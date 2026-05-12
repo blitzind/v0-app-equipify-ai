@@ -5,6 +5,13 @@
 
 export const BLITZPAY_REPORTING_SNAPSHOT_MAX_NESTING_DEPTH = 3 as const
 
+/** Hard clamp so nested callers cannot bypass max depth with an out-of-range number. */
+export function clampBlitzpayReportingNestingDepth(raw: unknown): number {
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return 0
+  return Math.min(BLITZPAY_REPORTING_SNAPSHOT_MAX_NESTING_DEPTH, Math.max(0, Math.round(n)))
+}
+
 export type BlitzpayReportingSnapshotNestedSkipInput = {
   skipMultiEntity?: boolean
   skipSupplierNetwork?: boolean
@@ -25,10 +32,7 @@ export function resolveBlitzpayReportingSnapshotNestedSkipState(
   skipMobilePhase6a: boolean
   skipObservabilityPhase6b: boolean
 } {
-  const raw = Number(options?.nestingDepth ?? 0)
-  const nestingDepth = Number.isFinite(raw)
-    ? Math.min(BLITZPAY_REPORTING_SNAPSHOT_MAX_NESTING_DEPTH, Math.max(0, Math.round(raw)))
-    : 0
+  const nestingDepth = clampBlitzpayReportingNestingDepth(options?.nestingDepth ?? 0)
   const atDepthCap = nestingDepth >= BLITZPAY_REPORTING_SNAPSHOT_MAX_NESTING_DEPTH
   return {
     nestingDepth,

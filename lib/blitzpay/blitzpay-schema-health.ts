@@ -151,6 +151,9 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_multi_region_sync_state", select: "id, region_name, sync_status" },
 ]
 
+/** Parallel table probes per round-trip batch (Phase 7A.4 — faster health checks, same coverage). */
+export const BLITZPAY_SCHEMA_HEALTH_PROBE_CONCURRENCY = 8 as const
+
 export type BlitzpaySchemaHealthResult =
   | { ok: true }
   | { ok: false; kind: "schema_incomplete"; missing: string; detail: string }
@@ -183,14 +186,19 @@ export async function runBlitzpaySchemaHealthCheck(admin: SupabaseClient): Promi
     return { ok: false, kind: "check_failed", detail: msg, code: orgErr.code }
   }
 
-  for (const t of CRITICAL_BLITZPAY_TABLES) {
-    const { error } = await admin.from(t.name).select(t.select).limit(1)
-    if (error) {
-      const msg = error.message ?? String(error)
-      if (looksLikePostgrestMissingSchemaError(msg, error.code)) {
-        return { ok: false, kind: "schema_incomplete", missing: `table:${t.name}`, detail: msg }
+  for (let i = 0; i < CRITICAL_BLITZPAY_TABLES.length; i += BLITZPAY_SCHEMA_HEALTH_PROBE_CONCURRENCY) {
+    const slice = CRITICAL_BLITZPAY_TABLES.slice(i, i + BLITZPAY_SCHEMA_HEALTH_PROBE_CONCURRENCY)
+    const results = await Promise.all(slice.map((t) => admin.from(t.name).select(t.select).limit(1)))
+    for (let j = 0; j < slice.length; j++) {
+      const t = slice[j]!
+      const { error } = results[j]!
+      if (error) {
+        const msg = error.message ?? String(error)
+        if (looksLikePostgrestMissingSchemaError(msg, error.code)) {
+          return { ok: false, kind: "schema_incomplete", missing: `table:${t.name}`, detail: msg }
+        }
+        return { ok: false, kind: "check_failed", detail: `${t.name}: ${msg}`, code: error.code }
       }
-      return { ok: false, kind: "check_failed", detail: `${t.name}: ${msg}`, code: error.code }
     }
   }
 

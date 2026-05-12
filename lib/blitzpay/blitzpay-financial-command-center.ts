@@ -9,6 +9,7 @@ import {
 import { aggregateBlitzpayTreasuryMetrics } from "@/lib/blitzpay/blitzpay-contractor-treasury"
 import { assertUuid } from "@/lib/blitzpay/idempotency-keys"
 import { buildOwnerScorecards, type OwnerScorecard } from "@/lib/blitzpay/blitzpay-owner-scorecards"
+import { computeBlitzpayCollectionsReporting } from "@/lib/blitzpay/blitzpay-collections"
 import { fetchBlitzpayOrgRevenueIntelligence } from "@/lib/blitzpay/blitzpay-revenue-intelligence"
 import type { BlitzpayRevenueRecommendation } from "@/lib/blitzpay/blitzpay-revenue-recommendations"
 import { fetchBlitzpayOrgReportingSnapshot } from "@/lib/blitzpay/blitzpay-reporting-snapshot"
@@ -255,9 +256,18 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
   const reportingWindowDays = Math.min(90, Math.max(7, Math.round(Number(options?.reportingWindowDays ?? 30))))
   const sinceIso = new Date(Date.now() - reportingWindowDays * 86400_000).toISOString()
 
-  const [intelligence, reporting, membershipDash, payrollHealth] = await Promise.all([
-    fetchBlitzpayOrgRevenueIntelligence(admin, organizationId, { reportingWindowDays }),
-    fetchBlitzpayOrgReportingSnapshot(admin, organizationId, { sinceIso }),
+  const collections = await computeBlitzpayCollectionsReporting(admin, organizationId)
+  const reporting = await fetchBlitzpayOrgReportingSnapshot(admin, organizationId, {
+    sinceIso,
+    collectionsPulse: { reminderEffectivenessRatePct: collections.reminderEffectivenessRatePct },
+  })
+
+  const [intelligence, membershipDash, payrollHealth] = await Promise.all([
+    fetchBlitzpayOrgRevenueIntelligence(admin, organizationId, {
+      reportingWindowDays,
+      precomputedReporting: reporting,
+      precomputedCollections: collections,
+    }),
     fetchBlitzpayMembershipDashboard(admin, organizationId).catch(() => null),
     summarizePayrollHealth(admin, organizationId).catch(() => null),
   ])

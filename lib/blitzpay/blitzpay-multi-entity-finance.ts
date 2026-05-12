@@ -18,6 +18,8 @@ export const BLITZPAY_MULTI_ENTITY_LIST_CAP = 50
 export const BLITZPAY_MULTI_ENTITY_IC_CAP = 200
 export const BLITZPAY_MULTI_ENTITY_SNAPSHOT_LIST_CAP = 30
 export const BLITZPAY_MULTI_ENTITY_AUDIT_LIST_CAP = 60
+/** Parallel nested snapshot fetches (same args per org; bounded by `BLITZPAY_MULTI_ENTITY_MAX_DISTINCT_ORGS`). */
+export const BLITZPAY_MULTI_ENTITY_SNAPSHOT_FETCH_CONCURRENCY = 4 as const
 
 export type BlitzpayFinancialGroupRow = {
   id: string
@@ -238,19 +240,23 @@ export async function buildPhase5aLinkedOrgReportingSlice(
   const sortedOrgIds = [...orgSet].sort((a, b) => a.localeCompare(b)).slice(0, BLITZPAY_MULTI_ENTITY_MAX_DISTINCT_ORGS)
 
   const { fetchBlitzpayOrgReportingSnapshot } = await import("@/lib/blitzpay/blitzpay-reporting-snapshot")
-  const snaps = []
-  for (const oid of sortedOrgIds) {
-    snaps.push(
-      await fetchBlitzpayOrgReportingSnapshot(admin, oid, {
-        sinceIso,
-        skipMultiEntity: true,
-        skipSupplierNetwork: true,
-        skipClaimsWarranty: true,
-        skipMobilePhase6a: true,
-        skipObservabilityPhase6b: true,
-        nestingDepth: reportingNestingDepth + 1,
-      }),
+  const snaps: Awaited<ReturnType<typeof fetchBlitzpayOrgReportingSnapshot>>[] = []
+  for (let i = 0; i < sortedOrgIds.length; i += BLITZPAY_MULTI_ENTITY_SNAPSHOT_FETCH_CONCURRENCY) {
+    const chunk = sortedOrgIds.slice(i, i + BLITZPAY_MULTI_ENTITY_SNAPSHOT_FETCH_CONCURRENCY)
+    const part = await Promise.all(
+      chunk.map((oid) =>
+        fetchBlitzpayOrgReportingSnapshot(admin, oid, {
+          sinceIso,
+          skipMultiEntity: true,
+          skipSupplierNetwork: true,
+          skipClaimsWarranty: true,
+          skipMobilePhase6a: true,
+          skipObservabilityPhase6b: true,
+          nestingDepth: reportingNestingDepth + 1,
+        }),
+      ),
     )
+    snaps.push(...part)
   }
   const pairs = sortedOrgIds.map((oid, i) => ({ oid, snap: snaps[i]! }))
   pairs.sort((a, b) => a.oid.localeCompare(b.oid))

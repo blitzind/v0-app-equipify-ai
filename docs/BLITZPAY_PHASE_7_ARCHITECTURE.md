@@ -76,6 +76,7 @@ Phase 7A is intentionally **not** a feature-expansion release. It hardens operat
 - `pnpm test:blitzpay-phase-7a-hardening` — `scripts/test-blitzpay-phase-7a-hardening.ts` covers nesting skips, entitlement permissive defaults, packaging-preview `blitzpayModuleWouldBeGatedAtTier`, token scan helper, replay auth helper, deterministic ordering, and schema-health script presence.
 - `pnpm test:blitzpay-phase-7a2-entitlements` — `scripts/test-blitzpay-phase-7a2-entitlements.ts` covers catalog uniqueness, enforced vs permissive `canAccessBlitzpayFeature`, plan feature sets, recommended tier, upgrade metadata, commercial category labels, platform-admin classification, and audit snapshots.
 - `pnpm test:blitzpay-phase-7a3-security-hardening` — `scripts/test-blitzpay-phase-7a3-security-hardening.ts` covers payload shaping (observability, idempotency, claims payouts, portal prepare-pay), replay route wiring assertions, platform rollup safe errors, technician intent filtering, and staff `load_failed` JSON shape.
+- `pnpm test:blitzpay-phase-7a4-performance` — `scripts/test-blitzpay-phase-7a4-performance.ts` covers nesting clamp/skip propagation, schema-health probe batching, multi-entity parallel snapshot fetch constant, platform observability rollup caps, FCC duplicate snapshot elimination wiring, and observability list row shaping compactness.
 
 ## 9. Phase 7A.3 — security, permissions & sensitive data audit hardening
 
@@ -89,8 +90,20 @@ Phase 7A is intentionally **not** a feature-expansion release. It hardens operat
 - **Reporting recursion:** unchanged caps in `blitzpay-reporting-snapshot-nesting.ts` — tests assert depth-3 forced skips for observability enrichers.
 - **Verification script:** `pnpm test:blitzpay-phase-7a3-security-hardening`.
 
-## 10. Related documents
+## 10. Phase 7A.4 — performance, scale & reporting efficiency
+
+**Intent:** optimization and audit only — no new BlitzPay modules, no permission changes, no removal of reporting fields, no Redis/workers, no financial math changes.
+
+- **Reporting nesting:** `clampBlitzpayReportingNestingDepth` in `blitzpay-reporting-snapshot-nesting.ts` hard-clamps any caller-supplied depth to `[0, BLITZPAY_REPORTING_SNAPSHOT_MAX_NESTING_DEPTH]`; `fetchBlitzpayOrgReportingSnapshot` documents window-scoped reads and skip/depth behavior (re-exported from `blitzpay-reporting-snapshot.ts`).
+- **FCC load:** `fetchBlitzpayOrgFinancialCommandCenter` runs **one** `computeBlitzpayCollectionsReporting` + **one** `fetchBlitzpayOrgReportingSnapshot` (with collections pulse), then passes `precomputedReporting` / `precomputedCollections` into `fetchBlitzpayOrgRevenueIntelligence` — removes a duplicate full snapshot pass versus the prior `Promise.all` pattern.
+- **Phase 5A nested orgs:** `buildPhase5aLinkedOrgReportingSlice` fetches member-org snapshots in **batches** of `BLITZPAY_MULTI_ENTITY_SNAPSHOT_FETCH_CONCURRENCY` (still capped by `BLITZPAY_MULTI_ENTITY_MAX_DISTINCT_ORGS`, deterministic org order preserved).
+- **Schema health:** `runBlitzpaySchemaHealthCheck` probes `CRITICAL_BLITZPAY_TABLES` in parallel batches of `BLITZPAY_SCHEMA_HEALTH_PROBE_CONCURRENCY` — same table coverage, lower wall-clock versus strictly sequential probes.
+- **Platform observability rollup:** row cap and org sample cap are named constants (`BLITZPAY_PLATFORM_OBSERVABILITY_QUEUE_SNAPSHOT_ROW_CAP`, `BLITZPAY_PLATFORM_OBSERVABILITY_MAX_ORGS`) for documentation and tests.
+- **FCC UI:** `blitzpay-financial-command-center-panel.tsx` caps rendered checklist lines, risk notes, scorecards, and command-center recommendation bullets to modest fixed maximums (payload unchanged; display-only).
+- **SQL migrations:** none in 7A.4 (no new indexes in this pass; large-window ledger scans remain a documented future risk when `sinceIso` is absent).
+
+## 11. Related documents
 
 - [BLITZPAY_ARCHITECTURE.md](./BLITZPAY_ARCHITECTURE.md)
-- [SCALE_READINESS_AUDIT.md](./SCALE_READINESS_AUDIT.md) §8.18–§8.19
+- [SCALE_READINESS_AUDIT.md](./SCALE_READINESS_AUDIT.md) §8.18–§8.20
 - [STRIPE_PRODUCTION_READINESS.md](./STRIPE_PRODUCTION_READINESS.md) — BlitzPay Connect supplement

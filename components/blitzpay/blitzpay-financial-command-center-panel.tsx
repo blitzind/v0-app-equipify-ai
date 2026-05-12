@@ -315,7 +315,7 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed min-w-0">{data.operationalReadiness.permissionAuditNote}</p>
               <ul className="text-[11px] text-muted-foreground space-y-1 leading-relaxed list-disc pl-4 min-w-0">
-                {data.operationalReadiness.checklistLines.map((line) => (
+                {data.operationalReadiness.checklistLines.slice(0, 12).map((line) => (
                   <li key={line}>{line}</li>
                 ))}
               </ul>
@@ -485,7 +485,7 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
             </div>
             {data.combinedForecast.riskNotes.length > 0 ? (
               <ul className="text-xs text-[color:var(--status-warning)] space-y-1 leading-relaxed">
-                {data.combinedForecast.riskNotes.map((n) => (
+                {data.combinedForecast.riskNotes.slice(0, 10).map((n) => (
                   <li key={n}>{n}</li>
                 ))}
               </ul>
@@ -497,7 +497,7 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
           <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Owner scorecards</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {data.scorecards.map((s) => (
+              {data.scorecards.slice(0, 8).map((s) => (
                 <div key={s.id} className="rounded-lg border border-border/70 bg-background/30 px-3 py-3 text-sm">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-semibold text-foreground">{s.title}</p>
@@ -522,7 +522,7 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               <ul className="space-y-2 text-sm leading-relaxed">
                 {data.commandCenterRecommendations.length === 0 ?
                   <li className="text-muted-foreground">No extra automation flags.</li>
-                : data.commandCenterRecommendations.map((r) => (
+                : data.commandCenterRecommendations.slice(0, 12).map((r) => (
                     <li
                       key={r.id}
                       className={r.severity === "warning" ? "text-[color:var(--status-warning)]" : "text-muted-foreground"}

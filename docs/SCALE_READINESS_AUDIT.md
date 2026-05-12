@@ -262,6 +262,15 @@ Evidence from migrations under `supabase/migrations/`:
 - **Platform vs tenant:** `GET /api/platform/blitzpay/observability-rollup` no longer forwards raw exception text in JSON on failure — server logs retain detail via `logBlitzpayServerFailure`.
 - **Regression test:** `pnpm test:blitzpay-phase-7a3-security-hardening`.
 
+### 8.20 BlitzPay Phase 7A.4 (performance & reporting efficiency)
+
+- **FCC:** `fetchBlitzpayOrgFinancialCommandCenter` eliminates duplicate `fetchBlitzpayOrgReportingSnapshot` by precomputing collections + snapshot once and passing `precomputedReporting` / `precomputedCollections` into `fetchBlitzpayOrgRevenueIntelligence`.
+- **Multi-entity:** nested org reporting snapshots are fetched in small parallel batches (`BLITZPAY_MULTI_ENTITY_SNAPSHOT_FETCH_CONCURRENCY`) while respecting `BLITZPAY_MULTI_ENTITY_MAX_DISTINCT_ORGS`.
+- **Schema health:** table probes run in fixed-size parallel batches (`BLITZPAY_SCHEMA_HEALTH_PROBE_CONCURRENCY`) with unchanged coverage; cached path unchanged.
+- **Nesting depth:** `clampBlitzpayReportingNestingDepth` prevents bypass of max depth from malformed inputs.
+- **Platform observability rollup:** explicit caps `BLITZPAY_PLATFORM_OBSERVABILITY_QUEUE_SNAPSHOT_ROW_CAP` / `BLITZPAY_PLATFORM_OBSERVABILITY_MAX_ORGS`.
+- **Regression test:** `pnpm test:blitzpay-phase-7a4-performance`.
+
 ---
 
 ## 9. AI / Usage Scale Risks

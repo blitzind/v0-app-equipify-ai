@@ -9,7 +9,10 @@ import {
   buildBlitzpayForecastHorizonsCents,
 } from "@/lib/blitzpay/blitzpay-revenue-forecast-math"
 import { buildBlitzpayRevenueRecommendations } from "@/lib/blitzpay/blitzpay-revenue-recommendations"
-import { fetchBlitzpayOrgReportingSnapshot } from "@/lib/blitzpay/blitzpay-reporting-snapshot"
+import {
+  fetchBlitzpayOrgReportingSnapshot,
+  type BlitzpayOrgReportingSnapshot,
+} from "@/lib/blitzpay/blitzpay-reporting-snapshot"
 import {
   computeInvoicePaymentAllocation,
   invoiceGrandTotalCents,
@@ -233,17 +236,34 @@ async function achPendingSettlementCents(admin: SupabaseClient, organizationId: 
   return sum
 }
 
+export type BlitzpayCollectionsReportingRow = Awaited<ReturnType<typeof computeBlitzpayCollectionsReporting>>
+
 export async function fetchBlitzpayOrgRevenueIntelligence(
   admin: SupabaseClient,
   organizationId: string,
-  options?: { reportingWindowDays?: number },
+  options?: {
+    reportingWindowDays?: number
+    /** When set (e.g. FCC), skips a duplicate full `fetchBlitzpayOrgReportingSnapshot` call. */
+    precomputedReporting?: BlitzpayOrgReportingSnapshot
+    /** When set with `precomputedReporting`, skips duplicate `computeBlitzpayCollectionsReporting`. */
+    precomputedCollections?: BlitzpayCollectionsReportingRow
+  },
 ): Promise<BlitzpayOrgRevenueIntelligence> {
   assertUuid(organizationId, "organizationId")
   const reportingWindowDays = Math.min(90, Math.max(7, Math.round(Number(options?.reportingWindowDays ?? 30))))
   const sinceIso = new Date(Date.now() - reportingWindowDays * 86400_000).toISOString()
   const nowIso = new Date().toISOString()
 
-  const collections = await computeBlitzpayCollectionsReporting(admin, organizationId)
+  const collections =
+    options?.precomputedCollections ?? (await computeBlitzpayCollectionsReporting(admin, organizationId))
+
+  const reportingPromise: Promise<BlitzpayOrgReportingSnapshot> =
+    options?.precomputedReporting != null ?
+      Promise.resolve(options.precomputedReporting)
+    : fetchBlitzpayOrgReportingSnapshot(admin, organizationId, {
+        sinceIso,
+        collectionsPulse: { reminderEffectivenessRatePct: collections.reminderEffectivenessRatePct },
+      })
 
   const [
     reporting,
@@ -259,10 +279,7 @@ export async function fetchBlitzpayOrgRevenueIntelligence(
     inst60,
     achPending,
   ] = await Promise.all([
-    fetchBlitzpayOrgReportingSnapshot(admin, organizationId, {
-      sinceIso,
-      collectionsPulse: { reminderEffectivenessRatePct: collections.reminderEffectivenessRatePct },
-    }),
+    reportingPromise,
     computeOverdueCollectible(admin, organizationId),
     admin
       .from("blitzpay_invoice_disputes")

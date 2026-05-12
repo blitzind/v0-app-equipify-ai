@@ -17,6 +17,12 @@ export type BlitzpayPlatformObservabilityRollup = {
 const DISCLAIMER =
   "Platform observability rollups use bounded samples for admin visibility only. They do not trigger financial execution or autonomous remediation."
 
+/** PostgREST read cap before de-duping to latest row per org. */
+export const BLITZPAY_PLATFORM_OBSERVABILITY_QUEUE_SNAPSHOT_ROW_CAP = 400 as const
+
+/** Distinct orgs included in rollup averages after newest-first scan. */
+export const BLITZPAY_PLATFORM_OBSERVABILITY_MAX_ORGS = 60 as const
+
 /**
  * Latest org-scoped queue health rows (bounded), de-duplicated per organization.
  */
@@ -33,7 +39,7 @@ export async function fetchBlitzpayPlatformObservabilityRollup(
     .eq("snapshot_scope", "org")
     .not("organization_id", "is", null)
     .order("created_at", { ascending: false })
-    .limit(400)
+    .limit(BLITZPAY_PLATFORM_OBSERVABILITY_QUEUE_SNAPSHOT_ROW_CAP)
 
   if (error) {
     return {
@@ -62,7 +68,7 @@ export async function fetchBlitzpayPlatformObservabilityRollup(
   for (const r of rows) {
     if (!r.organization_id) continue
     if (!latestByOrg.has(r.organization_id)) latestByOrg.set(r.organization_id, r)
-    if (latestByOrg.size >= 60) break
+    if (latestByOrg.size >= BLITZPAY_PLATFORM_OBSERVABILITY_MAX_ORGS) break
   }
 
   const picked = [...latestByOrg.values()]

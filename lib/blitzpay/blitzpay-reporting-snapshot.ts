@@ -21,7 +21,7 @@ import {
 } from "@/lib/blitzpay/blitzpay-revenue-optimization-metrics"
 import { resolveBlitzpayReportingSnapshotNestedSkipState } from "@/lib/blitzpay/blitzpay-reporting-snapshot-nesting"
 
-export { BLITZPAY_REPORTING_SNAPSHOT_MAX_NESTING_DEPTH } from "@/lib/blitzpay/blitzpay-reporting-snapshot-nesting"
+export { BLITZPAY_REPORTING_SNAPSHOT_MAX_NESTING_DEPTH, clampBlitzpayReportingNestingDepth } from "@/lib/blitzpay/blitzpay-reporting-snapshot-nesting"
 
 export type BlitzpayOrgReportingSnapshot = {
   sinceIso: string | null
@@ -271,6 +271,8 @@ export type BlitzpayOrgReportingSnapshot = {
 
 /**
  * Lightweight internal aggregates for support / future dashboards (no charts).
+ * When `sinceIso` is set, ledger and payment scans are window-scoped; nested Phase 5A/5B/5C/6A/6B enrichers
+ * honor `nestingDepth` + skip flags (`resolveBlitzpayReportingSnapshotNestedSkipState`) so deep multi-org graphs cannot bypass the max depth cap.
  */
 export async function fetchBlitzpayOrgReportingSnapshot(
   admin: SupabaseClient,
