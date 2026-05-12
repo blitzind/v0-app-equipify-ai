@@ -36,8 +36,8 @@ Phase 7A is intentionally **not** a feature-expansion release. It hardens operat
 - **`lib/billing/blitzpay-commercial-tier.ts`** — canonical `CommercialProductTier`, `BLITZPAY_COMMERCIAL_TIER_RANK`, `normalizeCommercialProductTier`, `tierRank`, `maxCommercialTier`. No Stripe subscription reads.
 - **`lib/billing/blitzpay-module-registry.ts`** — `BlitzpayCommercialModuleKey` union + `BLITZPAY_COMMERCIAL_MODULE_KEYS` exhaust list.
 - **`lib/billing/blitzpay-feature-catalog.ts`** — typed `BlitzpayFeatureKey` rows (label, module, `minimumPackagingTier`, `moduleClassification`, `commercialLane`, `packagingHint`). `deriveBlitzpayModuleMinimumTiers()` aggregates module mins (max of feature mins).
-- **`lib/billing/blitzpay-plan-metadata.ts`** — human positioning per tier (`BLITZPAY_PLAN_METADATA`, `getBlitzpayPlanMetadata`).
-- **`lib/billing/blitzpay-commercial-packaging.ts`** — `getBlitzpayCommercialCategory`, `getBlitzpayCommercialLane`, `getBlitzpayUpgradeMetadata`, `getBlitzpayPlanPackagingFootnote`, `blitzpayModuleMaturityStage`, `BLITZPAY_FUTURE_PRICING_MATRIX_PLACEHOLDER` (structure only).
+- **`lib/billing/blitzpay-plan-metadata.ts`** — human positioning per tier (`BLITZPAY_PLAN_METADATA`, `getBlitzpayPlanMetadata`). **Phase 7A.7** extends rows with **best-for tags**, **operational sophistication**, **setup complexity**, **onboarding readiness bands**, **commonly enabled together** hints, and **visible module** lists for collateral-weighted histograms.
+- **`lib/billing/blitzpay-commercial-packaging.ts`** — `getBlitzpayCommercialCategory`, `getBlitzpayCommercialLane`, `getBlitzpayUpgradeMetadata`, `getBlitzpayPlanPackagingFootnote`, `blitzpayModuleMaturityStage`, `BLITZPAY_FUTURE_PRICING_MATRIX_PLACEHOLDER` (structure only). **Phase 7A.7** adds **commercial module packaging categories** (`MODULE_COMMERCIAL_CATEGORY`, ordered labels), **tier operational posture** (`blitzpayCommercialTierOperationalPosture`), **bounded histogram helpers** (`summarizeBlitzpayCommercialPlanSample`, onboarding band + maturity posture samples, collateral-weighted packaging skew, `buildBlitzpayPlatformCommercialPackagingHistogram`), **positioning snippets** (`buildBlitzpayCommercialAwarenessSnippet`, `buildBlitzpayCommercialPositioningHint`, `buildBlitzpayUpgradeRecommendationSummary`), and **`listBlitzpayCommercialModuleTriadsForSales`** — all display/reference only.
 - **Entitlement API (server-safe, permissive default):**
   - `canAccessBlitzpayFeature(plan, feature, { enforceTierGates? })` — returns **`true` by default**; when `enforceTierGates: true`, compares tier ranks to the feature’s `minimumPackagingTier` (for future Route Handler guards / tests).
   - `getBlitzpayPlanFeatures(tier)` — feature keys included at/under a packaging tier.
@@ -48,7 +48,7 @@ Phase 7A is intentionally **not** a feature-expansion release. It hardens operat
 ### 3.3 Rollout & billing boundaries
 
 - **No** Stripe subscription coupling, **no** paywalls, **no** new org billing enforcement in Phase 7A.2.
-- **Soft UI:** `components/blitzpay/blitzpay-plan-awareness-strip.tsx` — subtle footnote + link to Settings → Billing; uses `useBillingAccessOptional` so **platform admin** surfaces stay safe without tenant billing context (platform copy only on `platform_blitzpay_ops`).
+- **Soft UI:** `components/blitzpay/blitzpay-plan-awareness-strip.tsx` — subtle footnote + link to Settings → Billing; uses `useBillingAccessOptional` so **platform admin** surfaces stay safe without tenant billing context (platform copy only on `platform_blitzpay_ops`). **Phase 7A.7:** additive **secondary positioning line** (`buildBlitzpayCommercialPositioningHint`) — still informational, not a paywall.
 - **Future:** flip `enforceTierGates` in server guards only after legal/product sign-off; keep org permission checks as the primary access control.
 
 ## 4. Operational readiness strip (FCC)
@@ -79,6 +79,7 @@ Phase 7A is intentionally **not** a feature-expansion release. It hardens operat
 - `pnpm test:blitzpay-phase-7a4-performance` — `scripts/test-blitzpay-phase-7a4-performance.ts` covers nesting clamp/skip propagation, schema-health probe batching, multi-entity parallel snapshot fetch constant, platform observability rollup caps, FCC duplicate snapshot elimination wiring, and observability list row shaping compactness.
 - `pnpm test:blitzpay-phase-7a5-demo-data` — `scripts/test-blitzpay-phase-7a5-demo-data.ts` covers deterministic demo presets, bounded activity feeds, showcase metric human labels, fixture coherence rules, mixed operational-readiness inputs, and module health tone diversity.
 - `pnpm test:blitzpay-phase-7a6-stripe-live-readiness` — `scripts/test-blitzpay-phase-7a6-stripe-live-readiness.ts` covers Stripe key-mode parsing, webhook id shape checks, duplicate-delivery contract, livemode alignment hints, log sanitization, deterministic `buildBlitzpayStripeLiveReadinessStrip`, platform webhook narrative helper, and FCC/platform wiring strings.
+- `pnpm test:blitzpay-phase-7a7-commercialization` — `scripts/test-blitzpay-phase-7a7-commercialization.ts` covers deterministic plan metadata, module packaging category coverage, upgrade recommendation ordering, maturity progression helpers, onboarding readiness histograms, and permissive entitlements (no hard-lock drift).
 
 ## 9. Phase 7A.3 — security, permissions & sensitive data audit hardening
 
@@ -134,7 +135,26 @@ Phase 7A is intentionally **not** a feature-expansion release. It hardens operat
 
 **Regression test:** `pnpm test:blitzpay-phase-7a6-stripe-live-readiness`.
 
-## 13. Related documents
+## 13. Phase 7A.7 — commercial packaging, upgrade readiness & positioning infrastructure
+
+**Intent:** make BlitzPay **packageable and explainable** as a contractor financial operating system with clear **maturity levels** — **without** Stripe subscription products for BlitzPay modules, **without** hard feature lockout, **without** checkout flows, **without** navigation redesigns, and **without** noisy upsell banners.
+
+**Plan & onboarding metadata:** `lib/billing/blitzpay-plan-metadata.ts` — per-tier **best-for** tags, **operational sophistication** labels, **setup complexity** labels, **onboarding readiness bands** (quick → enterprise program), **commonly enabled together** hints, **upgrade path summaries**, and **visible module** lists used for collateral-weighted packaging skew.
+
+**Commercial packaging module:** `lib/billing/blitzpay-commercial-packaging.ts`
+
+- **Module packaging categories:** deterministic `MODULE_COMMERCIAL_CATEGORY` map + ordered `BLITZPAY_COMMERCIAL_MODULE_PACKAGING_CATEGORY_ORDER` + human labels (`getBlitzpayModulePackagingCategoryLabel`, `describeBlitzpayCommercialModulePackagingCategory`).
+- **Upgrade & sales helpers:** `getBlitzpayNextPackagingTier`, `buildBlitzpayUpgradeRecommendationSummary`, `getBlitzpayUpgradeMetadata` (includes **module packaging category** label for future comparison tables), `listBlitzpayCommercialModuleTriadsForSales`, `assertBlitzpayModulePackagingCategoryCoverage` (test hook).
+- **Onboarding & maturity samples:** `summarizeBlitzpayOnboardingReadinessBandSample`, `summarizeBlitzpayOperationalMaturityPostureSample` (tier-derived **launch → govern** posture, distinct from `blitzpayModuleMaturityStage` on module classification), `summarizeBlitzpayModulePackagingCategorySkewSample`, `buildBlitzpayPlatformCommercialPackagingHistogram` — all **bounded** inputs, **aggregate-only** outputs.
+- **Staff surfaces:** `buildBlitzpayCommercialAwarenessSnippet` powers `BlitzpayPlanAwarenessStrip` (primary footnote + subtle secondary line).
+
+**Platform ops:** `lib/blitzpay/blitzpay-platform-operations.ts` — `fetchBlitzpayPlatformOperationsSummary` attaches `commercialPackagingHistogram` built from up to **800** `organization_subscriptions.plan_id` rows (`active` / `trialing` only) — **no org ids** in the DTO. `components/admin/blitzpay-operations-content.tsx` renders a compact **Commercial packaging sample** card.
+
+**Versioning:** `lib/blitzpay/blitzpay-commercial-readiness.ts` (`BLITZPAY_COMMERCIAL_METADATA_VERSION`) and `lib/billing/blitzpay-entitlements.ts` (`BLITZPAY_ENTITLEMENTS_FOUNDATION_VERSION`) advance to **`7a.7`** so audit strips and future matrices align.
+
+**Regression test:** `pnpm test:blitzpay-phase-7a7-commercialization`.
+
+## 14. Related documents
 
 - [BLITZPAY_ARCHITECTURE.md](./BLITZPAY_ARCHITECTURE.md)
 - [SCALE_READINESS_AUDIT.md](./SCALE_READINESS_AUDIT.md) §8.18–§8.22

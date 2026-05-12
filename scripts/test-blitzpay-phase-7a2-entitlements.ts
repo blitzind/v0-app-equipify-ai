@@ -59,6 +59,7 @@ function testUpgradeMetadata() {
   assert.ok(u)
   assert.equal(u!.recommendedTier, "growth")
   assert.ok(u!.headline.length > 0)
+  assert.ok(u!.modulePackagingCategoryLabel.length > 0)
 }
 
 function testCommercialCategory() {

@@ -16,7 +16,7 @@ import type { CommercialProductTier } from "@/lib/billing/blitzpay-commercial-ti
 import { normalizeCommercialProductTier, tierRank, maxCommercialTier } from "@/lib/billing/blitzpay-commercial-tier"
 import type { BlitzpayCommercialModuleKey } from "@/lib/billing/blitzpay-module-registry"
 
-export const BLITZPAY_ENTITLEMENTS_FOUNDATION_VERSION = "7a.2" as const
+export const BLITZPAY_ENTITLEMENTS_FOUNDATION_VERSION = "7a.7" as const
 
 export type { CommercialProductTier } from "@/lib/billing/blitzpay-commercial-tier"
 export { normalizeCommercialProductTier } from "@/lib/billing/blitzpay-commercial-tier"

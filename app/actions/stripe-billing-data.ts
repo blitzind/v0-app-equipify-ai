@@ -5,6 +5,12 @@ import { getStripe } from "@/lib/stripe"
 import { resolveActiveOrganizationForUser } from "@/lib/billing/resolve-active-organization"
 import { getOrganizationSubscription, normalizeStripeIdColumn } from "@/lib/billing/subscriptions"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
+import {
+  logStripeSaaSBillingFailure,
+  tryClearStaleStripeCustomerId,
+  userFacingStripeSaaSBillingError,
+} from "@/lib/billing/stripe-saas-billing-errors"
 
 export type StripeBillingPaymentMethod = {
   brand: string | null
@@ -144,7 +150,21 @@ export async function getStripeBillingSummary(): Promise<StripeBillingSummaryRes
 
     return { ok: true, paymentMethod: paymentSummary, invoices }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Could not load billing details from Stripe."
-    return { ok: false, error: msg, paymentMethod: null, invoices: [] }
+    logStripeSaaSBillingFailure("getStripeBillingSummary", resolved.organizationId, e)
+    try {
+      const admin = createServiceRoleSupabaseClient()
+      const cleared = await tryClearStaleStripeCustomerId(admin, resolved.organizationId, customerId, e)
+      if (cleared) {
+        return { ok: true, paymentMethod: null, invoices: [] }
+      }
+    } catch {
+      /* service role unavailable — fall through to friendly error */
+    }
+    return {
+      ok: false,
+      error: userFacingStripeSaaSBillingError(e, "payment_details"),
+      paymentMethod: null,
+      invoices: [],
+    }
   }
 }

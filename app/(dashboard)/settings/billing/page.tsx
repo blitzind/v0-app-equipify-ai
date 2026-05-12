@@ -489,7 +489,11 @@ function BillingPageContent() {
         window.location.href = url
         return
       }
-      setPortalMessage(error ?? "Could not open billing portal.")
+      setPortalMessage(
+        error ??
+          "We couldn't open billing management right now. Please try again or contact support.",
+      )
+      setBillingRefreshTick((n) => n + 1)
     } finally {
       setPortalBusy(false)
     }
@@ -980,6 +984,14 @@ function BillingPageContent() {
                 <p className="text-xs text-muted-foreground">Available after checkout</p>
               )}
             </div>
+            {portalMessage ? (
+              <div
+                className="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs text-foreground leading-relaxed"
+                role="status"
+              >
+                {portalMessage}
+              </div>
+            ) : null}
           </div>
           <p className="text-xs text-muted-foreground mt-4">
             Your card is charged automatically each billing cycle. We accept Visa, Mastercard, American Express, and Discover.

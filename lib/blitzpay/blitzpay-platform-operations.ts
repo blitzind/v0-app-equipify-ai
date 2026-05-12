@@ -9,6 +9,12 @@ import {
   type StripeKeyMode,
 } from "@/lib/blitzpay/blitzpay-stripe-readiness-guards"
 import { runBlitzpaySchemaHealthCheckCached, type BlitzpaySchemaHealthResult } from "@/lib/blitzpay/blitzpay-schema-health"
+import {
+  buildBlitzpayPlatformCommercialPackagingHistogram,
+  type BlitzpayPlatformCommercialPackagingHistogram,
+} from "@/lib/billing/blitzpay-commercial-packaging"
+
+const BLITZPAY_COMMERCIAL_PLAN_SAMPLE_LIMIT = 800
 
 export type BlitzpayPlatformOperationsSummary = {
   orgsBlitzpayEnabled: number
@@ -44,6 +50,8 @@ export type BlitzpayPlatformOperationsSummary = {
     error: string | null
   }>
   alerts: Array<{ severity: "critical" | "warning" | "info"; code: string; message: string }>
+  /** Phase 7A.7 — bounded `plan_id` sample only; no org identifiers. */
+  commercialPackagingHistogram: BlitzpayPlatformCommercialPackagingHistogram | null
 }
 
 const DISPUTE_TERMINAL = new Set(["won", "lost", "charge_refunded", "closed"])
@@ -72,6 +80,7 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
     payoutsBlockedRes,
     onboardingAttentionRes,
     recentRuns,
+    planSampleRes,
   ] = await Promise.all([
     admin
       .from("blitzpay_org_settings")
@@ -149,6 +158,11 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
       .select("id, trigger, status, reminders_evaluated, reminders_sent, reminders_skipped, created_at, finished_at, error")
       .order("created_at", { ascending: false })
       .limit(15),
+    admin
+      .from("organization_subscriptions")
+      .select("plan_id")
+      .in("status", ["active", "trialing"])
+      .limit(BLITZPAY_COMMERCIAL_PLAN_SAMPLE_LIMIT),
   ])
 
   let volumeCapturedCents30d = 0
@@ -262,6 +276,12 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
     ignoredUnknownEvents7dApprox: 0,
   })
 
+  const planIds = ((planSampleRes.data ?? []) as Array<{ plan_id?: string | null }>).map((r) => String(r.plan_id ?? ""))
+  const commercialPackagingHistogram =
+    planSampleRes.error ? null : (
+      buildBlitzpayPlatformCommercialPackagingHistogram(planIds, BLITZPAY_COMMERCIAL_PLAN_SAMPLE_LIMIT)
+    )
+
   return {
     orgsBlitzpayEnabled: payEnabledRes.count ?? 0,
     orgsConnectChargesReady: chargesReadyRes.count ?? 0,
@@ -282,5 +302,6 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
     schemaHealth,
     recentReminderRuns,
     alerts,
+    commercialPackagingHistogram,
   }
 }

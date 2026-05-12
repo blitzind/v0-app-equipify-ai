@@ -11,6 +11,16 @@ export type BlitzpayPlanMetadata = {
   shortLabel: string
   positioning: string
   intendedCustomerProfile: string
+  /** Short “best for” tagline for strips and future comparison tables. */
+  bestForTag: string
+  /** How operationally mature the default buyer profile is expected to be. */
+  operationalSophisticationLabel: string
+  /** Setup / ownership expectation — not a service commitment. */
+  setupComplexityLabel: string
+  /** Coarse onboarding posture for future checklists and upgrade teasers. */
+  onboardingReadinessBand: "quick" | "moderate" | "delegated_finance" | "enterprise_program"
+  /** One line: modules or themes that are commonly adopted together at this tier. */
+  commonlyEnabledTogetherHint: string
   /** Narrative upgrade path (not a checkout URL). */
   upgradePathSummary: string
   /** Module keys typically highlighted in sales collateral for this tier. */
@@ -65,6 +75,11 @@ export const BLITZPAY_PLAN_METADATA: Record<CommercialProductTier, BlitzpayPlanM
     shortLabel: "Solo",
     positioning: "Single-operator cash visibility with hosted customer pay.",
     intendedCustomerProfile: "Owner-operators collecting on jobs with light back office.",
+    bestForTag: "Best for owner-operators",
+    operationalSophisticationLabel: "Foundational cash and invoice discipline",
+    setupComplexityLabel: "Quick setup",
+    onboardingReadinessBand: "quick",
+    commonlyEnabledTogetherHint: "Payments, hosted invoice pay, and collections reminders are commonly enabled first.",
     upgradePathSummary: "Move to Core when you add staff workflows, memberships, or AP basics.",
     visibleModules: SOLO_VISIBLE,
   },
@@ -74,6 +89,11 @@ export const BLITZPAY_PLAN_METADATA: Record<CommercialProductTier, BlitzpayPlanM
     shortLabel: "Core",
     positioning: "Team operations with memberships, treasury basics, and vendor payables signals.",
     intendedCustomerProfile: "Small teams coordinating dispatch, billing, and vendor bills.",
+    bestForTag: "Built for coordinated field & office teams",
+    operationalSophisticationLabel: "Team-wide billing and cash rhythm",
+    setupComplexityLabel: "Moderate setup with finance touchpoints",
+    onboardingReadinessBand: "moderate",
+    commonlyEnabledTogetherHint: "Treasury views, memberships, and vendor payables signals often roll out together.",
     upgradePathSummary: "Growth unlocks AI copilot, financing, procurement finance, and deeper compliance.",
     visibleModules: CORE_VISIBLE,
   },
@@ -83,6 +103,11 @@ export const BLITZPAY_PLAN_METADATA: Record<CommercialProductTier, BlitzpayPlanM
     shortLabel: "Growth",
     positioning: "Finance-led acceleration: GL, tax workspace, financing, procurement, AI copilot.",
     intendedCustomerProfile: "Growing shops standardizing books and cash discipline.",
+    bestForTag: "Built for growing service teams",
+    operationalSophisticationLabel: "Cross-module financial control",
+    setupComplexityLabel: "Best with dedicated office staff",
+    onboardingReadinessBand: "delegated_finance",
+    commonlyEnabledTogetherHint: "Internal books, tax workspace, and AI copilot are commonly adopted as a bundle.",
     upgradePathSummary: "Scale adds multi-entity, supplier network, and enterprise observability depth.",
     visibleModules: GROWTH_VISIBLE,
   },
@@ -92,6 +117,11 @@ export const BLITZPAY_PLAN_METADATA: Record<CommercialProductTier, BlitzpayPlanM
     shortLabel: "Scale",
     positioning: "Multi-location and network-aware financial signals with observability.",
     intendedCustomerProfile: "Regional operators and light franchise groups.",
+    bestForTag: "Designed for multi-location operators",
+    operationalSophisticationLabel: "Network-aware cash and compliance signals",
+    setupComplexityLabel: "Substantial rollout with regional controls",
+    onboardingReadinessBand: "delegated_finance",
+    commonlyEnabledTogetherHint: "Multi-entity rollups, supplier network signals, and observability depth are commonly layered together.",
     upgradePathSummary: "Enterprise contracts add negotiated controls, replay governance, and platform ops.",
     visibleModules: SCALE_VISIBLE,
   },
@@ -101,6 +131,11 @@ export const BLITZPAY_PLAN_METADATA: Record<CommercialProductTier, BlitzpayPlanM
     shortLabel: "Enterprise",
     positioning: "Contracted controls, consolidated operations, and platform-grade tooling.",
     intendedCustomerProfile: "Large groups with bespoke governance and support expectations.",
+    bestForTag: "Enterprise operational visibility",
+    operationalSophisticationLabel: "Programmatic governance and audit-friendly operations",
+    setupComplexityLabel: "Enterprise rollout recommended",
+    onboardingReadinessBand: "enterprise_program",
+    commonlyEnabledTogetherHint: "Platform operations consoles pair with negotiated controls and custom runbooks.",
     upgradePathSummary: "Packaging is negotiated — feature matrix lives in contract addenda.",
     visibleModules: ENTERPRISE_VISIBLE,
   },

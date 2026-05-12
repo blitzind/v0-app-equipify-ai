@@ -5,10 +5,10 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { resolveActiveOrganizationForUser } from "@/lib/billing/resolve-active-organization"
 import {
-  getOrganizationSubscription,
-  normalizeStripeIdColumn,
-  type OrganizationSubscription,
-} from "@/lib/billing/subscriptions"
+  logStripeSaaSBillingFailure,
+  tryClearStaleStripeCustomerId,
+  userFacingStripeSaaSBillingError,
+} from "@/lib/billing/stripe-saas-billing-errors"
 
 const BILLING_SOURCE = "equipify_billing_page_setup"
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
@@ -70,7 +70,7 @@ export async function createSetupIntent(): Promise<{ clientSecret: string | null
       error:
         msg.includes("SUPABASE_SERVICE_ROLE_KEY") ?
           "Billing server is not configured (missing SUPABASE_SERVICE_ROLE_KEY)."
-        : msg,
+        : userFacingStripeSaaSBillingError(e, "setup"),
     }
   }
 
@@ -79,7 +79,8 @@ export async function createSetupIntent(): Promise<{ clientSecret: string | null
   try {
     sub = await ensureOrganizationSubscriptionRow(admin, organizationId)
   } catch (e) {
-    return { clientSecret: null, error: e instanceof Error ? e.message : "Could not prepare billing profile." }
+    logStripeSaaSBillingFailure("createSetupIntent.ensureOrganizationSubscriptionRow", organizationId, e)
+    return { clientSecret: null, error: "Could not prepare billing profile. Please try again or contact support." }
   }
   if (!sub) return { clientSecret: null, error: "Could not load subscription for this organization." }
 
@@ -110,7 +111,10 @@ export async function createSetupIntent(): Promise<{ clientSecret: string | null
         updated_at: new Date().toISOString(),
       })
       .eq("organization_id", organizationId)
-    if (saveCustomerErr) return { clientSecret: null, error: saveCustomerErr.message }
+    if (saveCustomerErr) {
+      logStripeSaaSBillingFailure("createSetupIntent.saveStripeCustomerId", organizationId, saveCustomerErr)
+      return { clientSecret: null, error: "Could not save billing profile. Please try again or contact support." }
+    }
   }
 
   try {
@@ -125,7 +129,10 @@ export async function createSetupIntent(): Promise<{ clientSecret: string | null
     })
     return { clientSecret: setupIntent.client_secret }
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Stripe error"
-    return { clientSecret: null, error: message }
+    logStripeSaaSBillingFailure("createSetupIntent.setupIntents.create", organizationId, err)
+    if (stripeCustomerId) {
+      await tryClearStaleStripeCustomerId(admin, organizationId, stripeCustomerId, err)
+    }
+    return { clientSecret: null, error: userFacingStripeSaaSBillingError(err, "setup") }
   }
 }

@@ -9,13 +9,10 @@ import {
   validateStripePriceId,
 } from "@/lib/billing/stripe-price-validation"
 import {
-  getOrganizationSubscription,
-  getTrialDaysRemaining,
-  isTrialActive,
-  normalizeOrganizationSubscription,
-  normalizeStripeIdColumn,
-  type OrganizationSubscription,
-} from "@/lib/billing/subscriptions"
+  logStripeSaaSBillingFailure,
+  tryClearStaleStripeCustomerId,
+  userFacingStripeSaaSBillingError,
+} from "@/lib/billing/stripe-saas-billing-errors"
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
 const HOSTED_SOURCE = "equipify_hosted_checkout"
@@ -93,7 +90,8 @@ export async function createHostedSubscriptionCheckout(params: {
   try {
     stripe = getStripe()
   } catch (e) {
-    return { url: null, error: e instanceof Error ? e.message : "Stripe is not configured." }
+    logStripeSaaSBillingFailure("createHostedSubscriptionCheckout.getStripe", null, e)
+    return { url: null, error: userFacingStripeSaaSBillingError(e, "checkout") }
   }
 
   let admin: ReturnType<typeof createServiceRoleSupabaseClient>
@@ -106,7 +104,7 @@ export async function createHostedSubscriptionCheckout(params: {
       error:
         msg.includes("SUPABASE_SERVICE_ROLE_KEY") ?
           "Billing server is not configured (missing SUPABASE_SERVICE_ROLE_KEY)."
-        : msg,
+        : userFacingStripeSaaSBillingError(e, "checkout"),
     }
   }
 
@@ -125,9 +123,10 @@ export async function createHostedSubscriptionCheckout(params: {
   try {
     sub = await ensureOrganizationSubscriptionRow(admin, params.organizationId)
   } catch (e) {
+    logStripeSaaSBillingFailure("createHostedSubscriptionCheckout.ensureOrganizationSubscriptionRow", params.organizationId, e)
     return {
       url: null,
-      error: e instanceof Error ? e.message : "Could not prepare subscription row.",
+      error: "Could not prepare subscription row. Please try again or contact support.",
     }
   }
 
@@ -167,7 +166,8 @@ export async function createHostedSubscriptionCheckout(params: {
       .eq("organization_id", params.organizationId)
 
     if (saveCustomerErr) {
-      return { url: null, error: saveCustomerErr.message }
+      logStripeSaaSBillingFailure("createHostedSubscriptionCheckout.saveStripeCustomerId", params.organizationId, saveCustomerErr)
+      return { url: null, error: "Could not save billing profile. Please try again or contact support." }
     }
 
     stripeCustomerId = persistedCustomerId
@@ -233,7 +233,8 @@ export async function createHostedSubscriptionCheckout(params: {
     }
     return { url }
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Stripe error"
-    return { url: null, error: message }
+    logStripeSaaSBillingFailure("createHostedSubscriptionCheckout.checkout.sessions.create", params.organizationId, err)
+    await tryClearStaleStripeCustomerId(admin, params.organizationId, stripeCustomerId, err)
+    return { url: null, error: userFacingStripeSaaSBillingError(err, "checkout") }
   }
 }

@@ -19,6 +19,11 @@ import {
   type OrganizationSubscription,
 } from "@/lib/billing/subscriptions"
 import { headers } from "next/headers"
+import {
+  logStripeSaaSBillingFailure,
+  tryClearStaleStripeCustomerId,
+  userFacingStripeSaaSBillingError,
+} from "@/lib/billing/stripe-saas-billing-errors"
 
 const BILLING_SOURCE = "equipify_billing_page"
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
@@ -88,7 +93,8 @@ export async function createCheckoutSession(
   try {
     stripe = getStripe()
   } catch (e) {
-    return { clientSecret: null, error: e instanceof Error ? e.message : "Stripe is not configured." }
+    logStripeSaaSBillingFailure("createCheckoutSession.getStripe", null, e)
+    return { clientSecret: null, error: userFacingStripeSaaSBillingError(e, "checkout") }
   }
 
   let admin: ReturnType<typeof createServiceRoleSupabaseClient>
@@ -101,7 +107,7 @@ export async function createCheckoutSession(
       error:
         msg.includes("SUPABASE_SERVICE_ROLE_KEY") ?
           "Billing server is not configured (missing SUPABASE_SERVICE_ROLE_KEY)."
-        : msg,
+        : userFacingStripeSaaSBillingError(e, "checkout"),
     }
   }
 
@@ -136,9 +142,10 @@ export async function createCheckoutSession(
   try {
     sub = await ensureOrganizationSubscriptionRow(admin, organizationId)
   } catch (e) {
+    logStripeSaaSBillingFailure("createCheckoutSession.ensureOrganizationSubscriptionRow", organizationId, e)
     return {
       clientSecret: null,
-      error: e instanceof Error ? e.message : "Could not prepare subscription row.",
+      error: "Could not prepare subscription row. Please try again or contact support.",
     }
   }
 
@@ -178,7 +185,8 @@ export async function createCheckoutSession(
       .eq("organization_id", organizationId)
 
     if (saveCustomerErr) {
-      return { clientSecret: null, error: saveCustomerErr.message }
+      logStripeSaaSBillingFailure("createCheckoutSession.saveStripeCustomerId", organizationId, saveCustomerErr)
+      return { clientSecret: null, error: "Could not save billing profile. Please try again or contact support." }
     }
 
     stripeCustomerId = persistedCustomerId
@@ -229,8 +237,9 @@ export async function createCheckoutSession(
     })
     return { clientSecret: session.client_secret }
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Stripe error"
-    return { clientSecret: null, error: message }
+    logStripeSaaSBillingFailure("createCheckoutSession.checkout.sessions.create", organizationId, err)
+    await tryClearStaleStripeCustomerId(admin, organizationId, stripeCustomerId, err)
+    return { clientSecret: null, error: userFacingStripeSaaSBillingError(err, "checkout") }
   }
 }
 
@@ -240,7 +249,8 @@ export async function createPortalSession(): Promise<{ url: string | null; error
   try {
     stripe = getStripe()
   } catch (e) {
-    return { url: null, error: e instanceof Error ? e.message : "Stripe is not configured." }
+    logStripeSaaSBillingFailure("createPortalSession.getStripe", null, e)
+    return { url: null, error: userFacingStripeSaaSBillingError(e, "portal") }
   }
 
   const supabase = await createServerSupabaseClient()
@@ -267,7 +277,7 @@ export async function createPortalSession(): Promise<{ url: string | null; error
       error:
         msg.includes("SUPABASE_SERVICE_ROLE_KEY") ?
           "Billing server is not configured (missing SUPABASE_SERVICE_ROLE_KEY)."
-        : msg,
+        : userFacingStripeSaaSBillingError(e, "portal"),
     }
   }
 
@@ -287,7 +297,8 @@ export async function createPortalSession(): Promise<{ url: string | null; error
     })
     return { url: session.url }
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Stripe error"
-    return { url: null, error: message }
+    logStripeSaaSBillingFailure("createPortalSession.billingPortal.sessions.create", resolved.organizationId, err)
+    await tryClearStaleStripeCustomerId(admin, resolved.organizationId, customerId, err)
+    return { url: null, error: userFacingStripeSaaSBillingError(err, "portal") }
   }
 }

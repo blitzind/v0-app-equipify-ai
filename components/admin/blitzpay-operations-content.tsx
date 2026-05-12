@@ -5,6 +5,7 @@ import { CreditCard, Loader2, Play, FlaskConical, AlertTriangle, Info, ShieldAle
 import { Button } from "@/components/ui/button"
 import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 import { BlitzpayPlanAwarenessStrip } from "@/components/blitzpay/blitzpay-plan-awareness-strip"
+import type { BlitzpayPlatformCommercialPackagingHistogram } from "@/lib/billing/blitzpay-commercial-packaging"
 import { cn } from "@/lib/utils"
 
 type CommandCenterPlatformRollup = {
@@ -155,6 +156,7 @@ type OpsSummary = {
     error: string | null
   }>
   alerts: Array<{ severity: "critical" | "warning" | "info"; code: string; message: string }>
+  commercialPackagingHistogram: BlitzpayPlatformCommercialPackagingHistogram | null
 }
 
 function fmtMoney(cents: number) {
@@ -331,6 +333,19 @@ export function BlitzpayOperationsContent() {
       </div>
 
       <BlitzpayPlanAwarenessStrip surface="platform_blitzpay_ops" className="max-w-3xl" />
+
+      {summary?.commercialPackagingHistogram ? (
+        <div className="rounded-lg border border-border/60 bg-muted/10 px-3 py-2 max-w-4xl space-y-1.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Commercial packaging sample</p>
+          <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
+            {summary.commercialPackagingHistogram.compositeNarrativeLine}
+          </p>
+          <p className="text-[10px] text-muted-foreground/90">
+            Bounded to {String(summary.commercialPackagingHistogram.planSampleLimit)} active/trialing{" "}
+            <code className="text-[10px]">plan_id</code> rows — aggregate only, no organization identifiers.
+          </p>
+        </div>
+      ) : null}
 
       {summary?.alerts && summary.alerts.length > 0 ? (
         <div className="space-y-2">
