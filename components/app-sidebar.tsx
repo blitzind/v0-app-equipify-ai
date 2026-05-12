@@ -133,7 +133,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Automation & Intelligence",
     items: [
       {
-        label: "Insights",
+        label: "AI Insights",
         href: "/insights",
         icon: ChartNoAxesCombined,
         highlight: true,
@@ -143,6 +143,13 @@ const NAV_GROUPS: NavGroup[] = [
       {
         label: "AI Operations",
         href: "/ai-ops",
+        icon: Bot,
+        highlight: true,
+        anyOf: ["canViewInsights"],
+      },
+      {
+        label: "AI Assistants",
+        href: "/ai-assistants",
         icon: Bot,
         highlight: true,
         anyOf: ["canViewInsights"],
@@ -159,13 +166,6 @@ const NAV_GROUPS: NavGroup[] = [
         href: "/communications",
         icon: Bell,
         anyOf: ["canViewCommunications"],
-      },
-      {
-        label: "AI Assistants",
-        href: "/ai-assistants",
-        icon: Bot,
-        highlight: true,
-        anyOf: ["canViewInsights"],
       },
     ],
   },

@@ -12,8 +12,9 @@ import { getOrgPermissionsForRole, type OrgMemberRole, type OrgPermissions } fro
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import {
   LayoutDashboard, CalendarClock, Users, MoreHorizontal, Plus,
-  Wrench, ClipboardList, FileText, Receipt, BarChart3, Sparkles,
+  Wrench, ClipboardList, FileText, Receipt, BarChart3,
   Settings, X, UserPlus, CalendarPlus, ClipboardPlus, FilePlus, ReceiptText, ShoppingCart, HardHat,
+  ChartNoAxesCombined,
 } from "lucide-react"
 import { MaintenancePlansLucideIcon, MembershipsLucideIcon } from "@/lib/navigation/module-icons"
 
@@ -219,7 +220,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     { icon: Receipt, label: "Invoices", href: "/invoices", anyOf: ["canViewBilling", "canEditInvoices"] },
     { icon: ShoppingCart, label: "Purchase Orders", href: "/purchase-orders", anyOf: ["canViewBilling"] },
     { icon: BarChart3, label: "Reports", href: "/reports", anyOf: ["canViewOperationalReports", "canViewFinancialReports"] },
-    { icon: Sparkles, label: "Insights", href: "/insights", anyOf: ["canViewInsights"] },
+    { icon: ChartNoAxesCombined, label: "AI Insights", href: "/insights", anyOf: ["canViewInsights"] },
     { icon: Settings, label: "Settings", href: "/settings/workspace", anyOf: ["canManageSettings", "canManageWorkspaceSettings", "canManagePortalSettings"] },
   ]
   const filteredItems = allItems.filter((item) => allowed(navPermissions, item.anyOf))

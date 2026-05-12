@@ -194,12 +194,12 @@ export const AIDEN_MODULES: AidenModuleDefinition[] = [
   },
   {
     id: "insights",
-    label: "Insights",
+    label: "AI Insights",
     routes: ["/insights"],
     summary: "AI-generated operational insight summaries and review workflow.",
     limitations: ["Insights explain operational patterns; they do not autonomously forecast or execute workflows."],
     quickPrompts: ["How do I generate insights?", "What should I do with overdue work insights?", "How do I reduce missed maintenance?"],
-    allowedActions: [{ label: "Open Insights", href: "/insights", anyOf: ["canViewInsights"] }],
+    allowedActions: [{ label: "Open AI Insights", href: "/insights", anyOf: ["canViewInsights"] }],
   },
   {
     id: "ai_assistants",
