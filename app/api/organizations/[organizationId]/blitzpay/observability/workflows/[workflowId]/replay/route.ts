@@ -10,6 +10,10 @@ import {
 } from "@/lib/blitzpay/blitzpay-workflow-orchestration"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 
+/**
+ * Manual workflow replay (Phase 6B): owner/admin/platform-admin only; transitions use
+ * `nextBlitzpayWorkflowStatus(..., "mark_replayed")` so completed rows cannot be rewritten — append-only governance.
+ */
 export const runtime = "nodejs"
 
 const UUID_RE =

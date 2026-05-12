@@ -69,14 +69,28 @@ Phase 7A is intentionally **not** a feature-expansion release. It hardens operat
 
 - Confirmed pattern: BlitzPay org Route Handlers use `requireAnyOrgPermission` / `requireOrgPermission` + UUID param validation + `blitzpaySchemaGuardNextResponse` where established; observability **replay** adds `validateBlitzpayWorkflowReplayAuthorization` (owner/admin/platform).
 - Phase 7A does **not** change RLS policies or permission matrices — documentation only calls out periodic re-audit when new routes ship.
+- **Phase 7A.3** adds shared payload shaping/redaction helpers (`lib/blitzpay/blitzpay-payload-sanitization.ts`) for observability lists, claims payout APIs, portal hosted-checkout success JSON, and safer platform rollup errors — see §9.
 
 ## 8. Tests
 
 - `pnpm test:blitzpay-phase-7a-hardening` — `scripts/test-blitzpay-phase-7a-hardening.ts` covers nesting skips, entitlement permissive defaults, packaging-preview `blitzpayModuleWouldBeGatedAtTier`, token scan helper, replay auth helper, deterministic ordering, and schema-health script presence.
 - `pnpm test:blitzpay-phase-7a2-entitlements` — `scripts/test-blitzpay-phase-7a2-entitlements.ts` covers catalog uniqueness, enforced vs permissive `canAccessBlitzpayFeature`, plan feature sets, recommended tier, upgrade metadata, commercial category labels, platform-admin classification, and audit snapshots.
+- `pnpm test:blitzpay-phase-7a3-security-hardening` — `scripts/test-blitzpay-phase-7a3-security-hardening.ts` covers payload shaping (observability, idempotency, claims payouts, portal prepare-pay), replay route wiring assertions, platform rollup safe errors, technician intent filtering, and staff `load_failed` JSON shape.
 
-## 9. Related documents
+## 9. Phase 7A.3 — security, permissions & sensitive data audit hardening
+
+**Intent:** additive guardrails only — no auth redesign, no RLS rewrite, no broad permission matrix changes, and no removal of money-movement features.
+
+- **Shared helpers:** `lib/blitzpay/blitzpay-payload-sanitization.ts` — `sanitizeBlitzpayObservabilityJsonForApi` (nested key drops for integrity hashes + leaf redaction for Stripe-like ids and raw digests), `shapeBlitzpayObservabilityFinancialEventListItem`, `shapeBlitzpayIdempotencyRecordListItem`, `shapeBlitzpayClaimsPayoutForApi`, `shapePortalBlitzpayPreparePaySuccessResponse` (portal POST success returns **`{ url }` only** so hosted-checkout redirects work without exposing Stripe object ids to the browser JSON).
+- **Observability list APIs:** `GET …/blitzpay/observability/events` and `GET …/blitzpay/observability/idempotency` map rows through the shapers above — no full `event_hash` / `request_hash` in JSON; idempotency keys and provider-like references are truncated or redacted; nested `event_payload` / `metadata` are deep-sanitized.
+- **Claims payouts:** `GET/POST …/blitzpay/claims/payouts` responses expose `payout_reference_recorded` + short `payout_reference_probe` instead of the full internal hash (staff UI updated accordingly).
+- **Platform admin:** `GET /api/platform/blitzpay/observability-rollup` logs failures with `logBlitzpayServerFailure` and returns **`{ error: "load_failed" }`** without echoing `Error.message` (aligns with staff BlitzPay load error discipline).
+- **Replay:** `POST …/observability/workflows/[workflowId]/replay` documents append-only `mark_replayed` governance; authorization remains `validateBlitzpayWorkflowReplayAuthorization` (owner/admin/platform allowlist).
+- **Reporting recursion:** unchanged caps in `blitzpay-reporting-snapshot-nesting.ts` — tests assert depth-3 forced skips for observability enrichers.
+- **Verification script:** `pnpm test:blitzpay-phase-7a3-security-hardening`.
+
+## 10. Related documents
 
 - [BLITZPAY_ARCHITECTURE.md](./BLITZPAY_ARCHITECTURE.md)
-- [SCALE_READINESS_AUDIT.md](./SCALE_READINESS_AUDIT.md) §8.18
+- [SCALE_READINESS_AUDIT.md](./SCALE_READINESS_AUDIT.md) §8.18–§8.19
 - [STRIPE_PRODUCTION_READINESS.md](./STRIPE_PRODUCTION_READINESS.md) — BlitzPay Connect supplement

@@ -256,6 +256,12 @@ Evidence from migrations under `supabase/migrations/`:
 - **FCC additive strip:** `operationalReadiness` on `fetchBlitzpayOrgFinancialCommandCenter` surfaces recursion policy, mobile signal score, and replay governance text for staff only — bounded payload growth.
 - **Entitlements:** `lib/billing/blitzpay-entitlements.ts` + **Phase 7A.2** satellite modules (`blitzpay-feature-catalog.ts`, `blitzpay-commercial-tier.ts`, `blitzpay-module-registry.ts`, `blitzpay-plan-metadata.ts`, `blitzpay-commercial-packaging.ts`) define module/feature keys, **packaging tier minimums**, and `canAccessBlitzpayFeature(..., { enforceTierGates })` — **default remains permissive** (no customer lockout); `blitzpayModuleWouldBeGatedAtTier` is a **preview** for upgrade copy. UI: `BlitzpayPlanAwarenessStrip` (informational). No Stripe subscription coupling in these helpers.
 
+### 8.19 BlitzPay Phase 7A.3 (security & sensitive payload hardening)
+
+- **Sanitization module:** `lib/blitzpay/blitzpay-payload-sanitization.ts` centralizes observability JSON deep redaction (Stripe-like string prefixes, raw SHA-256/SHA-1 digests, sensitive nested keys), financial-event and idempotency **list row shaping**, claims payout **hash shaping**, and **portal-only** hosted-checkout success bodies (`url` field only).
+- **Platform vs tenant:** `GET /api/platform/blitzpay/observability-rollup` no longer forwards raw exception text in JSON on failure — server logs retain detail via `logBlitzpayServerFailure`.
+- **Regression test:** `pnpm test:blitzpay-phase-7a3-security-hardening`.
+
 ---
 
 ## 9. AI / Usage Scale Risks

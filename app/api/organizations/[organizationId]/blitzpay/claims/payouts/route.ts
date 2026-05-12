@@ -3,6 +3,7 @@ import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
 import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
 import { blitzpayStaffLoadFailedResponse } from "@/lib/blitzpay/blitzpay-staff-load-error-response"
 import { BLITZPAY_CLAIMS_PAYOUT_CAP, createClaimsPayoutTracking } from "@/lib/blitzpay/blitzpay-claims-orchestration"
+import { shapeBlitzpayClaimsPayoutForApi } from "@/lib/blitzpay/blitzpay-payload-sanitization"
 import { ensureBlitzpayDefaultClaimsAccounts } from "@/lib/blitzpay/blitzpay-general-ledger-service"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 
@@ -40,7 +41,8 @@ export async function GET(_request: Request, context: { params: Promise<{ organi
       .order("id", { ascending: true })
       .limit(BLITZPAY_CLAIMS_PAYOUT_CAP)
     if (error) throw new Error(error.message)
-    return NextResponse.json({ payouts: data ?? [] })
+    const payouts = (data ?? []).map((r) => shapeBlitzpayClaimsPayoutForApi(r as Record<string, unknown>))
+    return NextResponse.json({ payouts })
   } catch (e) {
     return blitzpayStaffLoadFailedResponse("GET blitzpay/claims/payouts", e)
   }
@@ -87,7 +89,7 @@ export async function POST(request: Request, context: { params: Promise<{ organi
       payout_status: payoutStatusRaw ?? undefined,
       actorUserId: gate.userId,
     })
-    return NextResponse.json({ payout })
+    return NextResponse.json({ payout: shapeBlitzpayClaimsPayoutForApi(payout as Record<string, unknown>) })
   } catch (e) {
     return blitzpayStaffLoadFailedResponse("POST blitzpay/claims/payouts", e)
   }

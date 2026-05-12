@@ -49,7 +49,7 @@ Base: `/api/organizations/[organizationId]/blitzpay/…`
 |--------|------|------|
 | GET/POST | `…/claims/reserves` | Bounded list; POST creates reserve + audit |
 | GET/POST | `…/claims` | Bounded list (no raw customer/equipment ids in GET select); POST creates claim + audit |
-| GET/POST | `…/claims/payouts` | Tracking rows only; responses use `payout_reference_hash` only |
+| GET/POST | `…/claims/payouts` | Tracking rows only; API responses shape internal integrity into `payout_reference_recorded` + short `payout_reference_probe` (full hash stays in Postgres) |
 | GET | `…/claims/health` | Phase **5C** slice + disclaimer |
 | GET/POST | `…/protection-plans` | Bounded list; POST creates plan + audit |
 | GET/POST | `…/storm-events` | Bounded list; POST creates storm row + audit |

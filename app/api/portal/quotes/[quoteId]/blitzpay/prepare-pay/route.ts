@@ -5,6 +5,7 @@ import {
   prepareBlitzpayQuoteHostedCheckout,
   previewBlitzpayQuoteHostedCheckout,
 } from "@/lib/blitzpay/blitzpay-prepare-quote-pay"
+import { shapePortalBlitzpayPreparePaySuccessResponse } from "@/lib/blitzpay/blitzpay-payload-sanitization"
 import { blitzpaySchemaDriftIfUnhealthy } from "@/lib/blitzpay/blitzpay-schema-health"
 import { requirePortalSession } from "@/lib/portal/require-portal-session"
 
@@ -77,12 +78,7 @@ export async function POST(
     return NextResponse.json({ error: result.code, message: result.message }, { status: result.status })
   }
 
-  return NextResponse.json({
-    url: result.data.url,
-    checkoutSessionId: result.data.checkoutSessionId,
-    stripePaymentIntentId: result.data.stripePaymentIntentId,
-    blitzpayPaymentIntentRowId: result.data.blitzpayPaymentIntentRowId,
-  })
+  return NextResponse.json(shapePortalBlitzpayPreparePaySuccessResponse(result.data))
 }
 
 export async function GET(

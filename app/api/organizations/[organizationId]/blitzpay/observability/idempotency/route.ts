@@ -2,7 +2,8 @@ import { NextResponse } from "next/server"
 import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
 import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
 import { blitzpayStaffLoadFailedResponse } from "@/lib/blitzpay/blitzpay-staff-load-error-response"
-import { BLITZPAY_OBSERVABILITY_IDEMPOTENCY_LIST_CAP, sanitizeBlitzpayObservabilityJson } from "@/lib/blitzpay/blitzpay-observability"
+import { BLITZPAY_OBSERVABILITY_IDEMPOTENCY_LIST_CAP } from "@/lib/blitzpay/blitzpay-observability"
+import { shapeBlitzpayIdempotencyRecordListItem } from "@/lib/blitzpay/blitzpay-payload-sanitization"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 
 export const runtime = "nodejs"
@@ -39,13 +40,7 @@ export async function GET(_request: Request, context: { params: Promise<{ organi
       .order("created_at", { ascending: false })
       .limit(BLITZPAY_OBSERVABILITY_IDEMPOTENCY_LIST_CAP)
     if (error) throw new Error(error.message)
-    const items = (data ?? []).map((r) => {
-      const row = r as Record<string, unknown>
-      return {
-        ...row,
-        metadata: sanitizeBlitzpayObservabilityJson((row.metadata as Record<string, unknown>) ?? {}),
-      }
-    })
+    const items = (data ?? []).map((r) => shapeBlitzpayIdempotencyRecordListItem(r as Record<string, unknown>))
     return NextResponse.json({ items })
   } catch (e) {
     return blitzpayStaffLoadFailedResponse("GET blitzpay/observability/idempotency", e)

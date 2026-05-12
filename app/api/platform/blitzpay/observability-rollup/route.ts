@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
+import { logBlitzpayServerFailure } from "@/lib/blitzpay/blitzpay-server-failure-log"
 import { fetchBlitzpayPlatformObservabilityRollup } from "@/lib/blitzpay/blitzpay-platform-observability-rollup"
 
 export const runtime = "nodejs"
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
     const rollup = await fetchBlitzpayPlatformObservabilityRollup(admin, { reportingWindowDays: windowDays })
     return NextResponse.json({ rollup })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "load_failed", message: msg }, { status: 500 })
+    logBlitzpayServerFailure("GET /api/platform/blitzpay/observability-rollup", e)
+    return NextResponse.json({ error: "load_failed" }, { status: 500 })
   }
 }

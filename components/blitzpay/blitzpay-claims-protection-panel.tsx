@@ -51,7 +51,8 @@ type PayoutRow = {
   payout_status: string
   payout_type: string
   payout_amount_cents: number
-  payout_reference_hash: string | null
+  payout_reference_recorded: boolean
+  payout_reference_probe: string | null
 }
 
 type PlanRow = {
@@ -293,7 +294,7 @@ export function BlitzpayClaimsProtectionPanel({ organizationId, orgReady }: Prop
       </div>
 
       <div className="rounded-lg border border-border/70 px-3 py-3 space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payout tracking (internal references)</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payout tracking (internal reference labels)</p>
         {payouts.length === 0 ?
           <p className="text-sm text-muted-foreground">No payout tracking rows yet.</p>
         : <ul className="space-y-1.5 text-xs text-muted-foreground leading-relaxed">
@@ -301,13 +302,13 @@ export function BlitzpayClaimsProtectionPanel({ organizationId, orgReady }: Prop
               <li key={p.id} className="tabular-nums min-w-0 break-words">
                 {formatBlitzpayUiLabel(String(p.payout_type))} · {formatBlitzpayUiLabel(p.payout_status)} ·{" "}
                 {fmtMoney(Math.max(0, Math.round(Number(p.payout_amount_cents))))}
-                {p.payout_reference_hash ? ` · ref ${String(p.payout_reference_hash).slice(0, 10)}…` : ""}
+                {p.payout_reference_probe ? ` · ref ${p.payout_reference_probe}` : p.payout_reference_recorded ? " · ref on file" : ""}
               </li>
             ))}
           </ul>
         }
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Reference labels are internal hashes only — not bank transfers, card payouts, or external payment identifiers.
+          Reference labels are shortened internal fingerprints only — not bank transfers, card payouts, or external payment identifiers.
         </p>
       </div>
 
