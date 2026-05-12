@@ -222,6 +222,7 @@ export async function buildPhase5aLinkedOrgReportingSlice(
   admin: SupabaseClient,
   organizationId: string,
   sinceIso: string | null,
+  reportingNestingDepth = 0,
 ): Promise<BlitzpayPhase5aOrgReportingExtension> {
   assertUuid(organizationId, "organizationId")
   const groups = await listVisibleFinancialGroupsForOrganization(admin, organizationId)
@@ -247,6 +248,7 @@ export async function buildPhase5aLinkedOrgReportingSlice(
         skipClaimsWarranty: true,
         skipMobilePhase6a: true,
         skipObservabilityPhase6b: true,
+        nestingDepth: reportingNestingDepth + 1,
       }),
     )
   }

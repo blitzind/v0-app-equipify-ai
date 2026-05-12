@@ -167,6 +167,17 @@ type CommandCenterPayload = {
   commandCenterRecommendations: Array<{ id: string; severity: "info" | "warning"; message: string }>
   revenueRecommendations: Array<{ id: string; title: string; detail: string; severity: string }>
   drilldowns: Record<string, { href: string; label: string; count?: number }>
+  operationalReadiness?: {
+    generatedAt: string
+    entitlementFoundationVersion: string
+    reportingSnapshotRecursionGuard: "nominal" | "depth_capped"
+    reportingNestingDepthMax: number
+    mobileFieldReadinessScore0to100: number
+    observabilityReplayGovernanceLabel: string
+    permissionAuditNote: string
+    overallComfort0to100: number
+    checklistLines: string[]
+  }
 }
 
 function fmtMoney(cents: number): string {
@@ -271,7 +282,43 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
             Window {data.reportingWindowDays}d · Generated {new Date(data.generatedAt).toLocaleString()}
           </p>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          {data.operationalReadiness ? (
+            <div className="rounded-lg border border-border/70 bg-muted/15 px-4 py-3 space-y-2 min-w-0">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Operational readiness (Phase 7A)
+                </p>
+                <p className="text-xs text-muted-foreground tabular-nums shrink-0">
+                  Overall comfort {data.operationalReadiness.overallComfort0to100}/100
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs text-muted-foreground leading-relaxed">
+                <p className="min-w-0">
+                  <span className="font-medium text-foreground">Reporting guard: </span>
+                  {data.operationalReadiness.reportingSnapshotRecursionGuard === "depth_capped" ?
+                    "Depth cap engaged on this build path"
+                  : "Nominal (root snapshot)"}{" "}
+                  · max depth {data.operationalReadiness.reportingNestingDepthMax}
+                </p>
+                <p className="min-w-0">
+                  <span className="font-medium text-foreground">Mobile field signals: </span>
+                  {data.operationalReadiness.mobileFieldReadinessScore0to100}/100
+                </p>
+                <p className="min-w-0">
+                  <span className="font-medium text-foreground">Replay governance: </span>
+                  {data.operationalReadiness.observabilityReplayGovernanceLabel}
+                </p>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed min-w-0">{data.operationalReadiness.permissionAuditNote}</p>
+              <ul className="text-[11px] text-muted-foreground space-y-1 leading-relaxed list-disc pl-4 min-w-0">
+                {data.operationalReadiness.checklistLines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 min-w-0">
             {[
               { k: "Cash collected", v: fmtMoney(data.tiles.cashCollectedWindowCents) },
               { k: "Expected collections (7d)", v: fmtMoney(data.tiles.expectedCollections7Cents) },
@@ -399,7 +446,7 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               { k: "Observability — multi-region readiness", v: `${data.tiles.multiRegionReadinessScore ?? 0}/100` },
               { k: "Observability — replay integrity (sample %)", v: `${data.tiles.replayIntegrityScore ?? 0}%` },
             ].map((x) => (
-              <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
+              <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5 min-w-0">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{x.k}</p>
                 <p className="text-sm font-semibold tabular-nums mt-1 text-foreground">{x.v}</p>
               </div>
@@ -418,7 +465,7 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
 
           <div className="rounded-lg border border-border/80 px-4 py-3 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">AR / AP combined cash outlook</p>
-            <div className="grid grid-cols-3 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm min-w-0">
               <div>
                 <p className="text-muted-foreground text-xs">Net 7d</p>
                 <p className="font-semibold tabular-nums text-foreground mt-0.5">{fmtMoney(data.combinedForecast.netCashPosition7Cents)}</p>

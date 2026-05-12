@@ -14,6 +14,10 @@ import type { BlitzpayRevenueRecommendation } from "@/lib/blitzpay/blitzpay-reve
 import { fetchBlitzpayOrgReportingSnapshot } from "@/lib/blitzpay/blitzpay-reporting-snapshot"
 import { fetchBlitzpayMembershipDashboard } from "@/lib/blitzpay/blitzpay-memberships"
 import { summarizePayrollHealth } from "@/lib/blitzpay/blitzpay-payroll-runs"
+import {
+  computeBlitzpayOperationalReadinessStrip,
+  type BlitzpayOperationalReadinessStrip,
+} from "@/lib/blitzpay/blitzpay-operational-readiness"
 
 export type BlitzpayFinancialCommandCenterDrilldown = {
   href: string
@@ -189,6 +193,8 @@ export type BlitzpayFinancialCommandCenterPayload = {
   /** Existing BlitzPay revenue / collections recommendations (structured). */
   revenueRecommendations: BlitzpayRevenueRecommendation[]
   drilldowns: Record<string, BlitzpayFinancialCommandCenterDrilldown>
+  /** Phase 7A — additive operational maturity strip for staff FCC (no customer exposure). */
+  operationalReadiness: BlitzpayOperationalReadinessStrip
 }
 
 function drilldownsForOrg(overdueCount: number): Record<string, BlitzpayFinancialCommandCenterDrilldown> {
@@ -495,6 +501,18 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
     commandCenterRecommendations,
     revenueRecommendations: intelligence.recommendations,
     drilldowns: drilldownsForOrg(d.overdueInvoiceCount),
+    operationalReadiness: computeBlitzpayOperationalReadinessStrip({
+      reportingForcedSkips: false,
+      trialBalanceHealthy: reporting.trialBalanceHealthy,
+      stripePayoutsEnabled,
+      mobileSyncFailureRate: reporting.mobileSyncFailureRate,
+      mobileTreasuryVisibilityScore: reporting.mobileTreasuryVisibilityScore,
+      mobileSignatureCoverageRate: reporting.mobileSignatureCoverageRate,
+      observabilityCoverageRate: reporting.observabilityCoverageRate,
+      queueHealthScore: reporting.queueHealthScore,
+      workflowFailureRate: reporting.workflowFailureRate,
+      replayIntegrityScore: reporting.replayIntegrityScore,
+    }),
   }
 }
 

@@ -19,6 +19,9 @@ import {
   computeBlitzpayPhase4bReportingFields,
   normalizeRevenueOptimizationContext,
 } from "@/lib/blitzpay/blitzpay-revenue-optimization-metrics"
+import { resolveBlitzpayReportingSnapshotNestedSkipState } from "@/lib/blitzpay/blitzpay-reporting-snapshot-nesting"
+
+export { BLITZPAY_REPORTING_SNAPSHOT_MAX_NESTING_DEPTH } from "@/lib/blitzpay/blitzpay-reporting-snapshot-nesting"
 
 export type BlitzpayOrgReportingSnapshot = {
   sinceIso: string | null
@@ -285,10 +288,16 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     skipMobilePhase6a?: boolean
     /** When true, skips Phase 6B observability aggregation (nested snapshot fetches / health endpoints). */
     skipObservabilityPhase6b?: boolean
+    /**
+     * Nested call depth for `fetchBlitzpayOrgReportingSnapshot` (Phase 7A).
+     * At the configured max, expensive enrichers are skipped even when explicit skip flags are false.
+     */
+    nestingDepth?: number
   },
 ): Promise<BlitzpayOrgReportingSnapshot> {
   assertUuid(organizationId, "organizationId")
   const sinceIso = options?.sinceIso?.trim() ? options.sinceIso.trim() : null
+  const nestedSkips = resolveBlitzpayReportingSnapshotNestedSkipState(options)
 
   let gross = 0
   let estimateDepositCapturedCents = 0
@@ -1011,10 +1020,10 @@ export async function fetchBlitzpayOrgReportingSnapshot(
   let phase5aSharedBenchmarkCoverage = 0
   let phase5aMultiEntityRiskScore = 0
   let phase5aConsolidatedOrganizationCount = 0
-  if (!options?.skipMultiEntity) {
+  if (!nestedSkips.skipMultiEntity) {
     try {
       const { buildPhase5aLinkedOrgReportingSlice } = await import("@/lib/blitzpay/blitzpay-multi-entity-finance")
-      const slice = await buildPhase5aLinkedOrgReportingSlice(admin, organizationId, sinceIso)
+      const slice = await buildPhase5aLinkedOrgReportingSlice(admin, organizationId, sinceIso, nestedSkips.nestingDepth)
       phase5aMultiEntityRevenueExposure = slice.multiEntityRevenueExposureCents
       phase5aMultiEntityTreasuryExposure = slice.multiEntityTreasuryExposureCents
       phase5aIntercompanyBalanceExposure = slice.intercompanyBalanceExposureCents
@@ -1036,7 +1045,7 @@ export async function fetchBlitzpayOrgReportingSnapshot(
   let phase5bRebateCaptureOpportunityScore = 0
   let phase5bVendorFinancingOpportunityScore = 0
   let phase5bSupplierNetworkCoverageRate = 0
-  if (!options?.skipSupplierNetwork) {
+  if (!nestedSkips.skipSupplierNetwork) {
     try {
       const { buildPhase5bSupplierNetworkReportingSlice } = await import("@/lib/blitzpay/blitzpay-supplier-network")
       const p5b = await buildPhase5bSupplierNetworkReportingSlice(admin, organizationId, {
@@ -1071,7 +1080,7 @@ export async function fetchBlitzpayOrgReportingSnapshot(
   let phase5cContractorProtectionHealthScore = 0
   let phase5cClaimsPayoutExposure = 0
   let phase5cProtectionPlanCoverageRate = 0
-  if (!options?.skipClaimsWarranty) {
+  if (!nestedSkips.skipClaimsWarranty) {
     try {
       const { buildPhase5cClaimsReportingSlice } = await import("@/lib/blitzpay/blitzpay-claims-orchestration")
       const p5c = await buildPhase5cClaimsReportingSlice(admin, organizationId, {
@@ -1101,7 +1110,7 @@ export async function fetchBlitzpayOrgReportingSnapshot(
   let phase6aFieldCollectionsIntentCents = 0
   let phase6aMobileTreasuryVisibilityScore = 0
   let phase6aMobileConflictReviewCount = 0
-  if (!options?.skipMobilePhase6a) {
+  if (!nestedSkips.skipMobilePhase6a) {
     try {
       const { buildPhase6aMobileReportingSlice } = await import("@/lib/blitzpay/blitzpay-mobile-financial-ops")
       const p6a = await buildPhase6aMobileReportingSlice(admin, organizationId, {
@@ -1129,7 +1138,7 @@ export async function fetchBlitzpayOrgReportingSnapshot(
   let phase6bWorkerHealthScore = 100
   let phase6bMultiRegionReadinessScore = 100
   let phase6bReplayIntegrityScore = 0
-  if (!options?.skipObservabilityPhase6b) {
+  if (!nestedSkips.skipObservabilityPhase6b) {
     try {
       const { buildPhase6bObservabilityReportingSlice } = await import("@/lib/blitzpay/blitzpay-observability")
       const p6b = await buildPhase6bObservabilityReportingSlice(admin, organizationId)

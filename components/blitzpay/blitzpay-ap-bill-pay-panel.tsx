@@ -92,6 +92,23 @@ function billStatusLabel(status: string): string {
   }
 }
 
+function payRunStatusLabel(status: string): string {
+  switch (status) {
+    case "draft":
+      return "Draft batch"
+    case "scheduled":
+      return "Scheduled"
+    case "processing":
+      return "Processing"
+    case "completed":
+      return "Completed"
+    case "canceled":
+      return "Canceled"
+    default:
+      return formatBlitzpayUiLabel(status)
+  }
+}
+
 type Props = {
   organizationId: string | null
   orgReady: boolean
@@ -358,7 +375,7 @@ export function BlitzpayApBillPayPanel({ organizationId, orgReady }: Props) {
                   <li key={r.id} className="flex flex-wrap justify-between gap-2">
                     <span className="text-muted-foreground">Planned batch</span>
                     <span className="tabular-nums font-medium text-foreground">
-                      {r.run_status} · {fmtMoney(r.total_amount_cents)}
+                      {payRunStatusLabel(r.run_status)} · {fmtMoney(r.total_amount_cents)}
                       {r.scheduled_for ? ` · target ${r.scheduled_for.slice(0, 10)}` : ""}
                     </span>
                   </li>

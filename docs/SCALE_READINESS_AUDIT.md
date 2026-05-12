@@ -249,6 +249,13 @@ Evidence from migrations under `supabase/migrations/`:
 - **Append-only audit:** `blitzpay_claims_audit_log` is **update/delete blocked** — optional `BLITZPAY_CLAIMS_AUDIT_PEPPER` strengthens hashes.
 - **Reporting:** `fetchBlitzpayOrgReportingSnapshot` supports `skipClaimsWarranty`, `skipMobilePhase6a`, and `skipObservabilityPhase6b` on nested linked-org / health-style fetches to cap extra reads; treat Phase **5C** / **6A** / **6B** enrichers like other bounded snapshot modules.
 
+### 8.18 BlitzPay Phase 7A (production hardening foundations)
+
+- **Reporting snapshot nesting:** `lib/blitzpay/blitzpay-reporting-snapshot-nesting.ts` caps `nestingDepth` at **3** and forces Phase **5A/5B/5C/6A/6B** enrichers off when the cap is hit — additive to existing `skip*` flags on linked-org pulls (`buildPhase5aLinkedOrgReportingSlice` passes `nestingDepth + 1` on member snapshots).
+- **No Redis / no workers:** guards are pure skip resolution + deterministic ordering preserved in existing snapshot code paths.
+- **FCC additive strip:** `operationalReadiness` on `fetchBlitzpayOrgFinancialCommandCenter` surfaces recursion policy, mobile signal score, and replay governance text for staff only — bounded payload growth.
+- **Entitlements:** `lib/billing/blitzpay-entitlements.ts` defines module keys + future tier matrix hooks while keeping **all modules enabled** in Phase 7A (no lockout).
+
 ---
 
 ## 9. AI / Usage Scale Risks
