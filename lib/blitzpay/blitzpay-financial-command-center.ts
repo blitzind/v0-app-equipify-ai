@@ -239,23 +239,23 @@ function drilldownsForOrg(overdueCount: number): Record<string, BlitzpayFinancia
       label: "Procurement & inventory finance (Settings → Payments)",
     },
     multiEntityFinance: {
-      href: "/insights/financial-command-center#blitzpay-multi-entity-finance",
+      href: "/insights/financial-command-center/multi-entity-finance",
       label: "Multi-entity finance (linked locations)",
     },
     supplierNetwork: {
-      href: "/insights/financial-command-center#blitzpay-supplier-network",
+      href: "/insights/financial-command-center/supplier-network",
       label: "Supplier network (opt-in coordination)",
     },
     claimsProtection: {
-      href: "/insights/financial-command-center#blitzpay-claims-protection",
+      href: "/insights/financial-command-center/claims-protection",
       label: "Claims & protection (tracking)",
     },
     mobileFinancialOps: {
-      href: "/settings/payments#blitzpay-mobile-financial-ops-anchor",
+      href: "/insights/financial-command-center/mobile-financial-ops",
       label: "Mobile financial ops (field capture)",
     },
     enterpriseObservability: {
-      href: "/settings/payments#blitzpay-enterprise-observability-anchor",
+      href: "/insights/financial-command-center/enterprise-observability",
       label: "Enterprise observability (queues & replays)",
     },
   }

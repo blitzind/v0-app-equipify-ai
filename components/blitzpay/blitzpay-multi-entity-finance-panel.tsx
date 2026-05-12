@@ -242,7 +242,7 @@ export function BlitzpayMultiEntityFinancePanel({ organizationId, orgReady }: Pr
 
       <p className="text-xs text-muted-foreground">
         Need the full command center view?{" "}
-        <Link href="/insights/financial-command-center" className="text-primary underline-offset-2 hover:underline">
+        <Link href="/insights/financial-command-center/overview" className="text-primary underline-offset-2 hover:underline">
           Financial command center
         </Link>
         .

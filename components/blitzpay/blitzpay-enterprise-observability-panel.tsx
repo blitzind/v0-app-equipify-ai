@@ -241,7 +241,7 @@ export function BlitzpayEnterpriseObservabilityPanel({ organizationId, orgReady 
 
             <p className="text-xs text-muted-foreground">
               Deeper lists live under{" "}
-              <Link href="/insights/financial-command-center#blitzpay-enterprise-observability-anchor" className="text-primary underline-offset-2 hover:underline">
+              <Link href="/insights/financial-command-center/enterprise-observability" className="text-primary underline-offset-2 hover:underline">
                 Financial Command Center
               </Link>{" "}
               and staff APIs (bounded reads).

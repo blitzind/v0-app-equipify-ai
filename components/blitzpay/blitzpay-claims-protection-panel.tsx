@@ -317,7 +317,7 @@ export function BlitzpayClaimsProtectionPanel({ organizationId, orgReady }: Prop
         <code className="rounded bg-muted px-1 py-0.5 text-[11px]">/api/organizations/…/blitzpay/claims/*</code>,{" "}
         <code className="rounded bg-muted px-1 py-0.5 text-[11px]">…/protection-plans</code>, and{" "}
         <code className="rounded bg-muted px-1 py-0.5 text-[11px]">…/storm-events</code>.{" "}
-        <Link href="/insights/financial-command-center#blitzpay-claims-protection" className="text-primary underline-offset-2 hover:underline">
+        <Link href="/insights/financial-command-center/claims-protection" className="text-primary underline-offset-2 hover:underline">
           Financial command center
         </Link>{" "}
         includes the same summary tiles when you have financial access.

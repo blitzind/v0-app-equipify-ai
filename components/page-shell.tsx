@@ -215,6 +215,9 @@ const SETTINGS_AREA_HERO: RouteMeta = {
 function resolveMeta(pathname: string): RouteMeta | null {
   if (HERO_SUPPRESS.has(pathname)) return null
   if (pathname.startsWith("/settings/")) return SETTINGS_AREA_HERO
+  if (pathname.startsWith("/insights/financial-command-center")) {
+    return ROUTE_META["/insights/financial-command-center"] ?? null
+  }
   if (ROUTE_META[pathname]) return ROUTE_META[pathname]
   if (pathname.startsWith("/customers/")) return { title: "Customer Detail", subtitle: "Full account overview — equipment, work orders, and service history.", icon: Users }
   if (
@@ -248,7 +251,7 @@ function PageHero({
   heroSubtitleMultiline?: boolean
 }) {
   const maintenancePlansHero = pathname === "/maintenance-plans"
-  const blitzPayFinancialHero = pathname === "/insights/financial-command-center"
+  const blitzPayFinancialHero = pathname.startsWith("/insights/financial-command-center")
   const isSettingsArea = pathname.startsWith("/settings/")
   const multilineSubtitle = Boolean(
     isSettingsArea || (heroSubtitleMultiline && !blitzPayFinancialHero),
@@ -313,9 +316,9 @@ function PageHero({
             <Image
               src="/blitzpay-wordmark-transparent.png"
               alt="BlitzPay"
-              width={550}
-              height={120}
-              className="h-[70px] w-auto max-w-[min(92vw,360px)] sm:h-20 sm:max-w-[min(520px,48vw)] object-contain object-left sm:object-right opacity-95 bg-transparent"
+              width={275}
+              height={60}
+              className="h-[35px] w-auto max-w-[min(92vw,180px)] sm:h-10 sm:max-w-[min(260px,48vw)] object-contain object-left sm:object-right opacity-95 bg-transparent"
               priority
             />
           </div>

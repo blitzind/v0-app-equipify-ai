@@ -576,7 +576,7 @@ export default function InsightsPage() {
                 {" "}
                 Owner financial command center (AR, AP, treasury, forecasts):{" "}
                 <Link
-                  href="/insights/financial-command-center"
+                  href="/insights/financial-command-center/overview"
                   className="font-semibold text-white/90 underline-offset-2 hover:underline"
                 >
                   Open BlitzPay command center

@@ -335,7 +335,7 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
       </div>
 
       <p className="text-[11px] text-muted-foreground">
-        <Link href="/insights/financial-command-center#blitzpay-mobile-financial-ops" className="text-primary underline-offset-2 hover:underline">
+        <Link href="/insights/financial-command-center/mobile-financial-ops" className="text-primary underline-offset-2 hover:underline">
           Open on Financial Command Center
         </Link>
       </p>
