@@ -31,17 +31,25 @@ export type StripeBillingInvoiceRow = {
   invoicePdf: string | null
 }
 
+/** Optional Stripe subscription instants (ISO) for billing UI when the DB row lags webhooks. */
+export type StripeBillingScheduleDates = {
+  trialEndIso: string | null
+  currentPeriodEndIso: string | null
+}
+
 export type StripeBillingSummaryResult =
   | {
       ok: true
       paymentMethod: StripeBillingPaymentMethod | null
       invoices: StripeBillingInvoiceRow[]
+      scheduleDates: StripeBillingScheduleDates
     }
   | {
       ok: false
       error: string
       paymentMethod: null
       invoices: []
+      scheduleDates: null
     }
 
 function paymentMethodToSummary(pm: Stripe.PaymentMethod): StripeBillingPaymentMethod | null {
@@ -81,6 +89,7 @@ export async function getStripeBillingSummary(): Promise<StripeBillingSummaryRes
       error: "Saved payment details are not available in this environment.",
       paymentMethod: null,
       invoices: [],
+      scheduleDates: null,
     }
   }
 
@@ -92,18 +101,23 @@ export async function getStripeBillingSummary(): Promise<StripeBillingSummaryRes
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return { ok: false, error: "You must be signed in.", paymentMethod: null, invoices: [] }
+    return { ok: false, error: "You must be signed in.", paymentMethod: null, invoices: [], scheduleDates: null }
   }
 
   const resolved = await resolveActiveOrganizationForUser(supabase, user.id)
   if ("error" in resolved) {
-    return { ok: false, error: resolved.error, paymentMethod: null, invoices: [] }
+    return { ok: false, error: resolved.error, paymentMethod: null, invoices: [], scheduleDates: null }
   }
 
   const sub = await getOrganizationSubscription(supabase, resolved.organizationId)
   const customerId = normalizeStripeIdColumn(sub?.stripe_customer_id ?? null)
   if (!customerId) {
-    return { ok: true, paymentMethod: null, invoices: [] }
+    return {
+      ok: true,
+      paymentMethod: null,
+      invoices: [],
+      scheduleDates: { trialEndIso: null, currentPeriodEndIso: null },
+    }
   }
 
   try {
@@ -112,7 +126,12 @@ export async function getStripeBillingSummary(): Promise<StripeBillingSummaryRes
     })
 
     if ("deleted" in customer && customer.deleted) {
-      return { ok: true, paymentMethod: null, invoices: [] }
+      return {
+        ok: true,
+        paymentMethod: null,
+        invoices: [],
+        scheduleDates: { trialEndIso: null, currentPeriodEndIso: null },
+      }
     }
 
     let paymentSummary: StripeBillingPaymentMethod | null = null
@@ -148,14 +167,39 @@ export async function getStripeBillingSummary(): Promise<StripeBillingSummaryRes
 
     const invoices = invList.data.map(invoiceToRow)
 
-    return { ok: true, paymentMethod: paymentSummary, invoices }
+    let scheduleDates: StripeBillingScheduleDates = { trialEndIso: null, currentPeriodEndIso: null }
+    const stripeSubId = normalizeStripeIdColumn(sub?.stripe_subscription_id ?? null)
+    if (stripeSubId) {
+      try {
+        const stripeSub = await stripe.subscriptions.retrieve(stripeSubId)
+        if (typeof stripeSub !== "string" && !stripeSub.deleted) {
+          scheduleDates = {
+            trialEndIso: stripeSub.trial_end
+              ? new Date(stripeSub.trial_end * 1000).toISOString()
+              : null,
+            currentPeriodEndIso: stripeSub.current_period_end
+              ? new Date(stripeSub.current_period_end * 1000).toISOString()
+              : null,
+          }
+        }
+      } catch (scheduleErr) {
+        logStripeSaaSBillingFailure("getStripeBillingSummary.scheduleDates", resolved.organizationId, scheduleErr)
+      }
+    }
+
+    return { ok: true, paymentMethod: paymentSummary, invoices, scheduleDates }
   } catch (e) {
     logStripeSaaSBillingFailure("getStripeBillingSummary", resolved.organizationId, e)
     try {
       const admin = createServiceRoleSupabaseClient()
       const cleared = await tryClearStaleStripeCustomerId(admin, resolved.organizationId, customerId, e)
       if (cleared) {
-        return { ok: true, paymentMethod: null, invoices: [] }
+        return {
+          ok: true,
+          paymentMethod: null,
+          invoices: [],
+          scheduleDates: { trialEndIso: null, currentPeriodEndIso: null },
+        }
       }
     } catch {
       /* service role unavailable — fall through to friendly error */
@@ -165,6 +209,7 @@ export async function getStripeBillingSummary(): Promise<StripeBillingSummaryRes
       error: userFacingStripeSaaSBillingError(e, "payment_details"),
       paymentMethod: null,
       invoices: [],
+      scheduleDates: null,
     }
   }
 }

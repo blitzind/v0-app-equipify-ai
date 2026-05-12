@@ -14,8 +14,6 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import {
   getEffectiveBillingStatus,
   getOrganizationSubscription,
-  getTrialDaysRemaining,
-  isSubscriptionActive,
   isTrialActive,
   type EffectiveBillingStatus,
   type OrganizationSubscription,
@@ -41,7 +39,9 @@ import {
   getStripeBillingSummary,
   type StripeBillingInvoiceRow,
   type StripeBillingPaymentMethod,
+  type StripeBillingScheduleDates,
 } from "@/app/actions/stripe-billing-data"
+import { buildBillingScheduleUiSnapshot, pickFirstYmd } from "@/lib/billing/subscription-billing-schedule-ui"
 import {
   CreditCard, Check, ArrowRight, AlertTriangle,
   Download, Zap, X, Sparkles,
@@ -381,6 +381,7 @@ function BillingPageContent() {
   const [stripePaymentMethod, setStripePaymentMethod] = useState<StripeBillingPaymentMethod | null>(null)
   const [stripeInvoices, setStripeInvoices] = useState<StripeBillingInvoiceRow[]>([])
   const [stripeBillingNote, setStripeBillingNote] = useState<string | null>(null)
+  const [stripeScheduleDates, setStripeScheduleDates] = useState<StripeBillingScheduleDates | null>(null)
   const [billingRefreshTick, setBillingRefreshTick] = useState(0)
   const [setupOpen, setSetupOpen] = useState(false)
   const [setupClientSecret, setSetupClientSecret] = useState<string | null>(null)
@@ -495,6 +496,7 @@ function BillingPageContent() {
     setStripeBillingNote(null)
     setStripePaymentMethod(null)
     setStripeInvoices([])
+    setStripeScheduleDates(null)
 
     ;(async () => {
       const res = await getStripeBillingSummary()
@@ -503,6 +505,7 @@ function BillingPageContent() {
       if (res.ok) {
         setStripePaymentMethod(res.paymentMethod)
         setStripeInvoices(res.invoices)
+        setStripeScheduleDates(res.scheduleDates)
         return
       }
       setStripePaymentMethod(null)
@@ -521,7 +524,6 @@ function BillingPageContent() {
 
   const storedPlanId = subscription?.plan_id ?? workspace.planId
   const effectivePlanId = getEffectivePlanId(storedPlanId, subscription)
-  const billingIsActive = subscription ? isSubscriptionActive(subscription) : false
   const effectiveBillingStatus: EffectiveBillingStatus = subscription
     ? getEffectiveBillingStatus(subscription)
     : "none"
@@ -537,7 +539,22 @@ function BillingPageContent() {
     subscription?.status === "past_due" || subscription?.status === "incomplete"
 
   const currentPlanData = getPlan(effectivePlanId)
-  const trialLive = subscription ? isTrialActive(subscription) : false
+  const trialEndEffectiveRaw =
+    subscription?.trial_ends_at?.trim() || stripeScheduleDates?.trialEndIso?.trim() || null
+  const trialLive =
+    subscription?.status === "trialing" &&
+    trialEndEffectiveRaw != null &&
+    new Date(trialEndEffectiveRaw).getTime() > Date.now()
+  const trialDaysLeft = (() => {
+    if (!trialEndEffectiveRaw) return 0
+    const diffMs = new Date(trialEndEffectiveRaw).getTime() - Date.now()
+    if (diffMs <= 0) return 0
+    return Math.ceil(diffMs / (86400 * 1000))
+  })()
+  const billingIsActive =
+    subscription != null &&
+    (subscription.status === "active" || (subscription.status === "trialing" && trialLive))
+  const trialEndYmd = pickFirstYmd(subscription?.trial_ends_at, stripeScheduleDates?.trialEndIso)
   const intendedPlanIdResolved =
     subscription?.intended_plan_id != null && subscription.intended_plan_id !== ""
       ? normalizePlanIdForRead(subscription.intended_plan_id)
@@ -545,8 +562,7 @@ function BillingPageContent() {
   const intendedPlanData = intendedPlanIdResolved ? getPlan(intendedPlanIdResolved) : null
   const pricingPlanForDisplay =
     trialLive && intendedPlanData ? intendedPlanData : currentPlanData
-  const trialDaysLeft = subscription ? getTrialDaysRemaining(subscription) : 0
-  const trialTotalDays = isoDiffInDays(subscription?.trial_starts_at ?? null, subscription?.trial_ends_at ?? null)
+  const trialTotalDays = isoDiffInDays(subscription?.trial_starts_at ?? null, trialEndEffectiveRaw)
   const trialDaysUsed =
     trialTotalDays != null ? Math.min(trialTotalDays, Math.max(0, trialTotalDays - trialDaysLeft)) : null
   const trialProgressPct =
@@ -583,18 +599,12 @@ function BillingPageContent() {
   const subscriptionStatusDisplay =
     subscription?.status ? formatBillingStatus(subscription.status) : formatBillingStatus(workspace.subscriptionStatus)
 
-  const periodEndIso = subscription?.current_period_end ?? workspace.currentPeriodEnd
-  const nextRenewalDate = periodEndIso ? fmtIsoDate(periodEndIso.slice(0, 10)) : ""
   const billingCycleLabel = subscription?.billing_cycle ?? workspace.billingCycle
 
-  const manageDialogScheduleLine =
-    trialLive && subscription?.trial_ends_at
-      ? `Trial ends ${fmtIsoDate(subscription.trial_ends_at.slice(0, 10))}`
-      : nextRenewalDate && subscription && subscription.status !== "trialing"
-        ? `Next renewal ${nextRenewalDate}`
-        : periodEndIso
-          ? `Billing period through ${fmtIsoDate(periodEndIso.slice(0, 10))}`
-          : null
+  const billingScheduleUi = useMemo(
+    () => buildBillingScheduleUiSnapshot(subscription, stripeScheduleDates, fmtIsoDate),
+    [subscription, stripeScheduleDates],
+  )
 
   function openManageBillingModal() {
     setManageBillingOpen(true)
@@ -765,11 +775,11 @@ function BillingPageContent() {
         <DialogContent
           showCloseButton
           className={cn(
-            "flex w-[calc(100%-1.25rem)] max-w-lg flex-col gap-0 overflow-hidden p-0 sm:max-w-lg",
+            "flex w-[calc(100%-1.25rem)] max-w-lg flex-col gap-0 overflow-hidden border-border bg-background p-0 shadow-lg sm:max-w-lg",
             "max-h-[min(90vh,680px)]",
           )}
         >
-          <div className="shrink-0 border-b border-border px-5 pb-4 pt-5 pr-12">
+          <div className="shrink-0 border-b border-border bg-background px-5 pb-4 pt-5 pr-12">
             <DialogHeader className="text-left">
               <DialogTitle className="text-base">Manage billing</DialogTitle>
               <DialogDescription className="text-xs leading-relaxed">
@@ -778,8 +788,8 @@ function BillingPageContent() {
             </DialogHeader>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 space-y-5">
-            <section className="space-y-2 rounded-lg border border-border bg-secondary/30 px-3 py-3">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-background px-5 py-4 space-y-5">
+            <section className="space-y-2 rounded-lg border border-border bg-card px-3 py-3 shadow-sm">
               <h4 className="text-xs font-semibold text-foreground">Plan & status</h4>
               <p className="text-sm text-foreground">
                 {trialLive ? "Scale trial" : `${currentPlanData.name} plan`}{" "}
@@ -788,12 +798,10 @@ function BillingPageContent() {
               <p className="text-xs text-muted-foreground">
                 Status: <span className="font-medium text-foreground">{subscriptionStatusDisplay}</span>
               </p>
-              {manageDialogScheduleLine ? (
-                <p className="text-xs text-muted-foreground">{manageDialogScheduleLine}</p>
-              ) : null}
+              <p className="text-xs text-muted-foreground">{billingScheduleUi.primaryLine}</p>
             </section>
 
-            <section className="space-y-2 rounded-lg border border-border bg-secondary/30 px-3 py-3">
+            <section className="space-y-2 rounded-lg border border-border bg-card px-3 py-3 shadow-sm">
               <h4 className="text-xs font-semibold text-foreground">Default payment method</h4>
               {stripeBillingLoading ? (
                 <p className="text-xs text-muted-foreground">Loading…</p>
@@ -811,7 +819,17 @@ function BillingPageContent() {
                 <p className="text-[11px] text-muted-foreground leading-snug">{stripeBillingNote}</p>
               ) : null}
               {canEditOrgInvoiceDefaults && hasStripe ? (
-                <Button type="button" variant="outline" size="sm" className="mt-1 w-full sm:w-auto" onClick={handleAddPaymentFromManageBilling}>
+                <Button
+                  type="button"
+                  size="sm"
+                  className={cn(
+                    "mt-1 w-full border-transparent shadow-sm sm:w-auto",
+                    "bg-[#ffbb55] text-[#292524] hover:bg-[#f5a03d] hover:text-[#1c1917]",
+                    "active:bg-[#e09235] active:text-[#1c1917]",
+                    "focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                  )}
+                  onClick={handleAddPaymentFromManageBilling}
+                >
                   Add or update payment method
                 </Button>
               ) : (
@@ -819,7 +837,7 @@ function BillingPageContent() {
               )}
             </section>
 
-            <section className="space-y-2 rounded-lg border border-border bg-secondary/30 px-3 py-3">
+            <section className="space-y-2 rounded-lg border border-border bg-card px-3 py-3 shadow-sm">
               <h4 className="text-xs font-semibold text-foreground">Billing contact</h4>
               <dl className="space-y-1.5 text-xs text-muted-foreground">
                 <div>
@@ -850,7 +868,7 @@ function BillingPageContent() {
               </p>
             </section>
 
-            <section className="space-y-2 rounded-lg border border-border bg-secondary/30 px-3 py-3">
+            <section className="space-y-2 rounded-lg border border-border bg-card px-3 py-3 shadow-sm">
               <h4 className="text-xs font-semibold text-foreground">Invoices & receipts</h4>
               {stripeBillingLoading ? (
                 <p className="text-xs text-muted-foreground">Loading…</p>
@@ -866,7 +884,7 @@ function BillingPageContent() {
                     return (
                       <li
                         key={inv.id}
-                        className="flex flex-col gap-1 rounded-md border border-border/80 bg-background/80 px-2.5 py-2 text-xs sm:flex-row sm:items-center sm:justify-between"
+                        className="flex flex-col gap-1 rounded-md border border-border/80 bg-card px-2.5 py-2 text-xs shadow-sm sm:flex-row sm:items-center sm:justify-between"
                       >
                         <div className="min-w-0">
                           <p className="font-medium text-foreground truncate">{label}</p>
@@ -897,7 +915,7 @@ function BillingPageContent() {
               )}
             </section>
 
-            <section className="space-y-2 rounded-lg border border-dashed border-border px-3 py-3">
+            <section className="space-y-2 rounded-lg border border-dashed border-border bg-card px-3 py-3 shadow-sm">
               <h4 className="text-xs font-semibold text-foreground">Change or cancel plan</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 <span className="font-medium text-foreground">Compare and change plan:</span> choose a plan on this page
@@ -906,14 +924,14 @@ function BillingPageContent() {
               <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={handleComparePlansFromManageBilling}>
                 Compare plans on this page
               </Button>
-              <div className="rounded-md bg-muted/50 px-2.5 py-2 text-[11px] text-muted-foreground leading-snug">
+              <div className="rounded-md border border-border/60 bg-background px-2.5 py-2 text-[11px] text-muted-foreground leading-snug">
                 Canceling or downgrading your subscription through a self-serve control is not available in this dialog
                 yet. This billing action will be available here soon.
               </div>
             </section>
           </div>
 
-          <div className="flex shrink-0 flex-col gap-3 border-t border-border bg-muted/20 px-5 py-4">
+          <div className="flex shrink-0 flex-col gap-3 border-t border-border bg-background px-5 py-4">
             <p className="text-[10px] text-muted-foreground leading-snug text-center sm:text-left">
               You will be billed by Blitz Industries, Inc., the parent company of Equipify.ai.
             </p>
@@ -1002,19 +1020,19 @@ function BillingPageContent() {
                   )}
                   <p className="text-xs text-muted-foreground mt-0.5">
                     <span className="capitalize">{billingCycleLabel}</span> billing
-                    {trialLive && subscription?.trial_ends_at && (
+                    {trialLive && trialEndYmd && (
                       <>
                         {" "}
-                        · Trial ends {fmtIsoDate(subscription.trial_ends_at.slice(0, 10))}
+                        · Trial ends {fmtIsoDate(trialEndYmd)}
                         {trialDaysLeft > 0 ?
                           ` · ${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left`
                         : ""}
                       </>
                     )}
-                    {!trialLive && nextRenewalDate && subscription && subscription.status !== "trialing" && (
+                    {!trialLive && billingScheduleUi.renewsDateDisplay && (
                       <>
                         {" "}
-                        · Renews {nextRenewalDate}
+                        · Renews {billingScheduleUi.renewsDateDisplay}
                       </>
                     )}
                   </p>
@@ -1067,10 +1085,10 @@ function BillingPageContent() {
             {subscription?.cancel_at_period_end && (
               <div className="rounded-lg border border-[color:var(--status-warning)] bg-[color:var(--status-warning)]/10 px-3 py-2 text-xs text-foreground">
                 Subscription is set to cancel at the end of the current billing period.
-                {nextRenewalDate && (
+                {billingScheduleUi.accessEndsDateDisplay && (
                   <>
                     {" "}
-                    Access until <strong>{nextRenewalDate}</strong>.
+                    Access until <strong>{billingScheduleUi.accessEndsDateDisplay}</strong>.
                   </>
                 )}
               </div>
@@ -1082,7 +1100,7 @@ function BillingPageContent() {
               </p>
             )}
 
-            {trialLive && subscription?.trial_ends_at && !showPaymentAttentionBanner && (
+            {trialLive && trialEndYmd && !showPaymentAttentionBanner && (
               <div
                 className={cn(
                   "rounded-lg border px-3 py-2.5 space-y-1.5",
@@ -1096,7 +1114,7 @@ function BillingPageContent() {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {trialDaysLeft} day{trialDaysLeft === 1 ? "" : "s"} remaining · Trial ends{" "}
-                  <strong>{fmtIsoDate(subscription.trial_ends_at.slice(0, 10))}</strong>.
+                  <strong>{fmtIsoDate(trialEndYmd)}</strong>.
                 </p>
                 <p className={cn("text-[11px] text-muted-foreground", trialDaysLeft <= 6 && "text-foreground/80 font-medium")}>
                   No card required. Add a card now to avoid interruption later.
@@ -1191,7 +1209,7 @@ function BillingPageContent() {
             </div>
           )}
 
-          {trialLive && subscription?.trial_ends_at && trialDaysLeft <= 6 && (
+          {trialLive && trialEndYmd && trialDaysLeft <= 6 && (
             <div
               className={cn(
                 "mt-4 flex items-center gap-2 p-3 rounded-lg border text-sm",
@@ -1203,7 +1221,7 @@ function BillingPageContent() {
               <AlertTriangle size={14} />
               <span>
                 Your free trial ends on{" "}
-                <strong>{fmtIsoDate(subscription.trial_ends_at.slice(0, 10))}</strong>.
+                <strong>{fmtIsoDate(trialEndYmd)}</strong>.
                 {" "}Choose a plan to continue after trial.
               </span>
             </div>
