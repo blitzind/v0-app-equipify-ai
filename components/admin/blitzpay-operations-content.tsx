@@ -132,6 +132,16 @@ type OpsSummary = {
   reminderRunsFailed7d: number
   reminderDispatchFailures7d: number
   orgsStaleConnectSync7d: number
+  stripeHostSecretKeyMode: "test" | "live" | "missing" | "invalid"
+  blitzpayWebhookSigningSecretConfigured: boolean
+  webhookInboxPendingApprox: number
+  orgsChargesEnabledPayoutsBlockedApprox: number
+  orgsConnectOnboardingAttentionApprox: number
+  webhookOperationalStatus: {
+    tone: "nominal" | "attention"
+    headline: string
+    detailLines: readonly string[]
+  }
   schemaHealth: { ok: boolean }
   recentReminderRuns: Array<{
     id: string
@@ -377,7 +387,39 @@ export function BlitzpayOperationsContent() {
           <p className="text-xs text-muted-foreground uppercase font-medium">Schema</p>
           <p className="text-lg font-semibold">{summary?.schemaHealth?.ok ? "OK" : "Issue"}</p>
         </div>
+        <div className="rounded-lg border border-border p-3 min-w-0">
+          <p className="text-xs text-muted-foreground uppercase font-medium">Stripe API mode (host)</p>
+          <p className="text-lg font-semibold">{summary?.stripeHostSecretKeyMode ?? "—"}</p>
+        </div>
+        <div className="rounded-lg border border-border p-3 min-w-0">
+          <p className="text-xs text-muted-foreground uppercase font-medium">BlitzPay webhook secret</p>
+          <p className="text-lg font-semibold">{summary?.blitzpayWebhookSigningSecretConfigured ? "Set" : "Missing"}</p>
+        </div>
+        <div className="rounded-lg border border-border p-3 min-w-0">
+          <p className="text-xs text-muted-foreground uppercase font-medium">Webhook inbox pending</p>
+          <p className="text-lg font-semibold tabular-nums">{summary?.webhookInboxPendingApprox ?? "—"}</p>
+        </div>
+        <div className="rounded-lg border border-border p-3 min-w-0">
+          <p className="text-xs text-muted-foreground uppercase font-medium">Charges on / payouts off</p>
+          <p className="text-lg font-semibold tabular-nums">{summary?.orgsChargesEnabledPayoutsBlockedApprox ?? "—"}</p>
+        </div>
+        <div className="rounded-lg border border-border p-3 min-w-0">
+          <p className="text-xs text-muted-foreground uppercase font-medium">Connect onboarding attention</p>
+          <p className="text-lg font-semibold tabular-nums">{summary?.orgsConnectOnboardingAttentionApprox ?? "—"}</p>
+        </div>
       </div>
+
+      {summary?.webhookOperationalStatus ? (
+        <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 space-y-1 min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Webhook operations</p>
+          <p className="text-sm text-foreground font-medium">{summary.webhookOperationalStatus.headline}</p>
+          <ul className="text-[11px] text-muted-foreground space-y-1 list-disc pl-4">
+            {summary.webhookOperationalStatus.detailLines.slice(0, 4).map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {revenueRollup ? (
         <div className="rounded-xl border border-border p-4 space-y-2">

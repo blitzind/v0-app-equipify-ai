@@ -59,7 +59,8 @@
     "test:blitzpay-phase-7a2-entitlements": "tsx scripts/test-blitzpay-phase-7a2-entitlements.ts",
     "test:blitzpay-phase-7a3-security-hardening": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-blitzpay-phase-7a3-security-hardening.ts",
     "test:blitzpay-phase-7a4-performance": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-blitzpay-phase-7a4-performance.ts",
-    "test:blitzpay-phase-7a5-demo-data": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-blitzpay-phase-7a5-demo-data.ts"
+    "test:blitzpay-phase-7a5-demo-data": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-blitzpay-phase-7a5-demo-data.ts",
+    "test:blitzpay-phase-7a6-stripe-live-readiness": "tsx scripts/test-blitzpay-phase-7a6-stripe-live-readiness.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

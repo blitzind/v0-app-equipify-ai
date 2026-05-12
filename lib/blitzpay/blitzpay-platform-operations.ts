@@ -1,6 +1,13 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { isStripeLiveEnforced } from "@/lib/billing/stripe-env"
+import {
+  parseStripeSecretKeyMode,
+  sanitizeBlitzpayOperationalLogDetail,
+  summarizeBlitzpayWebhookOperationalStatus,
+  type StripeKeyMode,
+} from "@/lib/blitzpay/blitzpay-stripe-readiness-guards"
 import { runBlitzpaySchemaHealthCheckCached, type BlitzpaySchemaHealthResult } from "@/lib/blitzpay/blitzpay-schema-health"
 
 export type BlitzpayPlatformOperationsSummary = {
@@ -14,6 +21,15 @@ export type BlitzpayPlatformOperationsSummary = {
   reminderRunsFailed7d: number
   reminderDispatchFailures7d: number
   orgsStaleConnectSync7d: number
+  /** Phase 7A.6 — host Stripe secret key shape (never the value). */
+  stripeHostSecretKeyMode: StripeKeyMode
+  blitzpayWebhookSigningSecretConfigured: boolean
+  webhookInboxPendingApprox: number
+  /** Active orgs with charges on but payouts still off (Connect advisory). */
+  orgsChargesEnabledPayoutsBlockedApprox: number
+  /** Active orgs still in Connect onboarding attention states. */
+  orgsConnectOnboardingAttentionApprox: number
+  webhookOperationalStatus: ReturnType<typeof summarizeBlitzpayWebhookOperationalStatus>
   schemaHealth: BlitzpaySchemaHealthResult
   /** ISO timestamps of recent reminder runs (success + failed). */
   recentReminderRuns: Array<{
@@ -48,10 +64,13 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
     disputesRes,
     pendingRefundsRes,
     webhookDeadRes,
+    webhookPendingRes,
     reminderRunsFailedRes,
     remFailedDispRes,
     staleNullRes,
     staleOldRes,
+    payoutsBlockedRes,
+    onboardingAttentionRes,
     recentRuns,
   ] = await Promise.all([
     admin
@@ -86,6 +105,10 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
       .eq("processing_status", "dead")
       .gte("created_at", since24h),
     admin
+      .from("blitzpay_webhook_inbox")
+      .select("stripe_event_id", { count: "exact", head: true })
+      .eq("processing_status", "pending"),
+    admin
       .from("blitzpay_reminder_runs")
       .select("id", { count: "exact", head: true })
       .eq("status", "failed")
@@ -108,6 +131,19 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
       .not("stripe_connect_account_id", "is", null)
       .not("last_stripe_connect_sync_at", "is", null)
       .lt("last_stripe_connect_sync_at", connectStaleBefore),
+    admin
+      .from("organizations")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active")
+      .not("stripe_connect_account_id", "is", null)
+      .eq("stripe_charges_enabled", true)
+      .eq("stripe_payouts_enabled", false),
+    admin
+      .from("organizations")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active")
+      .not("stripe_connect_account_id", "is", null)
+      .in("stripe_connect_status", ["action_required", "pending_verification", "onboarding_started"]),
     admin
       .from("blitzpay_reminder_runs")
       .select("id, trigger, status, reminders_evaluated, reminders_sent, reminders_skipped, created_at, finished_at, error")
@@ -136,7 +172,7 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
     remindersSkipped: Math.round(Number(r.reminders_skipped ?? 0)),
     createdAt: String(r.created_at ?? ""),
     finishedAt: r.finished_at ? String(r.finished_at) : null,
-    error: r.error ? String(r.error) : null,
+    error: r.error ? sanitizeBlitzpayOperationalLogDetail(String(r.error), 200) : null,
   }))
 
   const alerts: BlitzpayPlatformOperationsSummary["alerts"] = []
@@ -154,6 +190,28 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
   const reminderRunsFailed7d = reminderRunsFailedRes.count ?? 0
   const reminderDispatchFailures7d = remFailedDispRes.count ?? 0
   const orgsStaleConnectSync7d = (staleNullRes.count ?? 0) + (staleOldRes.count ?? 0)
+  const stripeHostSecretKeyMode = parseStripeSecretKeyMode(process.env.STRIPE_SECRET_KEY)
+  const blitzpayWebhookSigningSecretConfigured = Boolean(process.env.STRIPE_BLITZPAY_WEBHOOK_SECRET?.trim())
+  const webhookInboxPendingApprox = Math.min(5000, webhookPendingRes.count ?? 0)
+  const orgsChargesEnabledPayoutsBlockedApprox = Math.min(5000, payoutsBlockedRes.count ?? 0)
+  const orgsConnectOnboardingAttentionApprox = Math.min(5000, onboardingAttentionRes.count ?? 0)
+
+  if (isStripeLiveEnforced() && stripeHostSecretKeyMode === "test") {
+    alerts.push({
+      severity: "critical",
+      code: "stripe_live_policy_test_key",
+      message:
+        "This host enforces live Stripe policy, but STRIPE_SECRET_KEY is test mode — do not process live customer money against this configuration.",
+    })
+  }
+  if (isStripeLiveEnforced() && stripeHostSecretKeyMode === "live" && !blitzpayWebhookSigningSecretConfigured) {
+    alerts.push({
+      severity: "critical",
+      code: "blitzpay_webhook_secret_missing_live",
+      message:
+        "Live Stripe keys are present, but STRIPE_BLITZPAY_WEBHOOK_SECRET is not set — BlitzPay Connect webhooks cannot be verified.",
+    })
+  }
 
   if (webhookDead24h > 0) {
     alerts.push({
@@ -183,6 +241,26 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
       message: `${orgsStaleConnectSync7d} active workspace(s) have Stripe Connect sync older than 7 days or never synced.`,
     })
   }
+  if (orgsConnectOnboardingAttentionApprox > 0) {
+    alerts.push({
+      severity: "info",
+      code: "connect_onboarding_attention",
+      message: `${orgsConnectOnboardingAttentionApprox} workspace(s) show Connect onboarding attention states (in progress or information requests).`,
+    })
+  }
+  if (orgsChargesEnabledPayoutsBlockedApprox > 0) {
+    alerts.push({
+      severity: "info",
+      code: "charges_without_payouts",
+      message: `${orgsChargesEnabledPayoutsBlockedApprox} workspace(s) can charge customers while Stripe payouts remain off — settlement timing may be constrained.`,
+    })
+  }
+
+  const webhookOperationalStatus = summarizeBlitzpayWebhookOperationalStatus({
+    deadInbox24h: webhookDead24h,
+    pendingInboxApprox: webhookInboxPendingApprox,
+    ignoredUnknownEvents7dApprox: 0,
+  })
 
   return {
     orgsBlitzpayEnabled: payEnabledRes.count ?? 0,
@@ -195,6 +273,12 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
     reminderRunsFailed7d,
     reminderDispatchFailures7d,
     orgsStaleConnectSync7d,
+    stripeHostSecretKeyMode,
+    blitzpayWebhookSigningSecretConfigured,
+    webhookInboxPendingApprox,
+    orgsChargesEnabledPayoutsBlockedApprox,
+    orgsConnectOnboardingAttentionApprox,
+    webhookOperationalStatus,
     schemaHealth,
     recentReminderRuns,
     alerts,

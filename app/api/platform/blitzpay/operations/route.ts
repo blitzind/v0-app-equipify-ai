@@ -28,6 +28,7 @@ export async function GET() {
     return NextResponse.json({ summary })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "load_failed", message: msg }, { status: 500 })
+    console.error("[platform blitzpay operations]", msg)
+    return NextResponse.json({ error: "load_failed", message: "Could not load BlitzPay operations summary." }, { status: 500 })
   }
 }

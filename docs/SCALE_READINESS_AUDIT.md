@@ -277,6 +277,13 @@ Evidence from migrations under `supabase/migrations/`:
 - **Sales posture:** mixed `healthy` / `attention` / `elevated` module tags and staggered reference-day offsets keep demos from reading as uniformly green while staying realistic on totals.
 - **Regression test:** `pnpm test:blitzpay-phase-7a5-demo-data`.
 
+### 8.22 BlitzPay Phase 7A.6 (Stripe live readiness & webhook safety)
+
+- **Guards:** `lib/blitzpay/blitzpay-stripe-readiness-guards.ts` adds key-mode parsing, webhook id validation, duplicate-delivery body helper, livemode alignment hints (advisory), operational log sanitization (no `whsec_` / `sk_*` / `pk_*` leakage), expanded Connect webhook checklist notes, `buildBlitzpayStripeLiveReadinessStrip` for staff FCC, and bounded webhook ops narrative for platform summaries.
+- **FCC:** `fetchBlitzpayOrgFinancialCommandCenter` includes additive `stripeLiveReadiness` (host/publishable mode labels, webhook signing flag, Connect/payout/dispute/ACH advisory copy — **no secrets**).
+- **Platform ops:** `fetchBlitzpayPlatformOperationsSummary` adds bounded webhook inbox pending counts, Connect onboarding-attention org counts, charges-without-payouts org counts, host secret-key **mode** only, BlitzPay webhook secret presence, webhook operational status lines, critical alerts on live-policy vs test-key mismatch, and stable JSON on `GET /api/platform/blitzpay/operations` load failures.
+- **Regression test:** `pnpm test:blitzpay-phase-7a6-stripe-live-readiness`.
+
 ---
 
 ## 9. AI / Usage Scale Risks

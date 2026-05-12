@@ -19,6 +19,18 @@ import {
   computeBlitzpayOperationalReadinessStrip,
   type BlitzpayOperationalReadinessStrip,
 } from "@/lib/blitzpay/blitzpay-operational-readiness"
+import { isStripeLiveEnforced } from "@/lib/billing/stripe-env"
+import {
+  buildBlitzpayStripeLiveReadinessStrip,
+  type BlitzpayStripeLiveReadinessStrip,
+  parseStripePublishableKeyMode,
+  parseStripeSecretKeyMode,
+} from "@/lib/blitzpay/blitzpay-stripe-readiness-guards"
+
+function countJsonStringArrayLength(value: unknown): number {
+  if (!Array.isArray(value)) return 0
+  return value.filter((x): x is string => typeof x === "string").length
+}
 
 export type BlitzpayFinancialCommandCenterDrilldown = {
   href: string
@@ -196,6 +208,8 @@ export type BlitzpayFinancialCommandCenterPayload = {
   drilldowns: Record<string, BlitzpayFinancialCommandCenterDrilldown>
   /** Phase 7A — additive operational maturity strip for staff FCC (no customer exposure). */
   operationalReadiness: BlitzpayOperationalReadinessStrip
+  /** Phase 7A.6 — Stripe / Connect live readiness (advisory; no secrets). */
+  stripeLiveReadiness: BlitzpayStripeLiveReadinessStrip
 }
 
 function drilldownsForOrg(overdueCount: number): Record<string, BlitzpayFinancialCommandCenterDrilldown> {
@@ -275,7 +289,13 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
   let stripePayoutsEnabled = false
   let pendingApprovalPayableCount = 0
   const [{ data: orgRow }, { count: apPendingCount, error: apErr }] = await Promise.all([
-    admin.from("organizations").select("stripe_payouts_enabled").eq("id", organizationId).maybeSingle(),
+    admin
+      .from("organizations")
+      .select(
+        "stripe_connect_account_id, stripe_payouts_enabled, stripe_connect_status, stripe_charges_enabled, stripe_details_submitted, stripe_requirements_currently_due, stripe_requirements_past_due",
+      )
+      .eq("id", organizationId)
+      .maybeSingle(),
     admin
       .from("blitzpay_vendor_payables")
       .select("id", { count: "exact", head: true })
@@ -283,7 +303,17 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
       .eq("status", "pending_approval"),
   ])
   if (!apErr && apPendingCount != null) pendingApprovalPayableCount = apPendingCount
-  stripePayoutsEnabled = Boolean((orgRow as { stripe_payouts_enabled?: boolean } | null)?.stripe_payouts_enabled)
+  const org = orgRow as {
+    stripe_connect_account_id?: string | null
+    stripe_payouts_enabled?: boolean | null
+    stripe_connect_status?: string | null
+    stripe_charges_enabled?: boolean | null
+    stripe_details_submitted?: boolean | null
+    stripe_requirements_currently_due?: unknown
+    stripe_requirements_past_due?: unknown
+  } | null
+
+  stripePayoutsEnabled = Boolean(org?.stripe_payouts_enabled)
 
   let tm: Awaited<ReturnType<typeof aggregateBlitzpayTreasuryMetrics>> | null = null
   try {
@@ -356,9 +386,33 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
     pendingRevenueRecognitionCount: reporting.pendingRevenueRecognitionCount,
   })
 
+  const generatedAt = new Date().toISOString()
+  const connectStatus = org?.stripe_connect_account_id ?
+      String(org.stripe_connect_status ?? "onboarding_started")
+    : "not_started"
+
+  const stripeLiveReadiness = buildBlitzpayStripeLiveReadinessStrip({
+    generatedAtIso: generatedAt,
+    stripeSecretKeyMode: parseStripeSecretKeyMode(process.env.STRIPE_SECRET_KEY),
+    nextPublicPublishableKeyMode: parseStripePublishableKeyMode(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY),
+    stripeLiveModeEnforcedOnHost: isStripeLiveEnforced(),
+    blitzpayWebhookSecretConfigured: Boolean(process.env.STRIPE_BLITZPAY_WEBHOOK_SECRET?.trim()),
+    connectStatus,
+    stripeChargesEnabled: Boolean(org?.stripe_charges_enabled),
+    stripePayoutsEnabled,
+    stripeDetailsSubmitted: Boolean(org?.stripe_details_submitted),
+    requirementsCurrentlyDueCount: countJsonStringArrayLength(org?.stripe_requirements_currently_due),
+    requirementsPastDueCount: countJsonStringArrayLength(org?.stripe_requirements_past_due),
+    failedPayoutCount30d: reporting.treasuryFailedPayoutCount30d,
+    pendingPayoutsCents: d.pendingPayoutsCents,
+    openDisputesCount: d.openDisputesCount,
+    openDisputesAmountCents: d.openDisputesAmountCents,
+    achNudgeOpportunityCount: reporting.achNudgeOpportunityCount,
+  })
+
   return {
     reportingWindowDays,
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     tiles: {
       cashCollectedWindowCents: d.grossCollectedWindowCents,
       expectedCollections7Cents: forecastHorizons.next7DaysExpectedCents,
@@ -523,6 +577,7 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
       workflowFailureRate: reporting.workflowFailureRate,
       replayIntegrityScore: reporting.replayIntegrityScore,
     }),
+    stripeLiveReadiness,
   }
 }
 

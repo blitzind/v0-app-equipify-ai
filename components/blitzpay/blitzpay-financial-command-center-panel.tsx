@@ -179,6 +179,22 @@ type CommandCenterPayload = {
     overallComfort0to100: number
     checklistLines: string[]
   }
+  stripeLiveReadiness?: {
+    generatedAt: string
+    stripeHostApiModeLabel: string
+    stripePublishableKeyModeLabel: string
+    stripeLiveModeEnforcedOnHost: boolean
+    blitzpayWebhookSigningConfigured: boolean
+    publishableSecretModeAligned: boolean | null
+    webhookEventDedupeSummary: string
+    connectOnboardingHeadline: string
+    connectOperationalWarnings: string[]
+    payoutReadinessSummary: string
+    disputeExposureSummary: string
+    achAttentionSummary: string | null
+    environmentAlignmentNote: string | null
+    operationalFootnotes: string[]
+  }
 }
 
 function fmtMoney(cents: number): string {
@@ -319,6 +335,47 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
                   <li key={line}>{line}</li>
                 ))}
               </ul>
+            </div>
+          ) : null}
+
+          {data.stripeLiveReadiness ? (
+            <div className="rounded-lg border border-border/70 bg-muted/10 px-4 py-3 space-y-2 min-w-0">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Stripe live readiness (Phase 7A.6)
+                </p>
+                <p className="text-xs text-muted-foreground shrink-0">
+                  API {data.stripeLiveReadiness.stripeHostApiModeLabel}
+                  {data.stripeLiveReadiness.blitzpayWebhookSigningConfigured ? "" : " · webhook signing off"}
+                </p>
+              </div>
+              {data.stripeLiveReadiness.environmentAlignmentNote ? (
+                <p className="text-[11px] font-medium text-amber-900 dark:text-amber-100 leading-relaxed min-w-0">
+                  {data.stripeLiveReadiness.environmentAlignmentNote}
+                </p>
+              ) : null}
+              <p className="text-xs text-foreground font-medium leading-relaxed min-w-0">
+                {data.stripeLiveReadiness.connectOnboardingHeadline}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-muted-foreground leading-relaxed">
+                <p className="min-w-0">{data.stripeLiveReadiness.payoutReadinessSummary}</p>
+                <p className="min-w-0">{data.stripeLiveReadiness.disputeExposureSummary}</p>
+              </div>
+              {data.stripeLiveReadiness.achAttentionSummary ? (
+                <p className="text-[11px] text-muted-foreground leading-relaxed min-w-0">
+                  {data.stripeLiveReadiness.achAttentionSummary}
+                </p>
+              ) : null}
+              {data.stripeLiveReadiness.connectOperationalWarnings.length > 0 ? (
+                <ul className="text-[11px] text-muted-foreground space-y-1 list-disc pl-4 min-w-0">
+                  {data.stripeLiveReadiness.connectOperationalWarnings.slice(0, 5).map((w) => (
+                    <li key={w}>{w}</li>
+                  ))}
+                </ul>
+              ) : null}
+              <p className="text-[11px] text-muted-foreground leading-relaxed min-w-0 border-t border-border/50 pt-2">
+                {data.stripeLiveReadiness.webhookEventDedupeSummary}
+              </p>
             </div>
           ) : null}
 

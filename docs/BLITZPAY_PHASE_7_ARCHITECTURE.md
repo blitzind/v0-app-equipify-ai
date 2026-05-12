@@ -12,7 +12,7 @@ Phase 7A is intentionally **not** a feature-expansion release. It hardens operat
 - Provide entitlement **definitions** and helpers (`lib/billing/blitzpay-entitlements.ts`) while keeping **all modules enabled** for every tier until product turns gates on.
 - Add FCC **operational readiness** strip (additive JSON + UI) summarizing recursion policy, mobile signal score, replay governance, and a short permission-audit note.
 - Stripe / Connect **readiness notes** and JSON token scanners for QA (`lib/blitzpay/blitzpay-stripe-readiness-guards.ts`).
-- Deterministic **demo metric presets** for believable fixtures (`lib/blitzpay/blitzpay-demo-presets.ts`) — no randomness, no fake PII; **Phase 7A.5** expands archetypes, FCC showcase snapshots, activity feeds, and bounded coherence checks for sales-ready narratives (still in-memory; no seed bloat).
+- Deterministic **demo metric presets** for believable fixtures (`lib/blitzpay/blitzpay-demo-presets.ts`) — no randomness, no fake PII; **Phase 7A.5** expands archetypes, FCC showcase snapshots, activity feeds, and bounded coherence checks for sales-ready narratives (still in-memory; no seed bloat). **Phase 7A.6** expands **Stripe live readiness** helpers in `blitzpay-stripe-readiness-guards.ts`, adds an additive **Stripe live readiness** strip on the FCC payload, and tightens **platform BlitzPay Ops** summaries (bounded counts + safe load errors) — **no autonomous remediation**.
 
 **Non-goals**
 
@@ -63,7 +63,7 @@ Phase 7A is intentionally **not** a feature-expansion release. It hardens operat
 
 ## 6. Stripe / Connect validation helpers
 
-- `lib/blitzpay/blitzpay-stripe-readiness-guards.ts` — `scanJsonForStripeLikeTokens` (client/QA JSON leak scan) and `blitzpayConnectWebhookReadinessNotes` checklist strings. Complements `docs/STRIPE_PRODUCTION_READINESS.md`; does not call Stripe.
+- `lib/blitzpay/blitzpay-stripe-readiness-guards.ts` — `scanJsonForStripeLikeTokens` (client/QA JSON leak scan), `blitzpayConnectWebhookReadinessNotes`, **Phase 7A.6** helpers (`parseStripeSecretKeyMode`, `parseStripePublishableKeyMode`, `isLikelyStripeWebhookEventId`, `blitzpayWebhookDuplicateDeliveryBody`, `inferStripeWebhookLivemodeAlignment`, `sanitizeBlitzpayOperationalLogDetail`, `buildBlitzpayStripeLiveReadinessStrip`, `summarizeBlitzpayWebhookOperationalStatus`). Complements `docs/STRIPE_PRODUCTION_READINESS.md`; does not call Stripe.
 
 ## 7. Security audit (Phase 7A scope)
 
@@ -78,6 +78,7 @@ Phase 7A is intentionally **not** a feature-expansion release. It hardens operat
 - `pnpm test:blitzpay-phase-7a3-security-hardening` — `scripts/test-blitzpay-phase-7a3-security-hardening.ts` covers payload shaping (observability, idempotency, claims payouts, portal prepare-pay), replay route wiring assertions, platform rollup safe errors, technician intent filtering, and staff `load_failed` JSON shape.
 - `pnpm test:blitzpay-phase-7a4-performance` — `scripts/test-blitzpay-phase-7a4-performance.ts` covers nesting clamp/skip propagation, schema-health probe batching, multi-entity parallel snapshot fetch constant, platform observability rollup caps, FCC duplicate snapshot elimination wiring, and observability list row shaping compactness.
 - `pnpm test:blitzpay-phase-7a5-demo-data` — `scripts/test-blitzpay-phase-7a5-demo-data.ts` covers deterministic demo presets, bounded activity feeds, showcase metric human labels, fixture coherence rules, mixed operational-readiness inputs, and module health tone diversity.
+- `pnpm test:blitzpay-phase-7a6-stripe-live-readiness` — `scripts/test-blitzpay-phase-7a6-stripe-live-readiness.ts` covers Stripe key-mode parsing, webhook id shape checks, duplicate-delivery contract, livemode alignment hints, log sanitization, deterministic `buildBlitzpayStripeLiveReadinessStrip`, platform webhook narrative helper, and FCC/platform wiring strings.
 
 ## 9. Phase 7A.3 — security, permissions & sensitive data audit hardening
 
@@ -121,8 +122,20 @@ Phase 7A is intentionally **not** a feature-expansion release. It hardens operat
 
 **Regression test:** `pnpm test:blitzpay-phase-7a5-demo-data`.
 
-## 12. Related documents
+## 12. Phase 7A.6 — Stripe live readiness, webhook safety & production verification
+
+**Intent:** operational **safety and visibility** for real-world Connect payments — **without** new Stripe products, **without** autonomous remediation, **without** background worker infrastructure, and **without** weakening idempotent webhook protections.
+
+**Guards module:** `lib/blitzpay/blitzpay-stripe-readiness-guards.ts`
+
+- **Webhook safety helpers:** `isLikelyStripeWebhookEventId`, `blitzpayWebhookDuplicateDeliveryBody`, `inferStripeWebhookLivemodeAlignment` (advisory), `sanitizeBlitzpayOperationalLogDetail` (redacts `whsec_`, `sk_*`, `pk_*`, `rk_*` substrings; truncates), expanded `blitzpayConnectWebhookReadinessNotes`.
+- **FCC additive strip:** `buildBlitzpayStripeLiveReadinessStrip` — deterministic, **no secrets**, surfaces host API mode vs publishable key mode, webhook signing presence, Connect onboarding headline, bounded payout/dispute/ACH advisory lines, and webhook dedupe narrative. Composed in `fetchBlitzpayOrgFinancialCommandCenter` and rendered in `BlitzpayFinancialCommandCenterPanel`.
+- **Platform BlitzPay Ops:** `fetchBlitzpayPlatformOperationsSummary` adds bounded counts (webhook inbox **pending**, orgs with **charges on / payouts off**, Connect **onboarding attention** states), host `STRIPE_SECRET_KEY` **mode label only**, BlitzPay webhook secret presence, `summarizeBlitzpayWebhookOperationalStatus`, critical alerts when **live policy** conflicts with **test keys** or **missing** `STRIPE_BLITZPAY_WEBHOOK_SECRET` under live keys; `GET /api/platform/blitzpay/operations` returns stable JSON on load failure (no raw exception text).
+
+**Regression test:** `pnpm test:blitzpay-phase-7a6-stripe-live-readiness`.
+
+## 13. Related documents
 
 - [BLITZPAY_ARCHITECTURE.md](./BLITZPAY_ARCHITECTURE.md)
-- [SCALE_READINESS_AUDIT.md](./SCALE_READINESS_AUDIT.md) §8.18–§8.21
+- [SCALE_READINESS_AUDIT.md](./SCALE_READINESS_AUDIT.md) §8.18–§8.22
 - [STRIPE_PRODUCTION_READINESS.md](./STRIPE_PRODUCTION_READINESS.md) — BlitzPay Connect supplement
