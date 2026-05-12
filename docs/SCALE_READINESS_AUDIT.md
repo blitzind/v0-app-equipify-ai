@@ -254,7 +254,7 @@ Evidence from migrations under `supabase/migrations/`:
 - **Reporting snapshot nesting:** `lib/blitzpay/blitzpay-reporting-snapshot-nesting.ts` caps `nestingDepth` at **3** and forces Phase **5A/5B/5C/6A/6B** enrichers off when the cap is hit — additive to existing `skip*` flags on linked-org pulls (`buildPhase5aLinkedOrgReportingSlice` passes `nestingDepth + 1` on member snapshots).
 - **No Redis / no workers:** guards are pure skip resolution + deterministic ordering preserved in existing snapshot code paths.
 - **FCC additive strip:** `operationalReadiness` on `fetchBlitzpayOrgFinancialCommandCenter` surfaces recursion policy, mobile signal score, and replay governance text for staff only — bounded payload growth.
-- **Entitlements:** `lib/billing/blitzpay-entitlements.ts` defines module keys + future tier matrix hooks while keeping **all modules enabled** in Phase 7A (no lockout).
+- **Entitlements:** `lib/billing/blitzpay-entitlements.ts` + **Phase 7A.2** satellite modules (`blitzpay-feature-catalog.ts`, `blitzpay-commercial-tier.ts`, `blitzpay-module-registry.ts`, `blitzpay-plan-metadata.ts`, `blitzpay-commercial-packaging.ts`) define module/feature keys, **packaging tier minimums**, and `canAccessBlitzpayFeature(..., { enforceTierGates })` — **default remains permissive** (no customer lockout); `blitzpayModuleWouldBeGatedAtTier` is a **preview** for upgrade copy. UI: `BlitzpayPlanAwarenessStrip` (informational). No Stripe subscription coupling in these helpers.
 
 ---
 

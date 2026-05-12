@@ -29,6 +29,7 @@ import { BlitzpaySupplierNetworkPanel } from "@/components/blitzpay/blitzpay-sup
 import { BlitzpayClaimsProtectionPanel } from "@/components/blitzpay/blitzpay-claims-protection-panel"
 import { BlitzpayMobileFinancialOpsPanel } from "@/components/blitzpay/blitzpay-mobile-financial-ops-panel"
 import { BlitzpayEnterpriseObservabilityPanel } from "@/components/blitzpay/blitzpay-enterprise-observability-panel"
+import { BlitzpayPlanAwarenessStrip } from "@/components/blitzpay/blitzpay-plan-awareness-strip"
 import { Toaster } from "@/components/ui/toaster"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
@@ -618,6 +619,9 @@ export default function InsightsPage() {
 
       {/* ── Main content ──────────────────────────────────────────────────── */}
       <div className="flex-1 bg-zinc-50 p-6 space-y-6 min-w-0 max-w-full overflow-x-hidden">
+        {canBlitzpayFinancialCommandCenter ? (
+          <BlitzpayPlanAwarenessStrip surface="insights_financial_hub" className="border-zinc-200 bg-white" />
+        ) : null}
         {canBlitzpayFinancialCommandCenter && dash.organizationId ? (
           <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm min-w-0 max-w-full overflow-x-hidden">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">BlitzPay financial copilot</p>

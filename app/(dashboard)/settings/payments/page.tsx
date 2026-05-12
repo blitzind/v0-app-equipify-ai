@@ -28,6 +28,7 @@ import { BlitzpayCashAccountsPanel } from "@/components/blitzpay/blitzpay-cash-a
 import { BlitzpayCollectionsEnginePanel } from "@/components/blitzpay/blitzpay-collections-engine-panel"
 import { BlitzpayBillingProfilesPanel } from "@/components/blitzpay/blitzpay-billing-profiles-panel"
 import { BlitzpayTreasuryPanel } from "@/components/blitzpay/blitzpay-treasury-panel"
+import { BlitzpayPlanAwarenessStrip } from "@/components/blitzpay/blitzpay-plan-awareness-strip"
 import { WorkspaceInvoiceDefaultsCard } from "@/components/settings/workspace-invoice-defaults-card"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { blitzpayConnectOnboardingToastDescription } from "@/lib/blitzpay/connect-onboarding-client-messages"
@@ -536,6 +537,8 @@ function BlitzPaySettingsPageInner() {
           release — for now, complete onboarding and keep this status current.
         </p>
       </div>
+
+      <BlitzpayPlanAwarenessStrip surface="staff_settings_payments" className="mt-1" />
 
       <div className="w-full min-w-0 rounded-xl border border-border bg-card p-5 shadow-sm">
         {loading ? (

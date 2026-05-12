@@ -2,7 +2,7 @@
  * Commercial packaging metadata (Phase 7A) — no pricing pages; versioned hooks for future matrices.
  */
 
-export const BLITZPAY_COMMERCIAL_METADATA_VERSION = "7a.1" as const
+export const BLITZPAY_COMMERCIAL_METADATA_VERSION = "7a.2" as const
 
 export type BlitzpayCommercialSurfaceKey =
   | "staff_settings_payments"

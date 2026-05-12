@@ -1,83 +1,32 @@
 /**
- * BlitzPay commercial / module entitlement foundations (Phase 7A).
+ * BlitzPay commercial / module entitlement foundations (Phase 7A → 7A.2).
  *
  * Product tiers: Solo, Core, Growth, Scale, Enterprise (`PlanId` + enterprise contract tier).
- * Phase 7A is intentionally permissive: helpers exist for future gating without locking workflows today.
+ * **Default:** permissive — {@link canAccessBlitzpayFeature} returns true unless `enforceTierGates` is enabled
+ * (intended for future server guards / tests only; not enabled in production UI in Phase 7A.2).
  */
 
-import type { PlanId } from "@/lib/plans"
-import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
+import {
+  BLITZPAY_FEATURE_CATALOG,
+  deriveBlitzpayModuleMinimumTiers,
+  getBlitzpayFeatureCatalogRow,
+  type BlitzpayFeatureKey,
+} from "@/lib/billing/blitzpay-feature-catalog"
+import type { CommercialProductTier } from "@/lib/billing/blitzpay-commercial-tier"
+import { normalizeCommercialProductTier, tierRank, maxCommercialTier } from "@/lib/billing/blitzpay-commercial-tier"
+import type { BlitzpayCommercialModuleKey } from "@/lib/billing/blitzpay-module-registry"
 
-export const BLITZPAY_ENTITLEMENTS_FOUNDATION_VERSION = "7a.1" as const
+export const BLITZPAY_ENTITLEMENTS_FOUNDATION_VERSION = "7a.2" as const
 
-/** SaaS plan id or negotiated enterprise (not necessarily a `PlanId` row). */
-export type CommercialProductTier = PlanId | "enterprise"
+export type { CommercialProductTier } from "@/lib/billing/blitzpay-commercial-tier"
+export { normalizeCommercialProductTier } from "@/lib/billing/blitzpay-commercial-tier"
+export type { BlitzpayCommercialModuleKey } from "@/lib/billing/blitzpay-module-registry"
+export type { BlitzpayFeatureKey } from "@/lib/billing/blitzpay-feature-catalog"
 
-export type BlitzpayCommercialModuleKey =
-  | "payments_connect"
-  | "customer_invoicing"
-  | "treasury_payouts"
-  | "collections"
-  | "memberships_recurring"
-  | "payroll_accruals"
-  | "cash_planning"
-  | "general_ledger"
-  | "vendor_ap"
-  | "tax_compliance"
-  | "financing_marketplace"
-  | "procurement_inventory"
-  | "ai_copilot"
-  | "revenue_optimization"
-  | "multi_entity_franchise"
-  | "supplier_network"
-  | "claims_protection"
-  | "mobile_financial_ops"
-  | "enterprise_observability"
-  | "financial_command_center"
-  | "insights_hub"
-
-const TIER_RANK: Record<CommercialProductTier, number> = {
-  solo: 0,
-  core: 1,
-  growth: 2,
-  scale: 3,
-  enterprise: 4,
-}
-
-/** Minimum commercial tier for each module — all Solo+ today; adjust when packaging tightens. */
-const MODULE_MIN_TIER: Record<BlitzpayCommercialModuleKey, CommercialProductTier> = {
-  payments_connect: "solo",
-  customer_invoicing: "solo",
-  treasury_payouts: "solo",
-  collections: "solo",
-  memberships_recurring: "solo",
-  payroll_accruals: "solo",
-  cash_planning: "solo",
-  general_ledger: "solo",
-  vendor_ap: "solo",
-  tax_compliance: "solo",
-  financing_marketplace: "solo",
-  procurement_inventory: "solo",
-  ai_copilot: "solo",
-  revenue_optimization: "solo",
-  multi_entity_franchise: "solo",
-  supplier_network: "solo",
-  claims_protection: "solo",
-  mobile_financial_ops: "solo",
-  enterprise_observability: "solo",
-  financial_command_center: "solo",
-  insights_hub: "solo",
-}
-
-export function normalizeCommercialProductTier(raw: string | null | undefined): CommercialProductTier | null {
-  if (!raw?.trim()) return null
-  const s = raw.trim().toLowerCase()
-  if (s === "enterprise") return "enterprise"
-  return normalizePlanIdForRead(s) as PlanId
-}
+const MODULE_MIN_TIER: Record<BlitzpayCommercialModuleKey, CommercialProductTier> = deriveBlitzpayModuleMinimumTiers()
 
 /**
- * Phase 7A default: every module stays available on every tier (no customer-facing lockout).
+ * Phase 7A.2 default: every module stays available on every tier (no customer-facing lockout).
  */
 export function isBlitzpayModuleEnabledForTier(
   _plan: CommercialProductTier | null | undefined,
@@ -86,16 +35,15 @@ export function isBlitzpayModuleEnabledForTier(
   return true
 }
 
-/** Future gate: true when the org's tier is below the configured minimum for the module. */
+/** True when the org's tier is below the **packaging** minimum for the module (preview for future gates). */
 export function blitzpayModuleWouldBeGatedAtTier(
   plan: CommercialProductTier | null | undefined,
   module: BlitzpayCommercialModuleKey,
 ): boolean {
   if (!plan) return false
-  return TIER_RANK[plan] < TIER_RANK[MODULE_MIN_TIER[module]]
+  return tierRank(plan) < tierRank(MODULE_MIN_TIER[module])
 }
 
-/** Reserved for upgrade / disabled tooltips — returns null while gating is off. */
 export function blitzpayModuleDisabledReason(
   plan: CommercialProductTier | null | undefined,
   module: BlitzpayCommercialModuleKey,
@@ -104,6 +52,91 @@ export function blitzpayModuleDisabledReason(
   return "This area is not included on your current plan. Ask an owner or billing admin about upgrading."
 }
 
-export function blitzpayCommercialUpgradeHint(_module: BlitzpayCommercialModuleKey): string {
-  return "When you outgrow your current plan, your admin can move you to a tier that unlocks more automation and reporting depth."
+export function blitzpayCommercialUpgradeHint(module: BlitzpayCommercialModuleKey): string {
+  const min = MODULE_MIN_TIER[module]
+  return `Packaging reference: ${min} tier or higher — full access remains on during rollout; confirm contracts in Settings → Billing.`
 }
+
+export type BlitzpayEntitlementAccessOptions = {
+  /**
+   * When true, applies packaging tier minimums from the feature catalog.
+   * **Keep false in production** until product explicitly enables hard gates server-side.
+   */
+  enforceTierGates?: boolean
+}
+
+/**
+ * Server-safe: deterministic, no network. **Permissive by default** (`enforceTierGates` omitted/false).
+ */
+export function canAccessBlitzpayFeature(
+  plan: CommercialProductTier | null | undefined,
+  feature: BlitzpayFeatureKey,
+  options?: BlitzpayEntitlementAccessOptions,
+): boolean {
+  if (!options?.enforceTierGates) return true
+  const row = getBlitzpayFeatureCatalogRow(feature)
+  if (!row) return true
+  const effective = plan ?? "solo"
+  return tierRank(effective) >= tierRank(row.minimumPackagingTier)
+}
+
+/** Features whose packaging minimum is satisfied by `tier`. */
+export function getBlitzpayPlanFeatures(tier: CommercialProductTier | null | undefined): BlitzpayFeatureKey[] {
+  const t = tier ?? "solo"
+  return BLITZPAY_FEATURE_CATALOG.filter((f) => tierRank(t) >= tierRank(f.minimumPackagingTier)).map(
+    (f) => f.key as BlitzpayFeatureKey,
+  )
+}
+
+/** Smallest tier that covers all supplied features (max of each feature's minimum). */
+export function getBlitzpayRecommendedTier(features: readonly BlitzpayFeatureKey[]): CommercialProductTier {
+  let acc: CommercialProductTier = "solo"
+  for (const k of features) {
+    const row = getBlitzpayFeatureCatalogRow(k)
+    if (row) acc = maxCommercialTier(acc, row.minimumPackagingTier)
+  }
+  return acc
+}
+
+export type BlitzpayEntitlementAuditSnapshot = {
+  foundationVersion: typeof BLITZPAY_ENTITLEMENTS_FOUNDATION_VERSION
+  resolvedTier: CommercialProductTier | null
+  featureCatalogSize: number
+  modulesThatWouldGateIfEnforced: BlitzpayCommercialModuleKey[]
+  featuresBelowTierIfEnforced: BlitzpayFeatureKey[]
+  enforcementModeEnabled: boolean
+}
+
+export function buildBlitzpayEntitlementAuditSnapshot(
+  plan: CommercialProductTier | null | undefined,
+  options?: BlitzpayEntitlementAccessOptions,
+): BlitzpayEntitlementAuditSnapshot {
+  const resolved = plan ?? null
+  const effective = resolved ?? "solo"
+  const modulesThatWouldGate = (Object.keys(MODULE_MIN_TIER) as BlitzpayCommercialModuleKey[]).filter((m) =>
+    blitzpayModuleWouldBeGatedAtTier(effective, m),
+  )
+  const featuresBelowTier = BLITZPAY_FEATURE_CATALOG.filter(
+    (f) => tierRank(effective) < tierRank(f.minimumPackagingTier),
+  ).map((f) => f.key as BlitzpayFeatureKey)
+  return {
+    foundationVersion: BLITZPAY_ENTITLEMENTS_FOUNDATION_VERSION,
+    resolvedTier: resolved,
+    featureCatalogSize: BLITZPAY_FEATURE_CATALOG.length,
+    modulesThatWouldGateIfEnforced: modulesThatWouldGate,
+    featuresBelowTierIfEnforced: featuresBelowTier,
+    enforcementModeEnabled: Boolean(options?.enforceTierGates),
+  }
+}
+
+export {
+  getBlitzpayUpgradeMetadata,
+  getBlitzpayCommercialCategory,
+  getBlitzpayCommercialLane,
+  getBlitzpayPlanPackagingFootnote,
+  blitzpayModuleMaturityStage,
+  BLITZPAY_FUTURE_PRICING_MATRIX_PLACEHOLDER,
+} from "@/lib/billing/blitzpay-commercial-packaging"
+export type { BlitzpayUpgradeMetadata } from "@/lib/billing/blitzpay-commercial-packaging"
+export { getBlitzpayPlanMetadata, BLITZPAY_PLAN_METADATA } from "@/lib/billing/blitzpay-plan-metadata"
+export type { BlitzpayPlanMetadata } from "@/lib/billing/blitzpay-plan-metadata"

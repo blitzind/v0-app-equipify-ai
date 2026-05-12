@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { scorecardStatusLabel, type OwnerScorecardStatus } from "@/lib/blitzpay/blitzpay-owner-scorecards"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { BlitzpayPlanAwarenessStrip } from "@/components/blitzpay/blitzpay-plan-awareness-strip"
 
 type CommandCenterPayload = {
   reportingWindowDays: number
@@ -269,6 +270,8 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
           Refresh
         </Button>
       </div>
+
+      <BlitzpayPlanAwarenessStrip surface="financial_command_center" />
 
       {error ? <p className="text-xs text-muted-foreground leading-relaxed">{error}</p> : null}
       {loading && !data ? (

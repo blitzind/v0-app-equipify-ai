@@ -26,8 +26,30 @@ Phase 7A is intentionally **not** a feature-expansion release. It hardens operat
 
 ## 3. Entitlements & commercial packaging hooks
 
-- `lib/billing/blitzpay-entitlements.ts` — `CommercialProductTier`, `BlitzpayCommercialModuleKey`, `isBlitzpayModuleEnabledForTier` (always `true` in 7A), `blitzpayModuleWouldBeGatedAtTier` (future), `blitzpayModuleDisabledReason`, `blitzpayCommercialUpgradeHint`.
-- `lib/blitzpay/blitzpay-commercial-readiness.ts` — version constant + ordered surface keys for future feature matrices.
+### 3.1 Phase 7A (permissive runtime)
+
+- `lib/billing/blitzpay-entitlements.ts` — `CommercialProductTier`, `BlitzpayCommercialModuleKey`, `isBlitzpayModuleEnabledForTier` (**always `true`** until product enables server gates), `blitzpayModuleWouldBeGatedAtTier` (**packaging preview** derived from the feature catalog), `blitzpayModuleDisabledReason`, `blitzpayCommercialUpgradeHint`.
+- `lib/blitzpay/blitzpay-commercial-readiness.ts` — version constant + ordered surface keys (`BlitzpayCommercialSurfaceKey`) for staff vs platform surfaces.
+
+### 3.2 Phase 7A.2 (registry, metadata, soft UI)
+
+- **`lib/billing/blitzpay-commercial-tier.ts`** — canonical `CommercialProductTier`, `BLITZPAY_COMMERCIAL_TIER_RANK`, `normalizeCommercialProductTier`, `tierRank`, `maxCommercialTier`. No Stripe subscription reads.
+- **`lib/billing/blitzpay-module-registry.ts`** — `BlitzpayCommercialModuleKey` union + `BLITZPAY_COMMERCIAL_MODULE_KEYS` exhaust list.
+- **`lib/billing/blitzpay-feature-catalog.ts`** — typed `BlitzpayFeatureKey` rows (label, module, `minimumPackagingTier`, `moduleClassification`, `commercialLane`, `packagingHint`). `deriveBlitzpayModuleMinimumTiers()` aggregates module mins (max of feature mins).
+- **`lib/billing/blitzpay-plan-metadata.ts`** — human positioning per tier (`BLITZPAY_PLAN_METADATA`, `getBlitzpayPlanMetadata`).
+- **`lib/billing/blitzpay-commercial-packaging.ts`** — `getBlitzpayCommercialCategory`, `getBlitzpayCommercialLane`, `getBlitzpayUpgradeMetadata`, `getBlitzpayPlanPackagingFootnote`, `blitzpayModuleMaturityStage`, `BLITZPAY_FUTURE_PRICING_MATRIX_PLACEHOLDER` (structure only).
+- **Entitlement API (server-safe, permissive default):**
+  - `canAccessBlitzpayFeature(plan, feature, { enforceTierGates? })` — returns **`true` by default**; when `enforceTierGates: true`, compares tier ranks to the feature’s `minimumPackagingTier` (for future Route Handler guards / tests).
+  - `getBlitzpayPlanFeatures(tier)` — feature keys included at/under a packaging tier.
+  - `getBlitzpayRecommendedTier(featureKeys)` — smallest tier covering all listed features.
+  - `buildBlitzpayEntitlementAuditSnapshot(plan, options?)` — deterministic audit DTO (modules/features that *would* gate if enforcement were on).
+- **Re-exports:** `blitzpay-entitlements.ts` also re-exports selected packaging/plan helpers for discoverability.
+
+### 3.3 Rollout & billing boundaries
+
+- **No** Stripe subscription coupling, **no** paywalls, **no** new org billing enforcement in Phase 7A.2.
+- **Soft UI:** `components/blitzpay/blitzpay-plan-awareness-strip.tsx` — subtle footnote + link to Settings → Billing; uses `useBillingAccessOptional` so **platform admin** surfaces stay safe without tenant billing context (platform copy only on `platform_blitzpay_ops`).
+- **Future:** flip `enforceTierGates` in server guards only after legal/product sign-off; keep org permission checks as the primary access control.
 
 ## 4. Operational readiness strip (FCC)
 
@@ -50,7 +72,8 @@ Phase 7A is intentionally **not** a feature-expansion release. It hardens operat
 
 ## 8. Tests
 
-- `pnpm test:blitzpay-phase-7a-hardening` — `scripts/test-blitzpay-phase-7a-hardening.ts` covers nesting skips, entitlement defaults, token scan helper, replay auth helper, deterministic ordering, and schema-health script presence.
+- `pnpm test:blitzpay-phase-7a-hardening` — `scripts/test-blitzpay-phase-7a-hardening.ts` covers nesting skips, entitlement permissive defaults, packaging-preview `blitzpayModuleWouldBeGatedAtTier`, token scan helper, replay auth helper, deterministic ordering, and schema-health script presence.
+- `pnpm test:blitzpay-phase-7a2-entitlements` — `scripts/test-blitzpay-phase-7a2-entitlements.ts` covers catalog uniqueness, enforced vs permissive `canAccessBlitzpayFeature`, plan feature sets, recommended tier, upgrade metadata, commercial category labels, platform-admin classification, and audit snapshots.
 
 ## 9. Related documents
 

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { CreditCard, Loader2, Play, FlaskConical, AlertTriangle, Info, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
+import { BlitzpayPlanAwarenessStrip } from "@/components/blitzpay/blitzpay-plan-awareness-strip"
 import { cn } from "@/lib/utils"
 
 type CommandCenterPlatformRollup = {
@@ -318,6 +319,8 @@ export function BlitzpayOperationsContent() {
           </p>
         </div>
       </div>
+
+      <BlitzpayPlanAwarenessStrip surface="platform_blitzpay_ops" className="max-w-3xl" />
 
       {summary?.alerts && summary.alerts.length > 0 ? (
         <div className="space-y-2">

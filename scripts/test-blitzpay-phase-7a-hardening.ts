@@ -57,7 +57,8 @@ async function main(): Promise<void> {
 
   assert.equal(isBlitzpayModuleEnabledForTier("solo", "ai_copilot"), true)
   assert.equal(isBlitzpayModuleEnabledForTier(null, "financial_command_center"), true)
-  assert.equal(blitzpayModuleWouldBeGatedAtTier("solo", "ai_copilot"), false)
+  assert.equal(blitzpayModuleWouldBeGatedAtTier("solo", "ai_copilot"), true)
+  assert.equal(blitzpayModuleWouldBeGatedAtTier("growth", "ai_copilot"), false)
   assert.equal(normalizeCommercialProductTier("enterprise"), "enterprise")
   assert.equal(normalizeCommercialProductTier("growth"), "growth")
 
