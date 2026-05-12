@@ -16,6 +16,7 @@ import { BlitzpayExecutiveDashboard } from "@/components/blitzpay/blitzpay-execu
 import { BlitzpayFinancialCommandCenterPanel } from "@/components/blitzpay/blitzpay-financial-command-center-panel"
 import { BlitzpayAccountingOverviewPanel } from "@/components/blitzpay/blitzpay-accounting-overview-panel"
 import { BlitzpayApBillPayPanel } from "@/components/blitzpay/blitzpay-ap-bill-pay-panel"
+import { BlitzpayTaxCompliancePanel } from "@/components/blitzpay/blitzpay-tax-compliance-panel"
 import { BlitzpayPayrollDashboard } from "@/components/blitzpay/blitzpay-payroll-dashboard"
 import { BlitzpayCommissionQueue } from "@/components/blitzpay/blitzpay-commission-queue"
 import { BlitzpayVendorPayoutsPanel } from "@/components/blitzpay/blitzpay-vendor-payouts-panel"
@@ -994,9 +995,15 @@ function BlitzPaySettingsPageInner() {
                   <BlitzpayApBillPayPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
                 </div>
               ) : null}
+
+              {canViewFinancialCommandCenter && organizationId ? (
+                <div className="border-t border-border pt-4">
+                  <BlitzpayTaxCompliancePanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
+                </div>
+              ) : null}
             </div>
 
-            {canViewPayoutLedger && hasAccount ? (
+              {canViewPayoutLedger && hasAccount ? (
               <div className="border-t border-border pt-4 space-y-4">
                 <BlitzpayTreasuryPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
                 <BlitzpayApPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />

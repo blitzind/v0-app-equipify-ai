@@ -85,6 +85,13 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_ap_approval_flows", select: "id, organization_id, approval_status" },
   { name: "blitzpay_vendor_aging_snapshots", select: "id, organization_id, snapshot_date" },
   { name: "blitzpay_ap_audit_events", select: "id, organization_id, action" },
+  { name: "blitzpay_tax_jurisdictions", select: "id, organization_id, tax_status" },
+  { name: "blitzpay_tax_rules", select: "id, organization_id, compliance_status" },
+  { name: "blitzpay_tax_calculations", select: "id, organization_id, calculation_status" },
+  { name: "blitzpay_compliance_audit_log", select: "id, organization_id, audit_type" },
+  { name: "blitzpay_ach_authorizations", select: "id, organization_id, authorization_status" },
+  { name: "blitzpay_vendor_tax_profiles", select: "id, organization_id, vendor_id" },
+  { name: "blitzpay_tax_liability_snapshots", select: "id, organization_id, snapshot_date" },
 ]
 
 export type BlitzpaySchemaHealthResult =

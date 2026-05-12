@@ -169,6 +169,15 @@ export type BlitzpayOrgReportingSnapshot = {
   vendorConcentrationRisk: number
   treasuryCoverageForPayables: number
   payableAgingHealthScore: number
+  /** Phase 3C — tax & compliance (bounded; not legal advice). */
+  salesTaxPayableCents: number
+  payrollTaxPayableCents: number
+  contractorTaxEstimateCents: number
+  convenienceFeeExposureRisk: number
+  achAuthorizationCoverageRate: number
+  vendor1099ReadinessRate: number
+  filingReadinessScore: number
+  complianceHealthScore: number
 }
 
 /**
@@ -753,6 +762,14 @@ export async function fetchBlitzpayOrgReportingSnapshot(
   let vendorConcentrationRisk = 0
   let treasuryCoverageForPayables = 0
   let payableAgingHealthScore = 0
+  let salesTaxPayableCents = 0
+  let payrollTaxPayableCents = 0
+  let contractorTaxEstimateCents = 0
+  let convenienceFeeExposureRisk = 0
+  let achAuthorizationCoverageRate = 0
+  let vendor1099ReadinessRate = 0
+  let filingReadinessScore = 0
+  let complianceHealthScore = 0
   try {
     const { fetchApReportingSnapshotFields } = await import("@/lib/blitzpay/blitzpay-ap-service")
     const ap = await fetchApReportingSnapshotFields(admin, organizationId)
@@ -765,6 +782,21 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     payableAgingHealthScore = ap.payableAgingHealthScore
   } catch {
     /* Phase 3B AP tables optional until migration applied */
+  }
+
+  try {
+    const { fetchTaxComplianceReportingFields } = await import("@/lib/blitzpay/blitzpay-tax-service")
+    const tx = await fetchTaxComplianceReportingFields(admin, organizationId)
+    salesTaxPayableCents = tx.salesTaxPayableCents
+    payrollTaxPayableCents = tx.payrollTaxPayableCents
+    contractorTaxEstimateCents = tx.contractorTaxEstimateCents
+    convenienceFeeExposureRisk = tx.convenienceFeeExposureRisk
+    achAuthorizationCoverageRate = tx.achAuthorizationCoverageRate
+    vendor1099ReadinessRate = tx.vendor1099ReadinessRate
+    filingReadinessScore = tx.filingReadinessScore
+    complianceHealthScore = tx.complianceHealthScore
+  } catch {
+    /* Phase 3C tax tables optional until migration applied */
   }
 
   const cash2z = deriveBlitzpayCashPlanningMetrics({
@@ -910,5 +942,13 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     vendorConcentrationRisk,
     treasuryCoverageForPayables,
     payableAgingHealthScore,
+    salesTaxPayableCents,
+    payrollTaxPayableCents,
+    contractorTaxEstimateCents,
+    convenienceFeeExposureRisk,
+    achAuthorizationCoverageRate,
+    vendor1099ReadinessRate,
+    filingReadinessScore,
+    complianceHealthScore,
   }
 }

@@ -92,6 +92,15 @@ export type BlitzpayFinancialCommandCenterPayload = {
     vendorConcentrationRisk: number
     treasuryCoverageForPayables: number
     payableAgingHealthScore: number
+    /** Phase 3C — tax & compliance indicators (bounded; not legal advice). */
+    salesTaxPayableCents: number
+    payrollTaxPayableCents: number
+    contractorTaxEstimateCents: number
+    convenienceFeeExposureRisk: number
+    achAuthorizationCoverageRate: number
+    vendor1099ReadinessRate: number
+    filingReadinessScore: number
+    complianceHealthScore: number
   }
   combinedForecast: ReturnType<typeof buildCombinedArApCashForecast>
   scorecards: OwnerScorecard[]
@@ -119,6 +128,7 @@ function drilldownsForOrg(overdueCount: number): Record<string, BlitzpayFinancia
     cashPlanning: { href: "/settings/payments#blitzpay-cash-accounts-anchor", label: "Operating cash & runway (Settings → Payments)" },
     accounting: { href: "/settings/payments#blitzpay-accounting-overview-anchor", label: "Internal books & trial balance (Settings → Payments)" },
     apBillPay: { href: "/settings/payments#blitzpay-ap-bill-pay-anchor", label: "Vendor bills & pay planning (Settings → Payments)" },
+    taxCompliance: { href: "/settings/payments#blitzpay-tax-compliance-anchor", label: "Tax & compliance overview (Settings → Payments)" },
   }
 }
 
@@ -291,6 +301,14 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
       vendorConcentrationRisk: reporting.vendorConcentrationRisk,
       treasuryCoverageForPayables: reporting.treasuryCoverageForPayables,
       payableAgingHealthScore: reporting.payableAgingHealthScore,
+      salesTaxPayableCents: reporting.salesTaxPayableCents,
+      payrollTaxPayableCents: reporting.payrollTaxPayableCents,
+      contractorTaxEstimateCents: reporting.contractorTaxEstimateCents,
+      convenienceFeeExposureRisk: reporting.convenienceFeeExposureRisk,
+      achAuthorizationCoverageRate: reporting.achAuthorizationCoverageRate,
+      vendor1099ReadinessRate: reporting.vendor1099ReadinessRate,
+      filingReadinessScore: reporting.filingReadinessScore,
+      complianceHealthScore: reporting.complianceHealthScore,
     },
     combinedForecast,
     scorecards,

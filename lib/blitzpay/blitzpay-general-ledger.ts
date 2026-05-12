@@ -176,3 +176,14 @@ export const BLITZPAY_VENDOR_COA_EXTENSION: ReadonlyArray<{
   { code: "5500", name: "Inventory Expense", type: "expense" },
   { code: "5600", name: "Vehicle Expense", type: "expense" },
 ]
+
+/** Phase 3C — tax & compliance GL extensions (merged by ensureBlitzpayDefaultTaxAccounts). 2300 Sales Tax Payable is in default COA seed. */
+export const BLITZPAY_TAX_COA_EXTENSION: ReadonlyArray<{
+  code: string
+  name: string
+  type: BlitzpayCoaAccountType
+}> = [
+  { code: "2310", name: "Employer Payroll Tax Payable", type: "liability" },
+  { code: "5750", name: "Payroll Tax Expense", type: "expense" },
+  { code: "5760", name: "Sales Tax Expense", type: "expense" },
+]

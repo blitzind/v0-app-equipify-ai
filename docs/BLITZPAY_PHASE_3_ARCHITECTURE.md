@@ -107,3 +107,48 @@ Phase **3B** adds **vendor records**, **vendor bills** (header + lines), **appro
 ## Tests
 
 - `pnpm test:blitzpay-phase-3b-ap-automation` — deterministic helpers, migration immutability string, API permission/schema guards, schema health table list (no DB).
+
+---
+
+# BlitzPay Phase 3C — Tax & compliance engine foundations
+
+Phase **3C** adds **jurisdictions**, **tax rules** (effective-dated, deterministic resolution), **tax calculation rows** (estimated/finalized/adjusted/voided), **append-only compliance audit** (immutable at DB), **ACH authorization retention** (hashed references only), **vendor tax / 1099 readiness profiles**, and **tax liability snapshots** (optional aggregates). It extends the **COA** with **`ensureBlitzpayDefaultTaxAccounts()`** (employer payroll tax payable + tax expense rows; **2300 Sales Tax Payable** remains from Phase 3A seed).
+
+## Non-goals
+
+- **No tax filing or remittance** from Equipify.
+- **No legal guarantees** — UI carries an explicit disclaimer.
+- **No customer portal** exposure for compliance internals.
+- **No raw TINs or ACH mandate text** in Postgres — only **pepper-hashed** fingerprints where needed.
+
+## Deterministic engine
+
+- `lib/blitzpay/blitzpay-tax-engine.ts` — rule ordering (jurisdiction locality precedence → effective date → id), percentage / flat / threshold math in **integer cents** and **basis points**, convenience-fee policy parsing (`allowed` / `prohibited` / `conditional` via rule `metadata.convenience_fee_policy`), filing readiness and compliance risk scores (bounded heuristics).
+- `lib/blitzpay/blitzpay-payroll-tax-estimates.ts` — simple employer payroll tax **estimate** from payroll exposure proxies.
+- `lib/blitzpay/blitzpay-compliance-audit.ts` — SHA-256 audit hash using the same server pepper as GL reference hashing (`BLITZPAY_GL_SOURCE_PEPPER`).
+
+## APIs (staff, org-scoped)
+
+Under `…/blitzpay/`: `tax/jurisdictions`, `tax/rules`, `tax/calculations`, `tax/calculate` (POST), `tax/liabilities`, `compliance/audit-log`, `compliance/health`, `ach-authorizations`, `vendor-tax-profiles`. All use **`requireAnyOrgPermission`** + **`blitzpaySchemaGuardNextResponse`**.
+
+## Reporting & UI
+
+- `fetchTaxComplianceReportingFields` in `lib/blitzpay/blitzpay-tax-service.ts` feeds **bounded** reporting snapshot fields and the **Financial Command Center** tiles.
+- `BlitzpayTaxCompliancePanel` on **Settings → Payments** and **Insights → Financial command center**.
+
+## Key files
+
+| Area | Path |
+|------|------|
+| Migration | `supabase/migrations/20261013120000_blitzpay_phase_3c_tax_compliance.sql` |
+| Tax engine | `lib/blitzpay/blitzpay-tax-engine.ts` |
+| Tax service | `lib/blitzpay/blitzpay-tax-service.ts` |
+| Compliance hash | `lib/blitzpay/blitzpay-compliance-audit.ts` |
+| Payroll tax estimate | `lib/blitzpay/blitzpay-payroll-tax-estimates.ts` |
+| COA extension | `BLITZPAY_TAX_COA_EXTENSION` in `lib/blitzpay/blitzpay-general-ledger.ts` |
+| Org APIs | `app/api/organizations/[organizationId]/blitzpay/tax/**`, `…/compliance/**`, `…/ach-authorizations`, `…/vendor-tax-profiles` |
+| Staff UI | `components/blitzpay/blitzpay-tax-compliance-panel.tsx` |
+
+## Tests
+
+- `pnpm test:blitzpay-phase-3c-tax-compliance` — deterministic pure helpers, migration immutability strings, API guards, schema health table list (no DB).

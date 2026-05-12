@@ -65,6 +65,13 @@ If not set, defaults come from `lib/plans.ts` (must be real `price_…` IDs for 
 - **Schema:** apply `20261012120000_blitzpay_phase_3b_ap_automation.sql` so staff `GET/POST …/blitzpay/ap/*` routes pass **schema health** checks (`blitzpay_schema_incomplete` otherwise).
 - **Money movement** remains on **existing Connect** flows when you pay through approved provider paths; Phase 3B adds **internal liability tracking** and **audit lineage** only.
 
+### BlitzPay Phase 3C (tax & compliance foundations)
+
+- **Orchestration only:** Phase **3C** records **jurisdictions**, **tax rules**, **deterministic calculation rows**, **append-only compliance audit** entries, **ACH authorization retention metadata** (hashed references), **vendor tax / 1099 readiness profiles**, and optional **tax liability snapshots** — it does **not** file, remit, or guarantee tax outcomes.
+- **Schema:** apply `20261013120000_blitzpay_phase_3c_tax_compliance.sql` so staff tax/compliance routes pass **schema health** checks (`blitzpay_schema_incomplete` otherwise).
+- **Stripe / webhooks:** no new Connect webhook types are required for Phase **3C**; settlement and charge behavior remain unchanged. Optional server-only pepper `BLITZPAY_GL_SOURCE_PEPPER` also seeds **compliance audit row hashes** (same as GL reference fingerprinting) — rotate with care across environments.
+- **Client exposure:** staff UI shows **operational indicators** only; do not surface raw tax identifiers, TINs, or bank/ACH authorization text from these tables.
+
 ### BlitzPay Phase 2AA (billing profiles and payment method metadata)
 
 - **Stripe remains the vault:** Equipify stores only **hashed** payment-method references plus **non-sensitive** display fields (brand, last4, exp, type). **No** card or bank account numbers are stored in Postgres.

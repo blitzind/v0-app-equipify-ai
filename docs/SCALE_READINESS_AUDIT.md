@@ -2,7 +2,7 @@
 
 **Scope:** Read-only review of database design, API/query patterns, frontend data loading, caching, RLS, Stripe/BlitzPay, AI metering, jobs, observability, rate limits, and deployment/runtime. No code or schema changes were made for this document.
 
-**Stack context:** Next.js App Router (16.x per build output), Supabase (PostgreSQL + RLS + Auth), Vercel-style serverless, Stripe SaaS billing + BlitzPay Phase 1 (Connect onboarding only), multi-tenant SaaS for field service businesses. **Update (BlitzPay Phase 3A):** internal **general ledger** tables and capped staff reads add bounded accounting workload; keep GL APIs off hot navigation paths at very large scale. **Update (BlitzPay Phase 3B):** vendor bill / pay-run / allocation tables are **staff-only** (finance roles), **capped** list queries per org, and **not** on portal or public caches — treat like other BlitzPay internal finance surfaces.
+**Stack context:** Next.js App Router (16.x per build output), Supabase (PostgreSQL + RLS + Auth), Vercel-style serverless, Stripe SaaS billing + BlitzPay Phase 1 (Connect onboarding only), multi-tenant SaaS for field service businesses. **Update (BlitzPay Phase 3A):** internal **general ledger** tables and capped staff reads add bounded accounting workload; keep GL APIs off hot navigation paths at very large scale. **Update (BlitzPay Phase 3B):** vendor bill / pay-run / allocation tables are **staff-only** (finance roles), **capped** list queries per org, and **not** on portal or public caches — treat like other BlitzPay internal finance surfaces. **Update (BlitzPay Phase 3C):** tax jurisdictions/rules/calculations, compliance audit, ACH authorization metadata, vendor tax profiles, and liability snapshots are **finance-role reads** with **explicit list caps** in services; **no portal routes** — same “internal books” traffic profile as Phase **3A–3B** (avoid high-frequency polling).
 
 ---
 
@@ -206,6 +206,12 @@ Evidence from migrations under `supabase/migrations/`:
 - **Staff-only finance APIs** under `…/blitzpay/ap/*` with explicit **row caps** on bills, vendors, and runs — keep off high-frequency customer paths.
 - **No autonomous payouts:** allocation rows are bookkeeping / planning; volume scales with **manual** scheduling discipline, not webhook fan-out.
 - **GL posting** on approve adds journal work bounded like other Phase **3A** batches — monitor orgs with very large daily bill volume separately.
+
+### 8.11 BlitzPay Phase 3C (tax & compliance foundations)
+
+- **Staff-only finance APIs** under `…/blitzpay/tax/*`, `…/blitzpay/compliance/*`, `…/blitzpay/ach-authorizations`, and `…/blitzpay/vendor-tax-profiles` — **no customer portal** exposure; payloads avoid raw TINs and raw ACH references (hashed retention only).
+- **Append-only audit:** `blitzpay_compliance_audit_log` is **update/delete blocked** at the database — growth is **append-mostly** like other audit tables; retention/archival policy is a future ops concern if volume spikes.
+- **Bounded reads:** list caps in `blitzpay-tax-engine.ts` / `blitzpay-tax-service.ts` bound jurisdictions, rules, calculations, audit tail, ACH rows, and vendor tax profiles per request — keep reporting snapshot enrichers on the same modest cadence as other BlitzPay snapshot fields.
 
 ---
 

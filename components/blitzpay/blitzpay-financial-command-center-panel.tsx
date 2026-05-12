@@ -75,6 +75,15 @@ type CommandCenterPayload = {
     vendorConcentrationRisk?: number
     treasuryCoverageForPayables?: number
     payableAgingHealthScore?: number
+    /** Phase 3C — tax & compliance (bounded; not legal advice). */
+    salesTaxPayableCents?: number
+    payrollTaxPayableCents?: number
+    contractorTaxEstimateCents?: number
+    convenienceFeeExposureRisk?: number
+    achAuthorizationCoverageRate?: number
+    vendor1099ReadinessRate?: number
+    filingReadinessScore?: number
+    complianceHealthScore?: number
   }
   combinedForecast: {
     netCashPosition7Cents: number
@@ -253,6 +262,14 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               { k: "Vendor concentration (open)", v: `${data.tiles.vendorConcentrationRisk ?? 0}/100` },
               { k: "Treasury vs approved payables (est.)", v: treasuryCoverageTile(data.tiles.treasuryCoverageForPayables ?? 0) },
               { k: "Payable aging comfort", v: `${data.tiles.payableAgingHealthScore ?? 0}/100` },
+              { k: "Sales tax (tracked est.)", v: fmtMoney(data.tiles.salesTaxPayableCents ?? 0) },
+              { k: "Payroll tax (est.)", v: fmtMoney(data.tiles.payrollTaxPayableCents ?? 0) },
+              { k: "Contractor tax (est.)", v: fmtMoney(data.tiles.contractorTaxEstimateCents ?? 0) },
+              { k: "Convenience fee compliance risk", v: `${data.tiles.convenienceFeeExposureRisk ?? 0}/100` },
+              { k: "ACH authorization coverage", v: `${data.tiles.achAuthorizationCoverageRate ?? 0}/100` },
+              { k: "Vendor 1099 readiness", v: `${data.tiles.vendor1099ReadinessRate ?? 0}/100` },
+              { k: "Filing readiness (internal)", v: `${data.tiles.filingReadinessScore ?? 0}/100` },
+              { k: "Compliance health (internal)", v: `${data.tiles.complianceHealthScore ?? 0}/100` },
             ].map((x) => (
               <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{x.k}</p>
