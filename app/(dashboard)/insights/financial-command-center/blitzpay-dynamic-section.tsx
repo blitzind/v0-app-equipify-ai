@@ -245,3 +245,34 @@ export function BlitzpayDynamicSection({ slug, organizationId, orgReady }: Props
       return null
   }
 }
+
+/**
+ * Chunk-only prefetch (mirrors `dynamic()` targets above). Warms bundles without mounting.
+ */
+export const BLITZPAY_FCC_CHUNK_PREFETCH_BY_SLUG: Partial<Record<string, () => Promise<unknown>>> = {
+  "executive-health": () => import("@/components/blitzpay/blitzpay-executive-dashboard"),
+  "ai-financial-copilot": () => import("@/components/blitzpay/blitzpay-ai-financial-copilot-panel"),
+  "revenue-optimization": () => import("./sections/revenue-optimization-section"),
+  "recurring-revenue": () => import("@/components/blitzpay/blitzpay-recurring-revenue-panel"),
+  collections: () => import("./sections/collections-section"),
+  "billing-profiles": () => import("@/components/blitzpay/blitzpay-billing-profiles-panel"),
+  "command-center-data": () => import("@/components/blitzpay/blitzpay-financial-command-center-panel"),
+  "multi-entity-finance": () => import("@/components/blitzpay/blitzpay-multi-entity-finance-panel"),
+  "supplier-network": () => import("@/components/blitzpay/blitzpay-supplier-network-panel"),
+  "claims-protection": () => import("@/components/blitzpay/blitzpay-claims-protection-panel"),
+  "mobile-financial-ops": () => import("@/components/blitzpay/blitzpay-mobile-financial-ops-panel"),
+  "enterprise-observability": () => import("@/components/blitzpay/blitzpay-enterprise-observability-panel"),
+  "internal-books": () => import("@/components/blitzpay/blitzpay-accounting-overview-panel"),
+  "vendor-bills": () => import("@/components/blitzpay/blitzpay-ap-bill-pay-panel"),
+  "tax-compliance": () => import("@/components/blitzpay/blitzpay-tax-compliance-panel"),
+  "financing-marketplace": () => import("@/components/blitzpay/blitzpay-financing-marketplace-panel"),
+  "procurement-inventory": () => import("@/components/blitzpay/blitzpay-procurement-inventory-panel"),
+  "operating-cash": () => import("@/components/blitzpay/blitzpay-cash-accounts-panel"),
+  "payroll-commissions": () => import("./sections/payroll-commissions-section"),
+  "contractor-settlements": () => import("@/components/blitzpay/blitzpay-vendor-payouts-panel"),
+}
+
+export function prefetchBlitzpayFccSectionChunk(slug: string): Promise<unknown> | null {
+  const fn = BLITZPAY_FCC_CHUNK_PREFETCH_BY_SLUG[slug]
+  return fn ? fn() : null
+}
