@@ -705,7 +705,7 @@ function CertificatesPageInner() {
         title="Certificates"
         subtitle="Review completed certificates from work orders and build reusable calibration templates."
         icon={FileBadge2}
-        featureColor="hsl(var(--primary))"
+        iconTone="purple"
       />
 
       {error ? (

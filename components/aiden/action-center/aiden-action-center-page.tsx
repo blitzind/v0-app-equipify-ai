@@ -264,7 +264,7 @@ export function AidenActionCenterPage() {
         title="AIden Action Center"
         subtitle="Review AI-prepared workspace actions, recommendations, and follow-ups before anything is applied."
         icon={Sparkles}
-        featureColor="hsl(var(--primary))"
+        iconTone="blue"
         trailing={
           <Button
             type="button"

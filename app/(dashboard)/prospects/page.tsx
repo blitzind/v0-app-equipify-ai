@@ -412,7 +412,7 @@ function ProspectsPageInner() {
         title="Prospects"
         subtitle="Inbound leads and opportunities. Convert promising prospects into customers while preserving pre-conversion history."
         icon={UserPlus}
-        featureColor="var(--primary)"
+        iconTone="primary"
       />
 
       {!canManage ? (
