@@ -84,6 +84,7 @@ import {
   formatProspectStatus,
   prospectStatusBadgeClasses,
 } from "@/lib/prospects/format"
+import { PageHeroCard } from "@/components/page-hero-card"
 import { cn } from "@/lib/utils"
 
 type ArchiveScope = "active" | "archived" | "all"
@@ -407,34 +408,12 @@ function ProspectsPageInner() {
   return (
     <div className="flex flex-col gap-8 min-w-0">
       {/* Hero — title card (no decorative right-side graphic; matches dashboard shell rhythm) */}
-      <section
-        className={cn(
-          "rounded-xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6",
-          "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
-          "dark:shadow-[0_1px_3px_rgba(0,0,0,0.22),0_1px_2px_rgba(0,0,0,0.12)]",
-        )}
-      >
-        <div className="flex gap-4 min-w-0">
-          <div
-            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex items-center justify-center shrink-0"
-            style={{
-              backgroundColor: "color-mix(in srgb, var(--primary) 14%, var(--card))",
-              borderColor: "color-mix(in srgb, var(--primary) 24%, var(--border))",
-            }}
-          >
-            <UserPlus className="w-5 h-5 sm:w-[22px] sm:h-[22px] text-primary shrink-0" aria-hidden />
-          </div>
-          <div className="min-w-0 pt-0.5">
-            <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-foreground text-balance">
-              Prospects
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1.5 max-w-2xl text-pretty leading-relaxed">
-              Inbound leads and opportunities. Convert promising prospects into customers while
-              preserving pre-conversion history.
-            </p>
-          </div>
-        </div>
-      </section>
+      <PageHeroCard
+        title="Prospects"
+        subtitle="Inbound leads and opportunities. Convert promising prospects into customers while preserving pre-conversion history."
+        icon={UserPlus}
+        featureColor="var(--primary)"
+      />
 
       {!canManage ? (
         <RestrictedNotice

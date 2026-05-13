@@ -9,6 +9,8 @@ import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecyc
 import type { ServiceTimelineEvent } from "@/lib/lifecycle/service-timeline"
 import { invoiceTermsCodeLabel } from "@/lib/billing/invoice-terms"
 import { BLITZPAY_FUTURE_PAYMENT_AUTHORIZATION_COPY } from "@/lib/blitzpay/blitzpay-consent-copy"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
+import { cn } from "@/lib/utils"
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—"
@@ -329,7 +331,7 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
               <p className="text-xs font-mono font-medium" style={{ color: "var(--portal-nav-text)" }}>
                 {inv.invoiceNumber}
               </p>
-              <h1 className="text-xl font-semibold mt-0.5" style={{ color: "var(--portal-foreground)" }}>
+              <h1 className={cn(PAGE_STANDARD_PAGE_TITLE, "mt-0.5")} style={{ color: "var(--portal-foreground)" }}>
                 {inv.title}
               </h1>
               <p className="text-sm mt-1" style={{ color: "var(--portal-nav-text)" }}>

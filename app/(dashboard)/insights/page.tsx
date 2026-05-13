@@ -31,10 +31,16 @@ import { BlitzpayMobileFinancialOpsPanel } from "@/components/blitzpay/blitzpay-
 import { BlitzpayEnterpriseObservabilityPanel } from "@/components/blitzpay/blitzpay-enterprise-observability-panel"
 import { BlitzpayPlanAwarenessStrip } from "@/components/blitzpay/blitzpay-plan-awareness-strip"
 import { Toaster } from "@/components/ui/toaster"
+import {
+  PAGE_HERO_MARKETING_ICON_FRAME,
+  PAGE_HERO_MARKETING_SUBTITLE,
+  PAGE_HERO_MARKETING_TITLE,
+} from "@/lib/page-hero-tokens"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { aiFeatureUpgradeMessage } from "@/lib/billing/feature-access"
 import { AiInsightActions } from "@/components/insights/ai-insight-actions"
+import { cn } from "@/lib/utils"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -506,16 +512,22 @@ export default function InsightsPage() {
           <div className="flex items-start justify-between gap-4 mb-6">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center">
-                  <Sparkles size={14} className="text-white" />
+                <div className={cn(PAGE_HERO_MARKETING_ICON_FRAME, "bg-blue-600")}>
+                  <Sparkles className="w-5 h-5 text-white shrink-0" aria-hidden />
                 </div>
                 <span className="text-xs font-semibold uppercase tracking-widest"
                   style={{ color: "#3b82f6" }}>
                   Equipify AI
                 </span>
               </div>
-              <h1 className="text-2xl font-bold text-white tracking-tight">Intelligence Hub</h1>
-              <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.45)" }}>
+              <h1 className={PAGE_HERO_MARKETING_TITLE}>Intelligence Hub</h1>
+              <p
+                className={PAGE_HERO_MARKETING_SUBTITLE}
+                title={`Rule-based operational signals from your live data · ${new Date().toLocaleString("en-US", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}`}
+              >
                 Rule-based operational signals from your live data &bull; {new Date().toLocaleString("en-US", {
                   dateStyle: "medium",
                   timeStyle: "short",

@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { AI_DISPLAY_TOKENS_PER_USD } from "@/lib/ai/display-tokens"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
+import { cn } from "@/lib/utils"
 
 const money = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 4 })
 
@@ -363,7 +365,7 @@ export default function AiUsageSettingsPage() {
       <div>
         <div className="flex items-center gap-2 mb-1">
           <Sparkles className="h-5 w-5 text-primary" />
-          <h1 className="text-lg font-semibold text-foreground">AI usage</h1>
+          <h1 className={cn(PAGE_STANDARD_PAGE_TITLE, "text-foreground")}>AI usage</h1>
         </div>
         <p className="text-sm text-muted-foreground">
           {isAdmin ? (

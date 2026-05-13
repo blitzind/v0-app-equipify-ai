@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { ChevronLeft, Loader2, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { BLITZPAY_FUTURE_PAYMENT_AUTHORIZATION_COPY } from "@/lib/blitzpay/blitzpay-consent-copy"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
+import { cn } from "@/lib/utils"
 
 function fmtCurrency(cents: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100)
@@ -210,7 +212,7 @@ export default function PortalQuoteDetailPage({ params }: { params: Promise<{ qu
           <ChevronLeft className="h-4 w-4" />
           Quotes
         </Link>
-        <h1 className="mt-2 text-xl font-semibold" style={{ color: "var(--portal-foreground)" }}>
+        <h1 className={cn(PAGE_STANDARD_PAGE_TITLE, "mt-2")} style={{ color: "var(--portal-foreground)" }}>
           {detail.quoteNumber}
         </h1>
         <p className="mt-1 text-sm" style={{ color: "var(--portal-nav-text)" }}>

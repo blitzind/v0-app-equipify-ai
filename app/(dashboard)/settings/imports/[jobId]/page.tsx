@@ -9,6 +9,7 @@ import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { IMPORT_STRATEGIES } from "@/lib/migration-imports/strategy"
 import { cn } from "@/lib/utils"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 type JobDetail = {
   jobId: string
@@ -230,7 +231,7 @@ export default function ImportJobDetailPage() {
           </Link>
         </Button>
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-semibold text-foreground">Import job</h1>
+          <h1 className={cn(PAGE_STANDARD_PAGE_TITLE, "text-foreground")}>Import job</h1>
           {job ? (
             <span className="text-sm font-mono text-primary" aria-label="Import reference">
               #{job.importRef}

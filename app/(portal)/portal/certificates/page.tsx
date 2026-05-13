@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Clock, Download, Info, Lock, Search, ShieldCheck } from "lucide-react"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 type Cert = {
   id: string
@@ -61,7 +62,7 @@ export default function PortalCertificatesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold" style={{ color: "var(--portal-foreground)" }}>
+        <h1 className={PAGE_STANDARD_PAGE_TITLE} style={{ color: "var(--portal-foreground)" }}>
           Compliance archive
         </h1>
         <p className="text-sm mt-0.5" style={{ color: "var(--portal-nav-text)" }}>

@@ -2,6 +2,8 @@
 
 import Link from "next/link"
 import { Calendar } from "lucide-react"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
+import { cn } from "@/lib/utils"
 
 export default function BookMaintenancePage() {
   return (
@@ -13,7 +15,7 @@ export default function BookMaintenancePage() {
         >
           <Calendar size={32} style={{ color: "var(--portal-accent)" }} />
         </div>
-        <h1 className="text-xl font-semibold mb-2" style={{ color: "var(--portal-foreground)" }}>
+        <h1 className={cn(PAGE_STANDARD_PAGE_TITLE, "mb-2")} style={{ color: "var(--portal-foreground)" }}>
           Appointments are confirmed by your service provider
         </h1>
         <p className="text-sm leading-relaxed" style={{ color: "var(--portal-nav-text)" }}>

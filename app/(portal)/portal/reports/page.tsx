@@ -4,6 +4,7 @@ import { useState } from "react"
 import { FileText, FileDown, BarChart3, Activity, CheckSquare, DollarSign, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 import { portalReports } from "@/lib/mock-data"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 const CUSTOMER_ID = "CUS-001"
 // Show all reports so demo is richer; in production filter by CUSTOMER_ID
@@ -89,7 +90,7 @@ export default function PortalReportsPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-semibold" style={{ color: "var(--portal-foreground)" }}>Reports</h1>
+          <h1 className={PAGE_STANDARD_PAGE_TITLE} style={{ color: "var(--portal-foreground)" }}>Reports</h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--portal-nav-text)" }}>
             Download service summaries, health reports, and cost analyses
           </p>

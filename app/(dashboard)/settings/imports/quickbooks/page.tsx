@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label"
 import { Shield } from "lucide-react"
 import { IMPORT_STRATEGIES } from "@/lib/migration-imports/strategy"
 import type { MigrationImportStrategy } from "@/lib/migration-imports/types"
+import { cn } from "@/lib/utils"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 type Entity = "customers" | "items" | "invoices"
 type Preview = {
@@ -136,7 +138,7 @@ export default function QuickBooksMigrationPage() {
         </Link>
       </Button>
       <div>
-        <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
+        <h1 className={cn(PAGE_STANDARD_PAGE_TITLE, "text-foreground flex items-center gap-2")}>
           <Plug className="h-6 w-6 text-primary" />
           QuickBooks continuity
         </h1>

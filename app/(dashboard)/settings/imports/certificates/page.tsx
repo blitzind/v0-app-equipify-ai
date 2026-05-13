@@ -4,6 +4,8 @@ import Link from "next/link"
 import { ArrowLeft, FileArchive, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { cn } from "@/lib/utils"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 export default function CertificatesImportPage() {
   const { has, status } = useOrgPermissions()
@@ -36,7 +38,7 @@ export default function CertificatesImportPage() {
         </Link>
       </Button>
       <div>
-        <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
+        <h1 className={cn(PAGE_STANDARD_PAGE_TITLE, "text-foreground flex items-center gap-2")}>
           <FileArchive className="h-6 w-6 text-primary" />
           Certificates & compliance
         </h1>

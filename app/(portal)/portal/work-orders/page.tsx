@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { CalendarClock, CheckCircle2, ClipboardList, Clock3, Search, Wrench } from "lucide-react"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 type Wo = {
   id: string
@@ -154,7 +155,7 @@ export default function PortalWorkOrdersPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold" style={{ color: "var(--portal-foreground)" }}>
+          <h1 className={PAGE_STANDARD_PAGE_TITLE} style={{ color: "var(--portal-foreground)" }}>
             Service visits
           </h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--portal-nav-text)" }}>

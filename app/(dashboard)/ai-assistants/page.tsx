@@ -23,6 +23,11 @@ import {
 } from "@/lib/ai/operational-assistants/client"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import {
+  PAGE_HERO_MARKETING_ICON_FRAME,
+  PAGE_HERO_MARKETING_SUBTITLE,
+  PAGE_HERO_MARKETING_TITLE,
+} from "@/lib/page-hero-tokens"
 
 type RunMeta = {
   task: string
@@ -311,13 +316,16 @@ export default function AiAssistantsPage() {
         <div className="px-6 py-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
-                <Cpu size={16} className="text-white" />
+              <div className={cn(PAGE_HERO_MARKETING_ICON_FRAME, "bg-indigo-600")}>
+                <Cpu className="w-5 h-5 text-white shrink-0" aria-hidden />
               </div>
               <span className="text-xs font-semibold uppercase tracking-widest text-indigo-300">Operational AI</span>
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">AI Assistants</h1>
-            <p className="text-sm mt-1 text-slate-400 max-w-xl">
+            <h1 className={PAGE_HERO_MARKETING_TITLE}>AI Assistants</h1>
+            <p
+              className={PAGE_HERO_MARKETING_SUBTITLE}
+              title="Structured recommendations—not a chatbot. Each assistant reads your org metrics and returns alerts, priorities, and suggested actions (router, usage logs, cache, workflows, and AI jobs)."
+            >
               Structured recommendations—not a chatbot. Each assistant reads your org metrics and returns alerts,
               priorities, and suggested actions (router, usage logs, cache, workflows, and AI jobs).
             </p>

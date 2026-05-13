@@ -17,6 +17,7 @@ import {
   Wallet,
 } from "lucide-react"
 import { usePortalSession } from "@/components/portal/portal-session-context"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 type DashboardPayload = {
   certificateSummary?: {
@@ -303,7 +304,7 @@ export default function PortalDashboardPage() {
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-semibold text-balance" style={{ color: "var(--portal-foreground)" }}>
+          <h1 className={PAGE_STANDARD_PAGE_TITLE} style={{ color: "var(--portal-foreground)" }}>
             Hello, {greetingName}
           </h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--portal-nav-text)" }}>

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 const STATUSES = ["new", "reviewed", "planned", "in_progress", "released", "declined"] as const
 
@@ -179,7 +180,7 @@ export default function AdminFeatureRequestsPage() {
                   <Sparkles size={17} />
                 </span>
                 <div>
-                  <h1 className="text-xl font-semibold">AIden Feature Requests</h1>
+                  <h1 className={PAGE_STANDARD_PAGE_TITLE}>AIden Feature Requests</h1>
                   <p className="text-sm text-muted-foreground">
                     Lightweight product suggestions captured from unresolved AIden conversations.
                   </p>

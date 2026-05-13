@@ -16,6 +16,7 @@ import type {
   RecommendationPriority,
   RecommendationsResponse,
 } from "@/lib/ai-ops/types"
+import { PageHeroCard } from "@/components/page-hero-card"
 import { RecommendationCard } from "./recommendation-card"
 import { AiOpsCommandCenterDrawer } from "./command-center-drawer"
 import {
@@ -119,21 +120,12 @@ export function AiOpsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-border bg-card px-4 sm:px-6 py-4 sm:py-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="h-10 w-10 rounded-xl border border-violet-500/30 bg-violet-500/[0.08] flex items-center justify-center shrink-0">
-            <Brain className="h-5 w-5 text-violet-600 dark:text-violet-400" aria-hidden />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-base sm:text-lg font-semibold tracking-tight">AI Operations</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">
-              Operational recommendations from your live data. Use the command center for lifecycle,
-              timelines, and approval-based actions — Equipify never sends customer emails or mutates
-              records without your explicit confirmation.
-            </p>
-          </div>
-        </div>
-      </section>
+      <PageHeroCard
+        title="AI Operations"
+        subtitle="Operational recommendations from your live data. Use the command center for lifecycle, timelines, and approval-based actions — Equipify never sends customer emails or mutates records without your explicit confirmation."
+        icon={Brain}
+        featureColor="#7c3aed"
+      />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KpiCard label="Total" value={summary?.total ?? 0} accent="muted" />

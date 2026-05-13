@@ -6,6 +6,7 @@ import { useParams } from "next/navigation"
 import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 type AidenActionsAvailability = {
   enabled: boolean
@@ -95,7 +96,7 @@ export default function AdminAccountFeaturePage() {
               <ShieldCheck size={18} />
             </span>
             <div>
-              <h1 className="text-xl font-semibold">{data?.organization?.name ?? "Account Features"}</h1>
+              <h1 className={PAGE_STANDARD_PAGE_TITLE}>{data?.organization?.name ?? "Account Features"}</h1>
               <p className="text-sm text-muted-foreground">Manual feature controls for this organization.</p>
             </div>
           </div>

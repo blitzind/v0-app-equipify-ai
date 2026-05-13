@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { Loader2, Wallet } from "lucide-react"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 type PayStatus = {
   upcomingPaymentsCount: number
@@ -138,7 +139,7 @@ export default function PortalBillingPage() {
           <Wallet className="h-5 w-5" aria-hidden />
         </div>
         <div>
-          <h1 className="text-lg font-semibold" style={{ color: "var(--portal-foreground)" }}>
+          <h1 className={PAGE_STANDARD_PAGE_TITLE} style={{ color: "var(--portal-foreground)" }}>
             Billing overview
           </h1>
           <p className="text-sm mt-1 leading-relaxed" style={{ color: "var(--portal-nav-text)" }}>

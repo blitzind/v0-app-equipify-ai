@@ -15,6 +15,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 type QuoteRow = {
   id: string
@@ -106,7 +107,7 @@ export default function PortalQuotesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold" style={{ color: "var(--portal-foreground)" }}>
+        <h1 className={PAGE_STANDARD_PAGE_TITLE} style={{ color: "var(--portal-foreground)" }}>
           Quotes
         </h1>
         <p className="mt-0.5 text-sm" style={{ color: "var(--portal-nav-text)" }}>

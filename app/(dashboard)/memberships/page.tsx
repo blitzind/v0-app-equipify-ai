@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { AlertTriangle } from "lucide-react"
+import { PageHeroCard } from "@/components/page-hero-card"
 import { BlitzpayMembershipsDashboard } from "@/components/blitzpay/blitzpay-memberships-dashboard"
 import { MembershipsLucideIcon } from "@/lib/navigation/module-icons"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -34,22 +35,12 @@ export default function MembershipsPage() {
 
   return (
     <div className="flex flex-col gap-5 min-w-0 max-w-full overflow-x-hidden">
-      <div className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] flex gap-3 min-w-0">
-        <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-          aria-hidden
-        >
-          <MembershipsLucideIcon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 space-y-2">
-          <h1 className="text-lg font-semibold text-foreground tracking-tight">Memberships</h1>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Recurring service agreements and membership billing are native to Equipify. Invoices generate on a deterministic
-            cron (<span className="font-mono text-xs">POST /api/cron/blitzpay-memberships</span>). Customers can review plans
-            in the portal under <span className="font-medium text-foreground">Memberships</span> once invited.
-          </p>
-        </div>
-      </div>
+      <PageHeroCard
+        title="Memberships"
+        subtitle="Recurring service agreements and membership billing are native to Equipify. Invoices generate on a deterministic cron (POST /api/cron/blitzpay-memberships). Customers can review plans in the portal under Memberships once invited."
+        icon={MembershipsLucideIcon}
+        featureColor="#059669"
+      />
       <BlitzpayMembershipsDashboard organizationId={organizationId} orgReady={orgStatus === "ready"} />
     </div>
   )

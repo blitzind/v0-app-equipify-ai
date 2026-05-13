@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { PageHeroCard } from "@/components/page-hero-card"
 import { cn } from "@/lib/utils"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import {
@@ -435,34 +436,22 @@ export default function IntegrationsPage() {
         </div>
       )}
 
-      <div className="flex items-center gap-3 sm:gap-4 bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] px-4 sm:px-6 py-4 sm:py-5">
-        <div
-          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center shrink-0"
-          style={{
-            backgroundColor: "color-mix(in srgb, #2563eb 14%, var(--card))",
-            borderColor: "color-mix(in srgb, #2563eb 24%, var(--border))",
-          }}
-        >
-          <Plug className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" style={{ color: "#2563eb" }} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-base sm:text-lg font-semibold text-foreground tracking-tight leading-tight text-balance">
-            Integrations
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">
-            What is live in Equipify today vs planned. Use Settings → Integrations for QuickBooks; Billing for Stripe
-            Checkout.
-          </p>
-        </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="shrink-0 gap-2 cursor-pointer"
-          onClick={() => setRequestModal(true)}
-        >
-          Request Integration
-        </Button>
-      </div>
+      <PageHeroCard
+        title="Integrations"
+        subtitle="What is live in Equipify today vs planned. Use Settings → Integrations for QuickBooks; Billing for Stripe Checkout."
+        icon={Plug}
+        featureColor="#2563eb"
+        trailing={
+          <Button
+            size="sm"
+            variant="outline"
+            className="shrink-0 gap-2 cursor-pointer"
+            onClick={() => setRequestModal(true)}
+          >
+            Request Integration
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {KPIS.map(({ label, value, icon: Icon, tile }) => (

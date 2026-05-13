@@ -15,6 +15,7 @@ import { blitzpayConnectOnboardingToastDescription } from "@/lib/blitzpay/connec
 import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 import { blitzpayFccHref } from "@/lib/navigation/blitzpay-financial-command-center-nav"
 import { cn } from "@/lib/utils"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 type BlitzPayStatusPayload = {
   stripe_connect_account_id: string | null
@@ -402,7 +403,7 @@ function BlitzPaySettingsPageInner() {
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 overflow-x-hidden">
       <div>
-        <h1 className="text-lg font-semibold text-foreground">Payments</h1>
+        <h1 className={cn(PAGE_STANDARD_PAGE_TITLE, "text-foreground")}>Payments</h1>
         <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
           Connect BlitzPay to accept customer payments, and set workspace-wide payment terms for{" "}
           <strong className="font-medium text-foreground/90">customer invoices</strong> you create in Equipify.

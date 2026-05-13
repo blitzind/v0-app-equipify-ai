@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { ChevronRight, Search, CalendarClock, Shield, MapPin } from "lucide-react"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 type EqRow = {
   id: string
@@ -70,7 +71,7 @@ export default function PortalEquipmentPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold" style={{ color: "var(--portal-foreground)" }}>
+          <h1 className={PAGE_STANDARD_PAGE_TITLE} style={{ color: "var(--portal-foreground)" }}>
             Equipment
           </h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--portal-nav-text)" }}>

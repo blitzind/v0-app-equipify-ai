@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ChevronLeft, Loader2 } from "lucide-react"
 import { formatSlaCoverageLabel } from "@/components/service-contracts/sla-coverage-badge"
 import type { SlaCoverageLabel } from "@/lib/service-contracts/types"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 type Item = {
   id: string
@@ -54,7 +55,7 @@ export default function PortalServiceRequestsPage() {
         </Link>
       </div>
       <div>
-        <h1 className="text-xl font-semibold" style={{ color: "var(--portal-foreground)" }}>
+        <h1 className={PAGE_STANDARD_PAGE_TITLE} style={{ color: "var(--portal-foreground)" }}>
           My requests
         </h1>
         <p className="text-sm mt-0.5" style={{ color: "var(--portal-nav-text)" }}>

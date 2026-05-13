@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import {
   Paintbrush,
   Save,
@@ -302,7 +303,7 @@ export default function PortalSettingsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-base font-semibold text-foreground">Customer Portal</h1>
+          <h1 className={cn(PAGE_STANDARD_PAGE_TITLE, "text-foreground")}>Customer Portal</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             Workspace defaults for certificates, document library rollup, and activity. Branding is managed under{" "}
             <Link href="/settings/workspace" className="underline underline-offset-2 hover:text-foreground">

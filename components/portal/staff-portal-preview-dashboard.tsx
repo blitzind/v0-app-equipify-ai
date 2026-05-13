@@ -17,6 +17,7 @@ import { buildStaffPreviewHref } from "@/lib/portal/staff-preview-href"
 import { modeLabel } from "@/lib/portal/certificate-release-staff"
 import { normalizeReleaseMode } from "@/lib/portal/certificate-release"
 import type { StaffPortalPreviewSnapshot } from "@/lib/portal/staff-portal-preview-data"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—"
@@ -239,7 +240,7 @@ export function StaffPortalPreviewDashboard({
       <div className="scroll-mt-28 space-y-6">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div>
-            <h1 className="text-balance text-xl font-semibold" style={{ color: "var(--portal-foreground)" }}>
+            <h1 className={PAGE_STANDARD_PAGE_TITLE} style={{ color: "var(--portal-foreground)" }}>
               Overview
             </h1>
             <p className="mt-0.5 text-sm" style={{ color: "var(--portal-nav-text)" }}>

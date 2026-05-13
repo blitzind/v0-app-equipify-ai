@@ -1,3 +1,5 @@
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
+
 export function StaffPreviewPageHeading({
   title,
   description,
@@ -7,7 +9,7 @@ export function StaffPreviewPageHeading({
 }) {
   return (
     <div className="space-y-1">
-      <h1 className="text-xl font-semibold" style={{ color: "var(--portal-foreground)" }}>
+      <h1 className={PAGE_STANDARD_PAGE_TITLE} style={{ color: "var(--portal-foreground)" }}>
         {title}
       </h1>
       {description ?

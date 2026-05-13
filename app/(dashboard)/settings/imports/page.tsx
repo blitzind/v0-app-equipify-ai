@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { cn } from "@/lib/utils"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import { IMPORT_STRATEGIES } from "@/lib/migration-imports/strategy"
 
 type ImportJobListItem = {
@@ -164,7 +165,7 @@ export default function MigrationCenterPage() {
   return (
     <div className="flex flex-col gap-8 max-w-3xl">
       <div>
-        <h1 className="text-xl font-semibold text-foreground">Migration center</h1>
+        <h1 className={cn(PAGE_STANDARD_PAGE_TITLE, "text-foreground")}>Migration center</h1>
         <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
           Import legacy customers, equipment, invoices, and service history with preview and validation. Nothing is
           written until you confirm the import. QuickBooks live sync remains under Integrations — this area focuses on

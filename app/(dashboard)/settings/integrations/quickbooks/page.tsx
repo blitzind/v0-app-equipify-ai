@@ -21,6 +21,7 @@ import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 type IntegrationRow = {
   id: string
@@ -337,7 +338,7 @@ function QuickBooksIntegrationPageInner() {
               QB
             </div>
             <div>
-              <h1 className="text-lg font-semibold tracking-tight">QuickBooks Online</h1>
+              <h1 className={cn(PAGE_STANDARD_PAGE_TITLE, "text-foreground")}>QuickBooks Online</h1>
               <p className="text-sm text-muted-foreground">
                 Export customers, catalog items, and invoices to QuickBooks Online.
               </p>

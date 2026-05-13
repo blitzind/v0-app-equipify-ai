@@ -8,7 +8,8 @@ import { ScheduleServiceDrawer } from "@/components/schedule-service-drawer"
 import { useQuickAdd } from "@/lib/quick-add-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
-import { cn } from "@/lib/utils"
+import { PageHeroCard } from "@/components/page-hero-card"
+import { PAGE_HERO_SHELL_OUTER } from "@/lib/page-hero-tokens"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   HardHat, BarChart3, Globe, Settings, FileText, Receipt, Plug, ShoppingCart,
@@ -33,8 +34,6 @@ interface RouteMeta {
   cta?: { label: string; href?: string }
   /** Optional right-side mark in the title card (e.g. partner brand). */
   heroAccessory?: "blitzpay-wordmark"
-  /** When true, subtitle wraps like Settings hero instead of a single-line clamp. */
-  heroSubtitleMultiline?: boolean
 }
 
 const ROUTE_META: Record<string, RouteMeta> = {
@@ -240,7 +239,6 @@ function PageHero({
   featureColor,
   pathname,
   heroAccessory,
-  heroSubtitleMultiline,
 }: {
   title: string
   subtitle: string
@@ -248,71 +246,15 @@ function PageHero({
   featureColor: string
   pathname: string
   heroAccessory?: RouteMeta["heroAccessory"]
-  heroSubtitleMultiline?: boolean
 }) {
   const maintenancePlansHero = pathname === "/maintenance-plans"
-  const blitzPayFinancialHero = pathname.startsWith("/insights/financial-command-center")
-  const isSettingsArea = pathname.startsWith("/settings/")
-  const multilineSubtitle = Boolean(
-    isSettingsArea || (heroSubtitleMultiline && !blitzPayFinancialHero),
-  )
-  const heroIconFrameClass = blitzPayFinancialHero
-    ? "w-11 h-11 sm:w-12 sm:h-12 rounded-xl border flex items-center justify-center shrink-0"
-    : "w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center shrink-0"
-  const heroIconGlyphClass = blitzPayFinancialHero ? "shrink-0 w-6 h-6 sm:w-7 sm:h-7" : "w-4 h-4 sm:w-5 sm:h-5 shrink-0"
   return (
-    <div
-      className={cn(
-        "px-3 sm:px-6 shrink-0",
-        isSettingsArea ? "pt-4 sm:pt-6 pb-2" : "pt-4 sm:pt-5 pb-1",
-      )}
-    >
-      <div
-        className={cn(
-          "flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] px-4 sm:px-6",
-          isSettingsArea ? "py-4 sm:py-6" : "py-4 sm:py-5",
-        )}
-      >
-        <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
-          {maintenancePlansHero ? (
-            <MaintenancePlansBrandTile size="md" />
-          ) : (
-            <div
-              className={heroIconFrameClass}
-              style={{
-                backgroundColor: `color-mix(in srgb, ${featureColor} 14%, var(--card))`,
-                borderColor: `color-mix(in srgb, ${featureColor} 24%, var(--border))`,
-              }}
-            >
-              <Icon className={heroIconGlyphClass} style={{ color: featureColor }} aria-hidden />
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <h1
-              className={cn(
-                "font-semibold text-foreground tracking-tight leading-tight text-balance",
-                isSettingsArea ? "text-lg sm:text-xl" : "text-base sm:text-lg",
-              )}
-            >
-              {title}
-            </h1>
-            <p
-              className={cn(
-                "text-muted-foreground mt-1 sm:mt-1.5 leading-relaxed",
-                blitzPayFinancialHero
-                  ? "text-xs sm:text-sm max-sm:text-pretty sm:truncate sm:whitespace-nowrap sm:overflow-hidden sm:text-ellipsis"
-                  : multilineSubtitle
-                    ? "text-sm sm:text-[0.9375rem] max-w-3xl text-pretty"
-                    : "text-xs sm:text-sm line-clamp-1",
-              )}
-              title={blitzPayFinancialHero ? subtitle : undefined}
-            >
-              {subtitle}
-            </p>
-          </div>
-        </div>
-        {heroAccessory === "blitzpay-wordmark" ? (
-          <div className="flex shrink-0 items-center justify-start bg-transparent pt-1 sm:justify-end sm:pt-0 pl-0 sm:pl-0 w-full sm:w-auto">
+    <div className={PAGE_HERO_SHELL_OUTER}>
+      <PageHeroCard
+        title={title}
+        subtitle={subtitle}
+        trailing={
+          heroAccessory === "blitzpay-wordmark" ? (
             <Image
               src="/blitzpay-wordmark-transparent.png"
               alt="BlitzPay"
@@ -321,9 +263,12 @@ function PageHero({
               className="h-[35px] w-auto max-w-[min(92vw,180px)] sm:h-10 sm:max-w-[min(260px,48vw)] object-contain object-left sm:object-right opacity-95 bg-transparent"
               priority
             />
-          </div>
-        ) : null}
-      </div>
+          ) : undefined
+        }
+        {...(maintenancePlansHero
+          ? { leading: <MaintenancePlansBrandTile size="stat" /> }
+          : { icon: Icon, featureColor })}
+      />
     </div>
   )
 }
@@ -357,7 +302,6 @@ export function PageShell({ children }: { children: React.ReactNode }) {
           featureColor={getFeatureIconColor(pathname)}
           pathname={pathname}
           heroAccessory={meta.heroAccessory}
-          heroSubtitleMultiline={meta.heroSubtitleMultiline}
         />
       )}
       <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto outline-none scroll-mt-14 md:scroll-mt-16">

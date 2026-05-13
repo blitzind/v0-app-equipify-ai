@@ -7,6 +7,7 @@ import {
 } from "lucide-react"
 import { customers } from "@/lib/mock-data"
 import type { Customer, Contact } from "@/lib/mock-data"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 const CUSTOMER_ID = "CUS-001"
 const customer = customers.find((c) => c.id === CUSTOMER_ID)!
@@ -139,7 +140,7 @@ export default function PortalAccountPage() {
   return (
     <div className="max-w-3xl space-y-8">
       <div>
-        <h1 className="text-xl font-semibold" style={{ color: "var(--portal-foreground)" }}>Account &amp; Contacts</h1>
+        <h1 className={PAGE_STANDARD_PAGE_TITLE} style={{ color: "var(--portal-foreground)" }}>Account &amp; Contacts</h1>
         <p className="text-sm mt-0.5" style={{ color: "var(--portal-nav-text)" }}>
           Manage your company profile, contacts, and notification preferences
         </p>

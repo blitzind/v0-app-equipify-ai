@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation"
 import { ChevronLeft, CheckCircle2, Wrench } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 type EqOpt = { id: string; name: string }
 type LocOpt = { id: string; label: string; is_default: boolean }
@@ -91,7 +92,7 @@ function RequestRepairPageInner() {
           >
             <CheckCircle2 size={32} style={{ color: "var(--portal-success)" }} />
           </div>
-          <h1 className="text-xl font-semibold mb-2" style={{ color: "var(--portal-foreground)" }}>
+          <h1 className={cn(PAGE_STANDARD_PAGE_TITLE, "mb-2")} style={{ color: "var(--portal-foreground)" }}>
             Request received
           </h1>
           <p className="text-sm leading-relaxed" style={{ color: "var(--portal-nav-text)" }}>
@@ -124,7 +125,7 @@ function RequestRepairPageInner() {
       </div>
 
       <div>
-        <h1 className="text-xl font-semibold" style={{ color: "var(--portal-foreground)" }}>
+        <h1 className={PAGE_STANDARD_PAGE_TITLE} style={{ color: "var(--portal-foreground)" }}>
           Request service
         </h1>
         <p className="text-sm mt-0.5" style={{ color: "var(--portal-nav-text)" }}>

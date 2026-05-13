@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Calendar } from "lucide-react"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 type Plan = {
   id: string
@@ -63,7 +64,7 @@ export default function PortalMaintenancePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold" style={{ color: "var(--portal-foreground)" }}>
+        <h1 className={PAGE_STANDARD_PAGE_TITLE} style={{ color: "var(--portal-foreground)" }}>
           Maintenance
         </h1>
         <p className="text-sm mt-0.5" style={{ color: "var(--portal-nav-text)" }}>

@@ -19,6 +19,8 @@ import {
   Activity,
 } from "lucide-react"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
+
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—"
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -203,7 +205,7 @@ export default function PortalEquipmentDetailPage({ params }: { params: Promise<
               >
                 {eq.statusLabel}
               </span>
-              <h1 className="text-xl font-semibold text-balance" style={{ color: "var(--portal-foreground)" }}>
+              <h1 className={PAGE_STANDARD_PAGE_TITLE} style={{ color: "var(--portal-foreground)" }}>
                 {primary}
               </h1>
               <p className="text-sm mt-0.5" style={{ color: "var(--portal-nav-text)" }}>

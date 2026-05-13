@@ -19,6 +19,7 @@ import { PreparedActionAuditTrail } from "@/components/aiden/prepared-actions/Pr
 import { PreparedActionStatusBadge } from "@/components/aiden/prepared-actions/PreparedActionStatusBadge"
 import { PreparedActionWarnings } from "@/components/aiden/prepared-actions/PreparedActionWarnings"
 import { humanizePreparedActionId, type SerializedPreparedAction } from "@/components/aiden/prepared-actions/types"
+import { PageHeroCard } from "@/components/page-hero-card"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -259,22 +260,12 @@ export function AidenActionCenterPage() {
 
   return (
     <div className="flex flex-col gap-4 pb-8">
-      <div className="rounded-xl border border-border bg-card px-4 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] sm:px-5 sm:py-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-          <div className="flex min-w-0 gap-3">
-            <div
-              className="flex size-10 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-gradient-to-br from-sky-500/12 via-primary/10 to-blue-700/12 ring-1 ring-primary/10"
-              aria-hidden
-            >
-              <Sparkles className="size-[18px] text-primary drop-shadow-[0_1px_1px_rgba(0,0,0,0.08)]" strokeWidth={2} />
-            </div>
-            <div className="min-w-0 pt-0.5">
-              <h1 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">AIden Action Center</h1>
-              <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                Review AI-prepared workspace actions, recommendations, and follow-ups before anything is applied.
-              </p>
-            </div>
-          </div>
+      <PageHeroCard
+        title="AIden Action Center"
+        subtitle="Review AI-prepared workspace actions, recommendations, and follow-ups before anything is applied."
+        icon={Sparkles}
+        featureColor="hsl(var(--primary))"
+        trailing={
           <Button
             type="button"
             variant="outline"
@@ -286,8 +277,8 @@ export function AidenActionCenterPage() {
             <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} aria-hidden />
             Refresh
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <Card>
         <CardHeader className="pb-3">

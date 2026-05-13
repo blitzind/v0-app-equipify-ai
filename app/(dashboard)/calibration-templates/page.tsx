@@ -67,6 +67,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { tabsListDrawerRowClassName, tabsTriggerDrawerRowClassName } from "@/components/ui/tabs-chrome"
 import { useToast } from "@/hooks/use-toast"
 import { CertificateTemplatePreview } from "@/components/certificates/certificate-template-preview"
+import { PageHeroCard } from "@/components/page-hero-card"
 import {
   ImportTemplateDialog,
   type ImportReviewDraft,
@@ -700,21 +701,12 @@ function CertificatesPageInner() {
 
   return (
     <div className="space-y-6">
-      <Card className="rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-4 sm:p-5">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-            <FileBadge2 className="w-5 h-5 text-primary" />
-          </div>
-          <div className="min-w-0 flex flex-col">
-            <h1 className="text-base sm:text-lg font-semibold text-foreground tracking-tight leading-tight text-balance">
-              Certificates
-            </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 leading-relaxed">
-              Review completed certificates from work orders and build reusable calibration templates.
-            </p>
-          </div>
-        </div>
-      </Card>
+      <PageHeroCard
+        title="Certificates"
+        subtitle="Review completed certificates from work orders and build reusable calibration templates."
+        icon={FileBadge2}
+        featureColor="hsl(var(--primary))"
+      />
 
       {error ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">

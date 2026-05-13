@@ -6,6 +6,7 @@ import { AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FAILURE_COPY } from "@/lib/failure-states/copy"
 import { cn } from "@/lib/utils"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 export type RouteErrorScope = "app" | "dashboard" | "portal" | "admin" | "global"
 
@@ -78,7 +79,7 @@ export function RouteErrorFallback({
           <AlertTriangle className="size-5 shrink-0" aria-hidden />
         </div>
         <div className="space-y-2">
-          <h1 className="text-lg font-semibold tracking-tight text-balance">{title}</h1>
+          <h1 className={cn(PAGE_STANDARD_PAGE_TITLE, "text-foreground")}>{title}</h1>
           <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
             {description}
           </p>

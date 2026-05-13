@@ -7,6 +7,7 @@ import { CsvImportFlow } from "@/components/migration/csv-import-flow"
 import { Button } from "@/components/ui/button"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { cn } from "@/lib/utils"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 type FieldPulseDataType = "customer" | "equipment" | "work_order" | "invoice" | "appointment"
 
@@ -96,7 +97,7 @@ export default function FieldPulseMigrationPage() {
       <div className="max-w-3xl rounded-lg border border-border bg-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Import historical FieldPulse data</h1>
+            <h1 className={cn(PAGE_STANDARD_PAGE_TITLE, "text-foreground")}>Import historical FieldPulse data</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Use exported CSV files from FieldPulse. This will not modify FieldPulse, send customer emails, trigger
               automations, or sync imported invoices to QuickBooks.

@@ -35,6 +35,7 @@ import { canAccessInvoiceFollowUpTasks } from "@/lib/follow-up-automation/invoic
 import { isInvoiceFollowUpRuleKey } from "@/lib/follow-up-automation/invoice-rules"
 import type { FollowUpTaskRow } from "@/lib/follow-up-automation/types"
 import { cn } from "@/lib/utils"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 function priorityBadgeClass(priority: FollowUpTaskRow["priority"]) {
   const map: Record<string, string> = {
@@ -191,7 +192,7 @@ export default function FollowUpQueuePage() {
           <ClipboardList className="h-5 w-5 text-primary" aria-hidden />
         </div>
         <div>
-          <h1 className="text-lg font-semibold text-foreground">Follow-up queue</h1>
+          <h1 className={cn(PAGE_STANDARD_PAGE_TITLE, "text-foreground")}>Follow-up queue</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Suggested reminders — review drafts, then hand off to Communications. Nothing sends automatically.
           </p>
