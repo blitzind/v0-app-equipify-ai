@@ -4215,12 +4215,11 @@ export function InvoiceDetailView({ invoice, onClose, onSelectInvoiceId }: Invoi
   }, [organizationId, invoice.id])
 
   const canStaffInvoiceDocuments =
-    Boolean(invoicePrintHref) &&
-    (permissions.canViewFinancials || permissions.canEditInvoices) &&
-    !invoice.isArchived
+    Boolean(invoicePrintHref) && (permissions.canViewFinancials || permissions.canEditInvoices)
 
   const canCopyCustomerInvoiceUrl =
     canStaffInvoiceDocuments &&
+    !invoice.isArchived &&
     invoice.status !== "Draft" &&
     invoice.status !== "Void"
 

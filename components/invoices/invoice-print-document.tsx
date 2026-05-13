@@ -5,23 +5,12 @@ function money(cents: number): string {
   return formatUsdFromCents(Math.max(0, Math.round(cents)))
 }
 
-function detailFallback(ctx: InvoiceDocumentContext): string | null {
-  const parts: string[] = []
-  const subj = ctx.invoiceTitle?.trim()
-  if (subj) parts.push(subj)
-  const n = ctx.customerNotes?.trim()
-  if (n) parts.push(n)
-  const ins = ctx.invoiceInstructions?.trim()
-  if (ins) parts.push(`Customer instructions:\n${ins}`)
-  if (parts.length === 0) return null
-  return parts.join("\n\n")
-}
-
 export function InvoicePrintDocument({ ctx }: { ctx: InvoiceDocumentContext }) {
   const logo = ctx.documentLogoUrl?.trim() || ctx.logoUrl?.trim() || null
   const billName = ctx.billToName?.trim() || ctx.customerCompanyName
-  const fallback = detailFallback(ctx)
   const taxLabel = invoiceTaxRowLabel({ taxRatePercent: ctx.taxRatePercent })
+  const notesBlock = ctx.customerNotes?.trim() || null
+  const instructionsBlock = ctx.invoiceInstructions?.trim() || null
 
   return (
     <div className="invoice-print-root mx-auto max-w-[720px] px-6 py-8 text-gray-900 bg-white text-sm leading-relaxed">
@@ -76,6 +65,12 @@ export function InvoicePrintDocument({ ctx }: { ctx: InvoiceDocumentContext }) {
               {ctx.workOrderLabel}
             </p>
           ) : null}
+          {ctx.poNumber ? (
+            <p className="mt-1 text-xs">
+              <span className="font-medium text-gray-500">PO: </span>
+              {ctx.poNumber}
+            </p>
+          ) : null}
           {ctx.serviceDateLabel ? (
             <p className="mt-1 text-xs">
               <span className="font-medium text-gray-500">Service date: </span>
@@ -118,12 +113,6 @@ export function InvoicePrintDocument({ ctx }: { ctx: InvoiceDocumentContext }) {
                   </td>
                 </tr>
               ))
-            ) : fallback ? (
-              <tr>
-                <td colSpan={4} className="py-3 text-xs text-gray-700 whitespace-pre-wrap">
-                  {fallback}
-                </td>
-              </tr>
             ) : (
               <tr>
                 <td colSpan={4} className="py-3 text-xs italic text-gray-500">
@@ -159,6 +148,24 @@ export function InvoicePrintDocument({ ctx }: { ctx: InvoiceDocumentContext }) {
           <span className="tabular-nums font-semibold">{money(ctx.balanceDueCents)}</span>
         </div>
       </section>
+
+      {instructionsBlock || notesBlock ? (
+        <section className="invoice-print-notes-block mt-8 border-t border-gray-200 pt-6 text-xs text-gray-700">
+          <h2 className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-3">Terms & notes</h2>
+          {instructionsBlock ? (
+            <div className="mb-4 whitespace-pre-wrap">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Payment instructions</p>
+              <p>{instructionsBlock}</p>
+            </div>
+          ) : null}
+          {notesBlock ? (
+            <div className="whitespace-pre-wrap">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Notes</p>
+              <p>{notesBlock}</p>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
     </div>
   )
 }

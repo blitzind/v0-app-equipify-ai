@@ -26,10 +26,10 @@ export default async function OrganizationInvoicePrintPage({
   if (!ctx) notFound()
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <main className="invoice-print-shell">
       <InvoicePrintChrome />
       <InvoicePrintDocument ctx={ctx} />
       <InvoicePrintAutoTrigger />
-    </div>
+    </main>
   )
 }

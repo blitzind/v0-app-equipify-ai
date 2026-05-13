@@ -1,0 +1,52 @@
+/* Staff invoice print route — screen + print. Imported only from this route's page. */
+
+.invoice-print-shell {
+  min-height: 100vh;
+  background: rgb(248 250 252);
+}
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    height: auto !important;
+    overflow: visible !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .invoice-print-shell {
+    min-height: 0 !important;
+    background: #fff !important;
+  }
+
+  .invoice-print-no-print {
+    display: none !important;
+  }
+
+  .invoice-print-root {
+    box-shadow: none !important;
+    max-width: none !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+  }
+
+  .invoice-print-line-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .invoice-print-totals-block {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .invoice-print-notes-block {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
