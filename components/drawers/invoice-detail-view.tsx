@@ -899,7 +899,7 @@ function EmailModal({
   const [to, setTo] = useState(() => (isValidEmail(billingEmail) ? billingEmail : ""))
   const [subject, setSubject] = useState(`${invoiceLabel} — ${signOff}`)
   const [body, setBody] = useState(
-    `Hi ${invoice.customerName},\n\nPlease use the secure link in this email to view your invoice. A PDF is attached for your records.\n\nThank you,\n${signOff}`,
+    `Please use the secure link in this email to view your invoice. A PDF is attached for your records.\n\nThank you,\n${signOff}`,
   )
 
   async function handleSend() {

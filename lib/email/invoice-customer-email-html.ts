@@ -1,6 +1,30 @@
 import { escapeHtml, plainTextToHtml } from "@/lib/email/format"
 import { wrapEquipifyEmail } from "@/lib/email/wrap-equipify-email"
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+/**
+ * Strips a leading Hi/Hello/Dear + customer name so it does not duplicate the fixed template greeting.
+ */
+function stripLeadingCustomerGreeting(messagePlain: string | undefined, customerName: string): string | undefined {
+  if (!messagePlain?.trim()) return undefined
+  const name = customerName.trim()
+  let s = messagePlain.trim()
+  if (!name) return s
+  const esc = escapeRegExp(name)
+  const lineOpeners = [
+    new RegExp(`^(?:Hi|Hello)\\s+${esc}\\s*,?\\s*(?:\\r?\\n|$)`, "i"),
+    new RegExp(`^(?:Hi|Hello)\\s*,\\s*${esc}\\s*,?\\s*(?:\\r?\\n|$)`, "i"),
+    new RegExp(`^(?:Dear)\\s+${esc}\\s*,?\\s*(?:\\r?\\n|$)`, "i"),
+  ]
+  for (const re of lineOpeners) {
+    s = s.replace(re, "").trim()
+  }
+  return s || undefined
+}
+
 export type InvoiceCustomerEmailTemplateArgs = {
   organizationName: string
   customerName: string
@@ -70,6 +94,8 @@ export function buildInvoiceCustomerEmailFromTemplate(args: InvoiceCustomerEmail
       : `Invoice ${args.invoiceLabel} from ${args.organizationName}`
   const subject = args.subjectOverride?.trim() || defaultSubject
 
+  const messagePlain = stripLeadingCustomerGreeting(args.messagePlain, args.customerName)
+
   const greeting = `<p style="margin:0 0 14px;font-family:system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.55;color:#0f172a;">Hello ${cust},</p>`
 
   const lead =
@@ -112,8 +138,8 @@ ${eqBlock}
 </td></tr></table>`
 
   const messageBlock =
-    args.messagePlain?.trim() ?
-      `<div style="margin:0 0 20px;font-family:system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.6;color:#334155;">${plainTextToHtml(args.messagePlain)}</div>`
+    messagePlain?.trim() ?
+      `<div style="margin:0 0 20px;font-family:system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.6;color:#334155;">${plainTextToHtml(messagePlain)}</div>`
     : ""
 
   const ctaParts: string[] = []
@@ -151,7 +177,7 @@ ${args.certificatesList
   )
   .join("\n")}
 </ul>
-<p style="margin:8px 0 0;font-size:13px;color:#334155;">Certificates are on file for this job. Reply to this email if you need copies.</p>
+<p style="margin:8px 0 0;font-size:13px;color:#334155;">Certificates are on file for this job. Request copies from your service provider if needed.</p>
 </div>`
     : args.certificate?.included ?
       `<div style="margin:0 0 20px;padding:14px 16px;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;">
@@ -160,7 +186,7 @@ ${args.certificatesList
         args.certificate.templateName?.trim() ?
           ` (<strong>${escapeHtml(args.certificate.templateName.trim())}</strong>)`
         : ""
-      } is on file for this work. Reply to this email if you need a copy.</p>
+      } is on file for this work. Request a copy from your service provider if needed.</p>
 </div>`
     : ""
 
@@ -170,13 +196,12 @@ ${args.certificatesList
 </div>`
 
   const footerInner = `<div style="margin-top:28px;padding-top:18px;border-top:1px solid #e2e8f0;font-family:system-ui,-apple-system,sans-serif;font-size:12px;line-height:1.55;color:#64748b;">
-<p style="margin:0 0 8px;"><strong style="color:#475569;">${org}</strong></p>
-<p style="margin:0;">Questions about this invoice? Reply to this email and the team will help.</p>
+<p style="margin:0;"><strong style="color:#475569;">${org}</strong></p>
 </div>`
 
   const inner = `${header}${greeting}${lead}${summaryCard}${messageBlock}${ctaSection}${certBlock}${footerInner}`
 
-  const html = wrapEquipifyEmail(args.organizationName, inner, undefined)
+  const html = wrapEquipifyEmail(args.organizationName, inner, undefined, { transactionalClosing: true })
 
   const textLines: string[] = [
     `${args.organizationName} — invoice`,
@@ -195,7 +220,7 @@ ${args.certificatesList
   } else if (args.variant === "resend") {
     textLines.push("Resend: this is the same invoice, sent again for your records.", "")
   }
-  if (args.messagePlain?.trim()) textLines.push(args.messagePlain.trim(), "")
+  if (messagePlain?.trim()) textLines.push(messagePlain.trim(), "")
   if (args.viewInvoiceUrl?.trim()) textLines.push(`View: ${args.viewInvoiceUrl.trim()}`)
   if (args.paymentUrl?.trim()) textLines.push(`Pay: ${args.paymentUrl.trim()}`)
   if (args.pdfAttached) textLines.push("", "A PDF copy of this invoice is attached.")
@@ -206,14 +231,11 @@ ${args.certificatesList
         `- ${c.equipmentLabel}${c.templateName?.trim() ? ` (${c.templateName.trim()})` : ""}`,
       )
     }
-    textLines.push("", "Reply to request certificate copies.")
+    textLines.push("", "Request certificate copies from your service provider if needed.")
   } else if (args.certificate?.included) {
-    textLines.push("", "Certificate on file — reply if you need a copy.")
+    textLines.push("", "Certificate on file — request a copy from your service provider if needed.")
   }
-  textLines.push(
-    "",
-    `Questions? Reply to this email. Sent on behalf of ${args.organizationName}.`,
-  )
+  textLines.push("", `Sent on behalf of ${args.organizationName}.`)
 
   const text = textLines.filter((l, i, a) => !(l === "" && a[i - 1] === "")).join("\n")
 
