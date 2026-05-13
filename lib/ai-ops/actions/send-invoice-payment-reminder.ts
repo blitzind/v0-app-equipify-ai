@@ -11,17 +11,12 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { sendEmail } from "@/lib/email/resend"
-import { buildInvoiceCustomerEmailContent } from "@/lib/email/templates"
 import { isValidEmail } from "@/lib/email/format"
 import { invoiceStatusUiToDb } from "@/lib/org-quotes-invoices/map"
 import type { InvoiceStatus } from "@/lib/mock-data"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
-import {
-  formatUsdFromCents,
-  grandTotalCentsFromInvoiceRow,
-  invoiceTaxRowLabel,
-} from "@/lib/billing/invoice-financial-display"
+import { loadInvoiceDocumentContext } from "@/lib/invoices/load-invoice-document-context"
+import { dispatchCustomerInvoiceEmail } from "@/lib/invoices/dispatch-customer-invoice-email"
 
 export type SendInvoiceReminderResult =
   | { ok: true; sentAt: string; emailId: string | null }
@@ -39,9 +34,7 @@ export async function sendInvoicePaymentReminderFromAiOps(args: {
 }): Promise<SendInvoiceReminderResult> {
   const { data: invRow, error: invErr } = await args.supabase
     .from("org_invoices")
-    .select(
-      "id, customer_id, equipment_id, work_order_id, invoice_number, title, amount_cents, tax_amount_cents, tax_rate_percent, status, due_date, issued_at, archived_at",
-    )
+    .select("id, customer_id, archived_at, status")
     .eq("id", args.invoiceId)
     .eq("organization_id", args.organizationId)
     .maybeSingle()
@@ -49,13 +42,8 @@ export async function sendInvoicePaymentReminderFromAiOps(args: {
   const inv = invRow as {
     id: string
     customer_id: string
-    equipment_id: string | null
-    invoice_number?: string
-    amount_cents?: number
+    archived_at: string | null
     status?: string
-    due_date?: string | null
-    issued_at?: string | null
-    archived_at?: string | null
   } | null
 
   if (invErr || !inv || inv.archived_at) {
@@ -65,28 +53,13 @@ export async function sendInvoicePaymentReminderFromAiOps(args: {
     return { ok: false, code: "invalid_status", message: "Cannot email a void invoice." }
   }
 
-  const [{ data: org }, { data: cust }, equipRes] = await Promise.all([
-    args.supabase.from("organizations").select("name").eq("id", args.organizationId).maybeSingle(),
-    args.supabase
-      .from("customers")
-      .select("company_name, billing_email")
-      .eq("organization_id", args.organizationId)
-      .eq("id", inv.customer_id)
-      .maybeSingle(),
-    inv.equipment_id
-      ? args.supabase
-          .from("equipment")
-          .select("name")
-          .eq("organization_id", args.organizationId)
-          .eq("id", inv.equipment_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-  ])
+  const { data: cust } = await args.supabase
+    .from("customers")
+    .select("company_name, billing_email")
+    .eq("organization_id", args.organizationId)
+    .eq("id", inv.customer_id)
+    .maybeSingle()
 
-  const organizationName = (org as { name?: string } | null)?.name?.trim() || "Your service team"
-  const customerName =
-    (cust as { company_name?: string; billing_email?: string | null } | null)?.company_name?.trim() ||
-    "Customer"
   const billingEmail =
     typeof args.toEmail === "string" && args.toEmail.trim()
       ? args.toEmail.trim()
@@ -100,73 +73,33 @@ export async function sendInvoicePaymentReminderFromAiOps(args: {
     }
   }
 
-  const equipmentName =
-    equipRes.data && typeof equipRes.data === "object" && "name" in equipRes.data
-      ? String((equipRes.data as { name: string }).name).trim() || null
-      : null
+  const docCtx = await loadInvoiceDocumentContext(args.supabase, args.organizationId, args.invoiceId)
+  if (!docCtx) {
+    return { ok: false, code: "not_found", message: "Invoice not found." }
+  }
 
-  const invoiceLabel = String(inv.invoice_number ?? "").trim() || "Invoice"
-  const amountCents = Number(inv.amount_cents ?? 0)
-  const taxCentsRaw = (inv as { tax_amount_cents?: number | null }).tax_amount_cents
-  const taxCents = taxCentsRaw == null ? null : Math.round(Number(taxCentsRaw))
-  const grandTotalCents = grandTotalCentsFromInvoiceRow({
-    amount_cents: amountCents,
-    tax_amount_cents: taxCentsRaw,
-  })
-  const subtotalLabel = formatUsdFromCents(amountCents)
-  const totalLabel = formatUsdFromCents(grandTotalCents)
-  const taxRateRaw = (inv as { tax_rate_percent?: number | string | null }).tax_rate_percent
-  const taxLineLabel =
-    taxCents != null && taxCents > 0 ?
-      `${invoiceTaxRowLabel({
-        taxRatePercent: taxRateRaw == null ? null : Number(taxRateRaw),
-      })}: ${formatUsdFromCents(taxCents)}`
-    : null
-  const dueRaw = inv.due_date
-  const dueDateLabel = dueRaw
-    ? new Date(dueRaw + "T12:00:00").toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "—"
-  const issuedRaw = inv.issued_at
-  const issuedDateLabel = issuedRaw
-    ? new Date(issuedRaw).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-    : "—"
-
+  const invoiceLabel = docCtx.invoiceNumberLabel
   const reminderBody =
     args.messagePlain?.trim() ||
-    `This is a friendly reminder regarding Invoice ${invoiceLabel}. If you have already paid, please disregard this message.`
+    `This is a friendly reminder regarding invoice ${invoiceLabel}. If you have already paid, please disregard this message.`
 
-  const { subject, html, text } = buildInvoiceCustomerEmailContent({
-    organizationName,
-    customerName,
-    invoiceLabel,
-    amountLabel: totalLabel,
-    dueDateLabel,
-    issuedDateLabel,
-    workOrderLabel: null,
-    equipmentName,
-    messagePlain: reminderBody,
-    subjectOverride: undefined,
-    subtotalLabel: taxLineLabel ? subtotalLabel : null,
-    taxLineLabel,
-    totalLabel,
-  })
-
-  const sendResult = await sendEmail({
-    to: billingEmail,
-    subject,
-    html,
-    text,
-    category: "invoice_payment_reminder_ai_ops",
+  const dispatched = await dispatchCustomerInvoiceEmail({
+    supabase: args.supabase,
     organizationId: args.organizationId,
+    invoiceId: args.invoiceId,
+    to: billingEmail,
+    messagePlain: reminderBody,
+    variant: "reminder",
+    blitzpayStaffUserId: args.actorUserId,
+    documentContext: docCtx,
+    resendCategory: "invoice_payment_reminder_ai_ops",
   })
 
-  if (!sendResult.ok) {
-    return { ok: false, code: sendResult.code ?? "send_failed", message: sendResult.error }
+  if (!dispatched.ok) {
+    return { ok: false, code: dispatched.code, message: dispatched.message }
   }
+
+  const sendResult = dispatched.send
 
   const sentAt = new Date().toISOString()
   const rowPatch: Record<string, unknown> = {
@@ -206,7 +139,7 @@ export async function sendInvoicePaymentReminderFromAiOps(args: {
     providerMessageId: sendResult.id ?? null,
     sentAt,
     createdBy: args.actorUserId,
-    metadata: { variant: "ai_ops_reminder" },
+    metadata: { variant: "ai_ops_reminder", pdfAttached: dispatched.pdfAttached },
   })
 
   return { ok: true, sentAt, emailId: sendResult.id ?? null }

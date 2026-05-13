@@ -157,6 +157,8 @@ function coerceLineItemsArray(raw: unknown): unknown[] | null {
         if (Array.isArray(o.items)) return o.items
         if (Array.isArray(o.line_items)) return o.line_items
         if (Array.isArray(o.lineItems)) return o.lineItems
+        if (Array.isArray(o.Line)) return o.Line
+        if (Array.isArray(o.line)) return o.line
       }
     } catch {
       return null
@@ -169,6 +171,8 @@ function coerceLineItemsArray(raw: unknown): unknown[] | null {
     if (Array.isArray(o.items)) return o.items
     if (Array.isArray(o.line_items)) return o.line_items
     if (Array.isArray(o.lineItems)) return o.lineItems
+    if (Array.isArray(o.Line)) return o.Line
+    if (Array.isArray(o.line)) return o.line
   }
   return null
 }
@@ -178,30 +182,6 @@ function pickTrimmedString(...vals: unknown[]): string {
     if (typeof v === "string" && v.trim()) return v.trim()
   }
   return ""
-}
-
-function pickLineItemDescription(o: Record<string, unknown>): string {
-  const itemRef = o.ItemRef
-  let refName = ""
-  if (itemRef && typeof itemRef === "object") {
-    const nm = (itemRef as Record<string, unknown>).name
-    if (typeof nm === "string" && nm.trim()) refName = nm.trim()
-  }
-  return pickTrimmedString(
-    o.description,
-    o.name,
-    o.memo,
-    o.line_description,
-    o.title,
-    o.service_description,
-    o.detail,
-    o.Detail,
-    o.text,
-    o.label,
-    o.Line,
-    o.Service,
-    refName,
-  )
 }
 
 function pickNumeric(...vals: unknown[]): number | null {
@@ -215,8 +195,91 @@ function pickNumeric(...vals: unknown[]): number | null {
   return null
 }
 
+function pickLineItemDescription(o: Record<string, unknown>): string {
+  const itemRef = o.ItemRef ?? o.itemRef
+  let refName = ""
+  if (itemRef && typeof itemRef === "object") {
+    const nm = (itemRef as Record<string, unknown>).name
+    if (typeof nm === "string" && nm.trim()) refName = nm.trim()
+  }
+  return pickTrimmedString(
+    o.description,
+    o.Description,
+    o.name,
+    o.Name,
+    o.memo,
+    o.Memo,
+    o.line_description,
+    o.title,
+    o.Title,
+    o.service_description,
+    o.detail,
+    o.Detail,
+    o.text,
+    o.label,
+    o.Service,
+    refName,
+  )
+}
+
+/**
+ * Flatten QuickBooks-style `Line` rows (and similar wrappers) so `pickLineItem*` sees
+ * description, qty, and unit on one object.
+ */
+function normalizeRawInvoiceLineItem(item: unknown): Record<string, unknown> | null {
+  if (!item || typeof item !== "object") return null
+  const src = item as Record<string, unknown>
+  const o: Record<string, unknown> = { ...src }
+
+  const mergeDetail = (detail: unknown) => {
+    if (!detail || typeof detail !== "object") return
+    const d = detail as Record<string, unknown>
+    const qty = pickNumeric(d.Qty, d.Quantity, d.quantity, o.qty, o.quantity)
+    if (qty != null && qty > 0) {
+      o.qty = qty
+      o.quantity = qty
+    }
+    const up = pickNumeric(d.UnitPrice, d.unitPrice, d.Rate, d.UnitCost, d.unit_cost, d.Price, d.price)
+    if (up != null && up !== 0) {
+      o.unit = up
+      o.unit_price = up
+      o.UnitPrice = up
+    }
+    const da = pickNumeric(d.Amount, d.amount)
+    if (da != null && da !== 0 && pickNumeric(o.Amount, o.amount) == null) {
+      o.amount = da
+    }
+    const ir = d.ItemRef ?? d.itemRef
+    if (ir && typeof ir === "object") {
+      const nm = (ir as Record<string, unknown>).name
+      if (typeof nm === "string" && nm.trim()) {
+        o.name = typeof o.name === "string" && o.name.trim() ? o.name : nm.trim()
+      }
+    }
+  }
+
+  mergeDetail(o.SalesItemLineDetail)
+  mergeDetail(o.salesItemLineDetail)
+  mergeDetail(o.ItemBasedExpenseLineDetail)
+  mergeDetail(o.itemBasedExpenseLineDetail)
+  mergeDetail(o.DiscountLineDetail)
+  mergeDetail(o.discountLineDetail)
+  mergeDetail(o.DescriptionLineDetail)
+  mergeDetail(o.descriptionLineDetail)
+
+  const pascalDesc = o.Description
+  if (typeof pascalDesc === "string" && pascalDesc.trim()) {
+    if (typeof o.description !== "string" || !String(o.description).trim()) o.description = pascalDesc.trim()
+  }
+
+  const lineAmt = pickNumeric(o.Amount, o.amount)
+  if (lineAmt != null) o.amount = lineAmt
+
+  return o
+}
+
 function pickLineItemQty(o: Record<string, unknown>): number {
-  const q = pickNumeric(o.qty, o.quantity, o.Qty, o.count, o.quantity_ordered)
+  const q = pickNumeric(o.qty, o.quantity, o.Qty, o.Quantity, o.count, o.quantity_ordered)
   if (q == null || q <= 0) return 1
   return q
 }
@@ -234,6 +297,7 @@ function pickLineItemUnitDollars(o: Record<string, unknown>, qty: number): numbe
     o.rate,
     o.UnitPrice,
     o.price,
+    o.Price,
     o.unit_amount,
   )
   if (direct != null && direct !== 0) return direct
@@ -244,6 +308,7 @@ function pickLineItemUnitDollars(o: Record<string, unknown>, qty: number): numbe
     o.total,
     o.lineTotal,
     o.Amount,
+    o.SubTotal,
     o.subtotal,
     o.line_amount,
     o.extended,
@@ -266,13 +331,33 @@ function pickLineItemUnitDollars(o: Record<string, unknown>, qty: number): numbe
   return 0
 }
 
+/** Stable key for comparing editor line-item payloads (edit save / avoid wiping DB JSON). */
+export function stableCanonicalLineItemsKey(items: QuoteInvoiceLineItem[]): string {
+  return JSON.stringify(
+    items.map((li) => ({
+      d: (li.description ?? "").trim(),
+      q: li.qty,
+      u: li.unit,
+      c: (li.catalog_item_id ?? "").trim(),
+      sk: (li.sku ?? "").trim(),
+      it: (li.item_type ?? "").trim(),
+      ul: (li.unit_label ?? "").trim(),
+      sr: (li.source_ref ?? "").trim(),
+      tx: li.taxable === false ? 0 : 1,
+      tr: li.tax_rate_percent ?? null,
+      ta: li.tax_amount ?? null,
+    })),
+  )
+}
+
 export function parseLineItems(raw: unknown): LineItemJson[] {
   const arr = coerceLineItemsArray(raw)
   if (!arr) return []
   const out: LineItemJson[] = []
   for (const item of arr) {
-    if (!item || typeof item !== "object") continue
-    const o = item as Record<string, unknown>
+    const normalized = normalizeRawInvoiceLineItem(item)
+    if (!normalized) continue
+    const o = normalized
     const cid = o.catalog_item_id
     const qty = pickLineItemQty(o)
     let unit = pickLineItemUnitDollars(o, qty)

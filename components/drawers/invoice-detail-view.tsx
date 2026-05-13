@@ -21,6 +21,7 @@ import type { updateOrgInvoice } from "@/lib/org-quotes-invoices/repository"
 import {
   buildInvoiceTextualDetailFallback,
   filterLineItemsForDisplay,
+  stableCanonicalLineItemsKey,
   type QuoteInvoiceLineItem,
 } from "@/lib/org-quotes-invoices/map"
 import type { CatalogListItemRow } from "@/lib/catalog/catalog-line-snapshots"
@@ -81,6 +82,7 @@ import {
   Sparkles, RefreshCw, ThumbsUp, ThumbsDown, ShieldAlert, Monitor, Tablet,
   Loader2,
   Clock,
+  Printer,
   Smartphone, FileText, Settings, Eye, EyeOff, Building2, SlidersHorizontal,
   ExternalLink,
   Archive,
@@ -397,8 +399,8 @@ function InvoicePreview({
   const previewLines = useMemo(() => filterLineItemsForDisplay(invoice.lineItems), [invoice.lineItems])
   const titleText = (invoice.title ?? "").trim()
   const textualFallback = useMemo(
-    () => buildInvoiceTextualDetailFallback(invoice),
-    [invoice.notes, invoice.internalNotes, invoice.invoiceInstructions],
+    () => buildInvoiceTextualDetailFallback(invoice, { includeInvoiceSubject: true }),
+    [invoice],
   )
 
   const invoiceLabel = invoice.invoiceNumber?.trim() || "Invoice"
@@ -874,7 +876,7 @@ function EmailModal({
   const [to,      setTo]      = useState(`billing@${invoice.customerName.toLowerCase().replace(/\s+/g, "")}.com`)
   const [subject, setSubject] = useState(`Invoice ${invoiceLabel} from ${signOff}`)
   const [body,    setBody]    = useState(
-    `Hi ${invoice.customerName},\n\nPlease find attached Invoice ${invoiceLabel} for ${fmtCurrency(invoice.amount)}.\n\nPayment is due by ${fmtDate(invoice.dueDate)}. A secure payment link will be included when your workspace connects billing.\n\nPlease don't hesitate to reach out if you have any questions.\n\nThank you,\n${signOff}`,
+    `Hi ${invoice.customerName},\n\nThank you for your business. We have emailed a professional invoice summary with a PDF attachment for your records.\n\nPayment is due by ${fmtDate(invoice.dueDate)}. If you have questions, reply to this email.\n\nThank you,\n${signOff}`,
   )
 
   async function handleSend() {
@@ -1461,7 +1463,7 @@ function InfoTab({
             items={invoice.lineItems}
             total={invoice.amount}
             maskMoney={!showFinancials}
-            detailFallback={buildInvoiceTextualDetailFallback(invoice)}
+            detailFallback={buildInvoiceTextualDetailFallback(invoice, { includeInvoiceSubject: true })}
           />
         )}
       </Section>
@@ -4178,6 +4180,18 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
     [invoice, invoiceLinkedWoLabels],
   )
 
+  const invoicePrintHref = useMemo(() => {
+    const oid = organizationId?.trim()
+    if (!oid || !invoice.id) return null
+    return `/organizations/${encodeURIComponent(oid)}/invoices/${encodeURIComponent(invoice.id)}/print`
+  }, [organizationId, invoice.id])
+
+  const canPrintInvoice =
+    Boolean(invoicePrintHref) &&
+    (permissions.canViewFinancials || permissions.canEditInvoices) &&
+    invoice.status !== "Void" &&
+    !invoice.isArchived
+
   // Tabs + layout state
   const [activeTab,    setActiveTab]    = useState<Tab>("info")
   const [showPreview,  setShowPreview]  = useState(false)
@@ -4189,6 +4203,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
   const [editing,    setEditing]    = useState(false)
   const [draft,      setDraft]      = useState<Partial<AdminInvoice>>({})
   const [draftItems, setDraftItems] = useState<LineItem[]>([])
+  const lineItemsEditBaselineKeyRef = useRef<string | null>(null)
 
   // Toasts
   const [toasts, setToasts] = useState<{ id: number; message: string; kind: "success" | "error" }[]>([])
@@ -4224,7 +4239,9 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
   function startEdit() {
     if (invoice.isArchived || !canEditInvoiceFinancials) return
     setDraft({ status: invoice.status, dueDate: invoice.dueDate, notes: invoice.notes })
-    setDraftItems(invoice.lineItems.map((li) => ({ ...li })))
+    const initialLines = invoice.lineItems.map((li) => ({ ...li }))
+    setDraftItems(initialLines)
+    lineItemsEditBaselineKeyRef.current = stableCanonicalLineItemsKey(initialLines)
     setEditing(true)
     setActiveTab("info")
   }
@@ -4233,34 +4250,42 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
     setEditing(false)
     setDraft({})
     setDraftItems([])
+    lineItemsEditBaselineKeyRef.current = null
     setCatalogPickerOpen(false)
   }
 
   async function saveEdit() {
-    const newTotal = draftItems.reduce((s, i) => s + i.qty * i.unit, 0)
     const nextStatus = (draft.status ?? invoice.status) as InvoiceStatus
+    const nextLines: QuoteInvoiceLineItem[] = draftItems.map((li) => {
+      const row: QuoteInvoiceLineItem = {
+        description: li.description,
+        qty: li.qty,
+        unit: li.unit,
+      }
+      if (li.catalog_item_id) row.catalog_item_id = li.catalog_item_id
+      if (li.sku) row.sku = li.sku
+      if (li.item_type) row.item_type = li.item_type
+      if (li.unit_label) row.unit_label = li.unit_label
+      if (li.source_ref) row.source_ref = li.source_ref
+      if (li.taxable !== undefined) row.taxable = li.taxable
+      if (li.tax_category) row.tax_category = li.tax_category
+      if (li.tax_rate_percent !== undefined) row.tax_rate_percent = li.tax_rate_percent
+      if (li.tax_amount !== undefined) row.tax_amount = li.tax_amount
+      return row
+    })
+
+    const baseline = lineItemsEditBaselineKeyRef.current
+    const nextKey = stableCanonicalLineItemsKey(nextLines)
+    const lineItemsChanged = baseline === null || nextKey !== baseline
+
     const patch: Parameters<typeof updateOrgInvoice>[3] = {
       status: nextStatus,
       dueDate: draft.dueDate ?? invoice.dueDate,
       notes: draft.notes ?? invoice.notes,
-      lineItems: draftItems.map((li) => {
-        const row: QuoteInvoiceLineItem = {
-          description: li.description,
-          qty: li.qty,
-          unit: li.unit,
-        }
-        if (li.catalog_item_id) row.catalog_item_id = li.catalog_item_id
-        if (li.sku) row.sku = li.sku
-        if (li.item_type) row.item_type = li.item_type
-        if (li.unit_label) row.unit_label = li.unit_label
-        if (li.source_ref) row.source_ref = li.source_ref
-        if (li.taxable !== undefined) row.taxable = li.taxable
-        if (li.tax_category) row.tax_category = li.tax_category
-        if (li.tax_rate_percent !== undefined) row.tax_rate_percent = li.tax_rate_percent
-        if (li.tax_amount !== undefined) row.tax_amount = li.tax_amount
-        return row
-      }),
-      amountCents: Math.round(newTotal * 100),
+    }
+    if (lineItemsChanged) {
+      patch.lineItems = nextLines
+      patch.amountCents = Math.round(nextLines.reduce((s, i) => s + i.qty * i.unit, 0) * 100)
     }
     if (nextStatus === "Paid" && !invoice.paidDate) {
       patch.paidAt = new Date().toISOString()
@@ -4273,6 +4298,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
     setEditing(false)
     setDraft({})
     setDraftItems([])
+    lineItemsEditBaselineKeyRef.current = null
     toast("Invoice updated successfully")
   }
 
@@ -4459,7 +4485,23 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                         },
                         { icon: <MessageSquare className="w-3.5 h-3.5" />, label: "SMS Dynamic Invoice", soon: true },
                         { icon: <Link2 className="w-3.5 h-3.5" />, label: "Copy Invoice URL", soon: true },
-                        { icon: <Download className="w-3.5 h-3.5" />, label: "Download PDF", soon: true },
+                        {
+                          icon: <Download className="w-3.5 h-3.5" />,
+                          label: "Download PDF",
+                          run: () => {
+                            if (!organizationId?.trim()) return
+                            const url = `/api/organizations/${encodeURIComponent(organizationId.trim())}/invoices/${encodeURIComponent(invoice.id)}/pdf`
+                            window.open(url, "_blank", "noopener,noreferrer")
+                          },
+                        },
+                        {
+                          icon: <Printer className="w-3.5 h-3.5" />,
+                          label: "Print invoice",
+                          run: () => {
+                            if (!invoicePrintHref) return
+                            window.open(invoicePrintHref, "_blank", "noopener,noreferrer")
+                          },
+                        },
                         { icon: <Save className="w-3.5 h-3.5" />, label: "Save PDF to Record", soon: true },
                         { icon: <CreditCard className="w-3.5 h-3.5" />, label: "Record Payment", run: () => setModal("payment") },
                         {
@@ -4536,6 +4578,14 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
             {canEditInvoiceFinancials ? (
               <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={startEdit}>
                 <Pencil className="w-3.5 h-3.5" /> Edit
+              </Button>
+            ) : null}
+
+            {canPrintInvoice && invoicePrintHref ? (
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer px-2" asChild>
+                <Link href={invoicePrintHref} target="_blank" rel="noopener noreferrer">
+                  <Printer className="w-3.5 h-3.5" /> Print
+                </Link>
               </Button>
             ) : null}
 

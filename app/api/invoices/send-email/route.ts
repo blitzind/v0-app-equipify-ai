@@ -1,26 +1,19 @@
 import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { sendEmail } from "@/lib/email/resend"
-import { buildInvoiceCustomerEmailContent } from "@/lib/email/templates"
 import { isValidEmail } from "@/lib/email/format"
 import { parseUuid, requireOrganizationMember } from "@/lib/email/route-auth"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
 import { invoiceStatusUiToDb } from "@/lib/org-quotes-invoices/map"
 import type { InvoiceStatus } from "@/lib/mock-data"
-import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
-import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import {
   isCalibrationRecordComplete,
   listCalibrationTemplates,
   type CalibrationTemplate,
 } from "@/lib/calibration-certificates"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
-import {
-  formatUsdFromCents,
-  grandTotalCentsFromInvoiceRow,
-  invoiceTaxRowLabel,
-} from "@/lib/billing/invoice-financial-display"
+import { loadInvoiceDocumentContext } from "@/lib/invoices/load-invoice-document-context"
+import { dispatchCustomerInvoiceEmail } from "@/lib/invoices/dispatch-customer-invoice-email"
 
 type Body = {
   organizationId?: string
@@ -75,98 +68,18 @@ export async function POST(request: Request) {
     )
   }
 
-  // Phase 2 (Permissions): emailing an invoice is an invoice mutation —
-  // status flips to `sent` and `sent_at` is updated, so gate on canEditInvoices.
   const capGate = await requireOrgPermission(organizationId, "canEditInvoices")
   if ("error" in capGate) return capGate.error
 
-  const { data: invRow, error: invErr } = await supabase
-    .from("org_invoices")
-    .select(
-      "id, customer_id, equipment_id, work_order_id, calibration_record_id, invoice_number, title, amount_cents, tax_amount_cents, tax_rate_percent, status, due_date, issued_at, archived_at",
-    )
-    .eq("id", invoiceId)
-    .eq("organization_id", organizationId)
-    .maybeSingle()
-
-  const inv = invRow as {
-    id: string
-    customer_id: string
-    equipment_id: string | null
-    work_order_id: string | null
-    calibration_record_id: string | null
-    invoice_number?: string
-    amount_cents?: number
-    status?: string
-    due_date?: string | null
-    issued_at?: string | null
-    archived_at?: string | null
-  } | null
-
-  if (invErr || !inv || inv.archived_at) {
+  const docCtx = await loadInvoiceDocumentContext(supabase, organizationId, invoiceId)
+  if (!docCtx) {
     return NextResponse.json({ error: "not_found", message: "Invoice not found." }, { status: 404 })
-  }
-
-  if ((inv.status as string) === "void") {
-    return NextResponse.json({ error: "invalid_status", message: "Cannot email a void invoice." }, { status: 400 })
-  }
-
-  const [{ data: org }, { data: cust }, equipRes] = await Promise.all([
-    supabase.from("organizations").select("name").eq("id", organizationId).maybeSingle(),
-    supabase
-      .from("customers")
-      .select("company_name")
-      .eq("organization_id", organizationId)
-      .eq("id", inv.customer_id)
-      .maybeSingle(),
-    inv.equipment_id ?
-      supabase
-        .from("equipment")
-        .select("name")
-        .eq("organization_id", organizationId)
-        .eq("id", inv.equipment_id)
-        .maybeSingle()
-    : Promise.resolve({ data: null }),
-  ])
-
-  const organizationName = (org as { name?: string } | null)?.name?.trim() || "Your service team"
-  const customerName = (cust as { company_name?: string } | null)?.company_name?.trim() || "Customer"
-  const equipmentName =
-    equipRes.data && typeof equipRes.data === "object" && "name" in equipRes.data
-      ? String((equipRes.data as { name: string }).name).trim() || null
-    : null
-
-  let workOrderLabel: string | null = null
-  if (inv.work_order_id) {
-    let woSel = await supabase
-      .from("work_orders")
-      .select("id, work_order_number")
-      .eq("id", inv.work_order_id)
-      .eq("organization_id", organizationId)
-      .maybeSingle()
-
-    if (woSel.error && missingWorkOrderNumberColumn(woSel.error)) {
-      woSel = await supabase
-        .from("work_orders")
-        .select("id")
-        .eq("id", inv.work_order_id)
-        .eq("organization_id", organizationId)
-        .maybeSingle()
-    }
-
-    const wo = woSel.data as { id: string; work_order_number?: number | null } | null
-    if (!woSel.error && wo) {
-      workOrderLabel = getWorkOrderDisplay({
-        id: wo.id,
-        workOrderNumber: wo.work_order_number ?? undefined,
-      })
-    }
   }
 
   let certificatesList: { equipmentLabel: string; templateName: string | null }[] = []
   let legacyCertificate: { included: boolean; templateName: string | null } | undefined
 
-  if (inv.work_order_id) {
+  if (docCtx.workOrderId) {
     type RecRow = {
       equipment_id: string
       template_id: string
@@ -177,7 +90,7 @@ export async function POST(request: Request) {
       .from("calibration_records")
       .select("equipment_id, template_id, values, created_at")
       .eq("organization_id", organizationId)
-      .eq("work_order_id", inv.work_order_id)
+      .eq("work_order_id", docCtx.workOrderId)
       .order("created_at", { ascending: false })
 
     const rows = (recRows ?? []) as RecRow[]
@@ -256,12 +169,12 @@ export async function POST(request: Request) {
     })
   }
 
-  if (certificatesList.length === 0 && inv.calibration_record_id) {
+  if (certificatesList.length === 0 && docCtx.calibrationRecordId) {
     const { data: r } = await supabase
       .from("calibration_records")
       .select("template_id")
       .eq("organization_id", organizationId)
-      .eq("id", inv.calibration_record_id)
+      .eq("id", docCtx.calibrationRecordId)
       .maybeSingle()
     if (r && typeof r === "object" && "template_id" in r) {
       const { data: tmpl } = await supabase
@@ -277,70 +190,30 @@ export async function POST(request: Request) {
     }
   }
 
-  const invoiceLabel = String(inv.invoice_number ?? "").trim() || "Invoice"
-  const amountCents = Number(inv.amount_cents ?? 0)
-  const taxCentsRaw = (inv as { tax_amount_cents?: number | null }).tax_amount_cents
-  const taxCents = taxCentsRaw == null ? null : Math.round(Number(taxCentsRaw))
-  const grandTotalCents = grandTotalCentsFromInvoiceRow({
-    amount_cents: amountCents,
-    tax_amount_cents: taxCentsRaw,
-  })
-  const subtotalLabel = formatUsdFromCents(amountCents)
-  const totalLabel = formatUsdFromCents(grandTotalCents)
-  const taxRateRaw = (inv as { tax_rate_percent?: number | string | null }).tax_rate_percent
-  const taxLineLabel =
-    taxCents != null && taxCents > 0 ?
-      `${invoiceTaxRowLabel({
-        taxRatePercent: taxRateRaw == null ? null : Number(taxRateRaw),
-      })}: ${formatUsdFromCents(taxCents)}`
-    : null
-  const dueRaw = inv.due_date
-  const dueDateLabel = dueRaw
-    ? new Date(dueRaw + "T12:00:00").toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "—"
-  const issuedRaw = inv.issued_at
-  const issuedDateLabel = issuedRaw
-    ? new Date(issuedRaw).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-    : "—"
-
   const messagePlain = typeof body.message === "string" ? body.message : undefined
   const subjectOverride = typeof body.subject === "string" ? body.subject : undefined
 
-  const { subject, html, text } = buildInvoiceCustomerEmailContent({
-    organizationName,
-    customerName,
-    invoiceLabel,
-    amountLabel: totalLabel,
-    dueDateLabel,
-    issuedDateLabel,
-    workOrderLabel,
-    equipmentName,
-    messagePlain,
+  const dispatched = await dispatchCustomerInvoiceEmail({
+    supabase,
+    organizationId,
+    invoiceId,
+    to,
     subjectOverride,
-    subtotalLabel: taxLineLabel ? subtotalLabel : null,
-    taxLineLabel,
-    totalLabel,
+    messagePlain,
+    variant: "send",
+    blitzpayStaffUserId: user.id,
     certificatesList: certificatesList.length > 0 ? certificatesList : undefined,
     certificate: certificatesList.length > 0 ? undefined : legacyCertificate,
+    documentContext: docCtx,
   })
 
-  const sendResult = await sendEmail({
-    to,
-    subject,
-    html,
-    text,
-    category: "invoice_customer",
-    organizationId,
-  })
-
-  if (!sendResult.ok) {
-    const status = sendResult.code === "config" ? 503 : 502
-    return NextResponse.json({ error: "send_failed", message: sendResult.error }, { status })
+  if (!dispatched.ok) {
+    const status = dispatched.code === "config" ? 503 : 502
+    return NextResponse.json({ error: dispatched.code, message: dispatched.message }, { status })
   }
+
+  const sendResult = dispatched.send
+  const invoiceLabel = docCtx.invoiceNumberLabel
 
   const sentAt = new Date().toISOString()
   const rowPatch: Record<string, unknown> =
@@ -374,7 +247,7 @@ export async function POST(request: Request) {
     countsTowardUnread: false,
     deliveryStatus: "sent",
     recipientKind: "customer",
-    recipientCustomerId: inv.customer_id,
+    recipientCustomerId: docCtx.customerId,
     recipientAddress: to,
     relatedEntityType: "invoice",
     relatedEntityId: invoiceId,
@@ -382,7 +255,7 @@ export async function POST(request: Request) {
     providerMessageId: sendResult.id ?? null,
     sentAt,
     createdBy: user.id,
-    metadata: { variant },
+    metadata: { variant, pdfAttached: dispatched.pdfAttached },
   })
 
   return NextResponse.json({ ok: true, sentAt, emailId: sendResult.id })

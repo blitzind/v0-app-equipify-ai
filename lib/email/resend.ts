@@ -60,6 +60,8 @@ export type SendEmailInput = {
   html: string
   text?: string
   replyTo?: string
+  /** Binary attachments (e.g. invoice PDF). */
+  attachments?: Array<{ filename: string; content: Buffer; contentType?: string }>
   /**
    * Observability category (Phase 55.1). Use stable snake_case identifiers.
    * @example "invoice_customer", "team_invite", "signup_welcome"
@@ -94,6 +96,15 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       html: input.html,
       ...(input.text ? { text: input.text } : {}),
       ...(replyToEffective ? { replyTo: replyToEffective } : {}),
+      ...(input.attachments && input.attachments.length > 0 ?
+        {
+          attachments: input.attachments.map((a) => ({
+            filename: a.filename,
+            content: a.content,
+            contentType: a.contentType ?? "application/octet-stream",
+          })),
+        }
+      : {}),
     })
 
     if (error) {

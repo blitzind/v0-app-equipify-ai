@@ -72,6 +72,7 @@
     "test:create-invoice-from-work-order-resolver": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-create-invoice-from-work-order-resolver.ts",
     "test:create-invoice-from-work-order-executor": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-create-invoice-from-work-order-executor.ts",
     "test:bulk-invoice-completed-work-orders": "tsx scripts/test-bulk-invoice-completed-work-orders.ts",
+    "test:parse-line-items": "tsx scripts/test-parse-line-items.ts",
     "test:aiden-prepared-workspace-tier-policy": "tsx scripts/test-aiden-prepared-workspace-tier-policy.ts"
   },
   "dependencies": {
@@ -122,6 +123,7 @@
     "next": "16.2.4",
     "next-themes": "^0.4.6",
     "openai": "^4.104.0",
+    "pdf-lib": "^1.17.1",
     "react": "19.2.4",
     "react-day-picker": "9.13.2",
     "react-dom": "19.2.4",

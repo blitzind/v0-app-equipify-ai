@@ -10,7 +10,7 @@
  */
 
 import { escapeHtml } from "@/lib/email/format"
-import { wrapEquipifyEmail } from "@/lib/email/templates"
+import { wrapEquipifyEmail } from "@/lib/email/wrap-equipify-email"
 import type { DigestPayload } from "@/lib/ai-ops/digest"
 import type { Recommendation, RecommendationCategory } from "@/lib/ai-ops/types"
 

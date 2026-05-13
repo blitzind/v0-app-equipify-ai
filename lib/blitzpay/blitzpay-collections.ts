@@ -5,7 +5,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { getPublicAppOrigin, isOutboundEmailConfigured } from "@/lib/email/config"
 import { sendEmail } from "@/lib/email/resend"
 import { isValidEmail } from "@/lib/email/format"
-import { buildInvoiceCustomerEmailContent } from "@/lib/email/templates"
+import { loadInvoiceDocumentContext } from "@/lib/invoices/load-invoice-document-context"
+import { dispatchCustomerInvoiceEmail } from "@/lib/invoices/dispatch-customer-invoice-email"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
 import { sha256Hex } from "@/lib/portal/token-hash"
 import { assertUuid } from "@/lib/blitzpay/idempotency-keys"
@@ -307,44 +308,39 @@ async function sendReminderEmail(
     invoiceTitle: string | null
   },
 ): Promise<{ ok: boolean; providerMessageId?: string | null; error?: string }> {
-  const [{ data: org }, link] = await Promise.all([
-    admin.from("organizations").select("name").eq("id", input.organizationId).maybeSingle(),
-    createBlitzpayPaymentLink(admin, {
-      organizationId: input.organizationId,
-      invoiceId: input.invoiceId,
-      customerId: input.customerId,
-      createdByUserId: null,
-      metadata: { source: "automated_reminder", kind: input.reminderKind },
-    }),
-  ])
-  const orgName = ((org as { name?: string } | null)?.name ?? "").trim() || "Your service team"
+  const link = await createBlitzpayPaymentLink(admin, {
+    organizationId: input.organizationId,
+    invoiceId: input.invoiceId,
+    customerId: input.customerId,
+    createdByUserId: null,
+    metadata: { source: "automated_reminder", kind: input.reminderKind },
+  })
   const invoiceLabel = (input.invoiceNumber ?? "").trim() || "Invoice"
   const bodyPlain = `A payment reminder is scheduled for ${invoiceLabel}. Pay securely: ${link.url}`
-  const { subject, html, text } = buildInvoiceCustomerEmailContent({
-    organizationName: orgName,
-    customerName: input.customerName,
-    invoiceLabel,
-    amountLabel: "",
-    dueDateLabel: "",
-    issuedDateLabel: "",
-    workOrderLabel: null,
-    equipmentName: null,
-    messagePlain: bodyPlain,
-    subjectOverride: `Payment reminder: ${invoiceLabel}`,
-    subtotalLabel: null,
-    taxLineLabel: null,
-    totalLabel: null,
-  })
-  const htmlWithLink = `${html}<p><a href="${link.url}">Pay securely now</a></p>`
-  const send = await sendEmail({
-    to: input.toEmail,
-    subject,
-    html: htmlWithLink,
-    text: `${text ?? bodyPlain}\n\nPay securely now: ${link.url}`,
-    category: "blitzpay_invoice_payment_reminder",
+
+  const docCtx = await loadInvoiceDocumentContext(admin, input.organizationId, input.invoiceId)
+  if (!docCtx) {
+    return { ok: false, error: "invoice_not_found" }
+  }
+
+  const dispatched = await dispatchCustomerInvoiceEmail({
+    supabase: admin,
     organizationId: input.organizationId,
+    invoiceId: input.invoiceId,
+    to: input.toEmail,
+    messagePlain: bodyPlain,
+    variant: "reminder",
+    blitzpayStaffUserId: null,
+    paymentUrlOverride: link.url,
+    documentContext: docCtx,
+    resendCategory: "blitzpay_invoice_payment_reminder",
   })
-  if (!send.ok) return { ok: false, error: send.error }
+
+  if (!dispatched.ok) {
+    return { ok: false, error: dispatched.message }
+  }
+
+  const send = dispatched.send
   await logCommunicationEvent(admin, {
     organizationId: input.organizationId,
     channel: "email",
