@@ -1,5 +1,35 @@
 # Supabase migrations (Equipify)
 
+## Data API exposure — `public` tables and `GRANT`s
+
+Supabase is changing how the **Data API** exposes objects in the **`public`** schema. **Never assume** a newly created `public.*` table is automatically accessible through:
+
+- `supabase-js`
+- PostgREST (`/rest/v1`)
+- GraphQL
+- SSR Supabase clients
+- service-role-backed API routes that rely on PostgREST
+
+**For every migration that creates a table in `public`:** add **explicit `GRANT` statements immediately after** table creation (and after any related sequences if inserts use `serial`/`identity`).
+
+### Minimum standard (tighten per table if RLS design requires it)
+
+```sql
+grant select, insert, update, delete
+on public.your_table
+to authenticated;
+
+grant select, insert, update, delete
+on public.your_table
+to service_role;
+```
+
+Many Equipify migrations use **narrower** `authenticated` grants (e.g. `select` only) when writes are service-only—**follow the security model of neighboring tables** in the same feature area.
+
+`GRANT` enables role access at the SQL layer; **RLS still applies** and must be defined where the table is user-scoped.
+
+---
+
 ## Catalog tables
 
 These migrations define **`public.catalog_items`** and **`public.price_list_imports`**:

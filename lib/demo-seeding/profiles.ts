@@ -69,16 +69,28 @@ export const DEMO_INDUSTRY_PROFILES: Record<WorkspaceIndustryKey, DemoIndustryPr
  * Merge registry aliases with legacy stored/query-string keys so existing org rows normalize safely.
  * Unknown values resolve to `commercial_equipment`.
  */
+function canonicalizeLookupKey(value: string): string {
+  // Hyphens, slashes, parentheses, ampersands, multiple spaces → single underscore.
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+}
+
 function buildAliasMap(): Record<string, WorkspaceIndustryKey> {
   const map: Record<string, WorkspaceIndustryKey> = {}
 
   for (const key of WORKSPACE_INDUSTRY_KEYS) {
     map[key] = key
     const def = WORKSPACE_INDUSTRY_DEFINITIONS[key]
+    // Aliases listed in the registry (any punctuation/whitespace shape).
     for (const a of def.aliases) {
-      const norm = a.trim().toLowerCase().replace(/-/g, "_")
-      map[norm] = key
+      map[canonicalizeLookupKey(a)] = key
     }
+    // The human display label always resolves back to the canonical key —
+    // covers free-form values like "Biomedical / Medical Equipment Service".
+    map[canonicalizeLookupKey(def.label)] = key
   }
 
   // Legacy keys present in DB / older URLs before canonical registry (Phase B)
@@ -130,7 +142,8 @@ const INDUSTRY_ALIAS_MAP = buildAliasMap()
 
 export function normalizeIndustryKey(value: string | null | undefined): WorkspaceIndustryKey {
   if (!value) return "commercial_equipment"
-  const normalized = value.trim().toLowerCase().replace(/-/g, "_")
+  const normalized = canonicalizeLookupKey(value)
+  if (!normalized) return "commercial_equipment"
   return INDUSTRY_ALIAS_MAP[normalized] ?? "commercial_equipment"
 }
 

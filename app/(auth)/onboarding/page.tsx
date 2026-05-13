@@ -13,7 +13,6 @@ import {
   ONBOARDING_INTENT_STORAGE_KEY,
   ONBOARDING_INTENDED_PLAN_STORAGE_KEY,
   parseOnboardingPlan,
-  parseOnboardingTeamSize,
   parseOnboardingText,
 } from "@/lib/onboarding-intent"
 import {
@@ -23,23 +22,17 @@ import {
 } from "@/lib/demo-seeding/profiles"
 import { resolveOnboardingIndustryBundle } from "@/lib/onboarding-industry/resolve-onboarding-industry-bundle"
 import { WORKSPACE_INDUSTRY_DEFINITIONS } from "@/lib/workspace-industry-registry"
+import {
+  ONBOARDING_CURRENT_SYSTEM_OPTIONS,
+  ONBOARDING_TEAM_SIZE_OPTIONS,
+  parseOnboardingSearchParams,
+} from "@/lib/onboarding-canonical"
 
 const STEPS = ["Your account", "Workspace", "Choose a plan"]
 /** Central registry — labels and keys from `lib/workspace-industry-registry.ts` */
 const INDUSTRY_OPTIONS = workspaceIndustrySelectOptions()
-const TEAM_SIZE_OPTIONS = ["1-3", "4-10", "11-25", "26-50", "51-100", "100+"] as const
-const CURRENT_SYSTEM_OPTIONS = [
-  "Spreadsheets / Paper",
-  "ServiceTitan",
-  "Housecall Pro",
-  "Jobber",
-  "FieldEdge",
-  "ServiceMax",
-  "Salesforce Field Service",
-  "Custom / In-house",
-  "Other FSM Software",
-  "None / Starting Fresh",
-] as const
+const TEAM_SIZE_OPTIONS = ONBOARDING_TEAM_SIZE_OPTIONS
+const CURRENT_SYSTEM_OPTIONS = ONBOARDING_CURRENT_SYSTEM_OPTIONS
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -54,9 +47,10 @@ function OnboardingPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createBrowserSupabaseClient()
-  const firstNameParam = parseOnboardingText(searchParams.get("firstName"))
-  const lastNameParam = parseOnboardingText(searchParams.get("lastName"))
-  const emailParam = parseOnboardingText(searchParams.get("email"))
+  const prefill = parseOnboardingSearchParams(searchParams)
+  const firstNameParam = prefill.firstName
+  const lastNameParam = prefill.lastName
+  const emailParam = prefill.email
   const organizationIdParam = parseOnboardingText(searchParams.get("organizationId"))
   const inviteTokenParam =
     parseOnboardingText(searchParams.get("inviteToken")) ??
@@ -66,24 +60,22 @@ function OnboardingPageContent() {
   const seedDemoChoice = inviteTokenParam
     ? searchParams.get("seedDemo")?.trim().toLowerCase() === "true"
     : searchParams.get("seedDemo")?.trim().toLowerCase() !== "false"
-  const industryParam = normalizeIndustryKey(
-    searchParams.get("industry")?.trim() || searchParams.get("ainsleyIndustry")?.trim(),
-  )
+  const industryParam = prefill.industry
   const hasMarketingIdentity = Boolean(firstNameParam && lastNameParam && emailParam)
   const trialFromQuery = hasScaleTrialParam(searchParams.get("trial"))
   const [step, setStep] = useState(0)
   const [billing, setBilling] = useState<"monthly" | "annual">("annual")
   const [selectedPlan, setSelectedPlan] = useState<PlanId>("growth")
   const [form, setForm] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
+    firstName: prefill.firstName ?? "",
+    lastName: prefill.lastName ?? "",
+    email: prefill.email ?? "",
     password: "",
-    companyName: "",
-    phone: "",
-    industry: "commercial_equipment",
-    teamSize: "",
-    currentSystem: "",
+    companyName: prefill.company ?? "",
+    phone: prefill.phone ?? "",
+    industry: prefill.industry,
+    teamSize: prefill.teamSize ?? "",
+    currentSystem: prefill.currentSystem ?? "",
     timezone: "America/New_York",
   })
   const [stepOneError, setStepOneError] = useState<string | null>(null)
@@ -97,30 +89,26 @@ function OnboardingPageContent() {
     if (!searchParams) return
 
     const selectedPlanFromQuery = parseOnboardingPlan(searchParams.get("plan"))
-    const firstName = parseOnboardingText(searchParams.get("firstName")) || ""
-    const lastName = parseOnboardingText(searchParams.get("lastName")) || ""
-    const email = parseOnboardingText(searchParams.get("email")) || ""
-    const company = parseOnboardingText(searchParams.get("company")) || ""
-    const phone = parseOnboardingText(searchParams.get("phone")) || ""
-    const industry = normalizeIndustryKey(
-      searchParams.get("industry")?.trim() || searchParams.get("ainsleyIndustry")?.trim(),
-    )
-    const teamSize = parseOnboardingTeamSize(searchParams.get("teamSize")) || ""
-    const currentSystem = parseOnboardingText(searchParams.get("currentSystem")) || ""
+    const next = parseOnboardingSearchParams(searchParams)
 
     if (process.env.NODE_ENV === "development") {
-      console.log("APPLYING PREFILL", { firstName, lastName, email })
+      console.log("APPLYING PREFILL", {
+        firstName: next.firstName,
+        lastName: next.lastName,
+        email: next.email,
+      })
       console.log("onboarding params", {
         selectedPlan: selectedPlanFromQuery,
         trial: hasScaleTrialParam(searchParams.get("trial")) ? "scale" : null,
-        firstName,
-        lastName,
-        email,
-        company,
-        phone,
-        industry,
-        teamSize,
-        currentSystem,
+        firstName: next.firstName,
+        lastName: next.lastName,
+        email: next.email,
+        company: next.company,
+        phone: next.phone,
+        industry: next.industry,
+        industryFromQuery: next.industryFromQuery,
+        teamSize: next.teamSize,
+        currentSystem: next.currentSystem,
       })
     }
 
@@ -130,14 +118,16 @@ function OnboardingPageContent() {
 
     setForm((prev) => ({
       ...prev,
-      firstName: firstName || prev.firstName,
-      lastName: lastName || prev.lastName,
-      email: email || prev.email,
-      companyName: company || prev.companyName,
-      phone: phone || prev.phone,
-      industry,
-      teamSize: teamSize || prev.teamSize,
-      currentSystem: currentSystem || prev.currentSystem,
+      firstName: next.firstName ?? prev.firstName,
+      lastName: next.lastName ?? prev.lastName,
+      email: next.email ?? prev.email,
+      companyName: next.company ?? prev.companyName,
+      phone: next.phone ?? prev.phone,
+      // Only overwrite the industry select when the URL explicitly provided one;
+      // otherwise keep whatever the user already chose in the dropdown.
+      industry: next.industryFromQuery ? next.industry : prev.industry,
+      teamSize: next.teamSize ?? prev.teamSize,
+      currentSystem: next.currentSystem ?? prev.currentSystem,
     }))
   }, [searchParams])
 
