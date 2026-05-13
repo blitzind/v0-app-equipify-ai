@@ -10,13 +10,14 @@ import {
   listVisibleFinancialGroupsForOrganization,
 } from "@/lib/blitzpay/blitzpay-multi-entity-finance"
 import type {
-  FccExecutiveAttentionItem,
   FccExecutiveHealthCard,
   FccExecutiveHealthTone,
   FccExecutiveOverviewPayload,
   FccExecutiveTimelineItem,
 } from "@/lib/blitzpay/blitzpay-fcc-executive-overview-types"
+import type { FccExecutiveOverviewDataScope } from "@/lib/blitzpay/executive-overview-widgets"
 import { BLITZPAY_FCC_FUNDS_DISCLAIMER } from "@/lib/blitzpay/blitzpay-fcc-executive-overview-types"
+import { buildExecutiveAttentionPack } from "@/lib/blitzpay/blitzpay-executive-attention-engine"
 
 function clampScore(n: number): number {
   const x = Math.round(Number(n))
@@ -35,16 +36,6 @@ function toneForRiskScore(score: number): FccExecutiveHealthTone {
   if (score <= 38) return "healthy"
   if (score <= 58) return "watch"
   return "risk"
-}
-
-function recommendationHref(id: string): { hrefKind: "fcc" | "settings"; fccSlug?: string } {
-  if (id === "net_cash_30_negative" || id.includes("cash")) return { hrefKind: "fcc", fccSlug: "operating-cash" }
-  if (id.includes("ar_") || id.includes("overdue") || id.includes("collections")) return { hrefKind: "fcc", fccSlug: "collections" }
-  if (id.includes("tech_") || id.includes("job")) return { hrefKind: "fcc", fccSlug: "executive-health" }
-  if (id.includes("financing")) return { hrefKind: "fcc", fccSlug: "financing-marketplace" }
-  if (id.includes("customer_concentration")) return { hrefKind: "fcc", fccSlug: "revenue-optimization" }
-  if (id.includes("reminder")) return { hrefKind: "fcc", fccSlug: "collections" }
-  return { hrefKind: "fcc", fccSlug: "command-center-data" }
 }
 
 function buildHealthCards(health: BlitzpayBusinessHealthPayload, facts: BlitzpayBusinessHealthPayload["facts"]): FccExecutiveHealthCard[] {
@@ -138,105 +129,6 @@ function buildHealthCards(health: BlitzpayBusinessHealthPayload, facts: Blitzpay
   return cards
 }
 
-function buildAttention(args: {
-  health: BlitzpayBusinessHealthPayload
-  pendingApCount: number
-  stripe: {
-    connectAccountPresent: boolean
-    onboardingComplete: boolean
-    chargesEnabled: boolean
-  }
-}): FccExecutiveAttentionItem[] {
-  const { health, pendingApCount, stripe } = args
-  const items: FccExecutiveAttentionItem[] = []
-
-  if (stripe.connectAccountPresent && !stripe.onboardingComplete) {
-    items.push({
-      id: "stripe_onboarding",
-      severity: "risk",
-      message: "Stripe Connect onboarding is incomplete — payouts and hosted checkout readiness may be blocked.",
-      impactHint: "Revenue collection",
-      hrefKind: "settings",
-    })
-  } else if (stripe.connectAccountPresent && !stripe.chargesEnabled) {
-    items.push({
-      id: "stripe_charges",
-      severity: "risk",
-      message: "Stripe charges are not enabled yet — online collection may be limited.",
-      impactHint: "Checkout readiness",
-      hrefKind: "settings",
-    })
-  }
-
-  if (pendingApCount > 0) {
-    items.push({
-      id: "pending_vendor_approvals",
-      severity: pendingApCount >= 8 ? "risk" : "watch",
-      message: `${pendingApCount} vendor bill${pendingApCount === 1 ? "" : "s"} pending approval before pay scheduling.`,
-      impactHint: "Accounts payable queue",
-      hrefKind: "fcc",
-      fccSlug: "vendor-bills",
-    })
-  }
-
-  for (const r of health.recommendations) {
-    const href = recommendationHref(r.id)
-    items.push({
-      id: r.id,
-      severity: r.severity,
-      message: r.message,
-      hrefKind: href.hrefKind,
-      fccSlug: href.fccSlug,
-    })
-  }
-
-  for (const w of health.warnings) {
-    items.push({
-      id: `warn_${items.length}`,
-      severity: "watch",
-      message: w,
-      hrefKind: "fcc",
-      fccSlug: "command-center-data",
-    })
-  }
-
-  for (const line of health.pipeline.operationalLeakageNotes.slice(0, 4)) {
-    items.push({
-      id: `leak_${items.length}`,
-      severity: "watch",
-      message: line,
-      impactHint: "Operations ↔ cash",
-      hrefKind: "fcc",
-      fccSlug: "internal-books",
-    })
-  }
-
-  const rank = { risk: 0, watch: 1, info: 2 }
-  items.sort((a, b) => rank[a.severity] - rank[b.severity])
-  const seen = new Set<string>()
-  const dedup: FccExecutiveAttentionItem[] = []
-  for (const it of items) {
-    const k = `${it.severity}:${it.message}`
-    if (seen.has(k)) continue
-    seen.add(k)
-    dedup.push(it)
-    if (dedup.length >= 14) break
-  }
-  return dedup
-}
-
-function buildExecutiveParagraph(health: BlitzpayBusinessHealthPayload): string {
-  const s = health.scores
-  const rs = health.facts.cashRunwayStatus
-  const runway =
-    rs === "risk"
-      ? "Cash runway is flagged as elevated — align collections cadence with near-term obligations."
-      : rs === "watch"
-        ? "Cash runway is in a watch band — monitor inflows and staged vendor payouts."
-        : "Cash runway signals look stable in the current deterministic model."
-  return `Overall health is ${clampScore(s.overall)}/100 in the ${health.reportingWindowDays}-day window. ${runway} Review detailed workspaces before operational changes; nothing here moves money automatically.`
-}
-
 async function fetchStripeBrief(
   admin: SupabaseClient,
   organizationId: string,
@@ -297,25 +189,39 @@ async function fetchComplianceTimeline(admin: SupabaseClient, organizationId: st
 export async function fetchBlitzpayFccExecutiveOverview(
   admin: SupabaseClient,
   organizationId: string,
-  options?: { reportingWindowDays?: number },
+  options?: { reportingWindowDays?: number; dataScope?: FccExecutiveOverviewDataScope },
 ): Promise<FccExecutiveOverviewPayload> {
   assertUuid(organizationId, "organizationId")
   const reportingWindowDays = Math.min(90, Math.max(7, Math.round(Number(options?.reportingWindowDays ?? 30))))
   const sinceIso = new Date(Date.now() - reportingWindowDays * 86400_000).toISOString()
+  const scope = options?.dataScope ?? "scale_full"
 
-  const [health, stripe, groups, pendingApCount, complianceTimeline] = await Promise.all([
-    fetchBlitzpayBusinessHealth(admin, organizationId, { reportingWindowDays }),
-    fetchStripeBrief(admin, organizationId),
-    listVisibleFinancialGroupsForOrganization(admin, organizationId),
-    fetchPendingApCount(admin, organizationId),
-    fetchComplianceTimeline(admin, organizationId, 10),
+  const healthP = fetchBlitzpayBusinessHealth(admin, organizationId, { reportingWindowDays })
+  const stripeP = fetchStripeBrief(admin, organizationId)
+
+  const needAp = scope === "growth_standard" || scope === "scale_full"
+  const needCompliance = scope === "core_standard" || scope === "growth_standard" || scope === "scale_full"
+  const needMultiEntity = scope === "scale_full"
+
+  const pendingApP = needAp ? fetchPendingApCount(admin, organizationId) : Promise.resolve(0)
+  const complianceP = needCompliance ? fetchComplianceTimeline(admin, organizationId, 10) : Promise.resolve([] as FccExecutiveTimelineItem[])
+
+  const [health, stripe, pendingApCount, complianceTimeline] = await Promise.all([
+    healthP,
+    stripeP,
+    pendingApP,
+    complianceP,
   ])
+
+  const groups = needMultiEntity
+    ? await listVisibleFinancialGroupsForOrganization(admin, organizationId)
+    : []
 
   const { connectAccountPresent: _cap, ...stripePublic } = stripe
 
   let multiEntity: FccExecutiveOverviewPayload["multiEntity"] = null
   let enterpriseTimeline: FccExecutiveTimelineItem[] = []
-  if (groups.length >= 2) {
+  if (needMultiEntity && groups.length >= 2) {
     const meh = await buildMultiEntityHealthPayload(admin, organizationId, sinceIso)
     const p5 = meh.phase5a
     multiEntity = {
@@ -339,8 +245,9 @@ export async function fetchBlitzpayFccExecutiveOverview(
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
     .slice(0, 12)
 
-  const attention = buildAttention({
+  const attentionPack = buildExecutiveAttentionPack({
     health,
+    dataScope: scope,
     pendingApCount,
     stripe: {
       connectAccountPresent: stripe.connectAccountPresent,
@@ -350,16 +257,14 @@ export async function fetchBlitzpayFccExecutiveOverview(
   })
 
   const f = health.facts
-  const opportunities = [...health.growthOpportunities, ...health.automationOpportunities].slice(0, 6)
-  const risks = [...health.warnings].slice(0, 6)
-  const suggestedActions = health.recommendations.slice(0, 6).map((r) => r.message)
 
   return {
     disclaimer: BLITZPAY_FCC_FUNDS_DISCLAIMER,
     reportingWindowDays: health.reportingWindowDays,
     generatedAt: health.generatedAt,
     healthCards: buildHealthCards(health, f),
-    attention,
+    attention: attentionPack.alerts,
+    attentionEngineVersion: attentionPack.version,
     cash: {
       runwayStatus: f.cashRunwayStatus,
       operatingCashCents: f.estimatedOperatingCashCents,
@@ -390,10 +295,10 @@ export async function fetchBlitzpayFccExecutiveOverview(
     operationalNotes: health.pipeline.operationalLeakageNotes.slice(0, 8),
     cashAccelerationNotes: health.pipeline.cashAccelerationOpportunities.slice(0, 6),
     executiveBriefing: {
-      paragraph: buildExecutiveParagraph(health),
-      opportunities: opportunities.slice(0, 3),
-      risks: risks.slice(0, 3),
-      suggestedActions: suggestedActions.slice(0, 3),
+      paragraph: attentionPack.executiveBriefing.paragraph,
+      opportunities: attentionPack.executiveBriefing.opportunities.slice(0, 3),
+      risks: attentionPack.executiveBriefing.risks.slice(0, 3),
+      suggestedActions: attentionPack.executiveBriefing.suggestedActions.slice(0, 3),
     },
     multiEntity,
     timeline: timelineMerged,

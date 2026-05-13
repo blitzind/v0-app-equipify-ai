@@ -62,6 +62,8 @@
     "test:blitzpay-phase-7a5-demo-data": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-blitzpay-phase-7a5-demo-data.ts",
     "test:blitzpay-phase-7a6-stripe-live-readiness": "tsx scripts/test-blitzpay-phase-7a6-stripe-live-readiness.ts",
     "test:blitzpay-phase-7a7-commercialization": "tsx scripts/test-blitzpay-phase-7a7-commercialization.ts",
+    "test:blitzpay-capabilities-architecture": "tsx scripts/test-blitzpay-capabilities-architecture.ts",
+    "test:blitzpay-executive-attention-engine": "tsx scripts/test-blitzpay-executive-attention-engine.ts",
     "test:aiden-intent-parser": "tsx scripts/test-aiden-intent-parser.ts",
     "test:aiden-intent-llm-merge": "tsx scripts/test-aiden-intent-llm-merge.ts",
     "test:create-invoice-from-work-order-resolver": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-create-invoice-from-work-order-resolver.ts",

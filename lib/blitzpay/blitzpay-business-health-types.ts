@@ -91,5 +91,11 @@ export type BlitzpayBusinessHealthPayload = {
     expectedOutflows30dCents: number
     payrollReserveCoverageBasisPoints: number
     apReserveCoverageBasisPoints: number
+    /** Reporting-window ACH payment attempts marked failed (bounded snapshot). */
+    achFailedPaymentWindowCount: number
+    /** Open vendor payables due within 7 days (internal AP mirror). */
+    apDue7OpenCents: number
+    /** Stripe treasury mirror — failed payout rows in last 30d (when synced). */
+    treasuryFailedPayoutCount30d: number
   }
 }

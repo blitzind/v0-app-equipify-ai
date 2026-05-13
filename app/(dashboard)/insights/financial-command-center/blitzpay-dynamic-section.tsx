@@ -130,15 +130,9 @@ const InternalBooksSection = dynamic(
   { loading: SectionSkeleton },
 )
 
-const VendorBillsSection = dynamic(
-  () =>
-    import("@/components/blitzpay/blitzpay-ap-bill-pay-panel").then((m) => ({
-      default: function Section(p: BlitzpayFccOrgProps) {
-        return <m.BlitzpayApBillPayPanel organizationId={p.organizationId} orgReady={p.orgReady} />
-      },
-    })),
-  { loading: SectionSkeleton },
-)
+const VendorBillsSection = dynamic(() => import("./sections/vendor-bills-section"), {
+  loading: SectionSkeleton,
+})
 
 const TaxComplianceSection = dynamic(
   () =>
@@ -170,15 +164,9 @@ const ProcurementInventorySection = dynamic(
   { loading: SectionSkeleton },
 )
 
-const OperatingCashSection = dynamic(
-  () =>
-    import("@/components/blitzpay/blitzpay-cash-accounts-panel").then((m) => ({
-      default: function Section(p: BlitzpayFccOrgProps) {
-        return <m.BlitzpayCashAccountsPanel organizationId={p.organizationId} orgReady={p.orgReady} />
-      },
-    })),
-  { loading: SectionSkeleton },
-)
+const OperatingCashSection = dynamic(() => import("./sections/operating-cash-section"), {
+  loading: SectionSkeleton,
+})
 
 const PayrollCommissionsSection = dynamic(() => import("./sections/payroll-commissions-section"), {
   loading: SectionSkeleton,
@@ -266,11 +254,11 @@ export const BLITZPAY_FCC_CHUNK_PREFETCH_BY_SLUG: Partial<Record<string, () => P
   "mobile-financial-ops": () => import("@/components/blitzpay/blitzpay-mobile-financial-ops-panel"),
   "enterprise-observability": () => import("@/components/blitzpay/blitzpay-enterprise-observability-panel"),
   "internal-books": () => import("@/components/blitzpay/blitzpay-accounting-overview-panel"),
-  "vendor-bills": () => import("@/components/blitzpay/blitzpay-ap-bill-pay-panel"),
+  "vendor-bills": () => import("./sections/vendor-bills-section"),
   "tax-compliance": () => import("@/components/blitzpay/blitzpay-tax-compliance-panel"),
   "financing-marketplace": () => import("@/components/blitzpay/blitzpay-financing-marketplace-panel"),
   "procurement-inventory": () => import("@/components/blitzpay/blitzpay-procurement-inventory-panel"),
-  "operating-cash": () => import("@/components/blitzpay/blitzpay-cash-accounts-panel"),
+  "operating-cash": () => import("./sections/operating-cash-section"),
   "payroll-commissions": () => import("./sections/payroll-commissions-section"),
   "contractor-settlements": () => import("@/components/blitzpay/blitzpay-vendor-payouts-panel"),
 }

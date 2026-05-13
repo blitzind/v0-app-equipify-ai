@@ -1,5 +1,4 @@
 import type { LucideIcon } from "lucide-react"
-import type { BlitzpayCommercialModuleKey } from "@/lib/billing/blitzpay-module-registry"
 import {
   Activity,
   BarChart3,
@@ -23,12 +22,17 @@ import {
   UserCircle,
   Users,
 } from "lucide-react"
+import type { BlitzPayFccSectionId } from "@/lib/blitzpay/sections"
+import { BLITZPAY_FCC_PREFETCH_MODULE_BY_SLUG, BLITZPAY_FCC_SLUG_SET } from "@/lib/blitzpay/sections"
 
 export type BlitzpayFccNavItem = {
-  slug: string
+  slug: BlitzPayFccSectionId
   label: string
   icon: LucideIcon
 }
+
+export { BLITZPAY_FCC_PREFETCH_MODULE_BY_SLUG, BLITZPAY_FCC_SLUG_SET } from "@/lib/blitzpay/sections"
+export { getBlitzpayFccPrefetchAllowedSlugSet } from "@/lib/blitzpay/capabilities"
 
 const FCC_BASE = "/insights/financial-command-center"
 
@@ -56,38 +60,8 @@ export const BLITZPAY_FCC_NAV_ITEMS: BlitzpayFccNavItem[] = [
   { slug: "contractor-settlements", label: "Contractor / Partner Settlements", icon: Truck },
 ]
 
-export const BLITZPAY_FCC_SLUG_SET = new Set(BLITZPAY_FCC_NAV_ITEMS.map((i) => i.slug))
-
-/**
- * Primary commercial module for background prefetch eligibility (mirrors plan `visibleModules` hints).
- * Does not authorize APIs — routes remain authoritative.
- */
-export const BLITZPAY_FCC_PREFETCH_MODULE_BY_SLUG: Record<string, BlitzpayCommercialModuleKey> = {
-  overview: "financial_command_center",
-  "executive-health": "financial_command_center",
-  "ai-financial-copilot": "ai_copilot",
-  "revenue-optimization": "revenue_optimization",
-  "recurring-revenue": "memberships_recurring",
-  collections: "collections",
-  "billing-profiles": "customer_invoicing",
-  "command-center-data": "financial_command_center",
-  "multi-entity-finance": "multi_entity_franchise",
-  "supplier-network": "supplier_network",
-  "claims-protection": "claims_protection",
-  "mobile-financial-ops": "mobile_financial_ops",
-  "enterprise-observability": "enterprise_observability",
-  "internal-books": "general_ledger",
-  "vendor-bills": "vendor_ap",
-  "tax-compliance": "tax_compliance",
-  "financing-marketplace": "financing_marketplace",
-  "procurement-inventory": "procurement_inventory",
-  "operating-cash": "cash_planning",
-  "payroll-commissions": "payroll_accruals",
-  "contractor-settlements": "treasury_payouts",
-}
-
 /** High-traffic first; enterprise-heavy last (see BlitzPay FCC prefetch spec). */
-export const BLITZPAY_FCC_PREFETCH_PRIORITY: readonly string[] = [
+export const BLITZPAY_FCC_PREFETCH_PRIORITY = [
   "overview",
   "collections",
   "revenue-optimization",
@@ -109,15 +83,19 @@ export const BLITZPAY_FCC_PREFETCH_PRIORITY: readonly string[] = [
   "multi-entity-finance",
   "supplier-network",
   "enterprise-observability",
-]
+] as const satisfies readonly BlitzPayFccSectionId[]
 
-export function getBlitzpayFccPrefetchAllowedSlugSet(
-  visibleModules: readonly BlitzpayCommercialModuleKey[],
+/**
+ * Legacy helper: prefetch allow-list from raw `visibleModules` (pre–capability-registry).
+ * Prefer {@link getBlitzpayFccPrefetchAllowedSlugSet} from `@/lib/blitzpay/capabilities`.
+ */
+export function getBlitzpayFccPrefetchAllowedSlugSetFromVisibleModules(
+  visibleModules: readonly import("@/lib/billing/blitzpay-module-registry").BlitzpayCommercialModuleKey[],
 ): Set<string> {
   const visible = new Set(visibleModules)
   const allowed = new Set<string>()
   for (const slug of BLITZPAY_FCC_SLUG_SET) {
-    const mod = BLITZPAY_FCC_PREFETCH_MODULE_BY_SLUG[slug]
+    const mod = BLITZPAY_FCC_PREFETCH_MODULE_BY_SLUG[slug as BlitzPayFccSectionId]
     if (mod && visible.has(mod)) allowed.add(slug)
   }
   return allowed

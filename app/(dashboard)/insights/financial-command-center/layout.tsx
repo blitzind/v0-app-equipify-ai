@@ -5,10 +5,8 @@ import { usePathname } from "next/navigation"
 import { AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
-import {
-  BLITZPAY_FCC_NAV_ITEMS,
-  blitzpayFccHref,
-} from "@/lib/navigation/blitzpay-financial-command-center-nav"
+import { useBlitzPayCapabilities } from "@/hooks/use-blitzpay-capabilities"
+import { blitzpayFccHref } from "@/lib/navigation/blitzpay-financial-command-center-nav"
 import {
   NAV_ICON_INACTIVE_CARD,
   NAV_PRIMARY_ROW_MOTION,
@@ -20,6 +18,7 @@ export default function FinancialCommandCenterLayout({ children }: { children: R
   const pathname = usePathname()
   const { permissions, status } = useOrgPermissions()
   const canView = status === "ready" && (permissions.canViewFinancialReports || permissions.canViewFinancials)
+  const blitzPay = useBlitzPayCapabilities()
 
   if (!canView) {
     return (
@@ -46,7 +45,7 @@ export default function FinancialCommandCenterLayout({ children }: { children: R
         className="md:hidden flex items-center gap-2 overflow-x-auto scrollbar-none border-b border-border bg-card px-3 py-2.5 -mx-4 sticky top-0 z-20"
         aria-label="BlitzPay sections"
       >
-        {BLITZPAY_FCC_NAV_ITEMS.map(({ slug, label, icon: Icon }) => {
+        {blitzPay.visibleFccSections.map(({ slug, label, icon: Icon }) => {
           const href = blitzpayFccHref(slug)
           const active = pathname === href || pathname.startsWith(`${href}/`)
           return (
@@ -68,7 +67,7 @@ export default function FinancialCommandCenterLayout({ children }: { children: R
 
       <div className="flex gap-6 lg:gap-8 items-start mt-3 md:mt-0">
         <nav className="hidden md:flex w-48 shrink-0 flex-col gap-1 sticky top-4" aria-label="BlitzPay sections">
-          {BLITZPAY_FCC_NAV_ITEMS.map(({ slug, label, icon: Icon }) => {
+          {blitzPay.visibleFccSections.map(({ slug, label, icon: Icon }) => {
             const href = blitzpayFccHref(slug)
             const active = pathname === href || pathname.startsWith(`${href}/`)
             return (

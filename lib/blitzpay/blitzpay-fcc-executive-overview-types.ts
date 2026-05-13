@@ -16,9 +16,19 @@ export type FccExecutiveHealthCard = {
 
 export type FccExecutiveAttentionItem = {
   id: string
+  /** Stable registry id for scoring extensions and future automations. */
+  signalId?: string
   severity: ExecutiveRecommendationSeverity
   message: string
   impactHint?: string
+  /** Concise imperative next step (deterministic copy). */
+  recommendedAction?: string
+  /** When set, used for prioritization and UI impact chips (cents, USD). */
+  estimatedImpactCents?: number | null
+  /** ISO timestamp the signal was evaluated against (org reporting clock). */
+  contextAsOf?: string
+  /** Bounded clarifier (sample window, non-custody, etc.). */
+  contextNote?: string
   hrefKind: "fcc" | "settings"
   fccSlug?: string
 }
@@ -82,6 +92,8 @@ export type FccExecutiveOverviewPayload = {
   }
   multiEntity: FccExecutiveMultiEntityStrip | null
   timeline: FccExecutiveTimelineItem[]
+  /** Set when alerts are produced by the executive attention engine. */
+  attentionEngineVersion?: string
   stripe: {
     chargesEnabled: boolean
     payoutsEnabled: boolean

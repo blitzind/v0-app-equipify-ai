@@ -565,10 +565,10 @@ export default function InsightsPage() {
           <p className="text-[11px] pb-4" style={{ color: "rgba(255,255,255,0.5)" }}>
             BlitzPay revenue forecasts, collections metrics, and wallet liability:{" "}
             <Link
-              href="/settings/payments#blitzpay-revenue-intelligence"
+              href="/insights/financial-command-center/revenue-optimization#blitzpay-revenue-intelligence"
               className="font-semibold text-white/90 underline-offset-2 hover:underline"
             >
-              Settings → Payments → Revenue intelligence
+              BlitzPay → Revenue optimization
             </Link>
             .
             {canBlitzpayFinancialCommandCenter ?

@@ -1,27 +1,24 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { notFound, usePathname } from "next/navigation"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { notFound, usePathname, useRouter } from "next/navigation"
 import { RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { BLITZPAY_FCC_FUNDS_DISCLAIMER } from "@/lib/blitzpay/blitzpay-fcc-executive-overview-types"
 import { invalidateFccExecutiveOverviewSessionCache } from "@/components/blitzpay/blitzpay-fcc-executive-overview"
+import { BlitzpayFccSectionUpgradePreview } from "@/components/blitzpay/blitzpay-fcc-section-upgrade-preview"
 import { FCC_TOOL_STRIP } from "@/lib/navigation-chrome"
 import { useActiveOrganization } from "@/lib/active-organization-context"
-import { useBillingAccess } from "@/lib/billing-access-context"
-import { getEffectivePlanId } from "@/lib/billing/effective-plan"
-import type { CommercialProductTier } from "@/lib/billing/blitzpay-commercial-tier"
-import { normalizeCommercialProductTier } from "@/lib/billing/blitzpay-commercial-tier"
-import { getBlitzpayPlanMetadata } from "@/lib/billing/blitzpay-plan-metadata"
-import {
-  BLITZPAY_FCC_PREFETCH_PRIORITY,
-  BLITZPAY_FCC_SLUG_SET,
-  getBlitzpayFccPrefetchAllowedSlugSet,
-} from "@/lib/navigation/blitzpay-financial-command-center-nav"
+import { useBlitzPayCapabilities } from "@/hooks/use-blitzpay-capabilities"
+import { resolveBlitzPayFccSectionSurface } from "@/lib/blitzpay/capabilities"
+import { isFccSectionAllowedForTier } from "@/lib/blitzpay/fcc-tier-navigation"
+import { BLITZPAY_FCC_PREFETCH_PRIORITY, BLITZPAY_FCC_SLUG_SET } from "@/lib/navigation/blitzpay-financial-command-center-nav"
+import type { BlitzPayFccSectionId } from "@/lib/blitzpay/sections"
 import { BlitzpayDynamicSection, prefetchBlitzpayFccSectionChunk } from "./blitzpay-dynamic-section"
 
 const FCC_BASE = "/insights/financial-command-center"
+const FCC_OVERVIEW_PATH = "/insights/financial-command-center"
 
 function resolveFccSlug(pathname: string): string | null {
   if (!pathname.startsWith(FCC_BASE)) return null
@@ -51,11 +48,26 @@ function readEffectiveConnectionType(): string {
 
 export function BlitzpayFccSectionHost() {
   const pathname = usePathname()
+  const router = useRouter()
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const orgReady = orgStatus === "ready"
-  const billing = useBillingAccess()
+  const {
+    billingReady,
+    commercialTier,
+    enforceTierGates,
+    prefetchAllowedSlugSet,
+    fccSectionAllowsDataLoad,
+  } = useBlitzPayCapabilities()
 
   const slugResolved = useMemo(() => resolveFccSlug(pathname), [pathname])
+
+  const activeSurface = useMemo(() => {
+    if (!slugResolved) return "enabled" as const
+    if (!billingReady) return "enabled" as const
+    return resolveBlitzPayFccSectionSurface(commercialTier, slugResolved as BlitzPayFccSectionId, {
+      enforceTierGates: enforceTierGates,
+    })
+  }, [billingReady, commercialTier, enforceTierGates, slugResolved])
 
   const [visited, setVisited] = useState(() => {
     const s = resolveFccSlug(pathname)
@@ -69,15 +81,32 @@ export function BlitzpayFccSectionHost() {
     visitedRef.current = visited
   }, [visited])
 
+  useLayoutEffect(() => {
+    if (!billingReady || !slugResolved) return
+    if (activeSurface === "hidden") {
+      router.replace(FCC_OVERVIEW_PATH)
+    }
+  }, [activeSurface, billingReady, router, slugResolved])
+
   useEffect(() => {
     if (!slugResolved) return
+    if (!billingReady) {
+      setVisited((prev) => {
+        if (prev.has(slugResolved)) return prev
+        const next = new Set(prev)
+        next.add(slugResolved)
+        return next
+      })
+      return
+    }
+    if (!fccSectionAllowsDataLoad(slugResolved as BlitzPayFccSectionId)) return
     setVisited((prev) => {
       if (prev.has(slugResolved)) return prev
       const next = new Set(prev)
       next.add(slugResolved)
       return next
     })
-  }, [slugResolved])
+  }, [billingReady, fccSectionAllowsDataLoad, slugResolved])
 
   useEffect(() => {
     if (!slugResolved) return
@@ -87,20 +116,25 @@ export function BlitzpayFccSectionHost() {
     setRemountNonceBySlug({})
   }, [organizationId, slugResolved])
 
-  const billingPlanKey = useMemo(() => {
-    if (billing.status !== "ready") return ""
-    const raw = billing.subscription?.plan_id ?? "solo"
-    const trialing = billing.subscription?.status === "trialing"
-    return `${raw}:${trialing ? 1 : 0}`
-  }, [billing.status, billing.subscription?.plan_id, billing.subscription?.status])
+  const billingPlanKey = useMemo(
+    () =>
+      `${organizationId ?? "none"}:${billingReady ? 1 : 0}:${commercialTier}:${enforceTierGates ? 1 : 0}`,
+    [organizationId, billingReady, commercialTier, enforceTierGates],
+  )
 
-  const prefetchAllowedSlugSet = useMemo(() => {
-    if (billing.status !== "ready") return null
-    const planIdRaw = billing.subscription?.plan_id ?? "solo"
-    const effective = getEffectivePlanId(planIdRaw, billing.subscription)
-    const tier = (normalizeCommercialProductTier(effective) ?? "solo") as CommercialProductTier
-    return getBlitzpayFccPrefetchAllowedSlugSet(getBlitzpayPlanMetadata(tier).visibleModules)
-  }, [billing.status, billing.subscription])
+  useEffect(() => {
+    if (!billingReady) return
+    setVisited((prev) => {
+      let changed = false
+      const next = new Set<string>()
+      for (const s of prev) {
+        const sid = s as BlitzPayFccSectionId
+        if (isFccSectionAllowedForTier(commercialTier, sid)) next.add(s)
+        else changed = true
+      }
+      return changed ? next : prev
+    })
+  }, [billingReady, commercialTier])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -238,7 +272,19 @@ export function BlitzpayFccSectionHost() {
     notFound()
   }
 
-  const visitedList = Array.from(visited)
+  if (billingReady && activeSurface === "hidden") {
+    return (
+      <div className="flex flex-col gap-4 min-w-0">
+        <p className="text-sm text-muted-foreground px-1">Taking you to BlitzPay overview…</p>
+      </div>
+    )
+  }
+
+  const visitedList = Array.from(visited).filter((s) =>
+    billingReady ? fccSectionAllowsDataLoad(s as BlitzPayFccSectionId) : true,
+  )
+
+  const showUpgradePreview = billingReady && activeSurface === "upgrade_preview" && slugResolved
 
   return (
     <div className="flex flex-col gap-4 min-w-0">
@@ -246,39 +292,45 @@ export function BlitzpayFccSectionHost() {
         <p className="text-[11px] sm:text-xs text-muted-foreground leading-snug min-w-0 flex-1 basis-full sm:basis-0 sm:min-w-[12rem]">
           {BLITZPAY_FCC_FUNDS_DISCLAIMER}
         </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="shrink-0 sm:ml-auto"
-          onClick={() => void refreshActive()}
-        >
-          <RefreshCw className="h-3.5 w-3.5 mr-1.5" aria-hidden />
-          Refresh section
-        </Button>
+        {!showUpgradePreview ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0 sm:ml-auto"
+            onClick={() => void refreshActive()}
+          >
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" aria-hidden />
+            Refresh section
+          </Button>
+        ) : null}
       </div>
 
       <div className="relative min-w-0">
-        {visitedList.map((s) => {
-          const active = s === slugResolved
-          const nonce = remountNonceBySlug[s] ?? 0
-          return (
-            <div
-              key={s}
-              id={`blitzpay-fcc-section-${s}`}
-              role="tabpanel"
-              aria-hidden={!active}
-              className={cn("min-w-0", active ? "block" : "hidden")}
-            >
-              <BlitzpayDynamicSection
-                key={`${s}-${organizationId ?? "none"}-${nonce}`}
-                slug={s}
-                organizationId={organizationId}
-                orgReady={orgReady}
-              />
-            </div>
-          )
-        })}
+        {showUpgradePreview && slugResolved ? (
+          <BlitzpayFccSectionUpgradePreview slug={slugResolved as BlitzPayFccSectionId} tier={commercialTier} />
+        ) : (
+          visitedList.map((s) => {
+            const active = s === slugResolved
+            const nonce = remountNonceBySlug[s] ?? 0
+            return (
+              <div
+                key={s}
+                id={`blitzpay-fcc-section-${s}`}
+                role="tabpanel"
+                aria-hidden={!active}
+                className={cn("min-w-0", active ? "block" : "hidden")}
+              >
+                <BlitzpayDynamicSection
+                  key={`${s}-${organizationId ?? "none"}-${nonce}`}
+                  slug={s}
+                  organizationId={organizationId}
+                  orgReady={orgReady}
+                />
+              </div>
+            )
+          })
+        )}
       </div>
     </div>
   )

@@ -101,9 +101,16 @@ export function BlitzpayRelatedPaymentSettingsCollapsible() {
               .
             </li>
             <li>
-              Stripe Connect onboarding, fees, payment methods, reminders, and payout ledger sync:{" "}
+              Stripe Connect onboarding, fees, payment methods, and reminders:{" "}
               <Link href="/settings/payments" className="text-primary underline-offset-2 hover:underline font-medium">
                 Settings → Payments
+              </Link>
+              .
+            </li>
+            <li>
+              Contractor treasury, payout ledger sync, and operating cash:{" "}
+              <Link href={blitzpayFccHref("operating-cash")} className="text-primary underline-offset-2 hover:underline font-medium">
+                Operating cash
               </Link>
               .
             </li>

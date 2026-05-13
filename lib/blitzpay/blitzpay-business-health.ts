@@ -341,6 +341,9 @@ export async function fetchBlitzpayBusinessHealth(
       expectedOutflows30dCents: reportingResolved.expectedOutflows30dCents,
       payrollReserveCoverageBasisPoints: reportingResolved.payrollReserveCoverageBasisPoints,
       apReserveCoverageBasisPoints: reportingResolved.apReserveCoverageBasisPoints,
+      achFailedPaymentWindowCount: reportingResolved.achSettlement.failed,
+      apDue7OpenCents: reportingResolved.apDue7OpenCents,
+      treasuryFailedPayoutCount30d: reportingResolved.treasuryFailedPayoutCount30d,
     },
   }
 }

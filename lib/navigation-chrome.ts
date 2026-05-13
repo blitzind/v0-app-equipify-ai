@@ -57,6 +57,10 @@ export const FCC_BLOCK_HEADER = "flex items-center gap-2 min-h-8"
 export const FCC_BLOCK_TITLE = "text-sm font-semibold text-foreground tracking-tight"
 export const FCC_HEALTH_STRIP_GRID = "grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3"
 export const FCC_DUAL_COL_GRID = "grid grid-cols-1 xl:grid-cols-2 gap-5 md:gap-6 items-stretch"
+/** Extra top margin so section headers clear dense card rows above (FCC overview rhythm). */
+export const FCC_OVERVIEW_SECTION_LEAD = "mt-2 md:mt-3"
+/** Pull AI executive summary slightly closer to the preceding row when stack gap feels oversized. */
+export const FCC_OVERVIEW_PRE_AI_BRIEFING_TIGHTEN = "-mt-1.5 md:-mt-2"
 export const FCC_BRIEFING_TRI_GRID = "grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4"
 export const FCC_CARD_SHELL = "border-border/80 shadow-sm"
 export const FCC_CARD_BODY = "p-4 sm:p-5"

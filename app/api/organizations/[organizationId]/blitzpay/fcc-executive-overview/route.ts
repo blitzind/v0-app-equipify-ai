@@ -3,6 +3,10 @@ import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
 import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
 import { blitzpayStaffLoadFailedResponse } from "@/lib/blitzpay/blitzpay-staff-load-error-response"
 import { fetchBlitzpayFccExecutiveOverview } from "@/lib/blitzpay/blitzpay-fcc-executive-overview"
+import {
+  parseFccExecutiveOverviewDataScope,
+  type FccExecutiveOverviewDataScope,
+} from "@/lib/blitzpay/executive-overview-widgets"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 
 export const runtime = "nodejs"
@@ -25,10 +29,12 @@ export async function GET(request: Request, context: { params: Promise<{ organiz
   if (schemaResp) return schemaResp
 
   let windowDays = 30
+  let dataScope: FccExecutiveOverviewDataScope | null = null
   try {
     const u = new URL(request.url)
     const raw = u.searchParams.get("windowDays")
     if (raw != null) windowDays = Number(raw)
+    dataScope = parseFccExecutiveOverviewDataScope(u.searchParams.get("dataScope"))
   } catch {
     /* ignore */
   }
@@ -43,6 +49,7 @@ export async function GET(request: Request, context: { params: Promise<{ organiz
   try {
     const overview = await fetchBlitzpayFccExecutiveOverview(admin, organizationId, {
       reportingWindowDays: windowDays,
+      dataScope: dataScope ?? "scale_full",
     })
     return NextResponse.json({ overview })
   } catch (e) {
