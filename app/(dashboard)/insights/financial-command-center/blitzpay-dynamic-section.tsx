@@ -200,7 +200,7 @@ export function BlitzpayDynamicSection({ slug, organizationId, orgReady }: Props
 
   switch (slug) {
     case "overview":
-      return <OverviewSection />
+      return <OverviewSection organizationId={organizationId} orgReady={orgReady} />
     case "executive-health":
       return <ExecutiveHealthSection {...orgProps} />
     case "ai-financial-copilot":

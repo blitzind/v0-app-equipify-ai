@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 434,
+  apiRouteHandlers: 435,
   sqlMigrations: 187,
   dashboardPages: 64,
-  componentsTsx: 300,
-  libTsFiles: 768,
+  componentsTsx: 301,
+  libTsFiles: 770,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **434** |
+| API route handlers (\`app/api/**/route.ts\`) | **435** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **187** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **64** |
-| \`components/**/*.tsx\` | **300** |
-| \`lib/**/*.ts\` | **768** |
+| \`components/**/*.tsx\` | **301** |
+| \`lib/**/*.ts\` | **770** |
 
 ### Vercel crons
 
@@ -160,6 +160,7 @@ organizations/[organizationId]/blitzpay/commissions/route.ts
 organizations/[organizationId]/blitzpay/compliance/audit-log/route.ts
 organizations/[organizationId]/blitzpay/compliance/health/route.ts
 organizations/[organizationId]/blitzpay/enable/route.ts
+organizations/[organizationId]/blitzpay/fcc-executive-overview/route.ts
 organizations/[organizationId]/blitzpay/financial-command-center/route.ts
 organizations/[organizationId]/blitzpay/financing/applications/[applicationId]/cancel/route.ts
 organizations/[organizationId]/blitzpay/financing/applications/[applicationId]/submit/route.ts
