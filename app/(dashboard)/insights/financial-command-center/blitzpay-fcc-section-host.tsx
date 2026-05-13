@@ -5,6 +5,9 @@ import { notFound, usePathname } from "next/navigation"
 import { RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { BLITZPAY_FCC_FUNDS_DISCLAIMER } from "@/lib/blitzpay/blitzpay-fcc-executive-overview-types"
+import { invalidateFccExecutiveOverviewSessionCache } from "@/components/blitzpay/blitzpay-fcc-executive-overview"
+import { FCC_TOOL_STRIP } from "@/lib/navigation-chrome"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { getEffectivePlanId } from "@/lib/billing/effective-plan"
@@ -219,11 +222,14 @@ export function BlitzpayFccSectionHost() {
 
   const refreshActive = useCallback(() => {
     if (!slugResolved) return
+    if (slugResolved === "overview" && organizationId) {
+      invalidateFccExecutiveOverviewSessionCache(organizationId)
+    }
     setRemountNonceBySlug((prev) => ({
       ...prev,
       [slugResolved]: (prev[slugResolved] ?? 0) + 1,
     }))
-  }, [slugResolved])
+  }, [organizationId, slugResolved])
 
   if (!pathname.startsWith(FCC_BASE)) {
     return null
@@ -235,13 +241,16 @@ export function BlitzpayFccSectionHost() {
   const visitedList = Array.from(visited)
 
   return (
-    <div className="flex flex-col gap-3 min-w-0">
-      <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="flex flex-col gap-4 min-w-0">
+      <div className={FCC_TOOL_STRIP}>
+        <p className="text-[11px] sm:text-xs text-muted-foreground leading-snug min-w-0 flex-1 basis-full sm:basis-0 sm:min-w-[12rem]">
+          {BLITZPAY_FCC_FUNDS_DISCLAIMER}
+        </p>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="shrink-0"
+          className="shrink-0 sm:ml-auto"
           onClick={() => void refreshActive()}
         >
           <RefreshCw className="h-3.5 w-3.5 mr-1.5" aria-hidden />

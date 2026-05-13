@@ -16,9 +16,7 @@ import type {
   FccExecutiveOverviewPayload,
   FccExecutiveTimelineItem,
 } from "@/lib/blitzpay/blitzpay-fcc-executive-overview-types"
-
-const DISCLAIMER =
-  "BlitzPay is orchestration and advisory. Stripe and your bank remain the source of truth for settled funds, payouts, and official balances."
+import { BLITZPAY_FCC_FUNDS_DISCLAIMER } from "@/lib/blitzpay/blitzpay-fcc-executive-overview-types"
 
 function clampScore(n: number): number {
   const x = Math.round(Number(n))
@@ -357,7 +355,7 @@ export async function fetchBlitzpayFccExecutiveOverview(
   const suggestedActions = health.recommendations.slice(0, 6).map((r) => r.message)
 
   return {
-    disclaimer: DISCLAIMER,
+    disclaimer: BLITZPAY_FCC_FUNDS_DISCLAIMER,
     reportingWindowDays: health.reportingWindowDays,
     generatedAt: health.generatedAt,
     healthCards: buildHealthCards(health, f),

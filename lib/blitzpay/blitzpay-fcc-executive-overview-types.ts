@@ -90,3 +90,7 @@ export type FccExecutiveOverviewPayload = {
     connectStatus: string | null
   }
 }
+
+/** Shown in FCC chrome and echoed in API payloads. */
+export const BLITZPAY_FCC_FUNDS_DISCLAIMER =
+  "BlitzPay is orchestration and advisory. Stripe and your bank remain the source of truth for settled funds, payouts, and official balances."

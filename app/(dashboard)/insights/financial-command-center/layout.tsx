@@ -41,9 +41,9 @@ export default function FinancialCommandCenterLayout({ children }: { children: R
   }
 
   return (
-    <div className="flex flex-col gap-0 md:gap-5">
+    <div className="flex flex-col gap-0 md:gap-6">
       <nav
-        className="md:hidden flex items-center gap-1 overflow-x-auto scrollbar-none border-b border-border bg-card px-3 py-2 -mx-4 sticky top-0 z-20"
+        className="md:hidden flex items-center gap-2 overflow-x-auto scrollbar-none border-b border-border bg-card px-3 py-2.5 -mx-4 sticky top-0 z-20"
         aria-label="BlitzPay sections"
       >
         {BLITZPAY_FCC_NAV_ITEMS.map(({ slug, label, icon: Icon }) => {
@@ -54,7 +54,7 @@ export default function FinancialCommandCenterLayout({ children }: { children: R
               key={slug}
               href={href}
               className={cn(
-                "group flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium shrink-0 min-h-[44px]",
+                "group flex items-center gap-2 whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium shrink-0 min-h-[44px]",
                 NAV_PRIMARY_ROW_MOTION,
                 active ? "bg-primary/10 text-primary" : NAV_ROW_INACTIVE_HOVER_CARD,
               )}
@@ -66,8 +66,8 @@ export default function FinancialCommandCenterLayout({ children }: { children: R
         })}
       </nav>
 
-      <div className="flex gap-8 items-start mt-3 md:mt-0">
-        <nav className="hidden md:flex w-48 shrink-0 flex-col gap-0.5 sticky top-4" aria-label="BlitzPay sections">
+      <div className="flex gap-6 lg:gap-8 items-start mt-3 md:mt-0">
+        <nav className="hidden md:flex w-48 shrink-0 flex-col gap-1 sticky top-4" aria-label="BlitzPay sections">
           {BLITZPAY_FCC_NAV_ITEMS.map(({ slug, label, icon: Icon }) => {
             const href = blitzpayFccHref(slug)
             const active = pathname === href || pathname.startsWith(`${href}/`)
@@ -76,7 +76,7 @@ export default function FinancialCommandCenterLayout({ children }: { children: R
                 key={slug}
                 href={href}
                 className={cn(
-                  "group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm",
+                  "group flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm leading-snug",
                   NAV_PRIMARY_ROW_MOTION,
                   active ? "bg-primary/10 text-primary font-medium" : NAV_ROW_INACTIVE_HOVER_CARD,
                 )}
@@ -88,7 +88,7 @@ export default function FinancialCommandCenterLayout({ children }: { children: R
           })}
         </nav>
 
-        <div className="flex-1 min-w-0 max-w-full overflow-x-hidden pb-24 md:pb-6">
+        <div className="flex-1 min-w-0 max-w-full overflow-x-hidden pb-20 md:pb-6">
           <BlitzpayFccSectionHost />
           {children}
         </div>

@@ -1,6 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
+import { memo } from "react"
 import type { BlitzpayFccOrgProps } from "./fcc-org-props"
 import { OverviewSection } from "./sections/overview-section"
 
@@ -195,7 +196,7 @@ const ContractorSettlementsSection = dynamic(
 
 type Props = BlitzpayFccOrgProps & { slug: string }
 
-export function BlitzpayDynamicSection({ slug, organizationId, orgReady }: Props) {
+function BlitzpayDynamicSectionImpl({ slug, organizationId, orgReady }: Props) {
   const orgProps: BlitzpayFccOrgProps = { organizationId, orgReady }
 
   switch (slug) {
@@ -245,6 +246,8 @@ export function BlitzpayDynamicSection({ slug, organizationId, orgReady }: Props
       return null
   }
 }
+
+export const BlitzpayDynamicSection = memo(BlitzpayDynamicSectionImpl)
 
 /**
  * Chunk-only prefetch (mirrors `dynamic()` targets above). Warms bundles without mounting.

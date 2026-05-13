@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useState } from "react"
 import Link from "next/link"
 import {
   AlertTriangle,
@@ -19,6 +19,33 @@ import { cn } from "@/lib/utils"
 import { blitzpayFccHref } from "@/lib/navigation/blitzpay-financial-command-center-nav"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
 import type { FccExecutiveOverviewPayload } from "@/lib/blitzpay/blitzpay-fcc-executive-overview-types"
+import {
+  FCC_BLOCK,
+  FCC_BLOCK_HEADER,
+  FCC_BLOCK_TITLE,
+  FCC_BRIEFING_TRI_GRID,
+  FCC_CARD_BODY,
+  FCC_CARD_SHELL,
+  FCC_DUAL_COL_GRID,
+  FCC_EXEC_OVERVIEW_STACK,
+  FCC_HEALTH_STRIP_GRID,
+  FCC_META_FOOTNOTE,
+} from "@/lib/navigation-chrome"
+
+const fccExecutiveOverviewByOrg = new Map<string, FccExecutiveOverviewPayload>()
+
+export function invalidateFccExecutiveOverviewSessionCache(organizationId?: string | null): void {
+  if (organizationId) fccExecutiveOverviewByOrg.delete(organizationId)
+  else fccExecutiveOverviewByOrg.clear()
+}
+
+function readFccExecutiveOverviewSessionCache(organizationId: string): FccExecutiveOverviewPayload | null {
+  return fccExecutiveOverviewByOrg.get(organizationId) ?? null
+}
+
+function writeFccExecutiveOverviewSessionCache(organizationId: string, payload: FccExecutiveOverviewPayload): void {
+  fccExecutiveOverviewByOrg.set(organizationId, payload)
+}
 
 type Props = {
   organizationId: string | null
@@ -57,11 +84,8 @@ export function BlitzpayFccExecutiveOverview({ organizationId, orgReady }: Props
   const [data, setData] = useState<FccExecutiveOverviewPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    if (!organizationId || !orgReady) {
-      setData(null)
-      return
-    }
+  const fetchOverview = useCallback(async () => {
+    if (!organizationId || !orgReady) return
     setLoading(true)
     setError(null)
     try {
@@ -75,7 +99,10 @@ export function BlitzpayFccExecutiveOverview({ organizationId, orgReady }: Props
         setError(j.message ?? blitzpayStaffWidgetLoadCopy.executiveBusinessHealth)
         return
       }
-      setData(j.overview ?? null)
+      const overview = j.overview ?? null
+      if (overview) writeFccExecutiveOverviewSessionCache(organizationId, overview)
+      setData(overview)
+      if (!overview) setError(blitzpayStaffWidgetLoadCopy.executiveBusinessHealth)
     } catch {
       setData(null)
       setError(blitzpayStaffWidgetLoadCopy.executiveBusinessHealth)
@@ -84,9 +111,25 @@ export function BlitzpayFccExecutiveOverview({ organizationId, orgReady }: Props
     }
   }, [organizationId, orgReady])
 
+  useLayoutEffect(() => {
+    if (!organizationId || !orgReady) return
+    const cached = readFccExecutiveOverviewSessionCache(organizationId)
+    if (cached) {
+      setData(cached)
+      setError(null)
+      setLoading(false)
+    } else {
+      setData(null)
+      setError(null)
+      setLoading(true)
+    }
+  }, [organizationId, orgReady])
+
   useEffect(() => {
-    void load()
-  }, [load])
+    if (!organizationId || !orgReady) return
+    if (readFccExecutiveOverviewSessionCache(organizationId)) return
+    void fetchOverview()
+  }, [organizationId, orgReady, fetchOverview])
 
   if (!organizationId || !orgReady) return null
 
@@ -107,20 +150,16 @@ export function BlitzpayFccExecutiveOverview({ organizationId, orgReady }: Props
   const o = data
 
   return (
-    <div className="flex flex-col gap-8 min-w-0">
-      <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed border-l-2 border-primary/40 pl-3">
-        {o.disclaimer}
-      </p>
-
+    <div className={FCC_EXEC_OVERVIEW_STACK}>
       {/* 1. Executive health bar */}
-      <section aria-labelledby="fcc-exec-health-heading" className="space-y-3">
-        <div className="flex items-center gap-2">
+      <section aria-labelledby="fcc-exec-health-heading" className={FCC_BLOCK}>
+        <div className={FCC_BLOCK_HEADER}>
           <Gauge className="h-4 w-4 text-primary shrink-0" aria-hidden />
-          <h2 id="fcc-exec-health-heading" className="text-sm font-semibold text-foreground tracking-tight">
+          <h2 id="fcc-exec-health-heading" className={FCC_BLOCK_TITLE}>
             Executive health
           </h2>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+        <div className={FCC_HEALTH_STRIP_GRID}>
           {o.healthCards.map((c) => (
             <Link
               key={c.id}
@@ -148,14 +187,14 @@ export function BlitzpayFccExecutiveOverview({ organizationId, orgReady }: Props
       </section>
 
       {/* 2. Attention today */}
-      <section aria-labelledby="fcc-attention-heading" className="space-y-3">
-        <div className="flex items-center gap-2">
+      <section aria-labelledby="fcc-attention-heading" className={FCC_BLOCK}>
+        <div className={FCC_BLOCK_HEADER}>
           <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" aria-hidden />
-          <h2 id="fcc-attention-heading" className="text-sm font-semibold text-foreground tracking-tight">
+          <h2 id="fcc-attention-heading" className={FCC_BLOCK_TITLE}>
             What needs attention
           </h2>
         </div>
-        <Card className="border-border/80 shadow-sm">
+        <Card className={FCC_CARD_SHELL}>
           <CardContent className="p-0 divide-y divide-border">
             {o.attention.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">No prioritized items in this window — keep monitoring collections and payouts.</p>
@@ -188,12 +227,12 @@ export function BlitzpayFccExecutiveOverview({ organizationId, orgReady }: Props
         </Card>
       </section>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div className={FCC_DUAL_COL_GRID}>
         {/* 3. Cash snapshot */}
-        <section aria-labelledby="fcc-cash-heading" className="space-y-3">
-          <div className="flex items-center gap-2">
+        <section aria-labelledby="fcc-cash-heading" className={FCC_BLOCK}>
+          <div className={FCC_BLOCK_HEADER}>
             <CircleDollarSign className="h-4 w-4 text-primary shrink-0" aria-hidden />
-            <h2 id="fcc-cash-heading" className="text-sm font-semibold text-foreground">
+            <h2 id="fcc-cash-heading" className={FCC_BLOCK_TITLE}>
               Cash snapshot
             </h2>
             <span
@@ -207,8 +246,8 @@ export function BlitzpayFccExecutiveOverview({ organizationId, orgReady }: Props
               Runway {o.cash.runwayStatus}
             </span>
           </div>
-          <Card className="border-border/80 shadow-sm h-full">
-            <CardContent className="p-4 sm:p-5 space-y-3 text-sm">
+          <Card className={cn(FCC_CARD_SHELL, "h-full flex flex-col")}>
+            <CardContent className={cn(FCC_CARD_BODY, "space-y-3 text-sm flex-1 flex flex-col")}>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
                 <div>
                   <dt className="text-[11px] text-muted-foreground">Operating cash (estimate)</dt>
@@ -247,15 +286,15 @@ export function BlitzpayFccExecutiveOverview({ organizationId, orgReady }: Props
         </section>
 
         {/* 4. Revenue intelligence */}
-        <section aria-labelledby="fcc-revenue-heading" className="space-y-3">
-          <div className="flex items-center gap-2">
+        <section aria-labelledby="fcc-revenue-heading" className={FCC_BLOCK}>
+          <div className={FCC_BLOCK_HEADER}>
             <TrendingUp className="h-4 w-4 text-primary shrink-0" aria-hidden />
-            <h2 id="fcc-revenue-heading" className="text-sm font-semibold text-foreground">
+            <h2 id="fcc-revenue-heading" className={FCC_BLOCK_TITLE}>
               Revenue stability
             </h2>
           </div>
-          <Card className="border-border/80 shadow-sm h-full">
-            <CardContent className="p-4 sm:p-5 space-y-3 text-sm">
+          <Card className={cn(FCC_CARD_SHELL, "h-full flex flex-col")}>
+            <CardContent className={cn(FCC_CARD_BODY, "space-y-3 text-sm flex-1 flex flex-col")}>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
                 <div>
                   <dt className="text-[11px] text-muted-foreground">Planned recurring inflow (30d)</dt>
@@ -292,16 +331,16 @@ export function BlitzpayFccExecutiveOverview({ organizationId, orgReady }: Props
       </div>
 
       {/* 5. Collections snapshot + 6. Operational bottlenecks */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <section aria-labelledby="fcc-coll-heading" className="space-y-3">
-          <div className="flex items-center gap-2">
+      <div className={FCC_DUAL_COL_GRID}>
+        <section aria-labelledby="fcc-coll-heading" className={FCC_BLOCK}>
+          <div className={FCC_BLOCK_HEADER}>
             <ClipboardList className="h-4 w-4 text-primary shrink-0" aria-hidden />
-            <h2 id="fcc-coll-heading" className="text-sm font-semibold text-foreground">
+            <h2 id="fcc-coll-heading" className={FCC_BLOCK_TITLE}>
               Collections & recovery
             </h2>
           </div>
-          <Card className="border-border/80 shadow-sm">
-            <CardContent className="p-4 sm:p-5 space-y-2 text-sm">
+          <Card className={FCC_CARD_SHELL}>
+            <CardContent className={cn(FCC_CARD_BODY, "space-y-2 text-sm")}>
               <ul className="space-y-1.5 text-muted-foreground text-[13px] leading-relaxed">
                 <li>
                   Reminder effectiveness{" "}
@@ -333,15 +372,15 @@ export function BlitzpayFccExecutiveOverview({ organizationId, orgReady }: Props
           </Card>
         </section>
 
-        <section aria-labelledby="fcc-ops-heading" className="space-y-3">
-          <div className="flex items-center gap-2">
+        <section aria-labelledby="fcc-ops-heading" className={FCC_BLOCK}>
+          <div className={FCC_BLOCK_HEADER}>
             <Sparkles className="h-4 w-4 text-primary shrink-0" aria-hidden />
-            <h2 id="fcc-ops-heading" className="text-sm font-semibold text-foreground">
+            <h2 id="fcc-ops-heading" className={FCC_BLOCK_TITLE}>
               Operational bottlenecks
             </h2>
           </div>
-          <Card className="border-border/80 shadow-sm">
-            <CardContent className="p-4 sm:p-5 space-y-2">
+          <Card className={FCC_CARD_SHELL}>
+            <CardContent className={cn(FCC_CARD_BODY, "space-y-2")}>
               {o.operationalNotes.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No leakage signals in this window.</p>
               ) : (
@@ -370,10 +409,10 @@ export function BlitzpayFccExecutiveOverview({ organizationId, orgReady }: Props
       </div>
 
       {/* 7. AI-style executive briefing (deterministic) */}
-      <section aria-labelledby="fcc-brief-heading" className="space-y-3">
-        <div className="flex items-center gap-2">
+      <section aria-labelledby="fcc-brief-heading" className={FCC_BLOCK}>
+        <div className={FCC_BLOCK_HEADER}>
           <Sparkles className="h-4 w-4 text-violet-600 shrink-0" aria-hidden />
-          <h2 id="fcc-brief-heading" className="text-sm font-semibold text-foreground">
+          <h2 id="fcc-brief-heading" className={FCC_BLOCK_TITLE}>
             Executive briefing (deterministic)
           </h2>
         </div>
@@ -386,7 +425,7 @@ export function BlitzpayFccExecutiveOverview({ organizationId, orgReady }: Props
           </CardHeader>
           <CardContent className="px-4 sm:px-5 pb-4 space-y-4 text-sm">
             <p className="text-muted-foreground leading-relaxed">{o.executiveBriefing.paragraph}</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className={FCC_BRIEFING_TRI_GRID}>
               <div>
                 <p className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 mb-1.5">Top opportunities</p>
                 <ul className="space-y-1 text-[12px] text-muted-foreground leading-relaxed">
@@ -429,15 +468,15 @@ export function BlitzpayFccExecutiveOverview({ organizationId, orgReady }: Props
 
       {/* 8. Multi-entity */}
       {o.multiEntity ? (
-        <section aria-labelledby="fcc-me-heading" className="space-y-3">
-          <div className="flex items-center gap-2">
+        <section aria-labelledby="fcc-me-heading" className={FCC_BLOCK}>
+          <div className={FCC_BLOCK_HEADER}>
             <Building2 className="h-4 w-4 text-primary shrink-0" aria-hidden />
-            <h2 id="fcc-me-heading" className="text-sm font-semibold text-foreground">
+            <h2 id="fcc-me-heading" className={FCC_BLOCK_TITLE}>
               Multi-location / enterprise
             </h2>
           </div>
-          <Card className="border-border/80 shadow-sm">
-            <CardContent className="p-4 sm:p-5 text-sm space-y-2">
+          <Card className={FCC_CARD_SHELL}>
+            <CardContent className={cn(FCC_CARD_BODY, "text-sm space-y-2")}>
               <p className="text-muted-foreground text-[13px]">
                 {o.multiEntity.visibleGroupCount} linked financial group(s) · ~{o.multiEntity.activeMemberOrgApprox}{" "}
                 orgs in consolidated view.
@@ -471,11 +510,11 @@ export function BlitzpayFccExecutiveOverview({ organizationId, orgReady }: Props
       ) : null}
 
       {/* 9. Timeline */}
-      <section aria-labelledby="fcc-timeline-heading" className="space-y-3">
-        <h2 id="fcc-timeline-heading" className="text-sm font-semibold text-foreground">
+      <section aria-labelledby="fcc-timeline-heading" className={FCC_BLOCK}>
+        <h2 id="fcc-timeline-heading" className={FCC_BLOCK_TITLE}>
           Recent financial operations
         </h2>
-        <Card className="border-border/80 shadow-sm">
+        <Card className={FCC_CARD_SHELL}>
           <CardContent className="p-0">
             {o.timeline.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">No recent compliance or enterprise audit lines in this window.</p>
@@ -503,7 +542,7 @@ export function BlitzpayFccExecutiveOverview({ organizationId, orgReady }: Props
         </Card>
       </section>
 
-      <p className="text-[10px] text-muted-foreground">
+      <p className={FCC_META_FOOTNOTE}>
         As of {new Date(o.generatedAt).toLocaleString()} · {o.reportingWindowDays}-day window · Stripe Connect:{" "}
         {o.stripe.onboardingComplete ? "onboarding complete" : "onboarding incomplete"} · Charges:{" "}
         {o.stripe.chargesEnabled ? "enabled" : "disabled"}
