@@ -23,7 +23,7 @@ export function AidenChatLauncher() {
         If you change offsets or button height, update `--aiden-launcher-*` in app/globals.css (Phase 56.6).
         Layout imports this module statically so production never depends on a separate dynamic chunk for the button.
       */}
-      <div className="pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6">
+      <div data-screenshot-chrome="hide" className="pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6">
         <button
           type="button"
           className={cn(

@@ -1,5 +1,6 @@
 "use client"
 
+import { useSearchParams } from "next/navigation"
 import { useAdmin } from "@/lib/admin-store"
 import { useFirstRun } from "@/hooks/use-first-run"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -28,6 +29,7 @@ const FALLBACK_WELCOME = {
  * Acknowledgment is stored per user + org in Supabase Auth `user_metadata` (see first-run API).
  */
 export function FirstRunWelcomeGate() {
+  const searchParams = useSearchParams()
   const { impersonation } = useAdmin()
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const { permissions, status: permStatus } = useOrgPermissions()
@@ -44,6 +46,10 @@ export function FirstRunWelcomeGate() {
     !impersonation.active
 
   const { data, patch } = useFirstRun(organizationId, enabled)
+
+  if (searchParams.get("equipifyShot") === "1") {
+    return null
+  }
 
   const open = Boolean(
     data?.hasSampleWorkspace && !data.welcomeAckedForOrg && enabled,

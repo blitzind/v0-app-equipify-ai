@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { Suspense, useEffect, useState } from "react"
 import Link from "next/link"
 import { AidenChatLauncher } from "@/components/aiden/aiden-chat-launcher"
 import { AppSidebar, SidebarContext } from "@/components/app-sidebar"
@@ -22,6 +22,7 @@ import { EquipmentTypeProvider } from "@/lib/equipment-type-store"
 import { ArchivedDashboardGate } from "@/components/archived-dashboard-gate"
 import { DashboardWorkspaceShell } from "@/components/dashboard-workspace-shell"
 import { FirstRunWelcomeGate } from "@/components/first-run/first-run-welcome-gate"
+import { ScreenshotModeGate } from "@/components/screenshot-mode-gate"
 import { AdminProvider, useAdmin } from "@/lib/admin-store"
 import { ShieldAlert, X, ArrowRight } from "lucide-react"
 
@@ -37,7 +38,10 @@ function ImpersonationBanner() {
   if (!impersonation.active) return null
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 bg-[#7c3aed] text-white text-xs font-medium shrink-0">
+    <div
+      data-screenshot-chrome="hide"
+      className="flex items-center gap-3 px-4 py-2 bg-[#7c3aed] text-white text-xs font-medium shrink-0"
+    >
       <ShieldAlert size={13} className="shrink-0" />
       <span className="flex-1">
         You are viewing{" "}
@@ -68,6 +72,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <AdminProvider>
+      <Suspense fallback={null}>
+        <ScreenshotModeGate />
+      </Suspense>
       <ActiveOrganizationProvider>
         <BillingAccessProvider>
         <OrgPermissionsProvider>
@@ -94,7 +101,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           </div>
                           {/* Fixed launcher lives outside workspace overflow stacks; still not part of sidebar/nav RBAC */}
                           <AidenChatLauncher />
-                          <FirstRunWelcomeGate />
+                          <Suspense fallback={null}>
+                            <FirstRunWelcomeGate />
+                          </Suspense>
                         </div>
                       </SidebarContext.Provider>
                     </EquipmentTypeProvider>

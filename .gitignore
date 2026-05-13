@@ -23,6 +23,8 @@ yarn-error.log*
 # vercel
 .vercel
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# Playwright / marketing screenshots
+e2e/screenshots/.auth/user.json
+screenshots/output/
+test-results/
+playwright-report/

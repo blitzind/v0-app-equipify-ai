@@ -663,3 +663,23 @@
   }
   .portal-btn-secondary:hover { background: var(--portal-hover); }
 }
+
+/*
+ * Screenshot capture mode: append ?equipifyShot=1 to dashboard URLs.
+ * `ScreenshotModeGate` sets `data-equipify-shot` on <html>; hide floating chrome via data attribute.
+ */
+html[data-equipify-shot="1"] [data-screenshot-chrome="hide"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Calmer motion for repeatable stills */
+html[data-equipify-shot="1"] *,
+html[data-equipify-shot="1"] *::before,
+html[data-equipify-shot="1"] *::after {
+  animation-duration: 0ms !important;
+  animation-delay: 0ms !important;
+  transition-duration: 0ms !important;
+  transition-delay: 0ms !important;
+}

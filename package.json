@@ -10,6 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "screenshots:install": "playwright install chromium",
+    "screenshots:industry": "playwright test",
     "test:blitzpay-onboarding-errors": "tsx scripts/test-blitzpay-onboarding-errors.ts",
     "test:blitzpay-phase-2a": "tsx scripts/test-blitzpay-phase-2a-foundation.ts",
     "test:blitzpay-phase-2b": "tsx scripts/test-blitzpay-phase-2b.ts",
@@ -136,6 +138,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.51.1",
     "@tailwindcss/postcss": "^4.2.0",
     "@types/node": "^22",
     "@types/react": "19.2.14",
