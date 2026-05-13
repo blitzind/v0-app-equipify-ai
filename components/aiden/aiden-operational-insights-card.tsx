@@ -17,6 +17,11 @@ import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { sendOnboardingProductEvent } from "@/hooks/use-onboarding-product-event"
 import type { IndustryOperationalBrief } from "@/lib/aiden/industry-operational-public-types"
+import {
+  OPERATIONAL_MODULE_PATHS,
+  presentationFromInsight,
+  type OperationalInsightPresentation,
+} from "@/lib/aiden/operational-insight-schema"
 import { WORKSPACE_INDUSTRY_DEFINITIONS } from "@/lib/workspace-industry-registry"
 
 type EligibilityResponse = {
@@ -26,10 +31,11 @@ type EligibilityResponse = {
   operationalGrowthHint?: boolean
 }
 
-const severityStyle: Record<string, string> = {
-  low: "border-border bg-muted/30 text-foreground",
-  medium: "border-amber-500/35 bg-amber-500/5",
-  high: "border-destructive/40 bg-destructive/5",
+const presentationStyle: Record<OperationalInsightPresentation, string> = {
+  critical: "border-red-600/55 bg-red-600/8 ring-1 ring-red-600/15",
+  warning: "border-amber-600/45 bg-amber-500/6 ring-1 ring-amber-600/12",
+  informational: "border-border bg-muted/25 text-foreground",
+  healthy: "border-emerald-600/30 bg-emerald-600/5 ring-1 ring-emerald-600/10",
 }
 
 export function AidenOperationalInsightsCard({
@@ -149,6 +155,8 @@ export function AidenOperationalInsightsCard({
     industryBrief &&
     (industryBrief.dashboardSummaryLines.length > 0 ||
       industryBrief.maintenanceSummaryLines.length > 0 ||
+      industryBrief.dashboardOperationalSummaries.length > 0 ||
+      industryBrief.maintenanceOperationalSummaries.length > 0 ||
       industryBrief.deterministicInsights.length > 0)
 
   if (!eligibilityReady) {
@@ -222,9 +230,16 @@ export function AidenOperationalInsightsCard({
       <CardContent className="px-4 py-3 space-y-3">
         {showIndustryBlock ?
           <section className="space-y-2.5 rounded-lg border border-border/80 bg-muted/10 px-3 py-2.5" aria-label="Industry workspace signals">
-            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              <Layers className="size-3.5 opacity-80 shrink-0" aria-hidden />
-              Workspace signals
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="inline-flex items-center gap-2">
+                <Layers className="size-3.5 opacity-80 shrink-0" aria-hidden />
+                Workspace signals
+              </span>
+              {industryBrief!.signalsPresentationHealthy ?
+                <span className="rounded-full border border-emerald-600/25 bg-emerald-600/8 px-2 py-0.5 text-[10px] font-medium normal-case tracking-normal text-emerald-800 dark:text-emerald-200">
+                  Healthy signals
+                </span>
+              : null}
             </div>
             {(() => {
               const ib = industryBrief!
@@ -257,23 +272,52 @@ export function AidenOperationalInsightsCard({
             })()}
             {industryBrief!.deterministicInsights.length > 0 ?
               <ul className="space-y-2">
-                {industryBrief!.deterministicInsights.map((sig) => (
-                  <li
-                    key={sig.id}
-                    className={cn(
-                      "rounded-md border px-2.5 py-2 text-xs",
-                      severityStyle[sig.severity] ?? severityStyle.low,
-                    )}
-                  >
-                    <div className="font-medium text-foreground">{sig.title}</div>
-                    <p className="mt-1 text-[11px] leading-snug text-foreground/90">{sig.detail}</p>
-                    <ul className="mt-1.5 space-y-0.5 text-[10px] text-muted-foreground">
-                      {sig.evidence.map((ev) => (
-                        <li key={ev}>· {ev}</li>
-                      ))}
-                    </ul>
-                  </li>
-                ))}
+                {industryBrief!.deterministicInsights.map((sig) => {
+                  const tier = presentationFromInsight(sig)
+                  return (
+                    <li
+                      key={sig.id}
+                      className={cn("rounded-md border px-2.5 py-2 text-xs", presentationStyle[tier])}
+                    >
+                      <div className="flex flex-wrap items-center gap-1.5 gap-y-0.5">
+                        <span className="font-medium text-foreground">{sig.title}</span>
+                        <span className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                          {sig.severity} · {sig.confidence} · {sig.category.replace(/-/g, " ")}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground">Urgency: {sig.urgency}</span>
+                      </div>
+                      <p className="mt-1 text-[11px] leading-snug text-foreground/90">{sig.detail}</p>
+                      <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+                        <span className="font-medium text-foreground/80">Why: </span>
+                        {sig.triggerRationale}
+                      </p>
+                      {sig.thresholdsUsed.length > 0 ?
+                        <ul className="mt-1 space-y-0.5 text-[10px] text-muted-foreground">
+                          {sig.thresholdsUsed.map((t) => (
+                            <li key={t}>Threshold: {t}</li>
+                          ))}
+                        </ul>
+                      : null}
+                      <ul className="mt-1.5 space-y-0.5 text-[10px] text-muted-foreground">
+                        {sig.evidence.map((ev) => (
+                          <li key={ev}>· {ev}</li>
+                        ))}
+                      </ul>
+                      <p className="mt-1.5 text-[10px] leading-snug text-foreground/90">
+                        <span className="font-medium text-foreground/85">Next: </span>
+                        {sig.suggestedNextStep}
+                        <span className="text-muted-foreground"> · </span>
+                        <Link
+                          href={OPERATIONAL_MODULE_PATHS[sig.relevantModule]}
+                          className="text-foreground/80 underline decoration-muted-foreground/60 underline-offset-2 hover:text-foreground"
+                        >
+                          Open {sig.relevantModule.replace(/_/g, " ")}
+                        </Link>
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground italic">{sig.suggestedWorkflow}</p>
+                    </li>
+                  )
+                })}
               </ul>
             : null}
             <p className="text-[10px] text-muted-foreground leading-snug">
@@ -313,14 +357,17 @@ export function AidenOperationalInsightsCard({
             </button>
             {expanded ?
               <ul className="space-y-2">
-                {answer.recommendations.map((rec, idx) => (
-                  <li
-                    key={`${rec.title}-${idx}`}
-                    className={cn(
-                      "rounded-lg border px-3 py-2 text-sm",
-                      severityStyle[rec.severity] ?? severityStyle.low,
-                    )}
-                  >
+                {answer.recommendations.map((rec, idx) => {
+                  const recTier: OperationalInsightPresentation =
+                    rec.severity === "high" ? "warning" : "informational"
+                  return (
+                    <li
+                      key={`${rec.title}-${idx}`}
+                      className={cn(
+                        "rounded-lg border px-3 py-2 text-sm",
+                        presentationStyle[recTier],
+                      )}
+                    >
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-foreground">{rec.title}</span>
                       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{rec.severity}</span>
@@ -336,8 +383,9 @@ export function AidenOperationalInsightsCard({
                         Related ids: {rec.relatedRecordIds.join(", ")}
                       </p>
                     : null}
-                  </li>
-                ))}
+                    </li>
+                  )
+                })}
               </ul>
             : null}
           </div>
