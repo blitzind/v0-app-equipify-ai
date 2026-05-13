@@ -3,7 +3,17 @@
 import { useCallback, useEffect, useState } from "react"
 import type { FirstRunGetResponse } from "@/lib/first-run/api-types"
 
-export function useFirstRun(organizationId: string | null, enabled: boolean) {
+export type UseFirstRunReturn = {
+  data: FirstRunGetResponse | null
+  loading: boolean
+  error: string | null
+  reload: () => Promise<void>
+  patch: (
+    action: "ack_welcome" | "hide_launchpad" | "show_launchpad",
+  ) => Promise<{ ok: false; error: string } | { ok: true }>
+}
+
+export function useFirstRun(organizationId: string | null, enabled: boolean): UseFirstRunReturn {
   const [data, setData] = useState<FirstRunGetResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

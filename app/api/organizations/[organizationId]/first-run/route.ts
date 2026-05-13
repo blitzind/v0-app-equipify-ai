@@ -9,7 +9,8 @@ import {
   withOrgIdAppended,
   withOrgIdRemoved,
 } from "@/lib/first-run/user-metadata"
-import { industryLabelForLaunchpad, industryOperationalHint } from "@/lib/first-run/launchpad-copy"
+import { industryLabelForLaunchpad } from "@/lib/first-run/launchpad-copy"
+import { resolveOnboardingIndustryBundle } from "@/lib/onboarding-industry/resolve-onboarding-industry-bundle"
 import type { FirstRunStepId } from "@/lib/first-run/types"
 
 export type { FirstRunStepId } from "@/lib/first-run/types"
@@ -219,10 +220,19 @@ export async function GET(
     },
   ]
 
-  const steps = stepRows.map((s) => ({
-    ...s,
-    applicable: isLaunchpadStepApplicable(s.id, permissions),
-  }))
+  const industry = org?.industry ?? null
+  const industryLabel = industryLabelForLaunchpad(industry)
+  const onboardingBundle = resolveOnboardingIndustryBundle(industry, industryLabel)
+
+  const steps = stepRows.map((s) => {
+    const o = onboardingBundle.launchpadStepCopy[s.id]
+    return {
+      ...s,
+      label: o?.label ?? s.label,
+      description: o?.description ?? s.description,
+      applicable: isLaunchpadStepApplicable(s.id, permissions),
+    }
+  })
 
   const resourceLinks: { label: string; href: string }[] = []
   if (permissions.canManageWorkspaceSettings) {
@@ -239,12 +249,20 @@ export async function GET(
     resourceLinks.push({ label: "Import center", href: "/settings/imports" })
   }
 
-  const industry = org?.industry ?? null
-
   return NextResponse.json({
     industry,
-    industryLabel: industryLabelForLaunchpad(industry),
-    industryHint: industryOperationalHint(industry),
+    industryLabel,
+    industryHint: onboardingBundle.operationalHint,
+    welcomeCopy: onboardingBundle.welcomeCopy,
+    launchpadSecondaryNote: onboardingBundle.launchpadSecondaryNote,
+    exampleWorkflows: onboardingBundle.exampleWorkflows,
+    demoWalkthroughHints: onboardingBundle.demoWalkthroughHints,
+    quickActions: onboardingBundle.quickActions,
+    statCardPriority: onboardingBundle.statCardPriority,
+    aidenSectorFraming: onboardingBundle.aidenSectorFraming,
+    terminology: onboardingBundle.terminology,
+    dashboardEmptyCopy: onboardingBundle.dashboardEmptyCopy,
+    signupExampleWorkflows: onboardingBundle.signupExampleWorkflows,
     hasSampleWorkspace,
     demoSeedSucceeded,
     welcomeAckedForOrg,

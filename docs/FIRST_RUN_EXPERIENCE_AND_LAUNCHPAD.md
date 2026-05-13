@@ -15,10 +15,12 @@ This document describes the **guided first-run** surfaces: welcome modal, dashbo
 | --- | --- |
 | First-run payload | `GET /api/organizations/[organizationId]/first-run` |
 | User preference PATCH | `PATCH /api/organizations/[organizationId]/first-run` `{ "action": "…" }` |
-| Industry-facing copy | `lib/first-run/launchpad-copy.ts` |
+| Industry-facing copy | `lib/onboarding-industry/*` (resolved in `GET …/first-run`; labels via `lib/first-run/launchpad-copy.ts`) |
 | Step applicability rules | `lib/first-run/launchpad-eligibility.ts` |
 | Auth metadata keys | `lib/first-run/user-metadata.ts` |
-| Dashboard UI | `components/first-run/dashboard-launchpad.tsx` |
+| Dashboard checklist | `components/first-run/dashboard-launchpad.tsx` |
+| Demo walkthrough + quick actions | `components/first-run/industry-demo-starter-panel.tsx` |
+| Executive stat card order | `components/dashboard/executive-stat-cards.tsx` |
 | Welcome modal | `components/first-run/first-run-welcome-gate.tsx` |
 | Client fetch helper | `hooks/use-first-run.ts` |
 
@@ -58,8 +60,17 @@ This document describes the **guided first-run** surfaces: welcome modal, dashbo
 
 ## Industry-specific onboarding
 
-- `GET /first-run` returns `industry`, `industryLabel`, and `industryHint` (from workspace industry registry + `normalizeIndustryKey`).
-- Launchpad intro uses `industryHint` as a single operational sentence for the selected vertical.
+Central config lives in **`lib/onboarding-industry/`**:
+
+- **`operational-hints.ts`** — one-line `operationalHint` for every `WorkspaceIndustryKey` (launchpad intro).
+- **`industry-overrides.ts`** — optional deltas per industry (welcome copy, checklist label/description overrides, demo hints, quick actions, stat-card priority, empty-state copy, signup bullets, AIden framing).
+- **`resolve-onboarding-industry-bundle.ts`** — merges defaults + overrides; used by `GET …/first-run` and (server-side) AIden operational recommendations.
+
+`GET /first-run` returns, among other fields: `industry`, `industryLabel`, `industryHint`, `welcomeCopy`, `launchpadSecondaryNote`, `exampleWorkflows`, `launchpad` step rows with **industry-specific labels/descriptions** where configured, `demoWalkthroughHints`, `quickActions`, `statCardPriority`, `aidenSectorFraming`, `terminology`, `dashboardEmptyCopy`, `signupExampleWorkflows`. Step **IDs**, **hrefs**, **done** rules, and **applicable** flags are unchanged — only copy is customized.
+
+The **main dashboard** passes a single `useFirstRun` result into the launchpad, **Industry demo starter** panel, and **Executive snapshot** stat cards so industry UX does not multiply identical GETs. **Welcome gate** still performs its own fetch (acceptable; see Risks).
+
+**AIden operational recommendations** (`POST …/aiden/operational-recommendations`) loads `organizations.industry` and injects `aidenSectorFraming` into the prompt as **tone-only** guidance; snapshot JSON remains the source of truth for facts.
 
 ## Permission & security notes
 
@@ -88,4 +99,4 @@ This document describes the **guided first-run** surfaces: welcome modal, dashbo
 ## Risks / follow-ups
 
 - **QuickBooks “done”** may read empty under strict RLS for some roles — step may stay incomplete even if connected; revisit with a narrow RPC if product needs uniform detection.
-- **Dual fetch**: welcome gate and launchpad each call GET; acceptable until a shared provider is justified.
+- **Dual fetch**: welcome gate performs its own GET; executive dashboard shares one `useFirstRun` across launchpad + industry demo panel + stat order. A shared provider could dedupe further if needed.

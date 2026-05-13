@@ -29,10 +29,13 @@ export function RecentWorkOrders({
   rows,
   loading,
   error,
+  emptyMessage,
 }: {
   rows: RecentWorkOrderRow[]
   loading?: boolean
   error?: string | null
+  /** When set, replaces the default empty-state line (e.g. industry-aware copy). */
+  emptyMessage?: string | null
 }) {
   const [selectedWoId, setSelectedWoId] = useState<string | null>(null)
 
@@ -80,7 +83,8 @@ export function RecentWorkOrders({
                   ? (
                       <tr>
                         <td colSpan={7} className="px-5 py-10 text-center text-sm text-muted-foreground">
-                          No work orders yet. Create one from Work Orders.
+                          {emptyMessage?.trim() ||
+                            "No work orders yet. Create one from Work Orders."}
                         </td>
                       </tr>
                     )

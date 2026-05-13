@@ -10,6 +10,8 @@ import { buildOperationalSnapshot } from "@/lib/aiden/operational-snapshot"
 import { resolveOperationalRecommendationsRequest } from "@/lib/aiden/operational-request-context"
 import { recordAidenUsageEvent } from "@/lib/aiden/usage-events"
 import { runAiTask } from "@/lib/ai/server"
+import { industryLabelForLaunchpad } from "@/lib/first-run/launchpad-copy"
+import { resolveOnboardingIndustryBundle } from "@/lib/onboarding-industry/resolve-onboarding-industry-bundle"
 
 export const runtime = "nodejs"
 export const maxDuration = 90
@@ -56,10 +58,22 @@ export async function POST(
     includeFinancialHints,
   })
 
+  const { data: orgIndustry } = await ctx.supabase
+    .from("organizations")
+    .select("industry")
+    .eq("id", organizationId)
+    .maybeSingle()
+  const industryRaw = (orgIndustry as { industry?: string | null } | null)?.industry ?? null
+  const sectorFraming = resolveOnboardingIndustryBundle(
+    industryRaw,
+    industryLabelForLaunchpad(industryRaw),
+  ).aidenSectorFraming
+
   const snapshotJson = JSON.stringify(snapshot)
   const prompt = buildOperationalRecommendationsPrompt({
     snapshotJson,
     moduleContext: parsed.data.moduleContext,
+    sectorFraming,
   })
 
   const started = Date.now()

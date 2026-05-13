@@ -16,7 +16,18 @@ Strict rules:
 export function buildOperationalRecommendationsPrompt(args: {
   snapshotJson: string
   moduleContext: OperationalModuleContext
+  /** Optional workspace-vertical framing (tone only; facts still from snapshot). */
+  sectorFraming?: string | null
 }): { system: string; user: string } {
+  const framing = (args.sectorFraming ?? "").trim()
+  const framingBlock =
+    framing.length > 0
+      ? `
+
+Workspace vertical guidance (tone only — all factual claims must still come from the snapshot JSON):
+${framing}`
+      : ""
+
   return {
     system: `${RULES}
 
@@ -38,6 +49,7 @@ Return JSON:
   ]
 }`,
     user: `Current module context for prioritization: ${args.moduleContext}
+${framingBlock}
 
 Operational snapshot (JSON):
 ${args.snapshotJson}`,

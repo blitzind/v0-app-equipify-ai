@@ -21,6 +21,8 @@ import {
   workspaceIndustrySelectOptions,
   getIndustrySetupCopy,
 } from "@/lib/demo-seeding/profiles"
+import { resolveOnboardingIndustryBundle } from "@/lib/onboarding-industry/resolve-onboarding-industry-bundle"
+import { WORKSPACE_INDUSTRY_DEFINITIONS } from "@/lib/workspace-industry-registry"
 
 const STEPS = ["Your account", "Workspace", "Choose a plan"]
 /** Central registry — labels and keys from `lib/workspace-industry-registry.ts` */
@@ -462,6 +464,22 @@ function OnboardingPageContent() {
                 <p className="text-sm text-gray-500">
                   {getIndustrySetupCopy(form.industry)}
                 </p>
+                {(() => {
+                  const ik = normalizeIndustryKey(form.industry)
+                  const label = WORKSPACE_INDUSTRY_DEFINITIONS[ik].label
+                  const bullets = resolveOnboardingIndustryBundle(ik, label).signupExampleWorkflows
+                  if (bullets.length === 0) return null
+                  return (
+                    <div className="rounded-lg border border-gray-100 bg-gray-50/80 p-3 mt-3">
+                      <p className="text-xs font-medium text-gray-700 mb-2">Examples you&apos;ll explore first</p>
+                      <ul className="list-disc pl-4 text-xs text-gray-600 space-y-1">
+                        {bullets.map((b) => (
+                          <li key={b}>{b}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )
+                })()}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Company name</label>
                   <input value={form.companyName} onChange={(e) => setField("companyName", e.target.value)}

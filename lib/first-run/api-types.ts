@@ -1,3 +1,9 @@
+import type {
+  DemoWalkthroughHintDto,
+  ExecutiveStatCardId,
+  OnboardingTerminologyDto,
+  WelcomeCopyDto,
+} from "@/lib/onboarding-industry/types"
 import type { FirstRunStepId } from "@/lib/first-run/types"
 
 export type FirstRunStepDto = {
@@ -13,6 +19,16 @@ export type FirstRunGetResponse = {
   industry: string | null
   industryLabel: string
   industryHint: string
+  welcomeCopy: WelcomeCopyDto
+  launchpadSecondaryNote: string
+  exampleWorkflows: string[]
+  demoWalkthroughHints: DemoWalkthroughHintDto[]
+  quickActions: { label: string; href: string }[]
+  statCardPriority: ExecutiveStatCardId[] | null
+  aidenSectorFraming: string
+  terminology: OnboardingTerminologyDto
+  dashboardEmptyCopy: { recentWorkOrders?: string }
+  signupExampleWorkflows: string[]
   hasSampleWorkspace: boolean
   demoSeedSucceeded: boolean
   welcomeAckedForOrg: boolean

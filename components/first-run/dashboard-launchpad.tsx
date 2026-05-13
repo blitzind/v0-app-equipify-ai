@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { CheckCircle2, Circle, LayoutDashboard, X } from "lucide-react"
-import { useFirstRun } from "@/hooks/use-first-run"
+import type { UseFirstRunReturn } from "@/hooks/use-first-run"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { Button } from "@/components/ui/button"
@@ -11,8 +11,9 @@ import { cn } from "@/lib/utils"
 
 /**
  * Dismissible dashboard checklist. Step completion reflects real org data (see GET first-run API).
+ * Expects `firstRun` from the parent so the dashboard can share one GET with other industry-aware widgets.
  */
-export function DashboardLaunchpad() {
+export function DashboardLaunchpad({ firstRun }: { firstRun: UseFirstRunReturn }) {
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const { permissions, status: permStatus } = useOrgPermissions()
   const technicianFocused =
@@ -23,7 +24,7 @@ export function DashboardLaunchpad() {
   const enabled =
     orgStatus === "ready" && Boolean(organizationId) && permStatus === "ready" && !technicianFocused
 
-  const { data, loading, patch } = useFirstRun(organizationId, enabled)
+  const { data, loading, patch } = firstRun
 
   if (!enabled) return null
 
@@ -74,14 +75,21 @@ export function DashboardLaunchpad() {
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
                   {data.industryHint}{" "}
-                  <span className="text-foreground/80">
-                    Example jobs and invoices are for practice — add your own anytime.
-                  </span>
+                  <span className="text-foreground/80">{data.launchpadSecondaryNote}</span>
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-1.5">
                   Workspace profile:{" "}
                   <span className="text-foreground font-medium">{data.industryLabel}</span>
                 </p>
+                {data.exampleWorkflows.length > 0 ? (
+                  <ul className="mt-2 list-disc pl-4 text-[11px] text-muted-foreground space-y-0.5">
+                    {data.exampleWorkflows.map((line) => (
+                      <li key={line} className="leading-snug">
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
             </div>
             <Button
@@ -138,9 +146,7 @@ export function DashboardLaunchpad() {
 
           {data.resourceLinks.length > 0 ? (
             <div className="px-4 py-3 border-t border-border bg-muted/15">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
-                Explore
-              </p>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">Explore</p>
               <div className="flex flex-wrap gap-x-3 gap-y-1.5">
                 {data.resourceLinks.map((r) => (
                   <Link

@@ -1,22 +1,7 @@
 "use client"
 
-import {
-  CalendarClock,
-  AlertCircle,
-  ClipboardList,
-  DollarSign,
-  Shield,
-  Repeat2,
-  AlertTriangle,
-  FileWarning,
-  ListTodo,
-  CheckCircle2,
-  ScrollText,
-  UserRoundX,
-  ListChecks,
-} from "lucide-react"
+import { AlertTriangle } from "lucide-react"
 import { useSupabaseDashboard } from "@/lib/dashboard/use-supabase-dashboard"
-import { StatCard } from "@/components/dashboard/stat-card"
 import { RecentWorkOrders } from "@/components/dashboard/recent-work-orders"
 import { EquipmentDue } from "@/components/dashboard/equipment-due"
 import { RepeatRepairs } from "@/components/dashboard/repeat-repairs"
@@ -37,15 +22,13 @@ import { ServiceRequestSignals } from "@/components/dashboard/service-request-si
 import { cn } from "@/lib/utils"
 import { canReadServiceRequestQueue } from "@/lib/service-requests/list-filter"
 import { DashboardLaunchpad } from "@/components/first-run/dashboard-launchpad"
-
-function formatUsdFromCents(cents: number): string {
-  const dollars = Math.round(cents / 100)
-  return `$${dollars.toLocaleString()}`
-}
+import { IndustryDemoStarterPanel } from "@/components/first-run/industry-demo-starter-panel"
+import { ExecutiveStatCards } from "@/components/dashboard/executive-stat-cards"
+import { useFirstRun } from "@/hooks/use-first-run"
 
 export default function DashboardPage() {
   const { organizationId: dashboardOrgId, status: dashboardOrgStatus } = useActiveOrganization()
-  const { permissions } = useOrgPermissions()
+  const { permissions, status: permStatus } = useOrgPermissions()
   const showQuotesExecutive = Boolean(permissions.canViewQuotes)
   const showServiceRequestSignals = canReadServiceRequestQueue(permissions)
   const technicianFocused =
@@ -65,16 +48,25 @@ export default function DashboardPage() {
     operationalInsights,
   } = useSupabaseDashboard({ disabled: technicianFocused })
 
-  const monthlyRevenueLabel = formatUsdFromCents(stats.monthlyRevenueCents)
+  const launchpadEnabled =
+    dashboardOrgStatus === "ready" &&
+    Boolean(dashboardOrgId) &&
+    permStatus === "ready" &&
+    !technicianFocused
+
+  const firstRun = useFirstRun(dashboardOrgId ?? null, launchpadEnabled)
 
   if (technicianFocused) {
     return <TechnicianHome />
   }
 
+  const recentWoEmpty = firstRun.data?.dashboardEmptyCopy?.recentWorkOrders
+
   return (
     <div className="flex flex-col gap-6">
       <TechnicianTodayMobileCard />
-      <DashboardLaunchpad />
+      <DashboardLaunchpad firstRun={firstRun} />
+      <IndustryDemoStarterPanel firstRun={firstRun} />
       {dashboardOrgStatus === "ready" && dashboardOrgId ? (
         <>
           <FollowUpAutomationSignals organizationId={dashboardOrgId} />
@@ -97,145 +89,12 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Stat cards — Phase 63.2 executive snapshot (bounded head counts + existing hooks). */}
-      <div className="print:hidden">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-          Executive snapshot
-        </h2>
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 items-stretch">
-        <StatCard
-          title="Equipment Due This Month"
-          value={stats.equipmentDueThisMonth}
-          subtitle="Scheduled for service"
-          icon={CalendarClock}
-          iconColor="text-primary"
-          iconBg="bg-primary/10"
-          href="/service-schedule"
-          loading={loading}
-        />
-        <StatCard
-          title="Overdue Service"
-          value={stats.overdueService}
-          subtitle="Immediate attention needed"
-          icon={AlertCircle}
-          iconColor="text-destructive"
-          iconBg="bg-destructive/10"
-          urgent
-          href="/service-schedule"
-          loading={loading}
-        />
-        <StatCard
-          title="Open Work Orders"
-          value={stats.openWorkOrders}
-          subtitle="Across all technicians"
-          icon={ClipboardList}
-          iconColor="text-primary"
-          iconBg="bg-primary/10"
-          href="/work-orders"
-          loading={loading}
-        />
-        <StatCard
-          title="Monthly Revenue"
-          value={monthlyRevenueLabel}
-          subtitle="Completed & invoiced this month"
-          icon={DollarSign}
-          iconColor="text-[oklch(0.42_0.17_145)]"
-          iconBg="bg-[oklch(0.62_0.17_145)]/10"
-          href="/reports"
-          loading={loading}
-        />
-        <StatCard
-          title="Expiring Warranties"
-          value={stats.expiringWarrantiesCount}
-          subtitle="Within 30 days"
-          icon={Shield}
-          iconColor="text-[oklch(0.50_0.12_70)]"
-          iconBg="bg-[oklch(0.75_0.16_70)]/10"
-          href="/equipment"
-          loading={loading}
-        />
-        <StatCard
-          title="Repeat Repair Alerts"
-          value={stats.repeatRepairAlertsCount}
-          subtitle="Assets with 2+ WOs in 90 days"
-          icon={Repeat2}
-          iconColor="text-destructive"
-          iconBg="bg-destructive/10"
-          urgent
-          href="/work-orders"
-          loading={loading}
-        />
-        <StatCard
-          title="Overdue Invoices"
-          value={stats.overdueInvoicesCount}
-          subtitle={
-            stats.overdueInvoicesAmountCents > 0
-              ? `${formatUsdFromCents(stats.overdueInvoicesAmountCents)} outstanding`
-              : "Past due date"
-          }
-          icon={FileWarning}
-          iconColor="text-[color:var(--status-warning)]"
-          iconBg="bg-[color:var(--status-warning)]/10"
-          urgent={stats.overdueInvoicesCount > 0}
-          href="/invoices"
-          loading={loading}
-        />
-        <StatCard
-          title="PM Plans Overdue"
-          value={stats.maintenancePlansOverdueCount}
-          subtitle="Active plans past next due"
-          icon={ListTodo}
-          iconColor="text-primary"
-          iconBg="bg-primary/10"
-          urgent={stats.maintenancePlansOverdueCount > 0}
-          href="/maintenance-plans"
-          loading={loading}
-        />
-        <StatCard
-          title="Completed This Month"
-          value={stats.workOrdersCompletedThisMonth}
-          subtitle="Completed / pending signature / invoiced (completion date in range)"
-          icon={CheckCircle2}
-          iconColor="text-[oklch(0.42_0.17_145)]"
-          iconBg="bg-[oklch(0.62_0.17_145)]/10"
-          href="/work-orders"
-          loading={loading}
-        />
-        {showQuotesExecutive ? (
-          <StatCard
-            title="Quote Pipeline"
-            value={stats.openQuotesPipelineCount}
-            subtitle="Draft, sent, or pending approval"
-            icon={ScrollText}
-            iconColor="text-sky-700"
-            iconBg="bg-sky-500/10"
-            href="/quotes"
-            loading={loading}
-          />
-        ) : null}
-        <StatCard
-          title="Unassigned Open Work"
-          value={stats.unassignedOpenWorkOrders}
-          subtitle="Open, scheduled, or in progress — no primary technician"
-          icon={UserRoundX}
-          iconColor="text-amber-800"
-          iconBg="bg-amber-500/15"
-          urgent={stats.unassignedOpenWorkOrders > 0}
-          href="/dispatch"
-          loading={loading}
-        />
-        <StatCard
-          title="Active PM Plans"
-          value={stats.activeMaintenancePlansCount}
-          subtitle="Contracts on file (active status)"
-          icon={ListChecks}
-          iconColor="text-primary"
-          iconBg="bg-primary/10"
-          href="/maintenance-plans"
-          loading={loading}
-        />
-      </div>
+      <ExecutiveStatCards
+        stats={stats}
+        loading={loading}
+        showQuotesExecutive={showQuotesExecutive}
+        firstRun={firstRun}
+      />
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
@@ -256,7 +115,12 @@ export default function DashboardPage() {
 
       <OperationalInsightsWidget insights={operationalInsights} loading={loading} error={error} />
 
-      <RecentWorkOrders rows={recentWorkOrders} loading={loading} error={error} />
+      <RecentWorkOrders
+        rows={recentWorkOrders}
+        loading={loading}
+        error={error}
+        emptyMessage={recentWoEmpty}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
         <EquipmentDue items={equipmentDueSoon} loading={loading} error={error} />
