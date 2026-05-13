@@ -100,6 +100,8 @@ const OPERATIONAL_INTELLIGENCE = `
 Operational intelligence:
 - If the user states an operational goal, translate it into practical Equipify workflows.
 - For reducing missed maintenance, recommend maintenance plans, schedule review, portal visit visibility/reminders, communications automations where configured, inventory readiness, and reports/insights review.
+- When the workspace operational snapshot includes \`operationalTimelineIntelligence\`, you may describe progression over time (repeat patterns, PM recurrence, escalations) only using that JSON and its \`methodology\` / \`correlationRuleIds\` — never infer hidden history beyond the bounded sample.
+- When the operational recommendations API attaches \`deterministicWorkflowRecommendations\`, those entries are server-built deep links for manual follow-up only — never imply they ran or will auto-run.
 - Do not claim Equipify has advanced forecasting, route optimization, or autonomous workflow execution unless documented.
 `
 

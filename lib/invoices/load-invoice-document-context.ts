@@ -38,10 +38,19 @@ function buildStatusDisplay(dbStatus: string, balanceDueCents: number, dueYmd: s
   return ui
 }
 
+export type LoadInvoiceDocumentContextOptions = {
+  /**
+   * When true, void and archived invoices still load (internal PDF, print, download).
+   * Customer-facing sends should omit this so void/archived invoices are not exposed.
+   */
+  staffDocumentExport?: boolean
+}
+
 export async function loadInvoiceDocumentContext(
   supabase: SupabaseClient,
   organizationId: string,
   invoiceId: string,
+  opts?: LoadInvoiceDocumentContextOptions,
 ): Promise<InvoiceDocumentContext | null> {
   const { data: invRow, error: invErr } = await supabase
     .from("org_invoices")
@@ -115,9 +124,11 @@ export async function loadInvoiceDocumentContext(
     terms_code?: string | null
   }
 
-  if (inv.archived_at) return null
   const dbStatusLower = String(inv.status || "").toLowerCase()
-  if (dbStatusLower === "void") return null
+  if (!opts?.staffDocumentExport) {
+    if (inv.archived_at) return null
+    if (dbStatusLower === "void") return null
+  }
 
   const [{ data: org }, { data: cust }, equipRes, payRes, refundRes] = await Promise.all([
     supabase

@@ -13,6 +13,8 @@ import { runAiTask } from "@/lib/ai/server"
 import { industryLabelForLaunchpad } from "@/lib/first-run/launchpad-copy"
 import { normalizeIndustryKey } from "@/lib/demo-seeding/profiles"
 import { resolveOnboardingIndustryBundle } from "@/lib/onboarding-industry/resolve-onboarding-industry-bundle"
+import { buildOperationalWorkflowRecommendations } from "@/lib/aiden/operational-workflow-recommendations"
+import { recordAidenUsageEvent } from "@/lib/aiden/usage-events"
 
 export const runtime = "nodejs"
 export const maxDuration = 90
@@ -78,11 +80,21 @@ export async function POST(
   const industryOperational = snapshot.industryOperational ?? null
   const operationalHealthScores = (snapshot.operationalHealthScores ?? null) as OperationalHealthScoresReport | null
 
+  const deterministicWorkflowRecommendations = buildOperationalWorkflowRecommendations({
+    snapshot,
+    permissions: {
+      canViewFinancials: ctx.permissions.canViewFinancials,
+      canViewBilling: ctx.permissions.canViewBilling,
+      canViewFinancialReports: ctx.permissions.canViewFinancialReports,
+    },
+  })
+
   const snapshotJson = JSON.stringify(snapshot)
   const prompt = buildOperationalRecommendationsPrompt({
     snapshotJson,
     moduleContext: parsed.data.moduleContext,
     sectorFraming,
+    deterministicWorkflowRecommendationsJson: JSON.stringify(deterministicWorkflowRecommendations),
   })
 
   if (parsed.data.skipAi) {
@@ -91,6 +103,7 @@ export async function POST(
       answer: { recommendations: [] },
       industryOperational,
       operationalHealthScores,
+      deterministicWorkflowRecommendations,
     })
   }
 
@@ -122,5 +135,6 @@ export async function POST(
     answer: result.output,
     industryOperational,
     operationalHealthScores,
+    deterministicWorkflowRecommendations,
   })
 }

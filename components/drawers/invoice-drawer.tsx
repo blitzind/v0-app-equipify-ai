@@ -11,9 +11,10 @@ import { InvoiceDetailView } from "@/components/drawers/invoice-detail-view"
 interface InvoiceDrawerProps {
   invoiceId: string | null
   onClose: () => void
+  onSelectInvoiceId?: (invoiceId: string) => void
 }
 
-export function InvoiceDrawer({ invoiceId, onClose }: InvoiceDrawerProps) {
+export function InvoiceDrawer({ invoiceId, onClose, onSelectInvoiceId }: InvoiceDrawerProps) {
   const { invoices } = useInvoices()
   const invoice = invoiceId ? invoices.find((i) => i.id === invoiceId) ?? null : null
 
@@ -45,10 +46,7 @@ export function InvoiceDrawer({ invoiceId, onClose }: InvoiceDrawerProps) {
       }
     >
       {invoice && (
-        <InvoiceDetailView
-          invoice={invoice}
-          onClose={onClose}
-        />
+        <InvoiceDetailView invoice={invoice} onClose={onClose} onSelectInvoiceId={onSelectInvoiceId} />
       )}
     </DetailDrawer>
   )

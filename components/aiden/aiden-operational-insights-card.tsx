@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { sendOnboardingProductEvent } from "@/hooks/use-onboarding-product-event"
 import type { IndustryOperationalBrief } from "@/lib/aiden/industry-operational-public-types"
+import type { OperationalWorkflowRecommendationsReport } from "@/lib/aiden/operational-workflow-recommendations-types"
 import {
   OPERATIONAL_MODULE_PATHS,
   presentationFromInsight,
@@ -54,6 +55,9 @@ export function AidenOperationalInsightsCard({
   const [busy, setBusy] = useState(false)
   const [answer, setAnswer] = useState<AidenOperationalRecommendationsAnswer | null>(null)
   const [industryBrief, setIndustryBrief] = useState<IndustryOperationalBrief | null>(null)
+  const [workflowRecommendations, setWorkflowRecommendations] = useState<OperationalWorkflowRecommendationsReport | null>(
+    null,
+  )
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
 
@@ -95,9 +99,11 @@ export function AidenOperationalInsightsCard({
         const data = (await res.json().catch(() => ({}))) as {
           ok?: boolean
           industryOperational?: IndustryOperationalBrief | null
+          deterministicWorkflowRecommendations?: OperationalWorkflowRecommendationsReport | null
         }
-        if (!cancelled && res.ok && data.ok && data.industryOperational) {
-          setIndustryBrief(data.industryOperational)
+        if (!cancelled && res.ok && data.ok) {
+          if (data.industryOperational) setIndustryBrief(data.industryOperational)
+          setWorkflowRecommendations(data.deterministicWorkflowRecommendations ?? null)
         }
       } catch {
         /* non-fatal */
@@ -124,6 +130,7 @@ export function AidenOperationalInsightsCard({
         ok?: boolean
         answer?: AidenOperationalRecommendationsAnswer
         industryOperational?: IndustryOperationalBrief | null
+        deterministicWorkflowRecommendations?: OperationalWorkflowRecommendationsReport | null
         message?: string
         error?: string
       }
@@ -132,6 +139,7 @@ export function AidenOperationalInsightsCard({
       }
       setAnswer(data.answer)
       if (data.industryOperational) setIndustryBrief(data.industryOperational)
+      setWorkflowRecommendations(data.deterministicWorkflowRecommendations ?? null)
       setExpanded(true)
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Request failed."
@@ -324,6 +332,57 @@ export function AidenOperationalInsightsCard({
               Signals use work order types, dates, equipment status, and bounded title keyword matches — not predictions
               or sensor claims.
             </p>
+          </section>
+        : null}
+
+        {workflowRecommendations?.recommendations?.length ?
+          <section className="space-y-2 rounded-lg border border-border/80 bg-background/80 px-3 py-2.5" aria-label="Deterministic workflow shortcuts">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Suggested workflows (navigation only)
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-snug">{workflowRecommendations.methodologyNote}</p>
+            <ul className="space-y-2">
+              {workflowRecommendations.recommendations.map((w) => (
+                <li key={w.id} className="rounded-md border border-border/70 bg-muted/10 px-2.5 py-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-foreground">{w.title}</span>
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{w.severity}</span>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-snug text-foreground/90">{w.rationale}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button asChild size="sm" variant="secondary" className="h-7 text-[11px]">
+                      <Link href={w.primaryHref}>Primary</Link>
+                    </Button>
+                    {w.secondaryHrefs.map((s) => (
+                      <Button key={`${w.id}-${s.label}`} asChild size="sm" variant="outline" className="h-7 text-[11px]">
+                        <Link href={s.href}>{s.label}</Link>
+                      </Button>
+                    ))}
+                  </div>
+                  {w.suggestedAutomation ?
+                    <p className="mt-2 text-[10px] text-muted-foreground leading-snug">
+                      Automation: {w.suggestedAutomation.label}
+                      {w.suggestedAutomation.href ?
+                        <>
+                          {" · "}
+                          <Link
+                            href={w.suggestedAutomation.href}
+                            className="text-foreground/85 underline decoration-muted-foreground/55 underline-offset-2"
+                          >
+                            Open automations
+                          </Link>
+                        </>
+                      : null}
+                    </p>
+                  : null}
+                  {w.evidencePaths.length > 0 ?
+                    <p className="mt-1 text-[9px] font-mono text-muted-foreground/90 break-all">
+                      Evidence: {w.evidencePaths.join(", ")}
+                    </p>
+                  : null}
+                </li>
+              ))}
+            </ul>
           </section>
         : null}
 

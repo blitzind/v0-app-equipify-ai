@@ -18,7 +18,7 @@ export type DispatchCustomerInvoiceEmailArgs = {
   to: string
   subjectOverride?: string
   messagePlain?: string
-  variant: "send" | "reminder"
+  variant: "send" | "resend" | "reminder"
   /** When set, attempt BlitzPay hosted checkout for staff-initiated sends. */
   blitzpayStaffUserId?: string | null
   /** Overrides BlitzPay prepare (e.g. automated portal payment link). */

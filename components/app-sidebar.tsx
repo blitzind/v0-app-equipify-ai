@@ -288,6 +288,15 @@ function isItemActive(pathname: string, href: string, item?: Pick<NavItem, "acti
   return pathname === href || pathname.startsWith(href + "/") || pathname.startsWith(href + "?")
 }
 
+/** “AI” pill shared by Automation & Intelligence nav rows (AI Insights, AI Operations, AI Assistants, AIden Actions). */
+function SidebarNavAiPill() {
+  return (
+    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary shrink-0">
+      AI
+    </span>
+  )
+}
+
 // Mobile drawer open state — consumed by AppTopbar hamburger button
 export const SidebarContext = React.createContext<{
   mobileOpen: boolean
@@ -759,11 +768,7 @@ function SidebarBody({
                       {!isCollapsed && (
                         <>
                           <span className="truncate flex-1 font-medium">{label}</span>
-                          {highlight && !active && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                              AI
-                            </span>
-                          )}
+                          {highlight && !active && <SidebarNavAiPill />}
                         </>
                       )}
                     </Link>

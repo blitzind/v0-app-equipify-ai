@@ -24,8 +24,8 @@ export type InvoiceCustomerEmailTemplateArgs = {
   balanceDueCents: number
   certificatesList?: { equipmentLabel: string; templateName: string | null }[]
   certificate?: { included: boolean; templateName?: string | null }
-  /** Initial send vs payment reminder framing. */
-  variant: "send" | "reminder"
+  /** Initial send vs payment reminder vs staff resend. */
+  variant: "send" | "resend" | "reminder"
 }
 
 function ctaButton(label: string, href: string, bg: string): string {
@@ -75,7 +75,9 @@ export function buildInvoiceCustomerEmailFromTemplate(args: InvoiceCustomerEmail
   const lead =
     args.variant === "reminder"
       ? `<p style="margin:0 0 14px;font-family:system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.6;color:#334155;">This is a brief reminder about the invoice below. If you have already paid, you can disregard this message.</p>`
-      : `<p style="margin:0 0 14px;font-family:system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.6;color:#334155;">${org} has shared an invoice for your records. Key details are summarized in the card below.</p>`
+      : args.variant === "resend"
+        ? `<p style="margin:0 0 14px;font-family:system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.6;color:#334155;">We are resending this invoice for your records. Details are summarized below.</p>`
+        : `<p style="margin:0 0 14px;font-family:system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.6;color:#334155;">${org} has shared an invoice for your records. Key details are summarized in the card below.</p>`
 
   const cardRows = [
     { k: "Invoice #", v: inv },
@@ -190,6 +192,8 @@ ${args.certificatesList
   textLines.push("")
   if (args.variant === "reminder") {
     textLines.push("Reminder: if you have already paid, you can disregard this message.", "")
+  } else if (args.variant === "resend") {
+    textLines.push("Resend: this is the same invoice, sent again for your records.", "")
   }
   if (args.messagePlain?.trim()) textLines.push(args.messagePlain.trim(), "")
   if (args.viewInvoiceUrl?.trim()) textLines.push(`View: ${args.viewInvoiceUrl.trim()}`)

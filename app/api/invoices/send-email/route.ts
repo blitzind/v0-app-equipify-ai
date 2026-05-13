@@ -200,11 +200,12 @@ export async function POST(request: Request) {
     to,
     subjectOverride,
     messagePlain,
-    variant: "send",
+    variant,
     blitzpayStaffUserId: user.id,
     certificatesList: certificatesList.length > 0 ? certificatesList : undefined,
     certificate: certificatesList.length > 0 ? undefined : legacyCertificate,
     documentContext: docCtx,
+    resendCategory: variant === "resend" ? "invoice_customer_resend" : "invoice_customer",
   })
 
   if (!dispatched.ok) {

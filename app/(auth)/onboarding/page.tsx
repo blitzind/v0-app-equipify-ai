@@ -66,7 +66,9 @@ function OnboardingPageContent() {
   const seedDemoChoice = inviteTokenParam
     ? searchParams.get("seedDemo")?.trim().toLowerCase() === "true"
     : searchParams.get("seedDemo")?.trim().toLowerCase() !== "false"
-  const industryParam = normalizeIndustryKey(searchParams.get("industry"))
+  const industryParam = normalizeIndustryKey(
+    searchParams.get("industry")?.trim() || searchParams.get("ainsleyIndustry")?.trim(),
+  )
   const hasMarketingIdentity = Boolean(firstNameParam && lastNameParam && emailParam)
   const trialFromQuery = hasScaleTrialParam(searchParams.get("trial"))
   const [step, setStep] = useState(0)
@@ -100,7 +102,9 @@ function OnboardingPageContent() {
     const email = parseOnboardingText(searchParams.get("email")) || ""
     const company = parseOnboardingText(searchParams.get("company")) || ""
     const phone = parseOnboardingText(searchParams.get("phone")) || ""
-    const industry = normalizeIndustryKey(searchParams.get("industry"))
+    const industry = normalizeIndustryKey(
+      searchParams.get("industry")?.trim() || searchParams.get("ainsleyIndustry")?.trim(),
+    )
     const teamSize = parseOnboardingTeamSize(searchParams.get("teamSize")) || ""
     const currentSystem = parseOnboardingText(searchParams.get("currentSystem")) || ""
 
@@ -135,6 +139,16 @@ function OnboardingPageContent() {
       teamSize: teamSize || prev.teamSize,
       currentSystem: currentSystem || prev.currentSystem,
     }))
+  }, [searchParams])
+
+  useEffect(() => {
+    const topics = searchParams.get("ainsleyTopics")?.trim()
+    if (!topics) return
+    try {
+      sessionStorage.setItem("equipify_onboarding_ainsley_topics", topics)
+    } catch {
+      /* */
+    }
   }, [searchParams])
 
   useEffect(() => {

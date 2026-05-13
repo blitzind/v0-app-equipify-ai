@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     to,
     subjectOverride,
     messagePlain,
-    variant: "send",
+    variant,
     blitzpayStaffUserId: user.id,
     documentContext: docCtx,
     resendCategory: "invoice_customer_legacy_route",

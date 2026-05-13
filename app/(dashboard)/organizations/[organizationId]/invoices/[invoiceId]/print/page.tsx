@@ -20,7 +20,9 @@ export default async function OrganizationInvoicePrintPage({
   const gate = await requireAnyOrgPermission(organizationId, ["canEditInvoices", "canViewFinancials"])
   if ("error" in gate) notFound()
 
-  const ctx = await loadInvoiceDocumentContext(gate.supabase, organizationId, invoiceId)
+  const ctx = await loadInvoiceDocumentContext(gate.supabase, organizationId, invoiceId, {
+    staffDocumentExport: true,
+  })
   if (!ctx) notFound()
 
   return (

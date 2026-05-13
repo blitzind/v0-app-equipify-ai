@@ -19,7 +19,9 @@ export async function GET(
   }
 
   const supabase = await createServerSupabaseClient()
-  const ctx = await loadInvoiceDocumentContext(supabase, organizationId, invoiceId)
+  const ctx = await loadInvoiceDocumentContext(supabase, organizationId, invoiceId, {
+    staffDocumentExport: true,
+  })
   if (!ctx) {
     return NextResponse.json({ error: "not_found", message: "Invoice not found." }, { status: 404 })
   }

@@ -73,6 +73,9 @@
     "test:create-invoice-from-work-order-executor": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-create-invoice-from-work-order-executor.ts",
     "test:bulk-invoice-completed-work-orders": "tsx scripts/test-bulk-invoice-completed-work-orders.ts",
     "test:parse-line-items": "tsx scripts/test-parse-line-items.ts",
+    "test:operational-timeline-intelligence": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-operational-timeline-intelligence.ts",
+    "test:executive-operational-report": "tsx scripts/test-executive-operational-report.ts",
+    "test:operational-workflow-recommendations": "tsx scripts/test-operational-workflow-recommendations.ts",
     "test:aiden-prepared-workspace-tier-policy": "tsx scripts/test-aiden-prepared-workspace-tier-policy.ts"
   },
   "dependencies": {

@@ -10,6 +10,7 @@ import {
   fetchIndustryOperationalMetrics,
 } from "@/lib/aiden/industry-operational-metrics"
 import { buildOperationalHealthScores } from "@/lib/aiden/operational-health-scores"
+import { buildOperationalTimelineIntelligenceForOrg } from "@/lib/aiden/operational-timeline-intelligence"
 
 function utcTodayYmd(): string {
   return new Date().toISOString().slice(0, 10)
@@ -33,15 +34,23 @@ type SnapshotArgs = {
   industryKey?: WorkspaceIndustryKey | null
 }
 
-function scopeFilters(args: SnapshotArgs): { skip: boolean; woIds: string[] | null } {
-  if (!isAssignedWorkOnly(args.permissions)) {
+/** Shared with executive reporting — same bounded WO id list as operational snapshots. */
+export function workOrderScopeForAssignedTechnicians(
+  permissions: OrgPermissions,
+  assignedScope: AssignedWorkScope | null,
+): { skip: boolean; woIds: string[] | null } {
+  if (!isAssignedWorkOnly(permissions)) {
     return { skip: false, woIds: null }
   }
-  const ids = args.assignedScope?.workOrderIds ?? []
+  const ids = assignedScope?.workOrderIds ?? []
   if (ids.length === 0) {
     return { skip: true, woIds: [] }
   }
   return { skip: false, woIds: ids }
+}
+
+function scopeFilters(args: SnapshotArgs): { skip: boolean; woIds: string[] | null } {
+  return workOrderScopeForAssignedTechnicians(args.permissions, args.assignedScope)
 }
 
 /**
@@ -71,6 +80,8 @@ export async function buildOperationalSnapshot(
   const orgId = args.organizationId
   const assigned = isAssignedWorkOnly(args.permissions)
   const equipIds = assigned ? args.assignedScope?.equipmentIds ?? [] : null
+  const generatedAt = new Date().toISOString()
+  const timelineCreatedAfterIso = daysAgoIso(120)
 
   function woQuery(select: string, selectOpts?: { count: "exact" | "planned" | "estimated"; head?: boolean }) {
     let q = supabase
@@ -126,6 +137,7 @@ export async function buildOperationalSnapshot(
     equipDueRes,
     plansOverdueRes,
     scheduleDensityRes,
+    operationalTimelineIntelligence,
   ] = await Promise.all([
     woQuery("id", { count: "exact", head: true })
       .in("status", [...ACTIVE_STATUSES])
@@ -152,6 +164,14 @@ export async function buildOperationalSnapshot(
       .gte("scheduled_on", today)
       .lte("scheduled_on", weekAheadYmd)
       .limit(400),
+    buildOperationalTimelineIntelligenceForOrg(supabase, {
+      organizationId: orgId,
+      woIds: scope.woIds,
+      industryKey: args.industryKey ?? null,
+      createdAfterIso: timelineCreatedAfterIso,
+      rowLimit: 400,
+      generatedAtIso: generatedAt,
+    }),
   ])
 
   const activeRows = (activeWoSampleRes.data ?? []) as Array<{
@@ -244,8 +264,6 @@ export async function buildOperationalSnapshot(
     maxJobsSameDaySameAssignee: maxSameDaySameTech,
   }
 
-  const generatedAt = new Date().toISOString()
-
   const base: Record<string, unknown> = {
     generatedAt,
     moduleContext: args.moduleContext,
@@ -263,6 +281,7 @@ export async function buildOperationalSnapshot(
       args.includeFinancialHints && overdueInvoiceCount !== undefined ?
         { overdueInvoiceCount }
       : undefined,
+    operationalTimelineIntelligence,
   }
 
   const metricsSamplingIndustry = args.industryKey ?? "field_service"

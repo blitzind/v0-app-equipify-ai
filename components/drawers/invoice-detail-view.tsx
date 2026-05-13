@@ -49,6 +49,13 @@ import {
   NESTED_OVER_DRAWER_Z,
 } from "@/components/detail-drawer"
 import { cnDrawerTabButton } from "@/components/ui/tabs-chrome"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { CertificatePanel } from "@/components/certificates/certificate-panel"
 import { InvoicePortalCertificatePanel } from "@/components/invoices/invoice-portal-certificate-panel"
 import { InvoiceSourcePanel } from "@/components/invoices/invoice-source-panel"
@@ -61,6 +68,8 @@ import {
 } from "@/lib/certificates/certificate-attachments"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { invoiceTermsCodeLabel } from "@/lib/billing/invoice-terms"
+import { isValidEmail } from "@/lib/email/format"
+import { buildInvoicePdfFilename } from "@/lib/invoices/invoice-pdf-filename"
 import { formatTaxBasisLabel, formatTaxModeLabel } from "@/lib/billing/tax-framework"
 import {
   formatPaymentMethodDb,
@@ -77,7 +86,7 @@ import {
 } from "@/lib/billing/invoice-financial-display"
 import {
   Mail, MessageSquare, Link2, Download, Save, CreditCard, CheckCircle2,
-  Ban, Copy, Repeat, Paperclip, FileSignature, StickyNote, ClipboardList,
+  Ban, Copy, Paperclip, FileSignature, StickyNote, ClipboardList,
   ChevronDown, X, Check, Pencil, Plus, Trash2, AlertTriangle, DollarSign,
   Sparkles, RefreshCw, ThumbsUp, ThumbsDown, ShieldAlert, Monitor, Tablet,
   Loader2,
@@ -102,6 +111,19 @@ type LineItem = QuoteInvoiceLineItem
 function fmtDate(d: string) {
   if (!d) return "—"
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
+function fmtDateTime(iso: string | null | undefined) {
+  if (!iso) return "—"
+  const d = new Date(iso.includes("T") ? iso : `${iso}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return "—"
+  return d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
 }
 
 function fmtCurrency(n: number) {
@@ -872,20 +894,22 @@ function EmailModal({
 }) {
   const invoiceLabel = invoice.invoiceNumber?.trim() || "Invoice"
   const signOff = organizationName.trim() || "Your team"
+  const billingEmail = invoice.billingContactEmail?.trim() ?? ""
   const [sending, setSending] = useState(false)
-  const [to,      setTo]      = useState(`billing@${invoice.customerName.toLowerCase().replace(/\s+/g, "")}.com`)
-  const [subject, setSubject] = useState(`Invoice ${invoiceLabel} from ${signOff}`)
-  const [body,    setBody]    = useState(
-    `Hi ${invoice.customerName},\n\nThank you for your business. We have emailed a professional invoice summary with a PDF attachment for your records.\n\nPayment is due by ${fmtDate(invoice.dueDate)}. If you have questions, reply to this email.\n\nThank you,\n${signOff}`,
+  const [to, setTo] = useState(() => (isValidEmail(billingEmail) ? billingEmail : ""))
+  const [subject, setSubject] = useState(`${invoiceLabel} — ${signOff}`)
+  const [body, setBody] = useState(
+    `Hi ${invoice.customerName},\n\nPlease use the secure link in this email to view your invoice. A PDF is attached for your records.\n\nThank you,\n${signOff}`,
   )
 
   async function handleSend() {
+    if (sending) return
     if (!organizationId?.trim()) {
       onError?.("Select an organization to send email.")
       return
     }
     const trimmedTo = to.trim()
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedTo)) {
+    if (!isValidEmail(trimmedTo)) {
       onError?.("Enter a valid recipient email address.")
       return
     }
@@ -947,9 +971,11 @@ function EmailModal({
             <textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)}
               className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2 resize-none")} />
           </div>
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/40 border border-border">
-            <Paperclip className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-            <span className="text-xs text-muted-foreground">Invoice {invoiceLabel}.pdf will be attached</span>
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/40 border border-border">
+            <Paperclip className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+            <span className="text-xs text-muted-foreground leading-snug">
+              A detailed PDF is attached when delivery succeeds. The customer email also includes a secure portal link.
+            </span>
           </div>
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
@@ -4152,11 +4178,13 @@ function ReadOnlyLineItems({
 interface InvoiceDetailViewProps {
   invoice: AdminInvoice
   onClose: () => void
+  /** After duplicate (or similar), switch the drawer to another invoice id. */
+  onSelectInvoiceId?: (invoiceId: string) => void
 }
 
 let toastCounter = 0
 
-export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) {
+export function InvoiceDetailView({ invoice, onClose, onSelectInvoiceId }: InvoiceDetailViewProps) {
   const { canArchiveRestore } = useOrgArchivePermissions()
   const { permissions } = useOrgPermissions()
   const showFinancials = permissions.canViewBilling
@@ -4186,11 +4214,26 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
     return `/organizations/${encodeURIComponent(oid)}/invoices/${encodeURIComponent(invoice.id)}/print`
   }, [organizationId, invoice.id])
 
-  const canPrintInvoice =
+  const canStaffInvoiceDocuments =
     Boolean(invoicePrintHref) &&
     (permissions.canViewFinancials || permissions.canEditInvoices) &&
-    invoice.status !== "Void" &&
     !invoice.isArchived
+
+  const canCopyCustomerInvoiceUrl =
+    canStaffInvoiceDocuments &&
+    invoice.status !== "Draft" &&
+    invoice.status !== "Void"
+
+  const canSavePdfToRecord = Boolean(canEditInvoices && orgStatus === "ready" && organizationId?.trim())
+
+  const canMarkPaidFromMenu =
+    canEditInvoices &&
+    showFinancials &&
+    !["Draft", "Paid", "Void"].includes(invoice.status) &&
+    !invoice.isArchived
+
+  const canVoidFromMenu =
+    canEditInvoices && showFinancials && invoice.status !== "Void" && !invoice.isArchived
 
   // Tabs + layout state
   const [activeTab,    setActiveTab]    = useState<Tab>("info")
@@ -4211,9 +4254,11 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
   // Modals
   const [modal, setModal] = useState<"email" | "sms" | "payment" | null>(null)
   const [emailVariant, setEmailVariant] = useState<"send" | "resend">("send")
-  const [moreOpen, setMoreOpen] = useState(false)
-  const [actionsOpen, setActionsOpen] = useState(false)
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
+  const [destructiveDialog, setDestructiveDialog] = useState<null | "void" | "markPaid">(null)
+  const [duplicateInvoiceBusy, setDuplicateInvoiceBusy] = useState(false)
+  const [savePdfBusy, setSavePdfBusy] = useState(false)
+  const [downloadPdfBusy, setDownloadPdfBusy] = useState(false)
   const [archiveBusy, setArchiveBusy] = useState(false)
   const [restoreBusy, setRestoreBusy] = useState(false)
   const [catalogPickerOpen, setCatalogPickerOpen] = useState(false)
@@ -4234,6 +4279,147 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
   function openEmailModal(variant: "send" | "resend") {
     setEmailVariant(variant)
     setModal("email")
+  }
+
+  async function copyInvoiceUrlToClipboard() {
+    if (typeof window === "undefined") {
+      toast("Copy link is only available in the browser.", "error")
+      return
+    }
+    const u = `${window.location.origin}/portal/invoices/${encodeURIComponent(invoice.id)}`
+    try {
+      await navigator.clipboard.writeText(u)
+      toast("Customer invoice link copied")
+    } catch {
+      toast("Could not copy link", "error")
+    }
+  }
+
+  async function downloadInvoicePdf() {
+    const oid = organizationId?.trim()
+    if (!oid || downloadPdfBusy) return
+    setDownloadPdfBusy(true)
+    try {
+      const url = `/api/organizations/${encodeURIComponent(oid)}/invoices/${encodeURIComponent(invoice.id)}/pdf`
+      const res = await fetch(url, { credentials: "include", cache: "no-store" })
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { message?: string }
+        toast(typeof j.message === "string" ? j.message : "Could not download PDF.", "error")
+        return
+      }
+      const blob = await res.blob()
+      const cd = res.headers.get("Content-Disposition")
+      let name = buildInvoicePdfFilename(invoice.invoiceNumber?.trim() || "Invoice")
+      const m = cd?.match(/filename="([^"]+)"/i)
+      if (m?.[1]) name = m[1].trim()
+      const href = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = href
+      a.download = name
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(href)
+      toast("Invoice PDF downloaded")
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not download PDF.", "error")
+    } finally {
+      setDownloadPdfBusy(false)
+    }
+  }
+
+  async function saveInvoicePdfToRecord() {
+    const oid = organizationId?.trim()
+    if (!oid || !canSavePdfToRecord || savePdfBusy) return
+    setSavePdfBusy(true)
+    try {
+      const url = `/api/organizations/${encodeURIComponent(oid)}/invoices/${encodeURIComponent(invoice.id)}/pdf`
+      const res = await fetch(url, { credentials: "include", cache: "no-store" })
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { message?: string }
+        toast(typeof j.message === "string" ? j.message : "Could not generate PDF.", "error")
+        return
+      }
+      const blob = await res.blob()
+      const filename = buildInvoicePdfFilename(invoice.invoiceNumber?.trim() || "Invoice")
+      const file = new File([blob], filename, { type: "application/pdf" })
+      const form = new FormData()
+      form.set("file", file)
+      form.set("entityType", "invoice")
+      form.set("entityId", invoice.id)
+      form.set("attachmentType", "signed_paperwork")
+      form.set("visibilityScope", "internal")
+      form.set("sourceSystem", "invoice_pdf")
+      const up = await fetch(`/api/organizations/${encodeURIComponent(oid)}/attachments`, {
+        method: "POST",
+        body: form,
+        credentials: "include",
+      })
+      const j = (await up.json().catch(() => ({}))) as { message?: string }
+      if (!up.ok) {
+        toast(typeof j.message === "string" ? j.message : "Could not save PDF to invoice.", "error")
+        return
+      }
+      toast("PDF saved to invoice attachments")
+      setActiveTab("files")
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not save PDF.", "error")
+    } finally {
+      setSavePdfBusy(false)
+    }
+  }
+
+  async function duplicateInvoice() {
+    const oid = organizationId?.trim()
+    if (!oid || duplicateInvoiceBusy) return
+    setDuplicateInvoiceBusy(true)
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(oid)}/invoices/${encodeURIComponent(invoice.id)}/duplicate`,
+        { method: "POST", credentials: "include" },
+      )
+      const data = (await res.json().catch(() => ({}))) as {
+        invoiceId?: string
+        message?: string
+        invoiceNumber?: string
+      }
+      if (!res.ok) {
+        toast(typeof data.message === "string" ? data.message : "Could not duplicate invoice.", "error")
+        return
+      }
+      if (data.invoiceId) {
+        await refreshInvoices()
+        toast(data.invoiceNumber ? `Draft invoice created (${data.invoiceNumber})` : "Draft invoice created")
+        onSelectInvoiceId?.(data.invoiceId)
+      }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not duplicate invoice.", "error")
+    } finally {
+      setDuplicateInvoiceBusy(false)
+    }
+  }
+
+  async function executeMarkPaidFromDialog() {
+    const { error } = await updateInvoice(invoice.id, {
+      status: "Paid",
+      paidAt: new Date().toISOString(),
+    })
+    if (error) {
+      toast(`Could not mark paid: ${error}`, "error")
+      return
+    }
+    toast("Invoice marked as paid")
+    setDestructiveDialog(null)
+  }
+
+  async function executeVoidFromDialog() {
+    const { error } = await updateInvoice(invoice.id, { status: "Void" })
+    if (error) {
+      toast(`Could not void: ${error}`, "error")
+      return
+    }
+    toast("Invoice voided")
+    setDestructiveDialog(null)
   }
 
   function startEdit() {
@@ -4440,7 +4626,6 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
           <>
             {showFinancials ? (
               <>
-                {/* Primary: Email / already sent + resend (Phase 2: gated by canEditInvoices) */}
                 {!canEditInvoices ? (
                   <RestrictedNotice
                     inline
@@ -4467,106 +4652,117 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                   </Button>
                 )}
 
-                {/* Dropdown: send actions (Phase 2: gated by canEditInvoices) */}
-                <div className="relative" hidden={!canEditInvoices}>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer px-2" onClick={() => setActionsOpen((p) => !p)}>
-                <ChevronDown className="w-3.5 h-3.5" />
-              </Button>
-              {actionsOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setActionsOpen(false)} />
-                  <div className="absolute left-0 top-full mt-1 z-20 w-52 rounded-lg border border-border bg-popover shadow-lg overflow-hidden">
-                    {(
-                      [
-                        {
-                          icon: <Mail className="w-3.5 h-3.5" />,
-                          label: alreadyEmailed ? "Resend Invoice" : "Email Dynamic Invoice",
-                          run: () => openEmailModal(alreadyEmailed ? "resend" : "send"),
-                        },
-                        { icon: <MessageSquare className="w-3.5 h-3.5" />, label: "SMS Dynamic Invoice", soon: true },
-                        { icon: <Link2 className="w-3.5 h-3.5" />, label: "Copy Invoice URL", soon: true },
-                        {
-                          icon: <Download className="w-3.5 h-3.5" />,
-                          label: "Download PDF",
-                          run: () => {
-                            if (!organizationId?.trim()) return
-                            const url = `/api/organizations/${encodeURIComponent(organizationId.trim())}/invoices/${encodeURIComponent(invoice.id)}/pdf`
-                            window.open(url, "_blank", "noopener,noreferrer")
-                          },
-                        },
-                        {
-                          icon: <Printer className="w-3.5 h-3.5" />,
-                          label: "Print invoice",
-                          run: () => {
-                            if (!invoicePrintHref) return
-                            window.open(invoicePrintHref, "_blank", "noopener,noreferrer")
-                          },
-                        },
-                        { icon: <Save className="w-3.5 h-3.5" />, label: "Save PDF to Record", soon: true },
-                        { icon: <CreditCard className="w-3.5 h-3.5" />, label: "Record Payment", run: () => setModal("payment") },
-                        {
-                          icon: <CheckCircle2 className="w-3.5 h-3.5" />,
-                          label: "Mark Paid",
-                          run: async () => {
-                            const { error } = await updateInvoice(invoice.id, {
-                              status: "Paid",
-                              paidAt: new Date().toISOString(),
-                            })
-                            if (error) {
-                              toast(`Could not mark paid: ${error}`, "error")
-                              return
-                            }
-                            toast("Invoice marked as paid")
-                            setActionsOpen(false)
-                          },
-                        },
-                        {
-                          icon: <Ban className="w-3.5 h-3.5" />,
-                          label: "Void Invoice",
-                          run: async () => {
-                            const { error } = await updateInvoice(invoice.id, { status: "Void" })
-                            if (error) {
-                              toast(`Could not void: ${error}`, "error")
-                              return
-                            }
-                            toast("Invoice voided")
-                            setActionsOpen(false)
-                          },
-                        },
-                      ] as Array<
-                        | { icon: ReactNode; label: string; soon: true }
-                        | { icon: ReactNode; label: string; run: () => void | Promise<void> }
-                      >
-                    ).map((item) => (
-                      <button
-                        key={item.label}
+                {canStaffInvoiceDocuments ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 text-xs cursor-pointer px-2"
                         type="button"
-                        disabled={"soon" in item && item.soon}
-                        title={"soon" in item && item.soon ? "Not available yet for this invoice." : undefined}
-                        onClick={() => {
-                          if ("soon" in item && item.soon) return
-                          void Promise.resolve("run" in item ? item.run() : undefined).finally(() =>
-                            setActionsOpen(false),
-                          )
-                        }}
-                        className={cn(
-                          "flex items-center gap-2.5 w-full px-3 py-2.5 text-left text-xs transition-colors",
-                          "soon" in item && item.soon
-                            ? "text-muted-foreground cursor-not-allowed opacity-60"
-                            : "text-foreground ds-hover-list-row-menu cursor-pointer",
-                        )}
+                        aria-label="Invoice document and payment actions"
                       >
-                        <span className="text-muted-foreground shrink-0">{item.icon}</span>
-                        <span className="flex-1">{item.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-                </div>
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="min-w-[13.5rem] text-xs">
+                      {canEditInvoices ? (
+                        <DropdownMenuItem
+                          className="text-xs gap-2 cursor-pointer"
+                          onSelect={() => openEmailModal(alreadyEmailed ? "resend" : "send")}
+                        >
+                          <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                          {alreadyEmailed ? "Resend invoice" : "Email invoice"}
+                        </DropdownMenuItem>
+                      ) : null}
+                      {canCopyCustomerInvoiceUrl ? (
+                        <DropdownMenuItem
+                          className="text-xs gap-2 cursor-pointer"
+                          onSelect={(e) => {
+                            e.preventDefault()
+                            void copyInvoiceUrlToClipboard()
+                          }}
+                        >
+                          <Link2 className="w-3.5 h-3.5 text-muted-foreground" />
+                          Copy invoice URL
+                        </DropdownMenuItem>
+                      ) : null}
+                      <DropdownMenuItem
+                        className="text-xs gap-2 cursor-pointer"
+                        disabled={downloadPdfBusy}
+                        onSelect={(e) => {
+                          e.preventDefault()
+                          void downloadInvoicePdf()
+                        }}
+                      >
+                        <Download className="w-3.5 h-3.5 text-muted-foreground" />
+                        {downloadPdfBusy ? "Preparing PDF…" : "Download PDF"}
+                      </DropdownMenuItem>
+                      {invoicePrintHref ? (
+                        <DropdownMenuItem
+                          className="text-xs gap-2 cursor-pointer"
+                          onSelect={(e) => {
+                            e.preventDefault()
+                            window.open(invoicePrintHref, "_blank", "noopener,noreferrer")
+                          }}
+                        >
+                          <Printer className="w-3.5 h-3.5 text-muted-foreground" />
+                          Print invoice
+                        </DropdownMenuItem>
+                      ) : null}
+                      {canSavePdfToRecord ? (
+                        <DropdownMenuItem
+                          className="text-xs gap-2 cursor-pointer"
+                          disabled={savePdfBusy}
+                          onSelect={(e) => {
+                            e.preventDefault()
+                            void saveInvoicePdfToRecord()
+                          }}
+                        >
+                          <Save className="w-3.5 h-3.5 text-muted-foreground" />
+                          {savePdfBusy ? "Saving…" : "Save PDF to record"}
+                        </DropdownMenuItem>
+                      ) : null}
+                      {canEditInvoices ? (
+                        <>
+                          {canRecordPayment ? (
+                            <DropdownMenuItem
+                              className="text-xs gap-2 cursor-pointer"
+                              onSelect={() => setModal("payment")}
+                            >
+                              <CreditCard className="w-3.5 h-3.5 text-muted-foreground" />
+                              Record payment
+                            </DropdownMenuItem>
+                          ) : null}
+                          {canMarkPaidFromMenu ? (
+                            <DropdownMenuItem
+                              className="text-xs gap-2 cursor-pointer"
+                              onSelect={() => setDestructiveDialog("markPaid")}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-muted-foreground" />
+                              Mark paid
+                            </DropdownMenuItem>
+                          ) : null}
+                          {canVoidFromMenu ? (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                variant="destructive"
+                                className="text-xs gap-2 cursor-pointer"
+                                onSelect={() => setDestructiveDialog("void")}
+                              >
+                                <Ban className="w-3.5 h-3.5" />
+                                Void invoice
+                              </DropdownMenuItem>
+                            </>
+                          ) : null}
+                        </>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
 
-                {/* Record Payment (Phase 2: gated by canEditInvoices) */}
-                {canRecordPayment ? (
+                {canEditInvoices && canRecordPayment ? (
                   <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => setModal("payment")}>
                     <CreditCard className="w-3.5 h-3.5" /> Record Payment
                   </Button>
@@ -4581,101 +4777,67 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
               </Button>
             ) : null}
 
-            {canPrintInvoice && invoicePrintHref ? (
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer px-2" asChild>
-                <Link href={invoicePrintHref} target="_blank" rel="noopener noreferrer">
-                  <Printer className="w-3.5 h-3.5" /> Print
-                </Link>
-              </Button>
-            ) : null}
+            <span className="flex-1 min-w-[0.5rem]" aria-hidden />
 
-            {/* More Actions */}
-            <div className="relative ml-auto">
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => setMoreOpen((p) => !p)}>
-                More <ChevronDown className="w-3 h-3" />
-              </Button>
-              {moreOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setMoreOpen(false)} />
-                  <div className="absolute right-0 top-full mt-1 z-20 w-52 rounded-lg border border-border bg-popover shadow-lg overflow-hidden">
-                    {(
-                      [
-                        { icon: <Copy className="w-3.5 h-3.5" />, label: "Duplicate Invoice", soon: true },
-                        { icon: <Repeat className="w-3.5 h-3.5" />, label: "Convert to Recurring", soon: true },
-                        {
-                          icon: <Paperclip className="w-3.5 h-3.5" />,
-                          label: "Attach Certificates",
-                          run: () => {
-                            setActiveTab("files")
-                            setMoreOpen(false)
-                          },
-                        },
-                        { icon: <FileSignature className="w-3.5 h-3.5" />, label: "Attach Contract", soon: true },
-                        {
-                          icon: <StickyNote className="w-3.5 h-3.5" />,
-                          label: "Add Internal Note",
-                          run: () => {
-                            setActiveTab("comments")
-                            setMoreOpen(false)
-                          },
-                        },
-                        {
-                          icon: <ClipboardList className="w-3.5 h-3.5" />,
-                          label: "View Audit Log",
-                          run: () => {
-                            setActiveTab("activity")
-                            setMoreOpen(false)
-                          },
-                        },
-                        {
-                          icon: <Archive className="w-3.5 h-3.5" />,
-                          label: "Archive Invoice",
-                          run: () => {
-                            if (!canArchiveRestore) return
-                            setArchiveDialogOpen(true)
-                            setMoreOpen(false)
-                          },
-                        },
-                      ] as Array<
-                        | { icon: ReactNode; label: string; soon: true }
-                        | { icon: ReactNode; label: string; run: () => void }
-                      >
-                    ).map((item) => (
-                      <button
-                        key={item.label}
-                        type="button"
-                        disabled={
-                          ("soon" in item && item.soon) ||
-                          (item.label === "Archive Invoice" && !canArchiveRestore)
-                        }
-                        title={
-                          "soon" in item && item.soon
-                            ? "Not available yet for this invoice."
-                            : item.label === "Archive Invoice" && !canArchiveRestore
-                              ? "Owner, admin, or manager role required"
-                              : undefined
-                        }
-                        onClick={() => {
-                          if ("soon" in item && item.soon) return
-                          if ("run" in item) item.run()
-                        }}
-                        className={cn(
-                          "flex items-center gap-2.5 w-full px-3 py-2.5 text-left text-xs transition-colors",
-                          "soon" in item && item.soon
-                            ? "text-muted-foreground cursor-not-allowed opacity-60"
-                            : "text-foreground ds-hover-list-row-menu cursor-pointer",
-                        )}
-                      >
-                        <span className="text-muted-foreground shrink-0">{item.icon}</span>
-                        <span className="flex-1">{item.label}</span>
-                        {"soon" in item && item.soon ? (
-                          <span className="text-[10px] text-muted-foreground shrink-0">Soon</span>
-                        ) : null}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
+            <div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" type="button">
+                    More <ChevronDown className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[13.5rem] text-xs">
+                  {canEditInvoices && !invoice.isArchived ? (
+                    <DropdownMenuItem
+                      className="text-xs gap-2 cursor-pointer"
+                      disabled={duplicateInvoiceBusy}
+                      onSelect={(e) => {
+                        e.preventDefault()
+                        void duplicateInvoice()
+                      }}
+                    >
+                      <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                      {duplicateInvoiceBusy ? "Duplicating…" : "Duplicate invoice"}
+                    </DropdownMenuItem>
+                  ) : null}
+                  <DropdownMenuItem
+                    className="text-xs gap-2 cursor-pointer"
+                    onSelect={() => {
+                      setActiveTab("files")
+                    }}
+                  >
+                    <Paperclip className="w-3.5 h-3.5 text-muted-foreground" />
+                    Attach certificates
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-xs gap-2 cursor-pointer"
+                    onSelect={() => {
+                      setActiveTab("files")
+                      toast("Upload a contract PDF under Invoice attachments.")
+                    }}
+                  >
+                    <FileSignature className="w-3.5 h-3.5 text-muted-foreground" />
+                    Attach contract
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-xs gap-2 cursor-pointer" onSelect={() => setActiveTab("comments")}>
+                    <StickyNote className="w-3.5 h-3.5 text-muted-foreground" />
+                    Add internal note
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-xs gap-2 cursor-pointer" onSelect={() => setActiveTab("activity")}>
+                    <ClipboardList className="w-3.5 h-3.5 text-muted-foreground" />
+                    View audit log
+                  </DropdownMenuItem>
+                  {canArchiveRestore ? (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-xs gap-2 cursor-pointer" onSelect={() => setArchiveDialogOpen(true)}>
+                        <Archive className="w-3.5 h-3.5 text-muted-foreground" />
+                        Archive invoice
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </>
         )}
@@ -4920,6 +5082,34 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
             <AlertDialogCancel disabled={archiveBusy}>Cancel</AlertDialogCancel>
             <Button variant="destructive" disabled={archiveBusy} onClick={() => void confirmArchiveInvoice()}>
               {archiveBusy ? "Archiving…" : "Archive"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={destructiveDialog != null} onOpenChange={(open) => !open && setDestructiveDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {destructiveDialog === "void" ? "Void this invoice?" : "Mark this invoice as paid?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {destructiveDialog === "void" ?
+                "Void invoices cannot collect payment in Equipify. This status change is intended for invoices that should not be collected."
+              : "This records the invoice balance as paid. Confirm the customer has satisfied the balance."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant={destructiveDialog === "void" ? "destructive" : "default"}
+              className="cursor-pointer"
+              onClick={() =>
+                destructiveDialog === "void" ? void executeVoidFromDialog() : void executeMarkPaidFromDialog()
+              }
+            >
+              {destructiveDialog === "void" ? "Void invoice" : "Mark paid"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

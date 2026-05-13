@@ -12,14 +12,17 @@ Strict rules:
 - sourceSignals (optional) lists short factual cues from the snapshot (counts, thresholds) — no customer names.
 - Tailor emphasis to the current module context when prioritizing which recommendations to surface first.
 - The snapshot JSON may include \`operationalHealthScores\` with deterministic 0–100 category scores, overall band, contributing factors, and methodology notes — descriptive indices only, not predictions. If referenced, do not contradict those numbers.
-- The snapshot JSON may include \`industryOperational\` with deterministicInsights (each includes severity, confidence, category, urgency, thresholdsUsed, supportingMetrics) plus dashboard/maintenance operational summary rows. Those items are pre-computed from the same workspace data — if you reference them, keep counts identical and do not contradict them.
-- If the snapshot is sparse or empty, return a short overview and 0–2 low-severity observations — do not fabricate gaps.`
+- The snapshot JSON may include \`operationalTimelineIntelligence\`: deterministic work-order timelines (bounded 120d / 400 rows), \`methodology\` rule ids, \`operationalEvents\`, \`equipmentOperationalThreads\`, \`recurringIssueChains\`, \`repeatFailureHistory\`, \`escalationSequences\`, \`operationalEventGroups\`, \`incidentSummaries\`, \`operationalTrendTimelines\`, and optional \`deterministicCrossReads\`. When citing progression, reference those structures and rule ids — do not invent chains or dates.
+- If the snapshot is sparse or empty, return a short overview and 0–2 low-severity observations — do not fabricate gaps.
+- When a separate JSON block \`deterministicWorkflowRecommendations\` is provided, it lists server-built navigation targets only (deep links). You may align narrative wording with those items when the same snapshot facts support them — do not invent additional workflows, URLs, or execution guarantees beyond that block.`
 
 export function buildOperationalRecommendationsPrompt(args: {
   snapshotJson: string
   moduleContext: OperationalModuleContext
   /** Optional workspace-vertical framing (tone only; facts still from snapshot). */
   sectorFraming?: string | null
+  /** Deterministic workflow mapping JSON (same facts as snapshot; deep links only). */
+  deterministicWorkflowRecommendationsJson?: string | null
 }): { system: string; user: string } {
   const framing = (args.sectorFraming ?? "").trim()
   const framingBlock =
@@ -28,6 +31,14 @@ export function buildOperationalRecommendationsPrompt(args: {
 
 Workspace vertical guidance (tone only — all factual claims must still come from the snapshot JSON):
 ${framing}`
+      : ""
+
+  const workflowBlock =
+    (args.deterministicWorkflowRecommendationsJson ?? "").trim().length > 0
+      ? `
+
+Deterministic workflow recommendations (JSON — navigation only, no auto-execution):
+${args.deterministicWorkflowRecommendationsJson}`
       : ""
 
   return {
@@ -54,6 +65,6 @@ Return JSON:
 ${framingBlock}
 
 Operational snapshot (JSON):
-${args.snapshotJson}`,
+${args.snapshotJson}${workflowBlock}`,
   }
 }

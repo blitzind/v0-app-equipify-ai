@@ -1,5 +1,5 @@
 /**
- * Resend / filesystem-safe attachment name, e.g. `Invoice-INV-AR-PBS-7017.pdf`.
+ * Resend / filesystem-safe attachment name, e.g. `invoice-INV-AR-PBS-7017.pdf`.
  */
 export function buildInvoicePdfFilename(invoiceNumber: string): string {
   const raw = invoiceNumber.trim() || "Invoice"
@@ -9,5 +9,5 @@ export function buildInvoicePdfFilename(invoiceNumber: string): string {
     .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "")
   const base = slug.length > 0 ? slug : "Invoice"
-  return `Invoice-${base}.pdf`
+  return `invoice-${base}.pdf`
 }

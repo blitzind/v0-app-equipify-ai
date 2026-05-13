@@ -661,6 +661,7 @@ function InvoicesPageInner() {
       <InvoiceDrawer
         invoiceId={selectedInvoiceId}
         onClose={() => setSelectedInvoiceId(null)}
+        onSelectInvoiceId={(id) => setSelectedInvoiceId(id)}
       />
 
       <NewInvoiceModal
