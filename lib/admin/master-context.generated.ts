@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 436,
-  sqlMigrations: 188,
+  apiRouteHandlers: 437,
+  sqlMigrations: 189,
   dashboardPages: 64,
-  componentsTsx: 310,
-  libTsFiles: 807,
+  componentsTsx: 311,
+  libTsFiles: 812,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **436** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **188** |
+| API route handlers (\`app/api/**/route.ts\`) | **437** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **189** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **64** |
-| \`components/**/*.tsx\` | **310** |
-| \`lib/**/*.ts\` | **807** |
+| \`components/**/*.tsx\` | **311** |
+| \`lib/**/*.ts\` | **812** |
 
 ### Vercel crons
 
@@ -89,6 +89,7 @@ organizations/[organizationId]/aiden/actions/prepare/route.ts
 organizations/[organizationId]/aiden/approval-settings/route.ts
 organizations/[organizationId]/aiden/chat/route.ts
 organizations/[organizationId]/aiden/feature-requests/route.ts
+organizations/[organizationId]/aiden/industry-benchmarks/route.ts
 organizations/[organizationId]/aiden/operational-recommendations/route.ts
 organizations/[organizationId]/aiden/prepared-actions/[actionId]/audit-log/route.ts
 organizations/[organizationId]/aiden/prepared-actions/[actionId]/cancel/route.ts

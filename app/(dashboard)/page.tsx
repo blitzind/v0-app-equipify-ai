@@ -26,6 +26,7 @@ import { IndustryDemoStarterPanel } from "@/components/first-run/industry-demo-s
 import { OnboardingMilestoneTelemetry } from "@/components/first-run/onboarding-milestone-telemetry"
 import { ExecutiveStatCards } from "@/components/dashboard/executive-stat-cards"
 import { OperationalHealthScoresPanel } from "@/components/aiden/operational-health-scores-panel"
+import { IndustryBenchmarkIntelligencePanel } from "@/components/aiden/industry-benchmark-intelligence-panel"
 import { useFirstRun } from "@/hooks/use-first-run"
 
 export default function DashboardPage() {
@@ -103,6 +104,10 @@ export default function DashboardPage() {
 
       {dashboardOrgStatus === "ready" && dashboardOrgId && permissions.canViewInsights ?
         <OperationalHealthScoresPanel organizationId={dashboardOrgId} moduleContext="dashboard" />
+      : null}
+
+      {dashboardOrgStatus === "ready" && dashboardOrgId && permissions.canViewInsights ?
+        <IndustryBenchmarkIntelligencePanel organizationId={dashboardOrgId} />
       : null}
 
       {/* Charts row */}

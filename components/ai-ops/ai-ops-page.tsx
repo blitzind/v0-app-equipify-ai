@@ -18,6 +18,7 @@ import type {
 } from "@/lib/ai-ops/types"
 import { PageHeroCard } from "@/components/page-hero-card"
 import { OperationalHealthScoresPanel } from "@/components/aiden/operational-health-scores-panel"
+import { IndustryBenchmarkIntelligencePanel } from "@/components/aiden/industry-benchmark-intelligence-panel"
 import { RecommendationCard } from "./recommendation-card"
 import { AiOpsCommandCenterDrawer } from "./command-center-drawer"
 import {
@@ -130,6 +131,10 @@ export function AiOpsPage() {
 
       {organizationId && orgStatus === "ready" && permissions.canViewInsights ?
         <OperationalHealthScoresPanel organizationId={organizationId} moduleContext="dashboard" />
+      : null}
+
+      {organizationId && orgStatus === "ready" && permissions.canViewInsights ?
+        <IndustryBenchmarkIntelligencePanel organizationId={organizationId} />
       : null}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
