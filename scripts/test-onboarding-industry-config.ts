@@ -3,6 +3,8 @@
  */
 import { resolveOnboardingIndustryBundle } from "../lib/onboarding-industry/resolve-onboarding-industry-bundle"
 import { industryOperationalHint } from "../lib/first-run/launchpad-copy"
+import { goldenPathActionsForIndustry } from "../lib/onboarding-industry/golden-path-registry"
+import { recommendedModulesForIndustry } from "../lib/onboarding-industry/recommended-modules-registry"
 
 function assert(cond: unknown, msg: string): void {
   if (!cond) throw new Error(msg)
@@ -24,5 +26,12 @@ assert(
   industryOperationalHint("hvac_r") === resolveOnboardingIndustryBundle("hvac_r", "HVAC-R").operationalHint,
   "launchpad-copy hint matches bundle",
 )
+
+const hvacPaths = goldenPathActionsForIndustry("hvac_r")
+assert(hvacPaths.length === 3, "HVAC golden path count")
+assert(hvacPaths.some((p) => p.id === "hvac_pm_agreement"), "HVAC PM golden path id")
+
+const rentalMods = recommendedModulesForIndustry("equipment_rental")
+assert(rentalMods.some((m) => m.href === "/dispatch"), "Rental recommended dispatch module")
 
 console.log("onboarding-industry-config OK")

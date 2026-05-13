@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils"
 import { canReadServiceRequestQueue } from "@/lib/service-requests/list-filter"
 import { DashboardLaunchpad } from "@/components/first-run/dashboard-launchpad"
 import { IndustryDemoStarterPanel } from "@/components/first-run/industry-demo-starter-panel"
+import { OnboardingMilestoneTelemetry } from "@/components/first-run/onboarding-milestone-telemetry"
 import { ExecutiveStatCards } from "@/components/dashboard/executive-stat-cards"
 import { useFirstRun } from "@/hooks/use-first-run"
 
@@ -64,6 +65,9 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {dashboardOrgId && launchpadEnabled ?
+        <OnboardingMilestoneTelemetry organizationId={dashboardOrgId} counts={firstRun.data?.counts} />
+      : null}
       <TechnicianTodayMobileCard />
       <DashboardLaunchpad firstRun={firstRun} />
       <IndustryDemoStarterPanel firstRun={firstRun} />

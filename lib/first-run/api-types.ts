@@ -15,6 +15,28 @@ export type FirstRunStepDto = {
   applicable: boolean
 }
 
+export type GoldenPathActionDto = {
+  id: string
+  label: string
+  description: string
+  href: string
+  ctaLabel?: string
+  done: boolean
+  applicable: boolean
+  priority: number
+  sampleDataHint?: string
+  /** Opaque completion driver (for support / QA, not end-user facing). */
+  completionKind: string
+}
+
+export type RecommendedModuleDto = {
+  moduleKey: string
+  label: string
+  href: string
+  blurb?: string
+  applicable: boolean
+}
+
 export type FirstRunGetResponse = {
   industry: string | null
   industryLabel: string
@@ -29,6 +51,8 @@ export type FirstRunGetResponse = {
   terminology: OnboardingTerminologyDto
   dashboardEmptyCopy: { recentWorkOrders?: string }
   signupExampleWorkflows: string[]
+  goldenPathActions: GoldenPathActionDto[]
+  recommendedModules: RecommendedModuleDto[]
   hasSampleWorkspace: boolean
   demoSeedSucceeded: boolean
   welcomeAckedForOrg: boolean

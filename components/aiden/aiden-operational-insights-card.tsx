@@ -15,6 +15,7 @@ import type {
 } from "@/lib/aiden/operational-recommendations-schema"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
+import { sendOnboardingProductEvent } from "@/hooks/use-onboarding-product-event"
 
 type EligibilityResponse = {
   ok?: boolean
@@ -100,6 +101,14 @@ export function AidenOperationalInsightsCard({
       setBusy(false)
     }
   }, [organizationId, moduleContext, toast])
+
+  useEffect(() => {
+    if (!answer?.recommendations?.length || typeof window === "undefined") return
+    const k = `equipify_onb_ai_rec_viewed_${organizationId}_${moduleContext}`
+    if (sessionStorage.getItem(k)) return
+    sessionStorage.setItem(k, "1")
+    sendOnboardingProductEvent(organizationId, "onboarding_ai_recommendation_viewed", moduleContext)
+  }, [answer, organizationId, moduleContext])
 
   if (!eligibilityReady) {
     return (

@@ -1,8 +1,10 @@
 "use client"
 
+import { useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { useAdmin } from "@/lib/admin-store"
 import { useFirstRun } from "@/hooks/use-first-run"
+import { sendOnboardingProductEvent } from "@/hooks/use-onboarding-product-event"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import {
@@ -56,6 +58,14 @@ export function FirstRunWelcomeGate() {
   )
 
   const welcome = data?.welcomeCopy ?? FALLBACK_WELCOME
+
+  useEffect(() => {
+    if (!open || !organizationId || typeof window === "undefined") return
+    const k = `equipify_onb_welcome_viewed_${organizationId}`
+    if (sessionStorage.getItem(k)) return
+    sessionStorage.setItem(k, "1")
+    sendOnboardingProductEvent(organizationId, "onboarding_welcome_viewed")
+  }, [open, organizationId])
 
   async function onContinue() {
     if (!organizationId) return

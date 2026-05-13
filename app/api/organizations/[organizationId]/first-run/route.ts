@@ -10,7 +10,16 @@ import {
   withOrgIdRemoved,
 } from "@/lib/first-run/user-metadata"
 import { industryLabelForLaunchpad } from "@/lib/first-run/launchpad-copy"
+import { normalizeIndustryKey } from "@/lib/demo-seeding/profiles"
 import { resolveOnboardingIndustryBundle } from "@/lib/onboarding-industry/resolve-onboarding-industry-bundle"
+import { goldenPathActionsForIndustry } from "@/lib/onboarding-industry/golden-path-registry"
+import { recommendedModulesForIndustry } from "@/lib/onboarding-industry/recommended-modules-registry"
+import {
+  evaluateGoldenPathRule,
+  type GoldenPathCompletionMetrics,
+} from "@/lib/onboarding-industry/golden-path-completion"
+import { isGoldenPathHrefApplicable } from "@/lib/onboarding-industry/golden-path-eligibility"
+import type { WorkspaceIndustryKey } from "@/lib/workspace-industry-registry"
 import type { FirstRunStepId } from "@/lib/first-run/types"
 
 export type { FirstRunStepId } from "@/lib/first-run/types"
@@ -55,6 +64,7 @@ export async function GET(
     members,
     invites,
     qbRow,
+    mpReal,
   ] = await Promise.all([
     supabase
       .from("organizations")
@@ -116,6 +126,11 @@ export async function GET(
       .eq("organization_id", organizationId)
       .eq("provider", "quickbooks_online")
       .maybeSingle(),
+    supabase
+      .from("maintenance_plans")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("is_sample", false),
   ])
 
   if (orgRes.error) {
@@ -151,6 +166,7 @@ export async function GET(
   const nMembers = members.count ?? 0
   const nInvites = invites.count ?? 0
   const teamExpanded = nMembers >= 2 || nInvites > 0
+  const nMpReal = mpReal.count ?? 0
 
   const qb = qbRow.data as { connection_status?: string | null } | null
   const quickbooksConnected = qb?.connection_status === "connected"
@@ -223,6 +239,47 @@ export async function GET(
   const industry = org?.industry ?? null
   const industryLabel = industryLabelForLaunchpad(industry)
   const onboardingBundle = resolveOnboardingIndustryBundle(industry, industryLabel)
+  const industryKey = normalizeIndustryKey(industry ?? undefined) as WorkspaceIndustryKey
+
+  const completionMetrics: GoldenPathCompletionMetrics = {
+    customersNonSample: nCustReal,
+    equipmentNonSample: nEqReal,
+    workOrdersNonSample: nWoReal,
+    quotesNonSample: nQuoteReal,
+    invoicesSentNonSample: nInvSent,
+    maintenancePlansNonSample: nMpReal,
+  }
+
+  const goldenPathActions = goldenPathActionsForIndustry(industryKey).map((d) => ({
+    id: d.id,
+    label: d.label,
+    description: d.description,
+    href: d.href,
+    ctaLabel: d.ctaLabel,
+    done: evaluateGoldenPathRule(d.completionRule, completionMetrics),
+    applicable: isGoldenPathHrefApplicable(d.href, permissions),
+    priority: d.priority,
+    sampleDataHint: d.sampleDataHint,
+    completionKind: d.completionRule.kind,
+  }))
+
+  const recommendedModules = recommendedModulesForIndustry(industryKey).map((m) => ({
+    moduleKey: m.moduleKey,
+    label: m.label,
+    href: m.href,
+    blurb: m.blurb,
+    applicable: isGoldenPathHrefApplicable(m.href, permissions),
+  }))
+
+  const quickActionsMerged: { label: string; href: string }[] = [...onboardingBundle.quickActions]
+  const seenHrefs = new Set(quickActionsMerged.map((q) => q.href))
+  for (const m of recommendedModules) {
+    if (!m.applicable) continue
+    if (seenHrefs.has(m.href)) continue
+    if (quickActionsMerged.length >= 9) break
+    quickActionsMerged.unshift({ label: m.label, href: m.href })
+    seenHrefs.add(m.href)
+  }
 
   const steps = stepRows.map((s) => {
     const o = onboardingBundle.launchpadStepCopy[s.id]
@@ -257,12 +314,14 @@ export async function GET(
     launchpadSecondaryNote: onboardingBundle.launchpadSecondaryNote,
     exampleWorkflows: onboardingBundle.exampleWorkflows,
     demoWalkthroughHints: onboardingBundle.demoWalkthroughHints,
-    quickActions: onboardingBundle.quickActions,
+    quickActions: quickActionsMerged,
     statCardPriority: onboardingBundle.statCardPriority,
     aidenSectorFraming: onboardingBundle.aidenSectorFraming,
     terminology: onboardingBundle.terminology,
     dashboardEmptyCopy: onboardingBundle.dashboardEmptyCopy,
     signupExampleWorkflows: onboardingBundle.signupExampleWorkflows,
+    goldenPathActions,
+    recommendedModules,
     hasSampleWorkspace,
     demoSeedSucceeded,
     welcomeAckedForOrg,
@@ -273,6 +332,7 @@ export async function GET(
       workOrdersNonSample: nWoReal,
       quotesNonSample: nQuoteReal,
       invoicesNonDraftNonSample: nInvSent,
+      maintenancePlansNonSample: nMpReal,
       activeMembers: nMembers,
       pendingInvites: nInvites,
     },
