@@ -255,19 +255,6 @@ export default function IntegrationsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground leading-relaxed">
-        <p className="text-sm font-medium text-foreground">How integrations work today</p>
-        <p className="mt-1.5">
-          Only <strong className="text-foreground">QuickBooks</strong> has a full OAuth connection flow on this page.{" "}
-          <strong className="text-foreground">Stripe</strong> billing is managed under{" "}
-          <Link href="/settings/billing" className="text-primary underline-offset-2 hover:underline">
-            Billing
-          </Link>
-          . <strong className="text-foreground">Gmail</strong> is not connected anywhere in the app yet — customer-facing
-          and system email uses <strong className="text-foreground">Resend</strong> today.
-        </p>
-      </div>
-
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-card">
           <Plug size={13} className="text-muted-foreground" />

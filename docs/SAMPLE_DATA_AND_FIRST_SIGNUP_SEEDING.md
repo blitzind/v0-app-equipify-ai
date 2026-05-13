@@ -45,8 +45,9 @@ The **Equipment types** screen (`lib/equipment-type-store.tsx`) uses **in-browse
 
 - Canonical keys: `WORKSPACE_INDUSTRY_KEYS` in `lib/workspace-industry-registry.ts`.  
 - Normalization & aliases: `normalizeIndustryKey` in `lib/demo-seeding/profiles.ts`.  
-- Per-industry **customer names, equipment examples, WO titles, PM examples, skill tags**: `DEMO_INDUSTRY_PROFILES` (medical has a bespoke dense profile; others use registry-derived `starterProfileFromDefinition`).  
-- **Financial / ops bundle sizes**: `getSampleModuleTargets(industry)` in `industry-sample-packs.ts` (biomedical = larger “rich” bundle).
+- Per-industry **customer names, equipment examples, WO titles, PM examples, skill tags**: `DEMO_INDUSTRY_PROFILES` built from `DEMO_PROFILE_OVERRIDES` in `lib/demo-seeding/industry-demo-profile-overrides.ts` (dense packs) merged with `starterProfileFromDefinition` from `WORKSPACE_INDUSTRY_DEFINITIONS` for remaining keys.  
+- **Financial / ops bundle sizes**: `getSampleModuleTargets(industry)` in `industry-sample-packs.ts` — biomedical remains the largest “cert-heavy” tier; other **`isRichDemoProfileIndustry`** verticals use a mid-sized bundle.  
+- **Audit matrix** (marketing slug → workspace key → pack coverage): `lib/demo-seeding/industry-sample-data-audit.ts` — run `pnpm exec tsx scripts/verify-industry-sample-data-audit.ts` after changing aliases or packs.
 
 ## Idempotency
 

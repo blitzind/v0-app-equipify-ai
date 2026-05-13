@@ -5,6 +5,8 @@ import {
   type WorkspaceIndustryDefinition,
   type WorkspaceEquipmentExample,
 } from "@/lib/workspace-industry-registry"
+import type { DemoIndustryProfile, MaintenancePlanExample } from "@/lib/demo-seeding/demo-profile-model"
+import { DEMO_PROFILE_OVERRIDES } from "@/lib/demo-seeding/industry-demo-profile-overrides"
 
 /**
  * Canonical industry keys for workspace onboarding, org.industry, and demo seed routing.
@@ -17,29 +19,11 @@ export type DemoIndustryKey = WorkspaceIndustryKey
 
 export type { WorkspaceIndustryKey }
 
-type MaintenancePlanExample = {
-  name: string
-  intervalValue: number
-  intervalUnit: "month" | "year"
-}
-
-type DashboardMetricTargets = {
-  customers: number
-  equipment: number
-  workOrders: number
-  maintenancePlans: number
-}
-
-export type DemoIndustryProfile = {
-  industry: WorkspaceIndustryKey
-  demoCompanyName: string
-  customerTypes: string[]
-  equipmentAssetTypes: Array<{ name: string; category: string; manufacturer: string }>
-  workOrderTitleExamples: string[]
-  maintenancePlanExamples: MaintenancePlanExample[]
-  technicianSpecialties: string[]
-  dashboardMetricTargets: DashboardMetricTargets
-}
+export type {
+  MaintenancePlanExample,
+  DashboardMetricTargets,
+  DemoIndustryProfile,
+} from "@/lib/demo-seeding/demo-profile-model"
 
 function maintenancePlansFromNames(names: string[]): MaintenancePlanExample[] {
   return names.map((name, i) => ({
@@ -66,98 +50,11 @@ function starterProfileFromDefinition(def: WorkspaceIndustryDefinition): DemoInd
   }
 }
 
-/** Rich biomedical profile — overrides registry placeholders for `biomedical_medical_equipment` */
-const MEDICAL_PROFILE: DemoIndustryProfile = {
-  industry: "biomedical_medical_equipment",
-  demoCompanyName: "Precision Biomedical Services",
-  customerTypes: [
-    "Valley Regional Hospital",
-    "Summit Surgical Center",
-    "Greenview Family Clinic",
-    "Riverstone Imaging Center",
-    "Oak Ridge Dental Group",
-    "Blue Harbor Rehab Center",
-    "Starlight Urgent Care",
-    "Northside Pediatrics",
-    "Cedar Grove Endoscopy Center",
-    "Maple Street Dialysis Clinic",
-    "Lakeside Cardiology Associates",
-    "Horizon Women's Health Pavilion",
-    "Redwood Community Hospital",
-    "Clearwater Veterans Clinic",
-    "Pinecrest Sleep Disorders Lab",
-    "Meadowbrook Outpatient Surgery",
-    "Cascade Orthopedic Institute",
-    "Silverline Oncology Infusion Center",
-    "Pacific Coast Orthopedic Surgery Center",
-    "Harborview Community Health Center",
-    "Sierra Peak Ambulatory Surgery",
-    "Golden State Wound & Hyperbaric",
-    "Mission View Imaging Partners",
-    "Westgate Medical Plaza",
-    "Coastal Pediatric Specialty Center",
-  ],
-  equipmentAssetTypes: [
-    { name: "IntelliVue MX750 Patient Monitor", category: "Patient Monitoring", manufacturer: "Philips" },
-    { name: "CARESCAPE B850 Monitor", category: "Patient Monitoring", manufacturer: "GE HealthCare" },
-    { name: "BeneVision N17 OR Monitor", category: "Patient Monitoring", manufacturer: "Mindray" },
-    { name: "MA 27 / MA 28 Audiometer", category: "Diagnostics / Audiology", manufacturer: "Maico" },
-    { name: "AMSCO 400 Steam Sterilizer", category: "Sterilization", manufacturer: "STERIS" },
-    { name: "HSG-A 9102 Autoclave", category: "Sterilization", manufacturer: "Getinge" },
-    { name: "V-PRO maX Low-Temperature Sterilizer", category: "Sterilization", manufacturer: "STERIS" },
-    { name: "Alaris 8100 Pump Module", category: "Infusion", manufacturer: "BD" },
-    { name: "Plum 360 Large Volume Pump", category: "Infusion", manufacturer: "ICU Medical" },
-    { name: "Spectrum IQ Infusion System", category: "Infusion", manufacturer: "Baxter" },
-    { name: "X Series Defibrillator", category: "Emergency Care", manufacturer: "ZOLL" },
-    { name: "LIFEPAK 15 Defibrillator", category: "Emergency Care", manufacturer: "Physio-Control" },
-    { name: "MAC 5500 HD ECG", category: "Diagnostics", manufacturer: "GE HealthCare" },
-    { name: "AT-102 Plus ECG", category: "Diagnostics", manufacturer: "Schiller" },
-    { name: "LOGIQ E10 Ultrasound", category: "Imaging", manufacturer: "GE HealthCare" },
-    { name: "Mobilett Elara Max Portable X-Ray", category: "Imaging QA", manufacturer: "Siemens Healthineers" },
-    { name: "TOR DEN Digital QA Phantom Suite", category: "Imaging QA", manufacturer: "Fluke Biomedical" },
-    { name: "UniPulse Defib Analyzer", category: "Biomedical Test Equipment", manufacturer: "Rigel Medical" },
-    { name: "Allegra X-30R Centrifuge", category: "Laboratory", manufacturer: "Beckman Coulter" },
-    { name: "5702 Series General Purpose Centrifuge", category: "Laboratory", manufacturer: "Eppendorf" },
-  ],
-  workOrderTitleExamples: [
-    "Annual electrical safety & performance verification",
-    "Quarterly infusion pump calibration",
-    "Sterilizer chamber temperature variance investigation",
-    "Patient monitor arrhythmia alarm verification",
-    "Portable X-ray QA detector calibration",
-    "Audiometer daily bioacoustic calibration check",
-    "Defibrillator battery replacement",
-    "Sterilizer Bowie-Dick / BI failure investigation",
-    "Imaging phantom QA — mammography flat panel",
-    "ECG lead noise troubleshooting — ICU telemetry",
-    "Low-temp sterilizer vaporizer maintenance",
-    "Biomed analyzer annual verification (defib energy)",
-  ],
-  maintenancePlanExamples: [
-    { name: "Annual Electrical Safety Verification", intervalValue: 1, intervalUnit: "year" },
-    { name: "Quarterly Infusion Pump PM", intervalValue: 3, intervalUnit: "month" },
-    { name: "Monthly Monitor Inspection", intervalValue: 1, intervalUnit: "month" },
-    { name: "Semi-Annual Sterilizer QA", intervalValue: 6, intervalUnit: "month" },
-  ],
-  technicianSpecialties: [
-    "Biomedical Equipment",
-    "Calibration",
-    "Imaging QA",
-    "Sterilization Systems",
-    "Electrical Safety",
-    "Infusion Systems",
-  ],
-  dashboardMetricTargets: { customers: 25, equipment: 68, workOrders: 150, maintenancePlans: 22 },
-}
-
 function buildDemoProfiles(): Record<WorkspaceIndustryKey, DemoIndustryProfile> {
   const out = {} as Record<WorkspaceIndustryKey, DemoIndustryProfile>
   for (const key of WORKSPACE_INDUSTRY_KEYS) {
-    if (key === "biomedical_medical_equipment") {
-      out[key] = MEDICAL_PROFILE
-    } else {
-      out[key] = starterProfileFromDefinition(WORKSPACE_INDUSTRY_DEFINITIONS[key])
-    }
+    const override = DEMO_PROFILE_OVERRIDES[key]
+    out[key] = override ?? starterProfileFromDefinition(WORKSPACE_INDUSTRY_DEFINITIONS[key])
   }
   return out
 }
@@ -194,9 +91,36 @@ function buildAliasMap(): Record<string, WorkspaceIndustryKey> {
     appliance_repair: "appliance_repair",
     fire_security: "fire_security",
     av_installation: "av_installation",
-    /** Former umbrella — maps to dedicated key */
-    equipment_service: "equipment_service_repair",
-    "equipment-service": "equipment_service_repair",
+    equipment_service: "commercial_equipment",
+    "equipment-service": "commercial_equipment",
+    "commercial-hvac": "hvac_r",
+    commercial_hvac: "hvac_r",
+    "facility-maintenance": "facility_maintenance",
+    facility_maintenance: "facility_maintenance",
+    "biomedical-equipment": "biomedical_medical_equipment",
+    biomedical_equipment: "biomedical_medical_equipment",
+    "industrial-equipment": "industrial_equipment",
+    industrial_equipment: "industrial_equipment",
+    industrial_service: "industrial_equipment",
+    "industrial-service": "industrial_equipment",
+    "equipment-rental": "equipment_rental",
+    equipment_rental: "equipment_rental",
+    "refrigeration-service": "refrigeration_service",
+    refrigeration_service: "refrigeration_service",
+    "fleet-mobile-equipment": "fleet_mobile_equipment",
+    fleet_mobile_equipment: "fleet_mobile_equipment",
+    "material-handling": "material_handling",
+    material_handling: "material_handling",
+    "elevator-service": "elevator_service",
+    elevator_service: "elevator_service",
+    "generator-power-systems": "generator_power",
+    generator_power_systems: "generator_power",
+    "calibration-inspection": "calibration_inspection",
+    calibration_inspection: "calibration_inspection",
+    equipment_service_repair: "commercial_equipment",
+    commercial_kitchen_equipment: "commercial_equipment",
+    commercial_kitchen: "commercial_equipment",
+    other: "commercial_equipment",
   })
 
   return map
@@ -212,7 +136,7 @@ export function normalizeIndustryKey(value: string | null | undefined): Workspac
 
 /** Dropdown labels for onboarding / Settings → Sample data (human-readable sector titles) */
 export function workspaceIndustrySelectOptions(): { value: WorkspaceIndustryKey; label: string }[] {
-  return WORKSPACE_INDUSTRY_KEYS.map((k) => ({
+  return WORKSPACE_INDUSTRY_KEYS.filter((k) => k !== "equipment_service_repair").map((k) => ({
     value: k,
     label: WORKSPACE_INDUSTRY_DEFINITIONS[k].label,
   }))
@@ -228,3 +152,5 @@ export function getIndustrySetupCopy(key: string): string {
   const k = normalizeIndustryKey(key)
   return WORKSPACE_INDUSTRY_DEFINITIONS[k].sampleSetupCopy
 }
+
+export { isRichDemoProfileIndustry, RICH_DEMO_INDUSTRY_KEYS } from "@/lib/demo-seeding/industry-demo-profile-overrides"

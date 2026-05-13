@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { DemoIndustryKey, DemoIndustryProfile } from "@/lib/demo-seeding/profiles"
+import { isRichDemoProfileIndustry } from "@/lib/demo-seeding/industry-demo-profile-overrides"
 import { WORKSPACE_INDUSTRY_DEFINITIONS } from "@/lib/workspace-industry-registry"
 
 /** Prefix for generic demo inventory locations (reset matches this pattern). */
@@ -35,6 +36,20 @@ export function getSampleModuleTargets(industry: DemoIndustryKey): SampleModuleT
       communications: 16,
       aiOpsRecommendations: 6,
       skillTags: 8,
+    }
+  }
+  if (isRichDemoProfileIndustry(industry)) {
+    return {
+      vendors: 10,
+      catalogItems: 38,
+      quotes: 14,
+      invoices: 11,
+      purchaseOrders: 7,
+      prospects: 16,
+      inventoryLocations: 2,
+      communications: 12,
+      aiOpsRecommendations: 5,
+      skillTags: 7,
     }
   }
   return {
@@ -139,12 +154,48 @@ export function siteLabelsForIndustry(industry: DemoIndustryKey): string[] {
   if (industry === "garage_door" || industry === "locksmith") {
     return ["Loading dock", "Main entrance", "Service bay", "Warehouse door", "Office entry"]
   }
+  if (industry === "equipment_rental") {
+    return ["Yard check-in", "Wash bay", "Shop turnaround", "Ready line", "Delivery staging"]
+  }
+  if (industry === "refrigeration_service") {
+    return ["Walk-in cooler", "Rack machine room", "Roof condenser bank", "Kitchen line", "Cold storage dock"]
+  }
+  if (industry === "fleet_mobile_equipment") {
+    return ["Fleet yard", "Shop bay", "Road call site", "Customer yard", "DOT inspection lane"]
+  }
+  if (industry === "material_handling") {
+    return ["Warehouse aisle", "Loading dock", "Battery room", "Conveyor mezzanine", "QC staging"]
+  }
+  if (industry === "facility_maintenance") {
+    return ["Central plant", "Tenant floor", "Parking garage", "Roof mechanical", "Vendor work zone"]
+  }
+  if (industry === "commercial_equipment") {
+    return ["Main kitchen", "Bar line", "Dish pit", "Walk-in cooler", "Exhaust penthouse"]
+  }
+  if (industry === "calibration_inspection") {
+    return ["Lab bench", "Field site trailer", "Standards vault", "Customer QA room", "Shipping dock"]
+  }
+  if (industry === "elevator_service") {
+    return ["Machine room", "Hoistway", "Pit", "Controller cabinet", "Lobby cab"]
+  }
+  if (industry === "generator_power") {
+    return ["Generator yard", "Electrical room", "ATS closet", "Battery rack room", "Load bank pad"]
+  }
   return ["Job site", "Shop / warehouse", "Customer facility", "Rooftop / exterior", "Mechanical space"]
 }
 
 export function contactRolesForIndustry(industry: DemoIndustryKey): string[] {
   if (industry === "biomedical_medical_equipment") {
     return ["Clinical Engineering", "Facilities", "Imaging Director", "SPD Manager", "Biomed Lead"]
+  }
+  if (industry === "calibration_inspection") {
+    return ["Quality Manager", "Metrology Lead", "Lab Supervisor", "Compliance Coordinator", "Operations"]
+  }
+  if (industry === "elevator_service") {
+    return ["Building Engineer", "Facilities Manager", "Safety Director", "Property Manager", "Operations"]
+  }
+  if (industry === "generator_power") {
+    return ["Facilities Director", "Electrical Contractor PM", "Compliance Manager", "Operations", "Plant Engineer"]
   }
   return [
     "Operations",
