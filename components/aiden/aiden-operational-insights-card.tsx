@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Bot, ChevronDown, ChevronUp, Lightbulb, Loader2, Sparkles } from "lucide-react"
+import { Bot, ChevronDown, ChevronUp, Layers, Lightbulb, Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -16,6 +16,8 @@ import type {
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { sendOnboardingProductEvent } from "@/hooks/use-onboarding-product-event"
+import type { IndustryOperationalBrief } from "@/lib/aiden/industry-operational-public-types"
+import { WORKSPACE_INDUSTRY_DEFINITIONS } from "@/lib/workspace-industry-registry"
 
 type EligibilityResponse = {
   ok?: boolean
@@ -45,6 +47,7 @@ export function AidenOperationalInsightsCard({
   const [growthHint, setGrowthHint] = useState(false)
   const [busy, setBusy] = useState(false)
   const [answer, setAnswer] = useState<AidenOperationalRecommendationsAnswer | null>(null)
+  const [industryBrief, setIndustryBrief] = useState<IndustryOperationalBrief | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
 
@@ -70,6 +73,35 @@ export function AidenOperationalInsightsCard({
     }
   }, [organizationId])
 
+  useEffect(() => {
+    if (!eligibilityReady || !copilotEnabled || !organizationId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(organizationId)}/aiden/operational-recommendations`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ moduleContext, skipAi: true }),
+          },
+        )
+        const data = (await res.json().catch(() => ({}))) as {
+          ok?: boolean
+          industryOperational?: IndustryOperationalBrief | null
+        }
+        if (!cancelled && res.ok && data.ok && data.industryOperational) {
+          setIndustryBrief(data.industryOperational)
+        }
+      } catch {
+        /* non-fatal */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [eligibilityReady, copilotEnabled, organizationId, moduleContext])
+
   const loadRecommendations = useCallback(async () => {
     setBusy(true)
     setError(null)
@@ -85,6 +117,7 @@ export function AidenOperationalInsightsCard({
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
         answer?: AidenOperationalRecommendationsAnswer
+        industryOperational?: IndustryOperationalBrief | null
         message?: string
         error?: string
       }
@@ -92,6 +125,7 @@ export function AidenOperationalInsightsCard({
         throw new Error(data.message ?? data.error ?? "Could not load recommendations.")
       }
       setAnswer(data.answer)
+      if (data.industryOperational) setIndustryBrief(data.industryOperational)
       setExpanded(true)
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Request failed."
@@ -109,6 +143,13 @@ export function AidenOperationalInsightsCard({
     sessionStorage.setItem(k, "1")
     sendOnboardingProductEvent(organizationId, "onboarding_ai_recommendation_viewed", moduleContext)
   }, [answer, organizationId, moduleContext])
+
+  const industryLabel = industryBrief ? WORKSPACE_INDUSTRY_DEFINITIONS[industryBrief.industryKey]?.label : null
+  const showIndustryBlock =
+    industryBrief &&
+    (industryBrief.dashboardSummaryLines.length > 0 ||
+      industryBrief.maintenanceSummaryLines.length > 0 ||
+      industryBrief.deterministicInsights.length > 0)
 
   if (!eligibilityReady) {
     return (
@@ -157,6 +198,9 @@ export function AidenOperationalInsightsCard({
               <CardTitle className="text-sm font-semibold">Operational insights</CardTitle>
               <CardDescription className="text-[11px] leading-snug">
                 Read-only recommendations — nothing is changed automatically.
+                {industryLabel ?
+                  <span className="block text-muted-foreground/90 mt-1">Industry lens: {industryLabel}</span>
+                : null}
               </CardDescription>
             </div>
           </div>
@@ -176,6 +220,69 @@ export function AidenOperationalInsightsCard({
         </div>
       </CardHeader>
       <CardContent className="px-4 py-3 space-y-3">
+        {showIndustryBlock ?
+          <section className="space-y-2.5 rounded-lg border border-border/80 bg-muted/10 px-3 py-2.5" aria-label="Industry workspace signals">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <Layers className="size-3.5 opacity-80 shrink-0" aria-hidden />
+              Workspace signals
+            </div>
+            {(() => {
+              const ib = industryBrief!
+              const first =
+                moduleContext === "maintenance_plans" ? ib.maintenanceSummaryLines : ib.dashboardSummaryLines
+              const second =
+                moduleContext === "maintenance_plans" ? ib.dashboardSummaryLines : ib.maintenanceSummaryLines
+              return (
+                <>
+                  {first.length > 0 ?
+                    <ul className="list-disc pl-4 space-y-1 text-xs text-foreground/90">
+                      {first.map((line) => (
+                        <li key={line} className="leading-snug">
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
+                  : null}
+                  {second.length > 0 ?
+                    <ul className="list-disc pl-4 space-y-1 text-xs text-foreground/90">
+                      {second.map((line) => (
+                        <li key={`sec-${line}`} className="leading-snug">
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
+                  : null}
+                </>
+              )
+            })()}
+            {industryBrief!.deterministicInsights.length > 0 ?
+              <ul className="space-y-2">
+                {industryBrief!.deterministicInsights.map((sig) => (
+                  <li
+                    key={sig.id}
+                    className={cn(
+                      "rounded-md border px-2.5 py-2 text-xs",
+                      severityStyle[sig.severity] ?? severityStyle.low,
+                    )}
+                  >
+                    <div className="font-medium text-foreground">{sig.title}</div>
+                    <p className="mt-1 text-[11px] leading-snug text-foreground/90">{sig.detail}</p>
+                    <ul className="mt-1.5 space-y-0.5 text-[10px] text-muted-foreground">
+                      {sig.evidence.map((ev) => (
+                        <li key={ev}>· {ev}</li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            : null}
+            <p className="text-[10px] text-muted-foreground leading-snug">
+              Signals use work order types, dates, equipment status, and bounded title keyword matches — not predictions
+              or sensor claims.
+            </p>
+          </section>
+        : null}
+
         {!answer && !error ?
           <p className="text-xs text-muted-foreground">
             Summarize scheduling risk, aging jobs, and follow-up gaps from live workspace signals (counts & dates only).

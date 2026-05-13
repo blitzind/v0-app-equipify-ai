@@ -11,6 +11,7 @@ import { resolveOperationalRecommendationsRequest } from "@/lib/aiden/operationa
 import { recordAidenUsageEvent } from "@/lib/aiden/usage-events"
 import { runAiTask } from "@/lib/ai/server"
 import { industryLabelForLaunchpad } from "@/lib/first-run/launchpad-copy"
+import { normalizeIndustryKey } from "@/lib/demo-seeding/profiles"
 import { resolveOnboardingIndustryBundle } from "@/lib/onboarding-industry/resolve-onboarding-industry-bundle"
 
 export const runtime = "nodejs"
@@ -21,6 +22,8 @@ const UUID_RE =
 
 const BodySchema = z.object({
   moduleContext: OperationalModuleContextSchema.optional().default("dashboard"),
+  /** When true, return only the operational snapshot-derived industry brief (no LLM). */
+  skipAi: z.boolean().optional(),
 })
 
 function jsonError(code: string, message: string, status: number) {
@@ -50,24 +53,29 @@ export async function POST(
   const { ctx } = resolved
   const includeFinancialHints = Boolean(ctx.permissions.canViewFinancials || ctx.permissions.canViewBilling)
 
-  const snapshot = await buildOperationalSnapshot(ctx.supabase, {
-    organizationId,
-    permissions: ctx.permissions,
-    assignedScope: ctx.assignedScope,
-    moduleContext: parsed.data.moduleContext,
-    includeFinancialHints,
-  })
-
   const { data: orgIndustry } = await ctx.supabase
     .from("organizations")
     .select("industry")
     .eq("id", organizationId)
     .maybeSingle()
   const industryRaw = (orgIndustry as { industry?: string | null } | null)?.industry ?? null
+  const industryKey = normalizeIndustryKey(industryRaw ?? undefined)
+
+  const snapshot = await buildOperationalSnapshot(ctx.supabase, {
+    organizationId,
+    permissions: ctx.permissions,
+    assignedScope: ctx.assignedScope,
+    moduleContext: parsed.data.moduleContext,
+    includeFinancialHints,
+    industryKey,
+  })
+
   const sectorFraming = resolveOnboardingIndustryBundle(
     industryRaw,
     industryLabelForLaunchpad(industryRaw),
   ).aidenSectorFraming
+
+  const industryOperational = snapshot.industryOperational ?? null
 
   const snapshotJson = JSON.stringify(snapshot)
   const prompt = buildOperationalRecommendationsPrompt({
@@ -75,6 +83,14 @@ export async function POST(
     moduleContext: parsed.data.moduleContext,
     sectorFraming,
   })
+
+  if (parsed.data.skipAi) {
+    return NextResponse.json({
+      ok: true,
+      answer: { recommendations: [] },
+      industryOperational,
+    })
+  }
 
   const started = Date.now()
   const result = await runAiTask<AidenOperationalRecommendationsAnswer>({
@@ -99,5 +115,9 @@ export async function POST(
     metadata: { module: parsed.data.moduleContext },
   })
 
-  return NextResponse.json({ ok: true, answer: result.output })
+  return NextResponse.json({
+    ok: true,
+    answer: result.output,
+    industryOperational,
+  })
 }

@@ -11,6 +11,7 @@ Strict rules:
 - insightTheme (optional) must be one of the canonical Phase 27 themes when it fits the observation (revenue_opportunity, collections_risk, dispatch_backlog, capacity_risk, repeat_repair, maintenance_upsell, warranty_window, inventory_risk, follow_up_risk, communications_risk, automation_health, certificate_release, customer_retention_risk).
 - sourceSignals (optional) lists short factual cues from the snapshot (counts, thresholds) — no customer names.
 - Tailor emphasis to the current module context when prioritizing which recommendations to surface first.
+- The snapshot JSON may include \`industryOperational\` with deterministicInsights and summary lines. Those items are pre-computed from the same workspace data — if you reference them, keep counts identical and do not contradict them.
 - If the snapshot is sparse or empty, return a short overview and 0–2 low-severity observations — do not fabricate gaps.`
 
 export function buildOperationalRecommendationsPrompt(args: {

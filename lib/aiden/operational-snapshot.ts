@@ -4,6 +4,11 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { OperationalModuleContext } from "@/lib/aiden/operational-recommendations-schema"
 import type { OrgPermissions } from "@/lib/permissions/model"
 import { isAssignedWorkOnly, type AssignedWorkScope } from "@/lib/permissions/technician-scope"
+import type { WorkspaceIndustryKey } from "@/lib/workspace-industry-registry"
+import {
+  buildIndustryOperationalBrief,
+  fetchIndustryOperationalMetrics,
+} from "@/lib/aiden/industry-operational-metrics"
 
 function utcTodayYmd(): string {
   return new Date().toISOString().slice(0, 10)
@@ -23,6 +28,8 @@ type SnapshotArgs = {
   assignedScope: AssignedWorkScope | null
   moduleContext: OperationalModuleContext
   includeFinancialHints: boolean
+  /** Normalized workspace vertical — enables deterministic industry heuristics in snapshot. */
+  industryKey?: WorkspaceIndustryKey | null
 }
 
 function scopeFilters(args: SnapshotArgs): { skip: boolean; woIds: string[] | null } {
@@ -228,18 +235,20 @@ export async function buildOperationalSnapshot(
     }).length
   }
 
-  return {
+  const countsBlock = {
+    agingActiveWorkOrdersUpdatedBefore14d: agingRes.count ?? 0,
+    scheduledDatePassedStillActive: pastScheduledRes.count ?? 0,
+    activeWorkOrdersUnassigned: unassignedRes.count ?? 0,
+    maintenancePlansPastDue: plansOverdueRes.count ?? 0,
+    maxJobsSameDaySameAssignee: maxSameDaySameTech,
+  }
+
+  const base: Record<string, unknown> = {
     generatedAt: new Date().toISOString(),
     moduleContext: args.moduleContext,
     scope: scope.woIds ? "assigned_only" : "organization",
     todayUtc: today,
-    counts: {
-      agingActiveWorkOrdersUpdatedBefore14d: agingRes.count ?? 0,
-      scheduledDatePassedStillActive: pastScheduledRes.count ?? 0,
-      activeWorkOrdersUnassigned: unassignedRes.count ?? 0,
-      maintenancePlansPastDue: plansOverdueRes.count ?? 0,
-      maxJobsSameDaySameAssignee: maxSameDaySameTech,
-    },
+    counts: countsBlock,
     samples: {
       oldestActiveWorkOrderIds: activeRows.slice(0, 15).map((r) => r.id),
       topCustomersWithUnresolvedWork: topCustomersUnresolved,
@@ -252,4 +261,23 @@ export async function buildOperationalSnapshot(
         { overdueInvoiceCount }
       : undefined,
   }
+
+  if (args.industryKey) {
+    const metrics = await fetchIndustryOperationalMetrics(supabase, orgId, {
+      woIds: scope.woIds,
+      equipmentIds: equipIds,
+      assignedOnly: assigned,
+    }, args.industryKey)
+    base.industryOperational = buildIndustryOperationalBrief({
+      industryKey: args.industryKey,
+      moduleContext: args.moduleContext,
+      metrics,
+      counts: {
+        ...countsBlock,
+        repeatEquipmentPatterns: repeatEquipment,
+      },
+    })
+  }
+
+  return base
 }
