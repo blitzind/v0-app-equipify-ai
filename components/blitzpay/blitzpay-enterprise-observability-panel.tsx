@@ -123,7 +123,7 @@ export function BlitzpayEnterpriseObservabilityPanel({ organizationId, orgReady 
   return (
     <div
       id="blitzpay-enterprise-observability-anchor"
-      className="rounded-xl border border-border bg-card text-card-foreground shadow-sm min-w-0 max-w-full overflow-x-hidden"
+      className="rounded-xl border border-border bg-white dark:bg-card text-card-foreground shadow-sm min-w-0 max-w-full overflow-x-hidden"
     >
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
         <div className="flex items-center gap-2 min-w-0">

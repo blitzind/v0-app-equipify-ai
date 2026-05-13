@@ -74,7 +74,7 @@ export function BlitzpayTechnicianPayoutsPanel({ organizationId, technicianUserI
   return (
     <div
       className={cn(
-        "rounded-lg border border-border bg-muted/10 px-3 py-3 space-y-2",
+        "rounded-lg border border-border bg-white dark:bg-card px-3 py-3 space-y-2",
       )}
     >
       <div className="flex items-center justify-between gap-2">

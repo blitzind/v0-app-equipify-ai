@@ -229,7 +229,7 @@ export function BlitzpayCollectionsEnginePanel({ organizationId, orgReady }: Pro
 
   return (
     <section
-      className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-5 min-w-0 max-w-full overflow-hidden"
+      className="rounded-xl border border-border bg-white dark:bg-card p-5 shadow-sm space-y-5 min-w-0 max-w-full overflow-hidden"
       aria-labelledby="blitzpay-collections-engine-heading"
     >
       <div className="flex flex-wrap items-start justify-between gap-3 min-w-0">
@@ -302,7 +302,7 @@ export function BlitzpayCollectionsEnginePanel({ organizationId, orgReady }: Pro
               return (
                 <article
                   key={s.id}
-                  className="rounded-lg border border-border bg-muted/10 p-4 space-y-3 min-w-0 overflow-hidden shadow-sm"
+                  className="rounded-lg border border-border bg-white dark:bg-card p-4 space-y-3 min-w-0 overflow-hidden shadow-sm"
                 >
                   <div className="min-w-0 space-y-1">
                     <h4 className="text-sm font-semibold text-foreground break-words">{s.invoiceNumber ?? "Invoice"}</h4>

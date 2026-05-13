@@ -62,7 +62,13 @@ export const FCC_OVERVIEW_SECTION_LEAD = "mt-2 md:mt-3"
 /** Pull AI executive summary slightly closer to the preceding row when stack gap feels oversized. */
 export const FCC_OVERVIEW_PRE_AI_BRIEFING_TIGHTEN = "-mt-1.5 md:-mt-2"
 export const FCC_BRIEFING_TRI_GRID = "grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4"
-export const FCC_CARD_SHELL = "border-border/80 shadow-sm"
+/** Primary FCC panel fill — white in light; theme `card` in dark (readability). */
+export const FCC_PRIMARY_SURFACE = "bg-white dark:bg-card"
+/**
+ * Card chrome for FCC overview widgets (merged with shadcn `Card`, which defaults to `bg-card`).
+ * Not used by the AI Executive Summary card (that block uses its own gradient classes).
+ */
+export const FCC_CARD_SHELL = "bg-white dark:bg-card border-border/80 shadow-sm"
 export const FCC_CARD_BODY = "p-4 sm:p-5"
 export const FCC_META_FOOTNOTE = "text-[10px] sm:text-[11px] text-muted-foreground leading-relaxed"
 export const FCC_TOOL_STRIP =

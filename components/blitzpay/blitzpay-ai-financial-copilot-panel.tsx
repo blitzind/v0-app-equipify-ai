@@ -179,7 +179,7 @@ export function BlitzpayAiFinancialCopilotPanel({ organizationId, orgReady }: Pr
     <div
       id="blitzpay-ai-financial-copilot-anchor"
       className={cn(
-        "rounded-xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6 space-y-5",
+        "rounded-xl border border-border bg-white dark:bg-card px-4 py-5 sm:px-6 sm:py-6 space-y-5",
         "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
       )}
     >
@@ -236,7 +236,7 @@ export function BlitzpayAiFinancialCopilotPanel({ organizationId, orgReady }: Pr
           <p className="text-xs text-muted-foreground leading-relaxed">{exec.executive.summary}</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
             {Object.entries(exec.scores).map(([k, v]) => (
-              <div key={k} className="rounded-md border border-border bg-card px-2 py-2">
+              <div key={k} className="rounded-md border border-border bg-white dark:bg-card px-2 py-2">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground truncate" title={k}>
                   {k.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase())}
                 </p>
@@ -260,7 +260,7 @@ export function BlitzpayAiFinancialCopilotPanel({ organizationId, orgReady }: Pr
               <p className="text-xs text-muted-foreground">No active insights. Use Regenerate to materialize advisory rows.</p>
             ) : null}
             {insights.map((ins) => (
-              <div key={ins.id} className="rounded-lg border border-border bg-card/80 p-3 space-y-2">
+              <div key={ins.id} className="rounded-lg border border-border bg-white dark:bg-card p-3 space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className={cn("text-xs font-semibold", severityClass(ins.severity))}>
                     {formatBlitzpayUiLabel(ins.severity)}

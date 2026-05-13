@@ -8,7 +8,7 @@ import { OverviewSection } from "./sections/overview-section"
 function SectionSkeleton() {
   return (
     <div
-      className="rounded-xl border border-border bg-muted/15 p-8 min-h-[200px] animate-pulse"
+      className="rounded-xl border border-border bg-white dark:bg-card p-8 min-h-[200px] animate-pulse"
       aria-hidden
     />
   )

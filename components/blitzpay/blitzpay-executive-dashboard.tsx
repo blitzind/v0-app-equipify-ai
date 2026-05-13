@@ -18,7 +18,7 @@ function ScoreRing({ label, value }: { label: string; value: number }) {
     : v >= 50 ? "text-amber-800 dark:text-amber-200"
     : "text-destructive"
   return (
-    <div className="rounded-lg border border-border bg-card/60 px-4 py-3">
+    <div className="rounded-lg border border-border bg-white dark:bg-card px-4 py-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className={cn("text-2xl font-bold tabular-nums mt-1", tone)}>{v}</p>
       <div className="mt-2 h-2 w-full rounded-full bg-muted overflow-hidden">
@@ -81,7 +81,7 @@ export function BlitzpayExecutiveDashboard({ organizationId, orgReady }: Props) 
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6 space-y-5",
+        "rounded-xl border border-border bg-white dark:bg-card px-4 py-5 sm:px-6 sm:py-6 space-y-5",
         "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
       )}
     >

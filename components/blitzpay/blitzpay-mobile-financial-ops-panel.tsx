@@ -136,7 +136,7 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
     <div
       id="blitzpay-mobile-financial-ops"
       className={cn(
-        "rounded-xl border border-border bg-card p-4 shadow-sm space-y-4",
+        "rounded-xl border border-border bg-white dark:bg-card p-4 shadow-sm space-y-4",
         "min-w-0 max-w-full overflow-x-hidden",
       )}
     >

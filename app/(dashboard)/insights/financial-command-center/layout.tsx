@@ -8,6 +8,7 @@ import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { useBlitzPayCapabilities } from "@/hooks/use-blitzpay-capabilities"
 import { blitzpayFccHref } from "@/lib/navigation/blitzpay-financial-command-center-nav"
 import {
+  FCC_PRIMARY_SURFACE,
   NAV_ICON_INACTIVE_CARD,
   NAV_PRIMARY_ROW_MOTION,
   NAV_ROW_INACTIVE_HOVER_CARD,
@@ -23,7 +24,7 @@ export default function FinancialCommandCenterLayout({ children }: { children: R
   if (!canView) {
     return (
       <div className="max-w-lg mx-auto py-12 px-4">
-        <div className="rounded-xl border border-border bg-card p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] flex gap-3">
+        <div className={cn("rounded-xl border border-border p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] flex gap-3", FCC_PRIMARY_SURFACE)}>
           <AlertTriangle className="h-5 w-5 text-[color:var(--status-warning)] shrink-0 mt-0.5" aria-hidden />
           <div className="space-y-2 text-sm">
             <p className="font-semibold">Financial command center is restricted</p>

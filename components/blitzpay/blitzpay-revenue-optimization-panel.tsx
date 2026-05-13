@@ -245,7 +245,7 @@ export function BlitzpayRevenueOptimizationPanel({ organizationId, orgReady }: P
     <div
       id="blitzpay-revenue-optimization-anchor"
       className={cn(
-        "rounded-xl border border-border bg-card px-3 py-4 sm:px-5 sm:py-5 space-y-5",
+        "rounded-xl border border-border bg-white dark:bg-card px-3 py-4 sm:px-5 sm:py-5 space-y-5",
         "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
       )}
     >

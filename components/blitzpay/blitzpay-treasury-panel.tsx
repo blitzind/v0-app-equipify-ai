@@ -125,7 +125,7 @@ export function BlitzpayTreasuryPanel({ organizationId, orgReady }: Props) {
   if (!organizationId || !orgReady) return null
 
   return (
-    <div className="rounded-xl border border-border bg-muted/10 px-4 py-4 sm:px-5 sm:py-5 space-y-4">
+    <div className="rounded-xl border border-border bg-white dark:bg-card px-4 py-4 sm:px-5 sm:py-5 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <Landmark className="h-5 w-5 text-[color:var(--primary)] shrink-0" aria-hidden />

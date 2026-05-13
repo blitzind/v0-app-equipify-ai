@@ -38,6 +38,7 @@ import {
   FCC_META_FOOTNOTE,
   FCC_OVERVIEW_PRE_AI_BRIEFING_TIGHTEN,
   FCC_OVERVIEW_SECTION_LEAD,
+  FCC_PRIMARY_SURFACE,
 } from "@/lib/navigation-chrome"
 
 export type ExecutiveOverviewDashboardProps = {
@@ -126,7 +127,8 @@ export function ExecutiveOverviewDashboard({ data: o, tier, widgets, allowFcc, d
                 key={c.id}
                 href={fccHref(c.hrefKind, c.fccSlug)}
                 className={cn(
-                  "rounded-xl border bg-card/90 p-3 sm:p-3.5 shadow-sm ring-1 transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "rounded-xl border border-border p-3 sm:p-3.5 shadow-sm ring-1 transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  FCC_PRIMARY_SURFACE,
                   toneRing(c.tone),
                 )}
               >

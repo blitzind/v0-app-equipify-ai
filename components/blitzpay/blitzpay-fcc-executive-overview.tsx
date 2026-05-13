@@ -126,13 +126,13 @@ export function BlitzpayFccExecutiveOverview({
 
   if (loading && !data) {
     return (
-      <div className="rounded-xl border border-border bg-card/60 p-8 animate-pulse min-h-[120px]" aria-busy="true" />
+      <div className="rounded-xl border border-border bg-white dark:bg-card p-8 animate-pulse min-h-[120px]" aria-busy="true" />
     )
   }
 
   if (error || !data) {
     return (
-      <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+      <div className="rounded-xl border border-border bg-white dark:bg-card p-4 text-sm text-muted-foreground">
         {error ?? "Executive overview is unavailable."}
       </div>
     )

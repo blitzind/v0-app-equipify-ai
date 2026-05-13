@@ -105,7 +105,7 @@ export function BlitzpayTaxCompliancePanel({ organizationId, orgReady }: Props) 
   return (
     <div
       id="blitzpay-tax-compliance-anchor"
-      className="rounded-xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6 space-y-5 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]"
+      className="rounded-xl border border-border bg-white dark:bg-card px-4 py-5 sm:px-6 sm:py-6 space-y-5 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">

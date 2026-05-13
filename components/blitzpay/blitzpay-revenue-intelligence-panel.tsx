@@ -115,7 +115,7 @@ export function BlitzpayRevenueIntelligencePanel({ organizationId, orgReady }: P
   if (!organizationId || !orgReady) return null
 
   return (
-    <div id="blitzpay-revenue-intelligence" className="rounded-lg border border-border bg-muted/10 px-3 py-3 space-y-3">
+    <div id="blitzpay-revenue-intelligence" className="rounded-lg border border-border bg-white dark:bg-card px-3 py-3 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <BarChart3 className="h-4 w-4 text-[color:var(--primary)] shrink-0" aria-hidden />

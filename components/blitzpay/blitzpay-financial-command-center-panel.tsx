@@ -266,7 +266,7 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6 space-y-5",
+        "rounded-xl border border-border bg-white dark:bg-card px-4 py-5 sm:px-6 sm:py-6 space-y-5",
         "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
         "min-w-0 max-w-full overflow-x-hidden",
       )}
