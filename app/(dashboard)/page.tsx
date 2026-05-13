@@ -25,6 +25,7 @@ import { DashboardLaunchpad } from "@/components/first-run/dashboard-launchpad"
 import { IndustryDemoStarterPanel } from "@/components/first-run/industry-demo-starter-panel"
 import { OnboardingMilestoneTelemetry } from "@/components/first-run/onboarding-milestone-telemetry"
 import { ExecutiveStatCards } from "@/components/dashboard/executive-stat-cards"
+import { OperationalHealthScoresPanel } from "@/components/aiden/operational-health-scores-panel"
 import { useFirstRun } from "@/hooks/use-first-run"
 
 export default function DashboardPage() {
@@ -99,6 +100,10 @@ export default function DashboardPage() {
         showQuotesExecutive={showQuotesExecutive}
         firstRun={firstRun}
       />
+
+      {dashboardOrgStatus === "ready" && dashboardOrgId && permissions.canViewInsights ?
+        <OperationalHealthScoresPanel organizationId={dashboardOrgId} moduleContext="dashboard" />
+      : null}
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">

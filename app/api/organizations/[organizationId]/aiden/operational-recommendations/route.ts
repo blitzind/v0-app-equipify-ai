@@ -8,7 +8,7 @@ import {
 } from "@/lib/aiden/operational-recommendations-schema"
 import { buildOperationalSnapshot } from "@/lib/aiden/operational-snapshot"
 import { resolveOperationalRecommendationsRequest } from "@/lib/aiden/operational-request-context"
-import { recordAidenUsageEvent } from "@/lib/aiden/usage-events"
+import type { OperationalHealthScoresReport } from "@/lib/aiden/operational-health-score-types"
 import { runAiTask } from "@/lib/ai/server"
 import { industryLabelForLaunchpad } from "@/lib/first-run/launchpad-copy"
 import { normalizeIndustryKey } from "@/lib/demo-seeding/profiles"
@@ -76,6 +76,7 @@ export async function POST(
   ).aidenSectorFraming
 
   const industryOperational = snapshot.industryOperational ?? null
+  const operationalHealthScores = (snapshot.operationalHealthScores ?? null) as OperationalHealthScoresReport | null
 
   const snapshotJson = JSON.stringify(snapshot)
   const prompt = buildOperationalRecommendationsPrompt({
@@ -89,6 +90,7 @@ export async function POST(
       ok: true,
       answer: { recommendations: [] },
       industryOperational,
+      operationalHealthScores,
     })
   }
 
@@ -119,5 +121,6 @@ export async function POST(
     ok: true,
     answer: result.output,
     industryOperational,
+    operationalHealthScores,
   })
 }

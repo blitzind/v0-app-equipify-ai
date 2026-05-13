@@ -9,6 +9,7 @@ import {
   buildIndustryOperationalBrief,
   fetchIndustryOperationalMetrics,
 } from "@/lib/aiden/industry-operational-metrics"
+import { buildOperationalHealthScores } from "@/lib/aiden/operational-health-scores"
 
 function utcTodayYmd(): string {
   return new Date().toISOString().slice(0, 10)
@@ -243,8 +244,10 @@ export async function buildOperationalSnapshot(
     maxJobsSameDaySameAssignee: maxSameDaySameTech,
   }
 
+  const generatedAt = new Date().toISOString()
+
   const base: Record<string, unknown> = {
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     moduleContext: args.moduleContext,
     scope: scope.woIds ? "assigned_only" : "organization",
     todayUtc: today,
@@ -262,20 +265,34 @@ export async function buildOperationalSnapshot(
       : undefined,
   }
 
+  const metricsSamplingIndustry = args.industryKey ?? "field_service"
+  const industryMetrics = await fetchIndustryOperationalMetrics(
+    supabase,
+    orgId,
+    { woIds: scope.woIds, equipmentIds: equipIds, assignedOnly: assigned },
+    metricsSamplingIndustry,
+  )
+
+  const healthCounts = {
+    ...countsBlock,
+    repeatEquipmentPatterns: repeatEquipment,
+  }
+  base.operationalHealthScores = buildOperationalHealthScores({
+    generatedAt,
+    industryKey: args.industryKey ?? null,
+    metricsSamplingIndustryKey: args.industryKey ? undefined : metricsSamplingIndustry,
+    metrics: industryMetrics,
+    counts: healthCounts,
+    overdueInvoiceCount:
+      args.includeFinancialHints && overdueInvoiceCount !== undefined ? overdueInvoiceCount : undefined,
+  })
+
   if (args.industryKey) {
-    const metrics = await fetchIndustryOperationalMetrics(supabase, orgId, {
-      woIds: scope.woIds,
-      equipmentIds: equipIds,
-      assignedOnly: assigned,
-    }, args.industryKey)
     base.industryOperational = buildIndustryOperationalBrief({
       industryKey: args.industryKey,
       moduleContext: args.moduleContext,
-      metrics,
-      counts: {
-        ...countsBlock,
-        repeatEquipmentPatterns: repeatEquipment,
-      },
+      metrics: industryMetrics,
+      counts: healthCounts,
     })
   }
 

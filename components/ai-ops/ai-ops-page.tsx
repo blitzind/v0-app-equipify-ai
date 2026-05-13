@@ -17,6 +17,7 @@ import type {
   RecommendationsResponse,
 } from "@/lib/ai-ops/types"
 import { PageHeroCard } from "@/components/page-hero-card"
+import { OperationalHealthScoresPanel } from "@/components/aiden/operational-health-scores-panel"
 import { RecommendationCard } from "./recommendation-card"
 import { AiOpsCommandCenterDrawer } from "./command-center-drawer"
 import {
@@ -126,6 +127,10 @@ export function AiOpsPage() {
         icon={Brain}
         featureColor="#7c3aed"
       />
+
+      {organizationId && orgStatus === "ready" && permissions.canViewInsights ?
+        <OperationalHealthScoresPanel organizationId={organizationId} moduleContext="dashboard" />
+      : null}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KpiCard label="Total" value={summary?.total ?? 0} accent="muted" />
