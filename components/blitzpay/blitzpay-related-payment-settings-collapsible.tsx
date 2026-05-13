@@ -5,9 +5,10 @@ import { useState } from "react"
 import { ChevronDown } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
+import { blitzpayFccHref } from "@/lib/navigation/blitzpay-financial-command-center-nav"
 
 /**
- * Cross-links to Settings → Payments anchors (same destinations as before the FCC route split).
+ * Cross-links between BlitzPay Financial Command Center sections and Settings → Payments (configuration).
  */
 export function BlitzpayRelatedPaymentSettingsCollapsible() {
   const [open, setOpen] = useState(false)
@@ -31,72 +32,78 @@ export function BlitzpayRelatedPaymentSettingsCollapsible() {
         <div className="border-t border-border px-4 pb-4 pt-1">
           <ul className="space-y-2.5 text-sm text-muted-foreground leading-relaxed list-none">
             <li>
-              The same command center lives under{" "}
-              <Link href="/settings/payments#blitzpay-financial-command-center-anchor" className="text-primary underline-offset-2 hover:underline font-medium">
-                Settings → Payments
+              <Link href={blitzpayFccHref("command-center-data")} className="text-primary underline-offset-2 hover:underline font-medium">
+                Command center data
+              </Link>{" "}
+              and related financial workspaces are on this BlitzPay page (use the section navigation).
+            </li>
+            <li>
+              Executive business health (deterministic, no AI):{" "}
+              <Link href={blitzpayFccHref("executive-health")} className="text-primary underline-offset-2 hover:underline font-medium">
+                Executive Health
               </Link>
               .
             </li>
             <li>
-              Executive business health (deterministic, no AI) is at{" "}
-              <Link href="/settings/payments#blitzpay-executive-dashboard-anchor" className="text-primary underline-offset-2 hover:underline font-medium">
-                Settings → Payments → Executive business health
-              </Link>
-              .
-            </li>
-            <li>
-              Collections copilot:{" "}
-              <Link href="/settings/payments#blitzpay-collections-copilot-anchor" className="text-primary underline-offset-2 hover:underline font-medium">
-                Settings → Payments → Collections copilot
+              Collections copilot &amp; engine:{" "}
+              <Link href={blitzpayFccHref("collections")} className="text-primary underline-offset-2 hover:underline font-medium">
+                Collections
               </Link>
               .
             </li>
             <li>
               Recurring revenue:{" "}
-              <Link href="/settings/payments#blitzpay-recurring-revenue-anchor" className="text-primary underline-offset-2 hover:underline font-medium">
-                Settings → Payments → Recurring revenue
+              <Link href={blitzpayFccHref("recurring-revenue")} className="text-primary underline-offset-2 hover:underline font-medium">
+                Recurring Revenue &amp; Renewals
               </Link>
               .
             </li>
             <li>
-              Payroll accruals:{" "}
-              <Link href="/settings/payments#blitzpay-payroll-anchor" className="text-primary underline-offset-2 hover:underline font-medium">
-                Settings → Payments → Payroll
+              Payroll &amp; commissions:{" "}
+              <Link href={blitzpayFccHref("payroll-commissions")} className="text-primary underline-offset-2 hover:underline font-medium">
+                Payroll &amp; Commissions
               </Link>
               .
             </li>
             <li>
               Internal books (trial balance &amp; chart):{" "}
-              <Link href="/settings/payments#blitzpay-accounting-overview-anchor" className="text-primary underline-offset-2 hover:underline font-medium">
-                Settings → Payments → Internal books
+              <Link href={blitzpayFccHref("internal-books")} className="text-primary underline-offset-2 hover:underline font-medium">
+                Internal Books
               </Link>
               .
             </li>
             <li>
               Vendor bills &amp; pay planning:{" "}
-              <Link href="/settings/payments#blitzpay-ap-bill-pay-anchor" className="text-primary underline-offset-2 hover:underline font-medium">
-                Settings → Payments → Vendor bills &amp; pay planning
+              <Link href={blitzpayFccHref("vendor-bills")} className="text-primary underline-offset-2 hover:underline font-medium">
+                Vendor Bills &amp; Pay Planning
               </Link>
               .
             </li>
             <li>
               Tax &amp; compliance:{" "}
-              <Link href="/settings/payments#blitzpay-tax-compliance-anchor" className="text-primary underline-offset-2 hover:underline font-medium">
-                Settings → Payments → Tax &amp; compliance
+              <Link href={blitzpayFccHref("tax-compliance")} className="text-primary underline-offset-2 hover:underline font-medium">
+                Tax &amp; Compliance
               </Link>
               .
             </li>
             <li>
               Financing marketplace:{" "}
-              <Link href="/settings/payments#blitzpay-financing-marketplace-anchor" className="text-primary underline-offset-2 hover:underline font-medium">
-                Settings → Payments → Financing marketplace
+              <Link href={blitzpayFccHref("financing-marketplace")} className="text-primary underline-offset-2 hover:underline font-medium">
+                Financing Marketplace
               </Link>
               .
             </li>
             <li>
               Procurement &amp; inventory finance:{" "}
-              <Link href="/settings/payments#blitzpay-procurement-inventory-anchor" className="text-primary underline-offset-2 hover:underline font-medium">
-                Settings → Payments → Procurement &amp; inventory finance
+              <Link href={blitzpayFccHref("procurement-inventory")} className="text-primary underline-offset-2 hover:underline font-medium">
+                Procurement &amp; Inventory Finance
+              </Link>
+              .
+            </li>
+            <li>
+              Stripe Connect onboarding, fees, payment methods, reminders, and payout ledger sync:{" "}
+              <Link href="/settings/payments" className="text-primary underline-offset-2 hover:underline font-medium">
+                Settings → Payments
               </Link>
               .
             </li>

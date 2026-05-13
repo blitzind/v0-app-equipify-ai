@@ -8,31 +8,14 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useAdmin } from "@/lib/admin-store"
-import { BlitzpayRevenueIntelligencePanel } from "@/components/blitzpay/blitzpay-revenue-intelligence-panel"
 import { BlitzpayApPanel } from "@/components/blitzpay/blitzpay-ap-panel"
-import { BlitzpayCollectionsCopilotPanel } from "@/components/blitzpay/blitzpay-collections-copilot-panel"
-import { BlitzpayRecurringRevenuePanel } from "@/components/blitzpay/blitzpay-recurring-revenue-panel"
-import { BlitzpayExecutiveDashboard } from "@/components/blitzpay/blitzpay-executive-dashboard"
-import { BlitzpayFinancialCommandCenterPanel } from "@/components/blitzpay/blitzpay-financial-command-center-panel"
-import { BlitzpayAccountingOverviewPanel } from "@/components/blitzpay/blitzpay-accounting-overview-panel"
-import { BlitzpayApBillPayPanel } from "@/components/blitzpay/blitzpay-ap-bill-pay-panel"
-import { BlitzpayTaxCompliancePanel } from "@/components/blitzpay/blitzpay-tax-compliance-panel"
-import { BlitzpayFinancingMarketplacePanel } from "@/components/blitzpay/blitzpay-financing-marketplace-panel"
-import { BlitzpayProcurementInventoryPanel } from "@/components/blitzpay/blitzpay-procurement-inventory-panel"
-import { BlitzpayMobileFinancialOpsPanel } from "@/components/blitzpay/blitzpay-mobile-financial-ops-panel"
-import { BlitzpayEnterpriseObservabilityPanel } from "@/components/blitzpay/blitzpay-enterprise-observability-panel"
-import { BlitzpayPayrollDashboard } from "@/components/blitzpay/blitzpay-payroll-dashboard"
-import { BlitzpayCommissionQueue } from "@/components/blitzpay/blitzpay-commission-queue"
-import { BlitzpayVendorPayoutsPanel } from "@/components/blitzpay/blitzpay-vendor-payouts-panel"
-import { BlitzpayCashAccountsPanel } from "@/components/blitzpay/blitzpay-cash-accounts-panel"
-import { BlitzpayCollectionsEnginePanel } from "@/components/blitzpay/blitzpay-collections-engine-panel"
-import { BlitzpayBillingProfilesPanel } from "@/components/blitzpay/blitzpay-billing-profiles-panel"
 import { BlitzpayTreasuryPanel } from "@/components/blitzpay/blitzpay-treasury-panel"
 import { BlitzpayPlanAwarenessStrip } from "@/components/blitzpay/blitzpay-plan-awareness-strip"
 import { WorkspaceInvoiceDefaultsCard } from "@/components/settings/workspace-invoice-defaults-card"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { blitzpayConnectOnboardingToastDescription } from "@/lib/blitzpay/connect-onboarding-client-messages"
 import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
+import { blitzpayFccHref } from "@/lib/navigation/blitzpay-financial-command-center-nav"
 import { cn } from "@/lib/utils"
 
 type BlitzPayStatusPayload = {
@@ -174,13 +157,7 @@ function BlitzPaySettingsPageInner() {
   const canConfigure = isPlatformAdmin || rawRole === "owner" || rawRole === "admin"
   const canViewPayoutLedger =
     permStatus === "ready" && (orgPermissions.has("canViewFinancials") || orgPermissions.has("canEditInvoices"))
-  const canViewBlitzpayRevenue =
-    permStatus === "ready" &&
-    (isPlatformAdmin ||
-      orgPermissions.has("canViewFinancialReports") ||
-      orgPermissions.has("canViewFinancials"))
-
-  const canViewFinancialCommandCenter =
+  const canLinkBlitzpayFcc =
     permStatus === "ready" &&
     (isPlatformAdmin ||
       orgPermissions.has("canViewFinancialReports") ||
@@ -936,104 +913,28 @@ function BlitzPaySettingsPageInner() {
                 </div>
               ) : null}
 
-              {canViewBlitzpayRevenue && organizationId ? (
+              {canLinkBlitzpayFcc && organizationId ? (
                 <div className="border-t border-border pt-4">
-                  <BlitzpayRevenueIntelligencePanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
+                  <div className="rounded-lg border border-dashed border-primary/25 bg-primary/5 px-3 py-3 space-y-2">
+                  <p className="text-xs font-semibold text-foreground">BlitzPay insights &amp; operations</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Reporting, collections, treasury signals, payroll queues, and other financial workspaces live in the
+                    BlitzPay Financial Command Center. This page stays focused on configuration and Stripe Connect setup.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button asChild variant="default" size="sm">
+                      <Link href={blitzpayFccHref("overview")}>Open BlitzPay</Link>
+                    </Button>
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={blitzpayFccHref("command-center-data")}>Command center data</Link>
+                    </Button>
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={blitzpayFccHref("collections")}>Collections</Link>
+                    </Button>
+                  </div>
+                  </div>
                 </div>
               ) : null}
-
-              {canViewFinancialCommandCenter && organizationId ? (
-                <div id="blitzpay-executive-dashboard-anchor" className="border-t border-border pt-4">
-                  <BlitzpayExecutiveDashboard organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                </div>
-              ) : null}
-
-              {canViewFinancialCommandCenter && organizationId ? (
-                <div id="blitzpay-cash-accounts-anchor" className="border-t border-border pt-4">
-                  <BlitzpayCashAccountsPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                </div>
-              ) : null}
-
-              {canViewFinancialCommandCenter && organizationId ? (
-                <div id="blitzpay-payroll-anchor" className="border-t border-border pt-4 space-y-4">
-                  <BlitzpayPayrollDashboard organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                  <BlitzpayCommissionQueue organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                  <BlitzpayVendorPayoutsPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                </div>
-              ) : null}
-
-              {canViewFinancialCommandCenter && organizationId ? (
-                <div className="border-t border-border pt-4">
-                  <BlitzpayRecurringRevenuePanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                </div>
-              ) : null}
-
-              {canViewFinancialCommandCenter && organizationId ? (
-                <div className="border-t border-border pt-4">
-                  <BlitzpayCollectionsCopilotPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                </div>
-              ) : null}
-
-              {canViewFinancialCommandCenter && organizationId ? (
-                <div id="blitzpay-collections-engine-anchor" className="border-t border-border pt-4">
-                  <BlitzpayCollectionsEnginePanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                </div>
-              ) : null}
-
-              {canViewFinancialCommandCenter && organizationId ? (
-                <div id="blitzpay-billing-profiles-anchor" className="border-t border-border pt-4">
-                  <BlitzpayBillingProfilesPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                </div>
-              ) : null}
-
-              {canViewFinancialCommandCenter && organizationId ? (
-                <div id="blitzpay-financial-command-center-anchor" className="border-t border-border pt-4">
-                  <BlitzpayFinancialCommandCenterPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                </div>
-              ) : null}
-
-              {canViewFinancialCommandCenter && organizationId ? (
-                <div id="blitzpay-accounting-overview-anchor" className="border-t border-border pt-4">
-                  <BlitzpayAccountingOverviewPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                </div>
-              ) : null}
-
-              {canViewFinancialCommandCenter && organizationId ? (
-                <div className="border-t border-border pt-4">
-                  <BlitzpayApBillPayPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                </div>
-              ) : null}
-
-              {canViewFinancialCommandCenter && organizationId ? (
-                <div className="border-t border-border pt-4">
-                  <BlitzpayTaxCompliancePanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                </div>
-              ) : null}
-
-              {canViewFinancialCommandCenter && organizationId ? (
-                <div className="border-t border-border pt-4">
-                  <BlitzpayFinancingMarketplacePanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                </div>
-              ) : null}
-
-              {canViewFinancialCommandCenter && organizationId ? (
-                <div className="border-t border-border pt-4">
-                  <BlitzpayProcurementInventoryPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                </div>
-              ) : null}
-
-              {canViewFinancialCommandCenter && organizationId ? (
-                <div id="blitzpay-mobile-financial-ops-anchor" className="border-t border-border pt-4">
-                  <BlitzpayMobileFinancialOpsPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                </div>
-              ) : null}
-
-              {canViewFinancialCommandCenter && organizationId ? (
-                <div className="border-t border-border pt-4">
-                  <BlitzpayEnterpriseObservabilityPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                </div>
-              ) : null}
-            </div>
 
               {canViewPayoutLedger && hasAccount ? (
               <div className="border-t border-border pt-4 space-y-4">
@@ -1165,6 +1066,7 @@ function BlitzPaySettingsPageInner() {
                 </div>
               </div>
             ) : null}
+            </div>
           </div>
         )}
       </div>

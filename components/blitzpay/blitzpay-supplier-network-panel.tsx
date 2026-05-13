@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
 import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
+import { blitzpayFccHref } from "@/lib/navigation/blitzpay-financial-command-center-nav"
 
 type Phase5b = {
   supplierNetworkParticipationScore: number
@@ -262,7 +263,7 @@ export function BlitzpaySupplierNetworkPanel({ organizationId, orgReady }: Props
       <p className="text-xs text-muted-foreground">
         Staff APIs live under{" "}
         <code className="rounded bg-muted px-1 py-0.5 text-[11px]">/api/organizations/…/blitzpay/supplier-network/*</code>.{" "}
-        <Link href="/settings/payments#blitzpay-procurement-inventory-anchor" className="text-primary underline-offset-2 hover:underline">
+        <Link href={blitzpayFccHref("procurement-inventory")} className="text-primary underline-offset-2 hover:underline">
           Procurement &amp; inventory
         </Link>{" "}
         remains the system of record for stock and rebates on your own org.

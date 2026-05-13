@@ -33,15 +33,9 @@ const AiFinancialCopilotSection = dynamic(
   { loading: SectionSkeleton },
 )
 
-const RevenueOptimizationSection = dynamic(
-  () =>
-    import("@/components/blitzpay/blitzpay-revenue-optimization-panel").then((m) => ({
-      default: function Section(p: BlitzpayFccOrgProps) {
-        return <m.BlitzpayRevenueOptimizationPanel organizationId={p.organizationId} orgReady={p.orgReady} />
-      },
-    })),
-  { loading: SectionSkeleton },
-)
+const RevenueOptimizationSection = dynamic(() => import("./sections/revenue-optimization-section"), {
+  loading: SectionSkeleton,
+})
 
 const RecurringRevenueSection = dynamic(
   () =>

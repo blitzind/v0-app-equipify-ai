@@ -8,6 +8,7 @@ import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widge
 import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { blitzpayFccHref } from "@/lib/navigation/blitzpay-financial-command-center-nav"
 
 function fmtMoney(cents: number): string {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100)
@@ -109,7 +110,7 @@ export function BlitzpayCollectionsCopilotPanel({ organizationId, orgReady }: Pr
               <Link href="/communications">Communications</Link>
             </Button>
             <Button asChild variant="secondary" size="sm" className="h-7 text-[11px]">
-              <Link href="/settings/payments#blitzpay-recurring-revenue-anchor">Recurring revenue</Link>
+              <Link href={blitzpayFccHref("recurring-revenue")}>Recurring revenue</Link>
             </Button>
           </div>
 

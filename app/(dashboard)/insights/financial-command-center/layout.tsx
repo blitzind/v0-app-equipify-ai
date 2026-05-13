@@ -14,6 +14,7 @@ import {
   NAV_PRIMARY_ROW_MOTION,
   NAV_ROW_INACTIVE_HOVER_CARD,
 } from "@/lib/navigation-chrome"
+import { BlitzpayFccSectionHost } from "./blitzpay-fcc-section-host"
 
 export default function FinancialCommandCenterLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -87,7 +88,10 @@ export default function FinancialCommandCenterLayout({ children }: { children: R
           })}
         </nav>
 
-        <div className="flex-1 min-w-0 max-w-full overflow-x-hidden pb-24 md:pb-6">{children}</div>
+        <div className="flex-1 min-w-0 max-w-full overflow-x-hidden pb-24 md:pb-6">
+          <BlitzpayFccSectionHost />
+          {children}
+        </div>
       </div>
     </div>
   )
