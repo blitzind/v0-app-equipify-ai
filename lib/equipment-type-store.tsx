@@ -94,15 +94,19 @@ export function EquipmentTypeProvider({ children }: { children: ReactNode }) {
         .from("equipment")
         .select("category")
         .eq("organization_id", organizationId)
-        .eq("is_archived", false)
-
-      if (eErr) throw new Error(eErr.message)
+        .is("archived_at", null)
 
       const usage = new Map<string, number>()
-      for (const row of eq ?? []) {
-        const c = (row as { category?: string | null }).category?.trim()
-        if (!c) continue
-        usage.set(c, (usage.get(c) ?? 0) + 1)
+      if (eErr) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[equipment-type-store] usage counts skipped:", eErr.message)
+        }
+      } else {
+        for (const row of eq ?? []) {
+          const c = (row as { category?: string | null }).category?.trim()
+          if (!c) continue
+          usage.set(c, (usage.get(c) ?? 0) + 1)
+        }
       }
 
       setTypes(mapEquipmentTypeRows(list, usage))
