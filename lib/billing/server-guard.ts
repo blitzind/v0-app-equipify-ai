@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { equipmentSaveServerDebug } from "@/lib/billing/equipment-save-server-debug"
+import { describeUnknownThrown, normalizeUnknownServerError } from "@/lib/billing/normalize-unknown-server-error"
 import { canUseFeature, type Feature } from "@/lib/billing/entitlements"
 import {
   evaluateEquipmentCreate,
@@ -94,7 +95,7 @@ export async function loadOrgBillingContext(supabase: SupabaseClient, organizati
     equipmentSaveServerDebug("stage_org_subscription_read_threw", {
       helper: "loadOrgBillingContext",
       organizationId,
-      message: e instanceof Error ? e.message : String(e),
+      message: `${e instanceof Error ? e.message : String(e)}|diag=${describeUnknownThrown(e)}`,
     })
     subscription = null
   }
@@ -119,7 +120,7 @@ export async function loadOrgBillingContext(supabase: SupabaseClient, organizati
     equipmentSaveServerDebug("stage_usage_with_limits_threw", {
       helper: "loadOrgBillingContext",
       organizationId,
-      message: e instanceof Error ? e.message : String(e),
+      message: `${e instanceof Error ? e.message : String(e)}|diag=${describeUnknownThrown(e)}`,
     })
     usagePack = null
     usageLoadFailed = true
@@ -142,7 +143,7 @@ export async function loadOrgBillingContext(supabase: SupabaseClient, organizati
     equipmentSaveServerDebug("stage_seat_metrics_threw", {
       helper: "loadOrgBillingContext",
       organizationId,
-      message: e instanceof Error ? e.message : String(e),
+      message: `${e instanceof Error ? e.message : String(e)}|diag=${describeUnknownThrown(e)}`,
     })
     seatSlotsUsed = null
   }
@@ -179,7 +180,7 @@ async function supportSessionOrFalse(
     equipmentSaveServerDebug("support_session_threw_in_membership", {
       helper: "verifyActiveMembership",
       organizationId,
-      message: `${reason}:${e instanceof Error ? e.message : String(e)}`,
+      message: `${reason}:${e instanceof Error ? e.message : String(e)}|diag=${describeUnknownThrown(e)}`,
     })
     return false
   }
@@ -215,7 +216,7 @@ async function verifyActiveMembership(
     equipmentSaveServerDebug("membership_query_throw", {
       helper: "verifyActiveMembership",
       organizationId,
-      message: e instanceof Error ? e.message : String(e),
+      message: `${e instanceof Error ? e.message : String(e)}|diag=${describeUnknownThrown(e)}`,
     })
     return {
       ok: false,
@@ -267,7 +268,7 @@ function logCreateGateFailure(
   equipmentSaveServerDebug(phase, {
     helper: "requireCanCreateRecord",
     organizationId: meta.organizationId,
-    message: e instanceof Error ? e.message : String(e),
+    message: `${e instanceof Error ? e.message : String(e)}|diag=${describeUnknownThrown(e)}`,
   })
 }
 
@@ -394,12 +395,7 @@ export async function requireCanCreateRecord(
     return rules
   } catch (e) {
     logCreateGateFailure("requireCanCreateRecord", e, { organizationId, recordType })
-    return {
-      ok: false,
-      code: "membership_error",
-      message: "Could not verify create permission for this workspace. Try again or contact support.",
-      httpStatus: 500,
-    }
+    return normalizeUnknownServerError(e)
   }
 }
 
@@ -419,12 +415,7 @@ export async function requireCanCreateRecordForOrganization(
     })
   } catch (e) {
     logCreateGateFailure("requireCanCreateRecordForOrganization", e, { organizationId, recordType })
-    return {
-      ok: false,
-      code: "membership_error",
-      message: "Could not verify create permission for this workspace.",
-      httpStatus: 500,
-    }
+    return normalizeUnknownServerError(e)
   }
 }
 
@@ -463,14 +454,9 @@ function applyCreateRules(
   } catch (e) {
     equipmentSaveServerDebug("apply_create_rules_throw", {
       helper: "applyCreateRules",
-      message: e instanceof Error ? e.message : String(e),
+      message: `${e instanceof Error ? e.message : String(e)}|diag=${describeUnknownThrown(e)}`,
     })
-    return {
-      ok: false,
-      code: "membership_error",
-      message: "Could not evaluate create rules for this workspace. Try again or contact support.",
-      httpStatus: 500,
-    }
+    return normalizeUnknownServerError(e)
   }
 }
 
@@ -497,12 +483,7 @@ export async function requireFeatureAccess(
     }
   } catch (e) {
     logCreateGateFailure("requireFeatureAccess", e, { organizationId })
-    return {
-      ok: false,
-      code: "feature_denied",
-      message: "Could not verify plan access. Try again or contact support.",
-      httpStatus: 500,
-    }
+    return normalizeUnknownServerError(e)
   }
 }
 
@@ -548,12 +529,7 @@ export async function requireWithinPlanLimit(
     )
   } catch (e) {
     logCreateGateFailure("requireWithinPlanLimit", e, { organizationId })
-    return {
-      ok: false,
-      code: "usage_unavailable",
-      message: "Could not verify plan limits. Try again in a moment.",
-      httpStatus: 503,
-    }
+    return normalizeUnknownServerError(e)
   }
 }
 
@@ -575,11 +551,6 @@ export async function requireMaintenancePlanCreate(
     })
   } catch (e) {
     logCreateGateFailure("requireMaintenancePlanCreate", e, { organizationId })
-    return {
-      ok: false,
-      code: "membership_error",
-      message: "Could not verify maintenance plan permission. Try again or contact support.",
-      httpStatus: 500,
-    }
+    return normalizeUnknownServerError(e)
   }
 }
