@@ -16,9 +16,19 @@
  *     Postgres trigger raises `23514` which we surface as a friendly error.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import { X } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Check, ChevronsUpDown, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { missingCustomerHierarchyColumns } from "@/lib/customers/postgrest-fallback"
 import {
@@ -76,6 +86,8 @@ type Props = {
 
 type ParentOption = { id: string; company_name: string }
 
+const HIERARCHY_POPOVER_Z = "z-[120]"
+
 const SECTION_HEADER =
   "text-xs font-semibold uppercase tracking-wider text-muted-foreground"
 
@@ -97,6 +109,9 @@ export function ManageHierarchyDialog({
   const [sameAsService, setSameAsService] = useState(true)
   const [billingLocationId, setBillingLocationId] = useState<string | null>(null)
   const billingLocationSnapshotOnOpen = useRef<string | null>(null)
+  /** Last parent id we applied billing fields from; avoids clobbering manual edits until parent changes again. */
+  const lastBillingAutofillParentIdRef = useRef<string | null>(null)
+  const [parentPopoverOpen, setParentPopoverOpen] = useState(false)
   const [attention, setAttention] = useState("")
   const [contactName, setContactName] = useState("")
   const [email, setEmail] = useState("")
@@ -160,7 +175,113 @@ export function ManageHierarchyDialog({
     setDefaultTaxCategory(initialBilling.defaultTaxCategory ?? "")
     setNotes(initialBilling.notes ?? "")
     setError(null)
+    lastBillingAutofillParentIdRef.current = initialParent?.id ?? ""
   }, [open, initialParent?.id, initialBilling])
+
+  const applyBillingFieldsFromParentRow = useCallback(
+    (row: {
+      billing_address_same_as_service: boolean | null
+      billing_name: string | null
+      billing_attention: string | null
+      billing_contact_name: string | null
+      billing_email: string | null
+      billing_contact_phone: string | null
+      billing_address_line1: string | null
+      billing_address_line2: string | null
+      billing_city: string | null
+      billing_state: string | null
+      billing_postal_code: string | null
+      billing_country: string | null
+      billing_notes: string | null
+    }) => {
+      const same = row.billing_address_same_as_service !== false
+      setBillingName(row.billing_name ?? "")
+      setAttention(row.billing_attention ?? "")
+      setContactName(row.billing_contact_name ?? "")
+      setEmail(row.billing_email ?? "")
+      setPhone(row.billing_contact_phone ?? "")
+      setCountry(row.billing_country ?? "")
+      setNotes(row.billing_notes ?? "")
+      setSameAsService(same)
+      if (same) {
+        setBillingLocationId(billingLocationSnapshotOnOpen.current)
+        setLine1("")
+        setLine2("")
+        setCity("")
+        setState("")
+        setPostalCode("")
+      } else {
+        setBillingLocationId(null)
+        setLine1(row.billing_address_line1 ?? "")
+        setLine2(row.billing_address_line2 ?? "")
+        setCity(row.billing_city ?? "")
+        setState(row.billing_state ?? "")
+        setPostalCode(row.billing_postal_code ?? "")
+      }
+    },
+    [],
+  )
+
+  // When the user picks a different parent account, copy that parent's stored billing fields.
+  useEffect(() => {
+    if (!open) return
+    const trimmed = parentId.trim()
+    if (!trimmed) {
+      lastBillingAutofillParentIdRef.current = ""
+      return
+    }
+    if (trimmed === lastBillingAutofillParentIdRef.current) return
+    lastBillingAutofillParentIdRef.current = trimmed
+
+    let cancelled = false
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const { data, error } = await supabase
+        .from("customers")
+        .select(
+          [
+            "billing_address_same_as_service",
+            "billing_name",
+            "billing_attention",
+            "billing_contact_name",
+            "billing_email",
+            "billing_contact_phone",
+            "billing_address_line1",
+            "billing_address_line2",
+            "billing_city",
+            "billing_state",
+            "billing_postal_code",
+            "billing_country",
+            "billing_notes",
+          ].join(", "),
+        )
+        .eq("organization_id", organizationId)
+        .eq("id", trimmed)
+        .maybeSingle()
+      if (cancelled) return
+      if (error || !data) return
+      applyBillingFieldsFromParentRow(
+        data as {
+          billing_address_same_as_service: boolean | null
+          billing_name: string | null
+          billing_attention: string | null
+          billing_contact_name: string | null
+          billing_email: string | null
+          billing_contact_phone: string | null
+          billing_address_line1: string | null
+          billing_address_line2: string | null
+          billing_city: string | null
+          billing_state: string | null
+          billing_postal_code: string | null
+          billing_country: string | null
+          billing_notes: string | null
+        },
+      )
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, parentId, organizationId, applyBillingFieldsFromParentRow])
 
   // Load parent candidates: other active, non-archived customers in the same org.
   useEffect(() => {
@@ -193,6 +314,14 @@ export function ManageHierarchyDialog({
     () => parentOptions.filter((p) => p.id !== customerId),
     [parentOptions, customerId],
   )
+
+  const selectedParentLabel = useMemo(() => {
+    if (!parentId.trim()) return "No parent — top-level account"
+    const fromList = filteredParentOptions.find((p) => p.id === parentId)
+    if (fromList) return fromList.company_name
+    if (initialParent?.id === parentId) return initialParent.companyName
+    return "Selected parent account"
+  }, [parentId, filteredParentOptions, initialParent])
 
   if (!open) return null
 
@@ -313,23 +442,67 @@ export function ManageHierarchyDialog({
         >
           {/* Parent account */}
           <section className="space-y-2">
-            <label className={SECTION_HEADER} htmlFor="hierarchy-parent">
-              Parent account
-            </label>
-            <select
-              id="hierarchy-parent"
-              value={parentId}
-              onChange={(e) => setParentId(e.target.value)}
-              disabled={parentLoading || schemaMissing}
-              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
-            >
-              <option value="">No parent — top-level account</option>
-              {filteredParentOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.company_name}
-                </option>
-              ))}
-            </select>
+            <span className={SECTION_HEADER}>Parent account</span>
+            <Popover open={parentPopoverOpen} onOpenChange={setParentPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={parentPopoverOpen}
+                  disabled={parentLoading || schemaMissing}
+                  className="h-9 w-full justify-between font-normal"
+                >
+                  <span className="truncate">{selectedParentLabel}</span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className={cn("w-[var(--radix-popover-trigger-width)] p-0", HIERARCHY_POPOVER_Z)}
+                align="start"
+              >
+                <Command>
+                  <CommandInput placeholder="Search parent accounts…" />
+                  <CommandList>
+                    <CommandEmpty>
+                      {parentLoading ? "Loading parent accounts…" : "No matching parent account."}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="__no_parent"
+                        onSelect={() => {
+                          setParentId("")
+                          setParentPopoverOpen(false)
+                        }}
+                      >
+                        <Check
+                          className={cn("mr-2 h-4 w-4", !parentId.trim() ? "opacity-100" : "opacity-0")}
+                        />
+                        <span className="truncate">No parent — top-level account</span>
+                      </CommandItem>
+                      {filteredParentOptions.map((p) => (
+                        <CommandItem
+                          key={p.id}
+                          value={`${p.company_name} ${p.id}`}
+                          onSelect={() => {
+                            setParentId(p.id)
+                            setParentPopoverOpen(false)
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              parentId === p.id ? "opacity-100" : "opacity-0",
+                            )}
+                          />
+                          <span className="truncate">{p.company_name}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             <p className="text-[11px] text-muted-foreground">
               Linking to a parent enables consolidated reporting and a clear
               hierarchy in the customer list.
