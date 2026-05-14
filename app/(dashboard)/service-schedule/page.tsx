@@ -61,6 +61,10 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
+import {
+  loadTechnicianAssignOptions,
+  toScheduleAssigneePickerOptions,
+} from "@/lib/work-orders/load-technician-assign-options"
 import { buildSchedulePatch } from "@/lib/work-orders/schedule-patch"
 import { emitSchedulingEvent } from "@/lib/dispatch/scheduling-events-client"
 import { DRAWER_BACKDROP_Z, EQUIPIFY_SCRIM } from "@/components/detail-drawer"
@@ -2245,18 +2249,9 @@ function ServiceSchedulePageInner() {
       setScheduledWoRows(list.map((row) => byId.get(row.id)).filter((row): row is ScheduledWoRowView => Boolean(row)))
       setUnassignedWoRows(unassignedList.map((row) => byId.get(row.id)).filter((row): row is ScheduledWoRowView => Boolean(row)))
 
-      const { data: techRows } = await supabase
-        .from("technicians")
-        .select("id, full_name")
-        .eq("organization_id", orgId)
-        .eq("operational_status", "active")
-        .order("full_name", { ascending: true })
-      setAssignTechnicians(
-        ((techRows as Array<{ id: string; full_name: string | null }> | null) ?? []).map((tech) => ({
-          id: tech.id,
-          label: tech.full_name?.trim() || "Technician",
-        })),
-      )
+      const assignOpts = await loadTechnicianAssignOptions(supabase, orgId)
+      if (!active) return
+      setAssignTechnicians(toScheduleAssigneePickerOptions(assignOpts))
       setScheduledWoLoading(false)
     }
 

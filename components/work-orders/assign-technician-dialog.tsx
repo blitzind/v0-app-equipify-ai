@@ -56,7 +56,7 @@ export function AssignTechnicianDialog({
           <div className="space-y-2 pb-2 pr-3">
             {options.length === 0 ? (
               <p className="text-sm text-muted-foreground py-6 text-center">
-                No technicians found in this organization.
+                No assignees found in this organization.
               </p>
             ) : (
               options.map((opt) => {

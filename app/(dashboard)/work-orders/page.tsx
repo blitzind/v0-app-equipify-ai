@@ -34,6 +34,10 @@ import {
   missingOperationalBillingColumns,
   missingWorkOrderNumberColumn,
 } from "@/lib/work-orders/postgrest-fallback"
+import {
+  loadTechnicianAssignOptions,
+  toScheduleAssigneePickerOptions,
+} from "@/lib/work-orders/load-technician-assign-options"
 
 const UUID_PARAM =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -1060,19 +1064,9 @@ function WorkOrdersPageInner() {
     let active = true
     const supabase = createBrowserSupabaseClient()
     void (async () => {
-      const { data } = await supabase
-        .from("technicians")
-        .select("id, full_name")
-        .eq("organization_id", activeOrgId)
-        .eq("active", true)
-        .order("full_name")
+      const opts = await loadTechnicianAssignOptions(supabase, activeOrgId)
       if (!active) return
-      setQuickAppointmentTechnicians(
-        ((data as Array<{ id: string; full_name: string | null }> | null) ?? []).map((tech) => ({
-          id: tech.id,
-          label: tech.full_name?.trim() || "Technician",
-        })),
-      )
+      setQuickAppointmentTechnicians(toScheduleAssigneePickerOptions(opts))
     })()
     return () => {
       active = false

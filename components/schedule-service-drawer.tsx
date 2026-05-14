@@ -5,6 +5,10 @@ import type { WorkOrderType, WorkOrderPriority } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
+import {
+  loadTechnicianAssignOptions,
+  toScheduleAssigneePickerOptions,
+} from "@/lib/work-orders/load-technician-assign-options"
 import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -236,39 +240,9 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
 
       if (!cancelled) setCustomerOptions((custRows as CustomerOption[]) ?? [])
 
-      const { data: memberRows, error: memberError } = await supabase
-        .from("organization_members")
-        .select("user_id")
-        .eq("organization_id", orgId)
-        .eq("status", "active")
-        .in("role", ["owner", "admin", "manager", "tech"])
-
-      if (memberError || cancelled) {
-        if (!cancelled && memberError) setLoadError(memberError.message)
-        return
-      }
-
-      const userIds = [...new Set((memberRows ?? []).map((m: { user_id: string }) => m.user_id))]
-      let techOptions: TechnicianOption[] = []
-
-      if (userIds.length > 0) {
-        const { data: profRows } = await supabase
-          .from("profiles")
-          .select("id, full_name, email")
-          .in("id", userIds)
-
-        techOptions =
-          ((profRows as Array<{ id: string; full_name: string | null; email: string | null }> | null) ?? []).map(
-            (p) => ({
-              id: p.id,
-              label:
-                (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Team member",
-            })
-          )
-        techOptions.sort((a, b) => a.label.localeCompare(b.label))
-      }
-
-      if (!cancelled) setTechnicianOptions(techOptions)
+      const assignOpts = await loadTechnicianAssignOptions(supabase, orgId)
+      if (cancelled) return
+      if (!cancelled) setTechnicianOptions(toScheduleAssigneePickerOptions(assignOpts))
     })()
 
     return () => {

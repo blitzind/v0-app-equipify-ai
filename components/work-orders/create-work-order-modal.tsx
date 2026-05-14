@@ -22,6 +22,7 @@ import {
 import type { WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
+import { loadTechnicianAssignOptions } from "@/lib/work-orders/load-technician-assign-options"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
@@ -168,41 +169,14 @@ export function CreateWorkOrderModal({
 
       if (!cancelled) setCustomers((custRows as CustomerOption[]) ?? [])
 
-      const { data: memberRows, error: memberError } = await supabase
-        .from("organization_members")
-        .select("user_id")
-        .eq("organization_id", orgId)
-        .eq("status", "active")
-        .in("role", ["owner", "admin", "manager", "tech"])
+      const assignOpts = await loadTechnicianAssignOptions(supabase, orgId)
+      if (cancelled) return
 
-      if (memberError || cancelled) {
-        if (!cancelled && memberError) setLoadError(memberError.message)
-        return
-      }
-
-      const userIds = [...new Set((memberRows ?? []).map((m: { user_id: string }) => m.user_id))]
-      let techOptions: TechnicianOption[] = []
-
-      if (userIds.length > 0) {
-        const { data: profRows } = await supabase
-          .from("profiles")
-          .select("id, full_name, email, avatar_url")
-          .in("id", userIds)
-
-        techOptions =
-          ((profRows as Array<{
-            id: string
-            full_name: string | null
-            email: string | null
-            avatar_url: string | null
-          }> | null) ?? []).map((p) => ({
-            id: p.id,
-            label:
-              (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Team member",
-            avatarUrl: p.avatar_url?.trim() || null,
-          }))
-        techOptions.sort((a, b) => a.label.localeCompare(b.label))
-      }
+      const techOptions: TechnicianOption[] = assignOpts.map((o) => ({
+        id: o.id,
+        label: o.label,
+        avatarUrl: o.avatarUrl ?? undefined,
+      }))
 
       if (!cancelled) setTechnicians(techOptions)
     })()
