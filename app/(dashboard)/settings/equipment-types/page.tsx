@@ -362,36 +362,39 @@ function TypeRow({ type }: { type: EquipmentType }) {
           {!confirmDelete ? (
             <button
               onClick={() => {
-                if (type.isDefault) return
                 setConfirmDelete(true)
                 setEditing(false)
               }}
-              disabled={type.isDefault}
-              className={cn(
-                "w-7 h-7 rounded-md flex items-center justify-center transition-colors",
-                type.isDefault
-                  ? "text-muted-foreground/30 cursor-not-allowed"
-                  : "text-muted-foreground hover:text-destructive hover:bg-destructive/8"
-              )}
-              title={type.isDefault ? "Default types cannot be deleted" : "Delete"}
+              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/8 transition-colors"
+              title={type.isDefault ? "Remove from workspace (archive)" : "Delete"}
             >
               <Trash2 size={13} />
             </button>
           ) : (
-            <div className="flex items-center gap-1 ml-1">
-              <span className="text-xs text-destructive font-medium">Delete?</span>
-              <button
-                onClick={() => void handleDelete()}
-                className="w-6 h-6 rounded flex items-center justify-center text-destructive hover:bg-destructive/10 transition-colors"
-              >
-                <Check size={11} />
-              </button>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors"
-              >
-                <X size={11} />
-              </button>
+            <div className="flex flex-col items-end gap-1.5 ml-1 max-w-[min(20rem,70vw)]">
+              {type.usageCount > 0 ? (
+                <p className="text-[11px] text-muted-foreground text-right leading-snug">
+                  Used on {type.usageCount} equipment record{type.usageCount === 1 ? "" : "s"}. Those assets keep
+                  their category text; this type is only removed from pickers until you add it again or reset
+                  industry defaults.
+                </p>
+              ) : null}
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-destructive font-medium">Archive?</span>
+                <button
+                  onClick={() => void handleDelete()}
+                  className="w-6 h-6 rounded flex items-center justify-center text-destructive hover:bg-destructive/10 transition-colors"
+                  title="Confirm archive"
+                >
+                  <Check size={11} />
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors"
+                >
+                  <X size={11} />
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -422,7 +425,7 @@ export default function EquipmentTypesPage() {
     }
     if (
       !confirm(
-        "Replace all built-in (Default) equipment types with templates for your workspace industry? Custom types are kept. Edits to default types (name, icon, color, description) will be lost.",
+        "Replace all active built-in (Default) equipment types with fresh templates for your workspace industry? Custom types are kept. Any default types you archived or edited are superseded—archived defaults can come back from this reset.",
       )
     ) {
       return
@@ -434,7 +437,7 @@ export default function EquipmentTypesPage() {
       toast({ variant: "destructive", title: "Could not reset defaults", description: r.message })
       return
     }
-    toast({ title: "Default types refreshed", description: "Built-in types were reset from your industry templates." })
+    toast({ title: "Default types refreshed", description: "Built-in types were reset from your industry templates (including any you had archived)." })
     await refresh()
   }
 
@@ -507,7 +510,7 @@ export default function EquipmentTypesPage() {
       {/* Default types */}
       <SettingCard
         title="Default types"
-        description="Built-in equipment categories. You can edit names, icons, and colors but not delete them."
+        description="Industry starter categories. You can edit names, icons, and colors, or archive any you do not use. Equipment already tagged keeps its category text in lists and forms. Use “Reset default types to industry templates” below to bring the full starter set back."
       >
         <div className="flex flex-col gap-2">
           {defaults.map((t) => <TypeRow key={t.id} type={t} />)}
@@ -517,7 +520,7 @@ export default function EquipmentTypesPage() {
       {/* Custom types */}
       <SettingCard
         title="Custom types"
-        description="Add your own equipment categories. Custom types can be edited or deleted at any time."
+        description="Add your own equipment categories. Custom types can be edited or archived like defaults."
       >
         <div className="flex flex-col gap-2">
           {custom.length === 0 && (

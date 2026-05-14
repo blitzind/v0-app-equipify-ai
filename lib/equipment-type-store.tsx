@@ -242,7 +242,7 @@ export function EquipmentTypeProvider({ children }: { children: ReactNode }) {
               .update({ archived_at: new Date().toISOString() })
               .eq("id", action.payload.id)
               .eq("organization_id", organizationId)
-              .eq("is_seed", false)
+              .is("archived_at", null)
             if (dErr) throw new Error(dErr.message)
             break
           }
