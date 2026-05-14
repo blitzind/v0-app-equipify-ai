@@ -1,19 +1,8 @@
 "use client"
 
 import type { ReactNode } from "react"
-import type { SessionIdentity } from "@/lib/session-identity"
-import { AdminProvider } from "@/lib/admin-store"
 
-export function AdminLayoutClient({
-  children,
-  initialSessionIdentity,
-}: {
-  children: ReactNode
-  initialSessionIdentity: SessionIdentity
-}) {
-  return (
-    <AdminProvider initialSessionIdentity={initialSessionIdentity}>
-      {children}
-    </AdminProvider>
-  )
+/** Reserved for client-only admin shell wiring; layout composes children directly. */
+export function AdminLayoutClient({ children }: { children: ReactNode }) {
+  return <>{children}</>
 }

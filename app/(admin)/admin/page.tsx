@@ -2029,7 +2029,17 @@ export default function PlatformAdminPage() {
   const trialPipelineValue = kpi?.trialPipelineMrrCents
   const newAccountsLast30Days = kpi?.newAccountsLast30Days
 
-  function handleImpersonate(account: PlatformAccount) {
+  async function handleImpersonate(account: PlatformAccount) {
+    const res = await fetch("/api/platform/support-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ organizationId: account.id }),
+    })
+    const body = (await res.json().catch(() => ({}))) as { message?: string }
+    if (!res.ok) {
+      window.alert(typeof body.message === "string" && body.message.trim() ? body.message : "Could not open workspace.")
+      return
+    }
     startImpersonation(account)
     router.push("/")
   }

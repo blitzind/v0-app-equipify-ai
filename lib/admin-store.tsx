@@ -19,7 +19,9 @@ interface AdminContextValue {
   sessionIdentityLoading: boolean
   impersonation: ImpersonationState
   startImpersonation: (account: PlatformAccount) => void
-  endImpersonation: () => void
+  endImpersonation: () => Promise<void>
+  /** Server gate for `/admin` — hydrates global session before client fetch. */
+  seedPlatformSessionIdentity: (identity: SessionIdentity) => void
   /** Confirmed after bootstrap: session user email is in EQUIPIFY_PLATFORM_ADMIN_EMAILS (org role ignored). */
   isPlatformAdmin: boolean
   /** Show Platform Admin nav entry while loading or when confirmed platform admin (middleware still enforces /admin). */
@@ -39,24 +41,28 @@ function impersonationIdle(adminName: string, adminRole: string): ImpersonationS
   }
 }
 
-export function AdminProvider({
-  children,
-  initialSessionIdentity,
-}: {
-  children: React.ReactNode
-  /** Server-rendered session on `/admin`; omit on dashboard to bootstrap via API. */
-  initialSessionIdentity?: SessionIdentity | null
-}) {
-  const skipBootstrapFetch = initialSessionIdentity !== undefined
+type SupportSessionGetResponse =
+  | { active: false }
+  | {
+      active: true
+      organizationId: string
+      organizationName: string
+      organizationSlug: string
+      organizationStatus?: string
+      expiresAt: string
+    }
 
-  const [sessionIdentity, setSessionIdentity] = useState<SessionIdentity | null>(() =>
-    initialSessionIdentity !== undefined ? initialSessionIdentity ?? null : null,
-  )
+export function AdminProvider({ children }: { children: React.ReactNode }) {
+  const sessionSeededRef = useRef(false)
 
-  const [sessionIdentityLoading, setSessionIdentityLoading] = useState(!skipBootstrapFetch)
+  const [sessionIdentity, setSessionIdentity] = useState<SessionIdentity | null>(null)
+
+  const [sessionIdentityLoading, setSessionIdentityLoading] = useState(true)
 
   useEffect(() => {
-    if (skipBootstrapFetch) return
+    if (sessionSeededRef.current) {
+      return
+    }
 
     let cancelled = false
     ;(async () => {
@@ -84,7 +90,13 @@ export function AdminProvider({
     return () => {
       cancelled = true
     }
-  }, [skipBootstrapFetch])
+  }, [])
+
+  const seedPlatformSessionIdentity = useCallback((identity: SessionIdentity) => {
+    sessionSeededRef.current = true
+    setSessionIdentity(identity)
+    setSessionIdentityLoading(false)
+  }, [])
 
   const adminLabel = sessionIdentity?.displayName ?? "Platform admin"
   const adminRoleLabel = sessionIdentity?.platformRoleLabel ?? "Platform Admin"
@@ -103,6 +115,41 @@ export function AdminProvider({
   const sessionIdentityRef = useRef(sessionIdentity)
   sessionIdentityRef.current = sessionIdentity
 
+  /** Restore workspace banner from DB after refresh / new tab. */
+  useEffect(() => {
+    if (sessionIdentityLoading || !sessionIdentity?.platformAdmin) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/platform/support-session", { cache: "no-store" })
+        const data = (await res.json()) as SupportSessionGetResponse
+        if (cancelled) return
+        if (data.active) {
+          const sid = sessionIdentityRef.current
+          setImpersonation({
+            active: true,
+            accountId: data.organizationId,
+            accountName: data.organizationName?.trim() || "Organization",
+            accountSlug: data.organizationSlug?.trim() ? data.organizationSlug.trim() : null,
+            adminName: sid?.displayName ?? "Platform admin",
+            adminRole: sid?.platformRoleLabel ?? "Platform Admin",
+          })
+        } else {
+          setImpersonation((prev) =>
+            prev.active ? impersonationIdle(adminLabel, adminRoleLabel) : prev,
+          )
+        }
+      } catch {
+        /* ignore */
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [sessionIdentityLoading, sessionIdentity?.platformAdmin, adminLabel, adminRoleLabel])
+
   const startImpersonation = useCallback((account: PlatformAccount) => {
     const sid = sessionIdentityRef.current
     setImpersonation({
@@ -115,7 +162,12 @@ export function AdminProvider({
     })
   }, [])
 
-  const endImpersonation = useCallback(() => {
+  const endImpersonation = useCallback(async () => {
+    try {
+      await fetch("/api/platform/support-session", { method: "DELETE" })
+    } catch {
+      /* still clear local UI */
+    }
     setImpersonation(impersonationIdle(adminLabel, adminRoleLabel))
   }, [adminLabel, adminRoleLabel])
 
@@ -130,6 +182,7 @@ export function AdminProvider({
         impersonation,
         startImpersonation,
         endImpersonation,
+        seedPlatformSessionIdentity,
         isPlatformAdmin,
         platformAdminNavVisible,
       }}

@@ -84,11 +84,30 @@ export function OrgPermissionsProvider({ children }: { children: ReactNode }) {
       .eq("status", "active")
       .maybeSingle()
 
-    const r = (data as { role?: string } | null)?.role?.trim() ?? null
-    const p = (data as { permission_profile?: string | null } | null)?.permission_profile?.trim() ?? null
+    let r = (data as { role?: string } | null)?.role?.trim() ?? null
+    let p = (data as { permission_profile?: string | null } | null)?.permission_profile?.trim() ?? null
+    let j = (data as { permissions_json?: unknown } | null)?.permissions_json ?? null
+
+    if (!r) {
+      try {
+        const res = await fetch("/api/platform/support-session", { cache: "no-store" })
+        const d = (await res.json()) as {
+          active?: boolean
+          organizationId?: string
+        }
+        if (d.active && d.organizationId === organizationId) {
+          r = "owner"
+          p = null
+          j = null
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
     setRawRole(r)
     setRawProfile(p)
-    setPermissionsJson((data as { permissions_json?: unknown } | null)?.permissions_json ?? null)
+    setPermissionsJson(j)
     setLoadStatus("ready")
   }, [orgStatus, organizationId])
 

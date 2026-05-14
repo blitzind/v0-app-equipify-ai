@@ -1,7 +1,6 @@
 "use client"
 
 import React, { Suspense, useEffect, useState } from "react"
-import Link from "next/link"
 import { AidenChatLauncher } from "@/components/aiden/aiden-chat-launcher"
 import { AppSidebar, SidebarContext } from "@/components/app-sidebar"
 import { PageShell } from "@/components/page-shell"
@@ -23,8 +22,9 @@ import { ArchivedDashboardGate } from "@/components/archived-dashboard-gate"
 import { DashboardWorkspaceShell } from "@/components/dashboard-workspace-shell"
 import { FirstRunWelcomeGate } from "@/components/first-run/first-run-welcome-gate"
 import { ScreenshotModeGate } from "@/components/screenshot-mode-gate"
-import { AdminProvider, useAdmin } from "@/lib/admin-store"
-import { ShieldAlert, X, ArrowRight } from "lucide-react"
+import { useAdmin } from "@/lib/admin-store"
+import { ShieldAlert, ArrowRight } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 function debugDashboardShell(details: Record<string, unknown>) {
   if (process.env.NEXT_PUBLIC_DEBUG_NAV !== "true" && process.env.NODE_ENV !== "development") return
@@ -34,29 +34,36 @@ function debugDashboardShell(details: Record<string, unknown>) {
 // ─── Impersonation banner ─────────────────────────────────────────────────────
 
 function ImpersonationBanner() {
+  const router = useRouter()
   const { impersonation, endImpersonation } = useAdmin()
   if (!impersonation.active) return null
 
   return (
     <div
       data-screenshot-chrome="hide"
-      className="flex items-center gap-3 px-4 py-2 bg-[#7c3aed] text-white text-xs font-medium shrink-0"
+      className="flex flex-wrap items-center gap-3 px-4 py-2 bg-[#7c3aed] text-white text-xs font-medium shrink-0"
     >
       <ShieldAlert size={13} className="shrink-0" />
-      <span className="flex-1">
-        You are viewing{" "}
+      <span className="flex-1 min-w-[12rem]">
+        <span className="font-semibold">Platform admin support access</span>
+        {" — "}viewing{" "}
         <span className="font-bold">{impersonation.accountName}</span>
         {" "}as{" "}
         <span className="font-bold">{impersonation.adminRole}</span>
         {" "}({impersonation.adminName})
       </span>
-      <Link
-        href="/admin"
-        onClick={endImpersonation}
+      <button
+        type="button"
         className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/20 hover:bg-white/30 transition-colors whitespace-nowrap"
+        onClick={() => {
+          void (async () => {
+            await endImpersonation()
+            router.push("/admin")
+          })()
+        }}
       >
-        Exit session <ArrowRight size={11} />
-      </Link>
+        Back to Platform Admin <ArrowRight size={11} />
+      </button>
     </div>
   )
 }
@@ -71,7 +78,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [])
 
   return (
-    <AdminProvider>
+    <>
       <Suspense fallback={null}>
         <ScreenshotModeGate />
       </Suspense>
@@ -117,6 +124,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </OrgPermissionsProvider>
         </BillingAccessProvider>
       </ActiveOrganizationProvider>
-    </AdminProvider>
+    </>
   )
 }

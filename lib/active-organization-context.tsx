@@ -184,8 +184,33 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
     }
 
     const orgs = sortOrganizationsDemoFirst(normalizeOrgRows(memberRows as never))
-    setOrganizations(orgs)
-    const memberIds = new Set(orgs.map((o) => o.id))
+
+    let resolvedOrgs = orgs
+    if (orgs.length === 0 && isPlatformAdminRef.current) {
+      try {
+        const res = await fetch("/api/platform/support-session", { cache: "no-store" })
+        const d = (await res.json()) as {
+          active?: boolean
+          organizationId?: string
+          organizationName?: string
+          organizationSlug?: string
+        }
+        if (d.active && d.organizationId) {
+          resolvedOrgs = [
+            {
+              id: d.organizationId,
+              name: (d.organizationName ?? "").trim() || "Organization",
+              slug: (d.organizationSlug ?? "").trim(),
+            },
+          ]
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    setOrganizations(resolvedOrgs)
+    const memberIds = new Set(resolvedOrgs.map((o) => o.id))
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -209,13 +234,13 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
         ? stored
         : profile?.default_organization_id && memberIds.has(profile.default_organization_id)
           ? profile.default_organization_id
-          : orgs[0]?.id ?? null
+          : resolvedOrgs[0]?.id ?? null
 
     if (chosen && !memberIds.has(chosen)) {
-      chosen = orgs[0]?.id ?? null
+      chosen = resolvedOrgs[0]?.id ?? null
     }
 
-    const row = chosen ? orgs.find((o) => o.id === chosen) ?? null : null
+    const row = chosen ? resolvedOrgs.find((o) => o.id === chosen) ?? null : null
     setOrganizationId(chosen)
     setOrganizationSlug(row?.slug ?? null)
     setOrganizationName(row?.name ?? null)
@@ -262,6 +287,32 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
       if (!user) {
         setSwitching(false)
         return { error: "Not signed in." }
+      }
+
+      const { data: memActive } = await supabase
+        .from("organization_members")
+        .select("id")
+        .eq("organization_id", orgId)
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .maybeSingle()
+
+      if (!memActive) {
+        try {
+          localStorage.setItem(STORAGE_KEY, orgId)
+        } catch {
+          /* ignore */
+        }
+        setOrganizationId(org.id)
+        setOrganizationSlug(org.slug)
+        setOrganizationName(org.name)
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("equipify:organization-changed", { detail: { organizationId: orgId } }),
+          )
+        }
+        setSwitching(false)
+        return {}
       }
 
       const { error: upErr } = await supabase
