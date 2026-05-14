@@ -1109,8 +1109,8 @@ function AccountsTab({
             <DialogTitle>Permanently delete organization</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            This removes the organization and related data. You cannot undo this. Blocked if there is an
-            active Stripe subscription or unpaid invoices.
+            This removes the organization and related data. You cannot undo this. Deletion is blocked when there is a
+            billable Stripe subscription (not trial) or customer invoices that still have a balance due.
           </p>
           {deleteTarget && (
             <p className="text-sm font-medium text-foreground">
