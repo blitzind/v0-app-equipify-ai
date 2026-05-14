@@ -12,7 +12,6 @@ import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
 import { CalendarPlus, Check, CheckCircle2, ChevronsUpDown, X } from "lucide-react"
 import { DRAWER_PANEL_SURFACE } from "@/components/detail-drawer"
-import { BR_STACK_CLEAR_AIDEN } from "@/lib/layout/aiden-safe-area"
 import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
@@ -48,7 +47,7 @@ const STATUSES = ["Active", "Needs Service", "In Repair", "Out of Service"] as c
 type EquipmentStatus = (typeof STATUSES)[number]
 type CustomerOption = { id: string; company_name: string }
 
-/** Popover must stack above Add Equipment shell (`z-[230]`) and in-modal toasts (`z-[240]`). */
+/** Popover must stack above Add Equipment dialog (`z-[231]`) and in-modal toasts (`z-[240]`). */
 const ADD_EQUIPMENT_CUSTOMER_POPOVER_Z = "z-[245]"
 
 function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
@@ -91,9 +90,48 @@ type FormErrors = Partial<Record<keyof FormState, string>>
 function validate(form: FormState): FormErrors {
   const errors: FormErrors = {}
   if (!form.name.trim()) errors.name = "Equipment name is required"
-  if (!form.equipmentType) errors.equipmentType = "Equipment type is required"
-  if (!form.customerId) errors.customerId = "Customer is required"
+  if (!form.equipmentType.trim()) errors.equipmentType = "Equipment type is required"
+  if (!form.customerId.trim()) errors.customerId = "Customer is required"
   return errors
+}
+
+/** Normalize optional date fields for Postgres `date` columns (expects `YYYY-MM-DD`). */
+function normalizeOptionalDateInput(raw: string): string | null {
+  const s = raw.trim()
+  if (!s) return null
+  const iso = s.match(/^(\d{4}-\d{2}-\d{2})/)
+  if (iso) return iso[1]
+  const t = Date.parse(s)
+  if (!Number.isNaN(t)) {
+    const d = new Date(t)
+    const y = d.getFullYear()
+    const mo = String(d.getMonth() + 1).padStart(2, "0")
+    const da = String(d.getDate()).padStart(2, "0")
+    return `${y}-${mo}-${da}`
+  }
+  return null
+}
+
+/** Non-empty text that is not a valid calendar date (for field-level errors). */
+function optionalDateFieldError(raw: string): string | undefined {
+  const s = raw.trim()
+  if (!s) return undefined
+  return normalizeOptionalDateInput(s) === null
+    ? "Use a valid date (calendar or YYYY-MM-DD)."
+    : undefined
+}
+
+function friendlyInsertError(message: string): string {
+  const m = message.trim()
+  if (!m) return "Could not save equipment. Please try again."
+  if (m.includes("violates foreign key")) {
+    return "Save failed: linked customer or site is no longer valid. Pick the customer again and retry."
+  }
+  if (m.includes("invalid input syntax for type date")) {
+    return "Save failed: a date field was not in YYYY-MM-DD form. Clear the date or re-pick it from the calendar."
+  }
+  if (m.length > 220) return `${m.slice(0, 217)}…`
+  return m
 }
 
 export function AddEquipmentModal({
@@ -113,7 +151,7 @@ export function AddEquipmentModal({
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false)
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [errors, setErrors] = useState<FormErrors>({})
-  const [toastMsg, setToastMsg] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [postSave, setPostSave] = useState<{ customerId: string; equipmentId: string } | null>(null)
   const [serviceSiteOptions, setServiceSiteOptions] = useState<Array<{ id: string; label: string }>>([])
@@ -152,6 +190,7 @@ export function AddEquipmentModal({
       ...(prefilledCustomerId ? { customerId: prefilledCustomerId } : {}),
     })
     setErrors({})
+    setSaveError(null)
   }, [open, prefilledCustomerId])
 
   useEffect(() => {
@@ -198,8 +237,8 @@ export function AddEquipmentModal({
       setServiceSiteOptions(opts)
       setForm((prev) => {
         if (opts.length === 0) return { ...prev, serviceSiteId: "" }
-        const stillValid = opts.some((o) => o.id === prev.serviceSiteId)
-        if (stillValid) return prev
+        if (opts.some((o) => o.id === prev.serviceSiteId)) return prev
+        if (!prev.serviceSiteId.trim()) return { ...prev, serviceSiteId: "" }
         const def = rows.find((r) => r.is_default)?.id ?? opts[0]?.id ?? ""
         return { ...prev, serviceSiteId: def }
       })
@@ -219,15 +258,19 @@ export function AddEquipmentModal({
     return "Selected customer"
   }, [form.customerId, customers, customersLoading])
 
+  /**
+   * After types load, clear a draft type only if it does not match any DB-backed type name.
+   * Skip while the list is empty during fetch — otherwise Safari/slow networks clear the user's pick.
+   */
   useEffect(() => {
-    if (!open) return
+    if (!open || equipmentTypesLoading || orgEquipmentTypes.length === 0) return
     setForm((prev) => {
       const v = prev.equipmentType.trim()
       if (!v) return prev
       if (orgEquipmentTypes.some((t) => t.name === v)) return prev
       return { ...prev, equipmentType: "" }
     })
-  }, [open, orgEquipmentTypes])
+  }, [open, equipmentTypesLoading, orgEquipmentTypes])
 
   function set(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -238,6 +281,7 @@ export function AddEquipmentModal({
     setPostSave(null)
     setForm(INITIAL_FORM)
     setErrors({})
+    setSaveError(null)
     setCustomerPopoverOpen(false)
     onClose()
   }
@@ -254,9 +298,26 @@ export function AddEquipmentModal({
   }
 
   async function handleSave() {
+    setSaveError(null)
     const errs = validate(form)
+    const dateKeys = [
+      "installDate",
+      "warrantyExpiration",
+      "lastServiceDate",
+      "nextServiceDue",
+      "nextCalibrationDue",
+    ] as const satisfies readonly (keyof FormState)[]
+    for (const key of dateKeys) {
+      const msg = optionalDateFieldError(form[key])
+      if (msg) errs[key] = msg
+    }
     if (Object.keys(errs).length > 0) {
       setErrors(errs)
+      toast({
+        variant: "destructive",
+        title: "Fix the highlighted fields",
+        description: Object.values(errs).filter(Boolean).join(" · "),
+      })
       return
     }
 
@@ -275,98 +336,106 @@ export function AddEquipmentModal({
 
     setSaving(true)
     const supabase = createBrowserSupabaseClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-    if (!user) {
-      setSaving(false)
-      setToastMsg("You must be logged in.")
-      setTimeout(() => setToastMsg(null), 3500)
-      return
-    }
+      if (!user) {
+        const msg = "You must be logged in to save equipment."
+        setSaveError(msg)
+        toast({ variant: "destructive", title: "Sign in required", description: msg })
+        return
+      }
 
-    if (orgStatus !== "ready" || !activeOrgId) {
-      setSaving(false)
-      setToastMsg(
-        orgStatus === "ready" && !activeOrgId ? "No organization selected." : "Loading organization…"
-      )
-      setTimeout(() => setToastMsg(null), 3500)
-      return
-    }
+      if (orgStatus !== "ready" || !activeOrgId) {
+        const msg =
+          orgStatus === "ready" && !activeOrgId ? "No organization selected." : "Workspace is still loading. Try again in a moment."
+        setSaveError(msg)
+        toast({ variant: "destructive", title: "Cannot save yet", description: msg })
+        return
+      }
 
-    const statusMap: Record<EquipmentStatus, "active" | "needs_service" | "in_repair" | "out_of_service"> = {
-      Active: "active",
-      "Needs Service": "needs_service",
-      "In Repair": "in_repair",
-      "Out of Service": "out_of_service",
-    }
+      const statusMap: Record<EquipmentStatus, "active" | "needs_service" | "in_repair" | "out_of_service"> = {
+        Active: "active",
+        "Needs Service": "needs_service",
+        "In Repair": "in_repair",
+        "Out of Service": "out_of_service",
+      }
 
-    const { data: inserted, error } = await supabase
-      .from("equipment")
-      .insert({
-        organization_id: activeOrgId,
-        customer_id: form.customerId,
-        name: (form.model || form.name).trim(),
-        manufacturer: form.manufacturer.trim() || null,
-        category: form.equipmentType.trim(),
-        subcategory: form.subcategory.trim() || null,
-        serial_number: form.serialNumber.trim() || null,
-        status: statusMap[form.status],
-        install_date: form.installDate || null,
-        warranty_expires_at: form.warrantyExpiration || null,
-        last_service_at: form.lastServiceDate || null,
-        next_due_at: form.nextServiceDue || null,
-        next_calibration_due_at: form.nextCalibrationDue.trim() ? form.nextCalibrationDue.trim() : null,
-        calibration_interval_months: (() => {
-          const n = parseInt(form.calibrationIntervalMonths.trim(), 10)
-          return Number.isFinite(n) && n > 0 ? n : null
-        })(),
-        location_label: form.location.trim() || null,
-        customer_location_id: form.serviceSiteId.trim() || null,
-        notes: form.notes.trim() || null,
-      })
-      .select("id")
-      .single()
+      const installDate = normalizeOptionalDateInput(form.installDate)
+      const warrantyExpiration = normalizeOptionalDateInput(form.warrantyExpiration)
+      const lastServiceDate = normalizeOptionalDateInput(form.lastServiceDate)
+      const nextServiceDue = normalizeOptionalDateInput(form.nextServiceDue)
+      const nextCalibrationDue = normalizeOptionalDateInput(form.nextCalibrationDue)
 
-    if (error) {
-      setSaving(false)
-      setToastMsg(error.message)
-      setTimeout(() => setToastMsg(null), 3500)
-      return
-    }
+      const { data: inserted, error } = await supabase
+        .from("equipment")
+        .insert({
+          organization_id: activeOrgId,
+          customer_id: form.customerId.trim(),
+          name: (form.model || form.name).trim(),
+          manufacturer: form.manufacturer.trim() || null,
+          category: form.equipmentType.trim(),
+          subcategory: form.subcategory.trim() || null,
+          serial_number: form.serialNumber.trim() || null,
+          status: statusMap[form.status],
+          install_date: installDate,
+          warranty_expires_at: warrantyExpiration,
+          last_service_at: lastServiceDate,
+          next_due_at: nextServiceDue,
+          next_calibration_due_at: nextCalibrationDue,
+          calibration_interval_months: (() => {
+            const n = parseInt(form.calibrationIntervalMonths.trim(), 10)
+            return Number.isFinite(n) && n > 0 ? n : null
+          })(),
+          location_label: form.location.trim() || null,
+          customer_location_id: form.serviceSiteId.trim() || null,
+          notes: form.notes.trim() || null,
+        })
+        .select("id")
+        .single()
 
-    const newId = (inserted as { id: string } | null)?.id
+      if (error) {
+        const msg = friendlyInsertError(error.message ?? "Unknown error")
+        setSaveError(msg)
+        toast({ variant: "destructive", title: "Could not save equipment", description: msg })
+        return
+      }
 
-    setSaving(false)
-    await Promise.resolve(onSuccess?.(newId))
+      const newId = (inserted as { id: string } | null)?.id
 
-    if (offerMaintenancePlanNext && newId && form.customerId && onCreateMaintenancePlan) {
+      await Promise.resolve(onSuccess?.(newId))
+
+      if (offerMaintenancePlanNext && newId && form.customerId && onCreateMaintenancePlan) {
+        toast({
+          title: "Equipment added",
+          description: "You can start a maintenance plan for this asset next.",
+        })
+        setPostSave({ customerId: form.customerId, equipmentId: newId })
+        return
+      }
+
+      if (!offerMaintenancePlanNext) {
+        handleClose()
+        return
+      }
+
       toast({
         title: "Equipment added",
-        description: "You can start a maintenance plan for this asset next.",
+        description: "The new asset is available in your equipment list.",
       })
-      setPostSave({ customerId: form.customerId, equipmentId: newId })
-      return
-    }
-
-    if (!offerMaintenancePlanNext) {
       handleClose()
-      return
+    } finally {
+      setSaving(false)
     }
-
-    toast({
-      title: "Equipment added",
-      description: "The new asset is available in your equipment list.",
-    })
-    handleClose()
   }
 
   if (!open) return null
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop — stay below dialog so taps hit controls on mobile Safari */}
       <div
         aria-hidden="true"
         onClick={handleClose}
@@ -378,11 +447,11 @@ export function AddEquipmentModal({
         role="dialog"
         aria-modal="true"
         aria-label={postSave ? "Equipment saved" : "Add Equipment"}
-        className="fixed inset-0 z-[230] flex items-start justify-center pt-12 px-4 pb-8"
+        className="fixed inset-0 z-[231] flex items-start justify-center pt-10 sm:pt-12 px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pointer-events-none"
       >
         <div
           className={cn(
-            "relative w-full max-w-2xl rounded-xl shadow-2xl flex flex-col max-h-[calc(100vh-6rem)]",
+            "relative w-full max-w-2xl rounded-xl shadow-2xl flex flex-col max-h-[calc(100dvh-5rem)] pointer-events-auto",
             DRAWER_PANEL_SURFACE,
           )}
         >
@@ -600,26 +669,62 @@ export function AddEquipmentModal({
             <div className="grid grid-cols-2 gap-4">
               <Field>
                 <Label>Install Date</Label>
-                <Input type="date" value={form.installDate} onChange={(e) => set("installDate", e.target.value)} />
+                <Input
+                  type="date"
+                  value={form.installDate}
+                  onChange={(e) => set("installDate", e.target.value)}
+                  aria-invalid={Boolean(errors.installDate)}
+                />
+                {errors.installDate && <p className="text-xs text-destructive mt-1">{errors.installDate}</p>}
               </Field>
               <Field>
                 <Label>Warranty Expiration</Label>
-                <Input type="date" value={form.warrantyExpiration} onChange={(e) => set("warrantyExpiration", e.target.value)} />
+                <Input
+                  type="date"
+                  value={form.warrantyExpiration}
+                  onChange={(e) => set("warrantyExpiration", e.target.value)}
+                  aria-invalid={Boolean(errors.warrantyExpiration)}
+                />
+                {errors.warrantyExpiration && (
+                  <p className="text-xs text-destructive mt-1">{errors.warrantyExpiration}</p>
+                )}
               </Field>
               <Field>
                 <Label>Last Service Date</Label>
-                <Input type="date" value={form.lastServiceDate} onChange={(e) => set("lastServiceDate", e.target.value)} />
+                <Input
+                  type="date"
+                  value={form.lastServiceDate}
+                  onChange={(e) => set("lastServiceDate", e.target.value)}
+                  aria-invalid={Boolean(errors.lastServiceDate)}
+                />
+                {errors.lastServiceDate && (
+                  <p className="text-xs text-destructive mt-1">{errors.lastServiceDate}</p>
+                )}
               </Field>
               <Field>
                 <Label>Next Service Due</Label>
-                <Input type="date" value={form.nextServiceDue} onChange={(e) => set("nextServiceDue", e.target.value)} />
+                <Input
+                  type="date"
+                  value={form.nextServiceDue}
+                  onChange={(e) => set("nextServiceDue", e.target.value)}
+                  aria-invalid={Boolean(errors.nextServiceDue)}
+                />
+                {errors.nextServiceDue && <p className="text-xs text-destructive mt-1">{errors.nextServiceDue}</p>}
               </Field>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <Field>
                 <Label>{ui.calibrationDueLabel}</Label>
-                <Input type="date" value={form.nextCalibrationDue} onChange={(e) => set("nextCalibrationDue", e.target.value)} />
+                <Input
+                  type="date"
+                  value={form.nextCalibrationDue}
+                  onChange={(e) => set("nextCalibrationDue", e.target.value)}
+                  aria-invalid={Boolean(errors.nextCalibrationDue)}
+                />
+                {errors.nextCalibrationDue && (
+                  <p className="text-xs text-destructive mt-1">{errors.nextCalibrationDue}</p>
+                )}
               </Field>
               <Field>
                 <Label>Calibration interval (months)</Label>
@@ -666,42 +771,37 @@ export function AddEquipmentModal({
           )}
 
           {/* Footer */}
-          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 px-6 py-4 border-t border-border shrink-0">
+          <div className="flex flex-col gap-2 px-6 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-border shrink-0">
+            {saveError && !postSave ? (
+              <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+                {saveError}
+              </p>
+            ) : null}
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 py-3">
             {postSave ? (
               <>
-                <Button variant="outline" onClick={handleDoneAfterSave} className="cursor-pointer w-full sm:w-auto">
+                <Button type="button" variant="outline" onClick={handleDoneAfterSave} className="cursor-pointer w-full sm:w-auto">
                   Done
                 </Button>
-                <Button onClick={handleCreatePlanAfterSave} className="cursor-pointer gap-2 w-full sm:w-auto">
+                <Button type="button" onClick={handleCreatePlanAfterSave} className="cursor-pointer gap-2 w-full sm:w-auto">
                   <CalendarPlus className="h-4 w-4 shrink-0" />
                   Create Maintenance Plan
                 </Button>
               </>
             ) : (
               <>
-                <Button variant="outline" onClick={handleClose} className="cursor-pointer">
+                <Button type="button" variant="outline" onClick={handleClose} className="cursor-pointer">
                   Cancel
                 </Button>
-                <Button onClick={handleSave} className="cursor-pointer" disabled={saving}>
-                  {saving ? "Saving..." : "Save Equipment"}
+                <Button type="button" onClick={() => void handleSave()} className="cursor-pointer min-h-10" disabled={saving}>
+                  {saving ? "Saving…" : "Save Equipment"}
                 </Button>
               </>
             )}
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Toast */}
-      {toastMsg && (
-        <div
-          className={cn(
-            BR_STACK_CLEAR_AIDEN,
-            "z-[240] flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium bg-[color:var(--status-success)] text-white animate-in slide-in-from-right-4 fade-in duration-200",
-          )}
-        >
-          {toastMsg}
-        </div>
-      )}
     </>
   )
 }
