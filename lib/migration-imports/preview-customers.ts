@@ -1,4 +1,5 @@
 import { resolveMapped } from "./map-columns"
+import { findParentImportMatch, readParentImportSources } from "./parent-import"
 import { normalizeImportedInvoiceTerms } from "@/lib/billing/invoice-terms"
 import { normalizeBooleanImport } from "@/lib/billing/tax-framework"
 import type { PreviewIssue, PreviewResult, PreviewSampleRow } from "./public-types"
@@ -313,33 +314,47 @@ export async function buildCustomerPreview(
       oversized("tax_exemption_notes", resolveMapped(row, columnMapping, "tax_exemption_notes"), 1000),
       oversized("default_tax_basis", resolveMapped(row, columnMapping, "default_tax_basis"), 40),
       oversized("legacy_source_ids", resolveMapped(row, columnMapping, "legacy_source_ids"), 1000),
+      oversized("parent_account", resolveMapped(row, columnMapping, "parent_account"), 200),
+      oversized("parent_external_code", resolveMapped(row, columnMapping, "parent_external_code"), 120),
+      oversized("parent_company_name", resolveMapped(row, columnMapping, "parent_company_name"), 200),
     ]
     for (const issue of maxChecks) {
       if (issue) issues.push({ ...issue, rowIndex })
     }
 
-    const parentExt = resolveMapped(row, columnMapping, "parent_external_code")
-    const parentCompany = resolveMapped(row, columnMapping, "parent_company_name")
-    if (parentExt || parentCompany) {
-      const parentMatch =
-        (parentExt ? byCode.get(parentExt.trim().toLowerCase()) : null) ||
-        (parentCompany ? byName.get(normName(parentCompany)) : null) ||
-        null
+    const parentSources = readParentImportSources(row, columnMapping)
+    if (parentSources.parentExt || parentSources.parentCompany || parentSources.parentAccount) {
+      const parentMatch = findParentImportMatch(parentSources, company, {
+        resolveCode: (codeLower) => {
+          const hit = byCode.get(codeLower)
+          return hit ? { id: hit.id, label: hit.name } : null
+        },
+        resolveName: (raw) => {
+          const hit = byName.get(normName(raw))
+          return hit ? { id: hit.id, label: hit.name } : null
+        },
+      })
       issues.push({
         rowIndex,
         severity: "warning",
         code: parentMatch && ctx.options.linkChildrenToExistingParents ? "parent_link_ready" : "hierarchy_preserved",
         message:
           parentMatch && ctx.options.linkChildrenToExistingParents
-            ? `Will link to parent account ${parentMatch.name} if the row is imported or updated.`
+            ? `Will link to parent account ${parentMatch.label} if the row is imported or updated.`
             : parentMatch
-              ? `Parent account ${parentMatch.name} matched. Enable parent linking to connect this child during import.`
-              : "Hierarchy-related values are preserved in the import audit snapshot; no existing parent account was matched.",
+              ? `Parent account ${parentMatch.label} matched. Enable parent linking to connect this child during import.`
+              : ctx.options.linkChildrenToExistingParents
+                ? "Parent account column is mapped, but no existing parent was matched by external ID or company name."
+                : "Parent account values are preview-only until you enable parent linking; no existing parent was matched.",
       })
       if (!parentMatch) {
+        const detailParts: string[] = []
+        if (parentSources.parentExt) detailParts.push(`external code ${parentSources.parentExt}`)
+        if (parentSources.parentAccount) detailParts.push(`parent account ${parentSources.parentAccount}`)
+        if (parentSources.parentCompany) detailParts.push(`company name ${parentSources.parentCompany}`)
         unresolvedRefs.push({
           rowIndex,
-          message: `Parent account not found${parentExt ? ` for external code ${parentExt}` : ""}${parentCompany ? ` (${parentCompany})` : ""}.`,
+          message: `Parent account not found${detailParts.length ? ` (${detailParts.join("; ")})` : ""}.`,
         })
       }
     }

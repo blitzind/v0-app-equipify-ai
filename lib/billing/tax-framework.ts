@@ -1,4 +1,4 @@
-export type TaxCalculationMode = "manual" | "exempt" | "provider_pending" | "provider_calculated"
+export type TaxCalculationMode = "manual" | "exempt" | "provider_pending" | "provider_calculated" | "automated"
 export type TaxBasis = "service_location" | "billing_address" | "manual"
 export type TaxJurisdictionLevel = "state" | "county" | "city" | "district" | "special" | "other"
 
@@ -58,8 +58,8 @@ export function formatTaxModeLabel(mode: TaxCalculationMode | string | null | un
       return "Tax exempt"
     case "provider_pending":
       return "Provider pending"
-    case "provider_calculated":
-      return "Provider calculated"
+    case "automated":
+      return "Auto-calculated tax"
     default:
       return "Manual tax estimate"
   }

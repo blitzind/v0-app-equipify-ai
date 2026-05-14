@@ -14,6 +14,14 @@ import { insertOrgInvoice } from "@/lib/org-quotes-invoices/repository"
 import type { LineItemJson } from "@/lib/org-quotes-invoices/map"
 import { invoiceStatusDbToUi } from "@/lib/org-quotes-invoices/map"
 import type { OrgPermissions } from "@/lib/permissions/model"
+import type { TaxCalculationMode } from "@/lib/billing/tax-framework"
+import {
+  billingAddressFromCustomerLike,
+  lineItemsForTaxEngine,
+  mapSalesTaxToInvoiceInsertFields,
+  taxBasisFromCustomerDefault,
+} from "@/lib/tax/invoice-tax-bridge"
+import { resolveSalesTaxForLines } from "@/lib/tax/resolve-document-sales-tax"
 
 const ACTION_ID: AidenPreparedWorkspaceActionId = "create_invoice_from_work_order"
 
@@ -451,10 +459,40 @@ export async function executeCreateInvoiceFromWorkOrderDraft(
   }
 
   const amountCents = subtotalCentsFromLines
-  const taxAmountMajor = preview.taxEstimate == null ? null : preview.taxEstimate
 
   const issuedAt = new Date().toISOString().slice(0, 10)
   const internalNotes = `AIDEN_PREPARED_ACTION_ID=${preparedActionId}\n${preview.sourceSummary ? `Source: ${preview.sourceSummary}` : ""}`.trim()
+
+  const { data: authUser } = await userSupabase.auth.getUser()
+  const actorUserId = authUser.user?.id ?? null
+
+  const addr = billingAddressFromCustomerLike(preview.customer)
+  const taxBasisResolved = taxBasisFromCustomerDefault(preview.customer.default_tax_basis)
+  const resolution = await resolveSalesTaxForLines(userSupabase, {
+    organizationId,
+    customerId: preview.customer.id,
+    preferAutomatic: true,
+    lines: lineItemsForTaxEngine(lineItemsJson),
+    taxBasis: taxBasisResolved,
+    serviceAddress: addr,
+    billingAddress: addr,
+    customerTaxExempt: preview.customer.taxExempt === true,
+    asOfYmd: issuedAt,
+    persistLog: true,
+    auditSourceType: "aiden_create_invoice_from_work_order",
+    actorUserId,
+  })
+
+  const uiMode: TaxCalculationMode =
+    resolution.status === "exempt" ? "exempt" : resolution.status !== "skipped" ? "automated" : "manual"
+  const taxFromEngine = mapSalesTaxToInvoiceInsertFields({ resolution, uiMode })
+
+  const taxAmountMajor =
+    uiMode === "automated" && resolution.status !== "skipped"
+      ? taxFromEngine.taxAmount
+      : preview.taxEstimate == null
+        ? null
+        : preview.taxEstimate
 
   const insert = await insertOrgInvoice(
     userSupabase,
@@ -485,8 +523,18 @@ export async function executeCreateInvoiceFromWorkOrderDraft(
       billingState: preview.customer.billingState,
       billingPostalCode: preview.customer.billingPostalCode,
       billingCountry: preview.customer.billingCountry,
+      taxCalculationMode: taxFromEngine.taxCalculationMode,
+      taxBasis: taxFromEngine.taxBasis,
+      taxJurisdictionLabel: taxFromEngine.taxJurisdictionLabel,
+      taxRatePercent: taxFromEngine.taxRatePercent,
       taxAmount: taxAmountMajor,
-      taxExemptionApplied: preview.customer.taxExempt === true,
+      taxableSubtotal: taxFromEngine.taxableSubtotal,
+      nonTaxableSubtotal: taxFromEngine.nonTaxableSubtotal,
+      taxExemptionApplied: taxFromEngine.taxExemptionApplied,
+      taxExemptionReason: taxFromEngine.taxExemptionReason,
+      taxProvider: taxFromEngine.taxProvider,
+      taxProviderReference: taxFromEngine.taxProviderReference,
+      taxSnapshotJson: taxFromEngine.taxSnapshotJson,
     },
     { skipQuickBooksQueue: true, skipWorkOrderBillingStateSync: true },
   )

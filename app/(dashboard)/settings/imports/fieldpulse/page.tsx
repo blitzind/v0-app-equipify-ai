@@ -41,7 +41,7 @@ const FIELD_PULSE_TYPES: Array<{
     templateKind: "customer",
     title: "Import FieldPulse customers",
     description:
-      "Use exported FieldPulse customer CSV files. FieldPulse IDs, contacts, billing/service addresses, and notes are preserved in the import audit trail.",
+      "Use exported FieldPulse customer CSV files. FieldPulse IDs, contacts, billing/service addresses, optional parent_account (parent external ID or parent company name), and notes are preserved in the import audit trail.",
   },
   {
     value: "equipment",

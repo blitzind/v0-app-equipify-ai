@@ -948,7 +948,12 @@ function BillingPageContent() {
           <Link href="/settings/payments" className="text-primary font-medium underline-offset-4 hover:underline">
             Settings → Payments
           </Link>{" "}
-          (<span className="whitespace-nowrap">Invoice payment defaults</span>).
+          (<span className="whitespace-nowrap">Invoice payment defaults</span>).{" "}
+          <Link href="/settings/billing/taxes" className="text-primary font-medium underline-offset-4 hover:underline">
+            Sales tax settings
+          </Link>{" "}
+          for customer-facing invoices and quotes are under{" "}
+          <span className="font-medium text-foreground/90">Billing → Taxes</span>.
         </p>
       </div>
 

@@ -60,6 +60,7 @@ export function buildCsvTemplateContent(kind: CsvTemplateDownloadKind): string {
         "tax_exempt",
         "notes",
         "external_customer_id",
+        "parent_account",
       ]
       const row = [
         "Precision Biomedical Imaging LLC",
@@ -85,6 +86,7 @@ export function buildCsvTemplateContent(kind: CsvTemplateDownloadKind): string {
         "false",
         "MRI suite; FieldPulse customer ID preserved in external_customer_id.",
         "FP-CUST-88921",
+        "FP-CUST-HOLDINGS-01",
       ]
       return [csvLine(headers), csvLine(row)].join("\n")
     }

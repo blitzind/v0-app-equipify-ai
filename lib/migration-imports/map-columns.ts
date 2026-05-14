@@ -129,8 +129,21 @@ export function suggestColumnMapping(kind: MigrationImportKind, headers: string[
     set("legacy_source_ids", ["legacy_source_ids", "legacy source ids", "source_ids", "source ids", "quickbooks_id", "fieldpulse_id", "jobber_id"])
     set("status", ["status"])
     set("tags", ["tags", "categories"])
-    set("parent_external_code", ["parent_external_code", "parent_account", "parent_id"])
-    set("parent_company_name", ["parent_company_name", "parent company", "parent_customer"])
+    set("parent_account", [
+      "parent_account",
+      "parent account",
+      "parent_customer",
+      "parent customer",
+      "parent_company",
+      "parent company",
+      "parent_billing_account",
+      "parent billing account",
+      "billing parent",
+      "account parent",
+      "parent_customer_company_name",
+    ])
+    set("parent_external_code", ["parent_external_code", "parent_external_id", "parent external id", "parent_id"])
+    set("parent_company_name", ["parent_company_name"])
     set("location_group", ["location_group", "site_group", "region_group"])
   }
 

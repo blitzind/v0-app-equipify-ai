@@ -1,5 +1,6 @@
 import { resolveMapped } from "./map-columns"
 import { resolveImportStrategy } from "./strategy"
+import { findParentImportMatch, readParentImportSources } from "./parent-import"
 import { normalizeImportedInvoiceTerms } from "@/lib/billing/invoice-terms"
 import { normalizeBooleanImport } from "@/lib/billing/tax-framework"
 import type { CommitResult, ImportEngineContext, RowOutcome } from "./types"
@@ -180,16 +181,23 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
 
   function findParent(row: Record<string, string>, childName: string): { id: string; label: string } | null {
     if (!ctx.options.linkChildrenToExistingParents) return null
-    const parentExt = resolveMapped(row, columnMapping, "parent_external_code").trim()
-    const parentCompany = resolveMapped(row, columnMapping, "parent_company_name").trim()
-    const parentId =
-      (parentExt ? byCode.get(parentExt.toLowerCase()) : null) ||
-      (parentCompany ? byName.get(normName(parentCompany)) : null) ||
-      null
-    if (!parentId) return null
-    const parent = customersById.get(parentId)
-    if (!parent || normName(parent.company_name) === normName(childName)) return null
-    return { id: parentId, label: parent.company_name }
+    const sources = readParentImportSources(row, columnMapping)
+    return findParentImportMatch(sources, childName, {
+      resolveCode: (codeLower) => {
+        const id = byCode.get(codeLower)
+        if (!id) return null
+        const p = customersById.get(id)
+        if (!p) return null
+        return { id, label: p.company_name.trim() || id }
+      },
+      resolveName: (raw) => {
+        const id = byName.get(normName(raw))
+        if (!id) return null
+        const p = customersById.get(id)
+        if (!p) return null
+        return { id, label: p.company_name.trim() || id }
+      },
+    })
   }
 
   function addBillingPatch(
@@ -327,6 +335,9 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
       tooLong(resolveMapped(row, columnMapping, "tax_exemption_notes"), 1000) ? "tax_exemption_notes" : null,
       tooLong(resolveMapped(row, columnMapping, "default_tax_basis"), 40) ? "default_tax_basis" : null,
       tooLong(resolveMapped(row, columnMapping, "legacy_source_ids"), 1000) ? "legacy_source_ids" : null,
+      tooLong(resolveMapped(row, columnMapping, "parent_account"), 200) ? "parent_account" : null,
+      tooLong(resolveMapped(row, columnMapping, "parent_external_code"), 120) ? "parent_external_code" : null,
+      tooLong(resolveMapped(row, columnMapping, "parent_company_name"), 200) ? "parent_company_name" : null,
     ].filter(Boolean)
     if (oversizedFields.length > 0) {
       errorCount += 1

@@ -329,6 +329,18 @@ export function CustomerHierarchyCard({
                   : "Custom"}
             </span>
           </div>
+          {billingAddress.behavior === "parent_billing" ? (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Use parent address
+              {parent ? (
+                <>
+                  {" "}
+                  (<span className="font-medium text-foreground">{parent.companyName}</span>)
+                </>
+              ) : null}
+              .
+            </p>
+          ) : null}
           {billingAddress.attention ? (
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               Attn: <span className="font-medium text-foreground">{billingAddress.attention}</span>

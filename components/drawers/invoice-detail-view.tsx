@@ -1443,6 +1443,31 @@ function InfoTab({
                 {invoice.taxProviderReference ? (
                   <p className="text-muted-foreground">Provider ref: {invoice.taxProviderReference}</p>
                 ) : null}
+                {(() => {
+                  const snap = invoice.taxSnapshotJson
+                  if (!snap || typeof snap !== "object") return null
+                  const o = snap as { components?: unknown; engine?: unknown }
+                  if (!Array.isArray(o.components) || o.components.length === 0) return null
+                  return (
+                    <div className="rounded-md border border-border bg-muted/15 px-2 py-1.5 space-y-1">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Jurisdiction stack (snapshot)
+                      </p>
+                      <ul className="list-disc pl-4 space-y-0.5 text-muted-foreground">
+                        {(o.components as Array<{ name?: string; ratePercent?: number; code?: string }>).map(
+                          (c, idx) => (
+                            <li key={idx}>
+                              {(c.name ?? c.code ?? "Component").toString()} — {Number(c.ratePercent ?? 0)}%
+                            </li>
+                          ),
+                        )}
+                      </ul>
+                      {typeof o.engine === "string" ? (
+                        <p className="text-[10px] text-muted-foreground">Engine: {o.engine}</p>
+                      ) : null}
+                    </div>
+                  )
+                })()}
               </div>
             }
           />

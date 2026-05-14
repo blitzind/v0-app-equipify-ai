@@ -350,7 +350,7 @@ export function ManageHierarchyDialog({
               className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
             >
               <option value="own_billing">Bills independently</option>
-              <option value="parent_billing">Uses parent billing</option>
+              <option value="parent_billing">Use parent address</option>
               <option value="custom">Custom billing</option>
             </select>
             <p className="text-[11px] text-muted-foreground">

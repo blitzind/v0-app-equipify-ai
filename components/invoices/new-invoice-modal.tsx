@@ -38,9 +38,12 @@ import {
   calculateManualTaxAmount,
   calculateTaxSubtotals,
   formatTaxBasisLabel,
+  formatTaxModeLabel,
   type TaxBasis,
   type TaxCalculationMode,
 } from "@/lib/billing/tax-framework"
+import type { SalesTaxCalculationResult } from "@/lib/tax/types"
+import { mapSalesTaxToInvoiceInsertFields } from "@/lib/tax/invoice-tax-bridge"
 
 function quoteOptionLabel(q: AdminQuote) {
   const num = q.quoteNumber?.trim()
@@ -196,6 +199,25 @@ export function NewInvoiceModal({
   const { standardCreateEligibility } = useBillingAccess()
   const organizationId = orgContextStatus === "ready" ? activeOrgId : null
 
+  useEffect(() => {
+    if (!open || !organizationId) {
+      setOrgWorkspaceAutoTax(false)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/sales-tax/settings`, {
+        credentials: "include",
+      })
+      if (!res.ok || cancelled) return
+      const data = (await res.json()) as { settings?: { autoTaxEnabled?: boolean } }
+      if (!cancelled) setOrgWorkspaceAutoTax(Boolean(data.settings?.autoTaxEnabled))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, organizationId])
+
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [equipmentList, setEquipmentList] = useState<EquipmentOption[]>([])
@@ -217,6 +239,8 @@ export function NewInvoiceModal({
   const [discount, setDiscount] = useState("")
   const [taxCalculationMode, setTaxCalculationMode] = useState<TaxCalculationMode>("manual")
   const [taxBasis, setTaxBasis] = useState<TaxBasis>("billing_address")
+  const [orgWorkspaceAutoTax, setOrgWorkspaceAutoTax] = useState(false)
+  const [automatedTaxResult, setAutomatedTaxResult] = useState<SalesTaxCalculationResult | null>(null)
   const [taxJurisdictionLabel, setTaxJurisdictionLabel] = useState("")
   const [taxRatePercent, setTaxRatePercent] = useState("")
   const [taxAmountOverride, setTaxAmountOverride] = useState("")
@@ -302,6 +326,7 @@ export function NewInvoiceModal({
         setTaxAmountOverride("")
         setTaxExemptionApplied(false)
         setTaxExemptionReason("")
+        setAutomatedTaxResult(null)
         setNotes("")
         setInternalNotes("")
         setPoNumber("")
@@ -617,7 +642,7 @@ export function NewInvoiceModal({
         setTaxExemptionReason(profile.taxExemptionNotes || profile.taxExemptionId || "Customer marked tax exempt")
       } else {
         setTaxExemptionApplied(false)
-        setTaxCalculationMode("manual")
+        setTaxCalculationMode(orgWorkspaceAutoTax ? "automated" : "manual")
       }
       if (
         profile?.defaultTaxBasis === "service_location" ||
@@ -630,8 +655,80 @@ export function NewInvoiceModal({
     return () => {
       cancelled = true
     }
-  }, [open, organizationId, customerId])
+  }, [open, organizationId, customerId, orgWorkspaceAutoTax])
 
+  // Server-side sales tax preview (authoritative when workspace auto-tax is enabled).
+  useEffect(() => {
+    if (!open || !organizationId || !customerId || taxCalculationMode !== "automated" || !orgWorkspaceAutoTax) {
+      setAutomatedTaxResult(null)
+      return
+    }
+    if (!billingProfile?.state?.trim() || !billingProfile?.postalCode?.trim()) {
+      setAutomatedTaxResult(null)
+      return
+    }
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        const lines = lineItems
+          .filter((li) => li.description.trim())
+          .map((li) => ({
+            qty: parseFloat(li.qty) || 0,
+            unit: parseFloat(li.unit) || 0,
+            taxable: li.taxable !== false,
+            tax_category: li.taxCategory?.trim() || null,
+            source_ref: li.sourceRef?.trim() || null,
+          }))
+        const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/sales-tax/calculate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            preferAutomatic: true,
+            taxBasis,
+            customerTaxExempt: false,
+            customerId,
+            billingAddress: {
+              countryCode: (billingProfile.country || "US").slice(0, 2).toUpperCase(),
+              regionCode: (billingProfile.state || "").trim().slice(0, 8),
+              cityName: billingProfile.city?.trim() || null,
+              postalCode: billingProfile.postalCode?.trim() || null,
+            },
+            serviceAddress: {
+              countryCode: (billingProfile.country || "US").slice(0, 2).toUpperCase(),
+              regionCode: (billingProfile.state || "").trim().slice(0, 8),
+              cityName: billingProfile.city?.trim() || null,
+              postalCode: billingProfile.postalCode?.trim() || null,
+            },
+            lines,
+            persistLog: false,
+          }),
+        })
+        if (!res.ok) {
+          setAutomatedTaxResult(null)
+          return
+        }
+        const body = (await res.json()) as { result?: SalesTaxCalculationResult }
+        if (body.result) {
+          setAutomatedTaxResult(body.result)
+          if (body.result.status !== "skipped") {
+            setTaxRatePercent(String(body.result.combinedRatePercent ?? 0))
+            setTaxJurisdictionLabel(body.result.jurisdictionSummary.slice(0, 500))
+          }
+        }
+      })()
+    }, 450)
+    return () => window.clearTimeout(handle)
+  }, [
+    open,
+    organizationId,
+    customerId,
+    taxCalculationMode,
+    orgWorkspaceAutoTax,
+    taxBasis,
+    lineItems,
+    discount,
+    billingProfile,
+  ])
   // Invoicing Phase 2: resolve effective payment terms.
   // Reads the org default + customer override (schema-drift safe) and, when
   // the user hasn't manually edited the terms select, preselects the most
@@ -760,11 +857,22 @@ export function NewInvoiceModal({
     lineItems.map((li) => ({ qty: parseFloat(li.qty) || 0, unit: parseFloat(li.unit) || 0, taxable: li.taxable })),
   )
   const taxableSubtotalAfterDiscount = Math.max(0, taxSubtotals.taxableSubtotal - discountAmt)
+  const automatedTaxAmt =
+    taxCalculationMode === "automated" && automatedTaxResult && automatedTaxResult.status !== "skipped"
+      ? automatedTaxResult.taxAmount
+      : null
   const calculatedTaxAmt =
     taxCalculationMode === "exempt" || taxExemptionApplied
       ? 0
-      : calculateManualTaxAmount(taxableSubtotalAfterDiscount, parseFloat(taxRatePercent) || 0)
-  const taxAmt = taxAmountOverride.trim() ? Math.max(0, parseFloat(taxAmountOverride) || 0) : calculatedTaxAmt
+      : automatedTaxAmt != null
+        ? automatedTaxAmt
+        : calculateManualTaxAmount(taxableSubtotalAfterDiscount, parseFloat(taxRatePercent) || 0)
+  const taxAmt =
+    taxCalculationMode === "automated"
+      ? calculatedTaxAmt
+      : taxAmountOverride.trim()
+        ? Math.max(0, parseFloat(taxAmountOverride) || 0)
+        : calculatedTaxAmt
   const total = subtotal - discountAmt + taxAmt
 
   const updateLineItem = useCallback((id: string, field: keyof LineItem, value: string | boolean) => {
@@ -795,6 +903,59 @@ export function NewInvoiceModal({
     }
     if (toastRecordEligibilityBlocked(standardCreateEligibility)) return
     setSubmitting(true)
+
+    let finalAutomatedResolution: SalesTaxCalculationResult | null = null
+    if (taxCalculationMode === "automated" && orgWorkspaceAutoTax && billingProfile?.state?.trim() && billingProfile?.postalCode?.trim()) {
+      const linesBody = lineItems
+        .filter((li) => li.description.trim())
+        .map((li) => ({
+          qty: parseFloat(li.qty) || 0,
+          unit: parseFloat(li.unit) || 0,
+          taxable: li.taxable !== false,
+          tax_category: li.taxCategory?.trim() || null,
+          source_ref: li.sourceRef?.trim() || null,
+        }))
+      const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/sales-tax/calculate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          preferAutomatic: true,
+          taxBasis,
+          customerTaxExempt: false,
+          customerId,
+          billingAddress: {
+            countryCode: (billingProfile.country || "US").slice(0, 2).toUpperCase(),
+            regionCode: (billingProfile.state || "").trim().slice(0, 8),
+            cityName: billingProfile.city?.trim() || null,
+            postalCode: billingProfile.postalCode?.trim() || null,
+          },
+          serviceAddress: {
+            countryCode: (billingProfile.country || "US").slice(0, 2).toUpperCase(),
+            regionCode: (billingProfile.state || "").trim().slice(0, 8),
+            cityName: billingProfile.city?.trim() || null,
+            postalCode: billingProfile.postalCode?.trim() || null,
+          },
+          lines: linesBody,
+          persistLog: true,
+          idempotencyKey: `new-invoice:${organizationId}:${Date.now()}`,
+        }),
+      })
+      if (res.ok) {
+        const body = (await res.json()) as { result?: SalesTaxCalculationResult }
+        finalAutomatedResolution = body.result ?? null
+      }
+    }
+
+    const mappedAutomated =
+      taxCalculationMode === "automated" && finalAutomatedResolution && finalAutomatedResolution.status !== "skipped"
+        ? mapSalesTaxToInvoiceInsertFields({ resolution: finalAutomatedResolution, uiMode: "automated" })
+        : null
+
+    const preTaxSubtotalCents = Math.round((subtotal - discountAmt) * 100)
+    const amountCentsToSave =
+      mappedAutomated && taxCalculationMode === "automated" ? preTaxSubtotalCents : Math.round(total * 100)
+
     const lineItemsJson = lineItems
       .filter((li) => li.description.trim())
       .map((li) => {
@@ -823,7 +984,12 @@ export function NewInvoiceModal({
         if (li.sourceRef) row.source_ref = li.sourceRef
         row.taxable = li.taxable !== false
         if (li.taxCategory?.trim()) row.tax_category = li.taxCategory.trim()
-        if (taxCalculationMode !== "exempt" && !taxExemptionApplied && row.taxable) {
+        if (
+          taxCalculationMode !== "exempt" &&
+          !taxExemptionApplied &&
+          row.taxable &&
+          taxCalculationMode !== "automated"
+        ) {
           row.tax_rate_percent = parseFloat(taxRatePercent) || 0
           row.tax_amount = calculateManualTaxAmount(row.qty * row.unit, row.tax_rate_percent)
         }
@@ -836,7 +1002,7 @@ export function NewInvoiceModal({
       quoteId: quoteId || null,
       calibrationRecordId: calibrationRecordId.trim() || null,
       title: title.trim(),
-      amountCents: Math.round(total * 100),
+      amountCents: amountCentsToSave,
       status: submitStatus,
       issuedAt,
       dueDate,
@@ -863,23 +1029,25 @@ export function NewInvoiceModal({
       billingCountry: billingProfile?.country ?? null,
       poNumber: poNumber.trim() || null,
       invoiceInstructions: billingProfile?.invoiceInstructions ?? null,
-      taxCalculationMode,
-      taxBasis,
-      taxJurisdictionLabel: taxJurisdictionLabel.trim() || null,
-      taxRatePercent: parseFloat(taxRatePercent) || null,
-      taxAmount: taxAmt,
-      taxableSubtotal: taxableSubtotalAfterDiscount,
-      nonTaxableSubtotal: taxSubtotals.nonTaxableSubtotal,
-      taxExemptionApplied,
-      taxExemptionReason: taxExemptionReason.trim() || null,
-      taxProvider: taxCalculationMode.startsWith("provider_") ? "provider_pending" : null,
-      taxProviderReference: null,
-      taxSnapshotJson: {
-        mode: taxCalculationMode,
-        basis: taxBasis,
-        label: taxCalculationMode === "manual" ? "Manual tax estimate" : null,
-        manualOverride: Boolean(taxAmountOverride.trim()),
-      },
+      taxCalculationMode: mappedAutomated?.taxCalculationMode ?? taxCalculationMode,
+      taxBasis: mappedAutomated?.taxBasis ?? taxBasis,
+      taxJurisdictionLabel: mappedAutomated?.taxJurisdictionLabel ?? (taxJurisdictionLabel.trim() || null),
+      taxRatePercent: mappedAutomated?.taxRatePercent ?? (parseFloat(taxRatePercent) || null),
+      taxAmount: mappedAutomated?.taxAmount ?? taxAmt,
+      taxableSubtotal: mappedAutomated?.taxableSubtotal ?? taxableSubtotalAfterDiscount,
+      nonTaxableSubtotal: mappedAutomated?.nonTaxableSubtotal ?? taxSubtotals.nonTaxableSubtotal,
+      taxExemptionApplied: mappedAutomated?.taxExemptionApplied ?? taxExemptionApplied,
+      taxExemptionReason: mappedAutomated?.taxExemptionReason ?? (taxExemptionReason.trim() || null),
+      taxProvider: mappedAutomated?.taxProvider ?? (taxCalculationMode.startsWith("provider_") ? "provider_pending" : null),
+      taxProviderReference: mappedAutomated?.taxProviderReference ?? null,
+      taxSnapshotJson:
+        mappedAutomated?.taxSnapshotJson ??
+        ({
+          mode: taxCalculationMode,
+          basis: taxBasis,
+          label: taxCalculationMode === "manual" ? "Manual tax estimate" : null,
+          manualOverride: Boolean(taxAmountOverride.trim()),
+        } as Record<string, unknown>),
     })
     setSubmitting(false)
     if (saveError) {
@@ -1353,7 +1521,7 @@ export function NewInvoiceModal({
                       <p className="text-xs font-semibold text-foreground">Billing &amp; PO</p>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">
                         {billingProfile.inheritedFromParent
-                          ? `Using parent billing from ${billingProfile.billingCustomerName}.`
+                          ? `Using parent address from ${billingProfile.billingCustomerName}.`
                           : "Using this customer's billing settings."}
                       </p>
                     </div>
@@ -1403,11 +1571,13 @@ export function NewInvoiceModal({
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
                       {taxCalculationMode === "manual"
                         ? "Manual US jurisdiction-based tax estimate only. No tax provider is being called."
-                        : formatTaxBasisLabel(taxBasis)}
+                        : taxCalculationMode === "automated"
+                          ? "Tax is calculated on the server from workspace catalog + customer address (authoritative)."
+                          : formatTaxBasisLabel(taxBasis)}
                     </p>
                   </div>
                   <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                    {taxCalculationMode === "exempt" ? "Exempt" : "Manual estimate"}
+                    {formatTaxModeLabel(taxCalculationMode)}
                   </span>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -1422,6 +1592,9 @@ export function NewInvoiceModal({
                       }}
                     >
                       <option value="manual">Manual tax estimate</option>
+                      <option value="automated" disabled={!orgWorkspaceAutoTax}>
+                        Auto-calculated tax (workspace)
+                      </option>
                       <option value="exempt">Tax exempt</option>
                       <option value="provider_pending">Provider pending</option>
                     </FieldSelect>
@@ -1445,14 +1618,14 @@ export function NewInvoiceModal({
                   <div>
                     <Label>Manual tax rate</Label>
                     <div className="relative">
-                      <FieldInput
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.0001"
-                        value={taxRatePercent}
-                        onChange={(e) => setTaxRatePercent(e.target.value)}
-                        disabled={taxCalculationMode === "exempt"}
+                    <FieldInput
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.0001"
+                      value={taxRatePercent}
+                      onChange={(e) => setTaxRatePercent(e.target.value)}
+                      disabled={taxCalculationMode === "exempt" || taxCalculationMode === "automated"}
                         placeholder="0"
                         className="pr-6 text-right"
                       />
@@ -1467,7 +1640,7 @@ export function NewInvoiceModal({
                       step="0.01"
                       value={taxAmountOverride}
                       onChange={(e) => setTaxAmountOverride(e.target.value)}
-                      disabled={taxCalculationMode === "exempt"}
+                      disabled={taxCalculationMode === "exempt" || taxCalculationMode === "automated"}
                       placeholder={fmtCurrency(calculatedTaxAmt)}
                     />
                   </div>

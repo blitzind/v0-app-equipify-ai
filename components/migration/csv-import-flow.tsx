@@ -86,6 +86,12 @@ const CUSTOMER_MAPPING_FIELDS: CustomerMappingField[] = [
   { field: "source_record_id", label: "Source record ID", description: "Preserved for source-system mapping." },
   { field: "company_name", label: "Customer name", required: true, description: "Required for creating customers." },
   { field: "external_code", label: "External ID" },
+  {
+    field: "parent_account",
+    label: "Parent account",
+    description:
+      "Parent customer reference: matches an existing workspace customer by external ID first, then by company name. Does not replace Customer name.",
+  },
   { field: "contact_full_name", label: "Primary contact name" },
   { field: "contact_email", label: "Primary contact email" },
   { field: "contact_phone", label: "Primary contact phone" },
@@ -128,8 +134,16 @@ const CUSTOMER_MAPPING_FIELDS: CustomerMappingField[] = [
   { field: "default_tax_basis", label: "Default tax basis" },
   { field: "tax_id", label: "Tax ID" },
   { field: "legacy_source_ids", label: "Legacy source ID" },
-  { field: "parent_external_code", label: "Parent external code", description: "Preserved for future hierarchy support." },
-  { field: "parent_company_name", label: "Parent company name", description: "Preserved for future hierarchy support." },
+  {
+    field: "parent_external_code",
+    label: "Parent external code (legacy)",
+    description: "Optional. Parent lookup by external ID only; prefer Parent account when one column mixes ID and name.",
+  },
+  {
+    field: "parent_company_name",
+    label: "Parent company name (legacy)",
+    description: "Optional. Parent lookup by company name only; prefer Parent account for mixed parent identifiers.",
+  },
 ] as const
 
 const EQUIPMENT_MAPPING_FIELDS: CustomerMappingField[] = [
@@ -894,10 +908,16 @@ export function CsvImportFlow({
                   </p>
                 </div>
               ) : null}
-              {parsedColumnMapping.parent_external_code || parsedColumnMapping.parent_company_name || parsedColumnMapping.location_group ? (
+              {parsedColumnMapping.parent_account ||
+              parsedColumnMapping.parent_external_code ||
+              parsedColumnMapping.parent_company_name ||
+              parsedColumnMapping.location_group ? (
                 <div className="rounded-md border border-sky-500/30 bg-sky-500/5 p-3 text-sm text-sky-800 dark:text-sky-200">
                   <p>
-                    Hierarchy and site grouping fields are preserved in import row snapshots. Enable parent linking below to connect children to existing parent accounts when there is a safe match.
+                    Hierarchy and site grouping fields are preserved in import row snapshots. Map{" "}
+                    <span className="font-medium">Parent account</span> (or the legacy parent columns) and enable parent
+                    linking below to connect children to existing parent accounts when there is a safe match. Until parent
+                    linking is enabled, parent values are preview-only and are not written to the database.
                   </p>
                   <label className="mt-2 flex items-start gap-2 text-xs text-sky-900 dark:text-sky-100">
                     <input
@@ -906,7 +926,10 @@ export function CsvImportFlow({
                       onChange={(event) => setLinkChildrenToExistingParents(event.target.checked)}
                       className="mt-0.5 h-3.5 w-3.5 rounded border-border"
                     />
-                    <span>Link children to existing parents when matched by parent external code or parent company name.</span>
+                    <span>
+                      Link children to existing parents when matched by Parent account (external ID or company name),
+                      legacy parent external code, or legacy parent company name.
+                    </span>
                   </label>
                 </div>
               ) : null}

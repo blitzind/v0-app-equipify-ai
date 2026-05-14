@@ -35,6 +35,18 @@ export type OrgQuoteRow = {
   blitzpay_converted_invoice_id?: string | null
   blitzpay_financing_ready?: boolean | null
   blitzpay_financing_metadata?: unknown
+  tax_calculation_mode?: string | null
+  tax_basis?: string | null
+  tax_jurisdiction_label?: string | null
+  tax_rate_percent?: number | string | null
+  tax_amount_cents?: number | null
+  taxable_subtotal_cents?: number | null
+  non_taxable_subtotal_cents?: number | null
+  tax_exemption_applied?: boolean | null
+  tax_exemption_reason?: string | null
+  tax_provider?: string | null
+  tax_provider_reference?: string | null
+  tax_snapshot_json?: unknown
 }
 
 export type OrgInvoiceRow = {

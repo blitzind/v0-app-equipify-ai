@@ -12,6 +12,8 @@ import {
   fetchBlitzpayMembershipDashboard,
 } from "@/lib/blitzpay/blitzpay-memberships"
 import { insertOrgInvoice } from "@/lib/org-quotes-invoices/repository"
+import { billingAddressFromCustomerLike, lineItemsForTaxEngine, mapSalesTaxToInvoiceInsertFields } from "@/lib/tax/invoice-tax-bridge"
+import { resolveSalesTaxForLines } from "@/lib/tax/resolve-document-sales-tax"
 import { BLITZPAY_AUTOPAY_RETRY_INTERVALS_HOURS } from "@/lib/blitzpay/blitzpay-recurring-autopay-rules"
 
 export type BlitzpayMembershipCronResult = {
@@ -70,6 +72,53 @@ export async function generateMembershipInvoiceIfDue(
   const unit = amountCents / 100
   const dueDate = addDays(new Date(`${periodEnd}T12:00:00Z`), 14).toISOString().slice(0, 10)
 
+  const lineItems = [
+    {
+      description: `Recurring membership (${membership.billing_frequency}) — ${periodStart} → ${periodEnd}`,
+      qty: 1,
+      unit,
+      source_ref: `blitzpay_membership:${membership.id}`,
+    },
+  ]
+
+  const { data: custRow } = await admin
+    .from("customers")
+    .select(
+      "id, tax_exempt, default_tax_basis, billing_country, billing_state, billing_city, billing_postal_code",
+    )
+    .eq("organization_id", orgId)
+    .eq("id", membership.customer_id)
+    .maybeSingle()
+
+  const cust = custRow as {
+    id: string
+    tax_exempt: boolean | null
+    default_tax_basis: string | null
+    billing_country: string | null
+    billing_state: string | null
+    billing_city: string | null
+    billing_postal_code: string | null
+  } | null
+
+  const addr = cust ? billingAddressFromCustomerLike(cust) : { countryCode: "US", regionCode: "" }
+  const resolution = await resolveSalesTaxForLines(admin, {
+    organizationId: orgId,
+    customerId: membership.customer_id,
+    preferAutomatic: true,
+    lines: lineItemsForTaxEngine(lineItems),
+    taxBasis: cust?.default_tax_basis === "service_location" ? "service_location" : "billing_address",
+    serviceAddress: addr,
+    billingAddress: addr,
+    customerTaxExempt: cust?.tax_exempt === true,
+    asOfYmd: periodStart,
+    persistLog: true,
+    auditSourceType: "blitzpay_membership_invoice",
+    actorUserId: null,
+  })
+
+  const uiMode = resolution.status === "exempt" ? "exempt" : resolution.status !== "skipped" ? "automated" : "manual"
+  const taxFields = mapSalesTaxToInvoiceInsertFields({ resolution, uiMode })
+
   const res = await insertOrgInvoice(admin, {
     organizationId: orgId,
     customerId: membership.customer_id,
@@ -83,16 +132,21 @@ export async function generateMembershipInvoiceIfDue(
     issuedAt: periodStart,
     dueDate,
     paidAt: null,
-    lineItems: [
-      {
-        description: `Recurring membership (${membership.billing_frequency}) — ${periodStart} → ${periodEnd}`,
-        qty: 1,
-        unit,
-        source_ref: `blitzpay_membership:${membership.id}`,
-      },
-    ],
+    lineItems,
     notes: `Membership billing period ${periodStart} – ${periodEnd}.`,
     internalNotes: `BlitzPay membership trace\nmembership_id:${membership.id}\ngeneration_key:${genKey}`,
+    taxCalculationMode: taxFields.taxCalculationMode,
+    taxBasis: taxFields.taxBasis,
+    taxJurisdictionLabel: taxFields.taxJurisdictionLabel,
+    taxRatePercent: taxFields.taxRatePercent,
+    taxAmount: taxFields.taxAmount,
+    taxableSubtotal: taxFields.taxableSubtotal,
+    nonTaxableSubtotal: taxFields.nonTaxableSubtotal,
+    taxExemptionApplied: taxFields.taxExemptionApplied,
+    taxExemptionReason: taxFields.taxExemptionReason,
+    taxProvider: taxFields.taxProvider,
+    taxProviderReference: taxFields.taxProviderReference,
+    taxSnapshotJson: taxFields.taxSnapshotJson,
   })
   if (res.error || !res.id) return "error"
 

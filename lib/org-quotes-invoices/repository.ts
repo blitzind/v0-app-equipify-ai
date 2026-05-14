@@ -579,29 +579,53 @@ export async function insertOrgQuote(
     notes: string | null
     internalNotes: string | null
     sentAt: string | null
+    taxCalculationMode?: string | null
+    taxBasis?: string | null
+    taxJurisdictionLabel?: string | null
+    taxRatePercent?: number | null
+    taxAmount?: number | null
+    taxableSubtotal?: number | null
+    nonTaxableSubtotal?: number | null
+    taxExemptionApplied?: boolean | null
+    taxExemptionReason?: string | null
+    taxProvider?: string | null
+    taxProviderReference?: string | null
+    taxSnapshotJson?: unknown
   },
 ): Promise<{ id?: string; error?: string }> {
   const seedKey = `live-${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())}`
 
-  const { data, error } = await supabase
-    .from("org_quotes")
-    .insert({
-      organization_id: payload.organizationId,
-      customer_id: payload.customerId,
-      seed_key: seedKey,
-      title: payload.title.trim(),
-      amount_cents: payload.amountCents,
-      status: quoteStatusUiToDb(payload.status),
-      expires_at: payload.expiresAt || null,
-      equipment_id: payload.equipmentId,
-      work_order_id: payload.workOrderId,
-      line_items: payload.lineItems,
-      notes: payload.notes?.trim() ? payload.notes.trim() : null,
-      internal_notes: payload.internalNotes?.trim() ? payload.internalNotes.trim() : null,
-      sent_at: payload.sentAt,
-    })
-    .select("id")
-    .maybeSingle()
+  const insertRow: Record<string, unknown> = {
+    organization_id: payload.organizationId,
+    customer_id: payload.customerId,
+    seed_key: seedKey,
+    title: payload.title.trim(),
+    amount_cents: payload.amountCents,
+    status: quoteStatusUiToDb(payload.status),
+    expires_at: payload.expiresAt || null,
+    equipment_id: payload.equipmentId,
+    work_order_id: payload.workOrderId,
+    line_items: payload.lineItems,
+    notes: payload.notes?.trim() ? payload.notes.trim() : null,
+    internal_notes: payload.internalNotes?.trim() ? payload.internalNotes.trim() : null,
+    sent_at: payload.sentAt,
+  }
+  if (payload.taxCalculationMode !== undefined) insertRow.tax_calculation_mode = payload.taxCalculationMode
+  if (payload.taxBasis !== undefined) insertRow.tax_basis = payload.taxBasis
+  if (payload.taxJurisdictionLabel !== undefined) insertRow.tax_jurisdiction_label = payload.taxJurisdictionLabel?.trim() || null
+  if (payload.taxRatePercent !== undefined) insertRow.tax_rate_percent = payload.taxRatePercent
+  if (payload.taxAmount !== undefined) insertRow.tax_amount_cents = payload.taxAmount == null ? null : Math.round(payload.taxAmount * 100)
+  if (payload.taxableSubtotal !== undefined)
+    insertRow.taxable_subtotal_cents = payload.taxableSubtotal == null ? null : Math.round(payload.taxableSubtotal * 100)
+  if (payload.nonTaxableSubtotal !== undefined)
+    insertRow.non_taxable_subtotal_cents = payload.nonTaxableSubtotal == null ? null : Math.round(payload.nonTaxableSubtotal * 100)
+  if (payload.taxExemptionApplied !== undefined) insertRow.tax_exemption_applied = payload.taxExemptionApplied
+  if (payload.taxExemptionReason !== undefined) insertRow.tax_exemption_reason = payload.taxExemptionReason?.trim() || null
+  if (payload.taxProvider !== undefined) insertRow.tax_provider = payload.taxProvider?.trim() || null
+  if (payload.taxProviderReference !== undefined) insertRow.tax_provider_reference = payload.taxProviderReference?.trim() || null
+  if (payload.taxSnapshotJson !== undefined) insertRow.tax_snapshot_json = payload.taxSnapshotJson
+
+  const { data, error } = await supabase.from("org_quotes").insert(insertRow).select("id").maybeSingle()
 
   if (error) return { error: error.message }
   const id = (data as { id: string } | null)?.id
