@@ -55,8 +55,18 @@ export function OrgPermissionsProvider({ children }: { children: ReactNode }) {
   const [permissionsJson, setPermissionsJson] = useState<unknown>(null)
 
   const load = useCallback(async () => {
-    if (orgStatus !== "ready" || !organizationId) {
+    if (!organizationId) {
       setLoadStatus("no_org")
+      setRawRole(null)
+      setRawProfile(null)
+      setPermissionsJson(null)
+      return
+    }
+
+    if (orgStatus !== "ready") {
+      // Wait for ActiveOrganizationProvider to finish (e.g. support-session restore) without
+      // flipping to no_org — that state was clearing effective role during hydration.
+      setLoadStatus("loading")
       setRawRole(null)
       setRawProfile(null)
       setPermissionsJson(null)

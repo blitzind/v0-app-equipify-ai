@@ -38,25 +38,55 @@ interface EquipmentTypeContextValue {
 
 const EquipmentTypeContext = createContext<EquipmentTypeContextValue | null>(null)
 
+function debugEquipmentTypes(details: Record<string, unknown>) {
+  if (process.env.NEXT_PUBLIC_DEBUG_NAV !== "true") return
+  const prod = process.env.NODE_ENV === "production"
+  const payload = prod
+    ? {
+        ...details,
+        organizationId: undefined,
+        organizationHint:
+          typeof details.organizationId === "string" && (details.organizationId as string).length > 8
+            ? `…${(details.organizationId as string).slice(-6)}`
+            : undefined,
+      }
+    : details
+  console.info("[equipify:equipment-types]", payload)
+}
+
 export function EquipmentTypeProvider({ children }: { children: ReactNode }) {
-  const { organizationId, status } = useActiveOrganization()
+  const { organizationId, status, supportAccessActive } = useActiveOrganization()
   const orgReady = status === "ready"
   const [types, setTypes] = useState<EquipmentType[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const ensureAttemptedForOrgRef = useRef<string | null>(null)
+  const typesSnapshotRef = useRef<EquipmentType[]>([])
 
   useEffect(() => {
     ensureAttemptedForOrgRef.current = null
   }, [organizationId])
 
   const load = useCallback(async () => {
-    if (!organizationId || !orgReady) {
+    if (!organizationId) {
       setTypes([])
       setError(null)
       setLoading(false)
+      typesSnapshotRef.current = []
+      ensureAttemptedForOrgRef.current = null
       return
     }
+
+    if (!orgReady) {
+      debugEquipmentTypes({
+        event: "skip_load_org_not_ready",
+        organizationId,
+        supportAccessActive,
+        orgStatus: status,
+      })
+      return
+    }
+
     setLoading(true)
     setError(null)
     const supabase = createBrowserSupabaseClient()
@@ -76,7 +106,15 @@ export function EquipmentTypeProvider({ children }: { children: ReactNode }) {
       if (list.length === 0 && ensureAttemptedForOrgRef.current !== organizationId) {
         ensureAttemptedForOrgRef.current = organizationId
         const res = await ensureOrganizationEquipmentTypesIfEmptyAction(organizationId)
-        if (!res.ok && res.message) setError(res.message)
+        if (!res.ok && res.message) {
+          setError(res.message)
+          debugEquipmentTypes({
+            event: "ensure_if_empty_failed",
+            organizationId,
+            supportAccessActive,
+            reason: res.message,
+          })
+        }
         if (res.seeded) {
           const { data: again, error: aErr } = await supabase
             .from("organization_equipment_types")
@@ -109,14 +147,50 @@ export function EquipmentTypeProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      setTypes(mapEquipmentTypeRows(list, usage))
+      const mapped = mapEquipmentTypeRows(list, usage)
+      setError(null)
+      setTypes(mapped)
+      typesSnapshotRef.current = mapped
+      debugEquipmentTypes({
+        event: "load_ok",
+        organizationId,
+        supportAccessActive,
+        typeCount: mapped.length,
+      })
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load equipment types")
-      setTypes([])
+      const msg = e instanceof Error ? e.message : "Failed to load equipment types"
+      let friendly = msg
+      if (
+        msg.includes("You do not have access to this organization.") ||
+        /permission denied|rls|not authorized/i.test(msg)
+      ) {
+        try {
+          const r = await fetch("/api/platform/support-session", { cache: "no-store" })
+          const d = (await r.json()) as { active?: boolean }
+          if (!d.active && supportAccessActive) {
+            friendly =
+              "Support session expired or ended. Return to Platform Admin and use Login as again to open this workspace."
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      setError(friendly)
+      debugEquipmentTypes({
+        event: "load_error",
+        organizationId,
+        supportAccessActive,
+        reason: msg,
+      })
+      if (typesSnapshotRef.current.length > 0) {
+        setTypes(typesSnapshotRef.current)
+      } else {
+        setTypes([])
+      }
     } finally {
       setLoading(false)
     }
-  }, [organizationId, orgReady])
+  }, [organizationId, orgReady, status, supportAccessActive])
 
   useEffect(() => {
     void load()

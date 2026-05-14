@@ -7,6 +7,24 @@ import { buildEquipmentTypeSeedRowsForIndustry } from "@/lib/equipment/organizat
 
 const MANAGER_ROLES = new Set(["owner", "admin", "manager"])
 
+async function hasActiveSupportSessionForOrg(
+  supabase: SupabaseClient,
+  organizationId: string,
+  userId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("organization_support_sessions")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("user_id", userId)
+    .gt("expires_at", new Date().toISOString())
+    .maybeSingle()
+
+  if (error) return false
+  return Boolean(data)
+}
+
+/** Active member with manager+ role, or platform support session for this org (RLS-aligned). */
 async function assertManagerPlus(
   supabase: SupabaseClient,
   organizationId: string,
@@ -21,6 +39,9 @@ async function assertManagerPlus(
     .maybeSingle()
 
   if (error || !data?.role) {
+    if (await hasActiveSupportSessionForOrg(supabase, organizationId, userId)) {
+      return { ok: true }
+    }
     return { ok: false, message: "You do not have access to this organization." }
   }
   if (!MANAGER_ROLES.has(data.role)) {
