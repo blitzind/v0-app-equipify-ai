@@ -13,7 +13,9 @@ export class EmailConfigError extends Error {
 function requireFromAddress(): string {
   const from = getOutboundEmailEnv().fromAddress
   if (!from) {
-    throw new EmailConfigError("EMAIL_FROM_ADDRESS is not set. Add it to the server environment.")
+    throw new EmailConfigError(
+      "EMAIL_FROM_ADDRESS or EMAIL_FROM is not set. Add a verified sender address to the server environment.",
+    )
   }
   return from
 }

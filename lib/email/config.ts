@@ -18,7 +18,7 @@ export function getOutboundEmailEnv(): OutboundEmailEnv {
   return {
     provider: "resend",
     resendApiKey: process.env.RESEND_API_KEY?.trim() || null,
-    fromAddress: process.env.EMAIL_FROM_ADDRESS?.trim() || null,
+    fromAddress: process.env.EMAIL_FROM_ADDRESS?.trim() || process.env.EMAIL_FROM?.trim() || null,
     replyToDefault: process.env.EMAIL_REPLY_TO?.trim() || null,
   }
 }
@@ -38,6 +38,7 @@ export function getOutboundEmailHealth(): {
   hasResendApiKey: boolean
   hasFromAddress: boolean
   hasReplyToDefault: boolean
+  supportEmailOverride: boolean
 } {
   const e = getOutboundEmailEnv()
   return {
@@ -46,6 +47,7 @@ export function getOutboundEmailHealth(): {
     hasResendApiKey: Boolean(e.resendApiKey),
     hasFromAddress: Boolean(e.fromAddress),
     hasReplyToDefault: Boolean(e.replyToDefault),
+    supportEmailOverride: Boolean(process.env.SUPPORT_EMAIL?.trim()),
   }
 }
 
@@ -68,4 +70,11 @@ export function getSignupInternalNotifyRecipient(): string {
   const fromEnv = process.env.EMAIL_SIGNUP_INTERNAL_NOTIFY?.trim()
   if (fromEnv && fromEnv.includes("@")) return fromEnv
   return "mike@equipify.ai"
+}
+
+/** Product / AIden feature request notifications (internal). */
+export function getSupportEmailRecipient(): string {
+  const fromEnv = process.env.SUPPORT_EMAIL?.trim()
+  if (fromEnv && fromEnv.includes("@")) return fromEnv
+  return "support@equipify.ai"
 }

@@ -84,6 +84,7 @@ export function AidenFeatureRequestFlow({
   }
 
   async function submit() {
+    if (submitting) return
     setSubmitting(true)
     setError(null)
     try {

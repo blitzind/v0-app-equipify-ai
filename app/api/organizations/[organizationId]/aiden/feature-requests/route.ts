@@ -5,9 +5,18 @@ import { recordAidenUsageEvent } from "@/lib/aiden/usage-events"
 import { canAccessApp } from "@/lib/billing/access"
 import { getEffectivePlanId } from "@/lib/billing/effective-plan"
 import { getOrganizationSubscription } from "@/lib/billing/subscriptions"
+import { notifySupportNewFeatureRequest } from "@/lib/email/feature-request-support-notify"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
+
+const LOG_SOURCE = "aiden-feature-request-api"
+
+function logApi(event: string, fields: Record<string, unknown>, level: "info" | "error" = "info") {
+  const line = JSON.stringify({ source: LOG_SOURCE, event, ...fields })
+  if (level === "error") console.error(line)
+  else console.info(line)
+}
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -67,12 +76,14 @@ export async function POST(
 ) {
   const { organizationId } = await context.params
   if (!UUID_RE.test(organizationId)) {
+    logApi("request_rejected", { reason: "invalid_organization" }, "error")
     return jsonError("invalid_organization", "Invalid organization id.", 400)
   }
 
   const rawBody = await request.json().catch(() => null)
   const parsed = BodySchema.safeParse(rawBody)
   if (!parsed.success) {
+    logApi("request_rejected", { reason: "invalid_body", organizationId }, "error")
     return jsonError("invalid_body", "Send either draft (from AIden) or manual form fields.", 400)
   }
 
@@ -83,6 +94,7 @@ export async function POST(
   } = await supabase.auth.getUser()
 
   if (authErr || !user?.id) {
+    logApi("request_rejected", { reason: "unauthorized", organizationId }, "error")
     return jsonError("unauthorized", "Sign in required.", 401)
   }
 
@@ -95,11 +107,13 @@ export async function POST(
     .maybeSingle()
 
   if (memberErr || !member) {
+    logApi("request_rejected", { reason: "forbidden", organizationId, userId: user.id }, "error")
     return jsonError("forbidden", "You do not have access to this organization.", 403)
   }
 
   const subscription = await getOrganizationSubscription(supabase, organizationId)
   if (!canAccessApp(subscription)) {
+    logApi("request_rejected", { reason: "billing_inactive", organizationId, userId: user.id }, "error")
     return jsonError(
       "billing_inactive",
       "Feature requests are unavailable while billing is restricted for this workspace.",
@@ -139,6 +153,7 @@ export async function POST(
       : null
 
   if (!payload || !payload.title || !payload.originalQuestion) {
+    logApi("request_rejected", { reason: "invalid_payload", organizationId, userId: user.id }, "error")
     return jsonError("invalid_payload", "Title and description are required.", 400)
   }
 
@@ -200,8 +215,48 @@ export async function POST(
     .single()
 
   if (insertErr || !inserted?.id) {
-    return jsonError("insert_failed", insertErr?.message ?? "Could not save feature request.", 500)
+    logApi(
+      "insert_failed",
+      {
+        organizationId,
+        userId: user.id,
+        dbCode: insertErr?.code ?? null,
+        dbHint: insertErr?.hint ?? null,
+      },
+      "error",
+    )
+    return jsonError("insert_failed", "Could not save feature request. Try again in a moment.", 500)
   }
+
+  logApi("request_saved", { organizationId, userId: user.id, requestId: inserted.id }, "info")
+
+  const submittedAtIso = new Date().toISOString()
+
+  const [{ data: orgRow }, { data: profileRow }] = await Promise.all([
+    supabase.from("organizations").select("name").eq("id", organizationId).maybeSingle(),
+    supabase.from("profiles").select("full_name, email").eq("id", user.id).maybeSingle(),
+  ])
+
+  const organizationName = String((orgRow as { name?: string } | null)?.name ?? "").trim() || "Unknown organization"
+  const prof = profileRow as { full_name?: string | null; email?: string | null } | null
+  const userDisplayName = prof?.full_name?.trim() || null
+  const userEmail = user.email?.trim() || prof?.email?.trim() || null
+
+  await notifySupportNewFeatureRequest({
+    requestId: inserted.id,
+    organizationId,
+    organizationName,
+    userId: user.id,
+    userEmail,
+    userDisplayName,
+    title: String(payload.title ?? ""),
+    originalQuestion: String(payload.originalQuestion ?? ""),
+    module: payload.module,
+    currentPath: payload.path,
+    priority: String(payload.priority ?? "unreviewed"),
+    submissionKind: payload.kind,
+    submittedAtIso,
+  })
 
   await recordAidenUsageEvent({
     organizationId,
