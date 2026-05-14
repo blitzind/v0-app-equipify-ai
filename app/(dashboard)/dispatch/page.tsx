@@ -24,10 +24,7 @@ import {
   WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM,
 } from "@/lib/work-orders/supabase-select"
 import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
-import {
-  queryOrganizationMembersForRoster,
-  queryProfilesForRoster,
-} from "@/lib/technicians/roster-queries"
+import { loadTechnicianAssignOptions } from "@/lib/work-orders/load-technician-assign-options"
 import { cn } from "@/lib/utils"
 import {
   addDays,
@@ -99,8 +96,6 @@ import {
   severityForConflictAck,
 } from "@/lib/dispatch/scheduling-events-client"
 
-const ROSTER_MEMBER_ROLES = ["owner", "admin", "manager", "tech"] as const
-const DISPATCH_STATUSES_BASE = ["open", "scheduled", "in_progress", "completed"] as const
 const DISPATCH_STATUSES_WITH_INVOICED = [
   "open",
   "scheduled",
@@ -371,34 +366,15 @@ function DispatchPageInner() {
       : null
     const assignedWorkOrderIds = assignedScope?.workOrderIds ?? []
 
-    const memberRes = await queryOrganizationMembersForRoster(supabase, {
-      organizationId: orgId,
-      statusIn: ["active"],
-      roleIn: ROSTER_MEMBER_ROLES,
-    })
-
-    if (memberRes.error) {
-      setLoadError(memberRes.error.message)
-      setTechnicians([])
-      setWorkOrders([])
-      setLoading(false)
-      return
-    }
-
-    const userIds = [...new Set((memberRes.data ?? []).map((m: { user_id: string }) => m.user_id))]
-    const profRes = await queryProfilesForRoster(supabase, userIds)
-
-    const techList: DispatchTech[] = (
-      (profRes.data as Array<{ id: string; full_name: string | null; email: string | null; avatar_url?: string | null }> | null) ??
-      []
-    ).map((p) => {
-      const label =
-        (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Technician"
+    const assignOpts = await loadTechnicianAssignOptions(supabase, orgId)
+    const techList: DispatchTech[] = assignOpts.map((o) => {
+      const rosterId = o.linkedUserId ?? o.id
+      const label = o.label
       return {
-        id: p.id,
+        id: rosterId,
         label,
         initials: initialsFromName(label),
-        avatarUrl: p.avatar_url?.trim() || null,
+        avatarUrl: o.avatarUrl?.trim() || null,
       }
     })
     techList.sort((a, b) => a.label.localeCompare(b.label))

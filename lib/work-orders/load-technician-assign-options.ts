@@ -4,6 +4,7 @@ import {
   queryOrganizationMembersForRoster,
   queryProfilesForRoster,
 } from "@/lib/technicians/roster-queries"
+import { isEligibleFieldAssignableMember } from "@/lib/work-orders/assignee-eligibility"
 
 export type TechnicianAssignOption = {
   /**
@@ -11,6 +12,11 @@ export type TechnicianAssignOption = {
    * otherwise `profiles.id` / auth user id (saved as `work_orders.assigned_user_id`).
    */
   id: string
+  /**
+   * When {@link assignmentKind} is `technician` and the row is linked to a login, the auth/profile
+   * user id (for dispatch boards / conflict checks that key off `assigned_user_id`).
+   */
+  linkedUserId: string | null
   label: string
   avatarUrl: string | null
   /** Job title when set, else "Technician". */
@@ -23,6 +29,9 @@ export type TechnicianAssignOption = {
   /** `field_resource` = org member without a linked `technicians` row (owner/admin/manager/tech). */
   assignmentKind?: "technician" | "field_resource"
 }
+
+export const ASSIGNEE_PICKER_EMPTY_HINT =
+  "No assignable technicians or eligible team members. Add an active technician under Technicians, or invite an active field technician in Team."
 
 function formatMemberRole(role: string): string {
   if (!role) return "Member"
@@ -40,6 +49,15 @@ const ROSTER_MEMBER_ROLES = ["owner", "admin", "manager", "tech"] as const
  * Excludes users already linked to an active technician via `organization_members.membership_id`.
  */
 const FIELD_RESOURCE_MEMBER_ROLES = ["owner", "admin", "manager", "tech"] as const
+
+function isMissingColumnOrSchemaError(err: { message?: string } | null): boolean {
+  const m = (err?.message ?? "").toLowerCase()
+  return (
+    (m.includes("column") && m.includes("does not exist")) ||
+    m.includes("could not find") ||
+    (m.includes("schema cache") && m.includes("column"))
+  )
+}
 
 async function buildFieldResourceAssigneeOptions(
   supabase: SupabaseClient,
@@ -65,9 +83,20 @@ async function buildFieldResourceAssigneeOptions(
     job_title?: string | null
     region?: string | null
     availability_status?: string | null
+    permission_profile?: string | null
+    permissions_json?: unknown
   }
 
-  const memberList = (members as M[]).filter((m) => !linkedMemberUserIds.has(m.user_id))
+  const memberList = (members as M[]).filter(
+    (m) =>
+      !linkedMemberUserIds.has(m.user_id) &&
+      isEligibleFieldAssignableMember({
+        role: m.role,
+        status: m.status,
+        permission_profile: m.permission_profile,
+        permissions_json: m.permissions_json,
+      }),
+  )
   if (!memberList.length) return []
 
   const userIds = [...new Set(memberList.map((m) => m.user_id))]
@@ -108,6 +137,7 @@ async function buildFieldResourceAssigneeOptions(
 
     out.push({
       id: uid,
+      linkedUserId: uid,
       label,
       avatarUrl: p.avatar_url?.trim() || null,
       roleLabel,
@@ -140,7 +170,7 @@ async function loadTechnicianAssignOptionsLegacy(
     rosterColumnsAvailable: omRoster,
   } = await queryOrganizationMembersForRoster(supabase, {
     organizationId,
-    statusIn: ["active", "invited"],
+    statusIn: ["active"],
     roleIn: ROSTER_MEMBER_ROLES,
   })
 
@@ -153,9 +183,20 @@ async function loadTechnicianAssignOptionsLegacy(
     job_title?: string | null
     region?: string | null
     availability_status?: string | null
+    permission_profile?: string | null
+    permissions_json?: unknown
   }
 
-  const memberList = members as M[]
+  const memberList = (members as M[]).filter((m) =>
+    isEligibleFieldAssignableMember({
+      role: m.role,
+      status: m.status,
+      permission_profile: m.permission_profile,
+      permissions_json: m.permissions_json,
+    }),
+  )
+  if (!memberList.length) return []
+
   const userIds = [...new Set(memberList.map((m) => m.user_id))]
   const { data: profs, error: profErr } = await queryProfilesForRoster(supabase, userIds)
   if (profErr) return []
@@ -194,6 +235,7 @@ async function loadTechnicianAssignOptionsLegacy(
 
     out.push({
       id: uid,
+      linkedUserId: uid,
       label,
       avatarUrl: p.avatar_url?.trim() || null,
       roleLabel,
@@ -223,15 +265,29 @@ export async function loadTechnicianAssignOptions(
 
   const membershipIds = [...new Set(rows.map((r) => r.membership_id).filter(Boolean))] as string[]
 
-  type OmRow = { membership_id: string; user_id: string; status: string; role: string }
+  type OmRow = {
+    membership_id: string
+    user_id: string
+    status: string
+    role: string
+    permission_profile?: string | null
+    permissions_json?: unknown
+  }
   let omList: OmRow[] = []
   if (membershipIds.length) {
-    const { data: oms } = await supabase
+    let r = await supabase
       .from("organization_members")
-      .select("membership_id, user_id, status, role")
+      .select("membership_id, user_id, status, role, permission_profile, permissions_json")
       .eq("organization_id", organizationId)
       .in("membership_id", membershipIds)
-    omList = (oms ?? []) as OmRow[]
+    if (r.error && isMissingColumnOrSchemaError(r.error)) {
+      r = await supabase
+        .from("organization_members")
+        .select("membership_id, user_id, status, role")
+        .eq("organization_id", organizationId)
+        .in("membership_id", membershipIds)
+    }
+    omList = (r.data ?? []) as OmRow[]
   }
   const omByMembership = new Map(omList.map((o) => [o.membership_id, o]))
 
@@ -258,6 +314,20 @@ export async function loadTechnicianAssignOptions(
   const out: TechnicianAssignOption[] = []
   for (const t of rows) {
     const om = t.membership_id ? omByMembership.get(t.membership_id) : undefined
+    if (t.membership_id) {
+      if (!om || om.status !== "active") continue
+      if (
+        !isEligibleFieldAssignableMember({
+          role: om.role,
+          status: om.status,
+          permission_profile: om.permission_profile,
+          permissions_json: om.permissions_json,
+        })
+      ) {
+        continue
+      }
+    }
+
     const prof = om ? profileById.get(om.user_id) : undefined
 
     const label =
@@ -284,6 +354,7 @@ export async function loadTechnicianAssignOptions(
 
     out.push({
       id: t.id,
+      linkedUserId: om?.user_id ?? null,
       label,
       avatarUrl,
       roleLabel,
@@ -296,7 +367,10 @@ export async function loadTechnicianAssignOptions(
 
   const linkedMemberUserIds = new Set<string>()
   for (const o of omList) {
-    if (o.user_id) linkedMemberUserIds.add(o.user_id)
+    if (o.user_id && o.status === "active") linkedMemberUserIds.add(o.user_id)
+  }
+  for (const opt of out) {
+    if (opt.linkedUserId) linkedMemberUserIds.add(opt.linkedUserId)
   }
 
   const fieldExtras = await buildFieldResourceAssigneeOptions(

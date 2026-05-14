@@ -33,6 +33,7 @@ import { useBillingAccess } from "@/lib/billing-access-context"
 import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
+import { ASSIGNEE_PICKER_EMPTY_HINT } from "@/lib/work-orders/load-technician-assign-options"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import type { WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
@@ -773,6 +774,9 @@ export function QuickAppointmentDialog({
                 ))}
               </SelectContent>
             </Select>
+            {technicians.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">{ASSIGNEE_PICKER_EMPTY_HINT}</p>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-1.5">

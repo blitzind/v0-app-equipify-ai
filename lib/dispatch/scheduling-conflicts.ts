@@ -5,7 +5,7 @@
  * fully reactive to client-side filtering / drag actions. Returns existing
  * appointments that overlap a target tech + date + slot. Two appointments are
  * considered "in the same slot" when:
- *   - assigned to the same technician (assigned_user_id)
+ *   - assigned to the same technician (`assigned_user_id` or `assigned_technician_id`)
  *   - on the same scheduled_on (YYYY-MM-DD)
  *   - share the same dispatch slot index (`timeToSlotIndex`)
  *
@@ -43,6 +43,12 @@ function ymdHead(raw: string | null | undefined): string | null {
   return s.length >= 10 ? s.slice(0, 10) : s
 }
 
+function workOrderMatchesTechnicianSelection(wo: DispatchWo, technicianId: string): boolean {
+  if (wo.assigned_user_id && wo.assigned_user_id === technicianId) return true
+  if (wo.assigned_technician_id && wo.assigned_technician_id === technicianId) return true
+  return false
+}
+
 /**
  * Returns dispatch rows that overlap the target slot. Pass `excludeWoId` when
  * checking before a drag/drop or edit so the moving WO doesn't conflict with
@@ -61,7 +67,7 @@ export function findSlotConflicts(
 
   const out: SchedulingConflict[] = []
   for (const wo of rows) {
-    if (!wo.assigned_user_id || wo.assigned_user_id !== target.technicianId) continue
+    if (!workOrderMatchesTechnicianSelection(wo, target.technicianId)) continue
     if (ymdHead(wo.scheduled_on) !== targetYmd) continue
     if (timeToSlotIndex(wo.scheduled_time) !== targetSlot) continue
     if (exclude && wo.id === exclude) continue
@@ -118,7 +124,7 @@ export function findNeighborSlotConflicts(
 
   const out: SchedulingConflict[] = []
   for (const wo of rows) {
-    if (!wo.assigned_user_id || wo.assigned_user_id !== target.technicianId) continue
+    if (!workOrderMatchesTechnicianSelection(wo, target.technicianId)) continue
     if (ymdHead(wo.scheduled_on) !== targetYmd) continue
     const woSlot = timeToSlotIndex(wo.scheduled_time)
     if (woSlot < 0) continue

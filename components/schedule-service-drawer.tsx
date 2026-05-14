@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import {
+  ASSIGNEE_PICKER_EMPTY_HINT,
   loadTechnicianAssignOptions,
   toScheduleAssigneePickerOptions,
 } from "@/lib/work-orders/load-technician-assign-options"
@@ -867,6 +868,9 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
                     ))}
                   </DrawerSelectContent>
                 </Select>
+                {technicianOptions.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">{ASSIGNEE_PICKER_EMPTY_HINT}</p>
+                ) : null}
               </div>
 
               {/* Notes */}

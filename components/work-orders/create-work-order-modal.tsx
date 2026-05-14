@@ -22,7 +22,7 @@ import {
 import type { WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
-import { loadTechnicianAssignOptions } from "@/lib/work-orders/load-technician-assign-options"
+import { loadTechnicianAssignOptions, ASSIGNEE_PICKER_EMPTY_HINT } from "@/lib/work-orders/load-technician-assign-options"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
@@ -819,6 +819,9 @@ export function CreateWorkOrderModal({
                       ))}
                     </SelectContent>
                   </Select>
+                  {technicians.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">{ASSIGNEE_PICKER_EMPTY_HINT}</p>
+                  ) : null}
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <Label>

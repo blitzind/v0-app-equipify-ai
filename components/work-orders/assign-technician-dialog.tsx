@@ -2,7 +2,7 @@
 
 import { Loader2, MapPin, User } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { TechnicianAssignOption } from "@/lib/work-orders/load-technician-assign-options"
+import { ASSIGNEE_PICKER_EMPTY_HINT, type TechnicianAssignOption } from "@/lib/work-orders/load-technician-assign-options"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -55,9 +55,7 @@ export function AssignTechnicianDialog({
         <ScrollArea className="max-h-[50vh] px-6">
           <div className="space-y-2 pb-2 pr-3">
             {options.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">
-                No assignees found in this organization.
-              </p>
+              <p className="text-sm text-muted-foreground py-6 text-center">{ASSIGNEE_PICKER_EMPTY_HINT}</p>
             ) : (
               options.map((opt) => {
                 const selected = currentTechnicianId === opt.id

@@ -2,6 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 /** Full roster shape when technician migration columns exist. */
 export const ORG_MEMBERS_SELECT_FULL =
+  "user_id, role, status, job_title, region, skills, availability_status, start_date, permission_profile, permissions_json"
+
+/** Fallback when `permission_profile` / `permissions_json` are not deployed yet. */
+export const ORG_MEMBERS_SELECT_FULL_NO_PERMISSIONS =
   "user_id, role, status, job_title, region, skills, availability_status, start_date"
 
 export const ORG_MEMBERS_SELECT_MINIMAL = "user_id, role, status"
@@ -27,23 +31,27 @@ export async function queryOrganizationMembersForRoster(
     roleIn: readonly string[]
   },
 ) {
-  const base = () =>
+  const base = (select: string) =>
     supabase
       .from("organization_members")
-      .select(ORG_MEMBERS_SELECT_FULL)
+      .select(select)
       .eq("organization_id", params.organizationId)
       .in("status", params.statusIn)
       .in("role", [...params.roleIn])
 
-  const first = await base()
+  const first = await base(ORG_MEMBERS_SELECT_FULL)
   if (first.error && isMissingColumnOrSchemaError(first.error)) {
-    const fallback = await supabase
-      .from("organization_members")
-      .select(ORG_MEMBERS_SELECT_MINIMAL)
-      .eq("organization_id", params.organizationId)
-      .in("status", params.statusIn)
-      .in("role", [...params.roleIn])
-    return { ...fallback, rosterColumnsAvailable: false as const }
+    const noPerms = await base(ORG_MEMBERS_SELECT_FULL_NO_PERMISSIONS)
+    if (noPerms.error && isMissingColumnOrSchemaError(noPerms.error)) {
+      const fallback = await supabase
+        .from("organization_members")
+        .select(ORG_MEMBERS_SELECT_MINIMAL)
+        .eq("organization_id", params.organizationId)
+        .in("status", params.statusIn)
+        .in("role", [...params.roleIn])
+      return { ...fallback, rosterColumnsAvailable: false as const }
+    }
+    return { ...noPerms, rosterColumnsAvailable: true as const }
   }
   return { ...first, rosterColumnsAvailable: true as const }
 }

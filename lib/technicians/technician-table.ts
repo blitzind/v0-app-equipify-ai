@@ -16,6 +16,8 @@ export type TechnicianTableRow = {
   start_date: string | null
   labor_rate_cents: number | null
   operational_status: string
+  /** Present when `is_sample` column exists; demo rows are excluded from assignment pickers. */
+  is_sample?: boolean | null
   notes: string | null
   created_at: string
   updated_at: string
@@ -92,19 +94,42 @@ async function resolveLinkedUserId(
   return (data as { user_id?: string } | null)?.user_id ?? null
 }
 
-/** All technicians for roster / assignment pickers. */
+const TECHNICIAN_LIST_SELECT_BASE =
+  "id, organization_id, membership_id, full_name, email, phone, avatar_url, job_title, region, skills, availability_status, start_date, labor_rate_cents, operational_status, notes, created_at, updated_at"
+
+const TECHNICIAN_LIST_SELECT_WITH_SAMPLE = `${TECHNICIAN_LIST_SELECT_BASE}, is_sample`
+
+function isMissingColumnOrSchemaError(err: { message?: string } | null): boolean {
+  const m = (err?.message ?? "").toLowerCase()
+  return (
+    (m.includes("column") && m.includes("does not exist")) ||
+    m.includes("could not find") ||
+    (m.includes("schema cache") && m.includes("column"))
+  )
+}
+
+/** Active operational technicians for assignment pickers (excludes demo rows when `is_sample` exists). */
 export async function listTechniciansForOrg(
   supabase: SupabaseClient,
   organizationId: string,
 ): Promise<TechnicianTableRow[]> {
-  const { data, error } = await supabase
-    .from("technicians")
-    .select(
-      "id, organization_id, membership_id, full_name, email, phone, avatar_url, job_title, region, skills, availability_status, start_date, labor_rate_cents, operational_status, notes, created_at, updated_at",
-    )
-    .eq("organization_id", organizationId)
-    .eq("operational_status", "active")
-    .order("full_name", { ascending: true })
+  async function run(select: string, excludeSample: boolean) {
+    let q = supabase
+      .from("technicians")
+      .select(select)
+      .eq("organization_id", organizationId)
+      .eq("operational_status", "active")
+      .order("full_name", { ascending: true })
+    if (excludeSample) {
+      q = q.eq("is_sample", false)
+    }
+    return q
+  }
+
+  let { data, error } = await run(TECHNICIAN_LIST_SELECT_WITH_SAMPLE, true)
+  if (error && isMissingColumnOrSchemaError(error)) {
+    ;({ data, error } = await run(TECHNICIAN_LIST_SELECT_BASE, false))
+  }
 
   if (error) {
     if (
@@ -115,5 +140,33 @@ export async function listTechniciansForOrg(
     }
     throw new Error(error.message)
   }
-  return (data ?? []) as TechnicianTableRow[]
+
+  let rows = (data ?? []) as TechnicianTableRow[]
+  const mids = [...new Set(rows.map((r) => r.membership_id).filter(Boolean))] as string[]
+  if (mids.length === 0) {
+    return rows
+  }
+
+  const { data: oms, error: omErr } = await supabase
+    .from("organization_members")
+    .select("membership_id, status")
+    .eq("organization_id", organizationId)
+    .in("membership_id", mids)
+
+  if (omErr) {
+    return rows
+  }
+
+  const activeMembershipIds = new Set(
+    ((oms ?? []) as Array<{ membership_id: string; status: string }>)
+      .filter((o) => o.status === "active")
+      .map((o) => o.membership_id),
+  )
+
+  rows = rows.filter((t) => {
+    if (!t.membership_id) return true
+    return activeMembershipIds.has(t.membership_id)
+  })
+
+  return rows
 }
