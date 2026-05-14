@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { equipifyDispatchDebugLog, isEquipifyDispatchDebug } from "@/lib/dispatch/dispatch-debug-log"
+import { teamMemberSettingsListLabel } from "@/lib/team/team-member-display-label"
+import { fetchOrgMemberProfileLabels } from "@/lib/work-orders/fetch-org-member-profile-labels"
 import { listTechniciansForOrg } from "@/lib/technicians/technician-table"
 import {
   queryOrganizationMembersForRoster,
@@ -127,6 +129,76 @@ function avatarFromProfileRecord(p: Record<string, unknown> | undefined): string
   if (!p) return null
   const a = p.avatar_url ?? p.avatarUrl
   return typeof a === "string" && a.trim() ? a.trim() : null
+}
+
+const ASSIGNEE_LABEL_FALLBACK = "Team member"
+
+/**
+ * Fills `profileById` using the same service-backed `profiles` read as Settings → Team
+ * (`/api/organizations/.../member-profile-labels`), so assignee pickers are not blocked by
+ * `profiles` RLS when loading teammates' names in the browser.
+ */
+async function mergeTeamSettingsProfileHydration(
+  organizationId: string,
+  userIds: string[],
+  profileById: Map<string, Record<string, unknown>>,
+): Promise<Set<string>> {
+  const hit = new Set<string>()
+  if (!userIds.length) return hit
+  const hydrated = await fetchOrgMemberProfileLabels(organizationId, userIds)
+  for (const uid of userIds) {
+    const k = normalizeUserIdKey(uid)
+    const row = hydrated[k]
+    if (!row) continue
+    if (!String(row.full_name ?? "").trim() && !String(row.email ?? "").trim()) continue
+    hit.add(k)
+    const existing = profileById.get(k) ?? { id: uid }
+    const label = teamMemberSettingsListLabel(row.full_name, row.email)
+    const emailOut =
+      (row.email && String(row.email).trim()) ||
+      (typeof existing.email === "string" && existing.email.trim()) ||
+      null
+    const av =
+      (row.avatar_url && String(row.avatar_url).trim()) ||
+      (typeof existing.avatar_url === "string" && existing.avatar_url.trim()) ||
+      null
+    profileById.set(k, {
+      ...existing,
+      id: (existing.id as string) || uid,
+      full_name: label === "Member" ? (typeof existing.full_name === "string" ? existing.full_name : null) : label,
+      email: emailOut,
+      ...(av ? { avatar_url: av } : {}),
+    })
+  }
+  return hit
+}
+
+function logAssigneeFallbackDebug(args: {
+  assignmentKind: "technician" | "field_resource"
+  optionId: string
+  teamApiHydrated: boolean
+  profile: Record<string, unknown> | null | undefined
+  member: Record<string, unknown> | null | undefined
+}): void {
+  if (!isEquipifyDispatchDebug()) return
+  equipifyDispatchDebugLog("assignee_label_fallback_missing_fields", {
+    assignmentKind: args.assignmentKind,
+    optionIdSuffix: args.optionId.length > 10 ? args.optionId.slice(-10) : args.optionId,
+    teamApiHydrated: args.teamApiHydrated,
+    profileKeys:
+      args.profile && typeof args.profile === "object" ? Object.keys(args.profile).slice(0, 16).join(",") : "",
+    memberKeys:
+      args.member && typeof args.member === "object" ? Object.keys(args.member).slice(0, 16).join(",") : "",
+    hasProfileFullName: String(Boolean(trimStr((args.profile as { full_name?: unknown })?.full_name))),
+    hasProfileEmail: String(Boolean(trimStr((args.profile as { email?: unknown })?.email))),
+    hasMemberJobTitle: String(Boolean(trimStr((args.member as { job_title?: unknown })?.job_title))),
+  })
+}
+
+function trimStr(v: unknown): string | null {
+  if (v == null) return null
+  const s = typeof v === "string" ? v.trim() : String(v).trim()
+  return s.length ? s : null
 }
 
 /**
@@ -289,6 +361,8 @@ async function buildFieldResourceAssigneeOptions(
   }
   const memberByUser = new Map(memberList.map((m) => [normalizeUserIdKey(m.user_id), m]))
 
+  const teamApiHits = await mergeTeamSettingsProfileHydration(organizationId, userIds, profileById)
+
   const out: TechnicianAssignOption[] = []
   for (const uid of userIds) {
     const p = profileById.get(normalizeUserIdKey(uid))
@@ -298,8 +372,17 @@ async function buildFieldResourceAssigneeOptions(
     const resolved = resolveAssignableDisplayName({
       profile: p ?? null,
       member: m as unknown as Record<string, unknown>,
-      fallback: "Team member",
+      fallback: ASSIGNEE_LABEL_FALLBACK,
     })
+    if (resolved.source === "fallback" && resolved.label === ASSIGNEE_LABEL_FALLBACK) {
+      logAssigneeFallbackDebug({
+        assignmentKind: "field_resource",
+        optionId: uid,
+        teamApiHydrated: teamApiHits.has(normalizeUserIdKey(uid)),
+        profile: p ?? null,
+        member: m as unknown as Record<string, unknown>,
+      })
+    }
     if (isEquipifyDispatchDebug()) {
       equipifyDispatchDebugLog("assignee_display_name_resolved", {
         source: resolved.source,
@@ -468,6 +551,8 @@ async function loadTechnicianAssignOptionsLegacy(
   }
   const memberByUser = new Map(memberList.map((m) => [normalizeUserIdKey(m.user_id), m]))
 
+  const teamApiHitsLegacy = await mergeTeamSettingsProfileHydration(organizationId, userIds, profileById)
+
   const out: TechnicianAssignOption[] = []
   for (const uid of userIds) {
     const p = profileById.get(normalizeUserIdKey(uid))
@@ -477,8 +562,17 @@ async function loadTechnicianAssignOptionsLegacy(
     const resolved = resolveAssignableDisplayName({
       profile: p ?? null,
       member: m as unknown as Record<string, unknown>,
-      fallback: "Team member",
+      fallback: ASSIGNEE_LABEL_FALLBACK,
     })
+    if (resolved.source === "fallback" && resolved.label === ASSIGNEE_LABEL_FALLBACK) {
+      logAssigneeFallbackDebug({
+        assignmentKind: "field_resource",
+        optionId: uid,
+        teamApiHydrated: teamApiHitsLegacy.has(normalizeUserIdKey(uid)),
+        profile: p ?? null,
+        member: m as unknown as Record<string, unknown>,
+      })
+    }
     if (isEquipifyDispatchDebug()) {
       equipifyDispatchDebugLog("assignee_display_name_resolved", {
         source: resolved.source,
@@ -611,6 +705,7 @@ export async function loadTechnicianAssignOptions(
       profileById.set(normalizeUserIdKey(row.id), row)
     }
   }
+  const teamApiHitsTech = await mergeTeamSettingsProfileHydration(organizationId, userIds, profileById)
 
   const out: TechnicianAssignOption[] = []
   for (const t of rows) {
@@ -639,6 +734,15 @@ export async function loadTechnicianAssignOptions(
       technicianDisplayName: preTech,
       fallback: "Technician",
     })
+    if (resolved.source === "fallback" && resolved.label === "Technician" && om) {
+      logAssigneeFallbackDebug({
+        assignmentKind: "technician",
+        optionId: t.id,
+        teamApiHydrated: teamApiHitsTech.has(normalizeUserIdKey(om.user_id)),
+        profile: prof ?? null,
+        member: (om as unknown as Record<string, unknown>) ?? null,
+      })
+    }
     if (isEquipifyDispatchDebug()) {
       equipifyDispatchDebugLog("assignee_display_name_resolved", {
         source: resolved.source,

@@ -37,6 +37,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { MEMBERSHIP_ROLES, type MembershipRole } from "@/lib/team/membership"
+import { teamMemberSettingsListLabel } from "@/lib/team/team-member-display-label"
 import type { TechnicianSkillTagOption } from "@/lib/technicians/skill-tags"
 import {
   COMMERCIAL_PERMISSION_PROFILES,
@@ -117,11 +118,7 @@ function isMembershipRoleString(r: string): r is MembershipRole {
 }
 
 function displayName(m: TeamMemberRow): string {
-  const n = m.fullName?.trim()
-  if (n) return n
-  const e = m.email?.trim()
-  if (e) return e.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-  return "Member"
+  return teamMemberSettingsListLabel(m.fullName, m.email)
 }
 
 function initials(m: TeamMemberRow): string {
