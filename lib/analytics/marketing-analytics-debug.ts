@@ -10,3 +10,13 @@ export function marketingAnalyticsDebug(...args: unknown[]) {
     /* best-effort */
   }
 }
+
+/** Dev or `NEXT_PUBLIC_ANALYTICS_DEBUG=1` — onboarding funnel / redirect timing. */
+export function onboardingAnalyticsDevLog(...args: unknown[]) {
+  if (process.env.NODE_ENV !== "development" && !isMarketingAnalyticsDebugEnabled()) return
+  try {
+    console.info(`${PREFIX} onboarding`, ...args)
+  } catch {
+    /* best-effort */
+  }
+}

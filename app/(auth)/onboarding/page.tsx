@@ -28,6 +28,7 @@ import {
   parseOnboardingSearchParams,
 } from "@/lib/onboarding-canonical"
 import { trackFreeTrialSignup, trackOnboardingCompleted } from "@/lib/analytics/marketing-analytics-events"
+import { onboardingAnalyticsDevLog } from "@/lib/analytics/marketing-analytics-debug"
 
 const STEPS = ["Your account", "Workspace", "Choose a plan"]
 /** Central registry — labels and keys from `lib/workspace-industry-registry.ts` */
@@ -318,21 +319,6 @@ function OnboardingPageContent() {
       setIsSubmitting(false)
     }
 
-    if (authUserId && completedOrganizationId) {
-      trackOnboardingCompleted({
-        userId: authUserId,
-        organizationId: completedOrganizationId,
-        flow: completionFlow,
-      })
-      if (completionFlow === "self_serve") {
-        trackFreeTrialSignup({
-          userId: authUserId,
-          organizationId: completedOrganizationId,
-          selectedPlan,
-        })
-      }
-    }
-
     if (typeof window !== "undefined") {
       window.localStorage.setItem(ONBOARDING_INTENDED_PLAN_STORAGE_KEY, selectedPlan)
       window.localStorage.setItem(
@@ -355,13 +341,39 @@ function OnboardingPageContent() {
         })
       )
     }
-    if (inviteTokenParam) {
-      router.push("/")
-    } else if (parseOnboardingPlan(searchParams.get("plan"))) {
-      router.push(`/settings/billing?plan=${selectedPlan}&source=onboarding`)
-    } else {
-      router.push("/")
+
+    if (authUserId && completedOrganizationId) {
+      try {
+        if (completionFlow === "self_serve") {
+          trackFreeTrialSignup({
+            userId: authUserId,
+            organizationId: completedOrganizationId,
+            selectedPlan,
+          })
+        }
+        await new Promise<void>((resolve) => {
+          trackOnboardingCompleted({
+            userId: authUserId,
+            organizationId: completedOrganizationId,
+            flow: completionFlow,
+            onRedirectReady: resolve,
+          })
+        })
+      } catch (err) {
+        onboardingAnalyticsDevLog(
+          "post-provision analytics failed; continuing to redirect",
+          err,
+        )
+      }
     }
+
+    const redirectHref = inviteTokenParam
+      ? "/"
+      : parseOnboardingPlan(searchParams.get("plan"))
+        ? `/settings/billing?plan=${selectedPlan}&source=onboarding`
+        : "/"
+    onboardingAnalyticsDevLog("router.push after analytics settle", { redirectHref })
+    router.push(redirectHref)
   }
 
   function next() {

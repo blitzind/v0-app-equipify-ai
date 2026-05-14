@@ -36,7 +36,7 @@ They run only after the server confirms success:
 
 | Event / action | When it fires |
 |----------------|----------------|
-| `trackOnboardingCompleted` → GA4 `sign_up`, `onboarding_completed`, optional Ads `conversion` | Immediately after a successful `POST /api/invites/accept` or `POST /api/onboarding/provision` in `app/(auth)/onboarding/page.tsx` (`finalizeOnboarding`), with a parsed `organizationId`. |
+| `trackOnboardingCompleted` → GA4 `sign_up`, `onboarding_completed`, optional Ads `conversion` | After successful `POST /api/invites/accept` or `POST /api/onboarding/provision` in `app/(auth)/onboarding/page.tsx` (`finalizeOnboarding`), with parsed `organizationId`. The page **awaits** `onRedirectReady` from `trackOnboardingCompleted` before `router.push` so the Google Ads hit is not cut off by navigation. Ads conversion uses `transport_type: 'beacon'`, `event_callback`, and a **1500ms** timeout fallback (first wins). |
 | `trackFreeTrialSignup` → GA4 `free_trial_signup` | Same success path, **only** for self-serve provisioning (`completionFlow === "self_serve"`), i.e. when the trial subscription is bootstrapped server-side. |
 
 Client-side deduplication uses `sessionStorage` keys so refresh/retry in the same tab does not double-send the same completion.

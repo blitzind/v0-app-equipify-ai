@@ -1,13 +1,26 @@
 import {
   getGa4MeasurementId,
   getGoogleAdsSignupSendTo,
+  isMarketingAnalyticsDebugEnabled,
   isMarketingAnalyticsEnabled,
 } from "@/lib/analytics/marketing-analytics-config"
-import { marketingAnalyticsDebug } from "@/lib/analytics/marketing-analytics-debug"
+import {
+  marketingAnalyticsDebug,
+  onboardingAnalyticsDevLog,
+} from "@/lib/analytics/marketing-analytics-debug"
 
 export type OnboardingCompletionFlow = "self_serve" | "invite"
 
 const SESSION_KEY_PREFIX = "equipify_mk_analytics_fired:"
+
+function logTempGoogleAdsConversionMessage(message: "fired" | "callback") {
+  if (process.env.NODE_ENV !== "development" && !isMarketingAnalyticsDebugEnabled()) return
+  if (message === "fired") {
+    console.info("Google Ads conversion fired")
+  } else {
+    console.info("Google Ads conversion callback executed")
+  }
+}
 
 function storageKey(kind: string, userId: string, organizationId: string) {
   return `${SESSION_KEY_PREFIX}${kind}:${userId}:${organizationId}`
@@ -36,40 +49,98 @@ function invokeGtag(args: unknown[]) {
     marketingAnalyticsDebug("event skipped: gtag missing", args)
     return
   }
-  gtag(...(args as [string, ...unknown[]]))
+  try {
+    gtag(...(args as [string, ...unknown[]]))
+  } catch (err) {
+    onboardingAnalyticsDevLog("gtag invoke threw (continuing)", err)
+  }
 }
 
+const ADS_CONVERSION_SETTLE_MS = 1500
+
 /**
- * Google Ads conversion — only when `NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO` is set.
- * Fired from `trackOnboardingCompleted` only (deduped per session + user + org).
+ * Google Ads signup conversion — beacon + `event_callback` + timeout so navigation
+ * can wait without racing the network. Calls `onSettled` exactly once.
  */
-function fireGoogleAdsSignupConversionOnce(userId: string, organizationId: string) {
+function fireGoogleAdsSignupConversionOnceWithSettle(
+  userId: string,
+  organizationId: string,
+  onSettled: () => void,
+) {
+  if (typeof window === "undefined") {
+    onSettled()
+    return
+  }
+
   const sendTo = getGoogleAdsSignupSendTo()
   if (!sendTo) {
     marketingAnalyticsDebug("Ads conversion skipped: NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO unset")
+    onSettled()
     return
   }
+
   const key = `${SESSION_KEY_PREFIX}ads_signup:${userId}:${organizationId}`
   if (alreadyFired(key)) {
     marketingAnalyticsDebug("Ads conversion deduped", { userId, organizationId })
+    onSettled()
     return
   }
   markFired(key)
+
+  let settled = false
+  let timerId: ReturnType<typeof window.setTimeout> | undefined
+
+  const settle = () => {
+    if (settled) return
+    settled = true
+    if (timerId !== undefined) {
+      window.clearTimeout(timerId)
+      timerId = undefined
+    }
+    onSettled()
+  }
+
+  timerId = window.setTimeout(() => {
+    onboardingAnalyticsDevLog("Google Ads conversion: timeout fallback before redirect")
+    settle()
+  }, ADS_CONVERSION_SETTLE_MS)
+
+  const gtag = window.gtag
+  if (typeof gtag !== "function") {
+    marketingAnalyticsDebug("Ads conversion skipped: gtag missing")
+    settle()
+    return
+  }
+
   const transaction_id = `${userId}:${organizationId}`
-  invokeGtag([
-    "event",
-    "conversion",
-    {
+
+  logTempGoogleAdsConversionMessage("fired")
+  onboardingAnalyticsDevLog("Google Ads conversion dispatch", {
+    send_to: sendTo,
+    transaction_id,
+    transport_type: "beacon",
+  })
+
+  try {
+    gtag("event", "conversion", {
       send_to: sendTo,
       transaction_id,
-    },
-  ])
-  marketingAnalyticsDebug("Ads conversion", { send_to: sendTo, transaction_id })
+      transport_type: "beacon",
+      event_callback: () => {
+        logTempGoogleAdsConversionMessage("callback")
+        onboardingAnalyticsDevLog("Google Ads conversion event_callback (settling)")
+        settle()
+      },
+    })
+  } catch (err) {
+    onboardingAnalyticsDevLog("Google Ads conversion gtag threw; settling", err)
+    settle()
+  }
 }
 
 /**
  * Fires after the server confirms workspace provisioning (includes trial bootstrap).
- * Maps to GA4 `free_trial_signup` and optional Ads conversion (same send_to as onboarding if configured).
+ * Maps to GA4 `free_trial_signup`.
  */
 export function trackFreeTrialSignup(params: {
   userId: string
@@ -86,6 +157,7 @@ export function trackFreeTrialSignup(params: {
   markFired(dedupeKey)
 
   if (getGa4MeasurementId()) {
+    onboardingAnalyticsDevLog("GA4 free_trial_signup dispatch", params)
     invokeGtag([
       "event",
       "free_trial_signup",
@@ -100,40 +172,74 @@ export function trackFreeTrialSignup(params: {
 
 /**
  * Fires after successful onboarding completion (self-serve provision or invite accept).
- * GA4 recommended `sign_up` plus custom `onboarding_completed`.
+ * GA4 `sign_up` + `onboarding_completed`, then optional Google Ads conversion (beacon +
+ * callback + timeout). Always invokes `onRedirectReady` exactly once so callers can
+ * navigate without racing the conversion hit.
  */
 export function trackOnboardingCompleted(params: {
   userId: string
   organizationId: string
   flow: OnboardingCompletionFlow
+  onRedirectReady: () => void
 }) {
-  if (!isMarketingAnalyticsEnabled()) return
-  const { userId, organizationId, flow } = params
-  const dedupeKey = storageKey("onboarding_completed", userId, organizationId)
-  if (alreadyFired(dedupeKey)) {
-    marketingAnalyticsDebug("onboarding_completed deduped", params)
-    return
-  }
-  markFired(dedupeKey)
+  const { userId, organizationId, flow, onRedirectReady } = params
 
-  if (getGa4MeasurementId()) {
-    invokeGtag([
-      "event",
-      "sign_up",
-      {
-        method: flow === "invite" ? "invite" : "email",
-      },
-    ])
-    invokeGtag([
-      "event",
-      "onboarding_completed",
-      {
+  let redirectNotified = false
+  const notifyRedirect = () => {
+    if (redirectNotified) return
+    redirectNotified = true
+    try {
+      onRedirectReady()
+    } catch (err) {
+      onboardingAnalyticsDevLog("onRedirectReady threw", err)
+    }
+  }
+
+  try {
+    if (!isMarketingAnalyticsEnabled()) {
+      onboardingAnalyticsDevLog("trackOnboardingCompleted: analytics disabled, navigating")
+      notifyRedirect()
+      return
+    }
+
+    const dedupeKey = storageKey("onboarding_completed", userId, organizationId)
+    if (alreadyFired(dedupeKey)) {
+      marketingAnalyticsDebug("onboarding_completed deduped", params)
+      onboardingAnalyticsDevLog(
+        "onboarding_completed session dedupe — still calling onRedirectReady",
+      )
+      notifyRedirect()
+      return
+    }
+    markFired(dedupeKey)
+
+    if (getGa4MeasurementId()) {
+      onboardingAnalyticsDevLog("GA4 sign_up dispatch", { flow })
+      invokeGtag([
+        "event",
+        "sign_up",
+        {
+          method: flow === "invite" ? "invite" : "email",
+        },
+      ])
+      onboardingAnalyticsDevLog("GA4 onboarding_completed dispatch", {
         flow,
-        organization_id: organizationId,
-      },
-    ])
-    marketingAnalyticsDebug("GA4 sign_up + onboarding_completed", params)
-  }
+        organizationId,
+      })
+      invokeGtag([
+        "event",
+        "onboarding_completed",
+        {
+          flow,
+          organization_id: organizationId,
+        },
+      ])
+      marketingAnalyticsDebug("GA4 sign_up + onboarding_completed", params)
+    }
 
-  fireGoogleAdsSignupConversionOnce(userId, organizationId)
+    fireGoogleAdsSignupConversionOnceWithSettle(userId, organizationId, notifyRedirect)
+  } catch (err) {
+    onboardingAnalyticsDevLog("trackOnboardingCompleted unexpected error; navigating", err)
+    notifyRedirect()
+  }
 }
