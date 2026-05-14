@@ -20,6 +20,7 @@ import {
 } from "@/lib/work-orders/load-technician-assign-options"
 import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import { AssignTechnicianDialog } from "@/components/work-orders/assign-technician-dialog"
+import { WO_ASSIGNEE_FALLBACK_LABEL } from "@/lib/work-orders/work-order-assignee-display"
 import { repairLogJsonForPersist } from "@/lib/work-orders/parse-repair-log"
 import {
   deleteWorkOrderAttachment,
@@ -1170,6 +1171,23 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
         description: getWorkOrderDisplay(wo),
       })
       setAssignDialogOpen(false)
+
+      const opt = userId ? technicianAssignOptions.find((o) => o.id === userId) : null
+      const nextTechId = assign.assigned_user_id ?? assign.assigned_technician_id ?? "unassigned"
+      setWo((prev) =>
+        prev && prev.id === wo.id
+          ? {
+              ...prev,
+              technicianId: nextTechId,
+              assignedUserId: assign.assigned_user_id,
+              technicianName: userId
+                ? opt?.label ?? prev.technicianName
+                : "Unassigned",
+              technicianAvatarUrl: userId ? opt?.avatarUrl ?? prev.technicianAvatarUrl : null,
+            }
+          : prev,
+      )
+
       await loadWorkOrder()
       setSchedulingEventsRefresh((n) => n + 1)
       onUpdated?.()
@@ -2824,7 +2842,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                         setDraft((prev) => ({
                           ...prev,
                           technicianId: id,
-                          technicianName: opt?.label ?? "Unknown",
+                          technicianName: opt?.label ?? WO_ASSIGNEE_FALLBACK_LABEL,
                           technicianAvatarUrl: opt?.avatarUrl ?? null,
                         }))
                       }}

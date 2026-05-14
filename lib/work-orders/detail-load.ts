@@ -26,6 +26,7 @@ import {
   listCalibrationTemplates,
   type CalibrationTemplate,
 } from "@/lib/calibration-certificates"
+import { resolveWorkOrderAssigneeUiFields } from "@/lib/work-orders/work-order-assignee-display"
 
 function formatScheduledTime(isoOrTime: string | null): string {
   if (!isoOrTime) return ""
@@ -426,8 +427,6 @@ export async function loadWorkOrderDetailForOrg(
   const w = row as unknown as WoRow
   const resolvedWorkOrderId = w.id
 
-  const techIdCol = w.assigned_technician_id ?? null
-
   const [{ data: cust }, { data: eq }, { data: assigneeProf }, planRes] = await Promise.all([
     supabase
       .from("customers")
@@ -461,27 +460,6 @@ export async function loadWorkOrderDetailForOrg(
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ])
-
-  let techAssignRow: {
-    full_name: string | null
-    email: string | null
-    avatar_url: string | null
-  } | null = null
-  if (techIdCol) {
-    const tRes = await supabase
-      .from("technicians")
-      .select("full_name, email, avatar_url")
-      .eq("id", techIdCol)
-      .eq("organization_id", organizationId)
-      .maybeSingle()
-    if (!tRes.error && tRes.data) {
-      techAssignRow = tRes.data as {
-        full_name: string | null
-        email: string | null
-        avatar_url: string | null
-      }
-    }
-  }
 
   const customerName = (cust as { company_name: string } | null)?.company_name ?? "Unknown Customer"
   const eqRow = eq as {
@@ -519,19 +497,17 @@ export async function loadWorkOrderDetailForOrg(
     email: string | null
     avatar_url: string | null
   } | null
-  const tr = techAssignRow
-  const techName =
-    tr != null
-      ? (tr.full_name && tr.full_name.trim()) ||
-        (tr.email && tr.email.trim()) ||
-        "Technician"
-      : w.assigned_user_id
-        ? (ap?.full_name && ap.full_name.trim()) || (ap?.email && ap.email.trim()) || "Unknown"
-        : "Unassigned"
-  const techId =
-    (w.assigned_technician_id && String(w.assigned_technician_id)) ||
-    w.assigned_user_id ||
-    "unassigned"
+
+  const assigneeUi = await resolveWorkOrderAssigneeUiFields({
+    organizationId,
+    supabase,
+    assignedUserId: w.assigned_user_id,
+    assignedTechnicianId: w.assigned_technician_id ?? null,
+    directProfile: ap,
+  })
+  const techName = assigneeUi.technicianName
+  const techId = assigneeUi.technicianId
+  const techAvatarUrl = assigneeUi.technicianAvatarUrl
 
   const planRow = planRes.data as { name: string; services: unknown } | null
   const planName = w.maintenance_plan_id ? (planRow?.name ?? null) : null
@@ -649,7 +625,7 @@ export async function loadWorkOrderDetailForOrg(
     technicianId: techId,
     assignedUserId: w.assigned_user_id,
     technicianName: techName,
-    technicianAvatarUrl: tr?.avatar_url?.trim() || (w.assigned_user_id ? ap?.avatar_url?.trim() || null : null),
+    technicianAvatarUrl: techAvatarUrl,
     scheduledDate: w.scheduled_on ?? "",
     scheduledTime: formatScheduledTime(w.scheduled_time),
     completedDate: w.completed_at ? w.completed_at.slice(0, 10) : "",

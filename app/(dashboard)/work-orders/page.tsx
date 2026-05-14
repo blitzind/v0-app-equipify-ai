@@ -45,6 +45,12 @@ import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { applyArchivedAtScope } from "@/lib/archive-scope"
 import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
 import { buildWorkOrderListSelect } from "@/lib/work-orders/supabase-select"
+import {
+  batchHydrateAssigneeLabelsByUserId,
+  WO_ASSIGNEE_FALLBACK_LABEL,
+  WO_ASSIGNEE_UNASSIGNED_LABEL,
+} from "@/lib/work-orders/work-order-assignee-display"
+import { teamMemberSettingsListLabel } from "@/lib/team/team-member-display-label"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
 import { AidenOperationalInsightsCard } from "@/components/aiden/aiden-operational-insights-card"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
@@ -144,6 +150,8 @@ type DbWorkOrderRow = {
   scheduled_time: string | null
   completed_at: string | null
   assigned_user_id: string | null
+  /** Present when `buildWorkOrderListSelect` includes assigned technician column. */
+  assigned_technician_id?: string | null
   created_at: string
   invoice_number: string | null
   total_labor_cents: number
@@ -917,28 +925,33 @@ function WorkOrdersPageInner() {
         })
       }
 
-      const profileMap = new Map<string, { label: string; avatarUrl: string | null }>()
-      if (assigneeIds.length > 0) {
-        const { data: profRows } = await supabase
-          .from("profiles")
-          .select("id, full_name, email, avatar_url")
-          .in("id", assigneeIds)
+      const hydratedByUser = await batchHydrateAssigneeLabelsByUserId(orgId, assigneeIds)
 
-        ;(
-          (profRows as Array<{
-            id: string
-            full_name: string | null
-            email: string | null
-            avatar_url: string | null
-          }> | null) ?? []
-        ).forEach((p) => {
-          const label =
-            (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Technician"
-          profileMap.set(p.id, {
-            label,
-            avatarUrl: p.avatar_url?.trim() || null,
+      const techOnlyIds = [
+        ...new Set(
+          list
+            .filter((r) => Boolean(r.assigned_technician_id) && !r.assigned_user_id)
+            .map((r) => r.assigned_technician_id!),
+        ),
+      ]
+      const techOnlyMap = new Map<string, { label: string; avatarUrl: string | null }>()
+      if (techOnlyIds.length > 0) {
+        const { data: trows } = await supabase
+          .from("technicians")
+          .select("id, full_name, email, avatar_url")
+          .eq("organization_id", orgId)
+          .in("id", techOnlyIds)
+        for (const t of (trows ?? []) as Array<{
+          id: string
+          full_name: string | null
+          email: string | null
+          avatar_url: string | null
+        }>) {
+          techOnlyMap.set(t.id, {
+            label: teamMemberSettingsListLabel(t.full_name, t.email),
+            avatarUrl: t.avatar_url?.trim() || null,
           })
-        })
+        }
       }
 
       const planIds = [...new Set(list.map((r) => r.maintenance_plan_id).filter((pid): pid is string => Boolean(pid)))]
@@ -957,9 +970,20 @@ function WorkOrdersPageInner() {
 
       const mapped: WorkOrder[] = list.map((row) => {
         const eq = row.equipment_id ? equipmentMap.get(row.equipment_id) : undefined
-        const techId = row.assigned_user_id ?? "unassigned"
-        const tp = row.assigned_user_id ? profileMap.get(row.assigned_user_id) : undefined
-        const techName = row.assigned_user_id ? (tp?.label ?? "Unknown") : "Unassigned"
+        const aid = row.assigned_user_id
+        const tid = row.assigned_technician_id ?? null
+        const techId = aid ?? tid ?? "unassigned"
+        let techName = WO_ASSIGNEE_UNASSIGNED_LABEL
+        let techAvatar: string | null = null
+        if (aid) {
+          const h = hydratedByUser.get(aid)
+          techName = h?.label ?? WO_ASSIGNEE_FALLBACK_LABEL
+          techAvatar = h?.avatarUrl ?? null
+        } else if (tid) {
+          const t = techOnlyMap.get(tid)
+          techName = t?.label ?? WO_ASSIGNEE_FALLBACK_LABEL
+          techAvatar = t?.avatarUrl ?? null
+        }
 
         const equipmentName = eq
           ? getEquipmentDisplayPrimary({
@@ -984,7 +1008,7 @@ function WorkOrdersPageInner() {
           priority: mapDbPriority(row.priority),
           technicianId: techId,
           technicianName: techName,
-          technicianAvatarUrl: tp?.avatarUrl ?? null,
+          technicianAvatarUrl: techAvatar,
           scheduledDate: row.scheduled_on ?? "",
           scheduledTime: formatScheduledTime(row.scheduled_time),
           completedDate: row.completed_at ? row.completed_at.slice(0, 10) : "",

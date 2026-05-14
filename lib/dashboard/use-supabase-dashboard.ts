@@ -15,6 +15,7 @@ import {
   WORK_ORDER_PIPELINE_CHART_ORDER_DB,
   WORK_ORDER_REVENUE_MONTH_ROLLUP_DB,
 } from "@/lib/kpi/definitions"
+import { batchHydrateAssigneeLabelsByUserId } from "@/lib/work-orders/work-order-assignee-display"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -853,7 +854,7 @@ export function useSupabaseDashboard(
       const rcIds = [...new Set(recent.map((r) => r.customer_id))]
       const reIds = [...new Set(recent.map((r) => r.equipment_id))]
       const rtIds = [...new Set(recent.map((r) => r.assigned_user_id).filter(Boolean))] as string[]
-      const [rcData, reData, rtData] = await Promise.all([
+      const [rcData, reData] = await Promise.all([
         rcIds.length
           ? supabase.from("customers").select("id, company_name").eq("organization_id", orgId).in("id", rcIds)
           : Promise.resolve({ data: [] as { id: string; company_name: string }[] }),
@@ -864,10 +865,9 @@ export function useSupabaseDashboard(
               .eq("organization_id", orgId)
               .in("id", reIds)
           : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-        rtIds.length
-          ? supabase.from("profiles").select("id, full_name, email").in("id", rtIds)
-          : Promise.resolve({ data: [] as { id: string; full_name: string | null; email: string | null }[] }),
       ])
+      const techLabelByUserId =
+        rtIds.length > 0 ? await batchHydrateAssigneeLabelsByUserId(orgId, rtIds) : new Map()
       const cm = new Map(((rcData.data ?? []) as { id: string; company_name: string }[]).map((c) => [c.id, c.company_name]))
       const em = new Map(
         ((reData.data ?? []) as Array<{
@@ -877,12 +877,6 @@ export function useSupabaseDashboard(
           serial_number: string | null
           category: string | null
         }>).map((e) => [e.id, e]),
-      )
-      const tm = new Map(
-        ((rtData.data ?? []) as { id: string; full_name: string | null; email: string | null }[]).map((p) => [
-          p.id,
-          (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Technician",
-        ]),
       )
       const recentRows: RecentWorkOrderRow[] = recent.map((r) => ({
         id: r.id,
@@ -900,7 +894,7 @@ export function useSupabaseDashboard(
               })
             : "—"
         })(),
-        technician: r.assigned_user_id ? tm.get(r.assigned_user_id) ?? "—" : "Unassigned",
+        technician: r.assigned_user_id ? techLabelByUserId.get(r.assigned_user_id)?.label ?? "—" : "Unassigned",
         priority: woDbPriorityToUi(r.priority),
         status: woDbStatusToUi(r.status),
         due: r.scheduled_on ? fmtShortDate(r.scheduled_on) : fmtShortDate(r.created_at.slice(0, 10)),

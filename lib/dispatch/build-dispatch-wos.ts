@@ -12,6 +12,8 @@ import { resolveEffectiveCertificateReleaseMode } from "@/lib/portal/certificate
 import { allLinkedInvoicesPaid } from "@/lib/portal/work-order-invoices"
 import { timeToSlotIndex } from "@/lib/dispatch/board-utils"
 import type { DispatchTech, DispatchWo } from "@/components/dispatch/dispatch-board"
+import { batchHydrateAssigneeLabelsByUserId } from "@/lib/work-orders/work-order-assignee-display"
+import { teamMemberSettingsListLabel } from "@/lib/team/team-member-display-label"
 
 type CustomerLocationRow = {
   id: string
@@ -119,6 +121,36 @@ export async function enrichDispatchWorkOrders(
   const fromSrSet = new Set(
     ((srRows ?? []) as { converted_work_order_id: string }[]).map((r) => r.converted_work_order_id),
   )
+
+  const missingRosterUserIds = new Set<string>()
+  for (const wo of rows) {
+    const u = wo.assigned_user_id?.trim()
+    if (u && !techByUserId.has(u)) missingRosterUserIds.add(u)
+  }
+  let extraUserLabelById = new Map<string, string>()
+  if (missingRosterUserIds.size > 0) {
+    const hydrated = await batchHydrateAssigneeLabelsByUserId(organizationId, [...missingRosterUserIds])
+    for (const [id, v] of hydrated) extraUserLabelById.set(id, v.label)
+  }
+
+  const missingTechOnlyIds = new Set<string>()
+  for (const wo of rows) {
+    const tid = wo.assigned_technician_id?.trim()
+    if (tid && !wo.assigned_user_id?.trim()) missingTechOnlyIds.add(tid)
+  }
+  let extraTechLabelById = new Map<string, string>()
+  if (missingTechOnlyIds.size > 0) {
+    const { data: techRows, error: techErr } = await supabase
+      .from("technicians")
+      .select("id, full_name, email")
+      .eq("organization_id", organizationId)
+      .in("id", [...missingTechOnlyIds])
+    if (!techErr && techRows) {
+      for (const r of techRows as Array<{ id: string; full_name: string | null; email: string | null }>) {
+        extraTechLabelById.set(r.id, teamMemberSettingsListLabel(r.full_name, r.email))
+      }
+    }
+  }
 
   const orgCertMode =
     (orgRes.data as { portal_certificate_release_mode?: string | null } | null)?.portal_certificate_release_mode ?? null
@@ -256,7 +288,13 @@ export async function enrichDispatchWorkOrders(
     const opsBadges = deriveOperationalBadges(input, ctx)
     const flags: OpsFlags = computeOpsFlags(input, ctx)
 
-    const tech = wo.assigned_user_id ? techByUserId.get(wo.assigned_user_id) : null
+    const rosterTech = wo.assigned_user_id ? techByUserId.get(wo.assigned_user_id) : null
+    const technicianLabel =
+      rosterTech?.label ??
+      (wo.assigned_user_id ? extraUserLabelById.get(wo.assigned_user_id) ?? null : null) ??
+      (wo.assigned_technician_id ? extraTechLabelById.get(wo.assigned_technician_id) ?? null : null) ??
+      null
+
     const eqIdsForLoc =
       equipmentIdsByWo.get(wo.id)?.length ? equipmentIdsByWo.get(wo.id)! : wo.equipment_id ? [wo.equipment_id] : []
     let equipLoc: string | null = null
@@ -312,7 +350,7 @@ export async function enrichDispatchWorkOrders(
       type: wo.type ?? null,
       opsBadges,
       opsFlags: flags,
-      technicianLabel: tech?.label ?? null,
+      technicianLabel,
       serviceLocationLabel,
       siteLabel,
       addressLine1,
