@@ -13,6 +13,7 @@ import { AidenPreparedWorkspaceIntentLlmSchema } from "@/lib/aiden/intent/aiden-
 import type { AidenPreparedWorkspaceActionId } from "@/lib/aiden/actions/action-types"
 import { priceListAiResponseSchema } from "@/lib/catalog/import-types"
 import { aiImportResponseSchema } from "@/lib/calibration-templates/ai-import-schema"
+import { equipmentAiScanModelSchema } from "@/lib/equipment/equipment-ai-scan-schema"
 import { parseWithSchemaSafe } from "@/lib/ai/structured"
 import type { AiTaskId, AiTaskInput } from "@/lib/ai/types"
 import { WorkOrderServiceSummaryAiSchema } from "@/lib/work-orders/service-summary-ai-schema"
@@ -25,7 +26,7 @@ import {
 } from "@/lib/ai/trial-operational-snapshot"
 import type { WorkspaceIndustryKey } from "@/lib/workspace-industry-registry"
 
-type MockFileTaskId = Extract<AiTaskId, "catalog_extraction" | "certificate_cleanup">
+type MockFileTaskId = Extract<AiTaskId, "catalog_extraction" | "certificate_cleanup" | "equipment_ai_scan">
 
 export type MockStructuredOutputContext = {
   organizationId: string
@@ -504,6 +505,32 @@ export async function buildMockStructuredOutput<T>(params: {
         totals: { subtotal: 0, tax: 0, total: 0 },
       }
       break
+    case "equipment_ai_scan": {
+      rawObj = {
+        equipmentName: "Trial preview — sample asset",
+        manufacturer: "Preview OEM",
+        model: "Model 100 (trial)",
+        serialNumber: "PREVIEW-SN-0001",
+        equipmentType: "Medical device",
+        subcategory: "Audiometry",
+        documentCustomerName: "Preview Customer LLC",
+        installDate: null,
+        warrantyExpiration: null,
+        lastServiceDate: null,
+        nextServiceDue: null,
+        nextCalibrationDue: null,
+        calibrationIntervalMonths: 12,
+        serviceIntervalDescription: "Annual calibration (preview)",
+        notes:
+          "Trial AI preview — values are illustrative. Upload again on a subscribed workspace for live extraction from your photo or PDF.",
+        supportingDetails: [
+          "Calibrated by: Preview Lab (simulated)",
+          "Standards: preview only — confirm against the source document.",
+        ],
+        confidence: 0.55,
+      }
+      break
+    }
     default:
       rawObj = {
         message:
@@ -762,6 +789,27 @@ export async function buildMockFileExtractionOutput<T>(params: {
             },
           ],
         })
+      : params.task === "equipment_ai_scan"
+        ? equipmentAiScanModelSchema.parse({
+            equipmentName: `Trial preview — ${params.fileName}`,
+            manufacturer: "Preview OEM",
+            model: "Model 200 (trial)",
+            serialNumber: "PREVIEW-SN-FILE",
+            equipmentType: "Medical device",
+            subcategory: null,
+            documentCustomerName: null,
+            installDate: null,
+            warrantyExpiration: null,
+            lastServiceDate: null,
+            nextServiceDue: null,
+            nextCalibrationDue: null,
+            calibrationIntervalMonths: null,
+            serviceIntervalDescription: null,
+            notes:
+              "Trial AI preview — file extraction is simulated. Re-upload after upgrading for live parsing from your photo or PDF.",
+            supportingDetails: [`Simulated scan of ${params.byteLength} bytes.`],
+            confidence: 0.5,
+          })
       : aiImportResponseSchema.parse({
           templateName: `Preview template (${params.fileName})`,
           equipmentCategory: "General",

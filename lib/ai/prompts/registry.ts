@@ -100,6 +100,52 @@ Rules:
       "Analyze this calibration certificate and output the JSON template object as specified.",
   },
   {
+    promptId: "equipify.equipment.ai_scan_extraction",
+    version: 1,
+    task: "equipment_ai_scan",
+    schemaVersion: "equipment_scan_v1",
+    active: true,
+    changelog: "Equipment AI scan: nameplate photos + calibration/spec PDF text extraction.",
+    outputFormatNotes:
+      "Single JSON: equipmentName, manufacturer, model, serialNumber, equipmentType, subcategory, documentCustomerName, dates, calibrationIntervalMonths, serviceIntervalDescription, notes, supportingDetails[], confidence.",
+    systemPrompt: `You extract structured equipment data for a field-service CMMS (Equipify).
+
+You may receive either:
+- A photo of a nameplate, label, or equipment (via vision), OR
+- Plain text extracted from a PDF (calibration certificate, spec sheet, service report).
+
+Return ONE JSON object only (no markdown fences) with this exact shape:
+{
+  "equipmentName": string | null,
+  "manufacturer": string | null,
+  "model": string | null,
+  "serialNumber": string | null,
+  "equipmentType": string | null (short category label, e.g. "HVAC", "Medical device", "Audiometer", "Pump"),
+  "subcategory": string | null (optional refinement),
+  "documentCustomerName": string | null (customer/account printed on the document — do not invent),
+  "installDate": string | null (ISO YYYY-MM-DD if clearly stated),
+  "warrantyExpiration": string | null (ISO YYYY-MM-DD if clearly stated),
+  "lastServiceDate": string | null (ISO YYYY-MM-DD if clearly stated),
+  "nextServiceDue": string | null (ISO YYYY-MM-DD if clearly stated),
+  "nextCalibrationDue": string | null (ISO YYYY-MM-DD if clearly stated),
+  "calibrationIntervalMonths": number | null (integer months if stated or implied, else null),
+  "serviceIntervalDescription": string | null (free text like "Annual PM" if present),
+  "notes": string | null (concise observations about condition, configuration, or certificate outcome),
+  "supportingDetails": string[] (0–12 short lines: calibrated-by lab, technician name, reference standards such as ANSI, firmware/version, transducer/probe model, environmental corrections, ACS hardware, etc. Each line max ~300 characters; summarize, do not paste huge tables),
+  "confidence": number | null (0–1 for your overall extraction quality)
+}
+
+Rules:
+- Prefer empty/null over guessing serial numbers, model numbers, or customer names.
+- Normalize obvious dates to ISO; if only month/year appears, use the first day of that month.
+- If the document is a calibration certificate, map "next calibration due" / "due date" / "valid until" to nextCalibrationDue when applicable.
+- Put information that does not map cleanly to the fields above into supportingDetails[] and/or notes — keep notes readable and under ~800 characters when possible (the app may append supportingDetails).
+- Never include API keys, internal URLs, or raw multi-page dumps.
+- equipmentName should be a human-friendly asset title when visible (e.g. device marketing name); otherwise derive from manufacturer + model.`,
+    userPromptTemplate:
+      "File name: {{fileName}}. Extract equipment fields as JSON exactly as specified.",
+  },
+  {
     promptId: "equipify.ocr.plaintext_cleanup",
     version: 1,
     task: "OCR_cleanup",

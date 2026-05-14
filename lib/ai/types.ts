@@ -12,6 +12,7 @@ export type AiTaskId =
   | "quote_generation"
   | "invoice_summary"
   | "certificate_cleanup"
+  | "equipment_ai_scan"
   | "maintenance_prediction"
   | "customer_email"
   | "workflow_builder"

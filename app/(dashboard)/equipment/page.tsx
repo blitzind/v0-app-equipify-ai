@@ -713,7 +713,9 @@ function EquipmentPageInner() {
                 <Sparkles className="w-4 h-4 text-[color:var(--ds-info-subtle)] shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-[color:var(--ds-info-text)]">Scan with AI</p>
-                  <p className="text-xs text-muted-foreground">Upload a photo to auto-fill</p>
+                  <p className="text-xs text-muted-foreground">
+                    Upload a photo, PDF certificate, or spec sheet to auto-fill
+                  </p>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -948,6 +950,10 @@ function EquipmentPageInner() {
       <AIScanModal
         open={scanModalOpen}
         onClose={() => setScanModalOpen(false)}
+        organizationId={activeOrgId}
+        orgReady={orgStatus === "ready"}
+        equipmentCreateEligibility={equipmentCreateEligibility}
+        onSaved={() => setRefreshToken((v) => v + 1)}
       />
 
       <QuickAddParamBridge

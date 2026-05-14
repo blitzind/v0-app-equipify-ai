@@ -57,7 +57,11 @@ function routerShouldUseCache(def: AiTaskDefinition, options: RunAiTaskOptions):
   if (!def.cacheable || !def.allowResponseCaching || options.skipCache) return false
   const oid = options.organizationId?.trim()
   if (!oid) return false
-  if (def.id === "catalog_extraction" || def.id === "certificate_cleanup") {
+  if (
+    def.id === "catalog_extraction" ||
+    def.id === "certificate_cleanup" ||
+    def.id === "equipment_ai_scan"
+  ) {
     return Boolean(options.cacheKeyExtras?.file_sha256?.trim())
   }
   return true

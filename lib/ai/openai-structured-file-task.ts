@@ -72,7 +72,10 @@ function openAiChainFromTask(def: AiTaskDefinition): AiModelRef[] {
   return merged.filter((r) => r.provider === "openai")
 }
 
-export type StructuredFileTaskId = Extract<AiTaskId, "catalog_extraction" | "certificate_cleanup">
+export type StructuredFileTaskId = Extract<
+  AiTaskId,
+  "catalog_extraction" | "certificate_cleanup" | "equipment_ai_scan"
+>
 
 export async function executeOpenAiStructuredFileExtraction<T>(args: {
   organizationId: string | null
@@ -98,7 +101,9 @@ export async function executeOpenAiStructuredFileExtraction<T>(args: {
 
   const base = getTaskDefinition(args.task)
   const legacy =
-    args.task === "catalog_extraction" ? legacyCatalogOverrides() : legacyCertificateOverrides()
+    args.task === "catalog_extraction"
+      ? legacyCatalogOverrides()
+      : legacyCertificateOverrides()
   const def = mergeTaskDef(base, legacy)
   const primaryRef = applyPrimaryModelRef(def.id, def.primaryModel)
   const chain = openAiChainFromTask({ ...def, primaryModel: primaryRef })
@@ -319,7 +324,11 @@ export async function executeOpenAiStructuredFileExtraction<T>(args: {
 
   try {
     const isPdf = args.mimeType === "application/pdf"
-    const isImage = args.mimeType === "image/png" || args.mimeType === "image/jpeg"
+    const isImage =
+      args.mimeType === "image/png" ||
+      args.mimeType === "image/jpeg" ||
+      args.mimeType === "image/webp" ||
+      args.mimeType === "image/gif"
 
     if (isPdf) {
       const file = await toFile(args.buffer, args.fileName || "document.pdf", {
@@ -498,7 +507,7 @@ export async function executeOpenAiStructuredFileExtraction<T>(args: {
         const aborted = err.name === "AbortError" || err.message.includes("aborted")
         lastError = aborted
           ? new Error(
-              args.task === "catalog_extraction"
+              args.task === "catalog_extraction" || args.task === "equipment_ai_scan"
                 ? "AI extraction timed out. Try a smaller PDF or try again."
                 : "Import timed out. Try again with a smaller file.",
             )
@@ -556,7 +565,7 @@ export async function executeOpenAiStructuredFileExtraction<T>(args: {
       message: lastError?.message,
     })
 
-    if (args.task === "catalog_extraction") {
+    if (args.task === "catalog_extraction" || args.task === "equipment_ai_scan") {
       throw lastError ?? new Error("AI extraction failed. Try a smaller PDF or try again.")
     }
     throw lastError ?? new Error("Import failed. Try again.")
