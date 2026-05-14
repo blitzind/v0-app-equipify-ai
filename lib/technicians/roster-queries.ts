@@ -61,10 +61,8 @@ export async function queryOrganizationMembersForRoster(
   if (!last.error) {
     return { ...last, rosterColumnsAvailable: true as const }
   }
-  if (!isMissingColumnOrSchemaError(last.error)) {
-    return { ...last, rosterColumnsAvailable: false as const }
-  }
 
+  // Try progressively narrower projections until one succeeds (schema drift, optional columns, etc.).
   for (let i = 1; i < ordered.length; i++) {
     last = await base(ordered[i])
     if (!last.error) {
@@ -72,7 +70,7 @@ export async function queryOrganizationMembersForRoster(
       return { ...last, rosterColumnsAvailable }
     }
     if (!isMissingColumnOrSchemaError(last.error)) {
-      return { ...last, rosterColumnsAvailable: false as const }
+      continue
     }
   }
 

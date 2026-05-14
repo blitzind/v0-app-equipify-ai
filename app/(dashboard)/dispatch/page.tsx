@@ -57,6 +57,7 @@ import {
   filterDispatchRows,
   sortDispatchRows,
 } from "@/lib/dispatch/build-dispatch-wos"
+import { equipifyDispatchDebugLog, sanitizeUserFacingLoadError } from "@/lib/dispatch/dispatch-debug-log"
 import { DISPATCH_FOCUS_OPTIONS, type DispatchFilterId } from "@/lib/dispatch/operational-badges"
 import {
   DEFAULT_DISPATCH_STATUSES,
@@ -349,7 +350,9 @@ function DispatchPageInner() {
     const we = toYmd(weekEnd)
 
     setLoading(true)
+    equipifyDispatchDebugLog("dispatch_load_start", { organizationId: orgId })
 
+    try {
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -357,7 +360,6 @@ function DispatchPageInner() {
       setLoadError("Sign in to load dispatch.")
       setTechnicians([])
       setWorkOrders([])
-      setLoading(false)
       return
     }
 
@@ -531,15 +533,13 @@ function DispatchPageInner() {
     const [rangeRes, unassignRes] = await Promise.all([fetchRange(), unassignPromise])
 
     if (rangeRes.error) {
-      setLoadError(rangeRes.error.message)
+      setLoadError(sanitizeUserFacingLoadError(rangeRes.error.message))
       setWorkOrders([])
-      setLoading(false)
       return
     }
     if (unassignRes.error) {
-      setLoadError(unassignRes.error.message)
+      setLoadError(sanitizeUserFacingLoadError(unassignRes.error.message))
       setWorkOrders([])
-      setLoading(false)
       return
     }
 
@@ -621,7 +621,18 @@ function DispatchPageInner() {
     const enriched = await enrichDispatchWorkOrders(supabase, orgId, mergedRaw, techByUserId, customerMap)
 
     setWorkOrders(enriched)
-    setLoading(false)
+    equipifyDispatchDebugLog("dispatch_load_ok", {
+      workOrderCount: enriched.length,
+      technicianCount: rosterTechs.length,
+    })
+    } catch (e) {
+      const safe = sanitizeUserFacingLoadError(e)
+      setLoadError(safe)
+      setWorkOrders([])
+      equipifyDispatchDebugLog("dispatch_load_failed", { message: safe })
+    } finally {
+      setLoading(false)
+    }
   }, [activeOrgId, orgStatus, weekStart, weekEnd, includeInvoiced, assignedOnlyView])
 
   useEffect(() => {

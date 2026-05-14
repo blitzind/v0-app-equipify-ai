@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { equipifyDispatchDebugLog } from "@/lib/dispatch/dispatch-debug-log"
 import { listTechniciansForOrg } from "@/lib/technicians/technician-table"
 import {
   queryOrganizationMembersForRoster,
@@ -74,7 +75,13 @@ async function buildFieldResourceAssigneeOptions(
     roleIn: FIELD_RESOURCE_MEMBER_ROLES,
   })
 
-  if (memErr || !members?.length) return []
+  if (memErr) {
+    equipifyDispatchDebugLog("assignee_field_members_query_error", {
+      reason: String(memErr.message ?? "unknown").slice(0, 160),
+    })
+    return []
+  }
+  if (!members?.length) return []
 
   type M = {
     user_id: string
@@ -103,7 +110,11 @@ async function buildFieldResourceAssigneeOptions(
 
   const userIds = [...new Set(memberList.map((m) => m.user_id))]
   const { data: profs, error: profErr } = await queryProfilesForRoster(supabase, userIds)
-  if (profErr) return []
+  if (profErr) {
+    equipifyDispatchDebugLog("assignee_field_profiles_query_error", {
+      reason: String(profErr.message ?? "unknown").slice(0, 160),
+    })
+  }
 
   const profileById = new Map(
     ((profs ?? []) as Array<{
@@ -119,10 +130,11 @@ async function buildFieldResourceAssigneeOptions(
   for (const uid of userIds) {
     const p = profileById.get(uid)
     const m = memberByUser.get(uid)
-    if (!p || !m) continue
+    if (!m) continue
+    if (!p && !profErr) continue
 
     const label =
-      (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Team member"
+      (p?.full_name && p.full_name.trim()) || (p?.email && p.email.trim()) || "Team member"
 
     const roleLabel =
       omRoster && m.job_title?.trim()
@@ -141,7 +153,7 @@ async function buildFieldResourceAssigneeOptions(
       id: uid,
       linkedUserId: uid,
       label,
-      avatarUrl: p.avatar_url?.trim() || null,
+      avatarUrl: p?.avatar_url?.trim() || null,
       roleLabel,
       region,
       fieldStatus,
@@ -176,7 +188,13 @@ async function loadTechnicianAssignOptionsLegacy(
     roleIn: ROSTER_MEMBER_ROLES,
   })
 
-  if (memErr || !members?.length) return []
+  if (memErr) {
+    equipifyDispatchDebugLog("assignee_legacy_members_query_error", {
+      reason: String(memErr.message ?? "unknown").slice(0, 160),
+    })
+    return []
+  }
+  if (!members?.length) return []
 
   type M = {
     user_id: string
@@ -203,7 +221,11 @@ async function loadTechnicianAssignOptionsLegacy(
 
   const userIds = [...new Set(memberList.map((m) => m.user_id))]
   const { data: profs, error: profErr } = await queryProfilesForRoster(supabase, userIds)
-  if (profErr) return []
+  if (profErr) {
+    equipifyDispatchDebugLog("assignee_legacy_profiles_query_error", {
+      reason: String(profErr.message ?? "unknown").slice(0, 160),
+    })
+  }
 
   const profileById = new Map(
     ((profs ?? []) as Array<{
@@ -219,10 +241,11 @@ async function loadTechnicianAssignOptionsLegacy(
   for (const uid of userIds) {
     const p = profileById.get(uid)
     const m = memberByUser.get(uid)
-    if (!p || !m) continue
+    if (!m) continue
+    if (!p && !profErr) continue
 
     const label =
-      (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Team member"
+      (p?.full_name && p.full_name.trim()) || (p?.email && p.email.trim()) || "Team member"
 
     const roleLabel =
       omRoster && m.job_title?.trim()
@@ -241,7 +264,7 @@ async function loadTechnicianAssignOptionsLegacy(
       id: uid,
       linkedUserId: uid,
       label,
-      avatarUrl: p.avatar_url?.trim() || null,
+      avatarUrl: p?.avatar_url?.trim() || null,
       roleLabel,
       region,
       fieldStatus,
@@ -251,6 +274,7 @@ async function loadTechnicianAssignOptionsLegacy(
   }
 
   out.sort((a, b) => a.label.localeCompare(b.label))
+  equipifyDispatchDebugLog("assignee_options_loaded_legacy", { total: out.length })
   return out
 }
 
@@ -400,5 +424,11 @@ export async function loadTechnicianAssignOptions(
   }
 
   out.sort((a, b) => a.label.localeCompare(b.label))
+  const fieldResourceMemberCount = out.filter((o) => o.assignmentKind === "field_resource").length
+  equipifyDispatchDebugLog("assignee_options_loaded", {
+    total: out.length,
+    technicians: out.length - fieldResourceMemberCount,
+    fieldResourceMembers: fieldResourceMemberCount,
+  })
   return out
 }

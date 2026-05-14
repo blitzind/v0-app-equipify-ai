@@ -1996,6 +1996,7 @@ function ServiceSchedulePageInner() {
 
     async function loadScheduledWorkOrders() {
       setScheduledWoLoading(true)
+      try {
       const supabase = createBrowserSupabaseClient()
       const {
         data: { user },
@@ -2005,7 +2006,6 @@ function ServiceSchedulePageInner() {
         if (active) {
           setScheduledWoRows([])
           setUnassignedWoRows([])
-          setScheduledWoLoading(false)
         }
         return
       }
@@ -2014,7 +2014,6 @@ function ServiceSchedulePageInner() {
         if (active) {
           setScheduledWoRows([])
           setUnassignedWoRows([])
-          setScheduledWoLoading(false)
         }
         return
       }
@@ -2130,7 +2129,6 @@ function ServiceSchedulePageInner() {
         if (active) {
           setScheduledWoRows([])
           setUnassignedWoRows([])
-          setScheduledWoLoading(false)
         }
         return
       }
@@ -2252,7 +2250,14 @@ function ServiceSchedulePageInner() {
       const assignOpts = await loadTechnicianAssignOptions(supabase, orgId)
       if (!active) return
       setAssignTechnicians(toScheduleAssigneePickerOptions(assignOpts))
-      setScheduledWoLoading(false)
+      } catch {
+        if (active) {
+          setScheduledWoRows([])
+          setUnassignedWoRows([])
+        }
+      } finally {
+        if (active) setScheduledWoLoading(false)
+      }
     }
 
     loadScheduledWorkOrders()

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { LinkedInvoiceRow } from "@/lib/portal/work-order-invoices"
+import { equipifyDispatchDebugLog } from "@/lib/dispatch/dispatch-debug-log"
 
 /** Operational aging buckets for unpaid invoice exposure (not accounting). */
 export type InvoiceAgingBucket =
@@ -108,21 +109,29 @@ export async function fetchWorkOrderInvoiceOpsBatch(
         .select("id, status, due_date, issued_at, work_order_id")
         .eq("organization_id", organizationId)
         .in("work_order_id", workOrderIds)
-      if (fallback.error) throw new Error(fallback.error.message)
-      directData = ((fallback.data ?? []) as Array<Omit<InvRow, "portal_certificate_release_override">>).map(
-        (r) => ({ ...r, portal_certificate_release_override: null }),
-      )
+      if (fallback.error) {
+        equipifyDispatchDebugLog("invoice_batch_direct_fallback_failed", {
+          reason: String(fallback.error.message ?? "unknown").slice(0, 120),
+        })
+        directData = []
+      } else {
+        directData = ((fallback.data ?? []) as Array<Omit<InvRow, "portal_certificate_release_override">>).map(
+          (r) => ({ ...r, portal_certificate_release_override: null }),
+        )
+      }
     } else {
-      throw new Error(directRes.error.message)
+      equipifyDispatchDebugLog("invoice_batch_direct_skipped", {
+        reason: String(directRes.error.message ?? "unknown").slice(0, 120),
+      })
+      directData = []
     }
   }
 
   const canUseLinkTable = !linkRes.error
-    ? true
-    : !isMissingDbObject(linkRes.error.message)
-
-  if (linkRes.error && canUseLinkTable) {
-    throw new Error(linkRes.error.message)
+  if (linkRes.error) {
+    equipifyDispatchDebugLog("invoice_batch_links_unavailable", {
+      reason: String(linkRes.error.message ?? "unknown").slice(0, 120),
+    })
   }
 
   const byWo = new Map<string, Map<string, InvRow>>()
@@ -141,9 +150,10 @@ export async function fetchWorkOrderInvoiceOpsBatch(
   }
 
   const extraIds = new Set<string>()
-  const linkRows = canUseLinkTable
-    ? ((linkRes.data ?? []) as { invoice_id: string; work_order_id: string }[])
-    : []
+  const linkRows =
+    canUseLinkTable && !linkRes.error
+      ? ((linkRes.data ?? []) as { invoice_id: string; work_order_id: string }[])
+      : []
   for (const r of linkRows) {
     extraIds.add(r.invoice_id)
   }
@@ -154,11 +164,16 @@ export async function fetchWorkOrderInvoiceOpsBatch(
       .select("id, status, due_date, issued_at, work_order_id, portal_certificate_release_override")
       .eq("organization_id", organizationId)
       .in("id", [...extraIds])
-    if (error) throw new Error(error.message)
-    const invMap = new Map((extraRows ?? []).map((r) => [(r as InvRow).id, r as InvRow]))
-    for (const r of linkRows) {
-      const inv = invMap.get(r.invoice_id)
-      if (inv) addInv(r.work_order_id, inv)
+    if (error) {
+      equipifyDispatchDebugLog("invoice_batch_extra_skipped", {
+        reason: String(error.message ?? "unknown").slice(0, 120),
+      })
+    } else {
+      const invMap = new Map((extraRows ?? []).map((r) => [(r as InvRow).id, r as InvRow]))
+      for (const r of linkRows) {
+        const inv = invMap.get(r.invoice_id)
+        if (inv) addInv(r.work_order_id, inv)
+      }
     }
   }
 
