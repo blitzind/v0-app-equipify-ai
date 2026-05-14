@@ -1,11 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 const ORG_MEMBERS_ROSTER_CORE =
-  "organization_id, user_id, role, status, job_title, region, skills, availability_status, start_date"
+  "organization_id, user_id, membership_id, role, status, job_title, region, skills, availability_status, start_date"
 
 /** Same as {@link ORG_MEMBERS_ROSTER_CORE} but without `skills` (optional column drift). */
 const ORG_MEMBERS_ROSTER_NO_SKILLS =
-  "organization_id, user_id, role, status, job_title, region, availability_status, start_date"
+  "organization_id, user_id, membership_id, role, status, job_title, region, availability_status, start_date"
 
 /** Full roster shape: roster columns + permission overlays + field-resource flag. */
 export const ORG_MEMBERS_SELECT_FULL =
@@ -106,6 +106,36 @@ export async function queryProfilesForRoster(supabase: SupabaseClient, userIds: 
     return { ...fallback, rosterColumnsAvailable: false as const }
   }
   return { ...first, rosterColumnsAvailable: true as const }
+}
+
+/** Optional extra name columns; falls back to {@link queryProfilesForRoster} when not migrated. */
+const PROFILES_ASSIGN_PICKER_EXTENDED =
+  "id, email, full_name, avatar_url, display_name, first_name, last_name, created_at, phone"
+
+export async function queryProfilesForAssigneePicker(
+  supabase: SupabaseClient,
+  userIds: string[],
+): Promise<{
+  data: unknown[] | null
+  error: { message?: string } | null
+  columnSet: "extended" | "full" | "minimal"
+}> {
+  if (userIds.length === 0) {
+    return { data: [], error: null, columnSet: "full" }
+  }
+  const ext = await supabase.from("profiles").select(PROFILES_ASSIGN_PICKER_EXTENDED).in("id", userIds)
+  if (!ext.error) {
+    return { data: ext.data ?? [], error: null, columnSet: "extended" }
+  }
+  if (isMissingColumnOrSchemaError(ext.error)) {
+    const r = await queryProfilesForRoster(supabase, userIds)
+    return {
+      data: (r.data ?? []) as unknown[],
+      error: r.error,
+      columnSet: r.rosterColumnsAvailable ? "full" : "minimal",
+    }
+  }
+  return { data: ext.data ?? [], error: ext.error, columnSet: "minimal" }
 }
 
 const PROFILE_DRAWER_FULL = "full_name, email, avatar_url, phone"

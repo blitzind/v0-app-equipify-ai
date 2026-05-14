@@ -4,6 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useMaintenancePlans } from "@/lib/maintenance-store";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { computeNextDueDate } from "@/lib/maintenance-plans/db-map";
+import {
+  normalizeUserIdKey,
+  resolveAssignableDisplayName,
+} from "@/lib/work-orders/assignee-display-name";
 import type {
   MaintenancePlan,
   MaintenancePlanService,
@@ -252,19 +256,25 @@ export function CreateMaintenancePlanDialog({
           .select("id, full_name, email")
           .in("id", userIds);
 
-        techOptions = (
-          (profRows as Array<{
-            id: string;
-            full_name: string | null;
-            email: string | null;
-          }> | null) ?? []
-        ).map((p) => ({
-          id: p.id,
-          label:
-            (p.full_name && p.full_name.trim()) ||
-            (p.email && p.email.trim()) ||
-            "Team member",
-        }));
+        const memberByUser = new Map(
+          (memberRows ?? []).map((m) => [
+            normalizeUserIdKey((m as { user_id: string }).user_id),
+            m as Record<string, unknown>,
+          ]),
+        );
+
+        techOptions = ((profRows as Array<Record<string, unknown>> | null) ?? []).map((p) => {
+          const id = String(p.id ?? "");
+          const mem = memberByUser.get(normalizeUserIdKey(id)) ?? null;
+          return {
+            id,
+            label: resolveAssignableDisplayName({
+              profile: p,
+              member: mem,
+              fallback: "Team member",
+            }).label,
+          };
+        });
         techOptions.sort((a, b) => a.label.localeCompare(b.label));
       }
 

@@ -3,12 +3,16 @@ import { equipifyDispatchDebugLog, isEquipifyDispatchDebug } from "@/lib/dispatc
 import { listTechniciansForOrg } from "@/lib/technicians/technician-table"
 import {
   queryOrganizationMembersForRoster,
-  queryProfilesForRoster,
+  queryProfilesForAssigneePicker,
 } from "@/lib/technicians/roster-queries"
 import {
   isAssignableFieldResourceMember,
   isEligibleFieldAssignableMember,
 } from "@/lib/work-orders/assignee-eligibility"
+import {
+  normalizeUserIdKey,
+  resolveAssignableDisplayName,
+} from "@/lib/work-orders/assignee-display-name"
 import { readIsFieldResourceFromOrgMemberRow } from "@/lib/work-orders/org-member-field-resource"
 import { normalizeOrgMemberRole } from "@/lib/permissions/model"
 
@@ -119,6 +123,12 @@ function formatMemberRole(role: string): string {
   return role.charAt(0).toUpperCase() + role.slice(1)
 }
 
+function avatarFromProfileRecord(p: Record<string, unknown> | undefined): string | null {
+  if (!p) return null
+  const a = p.avatar_url ?? p.avatarUrl
+  return typeof a === "string" && a.trim() ? a.trim() : null
+}
+
 /**
  * Technicians eligible for assignment (operational `technicians` rows).
  * Optional profile avatar when linked to a login via organization_members.
@@ -222,6 +232,7 @@ async function buildFieldResourceAssigneeOptions(
 
   type M = {
     user_id: string
+    membership_id?: string | null
     role: string
     status: string
     job_title?: string | null
@@ -241,7 +252,8 @@ async function buildFieldResourceAssigneeOptions(
 
   const memberList = rawRows.filter(
     (m) =>
-      !linkedMemberUserIds.has(m.user_id) && isAssignableFieldResourceMember(m as M & Record<string, unknown>),
+      !linkedMemberUserIds.has(normalizeUserIdKey(m.user_id)) &&
+      isAssignableFieldResourceMember(m as M & Record<string, unknown>),
   )
   const eligibleFieldResourceRowCount = memberList.length
 
@@ -264,31 +276,40 @@ async function buildFieldResourceAssigneeOptions(
     }
 
   const userIds = [...new Set(memberList.map((m) => m.user_id))]
-  const { data: profs, error: profErr } = await queryProfilesForRoster(supabase, userIds)
+  const { data: profs, error: profErr } = await queryProfilesForAssigneePicker(supabase, userIds)
   if (profErr) {
     equipifyDispatchDebugLog("assignee_field_profiles_query_error", {
       reason: String(profErr.message ?? "unknown").slice(0, 160),
     })
   }
 
-  const profileById = new Map(
-    ((profs ?? []) as Array<{
-      id: string
-      full_name: string | null
-      email: string | null
-      avatar_url?: string | null
-    }>).map((p) => [p.id, p]),
-  )
-  const memberByUser = new Map(memberList.map((m) => [m.user_id, m]))
+  const profileById = new Map<string, Record<string, unknown>>()
+  for (const row of (profs ?? []) as Array<{ id: string } & Record<string, unknown>>) {
+    profileById.set(normalizeUserIdKey(row.id), row)
+  }
+  const memberByUser = new Map(memberList.map((m) => [normalizeUserIdKey(m.user_id), m]))
 
   const out: TechnicianAssignOption[] = []
   for (const uid of userIds) {
-    const p = profileById.get(uid)
-    const m = memberByUser.get(uid)
+    const p = profileById.get(normalizeUserIdKey(uid))
+    const m = memberByUser.get(normalizeUserIdKey(uid))
     if (!m) continue
 
-    const label =
-      (p?.full_name && p.full_name.trim()) || (p?.email && p.email.trim()) || "Team member"
+    const resolved = resolveAssignableDisplayName({
+      profile: p ?? null,
+      member: m as unknown as Record<string, unknown>,
+      fallback: "Team member",
+    })
+    if (isEquipifyDispatchDebug()) {
+      equipifyDispatchDebugLog("assignee_display_name_resolved", {
+        source: resolved.source,
+        optionId: uid,
+        linkedUserId: uid,
+        membershipId: String(m.membership_id ?? ""),
+        label: resolved.label.slice(0, 80),
+      })
+    }
+    const label = resolved.label
 
     const roleLabel =
       omRoster && m.job_title?.trim()
@@ -303,11 +324,13 @@ async function buildFieldResourceAssigneeOptions(
     const membershipLabel =
       m.status === "invited" ? "Invite pending" : m.status === "suspended" ? "Suspended" : "Active"
 
+    const avatarRaw = avatarFromProfileRecord(p)
+
     out.push({
       id: uid,
       linkedUserId: uid,
       label,
-      avatarUrl: p?.avatar_url?.trim() || null,
+      avatarUrl: avatarRaw,
       roleLabel,
       region,
       fieldStatus,
@@ -390,6 +413,7 @@ async function loadTechnicianAssignOptionsLegacy(
 
   type M = {
     user_id: string
+    membership_id?: string | null
     role: string
     status: string
     job_title?: string | null
@@ -431,31 +455,39 @@ async function loadTechnicianAssignOptionsLegacy(
   }
 
   const userIds = [...new Set(memberList.map((m) => m.user_id))]
-  const { data: profs, error: profErr } = await queryProfilesForRoster(supabase, userIds)
+  const { data: profs, error: profErr } = await queryProfilesForAssigneePicker(supabase, userIds)
   if (profErr) {
     equipifyDispatchDebugLog("assignee_legacy_profiles_query_error", {
       reason: String(profErr.message ?? "unknown").slice(0, 160),
     })
   }
 
-  const profileById = new Map(
-    ((profs ?? []) as Array<{
-      id: string
-      full_name: string | null
-      email: string | null
-      avatar_url?: string | null
-    }>).map((p) => [p.id, p]),
-  )
-  const memberByUser = new Map(memberList.map((m) => [m.user_id, m]))
+  const profileById = new Map<string, Record<string, unknown>>()
+  for (const row of (profs ?? []) as Array<{ id: string } & Record<string, unknown>>) {
+    profileById.set(normalizeUserIdKey(row.id), row)
+  }
+  const memberByUser = new Map(memberList.map((m) => [normalizeUserIdKey(m.user_id), m]))
 
   const out: TechnicianAssignOption[] = []
   for (const uid of userIds) {
-    const p = profileById.get(uid)
-    const m = memberByUser.get(uid)
+    const p = profileById.get(normalizeUserIdKey(uid))
+    const m = memberByUser.get(normalizeUserIdKey(uid))
     if (!m) continue
 
-    const label =
-      (p?.full_name && p.full_name.trim()) || (p?.email && p.email.trim()) || "Team member"
+    const resolved = resolveAssignableDisplayName({
+      profile: p ?? null,
+      member: m as unknown as Record<string, unknown>,
+      fallback: "Team member",
+    })
+    if (isEquipifyDispatchDebug()) {
+      equipifyDispatchDebugLog("assignee_display_name_resolved", {
+        source: resolved.source,
+        optionId: uid,
+        linkedUserId: uid,
+        membershipId: String(m.membership_id ?? ""),
+        label: resolved.label.slice(0, 80),
+      })
+    }
 
     const roleLabel =
       omRoster && m.job_title?.trim()
@@ -473,8 +505,8 @@ async function loadTechnicianAssignOptionsLegacy(
     out.push({
       id: uid,
       linkedUserId: uid,
-      label,
-      avatarUrl: p?.avatar_url?.trim() || null,
+      label: resolved.label,
+      avatarUrl: avatarFromProfileRecord(p),
       roleLabel,
       region,
       fieldStatus,
@@ -572,22 +604,11 @@ export async function loadTechnicianAssignOptions(
   const omByMembership = new Map(omList.map((o) => [o.membership_id, o]))
 
   const userIds = [...new Set(omList.map((o) => o.user_id))]
-  const profileById = new Map<
-    string,
-    { id: string; full_name: string | null; email: string | null; avatar_url: string | null }
-  >()
+  const profileById = new Map<string, Record<string, unknown>>()
   if (userIds.length) {
-    const { data: profs } = await supabase
-      .from("profiles")
-      .select("id, full_name, email, avatar_url")
-      .in("id", userIds)
-    for (const p of (profs ?? []) as Array<{
-      id: string
-      full_name: string | null
-      email: string | null
-      avatar_url: string | null
-    }>) {
-      profileById.set(p.id, p)
+    const { data: profs } = await queryProfilesForAssigneePicker(supabase, userIds)
+    for (const row of (profs ?? []) as Array<{ id: string } & Record<string, unknown>>) {
+      profileById.set(normalizeUserIdKey(row.id), row)
     }
   }
 
@@ -609,14 +630,25 @@ export async function loadTechnicianAssignOptions(
       }
     }
 
-    const prof = om ? profileById.get(om.user_id) : undefined
-
-    const label =
-      (t.full_name && t.full_name.trim()) ||
-      (t.email && t.email.trim()) ||
-      (prof?.full_name && prof.full_name.trim()) ||
-      (prof?.email && prof.email.trim()) ||
-      "Technician"
+    const prof = om ? profileById.get(normalizeUserIdKey(om.user_id)) : undefined
+    const preTech =
+      (t.full_name && t.full_name.trim()) || (t.email && t.email.trim()) || null
+    const resolved = resolveAssignableDisplayName({
+      profile: prof ?? null,
+      member: (om as unknown as Record<string, unknown>) ?? null,
+      technicianDisplayName: preTech,
+      fallback: "Technician",
+    })
+    if (isEquipifyDispatchDebug()) {
+      equipifyDispatchDebugLog("assignee_display_name_resolved", {
+        source: resolved.source,
+        optionId: t.id,
+        linkedUserId: om?.user_id ?? "",
+        membershipId: om?.membership_id ?? "",
+        label: resolved.label.slice(0, 80),
+      })
+    }
+    const label = resolved.label
 
     const roleLabel =
       (t.job_title && t.job_title.trim()) || (om ? formatMemberRole(om.role) : "Technician")
@@ -631,7 +663,7 @@ export async function loadTechnicianAssignOptions(
     }
 
     const avatarUrl =
-      (t.avatar_url && t.avatar_url.trim()) || prof?.avatar_url?.trim() || null
+      (t.avatar_url && t.avatar_url.trim()) || avatarFromProfileRecord(prof) || null
 
     out.push({
       id: t.id,
@@ -648,7 +680,7 @@ export async function loadTechnicianAssignOptions(
 
   const linkedMemberUserIds = new Set<string>()
   for (const opt of out) {
-    if (opt.linkedUserId) linkedMemberUserIds.add(opt.linkedUserId)
+    if (opt.linkedUserId) linkedMemberUserIds.add(normalizeUserIdKey(opt.linkedUserId))
   }
 
   const { options: fieldExtras, stats: fieldStats } = await buildFieldResourceAssigneeOptions(
