@@ -76,7 +76,7 @@ function effectivePlanId(planId: PlanId | string, isTrialActive?: boolean): Plan
 
 export function getPlanLimits(planId: PlanId | string, isTrialActive?: boolean): PlanLimits {
   const id = effectivePlanId(planId, isTrialActive)
-  return PLAN_LIMITS[id]
+  return PLAN_LIMITS[id] ?? PLAN_LIMITS.solo
 }
 
 export function canUseFeature(
@@ -85,7 +85,8 @@ export function canUseFeature(
   isTrialActive?: boolean,
 ) {
   const id = effectivePlanId(planId, isTrialActive)
-  return PLAN_FEATURES[id].includes(feature)
+  const features = PLAN_FEATURES[id]
+  return Array.isArray(features) && features.includes(feature)
 }
 
 export function getUsageLimits(planId: PlanId | string, isTrialActive?: boolean) {

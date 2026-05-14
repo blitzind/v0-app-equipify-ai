@@ -455,24 +455,34 @@ function EquipmentPageInner() {
         in_repair: "In Repair",
       }
 
-      const mapped = equipmentRows.map((row) => ({
-        id: row.id,
-        customerId: row.customer_id,
-        customerName: customerMap.get(row.customer_id) ?? "Unknown Customer",
-        equipmentCode: row.equipment_code ?? "",
-        model: row.name,
-        manufacturer: row.manufacturer ?? "",
-        category: row.category ?? "General",
-        subcategory: row.subcategory?.trim() ? row.subcategory : "",
-        serialNumber: row.serial_number ?? "",
-        lastServiceDate: row.last_service_at ? row.last_service_at.slice(0, 10) : "1970-01-01",
-        nextDueDate: row.next_due_at ? row.next_due_at.slice(0, 10) : "2099-12-31",
-        nextCalibrationDue: row.next_calibration_due_at ? row.next_calibration_due_at.slice(0, 10) : "",
-        warrantyExpiresAt: row.warranty_expires_at ? row.warranty_expires_at.slice(0, 10) : "",
-        status: statusMap[row.status] ?? "Active",
-        location: row.location_label ?? "—",
-        isArchived: Boolean(row.archived_at),
-      }))
+      let mapped: Equipment[] = []
+      try {
+        mapped = equipmentRows.map((row) => ({
+          id: row.id,
+          customerId: row.customer_id,
+          customerName: customerMap.get(row.customer_id) ?? "Unknown Customer",
+          equipmentCode: row.equipment_code ?? "",
+          model: row.name,
+          manufacturer: row.manufacturer ?? "",
+          category: row.category ?? "General",
+          subcategory: row.subcategory?.trim() ? row.subcategory : "",
+          serialNumber: row.serial_number ?? "",
+          lastServiceDate: row.last_service_at ? row.last_service_at.slice(0, 10) : "1970-01-01",
+          nextDueDate: row.next_due_at ? row.next_due_at.slice(0, 10) : "2099-12-31",
+          nextCalibrationDue: row.next_calibration_due_at ? row.next_calibration_due_at.slice(0, 10) : "",
+          warrantyExpiresAt: row.warranty_expires_at ? row.warranty_expires_at.slice(0, 10) : "",
+          status: statusMap[row.status] ?? "Active",
+          location: row.location_label ?? "—",
+          isArchived: Boolean(row.archived_at),
+        }))
+      } catch (e) {
+        warnNonProduction(`[equipment] Row mapping failed: ${e instanceof Error ? e.message : String(e)}`)
+        if (active) {
+          setEquipment([])
+          setQueryError(userVisibleEquipmentQueryError(e instanceof Error ? e : null))
+        }
+        return
+      }
 
       if (active) {
         setEquipment(mapped)
@@ -498,11 +508,16 @@ function EquipmentPageInner() {
     const ids = equipment.slice(0, 250).map((e) => e.id)
     const supabase = createBrowserSupabaseClient()
     void (async () => {
-      const map = await loadEquipmentSignalsByIds(supabase, {
-        organizationId: activeOrgId,
-        equipmentIds: ids,
-      })
-      if (active) setSignalsMap(map)
+      try {
+        const map = await loadEquipmentSignalsByIds(supabase, {
+          organizationId: activeOrgId,
+          equipmentIds: ids,
+        })
+        if (active) setSignalsMap(map)
+      } catch (e) {
+        warnNonProduction(`[equipment] Signals load failed: ${e instanceof Error ? e.message : String(e)}`)
+        if (active) setSignalsMap(new Map())
+      }
     })()
     return () => {
       active = false

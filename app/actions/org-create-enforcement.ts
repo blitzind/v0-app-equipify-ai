@@ -13,19 +13,38 @@ import { hasActiveOrganizationSupportSession } from "@/lib/server/organization-s
 
 export type CreateEnforcementResult = GuardResult
 
+function logEnforcementActionFailure(phase: string, organizationId: string, e: unknown): void {
+  if (process.env.NODE_ENV === "production" && process.env.EQUIPMENT_SAVE_SERVER_DEBUG !== "1") return
+  const msg = e instanceof Error ? e.message : String(e)
+  console.error("[equipify:enforceCanCreateRecord]", phase, {
+    organizationIdSuffix: organizationId.length > 8 ? organizationId.slice(-8) : organizationId,
+    message: msg.slice(0, 240),
+  })
+}
+
 /** Server-verified gate for browser/client inserts (membership + billing + limits). */
 export async function enforceCanCreateRecord(
   organizationId: string,
   recordType: CreateRecordType,
 ): Promise<CreateEnforcementResult> {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return { ok: false, code: "unauthorized", message: "Sign in required.", httpStatus: 401 }
+  try {
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return { ok: false, code: "unauthorized", message: "Sign in required.", httpStatus: 401 }
+    }
+    return await requireCanCreateRecord(supabase, user.id, organizationId, recordType)
+  } catch (e) {
+    logEnforcementActionFailure("enforceCanCreateRecord", organizationId, e)
+    return {
+      ok: false,
+      code: "membership_error",
+      message: "Could not verify create permission. Try again or contact support.",
+      httpStatus: 500,
+    }
   }
-  return requireCanCreateRecord(supabase, user.id, organizationId, recordType)
 }
 
 export async function enforceFeatureAccess(organizationId: string, feature: Feature): Promise<CreateEnforcementResult> {

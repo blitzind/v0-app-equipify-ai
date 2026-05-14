@@ -67,6 +67,7 @@ function collectCategoriesFromDemoAndRegistry(key: WorkspaceIndustryKey): string
   const profile = DEMO_INDUSTRY_PROFILES[key]
   const def = WORKSPACE_INDUSTRY_DEFINITIONS[key]
   const found: string[] = []
+  if (!profile || !def) return found
   for (const ex of profile.equipmentAssetTypes) {
     if (ex.category?.trim()) found.push(ex.category.trim())
   }

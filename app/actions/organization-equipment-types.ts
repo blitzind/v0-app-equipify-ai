@@ -40,55 +40,66 @@ async function assertManagerPlus(
 export async function ensureOrganizationEquipmentTypesIfEmptyAction(
   organizationId: string,
 ): Promise<{ ok: boolean; message?: string; seeded?: boolean }> {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { ok: false, message: "Not authenticated." }
+  try {
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return { ok: false, message: "Not authenticated." }
 
-  const gate = await assertManagerPlus(supabase, organizationId, user.id)
-  if (!gate.ok) return gate
+    const gate = await assertManagerPlus(supabase, organizationId, user.id)
+    if (!gate.ok) return gate
 
-  const { data: existing, error: exErr } = await supabase
-    .from("organization_equipment_types")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .is("archived_at", null)
-    .limit(1)
-    .maybeSingle()
+    const { data: existing, error: exErr } = await supabase
+      .from("organization_equipment_types")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .is("archived_at", null)
+      .limit(1)
+      .maybeSingle()
 
-  if (exErr) return { ok: false, message: exErr.message }
-  if (existing) return { ok: true, seeded: false }
+    if (exErr) return { ok: false, message: exErr.message }
+    if (existing) return { ok: true, seeded: false }
 
-  const { data: org, error: orgErr } = await supabase
-    .from("organizations")
-    .select("industry")
-    .eq("id", organizationId)
-    .maybeSingle()
+    const { data: org, error: orgErr } = await supabase
+      .from("organizations")
+      .select("industry")
+      .eq("id", organizationId)
+      .maybeSingle()
 
-  if (orgErr || !org) return { ok: false, message: orgErr?.message ?? "Organization not found." }
+    if (orgErr || !org) return { ok: false, message: orgErr?.message ?? "Organization not found." }
 
-  const industryKey = normalizeIndustryKey((org as { industry?: string | null }).industry)
-  const seeds = buildEquipmentTypeSeedRowsForIndustry(industryKey)
-  const rows = seeds.map((s) => ({
-    organization_id: organizationId,
-    name: s.name,
-    description: s.description,
-    color: s.color,
-    icon: s.icon,
-    sort_order: s.sort_order,
-    is_seed: true,
-    seed_key: s.seed_key,
-  }))
+    const industryKey = normalizeIndustryKey((org as { industry?: string | null }).industry)
+    const seeds = buildEquipmentTypeSeedRowsForIndustry(industryKey)
+    const rows = seeds.map((s) => ({
+      organization_id: organizationId,
+      name: s.name,
+      description: s.description,
+      color: s.color,
+      icon: s.icon,
+      sort_order: s.sort_order,
+      is_seed: true,
+      seed_key: s.seed_key,
+    }))
 
-  const { error: insErr } = await supabase.from("organization_equipment_types").insert(rows)
-  if (insErr) {
-    if (insErr.code === "23505") {
-      return { ok: true, seeded: false }
+    const { error: insErr } = await supabase.from("organization_equipment_types").insert(rows)
+    if (insErr) {
+      if (insErr.code === "23505") {
+        return { ok: true, seeded: false }
+      }
+      return { ok: false, message: insErr.message }
     }
-    return { ok: false, message: insErr.message }
+    return { ok: true, seeded: true }
+  } catch (e) {
+    if (process.env.NODE_ENV !== "production" || process.env.EQUIPMENT_SAVE_SERVER_DEBUG === "1") {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error("[equipify:ensureEquipmentTypes]", {
+        organizationIdSuffix: organizationId.length > 8 ? organizationId.slice(-8) : organizationId,
+        message: msg.slice(0, 240),
+      })
+    }
+    return { ok: false, message: "Could not initialize equipment types for this workspace." }
   }
-  return { ok: true, seeded: true }
 }
 
 /**
@@ -97,47 +108,58 @@ export async function ensureOrganizationEquipmentTypesIfEmptyAction(
 export async function resetOrganizationEquipmentTypeSeedsAction(
   organizationId: string,
 ): Promise<{ ok: boolean; message?: string }> {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { ok: false, message: "Not authenticated." }
+  try {
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return { ok: false, message: "Not authenticated." }
 
-  const gate = await assertManagerPlus(supabase, organizationId, user.id)
-  if (!gate.ok) return gate
+    const gate = await assertManagerPlus(supabase, organizationId, user.id)
+    if (!gate.ok) return gate
 
-  const { data: org, error: orgErr } = await supabase
-    .from("organizations")
-    .select("industry")
-    .eq("id", organizationId)
-    .maybeSingle()
+    const { data: org, error: orgErr } = await supabase
+      .from("organizations")
+      .select("industry")
+      .eq("id", organizationId)
+      .maybeSingle()
 
-  if (orgErr || !org) return { ok: false, message: orgErr?.message ?? "Organization not found." }
+    if (orgErr || !org) return { ok: false, message: orgErr?.message ?? "Organization not found." }
 
-  const industryKey = normalizeIndustryKey((org as { industry?: string | null }).industry)
-  const seeds = buildEquipmentTypeSeedRowsForIndustry(industryKey)
+    const industryKey = normalizeIndustryKey((org as { industry?: string | null }).industry)
+    const seeds = buildEquipmentTypeSeedRowsForIndustry(industryKey)
 
-  const { error: archErr } = await supabase
-    .from("organization_equipment_types")
-    .update({ archived_at: new Date().toISOString() })
-    .eq("organization_id", organizationId)
-    .eq("is_seed", true)
-    .is("archived_at", null)
+    const { error: archErr } = await supabase
+      .from("organization_equipment_types")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("organization_id", organizationId)
+      .eq("is_seed", true)
+      .is("archived_at", null)
 
-  if (archErr) return { ok: false, message: archErr.message }
+    if (archErr) return { ok: false, message: archErr.message }
 
-  const rows = seeds.map((s) => ({
-    organization_id: organizationId,
-    name: s.name,
-    description: s.description,
-    color: s.color,
-    icon: s.icon,
-    sort_order: s.sort_order,
-    is_seed: true,
-    seed_key: s.seed_key,
-  }))
+    const rows = seeds.map((s) => ({
+      organization_id: organizationId,
+      name: s.name,
+      description: s.description,
+      color: s.color,
+      icon: s.icon,
+      sort_order: s.sort_order,
+      is_seed: true,
+      seed_key: s.seed_key,
+    }))
 
-  const { error: insErr } = await supabase.from("organization_equipment_types").insert(rows)
-  if (insErr) return { ok: false, message: insErr.message }
-  return { ok: true }
+    const { error: insErr } = await supabase.from("organization_equipment_types").insert(rows)
+    if (insErr) return { ok: false, message: insErr.message }
+    return { ok: true }
+  } catch (e) {
+    if (process.env.NODE_ENV !== "production" || process.env.EQUIPMENT_SAVE_SERVER_DEBUG === "1") {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error("[equipify:resetEquipmentTypeSeeds]", {
+        organizationIdSuffix: organizationId.length > 8 ? organizationId.slice(-8) : organizationId,
+        message: msg.slice(0, 240),
+      })
+    }
+    return { ok: false, message: "Could not reset equipment type seeds." }
+  }
 }

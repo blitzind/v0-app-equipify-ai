@@ -161,11 +161,11 @@ export function AidenOperationalInsightsCard({
   const industryLabel = industryBrief ? WORKSPACE_INDUSTRY_DEFINITIONS[industryBrief.industryKey]?.label : null
   const showIndustryBlock =
     industryBrief &&
-    (industryBrief.dashboardSummaryLines.length > 0 ||
-      industryBrief.maintenanceSummaryLines.length > 0 ||
-      industryBrief.dashboardOperationalSummaries.length > 0 ||
-      industryBrief.maintenanceOperationalSummaries.length > 0 ||
-      industryBrief.deterministicInsights.length > 0)
+    ((industryBrief.dashboardSummaryLines?.length ?? 0) > 0 ||
+      (industryBrief.maintenanceSummaryLines?.length ?? 0) > 0 ||
+      (industryBrief.dashboardOperationalSummaries?.length ?? 0) > 0 ||
+      (industryBrief.maintenanceOperationalSummaries?.length ?? 0) > 0 ||
+      (industryBrief.deterministicInsights?.length ?? 0) > 0)
 
   if (!eligibilityReady) {
     return (
