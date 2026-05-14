@@ -850,6 +850,8 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
 
   let invoicesInserted = 0
   if (invoiceTarget > 0 && insertedWOs && insertedWOs.length > 0) {
+    // `is_sample`, `demo-import-inv-*` seed_key, and `I-DEMO-####` numbers are the contract for
+    // `isOrgInvoiceDemoOrSampleForDeleteGuard` (platform org hard-delete must not treat these as open AR).
     const invStatuses = ["draft", "sent", "unpaid", "paid", "overdue", "paid", "sent", "overdue", "void"] as const
     const custIds = customerRows.map((c) => customerIndex.get(c.external_code)!)
     const invRows = Array.from({ length: invoiceTarget }, (_, i) => {

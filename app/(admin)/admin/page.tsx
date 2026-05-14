@@ -37,6 +37,7 @@ import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis } from "rec
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import { planTierLabelFromDbPlanId } from "@/lib/plan-display"
 import { applyDiscountToMrrCents, resolveListMrrCents } from "@/lib/billing/discount-pricing"
+import type { OrganizationDeleteInvoiceBlockDetails } from "@/lib/platform/organization-delete-guards"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -307,6 +308,8 @@ function AccountsTab({
   const [deleteConfirmName, setDeleteConfirmName] = useState("")
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [deleteInvoiceBlockDetails, setDeleteInvoiceBlockDetails] =
+    useState<OrganizationDeleteInvoiceBlockDetails | null>(null)
 
   const [planTarget, setPlanTarget] = useState<PlatformAccount | null>(null)
   const [planFormPlanId, setPlanFormPlanId] = useState<string>("solo")
@@ -506,11 +509,19 @@ function AccountsTab({
     if (!deleteTarget || deleteConfirmName.trim() !== deleteTarget.name.trim()) return
     setDeleteBusy(true)
     setDeleteError(null)
+    setDeleteInvoiceBlockDetails(null)
     try {
       const res = await fetch(`/api/platform/accounts/${deleteTarget.id}`, { method: "DELETE" })
-      const data = (await res.json()) as { message?: string }
+      const data = (await res.json()) as {
+        message?: string
+        error?: string
+        details?: OrganizationDeleteInvoiceBlockDetails
+      }
       if (!res.ok) {
         setDeleteError(data.message ?? "Delete failed.")
+        if (data.error === "unpaid_invoices" && data.details) {
+          setDeleteInvoiceBlockDetails(data.details)
+        }
         return
       }
       setDeleteTarget(null)
@@ -1063,6 +1074,7 @@ function AccountsTab({
                                 setDeleteTarget(account)
                                 setDeleteConfirmName("")
                                 setDeleteError(null)
+                                setDeleteInvoiceBlockDetails(null)
                                 setMenuOpen(null)
                               }}
                             >
@@ -1101,6 +1113,7 @@ function AccountsTab({
             setDeleteTarget(null)
             setDeleteConfirmName("")
             setDeleteError(null)
+            setDeleteInvoiceBlockDetails(null)
           }
         }}
       >
@@ -1110,7 +1123,8 @@ function AccountsTab({
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             This removes the organization and related data. You cannot undo this. Deletion is blocked when there is a
-            billable Stripe subscription (not trial) or customer invoices that still have a balance due.
+            billable Stripe subscription (not trial) or non-sample customer invoices that still have a balance due
+            (demo/sample invoices are ignored by this check).
           </p>
           {deleteTarget && (
             <p className="text-sm font-medium text-foreground">
@@ -1125,6 +1139,41 @@ function AccountsTab({
             autoComplete="off"
           />
           {deleteError && <p className="text-xs text-destructive">{deleteError}</p>}
+          {deleteInvoiceBlockDetails && deleteInvoiceBlockDetails.blockingRealInvoiceCount > 0 && (
+            <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs space-y-2">
+              <p className="font-medium text-foreground">
+                Production open AR: {deleteInvoiceBlockDetails.blockingRealInvoiceCount} invoice
+                {deleteInvoiceBlockDetails.blockingRealInvoiceCount === 1 ? "" : "s"}
+                {deleteInvoiceBlockDetails.excludedDemoSampleInvoicesWithBalanceDueCount > 0
+                  ? ` · Demo/sample invoices with balance (not blockers): ${deleteInvoiceBlockDetails.excludedDemoSampleInvoicesWithBalanceDueCount}`
+                  : ""}
+              </p>
+              <ul className="space-y-1.5 max-h-40 overflow-y-auto text-muted-foreground">
+                {deleteInvoiceBlockDetails.blockingInvoices.map((inv) => (
+                  <li key={inv.id} className="border-b border-border/60 pb-1.5 last:border-0 last:pb-0">
+                    <span className="font-mono text-[11px] text-foreground">{inv.id.slice(0, 8)}…</span>
+                    {inv.invoiceNumber ? (
+                      <span className="text-foreground/80"> · #{inv.invoiceNumber}</span>
+                    ) : null}
+                    <span className="text-foreground/80"> · {inv.status}</span>
+                    <span className="tabular-nums"> · due {fmt$(inv.balanceDueCents)}</span>
+                    {inv.customerLabel ? (
+                      <span className="block pl-0 text-foreground/90">Customer: {inv.customerLabel}</span>
+                    ) : null}
+                    <span className="block text-[11px]">
+                      Flags: invoice is_sample={String(inv.isSample)}
+                      {inv.customerIsSample != null ? ` · customer is_sample=${String(inv.customerIsSample)}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-muted-foreground">
+                Use <span className="font-medium text-foreground">Login as</span>, then fix these{" "}
+                <span className="font-medium text-foreground">production</span> invoices in Invoices or Billing (collect
+                payment, void, or credit). Onboarding sample invoices are never blockers.
+              </p>
+            </div>
+          )}
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"
@@ -1133,6 +1182,7 @@ function AccountsTab({
                 setDeleteTarget(null)
                 setDeleteConfirmName("")
                 setDeleteError(null)
+                setDeleteInvoiceBlockDetails(null)
               }}
             >
               Cancel

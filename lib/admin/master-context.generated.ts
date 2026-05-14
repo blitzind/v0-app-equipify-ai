@@ -5,7 +5,7 @@
 
 export const MCG_SCAN_COUNTS = {
   apiRouteHandlers: 443,
-  sqlMigrations: 191,
+  sqlMigrations: 192,
   dashboardPages: 65,
   componentsTsx: 316,
   libTsFiles: 849,
@@ -18,7 +18,7 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 | Metric | Count |
 |--------|------:|
 | API route handlers (\`app/api/**/route.ts\`) | **443** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **191** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **192** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
 | \`components/**/*.tsx\` | **316** |
 | \`lib/**/*.ts\` | **849** |

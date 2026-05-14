@@ -1419,6 +1419,7 @@ async function seedPrecisionMarketingTenant(supabase, { orgId, ownerId, techUser
       issued_at: issuedStr,
       paid_at: paidAt,
       created_by: ownerId,
+      is_sample: true,
     })
   }
   const insInv = await supabase.from("org_invoices").insert(invPayload)

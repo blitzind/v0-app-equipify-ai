@@ -106,6 +106,12 @@ export async function DELETE(
 
   const guard = await evaluateOrganizationDeleteGuards(admin, organizationId)
   if (!guard.ok) {
+    if (guard.error === "unpaid_invoices" && "details" in guard) {
+      return NextResponse.json(
+        { error: guard.error, message: guard.message, details: guard.details },
+        { status: guard.httpStatus },
+      )
+    }
     return NextResponse.json({ error: guard.error, message: guard.message }, { status: guard.httpStatus })
   }
 
