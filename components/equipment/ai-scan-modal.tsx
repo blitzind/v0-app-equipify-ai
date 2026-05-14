@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { DRAWER_PANEL_SURFACE } from "@/components/detail-drawer"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { NativeSelect } from "@/components/ui/native-select"
+import { Textarea } from "@/components/ui/textarea"
 import {
   X,
   Sparkles,
@@ -74,48 +77,6 @@ function Label({ children, required }: { children: React.ReactNode; required?: b
       {children}
       {required && <span className="text-destructive ml-0.5">*</span>}
     </label>
-  )
-}
-
-function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      className={cn(
-        "w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground",
-        "placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors",
-        className,
-      )}
-      {...props}
-    />
-  )
-}
-
-function Select({ children, className, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <select
-      className={cn(
-        "w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground",
-        "outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer",
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </select>
-  )
-}
-
-function Textarea({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return (
-    <textarea
-      rows={3}
-      className={cn(
-        "w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground",
-        "placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none",
-        className,
-      )}
-      {...props}
-    />
   )
 }
 
@@ -678,7 +639,7 @@ export function AIScanModal({
                     </div>
                     <div>
                       <Label required>Equipment type</Label>
-                      <Select
+                      <NativeSelect
                         value={form.equipmentType}
                         onChange={(e) => setField("equipmentType", e.target.value)}
                         disabled={equipmentTypesLoading}
@@ -695,7 +656,7 @@ export function AIScanModal({
                             ))}
                           </>
                         )}
-                      </Select>
+                      </NativeSelect>
                     </div>
                     <div>
                       <Label>Subcategory</Label>
@@ -736,14 +697,14 @@ export function AIScanModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="sm:col-span-2">
                     <Label required>Customer</Label>
-                    <Select value={form.customerId} onChange={(e) => setField("customerId", e.target.value)}>
+                    <NativeSelect value={form.customerId} onChange={(e) => setField("customerId", e.target.value)}>
                       <option value="">Select customer…</option>
                       {customers.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.company_name}
                         </option>
                       ))}
-                    </Select>
+                    </NativeSelect>
                     {!form.customerId ? (
                       <p className="flex items-center gap-1 text-[10px] text-[color:var(--status-warning)] mt-1">
                         <AlertCircle className="w-3 h-3 shrink-0" aria-hidden />
@@ -754,7 +715,7 @@ export function AIScanModal({
                   {form.customerId && serviceSiteOptions.length > 0 ? (
                     <div className="sm:col-span-2">
                       <Label>Service site</Label>
-                      <Select
+                      <NativeSelect
                         value={form.serviceSiteId}
                         onChange={(e) => setField("serviceSiteId", e.target.value)}
                       >
@@ -764,7 +725,7 @@ export function AIScanModal({
                             {o.label}
                           </option>
                         ))}
-                      </Select>
+                      </NativeSelect>
                     </div>
                   ) : null}
                   <div className="sm:col-span-2">
@@ -830,19 +791,21 @@ export function AIScanModal({
                   </div>
                   <div>
                     <Label>Status</Label>
-                    <Select value={form.status} onChange={(e) => setField("status", e.target.value as EquipmentStatus)}>
+                    <NativeSelect value={form.status} onChange={(e) => setField("status", e.target.value as EquipmentStatus)}>
                       {STATUSES.map((s) => (
                         <option key={s} value={s}>
                           {s}
                         </option>
                       ))}
-                    </Select>
+                    </NativeSelect>
                   </div>
                 </div>
 
                 <div>
                   <Label>Notes</Label>
                   <Textarea
+                    rows={3}
+                    className="resize-none"
                     value={form.notes}
                     onChange={(e) => setField("notes", e.target.value)}
                     placeholder={ui.placeholders.notes}

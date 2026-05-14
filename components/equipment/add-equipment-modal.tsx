@@ -7,6 +7,9 @@ import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { NativeSelect } from "@/components/ui/native-select"
+import { Textarea } from "@/components/ui/textarea"
 import { CalendarPlus, CheckCircle2, X } from "lucide-react"
 import { DRAWER_PANEL_SURFACE } from "@/components/detail-drawer"
 import { BR_STACK_CLEAR_AIDEN } from "@/lib/layout/aiden-safe-area"
@@ -47,48 +50,6 @@ function Label({ children, required }: { children: React.ReactNode; required?: b
 
 function Field({ children, className }: { children: React.ReactNode; className?: string }) {
   return <div className={cn("flex flex-col", className)}>{children}</div>
-}
-
-function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      className={cn(
-        "w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground",
-        "placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function Select({ children, className, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <select
-      className={cn(
-        "w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground",
-        "outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </select>
-  )
-}
-
-function Textarea({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return (
-    <textarea
-      rows={3}
-      className={cn(
-        "w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground",
-        "placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none",
-        className
-      )}
-      {...props}
-    />
-  )
 }
 
 const INITIAL_FORM = {
@@ -439,15 +400,17 @@ export function AddEquipmentModal({
                   placeholder={ui.placeholders.name}
                   value={form.name}
                   onChange={(e) => set("name", e.target.value)}
+                  aria-invalid={Boolean(errors.name)}
                 />
                 {errors.name && <p className="text-xs text-destructive mt-1">{errors.name}</p>}
               </Field>
               <Field>
                 <Label required>Equipment Type</Label>
-                <Select
+                <NativeSelect
                   value={form.equipmentType}
                   onChange={(e) => set("equipmentType", e.target.value)}
                   disabled={equipmentTypesLoading}
+                  aria-invalid={Boolean(errors.equipmentType)}
                 >
                   {equipmentTypesLoading ? (
                     <option value="">Loading types…</option>
@@ -461,7 +424,7 @@ export function AddEquipmentModal({
                       ))}
                     </>
                   )}
-                </Select>
+                </NativeSelect>
                 {errors.equipmentType && <p className="text-xs text-destructive mt-1">{errors.equipmentType}</p>}
               </Field>
             </div>
@@ -504,10 +467,14 @@ export function AddEquipmentModal({
               </Field>
               <Field>
                 <Label required>Customer</Label>
-                <Select value={form.customerId} onChange={(e) => set("customerId", e.target.value)}>
+                <NativeSelect
+                  value={form.customerId}
+                  onChange={(e) => set("customerId", e.target.value)}
+                  aria-invalid={Boolean(errors.customerId)}
+                >
                   <option value="">Select customer...</option>
                   {customers.map((c) => <option key={c.id} value={c.id}>{c.company_name}</option>)}
-                </Select>
+                </NativeSelect>
                 {errors.customerId && <p className="text-xs text-destructive mt-1">{errors.customerId}</p>}
               </Field>
             </div>
@@ -516,7 +483,7 @@ export function AddEquipmentModal({
             {form.customerId && serviceSiteOptions.length > 0 && (
               <Field>
                 <Label>Service site</Label>
-                <Select
+                <NativeSelect
                   value={form.serviceSiteId}
                   onChange={(e) => set("serviceSiteId", e.target.value)}
                 >
@@ -526,7 +493,7 @@ export function AddEquipmentModal({
                       {o.label}
                     </option>
                   ))}
-                </Select>
+                </NativeSelect>
                 <p className="text-[10px] text-muted-foreground mt-1">{ui.serviceSiteLocationHint}</p>
               </Field>
             )}
@@ -588,9 +555,9 @@ export function AddEquipmentModal({
               </Field>
               <Field>
                 <Label>Status</Label>
-                <Select value={form.status} onChange={(e) => set("status", e.target.value as EquipmentStatus)}>
+                <NativeSelect value={form.status} onChange={(e) => set("status", e.target.value as EquipmentStatus)}>
                   {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </Select>
+                </NativeSelect>
               </Field>
             </div>
 
@@ -598,6 +565,8 @@ export function AddEquipmentModal({
             <Field>
               <Label>Notes</Label>
               <Textarea
+                rows={3}
+                className="resize-none"
                 placeholder={ui.placeholders.notes}
                 value={form.notes}
                 onChange={(e) => set("notes", e.target.value)}
