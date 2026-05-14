@@ -51,6 +51,7 @@ export async function computeImportProjection(
   const z: ImportProjection = { willCreate: 0, willUpdate: 0, willSkip: 0, willFail: 0 }
 
   if (
+    ctx.kind === "quote" ||
     ctx.kind === "certificate" ||
     ctx.kind === "quickbooks_snapshot" ||
     ctx.kind === "generic"

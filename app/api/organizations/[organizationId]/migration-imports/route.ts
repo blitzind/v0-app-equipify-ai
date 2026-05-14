@@ -22,6 +22,7 @@ const KINDS = new Set<MigrationImportKind>([
   "equipment",
   "invoice",
   "work_order",
+  "quote",
   "certificate",
   "quickbooks_snapshot",
   "generic",

@@ -31,6 +31,13 @@ function sourceRecordId(kind: MigrationImportKind, row: Record<string, string>, 
   if (kind === "equipment") return resolveMapped(row, mapping, "equipment_code")
   if (kind === "work_order") return resolveMapped(row, mapping, "work_order_number")
   if (kind === "invoice") return resolveMapped(row, mapping, "invoice_number")
+  if (kind === "quote") {
+    return (
+      resolveMapped(row, mapping, "source_record_id") ||
+      resolveMapped(row, mapping, "quote_number") ||
+      resolveMapped(row, mapping, "external_quote_id")
+    )
+  }
   return ""
 }
 

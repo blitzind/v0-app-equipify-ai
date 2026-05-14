@@ -185,11 +185,37 @@ const INVOICE_MAPPING_FIELDS: CustomerMappingField[] = [
   { field: "notes", label: "Notes" },
 ]
 
-const MAPPING_FIELDS_BY_KIND: Record<"customer" | "equipment" | "invoice" | "work_order", CustomerMappingField[]> = {
+const QUOTE_MAPPING_FIELDS: CustomerMappingField[] = [
+  { field: "source_record_id", label: "Source record ID", description: "Maps external_quote_id when present." },
+  { field: "quote_number", label: "Quote number", required: true },
+  { field: "customer_external_code", label: "Customer external ID" },
+  { field: "customer_company", label: "Customer company" },
+  { field: "work_order_number", label: "Related work order ID" },
+  { field: "quote_date", label: "Quote date" },
+  { field: "expiration_date", label: "Expiration date" },
+  { field: "status", label: "Status" },
+  { field: "subtotal", label: "Subtotal" },
+  { field: "tax", label: "Tax" },
+  { field: "discount", label: "Discount" },
+  { field: "total", label: "Total" },
+  { field: "accepted_at", label: "Accepted at" },
+  { field: "declined_at", label: "Declined at" },
+  { field: "line_item_name", label: "Line item name" },
+  { field: "line_item_description", label: "Line item description" },
+  { field: "line_item_quantity", label: "Line item quantity" },
+  { field: "line_item_unit_price", label: "Line item unit price" },
+  { field: "notes", label: "Notes" },
+]
+
+const MAPPING_FIELDS_BY_KIND: Record<
+  "customer" | "equipment" | "invoice" | "work_order" | "quote",
+  CustomerMappingField[]
+> = {
   customer: CUSTOMER_MAPPING_FIELDS,
   equipment: EQUIPMENT_MAPPING_FIELDS,
   invoice: INVOICE_MAPPING_FIELDS,
   work_order: WORK_ORDER_MAPPING_FIELDS,
+  quote: QUOTE_MAPPING_FIELDS,
 }
 
 function formatBytes(bytes?: number | null): string {
@@ -206,7 +232,7 @@ export function CsvImportFlow({
   backHref,
   defaultSourceSystem = "",
 }: {
-  kind: "customer" | "equipment" | "invoice" | "work_order"
+  kind: "customer" | "equipment" | "invoice" | "work_order" | "quote"
   title: string
   description: string
   backHref: string
@@ -546,7 +572,13 @@ export function CsvImportFlow({
   const hasReliableCustomerMatch =
     kind !== "customer" ||
     Boolean(parsedColumnMapping.company_name || parsedColumnMapping.external_code || parsedColumnMapping.contact_email)
-  const canStartImport = Boolean(jobId) && !asyncMode && hasRequiredCustomerName && hasReliableCustomerMatch
+  const hasRequiredQuoteNumber = kind !== "quote" || Boolean(parsedColumnMapping.quote_number)
+  const canStartImport =
+    Boolean(jobId) &&
+    !asyncMode &&
+    hasRequiredCustomerName &&
+    hasReliableCustomerMatch &&
+    hasRequiredQuoteNumber
 
   const issueCounts = preview?.summary.issueCounts ?? {}
   const issueEntries = Object.entries(issueCounts).sort((a, b) => b[1] - a[1])

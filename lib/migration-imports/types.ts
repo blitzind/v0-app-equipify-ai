@@ -12,6 +12,7 @@ export type MigrationImportKind =
   | "equipment"
   | "invoice"
   | "work_order"
+  | "quote"
   | "certificate"
   | "quickbooks_snapshot"
   | "generic"
@@ -79,6 +80,7 @@ export async function buildPreview(ctx: ImportEngineContext & { kind: MigrationI
       return buildInvoicePreview(ctx)
     case "work_order":
       return buildWorkOrderPreview(ctx)
+    case "quote":
     case "certificate":
     case "quickbooks_snapshot":
     case "generic":
@@ -117,6 +119,20 @@ export async function runCommit(ctx: ImportEngineContext & { kind: MigrationImpo
       return commitInvoices(ctx)
     case "work_order":
       return commitWorkOrders(ctx)
+    case "quote":
+      return {
+        createdCount: 0,
+        updatedCount: 0,
+        errorCount: 0,
+        skippedCount: ctx.rows.length,
+        outcomes: ctx.rows.map((_, i) => ({
+          rowIndex: i + 1,
+          status: "skipped" as const,
+          codes: ["not_implemented"],
+          message:
+            "Quote CSV import is not available yet — use the template to align FieldPulse exports; import customers, equipment, and work orders from the other cards for now.",
+        })),
+      }
     case "certificate":
       return {
         createdCount: 0,
