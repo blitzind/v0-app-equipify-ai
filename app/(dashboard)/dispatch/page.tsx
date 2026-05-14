@@ -382,6 +382,13 @@ function DispatchPageInner() {
     techList.sort((a, b) => a.label.localeCompare(b.label))
 
     const rosterTechs = assignedOnlyView ? techList.filter((t) => t.id === user.id) : techList
+    equipifyDispatchDebugLog("dispatch_roster_debug", {
+      assigneeOptionCount: assignOpts.length,
+      fieldResourceMembers: assignOpts.filter((o) => o.assignmentKind === "field_resource").length,
+      technicianRows: assignOpts.filter((o) => o.assignmentKind === "technician").length,
+      rosterRenderedCount: rosterTechs.length,
+      assignedOnlyView,
+    })
     setTechnicians(rosterTechs)
 
     const selFull =
@@ -397,7 +404,7 @@ function DispatchPageInner() {
 
     const dispatchStatuses = includeInvoiced
       ? [...DISPATCH_STATUSES_WITH_INVOICED]
-      : [...DISPATCH_STATUSES_BASE]
+      : [...DEFAULT_DISPATCH_STATUSES]
 
     function applyAssignedScope<
       T extends {
