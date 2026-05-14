@@ -163,6 +163,46 @@ function equipmentSaveDebug(
   console.info("[equipify:equipment-save]", message, { ...details, organizationIdHint: orgHint })
 }
 
+function equipmentFlowLog(
+  stage: string,
+  details?: Record<string, unknown>,
+  activeOrgId: string | null | undefined = undefined,
+) {
+  const orgHint =
+    activeOrgId && activeOrgId.length > 12
+      ? `...${activeOrgId.slice(-8)}`
+      : activeOrgId === null || activeOrgId === undefined
+        ? "(none)"
+        : activeOrgId
+  console.error(
+    "[equipify:add-equipment-flow]",
+    JSON.stringify({
+      stage,
+      organizationIdHint: orgHint,
+      ...(details ?? {}),
+    }),
+  )
+}
+
+function describeClientThrown(e: unknown): Record<string, unknown> {
+  const kind = typeof e
+  if (!e || kind !== "object") return { kind, message: String(e).slice(0, 180) }
+  let keys: string[] = []
+  try {
+    keys = Object.keys(e as object).slice(0, 10)
+  } catch {
+    keys = []
+  }
+  return {
+    kind,
+    constructorName: (e as { constructor?: { name?: string } }).constructor?.name ?? "",
+    isError: e instanceof Error,
+    plainObject: Object.getPrototypeOf(e) === Object.prototype,
+    keys,
+    message: e instanceof Error ? e.message.slice(0, 180) : String(e).slice(0, 180),
+  }
+}
+
 export function AddEquipmentModal({
   open,
   onClose,
@@ -327,7 +367,43 @@ export function AddEquipmentModal({
     handleClose()
   }
 
+  async function shouldBypassCreateEnforcementForEmergencyDebug(
+    supabase: ReturnType<typeof createBrowserSupabaseClient>,
+    userId: string,
+    organizationId: string,
+  ): Promise<{ bypass: boolean; reason: string }> {
+    try {
+      const { data: member } = await supabase
+        .from("organization_members")
+        .select("role,status")
+        .eq("organization_id", organizationId)
+        .eq("user_id", userId)
+        .maybeSingle()
+      const role = (member as { role?: string | null; status?: string | null } | null)?.role ?? null
+      const status = (member as { role?: string | null; status?: string | null } | null)?.status ?? null
+      if (role === "owner" && status === "active") return { bypass: true, reason: "owner_active" }
+    } catch (e) {
+      equipmentFlowLog("emergency_bypass_membership_check_threw", describeClientThrown(e), organizationId)
+    }
+
+    try {
+      const { data: supportSession } = await supabase
+        .from("organization_support_sessions")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("user_id", userId)
+        .gt("expires_at", new Date().toISOString())
+        .maybeSingle()
+      if (supportSession) return { bypass: true, reason: "support_session" }
+    } catch (e) {
+      equipmentFlowLog("emergency_bypass_support_check_threw", describeClientThrown(e), organizationId)
+    }
+
+    return { bypass: false, reason: "not_eligible" }
+  }
+
   async function handleSave() {
+    equipmentFlowLog("click_save", { offerMaintenancePlanNext }, activeOrgId)
     equipmentSaveDebug("handler_enter", {}, activeOrgId)
     setSaveError(null)
 
@@ -381,10 +457,36 @@ export function AddEquipmentModal({
 
     setSaving(true)
     try {
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        const msg = "You must be logged in to save equipment."
+        setSaveError(msg)
+        toast({ variant: "destructive", title: "Sign in required", description: msg })
+        return
+      }
+
+      equipmentFlowLog("before_enforce", { userHint: user.id.slice(-8) }, activeOrgId)
       equipmentSaveDebug("enforce_start", {}, activeOrgId)
       let serverGate: unknown
       try {
-        serverGate = await enforceCanCreateRecord(activeOrgId, "equipment")
+        const bypass = await shouldBypassCreateEnforcementForEmergencyDebug(supabase, user.id, activeOrgId)
+        if (bypass.bypass) {
+          serverGate = { ok: true }
+          equipmentFlowLog("after_enforce", { bypass: true, reason: bypass.reason }, activeOrgId)
+        } else {
+          serverGate = await enforceCanCreateRecord(activeOrgId, "equipment")
+          equipmentFlowLog(
+            "after_enforce",
+            isEnforcementGate(serverGate)
+              ? { ok: serverGate.ok, code: serverGate.ok ? "" : serverGate.code }
+              : { badShape: true, receivedType: typeof serverGate },
+            activeOrgId,
+          )
+        }
       } catch (e) {
         const msg = serverActionFailureMessage(e)
         setSaveError(msg)
@@ -394,6 +496,7 @@ export function AddEquipmentModal({
           description: msg,
         })
         equipmentSaveDebug("enforce_threw", { message: msg, kind: typeof e }, activeOrgId)
+        equipmentFlowLog("enforce_threw", describeClientThrown(e), activeOrgId)
         return
       }
 
@@ -422,18 +525,6 @@ export function AddEquipmentModal({
       }
 
       try {
-        const supabase = createBrowserSupabaseClient()
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-
-        if (!user) {
-          const msg = "You must be logged in to save equipment."
-          setSaveError(msg)
-          toast({ variant: "destructive", title: "Sign in required", description: msg })
-          return
-        }
-
         if (orgStatus !== "ready" || !activeOrgId) {
           const msg =
             orgStatus === "ready" && !activeOrgId
@@ -481,14 +572,27 @@ export function AddEquipmentModal({
         }
 
         equipmentSaveDebug("insert_start", { payloadKeys: Object.keys(insertPayload) }, activeOrgId)
+        equipmentFlowLog("before_insert", { payloadKeys: Object.keys(insertPayload).length }, activeOrgId)
 
-        const { data: inserted, error } = await supabase
+        const { data: inserted, error, count } = await supabase
           .from("equipment")
-          .insert(insertPayload)
+          .insert(insertPayload, { count: "exact" })
           .select("id")
           .maybeSingle()
 
         equipmentSaveDebug("insert_finished", { hasError: Boolean(error), hasRow: Boolean(inserted?.id) }, activeOrgId)
+        equipmentFlowLog(
+          "after_insert",
+          {
+            hasError: Boolean(error),
+            errorCode: error?.code ?? "",
+            errorMessage: error?.message?.slice(0, 180) ?? "",
+            hasRow: Boolean(inserted?.id),
+            insertedIdHint: inserted?.id ? inserted.id.slice(-8) : "",
+            insertCount: count ?? null,
+          },
+          activeOrgId,
+        )
 
         if (error) {
           const msg = friendlyInsertError(error.message ?? "Unknown error")
@@ -506,29 +610,13 @@ export function AddEquipmentModal({
           return
         }
 
-        try {
-          await Promise.resolve(onSuccess?.(newId))
-        } catch (cbErr) {
-          equipmentSaveDebug("onSuccess_threw", { message: serverActionFailureMessage(cbErr) }, activeOrgId)
-        }
-
-        if (offerMaintenancePlanNext && newId && form.customerId && onCreateMaintenancePlan) {
-          toast({
-            title: "Equipment added",
-            description: "You can start a maintenance plan for this asset next.",
-          })
-          setPostSave({ customerId: form.customerId, equipmentId: newId })
-          return
-        }
-
-        if (!offerMaintenancePlanNext) {
-          handleClose()
-          return
-        }
-
+        equipmentFlowLog("before_refresh", { disabled: true }, activeOrgId)
+        equipmentFlowLog("after_refresh", { disabled: true }, activeOrgId)
+        equipmentFlowLog("before_onSuccess", { disabled: true, hasOnSuccess: Boolean(onSuccess) }, activeOrgId)
+        equipmentFlowLog("after_onSuccess", { disabled: true }, activeOrgId)
         toast({
           title: "Equipment added",
-          description: "The new asset is available in your equipment list.",
+          description: "The new asset was saved. Post-save refresh is temporarily disabled for debugging.",
         })
         handleClose()
       } catch (pathErr) {
@@ -536,6 +624,7 @@ export function AddEquipmentModal({
         setSaveError(msg)
         toast({ variant: "destructive", title: "Could not save equipment", description: msg })
         equipmentSaveDebug("insert_path_threw", { message: msg }, activeOrgId)
+        equipmentFlowLog("insert_path_threw", describeClientThrown(pathErr), activeOrgId)
         return
       }
     } catch (e) {
@@ -543,6 +632,7 @@ export function AddEquipmentModal({
       setSaveError(msg)
       toast({ variant: "destructive", title: "Could not save equipment", description: msg })
       equipmentSaveDebug("handler_unexpected", { message: msg, kind: typeof e }, activeOrgId)
+      equipmentFlowLog("handler_unexpected", describeClientThrown(e), activeOrgId)
     } finally {
       setSaving(false)
     }

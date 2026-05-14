@@ -22,6 +22,26 @@ import { hasActiveOrganizationSupportSession } from "@/lib/server/organization-s
 
 export type CreateEnforcementResult = GuardResult
 
+function directServerFlowLog(
+  stage: string,
+  details?: { helper?: string; organizationId?: string; message?: string },
+): void {
+  const org = details?.organizationId
+  const organizationIdSuffix = org && org.length > 8 ? org.slice(-8) : org ?? ""
+  const payload = {
+    stage,
+    helper: details?.helper ?? "org-create-enforcement",
+    organizationIdSuffix,
+    message: (details?.message ?? "").slice(0, 300),
+  }
+  const line = `[equipify:create-equipment-server] ${JSON.stringify(payload)}\n`
+  try {
+    process.stdout.write(line)
+  } catch {
+    console.error(line.trim())
+  }
+}
+
 function isNextRedirectError(e: unknown): boolean {
   if (typeof e !== "object" || e === null) return false
   const d = (e as { digest?: unknown }).digest
@@ -36,6 +56,7 @@ async function wrapEnforcementAction(
   organizationId: string,
   run: () => Promise<CreateEnforcementResult>,
 ): Promise<CreateEnforcementResult> {
+  directServerFlowLog("top_enter", { helper: actionId, organizationId })
   equipmentSaveServerDebug(`action_${actionId}_top_enter`, {
     helper: actionId,
     organizationId,
@@ -60,6 +81,16 @@ async function wrapEnforcementAction(
       organizationId,
       message: `ok=${String(serialized.ok)}`,
     })
+    directServerFlowLog("before_return", {
+      helper: actionId,
+      organizationId,
+      message: `ok=${String(serialized.ok)}`,
+    })
+    directServerFlowLog("after_return", {
+      helper: actionId,
+      organizationId,
+      message: `ok=${String(serialized.ok)}`,
+    })
     return serialized
   } catch (error) {
     if (isNextRedirectError(error)) throw error
@@ -68,7 +99,18 @@ async function wrapEnforcementAction(
       organizationId,
       message: `${sanitizeEnforcementError(error)}|diag=${describeUnknownThrown(error)}`,
     })
-    return serializeEnforcementActionResult(normalizeUnknownServerError(error))
+    const normalized = serializeEnforcementActionResult(normalizeUnknownServerError(error))
+    directServerFlowLog("before_return", {
+      helper: actionId,
+      organizationId,
+      message: `normalized_failure ok=${String(normalized.ok)}`,
+    })
+    directServerFlowLog("after_return", {
+      helper: actionId,
+      organizationId,
+      message: `normalized_failure ok=${String(normalized.ok)}`,
+    })
+    return normalized
   }
 }
 
@@ -130,8 +172,14 @@ async function authGetUserIdSafe(
     message: "before_auth_getUser",
   })
   try {
+    directServerFlowLog("before_auth", { helper: "enforceCanCreateRecord", organizationId })
     const { data, error } = await supabase.auth.getUser()
     if (error) {
+      directServerFlowLog("after_auth", {
+        helper: "enforceCanCreateRecord",
+        organizationId,
+        message: `error=${error.message.slice(0, 160)}`,
+      })
       equipmentSaveServerDebug("enforce_ccr_stage", {
         helper: "enforceCanCreateRecord",
         organizationId,
@@ -145,8 +193,14 @@ async function authGetUserIdSafe(
       }
     }
     if (!data.user) {
+      directServerFlowLog("after_auth", { helper: "enforceCanCreateRecord", organizationId, message: "no_user" })
       return { ok: false, code: "unauthorized", message: "Sign in required.", httpStatus: 401 }
     }
+    directServerFlowLog("after_auth", {
+      helper: "enforceCanCreateRecord",
+      organizationId,
+      message: `user=${data.user.id.slice(-8)}`,
+    })
     equipmentSaveServerDebug("enforce_ccr_stage", {
       helper: "enforceCanCreateRecord",
       organizationId,
@@ -161,6 +215,11 @@ async function authGetUserIdSafe(
       message: `auth_getUser_threw:${sanitizeEnforcementError(e)}|diag=${describeUnknownThrown(e)}`,
     })
     logEnforcementActionFailure("enforceCanCreateRecord_auth_getUser", organizationId, e)
+    directServerFlowLog("after_auth", {
+      helper: "enforceCanCreateRecord",
+      organizationId,
+      message: `threw=${describeUnknownThrown(e)}`,
+    })
     return {
       ok: false,
       code: "unauthorized",

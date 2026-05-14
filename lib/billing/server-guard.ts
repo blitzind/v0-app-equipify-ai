@@ -53,6 +53,21 @@ export type GuardResult =
   | { ok: true }
   | { ok: false; code: GuardFailureCode; message: string; httpStatus: number }
 
+function directCreateGateLog(stage: string, organizationId: string, message = ""): void {
+  const organizationIdSuffix = organizationId.length > 8 ? organizationId.slice(-8) : organizationId
+  const line = `[equipify:create-equipment-server] ${JSON.stringify({
+    stage,
+    helper: "requireCanCreateRecord",
+    organizationIdSuffix,
+    message: message.slice(0, 300),
+  })}\n`
+  try {
+    process.stdout.write(line)
+  } catch {
+    console.error(line.trim())
+  }
+}
+
 function fromEligibility(el: RecordEligibility, httpStatus = 403): GuardResult {
   if (el.ok) return { ok: true }
   if (el.reason === "usage_verify") {
@@ -290,7 +305,9 @@ export async function requireCanCreateRecord(
       organizationId,
       message: "before_verifyActiveMembership",
     })
+    directCreateGateLog("before_membership", organizationId, `recordType=${recordType}`)
     const denied = await verifyActiveMembership(supabase, userId, organizationId)
+    directCreateGateLog("after_membership", organizationId, denied ? `denied=${denied.code}` : "pass")
     equipmentSaveServerDebug("require_ccr_stage", {
       helper: "requireCanCreateRecord",
       organizationId,
@@ -308,7 +325,13 @@ export async function requireCanCreateRecord(
       organizationId,
       message: "before_loadOrgBillingContext",
     })
+    directCreateGateLog("before_billing", organizationId, `recordType=${recordType}`)
     const ctx = await loadOrgBillingContext(supabase, organizationId)
+    directCreateGateLog(
+      "after_billing",
+      organizationId,
+      `usage=${ctx.usagePack ? "y" : "n"} usageLoadFailed=${String(ctx.usageLoadFailed)}`,
+    )
     equipmentSaveServerDebug("require_ccr_stage", {
       helper: "requireCanCreateRecord",
       organizationId,
@@ -382,11 +405,13 @@ export async function requireCanCreateRecord(
       organizationId,
       message: "before_applyCreateRules",
     })
+    directCreateGateLog("before_rules", organizationId, `recordType=${recordType}`)
     const rules = applyCreateRules(ctx.subscription, ctx.usagePack, ctx.seatSlotsUsed, recordType, {
       usageLoadFailed,
       strictUsageCounts: true,
       skipSeatCap,
     })
+    directCreateGateLog("after_rules", organizationId, `ok=${String(rules.ok)}`)
     equipmentSaveServerDebug("require_ccr_stage", {
       helper: "requireCanCreateRecord",
       organizationId,
