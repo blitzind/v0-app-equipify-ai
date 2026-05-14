@@ -1,6 +1,6 @@
 "use client"
 
-import { Component, useState, useMemo, useEffect, useRef, Suspense, type ReactNode } from "react"
+import { Component, useState, useMemo, useEffect, useRef, useCallback, Suspense, type ReactNode } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
@@ -13,6 +13,8 @@ import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { isAssignedWorkOnly, loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
+import { useToast } from "@/hooks/use-toast"
+import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -56,6 +58,7 @@ import {
   Download,
   Tag,
   Sparkles,
+  Loader2,
 } from "lucide-react"
 import { EquipmentDrawer } from "@/components/drawers/equipment-drawer"
 import { equipmentMatchesSearch, getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
@@ -317,6 +320,8 @@ function EquipmentCard({ eq, signals, selected, onSelect, onOpen }: {
 function EquipmentPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const { permissions } = useOrgPermissions()
+  const { canArchiveRestore } = useOrgArchivePermissions()
+  const { toast } = useToast()
   const { equipmentCreateEligibility } = useBillingAccess()
   const assignedOnlyView = isAssignedWorkOnly(permissions)
   const canManageEquipmentRecords = !assignedOnlyView
@@ -338,6 +343,7 @@ function EquipmentPageInner() {
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null)
   const [archiveScope, setArchiveScope] = useState<RecordArchiveVisibility>("active")
   const [queryWarning, setQueryWarning] = useState<string | null>(null)
+  const [bulkArchiving, setBulkArchiving] = useState(false)
   const previousSelectedCountRef = useRef(0)
 
   // Auto-open drawer from ?open= query param
@@ -741,6 +747,99 @@ function EquipmentPageInner() {
     })
   }
 
+  const bulkArchiveSelected = useCallback(async () => {
+    if (!activeOrgId || orgStatus !== "ready") {
+      toast({
+        variant: "destructive",
+        title: "Cannot remove",
+        description: "Workspace is not ready. Try again in a moment.",
+      })
+      return
+    }
+    if (!canArchiveRestore) {
+      toast({
+        variant: "destructive",
+        title: "Cannot archive equipment",
+        description: "Your role does not include archiving records. Ask an owner, admin, or manager.",
+      })
+      return
+    }
+
+    const idsToArchive = Array.from(selected).filter((id) => {
+      const row = equipment.find((e) => e.id === id)
+      return Boolean(row && !row.isArchived)
+    })
+    if (idsToArchive.length === 0) {
+      toast({
+        title: "Nothing to remove",
+        description: "None of the selected rows are active equipment, or the selection is empty.",
+      })
+      return
+    }
+
+    const n = idsToArchive.length
+    const confirmed = window.confirm(
+      `Archive ${n} selected equipment record${n === 1 ? "" : "s"}? They will be hidden from active lists. Linked work orders and certificates are not deleted.`,
+    )
+    if (!confirmed) return
+
+    setBulkArchiving(true)
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      const archivedAt = new Date().toISOString()
+      const archivedBy = user?.id ?? null
+
+      const BATCH = 80
+      for (let i = 0; i < idsToArchive.length; i += BATCH) {
+        const batch = idsToArchive.slice(i, i + BATCH)
+        const { error } = await supabase
+          .from("equipment")
+          .update({ archived_at: archivedAt, archived_by: archivedBy })
+          .in("id", batch)
+          .eq("organization_id", activeOrgId)
+          .is("archived_at", null)
+
+        if (error) {
+          toast({
+            variant: "destructive",
+            title: "Archive failed",
+            description: error.message?.trim() || "Could not archive selected equipment.",
+          })
+          return
+        }
+      }
+
+      toast({
+        title: "Equipment archived",
+        description: `${n} item${n === 1 ? "" : "s"} moved to archived. Restore from a record’s detail or switch the list to Archived.`,
+      })
+      setSelected(new Set())
+      if (selectedEquipmentId && idsToArchive.includes(selectedEquipmentId)) {
+        setSelectedEquipmentId(null)
+      }
+      setRefreshToken((t) => t + 1)
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Archive failed",
+        description: e instanceof Error ? e.message : "Unexpected error while archiving.",
+      })
+    } finally {
+      setBulkArchiving(false)
+    }
+  }, [
+    activeOrgId,
+    orgStatus,
+    canArchiveRestore,
+    selected,
+    equipment,
+    toast,
+    selectedEquipmentId,
+  ])
+
   function SortIcon({ col }: { col: SortKey }) {
     if (sortKey !== col) return <ArrowUpDown className="w-3.5 h-3.5 ml-1 text-muted-foreground/50 inline" />
     return <ArrowUpDown className="w-3.5 h-3.5 ml-1 inline text-primary" />
@@ -894,8 +993,25 @@ function EquipmentPageInner() {
             <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8">
               <Tag className="w-3.5 h-3.5" /> Assign Plan
             </Button>
-            <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8 text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/60">
-              <Trash2 className="w-3.5 h-3.5" /> Remove
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              className="gap-1.5 text-xs h-8 text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/60"
+              disabled={bulkArchiving || !canArchiveRestore}
+              title={
+                !canArchiveRestore
+                  ? "Your role cannot archive equipment."
+                  : "Archive selected equipment (soft-delete)"
+              }
+              onClick={() => void bulkArchiveSelected()}
+            >
+              {bulkArchiving ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" aria-hidden />
+              ) : (
+                <Trash2 className="w-3.5 h-3.5 shrink-0" aria-hidden />
+              )}
+              Remove
             </Button>
             <Button
               variant="ghost"
