@@ -127,6 +127,11 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         if (cancelled) return
         if (data.active) {
           const sid = sessionIdentityRef.current
+          if (process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_DEBUG_NAV === "true") {
+            console.info("[equipify:admin] support_session_restore", {
+              organizationId: data.organizationId,
+            })
+          }
           setImpersonation({
             active: true,
             accountId: data.organizationId,

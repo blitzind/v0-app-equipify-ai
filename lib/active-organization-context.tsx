@@ -79,12 +79,21 @@ function normalizeOrgRows(
   return out
 }
 
+function debugActiveOrg(details: Record<string, unknown>) {
+  if (process.env.NODE_ENV !== "development" || process.env.NEXT_PUBLIC_DEBUG_NAV !== "true") return
+  console.info("[equipify:active-org]", details)
+}
+
 export function ActiveOrganizationProvider({ children }: { children: ReactNode }) {
   const { impersonation, isPlatformAdmin } = useAdmin()
   const impersonationRef = useRef(impersonation)
   const isPlatformAdminRef = useRef(isPlatformAdmin)
   impersonationRef.current = impersonation
   isPlatformAdminRef.current = isPlatformAdmin
+
+  /** After first successful resolution for this browser session, avoid flipping `status` to "loading" on refresh — downstream providers treat "loading" as loss of org. */
+  const initialOrgResolutionCompleteRef = useRef(false)
+  const lastResolvedUserIdRef = useRef<string | null>(null)
 
   const [status, setStatus] = useState<Status>("loading")
   const [switching, setSwitching] = useState(false)
@@ -95,7 +104,6 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
   const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
-    setStatus("loading")
     setError(null)
     const supabase = createBrowserSupabaseClient()
     const {
@@ -103,6 +111,8 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
     } = await supabase.auth.getUser()
 
     if (!user) {
+      initialOrgResolutionCompleteRef.current = false
+      lastResolvedUserIdRef.current = null
       try {
         localStorage.removeItem(STORAGE_KEY)
       } catch {
@@ -114,6 +124,15 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
       setOrganizationName(null)
       setStatus("ready")
       return
+    }
+
+    if (lastResolvedUserIdRef.current !== user.id) {
+      initialOrgResolutionCompleteRef.current = false
+      lastResolvedUserIdRef.current = user.id
+    }
+
+    if (!initialOrgResolutionCompleteRef.current) {
+      setStatus("loading")
     }
 
     const imp = impersonationRef.current
@@ -131,6 +150,8 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
         /* ignore */
       }
       setStatus("ready")
+      initialOrgResolutionCompleteRef.current = true
+      debugActiveOrg({ source: "impersonation_banner", organizationId: imp.accountId })
       return
     }
 
@@ -152,6 +173,7 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
       setOrganizationSlug(null)
       setOrganizationName(null)
       setStatus("ready")
+      initialOrgResolutionCompleteRef.current = true
       return
     }
 
@@ -186,6 +208,7 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
     const orgs = sortOrganizationsDemoFirst(normalizeOrgRows(memberRows as never))
 
     let resolvedOrgs = orgs
+    let resolvedFromSupportSession = false
     if (orgs.length === 0 && isPlatformAdminRef.current) {
       try {
         const res = await fetch("/api/platform/support-session", { cache: "no-store" })
@@ -196,6 +219,7 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
           organizationSlug?: string
         }
         if (d.active && d.organizationId) {
+          resolvedFromSupportSession = true
           resolvedOrgs = [
             {
               id: d.organizationId,
@@ -203,6 +227,11 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
               slug: (d.organizationSlug ?? "").trim(),
             },
           ]
+          debugActiveOrg({
+            source: "support_session_api",
+            organizationId: d.organizationId,
+            ok: res.ok,
+          })
         }
       } catch {
         /* ignore */
@@ -260,11 +289,17 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
     }
 
     setStatus("ready")
+    initialOrgResolutionCompleteRef.current = true
+    debugActiveOrg({
+      source: resolvedFromSupportSession ? "support_session" : "membership",
+      organizationId: chosen,
+      orgCount: resolvedOrgs.length,
+    })
   }, [])
 
   useEffect(() => {
     void refresh()
-  }, [refresh, impersonation.active, impersonation.accountId, impersonation.accountSlug])
+  }, [refresh, impersonation.active, impersonation.accountId, impersonation.accountSlug, isPlatformAdmin])
 
   const switchOrganization = useCallback(
     async (orgId: string) => {
