@@ -1,19 +1,65 @@
 /**
  * Server- and client-safe reads of public marketing analytics env vars.
  * IDs are optional in dev; scripts and events no-op when unset.
+ *
+ * On the client, values prefer `window.__EQUIPIFY_MARKETING_ENV__` (injected from the
+ * root Server Component) so Tag Assistant and events stay aligned with the HTML that
+ * was rendered for this deployment, even when client-bundle inlining of `NEXT_PUBLIC_*`
+ * differs from the server.
  */
 
-function trimEnv(value: string | undefined): string | null {
+export type EquipifyMarketingPublicEnv = {
+  ga4Id: string | null
+  googleAdsId: string | null
+  signupSendTo: string | null
+  analyticsDebug: string | null
+  cookieDomainOverride: string | null
+  linkerDomainsRaw: string | null
+}
+
+declare global {
+  interface Window {
+    __EQUIPIFY_MARKETING_ENV__?: EquipifyMarketingPublicEnv
+  }
+}
+
+function trimEnv(value: string | undefined | null): string | null {
   const v = value?.trim()
   return v ? v : null
 }
 
+function publicEnvFromWindow(): EquipifyMarketingPublicEnv | null {
+  if (typeof window === "undefined") return null
+  const raw = window.__EQUIPIFY_MARKETING_ENV__
+  if (!raw || typeof raw !== "object") return null
+  return raw
+}
+
+/** Used by the root Server Component to serialize env into the HTML bootstrap script. */
+export function readMarketingPublicEnvForServerScript(): EquipifyMarketingPublicEnv {
+  return {
+    ga4Id: trimEnv(process.env.NEXT_PUBLIC_GA4_ID),
+    googleAdsId: trimEnv(process.env.NEXT_PUBLIC_GOOGLE_ADS_ID),
+    signupSendTo: trimEnv(process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO),
+    analyticsDebug: trimEnv(process.env.NEXT_PUBLIC_ANALYTICS_DEBUG),
+    cookieDomainOverride: trimEnv(process.env.NEXT_PUBLIC_ANALYTICS_COOKIE_DOMAIN),
+    linkerDomainsRaw: trimEnv(process.env.NEXT_PUBLIC_ANALYTICS_LINKER_DOMAINS),
+  }
+}
+
+export function isMarketingAnalyticsEnabledFromServerEnv(): boolean {
+  const e = readMarketingPublicEnvForServerScript()
+  return Boolean(e.ga4Id || e.googleAdsId)
+}
+
 export function getGa4MeasurementId(): string | null {
-  return trimEnv(process.env.NEXT_PUBLIC_GA4_ID)
+  const w = publicEnvFromWindow()
+  return trimEnv(w?.ga4Id ?? undefined) ?? trimEnv(process.env.NEXT_PUBLIC_GA4_ID)
 }
 
 export function getGoogleAdsId(): string | null {
-  return trimEnv(process.env.NEXT_PUBLIC_GOOGLE_ADS_ID)
+  const w = publicEnvFromWindow()
+  return trimEnv(w?.googleAdsId ?? undefined) ?? trimEnv(process.env.NEXT_PUBLIC_GOOGLE_ADS_ID)
 }
 
 /**
@@ -21,10 +67,13 @@ export function getGoogleAdsId(): string | null {
  * Optional: when unset, GA4 events still fire but the Ads `conversion` event is skipped.
  */
 export function getGoogleAdsSignupSendTo(): string | null {
-  return trimEnv(process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO)
+  const w = publicEnvFromWindow()
+  return trimEnv(w?.signupSendTo ?? undefined) ?? trimEnv(process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO)
 }
 
 export function isMarketingAnalyticsDebugEnabled(): boolean {
+  const w = publicEnvFromWindow()
+  if (trimEnv(w?.analyticsDebug ?? undefined) === "1") return true
   return process.env.NEXT_PUBLIC_ANALYTICS_DEBUG === "1"
 }
 
@@ -37,7 +86,8 @@ export function isMarketingAnalyticsEnabled(): boolean {
  * Defaults to `.equipify.ai` when hostname matches; override via env for previews.
  */
 export function resolveMarketingCookieDomain(hostname: string | null | undefined): string | undefined {
-  const fromEnv = trimEnv(process.env.NEXT_PUBLIC_ANALYTICS_COOKIE_DOMAIN)
+  const w = publicEnvFromWindow()
+  const fromEnv = trimEnv(w?.cookieDomainOverride ?? undefined) ?? trimEnv(process.env.NEXT_PUBLIC_ANALYTICS_COOKIE_DOMAIN)
   if (fromEnv) return fromEnv === "auto" ? undefined : fromEnv
   if (!hostname) return undefined
   if (hostname === "localhost" || hostname.endsWith(".local")) return undefined
@@ -46,7 +96,9 @@ export function resolveMarketingCookieDomain(hostname: string | null | undefined
 }
 
 export function getLinkerDomains(): string[] {
-  const raw = trimEnv(process.env.NEXT_PUBLIC_ANALYTICS_LINKER_DOMAINS)
+  const w = publicEnvFromWindow()
+  const raw =
+    trimEnv(w?.linkerDomainsRaw ?? undefined) ?? trimEnv(process.env.NEXT_PUBLIC_ANALYTICS_LINKER_DOMAINS)
   if (raw) {
     return raw
       .split(",")

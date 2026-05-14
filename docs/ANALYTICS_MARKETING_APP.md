@@ -17,10 +17,16 @@ This app mirrors the marketing stack used on [www.equipify.ai](https://www.equip
 
 ## Where code runs
 
-- **Bootstrap + loader:** `components/analytics/marketing-analytics-provider.tsx` — `next/script` (inline gtag bootstrap + `gtag/js` loader, both `afterInteractive`). A short retry loop ensures `gtag('config', …)` runs after the bootstrap snippet is on the page.
-- **Config (linker, cookie domain, `send_page_view: false`):** `lib/analytics/marketing-analytics-gtag.ts`
-- **SPA page views:** same provider via `usePathname` / `useSearchParams`, with dedupe in `lib/analytics/marketing-analytics-pageview-dedupe.ts` to reduce duplicate fires under React Strict Mode.
+- **Bootstrap + `gtag/js` loader (all routes):** `components/analytics/marketing-gtag-server-scripts.tsx`, mounted from **`app/layout.tsx`** (Server Component) as the first child of `<body>`. This avoids relying on client-only `next/script` inside `MarketingAnalyticsProvider` for tag discovery (e.g. Tag Assistant on `/onboarding`).
+- **Runtime ID mirror for the client:** the server inline script sets `window.__EQUIPIFY_MARKETING_ENV__`. `lib/analytics/marketing-analytics-config.ts` prefers that object over `process.env` so event helpers match the IDs embedded in the HTML for this response.
+- **SPA `page_view` + `gtag('config', …)`:** `components/analytics/marketing-analytics-provider.tsx` (inside `GlobalProviders`) — `usePathname` / `useSearchParams`, with dedupe in `lib/analytics/marketing-analytics-pageview-dedupe.ts`.
 - **Conversion and funnel events (client-only):** `lib/analytics/marketing-analytics-events.ts`
+
+### Layout / routing (Tag Assistant on `/onboarding`)
+
+- `GlobalProviders` (including `MarketingAnalyticsProvider`) is mounted only from **`app/layout.tsx`**, so it wraps every route group (`(auth)`, `(dashboard)`, etc.). `(auth)/layout.tsx` does not remove it.
+- **Google tag scripts** load from **`MarketingGtagServerScripts`** in the same root layout, so they are present on public/auth routes without authentication and do not depend on dashboard-only trees.
+- Script loading is **not** gated on `NODE_ENV`, consent wrappers, pathname, or session; only missing `NEXT_PUBLIC_GA4_ID` / `NEXT_PUBLIC_GOOGLE_ADS_ID` disables emission.
 
 ## Where conversions fire (intentionally strict)
 
@@ -57,14 +63,17 @@ Use `lib/analytics/third-party-marketing-pixels.ts` and invoke `registerFutureMa
 ## Manual QA
 
 1. Set `NEXT_PUBLIC_GA4_ID`, `NEXT_PUBLIC_GOOGLE_ADS_ID`, and optionally `NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO` in `.env.local`.
-2. Set `NEXT_PUBLIC_ANALYTICS_DEBUG=1`, run the app, open DevTools → Console; filter `equipify-analytics`.
-3. Navigate between routes: confirm a `page_view` log per navigation without double bursts on a single navigation (Strict Mode may still mount twice in dev; dedupe should collapse identical path+search within ~450ms).
-4. Complete onboarding on a test account: confirm logs for `GA4 sign_up + onboarding_completed`, `GA4 free_trial_signup` (self-serve only), and `Ads conversion` when `SIGNUP_SEND_TO` is set.
-5. In GA4 **DebugView** (with debug mode or GA Debugger), confirm events and page views for `app.equipify.ai`.
-6. Optional: land on `www.equipify.ai` with UTM/gclid, then continue to `app.equipify.ai` onboarding; in Ads/GA4 reporting, verify attributed conversions within your attribution window (not real-time in all surfaces).
+2. **View source** or DevTools → Elements on `/onboarding`: confirm an inline `<script>` right after `<body>` assigns `window.__EQUIPIFY_MARKETING_ENV__` and defines `window.gtag`, and a `script[src*="googletagmanager.com/gtag/js"]` exists.
+3. DevTools → Console: `typeof window.gtag` should be `"function"` on `/onboarding` without signing in.
+4. Set `NEXT_PUBLIC_ANALYTICS_DEBUG=1`, run the app; filter console for `equipify-analytics`.
+5. Navigate between routes: confirm a `page_view` log per navigation without double bursts on a single navigation (Strict Mode may still mount twice in dev; dedupe should collapse identical path+search within ~450ms).
+6. Complete onboarding on a test account: confirm logs for `GA4 sign_up + onboarding_completed`, `GA4 free_trial_signup` (self-serve only), and `Ads conversion` when `SIGNUP_SEND_TO` is set.
+7. In GA4 **DebugView** (with debug mode or GA Debugger), confirm events and page views for `app.equipify.ai`.
+8. Optional: land on `www.equipify.ai` with UTM/gclid, then continue to `app.equipify.ai` onboarding; in Ads/GA4 reporting, verify attributed conversions within your attribution window (not real-time in all surfaces).
+9. Tag Assistant: connect to `https://app.equipify.ai/onboarding` and confirm the Google tag is detected after deploy.
 
 ## Hydration / SSR
 
 - The provider is a client component; the root layout stays a server component.
 - Default automatic GA pageviews are disabled (`send_page_view: false`); only explicit SPA `page_view` events run, avoiding duplicate automatic + manual pageviews.
-- gtag bootstrap uses `next/script` with `afterInteractive` (App Router does not support `beforeInteractive` outside the Pages Router `_document` pattern).
+- The **inline** gtag bootstrap is emitted from the server layout (synchronous when parsed). The **`gtag/js`** file is loaded via `next/script` with `afterInteractive`.

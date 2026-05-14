@@ -1,6 +1,5 @@
 "use client"
 
-import Script from "next/script"
 import { Suspense, useEffect, useMemo } from "react"
 import { usePathname, useSearchParams } from "next/navigation"
 import {
@@ -11,15 +10,15 @@ import { marketingAnalyticsDebug } from "@/lib/analytics/marketing-analytics-deb
 import {
   buildMarketingGtagConfigPayload,
   configureMarketingGtagOnce,
-  getMarketingGtagLoaderId,
   marketingGtagPageView,
 } from "@/lib/analytics/marketing-analytics-gtag"
 import { shouldSendMarketingPageView } from "@/lib/analytics/marketing-analytics-pageview-dedupe"
 import { registerFutureMarketingPixels } from "@/lib/analytics/third-party-marketing-pixels"
 
 /**
- * Loads gtag once, configures GA4 + Google Ads with cross-subdomain linker/cookies,
- * and tracks virtual `page_view` on App Router navigations (no default automatic pageviews).
+ * SPA virtual page_view + gtag config. **Script tags** load from `MarketingGtagServerScripts`
+ * in `app/layout.tsx` so Google tags appear on auth/public routes without relying on this
+ * client boundary for injection.
  */
 function MarketingAnalyticsRouteEffects() {
   const pathname = usePathname() ?? "/"
@@ -72,28 +71,8 @@ function MarketingAnalyticsRouteEffects() {
 }
 
 export function MarketingAnalyticsProvider({ children }: { children: React.ReactNode }) {
-  const loaderId = getMarketingGtagLoaderId()
-
-  if (!isMarketingAnalyticsEnabled()) {
-    return <>{children}</>
-  }
-
   return (
     <>
-      <Script
-        id="equipify-gtag-bootstrap"
-        strategy="afterInteractive"
-        dangerouslySetInnerHTML={{
-          __html:
-            "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}window.gtag=gtag;gtag('js',new Date());",
-        }}
-      />
-      {loaderId ? (
-        <Script
-          src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(loaderId)}`}
-          strategy="afterInteractive"
-        />
-      ) : null}
       <Suspense fallback={null}>
         <MarketingAnalyticsRouteEffects />
       </Suspense>
