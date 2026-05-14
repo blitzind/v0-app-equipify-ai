@@ -1,39 +1,24 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import {
   useEquipmentTypes,
   type EquipmentType,
   ICON_OPTIONS,
   COLOR_PRESETS,
+  EquipmentTypeIcon,
+  EQUIPMENT_TYPE_ICON_CATALOG,
+  EQUIPMENT_TYPE_ICON_CATEGORY_ORDER,
 } from "@/lib/equipment-type-store"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { resetOrganizationEquipmentTypeSeedsAction } from "@/app/actions/organization-equipment-types"
 import { toast } from "@/hooks/use-toast"
-import {
-  Thermometer, Snowflake, Zap, Droplets, UtensilsCrossed,
-  Flame, CircuitBoard, ArrowUpDown, Wrench, Settings, Wind,
-  Gauge, Lightbulb, Radio, Cpu, Server, ShieldCheck,
-  AlertTriangle, Power, PcCase, Plus, Pencil, Trash2,
-  Check, X, GripVertical, Package, BarChart3,
-} from "lucide-react"
+import { Plus, Pencil, Trash2, Check, X, GripVertical, Package, BarChart3, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-// ─── Icon map ─────────────────────────────────────────────────────────────────
-
-const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-  Thermometer, Snowflake, Zap, Droplets, UtensilsCrossed,
-  Flame, CircuitBoard, ArrowUpDown, Wrench, Settings, Wind,
-  Gauge, Lightbulb, Radio, Cpu, Server, ShieldCheck,
-  AlertTriangle, Power, PcCase,
-}
-
-function TypeIcon({ name, size = 16, className }: { name: string; size?: number; className?: string }) {
-  const Icon = ICON_MAP[name] ?? Wrench
-  return <Icon size={size} className={className} />
-}
+const CATEGORY_ORDER = EQUIPMENT_TYPE_ICON_CATEGORY_ORDER as readonly string[]
 
 // ─── Shared sub-components ────────────────────────────────────────────────────
 
@@ -88,27 +73,95 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
 }
 
 function IconPicker({ value, onChange }: { value: string; onChange: (i: string) => void }) {
+  const [query, setQuery] = useState("")
+  const q = query.trim().toLowerCase()
+
+  const filtered = useMemo(() => {
+    if (!q) return EQUIPMENT_TYPE_ICON_CATALOG
+    return EQUIPMENT_TYPE_ICON_CATALOG.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        e.category.toLowerCase().includes(q) ||
+        e.keywords.toLowerCase().includes(q),
+    )
+  }, [q])
+
+  const grouped = useMemo(() => {
+    const byCat = new Map<string, typeof EQUIPMENT_TYPE_ICON_CATALOG>()
+    for (const e of filtered) {
+      const list = byCat.get(e.category)
+      if (list) list.push(e)
+      else byCat.set(e.category, [e])
+    }
+    const out: { category: string; items: (typeof EQUIPMENT_TYPE_ICON_CATALOG)[number][] }[] = []
+    for (const c of CATEGORY_ORDER) {
+      const items = byCat.get(c)
+      if (items?.length) out.push({ category: c, items })
+    }
+    for (const [c, items] of byCat) {
+      if (!CATEGORY_ORDER.includes(c)) out.push({ category: c, items })
+    }
+    return out
+  }, [filtered])
+
+  const catalogHasValue = useMemo(() => ICON_OPTIONS.includes(value), [value])
+
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {ICON_OPTIONS.map((name) => {
-        const active = value === name
-        return (
-          <button
-            key={name}
-            type="button"
-            onClick={() => onChange(name)}
-            title={name}
-            className={cn(
-              "w-8 h-8 rounded-md border flex items-center justify-center transition-all",
-              active
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
-            )}
-          >
-            <TypeIcon name={name} size={14} />
-          </button>
-        )
-      })}
+    <div className="space-y-2">
+      {!catalogHasValue && value ? (
+        <p className="text-xs text-amber-600 dark:text-amber-500">
+          This type uses a legacy or unknown icon name; the preview shows a fallback until you pick an icon below.
+        </p>
+      ) : null}
+      <div className="relative">
+        <Search
+          size={14}
+          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+          aria-hidden
+        />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="input-base w-full h-8 pl-8 text-sm"
+          placeholder="Search icons by name, category, or keyword…"
+          aria-label="Filter equipment type icons"
+        />
+      </div>
+      <div className="max-h-[min(22rem,50vh)] overflow-y-auto overscroll-contain rounded-md border border-border p-2 space-y-3">
+        {grouped.length === 0 ? (
+          <p className="text-xs text-muted-foreground px-1 py-2">No icons match your search.</p>
+        ) : (
+          grouped.map(({ category, items }) => (
+            <div key={category}>
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 px-0.5">
+                {category}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {items.map(({ name }) => {
+                  const active = value === name
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => onChange(name)}
+                      title={name}
+                      className={cn(
+                        "w-8 h-8 rounded-md border flex items-center justify-center transition-all shrink-0",
+                        active
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                      )}
+                    >
+                      <EquipmentTypeIcon name={name} size={14} />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   )
 }
@@ -177,7 +230,7 @@ function TypeEditor({
           className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
           style={{ background: color + "22", color }}
         >
-          <TypeIcon name={icon} size={14} />
+          <EquipmentTypeIcon name={icon} size={14} />
         </div>
         <span className="text-sm font-medium text-foreground">{name || "Preview"}</span>
       </div>
@@ -278,7 +331,7 @@ function AddTypeForm({ onAdd }: { onAdd: () => void }) {
           className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
           style={{ background: color + "22", color }}
         >
-          <TypeIcon name={icon} size={14} />
+          <EquipmentTypeIcon name={icon} size={14} />
         </div>
         <span className="text-sm font-medium text-foreground">{name || "Preview"}</span>
       </div>
@@ -322,7 +375,7 @@ function TypeRow({ type }: { type: EquipmentType }) {
           className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
           style={{ background: type.color + "1a", color: type.color }}
         >
-          <TypeIcon name={type.icon} size={15} />
+          <EquipmentTypeIcon name={type.icon} size={15} />
         </div>
 
         {/* Name + description */}

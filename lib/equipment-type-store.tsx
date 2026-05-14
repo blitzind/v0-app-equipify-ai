@@ -271,30 +271,13 @@ export function useEquipmentTypes() {
   return ctx
 }
 
-export const ICON_OPTIONS = [
-  "Thermometer",
-  "Snowflake",
-  "Zap",
-  "Droplets",
-  "UtensilsCrossed",
-  "Flame",
-  "CircuitBoard",
-  "ArrowUpDown",
-  "Wrench",
-  "Settings",
-  "Wind",
-  "Gauge",
-  "Lightbulb",
-  "Radio",
-  "Cpu",
-  "Server",
-  "ShieldCheck",
-  "AlertTriangle",
-  "Power",
-  "PcCase",
-] as const
-
-export type IconName = (typeof ICON_OPTIONS)[number]
+export {
+  ICON_OPTIONS,
+  type IconName,
+  EquipmentTypeIcon,
+  EQUIPMENT_TYPE_ICON_CATALOG,
+  EQUIPMENT_TYPE_ICON_CATEGORY_ORDER,
+} from "@/lib/equipment-type-icons"
 
 export const COLOR_PRESETS = [
   "#2563eb",
