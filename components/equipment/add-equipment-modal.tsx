@@ -124,6 +124,10 @@ function optionalDateFieldError(raw: string): string | undefined {
 function friendlyInsertError(message: string): string {
   const m = message.trim()
   if (!m) return "Could not save equipment. Please try again."
+  const ml = m.toLowerCase()
+  if (ml.includes("row-level security") || ml.includes("violates row-level security") || m.includes("42501")) {
+    return "Save failed: your account does not have permission to insert equipment for this workspace (for example, support-session access may not allow this action). Try as a workspace owner or admin, or contact support."
+  }
   if (m.includes("violates foreign key")) {
     return "Save failed: linked customer or site is no longer valid. Pick the customer again and retry."
   }
@@ -132,6 +136,21 @@ function friendlyInsertError(message: string): string {
   }
   if (m.length > 220) return `${m.slice(0, 217)}…`
   return m
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function equipmentSaveDebug(
+  message: string,
+  details?: Record<string, unknown>,
+  activeOrgId: string | null | undefined = undefined,
+) {
+  if (process.env.NEXT_PUBLIC_DEBUG_EQUIPMENT_SAVE !== "true") return
+  if (typeof window === "undefined") return
+  const orgHint =
+    activeOrgId && activeOrgId.length > 12 ? `…${activeOrgId.slice(-8)}` : activeOrgId === null || activeOrgId === undefined ? "(none)" : activeOrgId
+  console.info("[equipify:equipment-save]", message, { ...details, organizationIdHint: orgHint })
 }
 
 export function AddEquipmentModal({
@@ -145,7 +164,8 @@ export function AddEquipmentModal({
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const { equipmentCreateEligibility } = useBillingAccess()
   const { ui } = useEquipmentFormIndustryUi(activeOrgId ?? null, orgStatus === "ready", open)
-  const { types: orgEquipmentTypes, loading: equipmentTypesLoading } = useEquipmentTypes()
+  const { types: orgEquipmentTypes, loading: equipmentTypesLoading, error: equipmentTypesQueryError } =
+    useEquipmentTypes()
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [customersLoading, setCustomersLoading] = useState(false)
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false)
@@ -298,7 +318,9 @@ export function AddEquipmentModal({
   }
 
   async function handleSave() {
+    equipmentSaveDebug("handler_enter", {}, activeOrgId)
     setSaveError(null)
+
     const errs = validate(form)
     const dateKeys = [
       "installDate",
@@ -311,32 +333,65 @@ export function AddEquipmentModal({
       const msg = optionalDateFieldError(form[key])
       if (msg) errs[key] = msg
     }
+
+    const cid = form.customerId.trim()
+    if (cid && !UUID_RE.test(cid)) {
+      errs.customerId = "Customer selection is invalid. Open the customer list and pick a customer again."
+    } else if (cid && !customersLoading && customers.length > 0 && !customers.some((c) => c.id === cid)) {
+      errs.customerId =
+        "Selected customer is not in the loaded list for this workspace. Re-select the customer (search again) and save."
+    }
+
     if (Object.keys(errs).length > 0) {
       setErrors(errs)
+      const line = Object.values(errs).filter(Boolean).join(" · ")
+      setSaveError(line)
+      equipmentSaveDebug("validation_failed", { fields: Object.keys(errs) }, activeOrgId)
       toast({
         variant: "destructive",
         title: "Fix the highlighted fields",
-        description: Object.values(errs).filter(Boolean).join(" · "),
+        description: line,
       })
       return
     }
 
-    if (toastRecordEligibilityBlocked(equipmentCreateEligibility)) return
-
-    if (!activeOrgId) {
-      toast({ variant: "destructive", title: "Cannot add equipment", description: "No organization selected." })
+    if (!equipmentCreateEligibility.ok) {
+      setSaveError(equipmentCreateEligibility.message)
+      equipmentSaveDebug("blocked_eligibility", { reason: equipmentCreateEligibility.reason }, activeOrgId)
+      toastRecordEligibilityBlocked(equipmentCreateEligibility)
       return
     }
 
-    const serverGate = await enforceCanCreateRecord(activeOrgId, "equipment")
-    if (!serverGate.ok) {
-      toast({ variant: "destructive", title: "Cannot add equipment", description: serverGate.message })
+    if (!activeOrgId) {
+      const msg = "No organization selected."
+      setSaveError(msg)
+      toast({ variant: "destructive", title: "Cannot add equipment", description: msg })
       return
     }
 
     setSaving(true)
-    const supabase = createBrowserSupabaseClient()
     try {
+      equipmentSaveDebug("enforce_start", {}, activeOrgId)
+      let serverGate: Awaited<ReturnType<typeof enforceCanCreateRecord>>
+      try {
+        serverGate = await enforceCanCreateRecord(activeOrgId, "equipment")
+      } catch (e) {
+        const msg =
+          e instanceof Error ? e.message : "Could not verify permission to save equipment (server action failed)."
+        setSaveError(msg)
+        toast({ variant: "destructive", title: "Cannot save equipment", description: msg })
+        equipmentSaveDebug("enforce_threw", { message: msg }, activeOrgId)
+        return
+      }
+
+      if (!serverGate.ok) {
+        setSaveError(serverGate.message)
+        toast({ variant: "destructive", title: "Cannot add equipment", description: serverGate.message })
+        equipmentSaveDebug("enforce_denied", { code: serverGate.code }, activeOrgId)
+        return
+      }
+
+      const supabase = createBrowserSupabaseClient()
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -369,32 +424,38 @@ export function AddEquipmentModal({
       const nextServiceDue = normalizeOptionalDateInput(form.nextServiceDue)
       const nextCalibrationDue = normalizeOptionalDateInput(form.nextCalibrationDue)
 
+      const insertPayload = {
+        organization_id: activeOrgId,
+        customer_id: cid,
+        name: (form.model || form.name).trim(),
+        manufacturer: form.manufacturer.trim() || null,
+        category: form.equipmentType.trim(),
+        subcategory: form.subcategory.trim() || null,
+        serial_number: form.serialNumber.trim() || null,
+        status: statusMap[form.status],
+        install_date: installDate,
+        warranty_expires_at: warrantyExpiration,
+        last_service_at: lastServiceDate,
+        next_due_at: nextServiceDue,
+        next_calibration_due_at: nextCalibrationDue,
+        calibration_interval_months: (() => {
+          const n = parseInt(form.calibrationIntervalMonths.trim(), 10)
+          return Number.isFinite(n) && n > 0 ? n : null
+        })(),
+        location_label: form.location.trim() || null,
+        customer_location_id: form.serviceSiteId.trim() || null,
+        notes: form.notes.trim() || null,
+      }
+
+      equipmentSaveDebug("insert_start", { payloadKeys: Object.keys(insertPayload) }, activeOrgId)
+
       const { data: inserted, error } = await supabase
         .from("equipment")
-        .insert({
-          organization_id: activeOrgId,
-          customer_id: form.customerId.trim(),
-          name: (form.model || form.name).trim(),
-          manufacturer: form.manufacturer.trim() || null,
-          category: form.equipmentType.trim(),
-          subcategory: form.subcategory.trim() || null,
-          serial_number: form.serialNumber.trim() || null,
-          status: statusMap[form.status],
-          install_date: installDate,
-          warranty_expires_at: warrantyExpiration,
-          last_service_at: lastServiceDate,
-          next_due_at: nextServiceDue,
-          next_calibration_due_at: nextCalibrationDue,
-          calibration_interval_months: (() => {
-            const n = parseInt(form.calibrationIntervalMonths.trim(), 10)
-            return Number.isFinite(n) && n > 0 ? n : null
-          })(),
-          location_label: form.location.trim() || null,
-          customer_location_id: form.serviceSiteId.trim() || null,
-          notes: form.notes.trim() || null,
-        })
+        .insert(insertPayload)
         .select("id")
-        .single()
+        .maybeSingle()
+
+      equipmentSaveDebug("insert_finished", { hasError: Boolean(error), hasRow: Boolean(inserted?.id) }, activeOrgId)
 
       if (error) {
         const msg = friendlyInsertError(error.message ?? "Unknown error")
@@ -403,7 +464,14 @@ export function AddEquipmentModal({
         return
       }
 
-      const newId = (inserted as { id: string } | null)?.id
+      const newId = inserted?.id
+      if (!newId) {
+        const msg =
+          "Save did not return a new equipment row. This usually means insert permission was denied or blocked after validation."
+        setSaveError(msg)
+        toast({ variant: "destructive", title: "Could not save equipment", description: msg })
+        return
+      }
 
       await Promise.resolve(onSuccess?.(newId))
 
@@ -426,6 +494,11 @@ export function AddEquipmentModal({
         description: "The new asset is available in your equipment list.",
       })
       handleClose()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Unexpected error while saving equipment."
+      setSaveError(msg)
+      toast({ variant: "destructive", title: "Could not save equipment", description: msg })
+      equipmentSaveDebug("handler_unexpected", { message: msg }, activeOrgId)
     } finally {
       setSaving(false)
     }
@@ -490,6 +563,13 @@ export function AddEquipmentModal({
           ) : (
           /* Scrollable body */
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+            {equipmentTypesQueryError ? (
+              <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+                Equipment types could not be loaded: {equipmentTypesQueryError}. You can still type a category below
+                if the field is shown. If this persists under support access, your session may lack read access to
+                organization equipment types.
+              </p>
+            ) : null}
             {/* Row 1 */}
             <div className="grid grid-cols-2 gap-4">
               <Field className="col-span-2 sm:col-span-1">
@@ -504,25 +584,42 @@ export function AddEquipmentModal({
               </Field>
               <Field>
                 <Label required>Equipment Type</Label>
-                <NativeSelect
-                  value={form.equipmentType}
-                  onChange={(e) => set("equipmentType", e.target.value)}
-                  disabled={equipmentTypesLoading}
-                  aria-invalid={Boolean(errors.equipmentType)}
-                >
-                  {equipmentTypesLoading ? (
+                {equipmentTypesLoading ? (
+                  <NativeSelect
+                    value={form.equipmentType}
+                    onChange={(e) => set("equipmentType", e.target.value)}
+                    disabled
+                    aria-invalid={Boolean(errors.equipmentType)}
+                  >
                     <option value="">Loading types…</option>
-                  ) : (
-                    <>
-                      <option value="">Select type...</option>
-                      {equipmentTypeOptions.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </>
-                  )}
-                </NativeSelect>
+                  </NativeSelect>
+                ) : orgEquipmentTypes.length === 0 ? (
+                  <>
+                    <Input
+                      placeholder="Category / type name"
+                      value={form.equipmentType}
+                      onChange={(e) => set("equipmentType", e.target.value)}
+                      aria-invalid={Boolean(errors.equipmentType)}
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      No configured equipment types for this workspace — enter a category name (same as you would pick
+                      from the list).
+                    </p>
+                  </>
+                ) : (
+                  <NativeSelect
+                    value={form.equipmentType}
+                    onChange={(e) => set("equipmentType", e.target.value)}
+                    aria-invalid={Boolean(errors.equipmentType)}
+                  >
+                    <option value="">Select type...</option>
+                    {equipmentTypeOptions.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                )}
                 {errors.equipmentType && <p className="text-xs text-destructive mt-1">{errors.equipmentType}</p>}
               </Field>
             </div>
@@ -565,7 +662,7 @@ export function AddEquipmentModal({
               </Field>
               <Field>
                 <Label required>Customer</Label>
-                <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
+                <Popover modal={false} open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
@@ -600,6 +697,9 @@ export function AddEquipmentModal({
                           <CommandGroup>
                             <CommandItem
                               value="__clear_customer"
+                              onPointerDown={(e) => {
+                                e.preventDefault()
+                              }}
                               onSelect={() => {
                                 set("customerId", "")
                                 setCustomerPopoverOpen(false)
@@ -614,6 +714,9 @@ export function AddEquipmentModal({
                               <CommandItem
                                 key={c.id}
                                 value={`${c.company_name} ${c.id}`}
+                                onPointerDown={(e) => {
+                                  e.preventDefault()
+                                }}
                                 onSelect={() => {
                                   set("customerId", c.id)
                                   setCustomerPopoverOpen(false)
