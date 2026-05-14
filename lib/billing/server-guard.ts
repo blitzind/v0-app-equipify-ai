@@ -183,20 +183,81 @@ export async function requireCanCreateRecord(
       message: `recordType=${recordType}`,
     })
 
+    equipmentSaveServerDebug("require_ccr_stage", {
+      helper: "requireCanCreateRecord",
+      organizationId,
+      message: "before_verifyActiveMembership",
+    })
     const denied = await verifyActiveMembership(supabase, userId, organizationId)
     if (denied) return denied
+    equipmentSaveServerDebug("require_ccr_stage", {
+      helper: "requireCanCreateRecord",
+      organizationId,
+      message: "after_verifyActiveMembership",
+    })
 
+    equipmentSaveServerDebug("require_ccr_stage", {
+      helper: "requireCanCreateRecord",
+      organizationId,
+      message: "before_loadOrgBillingContext",
+    })
     const ctx = await loadOrgBillingContext(supabase, organizationId)
-    const { data: actorProf } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("id", userId)
-      .maybeSingle()
-    const actorEmail = (actorProf as { email?: string | null } | null)?.email
+    equipmentSaveServerDebug("require_ccr_stage", {
+      helper: "requireCanCreateRecord",
+      organizationId,
+      message: "after_loadOrgBillingContext",
+    })
+
+    let actorEmail: string | null | undefined
+    try {
+      equipmentSaveServerDebug("require_ccr_stage", {
+        helper: "requireCanCreateRecord",
+        organizationId,
+        message: "before_profiles_actor",
+      })
+      const { data: actorProf } = await supabase
+        .from("profiles")
+        .select("email")
+        .eq("id", userId)
+        .maybeSingle()
+      actorEmail = (actorProf as { email?: string | null } | null)?.email
+      equipmentSaveServerDebug("require_ccr_stage", {
+        helper: "requireCanCreateRecord",
+        organizationId,
+        message: "after_profiles_actor",
+      })
+    } catch (e) {
+      equipmentSaveServerDebug("require_ccr_stage", {
+        helper: "requireCanCreateRecord",
+        organizationId,
+        message: `profiles_actor_threw:${e instanceof Error ? e.message : String(e)}`,
+      })
+      actorEmail = undefined
+    }
     const actorIsPlatformAdmin = isPlatformAdminEmail(actorEmail)
 
     let usageLoadFailed = ctx.usageLoadFailed
-    const supportSession = await hasActiveOrganizationSupportSession(supabase, userId, organizationId)
+    let supportSession = false
+    try {
+      equipmentSaveServerDebug("require_ccr_stage", {
+        helper: "requireCanCreateRecord",
+        organizationId,
+        message: "before_support_session",
+      })
+      supportSession = await hasActiveOrganizationSupportSession(supabase, userId, organizationId)
+      equipmentSaveServerDebug("require_ccr_stage", {
+        helper: "requireCanCreateRecord",
+        organizationId,
+        message: "after_support_session",
+      })
+    } catch (e) {
+      equipmentSaveServerDebug("require_ccr_stage", {
+        helper: "requireCanCreateRecord",
+        organizationId,
+        message: `support_session_threw:${e instanceof Error ? e.message : String(e)}`,
+      })
+      supportSession = false
+    }
     if (usageLoadFailed && (recordType === "equipment" || recordType === "team_invite")) {
       if (actorIsPlatformAdmin || supportSession) usageLoadFailed = false
     }
@@ -209,11 +270,22 @@ export async function requireCanCreateRecord(
       message: `recordType=${recordType} usageLoadFailed=${usageLoadFailed}`,
     })
 
-    return applyCreateRules(ctx.subscription, ctx.usagePack, ctx.seatSlotsUsed, recordType, {
+    equipmentSaveServerDebug("require_ccr_stage", {
+      helper: "requireCanCreateRecord",
+      organizationId,
+      message: "before_applyCreateRules",
+    })
+    const rules = applyCreateRules(ctx.subscription, ctx.usagePack, ctx.seatSlotsUsed, recordType, {
       usageLoadFailed,
       strictUsageCounts: true,
       skipSeatCap,
     })
+    equipmentSaveServerDebug("require_ccr_stage", {
+      helper: "requireCanCreateRecord",
+      organizationId,
+      message: `after_applyCreateRules_ok=${rules.ok}`,
+    })
+    return rules
   } catch (e) {
     logCreateGateFailure("requireCanCreateRecord", e, { organizationId, recordType })
     return {
@@ -257,22 +329,42 @@ function applyCreateRules(
   recordType: CreateRecordType,
   quotaOpts?: QuotaEvaluationOptions,
 ): GuardResult {
-  switch (recordType) {
-    case "equipment":
-      return fromEligibility(evaluateEquipmentCreate(subscription, usagePack, quotaOpts))
-    case "team_invite":
-      return fromEligibility(evaluateSeatInvite(subscription, usagePack, seatSlotsUsed, quotaOpts))
-    case "customer":
-    case "work_order":
-    case "quote":
-    case "invoice":
-    case "maintenance_plan":
-    case "purchase_order":
-    case "vendor":
-    case "calibration_template":
-    case "calibration_record":
-    case "org_task":
-      return fromEligibility(evaluateStandardCreate(subscription))
+  try {
+    switch (recordType) {
+      case "equipment":
+        return fromEligibility(evaluateEquipmentCreate(subscription, usagePack, quotaOpts))
+      case "team_invite":
+        return fromEligibility(evaluateSeatInvite(subscription, usagePack, seatSlotsUsed, quotaOpts))
+      case "customer":
+      case "work_order":
+      case "quote":
+      case "invoice":
+      case "maintenance_plan":
+      case "purchase_order":
+      case "vendor":
+      case "calibration_template":
+      case "calibration_record":
+      case "org_task":
+        return fromEligibility(evaluateStandardCreate(subscription))
+      default:
+        return {
+          ok: false,
+          code: "forbidden",
+          message: "Unsupported record type for create enforcement.",
+          httpStatus: 400,
+        }
+    }
+  } catch (e) {
+    equipmentSaveServerDebug("apply_create_rules_throw", {
+      helper: "applyCreateRules",
+      message: e instanceof Error ? e.message : String(e),
+    })
+    return {
+      ok: false,
+      code: "membership_error",
+      message: "Could not evaluate create rules for this workspace. Try again or contact support.",
+      httpStatus: 500,
+    }
   }
 }
 

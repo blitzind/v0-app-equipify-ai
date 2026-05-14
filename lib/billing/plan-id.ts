@@ -5,9 +5,12 @@ const VALID = new Set<string>(["solo", "core", "growth", "scale"])
 /**
  * Map DB or client plan strings to a valid {@link PlanId} for display and `getPlan`.
  * Legacy DB `plan_id` `starter` → `solo` (same product tier; UI label "Solo").
+ * Coerces non-string JSON values so billing gates never throw on `.trim()`.
  */
-export function normalizePlanIdForRead(raw: string): PlanId {
-  const t = raw.trim().toLowerCase()
+export function normalizePlanIdForRead(raw: string | number | null | undefined): PlanId {
+  if (raw == null) return "solo"
+  const t = String(raw).trim().toLowerCase()
+  if (t === "") return "solo"
   if (VALID.has(t)) return t as PlanId
   if (t === "starter") return "solo"
   return "solo"

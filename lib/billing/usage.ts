@@ -110,9 +110,11 @@ export async function getUsageWithLimits(
 }
 
 /** Normalize plan id from `organization_subscriptions.plan_id` text for limits helpers. */
-export function planIdFromSubscriptionRow(rawPlanId: string | null | undefined): PlanId {
-  if (!rawPlanId) return "solo"
-  return normalizePlanIdForRead(rawPlanId)
+export function planIdFromSubscriptionRow(rawPlanId: string | number | null | undefined): PlanId {
+  if (rawPlanId == null) return "solo"
+  const s = String(rawPlanId).trim()
+  if (!s) return "solo"
+  return normalizePlanIdForRead(s)
 }
 
 /** True when the plan defines a monthly API cap and recorded usage is at or over that cap. */
