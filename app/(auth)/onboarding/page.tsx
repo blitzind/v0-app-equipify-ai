@@ -27,6 +27,7 @@ import {
   ONBOARDING_TEAM_SIZE_OPTIONS,
   parseOnboardingSearchParams,
 } from "@/lib/onboarding-canonical"
+import { trackFreeTrialSignup, trackOnboardingCompleted } from "@/lib/analytics/marketing-analytics-events"
 
 const STEPS = ["Your account", "Workspace", "Choose a plan"]
 /** Central registry — labels and keys from `lib/workspace-industry-registry.ts` */
@@ -205,6 +206,8 @@ function OnboardingPageContent() {
     setIsSubmitting(true)
 
     let authUserId: string | null = null
+    let completedOrganizationId: string | null = null
+    let completionFlow: "invite" | "self_serve" = "self_serve"
     try {
       const signUpResult = await supabase.auth.signUp({
         email,
@@ -271,11 +274,18 @@ function OnboardingPageContent() {
           headers: authedJsonHeaders,
           body: JSON.stringify({ inviteToken: inviteTokenParam }),
         })
+        const acceptData = (await acceptRes.json()) as {
+          message?: string
+          ok?: boolean
+          organizationId?: string
+        }
         if (!acceptRes.ok) {
-          const acceptData = (await acceptRes.json()) as { message?: string }
           setSubmitError(acceptData.message ?? "Could not accept invite. Request a new invite.")
           return
         }
+        completedOrganizationId =
+          acceptData.organizationId ?? inviteContext?.organizationId ?? null
+        completionFlow = "invite"
       } else {
         const provisionRes = await fetch("/api/onboarding/provision", {
           method: "POST",
@@ -292,14 +302,35 @@ function OnboardingPageContent() {
             phone: form.phone.trim() || undefined,
           }),
         })
+        const provisionData = (await provisionRes.json()) as {
+          message?: string
+          ok?: boolean
+          organizationId?: string
+        }
         if (!provisionRes.ok) {
-          const provisionData = (await provisionRes.json()) as { message?: string }
           setSubmitError(provisionData.message ?? "Could not finish workspace setup. Please try again.")
           return
         }
+        completedOrganizationId = provisionData.organizationId ?? null
+        completionFlow = "self_serve"
       }
     } finally {
       setIsSubmitting(false)
+    }
+
+    if (authUserId && completedOrganizationId) {
+      trackOnboardingCompleted({
+        userId: authUserId,
+        organizationId: completedOrganizationId,
+        flow: completionFlow,
+      })
+      if (completionFlow === "self_serve") {
+        trackFreeTrialSignup({
+          userId: authUserId,
+          organizationId: completedOrganizationId,
+          selectedPlan,
+        })
+      }
     }
 
     if (typeof window !== "undefined") {
