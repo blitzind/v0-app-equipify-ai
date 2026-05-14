@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { MEMBERSHIP_ROLES, type MembershipRole } from "@/lib/team/membership"
 import type { TechnicianSkillTagOption } from "@/lib/technicians/skill-tags"
 import {
@@ -84,6 +85,8 @@ type TeamMemberRow = {
   permissionProfile: string | null
   effectivePermissions?: OrgPermissions
   status: string
+  /** Schedulable on Dispatch / Schedule / work orders (separate from base role). */
+  isFieldResource: boolean
   createdAt: string
   updatedAt: string | null
   invitedBy: string | null
@@ -218,6 +221,7 @@ export default function TeamPage() {
   const [editRole, setEditRole] = useState<MembershipRole>("tech")
   const [editPermissionProfile, setEditPermissionProfile] = useState<CommercialPermissionProfile | "">("")
   const [editStatus, setEditStatus] = useState<"active" | "suspended">("active")
+  const [editFieldResource, setEditFieldResource] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
   const [editAvatarUploading, setEditAvatarUploading] = useState(false)
   const [skillTags, setSkillTags] = useState<TechnicianSkillTagOption[]>([])
@@ -251,7 +255,12 @@ export default function TeamPage() {
       if (!res.ok) {
         throw new Error(data.message ?? data.error ?? "Could not load team.")
       }
-      setMembers(data.members ?? [])
+      setMembers(
+        (data.members ?? []).map((m) => ({
+          ...m,
+          isFieldResource: Boolean((m as TeamMemberRow).isFieldResource),
+        })),
+      )
       setPendingInvites(data.pendingInvites ?? [])
       setCurrentUserId(data.currentUserId ?? null)
       setCurrentUserRole(data.currentUserRole ?? null)
@@ -351,6 +360,7 @@ export default function TeamPage() {
     setEditRole(isMembershipRoleString(m.role) ? m.role : "tech")
     setEditPermissionProfile(normalizePermissionProfile(m.permissionProfile) ?? "")
     setEditStatus(m.status === "suspended" ? "suspended" : "active")
+    setEditFieldResource(Boolean(m.isFieldResource))
     setMenuOpen(null)
   }
 
@@ -373,6 +383,12 @@ export default function TeamPage() {
       }
       if (editMember.status !== "invited") {
         body.status = editStatus
+      }
+      if (
+        editMember.status === "active" &&
+        (["owner", "admin", "manager", "tech"] as const).includes(editRole)
+      ) {
+        body.isFieldResource = editFieldResource
       }
       const res = await fetch(`/api/team/members/${encodeURIComponent(editMember.userId)}`, {
         method: "PATCH",
@@ -1081,7 +1097,9 @@ export default function TeamPage() {
           <DialogHeader>
             <DialogTitle>Edit member</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              Update profile and membership. Owners and admins only; admins cannot modify owners.
+              Update profile and membership. <span className="font-medium text-foreground">Role</span> is workspace
+              access; <span className="font-medium text-foreground">field scheduling</span> is separate (see below).
+              Owners and admins only; admins cannot modify owners.
             </DialogDescription>
           </DialogHeader>
           {editMember && (
@@ -1180,7 +1198,11 @@ export default function TeamPage() {
                     id="team-edit-role"
                     className="input-base w-full"
                     value={editRole}
-                    onChange={(e) => setEditRole(e.target.value as MembershipRole)}
+                    onChange={(e) => {
+                      const r = e.target.value as MembershipRole
+                      setEditRole(r)
+                      if (r === "viewer") setEditFieldResource(false)
+                    }}
                     disabled={editSaving}
                   >
                     {roleSelectOptions.map((r) => (
@@ -1232,6 +1254,30 @@ export default function TeamPage() {
                   )}
                 </div>
               </div>
+              {editMember.status === "active" &&
+              (["owner", "admin", "manager", "tech"] as readonly MembershipRole[]).includes(editRole) ? (
+                <div className="rounded-lg border border-border bg-muted/30 px-3 py-3 space-y-2">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="team-field-resource"
+                      checked={editFieldResource}
+                      onCheckedChange={(v) => setEditFieldResource(v === true)}
+                      disabled={editSaving || !canManageTeam}
+                      className="mt-0.5"
+                    />
+                    <div className="space-y-1 min-w-0">
+                      <Label htmlFor="team-field-resource" className="text-sm font-medium cursor-pointer leading-snug">
+                        Can be scheduled for field work
+                      </Label>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Lets this person appear in Dispatch, Schedule, Quick Add, and work order assignees. You do{" "}
+                        <span className="font-medium text-foreground">not</span> need to change an Owner to Technician —
+                        keep their role and enable this when they should receive assignments.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
               <div className="rounded-lg border border-border bg-secondary/20 px-3 py-2">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Staged access preview

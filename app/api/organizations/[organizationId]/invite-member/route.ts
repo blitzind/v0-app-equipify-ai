@@ -194,6 +194,7 @@ export async function POST(
     role: "tech",
     status: "invited",
     invited_by: user.id,
+    is_field_resource: true,
   })
 
   if (omErr) {

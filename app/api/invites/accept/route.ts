@@ -74,6 +74,7 @@ export async function POST(request: Request) {
       role: invite.role,
       status: "active",
       invited_by: null,
+      is_field_resource: invite.role === "tech",
     },
     { onConflict: "organization_id,user_id" },
   )

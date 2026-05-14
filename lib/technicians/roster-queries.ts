@@ -1,12 +1,22 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-/** Full roster shape when technician migration columns exist. */
+const ORG_MEMBERS_ROSTER_CORE =
+  "user_id, role, status, job_title, region, skills, availability_status, start_date"
+
+/** Full roster shape: roster columns + permission overlays + field-resource flag. */
 export const ORG_MEMBERS_SELECT_FULL =
-  "user_id, role, status, job_title, region, skills, availability_status, start_date, permission_profile, permissions_json"
+  `${ORG_MEMBERS_ROSTER_CORE}, permission_profile, permissions_json, is_field_resource`
+
+/** When `is_field_resource` is not migrated yet. */
+export const ORG_MEMBERS_SELECT_FULL_NO_FIELD_RESOURCE =
+  `${ORG_MEMBERS_ROSTER_CORE}, permission_profile, permissions_json`
 
 /** Fallback when `permission_profile` / `permissions_json` are not deployed yet. */
 export const ORG_MEMBERS_SELECT_FULL_NO_PERMISSIONS =
-  "user_id, role, status, job_title, region, skills, availability_status, start_date"
+  `${ORG_MEMBERS_ROSTER_CORE}, is_field_resource`
+
+export const ORG_MEMBERS_SELECT_FULL_NO_PERMISSIONS_NO_FIELD =
+  `${ORG_MEMBERS_ROSTER_CORE}`
 
 export const ORG_MEMBERS_SELECT_MINIMAL = "user_id, role, status"
 
@@ -39,21 +49,34 @@ export async function queryOrganizationMembersForRoster(
       .in("status", params.statusIn)
       .in("role", [...params.roleIn])
 
-  const first = await base(ORG_MEMBERS_SELECT_FULL)
-  if (first.error && isMissingColumnOrSchemaError(first.error)) {
-    const noPerms = await base(ORG_MEMBERS_SELECT_FULL_NO_PERMISSIONS)
-    if (noPerms.error && isMissingColumnOrSchemaError(noPerms.error)) {
-      const fallback = await supabase
-        .from("organization_members")
-        .select(ORG_MEMBERS_SELECT_MINIMAL)
-        .eq("organization_id", params.organizationId)
-        .in("status", params.statusIn)
-        .in("role", [...params.roleIn])
-      return { ...fallback, rosterColumnsAvailable: false as const }
-    }
-    return { ...noPerms, rosterColumnsAvailable: true as const }
+  const ordered = [
+    ORG_MEMBERS_SELECT_FULL,
+    ORG_MEMBERS_SELECT_FULL_NO_FIELD_RESOURCE,
+    ORG_MEMBERS_SELECT_FULL_NO_PERMISSIONS,
+    ORG_MEMBERS_SELECT_FULL_NO_PERMISSIONS_NO_FIELD,
+    ORG_MEMBERS_SELECT_MINIMAL,
+  ] as const
+
+  let last = await base(ordered[0])
+  if (!last.error) {
+    return { ...last, rosterColumnsAvailable: true as const }
   }
-  return { ...first, rosterColumnsAvailable: true as const }
+  if (!isMissingColumnOrSchemaError(last.error)) {
+    return { ...last, rosterColumnsAvailable: false as const }
+  }
+
+  for (let i = 1; i < ordered.length; i++) {
+    last = await base(ordered[i])
+    if (!last.error) {
+      const rosterColumnsAvailable = ordered[i].includes("job_title")
+      return { ...last, rosterColumnsAvailable }
+    }
+    if (!isMissingColumnOrSchemaError(last.error)) {
+      return { ...last, rosterColumnsAvailable: false as const }
+    }
+  }
+
+  return { ...last, rosterColumnsAvailable: false as const }
 }
 
 export async function queryProfilesForRoster(supabase: SupabaseClient, userIds: string[]) {

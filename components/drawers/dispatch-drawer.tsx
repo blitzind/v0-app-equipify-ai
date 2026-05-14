@@ -70,6 +70,7 @@ import {
   queryOrganizationMembersForRoster,
   queryProfilesForRoster,
 } from "@/lib/technicians/roster-queries"
+import { isEligibleFieldAssignableMember } from "@/lib/work-orders/assignee-eligibility"
 
 const ROSTER_MEMBER_ROLES = ["owner", "admin", "manager", "tech"] as const
 
@@ -834,7 +835,7 @@ function DailyDispatchInner({ initialTechnicianId }: { initialTechnicianId?: str
 
       const { data: members, error: mErr } = await queryOrganizationMembersForRoster(supabase, {
         organizationId: orgId,
-        statusIn: ["active", "invited"],
+        statusIn: ["active"],
         roleIn: ROSTER_MEMBER_ROLES,
       })
 
@@ -854,16 +855,28 @@ function DailyDispatchInner({ initialTechnicianId }: { initialTechnicianId?: str
         status?: string
         region?: string | null
         skills?: string[] | null
+        permission_profile?: string | null
+        permissions_json?: unknown
+        is_field_resource?: boolean | null
       }>
-      const userIds = [...new Set(memberList.map((m) => m.user_id))]
-      const roleByUser = new Map(memberList.map((m) => [m.user_id, m.role]))
+      const eligibleMembers = memberList.filter((m) =>
+        isEligibleFieldAssignableMember({
+          role: m.role,
+          status: m.status ?? "active",
+          permission_profile: m.permission_profile,
+          permissions_json: m.permissions_json,
+          isFieldResource: m.is_field_resource,
+        }),
+      )
+      const userIds = [...new Set(eligibleMembers.map((m) => m.user_id))]
+      const roleByUser = new Map(eligibleMembers.map((m) => [m.user_id, m.role]))
       const jobTitleByUser = new Map(
-        memberList.map((m) => [m.user_id, (m.job_title ?? "").trim()]),
+        eligibleMembers.map((m) => [m.user_id, (m.job_title ?? "").trim()]),
       )
       const regionByUser = new Map(
-        memberList.map((m) => [m.user_id, (m.region ?? "").trim()]),
+        eligibleMembers.map((m) => [m.user_id, (m.region ?? "").trim()]),
       )
-      const skillsByUser = new Map(memberList.map((m) => [m.user_id, m.skills]))
+      const skillsByUser = new Map(eligibleMembers.map((m) => [m.user_id, m.skills]))
 
       if (userIds.length === 0) {
         if (!cancelled) {

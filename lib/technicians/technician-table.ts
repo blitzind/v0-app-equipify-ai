@@ -147,25 +147,32 @@ export async function listTechniciansForOrg(
     return rows
   }
 
-  const { data: oms, error: omErr } = await supabase
+  let { data: oms, error: omErr } = await supabase
     .from("organization_members")
-    .select("membership_id, status")
+    .select("membership_id, status, is_field_resource")
     .eq("organization_id", organizationId)
     .in("membership_id", mids)
+
+  if (omErr && isMissingColumnOrSchemaError(omErr)) {
+    ;({ data: oms, error: omErr } = await supabase
+      .from("organization_members")
+      .select("membership_id, status")
+      .eq("organization_id", organizationId)
+      .in("membership_id", mids))
+  }
 
   if (omErr) {
     return rows
   }
 
-  const activeMembershipIds = new Set(
-    ((oms ?? []) as Array<{ membership_id: string; status: string }>)
-      .filter((o) => o.status === "active")
-      .map((o) => o.membership_id),
-  )
+  const omRows = (oms ?? []) as Array<{ membership_id: string; status: string; is_field_resource?: boolean | null }>
 
   rows = rows.filter((t) => {
     if (!t.membership_id) return true
-    return activeMembershipIds.has(t.membership_id)
+    const om = omRows.find((o) => o.membership_id === t.membership_id)
+    if (!om || om.status !== "active") return false
+    if (om.is_field_resource === false) return false
+    return true
   })
 
   return rows

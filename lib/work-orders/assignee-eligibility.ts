@@ -7,25 +7,31 @@ import {
 const ROSTER_ASSIGNABLE_ROLES: readonly OrgMemberRole[] = ["owner", "admin", "manager", "tech"]
 
 /**
- * Org members who may appear as assignable field resources (no `technicians` row, or extras).
- * Honors commercial permission profiles (e.g. billing/sales overlays) via {@link getEffectiveOrgPermissions}.
+ * Org members who may appear as assignable field resources (Schedule, Dispatch, work orders).
+ * Uses `organization_members.is_field_resource` when present; falls back to legacy rules if the
+ * column is not projected (pre-migration clients).
  */
 export function isEligibleFieldAssignableMember(args: {
   role: string
   status: string
   permission_profile?: string | null
   permissions_json?: unknown
+  /** From `organization_members.is_field_resource` */
+  isFieldResource?: boolean | null
 }): boolean {
   if (args.status !== "active") return false
   const role = normalizeOrgMemberRole(args.role)
   if (!role || !ROSTER_ASSIGNABLE_ROLES.includes(role)) return false
 
+  if (args.isFieldResource === true) return true
+  if (args.isFieldResource === false) return false
+
+  // Legacy: column missing from SELECT — preserve prior behavior until migration is live everywhere.
   const perms = getEffectiveOrgPermissions({
     role,
     permissionProfile: args.permission_profile,
     permissionsJson: args.permissions_json,
   })
-
   if (role === "owner" || role === "tech") return true
   return perms.canEditWorkOrders
 }

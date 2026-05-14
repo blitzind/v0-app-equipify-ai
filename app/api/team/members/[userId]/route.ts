@@ -3,7 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { countActiveOwners, isMembershipRole, type MembershipRole } from "@/lib/team/membership"
-import { normalizePermissionProfile } from "@/lib/permissions/model"
+import { normalizeOrgMemberRole, normalizePermissionProfile } from "@/lib/permissions/model"
 import { insertTeamAuditEvent } from "@/lib/team-audit"
 import { removeAvatarObjectIfInBucket } from "@/lib/profile/avatar-storage"
 
@@ -24,20 +24,39 @@ type PatchBody = {
   clearAvatar?: boolean
   permissionProfile?: string | null
   permissionsJson?: unknown
+  /** Schedulable on Dispatch / Schedule / work orders (separate from base role). */
+  isFieldResource?: boolean
 }
 
 function jsonError(code: string, message: string, status: number) {
   return NextResponse.json({ error: code, message }, { status })
 }
 
+function isMissingColumnOrSchemaError(err: { message?: string } | null): boolean {
+  const m = (err?.message ?? "").toLowerCase()
+  return (
+    (m.includes("column") && m.includes("does not exist")) ||
+    m.includes("could not find") ||
+    (m.includes("schema cache") && m.includes("column"))
+  )
+}
+
 async function loadTargetMembership(organizationId: string, targetUserId: string) {
   const admin = createServiceRoleSupabaseClient()
-  const { data, error } = await admin
+  let { data, error } = await admin
     .from("organization_members")
-    .select("user_id, role, status, permission_profile, permissions_json")
+    .select("user_id, role, status, permission_profile, permissions_json, is_field_resource")
     .eq("organization_id", organizationId)
     .eq("user_id", targetUserId)
     .maybeSingle()
+  if (error && isMissingColumnOrSchemaError(error)) {
+    ;({ data, error } = await admin
+      .from("organization_members")
+      .select("user_id, role, status, permission_profile, permissions_json")
+      .eq("organization_id", organizationId)
+      .eq("user_id", targetUserId)
+      .maybeSingle())
+  }
   return { admin, row: data, error }
 }
 
@@ -76,6 +95,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
   const hasEmail = "email" in body
   const hasPhone = "phone" in body
   const clearAvatar = body.clearAvatar === true
+  const hasFieldResource = typeof body.isFieldResource === "boolean"
 
   const fullNameVal = hasFullName && typeof body.fullName === "string" ? body.fullName.trim() : undefined
   const emailVal = hasEmail && typeof body.email === "string" ? body.email.trim().toLowerCase() : undefined
@@ -83,8 +103,20 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
 
   const hasProfileFields = hasFullName || hasEmail || hasPhone || clearAvatar
 
-  if (roleRaw === undefined && statusRaw === undefined && profileRaw === undefined && body.permissionsJson === undefined && !hasProfileFields) {
-    return jsonError("invalid_body", "Provide role, status, permission profile, profile fields, or clearAvatar.", 400)
+  if (
+    roleRaw === undefined &&
+    statusRaw === undefined &&
+    profileRaw === undefined &&
+    body.permissionsJson === undefined &&
+    !hasProfileFields &&
+    !clearAvatar &&
+    !hasFieldResource
+  ) {
+    return jsonError(
+      "invalid_body",
+      "Provide role, status, permission profile, profile fields, clearAvatar, or isFieldResource.",
+      400,
+    )
   }
 
   if (roleRaw !== undefined && !isMembershipRole(roleRaw)) {
@@ -185,6 +217,17 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     }
   }
 
+  if (hasFieldResource) {
+    const effectiveRole = normalizeOrgMemberRole(newRole !== undefined ? newRole : targetRole)
+    if (body.isFieldResource && (!effectiveRole || effectiveRole === "viewer")) {
+      return jsonError(
+        "invalid_field_resource",
+        "Viewers cannot be enabled as field resources for scheduling.",
+        400,
+      )
+    }
+  }
+
   const patch: Record<string, unknown> = {}
   if (newRole !== undefined && newRole !== targetRole) {
     patch.role = newRole
@@ -197,6 +240,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
   }
   if (body.permissionsJson !== undefined) {
     patch.permissions_json = body.permissionsJson
+  }
+  if (hasFieldResource) {
+    const currentFr = Boolean((target as { is_field_resource?: boolean }).is_field_resource)
+    if (body.isFieldResource !== currentFr) {
+      patch.is_field_resource = body.isFieldResource
+    }
+  }
+  if (patch.role === "viewer") {
+    patch.is_field_resource = false
   }
 
   const membershipChanged = Object.keys(patch).length > 0

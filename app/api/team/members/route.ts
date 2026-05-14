@@ -7,6 +7,15 @@ import { getEffectiveOrgPermissions, normalizeOrgMemberRole } from "@/lib/permis
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+function isMissingColumnOrSchemaError(err: { message?: string } | null): boolean {
+  const m = (err?.message ?? "").toLowerCase()
+  return (
+    (m.includes("column") && m.includes("does not exist")) ||
+    m.includes("could not find") ||
+    (m.includes("schema cache") && m.includes("column"))
+  )
+}
+
 /**
  * List organization members + pending invites. Any active org member may read.
  */
@@ -63,11 +72,21 @@ export async function GET(request: Request) {
       currentUserRole = (meRow?.role as string | undefined) ?? null
     }
 
-    const { data: memberRows, error: mErr } = await admin
+    let { data: memberRows, error: mErr } = await admin
       .from("organization_members")
-      .select("user_id, role, status, permission_profile, permissions_json, created_at, invited_by, updated_at")
+      .select(
+        "user_id, role, status, permission_profile, permissions_json, created_at, invited_by, updated_at, is_field_resource",
+      )
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: true })
+
+    if (mErr && isMissingColumnOrSchemaError(mErr)) {
+      ;({ data: memberRows, error: mErr } = await admin
+        .from("organization_members")
+        .select("user_id, role, status, permission_profile, permissions_json, created_at, invited_by, updated_at")
+        .eq("organization_id", organizationId)
+        .order("created_at", { ascending: true }))
+    }
 
     if (mErr) {
       return NextResponse.json({ error: "load_failed", message: mErr.message }, { status: 500 })
@@ -102,6 +121,7 @@ export async function GET(request: Request) {
           permissionsJson: (row as { permissions_json?: unknown }).permissions_json ?? {},
         }),
         status: row.status as string,
+        isFieldResource: Boolean((row as { is_field_resource?: boolean }).is_field_resource),
         createdAt: row.created_at as string,
         updatedAt: row.updated_at as string | null,
         invitedBy: row.invited_by as string | null,

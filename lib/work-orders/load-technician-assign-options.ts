@@ -85,6 +85,7 @@ async function buildFieldResourceAssigneeOptions(
     availability_status?: string | null
     permission_profile?: string | null
     permissions_json?: unknown
+    is_field_resource?: boolean | null
   }
 
   const memberList = (members as M[]).filter(
@@ -95,6 +96,7 @@ async function buildFieldResourceAssigneeOptions(
         status: m.status,
         permission_profile: m.permission_profile,
         permissions_json: m.permissions_json,
+        isFieldResource: m.is_field_resource,
       }),
   )
   if (!memberList.length) return []
@@ -185,6 +187,7 @@ async function loadTechnicianAssignOptionsLegacy(
     availability_status?: string | null
     permission_profile?: string | null
     permissions_json?: unknown
+    is_field_resource?: boolean | null
   }
 
   const memberList = (members as M[]).filter((m) =>
@@ -193,6 +196,7 @@ async function loadTechnicianAssignOptionsLegacy(
       status: m.status,
       permission_profile: m.permission_profile,
       permissions_json: m.permissions_json,
+      isFieldResource: m.is_field_resource,
     }),
   )
   if (!memberList.length) return []
@@ -272,14 +276,22 @@ export async function loadTechnicianAssignOptions(
     role: string
     permission_profile?: string | null
     permissions_json?: unknown
+    is_field_resource?: boolean | null
   }
   let omList: OmRow[] = []
   if (membershipIds.length) {
     let r = await supabase
       .from("organization_members")
-      .select("membership_id, user_id, status, role, permission_profile, permissions_json")
+      .select("membership_id, user_id, status, role, permission_profile, permissions_json, is_field_resource")
       .eq("organization_id", organizationId)
       .in("membership_id", membershipIds)
+    if (r.error && isMissingColumnOrSchemaError(r.error)) {
+      r = await supabase
+        .from("organization_members")
+        .select("membership_id, user_id, status, role, permission_profile, permissions_json")
+        .eq("organization_id", organizationId)
+        .in("membership_id", membershipIds)
+    }
     if (r.error && isMissingColumnOrSchemaError(r.error)) {
       r = await supabase
         .from("organization_members")
@@ -322,6 +334,7 @@ export async function loadTechnicianAssignOptions(
           status: om.status,
           permission_profile: om.permission_profile,
           permissions_json: om.permissions_json,
+          isFieldResource: om.is_field_resource,
         })
       ) {
         continue

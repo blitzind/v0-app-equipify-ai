@@ -157,6 +157,7 @@ export async function POST(
     invited_by: user.id,
     created_at: now,
     updated_at: now,
+    is_field_resource: roleRaw === "tech",
   })
 
   if (insErr) {
