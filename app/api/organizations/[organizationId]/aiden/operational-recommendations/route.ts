@@ -32,109 +32,131 @@ function jsonError(code: string, message: string, status: number) {
   return NextResponse.json({ ok: false, error: code, message }, { status })
 }
 
+function operationalInsightsDegradedResponse(message: string) {
+  return NextResponse.json(
+    {
+      ok: false,
+      error: "operational_insights_unavailable",
+      message,
+      answer: { recommendations: [] },
+      industryOperational: null,
+      operationalHealthScores: null,
+      deterministicWorkflowRecommendations: null,
+    },
+    { status: 503 },
+  )
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ organizationId: string }> },
 ) {
-  const { organizationId } = await context.params
-  if (!UUID_RE.test(organizationId)) {
-    return jsonError("invalid_organization", "Invalid organization id.", 400)
-  }
+  try {
+    const { organizationId } = await context.params
+    if (!UUID_RE.test(organizationId)) {
+      return jsonError("invalid_organization", "Invalid organization id.", 400)
+    }
 
-  const rawBody = await request.json().catch(() => ({}))
-  const parsed = BodySchema.safeParse(rawBody)
-  if (!parsed.success) {
-    return jsonError("invalid_body", parsed.error.message, 400)
-  }
+    const rawBody = await request.json().catch(() => ({}))
+    const parsed = BodySchema.safeParse(rawBody)
+    if (!parsed.success) {
+      return jsonError("invalid_body", parsed.error.message, 400)
+    }
 
-  const resolved = await resolveOperationalRecommendationsRequest(organizationId)
-  if (!resolved.ok) {
-    return resolved.response
-  }
+    const resolved = await resolveOperationalRecommendationsRequest(organizationId)
+    if (!resolved.ok) {
+      return resolved.response
+    }
 
-  const { ctx } = resolved
-  const includeFinancialHints = Boolean(ctx.permissions.canViewFinancials || ctx.permissions.canViewBilling)
+    const { ctx } = resolved
+    const includeFinancialHints = Boolean(ctx.permissions.canViewFinancials || ctx.permissions.canViewBilling)
 
-  const { data: orgIndustry } = await ctx.supabase
-    .from("organizations")
-    .select("industry")
-    .eq("id", organizationId)
-    .maybeSingle()
-  const industryRaw = (orgIndustry as { industry?: string | null } | null)?.industry ?? null
-  const industryKey = normalizeIndustryKey(industryRaw ?? undefined)
+    const { data: orgIndustry } = await ctx.supabase
+      .from("organizations")
+      .select("industry")
+      .eq("id", organizationId)
+      .maybeSingle()
+    const industryRaw = (orgIndustry as { industry?: string | null } | null)?.industry ?? null
+    const industryKey = normalizeIndustryKey(industryRaw ?? undefined)
 
-  const snapshot = await buildOperationalSnapshot(ctx.supabase, {
-    organizationId,
-    permissions: ctx.permissions,
-    assignedScope: ctx.assignedScope,
-    moduleContext: parsed.data.moduleContext,
-    includeFinancialHints,
-    industryKey,
-  })
+    const snapshot = await buildOperationalSnapshot(ctx.supabase, {
+      organizationId,
+      permissions: ctx.permissions,
+      assignedScope: ctx.assignedScope,
+      moduleContext: parsed.data.moduleContext,
+      includeFinancialHints,
+      industryKey,
+    })
 
-  const sectorFraming = resolveOnboardingIndustryBundle(
-    industryRaw,
-    industryLabelForLaunchpad(industryRaw),
-  ).aidenSectorFraming
+    const sectorFraming = resolveOnboardingIndustryBundle(
+      industryRaw,
+      industryLabelForLaunchpad(industryRaw),
+    ).aidenSectorFraming
 
-  const industryOperational = snapshot.industryOperational ?? null
-  const operationalHealthScores = (snapshot.operationalHealthScores ?? null) as OperationalHealthScoresReport | null
+    const industryOperational = snapshot.industryOperational ?? null
+    const operationalHealthScores = (snapshot.operationalHealthScores ?? null) as OperationalHealthScoresReport | null
 
-  const deterministicWorkflowRecommendations = buildOperationalWorkflowRecommendations({
-    snapshot,
-    permissions: {
-      canViewFinancials: ctx.permissions.canViewFinancials,
-      canViewBilling: ctx.permissions.canViewBilling,
-      canViewFinancialReports: ctx.permissions.canViewFinancialReports,
-    },
-  })
+    const deterministicWorkflowRecommendations = buildOperationalWorkflowRecommendations({
+      snapshot,
+      permissions: {
+        canViewFinancials: ctx.permissions.canViewFinancials,
+        canViewBilling: ctx.permissions.canViewBilling,
+        canViewFinancialReports: ctx.permissions.canViewFinancialReports,
+      },
+    })
 
-  const snapshotJson = JSON.stringify(snapshot)
-  const prompt = buildOperationalRecommendationsPrompt({
-    snapshotJson,
-    moduleContext: parsed.data.moduleContext,
-    sectorFraming,
-    deterministicWorkflowRecommendationsJson: JSON.stringify(deterministicWorkflowRecommendations),
-  })
+    const snapshotJson = JSON.stringify(snapshot)
+    const prompt = buildOperationalRecommendationsPrompt({
+      snapshotJson,
+      moduleContext: parsed.data.moduleContext,
+      sectorFraming,
+      deterministicWorkflowRecommendationsJson: JSON.stringify(deterministicWorkflowRecommendations),
+    })
 
-  if (parsed.data.skipAi) {
+    if (parsed.data.skipAi) {
+      return NextResponse.json({
+        ok: true,
+        answer: { recommendations: [] },
+        industryOperational,
+        operationalHealthScores,
+        deterministicWorkflowRecommendations,
+      })
+    }
+
+    const started = Date.now()
+    const result = await runAiTask<AidenOperationalRecommendationsAnswer>({
+      task: "aiden_operational_recommendations",
+      organizationId,
+      input: { system: prompt.system, user: prompt.user },
+      schema: AidenOperationalRecommendationsAnswerSchema,
+    })
+
+    if (!result.ok) {
+      return jsonError("ai_failed", result.error.message || "Could not generate recommendations.", 502)
+    }
+
+    void recordAidenUsageEvent({
+      organizationId,
+      userId: ctx.userId,
+      featureKey: "operational_recommendations",
+      planTier: ctx.planId,
+      promptTokens: result.usage.promptTokens,
+      completionTokens: result.usage.completionTokens,
+      durationMs: Date.now() - started,
+      metadata: { module: parsed.data.moduleContext },
+    })
+
     return NextResponse.json({
       ok: true,
-      answer: { recommendations: [] },
+      answer: result.output,
       industryOperational,
       operationalHealthScores,
       deterministicWorkflowRecommendations,
     })
+  } catch (e) {
+    console.error("[aiden/operational-recommendations] POST failed", e)
+    return operationalInsightsDegradedResponse(
+      "Operational insights could not be loaded. You can continue working; try insights again later.",
+    )
   }
-
-  const started = Date.now()
-  const result = await runAiTask<AidenOperationalRecommendationsAnswer>({
-    task: "aiden_operational_recommendations",
-    organizationId,
-    input: { system: prompt.system, user: prompt.user },
-    schema: AidenOperationalRecommendationsAnswerSchema,
-  })
-
-  if (!result.ok) {
-    return jsonError("ai_failed", result.error.message || "Could not generate recommendations.", 502)
-  }
-
-  void recordAidenUsageEvent({
-    organizationId,
-    userId: ctx.userId,
-    featureKey: "operational_recommendations",
-    planTier: ctx.planId,
-    promptTokens: result.usage.promptTokens,
-    completionTokens: result.usage.completionTokens,
-    durationMs: Date.now() - started,
-    metadata: { module: parsed.data.moduleContext },
-  })
-
-  return NextResponse.json({
-    ok: true,
-    answer: result.output,
-    industryOperational,
-    operationalHealthScores,
-    deterministicWorkflowRecommendations,
-  })
 }

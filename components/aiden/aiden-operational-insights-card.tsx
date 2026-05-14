@@ -135,7 +135,13 @@ export function AidenOperationalInsightsCard({
         error?: string
       }
       if (!res.ok || !data.ok || !data.answer) {
-        throw new Error(data.message ?? data.error ?? "Could not load recommendations.")
+        const msg = data.message ?? data.error ?? "Could not load recommendations."
+        setError(null)
+        toast({
+          title: "Insights unavailable",
+          description: `${msg} You can keep working and try again later.`,
+        })
+        return
       }
       setAnswer(data.answer)
       if (data.industryOperational) setIndustryBrief(data.industryOperational)
@@ -143,8 +149,11 @@ export function AidenOperationalInsightsCard({
       setExpanded(true)
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Request failed."
-      setError(msg)
-      toast({ variant: "destructive", title: "Insights unavailable", description: msg })
+      setError(null)
+      toast({
+        title: "Insights unavailable",
+        description: `${msg} You can keep working and try again later.`,
+      })
     } finally {
       setBusy(false)
     }

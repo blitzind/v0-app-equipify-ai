@@ -30,13 +30,11 @@ export function OperationalHealthScoresPanel({
   const [data, setData] = useState<OperationalHealthScoresReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
       setLoading(true)
-      setError(null)
       try {
         const res = await fetch(
           `/api/organizations/${encodeURIComponent(organizationId)}/aiden/operational-recommendations`,
@@ -52,13 +50,15 @@ export function OperationalHealthScoresPanel({
           message?: string
         }
         if (!res.ok || !body.ok) {
-          throw new Error(body.message ?? "Could not load operational health scores.")
+          if (!cancelled) {
+            setData(null)
+          }
+          return
         }
         if (!cancelled) setData(body.operationalHealthScores ?? null)
-      } catch (e) {
+      } catch {
         if (!cancelled) {
           setData(null)
-          setError(e instanceof Error ? e.message : "Request failed.")
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -79,14 +79,6 @@ export function OperationalHealthScoresPanel({
       >
         <Loader2 className="size-3.5 animate-spin shrink-0" aria-hidden />
         Loading operational health index…
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className={cn("rounded-xl border border-border/80 bg-muted/10 px-4 py-2 text-xs text-muted-foreground", className)}>
-        {error}
       </div>
     )
   }

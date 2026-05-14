@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { hasActiveOrganizationSupportSession } from "@/lib/server/organization-support-session"
 import {
   getOrgPermissionsForRole,
   normalizeOrgMemberRole,
@@ -48,7 +49,15 @@ export async function getOrganizationMemberRole(
   organizationId: string,
 ): Promise<string | null> {
   const rec = await getOrganizationMemberRecord(supabase, userId, organizationId)
-  return rec?.role ?? null
+  if (rec?.role) return rec.role
+  try {
+    if (await hasActiveOrganizationSupportSession(supabase, userId, organizationId)) {
+      return "owner"
+    }
+  } catch {
+    /* treat as non-member */
+  }
+  return null
 }
 
 /** Org default certificate release mode (settings page). */

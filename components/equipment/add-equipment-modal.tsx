@@ -132,6 +132,7 @@ function isEnforcementGate(x: unknown): x is Awaited<ReturnType<typeof enforceCa
 }
 
 function friendlyInsertError(message: string): string {
+  const m = message.trim()
   if (!m) return "Could not save equipment. Please try again."
   const ml = m.toLowerCase()
   if (ml.includes("row-level security") || ml.includes("violates row-level security") || m.includes("42501")) {
