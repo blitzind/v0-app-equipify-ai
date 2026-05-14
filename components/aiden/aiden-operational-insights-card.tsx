@@ -74,6 +74,8 @@ export function AidenOperationalInsightsCard({
           setCopilotEnabled(Boolean(data.operationalCopilotEnabled))
           setGrowthHint(Boolean(data.operationalGrowthHint))
         }
+      } catch (e) {
+        console.warn("[equipify:operational-insights] eligibility failed", e instanceof Error ? e.message : String(e))
       } finally {
         if (!cancelled) setEligibilityReady(true)
       }
@@ -102,11 +104,18 @@ export function AidenOperationalInsightsCard({
           deterministicWorkflowRecommendations?: OperationalWorkflowRecommendationsReport | null
         }
         if (!cancelled && res.ok && data.ok) {
-          if (data.industryOperational) setIndustryBrief(data.industryOperational)
-          setWorkflowRecommendations(data.deterministicWorkflowRecommendations ?? null)
+          if (data.industryOperational && typeof data.industryOperational === "object") {
+            setIndustryBrief(data.industryOperational)
+          }
+          setWorkflowRecommendations(
+            data.deterministicWorkflowRecommendations &&
+              typeof data.deterministicWorkflowRecommendations === "object"
+              ? data.deterministicWorkflowRecommendations
+              : null,
+          )
         }
-      } catch {
-        /* non-fatal */
+      } catch (e) {
+        console.warn("[equipify:operational-insights] passive preload failed", e instanceof Error ? e.message : String(e))
       }
     })()
     return () => {
@@ -144,8 +153,12 @@ export function AidenOperationalInsightsCard({
         return
       }
       setAnswer(data.answer)
-      if (data.industryOperational) setIndustryBrief(data.industryOperational)
-      setWorkflowRecommendations(data.deterministicWorkflowRecommendations ?? null)
+      if (data.industryOperational && typeof data.industryOperational === "object") setIndustryBrief(data.industryOperational)
+      setWorkflowRecommendations(
+        data.deterministicWorkflowRecommendations && typeof data.deterministicWorkflowRecommendations === "object"
+          ? data.deterministicWorkflowRecommendations
+          : null,
+      )
       setExpanded(true)
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Request failed."
@@ -159,22 +172,42 @@ export function AidenOperationalInsightsCard({
     }
   }, [organizationId, moduleContext, toast])
 
+  const industryLabel = industryBrief ? WORKSPACE_INDUSTRY_DEFINITIONS[industryBrief.industryKey]?.label : null
+  const dashboardSummaryLines = Array.isArray(industryBrief?.dashboardSummaryLines)
+    ? industryBrief.dashboardSummaryLines
+    : []
+  const maintenanceSummaryLines = Array.isArray(industryBrief?.maintenanceSummaryLines)
+    ? industryBrief.maintenanceSummaryLines
+    : []
+  const dashboardOperationalSummaries = Array.isArray(industryBrief?.dashboardOperationalSummaries)
+    ? industryBrief.dashboardOperationalSummaries
+    : []
+  const maintenanceOperationalSummaries = Array.isArray(industryBrief?.maintenanceOperationalSummaries)
+    ? industryBrief.maintenanceOperationalSummaries
+    : []
+  const deterministicInsights = Array.isArray(industryBrief?.deterministicInsights)
+    ? industryBrief.deterministicInsights
+    : []
+  const workflowItems = Array.isArray(workflowRecommendations?.recommendations)
+    ? workflowRecommendations.recommendations
+    : []
+  const answerRecommendations = Array.isArray(answer?.recommendations) ? answer.recommendations : []
+
   useEffect(() => {
-    if (!answer?.recommendations?.length || typeof window === "undefined") return
+    if (!answerRecommendations.length || typeof window === "undefined") return
     const k = `equipify_onb_ai_rec_viewed_${organizationId}_${moduleContext}`
     if (sessionStorage.getItem(k)) return
     sessionStorage.setItem(k, "1")
     sendOnboardingProductEvent(organizationId, "onboarding_ai_recommendation_viewed", moduleContext)
-  }, [answer, organizationId, moduleContext])
+  }, [answerRecommendations.length, organizationId, moduleContext])
 
-  const industryLabel = industryBrief ? WORKSPACE_INDUSTRY_DEFINITIONS[industryBrief.industryKey]?.label : null
   const showIndustryBlock =
     industryBrief &&
-    ((industryBrief.dashboardSummaryLines?.length ?? 0) > 0 ||
-      (industryBrief.maintenanceSummaryLines?.length ?? 0) > 0 ||
-      (industryBrief.dashboardOperationalSummaries?.length ?? 0) > 0 ||
-      (industryBrief.maintenanceOperationalSummaries?.length ?? 0) > 0 ||
-      (industryBrief.deterministicInsights?.length ?? 0) > 0)
+    (dashboardSummaryLines.length > 0 ||
+      maintenanceSummaryLines.length > 0 ||
+      dashboardOperationalSummaries.length > 0 ||
+      maintenanceOperationalSummaries.length > 0 ||
+      deterministicInsights.length > 0)
 
   if (!eligibilityReady) {
     return (
@@ -252,18 +285,17 @@ export function AidenOperationalInsightsCard({
                 <Layers className="size-3.5 opacity-80 shrink-0" aria-hidden />
                 Workspace signals
               </span>
-              {industryBrief!.signalsPresentationHealthy ?
+              {Boolean(industryBrief?.signalsPresentationHealthy) ?
                 <span className="rounded-full border border-emerald-600/25 bg-emerald-600/8 px-2 py-0.5 text-[10px] font-medium normal-case tracking-normal text-emerald-800 dark:text-emerald-200">
                   Healthy signals
                 </span>
               : null}
             </div>
             {(() => {
-              const ib = industryBrief!
               const first =
-                moduleContext === "maintenance_plans" ? ib.maintenanceSummaryLines : ib.dashboardSummaryLines
+                moduleContext === "maintenance_plans" ? maintenanceSummaryLines : dashboardSummaryLines
               const second =
-                moduleContext === "maintenance_plans" ? ib.dashboardSummaryLines : ib.maintenanceSummaryLines
+                moduleContext === "maintenance_plans" ? dashboardSummaryLines : maintenanceSummaryLines
               return (
                 <>
                   {first.length > 0 ?
@@ -287,10 +319,12 @@ export function AidenOperationalInsightsCard({
                 </>
               )
             })()}
-            {industryBrief!.deterministicInsights.length > 0 ?
+            {deterministicInsights.length > 0 ?
               <ul className="space-y-2">
-                {industryBrief!.deterministicInsights.map((sig) => {
+                {deterministicInsights.map((sig) => {
                   const tier = presentationFromInsight(sig)
+                  const thresholdsUsed = Array.isArray(sig.thresholdsUsed) ? sig.thresholdsUsed : []
+                  const evidence = Array.isArray(sig.evidence) ? sig.evidence : []
                   return (
                     <li
                       key={sig.id}
@@ -308,15 +342,15 @@ export function AidenOperationalInsightsCard({
                         <span className="font-medium text-foreground/80">Why: </span>
                         {sig.triggerRationale}
                       </p>
-                      {sig.thresholdsUsed.length > 0 ?
+                      {thresholdsUsed.length > 0 ?
                         <ul className="mt-1 space-y-0.5 text-[10px] text-muted-foreground">
-                          {sig.thresholdsUsed.map((t) => (
+                          {thresholdsUsed.map((t) => (
                             <li key={t}>Threshold: {t}</li>
                           ))}
                         </ul>
                       : null}
                       <ul className="mt-1.5 space-y-0.5 text-[10px] text-muted-foreground">
-                        {sig.evidence.map((ev) => (
+                        {evidence.map((ev) => (
                           <li key={ev}>· {ev}</li>
                         ))}
                       </ul>
@@ -344,14 +378,17 @@ export function AidenOperationalInsightsCard({
           </section>
         : null}
 
-        {workflowRecommendations?.recommendations?.length ?
+        {workflowItems.length ?
           <section className="space-y-2 rounded-lg border border-border/80 bg-background/80 px-3 py-2.5" aria-label="Deterministic workflow shortcuts">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Suggested workflows (navigation only)
             </div>
-            <p className="text-[10px] text-muted-foreground leading-snug">{workflowRecommendations.methodologyNote}</p>
+            <p className="text-[10px] text-muted-foreground leading-snug">{workflowRecommendations?.methodologyNote ?? ""}</p>
             <ul className="space-y-2">
-              {workflowRecommendations.recommendations.map((w) => (
+              {workflowItems.map((w) => {
+                const secondaryHrefs = Array.isArray(w.secondaryHrefs) ? w.secondaryHrefs : []
+                const evidencePaths = Array.isArray(w.evidencePaths) ? w.evidencePaths : []
+                return (
                 <li key={w.id} className="rounded-md border border-border/70 bg-muted/10 px-2.5 py-2 text-xs">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium text-foreground">{w.title}</span>
@@ -362,7 +399,7 @@ export function AidenOperationalInsightsCard({
                     <Button asChild size="sm" variant="secondary" className="h-7 text-[11px]">
                       <Link href={w.primaryHref}>Primary</Link>
                     </Button>
-                    {w.secondaryHrefs.map((s) => (
+                    {secondaryHrefs.map((s) => (
                       <Button key={`${w.id}-${s.label}`} asChild size="sm" variant="outline" className="h-7 text-[11px]">
                         <Link href={s.href}>{s.label}</Link>
                       </Button>
@@ -384,13 +421,14 @@ export function AidenOperationalInsightsCard({
                       : null}
                     </p>
                   : null}
-                  {w.evidencePaths.length > 0 ?
+                  {evidencePaths.length > 0 ?
                     <p className="mt-1 text-[9px] font-mono text-muted-foreground/90 break-all">
-                      Evidence: {w.evidencePaths.join(", ")}
+                      Evidence: {evidencePaths.join(", ")}
                     </p>
                   : null}
                 </li>
-              ))}
+                )
+              })}
             </ul>
           </section>
         : null}
@@ -408,7 +446,7 @@ export function AidenOperationalInsightsCard({
           <p className="text-sm text-foreground/95">{answer.overview}</p>
         : null}
 
-        {answer?.recommendations?.length ?
+        {answerRecommendations.length ?
           <div className="space-y-2">
             <button
               type="button"
@@ -417,7 +455,7 @@ export function AidenOperationalInsightsCard({
             >
               <span className="inline-flex items-center gap-1.5">
                 <Lightbulb className="size-3.5 opacity-70" aria-hidden />
-                {answer.recommendations.length} recommendation{answer.recommendations.length === 1 ? "" : "s"}
+                {answerRecommendations.length} recommendation{answerRecommendations.length === 1 ? "" : "s"}
               </span>
               {expanded ?
                 <ChevronUp className="size-4 opacity-60" />
@@ -425,7 +463,7 @@ export function AidenOperationalInsightsCard({
             </button>
             {expanded ?
               <ul className="space-y-2">
-                {answer.recommendations.map((rec, idx) => {
+                {answerRecommendations.map((rec, idx) => {
                   const recTier: OperationalInsightPresentation =
                     rec.severity === "high" ? "warning" : "informational"
                   return (
@@ -446,7 +484,7 @@ export function AidenOperationalInsightsCard({
                       <span className="font-medium text-foreground/80">Next step: </span>
                       {rec.suggestedNextStep}
                     </p>
-                    {rec.relatedRecordIds?.length ?
+                    {Array.isArray(rec.relatedRecordIds) && rec.relatedRecordIds.length ?
                       <p className="mt-1 text-[10px] font-mono text-muted-foreground break-all">
                         Related ids: {rec.relatedRecordIds.join(", ")}
                       </p>

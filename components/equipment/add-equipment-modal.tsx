@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -225,6 +225,7 @@ export function AddEquipmentModal({
   const [saving, setSaving] = useState(false)
   const [postSave, setPostSave] = useState<{ customerId: string; equipmentId: string } | null>(null)
   const [serviceSiteOptions, setServiceSiteOptions] = useState<Array<{ id: string; label: string }>>([])
+  const saveSucceededRef = useRef(false)
 
   useEffect(() => {
     if (!open || orgStatus !== "ready" || !activeOrgId) {
@@ -405,6 +406,7 @@ export function AddEquipmentModal({
   async function handleSave() {
     equipmentFlowLog("click_save", { offerMaintenancePlanNext }, activeOrgId)
     equipmentSaveDebug("handler_enter", {}, activeOrgId)
+    saveSucceededRef.current = false
     setSaveError(null)
 
     const errs = validate(form)
@@ -610,16 +612,32 @@ export function AddEquipmentModal({
           return
         }
 
-        equipmentFlowLog("before_refresh", { disabled: true }, activeOrgId)
-        equipmentFlowLog("after_refresh", { disabled: true }, activeOrgId)
-        equipmentFlowLog("before_onSuccess", { disabled: true, hasOnSuccess: Boolean(onSuccess) }, activeOrgId)
-        equipmentFlowLog("after_onSuccess", { disabled: true }, activeOrgId)
+        saveSucceededRef.current = true
+        setSaveError(null)
         toast({
           title: "Equipment added",
-          description: "The new asset was saved. Post-save refresh is temporarily disabled for debugging.",
+          description: "The new asset is available in your equipment list.",
         })
         handleClose()
+        void (async () => {
+          equipmentFlowLog("before_refresh", { via: "onSuccess", hasOnSuccess: Boolean(onSuccess) }, activeOrgId)
+          try {
+            equipmentFlowLog("before_onSuccess", { hasOnSuccess: Boolean(onSuccess) }, activeOrgId)
+            await Promise.resolve(onSuccess?.(newId))
+            equipmentFlowLog("after_onSuccess", { ok: true }, activeOrgId)
+            equipmentFlowLog("after_refresh", { ok: true }, activeOrgId)
+          } catch (cbErr) {
+            const details = describeClientThrown(cbErr)
+            equipmentFlowLog("post_success_refresh_failed", details, activeOrgId)
+            console.warn("[equipify:add-equipment-flow] post-save refresh failed", details)
+          }
+        })()
+        return
       } catch (pathErr) {
+        if (saveSucceededRef.current) {
+          equipmentFlowLog("post_success_path_error_ignored", describeClientThrown(pathErr), activeOrgId)
+          return
+        }
         const msg = serverActionFailureMessage(pathErr)
         setSaveError(msg)
         toast({ variant: "destructive", title: "Could not save equipment", description: msg })
@@ -628,6 +646,10 @@ export function AddEquipmentModal({
         return
       }
     } catch (e) {
+      if (saveSucceededRef.current) {
+        equipmentFlowLog("post_success_handler_error_ignored", describeClientThrown(e), activeOrgId)
+        return
+      }
       const msg = serverActionFailureMessage(e)
       setSaveError(msg)
       toast({ variant: "destructive", title: "Could not save equipment", description: msg })

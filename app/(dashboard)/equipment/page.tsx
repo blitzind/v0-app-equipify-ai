@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, Suspense } from "react"
+import { Component, useState, useMemo, useEffect, Suspense, type ReactNode } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
@@ -130,6 +130,50 @@ function warnNonProduction(message: string): void {
   }
 }
 
+function equipmentPageRuntimeLog(stage: string, details?: Record<string, unknown>): void {
+  console.warn("[equipify:equipment-page-runtime]", stage, details ?? {})
+}
+
+function safeText(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback
+}
+
+function safeDatePrefix(value: unknown, fallback: string): string {
+  const s = safeText(value)
+  return s ? s.slice(0, 10) : fallback
+}
+
+class PassiveEquipmentBoundary extends Component<
+  { label: string; children: ReactNode; fallback?: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  componentDidCatch(error: unknown) {
+    equipmentPageRuntimeLog("widget_failed", {
+      label: this.props.label,
+      message: error instanceof Error ? error.message : String(error),
+    })
+  }
+
+  render() {
+    if (this.state.failed) {
+      return (
+        this.props.fallback ?? (
+          <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-muted-foreground">
+            {this.props.label} is temporarily unavailable.
+          </p>
+        )
+      )
+    }
+    return this.props.children
+  }
+}
+
 const statusColors: Record<Equipment["status"], string> = {
   "Active": "bg-[color:var(--status-success)]/15 text-[color:var(--status-success)] border-[color:var(--status-success)]/30",
   "Needs Service": "bg-[color:var(--status-warning)]/15 text-[color:var(--status-warning)] border-[color:var(--status-warning)]/30",
@@ -256,7 +300,9 @@ function EquipmentCard({ eq, signals, selected, onSelect, onOpen }: {
               View <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
-          <EquipmentSignalsRow signals={signals} className="mt-2" />
+          <PassiveEquipmentBoundary label="Equipment signals" fallback={null}>
+            <EquipmentSignalsRow signals={signals} className="mt-2" />
+          </PassiveEquipmentBoundary>
 
         </div>
       </CardContent>
@@ -287,7 +333,7 @@ function EquipmentPageInner() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null)
   const [archiveScope, setArchiveScope] = useState<RecordArchiveVisibility>("active")
-  const [queryError, setQueryError] = useState<string | null>(null)
+  const [queryWarning, setQueryWarning] = useState<string | null>(null)
 
   // Auto-open drawer from ?open= query param
   useEffect(() => {
@@ -339,6 +385,7 @@ function EquipmentPageInner() {
     let active = true
 
     async function loadEquipment() {
+      equipmentPageRuntimeLog("refresh_start", { refreshToken, orgStatus, hasOrg: Boolean(activeOrgId) })
       try {
         const supabase = createBrowserSupabaseClient()
         const {
@@ -348,7 +395,7 @@ function EquipmentPageInner() {
         if (!user) {
           if (active) {
             setEquipment([])
-            setQueryError(null)
+            setQueryWarning(null)
           }
           return
         }
@@ -356,7 +403,7 @@ function EquipmentPageInner() {
         if (!activeOrgId) {
           if (active) {
             setEquipment([])
-            setQueryError(null)
+            setQueryWarning(null)
           }
           return
         }
@@ -366,16 +413,25 @@ function EquipmentPageInner() {
         }
 
         const orgId = activeOrgId
-        if (active) setQueryError(null)
-        const assignedScope = assignedOnlyView
-          ? await loadAssignedWorkScope(supabase, { organizationId: orgId, userId: user.id })
-          : null
+        if (active) setQueryWarning(null)
+        let assignedScope: Awaited<ReturnType<typeof loadAssignedWorkScope>> | null = null
+        try {
+          assignedScope = assignedOnlyView
+            ? await loadAssignedWorkScope(supabase, { organizationId: orgId, userId: user.id })
+            : null
+        } catch (e) {
+          equipmentPageRuntimeLog("refresh_failed_assigned_scope", {
+            message: e instanceof Error ? e.message : String(e),
+          })
+          if (active) setQueryWarning("Equipment assignment scope could not refresh. Showing available equipment data.")
+          assignedScope = null
+        }
         const scopedEquipmentIds = assignedScope?.equipmentIds ?? []
 
         if (assignedOnlyView && scopedEquipmentIds.length === 0) {
           if (active) {
             setEquipment([])
-            setQueryError(null)
+            setQueryWarning(null)
           }
           return
         }
@@ -420,33 +476,47 @@ function EquipmentPageInner() {
             organizationId: orgId,
           })
           if (active) {
-            setEquipment([])
-            setQueryError(userVisibleEquipmentQueryError(equipmentError))
+            setQueryWarning(userVisibleEquipmentQueryError(equipmentError))
+            equipmentPageRuntimeLog("refresh_failed_equipment_query", {
+              message: equipmentError.message,
+              schemaFallback,
+            })
           }
           return
         }
 
         if (!equipmentRows) {
           if (active) {
-            setEquipment([])
-            setQueryError(userVisibleEquipmentQueryError({ message: "No data returned." }))
+            setQueryWarning(userVisibleEquipmentQueryError({ message: "No data returned." }))
+            equipmentPageRuntimeLog("refresh_failed_no_rows")
           }
           return
         }
 
-        const customerIds = [...new Set((equipmentRows as DbEquipmentRow[]).map((row) => row.customer_id))]
+        const rows = Array.isArray(equipmentRows) ? equipmentRows : []
+        const customerIds = [...new Set(rows.map((row) => safeText(row?.customer_id)).filter(Boolean))]
         let customerMap = new Map<string, string>()
 
         if (customerIds.length > 0) {
-          const { data: customerRows } = await supabase
-            .from("customers")
-            .select("id, company_name")
-            .eq("organization_id", orgId)
-            .in("id", customerIds)
+          try {
+            const { data: customerRows, error: customerError } = await supabase
+              .from("customers")
+              .select("id, company_name")
+              .eq("organization_id", orgId)
+              .in("id", customerIds)
 
-          ;((customerRows as Array<{ id: string; company_name: string }> | null) ?? []).forEach((row) => {
-            customerMap.set(row.id, row.company_name)
-          })
+            if (customerError) {
+              equipmentPageRuntimeLog("refresh_failed_customer_lookup", { message: customerError.message })
+            }
+            ;((customerRows as Array<{ id?: string | null; company_name?: string | null }> | null) ?? []).forEach((row) => {
+              const id = safeText(row.id)
+              if (id) customerMap.set(id, safeText(row.company_name, "Unknown Customer"))
+            })
+          } catch (e) {
+            equipmentPageRuntimeLog("refresh_threw_customer_lookup", {
+              message: e instanceof Error ? e.message : String(e),
+            })
+          }
         }
 
         const statusMap: Record<DbEquipmentRow["status"], EquipmentStatus> = {
@@ -458,42 +528,52 @@ function EquipmentPageInner() {
 
         let mapped: Equipment[] = []
         try {
-          mapped = equipmentRows.map((row) => ({
-            id: row.id,
-            customerId: row.customer_id,
-            customerName: customerMap.get(row.customer_id) ?? "Unknown Customer",
-            equipmentCode: row.equipment_code ?? "",
-            model: row.name,
-            manufacturer: row.manufacturer ?? "",
-            category: row.category ?? "General",
-            subcategory: row.subcategory?.trim() ? row.subcategory : "",
-            serialNumber: row.serial_number ?? "",
-            lastServiceDate: row.last_service_at ? row.last_service_at.slice(0, 10) : "1970-01-01",
-            nextDueDate: row.next_due_at ? row.next_due_at.slice(0, 10) : "2099-12-31",
-            nextCalibrationDue: row.next_calibration_due_at ? row.next_calibration_due_at.slice(0, 10) : "",
-            warrantyExpiresAt: row.warranty_expires_at ? row.warranty_expires_at.slice(0, 10) : "",
-            status: statusMap[row.status] ?? "Active",
-            location: row.location_label ?? "—",
-            isArchived: Boolean(row.archived_at),
-          }))
+          mapped = rows
+            .filter((row) => row && safeText(row.id))
+            .map((row) => {
+              const customerId = safeText(row.customer_id)
+              return {
+                id: safeText(row.id),
+                customerId,
+                customerName: customerMap.get(customerId) ?? "Unknown Customer",
+                equipmentCode: safeText(row.equipment_code),
+                model: safeText(row.name, "Untitled equipment"),
+                manufacturer: safeText(row.manufacturer),
+                category: safeText(row.category, "General"),
+                subcategory: safeText(row.subcategory).trim() ? safeText(row.subcategory) : "",
+                serialNumber: safeText(row.serial_number),
+                lastServiceDate: safeDatePrefix(row.last_service_at, "1970-01-01"),
+                nextDueDate: safeDatePrefix(row.next_due_at, "2099-12-31"),
+                nextCalibrationDue: safeDatePrefix(row.next_calibration_due_at, ""),
+                warrantyExpiresAt: safeDatePrefix(row.warranty_expires_at, ""),
+                status: statusMap[row.status] ?? "Active",
+                location: safeText(row.location_label, "—"),
+                isArchived: Boolean(row.archived_at),
+              }
+            })
         } catch (e) {
           warnNonProduction(`[equipment] Row mapping failed: ${e instanceof Error ? e.message : String(e)}`)
           if (active) {
-            setEquipment([])
-            setQueryError(userVisibleEquipmentQueryError(e instanceof Error ? e : null))
+            setQueryWarning(userVisibleEquipmentQueryError(e instanceof Error ? e : null))
+            equipmentPageRuntimeLog("refresh_failed_mapping", {
+              message: e instanceof Error ? e.message : String(e),
+            })
           }
           return
         }
 
         if (active) {
           setEquipment(mapped)
-          setQueryError(null)
+          setQueryWarning(null)
+          equipmentPageRuntimeLog("refresh_success", { count: mapped.length, refreshToken })
         }
       } catch (e) {
         warnNonProduction(`[equipment] loadEquipment failed: ${e instanceof Error ? e.message : String(e)}`)
         if (active) {
-          setEquipment([])
-          setQueryError(userVisibleEquipmentQueryError(e instanceof Error ? e : null))
+          setQueryWarning(userVisibleEquipmentQueryError(e instanceof Error ? e : null))
+          equipmentPageRuntimeLog("refresh_failed_unexpected", {
+            message: e instanceof Error ? e.message : String(e),
+          })
         }
       }
     }
@@ -517,13 +597,20 @@ function EquipmentPageInner() {
     const supabase = createBrowserSupabaseClient()
     void (async () => {
       try {
+        equipmentPageRuntimeLog("signals_refresh_start", { count: ids.length })
         const map = await loadEquipmentSignalsByIds(supabase, {
           organizationId: activeOrgId,
           equipmentIds: ids,
         })
-        if (active) setSignalsMap(map)
+        if (active) {
+          setSignalsMap(map instanceof Map ? map : new Map())
+          equipmentPageRuntimeLog("signals_refresh_success", { count: map instanceof Map ? map.size : 0 })
+        }
       } catch (e) {
         warnNonProduction(`[equipment] Signals load failed: ${e instanceof Error ? e.message : String(e)}`)
+        equipmentPageRuntimeLog("signals_refresh_failed", {
+          message: e instanceof Error ? e.message : String(e),
+        })
         if (active) setSignalsMap(new Map())
       }
     })()
@@ -618,15 +705,15 @@ function EquipmentPageInner() {
 
   return (
     <div className="flex flex-col gap-6">
-      {queryError ? (
+      {queryWarning ? (
         <div
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          role="status"
+          className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-muted-foreground"
         >
-          {queryError}
+          {queryWarning}
           {process.env.NODE_ENV !== "production" ? (
-            <span className="block text-xs mt-1 text-destructive/80 font-mono">
-              Check the browser console for <code className="font-mono">[equipment list query]</code> details.
+            <span className="block text-xs mt-1 text-muted-foreground font-mono">
+              Check the browser console for <code className="font-mono">[equipify:equipment-page-runtime]</code> details.
             </span>
           ) : null}
         </div>
@@ -642,7 +729,9 @@ function EquipmentPageInner() {
         </div>
       ) : null}
       {orgStatus === "ready" && activeOrgId ?
-        <AidenOperationalInsightsCard organizationId={activeOrgId} moduleContext="equipment" />
+        <PassiveEquipmentBoundary label="Operational insights" fallback={null}>
+          <AidenOperationalInsightsCard organizationId={activeOrgId} moduleContext="equipment" />
+        </PassiveEquipmentBoundary>
       : null}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex min-h-11 items-center gap-2 w-full sm:flex-1 sm:max-w-sm rounded-md border border-border bg-card px-3 py-2">
@@ -881,7 +970,9 @@ function EquipmentPageInner() {
                             eq.customerName,
                           )}
                         </span>
-                        <EquipmentSignalsRow signals={signalsMap.get(eq.id)} className="mt-0.5" />
+                        <PassiveEquipmentBoundary label="Equipment signals" fallback={null}>
+                          <EquipmentSignalsRow signals={signalsMap.get(eq.id)} className="mt-0.5" />
+                        </PassiveEquipmentBoundary>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -950,11 +1041,16 @@ function EquipmentPageInner() {
         </>
       )}
 
-      <EquipmentDrawer
-        equipmentId={selectedEquipmentId}
-        onClose={() => setSelectedEquipmentId(null)}
-        onUpdated={() => setRefreshToken((v) => v + 1)}
-      />
+      <PassiveEquipmentBoundary label="Equipment drawer" fallback={null}>
+        <EquipmentDrawer
+          equipmentId={selectedEquipmentId}
+          onClose={() => setSelectedEquipmentId(null)}
+          onUpdated={() => {
+            equipmentPageRuntimeLog("drawer_refresh_requested")
+            setRefreshToken((v) => v + 1)
+          }}
+        />
+      </PassiveEquipmentBoundary>
 
       <AddEquipmentModal
         open={addModalOpen}
@@ -963,7 +1059,10 @@ function EquipmentPageInner() {
           setAddModalOpen(false)
           setAddEquipmentPrefillCustomerId(null)
         }}
-        onSuccess={() => setRefreshToken((v) => v + 1)}
+        onSuccess={() => {
+          equipmentPageRuntimeLog("save_succeeded_refresh_requested")
+          setRefreshToken((v) => v + 1)
+        }}
         onCreateMaintenancePlan={({ customerId, equipmentId }) => {
           const q = new URLSearchParams({
             new: "1",
@@ -980,7 +1079,10 @@ function EquipmentPageInner() {
         organizationId={activeOrgId}
         orgReady={orgStatus === "ready"}
         equipmentCreateEligibility={equipmentCreateEligibility}
-        onSaved={() => setRefreshToken((v) => v + 1)}
+        onSaved={() => {
+          equipmentPageRuntimeLog("ai_scan_save_refresh_requested")
+          setRefreshToken((v) => v + 1)
+        }}
       />
 
       <QuickAddParamBridge
