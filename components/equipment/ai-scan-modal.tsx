@@ -26,7 +26,7 @@ import {
 } from "@/lib/equipment/equipment-scan-upload-validate"
 import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
 import { useEquipmentFormIndustryUi } from "@/hooks/use-equipment-form-industry-ui"
-import { equipmentTypeOptionsForForm } from "@/lib/equipment/equipment-form-industry-ui"
+import { useEquipmentTypes, equipmentCategorySelectOptions } from "@/lib/equipment-type-store"
 
 const STATUSES = ["Active", "Needs Service", "In Repair", "Out of Service"] as const
 type EquipmentStatus = (typeof STATUSES)[number]
@@ -149,7 +149,8 @@ export function AIScanModal({
   equipmentCreateEligibility,
   onSaved,
 }: AIScanModalProps) {
-  const { ui, industryKey } = useEquipmentFormIndustryUi(organizationId, orgReady, open)
+  const { ui } = useEquipmentFormIndustryUi(organizationId, orgReady, open)
+  const { types: orgEquipmentTypes, loading: equipmentTypesLoading } = useEquipmentTypes()
   const [step, setStep] = useState<ScanStep>("upload")
   const [uploadKind, setUploadKind] = useState<"image" | "pdf" | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -167,18 +168,19 @@ export function AIScanModal({
   const scanTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([])
 
   const equipmentTypeOptions = useMemo(
-    () => equipmentTypeOptionsForForm(ui, form.equipmentType),
-    [ui, form.equipmentType],
+    () => equipmentCategorySelectOptions(orgEquipmentTypes, form.equipmentType),
+    [orgEquipmentTypes, form.equipmentType],
   )
 
   useEffect(() => {
     if (!open) return
     setForm((prev) => {
-      if (!prev.equipmentType.trim()) return prev
-      if (ui.equipmentTypes.includes(prev.equipmentType)) return prev
+      const v = prev.equipmentType.trim()
+      if (!v) return prev
+      if (orgEquipmentTypes.some((t) => t.name === v)) return prev
       return { ...prev, equipmentType: "" }
     })
-  }, [open, industryKey, ui.equipmentTypes])
+  }, [open, orgEquipmentTypes])
 
   const clearScanTimers = useCallback(() => {
     for (const t of scanTimersRef.current) clearTimeout(t)
@@ -676,13 +678,23 @@ export function AIScanModal({
                     </div>
                     <div>
                       <Label required>Equipment type</Label>
-                      <Select value={form.equipmentType} onChange={(e) => setField("equipmentType", e.target.value)}>
-                        <option value="">Select type…</option>
-                        {equipmentTypeOptions.map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
+                      <Select
+                        value={form.equipmentType}
+                        onChange={(e) => setField("equipmentType", e.target.value)}
+                        disabled={equipmentTypesLoading}
+                      >
+                        {equipmentTypesLoading ? (
+                          <option value="">Loading types…</option>
+                        ) : (
+                          <>
+                            <option value="">Select type…</option>
+                            {equipmentTypeOptions.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </>
+                        )}
                       </Select>
                     </div>
                     <div>

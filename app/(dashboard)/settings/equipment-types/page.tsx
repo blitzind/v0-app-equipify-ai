@@ -8,6 +8,9 @@ import {
   ICON_OPTIONS,
   COLOR_PRESETS,
 } from "@/lib/equipment-type-store"
+import { useActiveOrganization } from "@/lib/active-organization-context"
+import { resetOrganizationEquipmentTypeSeedsAction } from "@/app/actions/organization-equipment-types"
+import { toast } from "@/hooks/use-toast"
 import {
   Thermometer, Snowflake, Zap, Droplets, UtensilsCrossed,
   Flame, CircuitBoard, ArrowUpDown, Wrench, Settings, Wind,
@@ -118,7 +121,7 @@ function TypeEditor({
   onCancel,
 }: {
   type: EquipmentType
-  onSave: (patch: Partial<Omit<EquipmentType, "id">>) => void
+  onSave: (patch: Partial<Omit<EquipmentType, "id">>) => void | Promise<void>
   onCancel: () => void
 }) {
   const [name, setName] = useState(type.name)
@@ -127,9 +130,12 @@ function TypeEditor({
   const [icon, setIcon] = useState(type.icon)
   const [nameErr, setNameErr] = useState("")
 
-  function handleSave() {
-    if (!name.trim()) { setNameErr("Name is required"); return }
-    onSave({ name: name.trim(), description: description.trim(), color, icon })
+  async function handleSave() {
+    if (!name.trim()) {
+      setNameErr("Name is required")
+      return
+    }
+    await Promise.resolve(onSave({ name: name.trim(), description: description.trim(), color, icon }))
   }
 
   return (
@@ -177,7 +183,7 @@ function TypeEditor({
       </div>
       {/* Actions */}
       <div className="flex items-center gap-2 pt-1">
-        <Button size="sm" onClick={handleSave} className="gap-1.5">
+        <Button size="sm" onClick={() => void handleSave()} className="gap-1.5">
           <Check size={13} /> Save
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel} className="gap-1.5">
@@ -208,9 +214,15 @@ function AddTypeForm({ onAdd }: { onAdd: () => void }) {
     setOpen(false)
   }
 
-  function handleAdd() {
-    if (!name.trim()) { setNameErr("Name is required"); return }
-    dispatch({ type: "ADD", payload: { name: name.trim(), description: description.trim(), color, icon } })
+  async function handleAdd() {
+    if (!name.trim()) {
+      setNameErr("Name is required")
+      return
+    }
+    await dispatch({
+      type: "ADD",
+      payload: { name: name.trim(), description: description.trim(), color, icon },
+    })
     reset()
     onAdd()
   }
@@ -271,7 +283,7 @@ function AddTypeForm({ onAdd }: { onAdd: () => void }) {
         <span className="text-sm font-medium text-foreground">{name || "Preview"}</span>
       </div>
       <div className="flex items-center gap-2">
-        <Button size="sm" onClick={handleAdd} className="gap-1.5">
+        <Button size="sm" onClick={() => void handleAdd()} className="gap-1.5">
           <Plus size={13} /> Add type
         </Button>
         <Button size="sm" variant="ghost" onClick={reset}>Cancel</Button>
@@ -287,13 +299,13 @@ function TypeRow({ type }: { type: EquipmentType }) {
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  function handleSave(patch: Partial<Omit<EquipmentType, "id">>) {
-    dispatch({ type: "UPDATE", payload: { id: type.id, ...patch } })
+  async function handleSave(patch: Partial<Omit<EquipmentType, "id">>) {
+    await dispatch({ type: "UPDATE", payload: { id: type.id, ...patch } })
     setEditing(false)
   }
 
-  function handleDelete() {
-    dispatch({ type: "DELETE", payload: { id: type.id } })
+  async function handleDelete() {
+    await dispatch({ type: "DELETE", payload: { id: type.id } })
   }
 
   return (
@@ -369,7 +381,7 @@ function TypeRow({ type }: { type: EquipmentType }) {
             <div className="flex items-center gap-1 ml-1">
               <span className="text-xs text-destructive font-medium">Delete?</span>
               <button
-                onClick={handleDelete}
+                onClick={() => void handleDelete()}
                 className="w-6 h-6 rounded flex items-center justify-center text-destructive hover:bg-destructive/10 transition-colors"
               >
                 <Check size={11} />
@@ -388,7 +400,7 @@ function TypeRow({ type }: { type: EquipmentType }) {
       {/* Inline editor */}
       {editing && (
         <div className="border-t border-border px-4 pb-4 pt-3">
-          <TypeEditor type={type} onSave={handleSave} onCancel={() => setEditing(false)} />
+          <TypeEditor type={type} onSave={(p) => void handleSave(p)} onCancel={() => setEditing(false)} />
         </div>
       )}
     </div>
@@ -398,8 +410,33 @@ function TypeRow({ type }: { type: EquipmentType }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function EquipmentTypesPage() {
-  const { types } = useEquipmentTypes()
+  const { organizationId } = useActiveOrganization()
+  const { types, loading, error, refresh } = useEquipmentTypes()
   const [addedKey, setAddedKey] = useState(0)
+  const [resetBusy, setResetBusy] = useState(false)
+
+  async function handleResetIndustryDefaults() {
+    if (!organizationId) {
+      toast({ variant: "destructive", title: "No workspace selected", description: "Select an organization first." })
+      return
+    }
+    if (
+      !confirm(
+        "Replace all built-in (Default) equipment types with templates for your workspace industry? Custom types are kept. Edits to default types (name, icon, color, description) will be lost.",
+      )
+    ) {
+      return
+    }
+    setResetBusy(true)
+    const r = await resetOrganizationEquipmentTypeSeedsAction(organizationId)
+    setResetBusy(false)
+    if (!r.ok) {
+      toast({ variant: "destructive", title: "Could not reset defaults", description: r.message })
+      return
+    }
+    toast({ title: "Default types refreshed", description: "Built-in types were reset from your industry templates." })
+    await refresh()
+  }
 
   const defaults = types.filter((t) => t.isDefault)
   const custom = types.filter((t) => !t.isDefault)
@@ -407,6 +444,14 @@ export default function EquipmentTypesPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {loading && (
+        <p className="text-xs text-muted-foreground px-1">Loading equipment types from your workspace…</p>
+      )}
+      {error && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
       {/* Stats bar */}
       <div className="grid grid-cols-3 gap-4">
@@ -420,6 +465,29 @@ export default function EquipmentTypesPage() {
             <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
           </div>
         ))}
+      </div>
+
+      <div className="bg-card border border-border rounded-lg px-4 py-4 flex flex-col gap-3">
+        <div>
+          <p className="text-sm font-semibold text-foreground">Industry default templates</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            New workspaces start with types that match your industry. Use this if you still see generic defaults after
+            changing industry, or you want to discard edits to built-in types and start fresh from templates. Custom
+            types are never removed.
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!organizationId || resetBusy}
+            onClick={() => void handleResetIndustryDefaults()}
+            className="shrink-0"
+          >
+            {resetBusy ? "Resetting…" : "Reset default types to industry templates"}
+          </Button>
+        </div>
       </div>
 
       <div className="bg-card border border-border rounded-lg px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

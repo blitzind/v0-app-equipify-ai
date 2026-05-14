@@ -1,150 +1,190 @@
 "use client"
 
-import { createContext, useContext, useReducer, type ReactNode } from "react"
-import { equipment as allEquipment } from "@/lib/mock-data"
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
+import { ensureOrganizationEquipmentTypesIfEmptyAction } from "@/app/actions/organization-equipment-types"
+import {
+  type EquipmentType,
+  mapEquipmentTypeRows,
+  type OrganizationEquipmentTypeRow,
+  equipmentCategorySelectOptions,
+} from "@/lib/organization-equipment-types"
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface EquipmentType {
-  id: string
-  name: string
-  color: string    // hex
-  icon: string     // lucide icon name (used as a key to look up)
-  description: string
-  usageCount: number
-  isDefault: boolean
-}
+export type { EquipmentType }
+export { equipmentCategorySelectOptions }
 
 type Action =
-  | { type: "ADD";    payload: Omit<EquipmentType, "id" | "usageCount" | "isDefault"> }
+  | { type: "ADD"; payload: Omit<EquipmentType, "id" | "usageCount" | "isDefault"> }
   | { type: "UPDATE"; payload: { id: string } & Partial<Omit<EquipmentType, "id">> }
   | { type: "DELETE"; payload: { id: string } }
 
-// ─── Seed data ────────────────────────────────────────────────────────────────
-
-// Count how many equipment records belong to each category
-function countByCategory(name: string): number {
-  return allEquipment.filter((e) => e.category === name).length
-}
-
-const DEFAULT_TYPES: EquipmentType[] = [
-  {
-    id: "et-001",
-    name: "HVAC",
-    color: "#2563eb",
-    icon: "Thermometer",
-    description: "Heating, ventilation, and air-conditioning units.",
-    usageCount: countByCategory("HVAC"),
-    isDefault: true,
-  },
-  {
-    id: "et-002",
-    name: "Refrigeration",
-    color: "#0891b2",
-    icon: "Snowflake",
-    description: "Walk-in coolers, freezers, and reach-in units.",
-    usageCount: countByCategory("Refrigeration"),
-    isDefault: true,
-  },
-  {
-    id: "et-003",
-    name: "Electrical",
-    color: "#d97706",
-    icon: "Zap",
-    description: "Panels, transformers, and electrical distribution.",
-    usageCount: countByCategory("Electrical"),
-    isDefault: true,
-  },
-  {
-    id: "et-004",
-    name: "Plumbing",
-    color: "#0f766e",
-    icon: "Droplets",
-    description: "Boilers, water heaters, and pipe systems.",
-    usageCount: countByCategory("Plumbing"),
-    isDefault: true,
-  },
-  {
-    id: "et-005",
-    name: "Kitchen Equipment",
-    color: "#dc2626",
-    icon: "UtensilsCrossed",
-    description: "Commercial ovens, fryers, dishwashers, and ranges.",
-    usageCount: countByCategory("Kitchen Equipment"),
-    isDefault: true,
-  },
-  {
-    id: "et-006",
-    name: "Fire Safety",
-    color: "#ea580c",
-    icon: "Flame",
-    description: "Suppression systems, extinguishers, and alarms.",
-    usageCount: countByCategory("Fire Safety"),
-    isDefault: true,
-  },
-  {
-    id: "et-007",
-    name: "Generators",
-    color: "#7c3aed",
-    icon: "CircuitBoard",
-    description: "Standby and portable generator units.",
-    usageCount: countByCategory("Generators"),
-    isDefault: true,
-  },
-  {
-    id: "et-008",
-    name: "Elevators",
-    color: "#475569",
-    icon: "ArrowUpDown",
-    description: "Passenger and freight elevator equipment.",
-    usageCount: countByCategory("Elevators"),
-    isDefault: true,
-  },
-]
-
-// ─── Reducer ──────────────────────────────────────────────────────────────────
-
-let nextId = DEFAULT_TYPES.length + 1
-
-function reducer(state: EquipmentType[], action: Action): EquipmentType[] {
-  switch (action.type) {
-    case "ADD":
-      return [
-        ...state,
-        {
-          ...action.payload,
-          id: `et-${String(nextId++).padStart(3, "0")}`,
-          usageCount: 0,
-          isDefault: false,
-        },
-      ]
-    case "UPDATE":
-      return state.map((t) =>
-        t.id === action.payload.id ? { ...t, ...action.payload } : t
-      )
-    case "DELETE":
-      return state.filter((t) => t.id !== action.payload.id)
-    default:
-      return state
-  }
-}
-
-// ─── Context ──────────────────────────────────────────────────────────────────
-
-interface Ctx {
+interface EquipmentTypeContextValue {
   types: EquipmentType[]
-  dispatch: React.Dispatch<Action>
+  loading: boolean
+  error: string | null
+  dispatch: (action: Action) => Promise<void>
+  refresh: () => Promise<void>
 }
 
-const EquipmentTypeContext = createContext<Ctx | null>(null)
+const EquipmentTypeContext = createContext<EquipmentTypeContextValue | null>(null)
 
 export function EquipmentTypeProvider({ children }: { children: ReactNode }) {
-  const [types, dispatch] = useReducer(reducer, DEFAULT_TYPES)
-  return (
-    <EquipmentTypeContext.Provider value={{ types, dispatch }}>
-      {children}
-    </EquipmentTypeContext.Provider>
+  const { organizationId, status } = useActiveOrganization()
+  const orgReady = status === "ready"
+  const [types, setTypes] = useState<EquipmentType[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const ensureAttemptedForOrgRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    ensureAttemptedForOrgRef.current = null
+  }, [organizationId])
+
+  const load = useCallback(async () => {
+    if (!organizationId || !orgReady) {
+      setTypes([])
+      setError(null)
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    setError(null)
+    const supabase = createBrowserSupabaseClient()
+    try {
+      const { data: rows, error: qErr } = await supabase
+        .from("organization_equipment_types")
+        .select("*")
+        .eq("organization_id", organizationId)
+        .is("archived_at", null)
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true })
+
+      if (qErr) throw new Error(qErr.message)
+
+      let list = (rows ?? []) as OrganizationEquipmentTypeRow[]
+
+      if (list.length === 0 && ensureAttemptedForOrgRef.current !== organizationId) {
+        ensureAttemptedForOrgRef.current = organizationId
+        const res = await ensureOrganizationEquipmentTypesIfEmptyAction(organizationId)
+        if (!res.ok && res.message) setError(res.message)
+        if (res.seeded) {
+          const { data: again, error: aErr } = await supabase
+            .from("organization_equipment_types")
+            .select("*")
+            .eq("organization_id", organizationId)
+            .is("archived_at", null)
+            .order("sort_order", { ascending: true })
+            .order("name", { ascending: true })
+          if (aErr) throw new Error(aErr.message)
+          list = (again ?? []) as OrganizationEquipmentTypeRow[]
+        }
+      }
+
+      const { data: eq, error: eErr } = await supabase
+        .from("equipment")
+        .select("category")
+        .eq("organization_id", organizationId)
+        .eq("is_archived", false)
+
+      if (eErr) throw new Error(eErr.message)
+
+      const usage = new Map<string, number>()
+      for (const row of eq ?? []) {
+        const c = (row as { category?: string | null }).category?.trim()
+        if (!c) continue
+        usage.set(c, (usage.get(c) ?? 0) + 1)
+      }
+
+      setTypes(mapEquipmentTypeRows(list, usage))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load equipment types")
+      setTypes([])
+    } finally {
+      setLoading(false)
+    }
+  }, [organizationId, orgReady])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const refresh = useCallback(async () => {
+    await load()
+  }, [load])
+
+  const dispatch = useCallback(
+    async (action: Action) => {
+      if (!organizationId || !orgReady) return
+      const supabase = createBrowserSupabaseClient()
+      setError(null)
+      try {
+        switch (action.type) {
+          case "ADD": {
+            const { error: insErr } = await supabase.from("organization_equipment_types").insert({
+              organization_id: organizationId,
+              name: action.payload.name,
+              description: action.payload.description,
+              color: action.payload.color,
+              icon: action.payload.icon,
+              sort_order: 9000,
+              is_seed: false,
+              seed_key: null,
+            })
+            if (insErr) throw new Error(insErr.message)
+            break
+          }
+          case "UPDATE": {
+            const { id, ...rest } = action.payload
+            const updatePayload: Record<string, unknown> = {}
+            if (rest.name !== undefined) updatePayload.name = rest.name
+            if (rest.description !== undefined) updatePayload.description = rest.description
+            if (rest.color !== undefined) updatePayload.color = rest.color
+            if (rest.icon !== undefined) updatePayload.icon = rest.icon
+            const { error: uErr } = await supabase
+              .from("organization_equipment_types")
+              .update(updatePayload)
+              .eq("id", id)
+              .eq("organization_id", organizationId)
+            if (uErr) throw new Error(uErr.message)
+            break
+          }
+          case "DELETE": {
+            const { error: dErr } = await supabase
+              .from("organization_equipment_types")
+              .update({ archived_at: new Date().toISOString() })
+              .eq("id", action.payload.id)
+              .eq("organization_id", organizationId)
+              .eq("is_seed", false)
+            if (dErr) throw new Error(dErr.message)
+            break
+          }
+          default:
+            break
+        }
+        await load()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Update failed")
+      }
+    },
+    [organizationId, orgReady, load],
   )
+
+  const value = useMemo(
+    () => ({ types, loading, error, dispatch, refresh }),
+    [types, loading, error, dispatch, refresh],
+  )
+
+  return <EquipmentTypeContext.Provider value={value}>{children}</EquipmentTypeContext.Provider>
 }
 
 export function useEquipmentTypes() {
@@ -153,28 +193,40 @@ export function useEquipmentTypes() {
   return ctx
 }
 
-// ─── Available icons for picker ───────────────────────────────────────────────
-
 export const ICON_OPTIONS = [
-  "Thermometer", "Snowflake", "Zap", "Droplets", "UtensilsCrossed",
-  "Flame", "CircuitBoard", "ArrowUpDown", "Wrench", "Settings",
-  "Wind", "Gauge", "Lightbulb", "Radio", "Cpu", "Server",
-  "ShieldCheck", "AlertTriangle", "Power", "PcCase",
+  "Thermometer",
+  "Snowflake",
+  "Zap",
+  "Droplets",
+  "UtensilsCrossed",
+  "Flame",
+  "CircuitBoard",
+  "ArrowUpDown",
+  "Wrench",
+  "Settings",
+  "Wind",
+  "Gauge",
+  "Lightbulb",
+  "Radio",
+  "Cpu",
+  "Server",
+  "ShieldCheck",
+  "AlertTriangle",
+  "Power",
+  "PcCase",
 ] as const
 
 export type IconName = (typeof ICON_OPTIONS)[number]
 
-// ─── Color presets ────────────────────────────────────────────────────────────
-
 export const COLOR_PRESETS = [
-  "#2563eb", // blue
-  "#0891b2", // cyan
-  "#0f766e", // teal
-  "#16a34a", // green
-  "#d97706", // amber
-  "#dc2626", // red
-  "#ea580c", // orange
-  "#7c3aed", // violet (allowed for non-AI use)
-  "#db2777", // pink
-  "#475569", // slate
+  "#2563eb",
+  "#0891b2",
+  "#0f766e",
+  "#16a34a",
+  "#d97706",
+  "#dc2626",
+  "#ea580c",
+  "#7c3aed",
+  "#db2777",
+  "#475569",
 ]

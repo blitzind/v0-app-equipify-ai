@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
 import { useEquipmentFormIndustryUi } from "@/hooks/use-equipment-form-industry-ui"
-import { equipmentTypeOptionsForForm } from "@/lib/equipment/equipment-form-industry-ui"
+import { useEquipmentTypes, equipmentCategorySelectOptions } from "@/lib/equipment-type-store"
 
 interface AddEquipmentModalProps {
   open: boolean
@@ -133,11 +133,8 @@ export function AddEquipmentModal({
 }: AddEquipmentModalProps) {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const { equipmentCreateEligibility } = useBillingAccess()
-  const { ui, industryKey } = useEquipmentFormIndustryUi(
-    activeOrgId ?? null,
-    orgStatus === "ready",
-    open,
-  )
+  const { ui } = useEquipmentFormIndustryUi(activeOrgId ?? null, orgStatus === "ready", open)
+  const { types: orgEquipmentTypes, loading: equipmentTypesLoading } = useEquipmentTypes()
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [errors, setErrors] = useState<FormErrors>({})
@@ -229,18 +226,19 @@ export function AddEquipmentModal({
   }, [open, orgStatus, activeOrgId, form.customerId])
 
   const equipmentTypeOptions = useMemo(
-    () => equipmentTypeOptionsForForm(ui, form.equipmentType),
-    [ui, form.equipmentType],
+    () => equipmentCategorySelectOptions(orgEquipmentTypes, form.equipmentType),
+    [orgEquipmentTypes, form.equipmentType],
   )
 
   useEffect(() => {
     if (!open) return
     setForm((prev) => {
-      if (!prev.equipmentType.trim()) return prev
-      if (ui.equipmentTypes.includes(prev.equipmentType)) return prev
+      const v = prev.equipmentType.trim()
+      if (!v) return prev
+      if (orgEquipmentTypes.some((t) => t.name === v)) return prev
       return { ...prev, equipmentType: "" }
     })
-  }, [open, industryKey, ui.equipmentTypes])
+  }, [open, orgEquipmentTypes])
 
   function set(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -446,13 +444,23 @@ export function AddEquipmentModal({
               </Field>
               <Field>
                 <Label required>Equipment Type</Label>
-                <Select value={form.equipmentType} onChange={(e) => set("equipmentType", e.target.value)}>
-                  <option value="">Select type...</option>
-                  {equipmentTypeOptions.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
+                <Select
+                  value={form.equipmentType}
+                  onChange={(e) => set("equipmentType", e.target.value)}
+                  disabled={equipmentTypesLoading}
+                >
+                  {equipmentTypesLoading ? (
+                    <option value="">Loading types…</option>
+                  ) : (
+                    <>
+                      <option value="">Select type...</option>
+                      {equipmentTypeOptions.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </>
+                  )}
                 </Select>
                 {errors.equipmentType && <p className="text-xs text-destructive mt-1">{errors.equipmentType}</p>}
               </Field>

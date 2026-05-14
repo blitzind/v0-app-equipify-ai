@@ -63,14 +63,6 @@ export function orderedUniqueEquipmentTypes(preferred: readonly string[], extra:
   return out
 }
 
-export function equipmentTypeOptionsForForm(ui: EquipmentFormIndustryUi, currentValue: string): string[] {
-  const trimmed = currentValue.trim()
-  if (!trimmed || ui.equipmentTypes.includes(trimmed)) {
-    return [...ui.equipmentTypes]
-  }
-  return [...ui.equipmentTypes, trimmed]
-}
-
 function collectCategoriesFromDemoAndRegistry(key: WorkspaceIndustryKey): string[] {
   const profile = DEMO_INDUSTRY_PROFILES[key]
   const def = WORKSPACE_INDUSTRY_DEFINITIONS[key]
