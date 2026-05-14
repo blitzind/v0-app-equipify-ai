@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
-import { CalendarPlus, CheckCircle2, X } from "lucide-react"
+import { CalendarPlus, Check, CheckCircle2, ChevronsUpDown, X } from "lucide-react"
 import { DRAWER_PANEL_SURFACE } from "@/components/detail-drawer"
 import { BR_STACK_CLEAR_AIDEN } from "@/lib/layout/aiden-safe-area"
 import { cn } from "@/lib/utils"
@@ -18,6 +18,15 @@ import { toast } from "@/hooks/use-toast"
 import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
 import { useEquipmentFormIndustryUi } from "@/hooks/use-equipment-form-industry-ui"
 import { useEquipmentTypes, equipmentCategorySelectOptions } from "@/lib/equipment-type-store"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 interface AddEquipmentModalProps {
   open: boolean
@@ -38,6 +47,9 @@ interface AddEquipmentModalProps {
 const STATUSES = ["Active", "Needs Service", "In Repair", "Out of Service"] as const
 type EquipmentStatus = (typeof STATUSES)[number]
 type CustomerOption = { id: string; company_name: string }
+
+/** Popover must stack above Add Equipment shell (`z-[230]`) and in-modal toasts (`z-[240]`). */
+const ADD_EQUIPMENT_CUSTOMER_POPOVER_Z = "z-[245]"
 
 function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
@@ -97,6 +109,8 @@ export function AddEquipmentModal({
   const { ui } = useEquipmentFormIndustryUi(activeOrgId ?? null, orgStatus === "ready", open)
   const { types: orgEquipmentTypes, loading: equipmentTypesLoading } = useEquipmentTypes()
   const [customers, setCustomers] = useState<CustomerOption[]>([])
+  const [customersLoading, setCustomersLoading] = useState(false)
+  const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false)
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [errors, setErrors] = useState<FormErrors>({})
   const [toastMsg, setToastMsg] = useState<string | null>(null)
@@ -106,9 +120,14 @@ export function AddEquipmentModal({
 
   useEffect(() => {
     if (!open || orgStatus !== "ready" || !activeOrgId) {
-      if (!open) setCustomers([])
+      if (!open) {
+        setCustomers([])
+        setCustomersLoading(false)
+        setCustomerPopoverOpen(false)
+      }
       return
     }
+    setCustomersLoading(true)
     const supabase = createBrowserSupabaseClient()
     void (async () => {
       const { data } = await supabase
@@ -120,6 +139,7 @@ export function AddEquipmentModal({
         .order("company_name", { ascending: true })
 
       setCustomers((data as CustomerOption[] | null) ?? [])
+      setCustomersLoading(false)
     })()
   }, [open, orgStatus, activeOrgId])
 
@@ -191,6 +211,14 @@ export function AddEquipmentModal({
     [orgEquipmentTypes, form.equipmentType],
   )
 
+  const selectedCustomerLabel = useMemo(() => {
+    if (!form.customerId.trim()) return "Select customer…"
+    const fromList = customers.find((c) => c.id === form.customerId)
+    if (fromList) return fromList.company_name
+    if (customersLoading) return "Loading customers…"
+    return "Selected customer"
+  }, [form.customerId, customers, customersLoading])
+
   useEffect(() => {
     if (!open) return
     setForm((prev) => {
@@ -210,6 +238,7 @@ export function AddEquipmentModal({
     setPostSave(null)
     setForm(INITIAL_FORM)
     setErrors({})
+    setCustomerPopoverOpen(false)
     onClose()
   }
 
@@ -467,14 +496,75 @@ export function AddEquipmentModal({
               </Field>
               <Field>
                 <Label required>Customer</Label>
-                <NativeSelect
-                  value={form.customerId}
-                  onChange={(e) => set("customerId", e.target.value)}
-                  aria-invalid={Boolean(errors.customerId)}
-                >
-                  <option value="">Select customer...</option>
-                  {customers.map((c) => <option key={c.id} value={c.id}>{c.company_name}</option>)}
-                </NativeSelect>
+                <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={customerPopoverOpen}
+                      aria-invalid={errors.customerId ? true : undefined}
+                      disabled={!activeOrgId || orgStatus !== "ready"}
+                      className={cn(
+                        "h-9 w-full justify-between font-normal",
+                        errors.customerId &&
+                          "border-destructive focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
+                      )}
+                    >
+                      <span className="truncate text-left">{selectedCustomerLabel}</span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className={cn("w-[var(--radix-popover-trigger-width)] p-0", ADD_EQUIPMENT_CUSTOMER_POPOVER_Z)}
+                    align="start"
+                  >
+                    {customersLoading ? (
+                      <div className="py-6 text-center text-sm text-muted-foreground">Loading customers…</div>
+                    ) : customers.length === 0 ? (
+                      <div className="py-6 text-center text-sm text-muted-foreground">No customers found</div>
+                    ) : (
+                      <Command>
+                        <CommandInput placeholder="Search customers…" />
+                        <CommandList>
+                          <CommandEmpty>No customers found</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              value="__clear_customer"
+                              onSelect={() => {
+                                set("customerId", "")
+                                setCustomerPopoverOpen(false)
+                              }}
+                            >
+                              <Check
+                                className={cn("mr-2 h-4 w-4", !form.customerId.trim() ? "opacity-100" : "opacity-0")}
+                              />
+                              <span className="truncate text-muted-foreground">Select customer…</span>
+                            </CommandItem>
+                            {customers.map((c) => (
+                              <CommandItem
+                                key={c.id}
+                                value={`${c.company_name} ${c.id}`}
+                                onSelect={() => {
+                                  set("customerId", c.id)
+                                  setCustomerPopoverOpen(false)
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    form.customerId === c.id ? "opacity-100" : "opacity-0",
+                                  )}
+                                />
+                                <span className="truncate">{c.company_name}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    )}
+                  </PopoverContent>
+                </Popover>
                 {errors.customerId && <p className="text-xs text-destructive mt-1">{errors.customerId}</p>}
               </Field>
             </div>
