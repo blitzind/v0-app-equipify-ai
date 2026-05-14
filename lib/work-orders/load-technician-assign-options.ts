@@ -1,12 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { equipifyDispatchDebugLog } from "@/lib/dispatch/dispatch-debug-log"
+import { equipifyDispatchDebugLog, isEquipifyDispatchDebug } from "@/lib/dispatch/dispatch-debug-log"
 import { listTechniciansForOrg } from "@/lib/technicians/technician-table"
 import {
   queryOrganizationMembersForRoster,
   queryProfilesForRoster,
 } from "@/lib/technicians/roster-queries"
-import { isEligibleFieldAssignableMember } from "@/lib/work-orders/assignee-eligibility"
+import {
+  isAssignableFieldResourceMember,
+  isEligibleFieldAssignableMember,
+} from "@/lib/work-orders/assignee-eligibility"
 import { readIsFieldResourceFromOrgMemberRow } from "@/lib/work-orders/org-member-field-resource"
+import { normalizeOrgMemberRole } from "@/lib/permissions/model"
 
 export type TechnicianAssignOption = {
   /**
@@ -35,6 +39,81 @@ export type TechnicianAssignOption = {
 export const ASSIGNEE_PICKER_EMPTY_HINT =
   'No assignable technicians or field resources. Enable "Can be scheduled for field work" in Team settings or add an active technician.'
 
+/** Dev / `NEXT_PUBLIC_DEBUG_DISPATCH`: shown when members have the field flag but the merged picker is empty. */
+export const ASSIGNEE_FILTERED_ELIGIBILITY_DEBUG_HINT =
+  "Field resource members were found but filtered out. Check assignee eligibility mapping."
+
+export type TechnicianAssignLoadDiagnostics = {
+  organizationIdSuffix: string
+  memberRowsCount: number
+  ownerRowFound: boolean
+  ownerStatus: string | null
+  ownerRole: string | null
+  ownerIsFieldResourceRawValue: string
+  ownerMappedIsFieldResource: string
+  ownerEligibilityResult: boolean
+  fieldResourceTrueRowCount: number
+  eligibleFieldResourceRowCount: number
+  finalAssigneeOptionCount: number
+}
+
+let lastTechnicianAssignLoadDiagnostics: TechnicianAssignLoadDiagnostics | null = null
+
+export function getLastTechnicianAssignLoadDiagnostics(): TechnicianAssignLoadDiagnostics | null {
+  return lastTechnicianAssignLoadDiagnostics
+}
+
+function setAssigneeLoadDiagnostics(next: TechnicianAssignLoadDiagnostics | null) {
+  lastTechnicianAssignLoadDiagnostics = next
+}
+
+function orgSuffix(organizationId: string): string {
+  return organizationId.length <= 8 ? organizationId : organizationId.slice(-8)
+}
+
+function computeOwnerFieldResourceDiagnostics(
+  rawRows: Array<{ user_id: string; role: string; status: string } & Record<string, unknown>>,
+): Pick<
+  TechnicianAssignLoadDiagnostics,
+  | "ownerRowFound"
+  | "ownerStatus"
+  | "ownerRole"
+  | "ownerIsFieldResourceRawValue"
+  | "ownerMappedIsFieldResource"
+  | "ownerEligibilityResult"
+> {
+  const owner = rawRows.find((m) => normalizeOrgMemberRole(m.role) === "owner")
+  if (!owner) {
+    return {
+      ownerRowFound: false,
+      ownerStatus: null,
+      ownerRole: null,
+      ownerIsFieldResourceRawValue: "",
+      ownerMappedIsFieldResource: "n/a",
+      ownerEligibilityResult: false,
+    }
+  }
+  const rec = owner as Record<string, unknown>
+  const rawFr = rec.is_field_resource ?? rec.isFieldResource
+  let ownerIsFieldResourceRawValue: string
+  if (rawFr === undefined) ownerIsFieldResourceRawValue = "undefined"
+  else if (rawFr === null) ownerIsFieldResourceRawValue = "null"
+  else if (typeof rawFr === "string" || typeof rawFr === "number" || typeof rawFr === "boolean") {
+    ownerIsFieldResourceRawValue = String(rawFr)
+  } else {
+    ownerIsFieldResourceRawValue = "[non-primitive]"
+  }
+  const mapped = readIsFieldResourceFromOrgMemberRow(rec)
+  return {
+    ownerRowFound: true,
+    ownerStatus: owner.status,
+    ownerRole: owner.role,
+    ownerIsFieldResourceRawValue,
+    ownerMappedIsFieldResource: mapped === undefined ? "undefined" : String(mapped),
+    ownerEligibilityResult: isAssignableFieldResourceMember(owner),
+  }
+}
+
 function formatMemberRole(role: string): string {
   if (!role) return "Member"
   return role.charAt(0).toUpperCase() + role.slice(1)
@@ -61,6 +140,39 @@ function isMissingColumnOrSchemaError(err: { message?: string } | null): boolean
   )
 }
 
+function buildAssigneeDiagnosticsSnapshot(
+  organizationId: string,
+  pipeline: {
+    memberRowsCount: number
+    owner: Pick<
+      TechnicianAssignLoadDiagnostics,
+      | "ownerRowFound"
+      | "ownerStatus"
+      | "ownerRole"
+      | "ownerIsFieldResourceRawValue"
+      | "ownerMappedIsFieldResource"
+      | "ownerEligibilityResult"
+    >
+    fieldResourceTrueRowCount: number
+    eligibleFieldResourceRowCount: number
+    finalAssigneeOptionCount: number
+  },
+): TechnicianAssignLoadDiagnostics {
+  return {
+    organizationIdSuffix: orgSuffix(organizationId),
+    memberRowsCount: pipeline.memberRowsCount,
+    ownerRowFound: pipeline.owner.ownerRowFound,
+    ownerStatus: pipeline.owner.ownerStatus,
+    ownerRole: pipeline.owner.ownerRole,
+    ownerIsFieldResourceRawValue: pipeline.owner.ownerIsFieldResourceRawValue,
+    ownerMappedIsFieldResource: pipeline.owner.ownerMappedIsFieldResource,
+    ownerEligibilityResult: pipeline.owner.ownerEligibilityResult,
+    fieldResourceTrueRowCount: pipeline.fieldResourceTrueRowCount,
+    eligibleFieldResourceRowCount: pipeline.eligibleFieldResourceRowCount,
+    finalAssigneeOptionCount: pipeline.finalAssigneeOptionCount,
+  }
+}
+
 async function buildFieldResourceAssigneeOptions(
   supabase: SupabaseClient,
   organizationId: string,
@@ -71,12 +183,23 @@ async function buildFieldResourceAssigneeOptions(
     activeOrgMemberRowCount: number
     fieldResourceTrueRowCount: number
     eligibleFieldResourceRowCount: number
+    owner: Pick<
+      TechnicianAssignLoadDiagnostics,
+      | "ownerRowFound"
+      | "ownerStatus"
+      | "ownerRole"
+      | "ownerIsFieldResourceRawValue"
+      | "ownerMappedIsFieldResource"
+      | "ownerEligibilityResult"
+    >
   }
 }> {
+  const emptyOwner = computeOwnerFieldResourceDiagnostics([])
   const emptyStats = {
     activeOrgMemberRowCount: 0,
     fieldResourceTrueRowCount: 0,
     eligibleFieldResourceRowCount: 0,
+    owner: emptyOwner,
   }
 
   const {
@@ -110,6 +233,7 @@ async function buildFieldResourceAssigneeOptions(
   }
 
   const rawRows = members as M[]
+  const ownerDiag = computeOwnerFieldResourceDiagnostics(rawRows)
   const activeOrgMemberRowCount = rawRows.length
   const fieldResourceTrueRowCount = rawRows.filter(
     (m) => readIsFieldResourceFromOrgMemberRow(m as Record<string, unknown>) === true,
@@ -117,14 +241,7 @@ async function buildFieldResourceAssigneeOptions(
 
   const memberList = rawRows.filter(
     (m) =>
-      !linkedMemberUserIds.has(m.user_id) &&
-      isEligibleFieldAssignableMember({
-        role: m.role,
-        status: m.status,
-        permission_profile: m.permission_profile,
-        permissions_json: m.permissions_json,
-        isFieldResource: readIsFieldResourceFromOrgMemberRow(m as Record<string, unknown>),
-      }),
+      !linkedMemberUserIds.has(m.user_id) && isAssignableFieldResourceMember(m as M & Record<string, unknown>),
   )
   const eligibleFieldResourceRowCount = memberList.length
 
@@ -142,6 +259,7 @@ async function buildFieldResourceAssigneeOptions(
         activeOrgMemberRowCount,
         fieldResourceTrueRowCount,
         eligibleFieldResourceRowCount: 0,
+        owner: ownerDiag,
       },
     }
 
@@ -168,7 +286,6 @@ async function buildFieldResourceAssigneeOptions(
     const p = profileById.get(uid)
     const m = memberByUser.get(uid)
     if (!m) continue
-    if (!p && !profErr) continue
 
     const label =
       (p?.full_name && p.full_name.trim()) || (p?.email && p.email.trim()) || "Team member"
@@ -200,12 +317,28 @@ async function buildFieldResourceAssigneeOptions(
   }
 
   out.sort((a, b) => a.label.localeCompare(b.label))
+  if (isEquipifyDispatchDebug()) {
+    equipifyDispatchDebugLog("assignee_owner_field_resource_diag", {
+      organizationIdSuffix: orgSuffix(organizationId),
+      memberRowsCount: activeOrgMemberRowCount,
+      ownerRowFound: ownerDiag.ownerRowFound,
+      ownerStatus: ownerDiag.ownerStatus,
+      ownerRole: ownerDiag.ownerRole,
+      ownerIsFieldResourceRawValue: ownerDiag.ownerIsFieldResourceRawValue.slice(0, 48),
+      ownerMappedIsFieldResource: ownerDiag.ownerMappedIsFieldResource,
+      ownerEligibilityResult: ownerDiag.ownerEligibilityResult,
+      eligibleFieldResourceRowCount,
+      fieldResourceTrueRowCount,
+      finalFieldResourcePickerOutCount: out.length,
+    })
+  }
   return {
     options: out,
     stats: {
       activeOrgMemberRowCount,
       fieldResourceTrueRowCount,
       eligibleFieldResourceRowCount,
+      owner: ownerDiag,
     },
   }
 }
@@ -232,13 +365,28 @@ async function loadTechnicianAssignOptionsLegacy(
     roleIn: ROSTER_MEMBER_ROLES,
   })
 
+  const diagEmpty = () =>
+    setAssigneeLoadDiagnostics(
+      buildAssigneeDiagnosticsSnapshot(organizationId, {
+        memberRowsCount: 0,
+        owner: computeOwnerFieldResourceDiagnostics([]),
+        fieldResourceTrueRowCount: 0,
+        eligibleFieldResourceRowCount: 0,
+        finalAssigneeOptionCount: 0,
+      }),
+    )
+
   if (memErr) {
     equipifyDispatchDebugLog("assignee_legacy_members_query_error", {
       reason: String(memErr.message ?? "unknown").slice(0, 160),
     })
+    diagEmpty()
     return []
   }
-  if (!members?.length) return []
+  if (!members?.length) {
+    diagEmpty()
+    return []
+  }
 
   type M = {
     user_id: string
@@ -253,20 +401,13 @@ async function loadTechnicianAssignOptionsLegacy(
   }
 
   const rawRows = members as M[]
+  const ownerDiag = computeOwnerFieldResourceDiagnostics(rawRows)
   const activeOrgMemberRowCount = rawRows.length
   const fieldResourceTrueRowCount = rawRows.filter(
     (m) => readIsFieldResourceFromOrgMemberRow(m as Record<string, unknown>) === true,
   ).length
 
-  const memberList = rawRows.filter((m) =>
-    isEligibleFieldAssignableMember({
-      role: m.role,
-      status: m.status,
-      permission_profile: m.permission_profile,
-      permissions_json: m.permissions_json,
-      isFieldResource: readIsFieldResourceFromOrgMemberRow(m as Record<string, unknown>),
-    }),
-  )
+  const memberList = rawRows.filter((m) => isAssignableFieldResourceMember(m as M & Record<string, unknown>))
   const eligibleFieldResourceRowCount = memberList.length
 
   if (!memberList.length) {
@@ -277,6 +418,15 @@ async function loadTechnicianAssignOptionsLegacy(
       finalAssigneeOptionCount: 0,
       linkedExcludedUserCount: 0,
     })
+    setAssigneeLoadDiagnostics(
+      buildAssigneeDiagnosticsSnapshot(organizationId, {
+        memberRowsCount: activeOrgMemberRowCount,
+        owner: ownerDiag,
+        fieldResourceTrueRowCount,
+        eligibleFieldResourceRowCount: 0,
+        finalAssigneeOptionCount: 0,
+      }),
+    )
     return []
   }
 
@@ -303,7 +453,6 @@ async function loadTechnicianAssignOptionsLegacy(
     const p = profileById.get(uid)
     const m = memberByUser.get(uid)
     if (!m) continue
-    if (!p && !profErr) continue
 
     const label =
       (p?.full_name && p.full_name.trim()) || (p?.email && p.email.trim()) || "Team member"
@@ -343,6 +492,30 @@ async function loadTechnicianAssignOptionsLegacy(
     linkedExcludedUserCount: 0,
   })
   equipifyDispatchDebugLog("assignee_options_loaded_legacy", { total: out.length })
+  if (isEquipifyDispatchDebug()) {
+    equipifyDispatchDebugLog("assignee_owner_field_resource_diag", {
+      organizationIdSuffix: orgSuffix(organizationId),
+      memberRowsCount: activeOrgMemberRowCount,
+      ownerRowFound: ownerDiag.ownerRowFound,
+      ownerStatus: ownerDiag.ownerStatus,
+      ownerRole: ownerDiag.ownerRole,
+      ownerIsFieldResourceRawValue: ownerDiag.ownerIsFieldResourceRawValue.slice(0, 48),
+      ownerMappedIsFieldResource: ownerDiag.ownerMappedIsFieldResource,
+      ownerEligibilityResult: ownerDiag.ownerEligibilityResult,
+      eligibleFieldResourceRowCount,
+      fieldResourceTrueRowCount,
+      finalFieldResourcePickerOutCount: out.length,
+    })
+  }
+  setAssigneeLoadDiagnostics(
+    buildAssigneeDiagnosticsSnapshot(organizationId, {
+      memberRowsCount: activeOrgMemberRowCount,
+      owner: ownerDiag,
+      fieldResourceTrueRowCount,
+      eligibleFieldResourceRowCount,
+      finalAssigneeOptionCount: out.length,
+    }),
+  )
   return out
 }
 
@@ -350,6 +523,7 @@ export async function loadTechnicianAssignOptions(
   supabase: SupabaseClient,
   organizationId: string,
 ): Promise<TechnicianAssignOption[]> {
+  setAssigneeLoadDiagnostics(null)
   let rows: Awaited<ReturnType<typeof listTechniciansForOrg>>
   try {
     rows = await listTechniciansForOrg(supabase, organizationId)
@@ -374,7 +548,9 @@ export async function loadTechnicianAssignOptions(
   if (membershipIds.length) {
     let r = await supabase
       .from("organization_members")
-      .select("membership_id, user_id, status, role, permission_profile, permissions_json, is_field_resource")
+      .select(
+        "organization_id, membership_id, user_id, status, role, permission_profile, permissions_json, is_field_resource",
+      )
       .eq("organization_id", organizationId)
       .in("membership_id", membershipIds)
     if (r.error && isMissingColumnOrSchemaError(r.error)) {
@@ -502,5 +678,30 @@ export async function loadTechnicianAssignOptions(
     technicians: out.length - fieldResourceMemberCount,
     fieldResourceMembers: fieldResourceMemberCount,
   })
+  setAssigneeLoadDiagnostics(
+    buildAssigneeDiagnosticsSnapshot(organizationId, {
+      memberRowsCount: fieldStats.activeOrgMemberRowCount,
+      owner: fieldStats.owner,
+      fieldResourceTrueRowCount: fieldStats.fieldResourceTrueRowCount,
+      eligibleFieldResourceRowCount: fieldStats.eligibleFieldResourceRowCount,
+      finalAssigneeOptionCount: out.length,
+    }),
+  )
+  if (isEquipifyDispatchDebug()) {
+    equipifyDispatchDebugLog("assignee_owner_field_resource_diag", {
+      organizationIdSuffix: orgSuffix(organizationId),
+      memberRowsCount: fieldStats.activeOrgMemberRowCount,
+      ownerRowFound: fieldStats.owner.ownerRowFound,
+      ownerStatus: fieldStats.owner.ownerStatus,
+      ownerRole: fieldStats.owner.ownerRole,
+      ownerIsFieldResourceRawValue: fieldStats.owner.ownerIsFieldResourceRawValue.slice(0, 48),
+      ownerMappedIsFieldResource: fieldStats.owner.ownerMappedIsFieldResource,
+      ownerEligibilityResult: fieldStats.owner.ownerEligibilityResult,
+      eligibleFieldResourceRowCount: fieldStats.eligibleFieldResourceRowCount,
+      fieldResourceTrueRowCount: fieldStats.fieldResourceTrueRowCount,
+      finalAssigneeOptionCount: out.length,
+      linkedExcludedUserCount: linkedMemberUserIds.size,
+    })
+  }
   return out
 }

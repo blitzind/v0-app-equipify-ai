@@ -1,11 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 const ORG_MEMBERS_ROSTER_CORE =
-  "user_id, role, status, job_title, region, skills, availability_status, start_date"
+  "organization_id, user_id, role, status, job_title, region, skills, availability_status, start_date"
 
 /** Same as {@link ORG_MEMBERS_ROSTER_CORE} but without `skills` (optional column drift). */
 const ORG_MEMBERS_ROSTER_NO_SKILLS =
-  "user_id, role, status, job_title, region, availability_status, start_date"
+  "organization_id, user_id, role, status, job_title, region, availability_status, start_date"
 
 /** Full roster shape: roster columns + permission overlays + field-resource flag. */
 export const ORG_MEMBERS_SELECT_FULL =
@@ -33,7 +33,7 @@ export const ORG_MEMBERS_SELECT_NO_SKILLS_NO_PERMISSIONS =
 export const ORG_MEMBERS_SELECT_FULL_NO_PERMISSIONS_NO_FIELD =
   `${ORG_MEMBERS_ROSTER_CORE}`
 
-export const ORG_MEMBERS_SELECT_MINIMAL = "user_id, role, status"
+export const ORG_MEMBERS_SELECT_MINIMAL = "organization_id, user_id, role, status"
 
 export const PROFILES_SELECT_FULL = "id, email, full_name, created_at, avatar_url, phone"
 

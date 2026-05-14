@@ -29,6 +29,7 @@ export function AssignTechnicianDialog({
   options,
   currentTechnicianId,
   savingKey,
+  emptyListDebugHint,
   onSelect,
 }: {
   open: boolean
@@ -38,6 +39,8 @@ export function AssignTechnicianDialog({
   currentTechnicianId: string
   /** `"unassigned"` | user id | null when idle */
   savingKey: string | null
+  /** Dev / dispatch debug: extra copy when the roster reports field-resource members but the merged list is empty. */
+  emptyListDebugHint?: string | null
   onSelect: (userId: string | null) => void
 }) {
   const busy = savingKey !== null
@@ -55,7 +58,12 @@ export function AssignTechnicianDialog({
         <ScrollArea className="max-h-[50vh] px-6">
           <div className="space-y-2 pb-2 pr-3">
             {options.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">{ASSIGNEE_PICKER_EMPTY_HINT}</p>
+              <div className="space-y-2 py-6">
+                <p className="text-sm text-muted-foreground text-center">{ASSIGNEE_PICKER_EMPTY_HINT}</p>
+                {emptyListDebugHint ? (
+                  <p className="text-xs text-amber-700 dark:text-amber-400 text-center px-2">{emptyListDebugHint}</p>
+                ) : null}
+              </div>
             ) : (
               options.map((opt) => {
                 const selected = currentTechnicianId === opt.id

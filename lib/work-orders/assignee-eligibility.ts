@@ -3,8 +3,23 @@ import {
   normalizeOrgMemberRole,
   type OrgMemberRole,
 } from "@/lib/permissions/model"
+import { readIsFieldResourceFromOrgMemberRow } from "@/lib/work-orders/org-member-field-resource"
 
 const ROSTER_ASSIGNABLE_ROLES: readonly OrgMemberRole[] = ["owner", "admin", "manager", "tech"]
+
+/**
+ * Field-resource assignee picker (no `technicians` row): strict gate on
+ * `organization_members.is_field_resource === true`, active membership, non-viewer role.
+ */
+export function isAssignableFieldResourceMember(
+  row: { role: string; status: string } & Record<string, unknown>,
+): boolean {
+  if (row.status !== "active") return false
+  const role = normalizeOrgMemberRole(row.role)
+  if (!role || role === "viewer") return false
+  if (!ROSTER_ASSIGNABLE_ROLES.includes(role)) return false
+  return readIsFieldResourceFromOrgMemberRow(row) === true
+}
 
 /**
  * Org members who may appear as assignable field resources (Schedule, Dispatch, work orders).

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } fro
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { isEquipifyDispatchDebug } from "@/lib/dispatch/dispatch-debug-log"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import {
@@ -12,7 +13,11 @@ import {
   type WorkOrderEquipmentAsset,
   type WorkOrderPhotoGalleryItem,
 } from "@/lib/work-orders/detail-load"
-import { loadTechnicianAssignOptions } from "@/lib/work-orders/load-technician-assign-options"
+import {
+  ASSIGNEE_FILTERED_ELIGIBILITY_DEBUG_HINT,
+  getLastTechnicianAssignLoadDiagnostics,
+  loadTechnicianAssignOptions,
+} from "@/lib/work-orders/load-technician-assign-options"
 import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import { AssignTechnicianDialog } from "@/components/work-orders/assign-technician-dialog"
 import { repairLogJsonForPersist } from "@/lib/work-orders/parse-repair-log"
@@ -442,6 +447,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   >([])
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [assignSavingKey, setAssignSavingKey] = useState<string | null>(null)
+  const [assignTechnicianEmptyDebugHint, setAssignTechnicianEmptyDebugHint] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [closeOutOpen, setCloseOutOpen] = useState(false)
@@ -563,6 +569,17 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
 
     const techOpts = await loadTechnicianAssignOptions(supabase, orgId)
     setTechnicianAssignOptions(techOpts)
+    const diag = getLastTechnicianAssignLoadDiagnostics()
+    const showAssigneeDiagUi = process.env.NODE_ENV !== "production" || isEquipifyDispatchDebug()
+    setAssignTechnicianEmptyDebugHint(
+      showAssigneeDiagUi &&
+        techOpts.length === 0 &&
+        diag &&
+        diag.fieldResourceTrueRowCount > 0 &&
+        diag.finalAssigneeOptionCount === 0
+        ? ASSIGNEE_FILTERED_ELIGIBILITY_DEBUG_HINT
+        : null,
+    )
     const { data: vendorRows } = await supabase
       .from("org_vendors")
       .select("id, name")
@@ -3443,6 +3460,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
         options={technicianAssignOptions}
         currentTechnicianId={wo.technicianId}
         savingKey={assignSavingKey}
+        emptyListDebugHint={assignTechnicianEmptyDebugHint}
         onSelect={(userId) => void persistTechnicianAssignment(userId)}
       />
 
