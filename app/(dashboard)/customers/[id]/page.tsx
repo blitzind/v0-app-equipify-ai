@@ -966,11 +966,17 @@ export default function CustomerDetailPage() {
         return
       }
 
-      if (orgStatus !== "ready" || !activeOrgId) {
+      if (!activeOrgId) {
         if (active) {
           setCustomer(null)
+          setTechnicianScope(null)
           setLoading(false)
         }
+        return
+      }
+
+      if (orgStatus !== "ready") {
+        if (active) setLoading(false)
         return
       }
 
@@ -1217,8 +1223,12 @@ export default function CustomerDetailPage() {
   // Hierarchy + billing/service summary (Phase 1) — non-blocking.
   useEffect(() => {
     let cancelled = false
-    if (!id || orgStatus !== "ready" || !activeOrgId) {
+    if (!id || !activeOrgId) {
       setHierarchySummary(null)
+      setHierarchyLoading(false)
+      return
+    }
+    if (orgStatus !== "ready") {
       setHierarchyLoading(false)
       return
     }

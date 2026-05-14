@@ -2,10 +2,12 @@ import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
+import { hasActiveOrganizationSupportSession } from "@/lib/server/organization-support-session"
 
 /**
  * Returns `organization_subscriptions` for the active org sidebar / tenant sync.
- * Platform admins may read any org (impersonation). Other users only when they are active members.
+ * Platform admins may read any org (service role). Other users when they are active members
+ * or have an active platform support session for that org.
  */
 export async function GET(request: Request) {
   try {
@@ -36,7 +38,9 @@ export async function GET(request: Request) {
         .maybeSingle()
 
       if (!membership) {
-        return NextResponse.json({ message: "Forbidden" }, { status: 403 })
+        if (!(await hasActiveOrganizationSupportSession(supabase, user.id, organizationId))) {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 })
+        }
       }
 
       const { data: sub, error } = await supabase

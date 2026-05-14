@@ -16,6 +16,7 @@ import {
 } from "@/lib/billing/subscriptions"
 import { fetchOrganizationSeatMetrics } from "@/lib/billing/seat-counts"
 import { getUsageWithLimits, planIdFromSubscriptionRow, type UsageWithLimits } from "@/lib/billing/usage"
+import { hasActiveOrganizationSupportSession } from "@/lib/server/organization-support-session"
 
 /** CRM / operational inserts */
 export type CreateRecordType =
@@ -115,6 +116,9 @@ async function verifyActiveMembership(
     return { ok: false, code: "membership_error", message: error.message, httpStatus: 403 }
   }
   if (!data) {
+    if (await hasActiveOrganizationSupportSession(supabase, userId, organizationId)) {
+      return null
+    }
     return {
       ok: false,
       code: "forbidden",

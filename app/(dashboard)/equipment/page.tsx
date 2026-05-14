@@ -352,11 +352,15 @@ function EquipmentPageInner() {
         return
       }
 
-      if (orgStatus !== "ready" || !activeOrgId) {
+      if (!activeOrgId) {
         if (active) {
           setEquipment([])
           setQueryError(null)
         }
+        return
+      }
+
+      if (orgStatus !== "ready") {
         return
       }
 

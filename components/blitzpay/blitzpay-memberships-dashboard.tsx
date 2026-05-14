@@ -53,10 +53,14 @@ export function BlitzpayMembershipsDashboard({ organizationId, orgReady }: Props
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    if (!organizationId || !orgReady) {
+    if (!organizationId) {
       setDash(null)
       setRows([])
       setSnapshots([])
+      setError(null)
+      return
+    }
+    if (!orgReady) {
       return
     }
     setLoading(true)
@@ -101,7 +105,7 @@ export function BlitzpayMembershipsDashboard({ organizationId, orgReady }: Props
     void load()
   }, [load])
 
-  if (!organizationId || !orgReady) return null
+  if (!organizationId) return null
 
   return (
     <div

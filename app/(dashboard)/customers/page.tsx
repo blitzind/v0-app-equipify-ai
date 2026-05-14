@@ -290,8 +290,12 @@ function CustomersPageInner() {
         return
       }
 
-      if (orgStatus !== "ready" || !activeOrgId) {
+      if (!activeOrgId) {
         if (active) setCustomers([])
+        return
+      }
+
+      if (orgStatus !== "ready") {
         return
       }
 

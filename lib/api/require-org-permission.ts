@@ -14,6 +14,7 @@ import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
+import { hasActiveOrganizationSupportSession } from "@/lib/server/organization-support-session"
 import {
   getEffectiveOrgPermissions,
   getOrgPermissionsForRole,
@@ -80,15 +81,21 @@ export async function requireOrgPermission(
   }
 
   const rawRole = (mem as { role?: string } | null)?.role?.trim() ?? null
-  const role = normalizeOrgMemberRole(rawRole)
+  let effectiveRawRole = rawRole
+  if (!effectiveRawRole && (await hasActiveOrganizationSupportSession(supabase, user.id, organizationId))) {
+    effectiveRawRole = "owner"
+  }
+  const role = normalizeOrgMemberRole(effectiveRawRole)
   const permissions = getEffectiveOrgPermissions({
     role,
-    permissionProfile: (mem as { permission_profile?: string | null } | null)?.permission_profile ?? null,
-    permissionsJson: (mem as { permissions_json?: unknown } | null)?.permissions_json ?? null,
+    permissionProfile: mem
+      ? ((mem as { permission_profile?: string | null }).permission_profile ?? null)
+      : null,
+    permissionsJson: mem ? ((mem as { permissions_json?: unknown }).permissions_json ?? null) : null,
   })
 
   if (!platformAdmin) {
-    if (!rawRole) {
+    if (!effectiveRawRole) {
       return {
         error: jsonError("You are not a member of this organization.", 403),
       }
@@ -108,7 +115,7 @@ export async function requireOrgPermission(
   return {
     userId: user.id,
     supabase,
-    role: rawRole,
+    role: effectiveRawRole,
     permissions: platformAdmin
       ? // Platform admins see effective owner permissions regardless of org role.
         getOrgPermissionsForRole("owner")
@@ -155,15 +162,21 @@ export async function requireAnyOrgPermission(
   }
 
   const rawRole = (mem as { role?: string } | null)?.role?.trim() ?? null
-  const role = normalizeOrgMemberRole(rawRole)
+  let effectiveRawRole = rawRole
+  if (!effectiveRawRole && (await hasActiveOrganizationSupportSession(supabase, user.id, organizationId))) {
+    effectiveRawRole = "owner"
+  }
+  const role = normalizeOrgMemberRole(effectiveRawRole)
   const permissions = getEffectiveOrgPermissions({
     role,
-    permissionProfile: (mem as { permission_profile?: string | null } | null)?.permission_profile ?? null,
-    permissionsJson: (mem as { permissions_json?: unknown } | null)?.permissions_json ?? null,
+    permissionProfile: mem
+      ? ((mem as { permission_profile?: string | null }).permission_profile ?? null)
+      : null,
+    permissionsJson: mem ? ((mem as { permissions_json?: unknown }).permissions_json ?? null) : null,
   })
 
   if (!platformAdmin) {
-    if (!rawRole) {
+    if (!effectiveRawRole) {
       return {
         error: jsonError("You are not a member of this organization.", 403),
       }
@@ -183,7 +196,7 @@ export async function requireAnyOrgPermission(
   return {
     userId: user.id,
     supabase,
-    role: rawRole,
+    role: effectiveRawRole,
     permissions: platformAdmin ? getOrgPermissionsForRole("owner") : permissions,
     isPlatformAdmin: platformAdmin,
   }
@@ -223,15 +236,21 @@ export async function requireOrgMemberSession(
   }
 
   const rawRole = (mem as { role?: string } | null)?.role?.trim() ?? null
-  const role = normalizeOrgMemberRole(rawRole)
+  let effectiveRawRole = rawRole
+  if (!effectiveRawRole && (await hasActiveOrganizationSupportSession(supabase, user.id, organizationId))) {
+    effectiveRawRole = "owner"
+  }
+  const role = normalizeOrgMemberRole(effectiveRawRole)
   const permissions = getEffectiveOrgPermissions({
     role,
-    permissionProfile: (mem as { permission_profile?: string | null } | null)?.permission_profile ?? null,
-    permissionsJson: (mem as { permissions_json?: unknown } | null)?.permissions_json ?? null,
+    permissionProfile: mem
+      ? ((mem as { permission_profile?: string | null }).permission_profile ?? null)
+      : null,
+    permissionsJson: mem ? ((mem as { permissions_json?: unknown }).permissions_json ?? null) : null,
   })
 
   if (!platformAdmin) {
-    if (!rawRole) {
+    if (!effectiveRawRole) {
       return {
         error: jsonError("You are not a member of this organization.", 403),
       }
@@ -241,7 +260,7 @@ export async function requireOrgMemberSession(
   return {
     userId: user.id,
     supabase,
-    role: rawRole,
+    role: effectiveRawRole,
     permissions: platformAdmin ? getOrgPermissionsForRole("owner") : permissions,
     isPlatformAdmin: platformAdmin,
   }

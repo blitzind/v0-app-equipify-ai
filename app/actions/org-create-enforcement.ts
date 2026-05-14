@@ -9,6 +9,7 @@ import {
   requireWithinPlanLimit,
 } from "@/lib/billing/server-guard"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { hasActiveOrganizationSupportSession } from "@/lib/server/organization-support-session"
 
 export type CreateEnforcementResult = GuardResult
 
@@ -43,7 +44,9 @@ export async function enforceFeatureAccess(organizationId: string, feature: Feat
     .eq("status", "active")
     .maybeSingle()
   if (!member.data) {
-    return { ok: false, code: "forbidden", message: "You do not have access to this organization.", httpStatus: 403 }
+    if (!(await hasActiveOrganizationSupportSession(supabase, user.id, organizationId))) {
+      return { ok: false, code: "forbidden", message: "You do not have access to this organization.", httpStatus: 403 }
+    }
   }
   return requireFeatureAccess(supabase, organizationId, feature)
 }

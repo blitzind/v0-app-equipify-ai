@@ -357,6 +357,12 @@ export function useSupabaseDashboard(
       setError(null)
       return
     }
+
+    if (activeOrg.status !== "ready") {
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     setError(null)
     const supabase = createBrowserSupabaseClient()
@@ -389,10 +395,6 @@ export function useSupabaseDashboard(
       setOperationalInsights([])
       setLoading(false)
       setError("Sign in to load dashboard data.")
-      return
-    }
-
-    if (activeOrg.status !== "ready") {
       return
     }
 

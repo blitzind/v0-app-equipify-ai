@@ -760,11 +760,15 @@ function WorkOrdersPageInner() {
         return
       }
 
-      if (orgStatus !== "ready" || !activeOrgId) {
+      if (!activeOrgId) {
         if (active) {
           setWorkOrders([])
           setWorkOrdersLoadError(null)
         }
+        return
+      }
+
+      if (orgStatus !== "ready") {
         return
       }
 
@@ -1046,8 +1050,11 @@ function WorkOrdersPageInner() {
   })
 
   useEffect(() => {
-    if (orgStatus !== "ready" || !activeOrgId) {
+    if (!activeOrgId) {
       setQuickAppointmentTechnicians([])
+      return
+    }
+    if (orgStatus !== "ready") {
       return
     }
     let active = true

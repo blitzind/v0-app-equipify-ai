@@ -926,8 +926,6 @@ function TechniciansPageInner() {
     let active = true
 
     async function loadRoster() {
-      setLoading(true)
-      setLoadError(null)
       const supabase = createBrowserSupabaseClient()
       const {
         data: { user },
@@ -942,19 +940,23 @@ function TechniciansPageInner() {
         return
       }
 
-      if (orgStatus !== "ready" || !activeOrgId) {
+      if (!activeOrgId) {
         if (active) {
           setTechs([])
           setWoRows([])
-          setLoadError(
-            orgStatus === "ready" && !activeOrgId
-              ? "No organization selected."
-              : null,
-          )
+          setLoadError(orgStatus === "ready" ? "No organization selected." : null)
           setLoading(false)
         }
         return
       }
+
+      if (orgStatus !== "ready") {
+        if (active) setLoading(false)
+        return
+      }
+
+      setLoading(true)
+      setLoadError(null)
 
       const orgId = activeOrgId
 
@@ -1083,8 +1085,11 @@ function TechniciansPageInner() {
   }, [rosterRefresh, orgStatus, activeOrgId])
 
   useEffect(() => {
-    if (orgStatus !== "ready" || !activeOrgId) {
+    if (!activeOrgId) {
       setSkillTagOptions([])
+      return
+    }
+    if (orgStatus !== "ready") {
       return
     }
     let active = true

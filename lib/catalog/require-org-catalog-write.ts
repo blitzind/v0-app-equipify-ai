@@ -8,6 +8,7 @@ import {
   normalizeOrgMemberRole,
   type OrgPermissionKey,
 } from "@/lib/permissions/model"
+import { hasActiveOrganizationSupportSession } from "@/lib/server/organization-support-session"
 
 /**
  * Phase 2 (Permissions): capability checks use **effective** permissions (base role +
@@ -59,20 +60,26 @@ export async function requireOrgCatalogWrite(
       }
     }
 
-    const rawRole = (mem as { role?: string } | null)?.role ?? null
-    const role = normalizeOrgMemberRole(rawRole)
+    const rawRole = (mem as { role?: string } | null)?.role?.trim() ?? null
+    let role = normalizeOrgMemberRole(rawRole)
     if (!role) {
-      return {
-        error: NextResponse.json(
-          { error: "forbidden", message: "You are not a member of this organization." },
-          { status: 403 },
-        ),
+      if (await hasActiveOrganizationSupportSession(supabase, user.id, organizationId)) {
+        role = normalizeOrgMemberRole("owner")
+      } else {
+        return {
+          error: NextResponse.json(
+            { error: "forbidden", message: "You are not a member of this organization." },
+            { status: 403 },
+          ),
+        }
       }
     }
     const perms = getEffectiveOrgPermissions({
       role,
-      permissionProfile: (mem as { permission_profile?: string | null } | null)?.permission_profile ?? null,
-      permissionsJson: (mem as { permissions_json?: unknown } | null)?.permissions_json ?? null,
+      permissionProfile: mem
+        ? ((mem as { permission_profile?: string | null }).permission_profile ?? null)
+        : null,
+      permissionsJson: mem ? ((mem as { permissions_json?: unknown }).permissions_json ?? null) : null,
     })
     if (!hasOrgPermission(perms, capability)) {
       return {
@@ -136,11 +143,13 @@ export async function requireOrgMemberRead(organizationId: string): Promise<
     }
 
     if (!mem) {
-      return {
-        error: NextResponse.json(
-          { error: "forbidden", message: "You are not a member of this organization." },
-          { status: 403 },
-        ),
+      if (!(await hasActiveOrganizationSupportSession(supabase, user.id, organizationId))) {
+        return {
+          error: NextResponse.json(
+            { error: "forbidden", message: "You are not a member of this organization." },
+            { status: 403 },
+          ),
+        }
       }
     }
   }
