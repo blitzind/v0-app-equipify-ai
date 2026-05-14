@@ -33,5 +33,10 @@ export function isEligibleFieldAssignableMember(args: {
     permissionsJson: args.permissions_json,
   })
   if (role === "owner" || role === "tech") return true
-  return perms.canEditWorkOrders
+  return (
+    perms.canEditWorkOrders ||
+    perms.canManageDispatch ||
+    perms.canViewDispatch ||
+    perms.canUseTechnicianWorkspace
+  )
 }

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { readIsFieldResourceFromOrgMemberRow } from "@/lib/work-orders/org-member-field-resource"
 
 /** Row shape for `public.technicians` (operational profile). */
 export type TechnicianTableRow = {
@@ -171,7 +172,7 @@ export async function listTechniciansForOrg(
     if (!t.membership_id) return true
     const om = omRows.find((o) => o.membership_id === t.membership_id)
     if (!om || om.status !== "active") return false
-    if (om.is_field_resource === false) return false
+    if (readIsFieldResourceFromOrgMemberRow(om as Record<string, unknown>) === false) return false
     return true
   })
 

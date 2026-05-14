@@ -3,17 +3,32 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 const ORG_MEMBERS_ROSTER_CORE =
   "user_id, role, status, job_title, region, skills, availability_status, start_date"
 
+/** Same as {@link ORG_MEMBERS_ROSTER_CORE} but without `skills` (optional column drift). */
+const ORG_MEMBERS_ROSTER_NO_SKILLS =
+  "user_id, role, status, job_title, region, availability_status, start_date"
+
 /** Full roster shape: roster columns + permission overlays + field-resource flag. */
 export const ORG_MEMBERS_SELECT_FULL =
   `${ORG_MEMBERS_ROSTER_CORE}, permission_profile, permissions_json, is_field_resource`
+
+/** Keeps `is_field_resource` when `skills` (or other roster columns) break the wider projection. */
+export const ORG_MEMBERS_SELECT_NO_SKILLS_FULL =
+  `${ORG_MEMBERS_ROSTER_NO_SKILLS}, permission_profile, permissions_json, is_field_resource`
 
 /** When `is_field_resource` is not migrated yet. */
 export const ORG_MEMBERS_SELECT_FULL_NO_FIELD_RESOURCE =
   `${ORG_MEMBERS_ROSTER_CORE}, permission_profile, permissions_json`
 
+/** When `skills` fails but permissions + field flag exist. */
+export const ORG_MEMBERS_SELECT_NO_SKILLS_NO_FIELD_RESOURCE =
+  `${ORG_MEMBERS_ROSTER_NO_SKILLS}, permission_profile, permissions_json`
+
 /** Fallback when `permission_profile` / `permissions_json` are not deployed yet. */
 export const ORG_MEMBERS_SELECT_FULL_NO_PERMISSIONS =
   `${ORG_MEMBERS_ROSTER_CORE}, is_field_resource`
+
+export const ORG_MEMBERS_SELECT_NO_SKILLS_NO_PERMISSIONS =
+  `${ORG_MEMBERS_ROSTER_NO_SKILLS}, is_field_resource`
 
 export const ORG_MEMBERS_SELECT_FULL_NO_PERMISSIONS_NO_FIELD =
   `${ORG_MEMBERS_ROSTER_CORE}`
@@ -51,8 +66,11 @@ export async function queryOrganizationMembersForRoster(
 
   const ordered = [
     ORG_MEMBERS_SELECT_FULL,
+    ORG_MEMBERS_SELECT_NO_SKILLS_FULL,
     ORG_MEMBERS_SELECT_FULL_NO_FIELD_RESOURCE,
+    ORG_MEMBERS_SELECT_NO_SKILLS_NO_FIELD_RESOURCE,
     ORG_MEMBERS_SELECT_FULL_NO_PERMISSIONS,
+    ORG_MEMBERS_SELECT_NO_SKILLS_NO_PERMISSIONS,
     ORG_MEMBERS_SELECT_FULL_NO_PERMISSIONS_NO_FIELD,
     ORG_MEMBERS_SELECT_MINIMAL,
   ] as const

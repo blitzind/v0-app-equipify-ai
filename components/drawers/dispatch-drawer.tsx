@@ -66,13 +66,7 @@ import {
   slotIndexToTimeHhMm,
   timeToSlotIndex,
 } from "@/lib/dispatch/board-utils"
-import {
-  queryOrganizationMembersForRoster,
-  queryProfilesForRoster,
-} from "@/lib/technicians/roster-queries"
-import { isEligibleFieldAssignableMember } from "@/lib/work-orders/assignee-eligibility"
-
-const ROSTER_MEMBER_ROLES = ["owner", "admin", "manager", "tech"] as const
+import { loadTechnicianAssignOptions } from "@/lib/work-orders/load-technician-assign-options"
 
 function localDateString(d: Date): string {
   const y = d.getFullYear()
@@ -104,11 +98,6 @@ function initialsFromName(name: string): string {
   if (parts.length === 0) return "?"
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-}
-
-function formatMemberRole(role: string): string {
-  if (!role) return "Member"
-  return role.charAt(0).toUpperCase() + role.slice(1)
 }
 
 function mapDbStatus(status: string): WorkOrderStatus {
@@ -833,100 +822,24 @@ function DailyDispatchInner({ initialTechnicianId }: { initialTechnicianId?: str
 
       const orgId = resolvedOrgId
 
-      const { data: members, error: mErr } = await queryOrganizationMembersForRoster(supabase, {
-        organizationId: orgId,
-        statusIn: ["active"],
-        roleIn: ROSTER_MEMBER_ROLES,
+      const opts = await loadTechnicianAssignOptions(supabase, orgId)
+      if (cancelled) return
+
+      const list: RosterTech[] = opts.map((o) => {
+        const id = o.linkedUserId ?? o.id
+        const name = o.label
+        return {
+          id,
+          name,
+          avatar: initialsFromName(name),
+          avatarUrl: o.avatarUrl,
+          role: o.roleLabel,
+          email: "",
+          phone: "—",
+          homeRegion: o.region !== "—" ? o.region : null,
+          skills: normalizeRosterSkills(undefined),
+        }
       })
-
-      if (mErr || cancelled) {
-        if (!cancelled) {
-          setRosterError(mErr?.message ?? "Failed to load team.")
-          setRoster([])
-          setRosterLoading(false)
-        }
-        return
-      }
-
-      const memberList = (members ?? []) as Array<{
-        user_id: string
-        role: string
-        job_title?: string | null
-        status?: string
-        region?: string | null
-        skills?: string[] | null
-        permission_profile?: string | null
-        permissions_json?: unknown
-        is_field_resource?: boolean | null
-      }>
-      const eligibleMembers = memberList.filter((m) =>
-        isEligibleFieldAssignableMember({
-          role: m.role,
-          status: m.status ?? "active",
-          permission_profile: m.permission_profile,
-          permissions_json: m.permissions_json,
-          isFieldResource: m.is_field_resource,
-        }),
-      )
-      const userIds = [...new Set(eligibleMembers.map((m) => m.user_id))]
-      const roleByUser = new Map(eligibleMembers.map((m) => [m.user_id, m.role]))
-      const jobTitleByUser = new Map(
-        eligibleMembers.map((m) => [m.user_id, (m.job_title ?? "").trim()]),
-      )
-      const regionByUser = new Map(
-        eligibleMembers.map((m) => [m.user_id, (m.region ?? "").trim()]),
-      )
-      const skillsByUser = new Map(eligibleMembers.map((m) => [m.user_id, m.skills]))
-
-      if (userIds.length === 0) {
-        if (!cancelled) {
-          setRoster([])
-          setRosterLoading(false)
-        }
-        return
-      }
-
-      const { data: profRows, error: prErr } = await queryProfilesForRoster(supabase, userIds)
-
-      if (prErr || cancelled) {
-        if (!cancelled) {
-          setRosterError(prErr?.message ?? "Failed to load profiles.")
-          setRoster([])
-          setRosterLoading(false)
-        }
-        return
-      }
-
-      const list: RosterTech[] = (
-        (profRows ?? []) as Array<{
-          id: string
-          email: string | null
-          full_name: string | null
-          avatar_url?: string | null
-          phone?: string | null
-        }>
-      )
-        .filter((p) => roleByUser.has(p.id))
-        .map((p) => {
-          const name =
-            (p.full_name && p.full_name.trim()) ||
-            (p.email && p.email.trim()) ||
-            "Technician"
-          const jt = jobTitleByUser.get(p.id)?.trim()
-          const reg = regionByUser.get(p.id)?.trim()
-          return {
-            id: p.id,
-            name,
-            avatar: initialsFromName(name),
-            avatarUrl: p.avatar_url?.trim() || null,
-            role: jt ? jt : formatMemberRole(roleByUser.get(p.id) ?? "tech"),
-            email: p.email ?? "",
-            phone: p.phone?.trim() || "—",
-            homeRegion: reg ? reg : null,
-            skills: normalizeRosterSkills(skillsByUser.get(p.id) ?? undefined),
-          }
-        })
-        .sort((a, b) => a.name.localeCompare(b.name))
 
       if (!cancelled) {
         setRoster(list)

@@ -6,6 +6,7 @@ import {
   queryProfilesForRoster,
 } from "@/lib/technicians/roster-queries"
 import { isEligibleFieldAssignableMember } from "@/lib/work-orders/assignee-eligibility"
+import { readIsFieldResourceFromOrgMemberRow } from "@/lib/work-orders/org-member-field-resource"
 
 export type TechnicianAssignOption = {
   /**
@@ -32,7 +33,7 @@ export type TechnicianAssignOption = {
 }
 
 export const ASSIGNEE_PICKER_EMPTY_HINT =
-  "No assignable technicians or eligible team members. Add an active technician under Technicians, or invite an active field technician in Team."
+  'No assignable technicians or field resources. Enable "Can be scheduled for field work" in Team settings or add an active technician.'
 
 function formatMemberRole(role: string): string {
   if (!role) return "Member"
@@ -64,7 +65,20 @@ async function buildFieldResourceAssigneeOptions(
   supabase: SupabaseClient,
   organizationId: string,
   linkedMemberUserIds: Set<string>,
-): Promise<TechnicianAssignOption[]> {
+): Promise<{
+  options: TechnicianAssignOption[]
+  stats: {
+    activeOrgMemberRowCount: number
+    fieldResourceTrueRowCount: number
+    eligibleFieldResourceRowCount: number
+  }
+}> {
+  const emptyStats = {
+    activeOrgMemberRowCount: 0,
+    fieldResourceTrueRowCount: 0,
+    eligibleFieldResourceRowCount: 0,
+  }
+
   const {
     data: members,
     error: memErr,
@@ -79,9 +93,9 @@ async function buildFieldResourceAssigneeOptions(
     equipifyDispatchDebugLog("assignee_field_members_query_error", {
       reason: String(memErr.message ?? "unknown").slice(0, 160),
     })
-    return []
+    return { options: [], stats: emptyStats }
   }
-  if (!members?.length) return []
+  if (!members?.length) return { options: [], stats: emptyStats }
 
   type M = {
     user_id: string
@@ -95,7 +109,13 @@ async function buildFieldResourceAssigneeOptions(
     is_field_resource?: boolean | null
   }
 
-  const memberList = (members as M[]).filter(
+  const rawRows = members as M[]
+  const activeOrgMemberRowCount = rawRows.length
+  const fieldResourceTrueRowCount = rawRows.filter(
+    (m) => readIsFieldResourceFromOrgMemberRow(m as Record<string, unknown>) === true,
+  ).length
+
+  const memberList = rawRows.filter(
     (m) =>
       !linkedMemberUserIds.has(m.user_id) &&
       isEligibleFieldAssignableMember({
@@ -103,10 +123,27 @@ async function buildFieldResourceAssigneeOptions(
         status: m.status,
         permission_profile: m.permission_profile,
         permissions_json: m.permissions_json,
-        isFieldResource: m.is_field_resource,
+        isFieldResource: readIsFieldResourceFromOrgMemberRow(m as Record<string, unknown>),
       }),
   )
-  if (!memberList.length) return []
+  const eligibleFieldResourceRowCount = memberList.length
+
+  equipifyDispatchDebugLog("assignee_field_resource_pipeline", {
+    activeOrgMemberRowCount,
+    fieldResourceTrueRowCount,
+    eligibleFieldResourceRowCount,
+    linkedExcludedUserCount: linkedMemberUserIds.size,
+  })
+
+  if (!memberList.length)
+    return {
+      options: [],
+      stats: {
+        activeOrgMemberRowCount,
+        fieldResourceTrueRowCount,
+        eligibleFieldResourceRowCount: 0,
+      },
+    }
 
   const userIds = [...new Set(memberList.map((m) => m.user_id))]
   const { data: profs, error: profErr } = await queryProfilesForRoster(supabase, userIds)
@@ -163,7 +200,14 @@ async function buildFieldResourceAssigneeOptions(
   }
 
   out.sort((a, b) => a.label.localeCompare(b.label))
-  return out
+  return {
+    options: out,
+    stats: {
+      activeOrgMemberRowCount,
+      fieldResourceTrueRowCount,
+      eligibleFieldResourceRowCount,
+    },
+  }
 }
 
 /** Minimal `{ id, label }[]` for Schedule / Dispatch pickers that resolve via {@link workOrderAssignmentColumns}. */
@@ -208,16 +252,33 @@ async function loadTechnicianAssignOptionsLegacy(
     is_field_resource?: boolean | null
   }
 
-  const memberList = (members as M[]).filter((m) =>
+  const rawRows = members as M[]
+  const activeOrgMemberRowCount = rawRows.length
+  const fieldResourceTrueRowCount = rawRows.filter(
+    (m) => readIsFieldResourceFromOrgMemberRow(m as Record<string, unknown>) === true,
+  ).length
+
+  const memberList = rawRows.filter((m) =>
     isEligibleFieldAssignableMember({
       role: m.role,
       status: m.status,
       permission_profile: m.permission_profile,
       permissions_json: m.permissions_json,
-      isFieldResource: m.is_field_resource,
+      isFieldResource: readIsFieldResourceFromOrgMemberRow(m as Record<string, unknown>),
     }),
   )
-  if (!memberList.length) return []
+  const eligibleFieldResourceRowCount = memberList.length
+
+  if (!memberList.length) {
+    equipifyDispatchDebugLog("assignee_loader_pipeline", {
+      activeOrgMemberRowCount,
+      fieldResourceTrueRowCount,
+      eligibleFieldResourceRowCount,
+      finalAssigneeOptionCount: 0,
+      linkedExcludedUserCount: 0,
+    })
+    return []
+  }
 
   const userIds = [...new Set(memberList.map((m) => m.user_id))]
   const { data: profs, error: profErr } = await queryProfilesForRoster(supabase, userIds)
@@ -274,6 +335,13 @@ async function loadTechnicianAssignOptionsLegacy(
   }
 
   out.sort((a, b) => a.label.localeCompare(b.label))
+  equipifyDispatchDebugLog("assignee_loader_pipeline", {
+    activeOrgMemberRowCount,
+    fieldResourceTrueRowCount,
+    eligibleFieldResourceRowCount,
+    finalAssigneeOptionCount: out.length,
+    linkedExcludedUserCount: 0,
+  })
   equipifyDispatchDebugLog("assignee_options_loaded_legacy", { total: out.length })
   return out
 }
@@ -358,7 +426,7 @@ export async function loadTechnicianAssignOptions(
           status: om.status,
           permission_profile: om.permission_profile,
           permissions_json: om.permissions_json,
-          isFieldResource: om.is_field_resource,
+          isFieldResource: readIsFieldResourceFromOrgMemberRow(om as Record<string, unknown>),
         })
       ) {
         continue
@@ -403,14 +471,11 @@ export async function loadTechnicianAssignOptions(
   }
 
   const linkedMemberUserIds = new Set<string>()
-  for (const o of omList) {
-    if (o.user_id && o.status === "active") linkedMemberUserIds.add(o.user_id)
-  }
   for (const opt of out) {
     if (opt.linkedUserId) linkedMemberUserIds.add(opt.linkedUserId)
   }
 
-  const fieldExtras = await buildFieldResourceAssigneeOptions(
+  const { options: fieldExtras, stats: fieldStats } = await buildFieldResourceAssigneeOptions(
     supabase,
     organizationId,
     linkedMemberUserIds,
@@ -425,6 +490,13 @@ export async function loadTechnicianAssignOptions(
 
   out.sort((a, b) => a.label.localeCompare(b.label))
   const fieldResourceMemberCount = out.filter((o) => o.assignmentKind === "field_resource").length
+  equipifyDispatchDebugLog("assignee_loader_pipeline", {
+    activeOrgMemberRowCount: fieldStats.activeOrgMemberRowCount,
+    fieldResourceTrueRowCount: fieldStats.fieldResourceTrueRowCount,
+    eligibleFieldResourceRowCount: fieldStats.eligibleFieldResourceRowCount,
+    finalAssigneeOptionCount: out.length,
+    linkedExcludedUserCount: linkedMemberUserIds.size,
+  })
   equipifyDispatchDebugLog("assignee_options_loaded", {
     total: out.length,
     technicians: out.length - fieldResourceMemberCount,
