@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { DRAWER_PANEL_SURFACE } from "@/components/detail-drawer"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -25,12 +25,8 @@ import {
   EQUIPMENT_SCAN_MAX_BYTES_PDF,
 } from "@/lib/equipment/equipment-scan-upload-validate"
 import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
-
-const EQUIPMENT_TYPES = [
-  "HVAC", "Electrical", "Plumbing", "Mechanical", "Refrigeration",
-  "Fire Safety", "Security", "Lighting", "Elevator", "Generator",
-  "Compressor", "Conveyor", "Pump", "Boiler", "Chiller", "Medical device", "Other",
-]
+import { useEquipmentFormIndustryUi } from "@/hooks/use-equipment-form-industry-ui"
+import { equipmentTypeOptionsForForm } from "@/lib/equipment/equipment-form-industry-ui"
 
 const STATUSES = ["Active", "Needs Service", "In Repair", "Out of Service"] as const
 type EquipmentStatus = (typeof STATUSES)[number]
@@ -153,6 +149,7 @@ export function AIScanModal({
   equipmentCreateEligibility,
   onSaved,
 }: AIScanModalProps) {
+  const { ui, industryKey } = useEquipmentFormIndustryUi(organizationId, orgReady, open)
   const [step, setStep] = useState<ScanStep>("upload")
   const [uploadKind, setUploadKind] = useState<"image" | "pdf" | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -168,6 +165,20 @@ export function AIScanModal({
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const scanTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([])
+
+  const equipmentTypeOptions = useMemo(
+    () => equipmentTypeOptionsForForm(ui, form.equipmentType),
+    [ui, form.equipmentType],
+  )
+
+  useEffect(() => {
+    if (!open) return
+    setForm((prev) => {
+      if (!prev.equipmentType.trim()) return prev
+      if (ui.equipmentTypes.includes(prev.equipmentType)) return prev
+      return { ...prev, equipmentType: "" }
+    })
+  }, [open, industryKey, ui.equipmentTypes])
 
   const clearScanTimers = useCallback(() => {
     for (const t of scanTimersRef.current) clearTimeout(t)
@@ -657,13 +668,17 @@ export function AIScanModal({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="sm:col-span-2">
                       <Label required>Equipment name</Label>
-                      <Input value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="e.g. Audiometer — Suite 3" />
+                      <Input
+                        value={form.name}
+                        onChange={(e) => setField("name", e.target.value)}
+                        placeholder={ui.placeholders.name}
+                      />
                     </div>
                     <div>
                       <Label required>Equipment type</Label>
                       <Select value={form.equipmentType} onChange={(e) => setField("equipmentType", e.target.value)}>
                         <option value="">Select type…</option>
-                        {EQUIPMENT_TYPES.map((t) => (
+                        {equipmentTypeOptions.map((t) => (
                           <option key={t} value={t}>
                             {t}
                           </option>
@@ -675,20 +690,33 @@ export function AIScanModal({
                       <Input
                         value={form.subcategory}
                         onChange={(e) => setField("subcategory", e.target.value)}
-                        placeholder="Optional"
+                        placeholder={ui.placeholders.subcategory}
                       />
+                      <p className="text-[10px] text-muted-foreground mt-1">{ui.subcategoryHint}</p>
                     </div>
                     <div>
                       <Label>Manufacturer</Label>
-                      <Input value={form.manufacturer} onChange={(e) => setField("manufacturer", e.target.value)} />
+                      <Input
+                        value={form.manufacturer}
+                        onChange={(e) => setField("manufacturer", e.target.value)}
+                        placeholder={ui.placeholders.manufacturer}
+                      />
                     </div>
                     <div>
                       <Label>Model</Label>
-                      <Input value={form.model} onChange={(e) => setField("model", e.target.value)} />
+                      <Input
+                        value={form.model}
+                        onChange={(e) => setField("model", e.target.value)}
+                        placeholder={ui.placeholders.model}
+                      />
                     </div>
                     <div className="sm:col-span-2">
                       <Label>Serial number</Label>
-                      <Input value={form.serialNumber} onChange={(e) => setField("serialNumber", e.target.value)} />
+                      <Input
+                        value={form.serialNumber}
+                        onChange={(e) => setField("serialNumber", e.target.value)}
+                        placeholder={ui.placeholders.serialNumber}
+                      />
                     </div>
                   </div>
                 </div>
@@ -729,7 +757,11 @@ export function AIScanModal({
                   ) : null}
                   <div className="sm:col-span-2">
                     <Label>Room / area label</Label>
-                    <Input value={form.location} onChange={(e) => setField("location", e.target.value)} />
+                    <Input
+                      value={form.location}
+                      onChange={(e) => setField("location", e.target.value)}
+                      placeholder={ui.placeholders.location}
+                    />
                   </div>
                 </div>
 
@@ -759,7 +791,7 @@ export function AIScanModal({
                     <Input type="date" value={form.nextServiceDue} onChange={(e) => setField("nextServiceDue", e.target.value)} />
                   </div>
                   <div>
-                    <Label>Next calibration due</Label>
+                    <Label>{ui.calibrationDueLabel}</Label>
                     <Input
                       type="date"
                       value={form.nextCalibrationDue}
@@ -771,6 +803,7 @@ export function AIScanModal({
                     <Input
                       type="number"
                       min={1}
+                      placeholder={ui.calibrationIntervalPlaceholder}
                       value={form.calibrationIntervalMonths}
                       onChange={(e) => setField("calibrationIntervalMonths", e.target.value)}
                     />
@@ -780,7 +813,7 @@ export function AIScanModal({
                     <Input
                       value={form.serviceInterval}
                       onChange={(e) => setField("serviceInterval", e.target.value)}
-                      placeholder="e.g. Annual PM"
+                      placeholder={ui.placeholders.serviceInterval}
                     />
                   </div>
                   <div>
@@ -797,7 +830,11 @@ export function AIScanModal({
 
                 <div>
                   <Label>Notes</Label>
-                  <Textarea value={form.notes} onChange={(e) => setField("notes", e.target.value)} />
+                  <Textarea
+                    value={form.notes}
+                    onChange={(e) => setField("notes", e.target.value)}
+                    placeholder={ui.placeholders.notes}
+                  />
                 </div>
               </div>
             )}

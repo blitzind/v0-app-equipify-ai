@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -13,6 +13,8 @@ import { BR_STACK_CLEAR_AIDEN } from "@/lib/layout/aiden-safe-area"
 import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
+import { useEquipmentFormIndustryUi } from "@/hooks/use-equipment-form-industry-ui"
+import { equipmentTypeOptionsForForm } from "@/lib/equipment/equipment-form-industry-ui"
 
 interface AddEquipmentModalProps {
   open: boolean
@@ -29,12 +31,6 @@ interface AddEquipmentModalProps {
   /** Called when user chooses “Create Maintenance Plan” on the success step. Modal closes after this. */
   onCreateMaintenancePlan?: (ctx: { customerId: string; equipmentId: string }) => void
 }
-
-const EQUIPMENT_TYPES = [
-  "HVAC", "Electrical", "Plumbing", "Mechanical", "Refrigeration",
-  "Fire Safety", "Security", "Lighting", "Elevator", "Generator",
-  "Compressor", "Conveyor", "Pump", "Boiler", "Chiller", "Other",
-]
 
 const STATUSES = ["Active", "Needs Service", "In Repair", "Out of Service"] as const
 type EquipmentStatus = (typeof STATUSES)[number]
@@ -137,6 +133,11 @@ export function AddEquipmentModal({
 }: AddEquipmentModalProps) {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const { equipmentCreateEligibility } = useBillingAccess()
+  const { ui, industryKey } = useEquipmentFormIndustryUi(
+    activeOrgId ?? null,
+    orgStatus === "ready",
+    open,
+  )
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [errors, setErrors] = useState<FormErrors>({})
@@ -226,6 +227,20 @@ export function AddEquipmentModal({
       })
     })()
   }, [open, orgStatus, activeOrgId, form.customerId])
+
+  const equipmentTypeOptions = useMemo(
+    () => equipmentTypeOptionsForForm(ui, form.equipmentType),
+    [ui, form.equipmentType],
+  )
+
+  useEffect(() => {
+    if (!open) return
+    setForm((prev) => {
+      if (!prev.equipmentType.trim()) return prev
+      if (ui.equipmentTypes.includes(prev.equipmentType)) return prev
+      return { ...prev, equipmentType: "" }
+    })
+  }, [open, industryKey, ui.equipmentTypes])
 
   function set(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -423,7 +438,7 @@ export function AddEquipmentModal({
               <Field className="col-span-2 sm:col-span-1">
                 <Label required>Equipment Name</Label>
                 <Input
-                  placeholder="e.g. Rooftop Unit #3"
+                  placeholder={ui.placeholders.name}
                   value={form.name}
                   onChange={(e) => set("name", e.target.value)}
                 />
@@ -433,7 +448,11 @@ export function AddEquipmentModal({
                 <Label required>Equipment Type</Label>
                 <Select value={form.equipmentType} onChange={(e) => set("equipmentType", e.target.value)}>
                   <option value="">Select type...</option>
-                  {EQUIPMENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  {equipmentTypeOptions.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
                 </Select>
                 {errors.equipmentType && <p className="text-xs text-destructive mt-1">{errors.equipmentType}</p>}
               </Field>
@@ -443,29 +462,37 @@ export function AddEquipmentModal({
             <div className="grid grid-cols-2 gap-4">
               <Field>
                 <Label>Manufacturer</Label>
-                <Input placeholder="e.g. Carrier" value={form.manufacturer} onChange={(e) => set("manufacturer", e.target.value)} />
+                <Input
+                  placeholder={ui.placeholders.manufacturer}
+                  value={form.manufacturer}
+                  onChange={(e) => set("manufacturer", e.target.value)}
+                />
               </Field>
               <Field>
                 <Label>Model</Label>
-                <Input placeholder="e.g. 50XC-060" value={form.model} onChange={(e) => set("model", e.target.value)} />
+                <Input placeholder={ui.placeholders.model} value={form.model} onChange={(e) => set("model", e.target.value)} />
               </Field>
             </div>
 
             <Field>
               <Label>Subcategory (optional)</Label>
               <Input
-                placeholder="e.g. Rooftop · Medical Gas · Audiometer"
+                placeholder={ui.placeholders.subcategory}
                 value={form.subcategory}
                 onChange={(e) => set("subcategory", e.target.value)}
               />
-              <p className="text-[10px] text-muted-foreground mt-1">Refines the primary type for reporting and filters.</p>
+              <p className="text-[10px] text-muted-foreground mt-1">{ui.subcategoryHint}</p>
             </Field>
 
             {/* Row 3 */}
             <div className="grid grid-cols-2 gap-4">
               <Field>
                 <Label>Serial Number</Label>
-                <Input placeholder="e.g. SN-1234567" value={form.serialNumber} onChange={(e) => set("serialNumber", e.target.value)} />
+                <Input
+                  placeholder={ui.placeholders.serialNumber}
+                  value={form.serialNumber}
+                  onChange={(e) => set("serialNumber", e.target.value)}
+                />
               </Field>
               <Field>
                 <Label required>Customer</Label>
@@ -492,14 +519,16 @@ export function AddEquipmentModal({
                     </option>
                   ))}
                 </Select>
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  Customer address on file. Use the field below for room, floor, or department.
-                </p>
+                <p className="text-[10px] text-muted-foreground mt-1">{ui.serviceSiteLocationHint}</p>
               </Field>
             )}
             <Field>
               <Label>Room / area label</Label>
-              <Input placeholder="e.g. ICU, Rooftop — Building A" value={form.location} onChange={(e) => set("location", e.target.value)} />
+              <Input
+                placeholder={ui.placeholders.location}
+                value={form.location}
+                onChange={(e) => set("location", e.target.value)}
+              />
             </Field>
 
             {/* Dates row */}
@@ -524,7 +553,7 @@ export function AddEquipmentModal({
 
             <div className="grid grid-cols-2 gap-4">
               <Field>
-                <Label>Next calibration / compliance due</Label>
+                <Label>{ui.calibrationDueLabel}</Label>
                 <Input type="date" value={form.nextCalibrationDue} onChange={(e) => set("nextCalibrationDue", e.target.value)} />
               </Field>
               <Field>
@@ -532,7 +561,7 @@ export function AddEquipmentModal({
                 <Input
                   type="number"
                   min={1}
-                  placeholder="e.g. 12"
+                  placeholder={ui.calibrationIntervalPlaceholder}
                   value={form.calibrationIntervalMonths}
                   onChange={(e) => set("calibrationIntervalMonths", e.target.value)}
                 />
@@ -543,7 +572,11 @@ export function AddEquipmentModal({
             <div className="grid grid-cols-2 gap-4">
               <Field>
                 <Label>Service Interval</Label>
-                <Input placeholder="e.g. Every 90 days" value={form.serviceInterval} onChange={(e) => set("serviceInterval", e.target.value)} />
+                <Input
+                  placeholder={ui.placeholders.serviceInterval}
+                  value={form.serviceInterval}
+                  onChange={(e) => set("serviceInterval", e.target.value)}
+                />
               </Field>
               <Field>
                 <Label>Status</Label>
@@ -556,7 +589,11 @@ export function AddEquipmentModal({
             {/* Notes */}
             <Field>
               <Label>Notes</Label>
-              <Textarea placeholder="Any additional notes about this equipment..." value={form.notes} onChange={(e) => set("notes", e.target.value)} />
+              <Textarea
+                placeholder={ui.placeholders.notes}
+                value={form.notes}
+                onChange={(e) => set("notes", e.target.value)}
+              />
             </Field>
           </div>
           )}
