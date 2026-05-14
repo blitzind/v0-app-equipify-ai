@@ -26,23 +26,24 @@ export async function getOrganizationUsage(
   supabase: SupabaseClient,
   organizationId: string,
 ): Promise<OrganizationUsage> {
-  const { count: seatsUsed, error: seatsErr } = await supabase
+  let seatsUsed = 0
+  const seatsRes = await supabase
     .from("organization_members")
     .select("*", { count: "exact", head: true })
     .eq("organization_id", organizationId)
     .eq("status", "active")
+  if (!seatsRes.error) seatsUsed = seatsRes.count ?? 0
 
-  if (seatsErr) throw new Error(seatsErr.message)
-
-  const { count: equipmentUsed, error: eqErr } = await supabase
+  let equipmentUsed = 0
+  const eqRes = await supabase
     .from("equipment")
     .select("*", { count: "exact", head: true })
     .eq("organization_id", organizationId)
     .is("archived_at", null)
-
-  if (eqErr) throw new Error(eqErr.message)
+  if (!eqRes.error) equipmentUsed = eqRes.count ?? 0
 
   const monthStart = utcMonthStartDateString()
+  let apiCallsUsedThisMonth = 0
   const { data: usageRow, error: usageErr } = await supabase
     .from("organization_api_usage_monthly")
     .select("api_calls")
@@ -50,12 +51,14 @@ export async function getOrganizationUsage(
     .eq("month_start", monthStart)
     .maybeSingle()
 
-  if (usageErr) throw new Error(usageErr.message)
+  if (!usageErr && usageRow && typeof (usageRow as { api_calls?: unknown }).api_calls === "number") {
+    apiCallsUsedThisMonth = (usageRow as { api_calls: number }).api_calls
+  }
 
   return {
-    seatsUsed: seatsUsed ?? 0,
-    equipmentUsed: equipmentUsed ?? 0,
-    apiCallsUsedThisMonth: typeof usageRow?.api_calls === "number" ? usageRow.api_calls : 0,
+    seatsUsed,
+    equipmentUsed,
+    apiCallsUsedThisMonth,
   }
 }
 

@@ -385,9 +385,13 @@ export function AddEquipmentModal({
       }
 
       if (!serverGate.ok) {
+        equipmentSaveDebug(
+          "enforce_error",
+          { code: serverGate.code, httpStatus: serverGate.httpStatus },
+          activeOrgId,
+        )
         setSaveError(serverGate.message)
         toast({ variant: "destructive", title: "Cannot add equipment", description: serverGate.message })
-        equipmentSaveDebug("enforce_denied", { code: serverGate.code }, activeOrgId)
         return
       }
 

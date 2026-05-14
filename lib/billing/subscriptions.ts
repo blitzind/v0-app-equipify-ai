@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { equipmentSaveServerDebug } from "@/lib/billing/equipment-save-server-debug"
 
 const MS_PER_DAY = 86400 * 1000
 
@@ -73,15 +74,31 @@ export async function getOrganizationSubscription(
   supabase: SupabaseClient,
   organizationId: string,
 ): Promise<OrganizationSubscription | null> {
-  const { data, error } = await supabase
-    .from("organization_subscriptions")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .maybeSingle()
+  try {
+    const { data, error } = await supabase
+      .from("organization_subscriptions")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .maybeSingle()
 
-  if (error) throw new Error(error.message)
-  const row = (data ?? null) as OrganizationSubscription | null
-  return row ? normalizeSubscriptionStripeIds(row) : null
+    if (error) {
+      equipmentSaveServerDebug("org_subscription_read_error", {
+        helper: "getOrganizationSubscription",
+        organizationId,
+        message: error.message,
+      })
+      return null
+    }
+    const row = (data ?? null) as OrganizationSubscription | null
+    return row ? normalizeSubscriptionStripeIds(row) : null
+  } catch (e) {
+    equipmentSaveServerDebug("org_subscription_read_throw", {
+      helper: "getOrganizationSubscription",
+      organizationId,
+      message: e instanceof Error ? e.message : String(e),
+    })
+    return null
+  }
 }
 
 /**

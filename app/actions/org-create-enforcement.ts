@@ -1,5 +1,6 @@
 "use server"
 
+import { equipmentSaveServerDebug } from "@/lib/billing/equipment-save-server-debug"
 import type { Feature } from "@/lib/billing/entitlements"
 import type { CreateRecordType, GuardResult, PlanLimitType } from "@/lib/billing/server-guard"
 import {
@@ -14,11 +15,10 @@ import { hasActiveOrganizationSupportSession } from "@/lib/server/organization-s
 export type CreateEnforcementResult = GuardResult
 
 function logEnforcementActionFailure(phase: string, organizationId: string, e: unknown): void {
-  if (process.env.NODE_ENV === "production" && process.env.EQUIPMENT_SAVE_SERVER_DEBUG !== "1") return
-  const msg = e instanceof Error ? e.message : String(e)
-  console.error("[equipify:enforceCanCreateRecord]", phase, {
-    organizationIdSuffix: organizationId.length > 8 ? organizationId.slice(-8) : organizationId,
-    message: msg.slice(0, 240),
+  equipmentSaveServerDebug(phase, {
+    helper: "enforceCanCreateRecord",
+    organizationId,
+    message: e instanceof Error ? e.message : String(e),
   })
 }
 
@@ -35,6 +35,11 @@ export async function enforceCanCreateRecord(
     if (!user) {
       return { ok: false, code: "unauthorized", message: "Sign in required.", httpStatus: 401 }
     }
+    equipmentSaveServerDebug("enforce_can_create_record_enter", {
+      helper: "enforceCanCreateRecord",
+      organizationId,
+      message: `recordType=${recordType}`,
+    })
     return await requireCanCreateRecord(supabase, user.id, organizationId, recordType)
   } catch (e) {
     logEnforcementActionFailure("enforceCanCreateRecord", organizationId, e)
@@ -48,52 +53,81 @@ export async function enforceCanCreateRecord(
 }
 
 export async function enforceFeatureAccess(organizationId: string, feature: Feature): Promise<CreateEnforcementResult> {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return { ok: false, code: "unauthorized", message: "Sign in required.", httpStatus: 401 }
-  }
-  const member = await supabase
-    .from("organization_members")
-    .select("user_id")
-    .eq("organization_id", organizationId)
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .maybeSingle()
-  if (!member.data) {
-    if (!(await hasActiveOrganizationSupportSession(supabase, user.id, organizationId))) {
-      return { ok: false, code: "forbidden", message: "You do not have access to this organization.", httpStatus: 403 }
+  try {
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return { ok: false, code: "unauthorized", message: "Sign in required.", httpStatus: 401 }
+    }
+    const member = await supabase
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", organizationId)
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .maybeSingle()
+    if (!member.data) {
+      if (!(await hasActiveOrganizationSupportSession(supabase, user.id, organizationId))) {
+        return { ok: false, code: "forbidden", message: "You do not have access to this organization.", httpStatus: 403 }
+      }
+    }
+    return await requireFeatureAccess(supabase, organizationId, feature)
+  } catch (e) {
+    logEnforcementActionFailure("enforceFeatureAccess", organizationId, e)
+    return {
+      ok: false,
+      code: "membership_error",
+      message: "Could not verify feature access. Try again or contact support.",
+      httpStatus: 500,
     }
   }
-  return requireFeatureAccess(supabase, organizationId, feature)
 }
 
 export async function enforcePlanLimit(
   organizationId: string,
   limitType: PlanLimitType,
 ): Promise<CreateEnforcementResult> {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return { ok: false, code: "unauthorized", message: "Sign in required.", httpStatus: 401 }
+  try {
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return { ok: false, code: "unauthorized", message: "Sign in required.", httpStatus: 401 }
+    }
+    const denied = await requireCanCreateRecord(supabase, user.id, organizationId, "customer")
+    if (!denied.ok) return denied
+    return await requireWithinPlanLimit(supabase, organizationId, limitType, user.id)
+  } catch (e) {
+    logEnforcementActionFailure("enforcePlanLimit", organizationId, e)
+    return {
+      ok: false,
+      code: "usage_unavailable",
+      message: "Could not verify plan limits. Try again or contact support.",
+      httpStatus: 503,
+    }
   }
-  const denied = await requireCanCreateRecord(supabase, user.id, organizationId, "customer")
-  if (!denied.ok) return denied
-  return requireWithinPlanLimit(supabase, organizationId, limitType, user.id)
 }
 
-/** Billing + maintenance_plans feature + membership. */
 export async function enforceMaintenancePlanCreate(organizationId: string): Promise<CreateEnforcementResult> {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return { ok: false, code: "unauthorized", message: "Sign in required.", httpStatus: 401 }
+  try {
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return { ok: false, code: "unauthorized", message: "Sign in required.", httpStatus: 401 }
+    }
+    return await requireMaintenancePlanCreate(supabase, user.id, organizationId)
+  } catch (e) {
+    logEnforcementActionFailure("enforceMaintenancePlanCreate", organizationId, e)
+    return {
+      ok: false,
+      code: "membership_error",
+      message: "Could not verify maintenance plan permission. Try again or contact support.",
+      httpStatus: 500,
+    }
   }
-  return requireMaintenancePlanCreate(supabase, user.id, organizationId)
 }

@@ -31,63 +31,67 @@ export async function fetchOrganizationSeatMetrics(
   supabase: SupabaseClient,
   organizationId: string,
 ): Promise<OrganizationSeatMetrics | null> {
-  const adminEmails = new Set(getPlatformAdminEmails())
+  try {
+    const adminEmails = new Set(getPlatformAdminEmails())
 
-  const { data: members, error: memErr } = await supabase
-    .from("organization_members")
-    .select("user_id, status")
-    .eq("organization_id", organizationId)
-    .in("status", ["active", "invited"])
+    const { data: members, error: memErr } = await supabase
+      .from("organization_members")
+      .select("user_id, status")
+      .eq("organization_id", organizationId)
+      .in("status", ["active", "invited"])
 
-  if (memErr || !members) return null
+    if (memErr || !members) return null
 
-  const userIds = [...new Set(members.map((m) => (m as { user_id: string }).user_id).filter(Boolean))]
-  let emailByUser = new Map<string, string | null>()
-  if (userIds.length > 0) {
-    const { data: profiles, error: profErr } = await supabase
-      .from("profiles")
-      .select("id, email")
-      .in("id", userIds)
-    if (profErr) return null
-    emailByUser = new Map(
-      (profiles ?? []).map((p) => [(p as { id: string }).id, (p as { email?: string | null }).email ?? null]),
-    )
-  }
-
-  let activeBillable = 0
-  let activeTotalIncludingAdmins = 0
-  let invitedMemberRowsBillable = 0
-
-  for (const row of members) {
-    const uid = (row as { user_id: string }).user_id
-    const st = (row as { status: string }).status
-    const em = emailByUser.get(uid) ?? null
-    if (st === "active") {
-      activeTotalIncludingAdmins++
-      if (isBillableSeatEmail(em, adminEmails)) activeBillable++
-    } else if (st === "invited") {
-      if (isBillableSeatEmail(em, adminEmails)) invitedMemberRowsBillable++
+    const userIds = [...new Set(members.map((m) => (m as { user_id: string }).user_id).filter(Boolean))]
+    let emailByUser = new Map<string, string | null>()
+    if (userIds.length > 0) {
+      const { data: profiles, error: profErr } = await supabase
+        .from("profiles")
+        .select("id, email")
+        .in("id", userIds)
+      if (profErr) return null
+      emailByUser = new Map(
+        (profiles ?? []).map((p) => [(p as { id: string }).id, (p as { email?: string | null }).email ?? null]),
+      )
     }
-  }
 
-  const nowIso = new Date().toISOString()
-  const { count: pendingTok, error: invErr } = await supabase
-    .from("organization_invites")
-    .select("*", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .eq("status", "pending")
-    .gt("expires_at", nowIso)
+    let activeBillable = 0
+    let activeTotalIncludingAdmins = 0
+    let invitedMemberRowsBillable = 0
 
-  if (invErr) return null
+    for (const row of members) {
+      const uid = (row as { user_id: string }).user_id
+      const st = (row as { status: string }).status
+      const em = emailByUser.get(uid) ?? null
+      if (st === "active") {
+        activeTotalIncludingAdmins++
+        if (isBillableSeatEmail(em, adminEmails)) activeBillable++
+      } else if (st === "invited") {
+        if (isBillableSeatEmail(em, adminEmails)) invitedMemberRowsBillable++
+      }
+    }
 
-  const pendingTokenInvites = pendingTok ?? 0
-  const seatsReservedForPlan = activeBillable + invitedMemberRowsBillable + pendingTokenInvites
+    const nowIso = new Date().toISOString()
+    const { count: pendingTok, error: invErr } = await supabase
+      .from("organization_invites")
+      .select("*", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("status", "pending")
+      .gt("expires_at", nowIso)
 
-  return {
-    activeBillable,
-    invitedMemberRowsBillable,
-    pendingTokenInvites,
-    seatsReservedForPlan,
-    activeTotalIncludingAdmins,
+    if (invErr) return null
+
+    const pendingTokenInvites = pendingTok ?? 0
+    const seatsReservedForPlan = activeBillable + invitedMemberRowsBillable + pendingTokenInvites
+
+    return {
+      activeBillable,
+      invitedMemberRowsBillable,
+      pendingTokenInvites,
+      seatsReservedForPlan,
+      activeTotalIncludingAdmins,
+    }
+  } catch {
+    return null
   }
 }

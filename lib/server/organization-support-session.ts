@@ -6,14 +6,18 @@ export async function hasActiveOrganizationSupportSession(
   userId: string,
   organizationId: string,
 ): Promise<boolean> {
-  const { data, error } = await supabase
-    .from("organization_support_sessions")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("user_id", userId)
-    .gt("expires_at", new Date().toISOString())
-    .maybeSingle()
+  try {
+    const { data, error } = await supabase
+      .from("organization_support_sessions")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("user_id", userId)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle()
 
-  if (error) return false
-  return Boolean(data)
+    if (error) return false
+    return Boolean(data)
+  } catch {
+    return false
+  }
 }

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { getBillingAccessState } from "@/lib/billing/access"
+import { equipmentSaveServerDebug } from "@/lib/billing/equipment-save-server-debug"
 import { canUseFeature, type Feature } from "@/lib/billing/entitlements"
 import {
   evaluateEquipmentCreate,
@@ -64,12 +64,6 @@ function fromEligibility(el: RecordEligibility, httpStatus = 403): GuardResult {
   return { ok: false, code, message: el.message, httpStatus }
 }
 
-async function fetchSeatSlots(supabase: SupabaseClient, organizationId: string): Promise<number | null> {
-  const metrics = await fetchOrganizationSeatMetrics(supabase, organizationId)
-  if (!metrics) return null
-  return metrics.seatsReservedForPlan
-}
-
 export async function loadOrgBillingContext(supabase: SupabaseClient, organizationId: string): Promise<{
   subscription: OrganizationSubscription | null
   usagePack: UsageWithLimits | null
@@ -77,6 +71,11 @@ export async function loadOrgBillingContext(supabase: SupabaseClient, organizati
   /** True when usage + limits could not be loaded (quota checks may be skipped unless strict). */
   usageLoadFailed: boolean
 }> {
+  equipmentSaveServerDebug("load_org_billing_context_start", {
+    helper: "loadOrgBillingContext",
+    organizationId,
+  })
+
   let subscription: OrganizationSubscription | null = null
   try {
     subscription = await getOrganizationSubscription(supabase, organizationId)
@@ -95,7 +94,20 @@ export async function loadOrgBillingContext(supabase: SupabaseClient, organizati
     usageLoadFailed = true
   }
 
-  const seatSlotsUsed = await fetchSeatSlots(supabase, organizationId)
+  let seatSlotsUsed: number | null = null
+  try {
+    const metrics = await fetchOrganizationSeatMetrics(supabase, organizationId)
+    seatSlotsUsed = metrics ? metrics.seatsReservedForPlan : null
+  } catch {
+    seatSlotsUsed = null
+  }
+
+  equipmentSaveServerDebug("load_org_billing_context_done", {
+    helper: "loadOrgBillingContext",
+    organizationId,
+    message: `sub=${subscription ? "y" : "n"} usage=${usagePack ? "y" : "n"} seats=${seatSlotsUsed ?? "null"}`,
+  })
+
   return { subscription, usagePack, seatSlotsUsed, usageLoadFailed }
 }
 
@@ -113,7 +125,20 @@ async function verifyActiveMembership(
     .maybeSingle()
 
   if (error) {
-    return { ok: false, code: "membership_error", message: error.message, httpStatus: 403 }
+    equipmentSaveServerDebug("membership_query_error", {
+      helper: "verifyActiveMembership",
+      organizationId,
+      message: error.message,
+    })
+    if (await hasActiveOrganizationSupportSession(supabase, userId, organizationId)) {
+      return null
+    }
+    return {
+      ok: false,
+      code: "membership_error",
+      message: "Could not verify workspace membership. Try again in a moment.",
+      httpStatus: 503,
+    }
   }
   if (!data) {
     if (await hasActiveOrganizationSupportSession(supabase, userId, organizationId)) {
@@ -138,12 +163,10 @@ function logCreateGateFailure(
   e: unknown,
   meta: { organizationId: string; recordType?: CreateRecordType },
 ): void {
-  if (process.env.NODE_ENV === "production" && process.env.EQUIPMENT_SAVE_SERVER_DEBUG !== "1") return
-  const msg = e instanceof Error ? e.message : String(e)
-  console.error("[equipify:create-gate]", phase, {
-    recordType: meta.recordType,
-    organizationIdSuffix: meta.organizationId.length > 8 ? meta.organizationId.slice(-8) : meta.organizationId,
-    message: msg.slice(0, 240),
+  equipmentSaveServerDebug(phase, {
+    helper: "requireCanCreateRecord",
+    organizationId: meta.organizationId,
+    message: e instanceof Error ? e.message : String(e),
   })
 }
 
@@ -154,6 +177,12 @@ export async function requireCanCreateRecord(
   recordType: CreateRecordType,
 ): Promise<GuardResult> {
   try {
+    equipmentSaveServerDebug("create_gate_start", {
+      helper: "requireCanCreateRecord",
+      organizationId,
+      message: `recordType=${recordType}`,
+    })
+
     const denied = await verifyActiveMembership(supabase, userId, organizationId)
     if (denied) return denied
 
@@ -167,11 +196,18 @@ export async function requireCanCreateRecord(
     const actorIsPlatformAdmin = isPlatformAdminEmail(actorEmail)
 
     let usageLoadFailed = ctx.usageLoadFailed
+    const supportSession = await hasActiveOrganizationSupportSession(supabase, userId, organizationId)
     if (usageLoadFailed && (recordType === "equipment" || recordType === "team_invite")) {
-      if (actorIsPlatformAdmin) usageLoadFailed = false
+      if (actorIsPlatformAdmin || supportSession) usageLoadFailed = false
     }
 
     const skipSeatCap = recordType === "team_invite" && actorIsPlatformAdmin
+
+    equipmentSaveServerDebug("create_gate_apply_rules", {
+      helper: "requireCanCreateRecord",
+      organizationId,
+      message: `recordType=${recordType} usageLoadFailed=${usageLoadFailed}`,
+    })
 
     return applyCreateRules(ctx.subscription, ctx.usagePack, ctx.seatSlotsUsed, recordType, {
       usageLoadFailed,
