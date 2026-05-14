@@ -3,6 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
 import type { PlatformAccount } from "./admin-data"
 import type { SessionIdentity } from "./session-identity"
+import { EQUIPIFY_SUPPORT_SESSION_ORG_CACHE_KEY } from "@/lib/support-session-storage"
 
 interface ImpersonationState {
   active: boolean
@@ -172,6 +173,11 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       await fetch("/api/platform/support-session", { method: "DELETE" })
     } catch {
       /* still clear local UI */
+    }
+    try {
+      localStorage.removeItem(EQUIPIFY_SUPPORT_SESSION_ORG_CACHE_KEY)
+    } catch {
+      /* ignore */
     }
     setImpersonation(impersonationIdle(adminLabel, adminRoleLabel))
   }, [adminLabel, adminRoleLabel])

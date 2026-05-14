@@ -317,8 +317,14 @@ function SidebarBody({
   const { workspace } = useTenant()
   const { role, status: permissionsStatus } = useOrgPermissions()
   const { isPlatformAdmin, impersonation, sessionIdentityLoading } = useAdmin()
-  const { organizations, organizationId, switchOrganization, status: orgStatus, switching } =
-    useActiveOrganization()
+  const {
+    organizations,
+    organizationId,
+    switchOrganization,
+    status: orgStatus,
+    switching,
+    supportAccessActive,
+  } = useActiveOrganization()
   const [wsMenuOpen, setWsMenuOpen] = useState(false)
   const planMeta = planBadgeFromWorkspace(workspace)
   const orgPickerLoading = orgStatus === "loading" || switching
@@ -345,7 +351,7 @@ function SidebarBody({
         role,
         status: permissionsStatus,
         platformAdmin: isPlatformAdmin || sessionIdentityLoading,
-        impersonating: impersonation.active,
+        impersonating: impersonation.active || supportAccessActive,
       })
       debugNavResolution({
         event: "Nav items before filter",
@@ -387,6 +393,7 @@ function SidebarBody({
           organizationName: organizations.find((org) => org.id === organizationId)?.name ?? null,
           platformAdmin: isPlatformAdmin,
           impersonating: impersonation.active,
+          supportAccessActive,
           enabledPermissions: enabledPermissionKeys(navPermissions),
           visibleLabels,
           filteredOut,
@@ -406,6 +413,7 @@ function SidebarBody({
       isPlatformAdmin,
       sessionIdentityLoading,
       impersonation.active,
+      supportAccessActive,
     ],
   )
 
@@ -565,6 +573,11 @@ function SidebarBody({
             <>
               <div className="flex-1 min-w-0 text-left">
                 <p className="text-sm font-semibold text-sidebar-foreground truncate leading-tight">{workspace.name}</p>
+                {supportAccessActive ? (
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-violet-400">
+                    Support workspace
+                  </span>
+                ) : null}
                 <span className="text-[11px] font-semibold" style={{ color: planMeta.color }}>{planMeta.label}</span>
               </div>
               {showOrgSwitcher ? (
@@ -640,7 +653,10 @@ function SidebarBody({
             <p className="font-semibold">Nav Debug</p>
             <p>Org: {navDebug.organizationName ?? "unknown"} ({navDebug.organizationId ?? "none"})</p>
             <p>Role: {navDebug.role ?? "none"} · State: {navDebug.permissionsStatus}</p>
-            <p>Platform admin: {String(navDebug.platformAdmin)} · Impersonating: {String(navDebug.impersonating)}</p>
+            <p>
+              Platform admin: {String(navDebug.platformAdmin)} · Impersonating: {String(navDebug.impersonating)} ·
+              Support access: {String(navDebug.supportAccessActive)}
+            </p>
             <p>Visible: {navDebug.visibleLabels.join(", ") || "none"}</p>
             <details className="mt-1">
               <summary>Filtered out ({navDebug.filteredOut.length})</summary>

@@ -12,6 +12,7 @@ import {
 } from "react"
 import { useAdmin } from "@/lib/admin-store"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { EQUIPIFY_SUPPORT_SESSION_ORG_CACHE_KEY } from "@/lib/support-session-storage"
 
 const STORAGE_KEY = "equipify_active_organization_id"
 
@@ -50,6 +51,8 @@ interface ActiveOrganizationContextValue {
   organizationSlug: string | null
   organizationName: string | null
   error: string | null
+  /** Active org is locked to a platform support session (must exit support to switch). */
+  supportAccessActive: boolean
   /** Persist selection: updates profile.default_organization_id, localStorage, and in-memory state. */
   switchOrganization: (orgId: string) => Promise<{ error?: string }>
   /** Re-resolve org list + active org from DB and storage (e.g. after login). */
@@ -80,8 +83,19 @@ function normalizeOrgRows(
 }
 
 function debugActiveOrg(details: Record<string, unknown>) {
-  if (process.env.NODE_ENV !== "development" || process.env.NEXT_PUBLIC_DEBUG_NAV !== "true") return
-  console.info("[equipify:active-org]", details)
+  if (process.env.NEXT_PUBLIC_DEBUG_NAV !== "true") return
+  const prod = process.env.NODE_ENV === "production"
+  const payload = prod
+    ? {
+        ...details,
+        organizationId: undefined,
+        organizationHint:
+          typeof details.organizationId === "string" && (details.organizationId as string).length > 8
+            ? `…${(details.organizationId as string).slice(-6)}`
+            : undefined,
+      }
+    : details
+  console.info("[equipify:active-org]", payload)
 }
 
 export function ActiveOrganizationProvider({ children }: { children: ReactNode }) {
@@ -102,6 +116,7 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
   const [organizationSlug, setOrganizationSlug] = useState<string | null>(null)
   const [organizationName, setOrganizationName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [supportAccessActive, setSupportAccessActive] = useState(false)
 
   const refresh = useCallback(async () => {
     setError(null)
@@ -113,8 +128,10 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
     if (!user) {
       initialOrgResolutionCompleteRef.current = false
       lastResolvedUserIdRef.current = null
+      setSupportAccessActive(false)
       try {
         localStorage.removeItem(STORAGE_KEY)
+        localStorage.removeItem(EQUIPIFY_SUPPORT_SESSION_ORG_CACHE_KEY)
       } catch {
         /* ignore */
       }
@@ -135,6 +152,61 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
       setStatus("loading")
     }
 
+    setSupportAccessActive(false)
+
+    let supportData: {
+      active?: boolean
+      organizationId?: string
+      organizationName?: string
+      organizationSlug?: string
+    } | null = null
+    try {
+      const res = await fetch("/api/platform/support-session", { cache: "no-store" })
+      supportData = (await res.json().catch(() => ({}))) as typeof supportData
+    } catch {
+      supportData = null
+    }
+
+    const supportOrgId =
+      supportData?.active && typeof supportData.organizationId === "string"
+        ? supportData.organizationId.trim()
+        : ""
+
+    if (!supportOrgId) {
+      try {
+        localStorage.removeItem(EQUIPIFY_SUPPORT_SESSION_ORG_CACHE_KEY)
+      } catch {
+        /* ignore */
+      }
+    } else {
+      try {
+        localStorage.setItem(EQUIPIFY_SUPPORT_SESSION_ORG_CACHE_KEY, supportOrgId)
+      } catch {
+        /* ignore */
+      }
+      const slug = (supportData?.organizationSlug ?? "").trim()
+      const name = (supportData?.organizationName ?? "").trim() || "Organization"
+      const row: ActiveOrgRow = { id: supportOrgId, name, slug }
+      setOrganizations([row])
+      setOrganizationId(supportOrgId)
+      setOrganizationSlug(slug || null)
+      setOrganizationName(name)
+      try {
+        localStorage.setItem(STORAGE_KEY, supportOrgId)
+      } catch {
+        /* ignore */
+      }
+      setSupportAccessActive(true)
+      setStatus("ready")
+      initialOrgResolutionCompleteRef.current = true
+      debugActiveOrg({
+        source: "support_session",
+        chosenFrom: "support_session_api",
+        organizationId: supportOrgId,
+      })
+      return
+    }
+
     const imp = impersonationRef.current
     if (imp.active && imp.accountId && isPlatformAdminRef.current) {
       const slug = imp.accountSlug?.trim() ?? ""
@@ -151,7 +223,7 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
       }
       setStatus("ready")
       initialOrgResolutionCompleteRef.current = true
-      debugActiveOrg({ source: "impersonation_banner", organizationId: imp.accountId })
+      debugActiveOrg({ source: "impersonation_banner", chosenFrom: "client_impersonation", organizationId: imp.accountId })
       return
     }
 
@@ -207,36 +279,7 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
 
     const orgs = sortOrganizationsDemoFirst(normalizeOrgRows(memberRows as never))
 
-    let resolvedOrgs = orgs
-    let resolvedFromSupportSession = false
-    if (orgs.length === 0 && isPlatformAdminRef.current) {
-      try {
-        const res = await fetch("/api/platform/support-session", { cache: "no-store" })
-        const d = (await res.json()) as {
-          active?: boolean
-          organizationId?: string
-          organizationName?: string
-          organizationSlug?: string
-        }
-        if (d.active && d.organizationId) {
-          resolvedFromSupportSession = true
-          resolvedOrgs = [
-            {
-              id: d.organizationId,
-              name: (d.organizationName ?? "").trim() || "Organization",
-              slug: (d.organizationSlug ?? "").trim(),
-            },
-          ]
-          debugActiveOrg({
-            source: "support_session_api",
-            organizationId: d.organizationId,
-            ok: res.ok,
-          })
-        }
-      } catch {
-        /* ignore */
-      }
-    }
+    const resolvedOrgs = orgs
 
     setOrganizations(resolvedOrgs)
     const memberIds = new Set(resolvedOrgs.map((o) => o.id))
@@ -258,15 +301,22 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
       stored = null
     }
 
-    let chosen =
+    let chosen: string | null =
       stored && memberIds.has(stored)
         ? stored
         : profile?.default_organization_id && memberIds.has(profile.default_organization_id)
           ? profile.default_organization_id
           : resolvedOrgs[0]?.id ?? null
 
+    let chosenFrom: "localStorage" | "profile_default" | "first_member" | "none" = "none"
+    if (stored && memberIds.has(stored)) chosenFrom = "localStorage"
+    else if (profile?.default_organization_id && memberIds.has(profile.default_organization_id))
+      chosenFrom = "profile_default"
+    else if (resolvedOrgs[0]?.id) chosenFrom = "first_member"
+
     if (chosen && !memberIds.has(chosen)) {
       chosen = resolvedOrgs[0]?.id ?? null
+      chosenFrom = resolvedOrgs[0]?.id ? "first_member" : "none"
     }
 
     const row = chosen ? resolvedOrgs.find((o) => o.id === chosen) ?? null : null
@@ -291,7 +341,8 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
     setStatus("ready")
     initialOrgResolutionCompleteRef.current = true
     debugActiveOrg({
-      source: resolvedFromSupportSession ? "support_session" : "membership",
+      source: "membership",
+      chosenFrom,
       organizationId: chosen,
       orgCount: resolvedOrgs.length,
     })
@@ -304,6 +355,11 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
   const switchOrganization = useCallback(
     async (orgId: string) => {
       const imp = impersonationRef.current
+      if (supportAccessActive && orgId !== organizationId) {
+        return {
+          error: "Exit platform support access (Back to Platform Admin) before switching workspaces.",
+        }
+      }
       if (imp.active && isPlatformAdminRef.current && imp.accountId && orgId !== imp.accountId) {
         return {
           error: "Switching workspaces is disabled while viewing another account as a platform admin.",
@@ -380,7 +436,7 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
       setSwitching(false)
       return {}
     },
-    [organizations],
+    [organizations, organizationId, supportAccessActive],
   )
 
   const value = useMemo<ActiveOrganizationContextValue>(
@@ -392,6 +448,7 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
       organizationSlug,
       organizationName,
       error,
+      supportAccessActive,
       switchOrganization,
       refresh,
     }),
@@ -403,6 +460,7 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
       organizationSlug,
       organizationName,
       error,
+      supportAccessActive,
       switchOrganization,
       refresh,
     ],
