@@ -14,7 +14,7 @@ export function BlitzpayRelatedPaymentSettingsCollapsible() {
   const [open, setOpen] = useState(false)
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="rounded-xl border border-border bg-card/80 shadow-sm">
+    <Collapsible open={open} onOpenChange={setOpen} className="rounded-xl border border-border bg-white dark:bg-card shadow-sm">
       <CollapsibleTrigger
         type="button"
         className={cn(
