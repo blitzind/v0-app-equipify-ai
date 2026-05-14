@@ -3,7 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { equipmentSaveServerDebug } from "@/lib/billing/equipment-save-server-debug"
 import type { Feature } from "@/lib/billing/entitlements"
-import type { CreateRecordType, GuardResult, PlanLimitType } from "@/lib/billing/server-guard"
+import type { CreateRecordType, GuardFailureCode, GuardResult, PlanLimitType } from "@/lib/billing/server-guard"
 import {
   requireCanCreateRecord,
   requireFeatureAccess,
@@ -15,10 +15,87 @@ import { hasActiveOrganizationSupportSession } from "@/lib/server/organization-s
 
 export type CreateEnforcementResult = GuardResult
 
+const UNABLE_VERIFY_CREATE_MSG = "Unable to verify create permissions right now."
+
+const KNOWN_GUARD_FAILURE_CODES = new Set<string>([
+  "unauthorized",
+  "forbidden",
+  "billing_restricted",
+  "billing",
+  "equipment",
+  "seats",
+  "feature_denied",
+  "membership_error",
+  "usage_unavailable",
+  "unexpected_error",
+])
+
 function isNextRedirectError(e: unknown): boolean {
   if (typeof e !== "object" || e === null) return false
   const d = (e as { digest?: unknown }).digest
-  return typeof d === "string" && d.startsWith("NEXT_REDIRECT")
+  if (typeof d !== "string") return false
+  if (d.startsWith("NEXT_REDIRECT")) return true
+  const head = d.split(";")[0] ?? ""
+  return head === "NEXT_REDIRECT"
+}
+
+/** Plain JSON-serializable shape for server action responses (avoids client POST / 500 from bad payloads). */
+function sanitizeForClient(result: unknown): CreateEnforcementResult {
+  if (!result || typeof result !== "object" || !("ok" in result)) {
+    return { ok: false, code: "unexpected_error", message: UNABLE_VERIFY_CREATE_MSG, httpStatus: 500 }
+  }
+  const r = result as GuardResult
+  if (r.ok === true) return { ok: true }
+  if (r.ok === false) {
+    const rawCode = typeof r.code === "string" ? r.code : ""
+    const code: GuardFailureCode = KNOWN_GUARD_FAILURE_CODES.has(rawCode)
+      ? (rawCode as GuardFailureCode)
+      : "unexpected_error"
+    const message =
+      typeof r.message === "string" && r.message.trim()
+        ? r.message.trim().slice(0, 800)
+        : UNABLE_VERIFY_CREATE_MSG
+    const hsRaw = r.httpStatus
+    const t = typeof hsRaw === "number" && Number.isFinite(hsRaw) ? Math.trunc(hsRaw) : 500
+    const httpStatus = t >= 200 && t <= 599 ? t : 500
+    return { ok: false, code, message, httpStatus }
+  }
+  return { ok: false, code: "unexpected_error", message: UNABLE_VERIFY_CREATE_MSG, httpStatus: 500 }
+}
+
+async function wrapEnforcementAction(
+  actionId: string,
+  organizationId: string,
+  run: () => Promise<CreateEnforcementResult>,
+): Promise<CreateEnforcementResult> {
+  equipmentSaveServerDebug(`action_${actionId}_top_enter`, {
+    helper: actionId,
+    organizationId,
+  })
+  try {
+    const out = await run()
+    const okHint =
+      out && typeof out === "object" && "ok" in out ? `ok=${String((out as GuardResult).ok)}` : "invalid_shape"
+    equipmentSaveServerDebug(`action_${actionId}_top_done`, {
+      helper: actionId,
+      organizationId,
+      message: okHint,
+    })
+    return sanitizeForClient(out)
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error
+    equipmentSaveServerDebug(`action_${actionId}_top_threw`, {
+      helper: actionId,
+      organizationId,
+      message: sanitizeEnforcementError(error),
+    })
+    return {
+      ok: false,
+      code: "unexpected_error",
+      message: UNABLE_VERIFY_CREATE_MSG,
+      httpStatus: 500,
+    }
+  }
 }
 
 function sanitizeEnforcementError(e: unknown): string {
@@ -120,7 +197,7 @@ async function authGetUserIdSafe(
 }
 
 /** Server-verified gate for browser/client inserts (membership + billing + limits). */
-export async function enforceCanCreateRecord(
+async function enforceCanCreateRecordImpl(
   organizationId: string,
   recordType: CreateRecordType,
 ): Promise<CreateEnforcementResult> {
@@ -176,14 +253,14 @@ export async function enforceCanCreateRecord(
     })
     return {
       ok: false,
-      code: "membership_error",
-      message: "Could not verify create permission. Try again or contact support.",
+      code: "unexpected_error",
+      message: UNABLE_VERIFY_CREATE_MSG,
       httpStatus: 500,
     }
   }
 }
 
-export async function enforceFeatureAccess(organizationId: string, feature: Feature): Promise<CreateEnforcementResult> {
+async function enforceFeatureAccessImpl(organizationId: string, feature: Feature): Promise<CreateEnforcementResult> {
   try {
     const supOrErr = await createServerSupabaseClientSafe(organizationId)
     if (isGuardResult(supOrErr)) return supOrErr
@@ -255,14 +332,14 @@ export async function enforceFeatureAccess(organizationId: string, feature: Feat
     logEnforcementActionFailure("enforceFeatureAccess_fatal", organizationId, e)
     return {
       ok: false,
-      code: "membership_error",
-      message: "Could not verify feature access. Try again or contact support.",
+      code: "unexpected_error",
+      message: UNABLE_VERIFY_CREATE_MSG,
       httpStatus: 500,
     }
   }
 }
 
-export async function enforcePlanLimit(
+async function enforcePlanLimitImpl(
   organizationId: string,
   limitType: PlanLimitType,
 ): Promise<CreateEnforcementResult> {
@@ -321,14 +398,14 @@ export async function enforcePlanLimit(
     logEnforcementActionFailure("enforcePlanLimit_fatal", organizationId, e)
     return {
       ok: false,
-      code: "usage_unavailable",
-      message: "Could not verify plan limits. Try again or contact support.",
-      httpStatus: 503,
+      code: "unexpected_error",
+      message: UNABLE_VERIFY_CREATE_MSG,
+      httpStatus: 500,
     }
   }
 }
 
-export async function enforceMaintenancePlanCreate(organizationId: string): Promise<CreateEnforcementResult> {
+async function enforceMaintenancePlanCreateImpl(organizationId: string): Promise<CreateEnforcementResult> {
   try {
     const supOrErr = await createServerSupabaseClientSafe(organizationId)
     if (isGuardResult(supOrErr)) return supOrErr
@@ -358,9 +435,42 @@ export async function enforceMaintenancePlanCreate(organizationId: string): Prom
     logEnforcementActionFailure("enforceMaintenancePlanCreate_fatal", organizationId, e)
     return {
       ok: false,
-      code: "membership_error",
-      message: "Could not verify maintenance plan permission. Try again or contact support.",
+      code: "unexpected_error",
+      message: UNABLE_VERIFY_CREATE_MSG,
       httpStatus: 500,
     }
   }
+}
+
+export async function enforceCanCreateRecord(
+  organizationId: string,
+  recordType: CreateRecordType,
+): Promise<CreateEnforcementResult> {
+  return wrapEnforcementAction("enforceCanCreateRecord", organizationId, () =>
+    enforceCanCreateRecordImpl(organizationId, recordType),
+  )
+}
+
+export async function enforceFeatureAccess(
+  organizationId: string,
+  feature: Feature,
+): Promise<CreateEnforcementResult> {
+  return wrapEnforcementAction("enforceFeatureAccess", organizationId, () =>
+    enforceFeatureAccessImpl(organizationId, feature),
+  )
+}
+
+export async function enforcePlanLimit(
+  organizationId: string,
+  limitType: PlanLimitType,
+): Promise<CreateEnforcementResult> {
+  return wrapEnforcementAction("enforcePlanLimit", organizationId, () =>
+    enforcePlanLimitImpl(organizationId, limitType),
+  )
+}
+
+export async function enforceMaintenancePlanCreate(organizationId: string): Promise<CreateEnforcementResult> {
+  return wrapEnforcementAction("enforceMaintenancePlanCreate", organizationId, () =>
+    enforceMaintenancePlanCreateImpl(organizationId),
+  )
 }

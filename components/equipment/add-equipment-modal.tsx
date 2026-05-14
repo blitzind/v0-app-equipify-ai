@@ -121,8 +121,17 @@ function optionalDateFieldError(raw: string): string | undefined {
     : undefined
 }
 
+function serverActionFailureMessage(e: unknown): string {
+  if (e instanceof Error) return e.message.trim() || "Server action failed."
+  if (typeof e === "string" && e.trim()) return e.trim()
+  return "Could not verify permission to save equipment. Try again in a moment."
+}
+
+function isEnforcementGate(x: unknown): x is Awaited<ReturnType<typeof enforceCanCreateRecord>> {
+  return Boolean(x && typeof x === "object" && "ok" in (x as object))
+}
+
 function friendlyInsertError(message: string): string {
-  const m = message.trim()
   if (!m) return "Could not save equipment. Please try again."
   const ml = m.toLowerCase()
   if (ml.includes("row-level security") || ml.includes("violates row-level security") || m.includes("42501")) {
@@ -372,15 +381,27 @@ export function AddEquipmentModal({
     setSaving(true)
     try {
       equipmentSaveDebug("enforce_start", {}, activeOrgId)
-      let serverGate: Awaited<ReturnType<typeof enforceCanCreateRecord>>
+      let serverGate: unknown
       try {
         serverGate = await enforceCanCreateRecord(activeOrgId, "equipment")
       } catch (e) {
+        const msg = serverActionFailureMessage(e)
+        setSaveError(msg)
+        toast({
+          variant: "destructive",
+          title: "Cannot save equipment",
+          description: msg,
+        })
+        equipmentSaveDebug("enforce_threw", { message: msg, kind: typeof e }, activeOrgId)
+        return
+      }
+
+      if (!isEnforcementGate(serverGate)) {
         const msg =
-          e instanceof Error ? e.message : "Could not verify permission to save equipment (server action failed)."
+          "Could not verify permission to save equipment (unexpected server response). Try again or refresh the page."
         setSaveError(msg)
         toast({ variant: "destructive", title: "Cannot save equipment", description: msg })
-        equipmentSaveDebug("enforce_threw", { message: msg }, activeOrgId)
+        equipmentSaveDebug("enforce_bad_shape", { receivedType: typeof serverGate }, activeOrgId)
         return
       }
 
@@ -390,119 +411,137 @@ export function AddEquipmentModal({
           { code: serverGate.code, httpStatus: serverGate.httpStatus },
           activeOrgId,
         )
-        setSaveError(serverGate.message)
-        toast({ variant: "destructive", title: "Cannot add equipment", description: serverGate.message })
+        const desc =
+          typeof serverGate.message === "string" && serverGate.message.trim()
+            ? serverGate.message.trim()
+            : "Create permission check failed."
+        setSaveError(desc)
+        toast({ variant: "destructive", title: "Cannot add equipment", description: desc })
         return
       }
 
-      const supabase = createBrowserSupabaseClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      try {
+        const supabase = createBrowserSupabaseClient()
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
 
-      if (!user) {
-        const msg = "You must be logged in to save equipment."
-        setSaveError(msg)
-        toast({ variant: "destructive", title: "Sign in required", description: msg })
-        return
-      }
+        if (!user) {
+          const msg = "You must be logged in to save equipment."
+          setSaveError(msg)
+          toast({ variant: "destructive", title: "Sign in required", description: msg })
+          return
+        }
 
-      if (orgStatus !== "ready" || !activeOrgId) {
-        const msg =
-          orgStatus === "ready" && !activeOrgId ? "No organization selected." : "Workspace is still loading. Try again in a moment."
-        setSaveError(msg)
-        toast({ variant: "destructive", title: "Cannot save yet", description: msg })
-        return
-      }
+        if (orgStatus !== "ready" || !activeOrgId) {
+          const msg =
+            orgStatus === "ready" && !activeOrgId
+              ? "No organization selected."
+              : "Workspace is still loading. Try again in a moment."
+          setSaveError(msg)
+          toast({ variant: "destructive", title: "Cannot save yet", description: msg })
+          return
+        }
 
-      const statusMap: Record<EquipmentStatus, "active" | "needs_service" | "in_repair" | "out_of_service"> = {
-        Active: "active",
-        "Needs Service": "needs_service",
-        "In Repair": "in_repair",
-        "Out of Service": "out_of_service",
-      }
+        const statusMap: Record<EquipmentStatus, "active" | "needs_service" | "in_repair" | "out_of_service"> = {
+          Active: "active",
+          "Needs Service": "needs_service",
+          "In Repair": "in_repair",
+          "Out of Service": "out_of_service",
+        }
 
-      const installDate = normalizeOptionalDateInput(form.installDate)
-      const warrantyExpiration = normalizeOptionalDateInput(form.warrantyExpiration)
-      const lastServiceDate = normalizeOptionalDateInput(form.lastServiceDate)
-      const nextServiceDue = normalizeOptionalDateInput(form.nextServiceDue)
-      const nextCalibrationDue = normalizeOptionalDateInput(form.nextCalibrationDue)
+        const installDate = normalizeOptionalDateInput(form.installDate)
+        const warrantyExpiration = normalizeOptionalDateInput(form.warrantyExpiration)
+        const lastServiceDate = normalizeOptionalDateInput(form.lastServiceDate)
+        const nextServiceDue = normalizeOptionalDateInput(form.nextServiceDue)
+        const nextCalibrationDue = normalizeOptionalDateInput(form.nextCalibrationDue)
 
-      const insertPayload = {
-        organization_id: activeOrgId,
-        customer_id: cid,
-        name: (form.model || form.name).trim(),
-        manufacturer: form.manufacturer.trim() || null,
-        category: form.equipmentType.trim(),
-        subcategory: form.subcategory.trim() || null,
-        serial_number: form.serialNumber.trim() || null,
-        status: statusMap[form.status],
-        install_date: installDate,
-        warranty_expires_at: warrantyExpiration,
-        last_service_at: lastServiceDate,
-        next_due_at: nextServiceDue,
-        next_calibration_due_at: nextCalibrationDue,
-        calibration_interval_months: (() => {
-          const n = parseInt(form.calibrationIntervalMonths.trim(), 10)
-          return Number.isFinite(n) && n > 0 ? n : null
-        })(),
-        location_label: form.location.trim() || null,
-        customer_location_id: form.serviceSiteId.trim() || null,
-        notes: form.notes.trim() || null,
-      }
+        const insertPayload = {
+          organization_id: activeOrgId,
+          customer_id: cid,
+          name: (form.model || form.name).trim(),
+          manufacturer: form.manufacturer.trim() || null,
+          category: form.equipmentType.trim(),
+          subcategory: form.subcategory.trim() || null,
+          serial_number: form.serialNumber.trim() || null,
+          status: statusMap[form.status],
+          install_date: installDate,
+          warranty_expires_at: warrantyExpiration,
+          last_service_at: lastServiceDate,
+          next_due_at: nextServiceDue,
+          next_calibration_due_at: nextCalibrationDue,
+          calibration_interval_months: (() => {
+            const n = parseInt(form.calibrationIntervalMonths.trim(), 10)
+            return Number.isFinite(n) && n > 0 ? n : null
+          })(),
+          location_label: form.location.trim() || null,
+          customer_location_id: form.serviceSiteId.trim() || null,
+          notes: form.notes.trim() || null,
+        }
 
-      equipmentSaveDebug("insert_start", { payloadKeys: Object.keys(insertPayload) }, activeOrgId)
+        equipmentSaveDebug("insert_start", { payloadKeys: Object.keys(insertPayload) }, activeOrgId)
 
-      const { data: inserted, error } = await supabase
-        .from("equipment")
-        .insert(insertPayload)
-        .select("id")
-        .maybeSingle()
+        const { data: inserted, error } = await supabase
+          .from("equipment")
+          .insert(insertPayload)
+          .select("id")
+          .maybeSingle()
 
-      equipmentSaveDebug("insert_finished", { hasError: Boolean(error), hasRow: Boolean(inserted?.id) }, activeOrgId)
+        equipmentSaveDebug("insert_finished", { hasError: Boolean(error), hasRow: Boolean(inserted?.id) }, activeOrgId)
 
-      if (error) {
-        const msg = friendlyInsertError(error.message ?? "Unknown error")
-        setSaveError(msg)
-        toast({ variant: "destructive", title: "Could not save equipment", description: msg })
-        return
-      }
+        if (error) {
+          const msg = friendlyInsertError(error.message ?? "Unknown error")
+          setSaveError(msg)
+          toast({ variant: "destructive", title: "Could not save equipment", description: msg })
+          return
+        }
 
-      const newId = inserted?.id
-      if (!newId) {
-        const msg =
-          "Save did not return a new equipment row. This usually means insert permission was denied or blocked after validation."
-        setSaveError(msg)
-        toast({ variant: "destructive", title: "Could not save equipment", description: msg })
-        return
-      }
+        const newId = inserted?.id
+        if (!newId) {
+          const msg =
+            "Save did not return a new equipment row. This usually means insert permission was denied or blocked after validation."
+          setSaveError(msg)
+          toast({ variant: "destructive", title: "Could not save equipment", description: msg })
+          return
+        }
 
-      await Promise.resolve(onSuccess?.(newId))
+        try {
+          await Promise.resolve(onSuccess?.(newId))
+        } catch (cbErr) {
+          equipmentSaveDebug("onSuccess_threw", { message: serverActionFailureMessage(cbErr) }, activeOrgId)
+        }
 
-      if (offerMaintenancePlanNext && newId && form.customerId && onCreateMaintenancePlan) {
+        if (offerMaintenancePlanNext && newId && form.customerId && onCreateMaintenancePlan) {
+          toast({
+            title: "Equipment added",
+            description: "You can start a maintenance plan for this asset next.",
+          })
+          setPostSave({ customerId: form.customerId, equipmentId: newId })
+          return
+        }
+
+        if (!offerMaintenancePlanNext) {
+          handleClose()
+          return
+        }
+
         toast({
           title: "Equipment added",
-          description: "You can start a maintenance plan for this asset next.",
+          description: "The new asset is available in your equipment list.",
         })
-        setPostSave({ customerId: form.customerId, equipmentId: newId })
-        return
-      }
-
-      if (!offerMaintenancePlanNext) {
         handleClose()
+      } catch (pathErr) {
+        const msg = serverActionFailureMessage(pathErr)
+        setSaveError(msg)
+        toast({ variant: "destructive", title: "Could not save equipment", description: msg })
+        equipmentSaveDebug("insert_path_threw", { message: msg }, activeOrgId)
         return
       }
-
-      toast({
-        title: "Equipment added",
-        description: "The new asset is available in your equipment list.",
-      })
-      handleClose()
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Unexpected error while saving equipment."
+      const msg = serverActionFailureMessage(e)
       setSaveError(msg)
       toast({ variant: "destructive", title: "Could not save equipment", description: msg })
-      equipmentSaveDebug("handler_unexpected", { message: msg }, activeOrgId)
+      equipmentSaveDebug("handler_unexpected", { message: msg, kind: typeof e }, activeOrgId)
     } finally {
       setSaving(false)
     }

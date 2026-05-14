@@ -339,154 +339,162 @@ function EquipmentPageInner() {
     let active = true
 
     async function loadEquipment() {
-      const supabase = createBrowserSupabaseClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      try {
+        const supabase = createBrowserSupabaseClient()
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
 
-      if (!user) {
-        if (active) {
-          setEquipment([])
-          setQueryError(null)
+        if (!user) {
+          if (active) {
+            setEquipment([])
+            setQueryError(null)
+          }
+          return
         }
-        return
-      }
 
-      if (!activeOrgId) {
-        if (active) {
-          setEquipment([])
-          setQueryError(null)
+        if (!activeOrgId) {
+          if (active) {
+            setEquipment([])
+            setQueryError(null)
+          }
+          return
         }
-        return
-      }
 
-      if (orgStatus !== "ready") {
-        return
-      }
-
-      const orgId = activeOrgId
-      if (active) setQueryError(null)
-      const assignedScope = assignedOnlyView
-        ? await loadAssignedWorkScope(supabase, { organizationId: orgId, userId: user.id })
-        : null
-      const scopedEquipmentIds = assignedScope?.equipmentIds ?? []
-
-      if (assignedOnlyView && scopedEquipmentIds.length === 0) {
-        if (active) {
-          setEquipment([])
-          setQueryError(null)
+        if (orgStatus !== "ready") {
+          return
         }
-        return
-      }
 
-      let eqQuery = supabase
-        .from("equipment")
-        .select(EQUIPMENT_PAGE_SELECT_FULL)
-        .eq("organization_id", orgId)
-        .order("created_at", { ascending: false })
+        const orgId = activeOrgId
+        if (active) setQueryError(null)
+        const assignedScope = assignedOnlyView
+          ? await loadAssignedWorkScope(supabase, { organizationId: orgId, userId: user.id })
+          : null
+        const scopedEquipmentIds = assignedScope?.equipmentIds ?? []
 
-      if (assignedOnlyView) eqQuery = eqQuery.in("id", scopedEquipmentIds).is("archived_at", null)
-      else eqQuery = applyArchivedAtScope(eqQuery, archiveScope)
+        if (assignedOnlyView && scopedEquipmentIds.length === 0) {
+          if (active) {
+            setEquipment([])
+            setQueryError(null)
+          }
+          return
+        }
 
-      const firstRes = await eqQuery
-      let equipmentError = firstRes.error
-      let equipmentRows = (firstRes.data as DbEquipmentRow[] | null) ?? null
-      let schemaFallback = false
-
-      if (equipmentError && isEquipmentListSchemaMismatchError(equipmentError)) {
-        logEquipmentListQueryFailure("initial_schema_fallback", equipmentError, { organizationId: orgId })
-
-        let legacyQ = supabase
+        let eqQuery = supabase
           .from("equipment")
-          .select(EQUIPMENT_PAGE_SELECT_LEGACY)
+          .select(EQUIPMENT_PAGE_SELECT_FULL)
           .eq("organization_id", orgId)
           .order("created_at", { ascending: false })
-        if (assignedOnlyView) legacyQ = legacyQ.in("id", scopedEquipmentIds).is("archived_at", null)
-        else legacyQ = applyArchivedAtScope(legacyQ, archiveScope)
-        const legacyRes = await legacyQ
-        equipmentError = legacyRes.error
-        equipmentRows = (legacyRes.data as DbEquipmentRow[] | null) ?? null
-        schemaFallback = true
-        if (!equipmentError && schemaFallback) {
-          warnNonProduction(
-            "[equipment] Loaded with LEGACY column set. Apply migration 20260720120000_equipment_intelligence_phase1 for full fields.",
-          )
-        }
-      }
 
-      if (equipmentError) {
-        logEquipmentListQueryFailure(schemaFallback ? "legacy_fallback_failed" : "fatal", equipmentError, {
-          organizationId: orgId,
-        })
+        if (assignedOnlyView) eqQuery = eqQuery.in("id", scopedEquipmentIds).is("archived_at", null)
+        else eqQuery = applyArchivedAtScope(eqQuery, archiveScope)
+
+        const firstRes = await eqQuery
+        let equipmentError = firstRes.error
+        let equipmentRows = (firstRes.data as DbEquipmentRow[] | null) ?? null
+        let schemaFallback = false
+
+        if (equipmentError && isEquipmentListSchemaMismatchError(equipmentError)) {
+          logEquipmentListQueryFailure("initial_schema_fallback", equipmentError, { organizationId: orgId })
+
+          let legacyQ = supabase
+            .from("equipment")
+            .select(EQUIPMENT_PAGE_SELECT_LEGACY)
+            .eq("organization_id", orgId)
+            .order("created_at", { ascending: false })
+          if (assignedOnlyView) legacyQ = legacyQ.in("id", scopedEquipmentIds).is("archived_at", null)
+          else legacyQ = applyArchivedAtScope(legacyQ, archiveScope)
+          const legacyRes = await legacyQ
+          equipmentError = legacyRes.error
+          equipmentRows = (legacyRes.data as DbEquipmentRow[] | null) ?? null
+          schemaFallback = true
+          if (!equipmentError && schemaFallback) {
+            warnNonProduction(
+              "[equipment] Loaded with LEGACY column set. Apply migration 20260720120000_equipment_intelligence_phase1 for full fields.",
+            )
+          }
+        }
+
+        if (equipmentError) {
+          logEquipmentListQueryFailure(schemaFallback ? "legacy_fallback_failed" : "fatal", equipmentError, {
+            organizationId: orgId,
+          })
+          if (active) {
+            setEquipment([])
+            setQueryError(userVisibleEquipmentQueryError(equipmentError))
+          }
+          return
+        }
+
+        if (!equipmentRows) {
+          if (active) {
+            setEquipment([])
+            setQueryError(userVisibleEquipmentQueryError({ message: "No data returned." }))
+          }
+          return
+        }
+
+        const customerIds = [...new Set((equipmentRows as DbEquipmentRow[]).map((row) => row.customer_id))]
+        let customerMap = new Map<string, string>()
+
+        if (customerIds.length > 0) {
+          const { data: customerRows } = await supabase
+            .from("customers")
+            .select("id, company_name")
+            .eq("organization_id", orgId)
+            .in("id", customerIds)
+
+          ;((customerRows as Array<{ id: string; company_name: string }> | null) ?? []).forEach((row) => {
+            customerMap.set(row.id, row.company_name)
+          })
+        }
+
+        const statusMap: Record<DbEquipmentRow["status"], EquipmentStatus> = {
+          active: "Active",
+          needs_service: "Needs Service",
+          out_of_service: "Out of Service",
+          in_repair: "In Repair",
+        }
+
+        let mapped: Equipment[] = []
+        try {
+          mapped = equipmentRows.map((row) => ({
+            id: row.id,
+            customerId: row.customer_id,
+            customerName: customerMap.get(row.customer_id) ?? "Unknown Customer",
+            equipmentCode: row.equipment_code ?? "",
+            model: row.name,
+            manufacturer: row.manufacturer ?? "",
+            category: row.category ?? "General",
+            subcategory: row.subcategory?.trim() ? row.subcategory : "",
+            serialNumber: row.serial_number ?? "",
+            lastServiceDate: row.last_service_at ? row.last_service_at.slice(0, 10) : "1970-01-01",
+            nextDueDate: row.next_due_at ? row.next_due_at.slice(0, 10) : "2099-12-31",
+            nextCalibrationDue: row.next_calibration_due_at ? row.next_calibration_due_at.slice(0, 10) : "",
+            warrantyExpiresAt: row.warranty_expires_at ? row.warranty_expires_at.slice(0, 10) : "",
+            status: statusMap[row.status] ?? "Active",
+            location: row.location_label ?? "—",
+            isArchived: Boolean(row.archived_at),
+          }))
+        } catch (e) {
+          warnNonProduction(`[equipment] Row mapping failed: ${e instanceof Error ? e.message : String(e)}`)
+          if (active) {
+            setEquipment([])
+            setQueryError(userVisibleEquipmentQueryError(e instanceof Error ? e : null))
+          }
+          return
+        }
+
         if (active) {
-          setEquipment([])
-          setQueryError(userVisibleEquipmentQueryError(equipmentError))
+          setEquipment(mapped)
+          setQueryError(null)
         }
-        return
-      }
-
-      if (!equipmentRows) {
-        if (active) {
-          setEquipment([])
-          setQueryError(userVisibleEquipmentQueryError({ message: "No data returned." }))
-        }
-        return
-      }
-
-      const customerIds = [...new Set((equipmentRows as DbEquipmentRow[]).map((row) => row.customer_id))]
-      let customerMap = new Map<string, string>()
-
-      if (customerIds.length > 0) {
-        const { data: customerRows } = await supabase
-          .from("customers")
-          .select("id, company_name")
-          .eq("organization_id", orgId)
-          .in("id", customerIds)
-
-        ;((customerRows as Array<{ id: string; company_name: string }> | null) ?? []).forEach((row) => {
-          customerMap.set(row.id, row.company_name)
-        })
-      }
-
-      const statusMap: Record<DbEquipmentRow["status"], EquipmentStatus> = {
-        active: "Active",
-        needs_service: "Needs Service",
-        out_of_service: "Out of Service",
-        in_repair: "In Repair",
-      }
-
-      let mapped: Equipment[] = []
-      try {
-        mapped = equipmentRows.map((row) => ({
-          id: row.id,
-          customerId: row.customer_id,
-          customerName: customerMap.get(row.customer_id) ?? "Unknown Customer",
-          equipmentCode: row.equipment_code ?? "",
-          model: row.name,
-          manufacturer: row.manufacturer ?? "",
-          category: row.category ?? "General",
-          subcategory: row.subcategory?.trim() ? row.subcategory : "",
-          serialNumber: row.serial_number ?? "",
-          lastServiceDate: row.last_service_at ? row.last_service_at.slice(0, 10) : "1970-01-01",
-          nextDueDate: row.next_due_at ? row.next_due_at.slice(0, 10) : "2099-12-31",
-          nextCalibrationDue: row.next_calibration_due_at ? row.next_calibration_due_at.slice(0, 10) : "",
-          warrantyExpiresAt: row.warranty_expires_at ? row.warranty_expires_at.slice(0, 10) : "",
-          status: statusMap[row.status] ?? "Active",
-          location: row.location_label ?? "—",
-          isArchived: Boolean(row.archived_at),
-        }))
       } catch (e) {
-        warnNonProduction(`[equipment] Row mapping failed: ${e instanceof Error ? e.message : String(e)}`)
+        warnNonProduction(`[equipment] loadEquipment failed: ${e instanceof Error ? e.message : String(e)}`)
         if (active) {
           setEquipment([])
           setQueryError(userVisibleEquipmentQueryError(e instanceof Error ? e : null))
         }
-        return
-      }
-
-      if (active) {
-        setEquipment(mapped)
-        setQueryError(null)
       }
     }
 

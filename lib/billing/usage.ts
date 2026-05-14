@@ -26,39 +26,47 @@ export async function getOrganizationUsage(
   supabase: SupabaseClient,
   organizationId: string,
 ): Promise<OrganizationUsage> {
-  let seatsUsed = 0
-  const seatsRes = await supabase
-    .from("organization_members")
-    .select("*", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .eq("status", "active")
-  if (!seatsRes.error) seatsUsed = seatsRes.count ?? 0
+  try {
+    let seatsUsed = 0
+    const seatsRes = await supabase
+      .from("organization_members")
+      .select("*", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("status", "active")
+    if (!seatsRes.error) seatsUsed = seatsRes.count ?? 0
 
-  let equipmentUsed = 0
-  const eqRes = await supabase
-    .from("equipment")
-    .select("*", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .is("archived_at", null)
-  if (!eqRes.error) equipmentUsed = eqRes.count ?? 0
+    let equipmentUsed = 0
+    const eqRes = await supabase
+      .from("equipment")
+      .select("*", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .is("archived_at", null)
+    if (!eqRes.error) equipmentUsed = eqRes.count ?? 0
 
-  const monthStart = utcMonthStartDateString()
-  let apiCallsUsedThisMonth = 0
-  const { data: usageRow, error: usageErr } = await supabase
-    .from("organization_api_usage_monthly")
-    .select("api_calls")
-    .eq("organization_id", organizationId)
-    .eq("month_start", monthStart)
-    .maybeSingle()
+    const monthStart = utcMonthStartDateString()
+    let apiCallsUsedThisMonth = 0
+    const { data: usageRow, error: usageErr } = await supabase
+      .from("organization_api_usage_monthly")
+      .select("api_calls")
+      .eq("organization_id", organizationId)
+      .eq("month_start", monthStart)
+      .maybeSingle()
 
-  if (!usageErr && usageRow && typeof (usageRow as { api_calls?: unknown }).api_calls === "number") {
-    apiCallsUsedThisMonth = (usageRow as { api_calls: number }).api_calls
-  }
+    if (!usageErr && usageRow && typeof (usageRow as { api_calls?: unknown }).api_calls === "number") {
+      apiCallsUsedThisMonth = (usageRow as { api_calls: number }).api_calls
+    }
 
-  return {
-    seatsUsed,
-    equipmentUsed,
-    apiCallsUsedThisMonth,
+    return {
+      seatsUsed,
+      equipmentUsed,
+      apiCallsUsedThisMonth,
+    }
+  } catch {
+    return {
+      seatsUsed: 0,
+      equipmentUsed: 0,
+      apiCallsUsedThisMonth: 0,
+    }
   }
 }
 

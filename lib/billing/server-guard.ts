@@ -45,6 +45,8 @@ export type GuardFailureCode =
   | "feature_denied"
   | "membership_error"
   | "usage_unavailable"
+  /** Top-level server action / gate wrapper only — never from plan rules evaluation. */
+  | "unexpected_error"
 
 export type GuardResult =
   | { ok: true }
@@ -78,8 +80,22 @@ export async function loadOrgBillingContext(supabase: SupabaseClient, organizati
 
   let subscription: OrganizationSubscription | null = null
   try {
+    equipmentSaveServerDebug("stage_before_org_subscription_read", {
+      helper: "loadOrgBillingContext",
+      organizationId,
+    })
     subscription = await getOrganizationSubscription(supabase, organizationId)
-  } catch {
+    equipmentSaveServerDebug("stage_after_org_subscription_read", {
+      helper: "loadOrgBillingContext",
+      organizationId,
+      message: subscription ? "has_row" : "null",
+    })
+  } catch (e) {
+    equipmentSaveServerDebug("stage_org_subscription_read_threw", {
+      helper: "loadOrgBillingContext",
+      organizationId,
+      message: e instanceof Error ? e.message : String(e),
+    })
     subscription = null
   }
 
@@ -88,17 +104,46 @@ export async function loadOrgBillingContext(supabase: SupabaseClient, organizati
   let usagePack: UsageWithLimits | null = null
   let usageLoadFailed = false
   try {
+    equipmentSaveServerDebug("stage_before_usage_with_limits", {
+      helper: "loadOrgBillingContext",
+      organizationId,
+      message: `planId=${planId} trialOn=${trialOn}`,
+    })
     usagePack = await getUsageWithLimits(supabase, organizationId, planId, trialOn)
-  } catch {
+    equipmentSaveServerDebug("stage_after_usage_with_limits", {
+      helper: "loadOrgBillingContext",
+      organizationId,
+      message: usagePack ? "ok" : "null",
+    })
+  } catch (e) {
+    equipmentSaveServerDebug("stage_usage_with_limits_threw", {
+      helper: "loadOrgBillingContext",
+      organizationId,
+      message: e instanceof Error ? e.message : String(e),
+    })
     usagePack = null
     usageLoadFailed = true
   }
 
   let seatSlotsUsed: number | null = null
   try {
+    equipmentSaveServerDebug("stage_before_seat_metrics", {
+      helper: "loadOrgBillingContext",
+      organizationId,
+    })
     const metrics = await fetchOrganizationSeatMetrics(supabase, organizationId)
     seatSlotsUsed = metrics ? metrics.seatsReservedForPlan : null
-  } catch {
+    equipmentSaveServerDebug("stage_after_seat_metrics", {
+      helper: "loadOrgBillingContext",
+      organizationId,
+      message: seatSlotsUsed == null ? "null" : String(seatSlotsUsed),
+    })
+  } catch (e) {
+    equipmentSaveServerDebug("stage_seat_metrics_threw", {
+      helper: "loadOrgBillingContext",
+      organizationId,
+      message: e instanceof Error ? e.message : String(e),
+    })
     seatSlotsUsed = null
   }
 
@@ -111,26 +156,82 @@ export async function loadOrgBillingContext(supabase: SupabaseClient, organizati
   return { subscription, usagePack, seatSlotsUsed, usageLoadFailed }
 }
 
+async function supportSessionOrFalse(
+  supabase: SupabaseClient,
+  userId: string,
+  organizationId: string,
+  reason: string,
+): Promise<boolean> {
+  try {
+    equipmentSaveServerDebug("stage_before_support_session", {
+      helper: "verifyActiveMembership",
+      organizationId,
+      message: reason,
+    })
+    const ok = await hasActiveOrganizationSupportSession(supabase, userId, organizationId)
+    equipmentSaveServerDebug("stage_after_support_session", {
+      helper: "verifyActiveMembership",
+      organizationId,
+      message: `${reason}:${ok ? "true" : "false"}`,
+    })
+    return ok
+  } catch (e) {
+    equipmentSaveServerDebug("support_session_threw_in_membership", {
+      helper: "verifyActiveMembership",
+      organizationId,
+      message: `${reason}:${e instanceof Error ? e.message : String(e)}`,
+    })
+    return false
+  }
+}
+
 async function verifyActiveMembership(
   supabase: SupabaseClient,
   userId: string,
   organizationId: string,
 ): Promise<GuardResult | null> {
-  const { data, error } = await supabase
-    .from("organization_members")
-    .select("user_id")
-    .eq("organization_id", organizationId)
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .maybeSingle()
+  let data: { user_id: string } | null = null
+  let error: { message?: string } | null = null
+  try {
+    equipmentSaveServerDebug("stage_before_membership_query", {
+      helper: "verifyActiveMembership",
+      organizationId,
+    })
+    const res = await supabase
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", organizationId)
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .maybeSingle()
+    data = (res.data as { user_id: string } | null) ?? null
+    error = res.error as { message?: string } | null
+    equipmentSaveServerDebug("stage_after_membership_query", {
+      helper: "verifyActiveMembership",
+      organizationId,
+      message: error ? `error:${(error.message ?? "unknown").slice(0, 120)}` : data ? "member" : "no_row",
+    })
+  } catch (e) {
+    equipmentSaveServerDebug("membership_query_throw", {
+      helper: "verifyActiveMembership",
+      organizationId,
+      message: e instanceof Error ? e.message : String(e),
+    })
+    return {
+      ok: false,
+      code: "membership_error",
+      message: "Could not verify workspace membership. Try again in a moment.",
+      httpStatus: 503,
+    }
+  }
 
   if (error) {
     equipmentSaveServerDebug("membership_query_error", {
       helper: "verifyActiveMembership",
       organizationId,
-      message: error.message,
+      message: (error.message ?? String(error)).slice(0, 200),
     })
-    if (await hasActiveOrganizationSupportSession(supabase, userId, organizationId)) {
+    if (await supportSessionOrFalse(supabase, userId, organizationId, "on_membership_error")) {
       return null
     }
     return {
@@ -141,7 +242,7 @@ async function verifyActiveMembership(
     }
   }
   if (!data) {
-    if (await hasActiveOrganizationSupportSession(supabase, userId, organizationId)) {
+    if (await supportSessionOrFalse(supabase, userId, organizationId, "on_no_member_row")) {
       return null
     }
     return {
@@ -189,6 +290,11 @@ export async function requireCanCreateRecord(
       message: "before_verifyActiveMembership",
     })
     const denied = await verifyActiveMembership(supabase, userId, organizationId)
+    equipmentSaveServerDebug("require_ccr_stage", {
+      helper: "requireCanCreateRecord",
+      organizationId,
+      message: denied ? `verifyMembership_denied:${denied.code}` : "verifyMembership_pass",
+    })
     if (denied) return denied
     equipmentSaveServerDebug("require_ccr_stage", {
       helper: "requireCanCreateRecord",
@@ -414,15 +520,19 @@ export async function requireWithinPlanLimit(
     let usageLoadFailed = ctx.usageLoadFailed
     let skipSeatCap = false
     if (actingUserId) {
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("email")
-        .eq("id", actingUserId)
-        .maybeSingle()
-      const em = (prof as { email?: string | null } | null)?.email
-      if (isPlatformAdminEmail(em)) {
-        usageLoadFailed = false
-        skipSeatCap = limitType === "seats"
+      try {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("id", actingUserId)
+          .maybeSingle()
+        const em = (prof as { email?: string | null } | null)?.email
+        if (isPlatformAdminEmail(em)) {
+          usageLoadFailed = false
+          skipSeatCap = limitType === "seats"
+        }
+      } catch {
+        /* ignore — treat as non-platform-admin */
       }
     }
     const quotaOpts: QuotaEvaluationOptions = {
