@@ -1,6 +1,6 @@
 "use client"
 
-import { Component, useState, useMemo, useEffect, Suspense, type ReactNode } from "react"
+import { Component, useState, useMemo, useEffect, useRef, Suspense, type ReactNode } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
@@ -132,6 +132,10 @@ function warnNonProduction(message: string): void {
 
 function equipmentPageRuntimeLog(stage: string, details?: Record<string, unknown>): void {
   console.warn("[equipify:equipment-page-runtime]", stage, details ?? {})
+}
+
+function equipmentSelectionLog(stage: string, details?: Record<string, unknown>): void {
+  console.warn("[equipify:equipment-selection]", stage, details ?? {})
 }
 
 function safeText(value: unknown, fallback = ""): string {
@@ -334,6 +338,7 @@ function EquipmentPageInner() {
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null)
   const [archiveScope, setArchiveScope] = useState<RecordArchiveVisibility>("active")
   const [queryWarning, setQueryWarning] = useState<string | null>(null)
+  const previousSelectedCountRef = useRef(0)
 
   // Auto-open drawer from ?open= query param
   useEffect(() => {
@@ -672,6 +677,24 @@ function EquipmentPageInner() {
     return list
   }, [equipment, search, statusFilter, categoryFilter, complianceFilter, sortKey, sortDir])
 
+  useEffect(() => {
+    equipmentSelectionLog("equipment_table_rerender", {
+      equipmentCount: equipment.length,
+      filteredCount: filtered.length,
+      selectedCount: selected.size,
+      refreshToken,
+    })
+  })
+
+  useEffect(() => {
+    const previous = previousSelectedCountRef.current
+    if (previous > 0 && selected.size === 0) {
+      equipmentSelectionLog("row_selection_reset", { previous, refreshToken })
+    }
+    previousSelectedCountRef.current = selected.size
+    equipmentSelectionLog("selected_row_count", { count: selected.size, refreshToken })
+  }, [selected.size, refreshToken])
+
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"))
@@ -681,21 +704,41 @@ function EquipmentPageInner() {
     }
   }
 
-  function toggleSelect(id: string) {
+  function setRowSelected(id: string, checked: boolean) {
     setSelected((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (checked) next.add(id)
+      else next.delete(id)
+      equipmentSelectionLog("row_selection_updated", {
+        idHint: id.slice(-8),
+        checked,
+        previousCount: prev.size,
+        nextCount: next.size,
+      })
       return next
     })
   }
 
-  function toggleAll() {
-    if (selected.size === filtered.length) {
-      setSelected(new Set())
-    } else {
-      setSelected(new Set(filtered.map((e) => e.id)))
-    }
+  function toggleSelect(id: string) {
+    setRowSelected(id, !selected.has(id))
+  }
+
+  function setAllVisibleSelected(checked: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      for (const eq of filtered) {
+        if (checked) next.add(eq.id)
+        else next.delete(eq.id)
+      }
+      equipmentSelectionLog("row_selection_updated", {
+        scope: "visible",
+        checked,
+        visibleCount: filtered.length,
+        previousCount: prev.size,
+        nextCount: next.size,
+      })
+      return next
+    })
   }
 
   function SortIcon({ col }: { col: SortKey }) {
@@ -854,7 +897,15 @@ function EquipmentPageInner() {
             <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8 text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/60">
               <Trash2 className="w-3.5 h-3.5" /> Remove
             </Button>
-            <Button variant="ghost" size="sm" className="text-xs h-8" onClick={() => setSelected(new Set())}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-8"
+              onClick={() => {
+                equipmentSelectionLog("row_selection_reset", { reason: "clear_button", previous: selected.size })
+                setSelected(new Set())
+              }}
+            >
               Clear
             </Button>
           </div>
@@ -879,7 +930,11 @@ function EquipmentPageInner() {
                   <div className="flex h-full w-full items-center justify-center">
                     <Checkbox
                       checked={selected.size === filtered.length && filtered.length > 0}
-                      onCheckedChange={toggleAll}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        equipmentSelectionLog("row_checkbox_clicked", { scope: "all_visible" })
+                      }}
+                      onCheckedChange={(checked) => setAllVisibleSelected(checked === true)}
                       className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                       aria-label="Select all"
                     />
@@ -935,13 +990,21 @@ function EquipmentPageInner() {
                     {canManageEquipmentRecords ? (
                     <TableCell
                       className="w-12 min-w-12 px-0 align-middle"
-                      onClick={(e) => { e.stopPropagation(); toggleSelect(eq.id) }}
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex h-full w-full items-center justify-center">
                         <Checkbox
                           checked={selected.has(eq.id)}
-                          onCheckedChange={() => toggleSelect(eq.id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            equipmentSelectionLog("row_checkbox_clicked", {
+                              idHint: eq.id.slice(-8),
+                              checked: selected.has(eq.id),
+                            })
+                          }}
+                          onCheckedChange={(checked) => setRowSelected(eq.id, checked === true)}
                           className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                          aria-label={`Select ${eq.model}`}
                         />
                       </div>
                     </TableCell>
