@@ -5,11 +5,16 @@
 
 export type EquipmentScanDiagEvent =
   | "upload_start"
-  | "file_selected"
+  | "client_file_selected"
+  | "client_compression_start"
+  | "client_compression_end"
+  | "client_action_start"
   | "file_type"
   | "file_size_mb"
   | "safari_heic_detected"
+  /** @deprecated prefer client_compression_end */
   | "compression_done"
+  /** @deprecated prefer client_compression_end */
   | "compression_skipped"
   | "compression_failed"
   | "upload_request_started"

@@ -328,7 +328,9 @@ export async function executeOpenAiStructuredFileExtraction<T>(args: {
       args.mimeType === "image/png" ||
       args.mimeType === "image/jpeg" ||
       args.mimeType === "image/webp" ||
-      args.mimeType === "image/gif"
+      args.mimeType === "image/gif" ||
+      args.mimeType === "image/heic" ||
+      args.mimeType === "image/heif"
 
     if (isPdf) {
       const file = await toFile(args.buffer, args.fileName || "document.pdf", {

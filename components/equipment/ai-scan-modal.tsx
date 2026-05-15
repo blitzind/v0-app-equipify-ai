@@ -284,7 +284,7 @@ export function AIScanModal({
         os_family: hints.osFamily,
         browser_family: hints.browserFamily,
       })
-      equipmentScanDiag("file_selected", {
+      equipmentScanDiag("client_file_selected", {
         ext: ext || "none",
         os_family: hints.osFamily,
         browser_family: hints.browserFamily,
@@ -309,9 +309,15 @@ export function AIScanModal({
       setUploadError(null)
 
       let uploadFile: File
+      equipmentScanDiag("client_compression_start", { bytes: file.size })
       try {
         const prepared = await prepareFileForEquipmentScanUpload(file)
         uploadFile = prepared.file
+        equipmentScanDiag("client_compression_end", {
+          skipped: prepared.meta.compressionSkipped,
+          final_bytes: prepared.meta.finalBytes,
+          kind: prepared.meta.kind,
+        })
         if (prepared.meta.compressionSkipped) {
           equipmentScanDiag("compression_skipped", {
             kind: prepared.meta.kind,
@@ -328,6 +334,7 @@ export function AIScanModal({
       } catch (prepErr) {
         const code = prepErr instanceof Error ? prepErr.message : "UNKNOWN"
         equipmentScanDiag("compression_failed", { code })
+        equipmentScanDiag("client_compression_end", { skipped: false, error: true })
         setUploadError(messageForPrepareError(code))
         return
       }
@@ -366,7 +373,7 @@ export function AIScanModal({
       fd.set("organizationId", organizationId)
       fd.set("file", uploadFile)
 
-      equipmentScanDiag("upload_request_started", {
+      equipmentScanDiag("client_action_start", {
         upload_bytes: uploadFile.size,
         kind: isPdf ? "pdf" : "image",
       })
@@ -387,8 +394,11 @@ export function AIScanModal({
         clearScanTimers()
         equipmentScanDiag("upload_response_ok", { ok: result.ok })
         if (!result.ok) {
-          equipmentScanDiag("upload_response_error", { reason: "server_returned_error" })
-          equipmentScanDiag("extraction_failed", { reason: "server_returned_error" })
+          equipmentScanDiag("upload_response_error", {
+            stage: result.stage,
+            code: result.code,
+          })
+          equipmentScanDiag("extraction_failed", { stage: result.stage, code: result.code })
           setUploadError(result.message)
           setStep("upload")
           revokePreviewObjectUrl()
@@ -396,7 +406,8 @@ export function AIScanModal({
           setUploadKind(null)
           return
         }
-        const f = result.fields
+        const f = result.data.fields
+        setUploadKind(result.data.sourceKind)
         setForm({
           name: f.name,
           equipmentType: f.equipmentType,
