@@ -18,6 +18,7 @@ export type EquipmentScanDiagEvent =
   | "compression_skipped"
   | "compression_failed"
   | "upload_request_started"
+  | "upload_response_received"
   | "upload_response_ok"
   | "upload_response_error"
   | "extraction_started"

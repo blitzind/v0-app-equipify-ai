@@ -36,6 +36,11 @@ import {
   prepareFileForEquipmentScanUpload,
 } from "@/lib/equipment/equipment-scan-client-prepare"
 import { mapEquipmentScanTransportError } from "@/lib/equipment/equipment-scan-client-errors"
+import {
+  EQUIPMENT_SCAN_DEBUG_MIN_JPEG_BASE64,
+  parseEquipmentScanActionResult,
+  sanitizeScanClientError,
+} from "@/lib/equipment/equipment-scan-client-parse"
 import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
 import { useEquipmentFormIndustryUi } from "@/hooks/use-equipment-form-industry-ui"
 import { useEquipmentTypes, equipmentCategorySelectOptions } from "@/lib/equipment-type-store"
@@ -53,6 +58,9 @@ const ACCEPT_ATTR =
 const ACCEPT_CAMERA_ATTR = "image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
 
 const EXTRACTION_TIMEOUT_MS = 120_000
+
+const SCAN_DEBUG_PUBLIC =
+  typeof process !== "undefined" && process.env.NEXT_PUBLIC_DEBUG_EQUIPMENT_SCAN === "true"
 
 const SCAN_LABELS = [
   "Checking file…",
@@ -152,6 +160,23 @@ export function AIScanModal({
     }
     previewObjectUrlRef.current = null
   }, [])
+
+  const runDebugScanProbe = useCallback(async () => {
+    if (!organizationId || !orgReady) return
+    const fd = new FormData()
+    fd.set("organizationId", organizationId)
+    const bin = Uint8Array.from(atob(EQUIPMENT_SCAN_DEBUG_MIN_JPEG_BASE64), (c) => c.charCodeAt(0))
+    fd.set("file", new File([bin], "probe.jpg", { type: "image/jpeg" }))
+    console.info("[equipment_scan_debug] probe_start", { org_id_length: organizationId.length })
+    try {
+      const raw = await extractEquipmentFromScanUploadAction(fd)
+      const parsed = parseEquipmentScanActionResult(raw)
+      console.info("[equipment_scan_debug] probe_raw_json", JSON.stringify(raw))
+      console.info("[equipment_scan_debug] probe_parsed_json", JSON.stringify(parsed))
+    } catch (e) {
+      console.info("[equipment_scan_debug] probe_rejected", sanitizeScanClientError(e))
+    }
+  }, [organizationId, orgReady])
 
   const equipmentTypeOptions = useMemo(
     () => equipmentCategorySelectOptions(orgEquipmentTypes, form.equipmentType),
@@ -390,24 +415,58 @@ export function AIScanModal({
         const timeoutPromise = new Promise<never>((_, reject) => {
           extractionTimer = window.setTimeout(() => reject(new Error("EXTRACTION_TIMEOUT")), EXTRACTION_TIMEOUT_MS)
         })
-        const result = await Promise.race([actionPromise, timeoutPromise])
+        const raw = await Promise.race([actionPromise, timeoutPromise])
         clearScanTimers()
-        equipmentScanDiag("upload_response_ok", { ok: result.ok })
-        if (!result.ok) {
+
+        const parsed = parseEquipmentScanActionResult(raw)
+        equipmentScanDiag("upload_response_received", { tag: parsed.tag })
+
+        if (parsed.tag === "err") {
+          equipmentScanDiag("upload_response_ok", { ok: false })
           equipmentScanDiag("upload_response_error", {
-            stage: result.stage,
-            code: result.code,
+            stage: parsed.stage,
+            code: parsed.code,
+            outcome: "structured_error",
           })
-          equipmentScanDiag("extraction_failed", { stage: result.stage, code: result.code })
-          setUploadError(result.message)
+          equipmentScanDiag("extraction_failed", { stage: parsed.stage, code: parsed.code })
+          const suffix = SCAN_DEBUG_PUBLIC ? ` [debug: code=${parsed.code} | stage=${parsed.stage}]` : ""
+          setUploadError(`${parsed.message}${suffix}`)
+          setStep("upload")
+          revokePreviewObjectUrl()
+          setImagePreview(null)
+          setUploadKind(null)
+          if (SCAN_DEBUG_PUBLIC) {
+            console.info("[equipment_scan_debug] action_ok_false", JSON.stringify(parsed))
+          }
+          return
+        }
+
+        if (parsed.tag === "malformed") {
+          equipmentScanDiag("upload_response_error", {
+            tag: "malformed",
+            detail: parsed.detail,
+            outcome: "malformed_payload",
+          })
+          if (SCAN_DEBUG_PUBLIC) {
+            console.warn("[equipment_scan_debug] malformed_action_payload", JSON.stringify(raw))
+          }
+          setUploadError(
+            `Server returned an unexpected scan response (${parsed.detail}). If you recently deployed, hard-refresh the page.${SCAN_DEBUG_PUBLIC ? " Raw payload logged above as [equipment_scan_debug] malformed_action_payload." : ""}`,
+          )
           setStep("upload")
           revokePreviewObjectUrl()
           setImagePreview(null)
           setUploadKind(null)
           return
         }
-        const f = result.data.fields
-        setUploadKind(result.data.sourceKind)
+
+        equipmentScanDiag("upload_response_ok", { ok: true })
+        if (SCAN_DEBUG_PUBLIC) {
+          console.info("[equipment_scan_debug] action_ok_true", JSON.stringify({ sourceKind: parsed.sourceKind }))
+        }
+
+        const f = parsed.fields
+        setUploadKind(parsed.sourceKind)
         setForm({
           name: f.name,
           equipmentType: f.equipmentType,
@@ -434,16 +493,22 @@ export function AIScanModal({
       } catch (err) {
         clearScanTimers()
         const isTimeout = err instanceof Error && err.message === "EXTRACTION_TIMEOUT"
+        const detail = sanitizeScanClientError(err)
         if (isTimeout) {
           equipmentScanDiag("timeout_hit", { ms: EXTRACTION_TIMEOUT_MS })
+          setUploadError(
+            `AI extraction timed out. Try again with a smaller file or better signal.${SCAN_DEBUG_PUBLIC ? ` [debug: ${detail}]` : ""}`,
+          )
         } else {
-          equipmentScanDiag("upload_failed", { reason: "transport_or_action_throw" })
+          equipmentScanDiag("upload_failed", { outcome: "throw_before_structured", detail })
+          console.info("[equipment_scan]", JSON.stringify({ ns: "equipment_scan", event: "action_rejected", detail }))
+          const transportHint = mapEquipmentScanTransportError(err)
+          setUploadError(
+            SCAN_DEBUG_PUBLIC
+              ? `Upload failed before the server could return details. [debug: ${detail}] (transport hint: ${transportHint})`
+              : "Upload failed before the server could return details.",
+          )
         }
-        setUploadError(
-          isTimeout
-            ? "AI extraction timed out. Try again with a smaller file or better signal."
-            : mapEquipmentScanTransportError(err),
-        )
         setStep("upload")
         revokePreviewObjectUrl()
         setImagePreview(null)
@@ -641,6 +706,16 @@ export function AIScanModal({
                 >
                   Use camera (photos only)
                 </button>
+
+                {SCAN_DEBUG_PUBLIC ? (
+                  <button
+                    type="button"
+                    onClick={() => void runDebugScanProbe()}
+                    className="text-[10px] font-mono text-muted-foreground border border-dashed border-border rounded-md px-2 py-1 hover:bg-muted/50 cursor-pointer"
+                  >
+                    Debug: run 1×1 JPEG probe + log full action result to console
+                  </button>
+                ) : null}
 
                 <button
                   type="button"
