@@ -1,26 +1,14 @@
 "use server"
 
 import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
-import {
-  buildDebugEquipmentScanSuccess,
-  extractEquipmentFieldsFromUpload,
-} from "@/lib/equipment/equipment-ai-scan"
+import { ingestEquipmentScanUpload } from "@/lib/equipment/equipment-scan-ingest"
 import type { EquipmentScanActionResult } from "@/lib/equipment/equipment-scan-action-result"
 import { equipmentScanServerLog } from "@/lib/equipment/equipment-scan-server-log"
-import { sniffEquipmentScanFileKind } from "@/lib/equipment/equipment-scan-upload-validate"
 import { isNextRedirectError } from "@/lib/server/is-next-redirect-error"
 
-function debugEquipmentScanMockEnabled(): boolean {
-  return (
-    process.env.NEXT_PUBLIC_DEBUG_EQUIPMENT_SCAN === "true" ||
-    process.env.DEBUG_EQUIPMENT_SCAN_MOCK === "true"
-  )
-}
-
 /**
- * Server-side equipment scan: validates org + create eligibility, sniffs file type,
- * runs image vision or PDF text extraction + structured AI.
- * Always returns a plain JSON-serializable object (never throws except Next redirects).
+ * @deprecated Prefer POST `/api/organizations/{organizationId}/equipment/ai-scan` from the client
+ * (multipart Server Actions can be fragile). Kept for scripts / backward compatibility.
  */
 export async function extractEquipmentFromScanUploadAction(
   formData: FormData,
@@ -79,25 +67,7 @@ export async function extractEquipmentFromScanUploadAction(
       }
     }
 
-    if (debugEquipmentScanMockEnabled()) {
-      equipmentScanServerLog("debug_mock_bypass", { active: true })
-      const sniff = sniffEquipmentScanFileKind(buffer)
-      equipmentScanServerLog("magic_byte_sniff", { sniff, mock: true })
-      if (sniff === "unknown") {
-        return {
-          ok: false,
-          code: "unsupported_type",
-          stage: "magic_byte_sniff",
-          message:
-            "This file type is not supported. Use a JPG, PNG, HEIC, WebP, GIF, or PDF (for example a calibration certificate or spec sheet).",
-        }
-      }
-      const out = buildDebugEquipmentScanSuccess(sniff === "pdf" ? "pdf" : "image")
-      equipmentScanServerLog("response_return", { mock: true, ok: true })
-      return out
-    }
-
-    const out = await extractEquipmentFieldsFromUpload({
+    const out = await ingestEquipmentScanUpload({
       organizationId,
       buffer,
       fileName: file.name || "upload",

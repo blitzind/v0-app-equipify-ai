@@ -18,7 +18,6 @@ import {
   ImageIcon,
 } from "lucide-react"
 import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
-import { extractEquipmentFromScanUploadAction } from "@/app/actions/equipment-ai-scan"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 import type { RecordEligibility } from "@/lib/billing/record-eligibility"
@@ -41,6 +40,7 @@ import {
   parseEquipmentScanActionResult,
   sanitizeScanClientError,
 } from "@/lib/equipment/equipment-scan-client-parse"
+import { fetchEquipmentScanViaApi } from "@/lib/equipment/equipment-scan-client-fetch"
 import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
 import { useEquipmentFormIndustryUi } from "@/hooks/use-equipment-form-industry-ui"
 import { useEquipmentTypes, equipmentCategorySelectOptions } from "@/lib/equipment-type-store"
@@ -169,7 +169,7 @@ export function AIScanModal({
     fd.set("file", new File([bin], "probe.jpg", { type: "image/jpeg" }))
     console.info("[equipment_scan_debug] probe_start", { org_id_length: organizationId.length })
     try {
-      const raw = await extractEquipmentFromScanUploadAction(fd)
+      const raw = await fetchEquipmentScanViaApi(organizationId, fd)
       const parsed = parseEquipmentScanActionResult(raw)
       console.info("[equipment_scan_debug] probe_raw_json", JSON.stringify(raw))
       console.info("[equipment_scan_debug] probe_parsed_json", JSON.stringify(parsed))
@@ -406,7 +406,7 @@ export function AIScanModal({
 
       try {
         let extractionTimer: ReturnType<typeof setTimeout> | undefined
-        const actionPromise = extractEquipmentFromScanUploadAction(fd).finally(() => {
+        const scanPromise = fetchEquipmentScanViaApi(organizationId, fd).finally(() => {
           if (extractionTimer !== undefined) {
             clearTimeout(extractionTimer)
             extractionTimer = undefined
@@ -415,7 +415,7 @@ export function AIScanModal({
         const timeoutPromise = new Promise<never>((_, reject) => {
           extractionTimer = window.setTimeout(() => reject(new Error("EXTRACTION_TIMEOUT")), EXTRACTION_TIMEOUT_MS)
         })
-        const raw = await Promise.race([actionPromise, timeoutPromise])
+        const raw = await Promise.race([scanPromise, timeoutPromise])
         clearScanTimers()
 
         const parsed = parseEquipmentScanActionResult(raw)
@@ -501,13 +501,28 @@ export function AIScanModal({
           )
         } else {
           equipmentScanDiag("upload_failed", { outcome: "throw_before_structured", detail })
-          console.info("[equipment_scan]", JSON.stringify({ ns: "equipment_scan", event: "action_rejected", detail }))
-          const transportHint = mapEquipmentScanTransportError(err)
-          setUploadError(
-            SCAN_DEBUG_PUBLIC
-              ? `Upload failed before the server could return details. [debug: ${detail}] (transport hint: ${transportHint})`
-              : "Upload failed before the server could return details.",
-          )
+          console.info("[equipment_scan]", JSON.stringify({ ns: "equipment_scan", event: "api_rejected", detail }))
+          if (err instanceof Error && err.message.startsWith("EQUIPMENT_SCAN_BAD_JSON:")) {
+            setUploadError(
+              SCAN_DEBUG_PUBLIC
+                ? `Scan API returned non-JSON. ${detail}`
+                : "The scan API returned an unexpected response. Your file may be too large for this host, or a proxy blocked the upload. Try a smaller image or PDF.",
+            )
+          } else if (err instanceof Error && err.message.startsWith("EQUIPMENT_SCAN_HTTP:")) {
+            const transportHint = mapEquipmentScanTransportError(err)
+            setUploadError(
+              SCAN_DEBUG_PUBLIC
+                ? `Scan API HTTP error. ${detail} (hint: ${transportHint})`
+                : "The scan request was rejected before extraction completed. Try signing in again, or use a smaller file.",
+            )
+          } else {
+            const transportHint = mapEquipmentScanTransportError(err)
+            setUploadError(
+              SCAN_DEBUG_PUBLIC
+                ? `Upload failed before the server could return details. [debug: ${detail}] (transport hint: ${transportHint})`
+                : "Upload failed before the server could return details.",
+            )
+          }
         }
         setStep("upload")
         revokePreviewObjectUrl()
