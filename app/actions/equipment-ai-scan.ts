@@ -35,7 +35,22 @@ export async function extractEquipmentFromScanUploadAction(
       buffer,
       fileName: file.name || "upload",
     })
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : ""
+    const lower = msg.toLowerCase()
+    if (lower.includes("body exceeded") || lower.includes("413")) {
+      return {
+        ok: false,
+        message:
+          "Upload is too large for the server. Try a smaller image or a PDF under about 4 MB, then try again.",
+      }
+    }
+    if (lower.includes("timeout") || lower.includes("timed out")) {
+      return {
+        ok: false,
+        message: "AI extraction timed out. Try again with a smaller file or better connectivity.",
+      }
+    }
     return {
       ok: false,
       message: "Something went wrong while processing the file. Try again or use manual entry.",

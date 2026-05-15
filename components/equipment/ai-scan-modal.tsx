@@ -27,6 +27,15 @@ import {
   EQUIPMENT_SCAN_MAX_BYTES_IMAGE,
   EQUIPMENT_SCAN_MAX_BYTES_PDF,
 } from "@/lib/equipment/equipment-scan-upload-validate"
+import {
+  equipmentScanClientHints,
+  equipmentScanDiag,
+} from "@/lib/equipment/equipment-scan-diagnostics"
+import {
+  messageForPrepareError,
+  prepareFileForEquipmentScanUpload,
+} from "@/lib/equipment/equipment-scan-client-prepare"
+import { mapEquipmentScanTransportError } from "@/lib/equipment/equipment-scan-client-errors"
 import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
 import { useEquipmentFormIndustryUi } from "@/hooks/use-equipment-form-industry-ui"
 import { useEquipmentTypes, equipmentCategorySelectOptions } from "@/lib/equipment-type-store"
@@ -40,6 +49,10 @@ type CustomerOption = { id: string; company_name: string }
 
 const ACCEPT_ATTR =
   "image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,application/pdf,.pdf,.jpg,.jpeg,.png,.webp,.gif,.heic,.heif"
+
+const ACCEPT_CAMERA_ATTR = "image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
+
+const EXTRACTION_TIMEOUT_MS = 120_000
 
 const SCAN_LABELS = [
   "Checking file…",
@@ -85,7 +98,9 @@ function validateClientFile(file: File): string | null {
   const isPdf = file.type === "application/pdf" || lower.endsWith(".pdf")
   const max = isPdf ? EQUIPMENT_SCAN_MAX_BYTES_PDF : EQUIPMENT_SCAN_MAX_BYTES_IMAGE
   if (file.size > max) {
-    return "This file is too large. Maximum size is 12 MB."
+    return isPdf
+      ? "This PDF is too large. Maximum size is 12 MB."
+      : "This image is too large. Maximum size is 12 MB."
   }
   if (file.size === 0) {
     return "This file appears to be empty."
@@ -126,7 +141,17 @@ export function AIScanModal({
   const [saving, setSaving] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const previewObjectUrlRef = useRef<string | null>(null)
   const scanTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([])
+
+  const revokePreviewObjectUrl = useCallback(() => {
+    const u = previewObjectUrlRef.current
+    if (u && u.startsWith("blob:")) {
+      URL.revokeObjectURL(u)
+    }
+    previewObjectUrlRef.current = null
+  }, [])
 
   const equipmentTypeOptions = useMemo(
     () => equipmentCategorySelectOptions(orgEquipmentTypes, form.equipmentType),
@@ -150,6 +175,7 @@ export function AIScanModal({
 
   function resetAll() {
     clearScanTimers()
+    revokePreviewObjectUrl()
     setStep("upload")
     setUploadKind(null)
     setImagePreview(null)
@@ -238,13 +264,42 @@ export function AIScanModal({
     })()
   }, [open, organizationId, orgReady, form.customerId])
 
+  useEffect(() => {
+    if (!open) {
+      revokePreviewObjectUrl()
+      setImagePreview(null)
+    }
+  }, [open, revokePreviewObjectUrl])
+
   const runExtraction = useCallback(
     async (file: File) => {
-      const clientErr = validateClientFile(file)
-      if (clientErr) {
-        setUploadError(clientErr)
-        return
+      const hints = equipmentScanClientHints()
+      const ext = (() => {
+        const i = file.name.lastIndexOf(".")
+        return i >= 0 ? file.name.slice(i + 1, i + 9).toLowerCase() : ""
+      })()
+      const sizeMb = Math.round((file.size / (1024 * 1024)) * 100) / 100
+
+      equipmentScanDiag("upload_start", {
+        os_family: hints.osFamily,
+        browser_family: hints.browserFamily,
+      })
+      equipmentScanDiag("file_selected", {
+        ext: ext || "none",
+        os_family: hints.osFamily,
+        browser_family: hints.browserFamily,
+      })
+      equipmentScanDiag("file_type", { reported_mime: file.type || "empty" })
+      equipmentScanDiag("file_size_mb", { value: sizeMb })
+
+      const reportedHeic =
+        (file.type || "").toLowerCase().includes("heic") ||
+        (file.type || "").toLowerCase().includes("heif") ||
+        /\.hei[cf]$/i.test(file.name)
+      if (hints.isIos && hints.isSafari && reportedHeic) {
+        equipmentScanDiag("safari_heic_detected", { value: true })
       }
+
       if (!organizationId) {
         setUploadError("No workspace selected.")
         return
@@ -252,16 +307,48 @@ export function AIScanModal({
       if (toastRecordEligibilityBlocked(equipmentCreateEligibility)) return
 
       setUploadError(null)
-      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
-      setUploadKind(isPdf ? "pdf" : "image")
-      setPendingFileName(file.name)
 
+      let uploadFile: File
+      try {
+        const prepared = await prepareFileForEquipmentScanUpload(file)
+        uploadFile = prepared.file
+        if (prepared.meta.compressionSkipped) {
+          equipmentScanDiag("compression_skipped", {
+            kind: prepared.meta.kind,
+            final_bytes: prepared.meta.finalBytes,
+          })
+        } else {
+          equipmentScanDiag("compression_done", {
+            kind: prepared.meta.kind,
+            original_bytes: prepared.meta.originalBytes,
+            final_bytes: prepared.meta.finalBytes,
+            converted_jpeg: prepared.meta.convertedToJpeg,
+          })
+        }
+      } catch (prepErr) {
+        const code = prepErr instanceof Error ? prepErr.message : "UNKNOWN"
+        equipmentScanDiag("compression_failed", { code })
+        setUploadError(messageForPrepareError(code))
+        return
+      }
+
+      const clientErr = validateClientFile(uploadFile)
+      if (clientErr) {
+        setUploadError(clientErr)
+        return
+      }
+
+      const isPdf =
+        uploadFile.type === "application/pdf" || uploadFile.name.toLowerCase().endsWith(".pdf")
+      setUploadKind(isPdf ? "pdf" : "image")
+      setPendingFileName(uploadFile.name)
+
+      revokePreviewObjectUrl()
+      setImagePreview(null)
       if (!isPdf) {
-        const reader = new FileReader()
-        reader.onload = (e) => setImagePreview((e.target?.result as string) ?? null)
-        reader.readAsDataURL(file)
-      } else {
-        setImagePreview(null)
+        const url = URL.createObjectURL(uploadFile)
+        previewObjectUrlRef.current = url
+        setImagePreview(url)
       }
 
       setStep("scanning")
@@ -277,14 +364,34 @@ export function AIScanModal({
 
       const fd = new FormData()
       fd.set("organizationId", organizationId)
-      fd.set("file", file)
+      fd.set("file", uploadFile)
+
+      equipmentScanDiag("upload_request_started", {
+        upload_bytes: uploadFile.size,
+        kind: isPdf ? "pdf" : "image",
+      })
+      equipmentScanDiag("extraction_started", {})
 
       try {
-        const result = await extractEquipmentFromScanUploadAction(fd)
+        let extractionTimer: ReturnType<typeof setTimeout> | undefined
+        const actionPromise = extractEquipmentFromScanUploadAction(fd).finally(() => {
+          if (extractionTimer !== undefined) {
+            clearTimeout(extractionTimer)
+            extractionTimer = undefined
+          }
+        })
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          extractionTimer = window.setTimeout(() => reject(new Error("EXTRACTION_TIMEOUT")), EXTRACTION_TIMEOUT_MS)
+        })
+        const result = await Promise.race([actionPromise, timeoutPromise])
         clearScanTimers()
+        equipmentScanDiag("upload_response_ok", { ok: result.ok })
         if (!result.ok) {
+          equipmentScanDiag("upload_response_error", { reason: "server_returned_error" })
+          equipmentScanDiag("extraction_failed", { reason: "server_returned_error" })
           setUploadError(result.message)
           setStep("upload")
+          revokePreviewObjectUrl()
           setImagePreview(null)
           setUploadKind(null)
           return
@@ -313,18 +420,29 @@ export function AIScanModal({
         setDocumentCustomerHint(f.documentCustomerHint)
         setScanLabel("Extraction complete")
         setStep("review")
-      } catch {
+      } catch (err) {
         clearScanTimers()
-        setUploadError("Could not reach the server. Check your connection and try again.")
+        const isTimeout = err instanceof Error && err.message === "EXTRACTION_TIMEOUT"
+        if (isTimeout) {
+          equipmentScanDiag("timeout_hit", { ms: EXTRACTION_TIMEOUT_MS })
+        } else {
+          equipmentScanDiag("upload_failed", { reason: "transport_or_action_throw" })
+        }
+        setUploadError(
+          isTimeout
+            ? "AI extraction timed out. Try again with a smaller file or better signal."
+            : mapEquipmentScanTransportError(err),
+        )
         setStep("upload")
+        revokePreviewObjectUrl()
         setImagePreview(null)
         setUploadKind(null)
       }
     },
-    [organizationId, equipmentCreateEligibility, clearScanTimers],
+    [organizationId, equipmentCreateEligibility, clearScanTimers, revokePreviewObjectUrl],
   )
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function consumePickedFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ""
     if (file) void runExtraction(file)
@@ -485,8 +603,17 @@ export function AIScanModal({
                   type="file"
                   accept={ACCEPT_ATTR}
                   className="sr-only"
-                  onChange={handleFileChange}
+                  onChange={consumePickedFile}
                   aria-label="Upload equipment photo or document"
+                />
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept={ACCEPT_CAMERA_ATTR}
+                  capture="environment"
+                  className="sr-only"
+                  onChange={consumePickedFile}
+                  aria-label="Take equipment photo with camera"
                 />
 
                 {uploadError ? (
@@ -495,6 +622,14 @@ export function AIScanModal({
                     <span>{uploadError}</span>
                   </p>
                 ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="text-xs font-medium text-[color:var(--ds-info-text)] underline-offset-2 hover:underline cursor-pointer px-3 py-1.5 rounded-md border border-[color:var(--ds-info-border)] bg-[color:var(--ds-info-bg)]"
+                >
+                  Use camera (photos only)
+                </button>
 
                 <button
                   type="button"

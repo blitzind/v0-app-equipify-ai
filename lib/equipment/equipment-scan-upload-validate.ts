@@ -1,5 +1,8 @@
 export const EQUIPMENT_SCAN_MAX_BYTES_IMAGE = 12 * 1024 * 1024
 export const EQUIPMENT_SCAN_MAX_BYTES_PDF = 12 * 1024 * 1024
+
+/** Stay under typical serverless request caps (~4.5MB on Vercel) after multipart overhead. */
+export const EQUIPMENT_SCAN_SAFE_UPLOAD_BYTES = 4_100_000
 export const EQUIPMENT_SCAN_MIN_PDF_TEXT_CHARS = 80
 export const EQUIPMENT_SCAN_PDF_TEXT_MAX_CHARS = 28_000
 
@@ -27,9 +30,23 @@ export function sniffEquipmentScanFileKind(buffer: Buffer): EquipmentScanSniffKi
   const g1 = buffer.toString("ascii", 0, 6)
   if (g1 === "GIF87a" || g1 === "GIF89a") return "gif"
   if (g1 === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP") return "webp"
-  if (buffer.length >= 12 && buffer.toString("ascii", 4, 8) === "ftyp") {
-    const brand = buffer.toString("ascii", 8, 12)
-    if (brand === "heic" || brand === "heix" || brand === "mif1" || brand === "msf1") return "heic"
+  // HEIF / HEIC: major + compatible brands (iPhone varies: heic, mif1, hevc, hevx, …)
+  if (buffer.length >= 16 && buffer.toString("ascii", 4, 8) === "ftyp") {
+    const heifBrands = new Set([
+      "heic",
+      "heix",
+      "hevc",
+      "hevx",
+      "mif1",
+      "msf1",
+      "heim",
+      "heis",
+    ])
+    const scanEnd = Math.min(buffer.length, 64)
+    for (let o = 8; o + 4 <= scanEnd; o += 4) {
+      const brand = buffer.toString("ascii", o, o + 4)
+      if (heifBrands.has(brand)) return "heic"
+    }
   }
   return "unknown"
 }
