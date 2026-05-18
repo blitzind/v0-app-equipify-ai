@@ -146,9 +146,11 @@ export function trackFreeTrialSignup(params: {
   userId: string
   organizationId: string
   selectedPlan?: string | null
+  howHeardAboutEquipify?: string | null
+  howHeardAboutEquipifyOther?: string | null
 }) {
   if (!isMarketingAnalyticsEnabled()) return
-  const { userId, organizationId, selectedPlan } = params
+  const { userId, organizationId, selectedPlan, howHeardAboutEquipify, howHeardAboutEquipifyOther } = params
   const dedupeKey = storageKey("free_trial_signup", userId, organizationId)
   if (alreadyFired(dedupeKey)) {
     marketingAnalyticsDebug("free_trial_signup deduped", params)
@@ -164,6 +166,9 @@ export function trackFreeTrialSignup(params: {
       {
         organization_id: organizationId,
         plan: selectedPlan ?? undefined,
+        how_heard: howHeardAboutEquipify ?? undefined,
+        how_heard_other:
+          howHeardAboutEquipify === "other" ? howHeardAboutEquipifyOther ?? undefined : undefined,
       },
     ])
     marketingAnalyticsDebug("GA4 free_trial_signup", params)
@@ -180,9 +185,11 @@ export function trackOnboardingCompleted(params: {
   userId: string
   organizationId: string
   flow: OnboardingCompletionFlow
+  howHeardAboutEquipify?: string | null
+  howHeardAboutEquipifyOther?: string | null
   onRedirectReady: () => void
 }) {
-  const { userId, organizationId, flow, onRedirectReady } = params
+  const { userId, organizationId, flow, howHeardAboutEquipify, howHeardAboutEquipifyOther, onRedirectReady } = params
 
   let redirectNotified = false
   const notifyRedirect = () => {
@@ -232,6 +239,9 @@ export function trackOnboardingCompleted(params: {
         {
           flow,
           organization_id: organizationId,
+          how_heard: howHeardAboutEquipify ?? undefined,
+          how_heard_other:
+            howHeardAboutEquipify === "other" ? howHeardAboutEquipifyOther ?? undefined : undefined,
         },
       ])
       marketingAnalyticsDebug("GA4 sign_up + onboarding_completed", params)

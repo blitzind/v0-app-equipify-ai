@@ -70,6 +70,8 @@ export interface PlatformAccount {
   subscriptionUpdatedAt?: string | null
   country: string
   industry: string
+  /** Human-readable attribution from onboarding (self-serve signups). */
+  howHeardAboutEquipify?: string | null
 }
 
 // ─── Feature flags ────────────────────────────────────────────────────────────

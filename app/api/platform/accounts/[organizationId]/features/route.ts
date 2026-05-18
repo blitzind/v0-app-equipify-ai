@@ -7,6 +7,7 @@ import {
   getAidenActionAvailability,
 } from "@/lib/permissions/aiden-actions"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { formatHowHeardAboutEquipifyDisplay } from "@/lib/onboarding/how-heard-about-equipify"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -43,11 +44,41 @@ export async function GET(
   if (!access.ok) return access.response
 
   const [{ data: org }, availability] = await Promise.all([
-    access.admin.from("organizations").select("id, name, slug").eq("id", organizationId).maybeSingle(),
+    access.admin
+      .from("organizations")
+      .select(
+        "id, name, slug, industry, how_heard_about_equipify, how_heard_about_equipify_other, created_at",
+      )
+      .eq("id", organizationId)
+      .maybeSingle(),
     getAidenActionAvailability({ supabase: access.admin, organizationId }),
   ])
 
-  return NextResponse.json({ ok: true, organization: org, aidenActions: availability })
+  const orgRow = org as {
+    id: string
+    name: string
+    slug: string | null
+    industry?: string | null
+    how_heard_about_equipify?: string | null
+    how_heard_about_equipify_other?: string | null
+    created_at?: string | null
+  } | null
+
+  return NextResponse.json({
+    ok: true,
+    organization: orgRow,
+    onboardingMetadata: orgRow
+      ? {
+          industry: orgRow.industry ?? null,
+          howHeardAboutEquipify: formatHowHeardAboutEquipifyDisplay({
+            value: orgRow.how_heard_about_equipify ?? null,
+            other: orgRow.how_heard_about_equipify_other ?? null,
+          }),
+          createdAt: orgRow.created_at ?? null,
+        }
+      : null,
+    aidenActions: availability,
+  })
 }
 
 export async function PATCH(

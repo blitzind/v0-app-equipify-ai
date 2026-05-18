@@ -29,6 +29,11 @@ import {
 } from "@/lib/onboarding-canonical"
 import { trackFreeTrialSignup, trackOnboardingCompleted } from "@/lib/analytics/marketing-analytics-events"
 import { onboardingAnalyticsDevLog } from "@/lib/analytics/marketing-analytics-debug"
+import { HowHeardSelect } from "@/components/onboarding/how-heard-select"
+import {
+  HOW_HEARD_ABOUT_EQUIPIFY_OTHER_VALUE,
+  type HowHeardAboutEquipifyValue,
+} from "@/lib/onboarding/how-heard-about-equipify"
 
 const STEPS = ["Your account", "Workspace", "Choose a plan"]
 /** Central registry — labels and keys from `lib/workspace-industry-registry.ts` */
@@ -79,8 +84,11 @@ function OnboardingPageContent() {
     teamSize: prefill.teamSize ?? "",
     currentSystem: prefill.currentSystem ?? "",
     timezone: "America/New_York",
+    howHeardAboutEquipify: "" as HowHeardAboutEquipifyValue | "",
+    howHeardAboutEquipifyOther: "",
   })
   const [stepOneError, setStepOneError] = useState<string | null>(null)
+  const [howHeardOtherError, setHowHeardOtherError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [inviteLoading, setInviteLoading] = useState(false)
@@ -301,6 +309,11 @@ function OnboardingPageContent() {
             firstName: effectiveFirstName,
             lastName: effectiveLastName,
             phone: form.phone.trim() || undefined,
+            howHeardAboutEquipify: form.howHeardAboutEquipify || undefined,
+            howHeardAboutEquipifyOther:
+              form.howHeardAboutEquipify === HOW_HEARD_ABOUT_EQUIPIFY_OTHER_VALUE
+                ? form.howHeardAboutEquipifyOther.trim() || undefined
+                : undefined,
           }),
         })
         const provisionData = (await provisionRes.json()) as {
@@ -334,6 +347,11 @@ function OnboardingPageContent() {
           industry: form.industry || undefined,
           teamSize: form.teamSize || undefined,
           currentSystem: form.currentSystem || undefined,
+          howHeardAboutEquipify: form.howHeardAboutEquipify || undefined,
+          howHeardAboutEquipifyOther:
+            form.howHeardAboutEquipify === HOW_HEARD_ABOUT_EQUIPIFY_OTHER_VALUE
+              ? form.howHeardAboutEquipifyOther.trim() || undefined
+              : undefined,
           organizationId: organizationIdParam || undefined,
           inviteTokenPresent: Boolean(inviteTokenParam),
           inviteOrganizationId: inviteContext?.organizationId || undefined,
@@ -349,6 +367,11 @@ function OnboardingPageContent() {
             userId: authUserId,
             organizationId: completedOrganizationId,
             selectedPlan,
+            howHeardAboutEquipify: form.howHeardAboutEquipify || null,
+            howHeardAboutEquipifyOther:
+              form.howHeardAboutEquipify === HOW_HEARD_ABOUT_EQUIPIFY_OTHER_VALUE
+                ? form.howHeardAboutEquipifyOther.trim() || null
+                : null,
           })
         }
         await new Promise<void>((resolve) => {
@@ -356,6 +379,11 @@ function OnboardingPageContent() {
             userId: authUserId,
             organizationId: completedOrganizationId,
             flow: completionFlow,
+            howHeardAboutEquipify: form.howHeardAboutEquipify || null,
+            howHeardAboutEquipifyOther:
+              form.howHeardAboutEquipify === HOW_HEARD_ABOUT_EQUIPIFY_OTHER_VALUE
+                ? form.howHeardAboutEquipifyOther.trim() || null
+                : null,
             onRedirectReady: resolve,
           })
         })
@@ -394,6 +422,17 @@ function OnboardingPageContent() {
         return
       }
       setStepOneError(null)
+    }
+
+    if (step === 1 && !inviteTokenParam) {
+      setHowHeardOtherError(null)
+      if (
+        form.howHeardAboutEquipify === HOW_HEARD_ABOUT_EQUIPIFY_OTHER_VALUE &&
+        !form.howHeardAboutEquipifyOther.trim()
+      ) {
+        setHowHeardOtherError("Please tell us how you found us.")
+        return
+      }
     }
 
     if (step < STEPS.length - 1) setStep((s) => s + 1)
@@ -590,6 +629,23 @@ function OnboardingPageContent() {
                     ))}
                   </select>
                 </div>
+                {!inviteTokenParam ? (
+                  <HowHeardSelect
+                    value={form.howHeardAboutEquipify}
+                    otherValue={form.howHeardAboutEquipifyOther}
+                    onValueChange={(v) => {
+                      setField("howHeardAboutEquipify", v)
+                      if (v !== HOW_HEARD_ABOUT_EQUIPIFY_OTHER_VALUE) {
+                        setHowHeardOtherError(null)
+                      }
+                    }}
+                    onOtherChange={(v) => {
+                      setField("howHeardAboutEquipifyOther", v)
+                      if (v.trim()) setHowHeardOtherError(null)
+                    }}
+                    otherError={howHeardOtherError}
+                  />
+                ) : null}
               </div>
               <div className="flex gap-3 mt-6">
                 <button onClick={back} className="portal-btn-secondary h-10 px-4">

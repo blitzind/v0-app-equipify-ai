@@ -21,6 +21,11 @@ type AidenActionsAvailability = {
 type ResponseData = {
   ok?: boolean
   organization?: { id: string; name: string; slug: string | null }
+  onboardingMetadata?: {
+    industry: string | null
+    howHeardAboutEquipify: string | null
+    createdAt: string | null
+  } | null
   aidenActions?: AidenActionsAvailability
   message?: string
   error?: string
@@ -80,6 +85,7 @@ export default function AdminAccountFeaturePage() {
   }
 
   const availability = data?.aidenActions
+  const onboardingMeta = data?.onboardingMetadata
 
   return (
     <div className="min-h-screen bg-background">
@@ -109,6 +115,32 @@ export default function AdminAccountFeaturePage() {
           ) : availability ? (
             <div className="mt-6 space-y-5">
               {error ? <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div> : null}
+
+              {onboardingMeta ? (
+                <div className="rounded-xl border border-border bg-muted/20 p-4">
+                  <p className="font-semibold">Onboarding metadata</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Self-serve signup context captured at workspace creation.
+                  </p>
+                  <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="text-muted-foreground">How they heard about Equipify</dt>
+                      <dd className="font-medium">{onboardingMeta.howHeardAboutEquipify ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Industry (workspace)</dt>
+                      <dd className="font-medium capitalize">{onboardingMeta.industry?.replace(/_/g, " ") ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Workspace created</dt>
+                      <dd className="font-medium">
+                        {onboardingMeta.createdAt ? onboardingMeta.createdAt.slice(0, 10) : "—"}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+              ) : null}
+
               <div className="rounded-xl border border-border bg-muted/30 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>

@@ -1,7 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { getPublicAppOrigin, getSignupInternalNotifyRecipient } from "@/lib/email/config"
+import { formatHowHeardAboutEquipifyDisplay } from "@/lib/onboarding/how-heard-about-equipify"
 import { sendEmail } from "@/lib/email/resend"
 
 const WELCOME_META_KEY = "signup_welcome_email_org_id"
@@ -67,6 +67,7 @@ function buildAdminNotifyContent(args: {
   organizationName: string | null
   organizationId: string
   atIso: string
+  howHeardDisplay: string | null
 }) {
   const subject = "[Equipify] New workspace signup"
   const lines = [
@@ -77,6 +78,7 @@ function buildAdminNotifyContent(args: {
     `User name: ${args.fullName ?? "—"}`,
     `Organization: ${args.organizationName ?? "—"}`,
     `Organization ID: ${args.organizationId}`,
+    `How they heard about Equipify: ${args.howHeardDisplay ?? "—"}`,
     `Source: POST /api/onboarding/provision`,
   ]
   const text = lines.join("\n")
@@ -117,7 +119,7 @@ export async function sendSignupProvisionEmailsIfNeeded(params: {
 
   const { data: orgRow, error: orgErr } = await admin
     .from("organizations")
-    .select("id, name, created_by")
+    .select("id, name, created_by, how_heard_about_equipify, how_heard_about_equipify_other")
     .eq("id", organizationId)
     .maybeSingle()
 
@@ -159,6 +161,10 @@ export async function sendSignupProvisionEmailsIfNeeded(params: {
   const dashboardUrl = `${getPublicAppOrigin()}/`
   const atIso = new Date().toISOString()
   const orgName = typeof orgRow.name === "string" ? orgRow.name : null
+  const howHeardDisplay = formatHowHeardAboutEquipifyDisplay({
+    value: (orgRow as { how_heard_about_equipify?: string | null }).how_heard_about_equipify ?? null,
+    other: (orgRow as { how_heard_about_equipify_other?: string | null }).how_heard_about_equipify_other ?? null,
+  })
 
   if (!welcomeDone) {
     if (!userEmail?.trim()) {
@@ -208,6 +214,7 @@ export async function sendSignupProvisionEmailsIfNeeded(params: {
       organizationName: orgName,
       organizationId,
       atIso,
+      howHeardDisplay,
     })
     const result = await sendEmail({
       to,

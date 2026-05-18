@@ -18,6 +18,8 @@ export type OnboardingIntent = {
   industry?: string
   teamSize?: OnboardingTeamSize
   currentSystem?: string
+  howHeardAboutEquipify?: string
+  howHeardAboutEquipifyOther?: string
 }
 
 function isPlanId(value: string): value is PlanId {

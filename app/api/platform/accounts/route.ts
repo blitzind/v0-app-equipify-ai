@@ -6,6 +6,7 @@ import { trialDaysLeftFromIso } from "@/lib/billing/trial-days-left"
 import { computePlatformAdminMrr } from "@/lib/billing/platform-admin-mrr"
 import { planTierLabelFromDbPlanId } from "@/lib/plan-display"
 import { subscriptionDisplayStatus } from "@/lib/platform-analytics-compute"
+import { formatHowHeardAboutEquipifyDisplay } from "@/lib/onboarding/how-heard-about-equipify"
 import type { AccountDisplayStatus, PlatformAccount, PlatformAccountsSummary } from "@/lib/admin-data"
 
 function normalizeOrgKey(id: string): string {
@@ -63,7 +64,9 @@ export async function GET() {
 
   const { data: orgs, error: orgErr } = await admin
     .from("organizations")
-    .select("id, name, slug, status, created_at, updated_at")
+    .select(
+      "id, name, slug, status, created_at, updated_at, industry, how_heard_about_equipify, how_heard_about_equipify_other",
+    )
     .order("created_at", { ascending: false })
 
   if (orgErr) {
@@ -209,7 +212,11 @@ export async function GET() {
       subscriptionUpdatedAt:
         typeof sub?.updated_at === "string" && sub.updated_at.trim() !== "" ? sub.updated_at : null,
       country: "",
-      industry: "",
+      industry: typeof o.industry === "string" ? o.industry : "",
+      howHeardAboutEquipify: formatHowHeardAboutEquipifyDisplay({
+        value: (o as { how_heard_about_equipify?: string | null }).how_heard_about_equipify ?? null,
+        other: (o as { how_heard_about_equipify_other?: string | null }).how_heard_about_equipify_other ?? null,
+      }),
     }
   })
 

@@ -16,6 +16,7 @@ import {
   type ProvisioningErrorCode,
 } from "@/lib/onboarding/error-mapping"
 import { sendSignupProvisionEmailsIfNeeded } from "@/lib/email/signup-provision-emails"
+import { parseHowHeardAboutEquipifyInput } from "@/lib/onboarding/how-heard-about-equipify"
 
 type Body = {
   organizationId?: string | null
@@ -28,6 +29,8 @@ type Body = {
   firstName?: string | null
   lastName?: string | null
   phone?: string | null
+  howHeardAboutEquipify?: string | null
+  howHeardAboutEquipifyOther?: string | null
 }
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
@@ -142,6 +145,28 @@ async function persistIndustryOnOrganization(
   }
 }
 
+async function persistHowHeardOnOrganization(
+  admin: SupabaseClient,
+  organizationId: string,
+  howHeard: { value: string | null; other: string | null },
+) {
+  if (!howHeard.value) return
+  const { error } = await admin
+    .from("organizations")
+    .update({
+      how_heard_about_equipify: howHeard.value,
+      how_heard_about_equipify_other: howHeard.other,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", organizationId)
+  if (error) {
+    logProvisionError("how_heard_persist_failed", {
+      organizationId,
+      error: error.message,
+    })
+  }
+}
+
 export async function POST(request: Request) {
   let body: Body
   try {
@@ -182,6 +207,16 @@ export async function POST(request: Request) {
 
   const seedDemo = body.seedDemo !== false
   const industry = normalizeIndustryKey(body.industry)
+  const howHeardParsed = parseHowHeardAboutEquipifyInput({
+    value: body.howHeardAboutEquipify,
+    other: body.howHeardAboutEquipifyOther,
+  })
+  if (!howHeardParsed.ok) {
+    return NextResponse.json(
+      { error: "invalid_how_heard", message: howHeardParsed.message },
+      { status: 400 },
+    )
+  }
   let organizationId = typeof body.organizationId === "string" ? body.organizationId.trim() : ""
   let createdNewOrganization = false
 
@@ -190,6 +225,7 @@ export async function POST(request: Request) {
     hasOrganizationIdParam: Boolean(organizationId),
     seedDemo,
     industry,
+    howHeard: howHeardParsed.value,
   })
 
   if (organizationId) {
@@ -258,6 +294,10 @@ export async function POST(request: Request) {
   // outcome. This guarantees industry-aware defaults even if seeding is skipped
   // or fails.
   await persistIndustryOnOrganization(svc, organizationId, industry)
+  await persistHowHeardOnOrganization(svc, organizationId, {
+    value: howHeardParsed.value,
+    other: howHeardParsed.other,
+  })
 
   if (createdNewOrganization) {
     try {
