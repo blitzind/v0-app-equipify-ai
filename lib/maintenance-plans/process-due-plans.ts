@@ -198,6 +198,10 @@ export async function processDuePlansForOrganization(
       },
     }
 
+    if (row.is_sample === true) {
+      insertPayload.is_sample = true
+    }
+
     if (systemInsert && systemActorId) {
       insertPayload.created_by = systemActorId
     }

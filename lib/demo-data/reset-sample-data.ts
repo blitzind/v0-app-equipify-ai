@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { mergeSampleWorkOrderIds } from "@/lib/demo-data/merge-sample-work-order-ids"
 
 const ID_CHUNK = 120
 
@@ -87,6 +88,39 @@ async function deleteCommunicationEventsByRelatedEntity(
     total += countDeleted(res)
   }
   return total
+}
+
+async function collectPmAutomationWorkOrderIdsForSampleReset(
+  admin: SupabaseClient,
+  organizationId: string,
+  sampleMaintenancePlanIds: string[],
+  sampleEquipmentIds: string[],
+  sampleCustomerIds: string[],
+): Promise<string[]> {
+  const found = new Set<string>()
+
+  async function collectByColumn(column: "maintenance_plan_id" | "equipment_id" | "customer_id", ids: string[]) {
+    if (ids.length === 0) return
+    for (let i = 0; i < ids.length; i += ID_CHUNK) {
+      const slice = ids.slice(i, i + ID_CHUNK)
+      const { data, error } = await admin
+        .from("work_orders")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("created_by_pm_automation", true)
+        .in(column, slice)
+      if (error) throw new Error(error.message)
+      for (const row of data ?? []) {
+        found.add((row as { id: string }).id)
+      }
+    }
+  }
+
+  await collectByColumn("maintenance_plan_id", sampleMaintenancePlanIds)
+  await collectByColumn("equipment_id", sampleEquipmentIds)
+  await collectByColumn("customer_id", sampleCustomerIds)
+
+  return [...found]
 }
 
 /**
@@ -183,6 +217,15 @@ export async function resetSampleDataForOrganization(
   ]
   const sampleServiceRequestIds = (serviceRequestRows ?? []).map((r) => (r as { id: string }).id)
 
+  const pmAutomationWoIds = await collectPmAutomationWorkOrderIdsForSampleReset(
+    admin,
+    organizationId,
+    sampleMpIds,
+    sampleEquipmentIds,
+    sampleCustomerIds,
+  )
+  const workOrderIdsToDelete = mergeSampleWorkOrderIds(sampleWoIds, pmAutomationWoIds)
+
   if (sampleUserIds.length > 0) {
     const tcRes = await admin
       .from("technician_certifications")
@@ -226,7 +269,7 @@ export async function resetSampleDataForOrganization(
   )
 
   const relatedTotal = await Promise.all([
-    deleteCommunicationEventsByRelatedEntity(admin, organizationId, "work_order", sampleWoIds),
+    deleteCommunicationEventsByRelatedEntity(admin, organizationId, "work_order", workOrderIdsToDelete),
     deleteCommunicationEventsByRelatedEntity(admin, organizationId, "customer", sampleCustomerIds),
     deleteCommunicationEventsByRelatedEntity(admin, organizationId, "equipment", sampleEquipmentIds),
     deleteCommunicationEventsByRelatedEntity(admin, organizationId, "quote", sampleQuoteIds),
@@ -288,7 +331,7 @@ export async function resetSampleDataForOrganization(
     "certificate_attachments",
     organizationId,
     "work_order_id",
-    sampleWoIds,
+    workOrderIdsToDelete,
   )
 
   summary.workOrderAttachments = await deleteInIdChunks(
@@ -296,7 +339,7 @@ export async function resetSampleDataForOrganization(
     "work_order_attachments",
     organizationId,
     "work_order_id",
-    sampleWoIds,
+    workOrderIdsToDelete,
   )
 
   const delInv = await admin
@@ -352,9 +395,9 @@ export async function resetSampleDataForOrganization(
     summary.inventoryStock += await deleteInIdChunks(admin, "inventory_stock", organizationId, "location_id", demoLocationIds)
   }
 
-  if (sampleWoIds.length > 0) {
-    for (let i = 0; i < sampleWoIds.length; i += ID_CHUNK) {
-      const slice = sampleWoIds.slice(i, i + ID_CHUNK)
+  if (workOrderIdsToDelete.length > 0) {
+    for (let i = 0; i < workOrderIdsToDelete.length; i += ID_CHUNK) {
+      const slice = workOrderIdsToDelete.slice(i, i + ID_CHUNK)
       const r = await admin
         .from("inventory_transactions")
         .delete()
@@ -408,13 +451,13 @@ export async function resetSampleDataForOrganization(
     .select("id")
   summary.orgVendors = countDeleted(delVend)
 
-  const delWo = await admin
-    .from("work_orders")
-    .delete()
-    .eq("organization_id", organizationId)
-    .eq("is_sample", true)
-    .select("id")
-  summary.workOrders = countDeleted(delWo)
+  summary.workOrders = await deleteInIdChunks(
+    admin,
+    "work_orders",
+    organizationId,
+    "id",
+    workOrderIdsToDelete,
+  )
 
   const delMp = await admin
     .from("maintenance_plans")

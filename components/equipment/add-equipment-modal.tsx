@@ -79,7 +79,6 @@ const INITIAL_FORM = {
   nextServiceDue: "",
   nextCalibrationDue: "",
   calibrationIntervalMonths: "",
-  serviceInterval: "",
   status: "Active" as EquipmentStatus,
   notes: "",
 }
@@ -997,23 +996,12 @@ export function AddEquipmentModal({
               </Field>
             </div>
 
-            {/* Row service interval + status */}
-            <div className="grid grid-cols-2 gap-4">
-              <Field>
-                <Label>Service Interval</Label>
-                <Input
-                  placeholder={ui.placeholders.serviceInterval}
-                  value={form.serviceInterval}
-                  onChange={(e) => set("serviceInterval", e.target.value)}
-                />
-              </Field>
-              <Field>
-                <Label>Status</Label>
-                <NativeSelect value={form.status} onChange={(e) => set("status", e.target.value as EquipmentStatus)}>
-                  {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </NativeSelect>
-              </Field>
-            </div>
+            <Field>
+              <Label>Status</Label>
+              <NativeSelect value={form.status} onChange={(e) => set("status", e.target.value as EquipmentStatus)}>
+                {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </NativeSelect>
+            </Field>
 
             {/* Notes */}
             <Field>

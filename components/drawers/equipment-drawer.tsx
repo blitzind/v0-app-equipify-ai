@@ -24,6 +24,11 @@ import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supab
 import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
+import { isEquipmentListSchemaMismatchError } from "@/lib/equipment/equipment-detail-queries"
+import {
+  EQUIPMENT_DRAWER_SELECT_FULL,
+  EQUIPMENT_DRAWER_SELECT_LEGACY,
+} from "@/lib/equipment/equipment-drawer-select"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -346,6 +351,7 @@ type DbEquipmentRow = {
   name: string
   manufacturer: string | null
   category: string | null
+  subcategory: string | null
   serial_number: string | null
   status: "active" | "needs_service" | "out_of_service" | "in_repair"
   install_date: string | null
@@ -355,6 +361,8 @@ type DbEquipmentRow = {
   warranty_expires_at: string | null
   last_service_at: string | null
   next_due_at: string | null
+  next_calibration_due_at: string | null
+  calibration_interval_months: number | null
   location_label: string | null
   customer_location_id: string | null
   notes: string | null
@@ -394,6 +402,10 @@ function mapUiStatusToDbStatus(status: Equipment["status"]): DbEquipmentRow["sta
     default:
       return "active"
   }
+}
+
+function equipmentSaveErrorMessage(): string {
+  return "Could not save changes. Try again or refresh the page."
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -679,21 +691,39 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
 
       const { data: row, error } = await supabase
         .from("equipment")
-        .select(
-          "id, organization_id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, install_date, warranty_start_date, warranty_expiration_date, warranty_expires_at, last_service_at, next_due_at, location_label, customer_location_id, notes, archived_at"
-        )
+        .select(EQUIPMENT_DRAWER_SELECT_FULL)
         .eq("id", equipmentId)
         .eq("organization_id", orgId)
         .maybeSingle()
 
-      if (error || !row) {
+      let equipmentRow: DbEquipmentRow | null = row as DbEquipmentRow | null
+      if (error && isEquipmentListSchemaMismatchError(error)) {
+        const legacy = await supabase
+          .from("equipment")
+          .select(EQUIPMENT_DRAWER_SELECT_LEGACY)
+          .eq("id", equipmentId)
+          .eq("organization_id", orgId)
+          .maybeSingle()
+        if (legacy.error || !legacy.data) {
+          setEq(null)
+          setDrawerWOs([])
+          setDrawerPlans([])
+          return
+        }
+        equipmentRow = legacy.data as DbEquipmentRow
+      } else if (error || !equipmentRow) {
         setEq(null)
         setDrawerWOs([])
         setDrawerPlans([])
         return
       }
 
-      const equipmentRow = row as DbEquipmentRow
+      if (!equipmentRow) {
+        setEq(null)
+        setDrawerWOs([])
+        setDrawerPlans([])
+        return
+      }
 
       const { data: locData } = await supabase
         .from("customer_locations")
@@ -750,6 +780,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
         model: equipmentRow.name,
         manufacturer: equipmentRow.manufacturer ?? "",
         category: equipmentRow.category ?? "",
+        subcategory: equipmentRow.subcategory ?? undefined,
         serialNumber: equipmentRow.serial_number ?? "",
         installDate: equipmentRow.install_date ?? "",
         warrantyStartDate: equipmentRow.warranty_start_date ?? "",
@@ -757,6 +788,8 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
           equipmentRow.warranty_expiration_date ?? equipmentRow.warranty_expires_at ?? "",
         lastServiceDate: equipmentRow.last_service_at ?? "",
         nextDueDate: equipmentRow.next_due_at ?? "",
+        nextCalibrationDue: equipmentRow.next_calibration_due_at?.slice(0, 10) ?? undefined,
+        calibrationIntervalMonths: equipmentRow.calibration_interval_months ?? undefined,
         status: mapDbStatusToUiStatus(equipmentRow.status),
         notes: equipmentRow.notes ?? "",
         location: equipmentRow.location_label ?? "",
@@ -837,9 +870,12 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
     if (!eq || eq.isArchived) return
     setDraft({
       model: eq.model, manufacturer: eq.manufacturer, category: eq.category,
+      subcategory: eq.subcategory ?? "",
       serialNumber: eq.serialNumber, location: eq.location,
       installDate: eq.installDate, warrantyStartDate: eq.warrantyStartDate ?? "", warrantyExpiration: eq.warrantyExpiration,
       lastServiceDate: eq.lastServiceDate, nextDueDate: eq.nextDueDate,
+      nextCalibrationDue: eq.nextCalibrationDue ?? "",
+      calibrationIntervalMonths: eq.calibrationIntervalMonths ?? null,
       status: eq.status, notes: eq.notes,
     })
     setEditCustomerLocationId(eq.serviceSiteId ?? "")
@@ -856,10 +892,23 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
     if (!eq || !activeOrgId || eq.isArchived) return
     const supabase = createBrowserSupabaseClient()
 
+    const calibrationIntervalRaw = draft.calibrationIntervalMonths ?? eq.calibrationIntervalMonths
+    const calibrationIntervalMonths =
+      calibrationIntervalRaw == null || calibrationIntervalRaw === undefined
+        ? null
+        : (() => {
+            const n =
+              typeof calibrationIntervalRaw === "number"
+                ? calibrationIntervalRaw
+                : Number.parseInt(String(calibrationIntervalRaw), 10)
+            return Number.isFinite(n) && n > 0 ? n : null
+          })()
+
     const updatePayload = {
       name: (draft.model ?? eq.model).trim(),
       manufacturer: (draft.manufacturer ?? eq.manufacturer).trim() || null,
       category: (draft.category ?? eq.category).trim() || null,
+      subcategory: (draft.subcategory ?? eq.subcategory ?? "").trim() || null,
       serial_number: (draft.serialNumber ?? eq.serialNumber).trim() || null,
       status: mapUiStatusToDbStatus((draft.status ?? eq.status) as Equipment["status"]),
       install_date: (draft.installDate ?? eq.installDate) || null,
@@ -868,6 +917,8 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       warranty_expires_at: (draft.warrantyExpiration ?? eq.warrantyExpiration) || null,
       last_service_at: (draft.lastServiceDate ?? eq.lastServiceDate) || null,
       next_due_at: (draft.nextDueDate ?? eq.nextDueDate) || null,
+      next_calibration_due_at: (draft.nextCalibrationDue ?? eq.nextCalibrationDue ?? "").trim() || null,
+      calibration_interval_months: calibrationIntervalMonths,
       location_label: (draft.location ?? eq.location).trim() || null,
       customer_location_id: editCustomerLocationId.trim() || null,
       notes: (draft.notes ?? eq.notes).trim() || null,
@@ -880,7 +931,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       .eq("organization_id", activeOrgId)
 
     if (error) {
-      toast(`Update failed: ${error.message}`)
+      toast(equipmentSaveErrorMessage())
       return
     }
 
@@ -907,7 +958,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       .eq("organization_id", activeOrgId)
 
     if (error) {
-      toast(`Archive failed: ${error.message}`)
+      toast("Could not archive this equipment. Try again.")
       return
     }
 
@@ -932,7 +983,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       .eq("organization_id", activeOrgId)
 
     if (error) {
-      toast(`Restore failed: ${error.message}`)
+      toast("Could not restore this equipment. Try again.")
       return
     }
 
@@ -1321,6 +1372,13 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                     className={drawerInputClass}
                   />
                 </EditableRow>
+                <EditableRow label="Subcategory" value={eq.subcategory?.trim() ? eq.subcategory : "—"} editing={editing}>
+                  <Input
+                    value={draft.subcategory ?? ""}
+                    onChange={(e) => setField("subcategory", e.target.value)}
+                    className={drawerInputClass}
+                  />
+                </EditableRow>
                 <EditableRow label="Serial Number" value={eq.serialNumber || "—"} editing={editing}>
                   <Input
                     value={draft.serialNumber ?? ""}
@@ -1425,31 +1483,13 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                 )}
               </DrawerSection>
 
-              {/* Service Information */}
-              <DrawerSection title="Service Information">
+              {/* Installation & warranty */}
+              <DrawerSection title="Installation & warranty">
                 <EditableRow label="Installed" value={fmtDate(eq.installDate)} editing={editing}>
                   <Input
                     type="date"
                     value={draft.installDate ?? ""}
                     onChange={(e) => setField("installDate", e.target.value)}
-                    className={drawerInputClass}
-                  />
-                </EditableRow>
-                <EditableRow label="Last Service" value={fmtDate(eq.lastServiceDate)} editing={editing}>
-                  <Input
-                    type="date"
-                    value={draft.lastServiceDate ?? ""}
-                    onChange={(e) => setField("lastServiceDate", e.target.value)}
-                    className={drawerInputClass}
-                  />
-                </EditableRow>
-                <EditableRow label="Next Due" value={
-                  <span className={cn("font-semibold", daysColor)}>{fmtDate(eq.nextDueDate)} · {daysLabel}</span>
-                } editing={editing}>
-                  <Input
-                    type="date"
-                    value={draft.nextDueDate ?? ""}
-                    onChange={(e) => setField("nextDueDate", e.target.value)}
                     className={drawerInputClass}
                   />
                 </EditableRow>
@@ -1474,6 +1514,84 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                     type="date"
                     value={draft.warrantyExpiration ?? ""}
                     onChange={(e) => setField("warrantyExpiration", e.target.value)}
+                    className={drawerInputClass}
+                  />
+                </EditableRow>
+              </DrawerSection>
+
+              {/* Preventive maintenance */}
+              <DrawerSection title="Preventive maintenance">
+                <p className="text-xs text-muted-foreground mb-3 -mt-1">
+                  Service tracks maintenance and repair work.
+                </p>
+                <EditableRow label="Last service date" value={fmtDate(eq.lastServiceDate)} editing={editing}>
+                  <Input
+                    type="date"
+                    value={draft.lastServiceDate ?? ""}
+                    onChange={(e) => setField("lastServiceDate", e.target.value)}
+                    className={drawerInputClass}
+                  />
+                </EditableRow>
+                <EditableRow
+                  label="Next service due"
+                  value={
+                    <span className={cn("font-semibold", daysColor)}>
+                      {fmtDate(eq.nextDueDate)} · {daysLabel}
+                    </span>
+                  }
+                  editing={editing}
+                >
+                  <Input
+                    type="date"
+                    value={draft.nextDueDate ?? ""}
+                    onChange={(e) => setField("nextDueDate", e.target.value)}
+                    className={drawerInputClass}
+                  />
+                </EditableRow>
+              </DrawerSection>
+
+              {/* Calibration & compliance */}
+              <DrawerSection title="Calibration & compliance">
+                <p className="text-xs text-muted-foreground mb-3 -mt-1">
+                  Calibration tracks compliance, certification, and due dates.
+                </p>
+                <EditableRow
+                  label="Next calibration due"
+                  value={eq.nextCalibrationDue?.trim() ? fmtDate(eq.nextCalibrationDue) : "—"}
+                  editing={editing}
+                >
+                  <Input
+                    type="date"
+                    value={draft.nextCalibrationDue ?? ""}
+                    onChange={(e) => setField("nextCalibrationDue", e.target.value)}
+                    className={drawerInputClass}
+                  />
+                </EditableRow>
+                <EditableRow
+                  label="Calibration interval"
+                  value={
+                    eq.calibrationIntervalMonths != null && eq.calibrationIntervalMonths > 0
+                      ? `${eq.calibrationIntervalMonths} months`
+                      : "—"
+                  }
+                  editing={editing}
+                >
+                  <Input
+                    type="number"
+                    min={1}
+                    placeholder="e.g. 12"
+                    value={
+                      draft.calibrationIntervalMonths ?? eq.calibrationIntervalMonths ?? ""
+                    }
+                    onChange={(e) => {
+                      const t = e.target.value.trim()
+                      if (!t) {
+                        setField("calibrationIntervalMonths", null)
+                        return
+                      }
+                      const n = Number.parseInt(t, 10)
+                      setField("calibrationIntervalMonths", Number.isFinite(n) && n > 0 ? n : null)
+                    }}
                     className={drawerInputClass}
                   />
                 </EditableRow>

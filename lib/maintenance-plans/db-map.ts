@@ -34,6 +34,8 @@ export type MaintenancePlanRow = {
   created_at: string
   updated_at: string
   last_auto_wo_at?: string | null
+  /** Demo/sample plans (`is_sample`) — PM automation work orders inherit this flag. */
+  is_sample?: boolean | null
 }
 
 export function planStatusUiToDb(s: PlanStatus): MaintenancePlanRow["status"] {
