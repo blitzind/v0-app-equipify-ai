@@ -49,6 +49,7 @@ import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -69,6 +70,13 @@ import { RestrictedNotice } from "@/components/permissions/restricted-notice"
 import { ProspectFormDialog } from "@/components/prospects/prospect-form-dialog"
 import { ProspectDrawer } from "@/components/prospects/prospect-drawer"
 import { ProspectPipelineBoard } from "@/components/prospects/prospect-pipeline-board"
+import { ProspectBulkArchiveDialog } from "@/components/prospects/prospect-bulk-archive-dialog"
+import { bulkArchiveProspectsViaApi } from "@/lib/prospects/bulk-archive-prospects-client"
+import {
+  bulkProspectArchivePartialToast,
+  bulkProspectArchiveSuccessToast,
+  BULK_PROSPECT_ARCHIVE_PARTIAL_DESCRIPTION,
+} from "@/lib/prospects/bulk-archive-messages"
 import {
   ACTIVE_PROSPECT_STATUSES,
   PROSPECT_STATUSES,
@@ -154,6 +162,20 @@ function ProspectsPageInner() {
   const [activeProspect, setActiveProspect] = useState<ProspectListItem | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>("table")
   const [assignees, setAssignees] = useState<AssigneeOption[]>([])
+  const [selectedProspectIds, setSelectedProspectIds] = useState<Set<string>>(() => new Set())
+  const [bulkArchiveOpen, setBulkArchiveOpen] = useState(false)
+  const [bulkArchiveBusy, setBulkArchiveBusy] = useState(false)
+
+  const canBulkArchiveFromList = canManage && archiveScope === "active" && viewMode === "table"
+  const selectedCount = selectedProspectIds.size
+
+  const clearSelection = useCallback(() => {
+    setSelectedProspectIds(new Set())
+  }, [])
+
+  useEffect(() => {
+    clearSelection()
+  }, [search, statusFilter, followUpFilter, archiveScope, viewMode, clearSelection])
 
   const [lostPrompt, setLostPrompt] = useState<{ prospectId: string } | null>(null)
   const [lostReasonDraft, setLostReasonDraft] = useState("")
@@ -230,6 +252,69 @@ function ProspectsPageInner() {
     if (followUpFilter === "all") return rows
     return rows.filter((r) => followUpBucketFor(r.next_follow_up_at) === followUpFilter)
   }, [rows, followUpFilter])
+
+  const selectableFollowUpFiltered = useMemo(
+    () => followUpFiltered.filter((r) => !r.archived_at),
+    [followUpFiltered],
+  )
+
+  const toggleAllVisibleSelection = useCallback(() => {
+    const visibleIds = selectableFollowUpFiltered.map((p) => p.id)
+    if (visibleIds.length === 0) return
+    setSelectedProspectIds((prev) => {
+      const allSelected = visibleIds.every((id) => prev.has(id))
+      if (allSelected) return new Set()
+      return new Set(visibleIds)
+    })
+  }, [selectableFollowUpFiltered])
+
+  const allVisibleSelected =
+    selectableFollowUpFiltered.length > 0 &&
+    selectableFollowUpFiltered.every((p) => selectedProspectIds.has(p.id))
+  const someVisibleSelected =
+    selectableFollowUpFiltered.some((p) => selectedProspectIds.has(p.id)) && !allVisibleSelected
+
+  const toggleRowSelection = useCallback((id: string) => {
+    setSelectedProspectIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  async function confirmBulkArchive() {
+    if (!organizationId || selectedProspectIds.size === 0) return
+    setBulkArchiveBusy(true)
+    const ids = [...selectedProspectIds]
+    const res = await bulkArchiveProspectsViaApi({ organizationId, prospectIds: ids })
+    setBulkArchiveBusy(false)
+    if (!res.ok) {
+      toast({ variant: "destructive", title: res.message })
+      return
+    }
+    setBulkArchiveOpen(false)
+    if (res.succeededCount === 0) {
+      toast({ variant: "destructive", title: "Could not archive selected prospects." })
+      return
+    }
+    if (activeProspect && selectedProspectIds.has(activeProspect.id)) {
+      setDrawerOpen(false)
+      setActiveProspect(null)
+    }
+    await load()
+    if (res.failedCount === 0) {
+      clearSelection()
+      toast({ title: bulkProspectArchiveSuccessToast(res.succeededCount) })
+      return
+    }
+    setSelectedProspectIds(new Set(res.failedIds))
+    toast({
+      variant: "destructive",
+      title: bulkProspectArchivePartialToast(res.succeededCount, res.failedCount),
+      description: BULK_PROSPECT_ARCHIVE_PARTIAL_DESCRIPTION,
+    })
+  }
 
   const followUpKpis = useMemo(() => {
     let overdue = 0
@@ -608,6 +693,26 @@ function ProspectsPageInner() {
         </p>
       ) : null}
 
+      {canBulkArchiveFromList && selectedCount > 0 ? (
+        <div className="hidden md:flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
+          <span className="text-sm font-medium text-foreground">
+            {selectedCount} prospect{selectedCount === 1 ? "" : "s"} selected
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            className="h-8"
+            onClick={() => setBulkArchiveOpen(true)}
+          >
+            Archive selected
+          </Button>
+          <Button type="button" size="sm" variant="ghost" className="h-8" onClick={clearSelection}>
+            Clear selection
+          </Button>
+        </div>
+      ) : null}
+
       {/* Table or pipeline */}
       <div className="bg-card border border-border rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.15)]">
         {viewMode === "pipeline" ? (
@@ -628,6 +733,16 @@ function ProspectsPageInner() {
           <Table>
             <TableHeader>
               <TableRow>
+                {canBulkArchiveFromList ? (
+                  <TableHead className="hidden md:table-cell w-10">
+                    <Checkbox
+                      aria-label="Select all visible prospects"
+                      checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+                      disabled={selectableFollowUpFiltered.length === 0 || loading}
+                      onCheckedChange={toggleAllVisibleSelection}
+                    />
+                  </TableHead>
+                ) : null}
                 <TableHead>Company</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Status</TableHead>
@@ -642,13 +757,19 @@ function ProspectsPageInner() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-sm text-muted-foreground py-8 text-center">
+                  <TableCell
+                    colSpan={canBulkArchiveFromList ? 10 : 9}
+                    className="text-sm text-muted-foreground py-8 text-center"
+                  >
                     Loading prospects…
                   </TableCell>
                 </TableRow>
               ) : followUpFiltered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-7 sm:py-8 text-center align-middle">
+                  <TableCell
+                    colSpan={canBulkArchiveFromList ? 10 : 9}
+                    className="py-7 sm:py-8 text-center align-middle"
+                  >
                     <EmptyState canManage={canManage} onCreate={() => setCreateOpen(true)} />
                   </TableCell>
                 </TableRow>
@@ -667,6 +788,19 @@ function ProspectsPageInner() {
                       className="cursor-pointer hover:bg-muted/40 transition-colors"
                       onClick={() => openProspect(p)}
                     >
+                      {canBulkArchiveFromList ? (
+                        <TableCell
+                          className="hidden md:table-cell w-10"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Checkbox
+                            aria-label={`Select ${p.company_name}`}
+                            checked={selectedProspectIds.has(p.id)}
+                            disabled={Boolean(p.archived_at)}
+                            onCheckedChange={() => toggleRowSelection(p.id)}
+                          />
+                        </TableCell>
+                      ) : null}
                       <TableCell className="text-sm font-medium">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span>{p.company_name}</span>
@@ -860,6 +994,16 @@ function ProspectsPageInner() {
         onChanged={() => {
           void load()
         }}
+      />
+
+      <ProspectBulkArchiveDialog
+        open={bulkArchiveOpen}
+        onOpenChange={(open) => {
+          if (!open && !bulkArchiveBusy) setBulkArchiveOpen(false)
+        }}
+        selectedCount={selectedCount}
+        busy={bulkArchiveBusy}
+        onConfirm={() => void confirmBulkArchive()}
       />
     </div>
   )

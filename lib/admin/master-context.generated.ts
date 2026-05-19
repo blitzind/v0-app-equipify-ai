@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 450,
+  apiRouteHandlers: 452,
   sqlMigrations: 197,
   dashboardPages: 65,
-  componentsTsx: 322,
-  libTsFiles: 890,
+  componentsTsx: 324,
+  libTsFiles: 896,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **450** |
+| API route handlers (\`app/api/**/route.ts\`) | **452** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **197** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **322** |
-| \`lib/**/*.ts\` | **890** |
+| \`components/**/*.tsx\` | **324** |
+| \`lib/**/*.ts\` | **896** |
 
 ### Vercel crons
 
@@ -284,6 +284,7 @@ organizations/[organizationId]/customers/[customerId]/locations/[locationId]/rou
 organizations/[organizationId]/customers/[customerId]/locations/route.ts
 organizations/[organizationId]/customers/[customerId]/portal-certificate-release/route.ts
 organizations/[organizationId]/customers/[customerId]/portal-consolidated-documents/route.ts
+organizations/[organizationId]/customers/bulk-archive/route.ts
 organizations/[organizationId]/equipment-warranties/[warrantyId]/route.ts
 organizations/[organizationId]/equipment-warranties/route.ts
 organizations/[organizationId]/equipment/ai-scan/route.ts
@@ -369,6 +370,7 @@ organizations/[organizationId]/prospects/[prospectId]/draft-followup/route.ts
 organizations/[organizationId]/prospects/[prospectId]/follow-up/route.ts
 organizations/[organizationId]/prospects/[prospectId]/route.ts
 organizations/[organizationId]/prospects/[prospectId]/timeline/route.ts
+organizations/[organizationId]/prospects/bulk-archive/route.ts
 organizations/[organizationId]/prospects/route.ts
 organizations/[organizationId]/quotes/[quoteId]/blitzpay/apply-deposit-credit/route.ts
 organizations/[organizationId]/quotes/[quoteId]/blitzpay/payment-link/route.ts

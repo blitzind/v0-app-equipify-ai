@@ -1,20 +1,30 @@
 "use client"
 
-import { useState, useMemo, useEffect, Suspense } from "react"
+import { useState, useMemo, useEffect, useCallback, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import { AddCustomerModal } from "@/components/customers/add-customer-modal"
+import { CustomerBulkArchiveDialog } from "@/components/customers/customer-bulk-archive-dialog"
+import { bulkArchiveCustomersViaApi } from "@/lib/customers/bulk-archive-customers-client"
+import {
+  bulkCustomerArchivePartialToast,
+  bulkCustomerArchiveSuccessToast,
+  BULK_CUSTOMER_ARCHIVE_PARTIAL_DESCRIPTION,
+} from "@/lib/customers/bulk-archive-messages"
 import { applyArchivedAtScope } from "@/lib/archive-scope"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
+import { useToast } from "@/hooks/use-toast"
 import { isAssignedWorkOnly, loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { useCustomers } from "@/lib/customer-store"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import {
   Table,
@@ -254,6 +264,8 @@ function CustomerCard({
 function CustomersPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const { permissions } = useOrgPermissions()
+  const { canArchiveRestore } = useOrgArchivePermissions()
+  const { toast } = useToast()
   const { standardCreateEligibility } = useBillingAccess()
   const assignedOnlyView = isAssignedWorkOnly(permissions)
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -272,9 +284,36 @@ function CustomersPageInner() {
   const [sortKey, setSortKey] = useState<SortKey>("company")
   const [sortDir, setSortDir] = useState<SortDir>("asc")
   const [viewMode, setViewMode] = useState<ViewMode>("table")
+  const [parentFilterId, setParentFilterId] = useState<string | null>(null)
+  const [hierarchyScope, setHierarchyScope] = useState<HierarchyScope>("all")
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(() => new Set())
+  const [bulkArchiveOpen, setBulkArchiveOpen] = useState(false)
+  const [bulkArchiveBusy, setBulkArchiveBusy] = useState(false)
   const searchParams = useSearchParams()
   const router = useRouter()
+
+  const canBulkArchiveFromList =
+    canArchiveRestore && !assignedOnlyView && archiveScope === "active" && viewMode === "table"
+  const selectedCount = selectedCustomerIds.size
+
+  const clearSelection = useCallback(() => {
+    setSelectedCustomerIds(new Set())
+  }, [])
+
+  useEffect(() => {
+    clearSelection()
+  }, [
+    search,
+    statusFilter,
+    archiveScope,
+    sortKey,
+    sortDir,
+    viewMode,
+    parentFilterId,
+    hierarchyScope,
+    clearSelection,
+  ])
 
   useEffect(() => {
     let active = true
@@ -456,13 +495,6 @@ function CustomersPageInner() {
     }
   }, [refreshToken, orgStatus, activeOrgId, archiveScope, assignedOnlyView])
 
-  // Phase 1: optional ?parent=<id> filter to scope the list to a parent's
-  // sub-accounts (deep-linked from the customer hierarchy card). The id is a
-  // valid customer id known to the user via RLS — never displayed raw.
-  const [parentFilterId, setParentFilterId] = useState<string | null>(null)
-  // Phase 2: hierarchy-scope filter (all/parents/children/standalone).
-  const [hierarchyScope, setHierarchyScope] = useState<HierarchyScope>("all")
-
   useEffect(() => {
     const openId = searchParams.get("open")
     if (openId) {
@@ -531,6 +563,67 @@ function CustomersPageInner() {
 
     return list
   }, [customers, search, statusFilter, sortKey, sortDir, parentFilterId, hierarchyScope])
+
+  const selectableFiltered = useMemo(
+    () => filtered.filter((c) => !c.isArchived),
+    [filtered],
+  )
+
+  const toggleAllVisibleSelection = useCallback(() => {
+    const visibleIds = selectableFiltered.map((c) => c.id)
+    if (visibleIds.length === 0) return
+    setSelectedCustomerIds((prev) => {
+      const allSelected = visibleIds.every((id) => prev.has(id))
+      if (allSelected) return new Set()
+      return new Set(visibleIds)
+    })
+  }, [selectableFiltered])
+
+  const allVisibleSelected =
+    selectableFiltered.length > 0 && selectableFiltered.every((c) => selectedCustomerIds.has(c.id))
+  const someVisibleSelected =
+    selectableFiltered.some((c) => selectedCustomerIds.has(c.id)) && !allVisibleSelected
+
+  const toggleRowSelection = useCallback((id: string) => {
+    setSelectedCustomerIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  async function confirmBulkArchive() {
+    if (!activeOrgId || selectedCustomerIds.size === 0) return
+    setBulkArchiveBusy(true)
+    const ids = [...selectedCustomerIds]
+    const res = await bulkArchiveCustomersViaApi({ organizationId: activeOrgId, customerIds: ids })
+    setBulkArchiveBusy(false)
+    if (!res.ok) {
+      toast({ variant: "destructive", title: res.message })
+      return
+    }
+    setBulkArchiveOpen(false)
+    if (res.succeededCount === 0) {
+      toast({ variant: "destructive", title: "Could not archive selected customers." })
+      return
+    }
+    if (selectedCustomerIds.has(selectedCustomerId ?? "")) {
+      setSelectedCustomerId(null)
+    }
+    setRefreshToken((v) => v + 1)
+    if (res.failedCount === 0) {
+      clearSelection()
+      toast({ title: bulkCustomerArchiveSuccessToast(res.succeededCount) })
+      return
+    }
+    setSelectedCustomerIds(new Set(res.failedIds))
+    toast({
+      variant: "destructive",
+      title: bulkCustomerArchivePartialToast(res.succeededCount, res.failedCount),
+      description: BULK_CUSTOMER_ARCHIVE_PARTIAL_DESCRIPTION,
+    })
+  }
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -700,6 +793,26 @@ function CustomersPageInner() {
         </div>
       ) : null}
 
+      {canBulkArchiveFromList && selectedCount > 0 ? (
+        <div className="hidden md:flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
+          <span className="text-sm font-medium text-foreground">
+            {selectedCount} customer{selectedCount === 1 ? "" : "s"} selected
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            className="h-8"
+            onClick={() => setBulkArchiveOpen(true)}
+          >
+            Archive selected
+          </Button>
+          <Button type="button" size="sm" variant="ghost" className="h-8" onClick={clearSelection}>
+            Clear selection
+          </Button>
+        </div>
+      ) : null}
+
       {/* Table view */}
       {viewMode === "table" && (
         <Card className="overflow-hidden p-0">
@@ -707,6 +820,16 @@ function CustomersPageInner() {
           <Table>
             <TableHeader>
               <TableRow className="ds-table-header-row">
+                {canBulkArchiveFromList ? (
+                  <TableHead className="hidden md:table-cell w-10">
+                    <Checkbox
+                      aria-label="Select all visible customers"
+                      checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+                      disabled={selectableFiltered.length === 0}
+                      onCheckedChange={toggleAllVisibleSelection}
+                    />
+                  </TableHead>
+                ) : null}
                 <TableHead>
                   <button
                     onClick={() => toggleSort("company")}
@@ -748,13 +871,29 @@ function CustomersPageInner() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground text-sm">
+                  <TableCell
+                    colSpan={canBulkArchiveFromList ? 9 : 8}
+                    className="text-center py-12 text-muted-foreground text-sm"
+                  >
                     No customers match your filters.
                   </TableCell>
                 </TableRow>
               ) : (
                 filtered.map((c) => (
                   <TableRow key={c.id} className="group cursor-pointer ds-hover-list-row" onClick={() => openCustomerDrawer(c)}>
+                    {canBulkArchiveFromList ? (
+                      <TableCell
+                        className="hidden md:table-cell w-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          aria-label={`Select ${c.company}`}
+                          checked={selectedCustomerIds.has(c.id)}
+                          disabled={c.isArchived}
+                          onCheckedChange={() => toggleRowSelection(c.id)}
+                        />
+                      </TableCell>
+                    ) : null}
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary font-semibold text-xs shrink-0">
@@ -855,6 +994,16 @@ function CustomersPageInner() {
       />
 
       <QuickAddParamBridge action="new-customer" onTrigger={() => openNewCustomerModal()} />
+
+      <CustomerBulkArchiveDialog
+        open={bulkArchiveOpen}
+        onOpenChange={(open) => {
+          if (!open && !bulkArchiveBusy) setBulkArchiveOpen(false)
+        }}
+        selectedCount={selectedCount}
+        busy={bulkArchiveBusy}
+        onConfirm={() => void confirmBulkArchive()}
+      />
     </div>
   )
 }
