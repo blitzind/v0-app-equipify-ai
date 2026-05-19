@@ -205,6 +205,12 @@ export async function runPriceListImportExtractionJob(params: {
     .maybeSingle()
 
   if (loadErr || !jobRow) {
+    console.warn("[catalog extraction] job load skipped", {
+      organizationId,
+      jobId,
+      hasRow: Boolean(jobRow),
+      loadError: loadErr?.message ?? null,
+    })
     return
   }
   const st = jobRow.status as string
@@ -215,7 +221,7 @@ export async function runPriceListImportExtractionJob(params: {
     return
   }
   if (st === "processing") {
-    // Another invocation is already running (or crashed mid-flight). Avoid duplicate extraction.
+    console.info("[catalog extraction] job already processing", { organizationId, jobId })
     return
   }
 
@@ -240,6 +246,12 @@ export async function runPriceListImportExtractionJob(params: {
     .maybeSingle()
 
   if (claimErr || !claimed) {
+    console.info("[catalog extraction] job claim skipped", {
+      organizationId,
+      jobId,
+      claimError: claimErr?.message ?? null,
+      claimed: Boolean(claimed),
+    })
     return
   }
 
@@ -291,6 +303,14 @@ export async function runPriceListImportExtractionJob(params: {
     const { data: bin, error: dlErr } = await svc.storage.from(PRICE_LIST_IMPORTS_BUCKET).download(path)
     if (dlErr || !bin) {
       const msg = sanitizeAiJobError(dlErr ?? new Error("Download failed."))
+      console.error("[catalog extraction] storage download failed (upload path)", {
+        organizationId,
+        jobId,
+        importId,
+        path,
+        fileKind,
+        message: msg,
+      })
       await failAiJob(svc, jobId, msg)
       await svc
         .from("price_list_imports")
@@ -313,6 +333,14 @@ export async function runPriceListImportExtractionJob(params: {
     const { data: bin, error: dlErr } = await svc.storage.from(PRICE_LIST_IMPORTS_BUCKET).download(path)
     if (dlErr || !bin) {
       const msg = sanitizeAiJobError(dlErr ?? new Error("Download failed."))
+      console.error("[catalog extraction] storage download failed (reextract path)", {
+        organizationId,
+        jobId,
+        importId,
+        path,
+        fileKind,
+        message: msg,
+      })
       await failAiJob(svc, jobId, msg)
       await svc
         .from("price_list_imports")
@@ -474,7 +502,7 @@ export async function runPriceListImportExtractionJob(params: {
     return
   }
 
-  await svc
+  const { error: saveErr } = await svc
     .from("price_list_imports")
     .update({
       extracted_json: payload as unknown as Record<string, unknown>,
@@ -484,6 +512,36 @@ export async function runPriceListImportExtractionJob(params: {
       updated_at: new Date().toISOString(),
     })
     .eq("id", importId)
+
+  if (saveErr) {
+    const msg = sanitizeAiJobError(saveErr)
+    console.error("[catalog extraction] save extracted_json failed", {
+      organizationId,
+      jobId,
+      importId,
+      fileKind,
+      rowCount: payload.rows.length,
+      message: msg,
+    })
+    await failAiJob(svc, jobId, "Could not save extracted rows. Try again.")
+    await svc
+      .from("price_list_imports")
+      .update({
+        status: "failed",
+        error_message: "Could not save extracted rows. Try again.",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", importId)
+    return
+  }
+
+  logCatalogCsvImport("job_saved_payload", {
+    organizationId,
+    jobId,
+    importId,
+    fileKind,
+    extractionRowCount: payload.rows.length,
+  })
 
   await updateAiJobProgress(svc, jobId, {
     progressPercent: 97,

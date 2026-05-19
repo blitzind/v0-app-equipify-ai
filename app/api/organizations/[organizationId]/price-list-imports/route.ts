@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server"
-import { PRICE_LIST_IMPORTS_BUCKET } from "@/lib/catalog/constants"
+import { runPriceListImportExtractionJob } from "@/lib/ai/jobs/process-ai-job"
 import { insertQueuedAiJob } from "@/lib/ai/jobs/create-ai-job"
 import { scheduleCatalogExtractionProcessing } from "@/lib/ai/jobs/schedule-catalog-extraction"
+import { PRICE_LIST_IMPORTS_BUCKET } from "@/lib/catalog/constants"
+import { logCatalogCsvImport } from "@/lib/catalog/csv-import-debug-log"
+import { readPriceListImportJobOutcome } from "@/lib/catalog/price-list-import-upload-result"
 import {
   defaultPriceListFileName,
   priceListStorageContentType,
@@ -10,7 +13,6 @@ import {
 } from "@/lib/catalog/price-list-file-validation"
 import { requireOrgCatalogWrite } from "@/lib/catalog/require-org-catalog-write"
 import { maybeCatalogSchemaErrorResponse } from "@/lib/supabase/catalog-schema-errors"
-import { logCatalogCsvImport } from "@/lib/catalog/csv-import-debug-log"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -148,25 +150,82 @@ export async function POST(
 
   const jobId = jobInsert.jobId
 
+  if (fileKind === "csv") {
+    logCatalogCsvImport("upload_inline_extract_start", {
+      organizationId,
+      importId,
+      jobId,
+      storagePath,
+      fileName: file.name || defaultPriceListFileName(fileKind),
+      fileKind,
+      sizeBytes: file.size,
+    })
+
+    try {
+      await runPriceListImportExtractionJob({ svc, organizationId, jobId })
+    } catch (e) {
+      console.error("[POST price-list-imports] inline csv extraction error", {
+        organizationId,
+        importId,
+        jobId,
+        message: e instanceof Error ? e.message : String(e),
+      })
+    }
+
+    const outcome = await readPriceListImportJobOutcome(svc, organizationId, importId, jobId)
+
+    logCatalogCsvImport("upload_inline_extract_outcome", {
+      organizationId,
+      importId,
+      jobId,
+      ok: outcome.ok,
+      status: outcome.status,
+      rowCount: outcome.ok ? outcome.rowCount : undefined,
+      message: outcome.ok ? undefined : outcome.message,
+    })
+
+    if (outcome.ok) {
+      return NextResponse.json({
+        ok: true,
+        importId,
+        jobId,
+        status: "completed",
+        rowCount: outcome.rowCount,
+        extractionReady: true,
+      })
+    }
+
+    return NextResponse.json(
+      {
+        ok: false,
+        importId,
+        jobId,
+        status: outcome.status,
+        message: outcome.message,
+      },
+      { status: 422 },
+    )
+  }
+
+  logCatalogCsvImport("upload_queued_pdf", {
+    organizationId,
+    importId,
+    jobId,
+    storagePath,
+    fileKind,
+  })
+
   scheduleCatalogExtractionProcessing({
     organizationId,
     jobId,
     importIdForCleanup: importId,
   })
 
-  if (fileKind === "csv") {
-    logCatalogCsvImport("upload_queued", {
-      organizationId,
-      importId,
-      jobId,
-      storagePath,
-    })
-  }
-
   return NextResponse.json({
     ok: true,
     importId,
     jobId,
     status: "queued",
+    extractionReady: false,
   })
 }

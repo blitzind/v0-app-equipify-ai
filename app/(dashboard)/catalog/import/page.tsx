@@ -46,6 +46,16 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
+import {
+  decideImportPollAction,
+  friendlyImportPollStopMessage,
+  normalizeUploadPriceListResponse,
+} from "@/lib/catalog/import-poll-handling"
+import {
+  isCatalogImportPageDebugEnabled,
+  pushCatalogImportDebug,
+  type CatalogImportDebugEntry,
+} from "@/lib/catalog/import-page-debug"
 
 const SS_IMPORT = "equipify.catalogImport.importId"
 const SS_JOB = "equipify.catalogImport.jobId"
@@ -80,9 +90,18 @@ export default function ImportPriceListPage() {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
   const [cancelBusy, setCancelBusy] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const queuedPollCountRef = useRef(0)
+  const pollNetworkFailuresRef = useRef(0)
   const pendingJobKindRef = useRef<"upload" | "reextract">("upload")
   /** Avoid duplicate toast when cancel dialog already showed success. */
   const suppressCancelPollToastRef = useRef(false)
+  const [debugEntries, setDebugEntries] = useState<CatalogImportDebugEntry[]>([])
+  const [flowStage, setFlowStage] = useState<string>("idle")
+
+  const logDebug = useCallback((stage: string, detail?: Record<string, unknown>) => {
+    setFlowStage(stage)
+    setDebugEntries((prev) => pushCatalogImportDebug(prev, stage, detail))
+  }, [])
 
   useEffect(() => {
     if (status !== "ready" || !organizationId) return
@@ -158,6 +177,12 @@ export default function ImportPriceListPage() {
         }
         if (cancelled || !res.ok) return
 
+        logDebug("resume_import_fetch", {
+          importStatus: data.import?.status ?? null,
+          activeJobId: data.activeJobId ?? null,
+          payloadRowCount: data.payload?.rows?.length ?? 0,
+        })
+
         if (data.activeJobId) {
           try {
             sessionStorage.setItem(SS_JOB, data.activeJobId)
@@ -178,22 +203,41 @@ export default function ImportPriceListPage() {
         }
 
         if (data.import?.status === "failed") {
-          setJobError(data.import.error_message?.trim() || "Extraction failed.")
+          const msg = data.import.error_message?.trim() || "Extraction failed."
+          setJobError(msg)
+          setFlowStage("resume_failed")
+          return
+        }
+
+        if (data.import?.status === "processing" && !data.activeJobId) {
+          const msg = "Extraction did not finish. Click Re-run extraction or upload again."
+          setJobError(msg)
+          setFlowStage("resume_stuck_processing")
+          return
+        }
+
+        if (data.import?.status === "needs_review" && data.payload?.rows?.length) {
+          setPayload(data.payload)
+          setFlowStage("resume_payload")
           return
         }
 
         if (data.payload?.rows?.length) {
           setPayload(data.payload)
+          setFlowStage("resume_payload")
         }
       } catch {
-        /* ignore */
+        if (!cancelled) {
+          setJobError("Could not restore this import. Try uploading again.")
+          setFlowStage("resume_error")
+        }
       }
     })()
 
     return () => {
       cancelled = true
     }
-  }, [status, organizationId])
+  }, [status, organizationId, logDebug])
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
@@ -243,26 +287,86 @@ export default function ImportPriceListPage() {
     }
   }
 
-  const loadImportPayload = useCallback(async (): Promise<{ ok: true; rowCount: number } | { ok: false }> => {
-    if (!organizationId || !importId) return { ok: false }
+  const loadImportPayload = useCallback(async (): Promise<
+    { ok: true; rowCount: number } | { ok: false; message: string }
+  > => {
+    if (!organizationId || !importId) return { ok: false, message: "Import not ready." }
     try {
       const res = await fetch(
         `/api/organizations/${encodeURIComponent(organizationId)}/price-list-imports/${encodeURIComponent(importId)}`,
         { cache: "no-store" },
       )
-      const data = (await res.json()) as { payload?: StoredPriceListPayload | null; error?: string }
-      if (!res.ok || !data.payload) {
-        return { ok: false }
+      const data = (await res.json()) as {
+        payload?: StoredPriceListPayload | null
+        import?: { status?: string; error_message?: string | null }
+        message?: string
+        error?: string
+      }
+      logDebug("load_import_payload", {
+        httpStatus: res.status,
+        importStatus: data.import?.status ?? null,
+        payloadRowCount: data.payload?.rows?.length ?? 0,
+      })
+      if (!res.ok) {
+        return {
+          ok: false,
+          message: data.message ?? data.error ?? "Could not load import results.",
+        }
+      }
+      if (data.import?.status === "failed") {
+        return {
+          ok: false,
+          message: data.import.error_message?.trim() || "Extraction failed.",
+        }
+      }
+      if (!data.payload) {
+        return { ok: false, message: "No extracted rows are available yet." }
       }
       setPayload(data.payload)
       return { ok: true, rowCount: data.payload.rows.length }
     } catch {
-      return { ok: false }
+      return { ok: false, message: "Could not load import results. Check your connection." }
     }
-  }, [organizationId, importId])
+  }, [organizationId, importId, logDebug])
+
+  const applyExtractionResult = useCallback(
+    async (kind: "upload" | "reextract") => {
+      const loaded = await loadImportPayload()
+      if (loaded.ok && loaded.rowCount > 0) {
+        setJobError(null)
+        toast({
+          title: kind === "reextract" ? "Re-extracted" : "Extracted",
+          description: "Review rows below before saving.",
+        })
+        logDebug("extraction_success", { rowCount: loaded.rowCount, kind })
+        return
+      }
+      if (loaded.ok && loaded.rowCount === 0) {
+        const msg =
+          "No catalog rows were extracted. Check column headers (e.g. Invoice Item Name, Item #/SKU, Unit Price) and try again."
+        setJobError(msg)
+        toast({ variant: "destructive", title: "No rows extracted", description: msg })
+        logDebug("extraction_zero_rows", { kind })
+        return
+      }
+      const msg = loaded.message
+      setJobError(msg)
+      toast({
+        variant: "destructive",
+        title: "Could not load results",
+        description: msg,
+      })
+      logDebug("extraction_load_failed", { kind, message: msg })
+    },
+    [loadImportPayload, logDebug, toast],
+  )
 
   useEffect(() => {
     if (!organizationId || !importId || !activeJobId || !jobPolling) return
+
+    queuedPollCountRef.current = 0
+    pollNetworkFailuresRef.current = 0
+    logDebug("poll_started", { importId, activeJobId })
 
     async function pollOnce() {
       if (!organizationId || !activeJobId) return
@@ -281,61 +385,56 @@ export default function ImportPriceListPage() {
           error?: string
           message?: string
         }
-        if (!res.ok) {
-          stopPolling()
-          const msg =
-            typeof data.message === "string" && data.message.trim()
-              ? data.message.trim()
-              : "Could not check extraction status. Refresh the page or try again."
-          setJobError(msg)
-          toast({ variant: "destructive", title: "Extraction status unavailable", description: msg })
-          return
-        }
-        if (!data.job) {
-          stopPolling()
-          const msg = "Extraction job was not found. Try uploading again."
-          setJobError(msg)
-          toast({ variant: "destructive", title: "Extraction unavailable", description: msg })
-          return
+
+        logDebug("poll_tick", {
+          httpStatus: res.status,
+          jobStatus: data.job?.status ?? null,
+          progress: data.job?.progress_percent ?? null,
+          step: data.job?.current_step ?? null,
+        })
+
+        if (data.job?.status === "queued") {
+          queuedPollCountRef.current += 1
+        } else {
+          queuedPollCountRef.current = 0
         }
 
-        const st = data.job.status
-        const pct =
-          typeof data.job.progress_percent === "number"
-            ? data.job.progress_percent
-            : Number(data.job.progress_percent ?? 0)
-        setJobProgress(Number.isFinite(pct) ? pct : 0)
-        setJobStep(typeof data.job.current_step === "string" ? data.job.current_step : null)
+        const action = decideImportPollAction({
+          httpOk: res.ok,
+          hasJob: Boolean(data.job),
+          job: data.job
+            ? {
+                status: data.job.status,
+                progressPercent: data.job.progress_percent,
+                currentStep: data.job.current_step,
+                errorMessage: data.job.error_message,
+              }
+            : null,
+          queuedPollCount: queuedPollCountRef.current,
+          httpMessage: data.message ?? data.error,
+        })
 
-        if (st === "completed") {
-          stopPolling()
-          const loaded = await loadImportPayload()
-          if (loaded.ok && loaded.rowCount > 0) {
-            const kind = pendingJobKindRef.current
-            toast({
-              title: kind === "reextract" ? "Re-extracted" : "Extracted",
-              description: "Review rows below before saving.",
-            })
-          } else if (loaded.ok && loaded.rowCount === 0) {
-            const msg =
-              "No catalog rows were extracted. Check column headers (e.g. Invoice Item Name, Item #/SKU, Unit Price) and try again."
-            setJobError(msg)
-            toast({ variant: "destructive", title: "No rows extracted", description: msg })
-          } else {
-            toast({
-              variant: "destructive",
-              title: "Could not load results",
-              description: "Job finished but the import payload could not be loaded. Refresh the page.",
-            })
-          }
+        if (action.type === "update_progress") {
+          pollNetworkFailuresRef.current = 0
+          setJobProgress(action.progressPercent)
+          setJobStep(action.currentStep)
           return
         }
 
-        if (st === "cancelled") {
-          stopPolling()
+        stopPolling()
+        pollNetworkFailuresRef.current = 0
+
+        if (action.reason === "completed") {
+          logDebug("poll_completed", { importId, activeJobId })
+          await applyExtractionResult(pendingJobKindRef.current)
+          return
+        }
+
+        if (action.reason === "cancelled") {
           setImportCancelled(true)
           setPayload(null)
           setJobError(null)
+          logDebug("poll_cancelled", { importId, activeJobId })
           if (suppressCancelPollToastRef.current) {
             suppressCancelPollToastRef.current = false
           } else {
@@ -347,21 +446,32 @@ export default function ImportPriceListPage() {
           return
         }
 
-        if (st === "failed") {
-          stopPolling()
-          const msg =
-            typeof data.job.error_message === "string" && data.job.error_message.trim()
-              ? data.job.error_message.trim()
-              : "Extraction failed."
-          setJobError(msg)
-          toast({
-            variant: "destructive",
-            title: "Extraction failed",
-            description: msg,
-          })
-        }
+        const detail =
+          action.reason === "failed"
+            ? data.job?.error_message ?? undefined
+            : data.message ?? data.error
+        const msg = friendlyImportPollStopMessage(action.reason, detail)
+        setJobError(msg)
+        toast({
+          variant: "destructive",
+          title:
+            action.reason === "failed"
+              ? "Extraction failed"
+              : action.reason === "stuck_queued"
+                ? "Extraction did not start"
+                : "Extraction unavailable",
+          description: msg,
+        })
+        logDebug("poll_stopped", { reason: action.reason, message: msg })
       } catch {
-        /* keep polling */
+        pollNetworkFailuresRef.current += 1
+        logDebug("poll_network_error", { failures: pollNetworkFailuresRef.current })
+        if (pollNetworkFailuresRef.current >= 3) {
+          stopPolling()
+          const msg = "Lost connection while checking extraction status. Refresh or try Re-run extraction."
+          setJobError(msg)
+          toast({ variant: "destructive", title: "Connection problem", description: msg })
+        }
       }
     }
 
@@ -374,7 +484,7 @@ export default function ImportPriceListPage() {
         pollRef.current = null
       }
     }
-  }, [organizationId, importId, activeJobId, jobPolling, loadImportPayload, stopPolling, toast])
+  }, [organizationId, importId, activeJobId, jobPolling, applyExtractionResult, stopPolling, toast, logDebug])
 
   const updateRow = useCallback((id: string, patch: Partial<ExtractedCatalogRow>) => {
     setPayload((p) => {
@@ -423,6 +533,11 @@ export default function ImportPriceListPage() {
     setJobProgress(0)
     setJobStep(null)
     setUploadBusy(true)
+    logDebug("upload_started", {
+      fileName: file.name,
+      fileType: file.type || null,
+      fileSize: file.size,
+    })
     try {
       const fd = new FormData()
       fd.set("file", file)
@@ -432,53 +547,73 @@ export default function ImportPriceListPage() {
         method: "POST",
         body: fd,
       })
-      const data = (await res.json()) as {
-        ok?: boolean
-        importId?: string
-        jobId?: string
-        message?: string
-        error?: string
+      let data: Record<string, unknown> = {}
+      try {
+        data = (await res.json()) as Record<string, unknown>
+      } catch {
+        data = {}
       }
 
-      if (!res.ok) {
+      logDebug("upload_response", {
+        httpStatus: res.status,
+        body: data,
+      })
+
+      const normalized = normalizeUploadPriceListResponse(data)
+
+      if (!res.ok || normalized.failed) {
+        const msg = normalized.message ?? `Upload failed (${res.status}).`
+        setJobError(msg)
         toast({
           variant: "destructive",
           title: "Upload / extraction failed",
-          description: data.message ?? data.error ?? `Request failed (${res.status})`,
+          description: msg,
         })
+        logDebug("upload_failed", { message: msg })
         return
       }
 
-      if (data.ok === false) {
-        toast({
-          variant: "destructive",
-          title: "Upload / extraction failed",
-          description: data.message ?? data.error ?? "Could not start extraction.",
-        })
-        return
-      }
-
-      const newImportId = data.importId ?? null
-      const jobId = data.jobId ?? null
+      const newImportId = normalized.importId
+      const jobId = normalized.jobId
       setImportId(newImportId)
-      if (newImportId && jobId) {
-        try {
-          sessionStorage.setItem(SS_IMPORT, newImportId)
-          sessionStorage.setItem(SS_JOB, jobId)
-        } catch {
-          /* ignore */
-        }
-        setActiveJobId(jobId)
-        setJobPolling(true)
-      } else {
+      if (!newImportId || !jobId) {
+        const msg = normalized.message ?? "Missing import or job id. Try again."
+        setJobError(msg)
         toast({
           variant: "destructive",
           title: "Unexpected response",
-          description: "Missing job id. Try again.",
+          description: msg,
         })
+        logDebug("upload_missing_ids", { newImportId, jobId })
+        return
       }
+
+      try {
+        sessionStorage.setItem(SS_IMPORT, newImportId)
+        sessionStorage.setItem(SS_JOB, jobId)
+      } catch {
+        /* ignore */
+      }
+
+      if (normalized.extractionReady) {
+        setActiveJobId(jobId)
+        logDebug("upload_inline_complete", {
+          importId: newImportId,
+          jobId,
+          rowCount: normalized.rowCount,
+        })
+        await applyExtractionResult("upload")
+        return
+      }
+
+      setActiveJobId(jobId)
+      setJobPolling(true)
+      logDebug("upload_queued_poll", { importId: newImportId, jobId })
     } catch {
-      toast({ variant: "destructive", title: "Network error", description: "Try again." })
+      const msg = "Network error while uploading. Try again."
+      setJobError(msg)
+      toast({ variant: "destructive", title: "Network error", description: msg })
+      logDebug("upload_network_error", {})
     } finally {
       setUploadBusy(false)
     }
@@ -493,51 +628,67 @@ export default function ImportPriceListPage() {
     setJobProgress(0)
     setJobStep(null)
     setExtractBusy(true)
+    logDebug("reextract_started", { importId })
     try {
       const res = await fetch(
         `/api/organizations/${encodeURIComponent(organizationId)}/price-list-imports/${encodeURIComponent(importId)}/extract`,
         { method: "POST" },
       )
-      const data = (await res.json()) as {
-        ok?: boolean
-        jobId?: string
-        resumed?: boolean
-        message?: string
-        error?: string
+      let data: Record<string, unknown> = {}
+      try {
+        data = (await res.json()) as Record<string, unknown>
+      } catch {
+        data = {}
       }
-      if (!res.ok) {
+      logDebug("reextract_response", { httpStatus: res.status, body: data })
+
+      const normalized = normalizeUploadPriceListResponse({ ...data, importId })
+
+      if (!res.ok || normalized.failed) {
+        const msg = normalized.message ?? `Re-extract failed (${res.status}).`
+        setJobError(msg)
         toast({
           variant: "destructive",
           title: "Re-extract failed",
-          description: data.message ?? data.error ?? `Failed (${res.status})`,
+          description: msg,
         })
         return
       }
-      const jobId = data.jobId ?? null
-      if (jobId && importId) {
-        try {
-          sessionStorage.setItem(SS_IMPORT, importId)
-          sessionStorage.setItem(SS_JOB, jobId)
-        } catch {
-          /* ignore */
-        }
-        setActiveJobId(jobId)
-        setJobPolling(true)
-        if (data.resumed) {
-          toast({
-            title: "Extraction in progress",
-            description: "Already running for this import — reconnecting to progress.",
-          })
-        }
-      } else {
+
+      const jobId = normalized.jobId
+      if (!jobId) {
+        const msg = normalized.message ?? "Missing job id."
+        setJobError(msg)
+        toast({ variant: "destructive", title: "Unexpected response", description: msg })
+        return
+      }
+
+      try {
+        sessionStorage.setItem(SS_IMPORT, importId)
+        sessionStorage.setItem(SS_JOB, jobId)
+      } catch {
+        /* ignore */
+      }
+
+      if (data.resumed === true) {
         toast({
-          variant: "destructive",
-          title: "Unexpected response",
-          description: "Missing job id.",
+          title: "Extraction in progress",
+          description: "Already running for this import — reconnecting to progress.",
         })
       }
+
+      if (normalized.extractionReady) {
+        setActiveJobId(jobId)
+        await applyExtractionResult("reextract")
+        return
+      }
+
+      setActiveJobId(jobId)
+      setJobPolling(true)
     } catch {
-      toast({ variant: "destructive", title: "Network error" })
+      const msg = "Network error while re-running extraction."
+      setJobError(msg)
+      toast({ variant: "destructive", title: "Network error", description: msg })
     } finally {
       setExtractBusy(false)
     }
@@ -877,6 +1028,27 @@ export default function ImportPriceListPage() {
       {jobError && !jobPolling && !importCancelled ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive max-w-xl">
           {jobError}
+        </div>
+      ) : null}
+
+      {isCatalogImportPageDebugEnabled() ? (
+        <div className="rounded-lg border border-dashed border-border bg-muted/20 px-3 py-2 max-w-xl text-[11px] font-mono text-muted-foreground space-y-1">
+          <p className="font-sans text-xs font-medium text-foreground">Import debug (dev only)</p>
+          <p>flow: {flowStage}</p>
+          <p>importId: {importId ?? "—"} · jobId: {activeJobId ?? "—"} · polling: {jobPolling ? "yes" : "no"}</p>
+          {file ? (
+            <p>
+              file: {file.name} · {file.type || "unknown"} · {file.size} bytes
+            </p>
+          ) : null}
+          <ul className="max-h-40 overflow-y-auto space-y-0.5">
+            {debugEntries.map((e, i) => (
+              <li key={`${e.at}-${i}`}>
+                {e.at.slice(11, 19)} {e.stage}
+                {e.detail ? ` ${JSON.stringify(e.detail)}` : ""}
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 
