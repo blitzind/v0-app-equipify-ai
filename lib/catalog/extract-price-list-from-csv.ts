@@ -1,5 +1,3 @@
-import "server-only"
-
 import { randomUUID } from "crypto"
 import { pickHeader } from "@/lib/migration-imports/map-columns"
 import { parseCsvText } from "@/lib/migration-imports/parse-csv"
@@ -9,6 +7,7 @@ import {
   type StoredPriceListPayload,
 } from "@/lib/catalog/import-types"
 import { PRICE_LIST_CSV_MAX_ROWS } from "@/lib/catalog/price-list-file-validation"
+import { logCatalogCsvImport } from "@/lib/catalog/csv-import-debug-log"
 
 const PART_ALIASES = [
   "part_number",
@@ -17,6 +16,8 @@ const PART_ALIASES = [
   "part #",
   "part#",
   "sku",
+  "item #/sku",
+  "item sku",
   "item number",
   "item no",
   "item #",
@@ -29,7 +30,16 @@ const PART_ALIASES = [
   "item code",
 ]
 
-const NAME_ALIASES = ["name", "item name", "product name", "title", "product", "item"]
+const NAME_ALIASES = [
+  "name",
+  "item name",
+  "invoice item name",
+  "product name",
+  "title",
+  "product",
+  "item",
+  "invoice item",
+]
 
 const DESC_ALIASES = ["description", "desc", "details", "long description", "product description"]
 
@@ -45,7 +55,16 @@ const LIST_PRICE_ALIASES = [
   "list usd",
 ]
 
-const COST_ALIASES = ["cost", "dealer cost", "net cost", "wholesale", "your cost", "buy price", "net price"]
+const COST_ALIASES = [
+  "cost",
+  "unit cost",
+  "dealer cost",
+  "net cost",
+  "wholesale",
+  "your cost",
+  "buy price",
+  "net price",
+]
 
 const CATEGORY_ALIASES = [
   "category",
@@ -102,6 +121,19 @@ export function extractPriceListPayloadFromCsv(args: {
   const unitCol = pickHeader(parsed.headers, UNIT_ALIASES)
   const notesCol = pickHeader(parsed.headers, NOTES_ALIASES)
   const effectiveCol = pickHeader(parsed.headers, EFFECTIVE_ALIASES)
+
+  logCatalogCsvImport("csv_headers_mapped", {
+    fileName: args.fileName,
+    headerCount: parsed.headers.length,
+    parsedRowCount: parsed.rows.length,
+    mapped: {
+      part: partCol ?? null,
+      name: nameCol ?? null,
+      description: descCol ?? null,
+      listPrice: listPriceCol ?? null,
+      cost: costCol ?? null,
+    },
+  })
 
   if (!partCol && !nameCol && !descCol) {
     throw new Error(
@@ -160,8 +192,22 @@ export function extractPriceListPayloadFromCsv(args: {
   }
 
   if (rows.length === 0) {
-    throw new Error("No catalog rows were found in the CSV. Check headers and data rows.")
+    logCatalogCsvImport("csv_zero_rows", {
+      fileName: args.fileName,
+      parsedRowCount: parsed.rows.length,
+      mappedNameCol: nameCol ?? null,
+      mappedDescCol: descCol ?? null,
+      mappedPartCol: partCol ?? null,
+    })
+    throw new Error(
+      "No catalog rows were found in the CSV. Check that item names or descriptions are present and column headers match (e.g. Invoice Item Name, Item #/SKU, Unit Price).",
+    )
   }
+
+  logCatalogCsvImport("csv_extract_ok", {
+    fileName: args.fileName,
+    extractionRowCount: rows.length,
+  })
 
   let manufacturerName = args.manufacturerNameHint?.trim() || null
   if (!manufacturerName && mfgCol) {

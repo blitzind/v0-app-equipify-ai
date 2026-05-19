@@ -6,7 +6,13 @@ export const PRICE_LIST_CSV_MAX_ROWS = 5000
 
 export type PriceListFileKind = "pdf" | "csv"
 
-const CSV_MIMES = new Set(["text/csv", "application/csv"])
+const CSV_MIMES = new Set([
+  "text/csv",
+  "application/csv",
+  "application/vnd.ms-excel",
+  "text/comma-separated-values",
+  "application/vnd.ms-excel.sheet.macroenabled.12",
+])
 
 export function detectPriceListFileKind(fileName: string, mimeType: string): PriceListFileKind | null {
   const mime = (mimeType || "").toLowerCase().trim()
@@ -17,6 +23,9 @@ export function detectPriceListFileKind(fileName: string, mimeType: string): Pri
   if (CSV_MIMES.has(mime) || ext === "csv") return "csv"
 
   if (mime === "text/plain" && ext === "csv") return "csv"
+
+  // Browsers often send CSV uploads as octet-stream; trust .csv extension.
+  if (mime === "application/octet-stream" && ext === "csv") return "csv"
 
   return null
 }

@@ -21,6 +21,7 @@ import type { PriceListImportJobInput, PriceListImportJobResult } from "@/lib/ai
 import { getPromptForTask, promptMetadataForLog } from "@/lib/ai/prompts"
 import { parseStoredPriceListPayload } from "@/lib/catalog/parse-stored-payload"
 import { toSafeAiJobPayload } from "@/lib/ai/redaction"
+import { logCatalogCsvImport } from "@/lib/catalog/csv-import-debug-log"
 import { FAILURE_COPY } from "@/lib/failure-states/copy"
 
 const JOB_PROCESSING_TIMEOUT_MS = 280_000
@@ -343,6 +344,15 @@ export async function runPriceListImportExtractionJob(params: {
         currentStep: "Parsing CSV columns…",
       })
 
+      logCatalogCsvImport("job_csv_branch", {
+        organizationId,
+        jobId,
+        importId,
+        fileName,
+        fileKind,
+        bufferBytes: buffer.length,
+      })
+
       if (await isPriceListImportCancellationRequested(svc, organizationId, jobId, importId)) {
         return
       }
@@ -356,6 +366,13 @@ export async function runPriceListImportExtractionJob(params: {
         buffer,
         fileName,
         manufacturerNameHint: manufacturerHint,
+      })
+
+      logCatalogCsvImport("job_csv_complete", {
+        organizationId,
+        jobId,
+        importId,
+        extractionRowCount: payload.rows.length,
       })
     } else {
       await updateAiJobProgress(svc, jobId, {
@@ -412,6 +429,14 @@ export async function runPriceListImportExtractionJob(params: {
           ? e.message
           : sanitizeAiJobError(e)
     const safe = sanitizeAiJobError(msg)
+    if (fileKind === "csv") {
+      logCatalogCsvImport("job_csv_failed", {
+        organizationId,
+        jobId,
+        importId,
+        message: safe,
+      })
+    }
     await failAiJob(svc, jobId, safe)
     await svc
       .from("price_list_imports")

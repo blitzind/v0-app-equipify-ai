@@ -243,21 +243,21 @@ export default function ImportPriceListPage() {
     }
   }
 
-  const loadImportPayload = useCallback(async () => {
-    if (!organizationId || !importId) return false
+  const loadImportPayload = useCallback(async (): Promise<{ ok: true; rowCount: number } | { ok: false }> => {
+    if (!organizationId || !importId) return { ok: false }
     try {
       const res = await fetch(
         `/api/organizations/${encodeURIComponent(organizationId)}/price-list-imports/${encodeURIComponent(importId)}`,
         { cache: "no-store" },
       )
-      const data = (await res.json()) as { payload?: StoredPriceListPayload; error?: string }
+      const data = (await res.json()) as { payload?: StoredPriceListPayload | null; error?: string }
       if (!res.ok || !data.payload) {
-        return false
+        return { ok: false }
       }
       setPayload(data.payload)
-      return true
+      return { ok: true, rowCount: data.payload.rows.length }
     } catch {
-      return false
+      return { ok: false }
     }
   }, [organizationId, importId])
 
@@ -278,8 +278,26 @@ export default function ImportPriceListPage() {
             current_step?: string | null
             error_message?: string | null
           }
+          error?: string
+          message?: string
         }
-        if (!res.ok || !data.job) return
+        if (!res.ok) {
+          stopPolling()
+          const msg =
+            typeof data.message === "string" && data.message.trim()
+              ? data.message.trim()
+              : "Could not check extraction status. Refresh the page or try again."
+          setJobError(msg)
+          toast({ variant: "destructive", title: "Extraction status unavailable", description: msg })
+          return
+        }
+        if (!data.job) {
+          stopPolling()
+          const msg = "Extraction job was not found. Try uploading again."
+          setJobError(msg)
+          toast({ variant: "destructive", title: "Extraction unavailable", description: msg })
+          return
+        }
 
         const st = data.job.status
         const pct =
@@ -291,13 +309,18 @@ export default function ImportPriceListPage() {
 
         if (st === "completed") {
           stopPolling()
-          const ok = await loadImportPayload()
-          if (ok) {
+          const loaded = await loadImportPayload()
+          if (loaded.ok && loaded.rowCount > 0) {
             const kind = pendingJobKindRef.current
             toast({
               title: kind === "reextract" ? "Re-extracted" : "Extracted",
               description: "Review rows below before saving.",
             })
+          } else if (loaded.ok && loaded.rowCount === 0) {
+            const msg =
+              "No catalog rows were extracted. Check column headers (e.g. Invoice Item Name, Item #/SKU, Unit Price) and try again."
+            setJobError(msg)
+            toast({ variant: "destructive", title: "No rows extracted", description: msg })
           } else {
             toast({
               variant: "destructive",
@@ -422,6 +445,15 @@ export default function ImportPriceListPage() {
           variant: "destructive",
           title: "Upload / extraction failed",
           description: data.message ?? data.error ?? `Request failed (${res.status})`,
+        })
+        return
+      }
+
+      if (data.ok === false) {
+        toast({
+          variant: "destructive",
+          title: "Upload / extraction failed",
+          description: data.message ?? data.error ?? "Could not start extraction.",
         })
         return
       }
@@ -724,7 +756,7 @@ export default function ImportPriceListPage() {
           <Input
             id="price-list-file"
             type="file"
-            accept="application/pdf,.pdf,text/csv,application/csv,.csv"
+            accept="application/pdf,.pdf,text/csv,application/csv,.csv,text/plain,application/octet-stream"
             className="mt-1"
             onChange={(e) => {
               const next = e.target.files?.[0] ?? null

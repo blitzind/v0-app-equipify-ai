@@ -10,6 +10,7 @@ import {
 } from "@/lib/catalog/price-list-file-validation"
 import { requireOrgCatalogWrite } from "@/lib/catalog/require-org-catalog-write"
 import { maybeCatalogSchemaErrorResponse } from "@/lib/supabase/catalog-schema-errors"
+import { logCatalogCsvImport } from "@/lib/catalog/csv-import-debug-log"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -54,6 +55,17 @@ export async function POST(
     )
   }
   const fileKind = fileValidation.kind
+
+  if (fileKind === "csv") {
+    logCatalogCsvImport("upload_received", {
+      organizationId,
+      fileName: file.name || defaultPriceListFileName(fileKind),
+      mimeType: file.type || null,
+      sizeBytes: file.size,
+      detectedKind: fileKind,
+      detectedExtension: priceListStorageExtension(fileKind),
+    })
+  }
 
   const manufacturerNameField = form.get("manufacturerName")
   const manufacturerName =
@@ -141,6 +153,15 @@ export async function POST(
     jobId,
     importIdForCleanup: importId,
   })
+
+  if (fileKind === "csv") {
+    logCatalogCsvImport("upload_queued", {
+      organizationId,
+      importId,
+      jobId,
+      storagePath,
+    })
+  }
 
   return NextResponse.json({
     ok: true,
