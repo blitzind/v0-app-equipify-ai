@@ -30,6 +30,14 @@ import {
 import { trackFreeTrialSignup, trackOnboardingCompleted } from "@/lib/analytics/marketing-analytics-events"
 import { onboardingAnalyticsDevLog } from "@/lib/analytics/marketing-analytics-debug"
 import { HowHeardSelect } from "@/components/onboarding/how-heard-select"
+import { OAuthSignInButtonStack } from "@/components/auth/oauth-sign-in-button"
+import {
+  clearStoredOnboardingOAuthProvider,
+  onboardingOAuthSignedInLabel,
+  readStoredOnboardingOAuthProvider,
+  storeOnboardingOAuthProvider,
+  type EquipifyOAuthProvider,
+} from "@/lib/auth/supabase-oauth"
 import {
   HOW_HEARD_ABOUT_EQUIPIFY_OTHER_VALUE,
   type HowHeardAboutEquipifyValue,
@@ -37,8 +45,9 @@ import {
 import {
   buildOnboardingOAuthCallbackUrl,
   buildOnboardingOAuthReturnPath,
-  isGoogleOAuthUser,
+  detectOAuthProviderFromUser,
   isOnboardingAccountStepSatisfied,
+  isSocialOAuthUser,
   ONBOARDING_OAUTH_ERROR_MESSAGE,
   ONBOARDING_OAUTH_SESSION_STORAGE_KEY,
   ONBOARDING_OAUTH_START_ERROR_MESSAGE,
@@ -106,7 +115,9 @@ function OnboardingPageContent() {
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [inviteContext, setInviteContext] = useState<InviteContext | null>(null)
   const [oauthLoading, setOauthLoading] = useState(false)
+  const [oauthLoadingProvider, setOauthLoadingProvider] = useState<EquipifyOAuthProvider | null>(null)
   const [oauthAuthenticated, setOauthAuthenticated] = useState(false)
+  const [oauthProvider, setOauthProvider] = useState<EquipifyOAuthProvider | null>(null)
   const [oauthProfileEmail, setOauthProfileEmail] = useState<string | null>(null)
 
   useEffect(() => {
@@ -214,8 +225,10 @@ function OnboardingPageContent() {
       setStepOneError(ONBOARDING_OAUTH_ERROR_MESSAGE)
       setStep(0)
       setOauthAuthenticated(false)
+      setOauthProvider(null)
       try {
         sessionStorage.removeItem(ONBOARDING_OAUTH_SESSION_STORAGE_KEY)
+        clearStoredOnboardingOAuthProvider()
       } catch {
         /* ignore */
       }
@@ -241,10 +254,12 @@ function OnboardingPageContent() {
 
       const user = data.session.user
       const parsed = parseOAuthProfileFromUser(user)
-      const fromGoogle = isGoogleOAuthUser(user)
-      if (!fromGoogle && !oauthReturn) return
+      const socialOAuth = isSocialOAuthUser(user)
+      if (!socialOAuth && !oauthReturn) return
 
+      const provider = readStoredOnboardingOAuthProvider() ?? detectOAuthProviderFromUser(user)
       setOauthAuthenticated(true)
+      setOauthProvider(provider)
       setOauthProfileEmail(parsed.email || user.email || null)
       setForm((prev) => ({
         ...prev,
@@ -260,6 +275,7 @@ function OnboardingPageContent() {
 
       try {
         sessionStorage.removeItem(ONBOARDING_OAUTH_SESSION_STORAGE_KEY)
+        clearStoredOnboardingOAuthProvider()
       } catch {
         /* ignore */
       }
@@ -270,26 +286,30 @@ function OnboardingPageContent() {
     }
   }, [searchParams, supabase, inviteContext])
 
-  async function handleGoogleSignIn() {
+  async function handleOAuthSignIn(provider: EquipifyOAuthProvider) {
     setStepOneError(null)
     setOauthLoading(true)
+    setOauthLoadingProvider(provider)
     try {
       const returnPath = buildOnboardingOAuthReturnPath(searchParams)
       const redirectTo = buildOnboardingOAuthCallbackUrl(window.location.origin, returnPath)
       try {
         sessionStorage.setItem(ONBOARDING_OAUTH_SESSION_STORAGE_KEY, "1")
+        storeOnboardingOAuthProvider(provider)
       } catch {
         /* ignore */
       }
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
+        provider,
         options: { redirectTo },
       })
       if (error) {
         setStepOneError(ONBOARDING_OAUTH_START_ERROR_MESSAGE)
+        setOauthLoadingProvider(null)
       }
     } catch {
       setStepOneError(ONBOARDING_OAUTH_START_ERROR_MESSAGE)
+      setOauthLoadingProvider(null)
     } finally {
       setOauthLoading(false)
     }
@@ -364,7 +384,7 @@ function OnboardingPageContent() {
       if (!authUserId) {
         setSubmitError(
           oauthAuthenticated
-            ? "Your Google session expired. Return to step 1 and sign in with Google again."
+            ? "Your sign-in session expired. Return to step 1 and sign in again."
             : "Account created, but session is not ready yet. Check your email to verify your account.",
         )
         return
@@ -377,7 +397,7 @@ function OnboardingPageContent() {
           inviteTokenParam
             ? "We couldn't start your session. Verify your email if you just created an account, then try again."
             : oauthAuthenticated
-              ? "Your Google session expired. Return to step 1 and sign in with Google again."
+              ? "Your sign-in session expired. Return to step 1 and sign in again."
               : "Account created, but session is not ready yet. Check your email to verify your account.",
         )
         return
@@ -539,7 +559,7 @@ function OnboardingPageContent() {
       ) {
         setStepOneError(
           oauthAuthenticated
-            ? "First name, last name, and email are required to continue."
+            ? "Email is required to continue."
             : "First name, last name, email, and password are required to continue.",
         )
         return
@@ -615,7 +635,9 @@ function OnboardingPageContent() {
               {oauthAuthenticated ? (
                 <>
                   <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-4">
-                    <p className="text-xs font-medium text-emerald-800">Signed in with Google</p>
+                    <p className="text-xs font-medium text-emerald-800">
+                      {onboardingOAuthSignedInLabel(oauthProvider)}
+                    </p>
                     <p className="text-sm text-gray-700 mt-1">
                       {inviteContext?.email || oauthProfileEmail || form.email || emailParam}
                     </p>
@@ -636,17 +658,12 @@ function OnboardingPageContent() {
                 </>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => void handleGoogleSignIn()}
+                  <OAuthSignInButtonStack
                     disabled={oauthLoading || inviteLoading}
-                    className="w-full h-10 inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-[#4285F4] font-semibold text-xs border border-gray-200">
-                      G
-                    </span>
-                    {oauthLoading ? "Redirecting to Google…" : "Continue with Google"}
-                  </button>
+                    loadingProvider={oauthLoadingProvider}
+                    onGoogleClick={() => void handleOAuthSignIn("google")}
+                    onAppleClick={() => void handleOAuthSignIn("apple")}
+                  />
 
                   <div className="my-6 flex items-center gap-3" aria-hidden>
                     <div className="h-px flex-1 bg-gray-200" />

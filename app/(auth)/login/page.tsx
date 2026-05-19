@@ -6,6 +6,12 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff, ArrowRight } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { BrandLogo } from "@/components/brand-logo"
+import { OAuthSignInButtonStack } from "@/components/auth/oauth-sign-in-button"
+import {
+  buildLoginOAuthCallbackUrl,
+  LOGIN_OAUTH_ERROR_MESSAGE,
+  type EquipifyOAuthProvider,
+} from "@/lib/auth/supabase-oauth"
 
 function LoginPageInner() {
   const router = useRouter()
@@ -15,6 +21,7 @@ function LoginPageInner() {
   const [password, setPassword] = useState("")
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [oauthLoadingProvider, setOauthLoadingProvider] = useState<EquipifyOAuthProvider | null>(null)
   const [error, setError] = useState("")
 
   const archivedNotice =
@@ -23,9 +30,7 @@ function LoginPageInner() {
       : null
 
   const oauthNotice =
-    searchParams.get("error") === "oauth"
-      ? "Google sign-in could not be completed. Try again or use your email and password."
-      : null
+    searchParams.get("error") === "oauth" ? LOGIN_OAUTH_ERROR_MESSAGE : null
 
   async function signInWithEmailPassword(nextEmail: string, nextPassword: string) {
     const { error } = await supabase.auth.signInWithPassword({
@@ -63,24 +68,24 @@ function LoginPageInner() {
     }
   }
 
-  async function handleGoogleSignIn() {
+  async function handleOAuthSignIn(provider: EquipifyOAuthProvider) {
     setError("")
-    setLoading(true)
+    setOauthLoadingProvider(provider)
     try {
       const redirectTo =
-        typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
+        typeof window !== "undefined" ? buildLoginOAuthCallbackUrl(window.location.origin) : undefined
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider,
         options: { redirectTo },
       })
-      if (error) throw new Error(error.message)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to continue with Google."
-      setError(message)
-      setLoading(false)
-      return
+      if (oauthError) {
+        setError(LOGIN_OAUTH_ERROR_MESSAGE)
+        setOauthLoadingProvider(null)
+      }
+    } catch {
+      setError(LOGIN_OAUTH_ERROR_MESSAGE)
+      setOauthLoadingProvider(null)
     }
-    setLoading(false)
   }
 
   return (
@@ -136,17 +141,12 @@ function LoginPageInner() {
           <h1 className="text-2xl font-semibold text-gray-900 mb-1">Welcome back</h1>
           <p className="text-sm text-gray-500 mb-8">Sign in to your workspace</p>
 
-          <button
-            type="button"
-            onClick={() => void handleGoogleSignIn()}
-            disabled={loading}
-            className="w-full h-10 inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-          >
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-[#4285F4] font-semibold text-xs border border-gray-200">
-              G
-            </span>
-            Continue with Google
-          </button>
+          <OAuthSignInButtonStack
+            disabled={loading || oauthLoadingProvider != null}
+            loadingProvider={oauthLoadingProvider}
+            onGoogleClick={() => void handleOAuthSignIn("google")}
+            onAppleClick={() => void handleOAuthSignIn("apple")}
+          />
 
           <div className="my-6 flex items-center gap-3" aria-hidden>
             <div className="h-px flex-1 bg-gray-200" />
@@ -193,7 +193,7 @@ function LoginPageInner() {
                 {error || oauthNotice || archivedNotice}
               </p>
             )}
-            <button type="submit" disabled={loading}
+            <button type="submit" disabled={loading || oauthLoadingProvider != null}
               className="portal-btn-primary w-full justify-center h-10 text-base font-medium">
               {loading ? "Signing in…" : (
                 <><span>Sign in</span><ArrowRight size={15} /></>

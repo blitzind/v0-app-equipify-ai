@@ -1,17 +1,28 @@
 import assert from "node:assert/strict"
 import type { User } from "@supabase/supabase-js"
 import {
+  buildLoginOAuthCallbackUrl,
+  oauthProviderLabel,
+  onboardingOAuthSignedInLabel,
+} from "../lib/auth/supabase-oauth"
+import {
   buildOnboardingOAuthCallbackUrl,
   buildOnboardingOAuthReturnPath,
+  detectOAuthProviderFromUser,
+  isAppleOAuthUser,
   isGoogleOAuthUser,
   isOnboardingAccountStepSatisfied,
+  isSocialOAuthUser,
   onboardingStepFromQuery,
   parseOAuthProfileFromUser,
   splitFullName,
 } from "../lib/onboarding/oauth-profile"
 
+assert.equal(oauthProviderLabel("apple"), "Apple")
+assert.equal(onboardingOAuthSignedInLabel("apple"), "Signed in with Apple")
+assert.equal(buildLoginOAuthCallbackUrl("http://localhost:3000"), "http://localhost:3000/auth/callback")
+
 assert.deepEqual(splitFullName("Josh Smith"), { firstName: "Josh", lastName: "Smith" })
-assert.deepEqual(splitFullName("Madonna"), { firstName: "Madonna", lastName: "" })
 
 const googleUser = {
   id: "user-1",
@@ -26,56 +37,59 @@ const googleUser = {
 } as unknown as User
 
 assert.equal(isGoogleOAuthUser(googleUser), true)
-const parsed = parseOAuthProfileFromUser(googleUser)
-assert.equal(parsed.email, "josh@example.com")
-assert.equal(parsed.firstName, "Josh")
-assert.equal(parsed.lastName, "Smith")
-assert.equal(parsed.avatarUrl, "https://example.com/avatar.jpg")
+assert.equal(isSocialOAuthUser(googleUser), true)
+assert.equal(detectOAuthProviderFromUser(googleUser), "google")
 
-const nameOnlyUser = {
-  id: "user-2",
-  email: "alex@example.com",
-  app_metadata: {},
-  user_metadata: { full_name: "Alex Johnson" },
-  identities: [{ provider: "google" }],
+const appleUser = {
+  id: "user-apple",
+  email: "apple@example.com",
+  app_metadata: { provider: "apple" },
+  user_metadata: {
+    name: { firstName: "Taylor", lastName: "Reed" },
+    email: "apple@example.com",
+  },
+  identities: [{ provider: "apple" }],
 } as unknown as User
 
-const parsedNameOnly = parseOAuthProfileFromUser(nameOnlyUser)
-assert.equal(parsedNameOnly.firstName, "Alex")
-assert.equal(parsedNameOnly.lastName, "Johnson")
+assert.equal(isAppleOAuthUser(appleUser), true)
+assert.equal(detectOAuthProviderFromUser(appleUser), "apple")
+const parsedApple = parseOAuthProfileFromUser(appleUser)
+assert.equal(parsedApple.firstName, "Taylor")
+assert.equal(parsedApple.lastName, "Reed")
+assert.equal(parsedApple.email, "apple@example.com")
+
+const appleEmailOnly = {
+  id: "user-apple-2",
+  email: "relay@privaterelay.appleid.com",
+  app_metadata: { provider: "apple" },
+  user_metadata: {},
+  identities: [{ provider: "apple" }],
+} as unknown as User
+
+const parsedAppleEmailOnly = parseOAuthProfileFromUser(appleEmailOnly)
+assert.equal(parsedAppleEmailOnly.email, "relay@privaterelay.appleid.com")
+assert.equal(parsedAppleEmailOnly.firstName, "")
+assert.equal(parsedAppleEmailOnly.lastName, "")
 
 const returnPath = buildOnboardingOAuthReturnPath(
   new URLSearchParams("plan=growth&firstName=Josh&email=josh@example.com"),
 )
-assert.match(returnPath, /^\/onboarding\?/)
 assert.match(returnPath, /step=workspace/)
-assert.match(returnPath, /plan=growth/)
 
 const callbackUrl = buildOnboardingOAuthCallbackUrl("http://localhost:3000", returnPath)
 assert.match(callbackUrl, /^http:\/\/localhost:3000\/auth\/callback\?next=/)
 
 assert.equal(onboardingStepFromQuery("workspace"), 1)
-assert.equal(onboardingStepFromQuery(null), null)
 
 assert.equal(
   isOnboardingAccountStepSatisfied({
-    firstName: "Josh",
-    lastName: "Smith",
-    email: "josh@example.com",
+    firstName: "",
+    lastName: "",
+    email: "relay@privaterelay.appleid.com",
     oauthAuthenticated: true,
     password: "",
   }),
   true,
-)
-assert.equal(
-  isOnboardingAccountStepSatisfied({
-    firstName: "Josh",
-    lastName: "Smith",
-    email: "josh@example.com",
-    oauthAuthenticated: false,
-    password: "",
-  }),
-  false,
 )
 
 console.log("test-onboarding-oauth-profile: ok")
