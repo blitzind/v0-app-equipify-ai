@@ -38,7 +38,7 @@ export async function POST(
     return NextResponse.json({ error: "load_failed", message: loadErr.message }, { status: 500 })
   }
   if (!row?.file_url) {
-    return NextResponse.json({ error: "not_found", message: "Import or stored PDF missing." }, { status: 404 })
+    return NextResponse.json({ error: "not_found", message: "Import or stored file missing." }, { status: 404 })
   }
 
   const existingActive = await getActiveCatalogJobForImport(svc, organizationId, importId)

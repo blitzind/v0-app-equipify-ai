@@ -11,6 +11,11 @@ import {
   extractPriceListPayloadFromPdf,
   PriceListExtractConfigError,
 } from "@/lib/catalog/extract-price-list-from-pdf"
+import { extractPriceListPayloadFromCsv } from "@/lib/catalog/extract-price-list-from-csv"
+import {
+  detectPriceListFileKind,
+  type PriceListFileKind,
+} from "@/lib/catalog/price-list-file-validation"
 import type { AiJobStatus } from "@/lib/ai/jobs/types"
 import type { PriceListImportJobInput, PriceListImportJobResult } from "@/lib/ai/jobs/types"
 import { getPromptForTask, promptMetadataForLog } from "@/lib/ai/prompts"
@@ -149,6 +154,11 @@ function parseInput(raw: unknown): PriceListImportJobInput | null {
     const importId = typeof o.importId === "string" ? o.importId : ""
     const storagePath = typeof o.storagePath === "string" ? o.storagePath : ""
     const fileName = typeof o.fileName === "string" ? o.fileName : "price-list.pdf"
+    const fileKindRaw = o.fileKind
+    const fileKind: PriceListFileKind | null =
+      fileKindRaw === "csv" || fileKindRaw === "pdf"
+        ? fileKindRaw
+        : detectPriceListFileKind(fileName, "")
     if (!importId || !storagePath) return null
     const manufacturerName =
       typeof o.manufacturerName === "string" && o.manufacturerName.trim()
@@ -161,6 +171,7 @@ function parseInput(raw: unknown): PriceListImportJobInput | null {
       importId,
       storagePath,
       fileName,
+      fileKind: fileKind ?? "pdf",
       manufacturerName,
       vendorId,
     }
@@ -251,12 +262,12 @@ export async function runPriceListImportExtractionJob(params: {
     .maybeSingle()
 
   if (impErr || !imp0?.file_url) {
-    await failAiJob(svc, jobId, "Import record or stored PDF was not found.")
+    await failAiJob(svc, jobId, "Import record or stored file was not found.")
     await svc
       .from("price_list_imports")
       .update({
         status: "failed",
-        error_message: "Import or PDF missing.",
+        error_message: "Import or file missing.",
         updated_at: new Date().toISOString(),
       })
       .eq("id", importId)
@@ -265,6 +276,10 @@ export async function runPriceListImportExtractionJob(params: {
 
   let buffer: Buffer
   let fileName = (imp0.file_name as string) || "price-list.pdf"
+  const fileKind: PriceListFileKind =
+    input.kind === "price_list_import_upload"
+      ? (input.fileKind ?? detectPriceListFileKind(fileName, "") ?? "pdf")
+      : (detectPriceListFileKind(fileName, "") ?? "pdf")
 
   if (input.kind === "price_list_import_upload") {
     await updateAiJobProgress(svc, jobId, {
@@ -322,26 +337,48 @@ export async function runPriceListImportExtractionJob(params: {
 
   let payload: Awaited<ReturnType<typeof extractPriceListPayloadFromPdf>>
   try {
-    await updateAiJobProgress(svc, jobId, {
-      progressPercent: 38,
-      currentStep: "Extracting with AI (may take a few minutes)…",
-    })
+    if (fileKind === "csv") {
+      await updateAiJobProgress(svc, jobId, {
+        progressPercent: 38,
+        currentStep: "Parsing CSV columns…",
+      })
 
-    if (await isPriceListImportCancellationRequested(svc, organizationId, jobId, importId)) {
-      return
+      if (await isPriceListImportCancellationRequested(svc, organizationId, jobId, importId)) {
+        return
+      }
+
+      const manufacturerHint =
+        input.kind === "price_list_import_upload"
+          ? input.manufacturerName
+          : ((imp0.manufacturer_name as string | null) ?? null)
+
+      payload = extractPriceListPayloadFromCsv({
+        buffer,
+        fileName,
+        manufacturerNameHint: manufacturerHint,
+      })
+    } else {
+      await updateAiJobProgress(svc, jobId, {
+        progressPercent: 38,
+        currentStep: "Extracting with AI (may take a few minutes)…",
+      })
+
+      if (await isPriceListImportCancellationRequested(svc, organizationId, jobId, importId)) {
+        return
+      }
+
+      const extraction = extractPriceListPayloadFromPdf({
+        buffer,
+        fileName,
+        organizationId,
+      })
+
+      payload = await withTimeout(
+        extraction,
+        JOB_PROCESSING_TIMEOUT_MS,
+        "Extraction timed out. Try a smaller PDF or retry.",
+      )
     }
-
-    const extraction = extractPriceListPayloadFromPdf({
-      buffer,
-      fileName,
-      organizationId,
-    })
-
-    payload = await withTimeout(
-      extraction,
-      JOB_PROCESSING_TIMEOUT_MS,
-      "Extraction timed out. Try a smaller PDF or retry.",
-    )
 
     if (await isPriceListImportCancellationRequested(svc, organizationId, jobId, importId)) {
       return
@@ -428,16 +465,16 @@ export async function runPriceListImportExtractionJob(params: {
     currentStep: "Ready for review",
   })
 
-  const pr = getPromptForTask("catalog_extraction")
-  const pm = promptMetadataForLog(pr)
+  const pr = fileKind === "pdf" ? getPromptForTask("catalog_extraction") : null
+  const pm = pr ? promptMetadataForLog(pr) : null
   const result: PriceListImportJobResult = {
     kind: "price_list_import",
     importId,
     rowCount: payload.rows.length,
     warningCount: payload.warnings?.length ?? 0,
-    promptId: pm.promptId,
-    promptVersion: pm.promptVersion,
-    schemaVersion: pm.schemaVersion,
+    promptId: pm?.promptId,
+    promptVersion: pm?.promptVersion,
+    schemaVersion: pm?.schemaVersion,
   }
 
   await completeAiJob(svc, jobId, result as unknown as Record<string, unknown>)

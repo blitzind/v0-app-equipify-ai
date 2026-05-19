@@ -7,6 +7,7 @@ import { AlertTriangle, ArrowLeft, Loader2, RefreshCw, Upload } from "lucide-rea
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import type { DuplicateAction, ExtractedCatalogRow, StoredPriceListPayload } from "@/lib/catalog/import-types"
 import { CATALOG_ITEM_TYPES } from "@/lib/catalog/import-types"
+import { isAllowedPriceListFile, validatePriceListFile } from "@/lib/catalog/price-list-file-validation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -56,6 +57,7 @@ export default function ImportPriceListPage() {
 
   const [manufacturerName, setManufacturerName] = useState("")
   const [file, setFile] = useState<File | null>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
   const [importId, setImportId] = useState<string | null>(null)
   const [payload, setPayload] = useState<StoredPriceListPayload | null>(null)
   const [uploadBusy, setUploadBusy] = useState(false)
@@ -372,7 +374,22 @@ export default function ImportPriceListPage() {
 
   async function handleUploadAndExtract() {
     if (!organizationId || !file) {
-      toast({ variant: "destructive", title: "Choose a PDF", description: "Select a price list file first." })
+      toast({
+        variant: "destructive",
+        title: "Choose a file",
+        description: "Select a PDF or CSV price list first.",
+      })
+      return
+    }
+
+    const validation = validatePriceListFile(file.name, file.type, file.size)
+    if (!validation.ok) {
+      setFileError(validation.message)
+      toast({
+        variant: "destructive",
+        title: "Invalid file",
+        description: validation.message,
+      })
       return
     }
     pendingJobKindRef.current = "upload"
@@ -703,15 +720,35 @@ export default function ImportPriceListPage() {
           />
         </div>
         <div>
-          <Label htmlFor="pdf">Price list PDF</Label>
+          <Label htmlFor="price-list-file">Price list file</Label>
           <Input
-            id="pdf"
+            id="price-list-file"
             type="file"
-            accept="application/pdf,.pdf"
+            accept="application/pdf,.pdf,text/csv,application/csv,.csv"
             className="mt-1"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => {
+              const next = e.target.files?.[0] ?? null
+              setFile(next)
+              if (!next) {
+                setFileError(null)
+                return
+              }
+              const validation = validatePriceListFile(next.name, next.type, next.size)
+              if (!validation.ok) {
+                setFileError(validation.message)
+                setFile(null)
+                return
+              }
+              if (!isAllowedPriceListFile(next.name, next.type)) {
+                setFileError("Upload a PDF or CSV price list.")
+                setFile(null)
+                return
+              }
+              setFileError(null)
+            }}
           />
-          <p className="text-xs text-muted-foreground mt-1">PDF only for MVP. CSV / Excel later.</p>
+          <p className="text-xs text-muted-foreground mt-1">Upload a PDF or CSV price list.</p>
+          {fileError ? <p className="text-xs text-destructive mt-1">{fileError}</p> : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -774,7 +811,7 @@ export default function ImportPriceListPage() {
         <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 max-w-xl space-y-2">
           <p className="text-sm font-medium text-foreground">Import cancelled</p>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Extraction was stopped and unsaved extracted rows were discarded. Upload a new PDF, re-run extraction on the stored file,
+            Extraction was stopped and unsaved extracted rows were discarded. Upload a new price list file, re-run extraction on the stored file,
             or return to the catalog.
           </p>
           <div className="flex flex-wrap gap-2 pt-1">
@@ -787,6 +824,7 @@ export default function ImportPriceListPage() {
                 setImportId(null)
                 setPayload(null)
                 setFile(null)
+                setFileError(null)
                 try {
                   sessionStorage.removeItem(SS_IMPORT)
                   sessionStorage.removeItem(SS_JOB)

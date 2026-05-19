@@ -2,6 +2,12 @@ import { NextResponse } from "next/server"
 import { PRICE_LIST_IMPORTS_BUCKET } from "@/lib/catalog/constants"
 import { insertQueuedAiJob } from "@/lib/ai/jobs/create-ai-job"
 import { scheduleCatalogExtractionProcessing } from "@/lib/ai/jobs/schedule-catalog-extraction"
+import {
+  defaultPriceListFileName,
+  priceListStorageContentType,
+  priceListStorageExtension,
+  validatePriceListFile,
+} from "@/lib/catalog/price-list-file-validation"
 import { requireOrgCatalogWrite } from "@/lib/catalog/require-org-catalog-write"
 import { maybeCatalogSchemaErrorResponse } from "@/lib/supabase/catalog-schema-errors"
 
@@ -10,8 +16,6 @@ export const maxDuration = 300
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-const MAX_BYTES = 50 * 1024 * 1024
 
 export async function POST(
   request: Request,
@@ -38,18 +42,18 @@ export async function POST(
   }
 
   const file = form.get("file")
-  if (!(file instanceof File) || file.size < 1) {
-    return NextResponse.json({ error: "invalid_file", message: "Choose a PDF price list." }, { status: 400 })
-  }
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: "file_too_large", message: "PDF must be 50MB or smaller." }, { status: 400 })
+  if (!(file instanceof File)) {
+    return NextResponse.json({ error: "invalid_file", message: "Choose a price list file." }, { status: 400 })
   }
 
-  const mime = (file.type || "").toLowerCase()
-  const ext = file.name.split(".").pop()?.toLowerCase()
-  if (mime !== "application/pdf" && ext !== "pdf") {
-    return NextResponse.json({ error: "invalid_type", message: "Only PDF uploads are supported for now." }, { status: 400 })
+  const fileValidation = validatePriceListFile(file.name || "", file.type || "", file.size)
+  if (!fileValidation.ok) {
+    return NextResponse.json(
+      { error: fileValidation.error, message: fileValidation.message },
+      { status: 400 },
+    )
   }
+  const fileKind = fileValidation.kind
 
   const manufacturerNameField = form.get("manufacturerName")
   const manufacturerName =
@@ -71,7 +75,7 @@ export async function POST(
       uploaded_by: userId,
       vendor_id: vendorId,
       manufacturer_name: manufacturerName,
-      file_name: file.name || "price-list.pdf",
+      file_name: file.name || defaultPriceListFileName(fileKind),
       status: "processing",
       extracted_json: {} as unknown as Record<string, unknown>,
       error_message: null,
@@ -89,10 +93,10 @@ export async function POST(
   }
 
   const importId = inserted.id as string
-  const storagePath = `${organizationId}/${importId}.pdf`
+  const storagePath = `${organizationId}/${importId}${priceListStorageExtension(fileKind)}`
 
   const { error: upErr } = await svc.storage.from(PRICE_LIST_IMPORTS_BUCKET).upload(storagePath, buffer, {
-    contentType: "application/pdf",
+    contentType: priceListStorageContentType(fileKind),
     cacheControl: "3600",
     upsert: true,
   })
@@ -115,7 +119,8 @@ export async function POST(
       kind: "price_list_import_upload",
       importId,
       storagePath,
-      fileName: file.name || "price-list.pdf",
+      fileName: file.name || defaultPriceListFileName(fileKind),
+      fileKind,
       manufacturerName,
       vendorId,
     },

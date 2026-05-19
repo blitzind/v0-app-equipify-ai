@@ -10,6 +10,7 @@ export type PriceListImportJobInput =
       importId: string
       storagePath: string
       fileName: string
+      fileKind?: "pdf" | "csv"
       manufacturerName: string | null
       vendorId: string | null
     }
