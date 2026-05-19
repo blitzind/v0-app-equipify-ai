@@ -1,15 +1,24 @@
 "use client"
 
-import { useState, useMemo, useEffect, Suspense } from "react"
+import { useState, useMemo, useEffect, useCallback, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { usePurchaseOrders, POStatus } from "@/lib/purchase-order-store"
 import { PurchaseOrderDrawer } from "@/components/drawers/purchase-order-drawer"
+import { PurchaseOrderBulkArchiveDialog } from "@/components/purchase-orders/purchase-order-bulk-archive-dialog"
+import { bulkArchivePurchaseOrdersViaApi } from "@/lib/purchase-orders/bulk-archive-purchase-orders-client"
+import {
+  bulkPurchaseOrderArchivePartialToast,
+  bulkPurchaseOrderArchiveSuccessToast,
+  BULK_PURCHASE_ORDER_ARCHIVE_PARTIAL_DESCRIPTION,
+} from "@/lib/purchase-orders/bulk-archive-messages"
+import { isPurchaseOrderBulkArchiveEligible } from "@/lib/purchase-orders/bulk-archive-eligibility"
 import { AddVendorModal } from "@/components/vendors/add-vendor-modal"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -17,6 +26,9 @@ import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { RestrictedNotice } from "@/components/permissions/restricted-notice"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
+import { useToast } from "@/hooks/use-toast"
+import { Toaster } from "@/components/ui/toaster"
 import {
   Search, Plus, ArrowUpDown, ChevronRight,
   ShoppingCart, CheckCircle2, Clock, Truck, XCircle, AlertTriangle, Building2, Trash2,
@@ -97,9 +109,11 @@ type VendorRow = {
 }
 
 function PurchaseOrdersPageInner() {
-  const { orders, loading, error, addOrder } = usePurchaseOrders()
+  const { orders, loading, error, addOrder, refreshOrders } = usePurchaseOrders()
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const { permissions } = useOrgPermissions()
+  const { canArchiveRestore } = useOrgArchivePermissions()
+  const { toast } = useToast()
   const { standardCreateEligibility } = useBillingAccess()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -119,6 +133,20 @@ function PurchaseOrdersPageInner() {
   const [vendorQuery, setVendorQuery] = useState("")
   const [vendorMenuOpen, setVendorMenuOpen] = useState(false)
   const [addVendorOpen, setAddVendorOpen] = useState(false)
+  const [selectedPoIds, setSelectedPoIds] = useState<Set<string>>(() => new Set())
+  const [bulkArchiveOpen, setBulkArchiveOpen] = useState(false)
+  const [bulkArchiveBusy, setBulkArchiveBusy] = useState(false)
+
+  const canBulkArchiveFromList = canArchiveRestore && viewMode === "table"
+  const selectedCount = selectedPoIds.size
+
+  const clearSelection = useCallback(() => {
+    setSelectedPoIds(new Set())
+  }, [])
+
+  useEffect(() => {
+    clearSelection()
+  }, [search, statusFilter, vendorFilter, sortKey, sortAsc, viewMode, clearSelection])
 
   function computeLineTotalCents(quantity: number, unitCostCents: number): number {
     return Math.round(quantity * unitCostCents)
@@ -248,6 +276,70 @@ function PurchaseOrdersPageInner() {
     })
     return list
   }, [orders, search, statusFilter, vendorFilter, sortKey, sortAsc])
+
+  const selectableFiltered = useMemo(
+    () => filtered.filter((po) => isPurchaseOrderBulkArchiveEligible({ status: po.status })),
+    [filtered],
+  )
+
+  const toggleAllVisibleSelection = useCallback(() => {
+    const visibleIds = selectableFiltered.map((po) => po.id)
+    if (visibleIds.length === 0) return
+    setSelectedPoIds((prev) => {
+      const allSelected = visibleIds.every((id) => prev.has(id))
+      if (allSelected) return new Set()
+      return new Set(visibleIds)
+    })
+  }, [selectableFiltered])
+
+  const allVisibleSelected =
+    selectableFiltered.length > 0 && selectableFiltered.every((po) => selectedPoIds.has(po.id))
+  const someVisibleSelected =
+    selectableFiltered.some((po) => selectedPoIds.has(po.id)) && !allVisibleSelected
+
+  const toggleRowSelection = useCallback((id: string) => {
+    setSelectedPoIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  async function confirmBulkArchive() {
+    if (!organizationId || selectedPoIds.size === 0) return
+    setBulkArchiveBusy(true)
+    const ids = [...selectedPoIds]
+    const res = await bulkArchivePurchaseOrdersViaApi({
+      organizationId,
+      purchaseOrderIds: ids,
+    })
+    setBulkArchiveBusy(false)
+    if (!res.ok) {
+      toast({ variant: "destructive", title: res.message })
+      return
+    }
+    setBulkArchiveOpen(false)
+    if (res.succeededCount === 0) {
+      toast({ variant: "destructive", title: "Could not archive selected purchase orders." })
+      return
+    }
+    if (selectedPoIds.has(selectedId ?? "")) {
+      setSelectedId(null)
+    }
+    await refreshOrders()
+    if (res.failedCount === 0) {
+      clearSelection()
+      toast({ title: bulkPurchaseOrderArchiveSuccessToast(res.succeededCount) })
+      return
+    }
+    setSelectedPoIds(new Set(res.failedIds))
+    toast({
+      variant: "destructive",
+      title: bulkPurchaseOrderArchivePartialToast(res.succeededCount, res.failedCount),
+      description: BULK_PURCHASE_ORDER_ARCHIVE_PARTIAL_DESCRIPTION,
+    })
+  }
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortAsc(a => !a)
@@ -399,6 +491,26 @@ function PurchaseOrdersPageInner() {
         </div>
       </div>
 
+      {canBulkArchiveFromList && selectedCount > 0 ? (
+        <div className="hidden md:flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
+          <span className="text-sm font-medium text-foreground">
+            {selectedCount} purchase order{selectedCount === 1 ? "" : "s"} selected
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            className="h-8"
+            onClick={() => setBulkArchiveOpen(true)}
+          >
+            Archive selected
+          </Button>
+          <Button type="button" size="sm" variant="ghost" className="h-8" onClick={clearSelection}>
+            Clear selection
+          </Button>
+        </div>
+      ) : null}
+
       {/* Card view */}
       {viewMode === "card" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -451,6 +563,16 @@ function PurchaseOrdersPageInner() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border ds-table-header-row">
+                  {canBulkArchiveFromList ? (
+                    <th className="hidden md:table-cell w-10 px-4 py-3">
+                      <Checkbox
+                        aria-label="Select all visible purchase orders"
+                        checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+                        disabled={selectableFiltered.length === 0}
+                        onCheckedChange={toggleAllVisibleSelection}
+                      />
+                    </th>
+                  ) : null}
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">
                     <span className="flex items-center gap-1">PO # <SortBtn col="id" /></span>
                   </th>
@@ -474,19 +596,33 @@ function PurchaseOrdersPageInner() {
               <tbody className="divide-y divide-border">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-16 text-muted-foreground text-sm">
+                    <td colSpan={canBulkArchiveFromList ? 9 : 8} className="text-center py-16 text-muted-foreground text-sm">
                       No purchase orders match the current filters.
                     </td>
                   </tr>
                 ) : filtered.map(po => {
                   const cfg = STATUS_CONFIG[po.status]
                   const StatusIcon = cfg.icon
+                  const rowSelectable = isPurchaseOrderBulkArchiveEligible({ status: po.status })
                   return (
                     <tr
                       key={po.id}
                       className="ds-hover-list-row cursor-pointer group"
                       onClick={() => setSelectedId(po.id)}
                     >
+                      {canBulkArchiveFromList ? (
+                        <td
+                          className="hidden md:table-cell w-10 px-4 py-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Checkbox
+                            aria-label={`Select ${po.purchaseOrderNumber || "PO"}`}
+                            checked={selectedPoIds.has(po.id)}
+                            disabled={!rowSelectable}
+                            onCheckedChange={() => toggleRowSelection(po.id)}
+                          />
+                        </td>
+                      ) : null}
                       <td className="px-4 py-3 font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2 whitespace-nowrap">
                         {po.purchaseOrderNumber || "PO"}
                       </td>
@@ -760,6 +896,14 @@ function PurchaseOrdersPageInner() {
         </div>
       )}
 
+      <PurchaseOrderBulkArchiveDialog
+        open={bulkArchiveOpen}
+        onOpenChange={setBulkArchiveOpen}
+        selectedCount={selectedCount}
+        busy={bulkArchiveBusy}
+        onConfirm={confirmBulkArchive}
+      />
+
       <AddVendorModal
         open={addVendorOpen}
         onClose={() => setAddVendorOpen(false)}
@@ -770,6 +914,7 @@ function PurchaseOrdersPageInner() {
           selectVendor(row)
         }}
       />
+      <Toaster />
     </div>
   )
 }

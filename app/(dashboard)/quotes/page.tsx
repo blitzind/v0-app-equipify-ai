@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, Suspense } from "react"
+import { useState, useMemo, useEffect, useCallback, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useQuotes, type RecordArchiveVisibility } from "@/lib/quote-invoice-store"
@@ -8,6 +8,7 @@ import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import type { AdminQuote, QuoteStatus } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -23,6 +24,13 @@ import {
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { QuoteDrawer } from "@/components/drawers/quote-drawer"
+import { QuoteBulkArchiveDialog } from "@/components/quotes/quote-bulk-archive-dialog"
+import { bulkArchiveQuotesViaApi } from "@/lib/quotes/bulk-archive-quotes-client"
+import {
+  bulkQuoteArchivePartialToast,
+  bulkQuoteArchiveSuccessToast,
+  BULK_QUOTE_ARCHIVE_PARTIAL_DESCRIPTION,
+} from "@/lib/quotes/bulk-archive-messages"
 import { getWorkOrderDisplay, workOrderMatchesSearch } from "@/lib/work-orders/display"
 import { NewQuoteModal } from "@/components/quotes/new-quote-modal"
 import { QuoteApprovalStatusBadge } from "@/components/quotes/quote-approval-status-badge"
@@ -32,6 +40,7 @@ import { useActiveOrganization } from "@/lib/active-organization-context"
 import { PermissionGate } from "@/components/permissions/permission-gate"
 import { RestrictedNotice } from "@/components/permissions/restricted-notice"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 
 const UUID_PARAM =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -141,6 +150,7 @@ function QuotesPageInner() {
   const { toast } = useToast()
   const { standardCreateEligibility } = useBillingAccess()
   const { permissions: orgPermissions } = useOrgPermissions()
+  const { canArchiveRestore } = useOrgArchivePermissions()
   const canViewQuotes = orgPermissions.canViewQuotes
   const { organizationId: activeOrgId, status: activeOrgStatus } = useActiveOrganization()
   const [newModalOpen, setNewModalOpen] = useState(false)
@@ -170,8 +180,23 @@ function QuotesPageInner() {
   const [sortDir, setSortDir]         = useState<"asc" | "desc">("desc")
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<"table" | "card">("table")
+  const [selectedQuoteIds, setSelectedQuoteIds] = useState<Set<string>>(() => new Set())
+  const [bulkArchiveOpen, setBulkArchiveOpen] = useState(false)
+  const [bulkArchiveBusy, setBulkArchiveBusy] = useState(false)
   const searchParams = useSearchParams()
   const router = useRouter()
+
+  const canBulkArchiveFromList =
+    canArchiveRestore && quotesListVisibility === "active" && viewMode === "table"
+  const selectedCount = selectedQuoteIds.size
+
+  const clearSelection = useCallback(() => {
+    setSelectedQuoteIds(new Set())
+  }, [])
+
+  useEffect(() => {
+    clearSelection()
+  }, [search, statusFilter, sortKey, sortDir, viewMode, quotesListVisibility, clearSelection])
 
   // Auto-open drawer from ?open= query param (include archived rows so the drawer resolves the quote)
   useEffect(() => {
@@ -292,6 +317,67 @@ function QuotesPageInner() {
     return list
   }, [quotes, search, statusFilter, sortKey, sortDir])
 
+  const selectableFiltered = useMemo(
+    () => filtered.filter((q) => !q.isArchived),
+    [filtered],
+  )
+
+  const toggleAllVisibleSelection = useCallback(() => {
+    const visibleIds = selectableFiltered.map((q) => q.id)
+    if (visibleIds.length === 0) return
+    setSelectedQuoteIds((prev) => {
+      const allSelected = visibleIds.every((id) => prev.has(id))
+      if (allSelected) return new Set()
+      return new Set(visibleIds)
+    })
+  }, [selectableFiltered])
+
+  const allVisibleSelected =
+    selectableFiltered.length > 0 && selectableFiltered.every((q) => selectedQuoteIds.has(q.id))
+  const someVisibleSelected =
+    selectableFiltered.some((q) => selectedQuoteIds.has(q.id)) && !allVisibleSelected
+
+  const toggleRowSelection = useCallback((id: string) => {
+    setSelectedQuoteIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  async function confirmBulkArchive() {
+    if (!activeOrgId || selectedQuoteIds.size === 0) return
+    setBulkArchiveBusy(true)
+    const ids = [...selectedQuoteIds]
+    const res = await bulkArchiveQuotesViaApi({ organizationId: activeOrgId, quoteIds: ids })
+    setBulkArchiveBusy(false)
+    if (!res.ok) {
+      toast({ variant: "destructive", title: res.message })
+      return
+    }
+    setBulkArchiveOpen(false)
+    if (res.succeededCount === 0) {
+      toast({ variant: "destructive", title: "Could not archive selected quotes." })
+      return
+    }
+    if (selectedQuoteIds.has(selectedQuoteId ?? "")) {
+      setSelectedQuoteId(null)
+    }
+    await refreshQuotes()
+    if (res.failedCount === 0) {
+      clearSelection()
+      toast({ title: bulkQuoteArchiveSuccessToast(res.succeededCount) })
+      return
+    }
+    setSelectedQuoteIds(new Set(res.failedIds))
+    toast({
+      variant: "destructive",
+      title: bulkQuoteArchivePartialToast(res.succeededCount, res.failedCount),
+      description: BULK_QUOTE_ARCHIVE_PARTIAL_DESCRIPTION,
+    })
+  }
+
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc")
     else { setSortKey(key); setSortDir("asc") }
@@ -395,6 +481,26 @@ function QuotesPageInner() {
         <span className="font-medium text-foreground">{quotes.length}</span> quotes
       </p>
 
+      {canBulkArchiveFromList && selectedCount > 0 ? (
+        <div className="hidden md:flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
+          <span className="text-sm font-medium text-foreground">
+            {selectedCount} quote{selectedCount === 1 ? "" : "s"} selected
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            className="h-8"
+            onClick={() => setBulkArchiveOpen(true)}
+          >
+            Archive selected
+          </Button>
+          <Button type="button" size="sm" variant="ghost" className="h-8" onClick={clearSelection}>
+            Clear selection
+          </Button>
+        </div>
+      ) : null}
+
       {/* Pending approval callout */}
       {statusFilter === "all" && awaitingCustomerQuotes.length > 0 && (
         <div className="rounded-xl border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/5 px-4 py-3 flex items-center gap-3">
@@ -462,6 +568,16 @@ function QuotesPageInner() {
           <Table>
             <TableHeader>
               <TableRow className="ds-table-header-row-subtle">
+                {canBulkArchiveFromList ? (
+                  <TableHead className="hidden md:table-cell w-10">
+                    <Checkbox
+                      aria-label="Select all visible quotes"
+                      checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+                      disabled={selectableFiltered.length === 0}
+                      onCheckedChange={toggleAllVisibleSelection}
+                    />
+                  </TableHead>
+                ) : null}
                 <TableHead>
                   <button onClick={() => toggleSort("id")} className="flex items-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
                     Quote # <SortIcon col="id" sortKey={sortKey} sortDir={sortDir} />
@@ -500,7 +616,7 @@ function QuotesPageInner() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-16">
+                  <TableCell colSpan={canBulkArchiveFromList ? 10 : 9} className="text-center py-16">
                     <div className="flex flex-col items-center gap-3">
                       <FileText className="w-10 h-10 text-muted-foreground/20" />
                       <div>
@@ -520,6 +636,19 @@ function QuotesPageInner() {
                     onMouseLeave={e => (e.currentTarget.style.backgroundColor = "var(--card)")}
                     onClick={() => setSelectedQuoteId(qt.id)}
                   >
+                    {canBulkArchiveFromList ? (
+                      <TableCell
+                        className="hidden md:table-cell w-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          aria-label={`Select ${quoteDisplayId(qt)}`}
+                          checked={selectedQuoteIds.has(qt.id)}
+                          disabled={qt.isArchived}
+                          onCheckedChange={() => toggleRowSelection(qt.id)}
+                        />
+                      </TableCell>
+                    ) : null}
                     <TableCell>
                       <span className="font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2 ds-tabular">
                         {quoteDisplayId(qt)}
@@ -597,6 +726,16 @@ function QuotesPageInner() {
       />
       <Toaster />
       <QuickAddParamBridge action="new-quote" onTrigger={() => openNewQuoteModal(null, null)} />
+
+      <QuoteBulkArchiveDialog
+        open={bulkArchiveOpen}
+        onOpenChange={(open) => {
+          if (!open && !bulkArchiveBusy) setBulkArchiveOpen(false)
+        }}
+        selectedCount={selectedCount}
+        busy={bulkArchiveBusy}
+        onConfirm={() => void confirmBulkArchive()}
+      />
     </div>
   )
 }

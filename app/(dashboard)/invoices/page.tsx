@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, Suspense } from "react"
+import { useState, useMemo, useEffect, useCallback, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useInvoices, type RecordArchiveVisibility } from "@/lib/quote-invoice-store"
@@ -8,6 +8,7 @@ import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -23,6 +24,17 @@ import {
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { InvoiceDrawer } from "@/components/drawers/invoice-drawer"
+import { InvoiceBulkArchiveDialog } from "@/components/invoices/invoice-bulk-archive-dialog"
+import { bulkArchiveInvoicesViaApi } from "@/lib/invoices/bulk-archive-invoices-client"
+import {
+  bulkInvoiceArchivePartialToast,
+  bulkInvoiceArchiveSuccessToast,
+  BULK_INVOICE_ARCHIVE_PARTIAL_DESCRIPTION,
+} from "@/lib/invoices/bulk-archive-messages"
+import {
+  invoiceBulkArchiveEligibilityFromAdmin,
+  isInvoiceBulkArchiveEligible,
+} from "@/lib/invoices/bulk-archive-eligibility"
 import { getWorkOrderDisplay, workOrderMatchesSearch } from "@/lib/work-orders/display"
 import { NewInvoiceModal } from "@/components/invoices/new-invoice-modal"
 import { useToast } from "@/hooks/use-toast"
@@ -31,6 +43,7 @@ import { useActiveOrganization } from "@/lib/active-organization-context"
 import { PermissionGate } from "@/components/permissions/permission-gate"
 import { RestrictedNotice } from "@/components/permissions/restricted-notice"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import { paymentAllocationUiLabel } from "@/lib/billing/invoice-payment-allocation"
 import { FinancialInvoiceReportSection } from "@/components/reporting/financial-invoice-report-section"
 import { INVOICE_STATUS_BADGE_CLASSNAME } from "@/lib/invoices/invoice-status-badge-classes"
@@ -164,6 +177,7 @@ function InvoicesPageInner() {
   const { standardCreateEligibility } = useBillingAccess()
   const { organizationId: activeOrgId, status: activeOrgStatus } = useActiveOrganization()
   const { permissions: orgPermissions } = useOrgPermissions()
+  const { canArchiveRestore } = useOrgArchivePermissions()
   const canViewFinancials = orgPermissions.canViewFinancials
   const [newModalOpen, setNewModalOpen] = useState(false)
   const [invoicePrefillWo, setInvoicePrefillWo] = useState<string | undefined>(undefined)
@@ -190,8 +204,19 @@ function InvoicesPageInner() {
   const [sortDir, setSortDir]         = useState<"asc" | "desc">("desc")
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<"table" | "card">("table")
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<string>>(() => new Set())
+  const [bulkArchiveOpen, setBulkArchiveOpen] = useState(false)
+  const [bulkArchiveBusy, setBulkArchiveBusy] = useState(false)
   const searchParams = useSearchParams()
   const router = useRouter()
+
+  const canBulkArchiveFromList =
+    canArchiveRestore && invoicesListVisibility === "active" && viewMode === "table"
+  const selectedCount = selectedInvoiceIds.size
+
+  const clearSelection = useCallback(() => {
+    setSelectedInvoiceIds(new Set())
+  }, [])
 
   // Auto-open drawer from ?open= query param (include archived rows so the drawer resolves)
   useEffect(() => {
@@ -278,6 +303,10 @@ function InvoicesPageInner() {
     return UUID_PARAM.test(raw) ? raw : ""
   }, [searchParams])
 
+  useEffect(() => {
+    clearSelection()
+  }, [search, statusFilter, sortKey, sortDir, viewMode, invoicesListVisibility, customerIdFilter, clearSelection])
+
   const invoicesForStats = useMemo(() => invoices.filter((i) => !i.isArchived), [invoices])
 
   const filtered = useMemo(() => {
@@ -321,6 +350,67 @@ function InvoicesPageInner() {
 
     return list
   }, [invoices, search, statusFilter, sortKey, sortDir, customerIdFilter])
+
+  const selectableFiltered = useMemo(
+    () => filtered.filter((inv) => isInvoiceBulkArchiveEligible(invoiceBulkArchiveEligibilityFromAdmin(inv))),
+    [filtered],
+  )
+
+  const toggleAllVisibleSelection = useCallback(() => {
+    const visibleIds = selectableFiltered.map((inv) => inv.id)
+    if (visibleIds.length === 0) return
+    setSelectedInvoiceIds((prev) => {
+      const allSelected = visibleIds.every((id) => prev.has(id))
+      if (allSelected) return new Set()
+      return new Set(visibleIds)
+    })
+  }, [selectableFiltered])
+
+  const allVisibleSelected =
+    selectableFiltered.length > 0 && selectableFiltered.every((inv) => selectedInvoiceIds.has(inv.id))
+  const someVisibleSelected =
+    selectableFiltered.some((inv) => selectedInvoiceIds.has(inv.id)) && !allVisibleSelected
+
+  const toggleRowSelection = useCallback((id: string) => {
+    setSelectedInvoiceIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  async function confirmBulkArchive() {
+    if (!activeOrgId || selectedInvoiceIds.size === 0) return
+    setBulkArchiveBusy(true)
+    const ids = [...selectedInvoiceIds]
+    const res = await bulkArchiveInvoicesViaApi({ organizationId: activeOrgId, invoiceIds: ids })
+    setBulkArchiveBusy(false)
+    if (!res.ok) {
+      toast({ variant: "destructive", title: res.message })
+      return
+    }
+    setBulkArchiveOpen(false)
+    if (res.succeededCount === 0) {
+      toast({ variant: "destructive", title: "Could not archive selected invoices." })
+      return
+    }
+    if (selectedInvoiceIds.has(selectedInvoiceId ?? "")) {
+      setSelectedInvoiceId(null)
+    }
+    await refreshInvoices()
+    if (res.failedCount === 0) {
+      clearSelection()
+      toast({ title: bulkInvoiceArchiveSuccessToast(res.succeededCount) })
+      return
+    }
+    setSelectedInvoiceIds(new Set(res.failedIds))
+    toast({
+      variant: "destructive",
+      title: bulkInvoiceArchivePartialToast(res.succeededCount, res.failedCount),
+      description: BULK_INVOICE_ARCHIVE_PARTIAL_DESCRIPTION,
+    })
+  }
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc")
@@ -442,6 +532,26 @@ function InvoicesPageInner() {
         <span className="font-medium text-foreground">{invoices.length}</span> invoices
       </p>
 
+      {canBulkArchiveFromList && selectedCount > 0 ? (
+        <div className="hidden md:flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
+          <span className="text-sm font-medium text-foreground">
+            {selectedCount} invoice{selectedCount === 1 ? "" : "s"} selected
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            className="h-8"
+            onClick={() => setBulkArchiveOpen(true)}
+          >
+            Archive selected
+          </Button>
+          <Button type="button" size="sm" variant="ghost" className="h-8" onClick={clearSelection}>
+            Clear selection
+          </Button>
+        </div>
+      ) : null}
+
       {/* Overdue callout */}
       {statusFilter === "all" && overdue.length > 0 && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 flex items-center gap-3">
@@ -519,6 +629,16 @@ function InvoicesPageInner() {
           <Table>
             <TableHeader>
               <TableRow className="ds-table-header-row-subtle">
+                {canBulkArchiveFromList ? (
+                  <TableHead className="hidden md:table-cell w-10">
+                    <Checkbox
+                      aria-label="Select all visible invoices"
+                      checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+                      disabled={selectableFiltered.length === 0}
+                      onCheckedChange={toggleAllVisibleSelection}
+                    />
+                  </TableHead>
+                ) : null}
                 <TableHead>
                   <button onClick={() => toggleSort("id")} className="flex items-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
                     Invoice # <SortIcon col="id" sortKey={sortKey} sortDir={sortDir} />
@@ -558,7 +678,7 @@ function InvoicesPageInner() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-16">
+                  <TableCell colSpan={canBulkArchiveFromList ? 11 : 10} className="text-center py-16">
                     <div className="flex flex-col items-center gap-3">
                       <Receipt className="w-10 h-10 text-muted-foreground/20" />
                       <div>
@@ -569,7 +689,9 @@ function InvoicesPageInner() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map(inv => (
+                filtered.map(inv => {
+                  const rowSelectable = isInvoiceBulkArchiveEligible(invoiceBulkArchiveEligibilityFromAdmin(inv))
+                  return (
                   <TableRow
                     key={inv.id}
                     className="group cursor-pointer transition-colors duration-100"
@@ -578,6 +700,19 @@ function InvoicesPageInner() {
                     onMouseLeave={e => (e.currentTarget.style.backgroundColor = "var(--card)")}
                     onClick={() => setSelectedInvoiceId(inv.id)}
                   >
+                    {canBulkArchiveFromList ? (
+                      <TableCell
+                        className="hidden md:table-cell w-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          aria-label={`Select ${invoiceDisplayId(inv)}`}
+                          checked={selectedInvoiceIds.has(inv.id)}
+                          disabled={!rowSelectable}
+                          onCheckedChange={() => toggleRowSelection(inv.id)}
+                        />
+                      </TableCell>
+                    ) : null}
                     <TableCell>
                       <span className="font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2 ds-tabular">
                         {invoiceDisplayId(inv)}
@@ -650,7 +785,8 @@ function InvoicesPageInner() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))
+                  )
+                })
               )}
             </TableBody>
           </Table>
@@ -662,6 +798,14 @@ function InvoicesPageInner() {
         invoiceId={selectedInvoiceId}
         onClose={() => setSelectedInvoiceId(null)}
         onSelectInvoiceId={(id) => setSelectedInvoiceId(id)}
+      />
+
+      <InvoiceBulkArchiveDialog
+        open={bulkArchiveOpen}
+        onOpenChange={setBulkArchiveOpen}
+        selectedCount={selectedCount}
+        busy={bulkArchiveBusy}
+        onConfirm={confirmBulkArchive}
       />
 
       <NewInvoiceModal

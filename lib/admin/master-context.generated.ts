@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 452,
+  apiRouteHandlers: 456,
   sqlMigrations: 197,
   dashboardPages: 65,
-  componentsTsx: 324,
-  libTsFiles: 899,
+  componentsTsx: 328,
+  libTsFiles: 913,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **452** |
+| API route handlers (\`app/api/**/route.ts\`) | **456** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **197** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **324** |
-| \`lib/**/*.ts\` | **899** |
+| \`components/**/*.tsx\` | **328** |
+| \`lib/**/*.ts\` | **913** |
 
 ### Vercel crons
 
@@ -340,6 +340,7 @@ organizations/[organizationId]/invoices/[invoiceId]/certificate-release-override
 organizations/[organizationId]/invoices/[invoiceId]/duplicate/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/pdf/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/quickbooks-sync/route.ts
+organizations/[organizationId]/invoices/bulk-archive/route.ts
 organizations/[organizationId]/member-profile-labels/route.ts
 organizations/[organizationId]/members/[userId]/avatar/route.ts
 organizations/[organizationId]/migration-imports/[jobId]/async/route.ts
@@ -372,10 +373,12 @@ organizations/[organizationId]/prospects/[prospectId]/route.ts
 organizations/[organizationId]/prospects/[prospectId]/timeline/route.ts
 organizations/[organizationId]/prospects/bulk-archive/route.ts
 organizations/[organizationId]/prospects/route.ts
+organizations/[organizationId]/purchase-orders/bulk-archive/route.ts
 organizations/[organizationId]/quotes/[quoteId]/blitzpay/apply-deposit-credit/route.ts
 organizations/[organizationId]/quotes/[quoteId]/blitzpay/payment-link/route.ts
 organizations/[organizationId]/quotes/[quoteId]/blitzpay/payment-links/[linkId]/route.ts
 organizations/[organizationId]/quotes/[quoteId]/blitzpay/prepare-pay/route.ts
+organizations/[organizationId]/quotes/bulk-archive/route.ts
 organizations/[organizationId]/reports/analytics/route.ts
 organizations/[organizationId]/reports/executive-operational/route.ts
 organizations/[organizationId]/reports/financial-invoices/route.ts
@@ -393,6 +396,7 @@ organizations/[organizationId]/service-requests/stats/route.ts
 organizations/[organizationId]/sms-workspace/route.ts
 organizations/[organizationId]/technician-skill-tags/[tagId]/route.ts
 organizations/[organizationId]/technician-skill-tags/route.ts
+organizations/[organizationId]/vendors/bulk-archive/route.ts
 organizations/[organizationId]/work-orders/[workOrderId]/ai-parts-suggestions/route.ts
 organizations/[organizationId]/work-orders/[workOrderId]/ai-service-summary/route.ts
 organizations/[organizationId]/work-orders/[workOrderId]/ai-technician-assist/route.ts
