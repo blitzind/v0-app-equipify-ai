@@ -2,6 +2,9 @@ import { randomUUID } from "crypto"
 import { pickHeader } from "@/lib/migration-imports/map-columns"
 import { parseCsvText } from "@/lib/migration-imports/parse-csv"
 import {
+  pickCatalogImportPriceColumns,
+} from "@/lib/catalog/catalog-import-column-map"
+import {
   mapAiRowToExtracted,
   type ExtractedCatalogRow,
   type StoredPriceListPayload,
@@ -43,29 +46,6 @@ const NAME_ALIASES = [
 
 const DESC_ALIASES = ["description", "desc", "details", "long description", "product description"]
 
-const LIST_PRICE_ALIASES = [
-  "list price",
-  "list",
-  "price",
-  "unit price",
-  "msrp",
-  "retail price",
-  "sell price",
-  "retail",
-  "list usd",
-]
-
-const COST_ALIASES = [
-  "cost",
-  "unit cost",
-  "dealer cost",
-  "net cost",
-  "wholesale",
-  "your cost",
-  "buy price",
-  "net price",
-]
-
 const CATEGORY_ALIASES = [
   "category",
   "product category",
@@ -76,7 +56,9 @@ const CATEGORY_ALIASES = [
   "product group",
 ]
 
-const MFG_ALIASES = ["manufacturer", "mfg", "brand", "vendor", "make"]
+const MFG_ALIASES = ["manufacturer", "mfg", "brand", "make"]
+
+const VENDOR_ALIASES = ["vendor", "supplier", "distributor"]
 
 const TYPE_ALIASES = ["type", "item type", "product type"]
 
@@ -111,12 +93,13 @@ export function extractPriceListPayloadFromCsv(args: {
   }
 
   const partCol = pickHeader(parsed.headers, PART_ALIASES)
+  const skuCol = pickHeader(parsed.headers, ["sku", "item sku"])
   const nameCol = pickHeader(parsed.headers, NAME_ALIASES)
   const descCol = pickHeader(parsed.headers, DESC_ALIASES)
-  const listPriceCol = pickHeader(parsed.headers, LIST_PRICE_ALIASES)
-  const costCol = pickHeader(parsed.headers, COST_ALIASES)
+  const { listPriceCol, costCol } = pickCatalogImportPriceColumns(parsed.headers)
   const categoryCol = pickHeader(parsed.headers, CATEGORY_ALIASES)
   const mfgCol = pickHeader(parsed.headers, MFG_ALIASES)
+  const vendorCol = pickHeader(parsed.headers, VENDOR_ALIASES)
   const typeCol = pickHeader(parsed.headers, TYPE_ALIASES)
   const unitCol = pickHeader(parsed.headers, UNIT_ALIASES)
   const notesCol = pickHeader(parsed.headers, NOTES_ALIASES)
@@ -145,8 +128,14 @@ export function extractPriceListPayloadFromCsv(args: {
     "Parsed from CSV using column headers — verify part numbers, names, and prices before saving.",
   ]
 
-  if (!listPriceCol) {
-    warnings.push("No price column was detected (e.g. List Price, Price, MSRP). Prices were left blank.")
+  if (!listPriceCol && !costCol) {
+    warnings.push(
+      "No price columns were detected (e.g. List Price, Unit Price, Unit Cost). Prices were left blank.",
+    )
+  } else if (!listPriceCol) {
+    warnings.push("No list price column was detected (e.g. List Price, Unit Price). List prices were left blank.")
+  } else if (!costCol) {
+    warnings.push("No cost column was detected (e.g. Unit Cost, Cost Price). Costs were left blank.")
   }
 
   const totalDataLines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter((l) => l.trim().length > 0).length - 1
@@ -159,7 +148,7 @@ export function extractPriceListPayloadFromCsv(args: {
   for (const row of parsed.rows) {
     if (isBlankRow(row)) continue
 
-    const partNumber = cell(row, partCol)
+    const partNumber = cell(row, partCol) || cell(row, skuCol && skuCol !== partCol ? skuCol : undefined)
     const description = cell(row, descCol)
     let name = cell(row, nameCol)
     if (!name && description) name = description
@@ -169,6 +158,13 @@ export function extractPriceListPayloadFromCsv(args: {
     const notesParts = [cell(row, notesCol)]
     const unit = cell(row, unitCol)
     if (unit) notesParts.push(`Unit: ${unit}`)
+    const vendor = cell(row, vendorCol)
+    if (vendor) notesParts.push(`Vendor: ${vendor}`)
+    const skuValue = cell(row, skuCol)
+    if (skuValue && skuValue !== partNumber) notesParts.push(`SKU: ${skuValue}`)
+
+    const listPriceRaw = cell(row, listPriceCol) || null
+    const costRaw = cell(row, costCol) || null
 
     const mapped = mapAiRowToExtracted(
       {
@@ -177,8 +173,8 @@ export function extractPriceListPayloadFromCsv(args: {
         partNumber: partNumber || null,
         name,
         description: description && description !== name ? description : null,
-        listPrice: cell(row, listPriceCol) || null,
-        cost: cell(row, costCol) || null,
+        listPrice: listPriceRaw,
+        cost: costRaw,
         notes: notesParts.filter(Boolean).join(" · ") || null,
         replacementPartNumber: null,
         status: "active",
@@ -200,7 +196,7 @@ export function extractPriceListPayloadFromCsv(args: {
       mappedPartCol: partCol ?? null,
     })
     throw new Error(
-      "No catalog rows were found in the CSV. Check that item names or descriptions are present and column headers match (e.g. Invoice Item Name, Item #/SKU, Unit Price).",
+      "No catalog rows were found in the CSV. Include Item Name (or Description / Part Number / SKU) on each row. Download the CSV template for the recommended column layout.",
     )
   }
 

@@ -27,6 +27,22 @@ assert.equal(payload.rows[0]?.listPrice, 24.99)
 assert.equal(payload.rows[0]?.cost, 12.5)
 assert.equal(payload.rows[1]?.name, "Widget B")
 
+const costPriceOnly = extractPriceListPayloadFromCsv({
+  buffer: Buffer.from("Item Name,Cost Price,List Price\nGasket,4.75,9.95", "utf8"),
+  fileName: "cost-price.csv",
+})
+assert.equal(costPriceOnly.rows[0]?.cost, 4.75)
+assert.equal(costPriceOnly.rows[0]?.listPrice, 9.95)
+
+assert.throws(
+  () =>
+    extractPriceListPayloadFromCsv({
+      buffer: Buffer.from("Unit Cost,List Price\n12.50,25.00", "utf8"),
+      fileName: "no-name.csv",
+    }),
+  /No catalog rows were found|Could not map catalog columns/,
+)
+
 assert.equal(detectPriceListFileKind("list.csv", "text/csv"), "csv")
 assert.equal(detectPriceListFileKind("list.csv", "application/csv"), "csv")
 assert.equal(detectPriceListFileKind("list.csv", "application/vnd.ms-excel"), "csv")

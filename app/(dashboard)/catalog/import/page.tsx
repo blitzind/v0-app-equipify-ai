@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, ArrowLeft, Loader2, RefreshCw, Upload } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Download, Loader2, RefreshCw, Upload } from "lucide-react"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import type { DuplicateAction, ExtractedCatalogRow, StoredPriceListPayload } from "@/lib/catalog/import-types"
 import { CATALOG_ITEM_TYPES } from "@/lib/catalog/import-types"
 import { validatePriceListFile } from "@/lib/catalog/price-list-file-validation"
+import { downloadCatalogImportTemplate } from "@/lib/catalog/catalog-import-template"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -959,8 +960,25 @@ export default function ImportPriceListPage() {
               setFileError(null)
             }}
           />
-          <p className="text-xs text-muted-foreground mt-1">Upload a PDF or CSV price list.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Upload a PDF or CSV price list. For CSV, use the template below so Unit Cost and List Price map correctly.
+          </p>
           {fileError ? <p className="text-xs text-destructive mt-1">{fileError}</p> : null}
+        </div>
+        <div className="flex flex-col gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-2 self-start"
+            onClick={() => downloadCatalogImportTemplate()}
+          >
+            <Download className="h-4 w-4" />
+            Download CSV template
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Use this template if you want the fastest, most accurate import.
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -1117,10 +1135,15 @@ export default function ImportPriceListPage() {
       {payload && (
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-medium text-foreground">
-              Extracted rows ({payload.rows.length}) · manufacturer: {payload.manufacturerName ?? "—"} · effective:{" "}
-              {payload.effectiveDate ?? "—"}
-            </p>
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                Extracted rows ({payload.rows.length}) · manufacturer: {payload.manufacturerName ?? "—"} · effective:{" "}
+                {payload.effectiveDate ?? "—"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Cost is your internal cost. List price is what you charge customers. Verify both before saving.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="secondary" size="sm" disabled={patchBusy} onClick={() => void handleApplyEdits()}>
                 {patchBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
@@ -1145,8 +1168,8 @@ export default function ImportPriceListPage() {
                   <TableHead>Type</TableHead>
                   <TableHead>Part #</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>List</TableHead>
-                  <TableHead>Cost</TableHead>
+                  <TableHead className="min-w-[96px]">List price</TableHead>
+                  <TableHead className="min-w-[96px]">Cost</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Notes</TableHead>
                   <TableHead>Conf.</TableHead>
