@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 449,
+  apiRouteHandlers: 450,
   sqlMigrations: 197,
   dashboardPages: 65,
-  componentsTsx: 321,
-  libTsFiles: 887,
+  componentsTsx: 322,
+  libTsFiles: 890,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **449** |
+| API route handlers (\`app/api/**/route.ts\`) | **450** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **197** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **321** |
-| \`lib/**/*.ts\` | **887** |
+| \`components/**/*.tsx\` | **322** |
+| \`lib/**/*.ts\` | **890** |
 
 ### Vercel crons
 
@@ -259,6 +259,7 @@ organizations/[organizationId]/catalog-items/[itemId]/attachments/route.ts
 organizations/[organizationId]/catalog-items/[itemId]/route.ts
 organizations/[organizationId]/catalog-items/[itemId]/usage/route.ts
 organizations/[organizationId]/catalog-items/[itemId]/verification/route.ts
+organizations/[organizationId]/catalog-items/bulk-archive/route.ts
 organizations/[organizationId]/catalog-items/route.ts
 organizations/[organizationId]/communications/[communicationId]/ai-assist/route.ts
 organizations/[organizationId]/communications/[communicationId]/route.ts

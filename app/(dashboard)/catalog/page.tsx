@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Loader2, MoreHorizontal, Package, Plus, Search, Upload } from "lucide-react"
 import { CatalogAddItemDrawer } from "@/components/catalog/catalog-add-item-drawer"
+import { CatalogBulkArchiveDialog } from "@/components/catalog/catalog-bulk-archive-dialog"
 import { CatalogItemDrawer } from "@/components/catalog/catalog-item-drawer"
+import { bulkArchiveCatalogItemsViaApi } from "@/lib/catalog/bulk-archive-catalog-client"
+import {
+  bulkCatalogArchivePartialToast,
+  bulkCatalogArchiveSuccessToast,
+  BULK_CATALOG_ARCHIVE_PARTIAL_DESCRIPTION,
+} from "@/lib/catalog/bulk-archive-messages"
 import { getCatalogAiStatusLabel } from "@/lib/catalog/catalog-ai-status"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useAdmin } from "@/lib/admin-store"
@@ -12,6 +19,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -173,6 +181,26 @@ export default function CatalogPage() {
   const [vendorFilter, setVendorFilter] = useState<string>("all")
   const [drawerItemId, setDrawerItemId] = useState<string | null>(null)
   const [addItemOpen, setAddItemOpen] = useState(false)
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(() => new Set())
+  const [bulkArchiveOpen, setBulkArchiveOpen] = useState(false)
+  const [bulkArchiveBusy, setBulkArchiveBusy] = useState(false)
+
+  const clearSelection = useCallback(() => {
+    setSelectedItemIds(new Set())
+  }, [])
+
+  useEffect(() => {
+    clearSelection()
+  }, [search, typeFilter, statusFilter, verificationFilter, manufacturerFilter, vendorFilter, clearSelection])
+
+  const toggleRowSelection = useCallback((id: string) => {
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
 
   const load = useCallback(async () => {
     if (!organizationId || status !== "ready") {
@@ -300,6 +328,55 @@ export default function CatalogPage() {
     }
     return list
   }, [items, search, typeFilter, statusFilter, verificationFilter, manufacturerFilter, vendorFilter])
+
+  const selectedCount = selectedItemIds.size
+
+  const toggleAllVisibleSelection = useCallback(() => {
+    const visibleIds = filtered.map((r) => r.id)
+    if (visibleIds.length === 0) return
+    setSelectedItemIds((prev) => {
+      const allSelected = visibleIds.every((id) => prev.has(id))
+      if (allSelected) return new Set()
+      return new Set(visibleIds)
+    })
+  }, [filtered])
+
+  const allVisibleSelected =
+    filtered.length > 0 && filtered.every((r) => selectedItemIds.has(r.id))
+  const someVisibleSelected =
+    filtered.some((r) => selectedItemIds.has(r.id)) && !allVisibleSelected
+
+  async function confirmBulkArchive() {
+    if (!organizationId || selectedItemIds.size === 0) return
+    setBulkArchiveBusy(true)
+    const ids = [...selectedItemIds]
+    const res = await bulkArchiveCatalogItemsViaApi({ organizationId, itemIds: ids })
+    setBulkArchiveBusy(false)
+    if (!res.ok) {
+      toast({ variant: "destructive", title: res.message })
+      return
+    }
+    setBulkArchiveOpen(false)
+    if (res.succeededCount === 0) {
+      toast({ variant: "destructive", title: "Could not archive selected catalog items." })
+      return
+    }
+    if (selectedItemIds.has(drawerItemId ?? "")) {
+      setDrawerItemId(null)
+    }
+    await load()
+    if (res.failedCount === 0) {
+      clearSelection()
+      toast({ title: bulkCatalogArchiveSuccessToast(res.succeededCount) })
+      return
+    }
+    setSelectedItemIds(new Set(res.failedIds))
+    toast({
+      variant: "destructive",
+      title: bulkCatalogArchivePartialToast(res.succeededCount, res.failedCount),
+      description: BULK_CATALOG_ARCHIVE_PARTIAL_DESCRIPTION,
+    })
+  }
 
   const patchVerification = useCallback(
     async (itemId: string, action: "verify" | "needs_review") => {
@@ -480,6 +557,24 @@ export default function CatalogPage() {
             </>
           ) : null}
         </p>
+
+        {canManageCatalog && selectedCount > 0 ? (
+          <div className="hidden md:flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
+            <span className="text-sm font-medium text-foreground">{selectedCount} selected</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              className="h-8"
+              onClick={() => setBulkArchiveOpen(true)}
+            >
+              Archive selected
+            </Button>
+            <Button type="button" size="sm" variant="ghost" className="h-8" onClick={clearSelection}>
+              Clear selection
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {loading ? (
@@ -547,6 +642,16 @@ export default function CatalogPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="ds-table-header-row-subtle">
+                    {canManageCatalog ? (
+                      <TableHead className="hidden md:table-cell w-10">
+                        <Checkbox
+                          aria-label="Select all visible catalog items"
+                          checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+                          disabled={filtered.length === 0}
+                          onCheckedChange={toggleAllVisibleSelection}
+                        />
+                      </TableHead>
+                    ) : null}
                     <TableHead className="min-w-[200px]">Item / description</TableHead>
                     <TableHead className="whitespace-nowrap">Part number</TableHead>
                     <TableHead className="whitespace-nowrap">SKU</TableHead>
@@ -566,7 +671,7 @@ export default function CatalogPage() {
                   {filtered.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={canManageCatalog ? 13 : 12}
+                        colSpan={canManageCatalog ? 14 : 12}
                         className="text-center text-sm text-muted-foreground py-12"
                       >
                         No items match your filters.
@@ -579,6 +684,18 @@ export default function CatalogPage() {
                         className="cursor-pointer hover:bg-muted/40"
                         onClick={() => setDrawerItemId(r.id)}
                       >
+                        {canManageCatalog ? (
+                          <TableCell
+                            className="hidden md:table-cell w-10"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Checkbox
+                              aria-label={`Select ${r.name || "catalog item"}`}
+                              checked={selectedItemIds.has(r.id)}
+                              onCheckedChange={() => toggleRowSelection(r.id)}
+                            />
+                          </TableCell>
+                        ) : null}
                         <TableCell className="align-top max-w-[280px]">
                           <div className="flex flex-col gap-0.5">
                             <span className="font-medium text-foreground text-sm line-clamp-2">{r.name || "—"}</span>
@@ -711,6 +828,16 @@ export default function CatalogPage() {
         onClose={() => setDrawerItemId(null)}
         canManage={canManageCatalog}
         onUpdated={() => void load()}
+      />
+
+      <CatalogBulkArchiveDialog
+        open={bulkArchiveOpen}
+        onOpenChange={(open) => {
+          if (!open && !bulkArchiveBusy) setBulkArchiveOpen(false)
+        }}
+        selectedCount={selectedCount}
+        busy={bulkArchiveBusy}
+        onConfirm={() => void confirmBulkArchive()}
       />
     </div>
   )
