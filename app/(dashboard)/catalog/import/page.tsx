@@ -52,6 +52,10 @@ import {
   normalizeUploadPriceListResponse,
 } from "@/lib/catalog/import-poll-handling"
 import {
+  evaluateCatalogImportReviewReadiness,
+  catalogImportMissingContextMessage,
+} from "@/lib/catalog/import-ready-state"
+import {
   isCatalogImportPageDebugEnabled,
   pushCatalogImportDebug,
   type CatalogImportDebugEntry,
@@ -287,24 +291,38 @@ export default function ImportPriceListPage() {
     }
   }
 
-  const loadImportPayload = useCallback(async (): Promise<
+  const loadImportPayload = useCallback(async (
+    targetImportId?: string,
+  ): Promise<
     { ok: true; rowCount: number } | { ok: false; message: string }
   > => {
-    if (!organizationId || !importId) return { ok: false, message: "Import not ready." }
+    const impId = targetImportId ?? importId
+    if (!organizationId || !impId) {
+      const message = catalogImportMissingContextMessage({ organizationId, importId: impId })
+      logDebug("load_import_payload_not_ready", {
+        organizationId: organizationId ?? null,
+        importId: impId ?? null,
+        message,
+      })
+      return { ok: false, message }
+    }
     try {
       const res = await fetch(
-        `/api/organizations/${encodeURIComponent(organizationId)}/price-list-imports/${encodeURIComponent(importId)}`,
+        `/api/organizations/${encodeURIComponent(organizationId)}/price-list-imports/${encodeURIComponent(impId)}`,
         { cache: "no-store" },
       )
       const data = (await res.json()) as {
         payload?: StoredPriceListPayload | null
         import?: { status?: string; error_message?: string | null }
+        activeJobId?: string | null
         message?: string
         error?: string
       }
       logDebug("load_import_payload", {
         httpStatus: res.status,
+        importId: impId,
         importStatus: data.import?.status ?? null,
+        activeJobId: data.activeJobId ?? null,
         payloadRowCount: data.payload?.rows?.length ?? 0,
       })
       if (!res.ok) {
@@ -313,25 +331,41 @@ export default function ImportPriceListPage() {
           message: data.message ?? data.error ?? "Could not load import results.",
         }
       }
-      if (data.import?.status === "failed") {
-        return {
-          ok: false,
-          message: data.import.error_message?.trim() || "Extraction failed.",
+
+      const readiness = evaluateCatalogImportReviewReadiness({
+        organizationId,
+        importId: impId,
+        importStatus: data.import?.status ?? null,
+        activeJobId: data.activeJobId ?? null,
+        payloadRowCount: data.payload?.rows?.length ?? 0,
+        hasPayload: Boolean(data.payload),
+        errorMessage: data.import?.error_message ?? null,
+      })
+
+      logDebug("load_import_payload_readiness", {
+        importId: impId,
+        ready: readiness.ready,
+        reason: readiness.ready ? "ready" : readiness.reason,
+        message: readiness.ready ? null : readiness.message,
+      })
+
+      if (readiness.ready && data.payload) {
+        setPayload(data.payload)
+        if (impId !== importId) {
+          setImportId(impId)
         }
+        return { ok: true, rowCount: readiness.rowCount }
       }
-      if (!data.payload) {
-        return { ok: false, message: "No extracted rows are available yet." }
-      }
-      setPayload(data.payload)
-      return { ok: true, rowCount: data.payload.rows.length }
+
+      return { ok: false, message: readiness.message }
     } catch {
       return { ok: false, message: "Could not load import results. Check your connection." }
     }
   }, [organizationId, importId, logDebug])
 
   const applyExtractionResult = useCallback(
-    async (kind: "upload" | "reextract") => {
-      const loaded = await loadImportPayload()
+    async (kind: "upload" | "reextract", targetImportId?: string) => {
+      const loaded = await loadImportPayload(targetImportId)
       if (loaded.ok && loaded.rowCount > 0) {
         setJobError(null)
         toast({
@@ -602,7 +636,7 @@ export default function ImportPriceListPage() {
           jobId,
           rowCount: normalized.rowCount,
         })
-        await applyExtractionResult("upload")
+        await applyExtractionResult("upload", newImportId)
         return
       }
 

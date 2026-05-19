@@ -4,6 +4,7 @@ import {
   IMPORT_POLL_STUCK_QUEUED_THRESHOLD,
   normalizeUploadPriceListResponse,
 } from "../lib/catalog/import-poll-handling"
+import { isInlineExtractionReadyResponse } from "../lib/catalog/import-ready-state"
 
 assert.equal(
   decideImportPollAction({
@@ -47,5 +48,6 @@ assert.equal(normalized.importId, "imp-1")
 assert.equal(normalized.jobId, "job-1")
 assert.equal(normalized.extractionReady, true)
 assert.equal(normalized.rowCount, 12)
+assert.equal(isInlineExtractionReadyResponse(normalized), true)
 
 console.log("test-import-poll-handling: ok")
