@@ -2,6 +2,16 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
+function oauthFailureRedirect(origin: string, next: string | null): NextResponse {
+  const safeNext = next?.startsWith("/") ? next : null
+  if (safeNext?.startsWith("/onboarding")) {
+    const url = new URL(safeNext, origin)
+    url.searchParams.set("error", "oauth")
+    return NextResponse.redirect(url.toString())
+  }
+  return NextResponse.redirect(`${origin}/login?error=oauth`)
+}
+
 /**
  * Supabase Auth OAuth callback (Google, etc.).
  * Exchanges the authorization code for a session cookie, then redirects into the app.
@@ -15,13 +25,11 @@ export async function GET(request: Request) {
     searchParams.get("error_description") ?? searchParams.get("error")
 
   if (oauthError) {
-    return NextResponse.redirect(
-      `${origin}/login?error=oauth`,
-    )
+    return oauthFailureRedirect(origin, next)
   }
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/login?error=oauth`)
+    return oauthFailureRedirect(origin, next)
   }
 
   const cookieStore = await cookies()
@@ -49,8 +57,9 @@ export async function GET(request: Request) {
   const { error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error) {
-    return NextResponse.redirect(`${origin}/login?error=oauth`)
+    return oauthFailureRedirect(origin, next)
   }
 
-  return NextResponse.redirect(`${origin}${next}`)
+  const safeNext = next.startsWith("/") ? next : "/"
+  return NextResponse.redirect(`${origin}${safeNext}`)
 }

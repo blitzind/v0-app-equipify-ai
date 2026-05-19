@@ -34,6 +34,17 @@ import {
   HOW_HEARD_ABOUT_EQUIPIFY_OTHER_VALUE,
   type HowHeardAboutEquipifyValue,
 } from "@/lib/onboarding/how-heard-about-equipify"
+import {
+  buildOnboardingOAuthCallbackUrl,
+  buildOnboardingOAuthReturnPath,
+  isGoogleOAuthUser,
+  isOnboardingAccountStepSatisfied,
+  ONBOARDING_OAUTH_ERROR_MESSAGE,
+  ONBOARDING_OAUTH_SESSION_STORAGE_KEY,
+  ONBOARDING_OAUTH_START_ERROR_MESSAGE,
+  onboardingStepFromQuery,
+  parseOAuthProfileFromUser,
+} from "@/lib/onboarding/oauth-profile"
 
 const STEPS = ["Your account", "Workspace", "Choose a plan"]
 /** Central registry — labels and keys from `lib/workspace-industry-registry.ts` */
@@ -94,6 +105,9 @@ function OnboardingPageContent() {
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [inviteContext, setInviteContext] = useState<InviteContext | null>(null)
+  const [oauthLoading, setOauthLoading] = useState(false)
+  const [oauthAuthenticated, setOauthAuthenticated] = useState(false)
+  const [oauthProfileEmail, setOauthProfileEmail] = useState<string | null>(null)
 
   useEffect(() => {
     if (!searchParams) return
@@ -195,6 +209,92 @@ function OnboardingPageContent() {
     }
   }, [inviteTokenParam])
 
+  useEffect(() => {
+    if (searchParams.get("error") === "oauth") {
+      setStepOneError(ONBOARDING_OAUTH_ERROR_MESSAGE)
+      setStep(0)
+      setOauthAuthenticated(false)
+      try {
+        sessionStorage.removeItem(ONBOARDING_OAUTH_SESSION_STORAGE_KEY)
+      } catch {
+        /* ignore */
+      }
+      return
+    }
+
+    const workspaceStep = onboardingStepFromQuery(searchParams.get("step"))
+    if (workspaceStep != null) {
+      setStep(workspaceStep)
+    }
+
+    let cancelled = false
+    ;(async () => {
+      const oauthReturn =
+        typeof window !== "undefined" &&
+        sessionStorage.getItem(ONBOARDING_OAUTH_SESSION_STORAGE_KEY) === "1"
+      const shouldHydrateOAuth = oauthReturn || workspaceStep === 1
+
+      if (!shouldHydrateOAuth) return
+
+      const { data } = await supabase.auth.getSession()
+      if (cancelled || !data.session?.user) return
+
+      const user = data.session.user
+      const parsed = parseOAuthProfileFromUser(user)
+      const fromGoogle = isGoogleOAuthUser(user)
+      if (!fromGoogle && !oauthReturn) return
+
+      setOauthAuthenticated(true)
+      setOauthProfileEmail(parsed.email || user.email || null)
+      setForm((prev) => ({
+        ...prev,
+        firstName: parsed.firstName || prev.firstName,
+        lastName: parsed.lastName || prev.lastName,
+        email: inviteContext?.email || parsed.email || prev.email,
+      }))
+      setStepOneError(null)
+
+      if (workspaceStep === 1 || oauthReturn) {
+        setStep(1)
+      }
+
+      try {
+        sessionStorage.removeItem(ONBOARDING_OAUTH_SESSION_STORAGE_KEY)
+      } catch {
+        /* ignore */
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams, supabase, inviteContext])
+
+  async function handleGoogleSignIn() {
+    setStepOneError(null)
+    setOauthLoading(true)
+    try {
+      const returnPath = buildOnboardingOAuthReturnPath(searchParams)
+      const redirectTo = buildOnboardingOAuthCallbackUrl(window.location.origin, returnPath)
+      try {
+        sessionStorage.setItem(ONBOARDING_OAUTH_SESSION_STORAGE_KEY, "1")
+      } catch {
+        /* ignore */
+      }
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo },
+      })
+      if (error) {
+        setStepOneError(ONBOARDING_OAUTH_START_ERROR_MESSAGE)
+      }
+    } catch {
+      setStepOneError(ONBOARDING_OAUTH_START_ERROR_MESSAGE)
+    } finally {
+      setOauthLoading(false)
+    }
+  }
+
   function setField(k: keyof typeof form, v: string) {
     setForm((f) => ({ ...f, [k]: v }))
   }
@@ -218,46 +318,55 @@ function OnboardingPageContent() {
     let completedOrganizationId: string | null = null
     let completionFlow: "invite" | "self_serve" = "self_serve"
     try {
-      const signUpResult = await supabase.auth.signUp({
-        email,
-        password: form.password,
-        options: {
-          data: {
-            full_name: fullName,
-            first_name: effectiveFirstName,
-            last_name: effectiveLastName,
-          },
-        },
-      })
+      const { data: existingSessionData } = await supabase.auth.getSession()
+      authUserId = existingSessionData.session?.user?.id ?? null
 
-      if (signUpResult.error) {
-        const userExists = /already registered|already exists|user already/i.test(signUpResult.error.message)
-        if (!userExists) {
-          setSubmitError(signUpResult.error.message || "Could not create your account.")
-          return
-        }
-
-        const signInResult = await supabase.auth.signInWithPassword({
+      if (!authUserId) {
+        const signUpResult = await supabase.auth.signUp({
           email,
           password: form.password,
+          options: {
+            data: {
+              full_name: fullName,
+              first_name: effectiveFirstName,
+              last_name: effectiveLastName,
+            },
+          },
         })
-        if (signInResult.error || !signInResult.data.user) {
-          const rawMsg = signInResult.error?.message ?? ""
-          const looksLikeWrongPassword = /invalid login credentials|invalid credentials/i.test(rawMsg)
-          setSubmitError(
-            looksLikeWrongPassword
-              ? "This email already has an account. Please sign in, reset your password, or use a different email."
-              : rawMsg || "Account exists. Sign in or reset your password.",
-          )
-          return
+
+        if (signUpResult.error) {
+          const userExists = /already registered|already exists|user already/i.test(signUpResult.error.message)
+          if (!userExists) {
+            setSubmitError(signUpResult.error.message || "Could not create your account.")
+            return
+          }
+
+          const signInResult = await supabase.auth.signInWithPassword({
+            email,
+            password: form.password,
+          })
+          if (signInResult.error || !signInResult.data.user) {
+            const rawMsg = signInResult.error?.message ?? ""
+            const looksLikeWrongPassword = /invalid login credentials|invalid credentials/i.test(rawMsg)
+            setSubmitError(
+              looksLikeWrongPassword
+                ? "This email already has an account. Please sign in, reset your password, or use a different email."
+                : rawMsg || "Account exists. Sign in or reset your password.",
+            )
+            return
+          }
+          authUserId = signInResult.data.user.id
+        } else {
+          authUserId = signUpResult.data.user?.id ?? null
         }
-        authUserId = signInResult.data.user.id
-      } else {
-        authUserId = signUpResult.data.user?.id ?? null
       }
 
       if (!authUserId) {
-        setSubmitError("Account created, but session is not ready yet. Check your email to verify your account.")
+        setSubmitError(
+          oauthAuthenticated
+            ? "Your Google session expired. Return to step 1 and sign in with Google again."
+            : "Account created, but session is not ready yet. Check your email to verify your account.",
+        )
         return
       }
 
@@ -267,7 +376,9 @@ function OnboardingPageContent() {
         setSubmitError(
           inviteTokenParam
             ? "We couldn't start your session. Verify your email if you just created an account, then try again."
-            : "Account created, but session is not ready yet. Check your email to verify your account.",
+            : oauthAuthenticated
+              ? "Your Google session expired. Return to step 1 and sign in with Google again."
+              : "Account created, but session is not ready yet. Check your email to verify your account.",
         )
         return
       }
@@ -417,8 +528,20 @@ function OnboardingPageContent() {
       const effectiveFirstName = form.firstName || firstNameParam || ""
       const effectiveLastName = form.lastName || lastNameParam || ""
       const effectiveEmail = inviteContext?.email || form.email || emailParam || ""
-      if (!effectiveFirstName || !effectiveLastName || !effectiveEmail || !form.password) {
-        setStepOneError("First name, last name, email, and password are required to continue.")
+      if (
+        !isOnboardingAccountStepSatisfied({
+          firstName: effectiveFirstName,
+          lastName: effectiveLastName,
+          email: effectiveEmail,
+          oauthAuthenticated,
+          password: form.password,
+        })
+      ) {
+        setStepOneError(
+          oauthAuthenticated
+            ? "First name, last name, and email are required to continue."
+            : "First name, last name, email, and password are required to continue.",
+        )
         return
       }
       setStepOneError(null)
@@ -489,7 +612,50 @@ function OnboardingPageContent() {
                 <User size={18} className="text-blue-600" />
                 <h2 className="text-lg font-semibold text-gray-900">Create your account</h2>
               </div>
-              {hasMarketingIdentity ? (
+              {oauthAuthenticated ? (
+                <>
+                  <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-4">
+                    <p className="text-xs font-medium text-emerald-800">Signed in with Google</p>
+                    <p className="text-sm text-gray-700 mt-1">
+                      {inviteContext?.email || oauthProfileEmail || form.email || emailParam}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    {([["firstName", "First name"], ["lastName", "Last name"]] as const).map(([k, label]) => (
+                      <div key={k}>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+                        <input
+                          value={form[k]}
+                          onChange={(e) => setField(k, e.target.value)}
+                          className="portal-input"
+                          placeholder={label}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void handleGoogleSignIn()}
+                    disabled={oauthLoading || inviteLoading}
+                    className="w-full h-10 inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-[#4285F4] font-semibold text-xs border border-gray-200">
+                      G
+                    </span>
+                    {oauthLoading ? "Redirecting to Google…" : "Continue with Google"}
+                  </button>
+
+                  <div className="my-6 flex items-center gap-3" aria-hidden>
+                    <div className="h-px flex-1 bg-gray-200" />
+                    <span className="text-xs font-medium text-gray-400">or continue with email</span>
+                    <div className="h-px flex-1 bg-gray-200" />
+                  </div>
+                </>
+              )}
+              {hasMarketingIdentity && !oauthAuthenticated ? (
                 <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-4">
                   <p className="text-xs font-medium text-gray-600">Creating account for</p>
                   <p className="mt-1 text-sm font-semibold text-gray-900">
@@ -497,7 +663,7 @@ function OnboardingPageContent() {
                   </p>
                   <p className="text-sm text-gray-700">{inviteContext?.email || form.email || emailParam}</p>
                 </div>
-              ) : (
+              ) : !oauthAuthenticated ? (
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     {([["firstName", "First name"], ["lastName", "Last name"]] as const).map(([k, label]) => (
@@ -518,15 +684,17 @@ function OnboardingPageContent() {
                       className="portal-input" placeholder="you@company.com" />
                   </div>
                 </>
-              )}
+              ) : null}
               {inviteLoading && <p className="mt-2 text-xs text-gray-500">Validating invite...</p>}
               {inviteError && <p className="mt-2 text-xs text-red-600">{inviteError}</p>}
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
-                <input type="password" value={form.password} onChange={(e) => setField("password", e.target.value)}
-                  className="portal-input" placeholder="Min. 8 characters" />
-                <p className="text-xs text-gray-400 mt-1">Use at least 8 characters with a mix of letters, numbers, and symbols.</p>
-              </div>
+              {!oauthAuthenticated ? (
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+                  <input type="password" value={form.password} onChange={(e) => setField("password", e.target.value)}
+                    className="portal-input" placeholder="Min. 8 characters" />
+                  <p className="text-xs text-gray-400 mt-1">Use at least 8 characters with a mix of letters, numbers, and symbols.</p>
+                </div>
+              ) : null}
               {stepOneError && (
                 <p className="mt-3 text-xs text-red-600">{stepOneError}</p>
               )}

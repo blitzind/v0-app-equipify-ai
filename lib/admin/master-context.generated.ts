@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 458,
-  sqlMigrations: 198,
+  apiRouteHandlers: 461,
+  sqlMigrations: 199,
   dashboardPages: 65,
   componentsTsx: 330,
-  libTsFiles: 925,
+  libTsFiles: 933,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **458** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **198** |
+| API route handlers (\`app/api/**/route.ts\`) | **461** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **199** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
 | \`components/**/*.tsx\` | **330** |
-| \`lib/**/*.ts\` | **925** |
+| \`lib/**/*.ts\` | **933** |
 
 ### Vercel crons
 
@@ -29,6 +29,7 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 - \`/api/cron/process-ai-jobs\` — cron: \`* * * * *\`
 - \`/api/cron/process-import-runs\` — cron: \`*/5 * * * *\`
 - \`/api/cron/ai-ops-digest\` — cron: \`0 * * * *\`
+- \`/api/cron/process-technician-push-queue\` — cron: \`*/5 * * * *\`
 
 ### API routes (relative to \`app/api\`)
 
@@ -47,6 +48,7 @@ cron/blitzpay-scheduled-payments/route.ts
 cron/maintenance-due/route.ts
 cron/process-ai-jobs/route.ts
 cron/process-import-runs/route.ts
+cron/process-technician-push-queue/route.ts
 demo-data/import/route.ts
 demo-data/reset/route.ts
 demo-data/route.ts
@@ -353,6 +355,8 @@ organizations/[organizationId]/migration-imports/quickbooks/commit/route.ts
 organizations/[organizationId]/migration-imports/quickbooks/preview/route.ts
 organizations/[organizationId]/migration-imports/route.ts
 organizations/[organizationId]/migration-imports/templates/[kind]/route.ts
+organizations/[organizationId]/mobile/push-devices/route.ts
+organizations/[organizationId]/mobile/push-devices/test/route.ts
 organizations/[organizationId]/notification-preferences/route.ts
 organizations/[organizationId]/onboarding-analytics/route.ts
 organizations/[organizationId]/portal-invites/route.ts

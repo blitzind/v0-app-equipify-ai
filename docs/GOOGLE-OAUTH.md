@@ -77,7 +77,11 @@ No Google credentials in the mobile app.
 
 See [CLIENT-PILOT-CHECKLIST.md](./CLIENT-PILOT-CHECKLIST.md) and mobile `docs/GOOGLE-OAUTH.md`.
 
-## 6. Known limitations
+## 6. Sign in with Apple
+
+See **[APPLE-OAUTH.md](./APPLE-OAUTH.md)** — native on iPhone; web optional via the same `/auth/callback` route.
+
+## 7. Known limitations
 
 - Google sign-in is disabled in **training/demo** mode (placeholder Supabase env).
 - Users must already have (or receive) an **organization membership**; Google does not replace invite/onboarding on web.

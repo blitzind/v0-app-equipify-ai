@@ -314,25 +314,47 @@ export async function POST(request: Request) {
   const meta = (user.user_metadata ?? {}) as Record<string, unknown>
   const fn =
     (typeof body.firstName === "string" ? body.firstName.trim() : "") ||
-    String(meta.first_name ?? "").trim()
+    String(meta.first_name ?? meta.given_name ?? "").trim()
   const ln =
     (typeof body.lastName === "string" ? body.lastName.trim() : "") ||
-    String(meta.last_name ?? "").trim()
+    String(meta.last_name ?? meta.family_name ?? "").trim()
   const composedFull = [fn, ln].filter(Boolean).join(" ").trim()
+  const metaFullName = String(meta.full_name ?? meta.name ?? "").trim()
+  const avatarFromMeta = String(meta.avatar_url ?? meta.picture ?? "").trim() || null
+
+  const { data: existingProfile } = await svc
+    .from("profiles")
+    .select("full_name, avatar_url, email, phone")
+    .eq("id", user.id)
+    .maybeSingle()
+
+  const existingFullName = String(existingProfile?.full_name ?? "").trim()
   const fullName =
     composedFull ||
-    String(meta.full_name ?? "").trim() ||
+    existingFullName ||
+    metaFullName ||
     (user.email ? user.email.split("@")[0]?.trim() ?? "" : "") ||
     null
+
   const profileUpsert: Record<string, unknown> = {
     id: user.id,
-    email: user.email ?? null,
+    email: user.email ?? existingProfile?.email ?? null,
     full_name: fullName,
     default_organization_id: organizationId,
     updated_at: new Date().toISOString(),
   }
   if (typeof body.phone === "string") {
-    profileUpsert.phone = body.phone.trim().slice(0, 64) || null
+    const nextPhone = body.phone.trim().slice(0, 64) || null
+    if (nextPhone) {
+      profileUpsert.phone = nextPhone
+    } else if (existingProfile?.phone) {
+      profileUpsert.phone = existingProfile.phone
+    } else {
+      profileUpsert.phone = null
+    }
+  }
+  if (avatarFromMeta && !String(existingProfile?.avatar_url ?? "").trim()) {
+    profileUpsert.avatar_url = avatarFromMeta
   }
 
   const { error: profUpsertErr } = await svc.from("profiles").upsert(profileUpsert, { onConflict: "id" })
@@ -346,6 +368,7 @@ export async function POST(request: Request) {
       full_name: fullName ?? meta.full_name,
       first_name: fn || meta.first_name,
       last_name: ln || meta.last_name,
+      ...(avatarFromMeta && !String(meta.avatar_url ?? "").trim() ? { avatar_url: avatarFromMeta } : {}),
     },
   })
 
