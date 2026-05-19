@@ -15,6 +15,10 @@ import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
+import { archiveWorkOrderViaApi } from "@/lib/work-orders/archive-work-order-client"
+import { WorkOrderArchiveDialog } from "@/components/work-orders/work-order-archive-dialog"
+import { useToast } from "@/hooks/use-toast"
 import { isAssignedWorkOnly, loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
@@ -72,7 +76,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Card, CardContent } from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Plus,
   Search,
@@ -86,6 +95,8 @@ import {
   Clock,
   ChevronRight as Arrow,
   AlertTriangle,
+  MoreHorizontal,
+  Archive,
 } from "lucide-react"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -447,13 +458,51 @@ const KanbanView = forwardRef<
 
 // ─── Mobile list (table data, card layout — avoids wide horizontal scroll) ─────
 
-function MobileWorkOrderRowCard({ wo, onOpen }: { wo: WorkOrder; onOpen: (id: string) => void }) {
+function MobileWorkOrderRowCard({
+  wo,
+  onOpen,
+  canArchive,
+  onArchive,
+}: {
+  wo: WorkOrder
+  onOpen: (id: string) => void
+  canArchive?: boolean
+  onArchive?: (wo: WorkOrder) => void
+}) {
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(wo.id)}
-      className="w-full rounded-xl border border-border bg-card p-4 text-left shadow-sm touch-manipulation min-h-[4.75rem] active:scale-[0.99] transition-transform flex flex-col gap-2"
-    >
+    <div className="relative w-full rounded-xl border border-border bg-card shadow-sm touch-manipulation">
+      {canArchive && !wo.isArchived && onArchive ? (
+        <div className="absolute top-2 right-2 z-10">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                aria-label="Work order actions"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                className="text-destructive gap-2 cursor-pointer"
+                onClick={() => onArchive(wo)}
+              >
+                <Archive className="w-4 h-4" />
+                Archive work order
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ) : null}
+      <button
+        type="button"
+        onClick={() => onOpen(wo.id)}
+        className="w-full p-4 text-left min-h-[4.75rem] active:scale-[0.99] transition-transform flex flex-col gap-2"
+      >
       <div className="flex items-start justify-between gap-2">
         <span className="font-mono text-xs text-primary shrink-0">{getWorkOrderDisplay(wo)}</span>
         <div className="flex flex-wrap items-center justify-end gap-1">
@@ -490,7 +539,8 @@ function MobileWorkOrderRowCard({ wo, onOpen }: { wo: WorkOrder; onOpen: (id: st
           <span className="truncate">{wo.technicianName}</span>
         </span>
       </div>
-    </button>
+      </button>
+    </div>
   )
 }
 
@@ -502,12 +552,16 @@ function TableView({
   sortDir,
   onSort,
   onOpen,
+  canArchive,
+  onArchive,
 }: {
   workOrders: WorkOrder[]
   sortKey: SortKey
   sortDir: "asc" | "desc"
   onSort: (k: SortKey) => void
   onOpen: (id: string) => void
+  canArchive?: boolean
+  onArchive?: (wo: WorkOrder) => void
 }) {
   function SortHeader({ label, col }: { label: string; col: SortKey }) {
     return (
@@ -579,9 +633,29 @@ function TableView({
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{formatDate(wo.scheduledDate)}</TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => onOpen(wo.id)}>
-                    <Arrow className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors" />
-                  </button>
+                  <div className="flex items-center justify-end gap-1">
+                    {canArchive && !wo.isArchived && onArchive ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Work order actions">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            className="text-destructive gap-2 cursor-pointer"
+                            onClick={() => onArchive(wo)}
+                          >
+                            <Archive className="w-4 h-4" />
+                            Archive work order
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : null}
+                    <button type="button" onClick={() => onOpen(wo.id)} aria-label="Open work order">
+                      <Arrow className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors" />
+                    </button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -602,7 +676,15 @@ function TableView({
             No work orders match your filters.
           </p>
         ) : (
-          workOrders.map((wo) => <MobileWorkOrderRowCard key={wo.id} wo={wo} onOpen={onOpen} />)
+          workOrders.map((wo) => (
+            <MobileWorkOrderRowCard
+              key={wo.id}
+              wo={wo}
+              onOpen={onOpen}
+              canArchive={canArchive}
+              onArchive={onArchive}
+            />
+          ))
         )}
       </div>
     </>
@@ -748,6 +830,8 @@ function CalendarView({ workOrders, onOpen }: { workOrders: WorkOrder[]; onOpen:
 function WorkOrdersPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const { permissions } = useOrgPermissions()
+  const { canArchiveRestore } = useOrgArchivePermissions()
+  const { toast } = useToast()
   const { standardCreateEligibility } = useBillingAccess()
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
   const [refreshToken, setRefreshToken] = useState(0)
@@ -1098,8 +1182,33 @@ function WorkOrdersPageInner() {
   }, [orgStatus, activeOrgId])
   const [selectedWoId, setSelectedWoId] = useState<string | null>(null)
   const [drawerInitialTab, setDrawerInitialTab] = useState<string | undefined>(undefined)
+  const [archiveTarget, setArchiveTarget] = useState<WorkOrder | null>(null)
+  const [archiveBusy, setArchiveBusy] = useState(false)
   const searchParams = useSearchParams()
   const router = useRouter()
+
+  const canArchiveFromList = canArchiveRestore && archiveScope === "active" && !assignedOnlyView
+
+  async function confirmListArchive() {
+    if (!archiveTarget || !activeOrgId) return
+    setArchiveBusy(true)
+    const res = await archiveWorkOrderViaApi({
+      organizationId: activeOrgId,
+      workOrderId: archiveTarget.id,
+    })
+    setArchiveBusy(false)
+    if (!res.ok) {
+      toast({ variant: "destructive", title: res.message })
+      return
+    }
+    if (selectedWoId === archiveTarget.id) {
+      setSelectedWoId(null)
+      setDrawerInitialTab(undefined)
+    }
+    setArchiveTarget(null)
+    setRefreshToken((v) => v + 1)
+    toast({ title: "Work order archived" })
+  }
 
   // Auto-open drawer from ?workOrderId= or legacy ?open=
   useEffect(() => {
@@ -1478,6 +1587,8 @@ function WorkOrdersPageInner() {
             sortDir={sortDir}
             onSort={handleSort}
             onOpen={setSelectedWoId}
+            canArchive={canArchiveFromList}
+            onArchive={(wo) => setArchiveTarget(wo)}
           />
         )}
         {view === "calendar" && <CalendarView workOrders={filtered} onOpen={setSelectedWoId} />}
@@ -1518,6 +1629,16 @@ function WorkOrdersPageInner() {
       />
 
       <QuickAddParamBridge action="new-work-order" onTrigger={() => setQuickAppointmentOpen(true)} />
+
+      <WorkOrderArchiveDialog
+        open={archiveTarget != null}
+        onOpenChange={(open) => {
+          if (!open && !archiveBusy) setArchiveTarget(null)
+        }}
+        mode="archive"
+        busy={archiveBusy}
+        onConfirm={() => void confirmListArchive()}
+      />
     </div>
   )
 }

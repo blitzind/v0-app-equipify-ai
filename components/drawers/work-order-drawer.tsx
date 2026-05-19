@@ -57,6 +57,11 @@ import { WorkOrderAiTechnicianAssistPanel } from "@/components/work-orders/work-
 import { AddWorkOrderEquipmentModal } from "@/components/work-orders/add-work-order-equipment-modal"
 import { useToast } from "@/hooks/use-toast"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
+import {
+  archiveWorkOrderViaApi,
+  restoreWorkOrderViaApi,
+} from "@/lib/work-orders/archive-work-order-client"
+import { WorkOrderArchiveDialog } from "@/components/work-orders/work-order-archive-dialog"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
 import type { Part, RepairLog, WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
@@ -95,6 +100,7 @@ import {
   UserPlus,
   ChevronDown,
   PlayCircle,
+  RotateCcw,
 } from "lucide-react"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import { useTenant } from "@/lib/tenant-store"
@@ -495,6 +501,8 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   }>({ pending: false, pendingPhotoCount: 0 })
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false)
   const [conflictDialogRecord, setConflictDialogRecord] = useState<WorkOrderOfflineOutboxRecord | null>(null)
+  const [archiveDialogMode, setArchiveDialogMode] = useState<"archive" | "restore" | null>(null)
+  const [archiveBusy, setArchiveBusy] = useState(false)
 
   const pendingOfflinePhotoPreviews = useWorkOrderOfflinePendingPhotoPreviews(activeOrgId, drawerUserId, wo?.id ?? null)
 
@@ -2202,49 +2210,29 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     await handleRemoveAttachmentPhoto(attachmentId)
   }
 
-  async function archiveWorkOrder() {
-    if (!wo || !activeOrgId) return
+  function openArchiveDialog() {
+    if (!wo) return
     if (!confirmDiscardUnsavedIfNeeded()) return
-    if (!window.confirm("Archive this work order?")) return
-    const supabase = createBrowserSupabaseClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    const { error } = await supabase
-      .from("work_orders")
-      .update({
-        archived_at: new Date().toISOString(),
-        archived_by: user?.id ?? null,
-      })
-      .eq("id", wo.id)
-      .eq("organization_id", activeOrgId)
-
-    if (error) {
-      toast(`Archive failed: ${error.message}`)
-      return
-    }
-    toast("Work order archived")
-    onUpdated?.()
-    onClose()
+    setArchiveDialogMode(wo.isArchived ? "restore" : "archive")
   }
 
-  async function restoreWorkOrder() {
-    if (!wo || !activeOrgId) return
-    if (!confirmDiscardUnsavedIfNeeded()) return
-    if (!window.confirm("Restore this work order to active lists?")) return
-    const supabase = createBrowserSupabaseClient()
-    const { error } = await supabase
-      .from("work_orders")
-      .update({
-        archived_at: null,
-        archived_by: null,
-        archive_reason: null,
-      })
-      .eq("id", wo.id)
-      .eq("organization_id", activeOrgId)
-
-    if (error) {
-      toast(`Restore failed: ${error.message}`)
+  async function confirmArchiveDialogAction() {
+    if (!wo || !activeOrgId || !archiveDialogMode) return
+    setArchiveBusy(true)
+    const res =
+      archiveDialogMode === "archive"
+        ? await archiveWorkOrderViaApi({ organizationId: activeOrgId, workOrderId: wo.id })
+        : await restoreWorkOrderViaApi({ organizationId: activeOrgId, workOrderId: wo.id })
+    setArchiveBusy(false)
+    if (!res.ok) {
+      toast(res.message)
+      return
+    }
+    setArchiveDialogMode(null)
+    if (archiveDialogMode === "archive") {
+      toast("Work order archived")
+      onUpdated?.()
+      onClose()
       return
     }
     toast("Work order restored")
@@ -2709,6 +2697,27 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                   <ExternalLink className="w-3.5 h-3.5 shrink-0" /> Full profile
                 </Link>
               </Button>
+              {canArchiveRestore ? (
+                wo.isArchived ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs cursor-pointer border-primary/40 text-primary hover:bg-primary/10"
+                    onClick={openArchiveDialog}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 shrink-0" /> Restore work order
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs cursor-pointer border-destructive/40 text-destructive hover:bg-destructive/10"
+                    onClick={openArchiveDialog}
+                  >
+                    <AlertOctagon className="w-3.5 h-3.5 shrink-0" /> Archive work order
+                  </Button>
+                )
+              ) : null}
             </>
           )
         }
@@ -3234,11 +3243,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             canCreateQuote={woOrgPermissions.canEditQuotes}
             canCreateInvoice={woCanCreateInvoice}
             onPrint={() => void handlePrintWorkOrderSummary()}
-            onArchive={
-              canArchiveRestore
-                ? () => void (wo.isArchived ? restoreWorkOrder() : archiveWorkOrder())
-                : undefined
-            }
+            onArchive={canArchiveRestore ? openArchiveDialog : undefined}
           />
           {!editing && !wo.isArchived ? (
             <TechnicianMobileQuickBar
@@ -3493,6 +3498,16 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
       />
 
       <DrawerToastStack toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
+
+      <WorkOrderArchiveDialog
+        open={archiveDialogMode != null}
+        onOpenChange={(open) => {
+          if (!open && !archiveBusy) setArchiveDialogMode(null)
+        }}
+        mode={archiveDialogMode ?? "archive"}
+        busy={archiveBusy}
+        onConfirm={() => void confirmArchiveDialogAction()}
+      />
     </>
   )
 }

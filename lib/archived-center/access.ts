@@ -127,7 +127,7 @@ export async function assertCanRestoreArchivedRecord(
     return {
       ok: false,
       status: 403,
-      message: "Only workspace owners, admins, and managers can restore archived records.",
+      message: "Only workspace owners, admins, and managers can archive or restore records.",
     }
   }
 

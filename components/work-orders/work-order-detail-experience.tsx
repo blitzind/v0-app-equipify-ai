@@ -1158,7 +1158,7 @@ export function WorkOrderDetailExperience({
               ) : (
                 <AlertOctagon className="w-3.5 h-3.5" />
               )}
-              {workOrder.isArchived ? "Restore" : "Archive"}
+              {workOrder.isArchived ? "Restore work order" : "Archive work order"}
             </Button>
           )}
         </div>
@@ -1471,7 +1471,7 @@ export function WorkOrderDetailExperience({
                     ) : (
                       <AlertOctagon className="w-3.5 h-3.5" />
                     )}
-                    {workOrder.isArchived ? "Restore" : "Archive"}
+                    {workOrder.isArchived ? "Restore work order" : "Archive work order"}
                   </Button>
                 )}
               </div>

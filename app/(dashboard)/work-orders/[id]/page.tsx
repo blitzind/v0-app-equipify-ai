@@ -48,6 +48,8 @@ import {
   Save,
   AlertTriangle,
   Receipt,
+  AlertOctagon,
+  RotateCcw,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -82,6 +84,12 @@ import { AidenProductivitySection } from "@/components/aiden/aiden-productivity-
 import { useCustomerPrimaryPhone } from "@/hooks/use-customer-primary-phone"
 import { useWorkOrderOfflinePendingPhotoPreviews } from "@/hooks/use-work-order-offline-pending-photo-previews"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
+import {
+  archiveWorkOrderViaApi,
+  restoreWorkOrderViaApi,
+} from "@/lib/work-orders/archive-work-order-client"
+import { WorkOrderArchiveDialog } from "@/components/work-orders/work-order-archive-dialog"
 import {
   appendWorkOrderOfflinePhotoQueue,
   removeWorkOrderOfflineQueuedPhoto,
@@ -136,6 +144,7 @@ export default function WorkOrderDetailPage() {
   const { toast } = useToast()
   const activeOrg = useActiveOrganization()
   const { permissions: orgPermissions, status: orgPermStatus } = useOrgPermissions()
+  const { canArchiveRestore } = useOrgArchivePermissions()
   const { getById, updateStatus, updateRepairLog, updateWorkOrder } = useWorkOrders()
 
   const storeWo = getById(workOrderRouteId)
@@ -188,6 +197,8 @@ export default function WorkOrderDetailPage() {
   const [pageConflictOpen, setPageConflictOpen] = useState(false)
   const [pageConflictRecord, setPageConflictRecord] = useState<WorkOrderOfflineOutboxRecord | null>(null)
   const [pageOfflineFormEpoch, setPageOfflineFormEpoch] = useState(0)
+  const [archiveDialogMode, setArchiveDialogMode] = useState<"archive" | "restore" | null>(null)
+  const [archiveBusy, setArchiveBusy] = useState(false)
 
   const pendingOfflinePhotoPreviews = useWorkOrderOfflinePendingPhotoPreviews(
     activeOrg.status === "ready" ? activeOrg.organizationId : null,
@@ -567,6 +578,38 @@ export default function WorkOrderDetailPage() {
   const laborCost = laborHours * LABOR_RATE
   const editable = editing && ["Open", "Scheduled", "In Progress"].includes(workOrder.status)
   const woCanEdit = orgPermStatus !== "loading" && orgPermissions.canEditWorkOrders
+
+  function openArchiveDialog() {
+    setArchiveDialogMode(workOrder.isArchived ? "restore" : "archive")
+  }
+
+  async function confirmArchiveDialogAction() {
+    if (!activeOrg.organizationId || !archiveDialogMode) return
+    setArchiveBusy(true)
+    const res =
+      archiveDialogMode === "archive"
+        ? await archiveWorkOrderViaApi({
+            organizationId: activeOrg.organizationId,
+            workOrderId: workOrder.id,
+          })
+        : await restoreWorkOrderViaApi({
+            organizationId: activeOrg.organizationId,
+            workOrderId: workOrder.id,
+          })
+    setArchiveBusy(false)
+    if (!res.ok) {
+      toast({ variant: "destructive", title: res.message })
+      return
+    }
+    setArchiveDialogMode(null)
+    if (archiveDialogMode === "archive") {
+      toast({ title: "Work order archived" })
+      router.push("/work-orders")
+      return
+    }
+    toast({ title: "Work order restored" })
+    await reload()
+  }
 
   async function openPageOfflineConflictReview() {
     if (!activeOrg.organizationId || !pageUserId) return
@@ -1393,6 +1436,29 @@ export default function WorkOrderDetailPage() {
                   Edit repair log
                 </Button>
               )}
+              {canArchiveRestore ? (
+                workOrder.isArchived ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-h-11 w-full touch-manipulation sm:min-h-9 sm:w-auto border-primary/40 text-primary hover:bg-primary/10"
+                    onClick={openArchiveDialog}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                    Restore work order
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-h-11 w-full touch-manipulation sm:min-h-9 sm:w-auto border-destructive/40 text-destructive hover:bg-destructive/10"
+                    onClick={openArchiveDialog}
+                  >
+                    <AlertOctagon className="w-3.5 h-3.5 mr-1.5" />
+                    Archive work order
+                  </Button>
+                )
+              ) : null}
             </>
           ) : (
             <>
@@ -1683,6 +1749,7 @@ export default function WorkOrderDetailPage() {
         onInvoicePlaceholder={() =>
           handleCreateInvoiceAction()
         }
+        onArchive={canArchiveRestore ? openArchiveDialog : undefined}
       />
 
       {!editing && !workOrder.isArchived ? (
@@ -1769,6 +1836,16 @@ export default function WorkOrderDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <WorkOrderArchiveDialog
+        open={archiveDialogMode != null}
+        onOpenChange={(open) => {
+          if (!open && !archiveBusy) setArchiveDialogMode(null)
+        }}
+        mode={archiveDialogMode ?? "archive"}
+        busy={archiveBusy}
+        onConfirm={() => void confirmArchiveDialogAction()}
+      />
     </div>
   )
 }
