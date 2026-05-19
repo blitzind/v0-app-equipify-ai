@@ -15,8 +15,9 @@ import {
 type WorkOrderArchiveDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  mode: "archive" | "restore"
+  mode: "archive" | "restore" | "bulk-archive"
   busy?: boolean
+  selectedCount?: number
   onConfirm: () => void | Promise<void>
 }
 
@@ -25,17 +26,36 @@ export function WorkOrderArchiveDialog({
   onOpenChange,
   mode,
   busy = false,
+  selectedCount = 0,
   onConfirm,
 }: WorkOrderArchiveDialogProps) {
-  const isArchive = mode === "archive"
+  const isBulkArchive = mode === "bulk-archive"
+  const isArchive = mode === "archive" || isBulkArchive
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{isArchive ? "Delete work order?" : "Restore work order?"}</AlertDialogTitle>
+          <AlertDialogTitle>
+            {isBulkArchive
+              ? "Archive selected work orders?"
+              : isArchive
+                ? "Delete work order?"
+                : "Restore work order?"}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            {isArchive ? (
+            {isBulkArchive ? (
+              <>
+                This removes the selected work orders from active queues. You can restore them later from Settings →
+                Archived.
+                {selectedCount > 0 ? (
+                  <>
+                    {" "}
+                    <span className="font-medium text-foreground">{selectedCount} selected.</span>
+                  </>
+                ) : null}
+              </>
+            ) : isArchive ? (
               <>
                 This removes the work order from active lists and dispatch queues. It is not permanently deleted —
                 service history, certificates, and linked records are kept. You can restore it later from Settings →
@@ -55,7 +75,7 @@ export function WorkOrderArchiveDialog({
             className="gap-2"
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {isArchive ? "Archive work order" : "Restore work order"}
+            {isBulkArchive ? "Archive work orders" : isArchive ? "Archive work order" : "Restore work order"}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

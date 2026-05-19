@@ -16,7 +16,12 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
-import { archiveWorkOrderViaApi } from "@/lib/work-orders/archive-work-order-client"
+import { archiveWorkOrderViaApi, bulkArchiveWorkOrdersViaApi } from "@/lib/work-orders/archive-work-order-client"
+import {
+  bulkArchivePartialToast,
+  bulkArchiveSuccessToast,
+  BULK_ARCHIVE_PARTIAL_DESCRIPTION,
+} from "@/lib/work-orders/bulk-archive-messages"
 import { WorkOrderArchiveDialog } from "@/components/work-orders/work-order-archive-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { isAssignedWorkOnly, loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
@@ -82,6 +87,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Plus,
   Search,
@@ -554,6 +560,10 @@ function TableView({
   onOpen,
   canArchive,
   onArchive,
+  canSelect,
+  selectedIds,
+  onToggleRow,
+  onToggleAllVisible,
 }: {
   workOrders: WorkOrder[]
   sortKey: SortKey
@@ -562,7 +572,19 @@ function TableView({
   onOpen: (id: string) => void
   canArchive?: boolean
   onArchive?: (wo: WorkOrder) => void
+  canSelect?: boolean
+  selectedIds?: Set<string>
+  onToggleRow?: (id: string) => void
+  onToggleAllVisible?: () => void
 }) {
+  const selectableRows = useMemo(
+    () => (canSelect ? workOrders.filter((wo) => !wo.isArchived) : []),
+    [canSelect, workOrders],
+  )
+  const selectedCount = selectableRows.filter((wo) => selectedIds?.has(wo.id)).length
+  const allVisibleSelected = selectableRows.length > 0 && selectedCount === selectableRows.length
+  const someVisibleSelected = selectedCount > 0 && !allVisibleSelected
+
   function SortHeader({ label, col }: { label: string; col: SortKey }) {
     return (
       <button
@@ -581,6 +603,16 @@ function TableView({
         <Table>
           <TableHeader>
             <TableRow className="ds-table-header-row-subtle">
+              {canSelect ? (
+                <TableHead className="w-10">
+                  <Checkbox
+                    aria-label="Select all visible work orders"
+                    checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+                    disabled={selectableRows.length === 0}
+                    onCheckedChange={() => onToggleAllVisible?.()}
+                  />
+                </TableHead>
+              ) : null}
               <TableHead className="w-28"><SortHeader label="ID" col="id" /></TableHead>
               <TableHead><SortHeader label="Customer" col="customerName" /></TableHead>
               <TableHead>Equipment</TableHead>
@@ -593,8 +625,26 @@ function TableView({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {workOrders.map((wo) => (
+            {workOrders.map((wo) => {
+              const rowSelectable = Boolean(canSelect && !wo.isArchived)
+              const rowSelected = Boolean(selectedIds?.has(wo.id))
+              return (
               <TableRow key={wo.id} className="ds-hover-list-row cursor-pointer" onClick={() => onOpen(wo.id)}>
+                {canSelect ? (
+                  <TableCell
+                    className="w-10"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Checkbox
+                      aria-label={`Select work order ${getWorkOrderDisplay(wo)}`}
+                      checked={rowSelected}
+                      disabled={!rowSelectable}
+                      onCheckedChange={() => {
+                        if (rowSelectable) onToggleRow?.(wo.id)
+                      }}
+                    />
+                  </TableCell>
+                ) : null}
                 <TableCell>
                   <span className="font-mono text-xs text-primary hover:underline">{getWorkOrderDisplay(wo)}</span>
                 </TableCell>
@@ -658,10 +708,10 @@ function TableView({
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+            )})}
             {workOrders.length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground text-sm py-12">
+                <TableCell colSpan={canSelect ? 10 : 9} className="text-center text-muted-foreground text-sm py-12">
                   No work orders match your filters.
                 </TableCell>
               </TableRow>
@@ -1184,10 +1234,30 @@ function WorkOrdersPageInner() {
   const [drawerInitialTab, setDrawerInitialTab] = useState<string | undefined>(undefined)
   const [archiveTarget, setArchiveTarget] = useState<WorkOrder | null>(null)
   const [archiveBusy, setArchiveBusy] = useState(false)
+  const [selectedWoIds, setSelectedWoIds] = useState<Set<string>>(() => new Set())
+  const [bulkArchiveOpen, setBulkArchiveOpen] = useState(false)
   const searchParams = useSearchParams()
   const router = useRouter()
 
   const canArchiveFromList = canArchiveRestore && archiveScope === "active" && !assignedOnlyView
+  const selectedCount = selectedWoIds.size
+
+  const clearSelection = useCallback(() => {
+    setSelectedWoIds(new Set())
+  }, [])
+
+  useEffect(() => {
+    clearSelection()
+  }, [search, statusFilter, priorityFilter, techFilter, archiveScope, view, clearSelection])
+
+  const toggleRowSelection = useCallback((id: string) => {
+    setSelectedWoIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
 
   async function confirmListArchive() {
     if (!archiveTarget || !activeOrgId) return
@@ -1208,6 +1278,42 @@ function WorkOrdersPageInner() {
     setArchiveTarget(null)
     setRefreshToken((v) => v + 1)
     toast({ title: "Work order archived" })
+  }
+
+  async function confirmBulkArchive() {
+    if (!activeOrgId || selectedWoIds.size === 0) return
+    setArchiveBusy(true)
+    const ids = [...selectedWoIds]
+    const res = await bulkArchiveWorkOrdersViaApi({
+      organizationId: activeOrgId,
+      workOrderIds: ids,
+    })
+    setArchiveBusy(false)
+    if (!res.ok) {
+      toast({ variant: "destructive", title: res.message })
+      return
+    }
+    setBulkArchiveOpen(false)
+    if (res.succeededCount === 0) {
+      toast({ variant: "destructive", title: "Could not archive selected work orders." })
+      return
+    }
+    if (selectedWoId && ids.includes(selectedWoId) && !res.failedIds.includes(selectedWoId)) {
+      setSelectedWoId(null)
+      setDrawerInitialTab(undefined)
+    }
+    setRefreshToken((v) => v + 1)
+    if (res.failedCount === 0) {
+      clearSelection()
+      toast({ title: bulkArchiveSuccessToast(res.succeededCount) })
+      return
+    }
+    setSelectedWoIds(new Set(res.failedIds))
+    toast({
+      variant: "destructive",
+      title: bulkArchivePartialToast(res.succeededCount, res.failedCount),
+      description: BULK_ARCHIVE_PARTIAL_DESCRIPTION,
+    })
   }
 
   // Auto-open drawer from ?workOrderId= or legacy ?open=
@@ -1351,6 +1457,16 @@ function WorkOrdersPageInner() {
     })
     return list
   }, [workOrders, search, statusFilter, priorityFilter, techFilter, sortKey, sortDir, assignedOnlyView])
+
+  const toggleAllVisibleSelection = useCallback(() => {
+    const selectableIds = filtered.filter((wo) => !wo.isArchived).map((wo) => wo.id)
+    if (selectableIds.length === 0) return
+    setSelectedWoIds((prev) => {
+      const allSelected = selectableIds.every((id) => prev.has(id))
+      if (allSelected) return new Set()
+      return new Set(selectableIds)
+    })
+  }, [filtered])
 
   function handleSort(key: SortKey) {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"))
@@ -1565,6 +1681,32 @@ function WorkOrdersPageInner() {
         </p>
       )}
 
+      {view === "table" && canArchiveFromList && selectedCount > 0 ? (
+        <div className="hidden md:flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2 -mt-1">
+          <span className="text-sm font-medium text-foreground">
+            {selectedCount} selected
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            className="h-8"
+            onClick={() => setBulkArchiveOpen(true)}
+          >
+            Archive selected
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8"
+            onClick={clearSelection}
+          >
+            Clear selection
+          </Button>
+        </div>
+      ) : null}
+
       {/* Views */}
       <div
         className={cn(
@@ -1589,6 +1731,10 @@ function WorkOrdersPageInner() {
             onOpen={setSelectedWoId}
             canArchive={canArchiveFromList}
             onArchive={(wo) => setArchiveTarget(wo)}
+            canSelect={canArchiveFromList}
+            selectedIds={selectedWoIds}
+            onToggleRow={toggleRowSelection}
+            onToggleAllVisible={toggleAllVisibleSelection}
           />
         )}
         {view === "calendar" && <CalendarView workOrders={filtered} onOpen={setSelectedWoId} />}
@@ -1638,6 +1784,17 @@ function WorkOrdersPageInner() {
         mode="archive"
         busy={archiveBusy}
         onConfirm={() => void confirmListArchive()}
+      />
+
+      <WorkOrderArchiveDialog
+        open={bulkArchiveOpen}
+        onOpenChange={(open) => {
+          if (!open && !archiveBusy) setBulkArchiveOpen(false)
+        }}
+        mode="bulk-archive"
+        selectedCount={selectedCount}
+        busy={archiveBusy}
+        onConfirm={() => void confirmBulkArchive()}
       />
     </div>
   )

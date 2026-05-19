@@ -70,3 +70,50 @@ export function restoreWorkOrderViaApi(args: {
     endpoint: "restore",
   })
 }
+
+export type BulkArchiveWorkOrdersApiResult =
+  | { ok: true; succeededCount: number; failedCount: number; failedIds: string[] }
+  | { ok: false; message: string }
+
+export async function bulkArchiveWorkOrdersViaApi(args: {
+  organizationId: string
+  workOrderIds: string[]
+}): Promise<BulkArchiveWorkOrdersApiResult> {
+  const res = await fetch("/api/archived/archive/bulk", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      organizationId: args.organizationId,
+      recordType: "work_order",
+      recordIds: args.workOrderIds,
+    }),
+  })
+
+  if (res.ok) {
+    try {
+      const body = (await res.json()) as {
+        succeededCount?: number
+        failedCount?: number
+        failedIds?: string[]
+      }
+      return {
+        ok: true,
+        succeededCount: body.succeededCount ?? 0,
+        failedCount: body.failedCount ?? 0,
+        failedIds: Array.isArray(body.failedIds) ? body.failedIds : [],
+      }
+    } catch {
+      return { ok: false, message: "Could not complete that action. Try again." }
+    }
+  }
+
+  let message: string | undefined
+  try {
+    const body = (await res.json()) as { message?: string }
+    message = body.message
+  } catch {
+    message = undefined
+  }
+
+  return { ok: false, message: friendlyWorkOrderArchiveApiError(res.status, message) }
+}

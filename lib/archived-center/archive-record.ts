@@ -57,3 +57,22 @@ async function archiveWorkOrderRecord(
 
   return { ok: true }
 }
+
+export type BulkArchiveWorkOrderItemResult =
+  | { id: string; ok: true }
+  | { id: string; ok: false; message: string }
+
+export async function bulkArchiveWorkOrders(
+  admin: SupabaseClient,
+  organizationId: string,
+  workOrderIds: string[],
+  actorUserId: string,
+): Promise<{ results: BulkArchiveWorkOrderItemResult[] }> {
+  const unique = [...new Set(workOrderIds)]
+  const results: BulkArchiveWorkOrderItemResult[] = []
+  for (const id of unique) {
+    const result = await archiveWorkOrderRecord(admin, organizationId, id, actorUserId)
+    results.push(result.ok ? { id, ok: true } : { id, ok: false, message: result.message })
+  }
+  return { results }
+}
