@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 456,
+  apiRouteHandlers: 458,
   sqlMigrations: 198,
   dashboardPages: 65,
-  componentsTsx: 328,
-  libTsFiles: 914,
+  componentsTsx: 330,
+  libTsFiles: 922,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **456** |
+| API route handlers (\`app/api/**/route.ts\`) | **458** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **198** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **328** |
-| \`lib/**/*.ts\` | **914** |
+| \`components/**/*.tsx\` | **330** |
+| \`lib/**/*.ts\` | **922** |
 
 ### Vercel crons
 
@@ -341,6 +341,7 @@ organizations/[organizationId]/invoices/[invoiceId]/duplicate/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/pdf/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/quickbooks-sync/route.ts
 organizations/[organizationId]/invoices/bulk-archive/route.ts
+organizations/[organizationId]/maintenance-plans/bulk-archive/route.ts
 organizations/[organizationId]/member-profile-labels/route.ts
 organizations/[organizationId]/members/[userId]/avatar/route.ts
 organizations/[organizationId]/migration-imports/[jobId]/async/route.ts
@@ -396,6 +397,7 @@ organizations/[organizationId]/service-requests/stats/route.ts
 organizations/[organizationId]/sms-workspace/route.ts
 organizations/[organizationId]/technician-skill-tags/[tagId]/route.ts
 organizations/[organizationId]/technician-skill-tags/route.ts
+organizations/[organizationId]/technicians/bulk-deactivate/route.ts
 organizations/[organizationId]/vendors/bulk-archive/route.ts
 organizations/[organizationId]/work-orders/[workOrderId]/ai-parts-suggestions/route.ts
 organizations/[organizationId]/work-orders/[workOrderId]/ai-service-summary/route.ts

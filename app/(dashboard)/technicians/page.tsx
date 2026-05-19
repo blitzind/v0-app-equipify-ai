@@ -10,11 +10,21 @@ import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { TechnicianDrawer } from "@/components/drawers/technician-drawer"
+import { TechnicianBulkDeactivateDialog } from "@/components/technicians/technician-bulk-deactivate-dialog"
+import { bulkDeactivateTechniciansViaApi } from "@/lib/technicians/bulk-deactivate-technicians-client"
+import {
+  bulkTechnicianDeactivatePartialToast,
+  bulkTechnicianDeactivateSuccessToast,
+  BULK_TECHNICIAN_DEACTIVATE_PARTIAL_DESCRIPTION,
+} from "@/lib/technicians/bulk-deactivate-messages"
+import { isTechnicianBulkDeactivateEligible } from "@/lib/technicians/bulk-deactivate-eligibility"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { DispatchDrawer } from "@/components/drawers/dispatch-drawer"
 import { ScheduleJobModal } from "@/components/technicians/schedule-job-modal"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -882,8 +892,11 @@ function TechCard({
 
 function TechniciansPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { rawRole } = useOrgPermissions()
   const { seatInviteEligibility } = useBillingAccess()
   const [techs, setTechs] = useState<Technician[]>([])
+  const [memberRolesByUserId, setMemberRolesByUserId] = useState<Map<string, string>>(() => new Map())
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [woRows, setWoRows] = useState<WoRow[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -901,9 +914,26 @@ function TechniciansPageInner() {
   const [dispatchDrawerOpen, setDispatchDrawerOpen] = useState(false)
   const [dispatchInitialTechId, setDispatchInitialTechId] = useState<string | null>(null)
   const [skillTagOptions, setSkillTagOptions] = useState<TechnicianSkillTagOption[]>([])
+  const [selectedTechIds, setSelectedTechIds] = useState<Set<string>>(() => new Set())
+  const [bulkDeactivateOpen, setBulkDeactivateOpen] = useState(false)
+  const [bulkDeactivateBusy, setBulkDeactivateBusy] = useState(false)
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
+
+  const canBulkDeactivateFromList =
+    (rawRole === "owner" || rawRole === "admin") && view === "table"
+  const selectedCount = selectedTechIds.size
+  const actorIsOwner = rawRole === "owner"
+  const actorIsAdmin = rawRole === "admin"
+
+  const clearSelection = useCallback(() => {
+    setSelectedTechIds(new Set())
+  }, [])
+
+  useEffect(() => {
+    clearSelection()
+  }, [search, statusFilter, skillFilter, regionFilter, kpiFilter, view, clearSelection])
 
   function openInviteTechnicianModal() {
     if (blockCreateIfNotEligible(seatInviteEligibility)) return
@@ -935,10 +965,14 @@ function TechniciansPageInner() {
         if (active) {
           setTechs([])
           setWoRows([])
+          setMemberRolesByUserId(new Map())
+          setCurrentUserId(null)
           setLoading(false)
         }
         return
       }
+
+      if (active) setCurrentUserId(user.id)
 
       if (!activeOrgId) {
         if (active) {
@@ -1074,6 +1108,7 @@ function TechniciansPageInner() {
       if (active) {
         setWoRows(woList)
         setTechs(list)
+        setMemberRolesByUserId(roleByUser)
         setLoading(false)
       }
     }
@@ -1268,6 +1303,98 @@ function TechniciansPageInner() {
       })
   }, [techs, search, statusFilter, skillFilter, regionFilter, kpiFilter, jobsTodaySet])
 
+  const activeOwnerCount = useMemo(
+    () =>
+      techs.filter(
+        (t) => memberRolesByUserId.get(t.id) === "owner" && t.membershipStatus === "active",
+      ).length,
+    [memberRolesByUserId, techs],
+  )
+
+  const techBulkDeactivateInput = useCallback(
+    (tech: Technician) => ({
+      targetUserId: tech.id,
+      actorUserId: currentUserId ?? "",
+      targetRole: memberRolesByUserId.get(tech.id) ?? "tech",
+      targetStatus:
+        tech.membershipStatus === "suspended"
+          ? "suspended"
+          : tech.membershipStatus === "invited"
+            ? "invited"
+            : "active",
+      actorIsOwner,
+      actorIsAdmin,
+      activeOwnerCount,
+    }),
+    [currentUserId, memberRolesByUserId, actorIsOwner, actorIsAdmin, activeOwnerCount],
+  )
+
+  const selectableFiltered = useMemo(
+    () =>
+      filtered.filter((tech) =>
+        isTechnicianBulkDeactivateEligible(techBulkDeactivateInput(tech)),
+      ),
+    [filtered, techBulkDeactivateInput],
+  )
+
+  const toggleAllVisibleSelection = useCallback(() => {
+    const visibleIds = selectableFiltered.map((t) => t.id)
+    if (visibleIds.length === 0) return
+    setSelectedTechIds((prev) => {
+      const allSelected = visibleIds.every((id) => prev.has(id))
+      if (allSelected) return new Set()
+      return new Set(visibleIds)
+    })
+  }, [selectableFiltered])
+
+  const allVisibleSelected =
+    selectableFiltered.length > 0 && selectableFiltered.every((t) => selectedTechIds.has(t.id))
+  const someVisibleSelected =
+    selectableFiltered.some((t) => selectedTechIds.has(t.id)) && !allVisibleSelected
+
+  const toggleRowSelection = useCallback((id: string) => {
+    setSelectedTechIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const confirmBulkDeactivate = useCallback(async () => {
+    if (!activeOrgId || selectedTechIds.size === 0) return
+    setBulkDeactivateBusy(true)
+    const ids = [...selectedTechIds]
+    const res = await bulkDeactivateTechniciansViaApi({
+      organizationId: activeOrgId,
+      userIds: ids,
+    })
+    setBulkDeactivateBusy(false)
+    if (!res.ok) {
+      addToast(res.message, "info")
+      return
+    }
+    setBulkDeactivateOpen(false)
+    if (res.succeededCount === 0) {
+      addToast("Could not deactivate selected technicians.", "info")
+      return
+    }
+    if (selectedTechIds.has(selectedTech?.id ?? "")) {
+      setSelectedTech(null)
+    }
+    setRosterRefresh((n) => n + 1)
+    if (res.failedCount === 0) {
+      clearSelection()
+      addToast(bulkTechnicianDeactivateSuccessToast(res.succeededCount))
+      return
+    }
+    setSelectedTechIds(new Set(res.failedIds))
+    addToast(
+      `${bulkTechnicianDeactivatePartialToast(res.succeededCount, res.failedCount)} ${BULK_TECHNICIAN_DEACTIVATE_PARTIAL_DESCRIPTION}`,
+      "info",
+    )
+  }, [activeOrgId, selectedTechIds, selectedTech, addToast, clearSelection])
+
   const skillFilterOptions = useMemo(
     () => skillTagOptionNames(skillTagOptions, techs.flatMap((t) => t.skills)),
     [skillTagOptions, techs],
@@ -1410,6 +1537,26 @@ function TechniciansPageInner() {
           {loading ? "Loading team…" : `${filtered.length} of ${techs.length} technicians`}
         </p>
 
+        {canBulkDeactivateFromList && selectedCount > 0 ? (
+          <div className="hidden md:flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
+            <span className="text-sm font-medium text-foreground">
+              {selectedCount} technician{selectedCount === 1 ? "" : "s"} selected
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              className="h-8"
+              onClick={() => setBulkDeactivateOpen(true)}
+            >
+              Deactivate selected
+            </Button>
+            <Button type="button" size="sm" variant="ghost" className="h-8" onClick={clearSelection}>
+              Clear selection
+            </Button>
+          </div>
+        ) : null}
+
         {/* ── Card view ── */}
         {view === "card" && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1450,6 +1597,16 @@ function TechniciansPageInner() {
             <Table>
               <TableHeader>
                 <TableRow className="ds-table-header-row">
+                  {canBulkDeactivateFromList ? (
+                    <TableHead className="hidden md:table-cell w-10">
+                      <Checkbox
+                        aria-label="Select all visible technicians"
+                        checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+                        disabled={selectableFiltered.length === 0 || loading}
+                        onCheckedChange={toggleAllVisibleSelection}
+                      />
+                    </TableHead>
+                  ) : null}
                   <TableHead>Technician</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Region</TableHead>
@@ -1464,14 +1621,29 @@ function TechniciansPageInner() {
               <TableBody>
                 {loading && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-16 text-muted-foreground">
+                    <TableCell colSpan={canBulkDeactivateFromList ? 10 : 9} className="text-center py-16 text-muted-foreground">
                       <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
                       Loading team…
                     </TableCell>
                   </TableRow>
                 )}
-                {!loading && filtered.map((tech) => (
+                {!loading && filtered.map((tech) => {
+                  const rowSelectable = isTechnicianBulkDeactivateEligible(techBulkDeactivateInput(tech))
+                  return (
                   <TableRow key={tech.id} className="cursor-pointer ds-hover-list-row" onClick={() => setSelectedTech(tech)}>
+                    {canBulkDeactivateFromList ? (
+                      <TableCell
+                        className="hidden md:table-cell w-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          aria-label={`Select ${tech.name}`}
+                          checked={selectedTechIds.has(tech.id)}
+                          disabled={!rowSelectable}
+                          onCheckedChange={() => toggleRowSelection(tech.id)}
+                        />
+                      </TableCell>
+                    ) : null}
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <TechAvatar tech={tech} size="sm" />
@@ -1522,10 +1694,11 @@ function TechniciansPageInner() {
                       <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </TableCell>
                   </TableRow>
-                ))}
+                  )
+                })}
                 {!loading && filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-12">
+                    <TableCell colSpan={canBulkDeactivateFromList ? 10 : 9} className="py-12">
                       <div className="flex flex-col items-center justify-center gap-2 text-center px-4">
                         <Users className="w-8 h-8 text-muted-foreground/45" aria-hidden />
                         <p className="text-sm font-medium text-foreground">No technicians match your filters</p>
@@ -1543,6 +1716,14 @@ function TechniciansPageInner() {
       </div>
 
       {/* ── Overlays ── */}
+
+      <TechnicianBulkDeactivateDialog
+        open={bulkDeactivateOpen}
+        onOpenChange={setBulkDeactivateOpen}
+        selectedCount={selectedCount}
+        busy={bulkDeactivateBusy}
+        onConfirm={confirmBulkDeactivate}
+      />
 
       {selectedTech && (
         <TechnicianDrawer

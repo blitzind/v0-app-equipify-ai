@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, Suspense } from "react"
+import { useState, useMemo, useEffect, useCallback, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useMaintenancePlans, type RecordArchiveVisibility } from "@/lib/maintenance-store"
@@ -79,6 +79,7 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Select,
@@ -102,12 +103,21 @@ import {
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { EditMaintenancePlanDialog } from "@/components/maintenance-plans/edit-maintenance-plan-dialog"
 import { CreateMaintenancePlanDialog } from "@/components/maintenance-plans/create-maintenance-plan-dialog"
+import { MaintenancePlanBulkArchiveDialog } from "@/components/maintenance-plans/maintenance-plan-bulk-archive-dialog"
+import { bulkArchiveMaintenancePlansViaApi } from "@/lib/maintenance-plans/bulk-archive-maintenance-plans-client"
+import {
+  bulkMaintenancePlanArchivePartialToast,
+  bulkMaintenancePlanArchiveSuccessToast,
+  BULK_MAINTENANCE_PLAN_ARCHIVE_PARTIAL_DESCRIPTION,
+} from "@/lib/maintenance-plans/bulk-archive-messages"
+import { isMaintenancePlanBulkArchiveEligible } from "@/lib/maintenance-plans/bulk-archive-eligibility"
 import { AidenOperationalInsightsCard } from "@/components/aiden/aiden-operational-insights-card"
 import { Toaster } from "@/components/ui/toaster"
 import { toast } from "@/hooks/use-toast"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockMaintenancePlanDialogIfNotEligible } from "@/lib/billing/guard-toast"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1116,11 +1126,13 @@ function MaintenancePlansPageInner() {
     plansListVisibility,
     setPlansListVisibility,
     organizationId: maintenanceOrgId,
+    refreshPlans,
   } = useMaintenancePlans()
   const searchParams = useSearchParams()
   const router = useRouter()
   const { standardCreateEligibility, maintenancePlansFeatureAllowed } = useBillingAccess()
   const { permissions } = useOrgPermissions()
+  const { canArchiveRestore } = useOrgArchivePermissions()
   const canViewFollowUpStats = Boolean(permissions.canViewCommunications)
   const [followUpMaintenanceStats, setFollowUpMaintenanceStats] = useState<{
     pending: number
@@ -1133,6 +1145,21 @@ function MaintenancePlansPageInner() {
   const [selectedPlan, setSelectedPlan] = useState<MaintenancePlan | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [view, setView] = useState<"cards" | "table">("table")
+  const [selectedPlanIds, setSelectedPlanIds] = useState<Set<string>>(() => new Set())
+  const [bulkArchiveOpen, setBulkArchiveOpen] = useState(false)
+  const [bulkArchiveBusy, setBulkArchiveBusy] = useState(false)
+
+  const canBulkArchiveFromList =
+    canArchiveRestore && plansListVisibility === "active" && view === "table"
+  const selectedCount = selectedPlanIds.size
+
+  const clearSelection = useCallback(() => {
+    setSelectedPlanIds(new Set())
+  }, [])
+
+  useEffect(() => {
+    clearSelection()
+  }, [search, statusFilter, intervalFilter, view, plansListVisibility, clearSelection])
 
   const prefillCustomerId = searchParams.get("customerId")
   const prefillEquipmentId = searchParams.get("equipmentId")
@@ -1227,6 +1254,70 @@ function MaintenancePlansPageInner() {
       return true
     })
   }, [plans, search, statusFilter, intervalFilter])
+
+  const selectableFiltered = useMemo(
+    () => filtered.filter((p) => isMaintenancePlanBulkArchiveEligible({ isArchived: p.isArchived })),
+    [filtered],
+  )
+
+  const toggleAllVisibleSelection = useCallback(() => {
+    const visibleIds = selectableFiltered.map((p) => p.id)
+    if (visibleIds.length === 0) return
+    setSelectedPlanIds((prev) => {
+      const allSelected = visibleIds.every((id) => prev.has(id))
+      if (allSelected) return new Set()
+      return new Set(visibleIds)
+    })
+  }, [selectableFiltered])
+
+  const allVisibleSelected =
+    selectableFiltered.length > 0 && selectableFiltered.every((p) => selectedPlanIds.has(p.id))
+  const someVisibleSelected =
+    selectableFiltered.some((p) => selectedPlanIds.has(p.id)) && !allVisibleSelected
+
+  const toggleRowSelection = useCallback((id: string) => {
+    setSelectedPlanIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  async function confirmBulkArchive() {
+    if (!maintenanceOrgId || selectedPlanIds.size === 0) return
+    setBulkArchiveBusy(true)
+    const ids = [...selectedPlanIds]
+    const res = await bulkArchiveMaintenancePlansViaApi({
+      organizationId: maintenanceOrgId,
+      planIds: ids,
+    })
+    setBulkArchiveBusy(false)
+    if (!res.ok) {
+      toast({ variant: "destructive", title: res.message })
+      return
+    }
+    setBulkArchiveOpen(false)
+    if (res.succeededCount === 0) {
+      toast({ variant: "destructive", title: "Could not archive selected maintenance plans." })
+      return
+    }
+    if (selectedPlanIds.has(selectedPlan?.id ?? "")) {
+      setSelectedPlan(null)
+    }
+    await refreshPlans({ silent: true })
+    if (res.failedCount === 0) {
+      clearSelection()
+      toast({ title: bulkMaintenancePlanArchiveSuccessToast(res.succeededCount) })
+      return
+    }
+    setSelectedPlanIds(new Set(res.failedIds))
+    toast({
+      variant: "destructive",
+      title: bulkMaintenancePlanArchivePartialToast(res.succeededCount, res.failedCount),
+      description: BULK_MAINTENANCE_PLAN_ARCHIVE_PARTIAL_DESCRIPTION,
+    })
+  }
 
   const plansForStats = useMemo(() => plans.filter((p) => !p.isArchived), [plans])
 
@@ -1401,6 +1492,26 @@ function MaintenancePlansPageInner() {
         </div>
       </div>
 
+      {canBulkArchiveFromList && selectedCount > 0 ? (
+        <div className="hidden md:flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
+          <span className="text-sm font-medium text-foreground">
+            {selectedCount} maintenance plan{selectedCount === 1 ? "" : "s"} selected
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            className="h-8"
+            onClick={() => setBulkArchiveOpen(true)}
+          >
+            Archive selected
+          </Button>
+          <Button type="button" size="sm" variant="ghost" className="h-8" onClick={clearSelection}>
+            Clear selection
+          </Button>
+        </div>
+      ) : null}
+
       {/* Content */}
       {listEmpty ? (
         <Card className="border border-border border-dashed">
@@ -1429,6 +1540,16 @@ function MaintenancePlansPageInner() {
           <table className="w-full text-sm min-w-[640px]">
             <thead className="ds-thead-bg-strong border-b border-border">
               <tr>
+                {canBulkArchiveFromList ? (
+                  <th className="hidden md:table-cell w-10 px-4 py-2.5">
+                    <Checkbox
+                      aria-label="Select all visible maintenance plans"
+                      checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+                      disabled={selectableFiltered.length === 0}
+                      onCheckedChange={toggleAllVisibleSelection}
+                    />
+                  </th>
+                ) : null}
                 {["Plan Name", "Customer", "Equipment", "Interval", "Technician", "Next Due", "Status", ""].map((h, colIdx) => (
                   <th key={`th-${colIdx}`} className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
                 ))}
@@ -1438,6 +1559,7 @@ function MaintenancePlansPageInner() {
               {filtered.map((plan) => {
                 const days = daysUntil(plan.nextDueDate)
                 const accent = planDueAccent(days)
+                const rowSelectable = isMaintenancePlanBulkArchiveEligible({ isArchived: plan.isArchived })
                 return (
                   <tr
                     key={plan.id}
@@ -1448,6 +1570,19 @@ function MaintenancePlansPageInner() {
                     )}
                     onClick={() => setSelectedPlan(plan)}
                   >
+                    {canBulkArchiveFromList ? (
+                      <td
+                        className="hidden md:table-cell w-10 px-4 py-3"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          aria-label={`Select ${plan.name}`}
+                          checked={selectedPlanIds.has(plan.id)}
+                          disabled={!rowSelectable}
+                          onCheckedChange={() => toggleRowSelection(plan.id)}
+                        />
+                      </td>
+                    ) : null}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-medium text-foreground">{plan.name}</span>
@@ -1484,7 +1619,7 @@ function MaintenancePlansPageInner() {
               })}
               {filteredEmpty && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={canBulkArchiveFromList ? 9 : 8} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     No plans match the current filters.
                   </td>
                 </tr>
@@ -1495,6 +1630,14 @@ function MaintenancePlansPageInner() {
       )}
 
       {/* Modals */}
+      <MaintenancePlanBulkArchiveDialog
+        open={bulkArchiveOpen}
+        onOpenChange={setBulkArchiveOpen}
+        selectedCount={selectedCount}
+        busy={bulkArchiveBusy}
+        onConfirm={confirmBulkArchive}
+      />
+
       <CreateMaintenancePlanDialog
         open={createOpen}
         onClose={handleCloseCreateModal}
