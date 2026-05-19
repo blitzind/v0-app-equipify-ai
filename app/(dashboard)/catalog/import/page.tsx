@@ -7,7 +7,7 @@ import { AlertTriangle, ArrowLeft, Loader2, RefreshCw, Upload } from "lucide-rea
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import type { DuplicateAction, ExtractedCatalogRow, StoredPriceListPayload } from "@/lib/catalog/import-types"
 import { CATALOG_ITEM_TYPES } from "@/lib/catalog/import-types"
-import { isAllowedPriceListFile, validatePriceListFile } from "@/lib/catalog/price-list-file-validation"
+import { validatePriceListFile } from "@/lib/catalog/price-list-file-validation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -919,11 +919,6 @@ export default function ImportPriceListPage() {
               const validation = validatePriceListFile(next.name, next.type, next.size)
               if (!validation.ok) {
                 setFileError(validation.message)
-                setFile(null)
-                return
-              }
-              if (!isAllowedPriceListFile(next.name, next.type)) {
-                setFileError("Upload a PDF or CSV price list.")
                 setFile(null)
                 return
               }

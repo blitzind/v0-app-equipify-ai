@@ -7,10 +7,11 @@ import { logCatalogCsvImport } from "@/lib/catalog/csv-import-debug-log"
 import { readPriceListImportJobOutcome } from "@/lib/catalog/price-list-import-upload-result"
 import {
   defaultPriceListFileName,
-  priceListStorageContentType,
+  getPriceListFileExtension,
   priceListStorageExtension,
   validatePriceListFile,
 } from "@/lib/catalog/price-list-file-validation"
+import { uploadPriceListImportFile } from "@/lib/catalog/price-list-storage-upload"
 import { requireOrgCatalogWrite } from "@/lib/catalog/require-org-catalog-write"
 import { maybeCatalogSchemaErrorResponse } from "@/lib/supabase/catalog-schema-errors"
 
@@ -58,16 +59,15 @@ export async function POST(
   }
   const fileKind = fileValidation.kind
 
-  if (fileKind === "csv") {
-    logCatalogCsvImport("upload_received", {
-      organizationId,
-      fileName: file.name || defaultPriceListFileName(fileKind),
-      mimeType: file.type || null,
-      sizeBytes: file.size,
-      detectedKind: fileKind,
-      detectedExtension: priceListStorageExtension(fileKind),
-    })
-  }
+  logCatalogCsvImport("upload_received", {
+    organizationId,
+    fileName: file.name || defaultPriceListFileName(fileKind),
+    mimeType: file.type || null,
+    sizeBytes: file.size,
+    detectedKind: fileKind,
+    detectedExtension: getPriceListFileExtension(file.name || ""),
+    storageExtension: priceListStorageExtension(fileKind),
+  })
 
   const manufacturerNameField = form.get("manufacturerName")
   const manufacturerName =
@@ -109,15 +109,16 @@ export async function POST(
   const importId = inserted.id as string
   const storagePath = `${organizationId}/${importId}${priceListStorageExtension(fileKind)}`
 
-  const { error: upErr } = await svc.storage.from(PRICE_LIST_IMPORTS_BUCKET).upload(storagePath, buffer, {
-    contentType: priceListStorageContentType(fileKind),
-    cacheControl: "3600",
-    upsert: true,
+  const storageUpload = await uploadPriceListImportFile({
+    svc,
+    storagePath,
+    buffer,
+    kind: fileKind,
   })
 
-  if (upErr) {
+  if (!storageUpload.ok) {
     await svc.from("price_list_imports").delete().eq("id", importId)
-    return NextResponse.json({ error: "upload_failed", message: upErr.message }, { status: 400 })
+    return NextResponse.json({ error: "upload_failed", message: storageUpload.message }, { status: 400 })
   }
 
   await svc
