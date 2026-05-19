@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { cnDrawerTabButton } from "@/components/ui/tabs-chrome"
@@ -29,6 +29,14 @@ import {
   EQUIPMENT_DRAWER_SELECT_FULL,
   EQUIPMENT_DRAWER_SELECT_LEGACY,
 } from "@/lib/equipment/equipment-drawer-select"
+import { EquipmentDateInput } from "@/components/equipment/equipment-date-input"
+import {
+  computeNextCalibrationDueYmd,
+  normalizeOptionalEquipmentDateInput,
+  optionalEquipmentDateFieldError,
+  parseCalibrationIntervalMonths,
+  resolveCalibrationDueAnchorYmd,
+} from "@/lib/equipment/equipment-date-fields"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -435,6 +443,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
   const [warrantyDrawerFormOpen, setWarrantyDrawerFormOpen] = useState(false)
   const [warrantyDrawerEdit, setWarrantyDrawerEdit] = useState<EquipmentWarrantyRow | null>(null)
   const [warrantyDrawerRefresh, setWarrantyDrawerRefresh] = useState(0)
+  const nextCalibrationDueTouchedRef = useRef(false)
 
   const permissions = useOrgPermissionsOptional()
   const canManageEquipmentWarranties = Boolean(permissions?.permissions.canManageDispatch)
@@ -879,6 +888,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       status: eq.status, notes: eq.notes,
     })
     setEditCustomerLocationId(eq.serviceSiteId ?? "")
+    nextCalibrationDueTouchedRef.current = Boolean(eq.nextCalibrationDue?.trim())
     setEditing(true)
   }
 
@@ -890,6 +900,30 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
 
   async function saveEdit() {
     if (!eq || !activeOrgId || eq.isArchived) return
+
+    const installRaw = (draft.installDate ?? eq.installDate) ?? ""
+    const warrantyStartRaw = (draft.warrantyStartDate ?? eq.warrantyStartDate ?? "") ?? ""
+    const warrantyExpRaw = (draft.warrantyExpiration ?? eq.warrantyExpiration) ?? ""
+    const lastServiceRaw = (draft.lastServiceDate ?? eq.lastServiceDate) ?? ""
+    const nextDueRaw = (draft.nextDueDate ?? eq.nextDueDate) ?? ""
+    const nextCalRaw = (draft.nextCalibrationDue ?? eq.nextCalibrationDue ?? "") ?? ""
+
+    const dateChecks: Array<[string, string]> = [
+      ["Install date", installRaw],
+      ["Warranty start", warrantyStartRaw],
+      ["Warranty expiration", warrantyExpRaw],
+      ["Last service date", lastServiceRaw],
+      ["Next service due", nextDueRaw],
+      ["Next calibration due", nextCalRaw],
+    ]
+    for (const [label, raw] of dateChecks) {
+      const err = optionalEquipmentDateFieldError(raw)
+      if (err) {
+        toast(`${label}: ${err}`)
+        return
+      }
+    }
+
     const supabase = createBrowserSupabaseClient()
 
     const calibrationIntervalRaw = draft.calibrationIntervalMonths ?? eq.calibrationIntervalMonths
@@ -911,13 +945,13 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       subcategory: (draft.subcategory ?? eq.subcategory ?? "").trim() || null,
       serial_number: (draft.serialNumber ?? eq.serialNumber).trim() || null,
       status: mapUiStatusToDbStatus((draft.status ?? eq.status) as Equipment["status"]),
-      install_date: (draft.installDate ?? eq.installDate) || null,
-      warranty_start_date: (draft.warrantyStartDate ?? eq.warrantyStartDate ?? "") || null,
-      warranty_expiration_date: (draft.warrantyExpiration ?? eq.warrantyExpiration) || null,
-      warranty_expires_at: (draft.warrantyExpiration ?? eq.warrantyExpiration) || null,
-      last_service_at: (draft.lastServiceDate ?? eq.lastServiceDate) || null,
-      next_due_at: (draft.nextDueDate ?? eq.nextDueDate) || null,
-      next_calibration_due_at: (draft.nextCalibrationDue ?? eq.nextCalibrationDue ?? "").trim() || null,
+      install_date: normalizeOptionalEquipmentDateInput(installRaw),
+      warranty_start_date: normalizeOptionalEquipmentDateInput(warrantyStartRaw),
+      warranty_expiration_date: normalizeOptionalEquipmentDateInput(warrantyExpRaw),
+      warranty_expires_at: normalizeOptionalEquipmentDateInput(warrantyExpRaw),
+      last_service_at: normalizeOptionalEquipmentDateInput(lastServiceRaw),
+      next_due_at: normalizeOptionalEquipmentDateInput(nextDueRaw),
+      next_calibration_due_at: normalizeOptionalEquipmentDateInput(nextCalRaw),
       calibration_interval_months: calibrationIntervalMonths,
       location_label: (draft.location ?? eq.location).trim() || null,
       customer_location_id: editCustomerLocationId.trim() || null,
@@ -993,7 +1027,37 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
   }
 
   function setField<K extends keyof Equipment>(field: K, value: Equipment[K]) {
-    setDraft((prev) => ({ ...prev, [field]: value }))
+    setDraft((prev) => {
+      let next: Partial<Equipment> = { ...prev, [field]: value }
+      if (
+        !nextCalibrationDueTouchedRef.current &&
+        eq &&
+        (field === "calibrationIntervalMonths" || field === "installDate")
+      ) {
+        const installDate = String(next.installDate ?? eq.installDate ?? "")
+        const intervalMonths =
+          typeof next.calibrationIntervalMonths === "number"
+            ? next.calibrationIntervalMonths
+            : parseCalibrationIntervalMonths(String(next.calibrationIntervalMonths ?? ""))
+        const hasIntervalInput =
+          field === "calibrationIntervalMonths" ?
+            value != null && String(value).trim() !== ""
+          : Boolean(parseCalibrationIntervalMonths(String(next.calibrationIntervalMonths ?? "")))
+        if (hasIntervalInput) {
+          const due = computeNextCalibrationDueYmd({
+            anchorYmd: resolveCalibrationDueAnchorYmd(installDate),
+            intervalMonths: intervalMonths,
+          })
+          if (due) next = { ...next, nextCalibrationDue: due }
+        }
+      }
+      return next
+    })
+  }
+
+  function setNextCalibrationDueField(value: string) {
+    nextCalibrationDueTouchedRef.current = true
+    setDraft((prev) => ({ ...prev, nextCalibrationDue: value }))
   }
 
   function startWarrantyEdit() {
@@ -1486,10 +1550,9 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
               {/* Installation & warranty */}
               <DrawerSection title="Installation & warranty">
                 <EditableRow label="Installed" value={fmtDate(eq.installDate)} editing={editing}>
-                  <Input
-                    type="date"
+                  <EquipmentDateInput
                     value={draft.installDate ?? ""}
-                    onChange={(e) => setField("installDate", e.target.value)}
+                    onChange={(v) => setField("installDate", v)}
                     className={drawerInputClass}
                   />
                 </EditableRow>
@@ -1498,10 +1561,9 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                   value={eq.warrantyStartDate ? fmtDate(eq.warrantyStartDate) : "—"}
                   editing={editing}
                 >
-                  <Input
-                    type="date"
+                  <EquipmentDateInput
                     value={draft.warrantyStartDate ?? ""}
-                    onChange={(e) => setField("warrantyStartDate", e.target.value)}
+                    onChange={(v) => setField("warrantyStartDate", v)}
                     className={drawerInputClass}
                   />
                 </EditableRow>
@@ -1510,10 +1572,9 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                   value={eq.warrantyExpiration ? fmtDate(eq.warrantyExpiration) : "—"}
                   editing={editing}
                 >
-                  <Input
-                    type="date"
+                  <EquipmentDateInput
                     value={draft.warrantyExpiration ?? ""}
-                    onChange={(e) => setField("warrantyExpiration", e.target.value)}
+                    onChange={(v) => setField("warrantyExpiration", v)}
                     className={drawerInputClass}
                   />
                 </EditableRow>
@@ -1525,13 +1586,15 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                   Service tracks maintenance and repair work.
                 </p>
                 <EditableRow label="Last service date" value={fmtDate(eq.lastServiceDate)} editing={editing}>
-                  <Input
-                    type="date"
+                  <EquipmentDateInput
                     value={draft.lastServiceDate ?? ""}
-                    onChange={(e) => setField("lastServiceDate", e.target.value)}
+                    onChange={(v) => setField("lastServiceDate", v)}
                     className={drawerInputClass}
                   />
                 </EditableRow>
+                {!editing ? null : (
+                  <p className="text-[10px] text-muted-foreground -mt-2 mb-2 pl-1">Optional.</p>
+                )}
                 <EditableRow
                   label="Next service due"
                   value={
@@ -1541,13 +1604,17 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                   }
                   editing={editing}
                 >
-                  <Input
-                    type="date"
+                  <EquipmentDateInput
                     value={draft.nextDueDate ?? ""}
-                    onChange={(e) => setField("nextDueDate", e.target.value)}
+                    onChange={(v) => setField("nextDueDate", v)}
                     className={drawerInputClass}
                   />
                 </EditableRow>
+                {!editing ? null : (
+                  <p className="text-[10px] text-muted-foreground -mt-2 mb-1 pl-1">
+                    Maintenance or repair follow-up.
+                  </p>
+                )}
               </DrawerSection>
 
               {/* Calibration & compliance */}
@@ -1560,13 +1627,17 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                   value={eq.nextCalibrationDue?.trim() ? fmtDate(eq.nextCalibrationDue) : "—"}
                   editing={editing}
                 >
-                  <Input
-                    type="date"
+                  <EquipmentDateInput
                     value={draft.nextCalibrationDue ?? ""}
-                    onChange={(e) => setField("nextCalibrationDue", e.target.value)}
+                    onChange={setNextCalibrationDueField}
                     className={drawerInputClass}
                   />
                 </EditableRow>
+                {!editing ? null : (
+                  <p className="text-[10px] text-muted-foreground -mt-2 mb-2 pl-1">
+                    Future compliance or certification due date.
+                  </p>
+                )}
                 <EditableRow
                   label="Calibration interval"
                   value={
@@ -1595,6 +1666,11 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                     className={drawerInputClass}
                   />
                 </EditableRow>
+                {!editing ? null : (
+                  <p className="text-[10px] text-muted-foreground -mt-2 mb-1 pl-1">
+                    Updates next calibration due when changed (defaults to 12 months).
+                  </p>
+                )}
               </DrawerSection>
             </>
           )}

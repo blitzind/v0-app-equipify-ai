@@ -44,6 +44,12 @@ import { fetchEquipmentScanViaApi } from "@/lib/equipment/equipment-scan-client-
 import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
 import { useEquipmentFormIndustryUi } from "@/hooks/use-equipment-form-industry-ui"
 import { useEquipmentTypes, equipmentCategorySelectOptions } from "@/lib/equipment-type-store"
+import { EquipmentDateInput } from "@/components/equipment/equipment-date-input"
+import {
+  applyNextCalibrationDueAutoFill,
+  normalizeOptionalEquipmentDateInput,
+  optionalEquipmentDateFieldError,
+} from "@/lib/equipment/equipment-date-fields"
 
 const STATUSES = ["Active", "Needs Service", "In Repair", "Out of Service"] as const
 type EquipmentStatus = (typeof STATUSES)[number]
@@ -85,7 +91,6 @@ const INITIAL_FORM = {
   nextServiceDue: "",
   nextCalibrationDue: "",
   calibrationIntervalMonths: "",
-  serviceInterval: "",
   status: "Active" as EquipmentStatus,
   notes: "",
 }
@@ -152,6 +157,7 @@ export function AIScanModal({
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const previewObjectUrlRef = useRef<string | null>(null)
   const scanTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([])
+  const nextCalibrationDueTouchedRef = useRef(false)
 
   const revokePreviewObjectUrl = useCallback(() => {
     const u = previewObjectUrlRef.current
@@ -483,10 +489,10 @@ export function AIScanModal({
           nextServiceDue: f.nextServiceDue,
           nextCalibrationDue: f.nextCalibrationDue,
           calibrationIntervalMonths: f.calibrationIntervalMonths,
-          serviceInterval: f.serviceInterval,
           status: "Active",
           notes: f.notes,
         })
+        nextCalibrationDueTouchedRef.current = Boolean(f.nextCalibrationDue?.trim())
         setDocumentCustomerHint(f.documentCustomerHint)
         setScanLabel("Extraction complete")
         setStep("review")
@@ -550,7 +556,18 @@ export function AIScanModal({
   )
 
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }))
+    setForm((prev) => {
+      let next: FormState = { ...prev, [key]: value }
+      if (key === "calibrationIntervalMonths" || key === "installDate") {
+        next = applyNextCalibrationDueAutoFill(next, nextCalibrationDueTouchedRef.current)
+      }
+      return next
+    })
+  }
+
+  function setNextCalibrationDue(value: string) {
+    nextCalibrationDueTouchedRef.current = true
+    setForm((prev) => ({ ...prev, nextCalibrationDue: value }))
   }
 
   async function handleSave() {
@@ -566,6 +583,22 @@ export function AIScanModal({
       })
       return
     }
+
+    const dateFields: Array<[string, string]> = [
+      ["Install date", form.installDate],
+      ["Warranty expiration", form.warrantyExpiration],
+      ["Last service date", form.lastServiceDate],
+      ["Next service due", form.nextServiceDue],
+      ["Next calibration due", form.nextCalibrationDue],
+    ]
+    for (const [label, raw] of dateFields) {
+      const err = optionalEquipmentDateFieldError(raw)
+      if (err) {
+        toast({ variant: "destructive", title: "Invalid date", description: `${label}: ${err}` })
+        return
+      }
+    }
+
     if (!organizationId) return
     if (toastRecordEligibilityBlocked(equipmentCreateEligibility)) return
 
@@ -604,11 +637,11 @@ export function AIScanModal({
       subcategory: form.subcategory.trim() || null,
       serial_number: form.serialNumber.trim() || null,
       status: statusMap[form.status],
-      install_date: form.installDate || null,
-      warranty_expires_at: form.warrantyExpiration || null,
-      last_service_at: form.lastServiceDate || null,
-      next_due_at: form.nextServiceDue || null,
-      next_calibration_due_at: form.nextCalibrationDue.trim() ? form.nextCalibrationDue.trim() : null,
+      install_date: normalizeOptionalEquipmentDateInput(form.installDate),
+      warranty_expires_at: normalizeOptionalEquipmentDateInput(form.warrantyExpiration),
+      last_service_at: normalizeOptionalEquipmentDateInput(form.lastServiceDate),
+      next_due_at: normalizeOptionalEquipmentDateInput(form.nextServiceDue),
+      next_calibration_due_at: normalizeOptionalEquipmentDateInput(form.nextCalibrationDue),
       calibration_interval_months: (() => {
         const n = parseInt(form.calibrationIntervalMonths.trim(), 10)
         return Number.isFinite(n) && n > 0 ? n : null
@@ -977,35 +1010,34 @@ export function AIScanModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <Label>Install date</Label>
-                    <Input type="date" value={form.installDate} onChange={(e) => setField("installDate", e.target.value)} />
+                    <EquipmentDateInput value={form.installDate} onChange={(v) => setField("installDate", v)} />
                   </div>
                   <div>
                     <Label>Warranty expiration</Label>
-                    <Input
-                      type="date"
+                    <EquipmentDateInput
                       value={form.warrantyExpiration}
-                      onChange={(e) => setField("warrantyExpiration", e.target.value)}
+                      onChange={(v) => setField("warrantyExpiration", v)}
                     />
                   </div>
                   <div>
                     <Label>Last service date</Label>
-                    <Input
-                      type="date"
+                    <EquipmentDateInput
                       value={form.lastServiceDate}
-                      onChange={(e) => setField("lastServiceDate", e.target.value)}
+                      onChange={(v) => setField("lastServiceDate", v)}
                     />
+                    <p className="text-[10px] text-muted-foreground mt-1">Optional.</p>
                   </div>
                   <div>
                     <Label>Next service due</Label>
-                    <Input type="date" value={form.nextServiceDue} onChange={(e) => setField("nextServiceDue", e.target.value)} />
+                    <EquipmentDateInput value={form.nextServiceDue} onChange={(v) => setField("nextServiceDue", v)} />
+                    <p className="text-[10px] text-muted-foreground mt-1">Maintenance or repair follow-up.</p>
                   </div>
                   <div>
-                    <Label>{ui.calibrationDueLabel}</Label>
-                    <Input
-                      type="date"
-                      value={form.nextCalibrationDue}
-                      onChange={(e) => setField("nextCalibrationDue", e.target.value)}
-                    />
+                    <Label>Next calibration due</Label>
+                    <EquipmentDateInput value={form.nextCalibrationDue} onChange={setNextCalibrationDue} />
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Future compliance or certification due date.
+                    </p>
                   </div>
                   <div>
                     <Label>Calibration interval (months)</Label>
@@ -1016,14 +1048,9 @@ export function AIScanModal({
                       value={form.calibrationIntervalMonths}
                       onChange={(e) => setField("calibrationIntervalMonths", e.target.value)}
                     />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label>Service interval</Label>
-                    <Input
-                      value={form.serviceInterval}
-                      onChange={(e) => setField("serviceInterval", e.target.value)}
-                      placeholder={ui.placeholders.serviceInterval}
-                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Fills next calibration due when interval is set (defaults to 12 months).
+                    </p>
                   </div>
                   <div>
                     <Label>Status</Label>

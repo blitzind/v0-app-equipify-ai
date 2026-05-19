@@ -26,6 +26,12 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { EquipmentDateInput } from "@/components/equipment/equipment-date-input"
+import {
+  applyNextCalibrationDueAutoFill,
+  normalizeOptionalEquipmentDateInput,
+  optionalEquipmentDateFieldError,
+} from "@/lib/equipment/equipment-date-fields"
 
 interface AddEquipmentModalProps {
   open: boolean
@@ -94,30 +100,11 @@ function validate(form: FormState): FormErrors {
   return errors
 }
 
-/** Normalize optional date fields for Postgres `date` columns (expects `YYYY-MM-DD`). */
-function normalizeOptionalDateInput(raw: string): string | null {
-  const s = raw.trim()
-  if (!s) return null
-  const iso = s.match(/^(\d{4}-\d{2}-\d{2})/)
-  if (iso) return iso[1]
-  const t = Date.parse(s)
-  if (!Number.isNaN(t)) {
-    const d = new Date(t)
-    const y = d.getFullYear()
-    const mo = String(d.getMonth() + 1).padStart(2, "0")
-    const da = String(d.getDate()).padStart(2, "0")
-    return `${y}-${mo}-${da}`
-  }
-  return null
-}
-
-/** Non-empty text that is not a valid calendar date (for field-level errors). */
-function optionalDateFieldError(raw: string): string | undefined {
-  const s = raw.trim()
-  if (!s) return undefined
-  return normalizeOptionalDateInput(s) === null
-    ? "Use a valid date (calendar or YYYY-MM-DD)."
-    : undefined
+function maybeAutoFillNextCalibrationDue(
+  form: FormState,
+  touched: boolean,
+): FormState {
+  return applyNextCalibrationDueAutoFill(form, touched)
 }
 
 function serverActionFailureMessage(e: unknown): string {
@@ -225,6 +212,11 @@ export function AddEquipmentModal({
   const [postSave, setPostSave] = useState<{ customerId: string; equipmentId: string } | null>(null)
   const [serviceSiteOptions, setServiceSiteOptions] = useState<Array<{ id: string; label: string }>>([])
   const saveSucceededRef = useRef(false)
+  const nextCalibrationDueTouchedRef = useRef(false)
+
+  useEffect(() => {
+    if (open) nextCalibrationDueTouchedRef.current = false
+  }, [open])
 
   useEffect(() => {
     if (!open || orgStatus !== "ready" || !activeOrgId) {
@@ -343,8 +335,20 @@ export function AddEquipmentModal({
   }, [open, equipmentTypesLoading, orgEquipmentTypes])
 
   function set(field: keyof FormState, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }))
+    setForm((prev) => {
+      let next: FormState = { ...prev, [field]: value }
+      if (field === "calibrationIntervalMonths" || field === "installDate") {
+        next = maybeAutoFillNextCalibrationDue(next, nextCalibrationDueTouchedRef.current)
+      }
+      return next
+    })
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }))
+  }
+
+  function setNextCalibrationDue(value: string) {
+    nextCalibrationDueTouchedRef.current = true
+    setForm((prev) => ({ ...prev, nextCalibrationDue: value }))
+    if (errors.nextCalibrationDue) setErrors((prev) => ({ ...prev, nextCalibrationDue: undefined }))
   }
 
   function handleClose() {
@@ -417,7 +421,7 @@ export function AddEquipmentModal({
       "nextCalibrationDue",
     ] as const satisfies readonly (keyof FormState)[]
     for (const key of dateKeys) {
-      const msg = optionalDateFieldError(form[key])
+      const msg = optionalEquipmentDateFieldError(form[key])
       if (msg) errs[key] = msg
     }
 
@@ -543,11 +547,11 @@ export function AddEquipmentModal({
           "Out of Service": "out_of_service",
         }
 
-        const installDate = normalizeOptionalDateInput(form.installDate)
-        const warrantyExpiration = normalizeOptionalDateInput(form.warrantyExpiration)
-        const lastServiceDate = normalizeOptionalDateInput(form.lastServiceDate)
-        const nextServiceDue = normalizeOptionalDateInput(form.nextServiceDue)
-        const nextCalibrationDue = normalizeOptionalDateInput(form.nextCalibrationDue)
+        const installDate = normalizeOptionalEquipmentDateInput(form.installDate)
+        const warrantyExpiration = normalizeOptionalEquipmentDateInput(form.warrantyExpiration)
+        const lastServiceDate = normalizeOptionalEquipmentDateInput(form.lastServiceDate)
+        const nextServiceDue = normalizeOptionalEquipmentDateInput(form.nextServiceDue)
+        const nextCalibrationDue = normalizeOptionalEquipmentDateInput(form.nextCalibrationDue)
 
         const insertPayload = {
           organization_id: activeOrgId,
@@ -926,21 +930,19 @@ export function AddEquipmentModal({
             {/* Dates row */}
             <div className="grid grid-cols-2 gap-4">
               <Field>
-                <Label>Install Date</Label>
-                <Input
-                  type="date"
+                <Label>Install date</Label>
+                <EquipmentDateInput
                   value={form.installDate}
-                  onChange={(e) => set("installDate", e.target.value)}
+                  onChange={(v) => set("installDate", v)}
                   aria-invalid={Boolean(errors.installDate)}
                 />
                 {errors.installDate && <p className="text-xs text-destructive mt-1">{errors.installDate}</p>}
               </Field>
               <Field>
-                <Label>Warranty Expiration</Label>
-                <Input
-                  type="date"
+                <Label>Warranty expiration</Label>
+                <EquipmentDateInput
                   value={form.warrantyExpiration}
-                  onChange={(e) => set("warrantyExpiration", e.target.value)}
+                  onChange={(v) => set("warrantyExpiration", v)}
                   aria-invalid={Boolean(errors.warrantyExpiration)}
                 />
                 {errors.warrantyExpiration && (
@@ -948,38 +950,40 @@ export function AddEquipmentModal({
                 )}
               </Field>
               <Field>
-                <Label>Last Service Date</Label>
-                <Input
-                  type="date"
+                <Label>Last service date</Label>
+                <EquipmentDateInput
                   value={form.lastServiceDate}
-                  onChange={(e) => set("lastServiceDate", e.target.value)}
+                  onChange={(v) => set("lastServiceDate", v)}
                   aria-invalid={Boolean(errors.lastServiceDate)}
                 />
+                <p className="text-[10px] text-muted-foreground mt-1">Optional.</p>
                 {errors.lastServiceDate && (
                   <p className="text-xs text-destructive mt-1">{errors.lastServiceDate}</p>
                 )}
               </Field>
               <Field>
-                <Label>Next Service Due</Label>
-                <Input
-                  type="date"
+                <Label>Next service due</Label>
+                <EquipmentDateInput
                   value={form.nextServiceDue}
-                  onChange={(e) => set("nextServiceDue", e.target.value)}
+                  onChange={(v) => set("nextServiceDue", v)}
                   aria-invalid={Boolean(errors.nextServiceDue)}
                 />
+                <p className="text-[10px] text-muted-foreground mt-1">Maintenance or repair follow-up.</p>
                 {errors.nextServiceDue && <p className="text-xs text-destructive mt-1">{errors.nextServiceDue}</p>}
               </Field>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <Field>
-                <Label>{ui.calibrationDueLabel}</Label>
-                <Input
-                  type="date"
+                <Label>Next calibration due</Label>
+                <EquipmentDateInput
                   value={form.nextCalibrationDue}
-                  onChange={(e) => set("nextCalibrationDue", e.target.value)}
+                  onChange={setNextCalibrationDue}
                   aria-invalid={Boolean(errors.nextCalibrationDue)}
                 />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Future compliance or certification due date.
+                </p>
                 {errors.nextCalibrationDue && (
                   <p className="text-xs text-destructive mt-1">{errors.nextCalibrationDue}</p>
                 )}
@@ -993,6 +997,9 @@ export function AddEquipmentModal({
                   value={form.calibrationIntervalMonths}
                   onChange={(e) => set("calibrationIntervalMonths", e.target.value)}
                 />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Fills next calibration due when interval is set (defaults to 12 months).
+                </p>
               </Field>
             </div>
 
