@@ -22,6 +22,11 @@ function LoginPageInner() {
       ? "This workspace has been archived. Contact support if you need access."
       : null
 
+  const oauthNotice =
+    searchParams.get("error") === "oauth"
+      ? "Google sign-in could not be completed. Try again or use your email and password."
+      : null
+
   async function signInWithEmailPassword(nextEmail: string, nextPassword: string) {
     const { error } = await supabase.auth.signInWithPassword({
       email: nextEmail,
@@ -46,7 +51,12 @@ function LoginPageInner() {
       await signInWithEmailPassword(email, password)
       router.push("/")
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to sign in."
+      const raw = err instanceof Error ? err.message : "Unable to sign in."
+      const message = raw.toLowerCase().includes("invalid login")
+        ? "Email or password is incorrect."
+        : raw.toLowerCase().includes("email not confirmed")
+          ? "Please confirm your email before signing in."
+          : "Unable to sign in. Check your email and password and try again."
       setError(message)
     } finally {
       setLoading(false)
@@ -130,13 +140,19 @@ function LoginPageInner() {
             type="button"
             onClick={() => void handleGoogleSignIn()}
             disabled={loading}
-            className="mb-4 w-full h-10 inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            className="w-full h-10 inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
             <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-[#4285F4] font-semibold text-xs border border-gray-200">
               G
             </span>
             Continue with Google
           </button>
+
+          <div className="my-6 flex items-center gap-3" aria-hidden>
+            <div className="h-px flex-1 bg-gray-200" />
+            <span className="text-xs font-medium text-gray-400 lowercase">or</span>
+            <div className="h-px flex-1 bg-gray-200" />
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -172,9 +188,9 @@ function LoginPageInner() {
                 </button>
               </div>
             </div>
-            {(error || archivedNotice) && (
+            {(error || archivedNotice || oauthNotice) && (
               <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
-                {error || archivedNotice}
+                {error || oauthNotice || archivedNotice}
               </p>
             )}
             <button type="submit" disabled={loading}

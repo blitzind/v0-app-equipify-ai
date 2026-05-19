@@ -25,6 +25,7 @@ export type CommunicationProvider =
   | "web_push"
   | "apns"
   | "fcm"
+  | "expo"
 
 export type RelatedEntityType =
   | "work_order"

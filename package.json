@@ -76,7 +76,8 @@
     "test:operational-timeline-intelligence": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-operational-timeline-intelligence.ts",
     "test:executive-operational-report": "tsx scripts/test-executive-operational-report.ts",
     "test:operational-workflow-recommendations": "tsx scripts/test-operational-workflow-recommendations.ts",
-    "test:aiden-prepared-workspace-tier-policy": "tsx scripts/test-aiden-prepared-workspace-tier-policy.ts"
+    "test:aiden-prepared-workspace-tier-policy": "tsx scripts/test-aiden-prepared-workspace-tier-policy.ts",
+    "test:technician-push": "tsx scripts/test-technician-push.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
