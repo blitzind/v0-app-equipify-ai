@@ -14,6 +14,7 @@ import type { AidenPreparedWorkspaceActionId } from "@/lib/aiden/actions/action-
 import { priceListAiResponseSchema } from "@/lib/catalog/import-types"
 import { aiImportResponseSchema } from "@/lib/calibration-templates/ai-import-schema"
 import { equipmentAiScanModelSchema } from "@/lib/equipment/equipment-ai-scan-schema"
+import { prospectBusinessCardScanModelSchema } from "@/lib/prospects/prospect-business-card-scan-schema"
 import { parseWithSchemaSafe } from "@/lib/ai/structured"
 import type { AiTaskId, AiTaskInput } from "@/lib/ai/types"
 import { WorkOrderServiceSummaryAiSchema } from "@/lib/work-orders/service-summary-ai-schema"
@@ -26,7 +27,10 @@ import {
 } from "@/lib/ai/trial-operational-snapshot"
 import type { WorkspaceIndustryKey } from "@/lib/workspace-industry-registry"
 
-type MockFileTaskId = Extract<AiTaskId, "catalog_extraction" | "certificate_cleanup" | "equipment_ai_scan">
+type MockFileTaskId = Extract<
+  AiTaskId,
+  "catalog_extraction" | "certificate_cleanup" | "equipment_ai_scan" | "prospect_business_card_scan"
+>
 
 export type MockStructuredOutputContext = {
   organizationId: string
@@ -531,6 +535,24 @@ export async function buildMockStructuredOutput<T>(params: {
       }
       break
     }
+    case "prospect_business_card_scan": {
+      rawObj = {
+        company_name: "Preview Lead Co.",
+        contact_name: "Alex Preview",
+        contact_email: "alex@preview.example",
+        contact_phone: "(555) 555-0199",
+        website: "preview.example",
+        address_line1: "100 Market St",
+        address_line2: "Suite 200",
+        city: "San Francisco",
+        state: "CA",
+        postal_code: "94105",
+        country: "USA",
+        notes: "Trial AI preview — illustrative business card values only.",
+        confidence: 0.55,
+      }
+      break
+    }
     default:
       rawObj = {
         message:
@@ -810,6 +832,22 @@ export async function buildMockFileExtractionOutput<T>(params: {
             supportingDetails: [`Simulated scan of ${params.byteLength} bytes.`],
             confidence: 0.5,
           })
+        : params.task === "prospect_business_card_scan"
+          ? prospectBusinessCardScanModelSchema.parse({
+              company_name: "Preview Lead Co.",
+              contact_name: "Alex Preview",
+              contact_email: "alex@preview.example",
+              contact_phone: "(555) 555-0199",
+              website: "preview.example",
+              address_line1: "100 Market St",
+              address_line2: null,
+              city: "San Francisco",
+              state: "CA",
+              postal_code: "94105",
+              country: "USA",
+              notes: `Trial preview — simulated scan of ${params.fileName}.`,
+              confidence: 0.5,
+            })
       : aiImportResponseSchema.parse({
           templateName: `Preview template (${params.fileName})`,
           equipmentCategory: "General",

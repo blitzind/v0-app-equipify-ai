@@ -60,7 +60,8 @@ function routerShouldUseCache(def: AiTaskDefinition, options: RunAiTaskOptions):
   if (
     def.id === "catalog_extraction" ||
     def.id === "certificate_cleanup" ||
-    def.id === "equipment_ai_scan"
+    def.id === "equipment_ai_scan" ||
+    def.id === "prospect_business_card_scan"
   ) {
     return Boolean(options.cacheKeyExtras?.file_sha256?.trim())
   }

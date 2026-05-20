@@ -74,7 +74,7 @@ function openAiChainFromTask(def: AiTaskDefinition): AiModelRef[] {
 
 export type StructuredFileTaskId = Extract<
   AiTaskId,
-  "catalog_extraction" | "certificate_cleanup" | "equipment_ai_scan"
+  "catalog_extraction" | "certificate_cleanup" | "equipment_ai_scan" | "prospect_business_card_scan"
 >
 
 export async function executeOpenAiStructuredFileExtraction<T>(args: {
@@ -509,7 +509,9 @@ export async function executeOpenAiStructuredFileExtraction<T>(args: {
         const aborted = err.name === "AbortError" || err.message.includes("aborted")
         lastError = aborted
           ? new Error(
-              args.task === "catalog_extraction" || args.task === "equipment_ai_scan"
+              args.task === "catalog_extraction" ||
+              args.task === "equipment_ai_scan" ||
+              args.task === "prospect_business_card_scan"
                 ? "AI extraction timed out. Try a smaller PDF or try again."
                 : "Import timed out. Try again with a smaller file.",
             )
@@ -567,7 +569,11 @@ export async function executeOpenAiStructuredFileExtraction<T>(args: {
       message: lastError?.message,
     })
 
-    if (args.task === "catalog_extraction" || args.task === "equipment_ai_scan") {
+    if (
+      args.task === "catalog_extraction" ||
+      args.task === "equipment_ai_scan" ||
+      args.task === "prospect_business_card_scan"
+    ) {
       throw lastError ?? new Error("AI extraction failed. Try a smaller PDF or try again.")
     }
     throw lastError ?? new Error("Import failed. Try again.")

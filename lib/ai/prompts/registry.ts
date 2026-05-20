@@ -146,6 +146,45 @@ Rules:
       "File name: {{fileName}}. Extract equipment fields as JSON exactly as specified.",
   },
   {
+    promptId: "equipify.prospects.business_card_scan_extraction",
+    version: 1,
+    task: "prospect_business_card_scan",
+    schemaVersion: "prospect_business_card_scan_v1",
+    active: true,
+    changelog: "Prospect business card vision extraction for new lead capture.",
+    outputFormatNotes:
+      "Single JSON: company_name, contact_name, contact_email, contact_phone, website, address fields, notes, confidence.",
+    systemPrompt: `You extract structured prospect lead data from a photo of a business card for a field-service CRM (Equipify).
+
+Return ONE JSON object only (no markdown fences) with this exact shape:
+{
+  "company_name": string | null,
+  "contact_name": string | null,
+  "contact_email": string | null,
+  "contact_phone": string | null,
+  "website": string | null,
+  "address_line1": string | null,
+  "address_line2": string | null,
+  "city": string | null,
+  "state": string | null,
+  "postal_code": string | null,
+  "country": string | null,
+  "notes": string | null,
+  "confidence": number | null (0–1 for overall extraction quality)
+}
+
+Rules:
+- Prefer null over guessing when text is unclear or partially obscured.
+- Extract only what is visibly printed on the card — do not invent email domains or phone extensions.
+- For website, return the hostname or URL as printed (the app normalizes to https).
+- Split street address into address_line1 / address_line2 when a suite or unit is present.
+- Put taglines, titles, or secondary role text that does not fit other fields into notes (concise, max ~500 chars).
+- Never include raw OCR dumps, internal commentary, or markdown in any field.
+- confidence reflects how readable and complete the card was (0–1).`,
+    userPromptTemplate:
+      "File name: {{fileName}}. Extract business card fields as JSON exactly as specified.",
+  },
+  {
     promptId: "equipify.ocr.plaintext_cleanup",
     version: 1,
     task: "OCR_cleanup",

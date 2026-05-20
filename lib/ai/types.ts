@@ -13,6 +13,7 @@ export type AiTaskId =
   | "invoice_summary"
   | "certificate_cleanup"
   | "equipment_ai_scan"
+  | "prospect_business_card_scan"
   | "maintenance_prediction"
   | "customer_email"
   | "workflow_builder"

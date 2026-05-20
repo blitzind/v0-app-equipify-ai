@@ -12,7 +12,11 @@
 
 import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import {
+  createServerSupabaseClient,
+  createSupabaseClientWithAccessToken,
+  getBearerAccessToken,
+} from "@/lib/supabase/server"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { hasActiveOrganizationSupportSession } from "@/lib/server/organization-support-session"
 import {
@@ -292,4 +296,114 @@ export async function requireOrgPermissionForServerAction(
     return { ok: false, error: message }
   }
   return { ok: true, userId: res.userId, supabase: res.supabase }
+}
+
+type ResolvedRequestAuth =
+  | { ok: true; supabase: SupabaseClient; userId: string; userEmail: string | null }
+  | { ok: false; error: NextResponse }
+
+async function resolveAuthedSupabaseFromRequest(request: Request): Promise<ResolvedRequestAuth> {
+  const bearer = getBearerAccessToken(request)
+  const cookieClient = await createServerSupabaseClient()
+
+  if (bearer) {
+    const { data, error } = await cookieClient.auth.getUser(bearer)
+    if (error || !data.user?.id) {
+      return { ok: false, error: jsonError("Sign in required.", 401, "unauthorized") }
+    }
+    return {
+      ok: true,
+      supabase: createSupabaseClientWithAccessToken(bearer),
+      userId: data.user.id,
+      userEmail: data.user.email ?? null,
+    }
+  }
+
+  const {
+    data: { user },
+  } = await cookieClient.auth.getUser()
+  if (!user?.id) {
+    return { ok: false, error: jsonError("Sign in required.", 401, "unauthorized") }
+  }
+  return {
+    ok: true,
+    supabase: cookieClient,
+    userId: user.id,
+    userEmail: user.email ?? null,
+  }
+}
+
+/**
+ * Same as {@link requireOrgPermission}, but accepts cookie or Bearer auth (mobile).
+ */
+export async function requireOrgPermissionFromRequest(
+  request: Request,
+  organizationId: string,
+  requiredCapabilities: OrgPermissionKey | OrgPermissionKey[],
+): Promise<Success | { error: NextResponse }> {
+  if (!UUID_RE.test(organizationId)) {
+    return { error: jsonError("Invalid organization.", 400, "bad_request") }
+  }
+
+  const required = Array.isArray(requiredCapabilities)
+    ? requiredCapabilities
+    : [requiredCapabilities]
+
+  const auth = await resolveAuthedSupabaseFromRequest(request)
+  if (!auth.ok) return { error: auth.error }
+
+  const { supabase, userId, userEmail } = auth
+  const platformAdmin = Boolean(userEmail && isPlatformAdminEmail(userEmail))
+
+  const { data: mem, error: memErr } = await supabase
+    .from("organization_members")
+    .select("role, permission_profile, permissions_json")
+    .eq("organization_id", organizationId)
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .maybeSingle()
+
+  if (memErr) {
+    return { error: jsonError(memErr.message, 500, "query_failed") }
+  }
+
+  const rawRole = (mem as { role?: string } | null)?.role?.trim() ?? null
+  let effectiveRawRole = rawRole
+  if (!effectiveRawRole && (await hasActiveOrganizationSupportSession(supabase, userId, organizationId))) {
+    effectiveRawRole = "owner"
+  }
+  const role = normalizeOrgMemberRole(effectiveRawRole)
+  const permissions = getEffectiveOrgPermissions({
+    role,
+    permissionProfile: mem
+      ? ((mem as { permission_profile?: string | null }).permission_profile ?? null)
+      : null,
+    permissionsJson: mem ? ((mem as { permissions_json?: unknown }).permissions_json ?? null) : null,
+  })
+
+  if (!platformAdmin) {
+    if (!effectiveRawRole) {
+      return {
+        error: jsonError("You are not a member of this organization.", 403),
+      }
+    }
+    const missing = required.find((cap) => !hasOrgPermission(permissions, cap))
+    if (missing) {
+      return {
+        error: jsonError(
+          `Your role does not have permission for "${missing}".`,
+          403,
+          "insufficient_permissions",
+        ),
+      }
+    }
+  }
+
+  return {
+    userId,
+    supabase,
+    role: effectiveRawRole,
+    permissions: platformAdmin ? getOrgPermissionsForRole("owner") : permissions,
+    isPlatformAdmin: platformAdmin,
+  }
 }
