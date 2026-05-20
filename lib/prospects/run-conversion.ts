@@ -5,6 +5,7 @@ import { requireCanCreateRecord } from "@/lib/billing/server-guard"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { insertOrgQuote } from "@/lib/org-quotes-invoices/repository"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
+import { prospectHasResolvableAddress } from "@/lib/prospects/prospect-address"
 import { optionalString } from "@/lib/prospects/server-helpers"
 import { recordProspectStatusChange } from "@/lib/prospects/status-events"
 import {
@@ -29,6 +30,12 @@ type ProspectRow = {
   contact_name: string | null
   contact_email: string | null
   contact_phone: string | null
+  address_line1: string | null
+  address_line2: string | null
+  city: string | null
+  state: string | null
+  postal_code: string | null
+  country: string | null
   estimated_value_cents: number | null
   notes: string | null
   converted_customer_id: string | null
@@ -202,6 +209,79 @@ async function ensureCustomerForProspect(args: {
   }
 }
 
+async function maybeCreateCustomerLocationFromProspect(args: {
+  supabase: SupabaseClient
+  organizationId: string
+  customerId: string
+  prospect: ProspectRow
+  companyName: string
+  userId: string
+}): Promise<void> {
+  const { supabase, organizationId, customerId, prospect, companyName, userId } = args
+  if (!prospectHasResolvableAddress(prospect)) return
+
+  const { count } = await supabase
+    .from("customer_locations")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("customer_id", customerId)
+    .is("archived_at", null)
+
+  if ((count ?? 0) > 0) return
+
+  let svc
+  try {
+    svc = createServiceRoleSupabaseClient()
+  } catch {
+    return
+  }
+
+  const name = `${companyName.trim()} — Site`.slice(0, 200)
+  const address = optionalString(prospect.address_line1, 400)
+  const city = optionalString(prospect.city, 120)
+  const state = optionalString(prospect.state, 80)
+  const zip = optionalString(prospect.postal_code, 32)
+  if (!address || !city || !state || !zip) return
+
+  const row = {
+    organization_id: organizationId,
+    customer_id: customerId,
+    name,
+    address_line1: address,
+    address_line2: optionalString(prospect.address_line2, 400),
+    city,
+    state,
+    postal_code: zip,
+    phone: optionalString(prospect.contact_phone, 64),
+    contact_person: optionalString(prospect.contact_name, 200),
+    notes: optionalString(prospect.notes, 4000),
+    is_default: true,
+    archived_at: null as string | null,
+  }
+
+  const { data: inserted, error } = await svc.from("customer_locations").insert(row).select("id").maybeSingle()
+  if (error || !inserted?.id) return
+
+  await logCommunicationEvent(supabase, {
+    organizationId,
+    channel: "system",
+    direction: "outbound",
+    eventType: "prospect_location_added",
+    title: `Service location added · ${name}`,
+    summary: `Created a default customer location from prospect address for ${companyName}.`,
+    audience: "organization",
+    countsTowardUnread: false,
+    deliveryStatus: "sent",
+    recipientKind: "none",
+    relatedEntityType: "customer",
+    relatedEntityId: customerId,
+    provider: "manual",
+    metadata: { customer_location_id: inserted.id, customer_id: customerId, source: "prospect_convert" },
+    sentAt: new Date().toISOString(),
+    createdBy: userId,
+  })
+}
+
 export async function runProspectConversion(args: {
   supabase: SupabaseClient
   userId: string
@@ -229,7 +309,7 @@ export async function runProspectConversion(args: {
   const { data: prospect, error: lookupError } = await supabase
     .from("prospects")
     .select(
-      "id, status, company_name, contact_name, contact_email, contact_phone, estimated_value_cents, notes, converted_customer_id",
+      "id, status, company_name, contact_name, contact_email, contact_phone, address_line1, address_line2, city, state, postal_code, country, estimated_value_cents, notes, converted_customer_id",
     )
     .eq("organization_id", organizationId)
     .eq("id", prospectId)
@@ -272,6 +352,15 @@ export async function runProspectConversion(args: {
     if (stampError) {
       return { ok: false, message: stampError.message, httpStatus: 500, code: "update_failed" }
     }
+
+    await maybeCreateCustomerLocationFromProspect({
+      supabase,
+      organizationId,
+      customerId: ensured.customerId,
+      prospect: p,
+      companyName: company,
+      userId,
+    })
 
     if (p.status !== "won") {
       await recordProspectStatusChange({

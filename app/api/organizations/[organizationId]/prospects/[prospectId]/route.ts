@@ -5,6 +5,7 @@ import {
   PROSPECT_SELECT_COLUMNS,
   optionalString,
   optionalUuid,
+  optionalWebsite,
   parseOptionalCents,
   parseOptionalIso,
 } from "@/lib/prospects/server-helpers"
@@ -61,6 +62,18 @@ export async function PATCH(
   if ("contact_phone" in body) update.contact_phone = optionalString(body.contact_phone)
   if ("lead_source" in body) update.lead_source = optionalString(body.lead_source)
   if ("notes" in body) update.notes = optionalString(body.notes)
+
+  if ("website" in body) {
+    const website = optionalWebsite(body.website)
+    if (website === "invalid") return jsonError("website must be a valid URL.", 400)
+    update.website = website
+  }
+  if ("address_line1" in body) update.address_line1 = optionalString(body.address_line1, 400)
+  if ("address_line2" in body) update.address_line2 = optionalString(body.address_line2, 400)
+  if ("city" in body) update.city = optionalString(body.city, 120)
+  if ("state" in body) update.state = optionalString(body.state, 80)
+  if ("postal_code" in body) update.postal_code = optionalString(body.postal_code, 32)
+  if ("country" in body) update.country = optionalString(body.country, 120)
 
   if ("lost_reason" in body) update.lost_reason = optionalString(body.lost_reason, 2000)
 

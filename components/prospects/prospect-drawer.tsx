@@ -54,6 +54,7 @@ import {
   prospectStatusBadgeClasses,
   formatDateOnly,
 } from "@/lib/prospects/format"
+import { formatProspectAddressSummary } from "@/lib/prospects/prospect-address"
 import { ProspectFormDialog } from "@/components/prospects/prospect-form-dialog"
 import { LogFollowUpDialog } from "@/components/prospects/log-follow-up-dialog"
 import { ConvertProspectDialog } from "@/components/prospects/convert-prospect-dialog"
@@ -172,6 +173,7 @@ export function ProspectDrawer({
     )
   }
 
+  const addressSummary = formatProspectAddressSummary(prospect)
   const bucket = followUpBucketFor(prospect.next_follow_up_at)
   const followUpTone =
     bucket === "overdue"
@@ -462,6 +464,22 @@ export function ProspectDrawer({
                   {prospect.contact_phone}
                 </a>
               </li>
+            ) : null}
+            {prospect.website ? (
+              <li className="flex items-center gap-2">
+                <span className="text-muted-foreground text-xs">Web</span>
+                <a
+                  className="text-primary hover:underline break-all"
+                  href={prospect.website}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {prospect.website}
+                </a>
+              </li>
+            ) : null}
+            {addressSummary ? (
+              <li className="text-muted-foreground whitespace-pre-wrap">{addressSummary}</li>
             ) : null}
           </ul>
         </DrawerSection>

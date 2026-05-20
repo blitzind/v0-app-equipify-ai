@@ -65,6 +65,13 @@ export type ProspectRow = {
   contact_email: string | null
   contact_phone: string | null
   lead_source: string | null
+  website: string | null
+  address_line1: string | null
+  address_line2: string | null
+  city: string | null
+  state: string | null
+  postal_code: string | null
+  country: string | null
   status: ProspectStatus
   next_follow_up_at: string | null
   last_contacted_at: string | null

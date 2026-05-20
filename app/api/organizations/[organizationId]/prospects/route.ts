@@ -7,6 +7,7 @@ import {
   PROSPECT_SELECT_COLUMNS,
   optionalString,
   optionalUuid,
+  optionalWebsite,
   parseOptionalCents,
   parseOptionalIso,
 } from "@/lib/prospects/server-helpers"
@@ -133,6 +134,13 @@ export async function POST(
     next_follow_up_at?: string | null
     estimated_value_cents?: number | null
     notes?: string | null
+    website?: string | null
+    address_line1?: string | null
+    address_line2?: string | null
+    city?: string | null
+    state?: string | null
+    postal_code?: string | null
+    country?: string | null
     assigned_to_user_id?: string | null
   }
   try {
@@ -159,6 +167,9 @@ export async function POST(
   const assignedTo = optionalUuid(body.assigned_to_user_id)
   if (assignedTo === "invalid") return jsonError("assigned_to_user_id must be a valid UUID.", 400)
 
+  const website = optionalWebsite(body.website)
+  if (website === "invalid") return jsonError("website must be a valid URL.", 400)
+
   const insertRow = {
     organization_id: organizationId,
     company_name: company,
@@ -166,6 +177,13 @@ export async function POST(
     contact_email: optionalString(body.contact_email),
     contact_phone: optionalString(body.contact_phone),
     lead_source: optionalString(body.lead_source),
+    website,
+    address_line1: optionalString(body.address_line1, 400),
+    address_line2: optionalString(body.address_line2, 400),
+    city: optionalString(body.city, 120),
+    state: optionalString(body.state, 80),
+    postal_code: optionalString(body.postal_code, 32),
+    country: optionalString(body.country, 120),
     status,
     next_follow_up_at: followUp,
     estimated_value_cents: value,

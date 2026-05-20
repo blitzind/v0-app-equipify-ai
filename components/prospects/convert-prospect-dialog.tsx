@@ -92,10 +92,10 @@ export function ConvertProspectDialog({
     setPhone(prospect.contact_phone ?? "")
     setTarget("customer")
     setLocName(prospect.company_name ? `${prospect.company_name} — Site` : "")
-    setLocAddress("")
-    setLocCity("")
-    setLocState("")
-    setLocZip("")
+    setLocAddress(prospect.address_line1 ?? "")
+    setLocCity(prospect.city ?? "")
+    setLocState(prospect.state ?? "")
+    setLocZip(prospect.postal_code ?? "")
   }, [open, prospect])
 
   async function handleConvert() {

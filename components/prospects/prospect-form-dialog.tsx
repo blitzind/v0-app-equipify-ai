@@ -49,6 +49,13 @@ type FormState = {
   contact_email: string
   contact_phone: string
   lead_source: string
+  website: string
+  address_line1: string
+  address_line2: string
+  city: string
+  state: string
+  postal_code: string
+  country: string
   status: ProspectStatus
   next_follow_up_at: string
   estimated_value_dollars: string
@@ -63,6 +70,13 @@ const EMPTY: FormState = {
   contact_email: "",
   contact_phone: "",
   lead_source: "",
+  website: "",
+  address_line1: "",
+  address_line2: "",
+  city: "",
+  state: "",
+  postal_code: "",
+  country: "",
   status: "new",
   next_follow_up_at: "",
   estimated_value_dollars: "",
@@ -102,6 +116,13 @@ export function ProspectFormDialog({
         contact_email: prospect.contact_email ?? "",
         contact_phone: prospect.contact_phone ?? "",
         lead_source: prospect.lead_source ?? "",
+        website: prospect.website ?? "",
+        address_line1: prospect.address_line1 ?? "",
+        address_line2: prospect.address_line2 ?? "",
+        city: prospect.city ?? "",
+        state: prospect.state ?? "",
+        postal_code: prospect.postal_code ?? "",
+        country: prospect.country ?? "",
         status: prospect.status,
         next_follow_up_at: toLocalDateInput(prospect.next_follow_up_at),
         estimated_value_dollars:
@@ -147,6 +168,13 @@ export function ProspectFormDialog({
       contact_email: form.contact_email.trim() || null,
       contact_phone: form.contact_phone.trim() || null,
       lead_source: form.lead_source.trim() || null,
+      website: form.website.trim() || null,
+      address_line1: form.address_line1.trim() || null,
+      address_line2: form.address_line2.trim() || null,
+      city: form.city.trim() || null,
+      state: form.state.trim() || null,
+      postal_code: form.postal_code.trim() || null,
+      country: form.country.trim() || null,
       status: form.status,
       next_follow_up_at: followUpIso,
       estimated_value_cents: cents,
@@ -239,6 +267,74 @@ export function ProspectFormDialog({
               value={form.contact_phone}
               onChange={(e) => set("contact_phone", e.target.value)}
               placeholder="(555) 555-1212"
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label className="text-xs">Website</Label>
+            <Input
+              value={form.website}
+              onChange={(e) => set("website", e.target.value)}
+              placeholder="example.com"
+              type="url"
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label className="text-xs font-medium">Address</Label>
+            <p className="text-[11px] text-muted-foreground">Optional — used for maps on mobile and convert prefill.</p>
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label className="text-xs">Street address</Label>
+            <Input
+              value={form.address_line1}
+              onChange={(e) => set("address_line1", e.target.value)}
+              placeholder="1200 Summit Blvd"
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label className="text-xs">Address line 2</Label>
+            <Input
+              value={form.address_line2}
+              onChange={(e) => set("address_line2", e.target.value)}
+              placeholder="Suite 200"
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">City</Label>
+            <Input
+              value={form.city}
+              onChange={(e) => set("city", e.target.value)}
+              placeholder="Denver"
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">State</Label>
+            <Input
+              value={form.state}
+              onChange={(e) => set("state", e.target.value)}
+              placeholder="CO"
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">ZIP / postal code</Label>
+            <Input
+              value={form.postal_code}
+              onChange={(e) => set("postal_code", e.target.value)}
+              placeholder="80202"
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label className="text-xs">Country</Label>
+            <Input
+              value={form.country}
+              onChange={(e) => set("country", e.target.value)}
+              placeholder="United States"
               className="h-9 text-sm"
             />
           </div>

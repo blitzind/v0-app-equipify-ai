@@ -15,6 +15,27 @@ export function optionalString(value: unknown, maxLength = 4000): string | null 
   return trimmed.length === 0 ? null : trimmed.slice(0, maxLength)
 }
 
+/** Normalizes optional website input to https URL for storage. */
+export function normalizeProspectWebsite(raw: string): string | null | "invalid" {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+  try {
+    const url = new URL(withScheme)
+    if (url.protocol !== "http:" && url.protocol !== "https:") return "invalid"
+    if (!url.hostname) return "invalid"
+    return url.href
+  } catch {
+    return "invalid"
+  }
+}
+
+export function optionalWebsite(value: unknown): string | null | "invalid" {
+  if (value === undefined || value === null) return null
+  if (typeof value !== "string") return "invalid"
+  return normalizeProspectWebsite(value)
+}
+
 export function parseOptionalIso(value: unknown): string | null | "invalid" {
   if (value === undefined || value === null) return null
   if (typeof value !== "string") return "invalid"
@@ -46,4 +67,4 @@ export function optionalUuid(value: unknown): string | null | "invalid" {
 }
 
 export const PROSPECT_SELECT_COLUMNS =
-  "id, organization_id, company_name, contact_name, contact_email, contact_phone, lead_source, status, next_follow_up_at, last_contacted_at, estimated_value_cents, notes, lost_reason, converted_customer_id, converted_at, archived_at, assigned_to_user_id, last_contacted_by_user_id, next_action_owner_user_id, created_at, updated_at"
+  "id, organization_id, company_name, contact_name, contact_email, contact_phone, lead_source, website, address_line1, address_line2, city, state, postal_code, country, status, next_follow_up_at, last_contacted_at, estimated_value_cents, notes, lost_reason, converted_customer_id, converted_at, archived_at, assigned_to_user_id, last_contacted_by_user_id, next_action_owner_user_id, created_at, updated_at"
