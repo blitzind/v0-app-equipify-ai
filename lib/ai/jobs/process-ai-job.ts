@@ -20,6 +20,7 @@ import type { AiJobStatus } from "@/lib/ai/jobs/types"
 import type { PriceListImportJobInput, PriceListImportJobResult } from "@/lib/ai/jobs/types"
 import { getPromptForTask, promptMetadataForLog } from "@/lib/ai/prompts"
 import { parseStoredPriceListPayload } from "@/lib/catalog/parse-stored-payload"
+import { normalizeCatalogImportPayload } from "@/lib/catalog/catalog-import-manufacturer"
 import { toSafeAiJobPayload } from "@/lib/ai/redaction"
 import { logCatalogCsvImport } from "@/lib/catalog/csv-import-debug-log"
 import { FAILURE_COPY } from "@/lib/failure-states/copy"
@@ -487,6 +488,7 @@ export async function runPriceListImportExtractionJob(params: {
       ? (payload.manufacturerName ?? input.manufacturerName)
       : (payload.manufacturerName ?? (imp0.manufacturer_name as string | null))
   payload.manufacturerName = mergedMfg ?? null
+  payload = normalizeCatalogImportPayload(payload)
 
   if (input.kind === "price_list_import_reextract" && prev?.rows?.length) {
     const prevByPart = new Map(

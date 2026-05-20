@@ -1,5 +1,6 @@
 import type { StoredPriceListPayload, ExtractedCatalogRow } from "@/lib/catalog/import-types"
 import { CATALOG_ITEM_TYPES, CATALOG_STATUSES } from "@/lib/catalog/import-types"
+import { normalizeCatalogImportPayload } from "@/lib/catalog/catalog-import-manufacturer"
 
 function isItemType(s: string): s is ExtractedCatalogRow["itemType"] {
   return (CATALOG_ITEM_TYPES as readonly string[]).includes(s)
@@ -44,11 +45,11 @@ export function parseStoredPriceListPayload(raw: unknown): StoredPriceListPayloa
     })
   }
 
-  return {
+  return normalizeCatalogImportPayload({
     version: 1,
     manufacturerName: typeof o.manufacturerName === "string" ? o.manufacturerName : null,
     effectiveDate: typeof o.effectiveDate === "string" ? o.effectiveDate : null,
     warnings: Array.isArray(o.warnings) ? o.warnings.filter((w): w is string => typeof w === "string") : [],
     rows,
-  }
+  })
 }

@@ -1,9 +1,13 @@
 import { randomUUID } from "crypto"
-import { pickHeader } from "@/lib/migration-imports/map-columns"
 import { parseCsvText } from "@/lib/migration-imports/parse-csv"
 import {
-  pickCatalogImportPriceColumns,
-} from "@/lib/catalog/catalog-import-column-map"
+  inferCatalogImportManufacturerFromColumn,
+  normalizeCatalogImportPayload,
+  sanitizeCatalogImportManufacturerName,
+} from "@/lib/catalog/catalog-import-manufacturer"
+import {
+  pickCatalogImportColumnHeaders,
+} from "@/lib/catalog/catalog-import-header-map"
 import {
   mapAiRowToExtracted,
   type ExtractedCatalogRow,
@@ -11,62 +15,6 @@ import {
 } from "@/lib/catalog/import-types"
 import { PRICE_LIST_CSV_MAX_ROWS } from "@/lib/catalog/price-list-file-validation"
 import { logCatalogCsvImport } from "@/lib/catalog/csv-import-debug-log"
-
-const PART_ALIASES = [
-  "part_number",
-  "part number",
-  "part no",
-  "part #",
-  "part#",
-  "sku",
-  "item #/sku",
-  "item sku",
-  "item number",
-  "item no",
-  "item #",
-  "catalog number",
-  "catalog #",
-  "model number",
-  "model #",
-  "product code",
-  "product number",
-  "item code",
-]
-
-const NAME_ALIASES = [
-  "name",
-  "item name",
-  "invoice item name",
-  "product name",
-  "title",
-  "product",
-  "item",
-  "invoice item",
-]
-
-const DESC_ALIASES = ["description", "desc", "details", "long description", "product description"]
-
-const CATEGORY_ALIASES = [
-  "category",
-  "product category",
-  "group",
-  "department",
-  "class",
-  "family",
-  "product group",
-]
-
-const MFG_ALIASES = ["manufacturer", "mfg", "brand", "make"]
-
-const VENDOR_ALIASES = ["vendor", "supplier", "distributor"]
-
-const TYPE_ALIASES = ["type", "item type", "product type"]
-
-const UNIT_ALIASES = ["unit", "uom", "unit of measure", "units"]
-
-const NOTES_ALIASES = ["notes", "note", "comment", "remarks"]
-
-const EFFECTIVE_ALIASES = ["effective date", "price date", "as of", "effective", "valid from"]
 
 function cell(row: Record<string, string>, header: string | undefined): string {
   if (!header) return ""
@@ -92,18 +40,22 @@ export function extractPriceListPayloadFromCsv(args: {
     throw new Error("The CSV file is empty.")
   }
 
-  const partCol = pickHeader(parsed.headers, PART_ALIASES)
-  const skuCol = pickHeader(parsed.headers, ["sku", "item sku"])
-  const nameCol = pickHeader(parsed.headers, NAME_ALIASES)
-  const descCol = pickHeader(parsed.headers, DESC_ALIASES)
-  const { listPriceCol, costCol } = pickCatalogImportPriceColumns(parsed.headers)
-  const categoryCol = pickHeader(parsed.headers, CATEGORY_ALIASES)
-  const mfgCol = pickHeader(parsed.headers, MFG_ALIASES)
-  const vendorCol = pickHeader(parsed.headers, VENDOR_ALIASES)
-  const typeCol = pickHeader(parsed.headers, TYPE_ALIASES)
-  const unitCol = pickHeader(parsed.headers, UNIT_ALIASES)
-  const notesCol = pickHeader(parsed.headers, NOTES_ALIASES)
-  const effectiveCol = pickHeader(parsed.headers, EFFECTIVE_ALIASES)
+  const columns = pickCatalogImportColumnHeaders(parsed.headers)
+  const {
+    partCol,
+    skuCol,
+    nameCol,
+    descCol,
+    listPriceCol,
+    costCol,
+    categoryCol,
+    mfgCol,
+    vendorCol,
+    typeCol,
+    unitCol,
+    notesCol,
+    effectiveCol,
+  } = columns
 
   logCatalogCsvImport("csv_headers_mapped", {
     fileName: args.fileName,
@@ -113,6 +65,7 @@ export function extractPriceListPayloadFromCsv(args: {
       part: partCol ?? null,
       name: nameCol ?? null,
       description: descCol ?? null,
+      manufacturer: mfgCol ?? null,
       listPrice: listPriceCol ?? null,
       cost: costCol ?? null,
     },
@@ -130,7 +83,7 @@ export function extractPriceListPayloadFromCsv(args: {
 
   if (!listPriceCol && !costCol) {
     warnings.push(
-      "No price columns were detected (e.g. List Price, Unit Price, Unit Cost). Prices were left blank.",
+      "No price columns were detected (e.g. List Price, Unit Cost, Cost Price). Prices were left blank.",
     )
   } else if (!listPriceCol) {
     warnings.push("No list price column was detected (e.g. List Price, Unit Price). List prices were left blank.")
@@ -144,12 +97,15 @@ export function extractPriceListPayloadFromCsv(args: {
   }
 
   const rows: ExtractedCatalogRow[] = []
+  const descriptionValues: string[] = []
 
   for (const row of parsed.rows) {
     if (isBlankRow(row)) continue
 
     const partNumber = cell(row, partCol) || cell(row, skuCol && skuCol !== partCol ? skuCol : undefined)
     const description = cell(row, descCol)
+    if (description) descriptionValues.push(description)
+
     let name = cell(row, nameCol)
     if (!name && description) name = description
     if (!name && partNumber) name = partNumber
@@ -205,23 +161,24 @@ export function extractPriceListPayloadFromCsv(args: {
     extractionRowCount: rows.length,
   })
 
-  let manufacturerName = args.manufacturerNameHint?.trim() || null
+  let manufacturerName: string | null = null
+  const hintSanitized = sanitizeCatalogImportManufacturerName(args.manufacturerNameHint, {
+    descriptionValues,
+    nameValues: rows.map((r) => r.name),
+  })
+  if (hintSanitized.warning) warnings.push(hintSanitized.warning)
+  manufacturerName = hintSanitized.value
+
   if (!manufacturerName && mfgCol) {
-    const counts = new Map<string, number>()
-    for (const row of parsed.rows) {
-      const v = cell(row, mfgCol)
-      if (!v) continue
-      counts.set(v, (counts.get(v) ?? 0) + 1)
-    }
-    let best = ""
-    let bestN = 0
-    for (const [k, n] of counts) {
-      if (n > bestN) {
-        best = k
-        bestN = n
-      }
-    }
-    manufacturerName = best || null
+    const inferred = inferCatalogImportManufacturerFromColumn({
+      rows: parsed.rows,
+      manufacturerColumn: mfgCol,
+      descriptionColumn: descCol,
+      notesColumn: notesCol,
+      cell,
+    })
+    if (inferred.warning) warnings.push(inferred.warning)
+    manufacturerName = inferred.value
   }
 
   let effectiveDate: string | null = null
@@ -235,11 +192,11 @@ export function extractPriceListPayloadFromCsv(args: {
     }
   }
 
-  return {
+  return normalizeCatalogImportPayload({
     version: 1,
     manufacturerName,
     effectiveDate,
     warnings,
     rows,
-  }
+  })
 }

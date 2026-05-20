@@ -10,6 +10,7 @@ import {
   type ExtractedCatalogRow,
   type StoredPriceListPayload,
 } from "@/lib/catalog/import-types"
+import { normalizeCatalogImportPayload } from "@/lib/catalog/catalog-import-manufacturer"
 
 export class PriceListExtractConfigError extends Error {
   constructor(message: string) {
@@ -46,13 +47,13 @@ export async function extractPriceListPayloadFromPdf(args: {
       mapAiRowToExtracted(extractedCatalogRowSchema.parse(r), randomUUID()),
     )
 
-    return {
+    return normalizeCatalogImportPayload({
       version: 1,
       manufacturerName: parsed.manufacturerName?.trim() || null,
       effectiveDate: parsed.effectiveDate?.trim() || null,
       warnings: parsed.warnings ?? [],
       rows,
-    }
+    })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     if (msg.includes("OPENAI_API_KEY") || msg.includes("not configured")) {

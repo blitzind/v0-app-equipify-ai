@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getActiveCatalogJobForImport } from "@/lib/ai/jobs/active-catalog-job"
 import { parseStoredPriceListPayload } from "@/lib/catalog/parse-stored-payload"
+import { normalizeCatalogImportPayload } from "@/lib/catalog/catalog-import-manufacturer"
 import type { StoredPriceListPayload } from "@/lib/catalog/import-types"
 import { requireOrgCatalogWrite, requireOrgMemberRead } from "@/lib/catalog/require-org-catalog-write"
 import { maybeCatalogSchemaErrorResponse } from "@/lib/supabase/catalog-schema-errors"
@@ -76,6 +77,8 @@ export async function PATCH(
     return NextResponse.json({ error: "invalid_payload", message: "Provide payload.version 1 with rows[]." }, { status: 400 })
   }
 
+  const normalizedPayload = normalizeCatalogImportPayload(payload)
+
   const { data: existing, error: loadErr } = await gate.svc
     .from("price_list_imports")
     .select("id, status")
@@ -102,8 +105,8 @@ export async function PATCH(
   const { error: upErr } = await gate.svc
     .from("price_list_imports")
     .update({
-      extracted_json: payload as unknown as Record<string, unknown>,
-      manufacturer_name: payload.manufacturerName ?? null,
+      extracted_json: normalizedPayload as unknown as Record<string, unknown>,
+      manufacturer_name: normalizedPayload.manufacturerName ?? null,
       status: existing.status === "failed" ? "needs_review" : existing.status,
       updated_at: new Date().toISOString(),
     })
