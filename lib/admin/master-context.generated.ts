@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 462,
+  apiRouteHandlers: 463,
   sqlMigrations: 200,
   dashboardPages: 65,
   componentsTsx: 331,
-  libTsFiles: 942,
+  libTsFiles: 943,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **462** |
+| API route handlers (\`app/api/**/route.ts\`) | **463** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **200** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
 | \`components/**/*.tsx\` | **331** |
-| \`lib/**/*.ts\` | **942** |
+| \`lib/**/*.ts\` | **943** |
 
 ### Vercel crons
 
@@ -287,6 +287,7 @@ organizations/[organizationId]/customers/[customerId]/locations/route.ts
 organizations/[organizationId]/customers/[customerId]/portal-certificate-release/route.ts
 organizations/[organizationId]/customers/[customerId]/portal-consolidated-documents/route.ts
 organizations/[organizationId]/customers/bulk-archive/route.ts
+organizations/[organizationId]/customers/business-card-scan/route.ts
 organizations/[organizationId]/equipment-warranties/[warrantyId]/route.ts
 organizations/[organizationId]/equipment-warranties/route.ts
 organizations/[organizationId]/equipment/ai-scan/route.ts
