@@ -31,6 +31,8 @@ import { blitzpayInvoicePaymentMetadata } from "@/lib/blitzpay/stripe-metadata"
 import {
   formatStripeCheckoutFailureMessage,
   logBlitzpayPreparePayDev,
+  logBlitzpayStripeCheckoutFailed,
+  logBlitzpayStripeCheckoutPayload,
 } from "@/lib/blitzpay/blitzpay-prepare-pay-dev-log"
 import { tryConsumeBlitzpayPreparePaySlots } from "@/lib/blitzpay/blitzpay-rate-limit"
 import { fetchBlitzpayInvoicePhase2kDashboard } from "@/lib/blitzpay/blitzpay-invoice-phase2k-dashboard"
@@ -626,23 +628,39 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
   })
   logCheckoutPaymentMethods()
 
+  const logCheckoutPayload = () => {
+    logBlitzpayStripeCheckoutPayload({
+      payment_method_types: checkoutMethodTypes,
+      mode: "payment",
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      customer: savedStripeCustomerId,
+      customer_email: null,
+      invoiceId,
+      organizationId,
+      stripeAccount: acct,
+      application_fee_amount: applicationFeeCents,
+    })
+  }
+
+  logCheckoutPayload()
+
   try {
     session = await createBlitzpayInvoiceCheckoutSession(buildCheckoutSessionParams())
   } catch (e) {
     if (isStripeInvalidPaymentMethodTypeError(e) && checkoutMethodTypes.includes("us_bank_account")) {
       switchToCardOnlyCheckout()
       logCheckoutPaymentMethods()
+      logCheckoutPayload()
       try {
         session = await createBlitzpayInvoiceCheckoutSession(buildCheckoutSessionParams())
       } catch (retryErr) {
-        const msg = retryErr instanceof Error ? retryErr.message : String(retryErr)
         const userMessage = formatStripeCheckoutFailureMessage(retryErr)
-        console.error(JSON.stringify({ source: "blitzpay-prepare-pay", message: msg, organizationId, retryCardOnly: true }))
-        logBlitzpayPreparePayDev("stripe_checkout_failed", {
+        logBlitzpayStripeCheckoutFailed({
+          error: retryErr,
           organizationId,
           invoiceId,
           blockReason: "stripe_error",
-          stripeError: msg.slice(0, 240),
           userMessage,
           retryCardOnly: true,
         })
@@ -654,14 +672,12 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
         }
       }
     } else {
-      const msg = e instanceof Error ? e.message : String(e)
       const userMessage = formatStripeCheckoutFailureMessage(e)
-      console.error(JSON.stringify({ source: "blitzpay-prepare-pay", message: msg, organizationId }))
-      logBlitzpayPreparePayDev("stripe_checkout_failed", {
+      logBlitzpayStripeCheckoutFailed({
+        error: e,
         organizationId,
         invoiceId,
         blockReason: "stripe_error",
-        stripeError: msg.slice(0, 240),
         userMessage,
         retryCardOnly,
       })
