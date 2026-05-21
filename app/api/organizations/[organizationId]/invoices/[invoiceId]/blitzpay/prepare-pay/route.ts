@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
+import { requireAnyOrgPermissionFromRequest } from "@/lib/api/require-org-permission"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import {
   prepareBlitzpayInvoiceHostedCheckout,
@@ -15,7 +15,10 @@ export async function POST(
 ) {
   const { organizationId, invoiceId } = await context.params
 
-  const gate = await requireAnyOrgPermission(organizationId, ["canEditInvoices", "canViewFinancials"])
+  const gate = await requireAnyOrgPermissionFromRequest(request, organizationId, [
+    "canEditInvoices",
+    "canViewFinancials",
+  ])
   if ("error" in gate) {
     return gate.error
   }
@@ -77,7 +80,10 @@ export async function GET(
   context: { params: Promise<{ organizationId: string; invoiceId: string }> },
 ) {
   const { organizationId, invoiceId } = await context.params
-  const gate = await requireAnyOrgPermission(organizationId, ["canEditInvoices", "canViewFinancials"])
+  const gate = await requireAnyOrgPermissionFromRequest(request, organizationId, [
+    "canEditInvoices",
+    "canViewFinancials",
+  ])
   if ("error" in gate) return gate.error
 
   const portionParam = new URL(request.url).searchParams.get("invoicePortionCents")

@@ -409,6 +409,80 @@ export async function requireOrgPermissionFromRequest(
 }
 
 /**
+ * Same as {@link requireAnyOrgPermission}, but accepts cookie or Bearer auth (mobile).
+ */
+export async function requireAnyOrgPermissionFromRequest(
+  request: Request,
+  organizationId: string,
+  capabilities: OrgPermissionKey[],
+): Promise<Success | { error: NextResponse }> {
+  if (!UUID_RE.test(organizationId)) {
+    return { error: jsonError("Invalid organization.", 400, "bad_request") }
+  }
+  if (capabilities.length === 0) {
+    return { error: jsonError("No capabilities requested.", 400, "bad_request") }
+  }
+
+  const auth = await resolveAuthedSupabaseFromRequest(request)
+  if (!auth.ok) return { error: auth.error }
+
+  const { supabase, userId, userEmail } = auth
+  const platformAdmin = Boolean(userEmail && isPlatformAdminEmail(userEmail))
+
+  const { data: mem, error: memErr } = await supabase
+    .from("organization_members")
+    .select("role, permission_profile, permissions_json")
+    .eq("organization_id", organizationId)
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .maybeSingle()
+
+  if (memErr) {
+    return { error: jsonError(memErr.message, 500, "query_failed") }
+  }
+
+  const rawRole = (mem as { role?: string } | null)?.role?.trim() ?? null
+  let effectiveRawRole = rawRole
+  if (!effectiveRawRole && (await hasActiveOrganizationSupportSession(supabase, userId, organizationId))) {
+    effectiveRawRole = "owner"
+  }
+  const role = normalizeOrgMemberRole(effectiveRawRole)
+  const permissions = getEffectiveOrgPermissions({
+    role,
+    permissionProfile: mem
+      ? ((mem as { permission_profile?: string | null }).permission_profile ?? null)
+      : null,
+    permissionsJson: mem ? ((mem as { permissions_json?: unknown }).permissions_json ?? null) : null,
+  })
+
+  if (!platformAdmin) {
+    if (!effectiveRawRole) {
+      return {
+        error: jsonError("You are not a member of this organization.", 403),
+      }
+    }
+    const allowed = capabilities.some((cap) => hasOrgPermission(permissions, cap))
+    if (!allowed) {
+      return {
+        error: jsonError(
+          "Your role does not have permission for this action.",
+          403,
+          "insufficient_permissions",
+        ),
+      }
+    }
+  }
+
+  return {
+    userId,
+    supabase,
+    role: effectiveRawRole,
+    permissions: platformAdmin ? getOrgPermissionsForRole("owner") : permissions,
+    isPlatformAdmin: platformAdmin,
+  }
+}
+
+/**
  * Same as {@link requireOrgMemberSession}, but accepts cookie or Bearer auth (mobile).
  */
 export async function requireOrgMemberSessionFromRequest(

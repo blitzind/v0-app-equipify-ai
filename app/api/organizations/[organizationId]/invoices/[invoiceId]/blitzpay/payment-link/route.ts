@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
+import { requireAnyOrgPermissionFromRequest } from "@/lib/api/require-org-permission"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { blitzpaySchemaDriftIfUnhealthy } from "@/lib/blitzpay/blitzpay-schema-health"
 import { createBlitzpayPaymentLink } from "@/lib/blitzpay/blitzpay-collections"
@@ -10,14 +10,17 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ organizationId: string; invoiceId: string }> },
 ) {
   const { organizationId, invoiceId } = await context.params
   if (!UUID_RE.test(organizationId) || !UUID_RE.test(invoiceId)) {
     return NextResponse.json({ error: "bad_request", message: "Invalid id." }, { status: 400 })
   }
-  const gate = await requireAnyOrgPermission(organizationId, ["canEditInvoices", "canViewFinancials"])
+  const gate = await requireAnyOrgPermissionFromRequest(request, organizationId, [
+    "canEditInvoices",
+    "canViewFinancials",
+  ])
   if ("error" in gate) return gate.error
   let admin: ReturnType<typeof createServiceRoleSupabaseClient>
   try {
@@ -42,14 +45,17 @@ export async function GET(
 }
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ organizationId: string; invoiceId: string }> },
 ) {
   const { organizationId, invoiceId } = await context.params
   if (!UUID_RE.test(organizationId) || !UUID_RE.test(invoiceId)) {
     return NextResponse.json({ error: "bad_request", message: "Invalid id." }, { status: 400 })
   }
-  const gate = await requireAnyOrgPermission(organizationId, ["canEditInvoices", "canViewFinancials"])
+  const gate = await requireAnyOrgPermissionFromRequest(request, organizationId, [
+    "canEditInvoices",
+    "canViewFinancials",
+  ])
   if ("error" in gate) return gate.error
   let admin: ReturnType<typeof createServiceRoleSupabaseClient>
   try {
