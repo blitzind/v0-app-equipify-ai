@@ -41,6 +41,7 @@ import { blitzpayInvoicePaymentMetadata } from "@/lib/blitzpay/stripe-metadata"
 import {
   formatStripeCheckoutFailureMessage,
   logBlitzpayPreparePayDev,
+  logBlitzpayPreparePayPersistFailed,
   logBlitzpayStripeCheckoutFailed,
   logBlitzpayStripeCheckoutPayload,
 } from "@/lib/blitzpay/blitzpay-prepare-pay-dev-log"
@@ -796,8 +797,21 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
   const internalPiId = randomUUID()
   const attemptNo = await nextBlitzpayInvoicePaymentAttemptNo(admin, organizationId, invoiceId)
 
+  const persistContext = {
+    organizationId,
+    invoiceId,
+    checkoutSessionId: session.id,
+    checkoutSessionPresent: Boolean(session.id),
+    stripePaymentIntentId: stripePiId ?? null,
+    stripePaymentIntentPresent: Boolean(stripePiId),
+    internalPiId,
+    attemptNo,
+  }
+
+  let blitzpayPaymentIntentRowId = internalPiId
+
   try {
-    await createBlitzpayPaymentIntentRecord(admin, {
+    const piRow = await createBlitzpayPaymentIntentRecord(admin, {
       id: internalPiId,
       organizationId,
       stripeConnectAccountId: acct,
@@ -817,17 +831,51 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
       stripeCustomerId: savedStripeCustomerId,
       savePaymentMethodRequested: allowSavePaymentMethod,
     })
+    blitzpayPaymentIntentRowId = piRow.id
+  } catch (e) {
+    logBlitzpayPreparePayPersistFailed({
+      step: "create_blitzpay_payment_intent",
+      table: "blitzpay_payment_intents",
+      action: "insert",
+      error: e,
+      ...persistContext,
+    })
+    return {
+      ok: false,
+      status: 500,
+      code: "db_persist_failed",
+      message: "Payment session started but workspace records failed. Contact support with the time of this attempt.",
+    }
+  }
 
+  try {
     await createBlitzpayFeeSnapshot(admin, {
       organizationId,
-      blitzpayPaymentIntentId: internalPiId,
+      blitzpayPaymentIntentId: blitzpayPaymentIntentRowId,
       feeInputs,
     })
+  } catch (e) {
+    logBlitzpayPreparePayPersistFailed({
+      step: "create_blitzpay_fee_snapshot",
+      table: "blitzpay_fee_snapshots",
+      action: "insert",
+      error: e,
+      ...persistContext,
+      blitzpayPaymentIntentRowId,
+    })
+    return {
+      ok: false,
+      status: 500,
+      code: "db_persist_failed",
+      message: "Payment session started but workspace records failed. Contact support with the time of this attempt.",
+    }
+  }
 
+  try {
     await createBlitzpayInvoicePaymentAttempt(admin, {
       organizationId,
       orgInvoiceId: invoiceId,
-      blitzpayPaymentIntentId: internalPiId,
+      blitzpayPaymentIntentId: blitzpayPaymentIntentRowId,
       attemptNo,
       channel: attemptChannel(input),
       createdByUserId: createdByUserId(input),
@@ -835,16 +883,14 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
       status: "initiated",
     })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    console.error(
-      JSON.stringify({
-        source: "blitzpay-prepare-pay",
-        phase: "db_after_stripe",
-        message: msg,
-        organizationId,
-        stripeCheckoutSessionId: session.id,
-      }),
-    )
+    logBlitzpayPreparePayPersistFailed({
+      step: "create_blitzpay_invoice_payment_attempt",
+      table: "blitzpay_invoice_payment_attempts",
+      action: "insert",
+      error: e,
+      ...persistContext,
+      blitzpayPaymentIntentRowId,
+    })
     return {
       ok: false,
       status: 500,
@@ -877,7 +923,7 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
       url,
       checkoutSessionId: session.id,
       stripePaymentIntentId: stripePiId ?? null,
-      blitzpayPaymentIntentRowId: internalPiId,
+      blitzpayPaymentIntentRowId,
     },
   }
 }

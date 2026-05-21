@@ -211,3 +211,61 @@ export function logBlitzpayStripeCheckoutFailed(
     ...rest,
   })
 }
+
+export type SupabaseErrorDiagnostics = {
+  table: string | null
+  action: string | null
+  code: string | null
+  message: string | null
+  details: string | null
+  hint: string | null
+}
+
+/** Safe PostgREST / Supabase error fields for server logs (never send to clients). */
+export function extractSupabaseErrorDiagnostics(
+  error: unknown,
+  context?: { table?: string; action?: string },
+): SupabaseErrorDiagnostics {
+  const duck = error as {
+    code?: string
+    message?: string
+    details?: string
+    hint?: string
+  }
+  return {
+    table: context?.table ?? null,
+    action: context?.action ?? null,
+    code: truncateLogField(duck.code ?? null),
+    message: truncateLogField(duck.message ?? (error instanceof Error ? error.message : String(error))),
+    details: truncateLogField(duck.details ?? null),
+    hint: truncateLogField(duck.hint ?? null),
+  }
+}
+
+/** Structured server log for post-Stripe DB persistence failures — always written. */
+export function logBlitzpayPreparePayPersistFailed(
+  details: Record<string, unknown> & {
+    step: string
+    error: unknown
+    table?: string
+    action?: string
+  },
+): void {
+  const { error, step, table, action, ...rest } = details
+  const db = extractSupabaseErrorDiagnostics(error, { table, action })
+  console.error(
+    JSON.stringify({
+      source: "blitzpay-prepare-pay",
+      event: "db_persist_failed",
+      step,
+      ts: new Date().toISOString(),
+      ...db,
+      ...rest,
+    }),
+  )
+  logBlitzpayPreparePayDev("db_persist_failed", {
+    step,
+    ...db,
+    ...rest,
+  })
+}

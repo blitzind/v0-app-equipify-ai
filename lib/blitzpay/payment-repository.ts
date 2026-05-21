@@ -15,6 +15,17 @@ function isUniqueViolation(err: { code?: string } | null): boolean {
   return err?.code === "23505"
 }
 
+function rethrowSupabaseError(
+  error: { code?: string; message?: string; details?: string; hint?: string },
+  fallbackMessage: string,
+): never {
+  const err = new Error(error.message ?? fallbackMessage)
+  if (error.code) Object.assign(err, { code: error.code })
+  if (error.details) Object.assign(err, { details: error.details })
+  if (error.hint) Object.assign(err, { hint: error.hint })
+  throw err
+}
+
 async function assertInvoiceInOrganization(
   admin: SupabaseClient,
   organizationId: string,
@@ -142,7 +153,12 @@ export async function createBlitzpayPaymentIntentRecord(
     assertNonNegativeCents(input.invoiceAmountCents, "invoiceAmountCents")
   }
 
+  if (input.id) {
+    assertUuid(input.id, "id")
+  }
+
   const row = {
+    ...(input.id ? { id: input.id } : {}),
     organization_id: input.organizationId,
     stripe_connect_account_id: input.stripeConnectAccountId,
     stripe_payment_intent_id: input.stripePaymentIntentId?.trim() ? input.stripePaymentIntentId.trim() : null,
@@ -176,11 +192,11 @@ export async function createBlitzpayPaymentIntentRecord(
         .eq("organization_id", input.organizationId)
         .eq("idempotency_key", input.idempotencyKey)
         .maybeSingle()
-      if (selErr) throw new Error(selErr.message)
+      if (selErr) rethrowSupabaseError(selErr, "blitzpay_payment_intents idempotency lookup failed")
       const id = (existing as { id?: string } | null)?.id
       if (id) return { id }
     }
-    throw new Error(error.message)
+    rethrowSupabaseError(error, "blitzpay_payment_intents insert failed")
   }
   return { id: (data as { id: string }).id }
 }
@@ -276,7 +292,7 @@ export async function createBlitzpayInvoicePaymentAttempt(
     .select("id")
     .single()
 
-  if (error) throw new Error(error.message)
+  if (error) rethrowSupabaseError(error, "blitzpay_invoice_payment_attempts insert failed")
   return { id: (data as { id: string }).id }
 }
 
@@ -315,11 +331,11 @@ export async function createBlitzpayFeeSnapshot(
         .select("id")
         .eq("blitzpay_payment_intent_id", input.blitzpayPaymentIntentId)
         .maybeSingle()
-      if (selErr) throw new Error(selErr.message)
+      if (selErr) rethrowSupabaseError(selErr, "blitzpay_fee_snapshots idempotency lookup failed")
       const id = (existing as { id?: string } | null)?.id
       if (id) return { id }
     }
-    throw new Error(error.message)
+    rethrowSupabaseError(error, "blitzpay_fee_snapshots insert failed")
   }
   return { id: (data as { id: string }).id }
 }
