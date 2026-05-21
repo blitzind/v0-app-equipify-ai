@@ -11,11 +11,33 @@ import { blitzpaySchemaDriftIfUnhealthy } from "@/lib/blitzpay/blitzpay-schema-h
 
 export const runtime = "nodejs"
 
+const PREPARE_PAY_RUNTIME_PROOF_VERSION = "prepare-pay-diagnostics-v2"
+
+function logPreparePayRuntimeProof(args: {
+  method: string
+  organizationId: string
+  invoiceId: string
+}) {
+  console.info(
+    JSON.stringify({
+      source: "blitzpay-prepare-pay",
+      event: "runtime_proof",
+      version: PREPARE_PAY_RUNTIME_PROOF_VERSION,
+      method: args.method,
+      organizationId: args.organizationId,
+      invoiceId: args.invoiceId,
+      timestamp: new Date().toISOString(),
+    }),
+  )
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ organizationId: string; invoiceId: string }> },
 ) {
   const { organizationId, invoiceId } = await context.params
+
+  logPreparePayRuntimeProof({ method: request.method, organizationId, invoiceId })
 
   logBlitzpayPreparePayDev("route_post_start", {
     organizationId,
@@ -114,6 +136,9 @@ export async function GET(
   context: { params: Promise<{ organizationId: string; invoiceId: string }> },
 ) {
   const { organizationId, invoiceId } = await context.params
+
+  logPreparePayRuntimeProof({ method: request.method, organizationId, invoiceId })
+
   const gate = await requireAnyOrgPermissionFromRequest(request, organizationId, [
     "canEditInvoices",
     "canViewFinancials",
