@@ -3,7 +3,18 @@ import "server-only"
 import { createHash, randomUUID } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getPublicAppOrigin } from "@/lib/email/config"
-import { createBlitzpayInvoiceCheckoutSession } from "@/lib/blitzpay/connect-stripe"
+import { createBlitzpayInvoiceCheckoutSession, retrieveConnectAccount } from "@/lib/blitzpay/connect-stripe"
+import {
+  connectedAccountSupportsAch,
+  filterPaymentMethodsForConnectedAccount,
+  isStripeInvalidPaymentMethodTypeError,
+  paymentMethodsEnabledInOrgSettings,
+  resolveBlitzpayCheckoutPaymentMethods,
+} from "@/lib/blitzpay/blitzpay-checkout-payment-method-types"
+import {
+  formatStripeCheckoutFailureMessage,
+  logBlitzpayPreparePayDev,
+} from "@/lib/blitzpay/blitzpay-prepare-pay-dev-log"
 import { computeBlitzpayApplicationFeeBreakdown, type BlitzpayFeeInputs } from "@/lib/blitzpay/fees"
 import { buildBlitzPayQuotePaymentIntentIdempotencyKey } from "@/lib/blitzpay/idempotency-keys"
 import { isBlitzPayInvoicePayEnabledEnv } from "@/lib/blitzpay/phase2-feature-flag"
@@ -99,16 +110,6 @@ function convenienceSettingsFromRow(settings: Record<string, unknown>): Blitzpay
       settings.blitzpay_fee_cap_cents == null ? null : Math.max(0, Math.round(Number(settings.blitzpay_fee_cap_cents))),
     disclosureCopy: disclosure,
   }
-}
-
-function enabledPaymentMethodsFromSettings(settings: Record<string, unknown>): BlitzpayPaymentMethodType[] {
-  const cardEnabled = settings.blitzpay_payment_method_card_enabled !== false
-  const achEnabled = Boolean(settings.blitzpay_payment_method_ach_enabled)
-  const methods: BlitzpayPaymentMethodType[] = []
-  if (cardEnabled) methods.push("card")
-  if (achEnabled) methods.push("us_bank_account")
-  if (methods.length === 0) methods.push("card")
-  return methods
 }
 
 function achTimelineCopyFromSettings(settings: Record<string, unknown>): string {
@@ -323,10 +324,23 @@ export async function previewBlitzpayQuoteHostedCheckout(
   if ("error" in ctx) return ctx.error
 
   const convenience = convenienceSettingsFromRow(ctx.settings)
-  const methods = enabledPaymentMethodsFromSettings(ctx.settings)
+  const acct = String((ctx.orgRow as { stripe_connect_account_id?: string | null }).stripe_connect_account_id ?? "").trim()
+  let connectAccountSupportsAchFlag = false
+  if (acct) {
+    try {
+      const stripeAccount = await retrieveConnectAccount(acct)
+      connectAccountSupportsAchFlag = connectedAccountSupportsAch(stripeAccount)
+    } catch {
+      connectAccountSupportsAchFlag = false
+    }
+  }
+  const previewMethods = filterPaymentMethodsForConnectedAccount({
+    settingsMethods: paymentMethodsEnabledInOrgSettings(ctx.settings),
+    connectAccountSupportsAch: connectAccountSupportsAchFlag,
+  })
   const achTimeline = achTimelineCopyFromSettings(ctx.settings)
   const portion = ctx.depositTargetCents
-  const methodPreviews = methods.map((method) => {
+  const methodPreviews = previewMethods.map((method) => {
     const p = computeBlitzpayConvenienceFeePreview({
       invoiceBalanceCents: portion,
       settings: convenience,
@@ -410,17 +424,33 @@ export async function prepareBlitzpayQuoteHostedCheckout(
   }
 
   const acct = String((orgRow as { stripe_connect_account_id?: string | null }).stripe_connect_account_id ?? "").trim()
-  const enabledMethods = enabledPaymentMethodsFromSettings(settings as Record<string, unknown>)
-  const selectedMethod =
-    input.preferredPaymentMethodType && enabledMethods.includes(input.preferredPaymentMethodType) ?
-      input.preferredPaymentMethodType
-    : enabledMethods[0]
-  const checkoutMethodTypes = input.preferredPaymentMethodType ? [selectedMethod] : enabledMethods
+  let connectAccountSupportsAchFlag = false
+  try {
+    const stripeAccount = await retrieveConnectAccount(acct)
+    connectAccountSupportsAchFlag = connectedAccountSupportsAch(stripeAccount)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    logBlitzpayPreparePayDev("connect_account_capability_lookup_failed", {
+      organizationId,
+      quoteId,
+      connectedAccountId: acct,
+      stripeError: msg.slice(0, 240),
+    })
+  }
+
+  const paymentResolution = resolveBlitzpayCheckoutPaymentMethods({
+    settings: settings as Record<string, unknown>,
+    connectAccountSupportsAch: connectAccountSupportsAchFlag,
+    preferredPaymentMethodType: input.preferredPaymentMethodType,
+  })
+  let selectedMethod = paymentResolution.selectedMethod
+  let checkoutMethodTypes = paymentResolution.selectedPaymentMethods
+  let achEnabled = paymentResolution.achEnabled
   const allowSavePaymentMethod =
     Boolean((settings as Record<string, unknown>).blitzpay_allow_save_payment_methods ?? true) &&
     (input.initiatedBy !== "customer_portal" || Boolean(input.acknowledgeFuturePaymentAuthorization))
 
-  const conveniencePreview = computeBlitzpayConvenienceFeePreview({
+  let conveniencePreview = computeBlitzpayConvenienceFeePreview({
     invoiceBalanceCents: portion,
     settings: convenienceSettingsFromRow(settings as Record<string, unknown>),
     paymentMethodType: selectedMethod,
@@ -432,7 +462,7 @@ export async function prepareBlitzpayQuoteHostedCheckout(
     platform_fee_fixed_cents: number
   }
 
-  const feeInputs: BlitzpayFeeInputs = {
+  let feeInputs: BlitzpayFeeInputs = {
     amountCents: BigInt(conveniencePreview.totalChargeCents),
     platformFeeBps: Math.max(0, Math.min(10_000, Number(s.platform_fee_bps) || 0)),
     platformFeeFixedCents: Math.max(0, Number(s.platform_fee_fixed_cents) || 0),
@@ -452,7 +482,7 @@ export async function prepareBlitzpayQuoteHostedCheckout(
     }
   }
 
-  const applicationFeeCents = Number(breakdown.computedTotalApplicationFeeCents)
+  let applicationFeeCents = Number(breakdown.computedTotalApplicationFeeCents)
   const attemptToken = buildPrepareQuoteAttemptToken(input)
   const idempotencyKey = buildBlitzPayQuotePaymentIntentIdempotencyKey({
     organizationId,
@@ -495,32 +525,118 @@ export async function prepareBlitzpayQuoteHostedCheckout(
   }
 
   let session: Awaited<ReturnType<typeof createBlitzpayInvoiceCheckoutSession>>
-  try {
-    session = await createBlitzpayInvoiceCheckoutSession({
-      stripeConnectAccountId: acct,
-      amountCents: conveniencePreview.totalChargeCents,
-      applicationFeeCents,
-      currency: "usd",
-      productName,
-      successUrl,
-      cancelUrl,
-      paymentIntentMetadata: meta,
-      sessionMetadata: meta,
-      idempotencyKey,
-      paymentMethodTypes: checkoutMethodTypes,
-      stripeCustomerId: savedStripeCustomerId,
-      savePaymentMethodForFutureUse: allowSavePaymentMethod,
+  let retryCardOnly = false
+  let checkoutIdempotencyKey = idempotencyKey
+
+  const logCheckoutPaymentMethods = () => {
+    logBlitzpayPreparePayDev("stripe_checkout_payment_methods", {
+      selectedPaymentMethods: checkoutMethodTypes,
+      connectedAccountId: acct,
+      achEnabled,
+      retryCardOnly,
     })
+  }
+
+  const buildCheckoutSessionParams = () => ({
+    stripeConnectAccountId: acct,
+    amountCents: conveniencePreview.totalChargeCents,
+    applicationFeeCents,
+    currency: "usd" as const,
+    productName,
+    successUrl,
+    cancelUrl,
+    paymentIntentMetadata: meta,
+    sessionMetadata: meta,
+    idempotencyKey: checkoutIdempotencyKey,
+    paymentMethodTypes: checkoutMethodTypes,
+    stripeCustomerId: savedStripeCustomerId,
+    savePaymentMethodForFutureUse: allowSavePaymentMethod,
+  })
+
+  const switchToCardOnlyCheckout = () => {
+    retryCardOnly = true
+    achEnabled = false
+    checkoutMethodTypes = ["card"]
+    selectedMethod = "card"
+    conveniencePreview = computeBlitzpayConvenienceFeePreview({
+      invoiceBalanceCents: portion,
+      settings: convenienceSettingsFromRow(settings as Record<string, unknown>),
+      paymentMethodType: selectedMethod,
+      achConvenienceFeeEnabled: Boolean((settings as Record<string, unknown>).blitzpay_ach_convenience_fee_enabled),
+    })
+    feeInputs = {
+      ...feeInputs,
+      amountCents: BigInt(conveniencePreview.totalChargeCents),
+    }
+    breakdown = computeBlitzpayApplicationFeeBreakdown(feeInputs)
+    applicationFeeCents = Number(breakdown.computedTotalApplicationFeeCents)
+    checkoutIdempotencyKey = `${idempotencyKey}:card_only`
+  }
+
+  logBlitzpayPreparePayDev("stripe_checkout_attempt", {
+    organizationId,
+    quoteId,
+    checkoutPortionCents: portion,
+    connectAccountPresent: Boolean(acct),
+    chargesEnabled: Boolean(orgRow.stripe_charges_enabled),
+    totalChargeCents: conveniencePreview.totalChargeCents,
+  })
+  logCheckoutPaymentMethods()
+
+  try {
+    session = await createBlitzpayInvoiceCheckoutSession(buildCheckoutSessionParams())
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    console.error(JSON.stringify({ source: "blitzpay-prepare-quote-pay", message: msg, organizationId }))
-    return {
-      ok: false,
-      status: 502,
-      code: "stripe_error",
-      message: "Could not start Stripe Checkout. Try again or contact support.",
+    if (isStripeInvalidPaymentMethodTypeError(e) && checkoutMethodTypes.includes("us_bank_account")) {
+      switchToCardOnlyCheckout()
+      logCheckoutPaymentMethods()
+      try {
+        session = await createBlitzpayInvoiceCheckoutSession(buildCheckoutSessionParams())
+      } catch (retryErr) {
+        const msg = retryErr instanceof Error ? retryErr.message : String(retryErr)
+        const userMessage = formatStripeCheckoutFailureMessage(retryErr)
+        console.error(JSON.stringify({ source: "blitzpay-prepare-quote-pay", message: msg, organizationId, retryCardOnly: true }))
+        logBlitzpayPreparePayDev("stripe_checkout_failed", {
+          organizationId,
+          quoteId,
+          blockReason: "stripe_error",
+          stripeError: msg.slice(0, 240),
+          userMessage,
+          retryCardOnly: true,
+        })
+        return {
+          ok: false,
+          status: 502,
+          code: "stripe_error",
+          message: userMessage,
+        }
+      }
+    } else {
+      const msg = e instanceof Error ? e.message : String(e)
+      const userMessage = formatStripeCheckoutFailureMessage(e)
+      console.error(JSON.stringify({ source: "blitzpay-prepare-quote-pay", message: msg, organizationId }))
+      logBlitzpayPreparePayDev("stripe_checkout_failed", {
+        organizationId,
+        quoteId,
+        blockReason: "stripe_error",
+        stripeError: msg.slice(0, 240),
+        userMessage,
+        retryCardOnly,
+      })
+      return {
+        ok: false,
+        status: 502,
+        code: "stripe_error",
+        message: userMessage,
+      }
     }
   }
+
+  logBlitzpayPreparePayDev("stripe_checkout_created", {
+    organizationId,
+    quoteId,
+    checkoutSessionId: session.id,
+    checkoutUrlPresent: Boolean(session.url),
+  })
 
   const piRef = session.payment_intent
   const stripePiId =
@@ -548,7 +664,7 @@ export async function prepareBlitzpayQuoteHostedCheckout(
       orgInvoiceId: null,
       orgQuoteId: quoteId,
       customerId: quote.customer_id,
-      idempotencyKey,
+      idempotencyKey: checkoutIdempotencyKey,
       metadata: { ...meta, stripe_checkout_session_id: session.id },
       paymentMethodType: selectedMethod,
       stripeCustomerId: savedStripeCustomerId,

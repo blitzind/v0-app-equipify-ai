@@ -13,7 +13,7 @@
     "lint": "eslint .",
     "screenshots:install": "playwright install chromium",
     "screenshots:industry": "playwright test",
-    "test:blitzpay-onboarding-errors": "tsx scripts/test-blitzpay-onboarding-errors.ts",
+    "test:blitzpay-checkout-payment-method-types": "tsx scripts/test-blitzpay-checkout-payment-method-types.ts",
     "test:blitzpay-phase-2a": "tsx scripts/test-blitzpay-phase-2a-foundation.ts",
     "test:blitzpay-phase-2b": "tsx scripts/test-blitzpay-phase-2b.ts",
     "test:blitzpay-phase-2c-portal": "tsx scripts/test-blitzpay-phase-2c-portal.ts",
