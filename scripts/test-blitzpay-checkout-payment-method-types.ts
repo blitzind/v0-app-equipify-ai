@@ -93,6 +93,35 @@ function testInvalidPaymentMethodError() {
   assert.equal(isStripeInvalidPaymentMethodTypeError(new Error("amount_cents must be an integer >= 50")), false)
 }
 
+function testDefaultCardOnlyUnlessExplicitAch() {
+  const cardOnly = resolveBlitzpayCheckoutPaymentMethods({
+    settings: { blitzpay_payment_method_ach_enabled: true },
+    connectAccountSupportsAch: true,
+    defaultCardOnlyUnlessExplicitAch: true,
+  })
+  assert.deepEqual(cardOnly.selectedPaymentMethods, ["card"])
+  assert.equal(cardOnly.selectedMethod, "card")
+  assert.equal(cardOnly.achEnabled, false)
+
+  const explicitAch = resolveBlitzpayCheckoutPaymentMethods({
+    settings: { blitzpay_payment_method_ach_enabled: true },
+    connectAccountSupportsAch: true,
+    preferredPaymentMethodType: "us_bank_account",
+    defaultCardOnlyUnlessExplicitAch: false,
+  })
+  assert.deepEqual(explicitAch.selectedPaymentMethods, ["us_bank_account"])
+  assert.equal(explicitAch.selectedMethod, "us_bank_account")
+
+  const explicitAchBlocked = resolveBlitzpayCheckoutPaymentMethods({
+    settings: { blitzpay_payment_method_ach_enabled: true },
+    connectAccountSupportsAch: false,
+    preferredPaymentMethodType: "us_bank_account",
+    defaultCardOnlyUnlessExplicitAch: false,
+  })
+  assert.deepEqual(explicitAchBlocked.selectedPaymentMethods, ["card"])
+  assert.equal(explicitAchBlocked.selectedMethod, "card")
+}
+
 function main() {
   testConnectedAccountSupportsAch()
   testSettingsMethods()
@@ -102,6 +131,7 @@ function main() {
   testPreferredAchWhenSupported()
   testFilterNeverEmpty()
   testInvalidPaymentMethodError()
+  testDefaultCardOnlyUnlessExplicitAch()
   console.log("test-blitzpay-checkout-payment-method-types: ok")
 }
 

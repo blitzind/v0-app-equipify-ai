@@ -38,6 +38,8 @@ export function resolveBlitzpayCheckoutPaymentMethods(args: {
   settings: Record<string, unknown>
   connectAccountSupportsAch: boolean
   preferredPaymentMethodType?: BlitzpayPaymentMethodType
+  /** When true, Checkout is card-only unless ACH is explicitly requested and allowed. */
+  defaultCardOnlyUnlessExplicitAch?: boolean
 }): BlitzpayCheckoutPaymentMethodResolution {
   const settingsMethods = paymentMethodsEnabledInOrgSettings(args.settings)
   const availableMethods = filterPaymentMethodsForConnectedAccount({
@@ -46,9 +48,20 @@ export function resolveBlitzpayCheckoutPaymentMethods(args: {
   })
   const achEnabled = args.connectAccountSupportsAch && settingsMethods.includes("us_bank_account")
 
+  const achExplicitlyRequested = args.preferredPaymentMethodType === "us_bank_account"
+  if (args.defaultCardOnlyUnlessExplicitAch && !achExplicitlyRequested) {
+    return {
+      selectedPaymentMethods: ["card"],
+      selectedMethod: "card",
+      achEnabled: false,
+    }
+  }
+
   let selectedMethod: BlitzpayPaymentMethodType
   if (args.preferredPaymentMethodType && availableMethods.includes(args.preferredPaymentMethodType)) {
     selectedMethod = args.preferredPaymentMethodType
+  } else if (achExplicitlyRequested) {
+    selectedMethod = availableMethods.includes("us_bank_account") ? "us_bank_account" : "card"
   } else {
     selectedMethod = availableMethods[0]
   }

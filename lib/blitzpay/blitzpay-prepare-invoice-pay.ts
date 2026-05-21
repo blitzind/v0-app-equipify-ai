@@ -101,6 +101,8 @@ type PrepareBlitzpayInvoiceHostedCheckoutStaffInput = {
   initiatedBy: "staff_dashboard"
   userId: string
   preferredPaymentMethodType?: BlitzpayPaymentMethodType
+  /** Card-only Checkout unless ACH is explicitly requested (Equipify Mobile default). */
+  defaultCardOnlyUnlessExplicitAch?: boolean
   /** When partial payments are enabled, pay up to this amount toward the invoice (cents). */
   invoicePortionCents?: number | null
   /** Required when saving a payment method for future use from the portal. */
@@ -495,6 +497,10 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
     settings: settings as Record<string, unknown>,
     connectAccountSupportsAch: connectAccountSupportsAchFlag,
     preferredPaymentMethodType: input.preferredPaymentMethodType,
+    defaultCardOnlyUnlessExplicitAch:
+      input.initiatedBy === "staff_dashboard" ?
+        Boolean(input.defaultCardOnlyUnlessExplicitAch)
+      : false,
   })
   let selectedMethod = paymentResolution.selectedMethod
   let checkoutMethodTypes = paymentResolution.selectedPaymentMethods
@@ -606,6 +612,24 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
   let checkoutIdempotencyKey = idempotencyKey
 
   const logCheckoutPaymentMethods = () => {
+    console.info(
+      JSON.stringify({
+        source: "blitzpay-prepare-pay",
+        event: "stripe_checkout_final_payment_method_types",
+        organizationId,
+        invoiceId,
+        initiatedBy: input.initiatedBy,
+        payment_method_types: checkoutMethodTypes,
+        selectedPaymentMethods: checkoutMethodTypes,
+        connectedAccountId: acct,
+        achEnabled,
+        retryCardOnly,
+        defaultCardOnlyUnlessExplicitAch:
+          input.initiatedBy === "staff_dashboard" ? Boolean(input.defaultCardOnlyUnlessExplicitAch) : false,
+        preferredPaymentMethodType: input.preferredPaymentMethodType ?? null,
+        timestamp: new Date().toISOString(),
+      }),
+    )
     logBlitzpayPreparePayDev("stripe_checkout_payment_methods", {
       selectedPaymentMethods: checkoutMethodTypes,
       connectedAccountId: acct,

@@ -87,6 +87,20 @@ export async function POST(
     preferredPaymentMethodType = undefined
   }
 
+  const defaultCardOnlyUnlessExplicitAch = preferredPaymentMethodType !== "us_bank_account"
+
+  console.info(
+    JSON.stringify({
+      source: "blitzpay-prepare-pay",
+      event: "prepare_pay_post_checkout_methods_policy",
+      organizationId,
+      invoiceId,
+      defaultCardOnlyUnlessExplicitAch,
+      preferredPaymentMethodType: preferredPaymentMethodType ?? null,
+      timestamp: new Date().toISOString(),
+    }),
+  )
+
   const result = await prepareBlitzpayInvoiceHostedCheckout({
     admin,
     organizationId,
@@ -95,6 +109,7 @@ export async function POST(
     userId: gate.userId,
     preferredPaymentMethodType,
     invoicePortionCents,
+    defaultCardOnlyUnlessExplicitAch,
   })
 
   if (!result.ok) {
