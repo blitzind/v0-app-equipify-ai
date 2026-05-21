@@ -3,7 +3,16 @@ import "server-only"
 import { createHash, randomUUID } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getPublicAppOrigin } from "@/lib/email/config"
-import { createBlitzpayInvoiceCheckoutSession, retrieveConnectAccount } from "@/lib/blitzpay/connect-stripe"
+import {
+  buildBlitzpayInvoiceCheckoutSessionApiBody,
+  connectCheckoutCustomerExists,
+  createBlitzpayInvoiceCheckoutSession,
+  retrieveConnectAccount,
+} from "@/lib/blitzpay/connect-stripe"
+import {
+  buildBlitzpayStaffInvoiceCheckoutReturnUrls,
+  blitzpayCheckoutReturnUrlDevFlags,
+} from "@/lib/blitzpay/blitzpay-checkout-return-urls"
 import {
   connectedAccountSupportsAch,
   filterPaymentMethodsForConnectedAccount,
@@ -545,14 +554,24 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
   })
 
   const origin = getPublicAppOrigin().replace(/\/+$/, "")
+  const staffReturnUrls = buildBlitzpayStaffInvoiceCheckoutReturnUrls(origin, invoiceId)
   const successUrl =
     input.initiatedBy === "customer_portal" ?
       input.returnUrls.successUrl
-    : `${origin}/invoices?blitzpay=1&status=success&invoiceId=${encodeURIComponent(invoiceId)}`
+    : staffReturnUrls.successUrl
   const cancelUrl =
     input.initiatedBy === "customer_portal" ?
       input.returnUrls.cancelUrl
-    : `${origin}/invoices?blitzpay=1&status=cancel&invoiceId=${encodeURIComponent(invoiceId)}`
+    : staffReturnUrls.cancelUrl
+  const returnUrlFlags = blitzpayCheckoutReturnUrlDevFlags(successUrl, cancelUrl)
+  logBlitzpayPreparePayDev("stripe_checkout_return_urls", {
+    organizationId,
+    invoiceId,
+    initiatedBy: input.initiatedBy,
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    ...returnUrlFlags,
+  })
 
   const productName = `Invoice ${inv.invoice_number} — ${inv.title}`.slice(0, 120)
   let savedStripeCustomerId: string | null = null
@@ -565,6 +584,21 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
       .maybeSingle()
     const candidate = (profile as { stripe_customer_id?: string | null } | null)?.stripe_customer_id
     savedStripeCustomerId = candidate ? String(candidate).trim() : null
+  }
+
+  if (savedStripeCustomerId) {
+    const customerOk = await connectCheckoutCustomerExists({
+      stripeConnectAccountId: acct,
+      stripeCustomerId: savedStripeCustomerId,
+    })
+    if (!customerOk) {
+      logBlitzpayPreparePayDev("stripe_checkout_customer_omitted", {
+        organizationId,
+        invoiceId,
+        reason: "connect_customer_not_found",
+      })
+      savedStripeCustomerId = null
+    }
   }
 
   let session: Awaited<ReturnType<typeof createBlitzpayInvoiceCheckoutSession>>
@@ -629,17 +663,28 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
   logCheckoutPaymentMethods()
 
   const logCheckoutPayload = () => {
+    const sessionBody = buildBlitzpayInvoiceCheckoutSessionApiBody(buildCheckoutSessionParams())
     logBlitzpayStripeCheckoutPayload({
-      payment_method_types: checkoutMethodTypes,
-      mode: "payment",
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      customer: savedStripeCustomerId,
-      customer_email: null,
+      payment_method_types: sessionBody.payment_method_types,
+      mode: sessionBody.mode,
+      success_url: sessionBody.success_url,
+      cancel_url: sessionBody.cancel_url,
+      success_url_exists: returnUrlFlags.success_url_exists,
+      cancel_url_exists: returnUrlFlags.cancel_url_exists,
+      customer: sessionBody.customer ?? null,
+      customer_email: sessionBody.customer_email ?? null,
+      customer_creation: sessionBody.customer_creation ?? null,
+      payment_intent_data: {
+        application_fee_amount: sessionBody.payment_intent_data.application_fee_amount,
+        setup_future_usage: sessionBody.payment_intent_data.setup_future_usage,
+        metadata_keys: Object.keys(sessionBody.payment_intent_data.metadata),
+      },
+      transfer_data: null,
       invoiceId,
       organizationId,
       stripeAccount: acct,
       application_fee_amount: applicationFeeCents,
+      initiatedBy: input.initiatedBy,
     })
   }
 

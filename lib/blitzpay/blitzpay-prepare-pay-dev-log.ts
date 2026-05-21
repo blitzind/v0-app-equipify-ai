@@ -160,12 +160,22 @@ export type StripeCheckoutPayloadDevLog = {
   mode: string
   success_url: string
   cancel_url: string
+  success_url_exists: boolean
+  cancel_url_exists: boolean
   customer: string | null
   customer_email: string | null
+  customer_creation: string | null
+  payment_intent_data: {
+    application_fee_amount?: number
+    setup_future_usage?: string
+    metadata_keys: string[]
+  }
+  transfer_data: null
   invoiceId: string
   organizationId: string
   stripeAccount: string
   application_fee_amount: number
+  initiatedBy: string
 }
 
 /** Log checkout payload immediately before Stripe session create (server logs). */

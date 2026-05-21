@@ -55,6 +55,99 @@ export function buildBlitzPayOrgUpdateFromStripeAccount(account: Stripe.Account)
   }
 }
 
+/** Returns true when the Customer exists on the connected account. */
+export async function connectCheckoutCustomerExists(params: {
+  stripeConnectAccountId: string
+  stripeCustomerId: string
+}): Promise<boolean> {
+  const stripe = getStripe()
+  try {
+    const cust = await stripe.customers.retrieve(params.stripeCustomerId, {
+      stripeAccount: params.stripeConnectAccountId,
+    })
+    return !("deleted" in cust && cust.deleted)
+  } catch {
+    return false
+  }
+}
+
+export type BlitzpayInvoiceCheckoutSessionApiBody = {
+  mode: "payment"
+  payment_method_types: Array<"card" | "us_bank_account">
+  customer?: string
+  customer_creation?: "always"
+  customer_email?: string
+  line_items: Array<{
+    price_data: {
+      currency: string
+      unit_amount: number
+      product_data: { name: string }
+    }
+    quantity: number
+  }>
+  payment_intent_data: {
+    application_fee_amount?: number
+    metadata: Record<string, string>
+    setup_future_usage?: "off_session"
+  }
+  metadata: Record<string, string>
+  success_url: string
+  cancel_url: string
+}
+
+export function buildBlitzpayInvoiceCheckoutSessionApiBody(params: {
+  stripeConnectAccountId: string
+  amountCents: number
+  applicationFeeCents: number
+  currency: string
+  productName: string
+  successUrl: string
+  cancelUrl: string
+  paymentIntentMetadata: Record<string, string>
+  sessionMetadata: Record<string, string>
+  paymentMethodTypes: Array<"card" | "us_bank_account">
+  stripeCustomerId?: string | null
+  savePaymentMethodForFutureUse?: boolean
+}): BlitzpayInvoiceCheckoutSessionApiBody {
+  const c = params.currency.trim().toLowerCase()
+  const paymentIntentData: BlitzpayInvoiceCheckoutSessionApiBody["payment_intent_data"] = {
+    metadata: params.paymentIntentMetadata,
+  }
+  if (params.applicationFeeCents > 0) {
+    paymentIntentData.application_fee_amount = params.applicationFeeCents
+  }
+  if (params.savePaymentMethodForFutureUse) {
+    paymentIntentData.setup_future_usage = "off_session"
+  }
+
+  const body: BlitzpayInvoiceCheckoutSessionApiBody = {
+    mode: "payment",
+    payment_method_types: params.paymentMethodTypes,
+    line_items: [
+      {
+        price_data: {
+          currency: c,
+          unit_amount: params.amountCents,
+          product_data: { name: params.productName.slice(0, 120) },
+        },
+        quantity: 1,
+      },
+    ],
+    payment_intent_data: paymentIntentData,
+    metadata: params.sessionMetadata,
+    success_url: params.successUrl,
+    cancel_url: params.cancelUrl,
+  }
+
+  if (params.stripeCustomerId) {
+    body.customer = params.stripeCustomerId
+  } else {
+    body.customer_creation = "always"
+  }
+
+  return body
+}
+
 /** Hosted Checkout on the connected account (BlitzPay invoice pay, Phase 2B). */
 export async function createBlitzpayInvoiceCheckoutSession(params: {
   stripeConnectAccountId: string
@@ -72,7 +165,6 @@ export async function createBlitzpayInvoiceCheckoutSession(params: {
   savePaymentMethodForFutureUse?: boolean
 }): Promise<Stripe.Checkout.Session> {
   const stripe = getStripe()
-  const c = params.currency.trim().toLowerCase()
   if (!Number.isInteger(params.amountCents) || params.amountCents < 50) {
     throw new Error("amount_cents must be an integer >= 50 (Stripe USD minimum).")
   }
@@ -83,36 +175,12 @@ export async function createBlitzpayInvoiceCheckoutSession(params: {
     throw new Error("application_fee_cents cannot exceed amount_cents.")
   }
 
-  return stripe.checkout.sessions.create(
-    {
-      mode: "payment",
-      payment_method_types: params.paymentMethodTypes,
-      customer: params.stripeCustomerId ?? undefined,
-      customer_creation: params.stripeCustomerId ? undefined : "always",
-      line_items: [
-        {
-          price_data: {
-            currency: c,
-            unit_amount: params.amountCents,
-            product_data: { name: params.productName.slice(0, 120) },
-          },
-          quantity: 1,
-        },
-      ],
-      payment_intent_data: {
-        application_fee_amount: params.applicationFeeCents,
-        metadata: params.paymentIntentMetadata,
-        setup_future_usage: params.savePaymentMethodForFutureUse ? "off_session" : undefined,
-      },
-      metadata: params.sessionMetadata,
-      success_url: params.successUrl,
-      cancel_url: params.cancelUrl,
-    },
-    {
-      stripeAccount: params.stripeConnectAccountId,
-      idempotencyKey: params.idempotencyKey,
-    },
-  )
+  const body = buildBlitzpayInvoiceCheckoutSessionApiBody(params)
+
+  return stripe.checkout.sessions.create(body, {
+    stripeAccount: params.stripeConnectAccountId,
+    idempotencyKey: params.idempotencyKey,
+  })
 }
 
 /** Refund a charge on the connected account; set `refundApplicationFee` so platform fee reverses with Stripe rules. */
