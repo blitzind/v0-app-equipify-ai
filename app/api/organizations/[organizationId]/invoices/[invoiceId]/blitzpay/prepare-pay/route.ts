@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server"
 import { requireAnyOrgPermissionFromRequest } from "@/lib/api/require-org-permission"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
+import { logBlitzpayPreparePayDev } from "@/lib/blitzpay/blitzpay-prepare-pay-dev-log"
 import {
   prepareBlitzpayInvoiceHostedCheckout,
   previewBlitzpayInvoiceHostedCheckout,
 } from "@/lib/blitzpay/blitzpay-prepare-invoice-pay"
+import { isBlitzPayInvoicePayEnabledEnv } from "@/lib/blitzpay/phase2-feature-flag"
 import { blitzpaySchemaDriftIfUnhealthy } from "@/lib/blitzpay/blitzpay-schema-health"
 
 export const runtime = "nodejs"
@@ -15,13 +17,26 @@ export async function POST(
 ) {
   const { organizationId, invoiceId } = await context.params
 
+  logBlitzpayPreparePayDev("route_post_start", {
+    organizationId,
+    invoiceId,
+    blitzpayInvoicePayEnabled: isBlitzPayInvoicePayEnabledEnv(),
+  })
+
   const gate = await requireAnyOrgPermissionFromRequest(request, organizationId, [
     "canEditInvoices",
     "canViewFinancials",
   ])
   if ("error" in gate) {
+    logBlitzpayPreparePayDev("route_post_auth_failed", { organizationId, invoiceId })
     return gate.error
   }
+
+  logBlitzpayPreparePayDev("route_post_auth_ok", {
+    organizationId,
+    invoiceId,
+    userId: gate.userId,
+  })
 
   let admin: ReturnType<typeof createServiceRoleSupabaseClient>
   try {
@@ -61,18 +76,37 @@ export async function POST(
   })
 
   if (!result.ok) {
+    logBlitzpayPreparePayDev("route_post_blocked", {
+      organizationId,
+      invoiceId,
+      blockReason: result.code,
+      message: result.message,
+      status: result.status,
+    })
     return NextResponse.json(
       { error: result.code, message: result.message },
       { status: result.status },
     )
   }
 
-  return NextResponse.json({
+  const responseBody = {
     url: result.data.url,
     checkoutSessionId: result.data.checkoutSessionId,
     stripePaymentIntentId: result.data.stripePaymentIntentId,
     blitzpayPaymentIntentRowId: result.data.blitzpayPaymentIntentRowId,
+  }
+
+  logBlitzpayPreparePayDev("route_post_success", {
+    organizationId,
+    invoiceId,
+    checkoutUrlPresent: Boolean(responseBody.url),
+    response: {
+      url: responseBody.url ? "[present]" : null,
+      checkoutSessionId: responseBody.checkoutSessionId,
+    },
   })
+
+  return NextResponse.json(responseBody)
 }
 
 export async function GET(

@@ -21,6 +21,10 @@ import {
   nextBlitzpayInvoicePaymentAttemptNo,
 } from "@/lib/blitzpay/payment-repository"
 import { blitzpayInvoicePaymentMetadata } from "@/lib/blitzpay/stripe-metadata"
+import {
+  formatStripeCheckoutFailureMessage,
+  logBlitzpayPreparePayDev,
+} from "@/lib/blitzpay/blitzpay-prepare-pay-dev-log"
 import { tryConsumeBlitzpayPreparePaySlots } from "@/lib/blitzpay/blitzpay-rate-limit"
 import { fetchBlitzpayInvoicePhase2kDashboard } from "@/lib/blitzpay/blitzpay-invoice-phase2k-dashboard"
 import type { BlitzpayInvoicePhase2kDashboard } from "@/lib/blitzpay/blitzpay-invoice-phase2k-dashboard"
@@ -155,12 +159,18 @@ async function loadPrepareContext(input: PrepareBlitzpayInvoiceHostedCheckoutInp
   const { admin, organizationId, invoiceId } = input
   const settings = await fetchBlitzpayOrgSettingsRow(admin, organizationId)
   if (!settings || !(settings as { blitzpay_invoice_pay_enabled?: boolean }).blitzpay_invoice_pay_enabled) {
+    logBlitzpayPreparePayDev("blocked", {
+      organizationId,
+      invoiceId,
+      blockReason: "org_pay_disabled",
+      orgBlitzpayEnabled: false,
+    })
     return {
       error: {
         ok: false,
         status: 403,
         code: "org_pay_disabled",
-        message: "BlitzPay online pay is not enabled for this workspace.",
+        message: "BlitzPay is disabled for this organization.",
       },
     }
   }
@@ -178,18 +188,31 @@ async function loadPrepareContext(input: PrepareBlitzpayInvoiceHostedCheckoutInp
   const acct = String((orgRow as { stripe_connect_account_id?: string | null }).stripe_connect_account_id ?? "").trim()
   const chargesOk = Boolean((orgRow as { stripe_charges_enabled?: boolean }).stripe_charges_enabled)
   if (!acct || !chargesOk) {
+    logBlitzpayPreparePayDev("blocked", {
+      organizationId,
+      invoiceId,
+      blockReason: "connect_not_ready",
+      connectAccountPresent: Boolean(acct),
+      chargesEnabled: chargesOk,
+    })
     return {
       error: {
         ok: false,
         status: 409,
         code: "connect_not_ready",
-        message: "Stripe Connect is not ready to accept charges. Finish BlitzPay onboarding in Settings → Payments.",
+        message: "Stripe Connect onboarding incomplete.",
       },
     }
   }
 
   const inv = await loadInvoiceForBlitzpayPay(admin, organizationId, invoiceId)
   if (!inv) {
+    logBlitzpayPreparePayDev("blocked", {
+      organizationId,
+      invoiceId,
+      blockReason: "invoice_not_found",
+      invoiceFound: false,
+    })
     return { error: { ok: false, status: 404, code: "invoice_not_found", message: "Invoice not found." } }
   }
   if (input.initiatedBy === "customer_portal" && inv.customer_id !== input.portalCustomerId) {
@@ -202,26 +225,42 @@ async function loadPrepareContext(input: PrepareBlitzpayInvoiceHostedCheckoutInp
     const code = errCode(e)
     const map: Record<string, string> = {
       invoice_archived: "This invoice is archived.",
-      invoice_not_payable_status: "This invoice cannot be paid online.",
-      invoice_no_balance_due: "There is no balance due for this invoice.",
+      invoice_not_payable_status: "Invoice not eligible.",
+      invoice_no_balance_due: "Invoice already paid.",
     }
+    logBlitzpayPreparePayDev("blocked", {
+      organizationId,
+      invoiceId,
+      blockReason: code,
+      invoiceFound: true,
+      invoiceStatus: inv.status,
+      balanceDueCents: balanceDueCentsForBlitzpay(inv, paidSum),
+    })
     return {
       error: {
         ok: false,
         status: 409,
         code,
-        message: map[code] ?? "This invoice cannot be paid online.",
+        message: map[code] ?? "Invoice not eligible.",
       },
     }
   }
   const balanceDue = balanceDueCentsForBlitzpay(inv, paidSum)
   if (balanceDue < 50) {
+    logBlitzpayPreparePayDev("blocked", {
+      organizationId,
+      invoiceId,
+      blockReason: "amount_below_minimum",
+      invoiceFound: true,
+      invoiceStatus: inv.status,
+      balanceDueCents: balanceDue,
+    })
     return {
       error: {
         ok: false,
         status: 409,
         code: "amount_below_minimum",
-        message: "Balance due is below the card minimum (USD 0.50). Record a manual payment instead.",
+        message: "Invoice balance too low.",
       },
     }
   }
@@ -501,6 +540,16 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
   }
 
   let session: Awaited<ReturnType<typeof createBlitzpayInvoiceCheckoutSession>>
+  logBlitzpayPreparePayDev("stripe_checkout_attempt", {
+    organizationId,
+    invoiceId,
+    invoiceStatus: inv.status,
+    balanceDueCents: balanceDue,
+    checkoutPortionCents: portion,
+    connectAccountPresent: Boolean(acct),
+    chargesEnabled: Boolean(orgRow.stripe_charges_enabled),
+    totalChargeCents: conveniencePreview.totalChargeCents,
+  })
   try {
     session = await createBlitzpayInvoiceCheckoutSession({
       stripeConnectAccountId: acct,
@@ -519,19 +568,45 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    const userMessage = formatStripeCheckoutFailureMessage(e)
     console.error(JSON.stringify({ source: "blitzpay-prepare-pay", message: msg, organizationId }))
+    logBlitzpayPreparePayDev("stripe_checkout_failed", {
+      organizationId,
+      invoiceId,
+      blockReason: "stripe_error",
+      stripeError: msg.slice(0, 240),
+      userMessage,
+    })
     return {
       ok: false,
       status: 502,
       code: "stripe_error",
-      message: "Could not start Stripe Checkout. Try again or contact support.",
+      message: userMessage,
     }
   }
+
+  logBlitzpayPreparePayDev("stripe_checkout_created", {
+    organizationId,
+    invoiceId,
+    checkoutSessionId: session.id,
+    checkoutUrlPresent: Boolean(session.url),
+  })
 
   const piRef = session.payment_intent
   const stripePiId = typeof piRef === "string" ? piRef : piRef && typeof piRef === "object" && "id" in piRef ? String((piRef as { id: string }).id) : ""
   if (!stripePiId) {
-    return { ok: false, status: 502, code: "missing_payment_intent", message: "Stripe did not return a PaymentIntent for this session." }
+    logBlitzpayPreparePayDev("blocked", {
+      organizationId,
+      invoiceId,
+      blockReason: "missing_payment_intent",
+      checkoutSessionId: session.id,
+    })
+    return {
+      ok: false,
+      status: 502,
+      code: "missing_payment_intent",
+      message: "Checkout session creation failed.",
+    }
   }
 
   const internalPiId = randomUUID()
@@ -596,8 +671,21 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
 
   const url = session.url
   if (!url) {
-    return { ok: false, status: 502, code: "missing_checkout_url", message: "Stripe did not return a Checkout URL." }
+    logBlitzpayPreparePayDev("blocked", {
+      organizationId,
+      invoiceId,
+      blockReason: "missing_checkout_url",
+      checkoutSessionId: session.id,
+    })
+    return { ok: false, status: 502, code: "missing_checkout_url", message: "Checkout session creation failed." }
   }
+
+  logBlitzpayPreparePayDev("prepare_pay_success", {
+    organizationId,
+    invoiceId,
+    checkoutUrlPresent: true,
+    checkoutSessionId: session.id,
+  })
 
   return {
     ok: true,
