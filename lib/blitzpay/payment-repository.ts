@@ -94,7 +94,7 @@ export type CreateBlitzpayPaymentIntentInput = {
   id?: string
   organizationId: string
   stripeConnectAccountId: string
-  stripePaymentIntentId: string
+  stripePaymentIntentId: string | null
   stripeCheckoutSessionId?: string | null
   status: string
   amountCents: bigint
@@ -145,7 +145,7 @@ export async function createBlitzpayPaymentIntentRecord(
   const row = {
     organization_id: input.organizationId,
     stripe_connect_account_id: input.stripeConnectAccountId,
-    stripe_payment_intent_id: input.stripePaymentIntentId,
+    stripe_payment_intent_id: input.stripePaymentIntentId?.trim() ? input.stripePaymentIntentId.trim() : null,
     stripe_checkout_session_id: input.stripeCheckoutSessionId ?? null,
     status: input.status,
     amount_cents: input.amountCents.toString(),
@@ -415,6 +415,54 @@ export async function fetchBlitzpayPaymentIntentByStripeId(
     .maybeSingle()
   if (error) throw new Error(error.message)
   return data ?? null
+}
+
+export async function fetchBlitzpayPaymentIntentByCheckoutSessionId(
+  admin: SupabaseClient,
+  stripeCheckoutSessionId: string,
+): Promise<unknown | null> {
+  const sessionId = stripeCheckoutSessionId.trim()
+  if (!sessionId) return null
+  const { data, error } = await admin
+    .from("blitzpay_payment_intents")
+    .select("*")
+    .eq("stripe_checkout_session_id", sessionId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return data ?? null
+}
+
+/** Backfill Stripe PaymentIntent id on a row created before PI was available on the Checkout Session. */
+export async function attachStripePaymentIntentIdToBlitzpayRecord(
+  admin: SupabaseClient,
+  input: { checkoutSessionId: string; stripePaymentIntentId: string },
+): Promise<boolean> {
+  const checkoutSessionId = input.checkoutSessionId.trim()
+  const stripePaymentIntentId = input.stripePaymentIntentId.trim()
+  if (!checkoutSessionId || !stripePaymentIntentId) return false
+
+  const { data: existing, error: selErr } = await admin
+    .from("blitzpay_payment_intents")
+    .select("id, stripe_payment_intent_id")
+    .eq("stripe_checkout_session_id", checkoutSessionId)
+    .maybeSingle()
+  if (selErr) throw new Error(selErr.message)
+  const row = existing as { id?: string; stripe_payment_intent_id?: string | null } | null
+  if (!row?.id) return false
+  if (row.stripe_payment_intent_id?.trim()) {
+    return row.stripe_payment_intent_id.trim() === stripePaymentIntentId
+  }
+
+  const { error: updErr } = await admin
+    .from("blitzpay_payment_intents")
+    .update({
+      stripe_payment_intent_id: stripePaymentIntentId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", row.id)
+    .is("stripe_payment_intent_id", null)
+  if (updErr) throw new Error(updErr.message)
+  return true
 }
 
 export async function updateBlitzpayPaymentIntentMethodDetails(

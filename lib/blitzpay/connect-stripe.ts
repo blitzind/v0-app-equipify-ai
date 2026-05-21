@@ -148,6 +148,18 @@ export function buildBlitzpayInvoiceCheckoutSessionApiBody(params: {
   return body
 }
 
+export function stripePaymentIntentIdFromCheckoutSession(session: Pick<Stripe.Checkout.Session, "payment_intent">): string | null {
+  const piRef = session.payment_intent
+  if (typeof piRef === "string" && piRef.trim().startsWith("pi_")) {
+    return piRef.trim()
+  }
+  if (piRef && typeof piRef === "object" && "id" in piRef) {
+    const id = String((piRef as { id: string }).id).trim()
+    return id.startsWith("pi_") ? id : null
+  }
+  return null
+}
+
 /** Hosted Checkout on the connected account (BlitzPay invoice pay, Phase 2B). */
 export async function createBlitzpayInvoiceCheckoutSession(params: {
   stripeConnectAccountId: string
@@ -177,10 +189,20 @@ export async function createBlitzpayInvoiceCheckoutSession(params: {
 
   const body = buildBlitzpayInvoiceCheckoutSessionApiBody(params)
 
-  return stripe.checkout.sessions.create(body, {
+  let session = await stripe.checkout.sessions.create(body, {
     stripeAccount: params.stripeConnectAccountId,
     idempotencyKey: params.idempotencyKey,
   })
+
+  if (!stripePaymentIntentIdFromCheckoutSession(session)) {
+    session = await stripe.checkout.sessions.retrieve(
+      session.id,
+      { expand: ["payment_intent"] },
+      { stripeAccount: params.stripeConnectAccountId },
+    )
+  }
+
+  return session
 }
 
 /** Refund a charge on the connected account; set `refundApplicationFee` so platform fee reverses with Stripe rules. */

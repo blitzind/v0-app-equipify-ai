@@ -3,12 +3,14 @@ import "server-only"
 import type Stripe from "stripe"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getStripe } from "@/lib/stripe"
+import { stripePaymentIntentIdFromCheckoutSession } from "@/lib/blitzpay/connect-stripe"
 import { parseBlitzpayInvoiceMetadata } from "@/lib/blitzpay/stripe-metadata"
 import {
   completeBlitzpayPaymentIntentCanceled,
   completeBlitzpayPaymentIntentFailed,
   completeBlitzpayPaymentIntentSucceeded,
 } from "@/lib/blitzpay/webhook-invoice-pay-completion"
+import { attachStripePaymentIntentIdToBlitzpayRecord, fetchBlitzpayPaymentIntentByStripeId } from "@/lib/blitzpay/payment-repository"
 import { dispatchBlitzpayChargeRefunded } from "@/lib/blitzpay/webhook-charge-refunded"
 import { upsertBlitzpayInvoiceDisputeFromStripe } from "@/lib/blitzpay/webhook-charge-dispute"
 import { dispatchBlitzpayPayoutWebhook } from "@/lib/blitzpay/blitzpay-payout-sync"
@@ -38,6 +40,45 @@ async function refreshBlitzpayPaymentIntentMirror(
   if (error) throw new Error(error.message)
 }
 
+async function ensureBlitzpayDeferredPaymentIntentLinked(
+  admin: SupabaseClient,
+  pi: Stripe.PaymentIntent,
+  connectAccountId: string | null,
+): Promise<void> {
+  const existing = await fetchBlitzpayPaymentIntentByStripeId(admin, pi.id)
+  if (existing) return
+  if (!connectAccountId) return
+
+  const stripe = getStripe()
+  const sessions = await stripe.checkout.sessions.list(
+    { payment_intent: pi.id, limit: 1 },
+    { stripeAccount: connectAccountId },
+  )
+  const session = sessions.data[0]
+  if (!session?.id) return
+
+  await attachStripePaymentIntentIdToBlitzpayRecord(admin, {
+    checkoutSessionId: session.id,
+    stripePaymentIntentId: pi.id,
+  })
+}
+
+async function resolveCheckoutSessionPaymentIntentId(
+  session: Stripe.Checkout.Session,
+  connectAccountId: string | null,
+): Promise<string | null> {
+  let piId = stripePaymentIntentIdFromCheckoutSession(session)
+  if (piId || !session.id || !connectAccountId) return piId
+
+  const stripe = getStripe()
+  const refreshed = await stripe.checkout.sessions.retrieve(
+    session.id,
+    { expand: ["payment_intent"] },
+    { stripeAccount: connectAccountId },
+  )
+  return stripePaymentIntentIdFromCheckoutSession(refreshed)
+}
+
 /**
  * Phase 2B: mirror PaymentIntent rows + allocate invoice payments on success (idempotent).
  */
@@ -48,18 +89,24 @@ export async function dispatchBlitzPayPhase2Webhook(
   switch (event.type) {
     case "payment_intent.succeeded": {
       const pi = event.data.object as Stripe.PaymentIntent
+      const acct = typeof event.account === "string" && event.account.length > 0 ? event.account : null
+      await ensureBlitzpayDeferredPaymentIntentLinked(admin, pi, acct)
       await refreshBlitzpayPaymentIntentMirror(admin, pi, event.created)
       await completeBlitzpayPaymentIntentSucceeded(admin, pi, event.created)
       return
     }
     case "payment_intent.payment_failed": {
       const pi = event.data.object as Stripe.PaymentIntent
+      const acct = typeof event.account === "string" && event.account.length > 0 ? event.account : null
+      await ensureBlitzpayDeferredPaymentIntentLinked(admin, pi, acct)
       await refreshBlitzpayPaymentIntentMirror(admin, pi, event.created)
       await completeBlitzpayPaymentIntentFailed(admin, pi)
       return
     }
     case "payment_intent.canceled": {
       const pi = event.data.object as Stripe.PaymentIntent
+      const acct = typeof event.account === "string" && event.account.length > 0 ? event.account : null
+      await ensureBlitzpayDeferredPaymentIntentLinked(admin, pi, acct)
       await refreshBlitzpayPaymentIntentMirror(admin, pi, event.created)
       await completeBlitzpayPaymentIntentCanceled(admin, pi)
       return
@@ -68,6 +115,8 @@ export async function dispatchBlitzPayPhase2Webhook(
     case "payment_intent.requires_action":
     case "payment_intent.amount_capturable_updated": {
       const pi = event.data.object as Stripe.PaymentIntent
+      const acct = typeof event.account === "string" && event.account.length > 0 ? event.account : null
+      await ensureBlitzpayDeferredPaymentIntentLinked(admin, pi, acct)
       await refreshBlitzpayPaymentIntentMirror(admin, pi, event.created)
       return
     }
@@ -75,8 +124,27 @@ export async function dispatchBlitzPayPhase2Webhook(
       const session = event.data.object as Stripe.Checkout.Session
       const meta = parseBlitzpayInvoiceMetadata(session.metadata as Record<string, string> | undefined)
       const acct = typeof event.account === "string" && event.account.length > 0 ? event.account : null
-      const piRef = session.payment_intent
-      const piId = typeof piRef === "string" ? piRef : piRef && typeof piRef === "object" && "id" in piRef ? String((piRef as { id: string }).id) : ""
+      const piId = await resolveCheckoutSessionPaymentIntentId(session, acct)
+
+      if (session.id && piId) {
+        try {
+          await attachStripePaymentIntentIdToBlitzpayRecord(admin, {
+            checkoutSessionId: session.id,
+            stripePaymentIntentId: piId,
+          })
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          console.error(
+            JSON.stringify({
+              source: "blitzpay-webhook",
+              message: "checkout.session.completed payment_intent backfill failed",
+              eventId: event.id,
+              checkoutSessionId: session.id,
+              error: msg.slice(0, 240),
+            }),
+          )
+        }
+      }
 
       if (meta && acct && piId && session.payment_status === "paid") {
         const stripe = getStripe()

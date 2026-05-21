@@ -8,6 +8,7 @@ import {
   connectCheckoutCustomerExists,
   createBlitzpayInvoiceCheckoutSession,
   retrieveConnectAccount,
+  stripePaymentIntentIdFromCheckoutSession,
 } from "@/lib/blitzpay/connect-stripe"
 import {
   buildBlitzpayStaffInvoiceCheckoutReturnUrls,
@@ -64,7 +65,7 @@ import {
 export type PrepareBlitzpayInvoicePayResult = {
   url: string
   checkoutSessionId: string
-  stripePaymentIntentId: string
+  stripePaymentIntentId: string | null
   blitzpayPaymentIntentRowId: string
 }
 
@@ -764,11 +765,20 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
     invoiceId,
     checkoutSessionId: session.id,
     checkoutUrlPresent: Boolean(session.url),
+    paymentIntentPresent: Boolean(stripePaymentIntentIdFromCheckoutSession(session)),
   })
 
-  const piRef = session.payment_intent
-  const stripePiId = typeof piRef === "string" ? piRef : piRef && typeof piRef === "object" && "id" in piRef ? String((piRef as { id: string }).id) : ""
-  if (!stripePiId) {
+  const stripePiId = stripePaymentIntentIdFromCheckoutSession(session)
+  const checkoutUrl = session.url
+  if (!stripePiId && checkoutUrl) {
+    logBlitzpayPreparePayDev("missing_payment_intent_deferred", {
+      organizationId,
+      invoiceId,
+      checkoutSessionId: session.id,
+      checkoutUrlPresent: true,
+    })
+  }
+  if (!stripePiId && !checkoutUrl) {
     logBlitzpayPreparePayDev("blocked", {
       organizationId,
       invoiceId,
@@ -791,7 +801,7 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
       id: internalPiId,
       organizationId,
       stripeConnectAccountId: acct,
-      stripePaymentIntentId: stripePiId,
+      stripePaymentIntentId: stripePiId ?? null,
       stripeCheckoutSessionId: session.id,
       status: "requires_payment_method",
       amountCents: BigInt(portion),
@@ -843,7 +853,7 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
     }
   }
 
-  const url = session.url
+  const url = checkoutUrl
   if (!url) {
     logBlitzpayPreparePayDev("blocked", {
       organizationId,
@@ -866,7 +876,7 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
     data: {
       url,
       checkoutSessionId: session.id,
-      stripePaymentIntentId: stripePiId,
+      stripePaymentIntentId: stripePiId ?? null,
       blitzpayPaymentIntentRowId: internalPiId,
     },
   }

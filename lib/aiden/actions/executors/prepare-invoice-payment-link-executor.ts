@@ -97,7 +97,7 @@ export type PrepareInvoicePaymentLinkExecutorResult =
       kind: "success"
       checkoutUrl: string
       checkoutSessionId: string
-      stripePaymentIntentId: string
+      stripePaymentIntentId: string | null
       blitzpayPaymentIntentRowId: string
       invoiceId: string
       message: string
@@ -106,7 +106,7 @@ export type PrepareInvoicePaymentLinkExecutorResult =
       kind: "idempotent"
       checkoutUrl: string
       checkoutSessionId: string
-      stripePaymentIntentId: string
+      stripePaymentIntentId: string | null
       blitzpayPaymentIntentRowId: string
       invoiceId: string
       message: string
