@@ -29,6 +29,8 @@ export default function AdminGrowthLeadsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [updatingLeadId, setUpdatingLeadId] = useState<string | null>(null)
+  const [deletingLeadId, setDeletingLeadId] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [selectedLead, setSelectedLead] = useState<GrowthLead | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
@@ -42,6 +44,7 @@ export default function AdminGrowthLeadsPage() {
   async function load() {
     setLoading(true)
     setError(null)
+    setSuccessMessage(null)
     try {
       const res = await fetch("/api/platform/growth/leads", { cache: "no-store" })
       const data = (await res.json().catch(() => ({}))) as {
@@ -142,6 +145,34 @@ export default function AdminGrowthLeadsPage() {
     setSelectedLead((prev) => (prev && prev.id === leadId ? { ...prev, ...patch } : prev))
   }
 
+  async function deleteLead(lead: GrowthLead) {
+    setDeletingLeadId(lead.id)
+    setError(null)
+    setSuccessMessage(null)
+    try {
+      const res = await fetch(`/api/platform/growth/leads/${lead.id}`, { method: "DELETE" })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        message?: string
+        error?: string
+      }
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message ?? data.error ?? "Could not delete growth lead.")
+      }
+
+      setLeads((prev) => prev.filter((item) => item.id !== lead.id))
+      if (selectedLead?.id === lead.id) {
+        setSelectedLead(null)
+        setDrawerOpen(false)
+      }
+      setSuccessMessage(`Deleted Growth Lead “${lead.companyName}”. Customer Prospects were not affected.`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete growth lead.")
+    } finally {
+      setDeletingLeadId(null)
+    }
+  }
+
   return (
     <PlatformAdminPageShell header={header}>
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
@@ -190,6 +221,12 @@ export default function AdminGrowthLeadsPage() {
           </div>
         ) : null}
 
+        {successMessage ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            {successMessage}
+          </div>
+        ) : null}
+
         {loading ? (
           <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
             <Loader2 className="mr-2 size-4 animate-spin" />
@@ -200,7 +237,9 @@ export default function AdminGrowthLeadsPage() {
             leads={leads}
             onStatusChange={updateLeadStatus}
             onOpenLead={openLead}
+            onDeleteLead={deleteLead}
             updatingLeadId={updatingLeadId}
+            deletingLeadId={deletingLeadId}
           />
         )}
       </div>

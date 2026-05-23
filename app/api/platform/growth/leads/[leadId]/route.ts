@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
-import { fetchGrowthLeadById, updateGrowthLead } from "@/lib/growth/lead-repository"
+import { fetchGrowthLeadById, updateGrowthLead, deleteGrowthLead } from "@/lib/growth/lead-repository"
 import { GROWTH_LEAD_SOURCE_KINDS, GROWTH_LEAD_STATUSES, GROWTH_LEAD_RESEARCH_PRIORITIES } from "@/lib/growth/types"
 
 export const runtime = "nodejs"
@@ -122,5 +122,35 @@ export async function PATCH(
       return NextResponse.json({ error: "empty_patch", message: "No changes provided." }, { status: 400 })
     }
     return NextResponse.json({ error: "update_failed", message }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  context: { params: Promise<{ leadId: string }> },
+) {
+  const access = await requireGrowthEnginePlatformAccess()
+  if (!access.ok) return access.response
+
+  const { leadId } = await context.params
+  if (!z.string().uuid().safeParse(leadId).success) {
+    return NextResponse.json({ error: "invalid_lead_id", message: "Lead id must be a UUID." }, { status: 400 })
+  }
+
+  try {
+    const deleted = await deleteGrowthLead(access.admin, leadId)
+    if (!deleted) {
+      return NextResponse.json({ error: "not_found", message: "Lead not found." }, { status: 404 })
+    }
+
+    logGrowthEngine("lead_delete_success", {
+      leadId,
+      actorEmail: access.userEmail,
+    })
+
+    return NextResponse.json({ ok: true, leadId })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ error: "delete_failed", message }, { status: 500 })
   }
 }

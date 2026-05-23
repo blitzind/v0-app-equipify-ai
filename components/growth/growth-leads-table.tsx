@@ -1,5 +1,18 @@
 "use client"
 
+import { useState } from "react"
+import { Loader2, Search, Trash2 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { GROWTH_LEAD_STATUSES, type GrowthLead, type GrowthLeadStatus } from "@/lib/growth/types"
 
@@ -37,10 +50,28 @@ type GrowthLeadsTableProps = {
   leads: GrowthLead[]
   onStatusChange: (leadId: string, status: GrowthLeadStatus) => Promise<void>
   onOpenLead?: (lead: GrowthLead) => void
+  onDeleteLead?: (lead: GrowthLead) => Promise<void>
   updatingLeadId?: string | null
+  deletingLeadId?: string | null
 }
 
-export function GrowthLeadsTable({ leads, onStatusChange, onOpenLead, updatingLeadId = null }: GrowthLeadsTableProps) {
+export function GrowthLeadsTable({
+  leads,
+  onStatusChange,
+  onOpenLead,
+  onDeleteLead,
+  updatingLeadId = null,
+  deletingLeadId = null,
+}: GrowthLeadsTableProps) {
+  const [deleteTarget, setDeleteTarget] = useState<GrowthLead | null>(null)
+
+  async function confirmDelete() {
+    if (!deleteTarget || !onDeleteLead) return
+    const lead = deleteTarget
+    setDeleteTarget(null)
+    await onDeleteLead(lead)
+  }
+
   if (leads.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-background px-6 py-12 text-center text-sm text-muted-foreground">
@@ -50,78 +81,117 @@ export function GrowthLeadsTable({ leads, onStatusChange, onOpenLead, updatingLe
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border">
-      <table className="min-w-full divide-y divide-border text-sm">
-        <thead className="bg-muted/40">
-          <tr>
-            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Company</th>
-            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Contact</th>
-            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Source</th>
-            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Priority</th>
-            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Created</th>
-            <th className="px-4 py-3 text-left font-medium text-muted-foreground"> </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border bg-card">
-          {leads.map((lead) => (
-            <tr key={lead.id} className="hover:bg-muted/30">
-              <td className="px-4 py-3 align-top">
-                <button
-                  type="button"
-                  className="text-left"
-                  onClick={() => onOpenLead?.(lead)}
-                >
-                  <div className="font-medium text-foreground underline-offset-2 hover:underline">{lead.companyName}</div>
-                {lead.website ? <div className="text-xs text-muted-foreground">{lead.website}</div> : null}
-                {lead.city || lead.state ? (
-                  <div className="text-xs text-muted-foreground">
-                    {[lead.city, lead.state].filter(Boolean).join(", ")}
-                  </div>
-                ) : null}
-                </button>
-              </td>
-              <td className="px-4 py-3 align-top">
-                <div>{lead.contactName ?? "—"}</div>
-                {lead.contactEmail ? <div className="text-xs text-muted-foreground">{lead.contactEmail}</div> : null}
-                {lead.contactPhone ? <div className="text-xs text-muted-foreground">{lead.contactPhone}</div> : null}
-              </td>
-              <td className="px-4 py-3 align-top">
-                <div className="capitalize">{lead.sourceKind.replace(/_/g, " ")}</div>
-                {lead.sourceDetail ? <div className="text-xs text-muted-foreground">{lead.sourceDetail}</div> : null}
-              </td>
-              <td className="px-4 py-3 align-top capitalize text-muted-foreground">{lead.researchPriority}</td>
-              <td className="px-4 py-3 align-top">
-                <select
-                  className={cn(
-                    "rounded-full border px-2.5 py-1 text-xs font-medium capitalize",
-                    statusClass(lead.status),
-                  )}
-                  value={lead.status}
-                  disabled={updatingLeadId === lead.id}
-                  onChange={(event) => void onStatusChange(lead.id, event.target.value as GrowthLeadStatus)}
-                >
-                  {GROWTH_LEAD_STATUSES.map((status) => (
-                    <option key={status} value={status}>
-                      {statusLabel(status)}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td className="px-4 py-3 align-top text-muted-foreground">{formatDate(lead.createdAt)}</td>
-              <td className="px-4 py-3 align-top">
-                <button
-                  type="button"
-                  className="text-xs font-medium text-primary hover:underline"
-                  onClick={() => onOpenLead?.(lead)}
-                >
-                  Research
-                </button>
-              </td>
+    <>
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="min-w-full divide-y divide-border text-sm">
+          <thead className="bg-muted/40">
+            <tr>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Company</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Contact</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Source</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Priority</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Created</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody className="divide-y divide-border bg-card">
+            {leads.map((lead) => (
+              <tr key={lead.id} className="hover:bg-muted/30">
+                <td className="px-4 py-3 align-top">
+                  <button type="button" className="text-left" onClick={() => onOpenLead?.(lead)}>
+                    <div className="font-medium text-foreground underline-offset-2 hover:underline">{lead.companyName}</div>
+                    {lead.website ? <div className="text-xs text-muted-foreground">{lead.website}</div> : null}
+                    {lead.city || lead.state ? (
+                      <div className="text-xs text-muted-foreground">
+                        {[lead.city, lead.state].filter(Boolean).join(", ")}
+                      </div>
+                    ) : null}
+                  </button>
+                </td>
+                <td className="px-4 py-3 align-top">
+                  <div>{lead.contactName ?? "—"}</div>
+                  {lead.contactEmail ? <div className="text-xs text-muted-foreground">{lead.contactEmail}</div> : null}
+                  {lead.contactPhone ? <div className="text-xs text-muted-foreground">{lead.contactPhone}</div> : null}
+                </td>
+                <td className="px-4 py-3 align-top">
+                  <div className="capitalize">{lead.sourceKind.replace(/_/g, " ")}</div>
+                  {lead.sourceDetail ? <div className="text-xs text-muted-foreground">{lead.sourceDetail}</div> : null}
+                </td>
+                <td className="px-4 py-3 align-top capitalize text-muted-foreground">{lead.researchPriority}</td>
+                <td className="px-4 py-3 align-top">
+                  <select
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 text-xs font-medium capitalize",
+                      statusClass(lead.status),
+                    )}
+                    value={lead.status}
+                    disabled={updatingLeadId === lead.id || deletingLeadId === lead.id}
+                    onChange={(event) => void onStatusChange(lead.id, event.target.value as GrowthLeadStatus)}
+                  >
+                    {GROWTH_LEAD_STATUSES.map((status) => (
+                      <option key={status} value={status}>
+                        {statusLabel(status)}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="px-4 py-3 align-top text-muted-foreground">{formatDate(lead.createdAt)}</td>
+                <td className="px-4 py-3 align-top">
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" onClick={() => onOpenLead?.(lead)} disabled={deletingLeadId === lead.id}>
+                      <Search className="mr-2 size-4" />
+                      Research
+                    </Button>
+                    {onDeleteLead ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setDeleteTarget(lead)}
+                        disabled={deletingLeadId === lead.id}
+                        aria-label={`Delete ${lead.companyName}`}
+                      >
+                        {deletingLeadId === lead.id ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="size-4" />
+                        )}
+                      </Button>
+                    ) : null}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <AlertDialog open={deleteTarget != null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Growth Lead?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">
+                This permanently deletes the internal Growth Lead
+                {deleteTarget ? ` “${deleteTarget.companyName}”` : ""} and its research history from the Growth Engine.
+              </span>
+              <span className="block font-medium text-foreground">
+                This does not delete customer Prospects, customers, or any outreach records.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => void confirmDelete()}
+            >
+              Delete Growth Lead
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

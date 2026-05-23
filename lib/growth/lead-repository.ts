@@ -295,3 +295,23 @@ export async function markGrowthLeadResearchCompleted(
   })
   return lead
 }
+
+export async function deleteGrowthLead(admin: SupabaseClient, leadId: string): Promise<boolean> {
+  const { data, error } = await growthLeadsTable(admin).delete().eq("id", leadId).select("id").maybeSingle()
+
+  if (error) {
+    logGrowthEngine("lead_delete_failed", {
+      table: "growth.leads",
+      action: "delete",
+      leadId,
+      code: error.code ?? null,
+      message: error.message,
+    })
+    throw new Error(error.message)
+  }
+
+  if (!data) return false
+
+  logGrowthEngine("lead_deleted", { leadId })
+  return true
+}
