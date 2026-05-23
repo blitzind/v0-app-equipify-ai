@@ -45,6 +45,10 @@ export async function GET() {
     await ensureGrowthStubOutboundConnection(access.admin, access.userId)
     const connections = await listGrowthProviderConnectionSummaries(access.admin)
     const adapters = listOutboundProviderAdapters()
+    logGrowthEngine("provider_connections_list_ok", {
+      count: connections.length,
+      softDelete: schema.softDelete,
+    })
     return NextResponse.json({
       ok: true,
       connections,

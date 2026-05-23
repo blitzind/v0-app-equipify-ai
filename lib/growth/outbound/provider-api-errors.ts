@@ -55,6 +55,14 @@ export function mapGrowthProviderApiError(error: unknown): GrowthProviderApiErro
     }
   }
 
+  if (detail === "provider_soft_delete_not_persisted") {
+    return {
+      error: "provider_error",
+      message: "Provider delete did not persist. Reload and try again.",
+      status: 500,
+    }
+  }
+
   return {
     error: "provider_error",
     message: detail || "Provider connection operation failed.",

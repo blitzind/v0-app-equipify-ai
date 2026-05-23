@@ -28,6 +28,10 @@ import {
 } from "../lib/growth/outbound/provider-connection-repository"
 import { mapGrowthProviderApiError } from "../lib/growth/outbound/provider-api-errors"
 import { withActiveProviderConnectionScope } from "../lib/growth/outbound/provider-connection-query"
+import {
+  filterActiveProviderConnectionRows,
+  isActiveProviderConnectionRow,
+} from "../lib/growth/outbound/provider-connection-query"
 
 const declared = emptyGrowthProviderCapabilitySnapshot()
 
@@ -116,6 +120,16 @@ assert.deepEqual(withActiveProviderConnectionScope(tableProbe.select(), true), {
   value: null,
   kind: "filter",
 })
+
+assert.equal(isActiveProviderConnectionRow({ deleted_at: null }), true)
+assert.equal(isActiveProviderConnectionRow({ deleted_at: "2026-01-01T00:00:00.000Z" }), false)
+assert.deepEqual(
+  filterActiveProviderConnectionRows(
+    [{ id: "a", deleted_at: null }, { id: "b", deleted_at: "2026-01-01T00:00:00.000Z" }],
+    true,
+  ),
+  [{ id: "a", deleted_at: null }],
+)
 
 async function run() {
   const stubValidation = await stubOutboundProviderAdapter.validateConnection({

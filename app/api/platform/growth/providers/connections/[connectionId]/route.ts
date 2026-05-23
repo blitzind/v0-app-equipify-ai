@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthEnginePlatformAccess, logGrowthEngine } from "@/lib/growth/access"
 import { mapGrowthProviderApiError } from "@/lib/growth/outbound/provider-api-errors"
 import {
   fetchGrowthProviderConnectionInternal,
@@ -70,9 +70,18 @@ export async function DELETE(
       connectionId,
       deletedBy: access.userId,
     })
+    logGrowthEngine("provider_connection_deleted", {
+      connectionId: deleted.id,
+      deletedAt: deleted.deletedAt,
+      deletedBy: access.userId,
+    })
     return NextResponse.json({ ok: true, deleted })
   } catch (e) {
     if (e instanceof GrowthProviderConnectionDeleteBlockedError) {
+      logGrowthEngine("provider_connection_delete_blocked", {
+        connectionId,
+        reason: e.code,
+      })
       return NextResponse.json(
         {
           error: e.code,
@@ -87,6 +96,12 @@ export async function DELETE(
       return NextResponse.json({ error: "not_found", message: "Connection not found." }, { status: 404 })
     }
     const mapped = mapGrowthProviderApiError(e)
+    logGrowthEngine("provider_connection_delete_failed", {
+      connectionId,
+      error: mapped.error,
+      message: mapped.message,
+      repositoryError: message,
+    })
     return NextResponse.json({ error: mapped.error, message: mapped.message }, { status: mapped.status })
   }
 }

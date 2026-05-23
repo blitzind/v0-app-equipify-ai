@@ -23,10 +23,14 @@ import {
 } from "@/lib/growth/outbound/provider-types"
 import type { GrowthOutboundProviderFamily } from "@/lib/growth/outbound/types"
 import {
+  filterActiveProviderConnectionRows,
   growthEmailProviderConnectionsTable,
   withActiveProviderConnectionScope,
 } from "@/lib/growth/outbound/provider-connection-query"
-import { probeGrowthProviderConnectionSchema } from "@/lib/growth/outbound/provider-schema-health"
+import {
+  invalidateGrowthProviderSchemaProbeCache,
+  probeGrowthProviderConnectionSchema,
+} from "@/lib/growth/outbound/provider-schema-health"
 
 export type GrowthProviderConnectionInternal = GrowthProviderConnectionSummary & {
   credentialsEncrypted: string | null
@@ -166,7 +170,8 @@ export async function listGrowthProviderConnectionSummaries(
   )
   const { data, error } = await selectQuery.order("created_at", { ascending: false })
   if (error) throw new Error(error.message)
-  return ((data ?? []) as ProviderConnectionRow[]).map(mapGrowthProviderConnectionSummary)
+  const rows = filterActiveProviderConnectionRows((data ?? []) as ProviderConnectionRow[], ctx.softDelete)
+  return rows.map(mapGrowthProviderConnectionSummary)
 }
 
 export async function createGrowthProviderConnection(
@@ -415,18 +420,27 @@ export async function softDeleteGrowthProviderConnection(
   }
 
   const deletedAt = new Date().toISOString()
-  const updateQuery = withActiveProviderConnectionScope(
-    connectionsTable(admin).update({
+  const { data, error } = await connectionsTable(admin)
+    .update({
       deleted_at: deletedAt,
       deleted_by: input.deletedBy,
       updated_at: deletedAt,
-    }),
-    true,
-  )
-  const { data, error } = await updateQuery.eq("id", input.connectionId).select("id, deleted_at").single()
+    })
+    .eq("id", input.connectionId)
+    .is("deleted_at", null)
+    .select("id, deleted_at")
+    .single()
 
   if (error) throw new Error(error.message)
-  return { id: (data as { id: string }).id, deletedAt: (data as { deleted_at: string }).deleted_at }
+
+  const row = data as { id: string; deleted_at: string | null }
+  if (!row?.deleted_at) {
+    throw new Error("provider_soft_delete_not_persisted")
+  }
+
+  invalidateGrowthProviderSchemaProbeCache()
+
+  return { id: row.id, deletedAt: row.deleted_at }
 }
 
 export function readGrowthProviderConnectionCredentials(

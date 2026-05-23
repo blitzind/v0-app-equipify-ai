@@ -55,3 +55,7 @@ export async function probeGrowthProviderConnectionSchema(
 export function resetGrowthProviderSchemaProbeCacheForTests(): void {
   cachedProbe = null
 }
+
+export function invalidateGrowthProviderSchemaProbeCache(): void {
+  cachedProbe = null
+}

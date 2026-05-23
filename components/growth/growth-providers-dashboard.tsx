@@ -90,7 +90,7 @@ export function GrowthProvidersDashboard() {
   const [credentialApiKey, setCredentialApiKey] = useState("")
 
   const selected = useMemo(
-    () => connections.find((entry) => entry.id === selectedId) ?? connections[0] ?? null,
+    () => (selectedId ? connections.find((entry) => entry.id === selectedId) ?? null : null),
     [connections, selectedId],
   )
 
@@ -105,15 +105,16 @@ export function GrowthProvidersDashboard() {
       }
       setConnections(data.connections)
       setAdapters(data.adapters ?? [])
-      if (!selectedId && data.connections[0]) {
-        setSelectedId(data.connections[0].id)
-      }
+      setSelectedId((current) => {
+        if (current && data.connections!.some((entry) => entry.id === current)) return current
+        return data.connections![0]?.id ?? ""
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
     } finally {
       setLoading(false)
     }
-  }, [selectedId])
+  }, [])
 
   const loadTimeline = useCallback(async (connectionId: string) => {
     const res = await fetch(
@@ -235,16 +236,26 @@ export function GrowthProvidersDashboard() {
 
   async function deleteConnection() {
     if (!selected) return
+    const deletedId = selected.id
     await runAction("delete", async () => {
-      const res = await fetch(`/api/platform/growth/providers/connections/${selected.id}`, { method: "DELETE" })
-      const data = (await res.json().catch(() => ({}))) as { message?: string; error?: string }
+      const res = await fetch(`/api/platform/growth/providers/connections/${deletedId}`, { method: "DELETE" })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        message?: string
+        error?: string
+        deleted?: { id: string; deletedAt: string }
+      }
       if (res.status === 409 && data.error === "active_email_provider") {
         throw new Error(data.message ?? "Clear the active email provider in Communication Settings first.")
       }
-      if (!res.ok) throw new Error(data.message ?? "Delete failed.")
+      if (!res.ok || !data.ok || !data.deleted?.deletedAt) {
+        throw new Error(data.message ?? "Delete failed.")
+      }
       setDeleteDialogOpen(false)
-      setSuccess("Provider connection deleted.")
+      setConnections((prev) => prev.filter((entry) => entry.id !== deletedId))
       setSelectedId("")
+      setTimeline([])
+      setSuccess("Provider connection deleted.")
       await load()
     })
   }
@@ -322,7 +333,7 @@ export function GrowthProvidersDashboard() {
                 type="button"
                 onClick={() => setSelectedId(connection.id)}
                 className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                  selected?.id === connection.id
+                  (selectedId ? selectedId === connection.id : connections[0]?.id === connection.id)
                     ? "border-emerald-200 bg-emerald-50"
                     : "border-border hover:bg-muted/40"
                 }`}

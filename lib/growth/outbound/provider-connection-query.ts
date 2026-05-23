@@ -17,3 +17,16 @@ export function withActiveProviderConnectionScope<
   }
   return query
 }
+
+/** Defense-in-depth when soft-delete columns are selected. */
+export function isActiveProviderConnectionRow(row: { deleted_at?: string | null | undefined }): boolean {
+  return row.deleted_at == null
+}
+
+export function filterActiveProviderConnectionRows<T extends { deleted_at?: string | null | undefined }>(
+  rows: T[],
+  softDelete: boolean,
+): T[] {
+  if (!softDelete) return rows
+  return rows.filter(isActiveProviderConnectionRow)
+}

@@ -8,6 +8,7 @@ import type {
 } from "@/lib/growth/outbound/types"
 import { GROWTH_OUTBOUND_DEFAULT_CONNECTION_LABEL, GROWTH_OUTBOUND_STUB_PROVIDER } from "@/lib/growth/outbound/constants"
 import {
+  filterActiveProviderConnectionRows,
   growthEmailProviderConnectionsTable,
   withActiveProviderConnectionScope,
 } from "@/lib/growth/outbound/provider-connection-query"
@@ -95,7 +96,8 @@ export async function listGrowthOutboundConnections(
   const selectQuery = withActiveProviderConnectionScope(connectionsTable(admin).select(SELECT), softDelete)
   const { data, error } = await selectQuery.order("created_at", { ascending: false })
   if (error) throw new Error(error.message)
-  return ((data ?? []) as ConnectionDbRow[]).map(mapRow)
+  const rows = filterActiveProviderConnectionRows((data ?? []) as ConnectionDbRow[], softDelete)
+  return rows.map(mapRow)
 }
 
 export async function ensureGrowthStubOutboundConnection(
