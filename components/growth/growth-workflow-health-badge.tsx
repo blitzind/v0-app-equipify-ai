@@ -17,7 +17,7 @@ function healthClass(status: GrowthWorkflowHealthStatus | null | undefined): str
     case "needs_attention":
       return "border-amber-200 bg-amber-50 text-amber-900"
     case "stalled":
-      return "border-orange-200 bg-orange-50 text-orange-900"
+      return "border-slate-200 bg-slate-100 text-slate-600"
     case "blocked":
       return "border-rose-200 bg-rose-50 text-rose-900"
     default:

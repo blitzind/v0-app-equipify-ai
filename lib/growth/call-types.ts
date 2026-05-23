@@ -66,4 +66,6 @@ export type GrowthCallQueueRow = {
   sourceChannel: string | null
   sourceCampaign: string | null
   sourceKind: string
+  agingDays: number | null
+  agingBucket: string | null
 }

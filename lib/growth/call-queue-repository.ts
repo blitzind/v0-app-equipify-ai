@@ -129,5 +129,7 @@ async function buildQueueRow(
     sourceChannel: lead.sourceChannel,
     sourceCampaign: lead.sourceCampaign,
     sourceKind: lead.sourceKind,
+    agingDays: lead.agingDays,
+    agingBucket: lead.agingBucket,
   }
 }
