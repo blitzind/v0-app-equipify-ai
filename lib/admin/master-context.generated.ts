@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 496,
-  sqlMigrations: 211,
+  apiRouteHandlers: 503,
+  sqlMigrations: 212,
   dashboardPages: 65,
-  componentsTsx: 355,
-  libTsFiles: 1036,
+  componentsTsx: 356,
+  libTsFiles: 1046,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **496** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **211** |
+| API route handlers (\`app/api/**/route.ts\`) | **503** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **212** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **355** |
-| \`lib/**/*.ts\` | **1036** |
+| \`components/**/*.tsx\` | **356** |
+| \`lib/**/*.ts\` | **1046** |
 
 ### Vercel crons
 
@@ -478,6 +478,13 @@ platform/growth/outbound/providers/route.ts
 platform/growth/outbound/replies/[replyId]/classification/route.ts
 platform/growth/outbound/webhooks/[webhookId]/link-lead/route.ts
 platform/growth/outbound/webhooks/route.ts
+platform/growth/providers/connections/[connectionId]/credentials/route.ts
+platform/growth/providers/connections/[connectionId]/disable/route.ts
+platform/growth/providers/connections/[connectionId]/reconnect/route.ts
+platform/growth/providers/connections/[connectionId]/route.ts
+platform/growth/providers/connections/[connectionId]/timeline/route.ts
+platform/growth/providers/connections/[connectionId]/validate/route.ts
+platform/growth/providers/connections/route.ts
 platform/growth/suppression/route.ts
 platform/growth/webhooks/outbound/[provider]/route.ts
 platform/import-operations/bulk-recover/route.ts

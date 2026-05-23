@@ -1,8 +1,14 @@
 import type {
   CanonicalOutboundEventType,
+  GrowthOutboundProviderFamily,
   NormalizedOutboundEvent,
   OutboundFixtureEnvelope,
 } from "@/lib/growth/outbound/types"
+import type {
+  GrowthProviderCapabilitySnapshot,
+  GrowthProviderValidationWarning,
+} from "@/lib/growth/outbound/provider-types"
+import type { GrowthEmailProviderConnection } from "@/lib/growth/outbound/types"
 
 export type ParsedWebhookEnvelope = OutboundFixtureEnvelope
 
@@ -12,9 +18,25 @@ export type VerifyWebhookResult = {
   message?: string
 }
 
+export type GrowthProviderValidationResult = {
+  healthy: boolean
+  warnings: GrowthProviderValidationWarning[]
+  supportedCapabilities: GrowthProviderCapabilitySnapshot
+  accountMetadata: Record<string, unknown>
+  temporarilyDegraded?: boolean
+  degradedReason?: string | null
+  degradedUntil?: string | null
+}
+
 export interface OutboundProviderAdapter {
   providerKey(): string
   providerName(): string
+  providerFamily(): GrowthOutboundProviderFamily
+  declaredCapabilities(): GrowthProviderCapabilitySnapshot
+  validateConnection(input: {
+    connection: GrowthEmailProviderConnection
+    credentials: Record<string, unknown> | null
+  }): Promise<GrowthProviderValidationResult>
   verifyWebhookSignature(input: {
     headers: Headers
     rawBody: string

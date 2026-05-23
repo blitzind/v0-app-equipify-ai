@@ -22,6 +22,11 @@ const LINKS = [
     match: (path: string) => path.startsWith("/admin/growth/outreach"),
   },
   {
+    href: "/admin/growth/providers",
+    label: "Providers",
+    match: (path: string) => path.startsWith("/admin/growth/providers"),
+  },
+  {
     href: "/admin/growth/settings",
     label: "Settings",
     match: (path: string) => path.startsWith("/admin/growth/settings"),

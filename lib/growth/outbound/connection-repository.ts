@@ -101,6 +101,8 @@ export async function ensureGrowthStubOutboundConnection(
       provider_family: "custom",
       label: GROWTH_OUTBOUND_DEFAULT_CONNECTION_LABEL,
       status: "active",
+      lifecycle_status: "connected",
+      health_reason: null,
       created_by: createdBy ?? null,
     })
     .select(SELECT)
