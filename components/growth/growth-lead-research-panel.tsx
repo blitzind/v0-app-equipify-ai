@@ -1,18 +1,52 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { GrowthLeadResearchHistory } from "@/components/growth/growth-lead-research-history"
 import { GrowthLeadResearchRunCard } from "@/components/growth/growth-lead-research-run-card"
+import { growthLeadResearchErrorMessage } from "@/lib/growth/research-error-messages"
 import type { GrowthLead } from "@/lib/growth/types"
-import type { GrowthLeadResearchBundle } from "@/lib/growth/research-types"
+import type { GrowthLeadResearchBundle, GrowthLeadResearchRun } from "@/lib/growth/research-types"
 
 type GrowthLeadResearchPanelProps = {
   lead: GrowthLead
   onLeadUpdated?: (patch: Partial<GrowthLead>) => void
+}
+
+type ResearchApiPayload = GrowthLeadResearchBundle & {
+  ok?: boolean
+  message?: string
+  error?: string
+  run?: GrowthLeadResearchRun | null
+  leadStatus?: GrowthLead["status"]
+  leadScore?: number | null
+  cached?: boolean
+}
+
+function mergeRunIntoBundle(
+  prev: GrowthLeadResearchBundle | null,
+  leadId: string,
+  run: GrowthLeadResearchRun,
+): GrowthLeadResearchBundle {
+  const runs = prev?.runs ?? []
+  const withoutDuplicate = runs.filter((item) => item.id !== run.id)
+  const nextRuns = [run, ...withoutDuplicate]
+
+  return {
+    leadId,
+    runs: nextRuns,
+    latestRun: run.status === "succeeded" ? run : (prev?.latestRun ?? null),
+    manualNotes: prev?.manualNotes ?? null,
+  }
+}
+
+function pickDisplayRun(bundle: GrowthLeadResearchBundle | null): GrowthLeadResearchRun | null {
+  if (!bundle) return null
+  if (bundle.latestRun) return bundle.latestRun
+  return bundle.runs.find((run) => run.status === "failed" || run.status === "partial") ?? null
 }
 
 export function GrowthLeadResearchPanel({ lead, onLeadUpdated }: GrowthLeadResearchPanelProps) {
@@ -24,70 +58,80 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated }: GrowthLeadResea
   const [cacheNotice, setCacheNotice] = useState<string | null>(null)
   const [notesDraft, setNotesDraft] = useState("")
 
-  async function loadResearch() {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch(`/api/platform/growth/leads/${lead.id}/research`, { cache: "no-store" })
-      const data = (await res.json().catch(() => ({}))) as GrowthLeadResearchBundle & {
-        ok?: boolean
-        message?: string
-        error?: string
+  const loadResearch = useCallback(
+    async (options?: { clearError?: boolean; silent?: boolean }) => {
+      if (options?.clearError !== false) setError(null)
+      if (!options?.silent) setLoading(true)
+
+      try {
+        const res = await fetch(`/api/platform/growth/leads/${lead.id}/research`, { cache: "no-store" })
+        const data = (await res.json().catch(() => ({}))) as ResearchApiPayload
+        if (!res.ok || !data.ok) {
+          throw new Error(growthLeadResearchErrorMessage(data))
+        }
+
+        setBundle({
+          leadId: data.leadId,
+          latestRun: data.latestRun ?? null,
+          runs: data.runs ?? [],
+          manualNotes: data.manualNotes ?? null,
+        })
+        setNotesDraft(data.manualNotes?.body ?? "")
+      } catch (e) {
+        if (!options?.silent) {
+          setError(e instanceof Error ? e.message : "Could not load research.")
+        }
+      } finally {
+        if (!options?.silent) setLoading(false)
       }
-      if (!res.ok || !data.ok) {
-        throw new Error(data.message ?? data.error ?? "Could not load research.")
-      }
-      setBundle({
-        leadId: data.leadId,
-        latestRun: data.latestRun ?? null,
-        runs: data.runs ?? [],
-        manualNotes: data.manualNotes ?? null,
-      })
-      setNotesDraft(data.manualNotes?.body ?? "")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load research.")
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+    [lead.id],
+  )
 
   useEffect(() => {
     void loadResearch()
-  }, [lead.id])
+  }, [loadResearch])
 
   async function generateResearch(regenerate = false) {
     setGenerating(true)
     setError(null)
     setCacheNotice(null)
+
     try {
       const res = await fetch(`/api/platform/growth/leads/${lead.id}/research`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ regenerate }),
       })
-      const data = (await res.json().catch(() => ({}))) as {
-        ok?: boolean
-        run?: GrowthLeadResearchBundle["latestRun"]
-        leadStatus?: GrowthLead["status"]
-        leadScore?: number | null
-        cached?: boolean
-        message?: string
-        error?: string
+      const data = (await res.json().catch(() => ({}))) as ResearchApiPayload
+
+      if (!res.ok || !data.ok) {
+        setError(growthLeadResearchErrorMessage(data))
+        if (data.run) {
+          setBundle((prev) => mergeRunIntoBundle(prev, lead.id, data.run!))
+        }
+        await loadResearch({ clearError: false, silent: true })
+        return
       }
-      if (!res.ok || !data.ok || !data.run) {
-        throw new Error(data.message ?? data.error ?? "Research generation failed.")
+
+      if (!data.run) {
+        setError("Research completed but no run payload was returned.")
+        await loadResearch({ clearError: false, silent: true })
+        return
       }
+
       if (data.cached) {
         setCacheNotice("Returned cached research from the last 30 days — no new AI run.")
       }
-      await loadResearch()
+
+      setBundle((prev) => mergeRunIntoBundle(prev, lead.id, data.run))
       onLeadUpdated?.({
         status: data.leadStatus,
         score: data.leadScore ?? null,
       })
+      await loadResearch({ clearError: false, silent: true })
     } catch (e) {
       setError(e instanceof Error ? e.message : "Research generation failed.")
-      await loadResearch()
     } finally {
       setGenerating(false)
     }
@@ -109,7 +153,7 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated }: GrowthLeadResea
         error?: string
       }
       if (!res.ok || !data.ok) {
-        throw new Error(data.message ?? data.error ?? "Could not save notes.")
+        throw new Error(growthLeadResearchErrorMessage(data))
       }
       setBundle((prev) =>
         prev
@@ -135,7 +179,8 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated }: GrowthLeadResea
     )
   }
 
-  const latestRun = bundle?.latestRun ?? null
+  const displayRun = pickDisplayRun(bundle)
+  const latestSucceededRun = bundle?.latestRun ?? null
   const runningRun = bundle?.runs.find((run) => run.status === "running") ?? null
 
   return (
@@ -145,9 +190,9 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated }: GrowthLeadResea
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => void generateResearch(Boolean(latestRun))} disabled={generating}>
+        <Button size="sm" onClick={() => void generateResearch(Boolean(latestSucceededRun))} disabled={generating}>
           {generating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Sparkles className="mr-2 size-4" />}
-          {latestRun ? "Regenerate research" : "Generate research"}
+          {latestSucceededRun ? "Regenerate research" : "Generate research"}
         </Button>
       </div>
 
@@ -168,9 +213,20 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated }: GrowthLeadResea
         </div>
       ) : null}
 
-      {latestRun ? <GrowthLeadResearchRunCard run={latestRun} /> : (
+      {displayRun ? (
+        <GrowthLeadResearchRunCard
+          run={displayRun}
+          title={
+            displayRun.status === "succeeded"
+              ? latestSucceededRun?.id === displayRun.id && cacheNotice
+                ? "Cached research"
+                : "Latest research"
+              : `${displayRun.status.replace(/_/g, " ")} research run`
+          }
+        />
+      ) : (
         <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-          No successful research yet. Generate research from the lead fields on file.
+          No research yet. Generate research from the lead fields on file.
         </div>
       )}
 
@@ -191,7 +247,7 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated }: GrowthLeadResea
       </div>
 
       {bundle ? (
-        <GrowthLeadResearchHistory runs={bundle.runs} latestRunId={latestRun?.id ?? null} />
+        <GrowthLeadResearchHistory runs={bundle.runs} latestRunId={displayRun?.id ?? null} />
       ) : null}
     </div>
   )

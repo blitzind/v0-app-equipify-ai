@@ -58,48 +58,67 @@ export async function POST(
   const rawBody = await request.json().catch(() => ({}))
   const parsed = PostSchema.safeParse(rawBody)
 
-  const result = await runGrowthLeadResearch({
-    admin: access.admin,
-    leadId,
-    createdBy: access.userId,
-    actingUserEmail: access.userEmail,
-    regenerate: parsed.success ? parsed.data.regenerate : false,
-  })
-
-  if (!result.ok) {
-    const status =
-      result.code === "not_found" ? 404
-      : result.code === "not_configured" || result.code === "server_config" ? 503
-      : 500
-
-    logGrowthEngine("research_api_failed", {
+  try {
+    const result = await runGrowthLeadResearch({
+      admin: access.admin,
       leadId,
-      code: result.code,
+      createdBy: access.userId,
+      actingUserEmail: access.userEmail,
+      regenerate: parsed.success ? parsed.data.regenerate : false,
+    })
+
+    if (!result.ok) {
+      const status =
+        result.code === "not_found" ? 404
+        : result.code === "not_configured" || result.code === "server_config" ? 503
+        : 500
+
+      logGrowthEngine("research_api_failed", {
+        leadId,
+        code: result.code,
+        actorEmail: access.userEmail,
+      })
+
+      return NextResponse.json(
+        {
+          ok: false,
+          error: result.code,
+          message: result.message,
+          run: result.run ?? null,
+        },
+        { status },
+      )
+    }
+
+    logGrowthEngine("research_api_success", {
+      leadId,
+      runId: result.run.id,
+      cached: result.cached,
       actorEmail: access.userEmail,
     })
 
+    return NextResponse.json({
+      ok: true,
+      run: result.run,
+      leadStatus: result.leadStatus,
+      leadScore: result.leadScore,
+      cached: result.cached,
+    })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    logGrowthEngine("research_api_exception", {
+      leadId,
+      message: message.slice(0, 240),
+      actorEmail: access.userEmail,
+    })
     return NextResponse.json(
       {
         ok: false,
-        error: result.code,
-        message: result.message,
-        run: result.run ?? null,
+        error: "research_failed",
+        message: message.slice(0, 240),
+        run: null,
       },
-      { status },
+      { status: 500 },
     )
   }
-
-  logGrowthEngine("research_api_success", {
-    leadId,
-    runId: result.run.id,
-    actorEmail: access.userEmail,
-  })
-
-  return NextResponse.json({
-    ok: true,
-    run: result.run,
-    leadStatus: result.leadStatus,
-    leadScore: result.leadScore,
-    cached: result.cached,
-  })
 }

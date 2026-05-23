@@ -44,7 +44,7 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
     return {
       ok: false,
       code: "server_config",
-      message: "GROWTH_ENGINE_AI_ORG_ID is not configured for AI research.",
+      message: "AI research is not configured. Set GROWTH_ENGINE_AI_ORG_ID on the server.",
     }
   }
 
@@ -62,20 +62,28 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
   })
 
   if (!regenerate) {
-    const cachedRun = await fetchCachedGrowthLeadResearchRun(input.admin, lead.id, inputHash)
-    if (cachedRun) {
-      logGrowthEngine("research_cache_hit", {
-        leadId: lead.id,
-        runId: cachedRun.id,
-        inputHash,
-      })
-      return {
-        ok: true,
-        run: cachedRun,
-        leadStatus: lead.status,
-        leadScore: lead.score,
-        cached: true,
+    try {
+      const cachedRun = await fetchCachedGrowthLeadResearchRun(input.admin, lead.id, inputHash)
+      if (cachedRun) {
+        logGrowthEngine("research_cache_hit", {
+          leadId: lead.id,
+          runId: cachedRun.id,
+          inputHash,
+        })
+        return {
+          ok: true,
+          run: cachedRun,
+          leadStatus: lead.status,
+          leadScore: lead.score,
+          cached: true,
+        }
       }
+    } catch (cacheError) {
+      const cacheMessage = cacheError instanceof Error ? cacheError.message : String(cacheError)
+      logGrowthEngine("research_cache_skipped", {
+        leadId: lead.id,
+        message: cacheMessage.slice(0, 240),
+      })
     }
   }
 
@@ -138,7 +146,7 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
         ok: false,
         code: notConfigured ? "not_configured" : "research_failed",
         message: notConfigured
-          ? "AI research requires OPENAI_API_KEY (and optional Anthropic/Google keys)."
+          ? "AI research is not configured. Set OPENAI_API_KEY and enable AI providers."
           : message.slice(0, 240),
         run,
       }
@@ -159,12 +167,22 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
       })) ?? run
 
     const nextStatus = nextLeadStatusAfterResearch(lead.status)
-    const updatedLead = await markGrowthLeadResearchCompleted(input.admin, {
-      leadId: lead.id,
-      latestResearchRunId: run.id,
-      equipifyFitScore: result.equipifyFitScore,
-      status: nextStatus,
-    })
+    let updatedLead = null
+    try {
+      updatedLead = await markGrowthLeadResearchCompleted(input.admin, {
+        leadId: lead.id,
+        latestResearchRunId: run.id,
+        equipifyFitScore: result.equipifyFitScore,
+        status: nextStatus,
+      })
+    } catch (trackingError) {
+      const trackingMessage = trackingError instanceof Error ? trackingError.message : String(trackingError)
+      logGrowthEngine("lead_research_tracking_failed_nonfatal", {
+        leadId: lead.id,
+        runId: run.id,
+        message: trackingMessage.slice(0, 240),
+      })
+    }
 
     logGrowthEngine("research_run_succeeded", {
       leadId: lead.id,
@@ -183,14 +201,16 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    run =
-      (await finishGrowthLeadResearchRun(input.admin, run.id, {
-        status: "failed",
-        errorCode: "research_failed",
-        errorMessage: message,
-        durationMs: Date.now() - started,
-        modelTask: "growth_lead_research",
-      })) ?? run
+    if (run.status !== "succeeded") {
+      run =
+        (await finishGrowthLeadResearchRun(input.admin, run.id, {
+          status: "failed",
+          errorCode: "research_failed",
+          errorMessage: message,
+          durationMs: Date.now() - started,
+          modelTask: "growth_lead_research",
+        })) ?? run
+    }
 
     logGrowthEngine("research_run_failed", {
       leadId: lead.id,
