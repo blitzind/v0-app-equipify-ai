@@ -7,6 +7,7 @@ import type {
   GrowthOutboundConnectionStatus,
 } from "@/lib/growth/outbound/types"
 import { GROWTH_OUTBOUND_DEFAULT_CONNECTION_LABEL, GROWTH_OUTBOUND_STUB_PROVIDER } from "@/lib/growth/outbound/constants"
+import { probeGrowthProviderConnectionSchema } from "@/lib/growth/outbound/provider-schema-health"
 
 type ConnectionDbRow = {
   id: string
@@ -35,8 +36,10 @@ function connectionsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("email_provider_connections")
 }
 
-function activeConnectionsQuery(admin: SupabaseClient) {
-  return connectionsTable(admin).is("deleted_at", null)
+async function scopedConnectionsQuery(admin: SupabaseClient) {
+  const { softDelete } = await probeGrowthProviderConnectionSchema(admin)
+  const query = connectionsTable(admin)
+  return softDelete ? query.is("deleted_at", null) : query
 }
 
 function mapRow(row: ConnectionDbRow): GrowthEmailProviderConnection {
@@ -64,7 +67,10 @@ export async function fetchGrowthOutboundConnectionById(
   admin: SupabaseClient,
   connectionId: string,
 ): Promise<GrowthEmailProviderConnection | null> {
-  const { data, error } = await connectionsTable(admin).select(SELECT).eq("id", connectionId).maybeSingle()
+  const { data, error } = await (await scopedConnectionsQuery(admin))
+    .select(SELECT)
+    .eq("id", connectionId)
+    .maybeSingle()
   if (error) throw new Error(error.message)
   return data ? mapRow(data as ConnectionDbRow) : null
 }
@@ -73,7 +79,7 @@ export async function fetchGrowthOutboundConnectionByProvider(
   admin: SupabaseClient,
   provider: string,
 ): Promise<GrowthEmailProviderConnection | null> {
-  const { data, error } = await connectionsTable(admin)
+  const { data, error } = await (await scopedConnectionsQuery(admin))
     .select(SELECT)
     .eq("provider", provider)
     .eq("status", "active")
@@ -87,7 +93,9 @@ export async function fetchGrowthOutboundConnectionByProvider(
 export async function listGrowthOutboundConnections(
   admin: SupabaseClient,
 ): Promise<GrowthEmailProviderConnection[]> {
-  const { data, error } = await connectionsTable(admin).select(SELECT).order("created_at", { ascending: false })
+  const { data, error } = await (await scopedConnectionsQuery(admin))
+    .select(SELECT)
+    .order("created_at", { ascending: false })
   if (error) throw new Error(error.message)
   return ((data ?? []) as ConnectionDbRow[]).map(mapRow)
 }
@@ -99,18 +107,20 @@ export async function ensureGrowthStubOutboundConnection(
   const existing = await fetchGrowthOutboundConnectionByProvider(admin, GROWTH_OUTBOUND_STUB_PROVIDER)
   if (existing) return existing
 
-  const { data, error } = await connectionsTable(admin)
-    .insert({
-      provider: GROWTH_OUTBOUND_STUB_PROVIDER,
-      provider_family: "custom",
-      label: GROWTH_OUTBOUND_DEFAULT_CONNECTION_LABEL,
-      status: "active",
-      lifecycle_status: "connected",
-      health_reason: null,
-      created_by: createdBy ?? null,
-    })
-    .select(SELECT)
-    .single()
+  const schema = await probeGrowthProviderConnectionSchema(admin)
+  const insert: Record<string, unknown> = {
+    provider: GROWTH_OUTBOUND_STUB_PROVIDER,
+    provider_family: "custom",
+    label: GROWTH_OUTBOUND_DEFAULT_CONNECTION_LABEL,
+    status: "active",
+    created_by: createdBy ?? null,
+  }
+  if (schema.providerConnector) {
+    insert.lifecycle_status = "connected"
+    insert.health_reason = null
+  }
+
+  const { data, error } = await connectionsTable(admin).insert(insert).select(SELECT).single()
 
   if (error) throw new Error(error.message)
   return mapRow(data as ConnectionDbRow)
@@ -139,7 +149,7 @@ export async function updateGrowthOutboundConnection(
     patch.notes = input.notes?.trim() ? input.notes.trim() : null
   }
 
-  const { data, error } = await activeConnectionsQuery(admin)
+  const { data, error } = await (await scopedConnectionsQuery(admin))
     .update(patch)
     .eq("id", connectionId)
     .select(SELECT)

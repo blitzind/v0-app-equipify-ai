@@ -56,6 +56,8 @@ const CAPABILITY_TONE: Record<string, string> = {
 
 type ConnectionsPayload = {
   ok?: boolean
+  error?: string
+  message?: string
   connections?: GrowthProviderConnectionSummary[]
   adapters?: Array<{ providerKey: string; providerName: string; providerFamily: GrowthOutboundProviderFamily }>
   capabilityLabels?: Record<GrowthProviderCapabilityKey, string>
@@ -99,7 +101,7 @@ export function GrowthProvidersDashboard() {
       const res = await fetch("/api/platform/growth/providers/connections", { cache: "no-store" })
       const data = (await res.json().catch(() => ({}))) as ConnectionsPayload
       if (!res.ok || !data.ok || !data.connections) {
-        throw new Error("Could not load provider connections.")
+        throw new Error(data.message ?? "Could not load provider connections.")
       }
       setConnections(data.connections)
       setAdapters(data.adapters ?? [])

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { mapGrowthProviderApiError } from "@/lib/growth/outbound/provider-api-errors"
 import {
   fetchGrowthProviderConnectionInternal,
   GrowthProviderConnectionDeleteBlockedError,
@@ -47,8 +48,8 @@ export async function PATCH(
     const connection = await updateGrowthProviderConnectionDetails(access.admin, connectionId, parsed.data)
     return NextResponse.json({ ok: true, connection })
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "update_failed", message }, { status: 500 })
+    const mapped = mapGrowthProviderApiError(e)
+    return NextResponse.json({ error: mapped.error, message: mapped.message }, { status: mapped.status })
   }
 }
 
@@ -85,6 +86,7 @@ export async function DELETE(
     if (message === "connection_not_found") {
       return NextResponse.json({ error: "not_found", message: "Connection not found." }, { status: 404 })
     }
-    return NextResponse.json({ error: "delete_failed", message }, { status: 500 })
+    const mapped = mapGrowthProviderApiError(e)
+    return NextResponse.json({ error: mapped.error, message: mapped.message }, { status: mapped.status })
   }
 }

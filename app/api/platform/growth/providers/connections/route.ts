@@ -2,11 +2,13 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { ensureGrowthStubOutboundConnection } from "@/lib/growth/outbound/connection-repository"
+import { mapGrowthProviderApiError } from "@/lib/growth/outbound/provider-api-errors"
 import { appendGrowthPlatformTimelineEvent } from "@/lib/growth/outbound/platform-timeline-repository"
 import {
   createGrowthProviderConnection,
   listGrowthProviderConnectionSummaries,
 } from "@/lib/growth/outbound/provider-connection-repository"
+import { probeGrowthProviderConnectionSchema } from "@/lib/growth/outbound/provider-schema-health"
 import { GROWTH_PROVIDER_CAPABILITY_LABELS } from "@/lib/growth/outbound/provider-types"
 import { listOutboundProviderAdapters } from "@/lib/growth/outbound/providers/registry"
 import { GROWTH_OUTBOUND_PROVIDER_FAMILIES } from "@/lib/growth/outbound/types"
@@ -28,6 +30,18 @@ export async function GET() {
   if (!access.ok) return access.response
 
   try {
+    const schema = await probeGrowthProviderConnectionSchema(access.admin)
+    if (!schema.providerConnector) {
+      return NextResponse.json(
+        {
+          error: "growth_schema_incomplete",
+          message:
+            "Apply Supabase migration 20270101120000_growth_engine_provider_connector.sql, then reload this page.",
+        },
+        { status: 503 },
+      )
+    }
+
     await ensureGrowthStubOutboundConnection(access.admin, access.userId)
     const connections = await listGrowthProviderConnectionSummaries(access.admin)
     const adapters = listOutboundProviderAdapters()
@@ -36,10 +50,11 @@ export async function GET() {
       connections,
       adapters,
       capabilityLabels: GROWTH_PROVIDER_CAPABILITY_LABELS,
+      schema: { softDelete: schema.softDelete },
     })
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "list_failed", message }, { status: 500 })
+    const mapped = mapGrowthProviderApiError(e)
+    return NextResponse.json({ error: mapped.error, message: mapped.message }, { status: mapped.status })
   }
 }
 
@@ -85,7 +100,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, connection }, { status: 201 })
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "create_failed", message }, { status: 500 })
+    const mapped = mapGrowthProviderApiError(e)
+    return NextResponse.json({ error: mapped.error, message: mapped.message }, { status: mapped.status })
   }
 }

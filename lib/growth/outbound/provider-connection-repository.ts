@@ -22,6 +22,7 @@ import {
   GROWTH_PROVIDER_VALIDATION_COOLDOWN_MS,
 } from "@/lib/growth/outbound/provider-types"
 import type { GrowthOutboundProviderFamily } from "@/lib/growth/outbound/types"
+import { probeGrowthProviderConnectionSchema } from "@/lib/growth/outbound/provider-schema-health"
 
 export type GrowthProviderConnectionInternal = GrowthProviderConnectionSummary & {
   credentialsEncrypted: string | null
@@ -61,19 +62,35 @@ type ProviderConnectionRow = {
   created_by: string | null
   created_at: string
   updated_at: string
-  deleted_at: string | null
-  deleted_by: string | null
+  deleted_at?: string | null
+  deleted_by?: string | null
 }
 
-const SELECT =
-  "id, provider, provider_family, label, status, api_base_url, credentials_encrypted, webhook_secret, config, last_webhook_at, last_error, monthly_cost_estimate, seat_count, notes, lifecycle_status, health_reason, last_validation_at, last_validation_success_at, validation_failure_count, last_error_message, capability_snapshot, last_validation_duration_ms, average_validation_duration_ms, temporarily_degraded, degraded_reason, degraded_until, credential_last_rotated_at, credential_rotation_recommended_at, next_validation_allowed_at, created_by, created_at, updated_at, deleted_at, deleted_by"
+const SELECT_BASE =
+  "id, provider, provider_family, label, status, api_base_url, credentials_encrypted, webhook_secret, config, last_webhook_at, last_error, monthly_cost_estimate, seat_count, notes, lifecycle_status, health_reason, last_validation_at, last_validation_success_at, validation_failure_count, last_error_message, capability_snapshot, last_validation_duration_ms, average_validation_duration_ms, temporarily_degraded, degraded_reason, degraded_until, credential_last_rotated_at, credential_rotation_recommended_at, next_validation_allowed_at, created_by, created_at, updated_at"
+
+const SELECT_WITH_SOFT_DELETE = `${SELECT_BASE}, deleted_at, deleted_by`
 
 function connectionsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("email_provider_connections")
 }
 
-function activeConnectionsQuery(admin: SupabaseClient) {
-  return connectionsTable(admin).is("deleted_at", null)
+type ConnectionQueryContext = {
+  select: string
+  softDelete: boolean
+}
+
+async function resolveConnectionQueryContext(admin: SupabaseClient): Promise<ConnectionQueryContext> {
+  const schema = await probeGrowthProviderConnectionSchema(admin)
+  return {
+    select: schema.softDelete ? SELECT_WITH_SOFT_DELETE : SELECT_BASE,
+    softDelete: schema.softDelete,
+  }
+}
+
+function scopedConnectionsQuery(admin: SupabaseClient, softDelete: boolean) {
+  const query = connectionsTable(admin)
+  return softDelete ? query.is("deleted_at", null) : query
 }
 
 function mapHealth(row: ProviderConnectionRow): GrowthProviderConnectionHealth {
@@ -130,7 +147,11 @@ export async function fetchGrowthProviderConnectionInternal(
   admin: SupabaseClient,
   connectionId: string,
 ): Promise<GrowthProviderConnectionInternal | null> {
-  const { data, error } = await activeConnectionsQuery(admin).select(SELECT).eq("id", connectionId).maybeSingle()
+  const ctx = await resolveConnectionQueryContext(admin)
+  const { data, error } = await scopedConnectionsQuery(admin, ctx.softDelete)
+    .select(ctx.select)
+    .eq("id", connectionId)
+    .maybeSingle()
   if (error) throw new Error(error.message)
   return data ? mapInternal(data as ProviderConnectionRow) : null
 }
@@ -138,7 +159,10 @@ export async function fetchGrowthProviderConnectionInternal(
 export async function listGrowthProviderConnectionSummaries(
   admin: SupabaseClient,
 ): Promise<GrowthProviderConnectionSummary[]> {
-  const { data, error } = await activeConnectionsQuery(admin).select(SELECT).order("created_at", { ascending: false })
+  const ctx = await resolveConnectionQueryContext(admin)
+  const { data, error } = await scopedConnectionsQuery(admin, ctx.softDelete)
+    .select(ctx.select)
+    .order("created_at", { ascending: false })
   if (error) throw new Error(error.message)
   return ((data ?? []) as ProviderConnectionRow[]).map(mapGrowthProviderConnectionSummary)
 }
@@ -162,6 +186,7 @@ export async function createGrowthProviderConnection(
     Date.now() + GROWTH_PROVIDER_CREDENTIAL_ROTATION_RECOMMEND_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString()
 
+  const ctx = await resolveConnectionQueryContext(admin)
   const { data, error } = await connectionsTable(admin)
     .insert({
       provider: input.provider,
@@ -179,7 +204,7 @@ export async function createGrowthProviderConnection(
       created_by: input.createdBy ?? null,
       updated_at: now,
     })
-    .select(SELECT)
+    .select(ctx.select)
     .single()
 
   if (error) throw new Error(error.message)
@@ -208,10 +233,11 @@ export async function updateGrowthProviderConnectionDetails(
   if (input.notes !== undefined) patch.notes = input.notes?.trim() || null
   if (input.webhookSecret !== undefined) patch.webhook_secret = input.webhookSecret?.trim() || null
 
-  const { data, error } = await activeConnectionsQuery(admin)
+  const ctx = await resolveConnectionQueryContext(admin)
+  const { data, error } = await scopedConnectionsQuery(admin, ctx.softDelete)
     .update(patch)
     .eq("id", connectionId)
-    .select(SELECT)
+    .select(ctx.select)
     .single()
 
   if (error) throw new Error(error.message)
@@ -228,7 +254,8 @@ export async function updateGrowthProviderConnectionCredentials(
     Date.now() + GROWTH_PROVIDER_CREDENTIAL_ROTATION_RECOMMEND_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString()
 
-  const { data, error } = await activeConnectionsQuery(admin)
+  const ctx = await resolveConnectionQueryContext(admin)
+  const { data, error } = await scopedConnectionsQuery(admin, ctx.softDelete)
     .update({
       credentials_encrypted: encryptGrowthProviderCredentials(credentials),
       credential_last_rotated_at: now,
@@ -238,7 +265,7 @@ export async function updateGrowthProviderConnectionCredentials(
       updated_at: now,
     })
     .eq("id", connectionId)
-    .select(SELECT)
+    .select(ctx.select)
     .single()
 
   if (error) throw new Error(error.message)
@@ -299,10 +326,11 @@ export async function applyGrowthProviderValidationPatch(
     patch.seat_count = input.seatCount
   }
 
-  const { data, error } = await activeConnectionsQuery(admin)
+  const ctx = await resolveConnectionQueryContext(admin)
+  const { data, error } = await scopedConnectionsQuery(admin, ctx.softDelete)
     .update(patch)
     .eq("id", connectionId)
-    .select(SELECT)
+    .select(ctx.select)
     .single()
 
   if (error) throw new Error(error.message)
@@ -314,7 +342,8 @@ export async function disableGrowthProviderConnection(
   connectionId: string,
 ): Promise<GrowthProviderConnectionSummary> {
   const now = new Date().toISOString()
-  const { data, error } = await activeConnectionsQuery(admin)
+  const ctx = await resolveConnectionQueryContext(admin)
+  const { data, error } = await scopedConnectionsQuery(admin, ctx.softDelete)
     .update({
       lifecycle_status: "disabled",
       status: "disabled",
@@ -325,7 +354,7 @@ export async function disableGrowthProviderConnection(
       updated_at: now,
     })
     .eq("id", connectionId)
-    .select(SELECT)
+    .select(ctx.select)
     .single()
 
   if (error) throw new Error(error.message)
@@ -337,7 +366,8 @@ export async function reconnectGrowthProviderConnection(
   connectionId: string,
 ): Promise<GrowthProviderConnectionSummary> {
   const now = new Date().toISOString()
-  const { data, error } = await activeConnectionsQuery(admin)
+  const ctx = await resolveConnectionQueryContext(admin)
+  const { data, error } = await scopedConnectionsQuery(admin, ctx.softDelete)
     .update({
       lifecycle_status: "configuring",
       status: "error",
@@ -348,7 +378,7 @@ export async function reconnectGrowthProviderConnection(
       updated_at: now,
     })
     .eq("id", connectionId)
-    .select(SELECT)
+    .select(ctx.select)
     .single()
 
   if (error) throw new Error(error.message)
@@ -377,8 +407,13 @@ export async function softDeleteGrowthProviderConnection(
     throw new GrowthProviderConnectionDeleteBlockedError()
   }
 
+  const ctx = await resolveConnectionQueryContext(admin)
+  if (!ctx.softDelete) {
+    throw new Error("growth_schema_incomplete_soft_delete")
+  }
+
   const deletedAt = new Date().toISOString()
-  const { data, error } = await activeConnectionsQuery(admin)
+  const { data, error } = await scopedConnectionsQuery(admin, true)
     .update({
       deleted_at: deletedAt,
       deleted_by: input.deletedBy,

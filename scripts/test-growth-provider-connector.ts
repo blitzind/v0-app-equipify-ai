@@ -26,6 +26,7 @@ import {
   growthProviderValidationCooldownRemainingMs,
   isGrowthProviderValidationCooldownActive,
 } from "../lib/growth/outbound/provider-connection-repository"
+import { mapGrowthProviderApiError } from "../lib/growth/outbound/provider-api-errors"
 
 const declared = emptyGrowthProviderCapabilitySnapshot()
 
@@ -96,6 +97,11 @@ assert.equal(growthProviderDeleteRequiresConfirmation("connected"), true)
 assert.equal(growthProviderDeleteRequiresConfirmation("warning"), true)
 assert.equal(growthProviderDeleteRequiresConfirmation("disabled"), false)
 assert.equal(growthProviderDeleteRequiresConfirmation("configuring"), false)
+
+const deletedAtError = mapGrowthProviderApiError(new Error('column "deleted_at" does not exist'))
+assert.equal(deletedAtError.error, "growth_schema_incomplete")
+assert.equal(deletedAtError.status, 503)
+assert.match(deletedAtError.message, /20270102120000/)
 
 async function run() {
   const stubValidation = await stubOutboundProviderAdapter.validateConnection({
