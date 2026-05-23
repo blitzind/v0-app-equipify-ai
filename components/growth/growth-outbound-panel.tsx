@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Loader2, Mail } from "lucide-react"
-import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import type { GrowthLeadOutboundData } from "@/components/growth/growth-outreach-center"
 import type { GrowthLead } from "@/lib/growth/types"
 
@@ -54,32 +54,30 @@ export function GrowthOutboundPanel({ lead }: GrowthOutboundPanelProps) {
   const hasData = Boolean(data && (data.messages.length > 0 || data.replies.length > 0))
 
   return (
-    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Mail className="size-4 text-muted-foreground" />
-          <h3 className="font-semibold">Outbound activity</h3>
-        </div>
-        {lead.contactTemperature ? (
+    <GrowthCollapsibleEngineCard
+      title="Outbound Activity"
+      icon={<Mail className="size-4" />}
+      headerTrailing={
+        lead.contactTemperature ? (
           <GrowthBadge label={lead.contactTemperature.replace(/_/g, " ")} tone={temperatureTone(lead.contactTemperature)} />
-        ) : null}
-      </div>
-
+        ) : null
+      }
+    >
       {loading ? (
-        <div className="mt-4 flex items-center text-sm text-muted-foreground">
+        <div className="flex items-center text-sm text-muted-foreground">
           <Loader2 className="mr-2 size-4 animate-spin" />
           Loading outbound history…
         </div>
       ) : error ? (
-        <p className="mt-4 text-sm text-destructive">{error}</p>
+        <p className="text-sm text-destructive">{error}</p>
       ) : !hasData ? (
-        <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/10 px-4 py-6 text-center text-sm text-muted-foreground">
+        <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
           No outbound activity yet. Events will appear when provider webhooks are connected or fixtures are processed.
         </div>
       ) : (
-        <div className="mt-4 space-y-4">
+        <div className="space-y-4">
           {data?.campaigns[0] ? (
-            <div className="rounded-lg border border-border/70 bg-muted/10 p-3 text-sm">
+            <div className="rounded-lg border border-border/70 bg-muted/15 p-3 text-sm">
               <div className="font-medium">{data.campaigns[0].name}</div>
               <div className="mt-1 text-xs text-muted-foreground">
                 {data.campaigns[0].sentCount} sent · {data.campaigns[0].replyCount} replies · engagement{" "}
@@ -92,7 +90,7 @@ export function GrowthOutboundPanel({ lead }: GrowthOutboundPanelProps) {
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Messages</h4>
             <ul className="mt-2 space-y-2">
               {(data?.messages ?? []).slice(0, 5).map((message) => (
-                <li key={message.id} className="rounded-lg border border-border/70 px-3 py-2 text-sm">
+                <li key={message.id} className="rounded-lg border border-border/80 bg-muted/15 px-3 py-2 text-sm">
                   <div className="font-medium">{message.subject ?? "Outbound email"}</div>
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <GrowthBadge label={message.status} tone="medium" />
@@ -108,7 +106,7 @@ export function GrowthOutboundPanel({ lead }: GrowthOutboundPanelProps) {
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Replies</h4>
               <ul className="mt-2 space-y-2">
                 {(data?.replies ?? []).slice(0, 5).map((reply) => (
-                  <li key={reply.id} className="rounded-lg border border-border/70 px-3 py-2 text-sm">
+                  <li key={reply.id} className="rounded-lg border border-border/80 bg-muted/15 px-3 py-2 text-sm">
                     <div className="flex flex-wrap items-center gap-2">
                       <GrowthBadge label={reply.classification.replace(/_/g, " ")} tone="healthy" />
                       {reply.classificationLocked ? (
@@ -123,7 +121,7 @@ export function GrowthOutboundPanel({ lead }: GrowthOutboundPanelProps) {
           ) : null}
         </div>
       )}
-    </section>
+    </GrowthCollapsibleEngineCard>
   )
 }
 

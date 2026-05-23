@@ -3,7 +3,7 @@
 import { AlertCircle, Gauge, Target, Timer, TrendingUp, Zap } from "lucide-react"
 import {
   GrowthBadge,
-  GrowthEngineCard,
+  GrowthCollapsibleEngineCard,
   StatTile,
   formatRelativeTime,
   momentumTierTone,
@@ -20,7 +20,7 @@ export function GrowthOperationalIntelligence({ lead }: GrowthOperationalIntelli
   const researchFreshness = researchFreshnessLabel(lead.lastResearchedAt)
 
   return (
-    <GrowthEngineCard title="Operational Intelligence" icon={<Gauge className="size-4" />}>
+    <GrowthCollapsibleEngineCard title="Operational Intelligence" icon={<Gauge className="size-4" />}>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <StatTile
           icon={<TrendingUp className="size-3.5" />}
@@ -105,6 +105,6 @@ export function GrowthOperationalIntelligence({ lead }: GrowthOperationalIntelli
           }
         />
       </div>
-    </GrowthEngineCard>
+    </GrowthCollapsibleEngineCard>
   )
 }

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react"
 import { Building2, Globe, MapPin, ShieldCheck, Wrench } from "lucide-react"
-import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import type { GrowthLeadResearchRun } from "@/lib/growth/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
 
@@ -62,16 +62,16 @@ export function GrowthCompanyIntelligenceSnapshot({ lead, latestRun }: GrowthCom
 
   if (!hasLeadIntel && !hasResearchIntel && !lead.website) {
     return (
-      <GrowthEngineCard title="Company Intelligence" icon={<Building2 className="size-4" />}>
+      <GrowthCollapsibleEngineCard title="Company Intelligence" icon={<Building2 className="size-4" />}>
         <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
           Company intelligence will populate after research and enrichment signals refresh.
         </div>
-      </GrowthEngineCard>
+      </GrowthCollapsibleEngineCard>
     )
   }
 
   return (
-    <GrowthEngineCard title="Company Intelligence" icon={<Building2 className="size-4" />}>
+    <GrowthCollapsibleEngineCard title="Company Intelligence" icon={<Building2 className="size-4" />}>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <IntelCell icon={<Building2 className="size-3.5" />} label="Revenue estimate" value={lead.estimatedAnnualRevenue ?? "—"} />
         <IntelCell icon={<Building2 className="size-3.5" />} label="Employee estimate" value={lead.estimatedEmployeeCount ?? "—"} />
@@ -110,6 +110,6 @@ export function GrowthCompanyIntelligenceSnapshot({ lead, latestRun }: GrowthCom
           value={dmConfidence ? <span className="capitalize">{dmConfidence}</span> : "—"}
         />
       </div>
-    </GrowthEngineCard>
+    </GrowthCollapsibleEngineCard>
   )
 }

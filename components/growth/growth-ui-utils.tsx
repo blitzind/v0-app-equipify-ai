@@ -43,6 +43,7 @@ export function GrowthCollapsibleEngineCard({
   id,
   defaultOpen = true,
   headerAside,
+  headerTrailing,
 }: {
   title: string
   icon?: ReactNode
@@ -51,6 +52,7 @@ export function GrowthCollapsibleEngineCard({
   id?: string
   defaultOpen?: boolean
   headerAside?: ReactNode
+  headerTrailing?: ReactNode
 }) {
   const [open, setOpen] = useState(defaultOpen)
 
@@ -70,6 +72,11 @@ export function GrowthCollapsibleEngineCard({
         {icon ? <span className="text-muted-foreground">{icon}</span> : null}
         <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
         {!open && headerAside ? <div className="ml-auto flex shrink-0 items-center gap-2">{headerAside}</div> : null}
+        {headerTrailing ? (
+          <div className={cn("flex shrink-0 items-center gap-2", open || !headerAside ? "ml-auto" : null)}>
+            {headerTrailing}
+          </div>
+        ) : null}
       </button>
       {open ? <div className="mt-4">{children}</div> : null}
     </section>

@@ -16,7 +16,7 @@ import {
   Mail,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
-import { GrowthEngineCard, formatRelativeTime } from "@/components/growth/growth-ui-utils"
+import { GrowthCollapsibleEngineCard, formatRelativeTime } from "@/components/growth/growth-ui-utils"
 import type { GrowthLeadTimelineEvent, GrowthLeadTimelineEventType } from "@/lib/growth/timeline-types"
 import { cn } from "@/lib/utils"
 
@@ -127,7 +127,7 @@ export function GrowthLeadTimelinePanel({ leadId, refreshToken = 0 }: GrowthLead
   }, [leadId, refreshToken])
 
   return (
-    <GrowthEngineCard title="Timeline" icon={<Clock className="size-4" />}>
+    <GrowthCollapsibleEngineCard title="Timeline" icon={<Clock className="size-4" />}>
       <div className="space-y-3">
         <p className="text-xs text-muted-foreground">Append-only workflow history</p>
 
@@ -187,6 +187,6 @@ export function GrowthLeadTimelinePanel({ leadId, refreshToken = 0 }: GrowthLead
           </ol>
         )}
       </div>
-    </GrowthEngineCard>
+    </GrowthCollapsibleEngineCard>
   )
 }
