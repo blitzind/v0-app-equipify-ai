@@ -3,6 +3,10 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { fetchGrowthCopilotSettings } from "@/lib/growth/ai-copilot-repository"
+import {
+  GROWTH_CALL_COPILOT_DISABLED_CODE,
+  resolveGrowthCallCopilotEnabled,
+} from "@/lib/growth/call-copilot-settings"
 import { buildGrowthCallCopilotBriefing } from "@/lib/growth/call-copilot-briefing"
 import {
   fetchGrowthCallCopilotSession,
@@ -39,8 +43,8 @@ export async function createGrowthCallCopilotPrepSession(
   },
 ): Promise<GrowthCallCopilotSession> {
   const settings = await fetchGrowthCopilotSettings(admin)
-  if (!settings.callCopilotEnabled) {
-    throw new Error("call_copilot_disabled")
+  if (!resolveGrowthCallCopilotEnabled(settings)) {
+    throw new Error(GROWTH_CALL_COPILOT_DISABLED_CODE)
   }
 
   const lead = await fetchGrowthLeadById(admin, input.leadId)

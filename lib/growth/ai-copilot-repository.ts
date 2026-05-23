@@ -8,6 +8,10 @@ import type {
   GrowthCopilotSettings,
   GrowthAiCopilotRule,
 } from "@/lib/growth/ai-copilot-types"
+import {
+  resolveGrowthCallCopilotEnabled,
+  resolveGrowthCallCopilotRequireSummaryApproval,
+} from "@/lib/growth/call-copilot-settings"
 
 function copilotSettingsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("copilot_settings")
@@ -84,6 +88,13 @@ function mapSettings(row: SettingsRow): GrowthCopilotSettings {
     aiCopilotPlaybookEnabled: row.ai_copilot_playbook_enabled ?? true,
     aiCopilotPlaybookMaxRulesPerGeneration: row.ai_copilot_playbook_max_rules_per_generation ?? 12,
     aiCopilotPlaybookSourceRetentionDays: row.ai_copilot_playbook_source_retention_days ?? 30,
+    callCopilotEnabled: resolveGrowthCallCopilotEnabled({
+      callCopilotEnabled: row.call_copilot_enabled,
+      aiCopilotEnabled: row.ai_copilot_enabled,
+    }),
+    callCopilotRequireSummaryApproval: resolveGrowthCallCopilotRequireSummaryApproval({
+      callCopilotRequireSummaryApproval: row.call_copilot_require_summary_approval,
+    }),
     updatedBy: row.updated_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

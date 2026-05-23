@@ -5,6 +5,11 @@ import {
   createGrowthCallCopilotPrepSession,
   listGrowthCallCopilotSessionsForLead,
 } from "@/lib/growth/run-call-copilot-session"
+import {
+  GROWTH_CALL_COPILOT_DISABLED_CODE,
+  GROWTH_CALL_COPILOT_DISABLED_MESSAGE,
+  isGrowthCallCopilotDisabledError,
+} from "@/lib/growth/call-copilot-settings"
 
 export const runtime = "nodejs"
 
@@ -65,8 +70,13 @@ export async function POST(
     return NextResponse.json({ ok: true, session }, { status: 201 })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    const status =
-      message === "call_copilot_disabled" ? 409 : message === "not_found" ? 404 : 500
+    if (isGrowthCallCopilotDisabledError(message)) {
+      return NextResponse.json(
+        { error: GROWTH_CALL_COPILOT_DISABLED_CODE, message: GROWTH_CALL_COPILOT_DISABLED_MESSAGE },
+        { status: 409 },
+      )
+    }
+    const status = message === "not_found" ? 404 : 500
     return NextResponse.json({ error: message, message }, { status })
   }
 }

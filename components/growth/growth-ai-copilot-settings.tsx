@@ -11,6 +11,7 @@ import type {
   GrowthCopilotSettings,
 } from "@/lib/growth/ai-copilot-types"
 import { GROWTH_AI_COPILOT_PROMPT_VARIANTS } from "@/lib/growth/ai-copilot-types"
+import { GROWTH_CALL_COPILOT_DISABLED_DRAWER_MESSAGE } from "@/lib/growth/call-copilot-settings"
 
 export function GrowthAiCopilotSettingsPanel() {
   const [loading, setLoading] = useState(true)
@@ -75,6 +76,8 @@ export function GrowthAiCopilotSettingsPanel() {
           aiCopilotPlaybookEnabled: settings.aiCopilotPlaybookEnabled,
           aiCopilotPlaybookMaxRulesPerGeneration: Number(playbookMaxRules),
           aiCopilotPlaybookSourceRetentionDays: Number(playbookRetentionDays),
+          callCopilotEnabled: settings.callCopilotEnabled,
+          callCopilotRequireSummaryApproval: settings.callCopilotRequireSummaryApproval,
         }),
       })
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; settings?: GrowthCopilotSettings; message?: string }
@@ -166,6 +169,46 @@ export function GrowthAiCopilotSettingsPanel() {
             </select>
           </div>
         </div>
+      </GrowthEngineCard>
+
+      <GrowthEngineCard title="Call Copilot">
+        <p className="mb-4 text-sm text-muted-foreground">
+          Call Copilot is separate from AI Communication Copilot. It powers pre-call briefings, in-call
+          objection help, and post-call summaries in the lead drawer and Calls dashboard.
+        </p>
+        {!settings.aiCopilotEnabled ? (
+          <p className="mb-4 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-sm text-amber-900">
+            Enable AI Copilot above before using Call Copilot — objection responses and post-call summaries
+            use the AI provider.
+          </p>
+        ) : null}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={settings.callCopilotEnabled}
+              disabled={!settings.aiCopilotEnabled}
+              onChange={(event) => setSettings({ ...settings, callCopilotEnabled: event.target.checked })}
+            />
+            Call Copilot enabled
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={settings.callCopilotRequireSummaryApproval}
+              disabled={!settings.callCopilotEnabled}
+              onChange={(event) =>
+                setSettings({ ...settings, callCopilotRequireSummaryApproval: event.target.checked })
+              }
+            />
+            Require summary approval before disposition
+          </label>
+        </div>
+        {settings.aiCopilotEnabled && !settings.callCopilotEnabled ? (
+          <p className="mt-4 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-sm text-amber-900">
+            {GROWTH_CALL_COPILOT_DISABLED_DRAWER_MESSAGE}
+          </p>
+        ) : null}
       </GrowthEngineCard>
 
       <GrowthEngineCard title="Playbook training">

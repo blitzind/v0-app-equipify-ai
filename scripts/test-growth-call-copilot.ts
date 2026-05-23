@@ -8,6 +8,10 @@ import {
   computeCallOutcomeConfidence,
   suggestCallDisposition,
 } from "../lib/growth/call-copilot-heuristics"
+import {
+  resolveGrowthCallCopilotEnabled,
+  resolveGrowthCallCopilotRequireSummaryApproval,
+} from "../lib/growth/call-copilot-settings"
 import type { GrowthCallCopilotBriefing, GrowthCallCopilotSession } from "../lib/growth/call-copilot-types"
 import {
   GROWTH_CALL_COPILOT_BUYING_SIGNAL_KEYS,
@@ -97,5 +101,13 @@ const mockSession: GrowthCallCopilotSession = {
 
 assert.equal(mockSession.dispositionApprovedAt, null)
 assert.ok(GROWTH_LEAD_CALL_DISPOSITIONS.includes(mockSession.suggestedDisposition!))
+
+assert.equal(resolveGrowthCallCopilotEnabled({ callCopilotEnabled: true, aiCopilotEnabled: false }), true)
+assert.equal(resolveGrowthCallCopilotEnabled({ callCopilotEnabled: false, aiCopilotEnabled: true }), false)
+assert.equal(
+  resolveGrowthCallCopilotEnabled({ callCopilotEnabled: undefined as unknown as boolean, aiCopilotEnabled: true }),
+  true,
+)
+assert.equal(resolveGrowthCallCopilotRequireSummaryApproval({ callCopilotRequireSummaryApproval: undefined as unknown as boolean }), true)
 
 console.log("growth call copilot tests passed")

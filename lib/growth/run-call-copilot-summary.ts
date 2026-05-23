@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { fetchGrowthCopilotSettings } from "@/lib/growth/ai-copilot-repository"
+import { resolveGrowthCallCopilotRequireSummaryApproval } from "@/lib/growth/call-copilot-settings"
 import type { GrowthLeadCallDisposition } from "@/lib/growth/call-types"
 import {
   computeCallOutcomeConfidence,
@@ -144,7 +145,7 @@ export async function approveGrowthCallCopilotSummary(
     callOutcomeConfidence: session.callOutcomeConfidence,
   })
 
-  if (settings.callCopilotRequireSummaryApproval) {
+  if (resolveGrowthCallCopilotRequireSummaryApproval(settings)) {
     await emitGrowthLeadCallCopilotSummaryApprovedTimeline(admin, {
       leadId: input.leadId,
       sessionId: session.id,

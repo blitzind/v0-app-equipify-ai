@@ -13,6 +13,12 @@ import {
   GROWTH_CALL_COPILOT_COMMITMENT_SIGNAL_LABELS,
 } from "@/lib/growth/call-copilot-types"
 import { GROWTH_LEAD_CALL_DISPOSITIONS } from "@/lib/growth/call-types"
+import type { GrowthCopilotSettings } from "@/lib/growth/ai-copilot-types"
+import {
+  GROWTH_CALL_COPILOT_DISABLED_DRAWER_MESSAGE,
+  isGrowthCallCopilotDisabledError,
+  resolveGrowthCallCopilotEnabled,
+} from "@/lib/growth/call-copilot-settings"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthCallCopilotProps = {
@@ -38,8 +44,27 @@ export function GrowthCallCopilot({ lead }: GrowthCallCopilotProps) {
   const [error, setError] = useState<string | null>(null)
   const [objectionText, setObjectionText] = useState("")
   const [liveNotes, setLiveNotes] = useState("")
+  const [copilotSettings, setCopilotSettings] = useState<GrowthCopilotSettings | null>(null)
+
+  const callCopilotEnabled = copilotSettings ? resolveGrowthCallCopilotEnabled(copilotSettings) : null
+  const aiCopilotEnabled = copilotSettings?.aiCopilotEnabled ?? null
 
   const briefing = useMemo(() => getBriefing(activeSession), [activeSession])
+
+  const loadSettings = useCallback(async () => {
+    try {
+      const res = await fetch("/api/platform/growth/copilot/settings", { cache: "no-store" })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        settings?: GrowthCopilotSettings
+      }
+      if (res.ok && data.ok && data.settings) {
+        setCopilotSettings(data.settings)
+      }
+    } catch {
+      setCopilotSettings(null)
+    }
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -66,6 +91,10 @@ export function GrowthCallCopilot({ lead }: GrowthCallCopilotProps) {
       setLoading(false)
     }
   }, [lead.id])
+
+  useEffect(() => {
+    void loadSettings()
+  }, [loadSettings])
 
   useEffect(() => {
     void load()
@@ -111,9 +140,16 @@ export function GrowthCallCopilot({ lead }: GrowthCallCopilotProps) {
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
         session?: GrowthCallCopilotSession
+        error?: string
         message?: string
       }
-      if (!res.ok || !data.ok || !data.session) throw new Error(data.message ?? "Could not create briefing.")
+      if (!res.ok || !data.ok || !data.session) {
+        if (isGrowthCallCopilotDisabledError(data.error)) {
+          setError(GROWTH_CALL_COPILOT_DISABLED_DRAWER_MESSAGE)
+          return
+        }
+        throw new Error(data.message ?? "Could not create briefing.")
+      }
       setActiveSession(data.session)
       setSessions((prev) => [data.session!, ...prev])
       setLiveNotes("")
@@ -224,6 +260,12 @@ export function GrowthCallCopilot({ lead }: GrowthCallCopilotProps) {
           Pre-call briefing and in-call guidance. Manual signals only — disposition requires human approval.
         </p>
 
+        {aiCopilotEnabled && callCopilotEnabled === false ? (
+          <p className="rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-sm text-amber-900">
+            {GROWTH_CALL_COPILOT_DISABLED_DRAWER_MESSAGE}
+          </p>
+        ) : null}
+
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
@@ -231,7 +273,7 @@ export function GrowthCallCopilot({ lead }: GrowthCallCopilotProps) {
           </div>
         ) : null}
 
-        {!loading && !activeSession ? (
+        {!loading && !activeSession && callCopilotEnabled !== false ? (
           <Button type="button" size="sm" disabled={acting !== null} onClick={() => void createPrep()}>
             {acting === "create" ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : <Sparkles className="mr-1 size-3.5" />}
             Prepare Call Briefing
