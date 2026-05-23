@@ -22,6 +22,7 @@ type GrowthLeadDrawerProps = {
 export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated }: GrowthLeadDrawerProps) {
   const [latestResearchRun, setLatestResearchRun] = useState<GrowthLeadResearchRun | null>(null)
   const [openAddDmForm, setOpenAddDmForm] = useState(false)
+  const [timelineRefreshToken, setTimelineRefreshToken] = useState(0)
 
   if (!lead) return null
 
@@ -74,7 +75,7 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated }: Gr
         onLatestRunChange={setLatestResearchRun}
       />
 
-      <GrowthLeadTimelinePanel leadId={activeLead.id} />
+      <GrowthLeadTimelinePanel leadId={activeLead.id} refreshToken={timelineRefreshToken} />
       </div>
     </DetailDrawer>
   )

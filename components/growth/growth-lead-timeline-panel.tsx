@@ -90,15 +90,18 @@ function emphasisClass(emphasis: ReturnType<typeof eventMeta>["emphasis"]) {
 
 type GrowthLeadTimelinePanelProps = {
   leadId: string
+  refreshToken?: number
 }
 
-export function GrowthLeadTimelinePanel({ leadId }: GrowthLeadTimelinePanelProps) {
+export function GrowthLeadTimelinePanel({ leadId, refreshToken = 0 }: GrowthLeadTimelinePanelProps) {
   const [events, setEvents] = useState<GrowthLeadTimelineEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  async function load() {
-    setLoading(true)
+  async function load(options?: { silent?: boolean }) {
+    if (!options?.silent) {
+      setLoading(true)
+    }
     setError(null)
     try {
       const res = await fetch(`/api/platform/growth/leads/${leadId}/timeline`, { cache: "no-store" })
@@ -120,8 +123,8 @@ export function GrowthLeadTimelinePanel({ leadId }: GrowthLeadTimelinePanelProps
   }
 
   useEffect(() => {
-    void load()
-  }, [leadId])
+    void load({ silent: refreshToken > 0 })
+  }, [leadId, refreshToken])
 
   return (
     <GrowthEngineCard title="Timeline" icon={<Clock className="size-4" />}>

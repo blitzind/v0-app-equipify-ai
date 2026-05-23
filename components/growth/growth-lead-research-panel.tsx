@@ -217,7 +217,7 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated, onLatestRunChange
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={() => void generateResearch(Boolean(latestUsableRun))} disabled={generating}>
               {generating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Sparkles className="mr-2 size-4" />}
-              {latestUsableRun ? "Regenerate research" : "Generate research"}
+              {latestUsableRun ? "Regenerate Research" : "Generate Research"}
             </Button>
           </div>
 
@@ -280,7 +280,7 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated, onLatestRunChange
                 />
                 <div className="flex justify-end">
                   <Button size="sm" variant="outline" onClick={() => void saveNotes()} disabled={savingNotes}>
-                    {savingNotes ? "Saving…" : "Save notes"}
+                    {savingNotes ? "Saving…" : "Save Notes"}
                   </Button>
                 </div>
               </div>

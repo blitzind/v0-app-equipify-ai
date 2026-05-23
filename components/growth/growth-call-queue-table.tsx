@@ -285,7 +285,7 @@ export function GrowthCallQueueTable({
       <Dialog open={Boolean(followUpTarget)} onOpenChange={(open) => !open && closeFollowUpDialog()}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Follow up later</DialogTitle>
+            <DialogTitle>Follow Up Later</DialogTitle>
             <DialogDescription>
               {followUpTarget ? `Schedule a follow-up for ${followUpTarget.companyName}.` : "Schedule a follow-up."}
             </DialogDescription>
@@ -334,7 +334,7 @@ export function GrowthCallQueueTable({
             </Button>
             <Button type="button" onClick={() => void submitFollowUp()} disabled={followUpSaving || !followUpAt}>
               {followUpSaving ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-              Save follow-up
+              Save Follow Up
             </Button>
           </DialogFooter>
         </DialogContent>

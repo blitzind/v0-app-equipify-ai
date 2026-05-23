@@ -26,6 +26,9 @@ export async function POST(
 
   const rawBody = await request.json().catch(() => ({}))
   const parsed = ManualTouchSchema.safeParse(rawBody)
+  if (!parsed.success) {
+    return NextResponse.json({ error: "invalid_body", message: "Invalid manual touch payload." }, { status: 400 })
+  }
 
   try {
     const lead = await fetchGrowthLeadById(access.admin, leadId)
@@ -36,11 +39,17 @@ export async function POST(
     await recordGrowthLeadHumanTouch(access.admin, leadId)
     await emitGrowthLeadManualTouchTimeline(access.admin, {
       leadId,
-      note: parsed.success ? parsed.data.note : null,
+      note: parsed.data.note,
       actor: { userId: access.userId, email: access.userEmail },
     })
 
     const updatedLead = await recomputeGrowthLeadWorkflowSignals(access.admin, leadId)
+    if (!updatedLead) {
+      return NextResponse.json(
+        { error: "update_failed", message: "Could not refresh lead after manual touch." },
+        { status: 500 },
+      )
+    }
 
     logGrowthEngine("manual_touch_recorded", {
       leadId,

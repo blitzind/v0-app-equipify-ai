@@ -275,7 +275,7 @@ export async function emitGrowthLeadManualTouchTimeline(
   await appendGrowthLeadTimelineEvent(admin, {
     leadId: input.leadId,
     eventType: "manual_touch",
-    title: "Manual touch",
+    title: "Manual Touch",
     summary: input.note?.trim() ? input.note.trim() : null,
     payload: { noteLength: input.note?.trim()?.length ?? 0 },
     actorUserId: input.actor?.userId,

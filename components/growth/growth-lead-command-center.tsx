@@ -42,6 +42,7 @@ type GrowthLeadCommandCenterProps = {
   lead: GrowthLead
   onLeadUpdated?: (patch: Partial<GrowthLead>) => void
   onAddDecisionMaker?: () => void
+  onTimelineRefresh?: () => void
 }
 
 function formatSource(lead: GrowthLead): string {
@@ -63,7 +64,12 @@ function toDateInputValue(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-export function GrowthLeadCommandCenter({ lead, onLeadUpdated, onAddDecisionMaker }: GrowthLeadCommandCenterProps) {
+export function GrowthLeadCommandCenter({
+  lead,
+  onLeadUpdated,
+  onAddDecisionMaker,
+  onTimelineRefresh,
+}: GrowthLeadCommandCenterProps) {
   const [primaryDmName, setPrimaryDmName] = useState<string | null>(null)
   const [touchSaving, setTouchSaving] = useState(false)
   const [followUpOpen, setFollowUpOpen] = useState(false)
@@ -71,6 +77,7 @@ export function GrowthLeadCommandCenter({ lead, onLeadUpdated, onAddDecisionMake
   const [followUpNote, setFollowUpNote] = useState("")
   const [followUpSaving, setFollowUpSaving] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null)
   const [callSheetOpen, setCallSheetOpen] = useState(false)
 
   const phone = lead.contactPhone?.trim() || null
@@ -114,21 +121,36 @@ export function GrowthLeadCommandCenter({ lead, onLeadUpdated, onAddDecisionMake
     [],
   )
 
+  useEffect(() => {
+    if (!actionSuccess) return
+    const timer = window.setTimeout(() => setActionSuccess(null), 4000)
+    return () => window.clearTimeout(timer)
+  }, [actionSuccess])
+
   async function recordManualTouch() {
     setTouchSaving(true)
     setActionError(null)
+    setActionSuccess(null)
     try {
       const res = await fetch(`/api/platform/growth/leads/${lead.id}/timeline/manual-touch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       })
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string; error?: string }
-      if (!res.ok || !data.ok) {
-        throw new Error(data.message ?? data.error ?? "Could not record manual touch.")
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        lead?: GrowthLead
+        message?: string
+        error?: string
       }
+      if (!res.ok || !data.ok || !data.lead) {
+        throw new Error(data.message ?? data.error ?? "Could not record Manual Touch.")
+      }
+      onLeadUpdated?.(data.lead)
+      onTimelineRefresh?.()
+      setActionSuccess("Manual Touch recorded.")
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Could not record manual touch.")
+      setActionError(e instanceof Error ? e.message : "Could not record Manual Touch.")
     } finally {
       setTouchSaving(false)
     }
@@ -147,6 +169,7 @@ export function GrowthLeadCommandCenter({ lead, onLeadUpdated, onAddDecisionMake
 
     setFollowUpSaving(true)
     setActionError(null)
+    setActionSuccess(null)
     try {
       const input: {
         disposition: GrowthLeadCallDisposition
@@ -169,12 +192,14 @@ export function GrowthLeadCommandCenter({ lead, onLeadUpdated, onAddDecisionMake
         error?: string
       }
       if (!res.ok || !data.ok) {
-        throw new Error(data.message ?? data.error ?? "Could not schedule follow-up.")
+        throw new Error(data.message ?? data.error ?? "Could not schedule Follow Up.")
       }
       if (data.lead) onLeadUpdated?.(data.lead)
+      onTimelineRefresh?.()
       setFollowUpOpen(false)
+      setActionSuccess("Follow Up scheduled.")
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Could not schedule follow-up.")
+      setActionError(e instanceof Error ? e.message : "Could not schedule Follow Up.")
     } finally {
       setFollowUpSaving(false)
     }
@@ -249,40 +274,50 @@ export function GrowthLeadCommandCenter({ lead, onLeadUpdated, onAddDecisionMake
             </div>
           ) : null}
 
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {phone ? (
-              <Button size="lg" className="h-11 justify-start gap-2 sm:col-span-2 lg:col-span-1" onClick={() => setCallSheetOpen(true)}>
-                <Phone className="size-4" />
-                Call
+          {actionSuccess ? (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+              {actionSuccess}
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              {phone ? (
+                <Button size="lg" className="h-11 justify-start gap-2" onClick={() => setCallSheetOpen(true)}>
+                  <Phone className="size-4" />
+                  Call
+                </Button>
+              ) : (
+                <Button size="lg" variant="outline" className="h-11 justify-start gap-2" disabled>
+                  <Phone className="size-4" />
+                  Call
+                </Button>
+              )}
+              <Button size="lg" variant="outline" className="h-11 justify-start gap-2" onClick={() => scrollTo("growth-research")}>
+                <Search className="size-4" />
+                Research
               </Button>
-            ) : (
-              <Button size="lg" variant="outline" className="h-11 justify-start gap-2" disabled>
-                <Phone className="size-4" />
-                Call
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <Button size="lg" variant="outline" className="h-11 justify-start gap-2" onClick={openFollowUpDialog}>
+                <Clock className="size-4" />
+                Follow Up
               </Button>
-            )}
-            <Button size="lg" variant="outline" className="h-11 justify-start gap-2" onClick={() => scrollTo("growth-research")}>
-              <Search className="size-4" />
-              Research
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="h-11 justify-start gap-2"
-              disabled={touchSaving}
-              onClick={() => void recordManualTouch()}
-            >
-              {touchSaving ? <Loader2 className="size-4 animate-spin" /> : <Activity className="size-4" />}
-              Manual touch
-            </Button>
-            <Button size="lg" variant="outline" className="h-11 justify-start gap-2" onClick={openFollowUpDialog}>
-              <Clock className="size-4" />
-              Follow up
-            </Button>
-            <Button size="lg" variant="outline" className="h-11 justify-start gap-2" onClick={onAddDecisionMaker}>
-              <UserPlus className="size-4" />
-              Add decision maker
-            </Button>
+              <Button size="lg" variant="outline" className="h-11 justify-start gap-2" onClick={onAddDecisionMaker}>
+                <UserPlus className="size-4" />
+                Add Decision Maker
+              </Button>
+              <Button
+                size="lg"
+                variant="ghost"
+                className="h-11 justify-start gap-2 text-muted-foreground hover:text-foreground"
+                disabled={touchSaving}
+                onClick={() => void recordManualTouch()}
+              >
+                {touchSaving ? <Loader2 className="size-4 animate-spin" /> : <Activity className="size-4" />}
+                Manual Touch
+              </Button>
+            </div>
           </div>
 
           {lead.nextBestAction ? (
@@ -296,7 +331,7 @@ export function GrowthLeadCommandCenter({ lead, onLeadUpdated, onAddDecisionMake
       <Dialog open={followUpOpen} onOpenChange={(open) => !followUpSaving && setFollowUpOpen(open)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Follow up later</DialogTitle>
+            <DialogTitle>Follow Up Later</DialogTitle>
             <DialogDescription>Schedule a follow-up for {lead.companyName}.</DialogDescription>
           </DialogHeader>
 
@@ -343,7 +378,7 @@ export function GrowthLeadCommandCenter({ lead, onLeadUpdated, onAddDecisionMake
             </Button>
             <Button type="button" onClick={() => void submitFollowUp()} disabled={followUpSaving || !followUpAt}>
               {followUpSaving ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-              Save follow-up
+              Save Follow Up
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -356,7 +391,10 @@ export function GrowthLeadCommandCenter({ lead, onLeadUpdated, onAddDecisionMake
           leadId={lead.id}
           phone={phone}
           contactLabel={lead.contactName ?? lead.companyName}
-          onLeadUpdated={(updated) => onLeadUpdated?.(updated)}
+          onLeadUpdated={(updated) => {
+            onLeadUpdated?.(updated)
+            onTimelineRefresh?.()
+          }}
         />
       ) : null}
     </>

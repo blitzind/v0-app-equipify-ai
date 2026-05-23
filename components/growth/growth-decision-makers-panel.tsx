@@ -307,7 +307,7 @@ export function GrowthDecisionMakersPanel({
         ) : (
           <Button size="lg" variant="default" className="w-full sm:w-auto" onClick={() => setShowForm(true)}>
             <UserPlus className="mr-2 size-4" />
-            Add decision maker
+            Add Decision Maker
           </Button>
         )}
       </div>
