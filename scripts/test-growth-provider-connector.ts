@@ -27,10 +27,11 @@ import {
   isGrowthProviderValidationCooldownActive,
 } from "../lib/growth/outbound/provider-connection-repository"
 import { mapGrowthProviderApiError } from "../lib/growth/outbound/provider-api-errors"
-import { withActiveProviderConnectionScope } from "../lib/growth/outbound/provider-connection-query"
+import { growthStubBootstrapBlockedBySoftDelete } from "../lib/growth/outbound/connection-repository"
 import {
   filterActiveProviderConnectionRows,
   isActiveProviderConnectionRow,
+  withActiveProviderConnectionScope,
 } from "../lib/growth/outbound/provider-connection-query"
 
 const declared = emptyGrowthProviderCapabilitySnapshot()
@@ -130,6 +131,11 @@ assert.deepEqual(
   ),
   [{ id: "a", deleted_at: null }],
 )
+
+assert.equal(growthStubBootstrapBlockedBySoftDelete(null, true), false)
+assert.equal(growthStubBootstrapBlockedBySoftDelete({ deleted_at: null }, true), false)
+assert.equal(growthStubBootstrapBlockedBySoftDelete({ deleted_at: "2026-01-01T00:00:00.000Z" }, true), true)
+assert.equal(growthStubBootstrapBlockedBySoftDelete({ deleted_at: "2026-01-01T00:00:00.000Z" }, false), false)
 
 async function run() {
   const stubValidation = await stubOutboundProviderAdapter.validateConnection({

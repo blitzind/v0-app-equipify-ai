@@ -23,10 +23,15 @@ export async function ingestOutboundWebhookPayload(
   },
 ): Promise<{ webhookId: string; results: ProcessOutboundEventResult[] }> {
   const adapter = getOutboundProviderAdapter(input.provider)
-  const connection = input.connectionId
+  const resolvedConnection = input.connectionId
     ? (await fetchGrowthOutboundConnectionById(admin, input.connectionId)) ??
       (await ensureGrowthStubOutboundConnection(admin, input.actorUserId))
     : await ensureGrowthStubOutboundConnection(admin, input.actorUserId)
+
+  if (!resolvedConnection) {
+    throw new Error("outbound_connection_unavailable")
+  }
+  const connection = resolvedConnection
 
   const verify = adapter.verifyWebhookSignature({
     headers: new Headers(),

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireGrowthEnginePlatformAccess, logGrowthEngine } from "@/lib/growth/access"
-import { ensureGrowthStubOutboundConnection } from "@/lib/growth/outbound/connection-repository"
 import { mapGrowthProviderApiError } from "@/lib/growth/outbound/provider-api-errors"
 import { appendGrowthPlatformTimelineEvent } from "@/lib/growth/outbound/platform-timeline-repository"
 import {
@@ -42,7 +41,6 @@ export async function GET() {
       )
     }
 
-    await ensureGrowthStubOutboundConnection(access.admin, access.userId)
     const connections = await listGrowthProviderConnectionSummaries(access.admin)
     const adapters = listOutboundProviderAdapters()
     logGrowthEngine("provider_connections_list_ok", {

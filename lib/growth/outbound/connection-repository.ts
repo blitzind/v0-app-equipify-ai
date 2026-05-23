@@ -14,6 +14,17 @@ import {
 } from "@/lib/growth/outbound/provider-connection-query"
 import { probeGrowthProviderConnectionSchema } from "@/lib/growth/outbound/provider-schema-health"
 
+function logGrowthStubBootstrapSkipped(details: Record<string, unknown>): void {
+  console.info(
+    JSON.stringify({
+      source: "growth-engine",
+      event: "provider_stub_bootstrap_skipped",
+      ts: new Date().toISOString(),
+      ...details,
+    }),
+  )
+}
+
 type ConnectionDbRow = {
   id: string
   provider: string
@@ -89,6 +100,29 @@ export async function fetchGrowthOutboundConnectionByProvider(
   return data ? mapRow(data as ConnectionDbRow) : null
 }
 
+/** Latest stub row including soft-deleted history (used to block bootstrap resurrection). */
+async function fetchLatestGrowthStubOutboundConnectionRecord(
+  admin: SupabaseClient,
+): Promise<(ConnectionDbRow & { deleted_at?: string | null }) | null> {
+  const schema = await probeGrowthProviderConnectionSchema(admin)
+  const select = schema.softDelete ? `${SELECT}, deleted_at` : SELECT
+  const { data, error } = await connectionsTable(admin)
+    .select(select)
+    .eq("provider", GROWTH_OUTBOUND_STUB_PROVIDER)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return data as (ConnectionDbRow & { deleted_at?: string | null }) | null
+}
+
+export function growthStubBootstrapBlockedBySoftDelete(
+  row: { deleted_at?: string | null } | null | undefined,
+  softDelete: boolean,
+): boolean {
+  return Boolean(softDelete && row?.deleted_at != null)
+}
+
 export async function listGrowthOutboundConnections(
   admin: SupabaseClient,
 ): Promise<GrowthEmailProviderConnection[]> {
@@ -103,11 +137,20 @@ export async function listGrowthOutboundConnections(
 export async function ensureGrowthStubOutboundConnection(
   admin: SupabaseClient,
   createdBy?: string | null,
-): Promise<GrowthEmailProviderConnection> {
+): Promise<GrowthEmailProviderConnection | null> {
   const existing = await fetchGrowthOutboundConnectionByProvider(admin, GROWTH_OUTBOUND_STUB_PROVIDER)
   if (existing) return existing
 
   const schema = await probeGrowthProviderConnectionSchema(admin)
+  const latestStub = await fetchLatestGrowthStubOutboundConnectionRecord(admin)
+  if (growthStubBootstrapBlockedBySoftDelete(latestStub, schema.softDelete)) {
+    logGrowthStubBootstrapSkipped({
+      reason: "soft_deleted_stub_exists",
+      stubConnectionId: latestStub?.id ?? null,
+    })
+    return null
+  }
+
   const insert: Record<string, unknown> = {
     provider: GROWTH_OUTBOUND_STUB_PROVIDER,
     provider_family: "custom",
