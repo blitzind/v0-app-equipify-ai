@@ -3,6 +3,7 @@
 import type { ReactNode } from "react"
 import { Building2, Globe, MapPin, ShieldCheck, Wrench } from "lucide-react"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { GrowthLeadResearchRun } from "@/lib/growth/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
 
@@ -62,7 +63,12 @@ export function GrowthCompanyIntelligenceSnapshot({ lead, latestRun }: GrowthCom
 
   if (!hasLeadIntel && !hasResearchIntel && !lead.website) {
     return (
-      <GrowthCollapsibleEngineCard title="Company Intelligence" icon={<Building2 className="size-4" />}>
+      <GrowthCollapsibleEngineCard
+        title="Company Intelligence"
+        icon={<Building2 className="size-4" />}
+        defaultOpen={false}
+        persistKey={GROWTH_DRAWER_CARD_KEYS.companyIntelligence}
+      >
         <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
           Company intelligence will populate after research and enrichment signals refresh.
         </div>
@@ -71,7 +77,12 @@ export function GrowthCompanyIntelligenceSnapshot({ lead, latestRun }: GrowthCom
   }
 
   return (
-    <GrowthCollapsibleEngineCard title="Company Intelligence" icon={<Building2 className="size-4" />}>
+    <GrowthCollapsibleEngineCard
+      title="Company Intelligence"
+      icon={<Building2 className="size-4" />}
+      defaultOpen={false}
+      persistKey={GROWTH_DRAWER_CARD_KEYS.companyIntelligence}
+    >
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <IntelCell icon={<Building2 className="size-3.5" />} label="Revenue estimate" value={lead.estimatedAnnualRevenue ?? "—"} />
         <IntelCell icon={<Building2 className="size-3.5" />} label="Employee estimate" value={lead.estimatedEmployeeCount ?? "—"} />

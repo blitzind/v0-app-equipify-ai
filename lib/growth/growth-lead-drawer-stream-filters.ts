@@ -1,0 +1,98 @@
+/** Client-safe filters for Growth lead drawer activity vs timeline separation. */
+
+import type { GrowthLeadActivityStreamItem } from "@/lib/growth/engagement-types"
+import type { GrowthLeadTimelineEventType } from "@/lib/growth/timeline-types"
+
+/** Human / external prospect interactions — Activity Stream. */
+export const GROWTH_DRAWER_ACTIVITY_STREAM_KINDS = new Set<string>([
+  "manual_touch",
+  "follow_up_completed",
+  "research_completed",
+  "decision_maker_added",
+  "email_sent",
+  "email_replied",
+  "call_started",
+  "call_attempted",
+  "voicemail_left",
+])
+
+/** System / audit / intelligence — Timeline. */
+export const GROWTH_DRAWER_TIMELINE_EVENT_TYPES = new Set<string>([
+  "lead_created",
+  "import_created",
+  "import_updated",
+  "next_best_action_changed",
+  "priority_changed",
+  "override_changed",
+  "forecast_regression_detected",
+  "relationship_cooled",
+  "executive_intervention_recommended",
+  "ai_copilot_generation_created",
+  "ai_copilot_generation_approved",
+  "playbook_conflict_detected",
+  "engagement_score_changed",
+  "engagement_tier_changed",
+  "lead_became_hot",
+  "lead_became_dormant",
+  "relationship_strength_changed",
+  "relationship_became_trusted",
+  "relationship_became_strategic",
+  "opportunity_readiness_changed",
+  "lead_became_sales_ready",
+  "lead_became_priority_opportunity",
+  "opportunity_blocker_added",
+  "opportunity_blocker_resolved",
+  "revenue_probability_changed",
+  "lead_became_forecasted",
+  "lead_became_commit_candidate",
+  "forecast_confidence_changed",
+  "executive_priority_changed",
+  "operational_capacity_changed",
+  "capacity_constraint_added",
+  "capacity_constraint_resolved",
+  "operational_risk_detected",
+  "call_copilot_session_started",
+  "call_copilot_objection_captured",
+  "call_copilot_session_completed",
+  "call_copilot_summary_approved",
+  "status_changed",
+  "website_changed",
+  "research_started",
+  "research_failed",
+  "website_fetch_failed",
+  "website_fetch_fixed",
+  "decision_maker_confirmed",
+  "decision_maker_rejected",
+  "follow_up_created",
+  "notes_updated",
+])
+
+export function isGrowthDrawerActivityStreamItem(item: GrowthLeadActivityStreamItem): boolean {
+  if (item.source === "call") return true
+  if (item.kind.startsWith("call_")) return true
+  return GROWTH_DRAWER_ACTIVITY_STREAM_KINDS.has(item.kind)
+}
+
+export function isGrowthDrawerTimelineEventType(eventType: GrowthLeadTimelineEventType | string): boolean {
+  return GROWTH_DRAWER_TIMELINE_EVENT_TYPES.has(eventType)
+}
+
+export const GROWTH_DRAWER_CARD_PERSIST_PREFIX = "growth-drawer-card:" as const
+
+export const GROWTH_DRAWER_CARD_KEYS = {
+  executive: "executive-intelligence",
+  capacity: "operational-capacity",
+  revenue: "revenue-forecast",
+  opportunity: "opportunity-readiness",
+  relationship: "relationship-intelligence",
+  engagement: "engagement",
+  callCopilot: "call-copilot",
+  aiCopilot: "ai-copilot",
+  decisionMakers: "decision-makers",
+  companyIntelligence: "company-intelligence",
+  research: "research",
+  outbound: "outbound-activity",
+  operationalIntelligence: "operational-intelligence",
+  activityStream: "activity-stream",
+  timeline: "timeline",
+} as const

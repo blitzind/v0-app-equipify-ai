@@ -3,6 +3,7 @@
 import { ArrowDownRight, ArrowRight, ArrowUpRight, TrendingUp } from "lucide-react"
 import { GrowthBadge, GrowthActionRequiredBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import { growthLeadRevenueActionRequired } from "@/lib/growth/growth-lead-drawer-badges"
+import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthRevenueForecastProps = {
@@ -42,6 +43,8 @@ export function GrowthRevenueForecast({ lead }: GrowthRevenueForecastProps) {
       icon={<TrendingUp className="size-4" />}
       headerAside={collapsedSummary || "No forecast data"}
       headerTrailing={growthLeadRevenueActionRequired(lead) ? <GrowthActionRequiredBadge /> : null}
+      defaultOpen
+      persistKey={GROWTH_DRAWER_CARD_KEYS.revenue}
     >
       <div className="space-y-4">
         <div className="flex flex-wrap items-baseline gap-2">

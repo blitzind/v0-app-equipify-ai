@@ -3,6 +3,7 @@
 import { ArrowDownRight, ArrowRight, ArrowUpRight, Handshake } from "lucide-react"
 import { GrowthBadge, GrowthActionRequiredBadge, GrowthCollapsibleEngineCard, formatRelativeTime } from "@/components/growth/growth-ui-utils"
 import { growthLeadRelationshipActionRequired } from "@/lib/growth/growth-lead-drawer-badges"
+import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthRelationshipIntelligenceProps = {
@@ -50,6 +51,8 @@ export function GrowthRelationshipIntelligence({ lead }: GrowthRelationshipIntel
       icon={<Handshake className="size-4" />}
       headerAside={collapsedSummary || "No relationship data"}
       headerTrailing={growthLeadRelationshipActionRequired(lead) ? <GrowthActionRequiredBadge /> : null}
+      defaultOpen={false}
+      persistKey={GROWTH_DRAWER_CARD_KEYS.relationship}
     >
       <div className="space-y-4">
         <div className="flex flex-wrap items-baseline gap-2">

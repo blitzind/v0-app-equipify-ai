@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { GrowthLeadResearchHistory } from "@/components/growth/growth-lead-research-history"
 import { GrowthLeadResearchRunCard } from "@/components/growth/growth-lead-research-run-card"
 import { GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import { growthLeadResearchErrorMessage } from "@/lib/growth/research-error-messages"
 import type { GrowthLead } from "@/lib/growth/types"
 import type { GrowthLeadResearchBundle, GrowthLeadResearchRun } from "@/lib/growth/research-types"
@@ -195,7 +196,13 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated, onLatestRunChange
   const summaryText = displayRun?.result?.companySummary
 
   return (
-    <GrowthCollapsibleEngineCard id={id} title="Research" icon={<Sparkles className="size-4" />}>
+    <GrowthCollapsibleEngineCard
+      id={id}
+      title="Research"
+      icon={<Sparkles className="size-4" />}
+      defaultOpen={false}
+      persistKey={GROWTH_DRAWER_CARD_KEYS.research}
+    >
       {loading ? (
         <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
           <Loader2 className="mr-2 size-4 animate-spin" />

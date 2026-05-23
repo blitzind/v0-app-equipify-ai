@@ -1,9 +1,13 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { History, Loader2 } from "lucide-react"
 import { GrowthCollapsibleEngineCard, formatRelativeTime } from "@/components/growth/growth-ui-utils"
 import type { GrowthLeadActivityStreamItem } from "@/lib/growth/engagement-types"
+import {
+  GROWTH_DRAWER_CARD_KEYS,
+  isGrowthDrawerActivityStreamItem,
+} from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthLeadActivityStreamProps = {
@@ -40,8 +44,23 @@ export function GrowthLeadActivityStream({ lead }: GrowthLeadActivityStreamProps
     void load()
   }, [load])
 
+  const activityItems = useMemo(() => items.filter(isGrowthDrawerActivityStreamItem), [items])
+  const collapsedSummary =
+    activityItems.length === 0
+      ? "No interactions"
+      : activityItems.length === 1
+        ? "1 interaction"
+        : `${activityItems.length} interactions`
+
   return (
-    <GrowthCollapsibleEngineCard title="Activity Stream" icon={<History className="size-4" />}>
+    <GrowthCollapsibleEngineCard
+      title="Activity Stream"
+      icon={<History className="size-4" />}
+      defaultOpen={false}
+      compact
+      persistKey={GROWTH_DRAWER_CARD_KEYS.activityStream}
+      headerAside={<span className="text-xs text-muted-foreground">{collapsedSummary}</span>}
+    >
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
@@ -49,19 +68,19 @@ export function GrowthLeadActivityStream({ lead }: GrowthLeadActivityStreamProps
         </div>
       ) : error ? (
         <p className="text-sm text-rose-600">{error}</p>
-      ) : items.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
-          No recent activity.
+      ) : activityItems.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border bg-muted/20 px-3 py-5 text-center text-sm text-muted-foreground">
+          No prospect interactions yet.
         </div>
       ) : (
-        <ul className="space-y-2">
-          {items.slice(0, 8).map((item) => (
-            <li key={item.id} className="rounded-lg border border-border/80 bg-muted/15 px-3 py-2 text-sm">
+        <ul className="space-y-1.5">
+          {activityItems.slice(0, 8).map((item) => (
+            <li key={item.id} className="rounded-md border border-border/70 bg-muted/10 px-3 py-2">
               <div className="flex items-start justify-between gap-2">
-                <span className="font-medium text-foreground">{item.title}</span>
+                <span className="text-sm font-medium text-foreground">{item.title}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">{formatRelativeTime(item.occurredAt)}</span>
               </div>
-              {item.summary ? <p className="mt-1 text-muted-foreground">{item.summary}</p> : null}
+              {item.summary ? <p className="mt-0.5 text-xs text-muted-foreground">{item.summary}</p> : null}
             </li>
           ))}
         </ul>

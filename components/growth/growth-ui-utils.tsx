@@ -1,9 +1,10 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import { DRAWER_NESTED_CARD } from "@/components/detail-drawer"
+import { GROWTH_DRAWER_CARD_PERSIST_PREFIX } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { GrowthCallPriorityTier } from "@/lib/growth/call-types"
 import type { GrowthMomentumTier } from "@/lib/growth/momentum-types"
 import type { GrowthWorkflowHealthStatus } from "@/lib/growth/workflow-health-types"
@@ -42,6 +43,8 @@ export function GrowthCollapsibleEngineCard({
   className,
   id,
   defaultOpen = true,
+  persistKey,
+  compact = false,
   headerAside,
   headerTrailing,
 }: {
@@ -51,17 +54,48 @@ export function GrowthCollapsibleEngineCard({
   className?: string
   id?: string
   defaultOpen?: boolean
+  persistKey?: string
+  compact?: boolean
   headerAside?: ReactNode
   headerTrailing?: ReactNode
 }) {
   const [open, setOpen] = useState(defaultOpen)
 
+  useEffect(() => {
+    if (!persistKey) return
+    try {
+      const stored = localStorage.getItem(`${GROWTH_DRAWER_CARD_PERSIST_PREFIX}${persistKey}`)
+      if (stored === "true" || stored === "false") {
+        setOpen(stored === "true")
+      }
+    } catch {
+      // ignore storage failures
+    }
+  }, [persistKey])
+
+  function toggleOpen() {
+    setOpen((value) => {
+      const next = !value
+      if (persistKey) {
+        try {
+          localStorage.setItem(`${GROWTH_DRAWER_CARD_PERSIST_PREFIX}${persistKey}`, String(next))
+        } catch {
+          // ignore storage failures
+        }
+      }
+      return next
+    })
+  }
+
   return (
-    <section id={id} className={cn(DRAWER_NESTED_CARD, "p-4 sm:p-5", className)}>
+    <section
+      id={id}
+      className={cn(DRAWER_NESTED_CARD, compact ? "p-3 sm:p-4" : "p-4 sm:p-5", className)}
+    >
       <button
         type="button"
         className="flex w-full items-center gap-2 text-left"
-        onClick={() => setOpen((value) => !value)}
+        onClick={toggleOpen}
         aria-expanded={open}
       >
         {open ? (
@@ -78,7 +112,7 @@ export function GrowthCollapsibleEngineCard({
           </div>
         ) : null}
       </button>
-      {open ? <div className="mt-4">{children}</div> : null}
+      {open ? <div className={cn(compact ? "mt-3" : "mt-4")}>{children}</div> : null}
     </section>
   )
 }

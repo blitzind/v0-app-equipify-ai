@@ -10,6 +10,7 @@ import {
   researchFreshnessLabel,
   workflowHealthTone,
 } from "@/components/growth/growth-ui-utils"
+import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthOperationalIntelligenceProps = {
@@ -20,7 +21,12 @@ export function GrowthOperationalIntelligence({ lead }: GrowthOperationalIntelli
   const researchFreshness = researchFreshnessLabel(lead.lastResearchedAt)
 
   return (
-    <GrowthCollapsibleEngineCard title="Operational Intelligence" icon={<Gauge className="size-4" />}>
+    <GrowthCollapsibleEngineCard
+      title="Operational Intelligence"
+      icon={<Gauge className="size-4" />}
+      defaultOpen={false}
+      persistKey={GROWTH_DRAWER_CARD_KEYS.operationalIntelligence}
+    >
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <StatTile
           icon={<TrendingUp className="size-3.5" />}

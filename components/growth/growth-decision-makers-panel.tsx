@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { GrowthLeadDecisionMaker } from "@/lib/growth/decision-maker-types"
 import type { GrowthLead } from "@/lib/growth/types"
 import { cn } from "@/lib/utils"
@@ -165,7 +166,13 @@ export function GrowthDecisionMakersPanel({
   }
 
   return (
-    <GrowthCollapsibleEngineCard id={id} title="Decision Makers" icon={<User className="size-4" />}>
+    <GrowthCollapsibleEngineCard
+      id={id}
+      title="Decision Makers"
+      icon={<User className="size-4" />}
+      defaultOpen={false}
+      persistKey={GROWTH_DRAWER_CARD_KEYS.decisionMakers}
+    >
       <div className="space-y-3">
         {error ? (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">

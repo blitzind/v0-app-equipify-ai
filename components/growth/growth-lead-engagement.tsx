@@ -3,6 +3,7 @@
 import { Activity } from "lucide-react"
 import { GrowthBadge, GrowthCollapsibleEngineCard, formatRelativeTime } from "@/components/growth/growth-ui-utils"
 import type { GrowthLead } from "@/lib/growth/types"
+import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 
 type GrowthLeadEngagementProps = {
   lead: GrowthLead
@@ -19,6 +20,8 @@ export function GrowthLeadEngagement({ lead }: GrowthLeadEngagementProps) {
           {lead.engagementTier ? <GrowthBadge label={lead.engagementTier} tone="healthy" /> : null}
         </>
       }
+      defaultOpen={false}
+      persistKey={GROWTH_DRAWER_CARD_KEYS.engagement}
     >
       <div className="space-y-3">
         <div className="flex flex-wrap items-baseline gap-2">

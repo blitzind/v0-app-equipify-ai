@@ -19,6 +19,7 @@ import {
   isGrowthCallCopilotDisabledError,
   resolveGrowthCallCopilotEnabled,
 } from "@/lib/growth/call-copilot-settings"
+import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthCallCopilotProps = {
@@ -254,6 +255,8 @@ export function GrowthCallCopilot({ lead }: GrowthCallCopilotProps) {
       title="Call Copilot"
       icon={<Phone className="size-4" />}
       headerAside={collapsedSummary}
+      defaultOpen
+      persistKey={GROWTH_DRAWER_CARD_KEYS.callCopilot}
     >
       <div className="space-y-4">
         <p className="text-xs text-muted-foreground">

@@ -3,6 +3,7 @@
 import { ArrowDownRight, ArrowRight, ArrowUpRight, Target } from "lucide-react"
 import { GrowthBadge, GrowthActionRequiredBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import { growthLeadOpportunityActionRequired } from "@/lib/growth/growth-lead-drawer-badges"
+import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthOpportunityReadinessProps = {
@@ -41,6 +42,8 @@ export function GrowthOpportunityReadiness({ lead }: GrowthOpportunityReadinessP
       icon={<Target className="size-4" />}
       headerAside={collapsedSummary || "No readiness data"}
       headerTrailing={growthLeadOpportunityActionRequired(lead) ? <GrowthActionRequiredBadge /> : null}
+      defaultOpen
+      persistKey={GROWTH_DRAWER_CARD_KEYS.opportunity}
     >
       <div className="space-y-4">
         <div className="flex flex-wrap items-baseline gap-2">

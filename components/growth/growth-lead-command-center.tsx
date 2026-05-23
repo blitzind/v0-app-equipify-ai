@@ -234,7 +234,10 @@ export function GrowthLeadCommandCenter({
               <GrowthBadge label={`Momentum ${lead.momentumTier}`} tone={momentumTierTone(lead.momentumTier)} />
             ) : null}
             {lead.callPriorityTier ? (
-              <GrowthBadge label={`Priority ${lead.callPriorityTier}`} tone={priorityTierTone(lead.callPriorityTier)} />
+              <GrowthBadge
+                label={`${lead.callPriorityTier} priority`}
+                tone={priorityTierTone(lead.callPriorityTier)}
+              />
             ) : null}
             {lead.score != null ? <GrowthBadge label={`Fit ${lead.score}`} tone="medium" /> : null}
             <GrowthBadge label={formatSource(lead)} tone="neutral" className="normal-case" />

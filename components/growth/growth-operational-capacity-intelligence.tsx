@@ -3,6 +3,7 @@
 import { Shield } from "lucide-react"
 import { GrowthBadge, GrowthActionRequiredBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import { growthLeadCapacityActionRequired } from "@/lib/growth/growth-lead-drawer-badges"
+import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthOperationalCapacityIntelligenceProps = {
@@ -38,6 +39,8 @@ export function GrowthOperationalCapacityIntelligence({ lead }: GrowthOperationa
       icon={<Shield className="size-4" />}
       headerAside={collapsedSummary || "No capacity data"}
       headerTrailing={growthLeadCapacityActionRequired(lead) ? <GrowthActionRequiredBadge /> : null}
+      defaultOpen
+      persistKey={GROWTH_DRAWER_CARD_KEYS.capacity}
     >
       <div className="space-y-4">
         <div className="flex flex-wrap items-baseline gap-2">

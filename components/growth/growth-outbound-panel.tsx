@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Loader2, Mail } from "lucide-react"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { GrowthLeadOutboundData } from "@/components/growth/growth-outreach-center"
 import type { GrowthLead } from "@/lib/growth/types"
 
@@ -57,6 +58,8 @@ export function GrowthOutboundPanel({ lead }: GrowthOutboundPanelProps) {
     <GrowthCollapsibleEngineCard
       title="Outbound Activity"
       icon={<Mail className="size-4" />}
+      defaultOpen={false}
+      persistKey={GROWTH_DRAWER_CARD_KEYS.outbound}
       headerTrailing={
         lead.contactTemperature ? (
           <GrowthBadge label={lead.contactTemperature.replace(/_/g, " ")} tone={temperatureTone(lead.contactTemperature)} />

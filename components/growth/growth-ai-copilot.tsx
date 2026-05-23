@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Bot, Check, Copy, Loader2, Sparkles, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type {
   GrowthAiCopilotGeneration,
   GrowthAiCopilotGenerationType,
@@ -41,6 +42,13 @@ function playbookSourceAttributionLabel(attribution: Record<string, unknown>): s
   const titles = sourceTitles.filter((title): title is string => typeof title === "string" && title.trim().length > 0)
   if (titles.length === 0) return null
   return titles.join(", ")
+}
+
+function formatGenerationTypeLabel(type: GrowthAiCopilotGenerationType): string {
+  return type
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
 }
 
 export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
@@ -128,18 +136,25 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
     }
   }
 
-  const latestDraft = generations.find((entry) => entry.status === "draft")
-  const collapsedSummary = latestDraft
-    ? `${latestDraft.generationType.replace(/_/g, " ")} · draft`
-    : generations[0]
-      ? `${generations[0].generationType.replace(/_/g, " ")} · ${generations[0].status}`
-      : "No drafts"
+  const draftCount = generations.filter((entry) => entry.status === "draft").length
+  const approvedCount = generations.filter((entry) => entry.status === "approved").length
+  const recent = generations[0]
+  const collapsedSummary =
+    generations.length === 0
+      ? "No drafts"
+      : draftCount > 0 || approvedCount > 0
+        ? `Drafts: ${draftCount} • Approved: ${approvedCount}`
+        : recent
+          ? `Recent: ${formatGenerationTypeLabel(recent.generationType)}`
+          : "No drafts"
 
   return (
     <GrowthCollapsibleEngineCard
       title="AI Copilot"
       icon={<Bot className="size-4" />}
-      headerAside={collapsedSummary}
+      headerAside={<span className="text-xs text-muted-foreground">{collapsedSummary}</span>}
+      defaultOpen={false}
+      persistKey={GROWTH_DRAWER_CARD_KEYS.aiCopilot}
     >
       <div className="space-y-4">
         <p className="text-xs text-muted-foreground">

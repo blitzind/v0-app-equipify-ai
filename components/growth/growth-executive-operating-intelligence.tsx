@@ -3,6 +3,7 @@
 import { Crown } from "lucide-react"
 import { GrowthBadge, GrowthActionRequiredBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import { growthLeadExecutiveActionRequired } from "@/lib/growth/growth-lead-drawer-badges"
+import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthExecutiveOperatingIntelligenceProps = {
@@ -34,6 +35,8 @@ export function GrowthExecutiveOperatingIntelligence({ lead }: GrowthExecutiveOp
       icon={<Crown className="size-4" />}
       headerAside={collapsedSummary || "No executive data"}
       headerTrailing={growthLeadExecutiveActionRequired(lead) ? <GrowthActionRequiredBadge /> : null}
+      defaultOpen
+      persistKey={GROWTH_DRAWER_CARD_KEYS.executive}
     >
       <div className="space-y-4">
         <div className="flex flex-wrap items-baseline gap-2">
