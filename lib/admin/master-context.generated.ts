@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 503,
-  sqlMigrations: 214,
+  apiRouteHandlers: 505,
+  sqlMigrations: 215,
   dashboardPages: 65,
-  componentsTsx: 356,
-  libTsFiles: 1049,
+  componentsTsx: 358,
+  libTsFiles: 1057,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **503** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **214** |
+| API route handlers (\`app/api/**/route.ts\`) | **505** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **215** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **356** |
-| \`lib/**/*.ts\` | **1049** |
+| \`components/**/*.tsx\` | **358** |
+| \`lib/**/*.ts\` | **1057** |
 
 ### Vercel crons
 
@@ -450,6 +450,7 @@ platform/feature-requests/route.ts
 platform/growth/call-queue/route.ts
 platform/growth/communication-preferences/route.ts
 platform/growth/communication-settings/route.ts
+platform/growth/engagement/dashboard/route.ts
 platform/growth/import-batches/[batchId]/commit/route.ts
 platform/growth/import-batches/[batchId]/dry-run/route.ts
 platform/growth/import-batches/[batchId]/events/route.ts
@@ -459,6 +460,7 @@ platform/growth/import-batches/[batchId]/rows/route.ts
 platform/growth/import-batches/route.ts
 platform/growth/import-mapping-profiles/route.ts
 platform/growth/import-vendors/route.ts
+platform/growth/leads/[leadId]/activity-stream/route.ts
 platform/growth/leads/[leadId]/call-events/route.ts
 platform/growth/leads/[leadId]/call-sessions/[sessionId]/route.ts
 platform/growth/leads/[leadId]/call-sessions/route.ts

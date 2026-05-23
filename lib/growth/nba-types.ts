@@ -5,6 +5,10 @@ export const GROWTH_NEXT_BEST_ACTIONS = [
   "wait_for_email_reply",
   "review_email_reply",
   "call_after_email_reply",
+  "call_immediately",
+  "call_now",
+  "escalate_owner_review",
+  "reengage",
   "run_research",
   "refresh_research",
   "fix_website_research",
@@ -23,6 +27,10 @@ export const GROWTH_NEXT_BEST_ACTION_LABELS: Record<GrowthNextBestAction, string
   wait_for_email_reply: "Wait for email reply",
   review_email_reply: "Review email reply",
   call_after_email_reply: "Call after email reply",
+  call_immediately: "Call immediately",
+  call_now: "Call now",
+  escalate_owner_review: "Escalate for owner review",
+  reengage: "Re-engage lead",
   run_research: "Run research",
   refresh_research: "Refresh research",
   fix_website_research: "Fix website research",
@@ -40,5 +48,5 @@ export type GrowthNextBestActionResult = {
   reason: string
   blockers: string[]
   confidence: "high" | "medium" | "low"
-  actionVersion: "v1"
+  actionVersion: "v1" | "v2"
 }

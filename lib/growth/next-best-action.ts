@@ -1,4 +1,5 @@
 import type { GrowthLeadEmailEventSummary } from "@/lib/growth/outbound/types"
+import type { GrowthEngagementTier } from "@/lib/growth/engagement-types"
 import type { GrowthLeadCallDisposition } from "@/lib/growth/call-types"
 import type { GrowthDecisionMakerPresenceStatus } from "@/lib/growth/decision-maker-types"
 import {
@@ -23,6 +24,9 @@ export type NextBestActionInput = {
   decisionMakerStatus: GrowthDecisionMakerPresenceStatus | null
   primaryDecisionMakerPhone: string | null
   emailSummary?: GrowthLeadEmailEventSummary
+  engagementTier?: GrowthEngagementTier | null
+  engagementLastActivityAt?: string | null
+  engagementDormancyExemptUntil?: string | null
   now?: Date
 }
 
@@ -71,7 +75,7 @@ function buildResult(
     reason,
     blockers,
     confidence,
-    actionVersion: "v1",
+    actionVersion: "v2",
   }
 }
 
@@ -95,6 +99,47 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
   const email = input.emailSummary
   if (email?.isSuppressed) {
     return buildResult("manual_review", "Outreach email is suppressed.", ["Email suppressed"], "high")
+  }
+
+  const engagementTier = input.engagementTier ?? null
+  const dormancyExempt =
+    input.engagementDormancyExemptUntil &&
+    Date.parse(input.engagementDormancyExemptUntil) > now.getTime()
+
+  if (
+    engagementTier === "hot" &&
+    fit > 85 &&
+    (input.decisionMakerStatus === "confirmed" || input.decisionMakerStatus === "verified_contactable")
+  ) {
+    return buildResult(
+      "escalate_owner_review",
+      "Hot engagement, strong fit, and confirmed decision maker — escalate for owner review.",
+      [],
+      "high",
+    )
+  }
+
+  if (
+    engagementTier === "hot" &&
+    (email?.interestedReply7d || email?.latestReplyClassification === "interested")
+  ) {
+    if (leadPhone || dmPhone) {
+      return buildResult("call_immediately", "Hot lead with positive email reply — call immediately.", [], "high")
+    }
+  }
+
+  if (engagementTier === "engaged" && fit > 75 && (leadPhone || dmPhone)) {
+    return buildResult("call_now", "Engaged lead with strong fit — call now.", [], "high")
+  }
+
+  const lastActivity = input.engagementLastActivityAt
+  const dormantDays =
+    lastActivity && !Number.isNaN(Date.parse(lastActivity))
+      ? (now.getTime() - Date.parse(lastActivity)) / (24 * 60 * 60 * 1000)
+      : Number.POSITIVE_INFINITY
+
+  if (!dormancyExempt && lastActivity && dormantDays > 45 && !email?.isSuppressed) {
+    return buildResult("reengage", "Lead has been dormant for more than 45 days — re-engage.", [], "medium")
   }
 
   if (

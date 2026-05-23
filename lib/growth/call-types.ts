@@ -20,6 +20,11 @@ export const GROWTH_CALL_QUEUE_FILTERS = [
   "high_fit",
   "needs_research",
   "needs_website_research",
+  "hot",
+  "engaged",
+  "dormant",
+  "recently_active",
+  "decision_maker_engaged",
 ] as const
 
 export type GrowthCallQueueFilter = (typeof GROWTH_CALL_QUEUE_FILTERS)[number]
@@ -69,4 +74,8 @@ export type GrowthCallQueueRow = {
   sourceKind: string
   agingDays: number | null
   agingBucket: string | null
+  engagementScore: number | null
+  engagementTier: string | null
+  engagementLastActivityAt: string | null
+  engagementSummary: string | null
 }

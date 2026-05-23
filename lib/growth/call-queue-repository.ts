@@ -40,6 +40,10 @@ export async function listGrowthCallQueue(
         followUpAt: lead.followUpAt,
         website: lead.website,
         websiteFetchStatus,
+        engagementScore: lead.engagementScore,
+        engagementTier: lead.engagementTier,
+        engagementLastActivityAt: lead.engagementLastActivityAt,
+        decisionMakerStatus: lead.decisionMakerStatus,
       }, now)
     ) {
       continue
@@ -72,7 +76,13 @@ export async function listGrowthCallQueue(
     )
   }
 
-  enriched.sort((a, b) => (b.callPriorityScore ?? 0) - (a.callPriorityScore ?? 0))
+  enriched.sort((a, b) => {
+    const engagementDiff = (b.engagementScore ?? 0) - (a.engagementScore ?? 0)
+    if (engagementDiff !== 0) return engagementDiff
+    const fitDiff = (b.score ?? 0) - (a.score ?? 0)
+    if (fitDiff !== 0) return fitDiff
+    return (b.callPriorityScore ?? 0) - (a.callPriorityScore ?? 0)
+  })
 
   const offset = Math.max(input.offset ?? 0, 0)
   const limit = Math.min(Math.max(input.limit ?? 50, 1), 100)
@@ -131,5 +141,9 @@ async function buildQueueRow(
     sourceKind: lead.sourceKind,
     agingDays: lead.agingDays,
     agingBucket: lead.agingBucket,
+    engagementScore: lead.engagementScore,
+    engagementTier: lead.engagementTier,
+    engagementLastActivityAt: lead.engagementLastActivityAt,
+    engagementSummary: lead.engagementSummary,
   }
 }

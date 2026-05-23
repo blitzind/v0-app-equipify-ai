@@ -327,3 +327,55 @@ export async function emitGrowthLeadFollowUpCompletedTimeline(
     actorEmail: input.actor?.email,
   })
 }
+
+export async function emitGrowthLeadEngagementScoreChangedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; from: number; to: number; summary: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "engagement_score_changed",
+    title: "Engagement score changed",
+    summary: `${input.from} → ${input.to}: ${input.summary}`,
+    payload: { from: input.from, to: input.to },
+  })
+}
+
+export async function emitGrowthLeadEngagementTierChangedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; from: string; to: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "engagement_tier_changed",
+    title: "Engagement tier changed",
+    summary: `${input.from} → ${input.to}`,
+    payload: { from: input.from, to: input.to },
+  })
+}
+
+export async function emitGrowthLeadBecameHotTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; score: number },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "lead_became_hot",
+    title: "Lead became hot",
+    summary: `Engagement score ${input.score}`,
+    payload: { score: input.score },
+  })
+}
+
+export async function emitGrowthLeadBecameDormantTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; lastActivityAt: string | null },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "lead_became_dormant",
+    title: "Lead became dormant",
+    summary: input.lastActivityAt ?? "No recent activity",
+    payload: { lastActivityAt: input.lastActivityAt },
+  })
+}

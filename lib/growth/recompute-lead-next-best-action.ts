@@ -6,7 +6,9 @@ import { fetchGrowthLeadDecisionMakerById, listGrowthLeadDecisionMakers } from "
 import { fetchGrowthLeadEmailEventSummary } from "@/lib/growth/outbound/email-event-summary"
 import { computeGrowthLeadNextBestAction } from "@/lib/growth/next-best-action"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { recomputeGrowthLeadEngagementIntelligence } from "@/lib/growth/recompute-engagement-intelligence"
 import { recomputeGrowthLeadWorkflowIntelligence } from "@/lib/growth/recompute-workflow-intelligence"
+import { recomputeGrowthLeadCallPriority } from "@/lib/growth/recompute-lead-call-priority"
 import { fetchLatestUsableGrowthLeadResearchRun } from "@/lib/growth/research-repository"
 import { emitGrowthLeadNextBestActionChangedTimeline } from "@/lib/growth/timeline-emitter"
 import type { GrowthLead } from "@/lib/growth/types"
@@ -51,6 +53,9 @@ export async function recomputeGrowthLeadNextBestAction(
     decisionMakerStatus: lead.decisionMakerStatus,
     primaryDecisionMakerPhone,
     emailSummary,
+    engagementTier: lead.engagementTier,
+    engagementLastActivityAt: lead.engagementLastActivityAt,
+    engagementDormancyExemptUntil: lead.engagementDormancyExemptUntil,
   })
 
   const now = new Date().toISOString()
@@ -90,10 +95,11 @@ export async function recomputeGrowthLeadWorkflowSignals(
   leadId: string,
 ): Promise<GrowthLead | null> {
   const { recomputeGrowthLeadDecisionMakerStatus } = await import("@/lib/growth/decision-maker-repository")
-  const { recomputeGrowthLeadCallPriority } = await import("@/lib/growth/recompute-lead-call-priority")
 
   await recomputeGrowthLeadDecisionMakerStatus(admin, leadId)
   await recomputeGrowthLeadCallPriority(admin, leadId)
+  await recomputeGrowthLeadWorkflowIntelligence(admin, leadId)
+  await recomputeGrowthLeadEngagementIntelligence(admin, leadId)
   await recomputeGrowthLeadNextBestAction(admin, leadId)
-  return recomputeGrowthLeadWorkflowIntelligence(admin, leadId)
+  return fetchGrowthLeadById(admin, leadId)
 }

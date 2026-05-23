@@ -145,6 +145,7 @@ export function GrowthCallQueueTable({
             <tr>
               <th className="px-3 py-3 text-left font-medium text-muted-foreground">Priority</th>
               <th className="px-3 py-3 text-left font-medium text-muted-foreground">Momentum</th>
+              <th className="px-3 py-3 text-left font-medium text-muted-foreground">Engagement</th>
               <th className="px-3 py-3 text-left font-medium text-muted-foreground">Health</th>
               <th className="px-3 py-3 text-left font-medium text-muted-foreground">Company</th>
               <th className="px-3 py-3 text-left font-medium text-muted-foreground">Decision maker</th>
@@ -181,6 +182,12 @@ export function GrowthCallQueueTable({
                         tone={momentumTierTone(row.momentumTier as GrowthMomentumTier)}
                         className="mt-1"
                       />
+                    ) : null}
+                  </td>
+                  <td className="px-3 py-3 align-top">
+                    <div className="font-semibold tabular-nums">{row.engagementScore ?? "—"}</div>
+                    {row.engagementTier ? (
+                      <GrowthBadge label={row.engagementTier} tone="healthy" className="mt-1" />
                     ) : null}
                   </td>
                   <td className="px-3 py-3 align-top">

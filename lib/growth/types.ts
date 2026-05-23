@@ -8,6 +8,7 @@ export const GROWTH_LEAD_SOURCE_KINDS = [
 ] as const
 
 import type { GrowthContactTemperature } from "@/lib/growth/outbound/types"
+import type { GrowthEngagementTier, GrowthEngagementTopSignal } from "@/lib/growth/engagement-types"
 import type { GrowthLeadCallDisposition, GrowthCallPriorityTier } from "@/lib/growth/call-types"
 import type { GrowthDecisionMakerPresenceStatus } from "@/lib/growth/decision-maker-types"
 import type { GrowthLeadAgingBucket } from "@/lib/growth/lead-aging"
@@ -99,6 +100,13 @@ export type GrowthLead = {
   callAttemptCount: number
   voicemailCount: number
   connectedCallCount: number
+  engagementScore: number | null
+  engagementTier: GrowthEngagementTier | null
+  engagementLastActivityAt: string | null
+  engagementSummary: string | null
+  engagementTopSignals: GrowthEngagementTopSignal[]
+  engagementDormancyExemptUntil: string | null
+  engagementComputedAt: string | null
   createdBy: string | null
   assignedTo: string | null
   createdAt: string

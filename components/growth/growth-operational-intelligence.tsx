@@ -1,6 +1,6 @@
 "use client"
 
-import { AlertCircle, Gauge, Target, Timer, TrendingUp } from "lucide-react"
+import { AlertCircle, Gauge, Target, Timer, TrendingUp, Zap } from "lucide-react"
 import {
   GrowthBadge,
   GrowthEngineCard,
@@ -34,6 +34,18 @@ export function GrowthOperationalIntelligence({ lead }: GrowthOperationalIntelli
             </div>
           }
           hint={lead.momentumWhySummary ?? undefined}
+        />
+
+        <StatTile
+          icon={<Zap className="size-3.5" />}
+          label="Engagement"
+          value={
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="tabular-nums">{lead.engagementScore ?? "—"}</span>
+              {lead.engagementTier ? <GrowthBadge label={lead.engagementTier} tone="healthy" /> : null}
+            </div>
+          }
+          hint={lead.engagementSummary ?? undefined}
         />
 
         <StatTile

@@ -11,7 +11,7 @@ import type {
 } from "@/lib/growth/types"
 
 const LEAD_SELECT =
-  "id, source_kind, source_detail, external_ref, company_name, contact_name, contact_email, contact_phone, website, address_line1, city, state, postal_code, country, status, promoted_organization_id, promoted_prospect_id, promoted_at, score, notes, metadata, latest_research_run_id, last_researched_at, research_priority, call_disposition, call_disposition_at, last_call_at, follow_up_at, call_priority_score, call_priority_tier, call_priority_computed_at, call_priority_override, last_human_touch_at, decision_maker_status, primary_decision_maker_id, next_best_action, next_best_action_reason, next_best_action_computed_at, estimated_annual_revenue, estimated_employee_count, fleet_size_estimate, crm_detected, field_service_stack_detected, momentum_score, momentum_tier, momentum_why_summary, momentum_computed_at, workflow_health, workflow_health_reason, workflow_health_computed_at, source_channel, source_campaign, source_import_batch_id, source_vendor, aging_days, aging_bucket, first_human_touch_at, time_to_first_touch_hours, contact_temperature, call_attempt_count, voicemail_count, connected_call_count, created_by, assigned_to, created_at, updated_at"
+  "id, source_kind, source_detail, external_ref, company_name, contact_name, contact_email, contact_phone, website, address_line1, city, state, postal_code, country, status, promoted_organization_id, promoted_prospect_id, promoted_at, score, notes, metadata, latest_research_run_id, last_researched_at, research_priority, call_disposition, call_disposition_at, last_call_at, follow_up_at, call_priority_score, call_priority_tier, call_priority_computed_at, call_priority_override, last_human_touch_at, decision_maker_status, primary_decision_maker_id, next_best_action, next_best_action_reason, next_best_action_computed_at, estimated_annual_revenue, estimated_employee_count, fleet_size_estimate, crm_detected, field_service_stack_detected, momentum_score, momentum_tier, momentum_why_summary, momentum_computed_at, workflow_health, workflow_health_reason, workflow_health_computed_at, source_channel, source_campaign, source_import_batch_id, source_vendor, aging_days, aging_bucket, first_human_touch_at, time_to_first_touch_hours, contact_temperature, call_attempt_count, voicemail_count, connected_call_count, engagement_score, engagement_tier, engagement_last_activity_at, engagement_summary, engagement_top_signals, engagement_dormancy_exempt_until, engagement_computed_at, created_by, assigned_to, created_at, updated_at"
 
 type GrowthLeadDbRow = {
   id: string
@@ -73,6 +73,16 @@ type GrowthLeadDbRow = {
   first_human_touch_at: string | null
   time_to_first_touch_hours: number | null
   contact_temperature: string | null
+  call_attempt_count: number | null
+  voicemail_count: number | null
+  connected_call_count: number | null
+  engagement_score: number | null
+  engagement_tier: string | null
+  engagement_last_activity_at: string | null
+  engagement_summary: string | null
+  engagement_top_signals: unknown
+  engagement_dormancy_exempt_until: string | null
+  engagement_computed_at: string | null
   created_by: string | null
   assigned_to: string | null
   created_at: string
@@ -147,6 +157,15 @@ function mapGrowthLeadRow(row: GrowthLeadDbRow): GrowthLead {
     callAttemptCount: row.call_attempt_count ?? 0,
     voicemailCount: row.voicemail_count ?? 0,
     connectedCallCount: row.connected_call_count ?? 0,
+    engagementScore: row.engagement_score,
+    engagementTier: row.engagement_tier as GrowthLead["engagementTier"],
+    engagementLastActivityAt: row.engagement_last_activity_at,
+    engagementSummary: row.engagement_summary,
+    engagementTopSignals: Array.isArray(row.engagement_top_signals)
+      ? (row.engagement_top_signals as GrowthLead["engagementTopSignals"])
+      : [],
+    engagementDormancyExemptUntil: row.engagement_dormancy_exempt_until,
+    engagementComputedAt: row.engagement_computed_at,
     createdBy: row.created_by,
     assignedTo: row.assigned_to,
     createdAt: row.created_at,

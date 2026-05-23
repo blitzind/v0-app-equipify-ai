@@ -87,6 +87,7 @@
     "test:growth-outbound": "tsx scripts/test-growth-outbound.ts",
     "test:growth-provider-connector": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-provider-connector.ts",
     "test:growth-call-dial": "tsx scripts/test-growth-call-dial.ts",
+    "test:growth-engagement-intelligence": "tsx scripts/test-growth-engagement-intelligence.ts",
     "test:catalog-import-manufacturer": "tsx scripts/test-catalog-import-manufacturer.ts",
     "test:catalog-import-template": "tsx scripts/test-catalog-import-template.ts",
     "test:extract-price-list-from-csv": "tsx scripts/test-extract-price-list-from-csv.ts",

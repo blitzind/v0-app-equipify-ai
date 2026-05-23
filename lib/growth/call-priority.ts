@@ -1,5 +1,7 @@
 import type { GrowthLeadEmailEventSummary } from "@/lib/growth/outbound/types"
 import type { GrowthCallPriorityTier, GrowthLeadCallDisposition } from "@/lib/growth/call-types"
+import { matchesEngagementQueueFilter } from "@/lib/growth/engagement-queue-filters"
+import type { GrowthEngagementTier } from "@/lib/growth/engagement-types"
 import type { GrowthLeadResearchPriority, GrowthLeadStatus } from "@/lib/growth/types"
 
 export type CallPriorityInput = {
@@ -211,10 +213,30 @@ export function matchesCallQueueFilter(
     followUpAt: string | null
     website: string | null
     websiteFetchStatus: string | null
+    engagementScore?: number | null
+    engagementTier?: GrowthEngagementTier | null
+    engagementLastActivityAt?: string | null
+    decisionMakerStatus?: import("@/lib/growth/decision-maker-types").GrowthDecisionMakerPresenceStatus | null
   },
   now: Date = new Date(),
 ): boolean {
   if (TERMINAL_STATUSES.has(row.status)) return false
+
+  if (
+    filter === "hot" ||
+    filter === "engaged" ||
+    filter === "dormant" ||
+    filter === "recently_active" ||
+    filter === "decision_maker_engaged"
+  ) {
+    return matchesEngagementQueueFilter(filter, {
+      status: row.status,
+      engagementScore: row.engagementScore ?? null,
+      engagementTier: row.engagementTier ?? null,
+      engagementLastActivityAt: row.engagementLastActivityAt ?? null,
+      decisionMakerStatus: row.decisionMakerStatus ?? null,
+    }, now)
+  }
 
   const usable = hasUsableResearch(row.lastResearchedAt, row.latestResearchRunId)
   const deferred =

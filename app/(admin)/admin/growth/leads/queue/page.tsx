@@ -27,6 +27,11 @@ const FILTER_LABELS: Record<GrowthCallQueueFilter, string> = {
   high_fit: "High Fit",
   needs_research: "Needs Research",
   needs_website_research: "Needs Website Research",
+  hot: "Hot",
+  engaged: "Engaged",
+  dormant: "Dormant",
+  recently_active: "Recently Active",
+  decision_maker_engaged: "DM Engaged",
 }
 
 export default function AdminGrowthCallQueuePage() {

@@ -5,6 +5,7 @@ import { DetailDrawer, DRAWER_INNER_SCROLL_CANVAS } from "@/components/detail-dr
 import { GrowthCompanyIntelligenceSnapshot } from "@/components/growth/growth-company-intelligence-snapshot"
 import { GrowthDecisionMakersPanel } from "@/components/growth/growth-decision-makers-panel"
 import { GrowthOutboundPanel } from "@/components/growth/growth-outbound-panel"
+import { GrowthLeadActivityStream } from "@/components/growth/growth-lead-activity-stream"
 import { GrowthLeadCommandCenter } from "@/components/growth/growth-lead-command-center"
 import { GrowthLeadResearchPanel } from "@/components/growth/growth-lead-research-panel"
 import { GrowthLeadTimelinePanel } from "@/components/growth/growth-lead-timeline-panel"
@@ -55,6 +56,8 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated }: Gr
       />
 
       <GrowthOperationalIntelligence lead={activeLead} />
+
+      <GrowthLeadActivityStream lead={activeLead} />
 
       <GrowthCompanyIntelligenceSnapshot lead={activeLead} latestRun={latestResearchRun} />
 

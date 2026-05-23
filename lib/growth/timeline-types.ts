@@ -36,6 +36,10 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "email_spam_complaint",
   "email_suppressed",
   "email_unmatched",
+  "engagement_score_changed",
+  "engagement_tier_changed",
+  "lead_became_hot",
+  "lead_became_dormant",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]
