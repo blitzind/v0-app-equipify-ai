@@ -1,17 +1,28 @@
 "use client"
 
-import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { ArrowLeft, ChevronRight, Loader2, Plus, RefreshCw, Target } from "lucide-react"
-import { BrandLogo } from "@/components/brand-logo"
+import { Loader2, Plus, RefreshCw, Target } from "lucide-react"
+import { useAdmin } from "@/lib/admin-store"
 import { Button } from "@/components/ui/button"
 import { GrowthLeadFormDialog, type GrowthLeadFormValues } from "@/components/growth/growth-lead-form-dialog"
 import { GrowthLeadDrawer } from "@/components/growth/growth-lead-drawer"
 import { GrowthLeadsTable } from "@/components/growth/growth-leads-table"
+import {
+  PlatformAdminPageShell,
+  PlatformAdminTabNav,
+  usePlatformAdminHeaderIdentity,
+} from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import type { GrowthLead, GrowthLeadStatus } from "@/lib/growth/types"
 
 export default function AdminGrowthLeadsPage() {
+  const { sessionIdentity } = useAdmin()
+  const header = usePlatformAdminHeaderIdentity({
+    displayName: sessionIdentity?.displayName,
+    email: sessionIdentity?.email,
+    platformRoleLabel: sessionIdentity?.platformRoleLabel,
+  })
+
   const [leads, setLeads] = useState<GrowthLead[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -132,25 +143,10 @@ export default function AdminGrowthLeadsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="flex h-14 shrink-0 flex-wrap items-center gap-4 border-b border-white/10 bg-[#0F172A] px-6">
-        <div className="flex items-center gap-2">
-          <BrandLogo className="h-7 max-h-7 w-auto" priority />
-          <span className="ml-2 rounded-full border border-emerald-400/25 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-emerald-200">
-            Growth Engine
-          </span>
-        </div>
-        <div className="flex-1" />
-        <Link href="/admin" className="flex items-center gap-1 text-xs text-slate-400 transition-colors hover:text-white">
-          <ArrowLeft size={14} />
-          Platform Admin
-        </Link>
-        <Link href="/" className="flex items-center gap-1.5 text-xs text-slate-400 transition-colors hover:text-white">
-          App <ChevronRight size={12} />
-        </Link>
-      </header>
+    <PlatformAdminPageShell header={header}>
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
+        <PlatformAdminTabNav activeKey="growth_leads" />
 
-      <main className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -207,7 +203,7 @@ export default function AdminGrowthLeadsPage() {
             updatingLeadId={updatingLeadId}
           />
         )}
-      </main>
+      </div>
 
       <GrowthLeadDrawer
         lead={selectedLead}
@@ -217,6 +213,6 @@ export default function AdminGrowthLeadsPage() {
       />
 
       <GrowthLeadFormDialog open={createOpen} onOpenChange={setCreateOpen} onSubmit={createLead} saving={saving} />
-    </div>
+    </PlatformAdminPageShell>
   )
 }

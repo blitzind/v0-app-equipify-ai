@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useMemo, useEffect, useCallback } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   Building2, Users, DollarSign, TrendingUp, TrendingDown, MoreHorizontal,
@@ -17,15 +16,20 @@ import {
   type PlatformAccountsSummary,
   type FeatureFlag,
 } from "@/lib/admin-data"
-import { initialsFromDisplayLabel } from "@/lib/user-display"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { BrandLogo } from "@/components/brand-logo"
 import { AiOperationsContent } from "@/components/admin/ai-operations-content"
 import { BlitzpayOperationsContent } from "@/components/admin/blitzpay-operations-content"
 import { ImportOperationsContent } from "@/components/admin/import-operations-content"
 import { MasterContextTabContent } from "@/components/admin/master-context-tab-content"
+import {
+  isPlatformAdminInlineTab,
+  PlatformAdminHeader,
+  PlatformAdminTabNav,
+  type PlatformAdminInlineTab,
+  usePlatformAdminHeaderIdentity,
+} from "@/components/admin/platform-admin-shell"
 import {
   Dialog,
   DialogContent,
@@ -253,15 +257,7 @@ function severityIcon(sev: string) {
   return <Info size={13} className="ds-icon-info shrink-0" />
 }
 
-type Tab =
-  | "accounts"
-  | "analytics"
-  | "flags"
-  | "audit"
-  | "ai_operations"
-  | "import_operations"
-  | "master_context"
-  | "blitzpay_operations"
+type Tab = PlatformAdminInlineTab
 
 // ─── Sub-sections ─────────────────────────────────────────────────────────────
 
@@ -1902,14 +1898,11 @@ function AuditTab() {
 export default function PlatformAdminPage() {
   const router = useRouter()
   const { sessionIdentity, startImpersonation } = useAdmin()
-  const displayName = sessionIdentity?.displayName?.trim() ?? ""
-  const email = sessionIdentity?.email?.trim() ?? ""
-  const headerLine1 = displayName || email || "…"
-  const headerLine2 =
-    displayName && email && displayName.toLowerCase() !== email.toLowerCase()
-      ? email
-      : (sessionIdentity?.platformRoleLabel ?? "Platform Admin")
-  const headerInitials = initialsFromDisplayLabel(displayName || email || "?")
+  const header = usePlatformAdminHeaderIdentity({
+    displayName: sessionIdentity?.displayName,
+    email: sessionIdentity?.email,
+    platformRoleLabel: sessionIdentity?.platformRoleLabel,
+  })
   const [activeTab, setActiveTab] = useState<Tab>("accounts")
   const [accounts, setAccounts] = useState<PlatformAccount[]>([])
   const [accountsLoading, setAccountsLoading] = useState(true)
@@ -1987,6 +1980,13 @@ export default function PlatformAdminPage() {
     void loadOverview()
   }, [loadAccounts, loadOverview])
 
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab")
+    if (isPlatformAdminInlineTab(tab)) {
+      setActiveTab(tab)
+    }
+  }, [])
+
   const nonArchivedAccounts = useMemo(
     () => accounts.filter((a) => !a.organizationArchived),
     [accounts],
@@ -2044,50 +2044,11 @@ export default function PlatformAdminPage() {
     router.push("/")
   }
 
-  const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
-    { key: "accounts",  label: "Accounts",   icon: Building2 },
-    { key: "analytics", label: "Analytics",  icon: TrendingUp },
-    { key: "flags",     label: "Feature Flags", icon: Flag },
-    { key: "audit",     label: "Audit Log",  icon: ScrollText },
-    { key: "ai_operations", label: "AI Operations", icon: Brain },
-    { key: "import_operations", label: "Import Ops", icon: Database },
-    { key: "master_context", label: "Master Context", icon: ScrollText },
-    { key: "blitzpay_operations", label: "BlitzPay Ops", icon: CreditCard },
-  ]
-
   return (
     <div className="min-h-screen bg-background">
-      {/* Top nav */}
-      <header className="flex items-center h-14 px-6 bg-[#0F172A] border-b border-white/10 gap-4 shrink-0">
-        <div className="flex items-center gap-2">
-          <BrandLogo className="h-7 w-auto max-h-7" priority />
-          <span className="ml-2 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-200 border border-violet-400/25">
-            Platform Admin
-          </span>
-        </div>
-        <div className="flex-1" />
-        {/* Admin identity */}
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-[#7c3aed] flex items-center justify-center text-white text-[11px] font-bold shrink-0">
-            {headerInitials}
-          </div>
-          <div className="hidden sm:block">
-            <p className="text-xs font-semibold text-white leading-tight">{headerLine1}</p>
-            <p className="text-[10px] text-slate-400">{headerLine2}</p>
-          </div>
-        </div>
-        <Link
-          href="/admin/growth/leads"
-          className="flex items-center gap-1.5 text-xs text-slate-400 transition-colors hover:text-white"
-        >
-          Growth Engine
-        </Link>
-        <Link href="/" className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors ml-4">
-          Back to app <ChevronRight size={12} />
-        </Link>
-      </header>
+      <PlatformAdminHeader {...header} />
 
-      <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col gap-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-8">
         {process.env.NODE_ENV === "development" && overviewError ? (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs text-amber-900 dark:text-amber-100">
             <span className="font-semibold">Analytics (dev):</span> {overviewError} — KPIs above use the
@@ -2173,23 +2134,7 @@ export default function PlatformAdminPage() {
 
         {/* Tabs */}
         <div className="flex flex-col gap-6">
-          <nav className="flex items-center gap-1 border-b border-border overflow-x-auto pb-px [scrollbar-width:thin]">
-            {TABS.map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setActiveTab(key)}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors shrink-0",
-                  activeTab === key
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Icon size={14} /> {label}
-              </button>
-            ))}
-          </nav>
+          <PlatformAdminTabNav activeKey={activeTab} onInlineTabSelect={setActiveTab} />
 
           {activeTab === "accounts" && (
             <AccountsTab
