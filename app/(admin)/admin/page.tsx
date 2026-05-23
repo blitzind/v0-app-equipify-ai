@@ -2076,6 +2076,12 @@ export default function PlatformAdminPage() {
             <p className="text-[10px] text-slate-400">{headerLine2}</p>
           </div>
         </div>
+        <Link
+          href="/admin/growth/leads"
+          className="flex items-center gap-1.5 text-xs text-slate-400 transition-colors hover:text-white"
+        >
+          Growth Engine
+        </Link>
         <Link href="/" className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors ml-4">
           Back to app <ChevronRight size={12} />
         </Link>

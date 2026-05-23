@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 463,
-  sqlMigrations: 201,
+  apiRouteHandlers: 465,
+  sqlMigrations: 202,
   dashboardPages: 65,
-  componentsTsx: 331,
-  libTsFiles: 948,
+  componentsTsx: 333,
+  libTsFiles: 951,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **463** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **201** |
+| API route handlers (\`app/api/**/route.ts\`) | **465** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **202** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **331** |
-| \`lib/**/*.ts\` | **948** |
+| \`components/**/*.tsx\` | **333** |
+| \`lib/**/*.ts\` | **951** |
 
 ### Vercel crons
 
@@ -447,6 +447,8 @@ platform/blitzpay/reminder-dispatch/route.ts
 platform/blitzpay/reminder-runs/route.ts
 platform/blitzpay/revenue-rollup/route.ts
 platform/feature-requests/route.ts
+platform/growth/leads/[leadId]/route.ts
+platform/growth/leads/route.ts
 platform/import-operations/bulk-recover/route.ts
 platform/import-operations/bulk-retry/route.ts
 platform/import-operations/route.ts
