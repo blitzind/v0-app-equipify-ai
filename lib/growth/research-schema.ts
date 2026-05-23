@@ -5,8 +5,70 @@ import type { GrowthLeadResearchResult } from "@/lib/growth/research-types"
 
 export const GROWTH_LEAD_FIT_MODEL_VERSION = "v1" as const
 
-const stringArray = z.array(z.string().trim()).transform((items) =>
-  items.map((s) => s.trim()).filter(Boolean).slice(0, 12),
+const MAX_STRING_LIST_ITEMS = 12
+
+/** Normalize AI list fields that may arrive as string, array, null, or mixed scalars. */
+export function normalizeGrowthLeadResearchStringList(value: unknown, maxItems = MAX_STRING_LIST_ITEMS): string[] {
+  if (value == null) return []
+
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    return trimmed ? [trimmed].slice(0, maxItems) : []
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((item) => {
+        if (typeof item === "string") {
+          const trimmed = item.trim()
+          return trimmed ? [trimmed] : []
+        }
+        if (item == null) return []
+        const trimmed = String(item).trim()
+        return trimmed ? [trimmed] : []
+      })
+      .slice(0, maxItems)
+  }
+
+  const trimmed = String(value).trim()
+  return trimmed ? [trimmed].slice(0, maxItems) : []
+}
+
+export function clampGrowthLeadFitScore(value: unknown): number {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 0
+  return Math.min(100, Math.max(0, Math.round(parsed)))
+}
+
+export function clampGrowthLeadResearchConfidence(value: unknown): number {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 0
+  return Math.min(1, Math.max(0, parsed))
+}
+
+export function normalizeGrowthLeadFitModelVersion(value: unknown): string {
+  if (typeof value === "string" && value.trim()) return value.trim()
+  return GROWTH_LEAD_FIT_MODEL_VERSION
+}
+
+const tolerantStringArray = z.preprocess(
+  (value) => normalizeGrowthLeadResearchStringList(value),
+  z.array(z.string()).max(MAX_STRING_LIST_ITEMS),
+)
+
+const clampedFitScore = z.preprocess(
+  (value) => clampGrowthLeadFitScore(value),
+  z.number().int().min(0).max(100),
+)
+
+const clampedResearchConfidence = z.preprocess(
+  (value) => clampGrowthLeadResearchConfidence(value),
+  z.number().min(0).max(1),
+)
+
+const fitModelVersion = z.preprocess(
+  (value) => normalizeGrowthLeadFitModelVersion(value),
+  z.string().min(1),
 )
 
 /** Snake_case schema matching the LLM JSON contract. */
@@ -14,16 +76,17 @@ export const growthLeadResearchModelSchema = z.object({
   company_summary: z.string(),
   website_summary: z.string().nullable().optional(),
   likely_service_category: z.string().nullable().optional(),
-  service_area_clues: stringArray.optional().default([]),
+  service_area_clues: tolerantStringArray.optional().default([]),
   company_size_estimate: z.string().nullable().optional(),
-  equipment_service_indicators: stringArray.optional().default([]),
-  equipify_pain_points: stringArray.optional().default([]),
-  equipify_fit_score: z.number().int().min(0).max(100),
-  outreach_angles: stringArray.optional().default([]),
+  equipment_service_indicators: tolerantStringArray.optional().default([]),
+  equipify_pain_points: tolerantStringArray.optional().default([]),
+  equipify_fit_score: clampedFitScore,
+  outreach_angles: tolerantStringArray.optional().default([]),
   recommended_next_action: z.string(),
-  research_confidence: z.number().min(0).max(1),
-  source_urls: stringArray.optional().default([]),
-  caveats: stringArray.optional().default([]),
+  research_confidence: clampedResearchConfidence,
+  source_urls: tolerantStringArray.optional().default([]),
+  caveats: tolerantStringArray.optional().default([]),
+  fit_model_version: fitModelVersion.optional().default(GROWTH_LEAD_FIT_MODEL_VERSION),
 })
 
 export type GrowthLeadResearchModelResult = z.infer<typeof growthLeadResearchModelSchema>
@@ -48,6 +111,6 @@ export function mapGrowthLeadResearchModelToResult(row: GrowthLeadResearchModelR
     researchConfidence: row.research_confidence,
     sourceUrls: row.source_urls,
     caveats: row.caveats,
-    fitModelVersion: GROWTH_LEAD_FIT_MODEL_VERSION,
+    fitModelVersion: row.fit_model_version ?? GROWTH_LEAD_FIT_MODEL_VERSION,
   }
 }

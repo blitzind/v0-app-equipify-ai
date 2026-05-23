@@ -78,6 +78,7 @@
     "test:operational-workflow-recommendations": "tsx scripts/test-operational-workflow-recommendations.ts",
     "test:aiden-prepared-workspace-tier-policy": "tsx scripts/test-aiden-prepared-workspace-tier-policy.ts",
     "test:prospect-business-card-scan": "tsx scripts/test-prospect-business-card-scan.ts",
+    "test:growth-lead-research-schema": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-lead-research-schema.ts",
     "test:catalog-import-manufacturer": "tsx scripts/test-catalog-import-manufacturer.ts",
     "test:catalog-import-template": "tsx scripts/test-catalog-import-template.ts",
     "test:extract-price-list-from-csv": "tsx scripts/test-extract-price-list-from-csv.ts",
