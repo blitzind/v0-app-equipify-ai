@@ -105,3 +105,11 @@ export const fetchGrowthCommunicationSettings = fetchGrowthPlatformCommunication
 
 /** @deprecated Use updateGrowthPlatformCommunicationSettings */
 export const updateGrowthCommunicationSettings = updateGrowthPlatformCommunicationSettings
+
+export async function isGrowthEmailConnectionActiveInPlatformSettings(
+  admin: SupabaseClient,
+  connectionId: string,
+): Promise<boolean> {
+  const settings = await fetchGrowthPlatformCommunicationSettings(admin)
+  return settings.activeEmailConnectionId === connectionId
+}

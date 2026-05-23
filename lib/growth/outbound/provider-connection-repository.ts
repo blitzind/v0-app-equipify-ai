@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { isGrowthEmailConnectionActiveInPlatformSettings } from "@/lib/growth/communication/settings-repository"
 import { parseGrowthProviderCapabilitySnapshot } from "@/lib/growth/outbound/capability-snapshot"
 import {
   growthProviderHealthReason,
@@ -60,13 +61,19 @@ type ProviderConnectionRow = {
   created_by: string | null
   created_at: string
   updated_at: string
+  deleted_at: string | null
+  deleted_by: string | null
 }
 
 const SELECT =
-  "id, provider, provider_family, label, status, api_base_url, credentials_encrypted, webhook_secret, config, last_webhook_at, last_error, monthly_cost_estimate, seat_count, notes, lifecycle_status, health_reason, last_validation_at, last_validation_success_at, validation_failure_count, last_error_message, capability_snapshot, last_validation_duration_ms, average_validation_duration_ms, temporarily_degraded, degraded_reason, degraded_until, credential_last_rotated_at, credential_rotation_recommended_at, next_validation_allowed_at, created_by, created_at, updated_at"
+  "id, provider, provider_family, label, status, api_base_url, credentials_encrypted, webhook_secret, config, last_webhook_at, last_error, monthly_cost_estimate, seat_count, notes, lifecycle_status, health_reason, last_validation_at, last_validation_success_at, validation_failure_count, last_error_message, capability_snapshot, last_validation_duration_ms, average_validation_duration_ms, temporarily_degraded, degraded_reason, degraded_until, credential_last_rotated_at, credential_rotation_recommended_at, next_validation_allowed_at, created_by, created_at, updated_at, deleted_at, deleted_by"
 
 function connectionsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("email_provider_connections")
+}
+
+function activeConnectionsQuery(admin: SupabaseClient) {
+  return connectionsTable(admin).is("deleted_at", null)
 }
 
 function mapHealth(row: ProviderConnectionRow): GrowthProviderConnectionHealth {
@@ -123,7 +130,7 @@ export async function fetchGrowthProviderConnectionInternal(
   admin: SupabaseClient,
   connectionId: string,
 ): Promise<GrowthProviderConnectionInternal | null> {
-  const { data, error } = await connectionsTable(admin).select(SELECT).eq("id", connectionId).maybeSingle()
+  const { data, error } = await activeConnectionsQuery(admin).select(SELECT).eq("id", connectionId).maybeSingle()
   if (error) throw new Error(error.message)
   return data ? mapInternal(data as ProviderConnectionRow) : null
 }
@@ -131,7 +138,7 @@ export async function fetchGrowthProviderConnectionInternal(
 export async function listGrowthProviderConnectionSummaries(
   admin: SupabaseClient,
 ): Promise<GrowthProviderConnectionSummary[]> {
-  const { data, error } = await connectionsTable(admin).select(SELECT).order("created_at", { ascending: false })
+  const { data, error } = await activeConnectionsQuery(admin).select(SELECT).order("created_at", { ascending: false })
   if (error) throw new Error(error.message)
   return ((data ?? []) as ProviderConnectionRow[]).map(mapGrowthProviderConnectionSummary)
 }
@@ -201,7 +208,7 @@ export async function updateGrowthProviderConnectionDetails(
   if (input.notes !== undefined) patch.notes = input.notes?.trim() || null
   if (input.webhookSecret !== undefined) patch.webhook_secret = input.webhookSecret?.trim() || null
 
-  const { data, error } = await connectionsTable(admin)
+  const { data, error } = await activeConnectionsQuery(admin)
     .update(patch)
     .eq("id", connectionId)
     .select(SELECT)
@@ -221,7 +228,7 @@ export async function updateGrowthProviderConnectionCredentials(
     Date.now() + GROWTH_PROVIDER_CREDENTIAL_ROTATION_RECOMMEND_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString()
 
-  const { data, error } = await connectionsTable(admin)
+  const { data, error } = await activeConnectionsQuery(admin)
     .update({
       credentials_encrypted: encryptGrowthProviderCredentials(credentials),
       credential_last_rotated_at: now,
@@ -292,7 +299,7 @@ export async function applyGrowthProviderValidationPatch(
     patch.seat_count = input.seatCount
   }
 
-  const { data, error } = await connectionsTable(admin)
+  const { data, error } = await activeConnectionsQuery(admin)
     .update(patch)
     .eq("id", connectionId)
     .select(SELECT)
@@ -307,7 +314,7 @@ export async function disableGrowthProviderConnection(
   connectionId: string,
 ): Promise<GrowthProviderConnectionSummary> {
   const now = new Date().toISOString()
-  const { data, error } = await connectionsTable(admin)
+  const { data, error } = await activeConnectionsQuery(admin)
     .update({
       lifecycle_status: "disabled",
       status: "disabled",
@@ -330,7 +337,7 @@ export async function reconnectGrowthProviderConnection(
   connectionId: string,
 ): Promise<GrowthProviderConnectionSummary> {
   const now = new Date().toISOString()
-  const { data, error } = await connectionsTable(admin)
+  const { data, error } = await activeConnectionsQuery(admin)
     .update({
       lifecycle_status: "configuring",
       status: "error",
@@ -346,6 +353,43 @@ export async function reconnectGrowthProviderConnection(
 
   if (error) throw new Error(error.message)
   return mapGrowthProviderConnectionSummary(data as ProviderConnectionRow)
+}
+
+export class GrowthProviderConnectionDeleteBlockedError extends Error {
+  readonly code = "active_email_provider" as const
+
+  constructor() {
+    super("active_email_provider")
+  }
+}
+
+export async function softDeleteGrowthProviderConnection(
+  admin: SupabaseClient,
+  input: {
+    connectionId: string
+    deletedBy: string
+  },
+): Promise<{ id: string; deletedAt: string }> {
+  const existing = await fetchGrowthProviderConnectionInternal(admin, input.connectionId)
+  if (!existing) throw new Error("connection_not_found")
+
+  if (await isGrowthEmailConnectionActiveInPlatformSettings(admin, input.connectionId)) {
+    throw new GrowthProviderConnectionDeleteBlockedError()
+  }
+
+  const deletedAt = new Date().toISOString()
+  const { data, error } = await activeConnectionsQuery(admin)
+    .update({
+      deleted_at: deletedAt,
+      deleted_by: input.deletedBy,
+      updated_at: deletedAt,
+    })
+    .eq("id", input.connectionId)
+    .select("id, deleted_at")
+    .single()
+
+  if (error) throw new Error(error.message)
+  return { id: (data as { id: string }).id, deletedAt: (data as { deleted_at: string }).deleted_at }
 }
 
 export function readGrowthProviderConnectionCredentials(

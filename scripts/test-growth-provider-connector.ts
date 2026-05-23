@@ -19,6 +19,7 @@ import { stubOutboundProviderAdapter } from "../lib/growth/outbound/providers/st
 import { isKnownOutboundProvider, listOutboundProviderAdapters } from "../lib/growth/outbound/providers/registry"
 import {
   GROWTH_PROVIDER_VALIDATION_COOLDOWN_MS,
+  growthProviderDeleteRequiresConfirmation,
   type GrowthProviderConnectionSummary,
 } from "../lib/growth/outbound/provider-types"
 import {
@@ -90,6 +91,11 @@ assert.ok(isKnownOutboundProvider("emailbison"))
 
 assert.equal(stubOutboundProviderAdapter.providerFamily(), "custom")
 assert.equal(smartleadOutboundProviderAdapter.providerFamily(), "smartlead")
+
+assert.equal(growthProviderDeleteRequiresConfirmation("connected"), true)
+assert.equal(growthProviderDeleteRequiresConfirmation("warning"), true)
+assert.equal(growthProviderDeleteRequiresConfirmation("disabled"), false)
+assert.equal(growthProviderDeleteRequiresConfirmation("configuring"), false)
 
 async function run() {
   const stubValidation = await stubOutboundProviderAdapter.validateConnection({

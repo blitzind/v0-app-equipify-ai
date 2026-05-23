@@ -35,6 +35,10 @@ function connectionsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("email_provider_connections")
 }
 
+function activeConnectionsQuery(admin: SupabaseClient) {
+  return connectionsTable(admin).is("deleted_at", null)
+}
+
 function mapRow(row: ConnectionDbRow): GrowthEmailProviderConnection {
   return {
     id: row.id,
@@ -135,7 +139,7 @@ export async function updateGrowthOutboundConnection(
     patch.notes = input.notes?.trim() ? input.notes.trim() : null
   }
 
-  const { data, error } = await connectionsTable(admin)
+  const { data, error } = await activeConnectionsQuery(admin)
     .update(patch)
     .eq("id", connectionId)
     .select(SELECT)

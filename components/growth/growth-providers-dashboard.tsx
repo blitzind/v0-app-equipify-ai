@@ -8,14 +8,25 @@ import {
   RefreshCw,
   ShieldOff,
   TestTube2,
+  Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import {
   GROWTH_PROVIDER_CAPABILITY_LABELS,
+  growthProviderDeleteRequiresConfirmation,
   type GrowthPlatformTimelineEvent,
   type GrowthProviderCapabilityKey,
   type GrowthProviderConnectionSummary,
@@ -70,6 +81,7 @@ export function GrowthProvidersDashboard() {
   const [selectedId, setSelectedId] = useState<string>("")
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [timeline, setTimeline] = useState<GrowthPlatformTimelineEvent[]>([])
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   const [newFamily, setNewFamily] = useState<GrowthOutboundProviderFamily>("smartlead")
   const [newLabel, setNewLabel] = useState("")
@@ -217,6 +229,31 @@ export function GrowthProvidersDashboard() {
       await load()
       await loadTimeline(selected.id)
     })
+  }
+
+  async function deleteConnection() {
+    if (!selected) return
+    await runAction("delete", async () => {
+      const res = await fetch(`/api/platform/growth/providers/connections/${selected.id}`, { method: "DELETE" })
+      const data = (await res.json().catch(() => ({}))) as { message?: string; error?: string }
+      if (res.status === 409 && data.error === "active_email_provider") {
+        throw new Error(data.message ?? "Clear the active email provider in Communication Settings first.")
+      }
+      if (!res.ok) throw new Error(data.message ?? "Delete failed.")
+      setDeleteDialogOpen(false)
+      setSuccess("Provider connection deleted.")
+      setSelectedId("")
+      await load()
+    })
+  }
+
+  function handleDeleteClick() {
+    if (!selected) return
+    if (growthProviderDeleteRequiresConfirmation(selected.health.lifecycleStatus)) {
+      setDeleteDialogOpen(true)
+      return
+    }
+    void deleteConnection()
   }
 
   if (loading) {
@@ -387,8 +424,49 @@ export function GrowthProvidersDashboard() {
                   <ShieldOff className="mr-2 size-4" />
                   Disable
                 </Button>
+                <Button
+                  variant="ghost"
+                  className="text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                  onClick={() => handleDeleteClick()}
+                  disabled={actionLoading === "delete"}
+                >
+                  {actionLoading === "delete" ? (
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="mr-2 size-4" />
+                  )}
+                  Delete
+                </Button>
               </div>
             </GrowthEngineCard>
+
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Provider Connection</AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-3 text-sm text-muted-foreground">
+                      <p>This removes the provider connection and provider configuration.</p>
+                      <p>No outbound messages are deleted.</p>
+                      <p>Provider timeline history remains.</p>
+                      <p>Capability history remains.</p>
+                      <p className="font-medium text-foreground">This cannot be undone.</p>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={actionLoading === "delete"}>Cancel</AlertDialogCancel>
+                  <Button
+                    variant="destructive"
+                    disabled={actionLoading === "delete"}
+                    onClick={() => void deleteConnection()}
+                  >
+                    {actionLoading === "delete" ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                    Delete Connection
+                  </Button>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             <GrowthEngineCard title="Capabilities">
               <div className="flex flex-wrap gap-2">

@@ -138,3 +138,12 @@ export const GROWTH_PROVIDER_CAPABILITY_LABELS: Record<GrowthProviderCapabilityK
 export const GROWTH_PROVIDER_VALIDATION_COOLDOWN_MS = 30_000
 
 export const GROWTH_PROVIDER_CREDENTIAL_ROTATION_RECOMMEND_DAYS = 90
+
+/** Lifecycle states that require confirmation before delete. Others delete immediately. */
+export const GROWTH_PROVIDER_DELETE_CONFIRMATION_LIFECYCLES = ["connected", "warning"] as const
+
+export function growthProviderDeleteRequiresConfirmation(
+  lifecycleStatus: GrowthProviderLifecycleStatus,
+): boolean {
+  return (GROWTH_PROVIDER_DELETE_CONFIRMATION_LIFECYCLES as readonly string[]).includes(lifecycleStatus)
+}

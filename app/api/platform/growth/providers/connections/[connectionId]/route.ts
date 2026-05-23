@@ -3,6 +3,8 @@ import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import {
   fetchGrowthProviderConnectionInternal,
+  GrowthProviderConnectionDeleteBlockedError,
+  softDeleteGrowthProviderConnection,
   updateGrowthProviderConnectionDetails,
 } from "@/lib/growth/outbound/provider-connection-repository"
 
@@ -47,5 +49,42 @@ export async function PATCH(
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ error: "update_failed", message }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  context: { params: Promise<{ connectionId: string }> },
+) {
+  const access = await requireGrowthEnginePlatformAccess()
+  if (!access.ok) return access.response
+
+  const { connectionId } = await context.params
+  if (!z.string().uuid().safeParse(connectionId).success) {
+    return NextResponse.json({ error: "invalid_connection_id", message: "Connection id must be a UUID." }, { status: 400 })
+  }
+
+  try {
+    const deleted = await softDeleteGrowthProviderConnection(access.admin, {
+      connectionId,
+      deletedBy: access.userId,
+    })
+    return NextResponse.json({ ok: true, deleted })
+  } catch (e) {
+    if (e instanceof GrowthProviderConnectionDeleteBlockedError) {
+      return NextResponse.json(
+        {
+          error: e.code,
+          message:
+            "This provider is the active email connection in Communication Settings. Select another provider or clear the active provider before deleting.",
+        },
+        { status: 409 },
+      )
+    }
+    const message = e instanceof Error ? e.message : String(e)
+    if (message === "connection_not_found") {
+      return NextResponse.json({ error: "not_found", message: "Connection not found." }, { status: 404 })
+    }
+    return NextResponse.json({ error: "delete_failed", message }, { status: 500 })
   }
 }
