@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthEnginePlatformAccess, logGrowthEngine } from "@/lib/growth/access"
 import { ensureGrowthStubOutboundConnection } from "@/lib/growth/outbound/connection-repository"
 import { mapGrowthProviderApiError } from "@/lib/growth/outbound/provider-api-errors"
 import { appendGrowthPlatformTimelineEvent } from "@/lib/growth/outbound/platform-timeline-repository"
@@ -54,6 +54,11 @@ export async function GET() {
     })
   } catch (e) {
     const mapped = mapGrowthProviderApiError(e)
+    logGrowthEngine("provider_connections_list_failed", {
+      error: mapped.error,
+      message: mapped.message,
+      repositoryError: e instanceof Error ? e.message : String(e),
+    })
     return NextResponse.json({ error: mapped.error, message: mapped.message }, { status: mapped.status })
   }
 }
@@ -101,6 +106,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, connection }, { status: 201 })
   } catch (e) {
     const mapped = mapGrowthProviderApiError(e)
+    logGrowthEngine("provider_connections_create_failed", {
+      error: mapped.error,
+      message: mapped.message,
+      repositoryError: e instanceof Error ? e.message : String(e),
+    })
     return NextResponse.json({ error: mapped.error, message: mapped.message }, { status: mapped.status })
   }
 }

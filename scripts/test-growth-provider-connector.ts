@@ -27,6 +27,7 @@ import {
   isGrowthProviderValidationCooldownActive,
 } from "../lib/growth/outbound/provider-connection-repository"
 import { mapGrowthProviderApiError } from "../lib/growth/outbound/provider-api-errors"
+import { withActiveProviderConnectionScope } from "../lib/growth/outbound/provider-connection-query"
 
 const declared = emptyGrowthProviderCapabilitySnapshot()
 
@@ -102,6 +103,19 @@ const deletedAtError = mapGrowthProviderApiError(new Error('column "deleted_at" 
 assert.equal(deletedAtError.error, "growth_schema_incomplete")
 assert.equal(deletedAtError.status, 503)
 assert.match(deletedAtError.message, /20270102120000/)
+
+const filterProbe = {
+  is(column: string, value: null) {
+    return { column, value, kind: "filter" as const }
+  },
+}
+const tableProbe = { select: () => filterProbe }
+assert.equal(withActiveProviderConnectionScope(filterProbe, false), filterProbe)
+assert.deepEqual(withActiveProviderConnectionScope(tableProbe.select(), true), {
+  column: "deleted_at",
+  value: null,
+  kind: "filter",
+})
 
 async function run() {
   const stubValidation = await stubOutboundProviderAdapter.validateConnection({

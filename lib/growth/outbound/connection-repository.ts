@@ -7,6 +7,10 @@ import type {
   GrowthOutboundConnectionStatus,
 } from "@/lib/growth/outbound/types"
 import { GROWTH_OUTBOUND_DEFAULT_CONNECTION_LABEL, GROWTH_OUTBOUND_STUB_PROVIDER } from "@/lib/growth/outbound/constants"
+import {
+  growthEmailProviderConnectionsTable,
+  withActiveProviderConnectionScope,
+} from "@/lib/growth/outbound/provider-connection-query"
 import { probeGrowthProviderConnectionSchema } from "@/lib/growth/outbound/provider-schema-health"
 
 type ConnectionDbRow = {
@@ -33,13 +37,7 @@ const SELECT =
   "id, provider, provider_family, label, status, api_base_url, webhook_secret, config, last_webhook_at, last_error, monthly_cost_estimate, seat_count, notes, created_by, created_at, updated_at"
 
 function connectionsTable(admin: SupabaseClient) {
-  return admin.schema("growth").from("email_provider_connections")
-}
-
-async function scopedConnectionsQuery(admin: SupabaseClient) {
-  const { softDelete } = await probeGrowthProviderConnectionSchema(admin)
-  const query = connectionsTable(admin)
-  return softDelete ? query.is("deleted_at", null) : query
+  return growthEmailProviderConnectionsTable(admin)
 }
 
 function mapRow(row: ConnectionDbRow): GrowthEmailProviderConnection {
@@ -67,10 +65,9 @@ export async function fetchGrowthOutboundConnectionById(
   admin: SupabaseClient,
   connectionId: string,
 ): Promise<GrowthEmailProviderConnection | null> {
-  const { data, error } = await (await scopedConnectionsQuery(admin))
-    .select(SELECT)
-    .eq("id", connectionId)
-    .maybeSingle()
+  const { softDelete } = await probeGrowthProviderConnectionSchema(admin)
+  const selectQuery = withActiveProviderConnectionScope(connectionsTable(admin).select(SELECT), softDelete)
+  const { data, error } = await selectQuery.eq("id", connectionId).maybeSingle()
   if (error) throw new Error(error.message)
   return data ? mapRow(data as ConnectionDbRow) : null
 }
@@ -79,8 +76,9 @@ export async function fetchGrowthOutboundConnectionByProvider(
   admin: SupabaseClient,
   provider: string,
 ): Promise<GrowthEmailProviderConnection | null> {
-  const { data, error } = await (await scopedConnectionsQuery(admin))
-    .select(SELECT)
+  const { softDelete } = await probeGrowthProviderConnectionSchema(admin)
+  const selectQuery = withActiveProviderConnectionScope(connectionsTable(admin).select(SELECT), softDelete)
+  const { data, error } = await selectQuery
     .eq("provider", provider)
     .eq("status", "active")
     .order("created_at", { ascending: false })
@@ -93,9 +91,9 @@ export async function fetchGrowthOutboundConnectionByProvider(
 export async function listGrowthOutboundConnections(
   admin: SupabaseClient,
 ): Promise<GrowthEmailProviderConnection[]> {
-  const { data, error } = await (await scopedConnectionsQuery(admin))
-    .select(SELECT)
-    .order("created_at", { ascending: false })
+  const { softDelete } = await probeGrowthProviderConnectionSchema(admin)
+  const selectQuery = withActiveProviderConnectionScope(connectionsTable(admin).select(SELECT), softDelete)
+  const { data, error } = await selectQuery.order("created_at", { ascending: false })
   if (error) throw new Error(error.message)
   return ((data ?? []) as ConnectionDbRow[]).map(mapRow)
 }
@@ -149,11 +147,9 @@ export async function updateGrowthOutboundConnection(
     patch.notes = input.notes?.trim() ? input.notes.trim() : null
   }
 
-  const { data, error } = await (await scopedConnectionsQuery(admin))
-    .update(patch)
-    .eq("id", connectionId)
-    .select(SELECT)
-    .single()
+  const { softDelete } = await probeGrowthProviderConnectionSchema(admin)
+  const updateQuery = withActiveProviderConnectionScope(connectionsTable(admin).update(patch), softDelete)
+  const { data, error } = await updateQuery.eq("id", connectionId).select(SELECT).single()
 
   if (error) throw new Error(error.message)
   return mapRow(data as ConnectionDbRow)
