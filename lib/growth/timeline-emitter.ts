@@ -261,6 +261,36 @@ export async function emitGrowthLeadManualTouchTimeline(
   })
 }
 
+export async function emitGrowthLeadImportCreatedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; batchId: string; rowIndex: number; companyName: string; actor?: Actor },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "import_created",
+    title: "Lead imported",
+    summary: input.companyName,
+    payload: { batchId: input.batchId, rowIndex: input.rowIndex },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}
+
+export async function emitGrowthLeadImportUpdatedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; batchId: string; rowIndex: number; actor?: Actor },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "import_updated",
+    title: "Lead updated from import",
+    summary: `Batch row ${input.rowIndex + 1}`,
+    payload: { batchId: input.batchId, rowIndex: input.rowIndex },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}
+
 export async function emitGrowthLeadFollowUpCompletedTimeline(
   admin: SupabaseClient,
   input: { leadId: string; followUpAt: string | null; actor?: Actor },

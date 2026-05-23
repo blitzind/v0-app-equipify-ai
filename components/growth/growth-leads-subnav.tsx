@@ -11,6 +11,11 @@ const LINKS = [
     label: "Call Queue",
     match: (path: string) => path.startsWith("/admin/growth/leads/queue"),
   },
+  {
+    href: "/admin/growth/imports",
+    label: "Imports",
+    match: (path: string) => path.startsWith("/admin/growth/imports"),
+  },
 ] as const
 
 export function GrowthLeadsSubnav() {

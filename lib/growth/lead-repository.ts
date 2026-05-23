@@ -338,6 +338,43 @@ export async function updateGrowthLead(
   return lead
 }
 
+/** Import merge — applies only safe empty-field patches; never touches protected workflow fields. */
+export async function updateGrowthLeadFromImportMerge(
+  admin: SupabaseClient,
+  leadId: string,
+  patch: Record<string, unknown>,
+): Promise<GrowthLead | null> {
+  if (Object.keys(patch).length === 0) {
+    return fetchGrowthLeadById(admin, leadId)
+  }
+
+  const { data, error } = await growthLeadsTable(admin)
+    .update(patch)
+    .eq("id", leadId)
+    .select(LEAD_SELECT)
+    .maybeSingle()
+
+  if (error) {
+    logGrowthEngine("lead_import_merge_failed", {
+      table: "growth.leads",
+      action: "update",
+      leadId,
+      code: error.code ?? null,
+      message: error.message,
+    })
+    throw new Error(error.message)
+  }
+
+  if (!data) return null
+
+  const lead = mapGrowthLeadRow(data as GrowthLeadDbRow)
+  logGrowthEngine("lead_import_merged", {
+    leadId: lead.id,
+    patchedFields: Object.keys(patch),
+  })
+  return lead
+}
+
 export async function markGrowthLeadResearchCompleted(
   admin: SupabaseClient,
   input: {
