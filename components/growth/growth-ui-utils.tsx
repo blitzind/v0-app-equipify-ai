@@ -118,6 +118,16 @@ export function GrowthBadge({
   )
 }
 
+export function GrowthActionRequiredBadge({ className }: { className?: string }) {
+  return (
+    <GrowthBadge
+      label="Action Required"
+      tone="attention"
+      className={cn("px-2 py-0 text-[10px] font-medium normal-case tracking-normal", className)}
+    />
+  )
+}
+
 export function priorityTierTone(tier: GrowthCallPriorityTier | null | undefined) {
   switch (tier) {
     case "critical":

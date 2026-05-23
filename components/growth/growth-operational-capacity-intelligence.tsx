@@ -1,7 +1,8 @@
 "use client"
 
 import { Shield } from "lucide-react"
-import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthBadge, GrowthActionRequiredBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { growthLeadCapacityActionRequired } from "@/lib/growth/growth-lead-drawer-badges"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthOperationalCapacityIntelligenceProps = {
@@ -36,6 +37,7 @@ export function GrowthOperationalCapacityIntelligence({ lead }: GrowthOperationa
       title="Operational Capacity"
       icon={<Shield className="size-4" />}
       headerAside={collapsedSummary || "No capacity data"}
+      headerTrailing={growthLeadCapacityActionRequired(lead) ? <GrowthActionRequiredBadge /> : null}
     >
       <div className="space-y-4">
         <div className="flex flex-wrap items-baseline gap-2">

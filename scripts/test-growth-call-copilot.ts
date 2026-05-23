@@ -12,6 +12,11 @@ import {
   resolveGrowthCallCopilotEnabled,
   resolveGrowthCallCopilotRequireSummaryApproval,
 } from "../lib/growth/call-copilot-settings"
+import {
+  growthLeadCapacityActionRequired,
+  growthLeadExecutiveActionRequired,
+  growthLeadRelationshipActionRequired,
+} from "../lib/growth/growth-lead-drawer-badges"
 import type { GrowthCallCopilotBriefing, GrowthCallCopilotSession } from "../lib/growth/call-copilot-types"
 import {
   GROWTH_CALL_COPILOT_BUYING_SIGNAL_KEYS,
@@ -109,5 +114,9 @@ assert.equal(
   true,
 )
 assert.equal(resolveGrowthCallCopilotRequireSummaryApproval({ callCopilotRequireSummaryApproval: undefined as unknown as boolean }), true)
+
+assert.equal(growthLeadExecutiveActionRequired({ executivePriorityTier: "executive_now" } as import("../lib/growth/types").GrowthLead), true)
+assert.equal(growthLeadCapacityActionRequired({ operationalCapacityTier: "critical" } as import("../lib/growth/types").GrowthLead), true)
+assert.equal(growthLeadRelationshipActionRequired({ relationshipTrend: "cooling" } as import("../lib/growth/types").GrowthLead), true)
 
 console.log("growth call copilot tests passed")

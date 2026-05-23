@@ -1,7 +1,8 @@
 "use client"
 
 import { Crown } from "lucide-react"
-import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthBadge, GrowthActionRequiredBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { growthLeadExecutiveActionRequired } from "@/lib/growth/growth-lead-drawer-badges"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthExecutiveOperatingIntelligenceProps = {
@@ -32,6 +33,7 @@ export function GrowthExecutiveOperatingIntelligence({ lead }: GrowthExecutiveOp
       title="Executive Intelligence"
       icon={<Crown className="size-4" />}
       headerAside={collapsedSummary || "No executive data"}
+      headerTrailing={growthLeadExecutiveActionRequired(lead) ? <GrowthActionRequiredBadge /> : null}
     >
       <div className="space-y-4">
         <div className="flex flex-wrap items-baseline gap-2">
