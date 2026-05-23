@@ -5,9 +5,13 @@
 
 create extension if not exists "citext";
 
-if to_regprocedure('public.set_updated_at()') is null then
-  raise exception 'Missing dependency: public.set_updated_at()';
-end if;
+do $$
+begin
+  if to_regprocedure('public.set_updated_at()') is null then
+    raise exception 'Missing dependency: public.set_updated_at()';
+  end if;
+end;
+$$;
 
 create schema if not exists growth;
 
