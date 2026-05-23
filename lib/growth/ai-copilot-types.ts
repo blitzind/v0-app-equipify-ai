@@ -77,6 +77,8 @@ export type GrowthAiCopilotGeneration = {
   status: GrowthAiCopilotGenerationStatus
   sourceReplyId: string | null
   inputHash: string | null
+  playbookInfluenceScore: number
+  playbookAttribution: Record<string, unknown>
   approvedAt: string | null
   approvedBy: string | null
   sentAt: string | null
@@ -117,6 +119,9 @@ export type GrowthCopilotSettings = {
   aiCopilotStoreGenerations: boolean
   aiCopilotGenerationRetentionDays: number
   aiCopilotDefaultPromptVariant: GrowthAiCopilotPromptVariant | string
+  aiCopilotPlaybookEnabled: boolean
+  aiCopilotPlaybookMaxRulesPerGeneration: number
+  aiCopilotPlaybookSourceRetentionDays: number
   updatedBy: string | null
   createdAt: string
   updatedAt: string

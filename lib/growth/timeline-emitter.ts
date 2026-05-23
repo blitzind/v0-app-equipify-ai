@@ -708,3 +708,27 @@ export async function emitGrowthLeadAiCopilotGenerationApprovedTimeline(
     actor: input.actor,
   })
 }
+
+export async function emitGrowthLeadPlaybookConflictDetectedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    generationId?: string | null
+    summary: string
+    conflicts: Array<{ ruleKeyA: string; ruleKeyB: string; reason: string; severity: string }>
+    actor?: { userId: string | null; email: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "playbook_conflict_detected",
+    title: "Playbook conflict detected",
+    summary: input.summary,
+    payload: {
+      generationId: input.generationId ?? null,
+      conflictCount: input.conflicts.length,
+      conflicts: input.conflicts.slice(0, 5),
+    },
+    actor: input.actor,
+  })
+}

@@ -17,6 +17,9 @@ const PatchSettingsSchema = z.object({
   aiCopilotStoreGenerations: z.boolean().optional(),
   aiCopilotGenerationRetentionDays: z.number().int().min(1).max(3650).optional(),
   aiCopilotDefaultPromptVariant: z.enum(GROWTH_AI_COPILOT_PROMPT_VARIANTS).optional(),
+  aiCopilotPlaybookEnabled: z.boolean().optional(),
+  aiCopilotPlaybookMaxRulesPerGeneration: z.number().int().min(1).max(50).optional(),
+  aiCopilotPlaybookSourceRetentionDays: z.number().int().min(1).max(3650).optional(),
 })
 
 const PatchRuleSchema = z.object({

@@ -22,6 +22,8 @@ export function GrowthAiCopilotSettingsPanel() {
   const [providerOk, setProviderOk] = useState<boolean | null>(null)
   const [retentionDays, setRetentionDays] = useState("90")
   const [defaultVariant, setDefaultVariant] = useState("default")
+  const [playbookMaxRules, setPlaybookMaxRules] = useState("12")
+  const [playbookRetentionDays, setPlaybookRetentionDays] = useState("30")
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -43,6 +45,8 @@ export function GrowthAiCopilotSettingsPanel() {
       setProviderOk(data.providerHealth?.ok ?? null)
       setRetentionDays(String(data.settings.aiCopilotGenerationRetentionDays))
       setDefaultVariant(String(data.settings.aiCopilotDefaultPromptVariant))
+      setPlaybookMaxRules(String(data.settings.aiCopilotPlaybookMaxRulesPerGeneration ?? 12))
+      setPlaybookRetentionDays(String(data.settings.aiCopilotPlaybookSourceRetentionDays ?? 30))
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
     } finally {
@@ -68,6 +72,9 @@ export function GrowthAiCopilotSettingsPanel() {
           aiCopilotStoreGenerations: settings.aiCopilotStoreGenerations,
           aiCopilotGenerationRetentionDays: Number(retentionDays),
           aiCopilotDefaultPromptVariant: defaultVariant,
+          aiCopilotPlaybookEnabled: settings.aiCopilotPlaybookEnabled,
+          aiCopilotPlaybookMaxRulesPerGeneration: Number(playbookMaxRules),
+          aiCopilotPlaybookSourceRetentionDays: Number(playbookRetentionDays),
         }),
       })
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; settings?: GrowthCopilotSettings; message?: string }
@@ -157,6 +164,27 @@ export function GrowthAiCopilotSettingsPanel() {
                 </option>
               ))}
             </select>
+          </div>
+        </div>
+      </GrowthEngineCard>
+
+      <GrowthEngineCard title="Playbook training">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={settings.aiCopilotPlaybookEnabled}
+              onChange={(event) => setSettings({ ...settings, aiCopilotPlaybookEnabled: event.target.checked })}
+            />
+            Apply approved playbook rules during generation
+          </label>
+          <div className="space-y-1">
+            <Label>Max rules per generation</Label>
+            <Input value={playbookMaxRules} onChange={(event) => setPlaybookMaxRules(event.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>Source retention days</Label>
+            <Input value={playbookRetentionDays} onChange={(event) => setPlaybookRetentionDays(event.target.value)} />
           </div>
         </div>
       </GrowthEngineCard>

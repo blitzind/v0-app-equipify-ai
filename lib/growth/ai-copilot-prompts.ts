@@ -3,6 +3,8 @@ import type {
   GrowthAiCopilotInputSnapshot,
   GrowthAiCopilotPromptVariant,
 } from "@/lib/growth/ai-copilot-types"
+import type { GrowthAiCopilotPlaybookResolvedRule } from "@/lib/growth/ai-copilot-playbook-types"
+import { formatPlaybookRulesForCopilotPrompt } from "@/lib/growth/ai-copilot-playbook-prompts"
 import {
   describeFrameworkKeys,
   GROWTH_AI_COPILOT_BUYING_SIGNAL_FRAMEWORK,
@@ -33,7 +35,9 @@ const TYPE_INSTRUCTIONS: Record<GrowthAiCopilotGenerationType, string> = {
 export function buildGrowthAiCopilotSystemPrompt(
   generationType: GrowthAiCopilotGenerationType,
   promptVariant: GrowthAiCopilotPromptVariant | string,
+  playbookRules: GrowthAiCopilotPlaybookResolvedRule[] = [],
 ): string {
+  const playbookBlock = formatPlaybookRulesForCopilotPrompt(playbookRules, generationType)
   return [
     "You are Equipify Growth Engine AI Communication Copilot.",
     "You suggest copy only. You do NOT send email, place calls, or modify CRM data.",
@@ -42,8 +46,11 @@ export function buildGrowthAiCopilotSystemPrompt(
     "Respect suppression and not_interested signals — if present, refuse outreach copy politely in JSON.",
     TYPE_INSTRUCTIONS[generationType],
     VARIANT_INSTRUCTIONS[promptVariant] ?? VARIANT_INSTRUCTIONS.default,
+    playbookBlock,
     "Return JSON with keys: subject (nullable), content (string), classification (optional object).",
-  ].join("\n")
+  ]
+    .filter(Boolean)
+    .join("\n")
 }
 
 export function buildGrowthAiCopilotUserPrompt(

@@ -227,6 +227,9 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
                         {entry.classification.primary ? (
                           <GrowthBadge label={String(entry.classification.primary)} tone="neutral" />
                         ) : null}
+                        {entry.playbookInfluenceScore > 0 ? (
+                          <GrowthBadge label={`playbook ${entry.playbookInfluenceScore}`} tone="healthy" />
+                        ) : null}
                       </div>
                       <div className="flex flex-wrap gap-1">
                         <Button
@@ -287,6 +290,27 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
                             <pre className="mt-1 whitespace-pre-wrap">
                               {JSON.stringify(entry.classification.callPrep, null, 2)}
                             </pre>
+                          </div>
+                        ) : null}
+                        {entry.playbookInfluenceScore > 0 ? (
+                          <div className="rounded-md border border-violet-200 bg-violet-50/40 p-2 text-xs">
+                            <p className="font-medium">Playbook influence ({entry.playbookInfluenceScore})</p>
+                            {Array.isArray(entry.playbookAttribution?.ruleTitles) &&
+                            entry.playbookAttribution.ruleTitles.length > 0 ? (
+                              <ul className="mt-1 list-disc pl-4">
+                                {(entry.playbookAttribution.ruleTitles as string[]).map((title) => (
+                                  <li key={title}>{title}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="mt-1 text-muted-foreground">Approved playbook rules influenced this draft.</p>
+                            )}
+                            {Array.isArray(entry.playbookAttribution?.conflicts) &&
+                            (entry.playbookAttribution.conflicts as unknown[]).length > 0 ? (
+                              <p className="mt-2 text-amber-800">
+                                {(entry.playbookAttribution.conflicts as unknown[]).length} playbook conflict(s) detected.
+                              </p>
+                            ) : null}
                           </div>
                         ) : null}
                       </div>

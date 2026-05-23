@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 515,
-  sqlMigrations: 221,
+  apiRouteHandlers: 522,
+  sqlMigrations: 222,
   dashboardPages: 65,
-  componentsTsx: 371,
-  libTsFiles: 1114,
+  componentsTsx: 372,
+  libTsFiles: 1124,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **515** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **221** |
+| API route handlers (\`app/api/**/route.ts\`) | **522** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **222** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **371** |
-| \`lib/**/*.ts\` | **1114** |
+| \`components/**/*.tsx\` | **372** |
+| \`lib/**/*.ts\` | **1124** |
 
 ### Vercel crons
 
@@ -453,6 +453,13 @@ platform/growth/communication-preferences/route.ts
 platform/growth/communication-settings/route.ts
 platform/growth/copilot/dashboard/route.ts
 platform/growth/copilot/generations/[generationId]/route.ts
+platform/growth/copilot/playbooks/approved/[ruleId]/route.ts
+platform/growth/copilot/playbooks/approved/route.ts
+platform/growth/copilot/playbooks/drafts/[draftId]/approve/route.ts
+platform/growth/copilot/playbooks/drafts/[draftId]/reject/route.ts
+platform/growth/copilot/playbooks/drafts/route.ts
+platform/growth/copilot/playbooks/route.ts
+platform/growth/copilot/playbooks/sources/[sourceId]/extract/route.ts
 platform/growth/copilot/settings/route.ts
 platform/growth/engagement/dashboard/route.ts
 platform/growth/executive/dashboard/route.ts

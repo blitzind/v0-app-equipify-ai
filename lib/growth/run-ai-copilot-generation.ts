@@ -33,7 +33,17 @@ import { fetchGrowthLeadEmailEventSummary } from "@/lib/growth/outbound/email-ev
 import {
   emitGrowthLeadAiCopilotGenerationApprovedTimeline,
   emitGrowthLeadAiCopilotGenerationCreatedTimeline,
+  emitGrowthLeadPlaybookConflictDetectedTimeline,
 } from "@/lib/growth/timeline-emitter"
+import {
+  buildPlaybookAttribution,
+  computePlaybookInfluenceScore,
+} from "@/lib/growth/ai-copilot-playbook-influence"
+import {
+  insertGrowthAiCopilotPlaybookEffectiveness,
+  linkGrowthAiCopilotGenerationPlaybookRules,
+} from "@/lib/growth/ai-copilot-playbook-repository"
+import { resolveGrowthAiCopilotPlaybookRules } from "@/lib/growth/ai-copilot-playbook-resolver"
 
 export type RunGrowthAiCopilotGenerationInput = {
   admin: SupabaseClient
@@ -93,7 +103,26 @@ export async function runGrowthAiCopilotGeneration(
     snapshot,
   })
 
-  const systemPrompt = buildGrowthAiCopilotSystemPrompt(input.generationType, promptVariant)
+  const playbookResolution =
+    settings.aiCopilotPlaybookEnabled
+      ? await resolveGrowthAiCopilotPlaybookRules(input.admin, {
+          generationType: input.generationType,
+          maxRules: settings.aiCopilotPlaybookMaxRulesPerGeneration,
+          leadIndustryTags: [],
+        })
+      : { rules: [], conflicts: [] }
+
+  const playbookInfluenceScore = computePlaybookInfluenceScore(playbookResolution.rules)
+  const playbookAttribution = buildPlaybookAttribution({
+    rules: playbookResolution.rules,
+    conflicts: playbookResolution.conflicts,
+  })
+
+  const systemPrompt = buildGrowthAiCopilotSystemPrompt(
+    input.generationType,
+    promptVariant,
+    playbookResolution.rules,
+  )
   const userPrompt = buildGrowthAiCopilotUserPrompt(input.generationType, snapshot)
 
   const aiResult = await provider.generate({
@@ -121,6 +150,8 @@ export async function runGrowthAiCopilotGeneration(
       status: "draft",
       sourceReplyId: input.sourceReplyId ?? null,
       inputHash,
+      playbookInfluenceScore,
+      playbookAttribution,
       approvedAt: null,
       approvedBy: null,
       sentAt: null,
@@ -141,8 +172,50 @@ export async function runGrowthAiCopilotGeneration(
     classification: mapped.classification,
     sourceReplyId: input.sourceReplyId ?? null,
     inputHash,
+    playbookInfluenceScore,
+    playbookAttribution,
     createdBy: input.actingUserId,
   })
+
+  if (playbookResolution.rules.length > 0) {
+    await linkGrowthAiCopilotGenerationPlaybookRules(input.admin, {
+      generationId: generation.id,
+      rules: playbookResolution.rules,
+    })
+
+    for (const rule of playbookResolution.rules) {
+      await insertGrowthAiCopilotPlaybookEffectiveness(input.admin, {
+        approvedRuleId: rule.id,
+        sourceId: rule.sourceId,
+        generationId: generation.id,
+        leadId: lead.id,
+        outcome: "applied",
+        category: rule.category,
+        playbookInfluenceScore,
+        effectivenessScore: Math.min(100, rule.priority + 10),
+        metadata: { generationType: generation.generationType },
+      })
+    }
+  }
+
+  if (playbookResolution.conflicts.length > 0) {
+    await insertGrowthAiCopilotPlaybookEffectiveness(input.admin, {
+      generationId: generation.id,
+      leadId: lead.id,
+      outcome: "conflict_detected",
+      playbookInfluenceScore,
+      effectivenessScore: 0,
+      metadata: { conflicts: playbookResolution.conflicts },
+    })
+
+    await emitGrowthLeadPlaybookConflictDetectedTimeline(input.admin, {
+      leadId: lead.id,
+      generationId: generation.id,
+      summary: `${playbookResolution.conflicts.length} playbook conflict(s) detected during generation`,
+      conflicts: playbookResolution.conflicts,
+      actor: { userId: input.actingUserId, email: input.actingUserEmail },
+    })
+  }
 
   await insertGrowthAiCopilotEffectiveness(input.admin, {
     generationId: generation.id,
