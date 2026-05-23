@@ -1,6 +1,8 @@
 "use client"
 
 import type { ReactNode } from "react"
+import { useState } from "react"
+import { ChevronDown, ChevronRight } from "lucide-react"
 import { DRAWER_NESTED_CARD } from "@/components/detail-drawer"
 import type { GrowthCallPriorityTier } from "@/lib/growth/call-types"
 import type { GrowthMomentumTier } from "@/lib/growth/momentum-types"
@@ -29,6 +31,47 @@ export function GrowthEngineCard({
         </div>
       ) : null}
       {children}
+    </section>
+  )
+}
+
+export function GrowthCollapsibleEngineCard({
+  title,
+  icon,
+  children,
+  className,
+  id,
+  defaultOpen = true,
+  headerAside,
+}: {
+  title: string
+  icon?: ReactNode
+  children: ReactNode
+  className?: string
+  id?: string
+  defaultOpen?: boolean
+  headerAside?: ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+
+  return (
+    <section id={id} className={cn(DRAWER_NESTED_CARD, "p-4 sm:p-5", className)}>
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 text-left"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+      >
+        {open ? (
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+        )}
+        {icon ? <span className="text-muted-foreground">{icon}</span> : null}
+        <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
+        {!open && headerAside ? <div className="ml-auto flex shrink-0 items-center gap-2">{headerAside}</div> : null}
+      </button>
+      {open ? <div className="mt-4">{children}</div> : null}
     </section>
   )
 }

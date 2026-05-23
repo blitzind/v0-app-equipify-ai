@@ -50,7 +50,7 @@ export function GrowthOperationalIntelligence({ lead }: GrowthOperationalIntelli
 
         <StatTile
           icon={<AlertCircle className="size-3.5" />}
-          label="Workflow health"
+          label="Workflow Health"
           value={
             lead.workflowHealth ? (
               <GrowthBadge
@@ -66,7 +66,7 @@ export function GrowthOperationalIntelligence({ lead }: GrowthOperationalIntelli
 
         <StatTile
           icon={<Timer className="size-3.5" />}
-          label="Aging bucket"
+          label="Aging Bucket"
           value={
             lead.agingBucket ? (
               <span className="capitalize">
@@ -81,7 +81,7 @@ export function GrowthOperationalIntelligence({ lead }: GrowthOperationalIntelli
 
         <StatTile
           icon={<Target className="size-3.5" />}
-          label="First touch"
+          label="First Touch"
           value={
             lead.firstHumanTouchAt ? formatRelativeTime(lead.firstHumanTouchAt) : lead.lastHumanTouchAt ? "Pending metric" : "Not yet"
           }
@@ -96,7 +96,7 @@ export function GrowthOperationalIntelligence({ lead }: GrowthOperationalIntelli
 
         <StatTile
           icon={<Gauge className="size-3.5" />}
-          label="Research freshness"
+          label="Research Freshness"
           value={<GrowthBadge label={researchFreshness.label} tone={researchFreshness.tone} />}
           hint={
             lead.lastResearchedAt
