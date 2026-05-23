@@ -7,6 +7,9 @@ import { fetchGrowthLeadEmailEventSummary } from "@/lib/growth/outbound/email-ev
 import { computeGrowthLeadNextBestAction } from "@/lib/growth/next-best-action"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadEngagementIntelligence } from "@/lib/growth/recompute-engagement-intelligence"
+import { recomputeGrowthLeadRelationshipIntelligence } from "@/lib/growth/recompute-relationship-intelligence"
+import { recomputeGrowthLeadOpportunityReadiness } from "@/lib/growth/recompute-opportunity-readiness"
+import { recomputeGrowthLeadRevenueForecast } from "@/lib/growth/recompute-revenue-forecast"
 import { recomputeGrowthLeadWorkflowIntelligence } from "@/lib/growth/recompute-workflow-intelligence"
 import { recomputeGrowthLeadCallPriority } from "@/lib/growth/recompute-lead-call-priority"
 import { fetchLatestUsableGrowthLeadResearchRun } from "@/lib/growth/research-repository"
@@ -56,6 +59,12 @@ export async function recomputeGrowthLeadNextBestAction(
     engagementTier: lead.engagementTier,
     engagementLastActivityAt: lead.engagementLastActivityAt,
     engagementDormancyExemptUntil: lead.engagementDormancyExemptUntil,
+    relationshipStrengthTier: lead.relationshipStrengthTier,
+    relationshipTrend: lead.relationshipTrend,
+    opportunityReadinessTier: lead.opportunityReadinessTier,
+    opportunityBlockerKeys: lead.opportunityBlockers.map((blocker) => blocker.key),
+    revenueProbabilityTier: lead.revenueProbabilityTier,
+    workflowHealth: lead.workflowHealth,
   })
 
   const now = new Date().toISOString()
@@ -100,6 +109,9 @@ export async function recomputeGrowthLeadWorkflowSignals(
   await recomputeGrowthLeadCallPriority(admin, leadId)
   await recomputeGrowthLeadWorkflowIntelligence(admin, leadId)
   await recomputeGrowthLeadEngagementIntelligence(admin, leadId)
+  await recomputeGrowthLeadRelationshipIntelligence(admin, leadId)
+  await recomputeGrowthLeadOpportunityReadiness(admin, leadId)
+  await recomputeGrowthLeadRevenueForecast(admin, leadId)
   await recomputeGrowthLeadNextBestAction(admin, leadId)
   return fetchGrowthLeadById(admin, leadId)
 }

@@ -22,6 +22,21 @@ const LINKS = [
     match: (path: string) => path.startsWith("/admin/growth/engagement"),
   },
   {
+    href: "/admin/growth/relationships",
+    label: "Relationships",
+    match: (path: string) => path.startsWith("/admin/growth/relationships"),
+  },
+  {
+    href: "/admin/growth/opportunities",
+    label: "Opportunities",
+    match: (path: string) => path.startsWith("/admin/growth/opportunities"),
+  },
+  {
+    href: "/admin/growth/revenue",
+    label: "Revenue",
+    match: (path: string) => path.startsWith("/admin/growth/revenue"),
+  },
+  {
     href: "/admin/growth/outreach",
     label: "Outreach",
     match: (path: string) => path.startsWith("/admin/growth/outreach"),

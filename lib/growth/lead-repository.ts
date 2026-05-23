@@ -11,7 +11,7 @@ import type {
 } from "@/lib/growth/types"
 
 const LEAD_SELECT =
-  "id, source_kind, source_detail, external_ref, company_name, contact_name, contact_email, contact_phone, website, address_line1, city, state, postal_code, country, status, promoted_organization_id, promoted_prospect_id, promoted_at, score, notes, metadata, latest_research_run_id, last_researched_at, research_priority, call_disposition, call_disposition_at, last_call_at, follow_up_at, call_priority_score, call_priority_tier, call_priority_computed_at, call_priority_override, last_human_touch_at, decision_maker_status, primary_decision_maker_id, next_best_action, next_best_action_reason, next_best_action_computed_at, estimated_annual_revenue, estimated_employee_count, fleet_size_estimate, crm_detected, field_service_stack_detected, momentum_score, momentum_tier, momentum_why_summary, momentum_computed_at, workflow_health, workflow_health_reason, workflow_health_computed_at, source_channel, source_campaign, source_import_batch_id, source_vendor, aging_days, aging_bucket, first_human_touch_at, time_to_first_touch_hours, contact_temperature, call_attempt_count, voicemail_count, connected_call_count, engagement_score, engagement_tier, engagement_last_activity_at, engagement_summary, engagement_top_signals, engagement_dormancy_exempt_until, engagement_computed_at, created_by, assigned_to, created_at, updated_at"
+  "id, source_kind, source_detail, external_ref, company_name, contact_name, contact_email, contact_phone, website, address_line1, city, state, postal_code, country, status, promoted_organization_id, promoted_prospect_id, promoted_at, score, notes, metadata, latest_research_run_id, last_researched_at, research_priority, call_disposition, call_disposition_at, last_call_at, follow_up_at, call_priority_score, call_priority_tier, call_priority_computed_at, call_priority_override, last_human_touch_at, decision_maker_status, primary_decision_maker_id, next_best_action, next_best_action_reason, next_best_action_computed_at, estimated_annual_revenue, estimated_employee_count, fleet_size_estimate, crm_detected, field_service_stack_detected, momentum_score, momentum_tier, momentum_why_summary, momentum_computed_at, workflow_health, workflow_health_reason, workflow_health_computed_at, source_channel, source_campaign, source_import_batch_id, source_vendor, aging_days, aging_bucket, first_human_touch_at, time_to_first_touch_hours, contact_temperature, call_attempt_count, voicemail_count, connected_call_count, engagement_score, engagement_tier, engagement_last_activity_at, engagement_summary, engagement_top_signals, engagement_dormancy_exempt_until, engagement_computed_at, relationship_strength_score, relationship_strength_tier, relationship_last_meaningful_touch_at, relationship_summary, relationship_top_signals, relationship_trend, relationship_previous_score, relationship_owner_attention_level, relationship_recovery_attempt_count, relationship_computed_at, opportunity_readiness_score, opportunity_readiness_tier, opportunity_readiness_summary, opportunity_readiness_top_signals, opportunity_blockers, opportunity_accelerators, opportunity_readiness_trend, opportunity_readiness_previous_score, opportunity_buying_signal_strength, opportunity_readiness_confidence, opportunity_age_bucket, opportunity_readiness_computed_at, revenue_probability_score, revenue_probability_tier, revenue_probability_summary, revenue_probability_top_signals, revenue_probability_confidence, revenue_probability_previous_score, revenue_trajectory, revenue_probability_volatility, forecast_contribution_weight, forecast_attention_level, forecast_attention_last_changed_at, revenue_forecast_computed_at, created_by, assigned_to, created_at, updated_at"
 
 type GrowthLeadDbRow = {
   id: string
@@ -83,6 +83,40 @@ type GrowthLeadDbRow = {
   engagement_top_signals: unknown
   engagement_dormancy_exempt_until: string | null
   engagement_computed_at: string | null
+  relationship_strength_score: number | null
+  relationship_strength_tier: string | null
+  relationship_last_meaningful_touch_at: string | null
+  relationship_summary: string | null
+  relationship_top_signals: unknown
+  relationship_trend: string | null
+  relationship_previous_score: number | null
+  relationship_owner_attention_level: string
+  relationship_recovery_attempt_count: number
+  relationship_computed_at: string | null
+  opportunity_readiness_score: number | null
+  opportunity_readiness_tier: string | null
+  opportunity_readiness_summary: string | null
+  opportunity_readiness_top_signals: unknown
+  opportunity_blockers: unknown
+  opportunity_accelerators: unknown
+  opportunity_readiness_trend: string | null
+  opportunity_readiness_previous_score: number | null
+  opportunity_buying_signal_strength: string
+  opportunity_readiness_confidence: number
+  opportunity_age_bucket: string
+  opportunity_readiness_computed_at: string | null
+  revenue_probability_score: number | null
+  revenue_probability_tier: string | null
+  revenue_probability_summary: string | null
+  revenue_probability_top_signals: unknown
+  revenue_probability_confidence: number
+  revenue_probability_previous_score: number | null
+  revenue_trajectory: string
+  revenue_probability_volatility: number
+  forecast_contribution_weight: number
+  forecast_attention_level: string
+  forecast_attention_last_changed_at: string | null
+  revenue_forecast_computed_at: string | null
   created_by: string | null
   assigned_to: string | null
   created_at: string
@@ -166,6 +200,53 @@ function mapGrowthLeadRow(row: GrowthLeadDbRow): GrowthLead {
       : [],
     engagementDormancyExemptUntil: row.engagement_dormancy_exempt_until,
     engagementComputedAt: row.engagement_computed_at,
+    relationshipStrengthScore: row.relationship_strength_score,
+    relationshipStrengthTier: row.relationship_strength_tier as GrowthLead["relationshipStrengthTier"],
+    relationshipLastMeaningfulTouchAt: row.relationship_last_meaningful_touch_at,
+    relationshipSummary: row.relationship_summary,
+    relationshipTopSignals: Array.isArray(row.relationship_top_signals)
+      ? (row.relationship_top_signals as GrowthLead["relationshipTopSignals"])
+      : [],
+    relationshipTrend: row.relationship_trend as GrowthLead["relationshipTrend"],
+    relationshipPreviousScore: row.relationship_previous_score,
+    relationshipOwnerAttentionLevel: (row.relationship_owner_attention_level ??
+      "none") as GrowthLead["relationshipOwnerAttentionLevel"],
+    relationshipRecoveryAttemptCount: row.relationship_recovery_attempt_count ?? 0,
+    relationshipComputedAt: row.relationship_computed_at,
+    opportunityReadinessScore: row.opportunity_readiness_score,
+    opportunityReadinessTier: row.opportunity_readiness_tier as GrowthLead["opportunityReadinessTier"],
+    opportunityReadinessSummary: row.opportunity_readiness_summary,
+    opportunityReadinessTopSignals: Array.isArray(row.opportunity_readiness_top_signals)
+      ? (row.opportunity_readiness_top_signals as GrowthLead["opportunityReadinessTopSignals"])
+      : [],
+    opportunityBlockers: Array.isArray(row.opportunity_blockers)
+      ? (row.opportunity_blockers as GrowthLead["opportunityBlockers"])
+      : [],
+    opportunityAccelerators: Array.isArray(row.opportunity_accelerators)
+      ? (row.opportunity_accelerators as GrowthLead["opportunityAccelerators"])
+      : [],
+    opportunityReadinessTrend: row.opportunity_readiness_trend as GrowthLead["opportunityReadinessTrend"],
+    opportunityReadinessPreviousScore: row.opportunity_readiness_previous_score,
+    opportunityBuyingSignalStrength: (row.opportunity_buying_signal_strength ??
+      "none") as GrowthLead["opportunityBuyingSignalStrength"],
+    opportunityReadinessConfidence: row.opportunity_readiness_confidence ?? 0,
+    opportunityAgeBucket: (row.opportunity_age_bucket ?? "new") as GrowthLead["opportunityAgeBucket"],
+    opportunityReadinessComputedAt: row.opportunity_readiness_computed_at,
+    revenueProbabilityScore: row.revenue_probability_score,
+    revenueProbabilityTier: row.revenue_probability_tier as GrowthLead["revenueProbabilityTier"],
+    revenueProbabilitySummary: row.revenue_probability_summary,
+    revenueProbabilityTopSignals: Array.isArray(row.revenue_probability_top_signals)
+      ? (row.revenue_probability_top_signals as GrowthLead["revenueProbabilityTopSignals"])
+      : [],
+    revenueProbabilityConfidence: row.revenue_probability_confidence ?? 0,
+    revenueProbabilityPreviousScore: row.revenue_probability_previous_score,
+    revenueTrajectory: (row.revenue_trajectory ?? "steady") as GrowthLead["revenueTrajectory"],
+    revenueProbabilityVolatility: row.revenue_probability_volatility ?? 0,
+    forecastContributionWeight: row.forecast_contribution_weight ?? 0,
+    forecastAttentionLevel: (row.forecast_attention_level ??
+      "none") as GrowthLead["forecastAttentionLevel"],
+    forecastAttentionLastChangedAt: row.forecast_attention_last_changed_at,
+    revenueForecastComputedAt: row.revenue_forecast_computed_at,
     createdBy: row.created_by,
     assignedTo: row.assigned_to,
     createdAt: row.created_at,

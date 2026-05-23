@@ -32,6 +32,18 @@ const FILTER_LABELS: Record<GrowthCallQueueFilter, string> = {
   dormant: "Dormant",
   recently_active: "Recently Active",
   decision_maker_engaged: "DM Engaged",
+  trusted_relationships: "Trusted Relationships",
+  strategic_relationships: "Strategic Relationships",
+  needs_relationship_building: "Needs Relationship Building",
+  relationship_cooling: "Relationship Cooling",
+  priority_opportunities: "Priority Opportunities",
+  sales_ready: "Sales Ready",
+  needs_qualification: "Needs Qualification",
+  blocked_opportunities: "Blocked Opportunities",
+  commit_candidates: "Commit Candidates",
+  forecasted: "Forecasted",
+  probable: "Probable",
+  low_confidence_forecast: "Low Confidence Forecast",
 }
 
 export default function AdminGrowthCallQueuePage() {

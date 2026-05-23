@@ -1,7 +1,17 @@
 import type { GrowthLeadEmailEventSummary } from "@/lib/growth/outbound/types"
 import type { GrowthEngagementTier } from "@/lib/growth/engagement-types"
+import type {
+  GrowthOpportunityBlockerKey,
+  GrowthOpportunityReadinessTier,
+} from "@/lib/growth/opportunity-types"
+import type {
+  GrowthRelationshipTier,
+  GrowthRelationshipTrend,
+} from "@/lib/growth/relationship-types"
 import type { GrowthLeadCallDisposition } from "@/lib/growth/call-types"
 import type { GrowthDecisionMakerPresenceStatus } from "@/lib/growth/decision-maker-types"
+import type { GrowthRevenueProbabilityTier } from "@/lib/growth/revenue-forecast-types"
+import type { GrowthWorkflowHealthStatus } from "@/lib/growth/workflow-health-types"
 import {
   GROWTH_NEXT_BEST_ACTION_LABELS,
   type GrowthNextBestAction,
@@ -27,6 +37,12 @@ export type NextBestActionInput = {
   engagementTier?: GrowthEngagementTier | null
   engagementLastActivityAt?: string | null
   engagementDormancyExemptUntil?: string | null
+  relationshipStrengthTier?: GrowthRelationshipTier | null
+  relationshipTrend?: GrowthRelationshipTrend | null
+  opportunityReadinessTier?: GrowthOpportunityReadinessTier | null
+  opportunityBlockerKeys?: GrowthOpportunityBlockerKey[]
+  revenueProbabilityTier?: GrowthRevenueProbabilityTier | null
+  workflowHealth?: GrowthWorkflowHealthStatus | null
   now?: Date
 }
 
@@ -106,6 +122,51 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
     input.engagementDormancyExemptUntil &&
     Date.parse(input.engagementDormancyExemptUntil) > now.getTime()
 
+  const opportunityTier = input.opportunityReadinessTier ?? null
+  const opportunityBlockers = new Set(input.opportunityBlockerKeys ?? [])
+
+  if (opportunityTier === "priority_opportunity" && fit > 85) {
+    return buildResult(
+      "immediate_sales_action",
+      "Priority opportunity with strong fit — take immediate sales action.",
+      [],
+      "high",
+    )
+  }
+
+  const revenueTier = input.revenueProbabilityTier ?? null
+  const workflowHealth = input.workflowHealth ?? null
+
+  if (revenueTier === "commit_candidate" && fit > 85) {
+    return buildResult(
+      "executive_close_motion",
+      "Commit candidate with strong fit — executive close motion.",
+      [],
+      "high",
+    )
+  }
+
+  if (revenueTier === "forecasted" && opportunityBlockers.has("missing_decision_maker")) {
+    return buildResult(
+      "secure_decision_maker",
+      "Forecasted revenue blocked by missing decision maker — secure decision maker.",
+      ["Missing decision maker"],
+      "high",
+    )
+  }
+
+  if (
+    revenueTier === "probable" &&
+    (workflowHealth === "stalled" || workflowHealth === "blocked")
+  ) {
+    return buildResult(
+      "unblock_progress",
+      "Probable revenue with stalled workflow — unblock progress.",
+      ["Workflow stalled"],
+      "high",
+    )
+  }
+
   if (
     engagementTier === "hot" &&
     fit > 85 &&
@@ -114,6 +175,57 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
     return buildResult(
       "escalate_owner_review",
       "Hot engagement, strong fit, and confirmed decision maker — escalate for owner review.",
+      [],
+      "high",
+    )
+  }
+
+  const relationshipTier = input.relationshipStrengthTier ?? null
+  const relationshipTrend = input.relationshipTrend ?? null
+
+  if (relationshipTier === "strategic" && engagementTier === "hot") {
+    return buildResult(
+      "immediate_owner_attention",
+      "Strategic relationship with hot engagement — immediate owner attention.",
+      [],
+      "high",
+    )
+  }
+
+  if (relationshipTier === "trusted" && fit > 80) {
+    return buildResult(
+      "owner_follow_up",
+      "Trusted relationship with strong fit — owner follow-up recommended.",
+      [],
+      "high",
+    )
+  }
+
+  if (relationshipTrend === "cooling" && fit > 75) {
+    return buildResult(
+      "rebuild_relationship",
+      "Relationship is cooling on a high-fit lead — rebuild the relationship.",
+      [],
+      "medium",
+    )
+  }
+
+  if (
+    opportunityTier === "qualified" &&
+    opportunityBlockers.has("missing_decision_maker")
+  ) {
+    return buildResult(
+      "find_decision_maker",
+      "Qualified opportunity blocked by missing decision maker — find decision maker.",
+      ["Missing decision maker"],
+      "high",
+    )
+  }
+
+  if (opportunityTier === "sales_ready" && relationshipTier === "strategic") {
+    return buildResult(
+      "owner_close_motion",
+      "Sales-ready strategic relationship — initiate owner close motion.",
       [],
       "high",
     )

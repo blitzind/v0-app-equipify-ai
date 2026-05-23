@@ -54,5 +54,17 @@ export function isGrowthCallQueueFilter(value: string): value is import("@/lib/g
     "dormant",
     "recently_active",
     "decision_maker_engaged",
+    "trusted_relationships",
+    "strategic_relationships",
+    "needs_relationship_building",
+    "relationship_cooling",
+    "priority_opportunities",
+    "sales_ready",
+    "needs_qualification",
+    "blocked_opportunities",
+    "commit_candidates",
+    "forecasted",
+    "probable",
+    "low_confidence_forecast",
   ].includes(value)
 }

@@ -44,6 +44,15 @@ export async function listGrowthCallQueue(
         engagementTier: lead.engagementTier,
         engagementLastActivityAt: lead.engagementLastActivityAt,
         decisionMakerStatus: lead.decisionMakerStatus,
+        relationshipStrengthScore: lead.relationshipStrengthScore,
+        relationshipStrengthTier: lead.relationshipStrengthTier,
+        relationshipTrend: lead.relationshipTrend,
+        opportunityReadinessScore: lead.opportunityReadinessScore,
+        opportunityReadinessTier: lead.opportunityReadinessTier,
+        opportunityBlockers: lead.opportunityBlockers,
+        revenueProbabilityScore: lead.revenueProbabilityScore,
+        revenueProbabilityTier: lead.revenueProbabilityTier,
+        revenueProbabilityConfidence: lead.revenueProbabilityConfidence,
       }, now)
     ) {
       continue
@@ -79,6 +88,12 @@ export async function listGrowthCallQueue(
   enriched.sort((a, b) => {
     const engagementDiff = (b.engagementScore ?? 0) - (a.engagementScore ?? 0)
     if (engagementDiff !== 0) return engagementDiff
+    const relationshipDiff = (b.relationshipStrengthScore ?? 0) - (a.relationshipStrengthScore ?? 0)
+    if (relationshipDiff !== 0) return relationshipDiff
+    const opportunityDiff = (b.opportunityReadinessScore ?? 0) - (a.opportunityReadinessScore ?? 0)
+    if (opportunityDiff !== 0) return opportunityDiff
+    const revenueDiff = (b.revenueProbabilityScore ?? 0) - (a.revenueProbabilityScore ?? 0)
+    if (revenueDiff !== 0) return revenueDiff
     const fitDiff = (b.score ?? 0) - (a.score ?? 0)
     if (fitDiff !== 0) return fitDiff
     return (b.callPriorityScore ?? 0) - (a.callPriorityScore ?? 0)
@@ -145,5 +160,22 @@ async function buildQueueRow(
     engagementTier: lead.engagementTier,
     engagementLastActivityAt: lead.engagementLastActivityAt,
     engagementSummary: lead.engagementSummary,
+    relationshipStrengthScore: lead.relationshipStrengthScore,
+    relationshipStrengthTier: lead.relationshipStrengthTier,
+    relationshipTrend: lead.relationshipTrend,
+    relationshipSummary: lead.relationshipSummary,
+    relationshipOwnerAttentionLevel: lead.relationshipOwnerAttentionLevel,
+    opportunityReadinessScore: lead.opportunityReadinessScore,
+    opportunityReadinessTier: lead.opportunityReadinessTier,
+    opportunityReadinessTrend: lead.opportunityReadinessTrend,
+    opportunityReadinessSummary: lead.opportunityReadinessSummary,
+    opportunityReadinessConfidence: lead.opportunityReadinessConfidence,
+    opportunityBuyingSignalStrength: lead.opportunityBuyingSignalStrength,
+    revenueProbabilityScore: lead.revenueProbabilityScore,
+    revenueProbabilityTier: lead.revenueProbabilityTier,
+    revenueProbabilityConfidence: lead.revenueProbabilityConfidence,
+    revenueTrajectory: lead.revenueTrajectory,
+    revenueProbabilityVolatility: lead.revenueProbabilityVolatility,
+    forecastAttentionLevel: lead.forecastAttentionLevel,
   }
 }

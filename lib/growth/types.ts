@@ -9,11 +9,32 @@ export const GROWTH_LEAD_SOURCE_KINDS = [
 
 import type { GrowthContactTemperature } from "@/lib/growth/outbound/types"
 import type { GrowthEngagementTier, GrowthEngagementTopSignal } from "@/lib/growth/engagement-types"
+import type {
+  GrowthOpportunityAccelerator,
+  GrowthOpportunityAgeBucket,
+  GrowthOpportunityBlocker,
+  GrowthOpportunityBuyingSignalStrength,
+  GrowthOpportunityReadinessTier,
+  GrowthOpportunityReadinessTrend,
+  GrowthOpportunityTopSignal,
+} from "@/lib/growth/opportunity-types"
+import type {
+  GrowthRelationshipOwnerAttentionLevel,
+  GrowthRelationshipTier,
+  GrowthRelationshipTopSignal,
+  GrowthRelationshipTrend,
+} from "@/lib/growth/relationship-types"
 import type { GrowthLeadCallDisposition, GrowthCallPriorityTier } from "@/lib/growth/call-types"
 import type { GrowthDecisionMakerPresenceStatus } from "@/lib/growth/decision-maker-types"
 import type { GrowthLeadAgingBucket } from "@/lib/growth/lead-aging"
 import type { GrowthMomentumTier } from "@/lib/growth/momentum-types"
 import type { GrowthNextBestAction } from "@/lib/growth/nba-types"
+import type {
+  GrowthForecastAttentionLevel,
+  GrowthRevenueForecastTopSignal,
+  GrowthRevenueProbabilityTier,
+  GrowthRevenueTrajectory,
+} from "@/lib/growth/revenue-forecast-types"
 import type { GrowthWorkflowHealthStatus } from "@/lib/growth/workflow-health-types"
 
 export type GrowthLeadSourceKind = (typeof GROWTH_LEAD_SOURCE_KINDS)[number]
@@ -107,6 +128,40 @@ export type GrowthLead = {
   engagementTopSignals: GrowthEngagementTopSignal[]
   engagementDormancyExemptUntil: string | null
   engagementComputedAt: string | null
+  relationshipStrengthScore: number | null
+  relationshipStrengthTier: GrowthRelationshipTier | null
+  relationshipLastMeaningfulTouchAt: string | null
+  relationshipSummary: string | null
+  relationshipTopSignals: GrowthRelationshipTopSignal[]
+  relationshipTrend: GrowthRelationshipTrend | null
+  relationshipPreviousScore: number | null
+  relationshipOwnerAttentionLevel: GrowthRelationshipOwnerAttentionLevel
+  relationshipRecoveryAttemptCount: number
+  relationshipComputedAt: string | null
+  opportunityReadinessScore: number | null
+  opportunityReadinessTier: GrowthOpportunityReadinessTier | null
+  opportunityReadinessSummary: string | null
+  opportunityReadinessTopSignals: GrowthOpportunityTopSignal[]
+  opportunityBlockers: GrowthOpportunityBlocker[]
+  opportunityAccelerators: GrowthOpportunityAccelerator[]
+  opportunityReadinessTrend: GrowthOpportunityReadinessTrend | null
+  opportunityReadinessPreviousScore: number | null
+  opportunityBuyingSignalStrength: GrowthOpportunityBuyingSignalStrength
+  opportunityReadinessConfidence: number
+  opportunityAgeBucket: GrowthOpportunityAgeBucket
+  opportunityReadinessComputedAt: string | null
+  revenueProbabilityScore: number | null
+  revenueProbabilityTier: GrowthRevenueProbabilityTier | null
+  revenueProbabilitySummary: string | null
+  revenueProbabilityTopSignals: GrowthRevenueForecastTopSignal[]
+  revenueProbabilityConfidence: number
+  revenueProbabilityPreviousScore: number | null
+  revenueTrajectory: GrowthRevenueTrajectory
+  revenueProbabilityVolatility: number
+  forecastContributionWeight: number
+  forecastAttentionLevel: GrowthForecastAttentionLevel
+  forecastAttentionLastChangedAt: string | null
+  revenueForecastComputedAt: string | null
   createdBy: string | null
   assignedTo: string | null
   createdAt: string

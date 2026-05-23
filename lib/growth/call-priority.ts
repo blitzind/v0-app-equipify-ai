@@ -1,6 +1,9 @@
 import type { GrowthLeadEmailEventSummary } from "@/lib/growth/outbound/types"
 import type { GrowthCallPriorityTier, GrowthLeadCallDisposition } from "@/lib/growth/call-types"
 import { matchesEngagementQueueFilter } from "@/lib/growth/engagement-queue-filters"
+import { matchesRelationshipQueueFilter } from "@/lib/growth/relationship-queue-filters"
+import { matchesOpportunityQueueFilter } from "@/lib/growth/opportunity-queue-filters"
+import { matchesRevenueForecastQueueFilter } from "@/lib/growth/revenue-forecast-queue-filters"
 import type { GrowthEngagementTier } from "@/lib/growth/engagement-types"
 import type { GrowthLeadResearchPriority, GrowthLeadStatus } from "@/lib/growth/types"
 
@@ -217,6 +220,15 @@ export function matchesCallQueueFilter(
     engagementTier?: GrowthEngagementTier | null
     engagementLastActivityAt?: string | null
     decisionMakerStatus?: import("@/lib/growth/decision-maker-types").GrowthDecisionMakerPresenceStatus | null
+    relationshipStrengthScore?: number | null
+    relationshipStrengthTier?: import("@/lib/growth/relationship-types").GrowthRelationshipTier | null
+    relationshipTrend?: import("@/lib/growth/relationship-types").GrowthRelationshipTrend | null
+    opportunityReadinessScore?: number | null
+    opportunityReadinessTier?: import("@/lib/growth/opportunity-types").GrowthOpportunityReadinessTier | null
+    opportunityBlockers?: Array<{ key: string }>
+    revenueProbabilityScore?: number | null
+    revenueProbabilityTier?: import("@/lib/growth/revenue-forecast-types").GrowthRevenueProbabilityTier | null
+    revenueProbabilityConfidence?: number
   },
   now: Date = new Date(),
 ): boolean {
@@ -236,6 +248,50 @@ export function matchesCallQueueFilter(
       engagementLastActivityAt: row.engagementLastActivityAt ?? null,
       decisionMakerStatus: row.decisionMakerStatus ?? null,
     }, now)
+  }
+
+  if (
+    filter === "trusted_relationships" ||
+    filter === "strategic_relationships" ||
+    filter === "needs_relationship_building" ||
+    filter === "relationship_cooling"
+  ) {
+    return matchesRelationshipQueueFilter(filter, {
+      status: row.status,
+      score: row.score,
+      relationshipStrengthScore: row.relationshipStrengthScore ?? null,
+      relationshipStrengthTier: row.relationshipStrengthTier ?? null,
+      relationshipTrend: row.relationshipTrend ?? null,
+    })
+  }
+
+  if (
+    filter === "priority_opportunities" ||
+    filter === "sales_ready" ||
+    filter === "needs_qualification" ||
+    filter === "blocked_opportunities"
+  ) {
+    return matchesOpportunityQueueFilter(filter, {
+      status: row.status,
+      score: row.score,
+      opportunityReadinessScore: row.opportunityReadinessScore ?? null,
+      opportunityReadinessTier: row.opportunityReadinessTier ?? null,
+      opportunityBlockers: row.opportunityBlockers ?? [],
+    })
+  }
+
+  if (
+    filter === "commit_candidates" ||
+    filter === "forecasted" ||
+    filter === "probable" ||
+    filter === "low_confidence_forecast"
+  ) {
+    return matchesRevenueForecastQueueFilter(filter, {
+      status: row.status,
+      revenueProbabilityScore: row.revenueProbabilityScore ?? null,
+      revenueProbabilityTier: row.revenueProbabilityTier ?? null,
+      revenueProbabilityConfidence: row.revenueProbabilityConfidence ?? 0,
+    })
   }
 
   const usable = hasUsableResearch(row.lastResearchedAt, row.latestResearchRunId)

@@ -40,6 +40,20 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "engagement_tier_changed",
   "lead_became_hot",
   "lead_became_dormant",
+  "relationship_strength_changed",
+  "relationship_became_trusted",
+  "relationship_became_strategic",
+  "relationship_cooled",
+  "opportunity_readiness_changed",
+  "lead_became_sales_ready",
+  "lead_became_priority_opportunity",
+  "opportunity_blocker_added",
+  "opportunity_blocker_resolved",
+  "revenue_probability_changed",
+  "lead_became_forecasted",
+  "lead_became_commit_candidate",
+  "forecast_confidence_changed",
+  "forecast_regression_detected",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]

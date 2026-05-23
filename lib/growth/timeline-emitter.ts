@@ -379,3 +379,206 @@ export async function emitGrowthLeadBecameDormantTimeline(
     payload: { lastActivityAt: input.lastActivityAt },
   })
 }
+
+export async function emitGrowthLeadRelationshipStrengthChangedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; from: number; to: number; summary: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "relationship_strength_changed",
+    title: "Relationship strength changed",
+    summary: `${input.from} → ${input.to}: ${input.summary}`,
+    payload: { from: input.from, to: input.to },
+  })
+}
+
+export async function emitGrowthLeadRelationshipBecameTrustedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; score: number },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "relationship_became_trusted",
+    title: "Relationship became trusted",
+    summary: `Relationship strength score ${input.score}`,
+    payload: { score: input.score },
+  })
+}
+
+export async function emitGrowthLeadRelationshipBecameStrategicTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; score: number },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "relationship_became_strategic",
+    title: "Relationship became strategic",
+    summary: `Relationship strength score ${input.score}`,
+    payload: { score: input.score },
+  })
+}
+
+export async function emitGrowthLeadRelationshipCooledTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; score: number; lastMeaningfulTouchAt: string | null },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "relationship_cooled",
+    title: "Relationship cooled",
+    summary: input.lastMeaningfulTouchAt
+      ? `Score ${input.score}; last meaningful touch ${input.lastMeaningfulTouchAt}`
+      : `Score ${input.score}; no meaningful touches`,
+    payload: {
+      score: input.score,
+      lastMeaningfulTouchAt: input.lastMeaningfulTouchAt,
+    },
+  })
+}
+
+export async function emitGrowthLeadOpportunityReadinessChangedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; from: number; to: number; summary: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "opportunity_readiness_changed",
+    title: "Opportunity readiness changed",
+    summary: `${input.from} → ${input.to}: ${input.summary}`,
+    payload: { from: input.from, to: input.to },
+  })
+}
+
+export async function emitGrowthLeadBecameSalesReadyTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; score: number },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "lead_became_sales_ready",
+    title: "Lead became sales ready",
+    summary: `Opportunity readiness score ${input.score}`,
+    payload: { score: input.score },
+  })
+}
+
+export async function emitGrowthLeadBecamePriorityOpportunityTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; score: number },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "lead_became_priority_opportunity",
+    title: "Lead became priority opportunity",
+    summary: `Opportunity readiness score ${input.score}`,
+    payload: { score: input.score },
+  })
+}
+
+export async function emitGrowthLeadOpportunityBlockerAddedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; key: string; label: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "opportunity_blocker_added",
+    title: "Opportunity blocker added",
+    summary: input.label,
+    payload: { key: input.key },
+  })
+}
+
+export async function emitGrowthLeadOpportunityBlockerResolvedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; key: string; label: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "opportunity_blocker_resolved",
+    title: "Opportunity blocker resolved",
+    summary: input.label,
+    payload: { key: input.key },
+  })
+}
+
+export async function emitGrowthLeadRevenueProbabilityChangedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; from: number; to: number; summary: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "revenue_probability_changed",
+    title: "Revenue probability changed",
+    summary: `${input.from} → ${input.to}: ${input.summary}`,
+    payload: { from: input.from, to: input.to },
+  })
+}
+
+export async function emitGrowthLeadBecameForecastedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; score: number },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "lead_became_forecasted",
+    title: "Lead became forecasted",
+    summary: `Revenue probability score ${input.score}`,
+    payload: { score: input.score },
+  })
+}
+
+export async function emitGrowthLeadBecameCommitCandidateTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; score: number },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "lead_became_commit_candidate",
+    title: "Lead became commit candidate",
+    summary: `Revenue probability score ${input.score}`,
+    payload: { score: input.score },
+  })
+}
+
+export async function emitGrowthLeadForecastConfidenceChangedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; from: number; to: number },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "forecast_confidence_changed",
+    title: "Forecast confidence changed",
+    summary: `${input.from} → ${input.to}`,
+    payload: { from: input.from, to: input.to },
+  })
+}
+
+export async function emitGrowthLeadForecastRegressionDetectedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    fromScore: number | null
+    toScore: number
+    fromTier: import("@/lib/growth/revenue-forecast-types").GrowthRevenueProbabilityTier | null
+    toTier: import("@/lib/growth/revenue-forecast-types").GrowthRevenueProbabilityTier
+    trajectory: import("@/lib/growth/revenue-forecast-types").GrowthRevenueTrajectory
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "forecast_regression_detected",
+    title: "Forecast regression detected",
+    summary:
+      input.fromScore != null
+        ? `Score ${input.fromScore} → ${input.toScore}; trajectory ${input.trajectory}`
+        : `Score ${input.toScore}; trajectory ${input.trajectory}`,
+    payload: {
+      fromScore: input.fromScore,
+      toScore: input.toScore,
+      fromTier: input.fromTier,
+      toTier: input.toTier,
+      trajectory: input.trajectory,
+    },
+  })
+}

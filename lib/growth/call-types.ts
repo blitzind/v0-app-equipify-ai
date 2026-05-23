@@ -25,6 +25,18 @@ export const GROWTH_CALL_QUEUE_FILTERS = [
   "dormant",
   "recently_active",
   "decision_maker_engaged",
+  "trusted_relationships",
+  "strategic_relationships",
+  "needs_relationship_building",
+  "relationship_cooling",
+  "priority_opportunities",
+  "sales_ready",
+  "needs_qualification",
+  "blocked_opportunities",
+  "commit_candidates",
+  "forecasted",
+  "probable",
+  "low_confidence_forecast",
 ] as const
 
 export type GrowthCallQueueFilter = (typeof GROWTH_CALL_QUEUE_FILTERS)[number]
@@ -78,4 +90,21 @@ export type GrowthCallQueueRow = {
   engagementTier: string | null
   engagementLastActivityAt: string | null
   engagementSummary: string | null
+  relationshipStrengthScore: number | null
+  relationshipStrengthTier: string | null
+  relationshipTrend: string | null
+  relationshipSummary: string | null
+  relationshipOwnerAttentionLevel: string | null
+  opportunityReadinessScore: number | null
+  opportunityReadinessTier: string | null
+  opportunityReadinessTrend: string | null
+  opportunityReadinessSummary: string | null
+  opportunityReadinessConfidence: number | null
+  opportunityBuyingSignalStrength: string | null
+  revenueProbabilityScore: number | null
+  revenueProbabilityTier: string | null
+  revenueProbabilityConfidence: number | null
+  revenueTrajectory: string | null
+  revenueProbabilityVolatility: number | null
+  forecastAttentionLevel: string | null
 }
