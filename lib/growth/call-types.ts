@@ -37,6 +37,10 @@ export const GROWTH_CALL_QUEUE_FILTERS = [
   "forecasted",
   "probable",
   "low_confidence_forecast",
+  "executive_now",
+  "executive_priority",
+  "leadership_bottlenecks",
+  "intelligence_conflicts",
 ] as const
 
 export type GrowthCallQueueFilter = (typeof GROWTH_CALL_QUEUE_FILTERS)[number]
@@ -107,4 +111,9 @@ export type GrowthCallQueueRow = {
   revenueTrajectory: string | null
   revenueProbabilityVolatility: number | null
   forecastAttentionLevel: string | null
+  executivePriorityScore: number | null
+  executivePriorityTier: string | null
+  intelligenceConflictSeverityScore: number | null
+  intelligenceConflictCount: number | null
+  executiveInterventionAgeBucket: string | null
 }

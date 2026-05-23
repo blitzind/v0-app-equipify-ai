@@ -4,6 +4,7 @@ import { matchesEngagementQueueFilter } from "@/lib/growth/engagement-queue-filt
 import { matchesRelationshipQueueFilter } from "@/lib/growth/relationship-queue-filters"
 import { matchesOpportunityQueueFilter } from "@/lib/growth/opportunity-queue-filters"
 import { matchesRevenueForecastQueueFilter } from "@/lib/growth/revenue-forecast-queue-filters"
+import { matchesExecutiveOperatingQueueFilter } from "@/lib/growth/executive-operating-queue-filters"
 import type { GrowthEngagementTier } from "@/lib/growth/engagement-types"
 import type { GrowthLeadResearchPriority, GrowthLeadStatus } from "@/lib/growth/types"
 
@@ -226,9 +227,16 @@ export function matchesCallQueueFilter(
     opportunityReadinessScore?: number | null
     opportunityReadinessTier?: import("@/lib/growth/opportunity-types").GrowthOpportunityReadinessTier | null
     opportunityBlockers?: Array<{ key: string }>
+    workflowHealth?: import("@/lib/growth/workflow-health-types").GrowthWorkflowHealthStatus | null
     revenueProbabilityScore?: number | null
     revenueProbabilityTier?: import("@/lib/growth/revenue-forecast-types").GrowthRevenueProbabilityTier | null
     revenueProbabilityConfidence?: number
+    executivePriorityScore?: number | null
+    executivePriorityTier?: import("@/lib/growth/executive-operating-types").GrowthExecutivePriorityTier | null
+    intelligenceConflictSeverityScore?: number
+    intelligenceConflictCount?: number
+    executiveInterventionAgeBucket?: string | null
+    opportunityBlockerCount?: number
   },
   now: Date = new Date(),
 ): boolean {
@@ -291,6 +299,24 @@ export function matchesCallQueueFilter(
       revenueProbabilityScore: row.revenueProbabilityScore ?? null,
       revenueProbabilityTier: row.revenueProbabilityTier ?? null,
       revenueProbabilityConfidence: row.revenueProbabilityConfidence ?? 0,
+    })
+  }
+
+  if (
+    filter === "executive_now" ||
+    filter === "executive_priority" ||
+    filter === "leadership_bottlenecks" ||
+    filter === "intelligence_conflicts"
+  ) {
+    return matchesExecutiveOperatingQueueFilter(filter, {
+      status: row.status,
+      executivePriorityScore: row.executivePriorityScore ?? null,
+      executivePriorityTier: row.executivePriorityTier ?? null,
+      intelligenceConflictSeverityScore: row.intelligenceConflictSeverityScore ?? 0,
+      intelligenceConflictCount: row.intelligenceConflictCount ?? 0,
+      executiveInterventionAgeBucket: row.executiveInterventionAgeBucket ?? null,
+      workflowHealth: row.workflowHealth ?? null,
+      opportunityBlockerCount: row.opportunityBlockerCount ?? 0,
     })
   }
 

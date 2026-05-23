@@ -44,6 +44,10 @@ const FILTER_LABELS: Record<GrowthCallQueueFilter, string> = {
   forecasted: "Forecasted",
   probable: "Probable",
   low_confidence_forecast: "Low Confidence Forecast",
+  executive_now: "Executive Now",
+  executive_priority: "Executive Priority",
+  leadership_bottlenecks: "Leadership Bottlenecks",
+  intelligence_conflicts: "Intelligence Conflicts",
 }
 
 export default function AdminGrowthCallQueuePage() {

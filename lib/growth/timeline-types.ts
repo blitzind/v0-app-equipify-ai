@@ -54,6 +54,8 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "lead_became_commit_candidate",
   "forecast_confidence_changed",
   "forecast_regression_detected",
+  "executive_priority_changed",
+  "executive_intervention_recommended",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]

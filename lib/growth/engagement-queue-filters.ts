@@ -66,5 +66,9 @@ export function isGrowthCallQueueFilter(value: string): value is import("@/lib/g
     "forecasted",
     "probable",
     "low_confidence_forecast",
+    "executive_now",
+    "executive_priority",
+    "leadership_bottlenecks",
+    "intelligence_conflicts",
   ].includes(value)
 }

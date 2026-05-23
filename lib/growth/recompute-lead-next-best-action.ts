@@ -10,6 +10,7 @@ import { recomputeGrowthLeadEngagementIntelligence } from "@/lib/growth/recomput
 import { recomputeGrowthLeadRelationshipIntelligence } from "@/lib/growth/recompute-relationship-intelligence"
 import { recomputeGrowthLeadOpportunityReadiness } from "@/lib/growth/recompute-opportunity-readiness"
 import { recomputeGrowthLeadRevenueForecast } from "@/lib/growth/recompute-revenue-forecast"
+import { recomputeGrowthLeadExecutiveOperatingIntelligence } from "@/lib/growth/recompute-executive-operating-intelligence"
 import { recomputeGrowthLeadWorkflowIntelligence } from "@/lib/growth/recompute-workflow-intelligence"
 import { recomputeGrowthLeadCallPriority } from "@/lib/growth/recompute-lead-call-priority"
 import { fetchLatestUsableGrowthLeadResearchRun } from "@/lib/growth/research-repository"
@@ -64,6 +65,10 @@ export async function recomputeGrowthLeadNextBestAction(
     opportunityReadinessTier: lead.opportunityReadinessTier,
     opportunityBlockerKeys: lead.opportunityBlockers.map((blocker) => blocker.key),
     revenueProbabilityTier: lead.revenueProbabilityTier,
+    revenueProbabilityScore: lead.revenueProbabilityScore,
+    revenueProbabilityPreviousScore: lead.revenueProbabilityPreviousScore,
+    revenueTrajectory: lead.revenueTrajectory,
+    executivePriorityTier: lead.executivePriorityTier,
     workflowHealth: lead.workflowHealth,
   })
 
@@ -112,6 +117,7 @@ export async function recomputeGrowthLeadWorkflowSignals(
   await recomputeGrowthLeadRelationshipIntelligence(admin, leadId)
   await recomputeGrowthLeadOpportunityReadiness(admin, leadId)
   await recomputeGrowthLeadRevenueForecast(admin, leadId)
+  await recomputeGrowthLeadExecutiveOperatingIntelligence(admin, leadId)
   await recomputeGrowthLeadNextBestAction(admin, leadId)
   return fetchGrowthLeadById(admin, leadId)
 }

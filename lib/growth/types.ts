@@ -35,6 +35,12 @@ import type {
   GrowthRevenueProbabilityTier,
   GrowthRevenueTrajectory,
 } from "@/lib/growth/revenue-forecast-types"
+import type {
+  GrowthExecutiveInterventionAgeBucket,
+  GrowthExecutiveOperatingTopSignal,
+  GrowthExecutivePriorityTier,
+  GrowthIntelligenceConflict,
+} from "@/lib/growth/executive-operating-types"
 import type { GrowthWorkflowHealthStatus } from "@/lib/growth/workflow-health-types"
 
 export type GrowthLeadSourceKind = (typeof GROWTH_LEAD_SOURCE_KINDS)[number]
@@ -162,6 +168,19 @@ export type GrowthLead = {
   forecastAttentionLevel: GrowthForecastAttentionLevel
   forecastAttentionLastChangedAt: string | null
   revenueForecastComputedAt: string | null
+  executivePriorityScore: number | null
+  executivePriorityTier: GrowthExecutivePriorityTier | null
+  executivePrioritySummary: string | null
+  executivePriorityTopSignals: GrowthExecutiveOperatingTopSignal[]
+  executivePriorityVolatility: number
+  executivePriorityPreviousScore: number | null
+  intelligenceConflicts: GrowthIntelligenceConflict[]
+  intelligenceConflictSeverityScore: number
+  executiveRecommendation: string | null
+  executiveOwner: string | null
+  executiveInterventionOpenedAt: string | null
+  executiveInterventionAgeBucket: GrowthExecutiveInterventionAgeBucket
+  executiveOperatingComputedAt: string | null
   createdBy: string | null
   assignedTo: string | null
   createdAt: string

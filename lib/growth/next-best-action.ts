@@ -10,7 +10,8 @@ import type {
 } from "@/lib/growth/relationship-types"
 import type { GrowthLeadCallDisposition } from "@/lib/growth/call-types"
 import type { GrowthDecisionMakerPresenceStatus } from "@/lib/growth/decision-maker-types"
-import type { GrowthRevenueProbabilityTier } from "@/lib/growth/revenue-forecast-types"
+import type { GrowthRevenueProbabilityTier, GrowthRevenueTrajectory } from "@/lib/growth/revenue-forecast-types"
+import type { GrowthExecutivePriorityTier } from "@/lib/growth/executive-operating-types"
 import type { GrowthWorkflowHealthStatus } from "@/lib/growth/workflow-health-types"
 import {
   GROWTH_NEXT_BEST_ACTION_LABELS,
@@ -18,6 +19,7 @@ import {
   type GrowthNextBestActionResult,
 } from "@/lib/growth/nba-types"
 import { hasUsableResearch } from "@/lib/growth/call-priority"
+import { isForecastRegression } from "@/lib/growth/revenue-forecast-trajectory"
 import type { GrowthLeadStatus } from "@/lib/growth/types"
 
 export type NextBestActionInput = {
@@ -42,6 +44,10 @@ export type NextBestActionInput = {
   opportunityReadinessTier?: GrowthOpportunityReadinessTier | null
   opportunityBlockerKeys?: GrowthOpportunityBlockerKey[]
   revenueProbabilityTier?: GrowthRevenueProbabilityTier | null
+  revenueProbabilityScore?: number | null
+  revenueProbabilityPreviousScore?: number | null
+  revenueTrajectory?: GrowthRevenueTrajectory | null
+  executivePriorityTier?: GrowthExecutivePriorityTier | null
   workflowHealth?: GrowthWorkflowHealthStatus | null
   now?: Date
 }
@@ -124,6 +130,16 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
 
   const opportunityTier = input.opportunityReadinessTier ?? null
   const opportunityBlockers = new Set(input.opportunityBlockerKeys ?? [])
+  const executiveTier = input.executivePriorityTier ?? null
+
+  if (executiveTier === "executive_now") {
+    return buildResult(
+      "executive_takeover",
+      "Executive now priority — leadership takeover recommended.",
+      [],
+      "high",
+    )
+  }
 
   if (opportunityTier === "priority_opportunity" && fit > 85) {
     return buildResult(
@@ -136,6 +152,38 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
 
   const revenueTier = input.revenueProbabilityTier ?? null
   const workflowHealth = input.workflowHealth ?? null
+  const revenueTrajectory = input.revenueTrajectory ?? null
+
+  const previousRevenueTier =
+    input.revenueProbabilityPreviousScore != null
+      ? input.revenueProbabilityPreviousScore >= 85
+        ? "commit_candidate"
+        : input.revenueProbabilityPreviousScore >= 65
+          ? "forecasted"
+          : input.revenueProbabilityPreviousScore >= 45
+            ? "probable"
+            : input.revenueProbabilityPreviousScore >= 25
+              ? "possible"
+              : "unlikely"
+      : null
+
+  if (
+    revenueTier === "commit_candidate" &&
+    isForecastRegression({
+      previousScore: input.revenueProbabilityPreviousScore ?? null,
+      currentScore: input.revenueProbabilityScore ?? 0,
+      previousTier: previousRevenueTier,
+      currentTier: revenueTier,
+      trajectory: revenueTrajectory ?? "steady",
+    })
+  ) {
+    return buildResult(
+      "executive_intervention",
+      "Commit candidate with forecast regression — executive intervention required.",
+      ["Forecast regression"],
+      "high",
+    )
+  }
 
   if (revenueTier === "commit_candidate" && fit > 85) {
     return buildResult(

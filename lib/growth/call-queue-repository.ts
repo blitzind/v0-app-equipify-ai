@@ -53,6 +53,13 @@ export async function listGrowthCallQueue(
         revenueProbabilityScore: lead.revenueProbabilityScore,
         revenueProbabilityTier: lead.revenueProbabilityTier,
         revenueProbabilityConfidence: lead.revenueProbabilityConfidence,
+        executivePriorityScore: lead.executivePriorityScore,
+        executivePriorityTier: lead.executivePriorityTier,
+        intelligenceConflictSeverityScore: lead.intelligenceConflictSeverityScore,
+        intelligenceConflictCount: lead.intelligenceConflicts.length,
+        executiveInterventionAgeBucket: lead.executiveInterventionAgeBucket,
+        workflowHealth: lead.workflowHealth,
+        opportunityBlockerCount: lead.opportunityBlockers.length,
       }, now)
     ) {
       continue
@@ -94,6 +101,8 @@ export async function listGrowthCallQueue(
     if (opportunityDiff !== 0) return opportunityDiff
     const revenueDiff = (b.revenueProbabilityScore ?? 0) - (a.revenueProbabilityScore ?? 0)
     if (revenueDiff !== 0) return revenueDiff
+    const executiveDiff = (b.executivePriorityScore ?? 0) - (a.executivePriorityScore ?? 0)
+    if (executiveDiff !== 0) return executiveDiff
     const fitDiff = (b.score ?? 0) - (a.score ?? 0)
     if (fitDiff !== 0) return fitDiff
     return (b.callPriorityScore ?? 0) - (a.callPriorityScore ?? 0)
@@ -177,5 +186,10 @@ async function buildQueueRow(
     revenueTrajectory: lead.revenueTrajectory,
     revenueProbabilityVolatility: lead.revenueProbabilityVolatility,
     forecastAttentionLevel: lead.forecastAttentionLevel,
+    executivePriorityScore: lead.executivePriorityScore,
+    executivePriorityTier: lead.executivePriorityTier,
+    intelligenceConflictSeverityScore: lead.intelligenceConflictSeverityScore,
+    intelligenceConflictCount: lead.intelligenceConflicts.length,
+    executiveInterventionAgeBucket: lead.executiveInterventionAgeBucket,
   }
 }

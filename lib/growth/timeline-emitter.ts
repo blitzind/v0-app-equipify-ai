@@ -582,3 +582,33 @@ export async function emitGrowthLeadForecastRegressionDetectedTimeline(
     },
   })
 }
+
+export async function emitGrowthLeadExecutivePriorityChangedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; from: number; to: number; summary: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "executive_priority_changed",
+    title: "Executive priority changed",
+    summary: `${input.from} → ${input.to}: ${input.summary}`,
+    payload: { from: input.from, to: input.to },
+  })
+}
+
+export async function emitGrowthLeadExecutiveInterventionRecommendedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    summary: string
+    tier: import("@/lib/growth/executive-operating-types").GrowthExecutivePriorityTier
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "executive_intervention_recommended",
+    title: "Executive intervention recommended",
+    summary: input.summary,
+    payload: { tier: input.tier },
+  })
+}
