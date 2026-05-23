@@ -177,6 +177,7 @@ export async function createGrowthImportBatch(
     fileName?: string | null
     storagePath?: string | null
     createdBy?: string | null
+    options?: GrowthImportBatchOptions
   },
 ): Promise<GrowthImportBatch> {
   const { data, error } = await batchesTable(admin)
@@ -190,7 +191,7 @@ export async function createGrowthImportBatch(
       storage_path: input.storagePath ?? null,
       status: "partial",
       created_by: input.createdBy ?? null,
-      options: { phase: "uploaded" },
+      options: input.options ?? { phase: "uploaded" },
     })
     .select(BATCH_SELECT)
     .single()

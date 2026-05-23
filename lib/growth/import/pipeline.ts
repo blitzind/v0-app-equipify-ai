@@ -12,6 +12,8 @@ import {
   upsertGrowthImportBatchRowOutcome,
 } from "@/lib/growth/import/batch-repository"
 import { GROWTH_IMPORT_COMMIT_CHUNK_SIZE, GROWTH_IMPORT_PREVIEW_ROWS } from "@/lib/growth/import/constants"
+import { inferBatchAutoTags } from "@/lib/growth/import/batch-tags"
+import { computeContactabilityScore, isEstimatedCallReadyLead } from "@/lib/growth/import/contactability"
 import { findImportDedupeMatch, proposeImportRowAction } from "@/lib/growth/import/dedupe"
 import { suggestGrowthImportColumnMapping } from "@/lib/growth/import/map-columns"
 import {
@@ -27,8 +29,10 @@ import type {
   GrowthImportDuplicateStrategy,
   ImportPipelineSummary,
   ImportRowPreview,
+  NormalizedImportRow,
 } from "@/lib/growth/import/types"
 import { getImportVendorAdapter } from "@/lib/growth/import/vendors/registry"
+import { extractSeamlessTierBPayload } from "@/lib/growth/import/vendors/seamless-csv"
 import { createGrowthLead, fetchGrowthLeadById, updateGrowthLeadFromImportMerge } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import {
@@ -37,6 +41,21 @@ import {
 } from "@/lib/growth/timeline-emitter"
 
 type Actor = { userId: string; email: string }
+
+function resolveBatchAutoTags(batch: GrowthImportBatch): string[] {
+  return batch.options.autoTags ?? inferBatchAutoTags(batch)
+}
+
+function buildPreviewStats(previews: ImportRowPreview[]) {
+  const rows = previews.map((preview) => preview.normalized)
+  const avgContactabilityScore =
+    rows.length === 0
+      ? 0
+      : Math.round((previews.reduce((sum, preview) => sum + preview.contactabilityScore, 0) / previews.length) * 100) /
+        100
+  const estimatedCallReadyLeads = previews.filter((preview) => preview.estimatedCallReady).length
+  return { avgContactabilityScore, estimatedCallReadyLeads }
+}
 
 export async function buildGrowthImportPreview(
   admin: SupabaseClient,
@@ -68,14 +87,21 @@ export async function buildGrowthImportPreview(
       externalRef,
     })
     const strategy = (batch.options.duplicateStrategy ?? "skip_high_confidence") as GrowthImportDuplicateStrategy
+    const proposedAction = proposeImportRowAction(dedupe, strategy)
+    const contactabilityScore = computeContactabilityScore(normalized)
+    const hasError = issues.some((i) => i.severity === "error")
     previews.push({
       rowIndex,
       normalized,
       issues,
       dedupe,
-      proposedAction: proposeImportRowAction(dedupe, strategy),
+      proposedAction,
+      contactabilityScore,
+      estimatedCallReady: isEstimatedCallReadyLead({ row: normalized, hasError, proposedAction }),
     })
   }
+
+  const previewStats = buildPreviewStats(previews)
 
   return {
     headers: parsed.headers,
@@ -85,6 +111,8 @@ export async function buildGrowthImportPreview(
       errorCount,
       warningCount,
       headers: parsed.headers,
+      ...previewStats,
+      autoTags: resolveBatchAutoTags(batch),
     },
   }
 }
@@ -100,6 +128,7 @@ export async function runGrowthImportDryRun(
   if (batch.status === "cancelled") throw new Error("batch_cancelled")
 
   const { previews, validationSummary } = await buildGrowthImportPreview(admin, batch, mapping)
+  const autoTags = resolveBatchAutoTags(batch)
 
   let imported = 0
   let updated = 0
@@ -154,6 +183,7 @@ export async function runGrowthImportDryRun(
     skipped,
     duplicate,
     error,
+    previews,
   })
 
   const updatedBatch = await updateGrowthImportBatch(admin, batchId, {
@@ -174,7 +204,12 @@ export async function runGrowthImportDryRun(
       headers: parsed.headers,
       rows: parsed.rows.slice(0, GROWTH_IMPORT_PREVIEW_ROWS),
     },
-    options: { ...batch.options, phase: "dry_run", duplicateStrategy: batch.options.duplicateStrategy ?? "skip_high_confidence" },
+    options: {
+      ...batch.options,
+      phase: "dry_run",
+      duplicateStrategy: batch.options.duplicateStrategy ?? "skip_high_confidence",
+      autoTags,
+    },
     status: "partial",
   })
 
@@ -228,13 +263,17 @@ export async function runGrowthImportCommit(
   const adapter = getImportVendorAdapter(existing.sourceVendor)
   const parsed = await loadGrowthImportCsvFromStorage(admin, existing.storagePath)
   const strategy = (existing.options.duplicateStrategy ?? "skip_high_confidence") as GrowthImportDuplicateStrategy
+  const autoTags = resolveBatchAutoTags(existing)
+  const isSeamless = existing.sourceVendor === "seamless"
 
   let imported = 0
   let updated = 0
   let skipped = 0
   let duplicate = 0
   let error = 0
-  const normalizedRows = []
+  let estimatedCallReadyLeads = 0
+  const normalizedRows: NormalizedImportRow[] = []
+  const commitPreviews: ImportRowPreview[] = []
 
   try {
     for (let offset = 0; offset < parsed.rows.length; offset += GROWTH_IMPORT_COMMIT_CHUNK_SIZE) {
@@ -275,6 +314,18 @@ export async function runGrowthImportCommit(
           externalRef,
         })
         const action = proposeImportRowAction(dedupe, strategy)
+        const contactabilityScore = computeContactabilityScore(normalized)
+        const seamlessTierB = isSeamless ? extractSeamlessTierBPayload(raw) : undefined
+        const hasError = issues.some((issue) => issue.severity === "error")
+        commitPreviews.push({
+          rowIndex,
+          normalized,
+          issues,
+          dedupe,
+          proposedAction: action,
+          contactabilityScore,
+          estimatedCallReady: isEstimatedCallReadyLead({ row: normalized, hasError, proposedAction: action }),
+        })
 
         if (action === "skip") {
           if (dedupe) duplicate++
@@ -317,6 +368,9 @@ export async function runGrowthImportCommit(
             sourceImportBatchId: batchId,
             externalRef,
             rowIndex,
+            autoTags,
+            contactabilityScore,
+            seamlessTierB,
           })
 
           const lead = await updateGrowthLeadFromImportMerge(admin, dedupe.leadId, patch)
@@ -333,6 +387,9 @@ export async function runGrowthImportCommit(
           })
           await recomputeGrowthLeadWorkflowSignals(admin, lead.id)
           updated++
+          if (isEstimatedCallReadyLead({ row: normalized, hasError: false, proposedAction: "merge" })) {
+            estimatedCallReadyLeads++
+          }
 
           await upsertGrowthImportBatchRowOutcome(admin, batchId, {
             rowIndex,
@@ -360,6 +417,9 @@ export async function runGrowthImportCommit(
             externalRef,
             rowIndex,
             createdBy: input.actor.userId,
+            autoTags,
+            contactabilityScore,
+            seamlessTierB,
           }),
         )
 
@@ -372,6 +432,9 @@ export async function runGrowthImportCommit(
         })
         await recomputeGrowthLeadWorkflowSignals(admin, lead.id)
         imported++
+        if (isEstimatedCallReadyLead({ row: normalized, hasError: false, proposedAction: "create_new" })) {
+          estimatedCallReadyLeads++
+        }
 
         await upsertGrowthImportBatchRowOutcome(admin, batchId, {
           rowIndex,
@@ -393,6 +456,8 @@ export async function runGrowthImportCommit(
       skipped,
       duplicate,
       error,
+      previews: commitPreviews,
+      estimatedCallReadyLeads,
     })
 
     const finalStatus = error > 0 && imported + updated === 0 ? "failed" : error > 0 ? "partial" : "completed"
@@ -414,6 +479,9 @@ export async function runGrowthImportCommit(
       options: { ...existing.options, phase: "committed" },
       validationSummary: {
         ...(existing.validationSummary ?? {}),
+        avgContactabilityScore: summary.avgContactabilityScore,
+        estimatedCallReadyLeads: summary.estimatedCallReadyLeads,
+        autoTags,
         commitSummary: summary,
       },
     })
@@ -461,6 +529,7 @@ export async function initializeGrowthImportBatchFromUpload(
   const adapter = getImportVendorAdapter(batch.sourceVendor)
   const suggestedMapping = mapping ?? suggestGrowthImportColumnMapping(parsed.headers, adapter)
 
+  const autoTags = resolveBatchAutoTags(batch)
   const updated = await updateGrowthImportBatch(admin, batch.id, {
     rowCount: parsed.rows.length,
     columnMapping: suggestedMapping,
@@ -468,7 +537,7 @@ export async function initializeGrowthImportBatchFromUpload(
       headers: parsed.headers,
       rows: parsed.rows.slice(0, GROWTH_IMPORT_PREVIEW_ROWS),
     },
-    options: { ...batch.options, phase: "uploaded" },
+    options: { ...batch.options, phase: "uploaded", autoTags },
     status: "partial",
   })
 

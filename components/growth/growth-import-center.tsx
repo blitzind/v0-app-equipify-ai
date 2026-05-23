@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import { GROWTH_SEAMLESS_EXPORT_TYPES } from "@/lib/growth/import/constants"
 import type { GrowthImportBatch } from "@/lib/growth/import/types"
 
 function statusTone(status: GrowthImportBatch["status"]) {
@@ -24,16 +25,25 @@ function statusTone(status: GrowthImportBatch["status"]) {
   }
 }
 
+type ImportVendorOption = {
+  vendorKey: string
+  vendorName: string
+  uiEnabled: boolean
+}
+
 type GrowthImportCenterProps = {
   onUploaded?: (batchId: string) => void
 }
 
 export function GrowthImportCenter({ onUploaded }: GrowthImportCenterProps) {
   const [batches, setBatches] = useState<GrowthImportBatch[]>([])
+  const [vendors, setVendors] = useState<ImportVendorOption[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [batchName, setBatchName] = useState("")
+  const [sourceVendor, setSourceVendor] = useState("manual_csv")
+  const [seamlessExportType, setSeamlessExportType] = useState<(typeof GROWTH_SEAMLESS_EXPORT_TYPES)[number]>("clean")
   const [sourceChannel, setSourceChannel] = useState("")
   const [sourceCampaign, setSourceCampaign] = useState("")
   const [file, setFile] = useState<File | null>(null)
@@ -42,15 +52,28 @@ export function GrowthImportCenter({ onUploaded }: GrowthImportCenterProps) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/platform/growth/import-batches", { cache: "no-store" })
-      const data = (await res.json().catch(() => ({}))) as {
+      const [batchRes, vendorRes] = await Promise.all([
+        fetch("/api/platform/growth/import-batches", { cache: "no-store" }),
+        fetch("/api/platform/growth/import-vendors", { cache: "no-store" }),
+      ])
+      const data = (await batchRes.json().catch(() => ({}))) as {
         ok?: boolean
         batches?: GrowthImportBatch[]
         message?: string
         error?: string
       }
-      if (!res.ok || !data.ok) throw new Error(data.message ?? data.error ?? "Could not load import batches.")
+      const vendorData = (await vendorRes.json().catch(() => ({}))) as {
+        ok?: boolean
+        vendors?: ImportVendorOption[]
+      }
+      if (!batchRes.ok || !data.ok) throw new Error(data.message ?? data.error ?? "Could not load import batches.")
       setBatches(data.batches ?? [])
+      const enabled = (vendorData.vendors ?? []).filter((vendor) => vendor.uiEnabled)
+      setVendors(enabled)
+      setSourceVendor((current) => {
+        if (enabled.length === 0) return current
+        return enabled.some((vendor) => vendor.vendorKey === current) ? current : enabled[0]!.vendorKey
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load import batches.")
     } finally {
@@ -70,7 +93,8 @@ export function GrowthImportCenter({ onUploaded }: GrowthImportCenterProps) {
       const form = new FormData()
       form.append("file", file)
       form.append("batchName", batchName.trim())
-      form.append("sourceVendor", "manual_csv")
+      form.append("sourceVendor", sourceVendor)
+      if (sourceVendor === "seamless") form.append("seamlessExportType", seamlessExportType)
       if (sourceChannel.trim()) form.append("sourceChannel", sourceChannel.trim())
       if (sourceCampaign.trim()) form.append("sourceCampaign", sourceCampaign.trim())
 
@@ -97,27 +121,76 @@ export function GrowthImportCenter({ onUploaded }: GrowthImportCenterProps) {
     }
   }
 
+  const selectedVendor = vendors.find((vendor) => vendor.vendorKey === sourceVendor)
+
   return (
     <div className="space-y-6">
       <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <h2 className="text-lg font-semibold">Upload CSV</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Manual CSV import — up to 5,000 rows per batch.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Manual CSV or Seamless export — up to 5,000 rows per batch.</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="batch-name">Batch name</Label>
             <Input id="batch-name" value={batchName} onChange={(e) => setBatchName(e.target.value)} placeholder="Q1 HVAC prospects" />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="source-channel">Source channel</Label>
-            <Input id="source-channel" value={sourceChannel} onChange={(e) => setSourceChannel(e.target.value)} placeholder="Outbound" />
+            <Label htmlFor="source-vendor">Import vendor</Label>
+            <select
+              id="source-vendor"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              value={sourceVendor}
+              onChange={(e) => setSourceVendor(e.target.value)}
+            >
+              {vendors.map((vendor) => (
+                <option key={vendor.vendorKey} value={vendor.vendorKey}>
+                  {vendor.vendorName}
+                </option>
+              ))}
+            </select>
           </div>
+          {sourceVendor === "seamless" ? (
+            <div className="space-y-2">
+              <Label htmlFor="seamless-export-type">Seamless export type</Label>
+              <select
+                id="seamless-export-type"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                value={seamlessExportType}
+                onChange={(e) => setSeamlessExportType(e.target.value as (typeof GROWTH_SEAMLESS_EXPORT_TYPES)[number])}
+              >
+                {GROWTH_SEAMLESS_EXPORT_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="source-channel">Source channel</Label>
+              <Input id="source-channel" value={sourceChannel} onChange={(e) => setSourceChannel(e.target.value)} placeholder="Outbound" />
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="source-campaign">Source campaign</Label>
             <Input id="source-campaign" value={sourceCampaign} onChange={(e) => setSourceCampaign(e.target.value)} placeholder="Spring 2026" />
           </div>
+          {sourceVendor === "seamless" ? (
+            <div className="space-y-2">
+              <Label htmlFor="source-channel-seamless">Source channel</Label>
+              <Input
+                id="source-channel-seamless"
+                value={sourceChannel}
+                onChange={(e) => setSourceChannel(e.target.value)}
+                placeholder="Seamless"
+              />
+            </div>
+          ) : null}
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="csv-file">CSV file</Label>
             <Input id="csv-file" type="file" accept=".csv,text/csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            {selectedVendor ? (
+              <p className="text-xs text-muted-foreground">Adapter: {selectedVendor.vendorName}</p>
+            ) : null}
           </div>
         </div>
         <div className="mt-4">

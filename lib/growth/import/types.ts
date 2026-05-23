@@ -80,6 +80,8 @@ export type GrowthImportBatchOptions = {
   duplicateStrategy?: GrowthImportDuplicateStrategy
   dryRun?: boolean
   phase?: "uploaded" | "mapped" | "validated" | "dry_run" | "committed"
+  seamlessExportType?: "clean" | "raw" | "custom"
+  autoTags?: string[]
 }
 
 export type NormalizedImportRow = {
@@ -200,6 +202,13 @@ export type ImportRowPreview = {
   issues: ImportValidationIssue[]
   dedupe: DedupeMatch | null
   proposedAction: GrowthImportRowAction
+  contactabilityScore: number
+  estimatedCallReady: boolean
+}
+
+export type ImportPreviewStats = {
+  avgContactabilityScore: number
+  estimatedCallReadyLeads: number
 }
 
 export type ImportPipelineSummary = {
@@ -213,4 +222,6 @@ export type ImportPipelineSummary = {
   websiteFillPercent: number
   decisionMakerFillPercent: number
   importQualityScore: number
+  avgContactabilityScore: number
+  estimatedCallReadyLeads: number
 }

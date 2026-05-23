@@ -37,6 +37,11 @@ export function GrowthImportBatchWizard({ batchId }: GrowthImportBatchWizardProp
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [profileName, setProfileName] = useState("")
+  const [previewStats, setPreviewStats] = useState<{
+    avgContactabilityScore?: number
+    estimatedCallReadyLeads?: number
+    autoTags?: string[]
+  }>({})
 
   const previewRows = useMemo(() => {
     const previewJson = batch?.previewJson as { headers?: string[]; rows?: Record<string, string>[] } | null
@@ -61,6 +66,16 @@ export function GrowthImportBatchWizard({ batchId }: GrowthImportBatchWizardProp
       setDuplicateStrategy(batchData.batch.options.duplicateStrategy ?? "skip_high_confidence")
       setEvents(eventsData.events ?? [])
       setRows(rowsData.rows ?? [])
+      const validationSummary = batchData.batch.validationSummary as {
+        avgContactabilityScore?: number
+        estimatedCallReadyLeads?: number
+        autoTags?: string[]
+      }
+      setPreviewStats({
+        avgContactabilityScore: validationSummary.avgContactabilityScore,
+        estimatedCallReadyLeads: validationSummary.estimatedCallReadyLeads,
+        autoTags: validationSummary.autoTags ?? batchData.batch.options.autoTags,
+      })
       const previewJson = batchData.batch.previewJson as { headers?: string[] } | null
       setHeaders(previewJson?.headers ?? [])
     } catch (e) {
@@ -107,11 +122,23 @@ export function GrowthImportBatchWizard({ batchId }: GrowthImportBatchWizardProp
         ok?: boolean
         previews?: ImportRowPreview[]
         headers?: string[]
+        validationSummary?: {
+          avgContactabilityScore?: number
+          estimatedCallReadyLeads?: number
+          autoTags?: string[]
+        }
         message?: string
       }
       if (!res.ok || !data.ok) throw new Error(data.message ?? "Preview failed.")
       setPreviews(data.previews ?? [])
       setHeaders(data.headers ?? headers)
+      if (data.validationSummary) {
+        setPreviewStats({
+          avgContactabilityScore: data.validationSummary.avgContactabilityScore,
+          estimatedCallReadyLeads: data.validationSummary.estimatedCallReadyLeads,
+          autoTags: data.validationSummary.autoTags,
+        })
+      }
       setSuccess("Validation preview updated.")
     } catch (e) {
       setError(e instanceof Error ? e.message : "Preview failed.")
@@ -133,11 +160,26 @@ export function GrowthImportBatchWizard({ batchId }: GrowthImportBatchWizardProp
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
         batch?: GrowthImportBatch
-        summary?: { imported: number; updated: number; skipped: number; duplicate: number; error: number }
+        summary?: {
+          imported: number
+          updated: number
+          skipped: number
+          duplicate: number
+          error: number
+          avgContactabilityScore?: number
+          estimatedCallReadyLeads?: number
+        }
         message?: string
       }
       if (!res.ok || !data.ok) throw new Error(data.message ?? "Dry run failed.")
       setBatch(data.batch ?? null)
+      if (data.summary) {
+        setPreviewStats((prev) => ({
+          ...prev,
+          avgContactabilityScore: data.summary?.avgContactabilityScore ?? prev.avgContactabilityScore,
+          estimatedCallReadyLeads: data.summary?.estimatedCallReadyLeads ?? prev.estimatedCallReadyLeads,
+        }))
+      }
       setSuccess(
         `Dry run: ${data.summary?.imported ?? 0} create · ${data.summary?.updated ?? 0} merge · ${(data.summary?.skipped ?? 0) + (data.summary?.duplicate ?? 0)} skip · ${data.summary?.error ?? 0} errors`,
       )
@@ -215,6 +257,9 @@ export function GrowthImportBatchWizard({ batchId }: GrowthImportBatchWizardProp
     return <div className="py-12 text-sm text-muted-foreground">Import batch not found.</div>
   }
 
+  const canCommit = batch.status !== "cancelled" && batch.status !== "running"
+  const estimatedCallReady = previewStats.estimatedCallReadyLeads
+
   return (
     <div className="space-y-6">
       <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -241,6 +286,25 @@ export function GrowthImportBatchWizard({ batchId }: GrowthImportBatchWizardProp
 
       {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</div> : null}
       {success ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{success}</div> : null}
+
+      {(previewStats.avgContactabilityScore != null || estimatedCallReady != null || (previewStats.autoTags?.length ?? 0) > 0) ? (
+        <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+          <h3 className="font-semibold">Import preview intelligence</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Review before commit — no leads are written until you confirm.</p>
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <Metric
+              label="Avg contactability"
+              value={previewStats.avgContactabilityScore != null ? `${previewStats.avgContactabilityScore}/100` : "—"}
+            />
+            <Metric
+              label="Est. call ready leads"
+              value={estimatedCallReady != null ? estimatedCallReady : "—"}
+            />
+            <Metric label="Auto tags" value={previewStats.autoTags?.length ? previewStats.autoTags.join(", ") : "—"} />
+            <Metric label="Rows" value={batch.rowCount} />
+          </dl>
+        </section>
+      ) : null}
 
       <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <h3 className="font-semibold">Column mapping</h3>
@@ -301,11 +365,18 @@ export function GrowthImportBatchWizard({ batchId }: GrowthImportBatchWizardProp
             <Sparkles className="mr-2 size-4" />
             Dry run
           </Button>
-          <Button disabled={working || batch.status === "cancelled"} onClick={() => void runCommit()}>
+          <Button disabled={working || !canCommit} onClick={() => void runCommit()}>
             {working ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Play className="mr-2 size-4" />}
             Commit import
           </Button>
         </div>
+        {estimatedCallReady != null ? (
+          <p className="mt-2 text-sm font-medium text-foreground">
+            Estimated call ready leads: {estimatedCallReady}
+          </p>
+        ) : (
+          <p className="mt-2 text-xs text-muted-foreground">Run Validate or Dry run to estimate call ready leads before commit.</p>
+        )}
         <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
           <ShieldCheck className="size-3.5" />
           Merge never overwrites notes, decision maker confirmations, call history, priority override, or human touch timestamps.
@@ -323,6 +394,8 @@ export function GrowthImportBatchWizard({ batchId }: GrowthImportBatchWizardProp
                 <th className="px-2 py-2">Contact</th>
                 <th className="px-2 py-2">Email</th>
                 <th className="px-2 py-2">Phone</th>
+                <th className="px-2 py-2">Score</th>
+                <th className="px-2 py-2">Call ready</th>
                 <th className="px-2 py-2">Action</th>
               </tr>
             </thead>
@@ -339,6 +412,8 @@ export function GrowthImportBatchWizard({ batchId }: GrowthImportBatchWizardProp
                       <td className="px-2 py-2">{row?.contactName ?? "—"}</td>
                       <td className="px-2 py-2">{row?.email ?? "—"}</td>
                       <td className="px-2 py-2">{row?.phone ?? "—"}</td>
+                      <td className="px-2 py-2 tabular-nums">{preview?.contactabilityScore ?? "—"}</td>
+                      <td className="px-2 py-2">{preview?.estimatedCallReady ? "Yes" : preview ? "No" : "—"}</td>
                       <td className="px-2 py-2 capitalize">
                         {rowOutcome?.action ?? preview?.proposedAction ?? "—"}
                         {preview?.dedupe ? ` (${preview.dedupe.rule})` : ""}

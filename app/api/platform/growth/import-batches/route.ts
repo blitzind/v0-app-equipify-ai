@@ -7,12 +7,17 @@ import {
   listGrowthImportBatches,
   updateGrowthImportBatch,
 } from "@/lib/growth/import/batch-repository"
-import { GROWTH_IMPORT_MAX_BYTES, GROWTH_IMPORT_VENDOR_SCHEMA_VERSION } from "@/lib/growth/import/constants"
+import { inferBatchAutoTags } from "@/lib/growth/import/batch-tags"
+import {
+  GROWTH_IMPORT_MAX_BYTES,
+  GROWTH_IMPORT_VENDOR_SCHEMA_VERSION,
+  GROWTH_SEAMLESS_EXPORT_TYPES,
+} from "@/lib/growth/import/constants"
 import { growthImportErrorMessage } from "@/lib/growth/import/errors"
 import { initializeGrowthImportBatchFromUpload } from "@/lib/growth/import/pipeline"
 import { uploadGrowthImportCsv } from "@/lib/growth/import/storage"
-import { GROWTH_IMPORT_BATCH_STATUSES } from "@/lib/growth/import/types"
-import { getImportVendorAdapter } from "@/lib/growth/import/vendors/registry"
+import { GROWTH_IMPORT_BATCH_STATUSES, type GrowthImportBatchOptions } from "@/lib/growth/import/types"
+import { getImportVendorAdapter, listImportVendorAdapters } from "@/lib/growth/import/vendors/registry"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
@@ -51,6 +56,7 @@ export async function POST(request: Request) {
   const file = form.get("file")
   const batchName = String(form.get("batchName") ?? "").trim()
   const sourceVendor = String(form.get("sourceVendor") ?? "manual_csv").trim()
+  const seamlessExportTypeRaw = String(form.get("seamlessExportType") ?? "clean").trim()
   const sourceChannel = optionalText.parse(form.get("sourceChannel")?.toString() ?? null)
   const sourceCampaign = optionalText.parse(form.get("sourceCampaign")?.toString() ?? null)
 
@@ -66,16 +72,37 @@ export async function POST(request: Request) {
 
   try {
     const adapter = getImportVendorAdapter(sourceVendor)
+    const uiEnabled = listImportVendorAdapters().find((vendor) => vendor.vendorKey === adapter.vendorKey())?.uiEnabled
+    if (!uiEnabled) {
+      return NextResponse.json({ error: "invalid_vendor", message: "Import vendor is not enabled." }, { status: 400 })
+    }
+
+    const seamlessExportType =
+      adapter.vendorKey() === "seamless" &&
+      GROWTH_SEAMLESS_EXPORT_TYPES.includes(seamlessExportTypeRaw as (typeof GROWTH_SEAMLESS_EXPORT_TYPES)[number])
+        ? (seamlessExportTypeRaw as (typeof GROWTH_SEAMLESS_EXPORT_TYPES)[number])
+        : adapter.vendorKey() === "seamless"
+          ? "clean"
+          : undefined
+
+    const autoTags = inferBatchAutoTags({ batchName, sourceCampaign, sourceChannel })
+    const batchOptions: GrowthImportBatchOptions = {
+      phase: "uploaded",
+      autoTags,
+      ...(seamlessExportType ? { seamlessExportType } : {}),
+    }
+
     const bytes = Buffer.from(await file.arrayBuffer())
 
     const batch = await createGrowthImportBatch(access.admin, {
       batchName,
       sourceVendor: adapter.vendorKey(),
-      sourceChannel,
+      sourceChannel: sourceChannel ?? (adapter.vendorKey() === "seamless" ? "Seamless" : null),
       sourceCampaign,
       vendorSchemaVersion: adapter.vendorSchemaVersion() ?? GROWTH_IMPORT_VENDOR_SCHEMA_VERSION,
       fileName: file.name,
       createdBy: access.userId,
+      options: batchOptions,
     })
 
     const { storagePath } = await uploadGrowthImportCsv(access.admin, {

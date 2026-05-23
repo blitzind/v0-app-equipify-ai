@@ -1,14 +1,16 @@
 import { apolloImportAdapter } from "@/lib/growth/import/vendors/apollo-stub"
 import { manualCsvImportAdapter } from "@/lib/growth/import/vendors/manual-csv"
-import { seamlessImportAdapter } from "@/lib/growth/import/vendors/seamless-stub"
+import { seamlessCsvImportAdapter } from "@/lib/growth/import/vendors/seamless-csv"
 import type { ImportVendorAdapter } from "@/lib/growth/import/vendors/types"
 import { GROWTH_IMPORT_VENDOR_KEYS, type GrowthImportVendorKey } from "@/lib/growth/import/types"
 
 const REGISTRY = new Map<string, ImportVendorAdapter>([
   [manualCsvImportAdapter.vendorKey(), manualCsvImportAdapter],
-  [seamlessImportAdapter.vendorKey(), seamlessImportAdapter],
+  [seamlessCsvImportAdapter.vendorKey(), seamlessCsvImportAdapter],
   [apolloImportAdapter.vendorKey(), apolloImportAdapter],
 ])
+
+const UI_ENABLED_VENDORS = new Set<string>(["manual_csv", "seamless"])
 
 export function registerImportVendorAdapter(key: string, adapter: ImportVendorAdapter): void {
   REGISTRY.set(key, adapter)
@@ -36,7 +38,7 @@ export function listImportVendorAdapters(): Array<{
       vendorName: adapter.vendorName(),
       vendorSchemaVersion: adapter.vendorSchemaVersion(),
       fieldAliases: adapter.fieldAliases(),
-      uiEnabled: key === "manual_csv",
+      uiEnabled: UI_ENABLED_VENDORS.has(key),
     }
   })
 }

@@ -1,0 +1,4 @@
+Company Name,First Name,Last Name,Email 1,Email 1 Validation Status,Contact Phone 1,Website,LinkedIn Profile URL,Title,Seamless Contact ID,Company Industry
+Acme Medical Equipment,Jane,Doe,jane@acme.com,Valid,5551234567,https://acme.example,https://linkedin.com/in/jane,CEO,SC-001,Healthcare
+Storm Restoration Co,Bob,Smith,bob@storm.com,Valid,5559876543,,,,SC-002,Construction
+HVAC Pros LLC,Sam,Green,,,5554443333,https://hvac.example,,Owner,SC-003,HVAC

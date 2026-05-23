@@ -1,4 +1,5 @@
 import type { GrowthLead } from "@/lib/growth/types"
+import { mergeLeadMetadataTags } from "@/lib/growth/import/batch-tags"
 import type { NormalizedImportRow } from "@/lib/growth/import/types"
 import { trimOrNull } from "@/lib/growth/import/normalize"
 
@@ -20,21 +21,29 @@ export function buildProtectedMergePatch(
     sourceImportBatchId: string
     externalRef: string | null
     rowIndex: number
+    autoTags?: string[]
+    contactabilityScore?: number
+    seamlessTierB?: Record<string, string>
   },
 ): Record<string, unknown> {
   const patch: Record<string, unknown> = {}
-  const metadata = {
-    ...(existing.metadata ?? {}),
-    import: {
-      ...(((existing.metadata ?? {}).import as Record<string, unknown> | undefined) ?? {}),
-      batchId: input.sourceImportBatchId,
-      rowIndex: input.rowIndex,
-      vendorKey: input.sourceVendor,
-      linkedin: incoming.linkedinUrl,
-      importedAt: new Date().toISOString(),
-    },
+  const existingMetadata = existing.metadata ?? {}
+  const importMeta = {
+    ...(((existingMetadata.import as Record<string, unknown> | undefined) ?? {})),
+    batchId: input.sourceImportBatchId,
+    rowIndex: input.rowIndex,
+    vendorKey: input.sourceVendor,
+    linkedin: incoming.linkedinUrl,
+    contactabilityScore: input.contactabilityScore,
+    importedAt: new Date().toISOString(),
+    ...(input.seamlessTierB ? { seamlessTierB: input.seamlessTierB } : {}),
   }
-  patch.metadata = metadata
+
+  patch.metadata = {
+    ...existingMetadata,
+    tags: mergeLeadMetadataTags(existingMetadata.tags, input.autoTags ?? []),
+    import: importMeta,
+  }
 
   if (!existing.contactName && incoming.contactName) patch.contact_name = incoming.contactName
   if (!existing.contactEmail && incoming.email) patch.contact_email = incoming.email
@@ -65,6 +74,9 @@ export function buildCreateLeadInputFromImportRow(
     externalRef: string | null
     rowIndex: number
     createdBy: string | null
+    autoTags?: string[]
+    contactabilityScore?: number
+    seamlessTierB?: Record<string, string>
   },
 ) {
   return {
@@ -87,13 +99,16 @@ export function buildCreateLeadInputFromImportRow(
     sourceVendor: input.sourceVendor,
     createdBy: input.createdBy,
     metadata: {
+      tags: input.autoTags ?? [],
       import: {
         batchId: input.sourceImportBatchId,
         rowIndex: input.rowIndex,
         vendorKey: input.sourceVendor,
         linkedin: incoming.linkedinUrl,
         title: incoming.title,
+        contactabilityScore: input.contactabilityScore,
         importedAt: new Date().toISOString(),
+        ...(input.seamlessTierB ? { seamlessTierB: input.seamlessTierB } : {}),
       },
     },
   }

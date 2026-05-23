@@ -12,6 +12,12 @@ export const GROWTH_IMPORT_COMMIT_CHUNK_SIZE = 100
 
 export const GROWTH_IMPORT_VENDOR_SCHEMA_VERSION = "1"
 
+export const GROWTH_SEAMLESS_VENDOR_SCHEMA_VERSION = "2"
+
+export const GROWTH_SEAMLESS_EXPORT_TYPES = ["clean", "raw", "custom"] as const
+
+export type GrowthSeamlessExportType = (typeof GROWTH_SEAMLESS_EXPORT_TYPES)[number]
+
 export const GROWTH_IMPORT_DEDUPE_SKIP_THRESHOLD = 0.85
 
 export const GROWTH_IMPORT_DEDUPE_MERGE_THRESHOLD = 0.7

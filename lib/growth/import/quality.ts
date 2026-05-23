@@ -1,4 +1,5 @@
 import type { ImportPipelineSummary, NormalizedImportRow } from "@/lib/growth/import/types"
+import { computeBatchContactabilityAverage, countEstimatedCallReadyLeads } from "@/lib/growth/import/contactability"
 
 function percentFilled(rows: NormalizedImportRow[], pick: (row: NormalizedImportRow) => boolean): number {
   if (rows.length === 0) return 0
@@ -41,10 +42,25 @@ export function computeImportPipelineSummary(input: {
   skipped: number
   duplicate: number
   error: number
+  previews?: Array<{
+    normalized: NormalizedImportRow
+    issues: { severity: string }[]
+    proposedAction: "create_new" | "merge" | "skip"
+    contactabilityScore?: number
+  }>
+  estimatedCallReadyLeads?: number
 }): ImportPipelineSummary {
   const fill = computeImportFillMetrics(input.rows)
   const total = input.rows.length || 1
   const errorRate = input.error / total
+  const avgContactabilityScore =
+    input.previews && input.previews.every((preview) => typeof preview.contactabilityScore === "number")
+      ? Math.round(
+          (input.previews.reduce((sum, preview) => sum + (preview.contactabilityScore ?? 0), 0) /
+            input.previews.length) *
+            100,
+        ) / 100
+      : computeBatchContactabilityAverage(input.rows)
   return {
     imported: input.imported,
     updated: input.updated,
@@ -53,6 +69,10 @@ export function computeImportPipelineSummary(input: {
     error: input.error,
     ...fill,
     importQualityScore: computeImportQualityScore({ ...fill, errorRate }),
+    avgContactabilityScore,
+    estimatedCallReadyLeads:
+      input.estimatedCallReadyLeads ??
+      (input.previews ? countEstimatedCallReadyLeads(input.previews) : 0),
   }
 }
 
