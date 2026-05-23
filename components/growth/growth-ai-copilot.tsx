@@ -35,6 +35,14 @@ function statusTone(status: GrowthAiCopilotGeneration["status"]): "healthy" | "w
   return "neutral"
 }
 
+function playbookSourceAttributionLabel(attribution: Record<string, unknown>): string | null {
+  const sourceTitles = attribution.sourceTitles
+  if (!Array.isArray(sourceTitles) || sourceTitles.length === 0) return null
+  const titles = sourceTitles.filter((title): title is string => typeof title === "string" && title.trim().length > 0)
+  if (titles.length === 0) return null
+  return titles.join(", ")
+}
+
 export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
   const [generations, setGenerations] = useState<GrowthAiCopilotGeneration[]>([])
   const [loading, setLoading] = useState(true)
@@ -217,6 +225,7 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
             <ul className="space-y-2">
               {generations.slice(0, 5).map((entry) => {
                 const expanded = expandedId === entry.id
+                const sourceAttribution = playbookSourceAttributionLabel(entry.playbookAttribution)
                 return (
                   <li key={entry.id} className="rounded-lg border border-border p-3 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -229,6 +238,9 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
                         ) : null}
                         {entry.playbookInfluenceScore > 0 ? (
                           <GrowthBadge label={`playbook ${entry.playbookInfluenceScore}`} tone="healthy" />
+                        ) : null}
+                        {sourceAttribution ? (
+                          <GrowthBadge label={`Influenced by: ${sourceAttribution}`} tone="neutral" />
                         ) : null}
                       </div>
                       <div className="flex flex-wrap gap-1">
@@ -295,6 +307,9 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
                         {entry.playbookInfluenceScore > 0 ? (
                           <div className="rounded-md border border-violet-200 bg-violet-50/40 p-2 text-xs">
                             <p className="font-medium">Playbook influence ({entry.playbookInfluenceScore})</p>
+                            {sourceAttribution ? (
+                              <p className="mt-1 text-muted-foreground">Influenced by: {sourceAttribution}</p>
+                            ) : null}
                             {Array.isArray(entry.playbookAttribution?.ruleTitles) &&
                             entry.playbookAttribution.ruleTitles.length > 0 ? (
                               <ul className="mt-1 list-disc pl-4">
