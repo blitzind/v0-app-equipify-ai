@@ -15,14 +15,16 @@ import type {
 } from "@/lib/growth/research-types"
 
 const RUN_SELECT =
-  "id, lead_id, status, trigger_kind, website_fetch_status, source_urls, result, research_confidence, equipify_fit_score, model_task, model_provider, model_name, error_code, error_message, duration_ms, input_hash, created_by, created_at, finished_at"
+  "id, lead_id, status, trigger_kind, website_url, website_fetch_status, website_text_excerpt, source_urls, result, research_confidence, equipify_fit_score, model_task, model_provider, model_name, error_code, error_message, duration_ms, input_hash, created_by, created_at, finished_at"
 
 type ResearchRunDbRow = {
   id: string
   lead_id: string
   status: string
   trigger_kind: string
+  website_url: string | null
   website_fetch_status: string
+  website_text_excerpt: string | null
   source_urls: string[] | null
   result: Record<string, unknown> | null
   research_confidence: number | null
@@ -102,7 +104,9 @@ function mapResearchRunRow(row: ResearchRunDbRow): GrowthLeadResearchRun {
     leadId: row.lead_id,
     status: row.status as GrowthLeadResearchRunStatus,
     triggerKind: row.trigger_kind === "regenerate" ? "regenerate" : "manual",
+    websiteUrl: row.website_url,
     websiteFetchStatus: row.website_fetch_status,
+    websiteTextExcerpt: row.website_text_excerpt,
     sourceUrls: row.source_urls ?? [],
     result: mapResult(row.result),
     researchConfidence: row.research_confidence,
@@ -147,7 +151,7 @@ export async function fetchCachedGrowthLeadResearchRun(
     .select(RUN_SELECT)
     .eq("lead_id", leadId)
     .eq("input_hash", inputHash)
-    .eq("status", "succeeded")
+    .in("status", ["succeeded", "partial"])
     .gte("finished_at", since)
     .order("finished_at", { ascending: false })
     .limit(1)
@@ -172,6 +176,7 @@ export async function insertGrowthLeadResearchRun(
     lead: GrowthLead
     triggerKind: "manual" | "regenerate"
     inputHash: string
+    websiteUrl?: string | null
     createdBy: string | null
   },
 ): Promise<GrowthLeadResearchRun> {
@@ -181,7 +186,7 @@ export async function insertGrowthLeadResearchRun(
     trigger_kind: input.triggerKind,
     input_snapshot: leadInputSnapshot(input.lead),
     input_hash: input.inputHash,
-    website_url: input.lead.website,
+    website_url: input.websiteUrl ?? null,
     website_fetch_status: "skipped",
     source_urls: [],
     created_by: input.createdBy,
@@ -209,6 +214,9 @@ export async function finishGrowthLeadResearchRun(
     result?: GrowthLeadResearchResult | null
     researchConfidence?: number | null
     equipifyFitScore?: number | null
+    websiteUrl?: string | null
+    websiteFetchStatus?: string
+    websiteTextExcerpt?: string | null
     sourceUrls?: string[]
     modelTask?: string | null
     modelProvider?: string | null
@@ -218,21 +226,27 @@ export async function finishGrowthLeadResearchRun(
     durationMs?: number | null
   },
 ): Promise<GrowthLeadResearchRun | null> {
+  const update: Record<string, unknown> = {
+    status: patch.status,
+    result: patch.result ?? null,
+    research_confidence: patch.researchConfidence ?? null,
+    equipify_fit_score: patch.equipifyFitScore ?? null,
+    source_urls: patch.sourceUrls ?? [],
+    model_task: patch.modelTask ?? null,
+    model_provider: patch.modelProvider ?? null,
+    model_name: patch.modelName ?? null,
+    error_code: patch.errorCode ?? null,
+    error_message: patch.errorMessage?.slice(0, 500) ?? null,
+    duration_ms: patch.durationMs ?? null,
+    finished_at: new Date().toISOString(),
+  }
+
+  if (patch.websiteUrl !== undefined) update.website_url = patch.websiteUrl
+  if (patch.websiteFetchStatus !== undefined) update.website_fetch_status = patch.websiteFetchStatus
+  if (patch.websiteTextExcerpt !== undefined) update.website_text_excerpt = patch.websiteTextExcerpt
+
   const { data, error } = await researchRunsTable(admin)
-    .update({
-      status: patch.status,
-      result: patch.result ?? null,
-      research_confidence: patch.researchConfidence ?? null,
-      equipify_fit_score: patch.equipifyFitScore ?? null,
-      source_urls: patch.sourceUrls ?? [],
-      model_task: patch.modelTask ?? null,
-      model_provider: patch.modelProvider ?? null,
-      model_name: patch.modelName ?? null,
-      error_code: patch.errorCode ?? null,
-      error_message: patch.errorMessage?.slice(0, 500) ?? null,
-      duration_ms: patch.durationMs ?? null,
-      finished_at: new Date().toISOString(),
-    })
+    .update(update)
     .eq("id", runId)
     .select(RUN_SELECT)
     .maybeSingle()
@@ -265,14 +279,14 @@ export async function listGrowthLeadResearchRuns(
   return ((data ?? []) as ResearchRunDbRow[]).map(mapResearchRunRow)
 }
 
-export async function fetchLatestSuccessfulGrowthLeadResearchRun(
+export async function fetchLatestUsableGrowthLeadResearchRun(
   admin: SupabaseClient,
   leadId: string,
 ): Promise<GrowthLeadResearchRun | null> {
   const { data, error } = await researchRunsTable(admin)
     .select(RUN_SELECT)
     .eq("lead_id", leadId)
-    .eq("status", "succeeded")
+    .in("status", ["succeeded", "partial"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -334,7 +348,7 @@ export async function loadGrowthLeadResearchBundle(
 ): Promise<{ runs: GrowthLeadResearchRun[]; latestRun: GrowthLeadResearchRun | null; manualNotes: GrowthLeadResearchNotes | null }> {
   const [runs, latestRun, manualNotes] = await Promise.all([
     listGrowthLeadResearchRuns(admin, leadId, 10),
-    fetchLatestSuccessfulGrowthLeadResearchRun(admin, leadId),
+    fetchLatestUsableGrowthLeadResearchRun(admin, leadId),
     fetchGrowthLeadResearchNotes(admin, leadId),
   ])
   return { runs, latestRun, manualNotes }

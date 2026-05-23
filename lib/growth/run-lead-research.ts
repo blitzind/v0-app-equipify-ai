@@ -6,13 +6,19 @@ import { getGrowthEngineAiOrgId, logGrowthEngine } from "@/lib/growth/access"
 import { fetchGrowthLeadById, markGrowthLeadResearchCompleted, updateGrowthLead } from "@/lib/growth/lead-repository"
 import { growthLeadResearchInputHash } from "@/lib/growth/research-input-hash"
 import {
+  buildGrowthLeadResearchSystemPrompt,
+  buildGrowthLeadResearchUserPrompt,
+  type GrowthLeadWebsitePromptContext,
+} from "@/lib/growth/research-prompt"
+import {
   fetchCachedGrowthLeadResearchRun,
   finishGrowthLeadResearchRun,
   insertGrowthLeadResearchRun,
 } from "@/lib/growth/research-repository"
-import { GROWTH_LEAD_RESEARCH_SYSTEM, buildGrowthLeadResearchUserPrompt } from "@/lib/growth/research-prompt"
 import { growthLeadResearchModelSchema, mapGrowthLeadResearchModelToResult } from "@/lib/growth/research-schema"
-import type { GrowthLeadResearchRun } from "@/lib/growth/research-types"
+import type { GrowthLeadResearchRun, GrowthLeadResearchRunStatus } from "@/lib/growth/research-types"
+import { fetchLeadWebsite, websiteFetchLogHost, type GrowthLeadWebsiteFetchResult } from "@/lib/growth/research-website-fetch"
+import { normalizeLeadWebsite, type GrowthLeadWebsiteFetchStatus } from "@/lib/growth/research-website-url"
 import type { GrowthLead, GrowthLeadStatus } from "@/lib/growth/types"
 
 export type RunGrowthLeadResearchInput = {
@@ -36,6 +42,32 @@ export type RunGrowthLeadResearchResult =
 function nextLeadStatusAfterResearch(current: GrowthLeadStatus): GrowthLeadStatus {
   if (current === "new" || current === "researching") return "enriched"
   return current
+}
+
+function resolveRunStatusAfterAi(fetchStatus: GrowthLeadWebsiteFetchStatus): Extract<GrowthLeadResearchRunStatus, "succeeded" | "partial"> {
+  if (fetchStatus === "ok" || fetchStatus === "skipped") return "succeeded"
+  return "partial"
+}
+
+function isTerminalSuccessStatus(status: GrowthLeadResearchRunStatus): boolean {
+  return status === "succeeded" || status === "partial"
+}
+
+function websitePromptContext(fetch: GrowthLeadWebsiteFetchResult): GrowthLeadWebsitePromptContext {
+  return {
+    fetchStatus: fetch.status,
+    normalizedUrl: fetch.normalizedUrl,
+    excerpt: fetch.excerpt,
+  }
+}
+
+function finishWebsitePatch(fetch: GrowthLeadWebsiteFetchResult) {
+  return {
+    websiteUrl: fetch.normalizedUrl,
+    websiteFetchStatus: fetch.status,
+    websiteTextExcerpt: fetch.excerpt,
+    sourceUrls: fetch.sourceUrls,
+  }
 }
 
 export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): Promise<RunGrowthLeadResearchResult> {
@@ -68,6 +100,7 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
         logGrowthEngine("research_cache_hit", {
           leadId: lead.id,
           runId: cachedRun.id,
+          runStatus: cachedRun.status,
           inputHash,
         })
         return {
@@ -87,11 +120,15 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
     }
   }
 
+  const normalizedWebsite = normalizeLeadWebsite(lead.website)
+  const insertWebsiteUrl = normalizedWebsite.status === "ready" ? normalizedWebsite.url : null
+
   const started = Date.now()
   let run = await insertGrowthLeadResearchRun(input.admin, {
     lead,
     triggerKind: regenerate ? "regenerate" : "manual",
     inputHash,
+    websiteUrl: insertWebsiteUrl,
     createdBy: input.createdBy,
   })
 
@@ -106,16 +143,30 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
     await updateGrowthLead(input.admin, lead.id, { status: "researching" })
   }
 
+  const websiteFetchStarted = Date.now()
+  const websiteFetch = await fetchLeadWebsite(lead.website)
+  logGrowthEngine("website_fetch_finished", {
+    leadId: lead.id,
+    runId: run.id,
+    status: websiteFetch.status,
+    host: websiteFetchLogHost(websiteFetch),
+    durationMs: websiteFetch.durationMs,
+    byteCount: websiteFetch.byteCount,
+  })
+
+  const promptContext = websitePromptContext(websiteFetch)
+  const websitePatch = finishWebsitePatch(websiteFetch)
+
   try {
     const aiResult = await runAiTask({
       task: "growth_lead_research",
       organizationId: aiOrgId,
       input: {
-        system: GROWTH_LEAD_RESEARCH_SYSTEM,
-        user: buildGrowthLeadResearchUserPrompt(lead),
+        system: buildGrowthLeadResearchSystemPrompt(promptContext),
+        user: buildGrowthLeadResearchUserPrompt(lead, promptContext),
       },
       schema: growthLeadResearchModelSchema,
-      cacheSchemaVersion: "growth_lead_research_v1",
+      cacheSchemaVersion: "growth_lead_research_v2",
       skipPlanGateCheck: true,
       skipBudgetCheck: true,
       actingUserEmail: input.actingUserEmail,
@@ -134,12 +185,14 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
           errorMessage: message,
           durationMs: Date.now() - started,
           modelTask: "growth_lead_research",
+          ...websitePatch,
         })) ?? run
 
       logGrowthEngine("research_run_failed", {
         leadId: lead.id,
         runId: run.id,
         errorCode,
+        websiteFetchStatus: websiteFetch.status,
       })
 
       return {
@@ -153,17 +206,21 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
     }
 
     const result = mapGrowthLeadResearchModelToResult(growthLeadResearchModelSchema.parse(aiResult.output))
+    const runStatus = resolveRunStatusAfterAi(websiteFetch.status)
+    const mergedSourceUrls = websitePatch.sourceUrls.length ? websitePatch.sourceUrls : result.sourceUrls
+
     run =
       (await finishGrowthLeadResearchRun(input.admin, run.id, {
-        status: "succeeded",
+        status: runStatus,
         result,
         researchConfidence: result.researchConfidence,
         equipifyFitScore: result.equipifyFitScore,
-        sourceUrls: result.sourceUrls,
+        sourceUrls: mergedSourceUrls,
         modelTask: "growth_lead_research",
         modelProvider: aiResult.meta.provider,
         modelName: aiResult.meta.model,
         durationMs: Date.now() - started,
+        ...websitePatch,
       })) ?? run
 
     const nextStatus = nextLeadStatusAfterResearch(lead.status)
@@ -184,12 +241,14 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
       })
     }
 
-    logGrowthEngine("research_run_succeeded", {
+    logGrowthEngine(runStatus === "partial" ? "research_run_partial" : "research_run_succeeded", {
       leadId: lead.id,
       runId: run.id,
       equipifyFitScore: result.equipifyFitScore,
       researchConfidence: result.researchConfidence,
       fitModelVersion: result.fitModelVersion,
+      websiteFetchStatus: websiteFetch.status,
+      websiteFetchMs: Date.now() - websiteFetchStarted,
     })
 
     return {
@@ -201,7 +260,7 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    if (run.status !== "succeeded") {
+    if (!isTerminalSuccessStatus(run.status)) {
       run =
         (await finishGrowthLeadResearchRun(input.admin, run.id, {
           status: "failed",
@@ -209,6 +268,7 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
           errorMessage: message,
           durationMs: Date.now() - started,
           modelTask: "growth_lead_research",
+          ...websitePatch,
         })) ?? run
     }
 
@@ -217,6 +277,7 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
       runId: run.id,
       errorCode: "research_failed",
       message: message.slice(0, 240),
+      websiteFetchStatus: websiteFetch.status,
     })
 
     return { ok: false, code: "research_failed", message: message.slice(0, 240), run }

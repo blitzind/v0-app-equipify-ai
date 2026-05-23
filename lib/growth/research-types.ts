@@ -32,7 +32,9 @@ export type GrowthLeadResearchRun = {
   leadId: string
   status: GrowthLeadResearchRunStatus
   triggerKind: "manual" | "regenerate"
+  websiteUrl: string | null
   websiteFetchStatus: string
+  websiteTextExcerpt: string | null
   sourceUrls: string[]
   result: GrowthLeadResearchResult | null
   researchConfidence: number | null

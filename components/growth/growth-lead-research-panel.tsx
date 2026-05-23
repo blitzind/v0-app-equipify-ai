@@ -38,7 +38,7 @@ function mergeRunIntoBundle(
   return {
     leadId,
     runs: nextRuns,
-    latestRun: run.status === "succeeded" ? run : (prev?.latestRun ?? null),
+    latestRun: run.status === "succeeded" || run.status === "partial" ? run : (prev?.latestRun ?? null),
     manualNotes: prev?.manualNotes ?? null,
   }
 }
@@ -180,7 +180,7 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated }: GrowthLeadResea
   }
 
   const displayRun = pickDisplayRun(bundle)
-  const latestSucceededRun = bundle?.latestRun ?? null
+  const latestUsableRun = bundle?.latestRun ?? null
   const runningRun = bundle?.runs.find((run) => run.status === "running") ?? null
 
   return (
@@ -190,9 +190,9 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated }: GrowthLeadResea
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => void generateResearch(Boolean(latestSucceededRun))} disabled={generating}>
+        <Button size="sm" onClick={() => void generateResearch(Boolean(latestUsableRun))} disabled={generating}>
           {generating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Sparkles className="mr-2 size-4" />}
-          {latestSucceededRun ? "Regenerate research" : "Generate research"}
+          {latestUsableRun ? "Regenerate research" : "Generate research"}
         </Button>
       </div>
 
@@ -217,10 +217,12 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated }: GrowthLeadResea
         <GrowthLeadResearchRunCard
           run={displayRun}
           title={
-            displayRun.status === "succeeded"
-              ? latestSucceededRun?.id === displayRun.id && cacheNotice
+            displayRun.status === "succeeded" || displayRun.status === "partial"
+              ? latestUsableRun?.id === displayRun.id && cacheNotice
                 ? "Cached research"
-                : "Latest research"
+                : displayRun.status === "partial"
+                  ? "Partial research"
+                  : "Latest research"
               : `${displayRun.status.replace(/_/g, " ")} research run`
           }
         />
