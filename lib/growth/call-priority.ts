@@ -5,6 +5,7 @@ import { matchesRelationshipQueueFilter } from "@/lib/growth/relationship-queue-
 import { matchesOpportunityQueueFilter } from "@/lib/growth/opportunity-queue-filters"
 import { matchesRevenueForecastQueueFilter } from "@/lib/growth/revenue-forecast-queue-filters"
 import { matchesExecutiveOperatingQueueFilter } from "@/lib/growth/executive-operating-queue-filters"
+import { matchesOperationalCapacityQueueFilter } from "@/lib/growth/operational-capacity-queue-filters"
 import type { GrowthEngagementTier } from "@/lib/growth/engagement-types"
 import type { GrowthLeadResearchPriority, GrowthLeadStatus } from "@/lib/growth/types"
 
@@ -237,6 +238,13 @@ export function matchesCallQueueFilter(
     intelligenceConflictCount?: number
     executiveInterventionAgeBucket?: string | null
     opportunityBlockerCount?: number
+    operationalCapacityScore?: number | null
+    operationalCapacityTier?: import("@/lib/growth/operational-capacity-types").GrowthOperationalCapacityTier | null
+    capacityPressureLevel?: number
+    operationalConstraintKeys?: string[]
+    isProtectedOpportunity?: boolean
+    capacityConflictCount?: number
+    operationalConstraintCount?: number
   },
   now: Date = new Date(),
 ): boolean {
@@ -317,6 +325,24 @@ export function matchesCallQueueFilter(
       executiveInterventionAgeBucket: row.executiveInterventionAgeBucket ?? null,
       workflowHealth: row.workflowHealth ?? null,
       opportunityBlockerCount: row.opportunityBlockerCount ?? 0,
+    })
+  }
+
+  if (
+    filter === "capacity_risk" ||
+    filter === "executive_overload" ||
+    filter === "protected_opportunities" ||
+    filter === "constraint_pressure"
+  ) {
+    return matchesOperationalCapacityQueueFilter(filter, {
+      status: row.status,
+      operationalCapacityScore: row.operationalCapacityScore ?? null,
+      operationalCapacityTier: row.operationalCapacityTier ?? null,
+      capacityPressureLevel: row.capacityPressureLevel ?? 0,
+      operationalConstraintKeys: row.operationalConstraintKeys ?? [],
+      operationalConstraintCount: row.operationalConstraintCount ?? 0,
+      isProtectedOpportunity: row.isProtectedOpportunity ?? false,
+      capacityConflictCount: row.capacityConflictCount ?? 0,
     })
   }
 

@@ -48,6 +48,10 @@ const FILTER_LABELS: Record<GrowthCallQueueFilter, string> = {
   executive_priority: "Executive Priority",
   leadership_bottlenecks: "Leadership Bottlenecks",
   intelligence_conflicts: "Intelligence Conflicts",
+  capacity_risk: "Capacity Risk",
+  executive_overload: "Executive Overload",
+  protected_opportunities: "Protected Opportunities",
+  constraint_pressure: "Constraint Pressure",
 }
 
 export default function AdminGrowthCallQueuePage() {

@@ -56,6 +56,12 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "forecast_regression_detected",
   "executive_priority_changed",
   "executive_intervention_recommended",
+  "operational_capacity_changed",
+  "capacity_constraint_added",
+  "capacity_constraint_resolved",
+  "operational_risk_detected",
+  "ai_copilot_generation_created",
+  "ai_copilot_generation_approved",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]

@@ -612,3 +612,99 @@ export async function emitGrowthLeadExecutiveInterventionRecommendedTimeline(
     payload: { tier: input.tier },
   })
 }
+
+export async function emitGrowthLeadOperationalCapacityChangedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; from: number; to: number; summary: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "operational_capacity_changed",
+    title: "Operational capacity changed",
+    summary: `${input.from} → ${input.to}: ${input.summary}`,
+    payload: { from: input.from, to: input.to },
+  })
+}
+
+export async function emitGrowthLeadCapacityConstraintAddedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; key: string; label: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "capacity_constraint_added",
+    title: "Capacity constraint added",
+    summary: input.label,
+    payload: { key: input.key },
+  })
+}
+
+export async function emitGrowthLeadCapacityConstraintResolvedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; key: string; label: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "capacity_constraint_resolved",
+    title: "Capacity constraint resolved",
+    summary: input.label,
+    payload: { key: input.key },
+  })
+}
+
+export async function emitGrowthLeadOperationalRiskDetectedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    tier: import("@/lib/growth/operational-capacity-types").GrowthOperationalCapacityTier
+    summary: string
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "operational_risk_detected",
+    title: "Operational risk detected",
+    summary: `${input.tier}: ${input.summary}`,
+    payload: { tier: input.tier },
+  })
+}
+
+export async function emitGrowthLeadAiCopilotGenerationCreatedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    generationId: string
+    generationType: string
+    summary: string
+    actor?: { userId: string | null; email: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "ai_copilot_generation_created",
+    title: "AI copilot draft created",
+    summary: input.summary,
+    payload: { generationId: input.generationId, generationType: input.generationType },
+    actor: input.actor,
+  })
+}
+
+export async function emitGrowthLeadAiCopilotGenerationApprovedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    generationId: string
+    generationType: string
+    summary: string
+    actor?: { userId: string | null; email: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "ai_copilot_generation_approved",
+    title: "AI copilot draft approved",
+    summary: input.summary,
+    payload: { generationId: input.generationId, generationType: input.generationType },
+    actor: input.actor,
+  })
+}

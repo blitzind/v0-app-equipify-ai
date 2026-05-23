@@ -30,6 +30,7 @@ export type AiTaskId =
   | "aiden_safe_action_prepare"
   | "aiden_prepared_workspace_intent_llm"
   | "growth_lead_research"
+  | "growth_copilot_generation"
 
 export type AiProviderId = "openai" | "anthropic" | "google" | "mock"
 

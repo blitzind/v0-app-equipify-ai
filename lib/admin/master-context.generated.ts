@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 509,
-  sqlMigrations: 219,
+  apiRouteHandlers: 515,
+  sqlMigrations: 221,
   dashboardPages: 65,
-  componentsTsx: 366,
-  libTsFiles: 1093,
+  componentsTsx: 371,
+  libTsFiles: 1114,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **509** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **219** |
+| API route handlers (\`app/api/**/route.ts\`) | **515** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **221** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **366** |
-| \`lib/**/*.ts\` | **1093** |
+| \`components/**/*.tsx\` | **371** |
+| \`lib/**/*.ts\` | **1114** |
 
 ### Vercel crons
 
@@ -448,8 +448,12 @@ platform/blitzpay/reminder-runs/route.ts
 platform/blitzpay/revenue-rollup/route.ts
 platform/feature-requests/route.ts
 platform/growth/call-queue/route.ts
+platform/growth/capacity/dashboard/route.ts
 platform/growth/communication-preferences/route.ts
 platform/growth/communication-settings/route.ts
+platform/growth/copilot/dashboard/route.ts
+platform/growth/copilot/generations/[generationId]/route.ts
+platform/growth/copilot/settings/route.ts
 platform/growth/engagement/dashboard/route.ts
 platform/growth/executive/dashboard/route.ts
 platform/growth/import-batches/[batchId]/commit/route.ts
@@ -465,6 +469,8 @@ platform/growth/leads/[leadId]/activity-stream/route.ts
 platform/growth/leads/[leadId]/call-events/route.ts
 platform/growth/leads/[leadId]/call-sessions/[sessionId]/route.ts
 platform/growth/leads/[leadId]/call-sessions/route.ts
+platform/growth/leads/[leadId]/copilot/generate/route.ts
+platform/growth/leads/[leadId]/copilot/generations/route.ts
 platform/growth/leads/[leadId]/decision-makers/[dmId]/route.ts
 platform/growth/leads/[leadId]/decision-makers/route.ts
 platform/growth/leads/[leadId]/outbound/route.ts

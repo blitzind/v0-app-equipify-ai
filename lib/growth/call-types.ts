@@ -41,6 +41,10 @@ export const GROWTH_CALL_QUEUE_FILTERS = [
   "executive_priority",
   "leadership_bottlenecks",
   "intelligence_conflicts",
+  "capacity_risk",
+  "executive_overload",
+  "protected_opportunities",
+  "constraint_pressure",
 ] as const
 
 export type GrowthCallQueueFilter = (typeof GROWTH_CALL_QUEUE_FILTERS)[number]
@@ -116,4 +120,6 @@ export type GrowthCallQueueRow = {
   intelligenceConflictSeverityScore: number | null
   intelligenceConflictCount: number | null
   executiveInterventionAgeBucket: string | null
+  operationalCapacityScore: number | null
+  capacityPressureLevel: number | null
 }

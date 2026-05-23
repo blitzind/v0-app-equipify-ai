@@ -42,6 +42,16 @@ const LINKS = [
     match: (path: string) => path.startsWith("/admin/growth/executive"),
   },
   {
+    href: "/admin/growth/capacity",
+    label: "Capacity",
+    match: (path: string) => path.startsWith("/admin/growth/capacity"),
+  },
+  {
+    href: "/admin/growth/copilot",
+    label: "Copilot",
+    match: (path: string) => path.startsWith("/admin/growth/copilot"),
+  },
+  {
     href: "/admin/growth/outreach",
     label: "Outreach",
     match: (path: string) => path.startsWith("/admin/growth/outreach"),

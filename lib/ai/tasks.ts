@@ -466,6 +466,24 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
     cacheable: true,
     cacheTtlSeconds: 86400,
   },
+  growth_copilot_generation: {
+    id: "growth_copilot_generation",
+    label: "Growth Engine AI communication copilot",
+    requiredPlan: "growth",
+    costTier: "medium",
+    modelTier: "balanced",
+    primaryModel: { provider: "openai", model: "gpt-4o-mini" },
+    fallbackModel: { provider: "anthropic", model: "claude-3-5-haiku-20241022" },
+    escalationModel: { provider: "openai", model: "gpt-4o" },
+    temperature: 0.35,
+    maxOutputTokens: 2048,
+    structuredMode: "json_object",
+    timeoutMs: 60_000,
+    maxRetries: 2,
+    confidenceThreshold: null,
+    cacheable: true,
+    cacheTtlSeconds: 3600,
+  },
 }
 
 export function getTaskDefinition(id: AiTaskId): AiTaskDefinition {

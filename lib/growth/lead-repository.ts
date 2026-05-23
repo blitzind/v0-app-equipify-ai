@@ -11,7 +11,7 @@ import type {
 } from "@/lib/growth/types"
 
 const LEAD_SELECT =
-  "id, source_kind, source_detail, external_ref, company_name, contact_name, contact_email, contact_phone, website, address_line1, city, state, postal_code, country, status, promoted_organization_id, promoted_prospect_id, promoted_at, score, notes, metadata, latest_research_run_id, last_researched_at, research_priority, call_disposition, call_disposition_at, last_call_at, follow_up_at, call_priority_score, call_priority_tier, call_priority_computed_at, call_priority_override, last_human_touch_at, decision_maker_status, primary_decision_maker_id, next_best_action, next_best_action_reason, next_best_action_computed_at, estimated_annual_revenue, estimated_employee_count, fleet_size_estimate, crm_detected, field_service_stack_detected, momentum_score, momentum_tier, momentum_why_summary, momentum_computed_at, workflow_health, workflow_health_reason, workflow_health_computed_at, source_channel, source_campaign, source_import_batch_id, source_vendor, aging_days, aging_bucket, first_human_touch_at, time_to_first_touch_hours, contact_temperature, call_attempt_count, voicemail_count, connected_call_count, engagement_score, engagement_tier, engagement_last_activity_at, engagement_summary, engagement_top_signals, engagement_dormancy_exempt_until, engagement_computed_at, relationship_strength_score, relationship_strength_tier, relationship_last_meaningful_touch_at, relationship_summary, relationship_top_signals, relationship_trend, relationship_previous_score, relationship_owner_attention_level, relationship_recovery_attempt_count, relationship_computed_at, opportunity_readiness_score, opportunity_readiness_tier, opportunity_readiness_summary, opportunity_readiness_top_signals, opportunity_blockers, opportunity_accelerators, opportunity_readiness_trend, opportunity_readiness_previous_score, opportunity_buying_signal_strength, opportunity_readiness_confidence, opportunity_age_bucket, opportunity_readiness_computed_at, revenue_probability_score, revenue_probability_tier, revenue_probability_summary, revenue_probability_top_signals, revenue_probability_confidence, revenue_probability_previous_score, revenue_trajectory, revenue_probability_volatility, forecast_contribution_weight, forecast_attention_level, forecast_attention_last_changed_at, revenue_forecast_computed_at, executive_priority_score, executive_priority_tier, executive_priority_summary, executive_priority_top_signals, executive_priority_volatility, executive_priority_previous_score, intelligence_conflicts, intelligence_conflict_severity_score, executive_recommendation, executive_owner, executive_intervention_opened_at, executive_intervention_age_bucket, executive_operating_computed_at, created_by, assigned_to, created_at, updated_at"
+  "id, source_kind, source_detail, external_ref, company_name, contact_name, contact_email, contact_phone, website, address_line1, city, state, postal_code, country, status, promoted_organization_id, promoted_prospect_id, promoted_at, score, notes, metadata, latest_research_run_id, last_researched_at, research_priority, call_disposition, call_disposition_at, last_call_at, follow_up_at, call_priority_score, call_priority_tier, call_priority_computed_at, call_priority_override, last_human_touch_at, decision_maker_status, primary_decision_maker_id, next_best_action, next_best_action_reason, next_best_action_computed_at, estimated_annual_revenue, estimated_employee_count, fleet_size_estimate, crm_detected, field_service_stack_detected, momentum_score, momentum_tier, momentum_why_summary, momentum_computed_at, workflow_health, workflow_health_reason, workflow_health_computed_at, source_channel, source_campaign, source_import_batch_id, source_vendor, aging_days, aging_bucket, first_human_touch_at, time_to_first_touch_hours, contact_temperature, call_attempt_count, voicemail_count, connected_call_count, engagement_score, engagement_tier, engagement_last_activity_at, engagement_summary, engagement_top_signals, engagement_dormancy_exempt_until, engagement_computed_at, relationship_strength_score, relationship_strength_tier, relationship_last_meaningful_touch_at, relationship_summary, relationship_top_signals, relationship_trend, relationship_previous_score, relationship_owner_attention_level, relationship_recovery_attempt_count, relationship_computed_at, opportunity_readiness_score, opportunity_readiness_tier, opportunity_readiness_summary, opportunity_readiness_top_signals, opportunity_blockers, opportunity_accelerators, opportunity_readiness_trend, opportunity_readiness_previous_score, opportunity_buying_signal_strength, opportunity_readiness_confidence, opportunity_age_bucket, opportunity_readiness_computed_at, revenue_probability_score, revenue_probability_tier, revenue_probability_summary, revenue_probability_top_signals, revenue_probability_confidence, revenue_probability_previous_score, revenue_trajectory, revenue_probability_volatility, forecast_contribution_weight, forecast_attention_level, forecast_attention_last_changed_at, revenue_forecast_computed_at, executive_priority_score, executive_priority_tier, executive_priority_summary, executive_priority_top_signals, executive_priority_volatility, executive_priority_previous_score, intelligence_conflicts, intelligence_conflict_severity_score, executive_recommendation, executive_owner, executive_intervention_opened_at, executive_intervention_age_bucket, executive_operating_computed_at, operational_capacity_score, operational_capacity_tier, operational_capacity_summary, operational_capacity_top_constraints, capacity_pressure_level, capacity_pressure_volatility, protected_pipeline_coverage, operational_constraints, capacity_conflicts, capacity_protection_recommendation, constraint_opened_at, constraint_age_bucket, capacity_recovery_direction, operational_capacity_previous_score, operational_capacity_computed_at, created_by, assigned_to, created_at, updated_at"
 
 type GrowthLeadDbRow = {
   id: string
@@ -130,6 +130,21 @@ type GrowthLeadDbRow = {
   executive_intervention_opened_at: string | null
   executive_intervention_age_bucket: string
   executive_operating_computed_at: string | null
+  operational_capacity_score: number | null
+  operational_capacity_tier: string | null
+  operational_capacity_summary: string | null
+  operational_capacity_top_constraints: unknown
+  capacity_pressure_level: number
+  capacity_pressure_volatility: number
+  protected_pipeline_coverage: number
+  operational_constraints: unknown
+  capacity_conflicts: unknown
+  capacity_protection_recommendation: string | null
+  constraint_opened_at: string | null
+  constraint_age_bucket: string
+  capacity_recovery_direction: string
+  operational_capacity_previous_score: number | null
+  operational_capacity_computed_at: string | null
   created_by: string | null
   assigned_to: string | null
   created_at: string
@@ -278,6 +293,28 @@ function mapGrowthLeadRow(row: GrowthLeadDbRow): GrowthLead {
     executiveInterventionAgeBucket: (row.executive_intervention_age_bucket ??
       "new") as GrowthLead["executiveInterventionAgeBucket"],
     executiveOperatingComputedAt: row.executive_operating_computed_at,
+    operationalCapacityScore: row.operational_capacity_score,
+    operationalCapacityTier: row.operational_capacity_tier as GrowthLead["operationalCapacityTier"],
+    operationalCapacitySummary: row.operational_capacity_summary,
+    operationalCapacityTopConstraints: Array.isArray(row.operational_capacity_top_constraints)
+      ? (row.operational_capacity_top_constraints as GrowthLead["operationalCapacityTopConstraints"])
+      : [],
+    capacityPressureLevel: row.capacity_pressure_level ?? 0,
+    capacityPressureVolatility: row.capacity_pressure_volatility ?? 0,
+    protectedPipelineCoverage: row.protected_pipeline_coverage ?? 0,
+    operationalConstraints: Array.isArray(row.operational_constraints)
+      ? (row.operational_constraints as GrowthLead["operationalConstraints"])
+      : [],
+    capacityConflicts: Array.isArray(row.capacity_conflicts)
+      ? (row.capacity_conflicts as GrowthLead["capacityConflicts"])
+      : [],
+    capacityProtectionRecommendation: row.capacity_protection_recommendation,
+    constraintOpenedAt: row.constraint_opened_at,
+    constraintAgeBucket: (row.constraint_age_bucket ?? "new") as GrowthLead["constraintAgeBucket"],
+    capacityRecoveryDirection: (row.capacity_recovery_direction ??
+      "stable") as GrowthLead["capacityRecoveryDirection"],
+    operationalCapacityPreviousScore: row.operational_capacity_previous_score,
+    operationalCapacityComputedAt: row.operational_capacity_computed_at,
     createdBy: row.created_by,
     assignedTo: row.assigned_to,
     createdAt: row.created_at,

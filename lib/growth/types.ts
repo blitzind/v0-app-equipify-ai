@@ -41,6 +41,14 @@ import type {
   GrowthExecutivePriorityTier,
   GrowthIntelligenceConflict,
 } from "@/lib/growth/executive-operating-types"
+import type {
+  GrowthCapacityConflict,
+  GrowthCapacityRecoveryDirection,
+  GrowthConstraintAgeBucket,
+  GrowthOperationalCapacityTier,
+  GrowthOperationalCapacityTopConstraint,
+  GrowthOperationalConstraint,
+} from "@/lib/growth/operational-capacity-types"
 import type { GrowthWorkflowHealthStatus } from "@/lib/growth/workflow-health-types"
 
 export type GrowthLeadSourceKind = (typeof GROWTH_LEAD_SOURCE_KINDS)[number]
@@ -181,6 +189,21 @@ export type GrowthLead = {
   executiveInterventionOpenedAt: string | null
   executiveInterventionAgeBucket: GrowthExecutiveInterventionAgeBucket
   executiveOperatingComputedAt: string | null
+  operationalCapacityScore: number | null
+  operationalCapacityTier: GrowthOperationalCapacityTier | null
+  operationalCapacitySummary: string | null
+  operationalCapacityTopConstraints: GrowthOperationalCapacityTopConstraint[]
+  capacityPressureLevel: number
+  capacityPressureVolatility: number
+  protectedPipelineCoverage: number
+  operationalConstraints: GrowthOperationalConstraint[]
+  capacityConflicts: GrowthCapacityConflict[]
+  capacityProtectionRecommendation: string | null
+  constraintOpenedAt: string | null
+  constraintAgeBucket: GrowthConstraintAgeBucket
+  capacityRecoveryDirection: GrowthCapacityRecoveryDirection
+  operationalCapacityPreviousScore: number | null
+  operationalCapacityComputedAt: string | null
   createdBy: string | null
   assignedTo: string | null
   createdAt: string

@@ -92,6 +92,8 @@
     "test:growth-opportunity-readiness": "tsx scripts/test-growth-opportunity-readiness.ts",
     "test:growth-revenue-forecast": "tsx scripts/test-growth-revenue-forecast.ts",
     "test:growth-executive-operating-intelligence": "tsx scripts/test-growth-executive-operating-intelligence.ts",
+    "test:growth-operational-capacity": "tsx scripts/test-growth-operational-capacity.ts",
+    "test:growth-ai-copilot": "tsx scripts/test-growth-ai-copilot.ts",
     "test:catalog-import-manufacturer": "tsx scripts/test-catalog-import-manufacturer.ts",
     "test:catalog-import-template": "tsx scripts/test-catalog-import-template.ts",
     "test:extract-price-list-from-csv": "tsx scripts/test-extract-price-list-from-csv.ts",

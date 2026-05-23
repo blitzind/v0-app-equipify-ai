@@ -12,6 +12,7 @@ import type { GrowthLeadCallDisposition } from "@/lib/growth/call-types"
 import type { GrowthDecisionMakerPresenceStatus } from "@/lib/growth/decision-maker-types"
 import type { GrowthRevenueProbabilityTier, GrowthRevenueTrajectory } from "@/lib/growth/revenue-forecast-types"
 import type { GrowthExecutivePriorityTier } from "@/lib/growth/executive-operating-types"
+import type { GrowthOperationalCapacityTier } from "@/lib/growth/operational-capacity-types"
 import type { GrowthWorkflowHealthStatus } from "@/lib/growth/workflow-health-types"
 import {
   GROWTH_NEXT_BEST_ACTION_LABELS,
@@ -48,6 +49,10 @@ export type NextBestActionInput = {
   revenueProbabilityPreviousScore?: number | null
   revenueTrajectory?: GrowthRevenueTrajectory | null
   executivePriorityTier?: GrowthExecutivePriorityTier | null
+  operationalCapacityTier?: GrowthOperationalCapacityTier | null
+  capacityPressureLevel?: number
+  operationalConstraintKeys?: string[]
+  isProtectedOpportunity?: boolean
   workflowHealth?: GrowthWorkflowHealthStatus | null
   now?: Date
 }
@@ -131,11 +136,46 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
   const opportunityTier = input.opportunityReadinessTier ?? null
   const opportunityBlockers = new Set(input.opportunityBlockerKeys ?? [])
   const executiveTier = input.executivePriorityTier ?? null
+  const capacityTier = input.operationalCapacityTier ?? null
+  const capacityConstraints = new Set(input.operationalConstraintKeys ?? [])
+  const isProtected = input.isProtectedOpportunity ?? false
 
   if (executiveTier === "executive_now") {
     return buildResult(
       "executive_takeover",
       "Executive now priority — leadership takeover recommended.",
+      [],
+      "high",
+    )
+  }
+
+  if (capacityTier === "critical") {
+    return buildResult(
+      "reduce_new_outreach",
+      "Critical operational capacity — reduce new outreach until load recovers.",
+      ["Capacity critical"],
+      "high",
+    )
+  }
+
+  if (capacityConstraints.has("executive_overload")) {
+    return buildResult(
+      "redistribute_attention",
+      "Executive overload — redistribute leadership attention across accounts.",
+      ["Executive overload"],
+      "high",
+    )
+  }
+
+  if (
+    isProtected &&
+    (capacityTier === "constrained" || capacityTier === "strained") &&
+    (input.revenueProbabilityTier === "forecasted" ||
+      input.revenueProbabilityTier === "commit_candidate")
+  ) {
+    return buildResult(
+      "protect_close_motion",
+      "Protected close motion — preserve capacity for forecasted revenue opportunity.",
       [],
       "high",
     )

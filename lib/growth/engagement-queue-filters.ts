@@ -70,5 +70,9 @@ export function isGrowthCallQueueFilter(value: string): value is import("@/lib/g
     "executive_priority",
     "leadership_bottlenecks",
     "intelligence_conflicts",
+    "capacity_risk",
+    "executive_overload",
+    "protected_opportunities",
+    "constraint_pressure",
   ].includes(value)
 }

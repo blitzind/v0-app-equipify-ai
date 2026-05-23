@@ -9,7 +9,15 @@ import {
   fetchGrowthLeadResearchNotes,
   fetchLatestUsableGrowthLeadResearchRun,
 } from "@/lib/growth/research-repository"
+import { isProtectedGrowthOpportunityFromLead } from "@/lib/growth/operational-capacity-score"
 import type { GrowthLead } from "@/lib/growth/types"
+
+const CAPACITY_FILTERS = new Set<GrowthCallQueueFilter>([
+  "capacity_risk",
+  "executive_overload",
+  "protected_opportunities",
+  "constraint_pressure",
+])
 
 export async function listGrowthCallQueue(
   admin: SupabaseClient,
@@ -60,6 +68,13 @@ export async function listGrowthCallQueue(
         executiveInterventionAgeBucket: lead.executiveInterventionAgeBucket,
         workflowHealth: lead.workflowHealth,
         opportunityBlockerCount: lead.opportunityBlockers.length,
+        operationalCapacityScore: lead.operationalCapacityScore,
+        operationalCapacityTier: lead.operationalCapacityTier,
+        capacityPressureLevel: lead.capacityPressureLevel,
+        operationalConstraintKeys: lead.operationalConstraints.map((entry) => entry.key),
+        operationalConstraintCount: lead.operationalConstraints.length,
+        isProtectedOpportunity: isProtectedGrowthOpportunityFromLead(lead),
+        capacityConflictCount: lead.capacityConflicts.length,
       }, now)
     ) {
       continue
@@ -93,6 +108,12 @@ export async function listGrowthCallQueue(
   }
 
   enriched.sort((a, b) => {
+    if (CAPACITY_FILTERS.has(input.filter)) {
+      const capacityDiff = (a.operationalCapacityScore ?? 100) - (b.operationalCapacityScore ?? 100)
+      if (capacityDiff !== 0) return capacityDiff
+      const pressureDiff = (b.capacityPressureLevel ?? 0) - (a.capacityPressureLevel ?? 0)
+      if (pressureDiff !== 0) return pressureDiff
+    }
     const engagementDiff = (b.engagementScore ?? 0) - (a.engagementScore ?? 0)
     if (engagementDiff !== 0) return engagementDiff
     const relationshipDiff = (b.relationshipStrengthScore ?? 0) - (a.relationshipStrengthScore ?? 0)
@@ -191,5 +212,7 @@ async function buildQueueRow(
     intelligenceConflictSeverityScore: lead.intelligenceConflictSeverityScore,
     intelligenceConflictCount: lead.intelligenceConflicts.length,
     executiveInterventionAgeBucket: lead.executiveInterventionAgeBucket,
+    operationalCapacityScore: lead.operationalCapacityScore,
+    capacityPressureLevel: lead.capacityPressureLevel,
   }
 }
