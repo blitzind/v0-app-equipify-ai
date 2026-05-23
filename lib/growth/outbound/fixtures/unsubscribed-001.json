@@ -1,0 +1,11 @@
+{
+  "fixtureId": "unsubscribed-001",
+  "provider": "stub",
+  "providerEventId": "stub:evt:unsub-001",
+  "eventType": "unsubscribed",
+  "occurredAt": "2026-05-18T16:00:00.000Z",
+  "contact": {
+    "email": "spam@example.com",
+    "providerContactId": "stub:contact:003"
+  }
+}

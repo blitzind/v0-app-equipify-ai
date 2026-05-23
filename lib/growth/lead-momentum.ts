@@ -1,3 +1,4 @@
+import type { GrowthLeadEmailEventSummary } from "@/lib/growth/outbound/types"
 import type { GrowthLeadCallDisposition } from "@/lib/growth/call-types"
 import { hasUsableResearch } from "@/lib/growth/call-priority"
 import type { GrowthDecisionMakerPresenceStatus } from "@/lib/growth/decision-maker-types"
@@ -20,6 +21,7 @@ export type MomentumInput = {
   priorFitScore: number | null
   voicemailCount30d: number
   callAttemptCount14d: number
+  emailSummary?: GrowthLeadEmailEventSummary
   now?: Date
 }
 
@@ -151,6 +153,29 @@ export function computeGrowthLeadMomentum(input: MomentumInput): GrowthMomentumR
   if (input.callAttemptCount14d >= 2 && input.callDisposition !== "interested") {
     score -= 6
     factors.push({ label: "Repeated call attempts", points: -6 })
+  }
+
+  const email = input.emailSummary
+  if (email) {
+    if (email.replyCount14d > 0) {
+      score += 12
+      factors.push({ label: "Email reply received", points: 12 })
+    }
+    if (email.clickCount14d > 0) {
+      score += 6
+      factors.push({ label: "Email link clicked", points: 6 })
+    } else if (email.openCount14d > 0) {
+      score += 3
+      factors.push({ label: "Email opened", points: 3 })
+    }
+    if (email.isSuppressed) {
+      score -= 20
+      factors.push({ label: "Email suppressed", points: -20 })
+    }
+    if (email.sentCount30d >= 3 && email.openCount30d === 0) {
+      score -= 8
+      factors.push({ label: "No email engagement", points: -8 })
+    }
   }
 
   const finalScore = clampScore(score)

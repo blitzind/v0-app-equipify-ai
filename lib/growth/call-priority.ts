@@ -1,3 +1,4 @@
+import type { GrowthLeadEmailEventSummary } from "@/lib/growth/outbound/types"
 import type { GrowthCallPriorityTier, GrowthLeadCallDisposition } from "@/lib/growth/call-types"
 import type { GrowthLeadResearchPriority, GrowthLeadStatus } from "@/lib/growth/types"
 
@@ -12,6 +13,7 @@ export type CallPriorityInput = {
   callDisposition: GrowthLeadCallDisposition | null
   followUpAt: string | null
   callPriorityOverride: number | null
+  emailSummary?: GrowthLeadEmailEventSummary
   now?: Date
 }
 
@@ -114,6 +116,16 @@ export function computeGrowthCallPriority(input: CallPriorityInput): CallPriorit
     }
   }
 
+  if (input.emailSummary?.isSuppressed) {
+    return {
+      computedScore: 0,
+      effectiveScore: input.callPriorityOverride != null ? clampScore(input.callPriorityOverride) : 0,
+      tier: tierFromScore(input.callPriorityOverride ?? 0),
+      whySummary: "Excluded — outreach email suppressed.",
+      excludedFromQueue: true,
+    }
+  }
+
   const fitScore = input.score ?? 0
   const base =
     RESEARCH_PRIORITY_POINTS[input.researchPriority] +
@@ -124,7 +136,11 @@ export function computeGrowthCallPriority(input: CallPriorityInput): CallPriorit
     keywordPoints(combinedNotes(input.leadNotes, input.manualResearchNotes), [], NOTES_URGENCY_KEYWORDS)
 
   const penalty = input.callDisposition ? (DISPOSITION_PENALTY[input.callDisposition] ?? 0) : 0
-  const computedScore = clampScore(base - penalty)
+  const emailBoost =
+    (input.emailSummary?.interestedReply7d ? 6 : 0) +
+    (input.emailSummary && input.emailSummary.clickCount14d > 0 && input.emailSummary.replyCount14d === 0 ? 4 : 0) +
+    (input.emailSummary && input.emailSummary.openCount14d > 0 && input.emailSummary.replyCount14d === 0 ? 2 : 0)
+  const computedScore = clampScore(base - penalty + emailBoost)
   const effectiveScore =
     input.callPriorityOverride != null ? clampScore(input.callPriorityOverride) : computedScore
   const tier = tierFromScore(effectiveScore)
@@ -153,6 +169,7 @@ export function computeGrowthCallPriority(input: CallPriorityInput): CallPriorit
     if (input.callDisposition === "interested") whyParts.push("marked interested")
     if (input.callDisposition === "call_attempted") whyParts.push("recent call attempt")
     if (input.callDisposition === "left_voicemail") whyParts.push("voicemail left")
+    if (input.emailSummary?.interestedReply7d) whyParts.push("interested email reply")
   }
 
   return {

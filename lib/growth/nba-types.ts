@@ -2,6 +2,9 @@
 
 export const GROWTH_NEXT_BEST_ACTIONS = [
   "wait_follow_up",
+  "wait_for_email_reply",
+  "review_email_reply",
+  "call_after_email_reply",
   "run_research",
   "refresh_research",
   "fix_website_research",
@@ -17,6 +20,9 @@ export type GrowthNextBestAction = (typeof GROWTH_NEXT_BEST_ACTIONS)[number]
 
 export const GROWTH_NEXT_BEST_ACTION_LABELS: Record<GrowthNextBestAction, string> = {
   wait_follow_up: "Wait for follow-up",
+  wait_for_email_reply: "Wait for email reply",
+  review_email_reply: "Review email reply",
+  call_after_email_reply: "Call after email reply",
   run_research: "Run research",
   refresh_research: "Refresh research",
   fix_website_research: "Fix website research",

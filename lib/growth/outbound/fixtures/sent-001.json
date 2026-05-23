@@ -1,0 +1,22 @@
+{
+  "fixtureId": "sent-001",
+  "provider": "stub",
+  "providerEventId": "stub:evt:sent-001",
+  "eventType": "sent",
+  "occurredAt": "2026-05-18T10:00:00.000Z",
+  "contact": {
+    "email": "jane@acme.example",
+    "providerContactId": "stub:contact:001"
+  },
+  "message": {
+    "providerMessageId": "stub:msg:001",
+    "subject": "Quick question about equipment financing",
+    "bodyPreview": "Hi Jane — reaching out about your fleet.",
+    "sequenceStep": 1,
+    "campaignName": "HVAC Spring Sequence"
+  },
+  "campaign": {
+    "providerCampaignId": "stub:camp:001",
+    "name": "HVAC Spring Sequence"
+  }
+}

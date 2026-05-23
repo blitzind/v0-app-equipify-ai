@@ -1,0 +1,16 @@
+{
+  "fixtureId": "replied-ooo-001",
+  "provider": "stub",
+  "providerEventId": "stub:evt:reply-ooo-001",
+  "eventType": "replied",
+  "occurredAt": "2026-05-18T12:00:00.000Z",
+  "contact": {
+    "email": "bob@storm.example",
+    "providerContactId": "stub:contact:002"
+  },
+  "reply": {
+    "providerReplyId": "stub:reply:002",
+    "bodyPreview": "I am out of office until next Monday.",
+    "inReplyToProviderMessageId": "stub:msg:002"
+  }
+}

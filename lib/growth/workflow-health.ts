@@ -1,3 +1,4 @@
+import type { GrowthLeadEmailEventSummary } from "@/lib/growth/outbound/types"
 import type { GrowthLeadCallDisposition } from "@/lib/growth/call-types"
 import { hasUsableResearch } from "@/lib/growth/call-priority"
 import type { GrowthDecisionMakerPresenceStatus } from "@/lib/growth/decision-maker-types"
@@ -21,6 +22,7 @@ export type WorkflowHealthInput = {
   nextBestAction: GrowthNextBestAction | null
   agingBucket: GrowthLeadAgingBucket | null
   voicemailCount45d: number
+  emailSummary?: GrowthLeadEmailEventSummary
   now?: Date
 }
 
@@ -30,6 +32,7 @@ const NEEDS_ATTENTION_NBA = new Set<GrowthNextBestAction>([
   "fix_website_research",
   "find_decision_maker",
   "refresh_research",
+  "review_email_reply",
 ])
 
 function daysSince(iso: string | null, now: Date): number | null {
@@ -53,6 +56,10 @@ export function computeGrowthLeadWorkflowHealth(input: WorkflowHealthInput): Gro
 
   if (TERMINAL_STATUSES.has(input.status)) {
     return build("healthy", "Terminal lead — workflow complete.")
+  }
+
+  if (input.emailSummary?.isSuppressed) {
+    return build("blocked", "Outreach email is suppressed.")
   }
 
   const touchDays = daysSince(input.lastHumanTouchAt, now)
@@ -127,6 +134,10 @@ export function computeGrowthLeadWorkflowHealth(input: WorkflowHealthInput): Gro
 
   if (input.nextBestAction && NEEDS_ATTENTION_NBA.has(input.nextBestAction)) {
     return build("needs_attention", "Next best action requires enrichment or fixes.")
+  }
+
+  if (input.emailSummary?.latestReplyClassification === "unclassified" && input.emailSummary.replyCount14d > 0) {
+    return build("needs_attention", "Unreviewed email reply.")
   }
 
   return build("healthy", "Workflow signals look current.")

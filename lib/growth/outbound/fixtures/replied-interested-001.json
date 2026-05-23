@@ -1,0 +1,24 @@
+{
+  "fixtureId": "replied-interested-001",
+  "provider": "stub",
+  "providerEventId": "stub:evt:reply-interested-001",
+  "eventType": "replied",
+  "occurredAt": "2026-05-18T14:30:00.000Z",
+  "contact": {
+    "email": "jane@acme.example",
+    "providerContactId": "stub:contact:001"
+  },
+  "message": {
+    "providerMessageId": "stub:msg:001",
+    "subject": "Quick question about equipment financing"
+  },
+  "reply": {
+    "providerReplyId": "stub:reply:001",
+    "bodyPreview": "Yes, I'd love to schedule a call this week.",
+    "inReplyToProviderMessageId": "stub:msg:001"
+  },
+  "campaign": {
+    "providerCampaignId": "stub:camp:001",
+    "name": "HVAC Spring Sequence"
+  }
+}

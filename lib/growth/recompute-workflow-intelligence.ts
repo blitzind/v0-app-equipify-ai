@@ -3,6 +3,8 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { fetchGrowthLeadDecisionMakerById, listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
+import { computeGrowthContactTemperature } from "@/lib/growth/outbound/contact-temperature"
+import { fetchGrowthLeadEmailEventSummary } from "@/lib/growth/outbound/email-event-summary"
 import { computeGrowthLeadAging } from "@/lib/growth/lead-aging"
 import { computeGrowthLeadMomentum } from "@/lib/growth/lead-momentum"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
@@ -58,6 +60,8 @@ export async function recomputeGrowthLeadWorkflowIntelligence(
   const runs = await listGrowthLeadResearchRuns(admin, leadId, 2)
   const priorFitScore = runs.length > 1 ? runs[1].equipifyFitScore : null
 
+  const emailSummary = await fetchGrowthLeadEmailEventSummary(admin, leadId, lead.contactEmail)
+
   const momentum = computeGrowthLeadMomentum({
     status: lead.status,
     score: lead.score,
@@ -73,6 +77,7 @@ export async function recomputeGrowthLeadWorkflowIntelligence(
     priorFitScore,
     voicemailCount30d,
     callAttemptCount14d,
+    emailSummary,
     now,
   })
 
@@ -91,8 +96,11 @@ export async function recomputeGrowthLeadWorkflowIntelligence(
     nextBestAction: lead.nextBestAction,
     agingBucket: aging.agingBucket,
     voicemailCount45d,
+    emailSummary,
     now,
   })
+
+  const contactTemperature = computeGrowthContactTemperature({ status: lead.status, emailSummary })
 
   const computedAt = now.toISOString()
   const { error } = await growthLeadsTable(admin)
@@ -106,6 +114,7 @@ export async function recomputeGrowthLeadWorkflowIntelligence(
       workflow_health: health.status,
       workflow_health_reason: health.reason,
       workflow_health_computed_at: computedAt,
+      contact_temperature: contactTemperature,
     })
     .eq("id", leadId)
 

@@ -1,3 +1,4 @@
+import type { GrowthLeadEmailEventSummary } from "@/lib/growth/outbound/types"
 import type { GrowthLeadCallDisposition } from "@/lib/growth/call-types"
 import type { GrowthDecisionMakerPresenceStatus } from "@/lib/growth/decision-maker-types"
 import {
@@ -21,6 +22,7 @@ export type NextBestActionInput = {
   recommendedNextAction: string | null
   decisionMakerStatus: GrowthDecisionMakerPresenceStatus | null
   primaryDecisionMakerPhone: string | null
+  emailSummary?: GrowthLeadEmailEventSummary
   now?: Date
 }
 
@@ -90,6 +92,11 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
     )
   }
 
+  const email = input.emailSummary
+  if (email?.isSuppressed) {
+    return buildResult("manual_review", "Outreach email is suppressed.", ["Email suppressed"], "high")
+  }
+
   if (
     input.callDisposition === "follow_up_later" &&
     input.followUpAt &&
@@ -102,6 +109,31 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
       [],
       "high",
     )
+  }
+
+  if (email?.latestReplyClassification === "unclassified" || email?.latestReplyClassification === "objection") {
+    if (email.replyCount14d > 0) {
+      return buildResult("review_email_reply", "Recent email reply needs classification review.", [], "high")
+    }
+  }
+
+  if (
+    email?.interestedReply7d ||
+    (email?.latestReplyClassification === "interested" && email.replyCount14d > 0)
+  ) {
+    if (leadPhone || dmPhone) {
+      return buildResult("call_after_email_reply", "Interested email reply with callable phone.", [], "high")
+    }
+  }
+
+  if (
+    input.status === "in_outreach" &&
+    email &&
+    email.sentCount14d > 0 &&
+    email.replyCount14d === 0 &&
+    !email.isSuppressed
+  ) {
+    return buildResult("wait_for_email_reply", "Outreach sent — waiting for email reply.", [], "medium")
   }
 
   if (!usable) {

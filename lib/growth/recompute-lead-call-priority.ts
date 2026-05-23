@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
+import { fetchGrowthLeadEmailEventSummary } from "@/lib/growth/outbound/email-event-summary"
 import { computeGrowthCallPriority } from "@/lib/growth/call-priority"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import {
@@ -29,6 +30,8 @@ export async function recomputeGrowthLeadCallPriority(
     fetchGrowthLeadResearchNotes(admin, leadId),
   ])
 
+  const emailSummary = await fetchGrowthLeadEmailEventSummary(admin, leadId, lead.contactEmail)
+
   const priority = computeGrowthCallPriority({
     researchPriority: lead.researchPriority,
     score: lead.score,
@@ -40,6 +43,7 @@ export async function recomputeGrowthLeadCallPriority(
     callDisposition: lead.callDisposition,
     followUpAt: lead.followUpAt,
     callPriorityOverride: lead.callPriorityOverride,
+    emailSummary,
   })
 
   const now = new Date().toISOString()

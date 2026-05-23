@@ -1,0 +1,15 @@
+{
+  "fixtureId": "unmatched-email-001",
+  "provider": "stub",
+  "providerEventId": "stub:evt:unmatched-001",
+  "eventType": "sent",
+  "occurredAt": "2026-05-18T11:00:00.000Z",
+  "contact": {
+    "email": "unknown-person@nowhere.example",
+    "providerContactId": "stub:contact:999"
+  },
+  "message": {
+    "providerMessageId": "stub:msg:999",
+    "subject": "Hello stranger"
+  }
+}

@@ -7,6 +7,7 @@ export const GROWTH_LEAD_SOURCE_KINDS = [
   "other",
 ] as const
 
+import type { GrowthContactTemperature } from "@/lib/growth/outbound/types"
 import type { GrowthLeadCallDisposition, GrowthCallPriorityTier } from "@/lib/growth/call-types"
 import type { GrowthDecisionMakerPresenceStatus } from "@/lib/growth/decision-maker-types"
 import type { GrowthLeadAgingBucket } from "@/lib/growth/lead-aging"
@@ -94,6 +95,7 @@ export type GrowthLead = {
   agingBucket: GrowthLeadAgingBucket | null
   firstHumanTouchAt: string | null
   timeToFirstTouchHours: number | null
+  contactTemperature: GrowthContactTemperature | null
   createdBy: string | null
   assignedTo: string | null
   createdAt: string

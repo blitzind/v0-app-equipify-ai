@@ -11,7 +11,7 @@ import type {
 } from "@/lib/growth/types"
 
 const LEAD_SELECT =
-  "id, source_kind, source_detail, external_ref, company_name, contact_name, contact_email, contact_phone, website, address_line1, city, state, postal_code, country, status, promoted_organization_id, promoted_prospect_id, promoted_at, score, notes, metadata, latest_research_run_id, last_researched_at, research_priority, call_disposition, call_disposition_at, last_call_at, follow_up_at, call_priority_score, call_priority_tier, call_priority_computed_at, call_priority_override, last_human_touch_at, decision_maker_status, primary_decision_maker_id, next_best_action, next_best_action_reason, next_best_action_computed_at, estimated_annual_revenue, estimated_employee_count, fleet_size_estimate, crm_detected, field_service_stack_detected, momentum_score, momentum_tier, momentum_why_summary, momentum_computed_at, workflow_health, workflow_health_reason, workflow_health_computed_at, source_channel, source_campaign, source_import_batch_id, source_vendor, aging_days, aging_bucket, first_human_touch_at, time_to_first_touch_hours, created_by, assigned_to, created_at, updated_at"
+  "id, source_kind, source_detail, external_ref, company_name, contact_name, contact_email, contact_phone, website, address_line1, city, state, postal_code, country, status, promoted_organization_id, promoted_prospect_id, promoted_at, score, notes, metadata, latest_research_run_id, last_researched_at, research_priority, call_disposition, call_disposition_at, last_call_at, follow_up_at, call_priority_score, call_priority_tier, call_priority_computed_at, call_priority_override, last_human_touch_at, decision_maker_status, primary_decision_maker_id, next_best_action, next_best_action_reason, next_best_action_computed_at, estimated_annual_revenue, estimated_employee_count, fleet_size_estimate, crm_detected, field_service_stack_detected, momentum_score, momentum_tier, momentum_why_summary, momentum_computed_at, workflow_health, workflow_health_reason, workflow_health_computed_at, source_channel, source_campaign, source_import_batch_id, source_vendor, aging_days, aging_bucket, first_human_touch_at, time_to_first_touch_hours, contact_temperature, created_by, assigned_to, created_at, updated_at"
 
 type GrowthLeadDbRow = {
   id: string
@@ -72,6 +72,7 @@ type GrowthLeadDbRow = {
   aging_bucket: string | null
   first_human_touch_at: string | null
   time_to_first_touch_hours: number | null
+  contact_temperature: string | null
   created_by: string | null
   assigned_to: string | null
   created_at: string
@@ -142,6 +143,7 @@ function mapGrowthLeadRow(row: GrowthLeadDbRow): GrowthLead {
     agingBucket: row.aging_bucket as GrowthLead["agingBucket"],
     firstHumanTouchAt: row.first_human_touch_at,
     timeToFirstTouchHours: row.time_to_first_touch_hours,
+    contactTemperature: row.contact_temperature as GrowthLead["contactTemperature"],
     createdBy: row.created_by,
     assignedTo: row.assigned_to,
     createdAt: row.created_at,

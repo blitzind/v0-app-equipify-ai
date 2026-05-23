@@ -16,6 +16,11 @@ const LINKS = [
     label: "Imports",
     match: (path: string) => path.startsWith("/admin/growth/imports"),
   },
+  {
+    href: "/admin/growth/outreach",
+    label: "Outreach",
+    match: (path: string) => path.startsWith("/admin/growth/outreach"),
+  },
 ] as const
 
 export function GrowthLeadsSubnav() {

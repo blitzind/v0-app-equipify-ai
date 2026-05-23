@@ -5,7 +5,7 @@ import { logGrowthEngine } from "@/lib/growth/access"
 import type { GrowthLeadTimelineEvent, GrowthLeadTimelineEventType } from "@/lib/growth/timeline-types"
 
 const TIMELINE_SELECT =
-  "id, lead_id, event_type, title, summary, actor_user_id, actor_email, research_run_id, call_event_id, decision_maker_id, payload, occurred_at, created_at"
+  "id, lead_id, event_type, title, summary, actor_user_id, actor_email, research_run_id, call_event_id, decision_maker_id, outbound_message_id, message_event_id, outbound_reply_id, payload, occurred_at, created_at"
 
 type TimelineDbRow = {
   id: string
@@ -18,6 +18,9 @@ type TimelineDbRow = {
   research_run_id: string | null
   call_event_id: string | null
   decision_maker_id: string | null
+  outbound_message_id: string | null
+  message_event_id: string | null
+  outbound_reply_id: string | null
   payload: Record<string, unknown> | null
   occurred_at: string
   created_at: string
@@ -39,6 +42,9 @@ function mapTimelineRow(row: TimelineDbRow): GrowthLeadTimelineEvent {
     researchRunId: row.research_run_id,
     callEventId: row.call_event_id,
     decisionMakerId: row.decision_maker_id,
+    outboundMessageId: row.outbound_message_id,
+    messageEventId: row.message_event_id,
+    outboundReplyId: row.outbound_reply_id,
     payload: row.payload ?? {},
     occurredAt: row.occurred_at,
     createdAt: row.created_at,
@@ -59,6 +65,9 @@ export async function appendGrowthLeadTimelineEvent(
     researchRunId?: string | null
     callEventId?: string | null
     decisionMakerId?: string | null
+    outboundMessageId?: string | null
+    messageEventId?: string | null
+    outboundReplyId?: string | null
   },
 ): Promise<GrowthLeadTimelineEvent> {
   const { data, error } = await timelineTable(admin)
@@ -73,6 +82,9 @@ export async function appendGrowthLeadTimelineEvent(
       research_run_id: input.researchRunId ?? null,
       call_event_id: input.callEventId ?? null,
       decision_maker_id: input.decisionMakerId ?? null,
+      outbound_message_id: input.outboundMessageId ?? null,
+      message_event_id: input.messageEventId ?? null,
+      outbound_reply_id: input.outboundReplyId ?? null,
       occurred_at: input.occurredAt ?? new Date().toISOString(),
     })
     .select(TIMELINE_SELECT)

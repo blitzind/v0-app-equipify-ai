@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 467,
-  sqlMigrations: 204,
+  apiRouteHandlers: 490,
+  sqlMigrations: 210,
   dashboardPages: 65,
-  componentsTsx: 337,
-  libTsFiles: 957,
+  componentsTsx: 353,
+  libTsFiles: 1025,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **467** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **204** |
+| API route handlers (\`app/api/**/route.ts\`) | **490** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **210** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **337** |
-| \`lib/**/*.ts\` | **957** |
+| \`components/**/*.tsx\` | **353** |
+| \`lib/**/*.ts\` | **1025** |
 
 ### Vercel crons
 
@@ -447,10 +447,33 @@ platform/blitzpay/reminder-dispatch/route.ts
 platform/blitzpay/reminder-runs/route.ts
 platform/blitzpay/revenue-rollup/route.ts
 platform/feature-requests/route.ts
+platform/growth/call-queue/route.ts
+platform/growth/import-batches/[batchId]/commit/route.ts
+platform/growth/import-batches/[batchId]/dry-run/route.ts
+platform/growth/import-batches/[batchId]/events/route.ts
+platform/growth/import-batches/[batchId]/preview/route.ts
+platform/growth/import-batches/[batchId]/route.ts
+platform/growth/import-batches/[batchId]/rows/route.ts
+platform/growth/import-batches/route.ts
+platform/growth/import-mapping-profiles/route.ts
+platform/growth/import-vendors/route.ts
+platform/growth/leads/[leadId]/call-events/route.ts
+platform/growth/leads/[leadId]/decision-makers/[dmId]/route.ts
+platform/growth/leads/[leadId]/decision-makers/route.ts
+platform/growth/leads/[leadId]/outbound/route.ts
 platform/growth/leads/[leadId]/research/notes/route.ts
 platform/growth/leads/[leadId]/research/route.ts
 platform/growth/leads/[leadId]/route.ts
+platform/growth/leads/[leadId]/timeline/manual-touch/route.ts
+platform/growth/leads/[leadId]/timeline/route.ts
 platform/growth/leads/route.ts
+platform/growth/outbound/connections/route.ts
+platform/growth/outbound/fixtures/process/route.ts
+platform/growth/outbound/replies/[replyId]/classification/route.ts
+platform/growth/outbound/webhooks/[webhookId]/link-lead/route.ts
+platform/growth/outbound/webhooks/route.ts
+platform/growth/suppression/route.ts
+platform/growth/webhooks/outbound/[provider]/route.ts
 platform/import-operations/bulk-recover/route.ts
 platform/import-operations/bulk-retry/route.ts
 platform/import-operations/route.ts

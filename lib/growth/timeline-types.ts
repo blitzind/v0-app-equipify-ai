@@ -24,6 +24,17 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "import_created",
   "import_updated",
   "manual_touch",
+  "email_sent",
+  "email_delivered",
+  "email_opened",
+  "email_clicked",
+  "email_replied",
+  "email_bounced",
+  "email_unsubscribed",
+  "email_failed",
+  "email_spam_complaint",
+  "email_suppressed",
+  "email_unmatched",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]
@@ -39,6 +50,9 @@ export type GrowthLeadTimelineEvent = {
   researchRunId: string | null
   callEventId: string | null
   decisionMakerId: string | null
+  outboundMessageId: string | null
+  messageEventId: string | null
+  outboundReplyId: string | null
   payload: Record<string, unknown>
   occurredAt: string
   createdAt: string

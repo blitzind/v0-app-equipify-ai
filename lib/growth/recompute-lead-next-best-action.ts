@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { fetchGrowthLeadDecisionMakerById, listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
+import { fetchGrowthLeadEmailEventSummary } from "@/lib/growth/outbound/email-event-summary"
 import { computeGrowthLeadNextBestAction } from "@/lib/growth/next-best-action"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadWorkflowIntelligence } from "@/lib/growth/recompute-workflow-intelligence"
@@ -34,6 +35,8 @@ export async function recomputeGrowthLeadNextBestAction(
     primaryDecisionMakerPhone = decisionMakers.find((dm) => dm.isPrimary)?.phone ?? decisionMakers[0]?.phone ?? null
   }
 
+  const emailSummary = await fetchGrowthLeadEmailEventSummary(admin, leadId, lead.contactEmail)
+
   const nba = computeGrowthLeadNextBestAction({
     status: lead.status,
     score: lead.score,
@@ -47,6 +50,7 @@ export async function recomputeGrowthLeadNextBestAction(
     recommendedNextAction: latestRun?.result?.recommendedNextAction ?? null,
     decisionMakerStatus: lead.decisionMakerStatus,
     primaryDecisionMakerPhone,
+    emailSummary,
   })
 
   const now = new Date().toISOString()

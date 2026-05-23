@@ -13,6 +13,7 @@ import {
   Sparkles,
   User,
   Zap,
+  Mail,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { GrowthEngineCard, formatRelativeTime } from "@/components/growth/growth-ui-utils"
@@ -56,6 +57,18 @@ function eventMeta(eventType: GrowthLeadTimelineEventType): {
     case "import_updated":
     case "lead_created":
       return { icon: AlertTriangle, emphasis: "default" }
+    case "email_sent":
+    case "email_delivered":
+    case "email_opened":
+    case "email_clicked":
+    case "email_replied":
+    case "email_bounced":
+    case "email_unsubscribed":
+    case "email_failed":
+    case "email_spam_complaint":
+    case "email_suppressed":
+    case "email_unmatched":
+      return { icon: Mail, emphasis: "touch" }
     default:
       return { icon: Activity, emphasis: "default" }
   }
