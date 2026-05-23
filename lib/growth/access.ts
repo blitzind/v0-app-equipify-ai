@@ -75,12 +75,19 @@ export async function requireGrowthEnginePlatformAccess(): Promise<GrowthEngineP
       userId: user.id,
       userEmail: user.email,
     }
-  } catch {
-    logGrowthEngine("access_denied", { reason: "server_config" })
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e)
+    const missingServiceRoleKey = detail.includes("SUPABASE_SERVICE_ROLE_KEY")
+    logGrowthEngine("access_denied", { reason: "server_config", detail })
     return {
       ok: false,
       response: NextResponse.json(
-        { error: "server_config", message: "Server is not configured for platform admin operations." },
+        {
+          error: "server_config",
+          message: missingServiceRoleKey
+            ? "SUPABASE_SERVICE_ROLE_KEY is not configured. Growth Engine requires the service role client for growth schema access."
+            : "Server is not configured for platform admin operations.",
+        },
         { status: 503 },
       ),
     }

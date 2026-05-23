@@ -173,7 +173,12 @@ alter table growth.lead_import_batch_events force row level security;
 alter table growth.lead_import_mapping_profiles enable row level security;
 alter table growth.lead_import_mapping_profiles force row level security;
 
-revoke all on growth.lead_import_batches from authenticated, anon;
-revoke all on growth.lead_import_batch_rows from authenticated, anon;
-revoke all on growth.lead_import_batch_events from authenticated, anon;
-revoke all on growth.lead_import_mapping_profiles from authenticated, anon;
+revoke all on growth.lead_import_batches from public, authenticated, anon;
+revoke all on growth.lead_import_batch_rows from public, authenticated, anon;
+revoke all on growth.lead_import_batch_events from public, authenticated, anon;
+revoke all on growth.lead_import_mapping_profiles from public, authenticated, anon;
+
+grant select, insert, update, delete on table growth.lead_import_batches to service_role;
+grant select, insert, update, delete on table growth.lead_import_batch_rows to service_role;
+grant select, insert, update, delete on table growth.lead_import_batch_events to service_role;
+grant select, insert, update, delete on table growth.lead_import_mapping_profiles to service_role;

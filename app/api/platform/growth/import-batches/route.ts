@@ -8,6 +8,7 @@ import {
   updateGrowthImportBatch,
 } from "@/lib/growth/import/batch-repository"
 import { GROWTH_IMPORT_MAX_BYTES, GROWTH_IMPORT_VENDOR_SCHEMA_VERSION } from "@/lib/growth/import/constants"
+import { growthImportErrorMessage } from "@/lib/growth/import/errors"
 import { initializeGrowthImportBatchFromUpload } from "@/lib/growth/import/pipeline"
 import { uploadGrowthImportCsv } from "@/lib/growth/import/storage"
 import { GROWTH_IMPORT_BATCH_STATUSES } from "@/lib/growth/import/types"
@@ -33,8 +34,8 @@ export async function GET(request: Request) {
     const batches = await listGrowthImportBatches(access.admin, { status })
     return NextResponse.json({ ok: true, batches })
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "query_failed", message }, { status: 500 })
+    const mapped = growthImportErrorMessage(e)
+    return NextResponse.json({ error: mapped.error, message: mapped.message }, { status: mapped.status })
   }
 }
 
@@ -132,6 +133,7 @@ export async function POST(request: Request) {
     if (message.startsWith("unknown_import_vendor")) {
       return NextResponse.json({ error: "invalid_vendor", message: "Unknown import vendor." }, { status: 400 })
     }
-    return NextResponse.json({ error: "upload_failed", message }, { status: 500 })
+    const mapped = growthImportErrorMessage(e)
+    return NextResponse.json({ error: mapped.error, message: mapped.message }, { status: mapped.status })
   }
 }
