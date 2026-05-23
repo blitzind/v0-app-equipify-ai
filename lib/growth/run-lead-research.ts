@@ -4,6 +4,13 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { runAiTask } from "@/lib/ai/server"
 import { getGrowthEngineAiOrgId, logGrowthEngine } from "@/lib/growth/access"
 import { fetchGrowthLeadById, markGrowthLeadResearchCompleted, updateGrowthLead } from "@/lib/growth/lead-repository"
+import { applyGrowthLeadResearchEnrichment } from "@/lib/growth/apply-lead-research-enrichment"
+import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
+import {
+  emitGrowthLeadResearchTimeline,
+  emitGrowthLeadWebsiteFetchTimeline,
+} from "@/lib/growth/timeline-emitter"
+import { hasGrowthLeadTimelineEventTypeSince } from "@/lib/growth/timeline-repository"
 import { growthLeadResearchInputHash } from "@/lib/growth/research-input-hash"
 import {
   buildGrowthLeadResearchSystemPrompt,
@@ -35,6 +42,7 @@ export type RunGrowthLeadResearchResult =
       run: GrowthLeadResearchRun
       leadStatus: GrowthLeadStatus
       leadScore: number | null
+      lead?: GrowthLead | null
       cached: boolean
     }
   | { ok: false; code: string; message: string; run?: GrowthLeadResearchRun | null }
@@ -139,6 +147,13 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
     inputHash,
   })
 
+  await emitGrowthLeadResearchTimeline(input.admin, {
+    leadId: lead.id,
+    eventType: "research_started",
+    runId: run.id,
+    actor: { userId: input.createdBy, email: input.actingUserEmail },
+  })
+
   if (lead.status === "new") {
     await updateGrowthLead(input.admin, lead.id, { status: "researching" })
   }
@@ -166,7 +181,7 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
         user: buildGrowthLeadResearchUserPrompt(lead, promptContext),
       },
       schema: growthLeadResearchModelSchema,
-      cacheSchemaVersion: "growth_lead_research_v2",
+      cacheSchemaVersion: "growth_lead_research_v3",
       skipPlanGateCheck: true,
       skipBudgetCheck: true,
       actingUserEmail: input.actingUserEmail,
@@ -194,6 +209,25 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
         errorCode,
         websiteFetchStatus: websiteFetch.status,
       })
+
+      await emitGrowthLeadResearchTimeline(input.admin, {
+        leadId: lead.id,
+        eventType: "research_failed",
+        runId: run.id,
+        summary: message.slice(0, 240),
+        payload: { errorCode },
+        actor: { userId: input.createdBy, email: input.actingUserEmail },
+      })
+
+      if (websiteFetch.status !== "ok" && websiteFetch.status !== "skipped") {
+        await emitGrowthLeadWebsiteFetchTimeline(input.admin, {
+          leadId: lead.id,
+          eventType: "website_fetch_failed",
+          runId: run.id,
+          status: websiteFetch.status,
+          url: websiteFetch.normalizedUrl,
+        })
+      }
 
       return {
         ok: false,
@@ -241,6 +275,69 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
       })
     }
 
+    try {
+      await applyGrowthLeadResearchEnrichment(input.admin, {
+        lead,
+        result,
+        createdBy: input.createdBy,
+      })
+    } catch (enrichmentError) {
+      const enrichmentMessage = enrichmentError instanceof Error ? enrichmentError.message : String(enrichmentError)
+      logGrowthEngine("research_enrichment_failed_nonfatal", {
+        leadId: lead.id,
+        runId: run.id,
+        message: enrichmentMessage.slice(0, 240),
+      })
+    }
+
+    await emitGrowthLeadResearchTimeline(input.admin, {
+      leadId: lead.id,
+      eventType: "research_completed",
+      runId: run.id,
+      summary: `Fit ${result.equipifyFitScore}`,
+      payload: {
+        fitScore: result.equipifyFitScore,
+        runStatus,
+        websiteFetchStatus: websiteFetch.status,
+      },
+      actor: { userId: input.createdBy, email: input.actingUserEmail },
+    })
+
+    if (websiteFetch.status !== "ok" && websiteFetch.status !== "skipped") {
+      await emitGrowthLeadWebsiteFetchTimeline(input.admin, {
+        leadId: lead.id,
+        eventType: "website_fetch_failed",
+        runId: run.id,
+        status: websiteFetch.status,
+        url: websiteFetch.normalizedUrl,
+      })
+    } else if (websiteFetch.status === "ok") {
+      const hadPriorFailure = await hasGrowthLeadTimelineEventTypeSince(
+        input.admin,
+        lead.id,
+        "website_fetch_failed",
+      )
+      if (hadPriorFailure) {
+        await emitGrowthLeadWebsiteFetchTimeline(input.admin, {
+          leadId: lead.id,
+          eventType: "website_fetch_fixed",
+          runId: run.id,
+          status: websiteFetch.status,
+          url: websiteFetch.normalizedUrl,
+        })
+      }
+    }
+
+    try {
+      await recomputeGrowthLeadWorkflowSignals(input.admin, lead.id)
+    } catch (workflowError) {
+      const workflowMessage = workflowError instanceof Error ? workflowError.message : String(workflowError)
+      logGrowthEngine("lead_workflow_recompute_failed_nonfatal", {
+        leadId: lead.id,
+        message: workflowMessage.slice(0, 240),
+      })
+    }
+
     logGrowthEngine(runStatus === "partial" ? "research_run_partial" : "research_run_succeeded", {
       leadId: lead.id,
       runId: run.id,
@@ -256,6 +353,7 @@ export async function runGrowthLeadResearch(input: RunGrowthLeadResearchInput): 
       run,
       leadStatus: updatedLead?.status ?? nextStatus,
       leadScore: updatedLead?.score ?? result.equipifyFitScore,
+      lead: (await fetchGrowthLeadById(input.admin, lead.id)) ?? updatedLead,
       cached: false,
     }
   } catch (e) {

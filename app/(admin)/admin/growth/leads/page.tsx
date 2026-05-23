@@ -6,6 +6,7 @@ import { useAdmin } from "@/lib/admin-store"
 import { Button } from "@/components/ui/button"
 import { GrowthLeadFormDialog, type GrowthLeadFormValues } from "@/components/growth/growth-lead-form-dialog"
 import { GrowthLeadDrawer } from "@/components/growth/growth-lead-drawer"
+import { GrowthLeadsSubnav } from "@/components/growth/growth-leads-subnav"
 import { GrowthLeadsTable } from "@/components/growth/growth-leads-table"
 import {
   PlatformAdminPageShell,
@@ -191,6 +192,9 @@ export default function AdminGrowthLeadsPage() {
                     Internal lead inbox for Equipify/Blitz. Separate from customer Prospects.
                   </p>
                 </div>
+              </div>
+              <div className="mt-4">
+                <GrowthLeadsSubnav />
               </div>
             </div>
             <div className="flex flex-wrap gap-2">

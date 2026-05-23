@@ -49,6 +49,39 @@ function researchNotesTable(admin: SupabaseClient) {
   return admin.schema("growth").from("lead_research_notes")
 }
 
+function mapDecisionMakerCandidatesFromRaw(
+  raw: Record<string, unknown>,
+): GrowthLeadResearchResult["decisionMakerCandidates"] {
+  const list = Array.isArray(raw.decisionMakerCandidates)
+    ? raw.decisionMakerCandidates
+    : Array.isArray(raw.decision_maker_candidates)
+      ? raw.decision_maker_candidates
+      : []
+
+  return list.flatMap((item) => {
+    if (!item || typeof item !== "object") return []
+    const row = item as Record<string, unknown>
+    const fullName = String(row.fullName ?? row.full_name ?? "").trim()
+    if (!fullName) return []
+    return [
+      {
+        fullName,
+        title: row.title != null ? String(row.title) : null,
+        email: row.email != null ? String(row.email) : null,
+        phone: row.phone != null ? String(row.phone) : null,
+        linkedinUrl: row.linkedinUrl != null ? String(row.linkedinUrl) : row.linkedin_url != null ? String(row.linkedin_url) : null,
+        confidence: row.confidence != null ? Number(row.confidence) : null,
+        evidenceExcerpt:
+          row.evidenceExcerpt != null
+            ? String(row.evidenceExcerpt)
+            : row.evidence_excerpt != null
+              ? String(row.evidence_excerpt)
+              : null,
+      },
+    ]
+  })
+}
+
 function mapResult(raw: Record<string, unknown> | null): GrowthLeadResearchResult | null {
   if (!raw) return null
   return {
@@ -95,6 +128,33 @@ function mapResult(raw: Record<string, unknown> | null): GrowthLeadResearchResul
         : [],
     caveats: Array.isArray(raw.caveats) ? (raw.caveats as string[]) : [],
     fitModelVersion: String(raw.fitModelVersion ?? raw.fit_model_version ?? GROWTH_LEAD_FIT_MODEL_VERSION),
+    decisionMakerCandidates: mapDecisionMakerCandidatesFromRaw(raw),
+    estimatedAnnualRevenue:
+      raw.estimatedAnnualRevenue != null
+        ? String(raw.estimatedAnnualRevenue)
+        : raw.estimated_annual_revenue != null
+          ? String(raw.estimated_annual_revenue)
+          : null,
+    estimatedEmployeeCount:
+      raw.estimatedEmployeeCount != null
+        ? String(raw.estimatedEmployeeCount)
+        : raw.estimated_employee_count != null
+          ? String(raw.estimated_employee_count)
+          : null,
+    fleetSizeEstimate:
+      raw.fleetSizeEstimate != null
+        ? String(raw.fleetSizeEstimate)
+        : raw.fleet_size_estimate != null
+          ? String(raw.fleet_size_estimate)
+          : null,
+    crmDetected:
+      raw.crmDetected != null ? String(raw.crmDetected) : raw.crm_detected != null ? String(raw.crm_detected) : null,
+    fieldServiceStackDetected:
+      raw.fieldServiceStackDetected != null
+        ? String(raw.fieldServiceStackDetected)
+        : raw.field_service_stack_detected != null
+          ? String(raw.field_service_stack_detected)
+          : null,
   }
 }
 

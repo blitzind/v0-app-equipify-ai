@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { recordGrowthLeadHumanTouch } from "@/lib/growth/first-human-touch"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
-import { upsertGrowthLeadResearchNotes } from "@/lib/growth/research-repository"
-import { emitGrowthLeadNotesUpdatedTimeline } from "@/lib/growth/timeline-emitter"
+import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
+import { emitGrowthLeadManualTouchTimeline } from "@/lib/growth/timeline-emitter"
 
 export const runtime = "nodejs"
 
-const PatchSchema = z.object({
-  body: z.string().max(8000),
+const ManualTouchSchema = z.object({
+  note: z.string().trim().max(2000).optional().nullable(),
 })
 
-export async function PATCH(
+export async function POST(
   request: Request,
   context: { params: Promise<{ leadId: string }> },
 ) {
@@ -23,11 +24,8 @@ export async function PATCH(
     return NextResponse.json({ error: "invalid_lead_id", message: "Lead id must be a UUID." }, { status: 400 })
   }
 
-  const rawBody = await request.json().catch(() => null)
-  const parsed = PatchSchema.safeParse(rawBody)
-  if (!parsed.success) {
-    return NextResponse.json({ error: "invalid_body", message: "Provide body text for manual notes." }, { status: 400 })
-  }
+  const rawBody = await request.json().catch(() => ({}))
+  const parsed = ManualTouchSchema.safeParse(rawBody)
 
   try {
     const lead = await fetchGrowthLeadById(access.admin, leadId)
@@ -35,26 +33,23 @@ export async function PATCH(
       return NextResponse.json({ error: "not_found", message: "Lead not found." }, { status: 404 })
     }
 
-    const manualNotes = await upsertGrowthLeadResearchNotes(access.admin, {
+    await recordGrowthLeadHumanTouch(access.admin, leadId)
+    await emitGrowthLeadManualTouchTimeline(access.admin, {
       leadId,
-      body: parsed.data.body,
-      updatedBy: access.userId,
-    })
-
-    await emitGrowthLeadNotesUpdatedTimeline(access.admin, {
-      leadId,
-      field: "research_notes",
+      note: parsed.success ? parsed.data.note : null,
       actor: { userId: access.userId, email: access.userEmail },
     })
 
-    logGrowthEngine("research_notes_api_success", {
+    const updatedLead = await recomputeGrowthLeadWorkflowSignals(access.admin, leadId)
+
+    logGrowthEngine("manual_touch_recorded", {
       leadId,
       actorEmail: access.userEmail,
     })
 
-    return NextResponse.json({ ok: true, manualNotes })
+    return NextResponse.json({ ok: true, lead: updatedLead })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "update_failed", message }, { status: 500 })
+    return NextResponse.json({ error: "create_failed", message }, { status: 500 })
   }
 }

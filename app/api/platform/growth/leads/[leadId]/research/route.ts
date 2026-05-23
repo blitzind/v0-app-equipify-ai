@@ -102,6 +102,7 @@ export async function POST(
       run: result.run,
       leadStatus: result.leadStatus,
       leadScore: result.leadScore,
+      lead: result.lead ?? null,
       cached: result.cached,
     })
   } catch (e) {

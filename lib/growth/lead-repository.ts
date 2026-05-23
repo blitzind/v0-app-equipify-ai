@@ -11,7 +11,7 @@ import type {
 } from "@/lib/growth/types"
 
 const LEAD_SELECT =
-  "id, source_kind, source_detail, external_ref, company_name, contact_name, contact_email, contact_phone, website, address_line1, city, state, postal_code, country, status, promoted_organization_id, promoted_prospect_id, promoted_at, score, notes, metadata, latest_research_run_id, last_researched_at, research_priority, created_by, assigned_to, created_at, updated_at"
+  "id, source_kind, source_detail, external_ref, company_name, contact_name, contact_email, contact_phone, website, address_line1, city, state, postal_code, country, status, promoted_organization_id, promoted_prospect_id, promoted_at, score, notes, metadata, latest_research_run_id, last_researched_at, research_priority, call_disposition, call_disposition_at, last_call_at, follow_up_at, call_priority_score, call_priority_tier, call_priority_computed_at, call_priority_override, last_human_touch_at, decision_maker_status, primary_decision_maker_id, next_best_action, next_best_action_reason, next_best_action_computed_at, estimated_annual_revenue, estimated_employee_count, fleet_size_estimate, crm_detected, field_service_stack_detected, momentum_score, momentum_tier, momentum_why_summary, momentum_computed_at, workflow_health, workflow_health_reason, workflow_health_computed_at, source_channel, source_campaign, source_import_batch_id, source_vendor, aging_days, aging_bucket, first_human_touch_at, time_to_first_touch_hours, created_by, assigned_to, created_at, updated_at"
 
 type GrowthLeadDbRow = {
   id: string
@@ -38,6 +38,40 @@ type GrowthLeadDbRow = {
   latest_research_run_id: string | null
   last_researched_at: string | null
   research_priority: string
+  call_disposition: string | null
+  call_disposition_at: string | null
+  last_call_at: string | null
+  follow_up_at: string | null
+  call_priority_score: number | null
+  call_priority_tier: string | null
+  call_priority_computed_at: string | null
+  call_priority_override: number | null
+  last_human_touch_at: string | null
+  decision_maker_status: string | null
+  primary_decision_maker_id: string | null
+  next_best_action: string | null
+  next_best_action_reason: string | null
+  next_best_action_computed_at: string | null
+  estimated_annual_revenue: string | null
+  estimated_employee_count: string | null
+  fleet_size_estimate: string | null
+  crm_detected: string | null
+  field_service_stack_detected: string | null
+  momentum_score: number | null
+  momentum_tier: string | null
+  momentum_why_summary: string | null
+  momentum_computed_at: string | null
+  workflow_health: string | null
+  workflow_health_reason: string | null
+  workflow_health_computed_at: string | null
+  source_channel: string | null
+  source_campaign: string | null
+  source_import_batch_id: string | null
+  source_vendor: string | null
+  aging_days: number | null
+  aging_bucket: string | null
+  first_human_touch_at: string | null
+  time_to_first_touch_hours: number | null
   created_by: string | null
   assigned_to: string | null
   created_at: string
@@ -74,6 +108,40 @@ function mapGrowthLeadRow(row: GrowthLeadDbRow): GrowthLead {
     latestResearchRunId: row.latest_research_run_id,
     lastResearchedAt: row.last_researched_at,
     researchPriority: row.research_priority as GrowthLead["researchPriority"],
+    callDisposition: row.call_disposition as GrowthLead["callDisposition"],
+    callDispositionAt: row.call_disposition_at,
+    lastCallAt: row.last_call_at,
+    followUpAt: row.follow_up_at,
+    callPriorityScore: row.call_priority_score,
+    callPriorityTier: row.call_priority_tier as GrowthLead["callPriorityTier"],
+    callPriorityComputedAt: row.call_priority_computed_at,
+    callPriorityOverride: row.call_priority_override,
+    lastHumanTouchAt: row.last_human_touch_at,
+    decisionMakerStatus: row.decision_maker_status as GrowthLead["decisionMakerStatus"],
+    primaryDecisionMakerId: row.primary_decision_maker_id,
+    nextBestAction: row.next_best_action as GrowthLead["nextBestAction"],
+    nextBestActionReason: row.next_best_action_reason,
+    nextBestActionComputedAt: row.next_best_action_computed_at,
+    estimatedAnnualRevenue: row.estimated_annual_revenue,
+    estimatedEmployeeCount: row.estimated_employee_count,
+    fleetSizeEstimate: row.fleet_size_estimate,
+    crmDetected: row.crm_detected,
+    fieldServiceStackDetected: row.field_service_stack_detected,
+    momentumScore: row.momentum_score,
+    momentumTier: row.momentum_tier as GrowthLead["momentumTier"],
+    momentumWhySummary: row.momentum_why_summary,
+    momentumComputedAt: row.momentum_computed_at,
+    workflowHealth: row.workflow_health as GrowthLead["workflowHealth"],
+    workflowHealthReason: row.workflow_health_reason,
+    workflowHealthComputedAt: row.workflow_health_computed_at,
+    sourceChannel: row.source_channel,
+    sourceCampaign: row.source_campaign,
+    sourceImportBatchId: row.source_import_batch_id,
+    sourceVendor: row.source_vendor,
+    agingDays: row.aging_days,
+    agingBucket: row.aging_bucket as GrowthLead["agingBucket"],
+    firstHumanTouchAt: row.first_human_touch_at,
+    timeToFirstTouchHours: row.time_to_first_touch_hours,
     createdBy: row.created_by,
     assignedTo: row.assigned_to,
     createdAt: row.created_at,
@@ -159,6 +227,10 @@ export async function createGrowthLead(
     notes: trimOrNull(input.notes),
     metadata: input.metadata ?? {},
     research_priority: input.researchPriority ?? "normal",
+    source_channel: trimOrNull(input.sourceChannel),
+    source_campaign: trimOrNull(input.sourceCampaign),
+    source_import_batch_id: input.sourceImportBatchId ?? null,
+    source_vendor: trimOrNull(input.sourceVendor),
     assigned_to: trimOrNull(input.assignedTo),
     created_by: trimOrNull(input.createdBy),
   }
@@ -216,6 +288,20 @@ export async function updateGrowthLead(
   if (input.notes !== undefined) patch.notes = trimOrNull(input.notes)
   if (input.metadata !== undefined) patch.metadata = input.metadata
   if (input.researchPriority !== undefined) patch.research_priority = input.researchPriority
+  if (input.callPriorityOverride !== undefined) patch.call_priority_override = input.callPriorityOverride
+  if (input.decisionMakerStatus !== undefined) patch.decision_maker_status = input.decisionMakerStatus
+  if (input.primaryDecisionMakerId !== undefined) patch.primary_decision_maker_id = input.primaryDecisionMakerId
+  if (input.estimatedAnnualRevenue !== undefined) patch.estimated_annual_revenue = trimOrNull(input.estimatedAnnualRevenue)
+  if (input.estimatedEmployeeCount !== undefined) patch.estimated_employee_count = trimOrNull(input.estimatedEmployeeCount)
+  if (input.fleetSizeEstimate !== undefined) patch.fleet_size_estimate = trimOrNull(input.fleetSizeEstimate)
+  if (input.crmDetected !== undefined) patch.crm_detected = trimOrNull(input.crmDetected)
+  if (input.fieldServiceStackDetected !== undefined) {
+    patch.field_service_stack_detected = trimOrNull(input.fieldServiceStackDetected)
+  }
+  if (input.sourceChannel !== undefined) patch.source_channel = trimOrNull(input.sourceChannel)
+  if (input.sourceCampaign !== undefined) patch.source_campaign = trimOrNull(input.sourceCampaign)
+  if (input.sourceImportBatchId !== undefined) patch.source_import_batch_id = input.sourceImportBatchId
+  if (input.sourceVendor !== undefined) patch.source_vendor = trimOrNull(input.sourceVendor)
   if (input.assignedTo !== undefined) patch.assigned_to = trimOrNull(input.assignedTo)
 
   if (Object.keys(patch).length === 0) {

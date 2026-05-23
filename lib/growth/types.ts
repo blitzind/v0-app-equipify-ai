@@ -7,6 +7,13 @@ export const GROWTH_LEAD_SOURCE_KINDS = [
   "other",
 ] as const
 
+import type { GrowthLeadCallDisposition, GrowthCallPriorityTier } from "@/lib/growth/call-types"
+import type { GrowthDecisionMakerPresenceStatus } from "@/lib/growth/decision-maker-types"
+import type { GrowthLeadAgingBucket } from "@/lib/growth/lead-aging"
+import type { GrowthMomentumTier } from "@/lib/growth/momentum-types"
+import type { GrowthNextBestAction } from "@/lib/growth/nba-types"
+import type { GrowthWorkflowHealthStatus } from "@/lib/growth/workflow-health-types"
+
 export type GrowthLeadSourceKind = (typeof GROWTH_LEAD_SOURCE_KINDS)[number]
 
 export const GROWTH_LEAD_STATUSES = [
@@ -53,6 +60,40 @@ export type GrowthLead = {
   latestResearchRunId: string | null
   lastResearchedAt: string | null
   researchPriority: GrowthLeadResearchPriority
+  callDisposition: GrowthLeadCallDisposition | null
+  callDispositionAt: string | null
+  lastCallAt: string | null
+  followUpAt: string | null
+  callPriorityScore: number | null
+  callPriorityTier: GrowthCallPriorityTier | null
+  callPriorityComputedAt: string | null
+  callPriorityOverride: number | null
+  lastHumanTouchAt: string | null
+  decisionMakerStatus: GrowthDecisionMakerPresenceStatus | null
+  primaryDecisionMakerId: string | null
+  nextBestAction: GrowthNextBestAction | null
+  nextBestActionReason: string | null
+  nextBestActionComputedAt: string | null
+  estimatedAnnualRevenue: string | null
+  estimatedEmployeeCount: string | null
+  fleetSizeEstimate: string | null
+  crmDetected: string | null
+  fieldServiceStackDetected: string | null
+  momentumScore: number | null
+  momentumTier: GrowthMomentumTier | null
+  momentumWhySummary: string | null
+  momentumComputedAt: string | null
+  workflowHealth: GrowthWorkflowHealthStatus | null
+  workflowHealthReason: string | null
+  workflowHealthComputedAt: string | null
+  sourceChannel: string | null
+  sourceCampaign: string | null
+  sourceImportBatchId: string | null
+  sourceVendor: string | null
+  agingDays: number | null
+  agingBucket: GrowthLeadAgingBucket | null
+  firstHumanTouchAt: string | null
+  timeToFirstTouchHours: number | null
   createdBy: string | null
   assignedTo: string | null
   createdAt: string
@@ -78,6 +119,18 @@ export type CreateGrowthLeadInput = {
   notes?: string | null
   metadata?: Record<string, unknown>
   researchPriority?: GrowthLeadResearchPriority
+  callPriorityOverride?: number | null
+  decisionMakerStatus?: GrowthDecisionMakerPresenceStatus | null
+  primaryDecisionMakerId?: string | null
+  estimatedAnnualRevenue?: string | null
+  estimatedEmployeeCount?: string | null
+  fleetSizeEstimate?: string | null
+  crmDetected?: string | null
+  fieldServiceStackDetected?: string | null
+  sourceChannel?: string | null
+  sourceCampaign?: string | null
+  sourceImportBatchId?: string | null
+  sourceVendor?: string | null
   assignedTo?: string | null
   createdBy?: string | null
 }
@@ -101,6 +154,18 @@ export type UpdateGrowthLeadInput = {
   notes?: string | null
   metadata?: Record<string, unknown>
   researchPriority?: GrowthLeadResearchPriority
+  callPriorityOverride?: number | null
+  decisionMakerStatus?: GrowthDecisionMakerPresenceStatus | null
+  primaryDecisionMakerId?: string | null
+  estimatedAnnualRevenue?: string | null
+  estimatedEmployeeCount?: string | null
+  fleetSizeEstimate?: string | null
+  crmDetected?: string | null
+  fieldServiceStackDetected?: string | null
+  sourceChannel?: string | null
+  sourceCampaign?: string | null
+  sourceImportBatchId?: string | null
+  sourceVendor?: string | null
   assignedTo?: string | null
 }
 

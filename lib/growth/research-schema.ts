@@ -71,6 +71,16 @@ const fitModelVersion = z.preprocess(
   z.string().min(1),
 )
 
+const decisionMakerCandidateSchema = z.object({
+  full_name: z.string(),
+  title: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  linkedin_url: z.string().nullable().optional(),
+  confidence: z.preprocess((value) => clampGrowthLeadResearchConfidence(value), z.number().min(0).max(1)).optional(),
+  evidence_excerpt: z.string().nullable().optional(),
+})
+
 /** Snake_case schema matching the LLM JSON contract. */
 export const growthLeadResearchModelSchema = z.object({
   company_summary: z.string(),
@@ -87,6 +97,12 @@ export const growthLeadResearchModelSchema = z.object({
   source_urls: tolerantStringArray.optional().default([]),
   caveats: tolerantStringArray.optional().default([]),
   fit_model_version: fitModelVersion.optional().default(GROWTH_LEAD_FIT_MODEL_VERSION),
+  decision_maker_candidates: z.array(decisionMakerCandidateSchema).optional().default([]),
+  estimated_annual_revenue: z.string().nullable().optional(),
+  estimated_employee_count: z.string().nullable().optional(),
+  fleet_size_estimate: z.string().nullable().optional(),
+  crm_detected: z.string().nullable().optional(),
+  field_service_stack_detected: z.string().nullable().optional(),
 })
 
 export type GrowthLeadResearchModelResult = z.infer<typeof growthLeadResearchModelSchema>
@@ -112,5 +128,27 @@ export function mapGrowthLeadResearchModelToResult(row: GrowthLeadResearchModelR
     sourceUrls: row.source_urls,
     caveats: row.caveats,
     fitModelVersion: row.fit_model_version ?? GROWTH_LEAD_FIT_MODEL_VERSION,
+    decisionMakerCandidates: (row.decision_maker_candidates ?? []).flatMap((candidate) => {
+      const fullName = candidate.full_name?.trim()
+      if (!fullName) return []
+      return [
+        {
+          fullName,
+          title: candidate.title?.trim() ? candidate.title.trim() : null,
+          email: candidate.email?.trim() ? candidate.email.trim() : null,
+          phone: candidate.phone?.trim() ? candidate.phone.trim() : null,
+          linkedinUrl: candidate.linkedin_url?.trim() ? candidate.linkedin_url.trim() : null,
+          confidence: candidate.confidence ?? null,
+          evidenceExcerpt: candidate.evidence_excerpt?.trim() ? candidate.evidence_excerpt.trim() : null,
+        },
+      ]
+    }),
+    estimatedAnnualRevenue: row.estimated_annual_revenue?.trim() ? row.estimated_annual_revenue.trim() : null,
+    estimatedEmployeeCount: row.estimated_employee_count?.trim() ? row.estimated_employee_count.trim() : null,
+    fleetSizeEstimate: row.fleet_size_estimate?.trim() ? row.fleet_size_estimate.trim() : null,
+    crmDetected: row.crm_detected?.trim() ? row.crm_detected.trim() : null,
+    fieldServiceStackDetected: row.field_service_stack_detected?.trim()
+      ? row.field_service_stack_detected.trim()
+      : null,
   }
 }

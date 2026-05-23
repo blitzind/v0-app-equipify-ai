@@ -23,6 +23,7 @@ type ResearchApiPayload = GrowthLeadResearchBundle & {
   run?: GrowthLeadResearchRun | null
   leadStatus?: GrowthLead["status"]
   leadScore?: number | null
+  lead?: GrowthLead | null
   cached?: boolean
 }
 
@@ -125,10 +126,14 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated }: GrowthLeadResea
       }
 
       setBundle((prev) => mergeRunIntoBundle(prev, lead.id, data.run))
-      onLeadUpdated?.({
-        status: data.leadStatus,
-        score: data.leadScore ?? null,
-      })
+      if (data.lead) {
+        onLeadUpdated?.(data.lead)
+      } else {
+        onLeadUpdated?.({
+          status: data.leadStatus,
+          score: data.leadScore ?? null,
+        })
+      }
       await loadResearch({ clearError: false, silent: true })
     } catch (e) {
       setError(e instanceof Error ? e.message : "Research generation failed.")

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { createGrowthLead, listGrowthLeads } from "@/lib/growth/lead-repository"
+import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
+import { emitGrowthLeadCreatedTimeline } from "@/lib/growth/timeline-emitter"
 import { GROWTH_LEAD_SOURCE_KINDS, GROWTH_LEAD_STATUSES, GROWTH_LEAD_RESEARCH_PRIORITIES } from "@/lib/growth/types"
 
 export const runtime = "nodejs"
@@ -28,6 +30,9 @@ const CreateLeadSchema = z.object({
   notes: optionalLongText,
   researchPriority: z.enum(GROWTH_LEAD_RESEARCH_PRIORITIES).optional(),
   assignedTo: z.string().uuid().optional().nullable(),
+  sourceChannel: optionalText,
+  sourceCampaign: optionalText,
+  sourceVendor: optionalText,
 })
 
 export async function GET(request: Request) {
@@ -91,15 +96,27 @@ export async function POST(request: Request) {
       notes: body.notes,
       researchPriority: body.researchPriority,
       assignedTo: body.assignedTo,
+      sourceChannel: body.sourceChannel,
+      sourceCampaign: body.sourceCampaign,
+      sourceVendor: body.sourceVendor,
       createdBy: access.userId,
     })
+
+    await emitGrowthLeadCreatedTimeline(access.admin, {
+      leadId: lead.id,
+      companyName: lead.companyName,
+      sourceKind: lead.sourceKind,
+      actor: { userId: access.userId, email: access.userEmail },
+    })
+
+    const enrichedLead = (await recomputeGrowthLeadWorkflowSignals(access.admin, lead.id)) ?? lead
 
     logGrowthEngine("lead_create_success", {
       leadId: lead.id,
       actorEmail: access.userEmail,
     })
 
-    return NextResponse.json({ ok: true, lead }, { status: 201 })
+    return NextResponse.json({ ok: true, lead: enrichedLead }, { status: 201 })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     if (message === "company_name_required") {

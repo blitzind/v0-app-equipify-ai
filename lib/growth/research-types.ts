@@ -10,6 +10,16 @@ export const GROWTH_LEAD_RESEARCH_RUN_STATUSES = [
 
 export type GrowthLeadResearchRunStatus = (typeof GROWTH_LEAD_RESEARCH_RUN_STATUSES)[number]
 
+export type GrowthLeadResearchDecisionMakerCandidate = {
+  fullName: string
+  title: string | null
+  email: string | null
+  phone: string | null
+  linkedinUrl: string | null
+  confidence: number | null
+  evidenceExcerpt: string | null
+}
+
 export type GrowthLeadResearchResult = {
   companySummary: string
   websiteSummary: string | null
@@ -25,6 +35,12 @@ export type GrowthLeadResearchResult = {
   sourceUrls: string[]
   caveats: string[]
   fitModelVersion: string
+  decisionMakerCandidates: GrowthLeadResearchDecisionMakerCandidate[]
+  estimatedAnnualRevenue: string | null
+  estimatedEmployeeCount: string | null
+  fleetSizeEstimate: string | null
+  crmDetected: string | null
+  fieldServiceStackDetected: string | null
 }
 
 export type GrowthLeadResearchRun = {

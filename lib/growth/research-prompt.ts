@@ -34,7 +34,9 @@ Return JSON only with these snake_case keys:
 company_summary, website_summary, likely_service_category, service_area_clues, company_size_estimate,
 equipment_service_indicators, equipify_pain_points, equipify_fit_score (0-100 integer),
 outreach_angles (internal draft angles only — not customer-facing copy to send),
-recommended_next_action, research_confidence (0-1 number), source_urls (array, may be empty), caveats (array).`
+recommended_next_action, research_confidence (0-1 number), source_urls (array, may be empty), caveats (array),
+decision_maker_candidates (array of objects with full_name, title, email, phone, linkedin_url, confidence, evidence_excerpt — only when supported by excerpt/lead facts; may be empty),
+estimated_annual_revenue, estimated_employee_count, fleet_size_estimate, crm_detected, field_service_stack_detected (nullable strings; omit guesses).`
 }
 
 export function buildGrowthLeadResearchUserPrompt(
