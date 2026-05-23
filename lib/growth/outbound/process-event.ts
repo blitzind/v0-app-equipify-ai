@@ -25,8 +25,8 @@ import { upsertGrowthSuppressionEntry } from "@/lib/growth/outbound/suppression-
 import {
   emitGrowthLeadEmailEventTimeline,
   emitGrowthLeadEmailSuppressedTimeline,
-  emitGrowthLeadStatusChangedTimeline,
 } from "@/lib/growth/outbound/timeline-emitter"
+import { emitGrowthLeadStatusChangedTimeline } from "@/lib/growth/timeline-emitter"
 import type { GrowthLeadStatus } from "@/lib/growth/types"
 
 function trimPhone(value: string | null | undefined): string | null {
