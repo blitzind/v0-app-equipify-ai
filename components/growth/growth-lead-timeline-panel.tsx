@@ -37,6 +37,7 @@ function eventMeta(eventType: GrowthLeadTimelineEventType): {
     case "override_changed":
     case "next_best_action_changed":
       return { icon: Flag, emphasis: "priority" }
+    case "call_started":
     case "call_attempted":
     case "voicemail_left":
       return { icon: Phone, emphasis: "touch" }

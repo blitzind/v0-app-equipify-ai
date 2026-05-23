@@ -14,6 +14,7 @@ const CALL_DISPOSITION_TIMELINE: Partial<Record<GrowthLeadCallDisposition, Growt
   left_voicemail: "voicemail_left",
   interested: "interested",
   follow_up_later: "follow_up_created",
+  no_answer: "call_attempted",
 }
 
 export async function emitGrowthLeadCreatedTimeline(
@@ -214,6 +215,27 @@ export async function emitGrowthLeadDecisionMakerTimeline(
   })
 }
 
+export async function emitGrowthLeadCallStartedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    sessionId: string
+    phoneDialed: string
+    dialMode: string
+    actor?: Actor
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "call_started",
+    title: "Dial initiated",
+    summary: input.phoneDialed,
+    payload: { sessionId: input.sessionId, dialMode: input.dialMode, phoneDialed: input.phoneDialed },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}
+
 export async function emitGrowthLeadCallDispositionTimeline(
   admin: SupabaseClient,
   input: {
@@ -228,7 +250,7 @@ export async function emitGrowthLeadCallDispositionTimeline(
   if (!eventType) return
 
   const titles: Record<string, string> = {
-    call_attempted: "Call attempted",
+    call_attempted: input.disposition === "no_answer" ? "No answer" : "Call attempted",
     voicemail_left: "Voicemail left",
     interested: "Marked interested",
     follow_up_created: "Follow-up scheduled",

@@ -85,6 +85,7 @@
     "test:growth-lead-aging": "tsx scripts/test-growth-lead-aging.ts",
     "test:growth-import": "tsx scripts/test-growth-import.ts",
     "test:growth-outbound": "tsx scripts/test-growth-outbound.ts",
+    "test:growth-call-dial": "tsx scripts/test-growth-call-dial.ts",
     "test:catalog-import-manufacturer": "tsx scripts/test-catalog-import-manufacturer.ts",
     "test:catalog-import-template": "tsx scripts/test-catalog-import-template.ts",
     "test:extract-price-list-from-csv": "tsx scripts/test-extract-price-list-from-csv.ts",

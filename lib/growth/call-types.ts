@@ -6,6 +6,7 @@ export const GROWTH_LEAD_CALL_DISPOSITIONS = [
   "interested",
   "not_a_fit",
   "follow_up_later",
+  "no_answer",
 ] as const
 
 export type GrowthLeadCallDisposition = (typeof GROWTH_LEAD_CALL_DISPOSITIONS)[number]

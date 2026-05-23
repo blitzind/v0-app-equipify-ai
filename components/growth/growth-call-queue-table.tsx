@@ -28,6 +28,7 @@ import {
   priorityTierTone,
 } from "@/components/growth/growth-ui-utils"
 import { GrowthWorkflowHealthBadge } from "@/components/growth/growth-workflow-health-badge"
+import { GrowthCallActionSheet } from "@/components/growth/growth-call-action-sheet"
 import {
   GROWTH_LEAD_CALL_DISPOSITIONS,
   type GrowthCallQueueRow,
@@ -43,6 +44,7 @@ const DISPOSITION_LABELS: Record<GrowthLeadCallDisposition, string> = {
   interested: "Interested",
   not_a_fit: "Not a fit",
   follow_up_later: "Follow up later",
+  no_answer: "No answer",
 }
 
 function addDays(days: number): string {
@@ -65,6 +67,7 @@ type GrowthCallQueueTableProps = {
     leadId: string,
     input: { disposition: GrowthLeadCallDisposition; note?: string | null; followUpAt?: string | null },
   ) => Promise<void>
+  onLeadUpdated?: (leadId: string, patch: Partial<GrowthCallQueueRow>) => void
   recordingLeadId?: string | null
 }
 
@@ -72,11 +75,13 @@ export function GrowthCallQueueTable({
   rows,
   onOpenLead,
   onRecordDisposition,
+  onLeadUpdated,
   recordingLeadId = null,
 }: GrowthCallQueueTableProps) {
   const [followUpTarget, setFollowUpTarget] = useState<GrowthCallQueueRow | null>(null)
   const [followUpAt, setFollowUpAt] = useState("")
   const [note, setNote] = useState("")
+  const [callTarget, setCallTarget] = useState<GrowthCallQueueRow | null>(null)
 
   const followUpSaving = followUpTarget ? recordingLeadId === followUpTarget.leadId : false
 
@@ -237,7 +242,12 @@ export function GrowthCallQueueTable({
                   <td className="px-3 py-3 align-top capitalize text-sm">{row.status.replace(/_/g, " ")}</td>
                   <td className="px-3 py-3 align-top">
                     <div className="flex items-center gap-1">
-                      <Button variant="outline" size="sm" disabled={saving} onClick={() => onOpenLead(row.leadId)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={saving || !row.contactPhone}
+                        onClick={() => setCallTarget(row)}
+                      >
                         {saving ? <Loader2 className="size-4 animate-spin" /> : <Phone className="size-4" />}
                       </Button>
                       <DropdownMenu>
@@ -329,6 +339,17 @@ export function GrowthCallQueueTable({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {callTarget?.contactPhone ? (
+        <GrowthCallActionSheet
+          open={Boolean(callTarget)}
+          onOpenChange={(open) => !open && setCallTarget(null)}
+          leadId={callTarget.leadId}
+          phone={callTarget.contactPhone}
+          contactLabel={callTarget.contactName ?? callTarget.companyName}
+          onLeadUpdated={() => onLeadUpdated?.(callTarget.leadId, {})}
+        />
+      ) : null}
     </>
   )
 }

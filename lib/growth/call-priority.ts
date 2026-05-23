@@ -47,6 +47,7 @@ const STATUS_READINESS_POINTS: Partial<Record<GrowthLeadStatus, number>> = {
 const DISPOSITION_PENALTY: Partial<Record<GrowthLeadCallDisposition, number>> = {
   call_attempted: 5,
   left_voicemail: 8,
+  no_answer: 4,
 }
 
 const URGENT_ACTION_KEYWORDS = ["call", "phone", "discovery", "demo", "schedule"]

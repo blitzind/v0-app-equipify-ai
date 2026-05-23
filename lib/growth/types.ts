@@ -96,6 +96,9 @@ export type GrowthLead = {
   firstHumanTouchAt: string | null
   timeToFirstTouchHours: number | null
   contactTemperature: GrowthContactTemperature | null
+  callAttemptCount: number
+  voicemailCount: number
+  connectedCallCount: number
   createdBy: string | null
   assignedTo: string | null
   createdAt: string

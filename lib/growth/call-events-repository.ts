@@ -6,6 +6,7 @@ import type { GrowthLeadCallDisposition, GrowthLeadCallEvent } from "@/lib/growt
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { recordGrowthLeadHumanTouch } from "@/lib/growth/first-human-touch"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
+import { recomputeGrowthLeadCallCounts } from "@/lib/growth/communication/recompute-lead-call-counts"
 import {
   emitGrowthLeadCallDispositionTimeline,
   emitGrowthLeadFollowUpCompletedTimeline,
@@ -146,6 +147,8 @@ export async function recordGrowthLeadCallEvent(
     callEventId: eventRow.id,
     followUpAt: input.disposition === "follow_up_later" ? input.followUpAt : null,
   })
+
+  await recomputeGrowthLeadCallCounts(admin, input.leadId)
 
   const updatedLead = await recomputeGrowthLeadWorkflowSignals(admin, input.leadId)
   if (!updatedLead) {

@@ -206,6 +206,7 @@ export default function AdminGrowthCallQueuePage() {
             rows={rows}
             onOpenLead={openLead}
             onRecordDisposition={recordDisposition}
+            onLeadUpdated={() => void load(filter)}
             recordingLeadId={recordingLeadId ?? openingLeadId}
           />
         )}

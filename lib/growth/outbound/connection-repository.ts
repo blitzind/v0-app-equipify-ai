@@ -20,13 +20,16 @@ type ConnectionDbRow = {
   config: Record<string, unknown> | null
   last_webhook_at: string | null
   last_error: string | null
+  monthly_cost_estimate: number | null
+  seat_count: number | null
+  notes: string | null
   created_by: string | null
   created_at: string
   updated_at: string
 }
 
 const SELECT =
-  "id, provider, provider_family, label, status, api_base_url, webhook_secret, config, last_webhook_at, last_error, created_by, created_at, updated_at"
+  "id, provider, provider_family, label, status, api_base_url, webhook_secret, config, last_webhook_at, last_error, monthly_cost_estimate, seat_count, notes, created_by, created_at, updated_at"
 
 function connectionsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("email_provider_connections")
@@ -44,6 +47,9 @@ function mapRow(row: ConnectionDbRow): GrowthEmailProviderConnection {
     config: row.config ?? {},
     lastWebhookAt: row.last_webhook_at,
     lastError: row.last_error,
+    monthlyCostEstimate: row.monthly_cost_estimate != null ? Number(row.monthly_cost_estimate) : null,
+    seatCount: row.seat_count,
+    notes: row.notes,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -97,6 +103,39 @@ export async function ensureGrowthStubOutboundConnection(
       status: "active",
       created_by: createdBy ?? null,
     })
+    .select(SELECT)
+    .single()
+
+  if (error) throw new Error(error.message)
+  return mapRow(data as ConnectionDbRow)
+}
+
+export async function updateGrowthOutboundConnection(
+  admin: SupabaseClient,
+  connectionId: string,
+  input: {
+    monthlyCostEstimate?: number | null
+    seatCount?: number | null
+    notes?: string | null
+  },
+): Promise<GrowthEmailProviderConnection> {
+  const patch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (input.monthlyCostEstimate !== undefined) {
+    patch.monthly_cost_estimate = input.monthlyCostEstimate
+  }
+  if (input.seatCount !== undefined) {
+    patch.seat_count = input.seatCount
+  }
+  if (input.notes !== undefined) {
+    patch.notes = input.notes?.trim() ? input.notes.trim() : null
+  }
+
+  const { data, error } = await connectionsTable(admin)
+    .update(patch)
+    .eq("id", connectionId)
     .select(SELECT)
     .single()
 

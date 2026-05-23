@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { GrowthNextBestActionBanner } from "@/components/growth/growth-next-best-action-banner"
+import { GrowthCallActionSheet } from "@/components/growth/growth-call-action-sheet"
 import {
   GrowthBadge,
   GrowthEngineCard,
@@ -70,6 +71,7 @@ export function GrowthLeadCommandCenter({ lead, onLeadUpdated, onAddDecisionMake
   const [followUpNote, setFollowUpNote] = useState("")
   const [followUpSaving, setFollowUpSaving] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [callSheetOpen, setCallSheetOpen] = useState(false)
 
   const phone = lead.contactPhone?.trim() || null
   const email = lead.contactEmail?.trim() || null
@@ -215,7 +217,7 @@ export function GrowthLeadCommandCenter({ lead, onLeadUpdated, onAddDecisionMake
 
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <ContactRow icon={<Phone className="size-3.5" />} label="Primary contact" value={lead.contactName} />
-            <ContactRow icon={<Phone className="size-3.5" />} label="Phone" value={phone} href={phone ? `tel:${phone}` : undefined} />
+            <ContactRow icon={<Phone className="size-3.5" />} label="Phone" value={phone} />
             <ContactRow icon={<Mail className="size-3.5" />} label="Email" value={email} href={email ? `mailto:${email}` : undefined} />
             <ContactRow
               icon={<ExternalLink className="size-3.5" />}
@@ -233,6 +235,12 @@ export function GrowthLeadCommandCenter({ lead, onLeadUpdated, onAddDecisionMake
             <p className="text-xs text-muted-foreground">Last touch {formatRelativeTime(lead.lastHumanTouchAt)}</p>
           ) : null}
 
+          {lead.callAttemptCount > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Calls: {lead.callAttemptCount} attempts · {lead.voicemailCount} voicemail · {lead.connectedCallCount} connected
+            </p>
+          ) : null}
+
           <GrowthNextBestActionBanner lead={lead} />
 
           {actionError ? (
@@ -243,11 +251,9 @@ export function GrowthLeadCommandCenter({ lead, onLeadUpdated, onAddDecisionMake
 
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {phone ? (
-              <Button asChild size="lg" className="h-11 justify-start gap-2 sm:col-span-2 lg:col-span-1">
-                <a href={`tel:${phone}`}>
-                  <Phone className="size-4" />
-                  Call
-                </a>
+              <Button size="lg" className="h-11 justify-start gap-2 sm:col-span-2 lg:col-span-1" onClick={() => setCallSheetOpen(true)}>
+                <Phone className="size-4" />
+                Call
               </Button>
             ) : (
               <Button size="lg" variant="outline" className="h-11 justify-start gap-2" disabled>
@@ -342,6 +348,17 @@ export function GrowthLeadCommandCenter({ lead, onLeadUpdated, onAddDecisionMake
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {phone ? (
+        <GrowthCallActionSheet
+          open={callSheetOpen}
+          onOpenChange={setCallSheetOpen}
+          leadId={lead.id}
+          phone={phone}
+          contactLabel={lead.contactName ?? lead.companyName}
+          onLeadUpdated={(updated) => onLeadUpdated?.(updated)}
+        />
+      ) : null}
     </>
   )
 }

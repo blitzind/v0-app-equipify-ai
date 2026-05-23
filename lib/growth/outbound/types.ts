@@ -70,6 +70,9 @@ export type GrowthEmailProviderConnection = {
   config: Record<string, unknown>
   lastWebhookAt: string | null
   lastError: string | null
+  monthlyCostEstimate: number | null
+  seatCount: number | null
+  notes: string | null
   createdBy: string | null
   createdAt: string
   updatedAt: string

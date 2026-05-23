@@ -10,6 +10,7 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "decision_maker_added",
   "decision_maker_confirmed",
   "decision_maker_rejected",
+  "call_started",
   "call_attempted",
   "voicemail_left",
   "interested",

@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 490,
-  sqlMigrations: 210,
+  apiRouteHandlers: 496,
+  sqlMigrations: 211,
   dashboardPages: 65,
-  componentsTsx: 353,
-  libTsFiles: 1025,
+  componentsTsx: 355,
+  libTsFiles: 1036,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **490** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **210** |
+| API route handlers (\`app/api/**/route.ts\`) | **496** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **211** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **353** |
-| \`lib/**/*.ts\` | **1025** |
+| \`components/**/*.tsx\` | **355** |
+| \`lib/**/*.ts\` | **1036** |
 
 ### Vercel crons
 
@@ -448,6 +448,8 @@ platform/blitzpay/reminder-runs/route.ts
 platform/blitzpay/revenue-rollup/route.ts
 platform/feature-requests/route.ts
 platform/growth/call-queue/route.ts
+platform/growth/communication-preferences/route.ts
+platform/growth/communication-settings/route.ts
 platform/growth/import-batches/[batchId]/commit/route.ts
 platform/growth/import-batches/[batchId]/dry-run/route.ts
 platform/growth/import-batches/[batchId]/events/route.ts
@@ -458,6 +460,8 @@ platform/growth/import-batches/route.ts
 platform/growth/import-mapping-profiles/route.ts
 platform/growth/import-vendors/route.ts
 platform/growth/leads/[leadId]/call-events/route.ts
+platform/growth/leads/[leadId]/call-sessions/[sessionId]/route.ts
+platform/growth/leads/[leadId]/call-sessions/route.ts
 platform/growth/leads/[leadId]/decision-makers/[dmId]/route.ts
 platform/growth/leads/[leadId]/decision-makers/route.ts
 platform/growth/leads/[leadId]/outbound/route.ts
@@ -467,8 +471,10 @@ platform/growth/leads/[leadId]/route.ts
 platform/growth/leads/[leadId]/timeline/manual-touch/route.ts
 platform/growth/leads/[leadId]/timeline/route.ts
 platform/growth/leads/route.ts
+platform/growth/outbound/connections/[connectionId]/route.ts
 platform/growth/outbound/connections/route.ts
 platform/growth/outbound/fixtures/process/route.ts
+platform/growth/outbound/providers/route.ts
 platform/growth/outbound/replies/[replyId]/classification/route.ts
 platform/growth/outbound/webhooks/[webhookId]/link-lead/route.ts
 platform/growth/outbound/webhooks/route.ts
