@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { GROWTH_LEAD_SOURCE_KINDS, GROWTH_LEAD_STATUSES, type GrowthLeadSourceKind, type GrowthLeadStatus } from "@/lib/growth/types"
+import { GROWTH_LEAD_SOURCE_KINDS, GROWTH_LEAD_STATUSES, GROWTH_LEAD_RESEARCH_PRIORITIES, type GrowthLeadResearchPriority, type GrowthLeadSourceKind, type GrowthLeadStatus } from "@/lib/growth/types"
 
 export type GrowthLeadFormValues = {
   sourceKind: GrowthLeadSourceKind
@@ -32,6 +32,7 @@ export type GrowthLeadFormValues = {
   city: string
   state: string
   status: GrowthLeadStatus
+  researchPriority: GrowthLeadResearchPriority
   notes: string
 }
 
@@ -46,6 +47,7 @@ const EMPTY_FORM: GrowthLeadFormValues = {
   city: "",
   state: "",
   status: "new",
+  researchPriority: "normal",
   notes: "",
 }
 
@@ -116,6 +118,24 @@ export function GrowthLeadFormDialog({
                   {GROWTH_LEAD_STATUSES.map((status) => (
                     <SelectItem key={status} value={status}>
                       {status.replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="growth-lead-research-priority">Research priority</Label>
+              <Select
+                value={form.researchPriority}
+                onValueChange={(value) => updateField("researchPriority", value as GrowthLeadResearchPriority)}
+              >
+                <SelectTrigger id="growth-lead-research-priority">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {GROWTH_LEAD_RESEARCH_PRIORITIES.map((priority) => (
+                    <SelectItem key={priority} value={priority}>
+                      {priority}
                     </SelectItem>
                   ))}
                 </SelectContent>

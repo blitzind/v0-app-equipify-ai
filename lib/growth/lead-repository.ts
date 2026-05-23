@@ -11,7 +11,7 @@ import type {
 } from "@/lib/growth/types"
 
 const LEAD_SELECT =
-  "id, source_kind, source_detail, external_ref, company_name, contact_name, contact_email, contact_phone, website, address_line1, city, state, postal_code, country, status, promoted_organization_id, promoted_prospect_id, promoted_at, score, notes, metadata, created_by, assigned_to, created_at, updated_at"
+  "id, source_kind, source_detail, external_ref, company_name, contact_name, contact_email, contact_phone, website, address_line1, city, state, postal_code, country, status, promoted_organization_id, promoted_prospect_id, promoted_at, score, notes, metadata, latest_research_run_id, last_researched_at, research_priority, created_by, assigned_to, created_at, updated_at"
 
 type GrowthLeadDbRow = {
   id: string
@@ -35,6 +35,9 @@ type GrowthLeadDbRow = {
   score: number | null
   notes: string | null
   metadata: Record<string, unknown> | null
+  latest_research_run_id: string | null
+  last_researched_at: string | null
+  research_priority: string
   created_by: string | null
   assigned_to: string | null
   created_at: string
@@ -68,6 +71,9 @@ function mapGrowthLeadRow(row: GrowthLeadDbRow): GrowthLead {
     score: row.score,
     notes: row.notes,
     metadata: row.metadata ?? {},
+    latestResearchRunId: row.latest_research_run_id,
+    lastResearchedAt: row.last_researched_at,
+    researchPriority: row.research_priority as GrowthLead["researchPriority"],
     createdBy: row.created_by,
     assignedTo: row.assigned_to,
     createdAt: row.created_at,
@@ -152,6 +158,7 @@ export async function createGrowthLead(
     score: input.score ?? null,
     notes: trimOrNull(input.notes),
     metadata: input.metadata ?? {},
+    research_priority: input.researchPriority ?? "normal",
     assigned_to: trimOrNull(input.assignedTo),
     created_by: trimOrNull(input.createdBy),
   }
@@ -208,6 +215,7 @@ export async function updateGrowthLead(
   if (input.score !== undefined) patch.score = input.score
   if (input.notes !== undefined) patch.notes = trimOrNull(input.notes)
   if (input.metadata !== undefined) patch.metadata = input.metadata
+  if (input.researchPriority !== undefined) patch.research_priority = input.researchPriority
   if (input.assignedTo !== undefined) patch.assigned_to = trimOrNull(input.assignedTo)
 
   if (Object.keys(patch).length === 0) {
@@ -240,6 +248,50 @@ export async function updateGrowthLead(
     leadId: lead.id,
     status: lead.status,
     patchedFields: Object.keys(patch),
+  })
+  return lead
+}
+
+export async function markGrowthLeadResearchCompleted(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    latestResearchRunId: string
+    equipifyFitScore: number
+    status: GrowthLeadStatus
+  },
+): Promise<GrowthLead | null> {
+  const now = new Date().toISOString()
+  const { data, error } = await growthLeadsTable(admin)
+    .update({
+      status: input.status,
+      score: input.equipifyFitScore,
+      latest_research_run_id: input.latestResearchRunId,
+      last_researched_at: now,
+    })
+    .eq("id", input.leadId)
+    .select(LEAD_SELECT)
+    .maybeSingle()
+
+  if (error) {
+    logGrowthEngine("lead_research_tracking_failed", {
+      table: "growth.leads",
+      action: "update",
+      leadId: input.leadId,
+      runId: input.latestResearchRunId,
+      code: error.code ?? null,
+      message: error.message,
+    })
+    throw new Error(error.message)
+  }
+
+  if (!data) return null
+
+  const lead = mapGrowthLeadRow(data as GrowthLeadDbRow)
+  logGrowthEngine("lead_research_tracking_updated", {
+    leadId: lead.id,
+    latestResearchRunId: input.latestResearchRunId,
+    lastResearchedAt: now,
   })
   return lead
 }

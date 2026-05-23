@@ -448,6 +448,24 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
     maxRetries: 2,
     confidenceThreshold: null,
   },
+  growth_lead_research: {
+    id: "growth_lead_research",
+    label: "Growth Engine lead research (internal)",
+    requiredPlan: "growth",
+    costTier: "medium",
+    modelTier: "balanced",
+    primaryModel: { provider: "openai", model: "gpt-4o-mini" },
+    fallbackModel: { provider: "anthropic", model: "claude-3-5-haiku-20241022" },
+    escalationModel: { provider: "openai", model: "gpt-4o" },
+    temperature: 0.25,
+    maxOutputTokens: 4096,
+    structuredMode: "json_object",
+    timeoutMs: 90_000,
+    maxRetries: 2,
+    confidenceThreshold: 0.5,
+    cacheable: true,
+    cacheTtlSeconds: 86400,
+  },
 }
 
 export function getTaskDefinition(id: AiTaskId): AiTaskDefinition {

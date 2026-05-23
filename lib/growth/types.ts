@@ -24,6 +24,10 @@ export const GROWTH_LEAD_STATUSES = [
 
 export type GrowthLeadStatus = (typeof GROWTH_LEAD_STATUSES)[number]
 
+export const GROWTH_LEAD_RESEARCH_PRIORITIES = ["low", "normal", "high", "critical"] as const
+
+export type GrowthLeadResearchPriority = (typeof GROWTH_LEAD_RESEARCH_PRIORITIES)[number]
+
 export type GrowthLead = {
   id: string
   sourceKind: GrowthLeadSourceKind
@@ -46,6 +50,9 @@ export type GrowthLead = {
   score: number | null
   notes: string | null
   metadata: Record<string, unknown>
+  latestResearchRunId: string | null
+  lastResearchedAt: string | null
+  researchPriority: GrowthLeadResearchPriority
   createdBy: string | null
   assignedTo: string | null
   createdAt: string
@@ -70,6 +77,7 @@ export type CreateGrowthLeadInput = {
   score?: number | null
   notes?: string | null
   metadata?: Record<string, unknown>
+  researchPriority?: GrowthLeadResearchPriority
   assignedTo?: string | null
   createdBy?: string | null
 }
@@ -92,6 +100,7 @@ export type UpdateGrowthLeadInput = {
   score?: number | null
   notes?: string | null
   metadata?: Record<string, unknown>
+  researchPriority?: GrowthLeadResearchPriority
   assignedTo?: string | null
 }
 

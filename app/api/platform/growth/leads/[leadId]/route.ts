@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchGrowthLeadById, updateGrowthLead } from "@/lib/growth/lead-repository"
-import { GROWTH_LEAD_SOURCE_KINDS, GROWTH_LEAD_STATUSES } from "@/lib/growth/types"
+import { GROWTH_LEAD_SOURCE_KINDS, GROWTH_LEAD_STATUSES, GROWTH_LEAD_RESEARCH_PRIORITIES } from "@/lib/growth/types"
 
 export const runtime = "nodejs"
 
@@ -27,6 +27,7 @@ const UpdateLeadSchema = z
     status: z.enum(GROWTH_LEAD_STATUSES).optional(),
     score: z.number().int().min(0).max(100).optional().nullable(),
     notes: optionalLongText,
+    researchPriority: z.enum(GROWTH_LEAD_RESEARCH_PRIORITIES).optional(),
     assignedTo: z.string().uuid().optional().nullable(),
   })
   .refine((value) => Object.keys(value).length > 0, { message: "empty_patch" })
@@ -98,6 +99,7 @@ export async function PATCH(
       status: body.status,
       score: body.score,
       notes: body.notes,
+      researchPriority: body.researchPriority,
       assignedTo: body.assignedTo,
     })
 

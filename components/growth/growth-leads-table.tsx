@@ -36,10 +36,11 @@ function formatDate(iso: string) {
 type GrowthLeadsTableProps = {
   leads: GrowthLead[]
   onStatusChange: (leadId: string, status: GrowthLeadStatus) => Promise<void>
+  onOpenLead?: (lead: GrowthLead) => void
   updatingLeadId?: string | null
 }
 
-export function GrowthLeadsTable({ leads, onStatusChange, updatingLeadId = null }: GrowthLeadsTableProps) {
+export function GrowthLeadsTable({ leads, onStatusChange, onOpenLead, updatingLeadId = null }: GrowthLeadsTableProps) {
   if (leads.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-background px-6 py-12 text-center text-sm text-muted-foreground">
@@ -56,21 +57,29 @@ export function GrowthLeadsTable({ leads, onStatusChange, updatingLeadId = null 
             <th className="px-4 py-3 text-left font-medium text-muted-foreground">Company</th>
             <th className="px-4 py-3 text-left font-medium text-muted-foreground">Contact</th>
             <th className="px-4 py-3 text-left font-medium text-muted-foreground">Source</th>
+            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Priority</th>
             <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
             <th className="px-4 py-3 text-left font-medium text-muted-foreground">Created</th>
+            <th className="px-4 py-3 text-left font-medium text-muted-foreground"> </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border bg-card">
           {leads.map((lead) => (
-            <tr key={lead.id}>
+            <tr key={lead.id} className="hover:bg-muted/30">
               <td className="px-4 py-3 align-top">
-                <div className="font-medium text-foreground">{lead.companyName}</div>
+                <button
+                  type="button"
+                  className="text-left"
+                  onClick={() => onOpenLead?.(lead)}
+                >
+                  <div className="font-medium text-foreground underline-offset-2 hover:underline">{lead.companyName}</div>
                 {lead.website ? <div className="text-xs text-muted-foreground">{lead.website}</div> : null}
                 {lead.city || lead.state ? (
                   <div className="text-xs text-muted-foreground">
                     {[lead.city, lead.state].filter(Boolean).join(", ")}
                   </div>
                 ) : null}
+                </button>
               </td>
               <td className="px-4 py-3 align-top">
                 <div>{lead.contactName ?? "—"}</div>
@@ -81,6 +90,7 @@ export function GrowthLeadsTable({ leads, onStatusChange, updatingLeadId = null 
                 <div className="capitalize">{lead.sourceKind.replace(/_/g, " ")}</div>
                 {lead.sourceDetail ? <div className="text-xs text-muted-foreground">{lead.sourceDetail}</div> : null}
               </td>
+              <td className="px-4 py-3 align-top capitalize text-muted-foreground">{lead.researchPriority}</td>
               <td className="px-4 py-3 align-top">
                 <select
                   className={cn(
@@ -99,6 +109,15 @@ export function GrowthLeadsTable({ leads, onStatusChange, updatingLeadId = null 
                 </select>
               </td>
               <td className="px-4 py-3 align-top text-muted-foreground">{formatDate(lead.createdAt)}</td>
+              <td className="px-4 py-3 align-top">
+                <button
+                  type="button"
+                  className="text-xs font-medium text-primary hover:underline"
+                  onClick={() => onOpenLead?.(lead)}
+                >
+                  Research
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>

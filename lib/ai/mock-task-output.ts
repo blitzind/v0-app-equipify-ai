@@ -553,6 +553,28 @@ export async function buildMockStructuredOutput<T>(params: {
       }
       break
     }
+    case "growth_lead_research": {
+      rawObj = {
+        company_summary:
+          "Preview field-service company — likely maintains commercial HVAC or industrial equipment in a regional service area.",
+        website_summary: null,
+        likely_service_category: "Commercial HVAC / equipment service",
+        service_area_clues: ["Regional metro area", "On-site service language in lead notes"],
+        company_size_estimate: "10–40 employees (estimate — verify manually)",
+        equipment_service_indicators: ["Preventive maintenance", "Service trucks / dispatch"],
+        equipify_pain_points: ["Manual scheduling", "Paper work orders", "Invoice follow-up"],
+        equipify_fit_score: 62,
+        outreach_angles: [
+          "Lead with maintenance-plan upsell story",
+          "Highlight dispatch + work order mobile flow",
+        ],
+        recommended_next_action: "Verify company size and service mix on a discovery call before outreach.",
+        research_confidence: 0.45,
+        source_urls: [],
+        caveats: ["Trial AI preview — not verified against live sources."],
+      }
+      break
+    }
     default:
       rawObj = {
         message:

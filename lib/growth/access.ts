@@ -11,6 +11,15 @@ export function isGrowthEngineEnabledEnv(): boolean {
   return process.env.GROWTH_ENGINE_ENABLED?.trim() === "true"
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/** Org UUID used for ai_usage_logs when running internal Growth Engine research. */
+export function getGrowthEngineAiOrgId(): string | null {
+  const id = process.env.GROWTH_ENGINE_AI_ORG_ID?.trim()
+  return id && UUID_RE.test(id) ? id : null
+}
+
 export function logGrowthEngine(event: string, details: Record<string, unknown>): void {
   console.info(
     JSON.stringify({

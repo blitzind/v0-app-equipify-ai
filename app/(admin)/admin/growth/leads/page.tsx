@@ -6,6 +6,7 @@ import { ArrowLeft, ChevronRight, Loader2, Plus, RefreshCw, Target } from "lucid
 import { BrandLogo } from "@/components/brand-logo"
 import { Button } from "@/components/ui/button"
 import { GrowthLeadFormDialog, type GrowthLeadFormValues } from "@/components/growth/growth-lead-form-dialog"
+import { GrowthLeadDrawer } from "@/components/growth/growth-lead-drawer"
 import { GrowthLeadsTable } from "@/components/growth/growth-leads-table"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import type { GrowthLead, GrowthLeadStatus } from "@/lib/growth/types"
@@ -17,6 +18,8 @@ export default function AdminGrowthLeadsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [updatingLeadId, setUpdatingLeadId] = useState<string | null>(null)
+  const [selectedLead, setSelectedLead] = useState<GrowthLead | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   const counts = useMemo(() => {
     return leads.reduce<Record<string, number>>((acc, lead) => {
@@ -69,6 +72,7 @@ export default function AdminGrowthLeadsPage() {
           city: values.city || null,
           state: values.state || null,
           status: values.status,
+          researchPriority: values.researchPriority,
           notes: values.notes || null,
         }),
       })
@@ -115,6 +119,16 @@ export default function AdminGrowthLeadsPage() {
     } finally {
       setUpdatingLeadId(null)
     }
+  }
+
+  function openLead(lead: GrowthLead) {
+    setSelectedLead(lead)
+    setDrawerOpen(true)
+  }
+
+  function handleLeadUpdated(leadId: string, patch: Partial<GrowthLead>) {
+    setLeads((prev) => prev.map((lead) => (lead.id === leadId ? { ...lead, ...patch } : lead)))
+    setSelectedLead((prev) => (prev && prev.id === leadId ? { ...prev, ...patch } : prev))
   }
 
   return (
@@ -186,9 +200,21 @@ export default function AdminGrowthLeadsPage() {
             Loading growth leads…
           </div>
         ) : (
-          <GrowthLeadsTable leads={leads} onStatusChange={updateLeadStatus} updatingLeadId={updatingLeadId} />
+          <GrowthLeadsTable
+            leads={leads}
+            onStatusChange={updateLeadStatus}
+            onOpenLead={openLead}
+            updatingLeadId={updatingLeadId}
+          />
         )}
       </main>
+
+      <GrowthLeadDrawer
+        lead={selectedLead}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        onLeadUpdated={handleLeadUpdated}
+      />
 
       <GrowthLeadFormDialog open={createOpen} onOpenChange={setCreateOpen} onSubmit={createLead} saving={saving} />
     </div>
