@@ -1,11 +1,9 @@
 "use client"
 
 import { Bot } from "lucide-react"
-import Link from "next/link"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthAiCopilotDashboard } from "@/components/growth/growth-ai-copilot-dashboard"
-import { GrowthLeadsSubnav } from "@/components/growth/growth-leads-subnav"
-import { Button } from "@/components/ui/button"
+import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -38,15 +36,11 @@ export default function AdminGrowthCopilotPage() {
               </p>
             </div>
           </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <GrowthLeadsSubnav />
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/admin/growth/copilot/playbooks">Playbook training</Link>
-            </Button>
-          </div>
         </section>
 
-        <GrowthAiCopilotDashboard />
+        <GrowthSectionLayout>
+          <GrowthAiCopilotDashboard />
+        </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>
   )

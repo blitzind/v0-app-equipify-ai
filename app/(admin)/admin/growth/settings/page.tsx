@@ -4,7 +4,7 @@ import { Settings2 } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthCommunicationSettingsPanel } from "@/components/growth/growth-communication-settings"
 import { GrowthAiCopilotSettingsPanel } from "@/components/growth/growth-ai-copilot-settings"
-import { GrowthLeadsSubnav } from "@/components/growth/growth-leads-subnav"
+import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -37,14 +37,12 @@ export default function AdminGrowthSettingsPage() {
               </p>
             </div>
           </div>
-          <div className="mt-4">
-            <GrowthLeadsSubnav />
-          </div>
         </section>
 
-        <GrowthCommunicationSettingsPanel />
-
-        <GrowthAiCopilotSettingsPanel />
+        <GrowthSectionLayout>
+          <GrowthCommunicationSettingsPanel />
+          <GrowthAiCopilotSettingsPanel />
+        </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>
   )

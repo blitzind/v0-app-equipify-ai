@@ -4,7 +4,7 @@ import { use } from "react"
 import { Upload } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthImportBatchWizard } from "@/components/growth/growth-import-batch-wizard"
-import { GrowthLeadsSubnav } from "@/components/growth/growth-leads-subnav"
+import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -38,12 +38,11 @@ export default function AdminGrowthImportBatchPage({ params }: { params: Promise
               </p>
             </div>
           </div>
-          <div className="mt-4">
-            <GrowthLeadsSubnav />
-          </div>
         </section>
 
-        <GrowthImportBatchWizard batchId={batchId} />
+        <GrowthSectionLayout>
+          <GrowthImportBatchWizard batchId={batchId} />
+        </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>
   )

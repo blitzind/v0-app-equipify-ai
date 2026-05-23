@@ -6,7 +6,7 @@ import { useAdmin } from "@/lib/admin-store"
 import { Button } from "@/components/ui/button"
 import { GrowthLeadFormDialog, type GrowthLeadFormValues } from "@/components/growth/growth-lead-form-dialog"
 import { GrowthLeadDrawer } from "@/components/growth/growth-lead-drawer"
-import { GrowthLeadsSubnav } from "@/components/growth/growth-leads-subnav"
+import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import { GrowthLeadsTable } from "@/components/growth/growth-leads-table"
 import {
   PlatformAdminPageShell,
@@ -193,9 +193,6 @@ export default function AdminGrowthLeadsPage() {
                   </p>
                 </div>
               </div>
-              <div className="mt-4">
-                <GrowthLeadsSubnav />
-              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
@@ -219,6 +216,7 @@ export default function AdminGrowthLeadsPage() {
           </div>
         </section>
 
+        <GrowthSectionLayout>
         {error ? (
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             {error}
@@ -246,6 +244,7 @@ export default function AdminGrowthLeadsPage() {
             deletingLeadId={deletingLeadId}
           />
         )}
+        </GrowthSectionLayout>
       </div>
 
       <GrowthLeadDrawer

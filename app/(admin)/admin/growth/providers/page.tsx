@@ -2,7 +2,7 @@
 
 import { Plug } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
-import { GrowthLeadsSubnav } from "@/components/growth/growth-leads-subnav"
+import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import { GrowthProvidersDashboard } from "@/components/growth/growth-providers-dashboard"
 import {
   PlatformAdminPageShell,
@@ -36,12 +36,11 @@ export default function AdminGrowthProvidersPage() {
               </p>
             </div>
           </div>
-          <div className="mt-4">
-            <GrowthLeadsSubnav />
-          </div>
         </section>
 
-        <GrowthProvidersDashboard />
+        <GrowthSectionLayout>
+          <GrowthProvidersDashboard />
+        </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>
   )

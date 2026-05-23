@@ -3,7 +3,7 @@
 import { Handshake } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthRelationshipDashboard } from "@/components/growth/growth-relationship-dashboard"
-import { GrowthLeadsSubnav } from "@/components/growth/growth-leads-subnav"
+import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -36,12 +36,11 @@ export default function AdminGrowthRelationshipsPage() {
               </p>
             </div>
           </div>
-          <div className="mt-4">
-            <GrowthLeadsSubnav />
-          </div>
         </section>
 
-        <GrowthRelationshipDashboard />
+        <GrowthSectionLayout>
+          <GrowthRelationshipDashboard />
+        </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>
   )

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { Mail } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
-import { GrowthLeadsSubnav } from "@/components/growth/growth-leads-subnav"
+import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import { GrowthOutreachCenter } from "@/components/growth/growth-outreach-center"
 import {
   PlatformAdminPageShell,
@@ -38,12 +38,11 @@ export default function AdminGrowthOutreachPage() {
               </p>
             </div>
           </div>
-          <div className="mt-4">
-            <GrowthLeadsSubnav />
-          </div>
         </section>
 
-        <GrowthOutreachCenter onProcessFixture={() => router.refresh()} />
+        <GrowthSectionLayout>
+          <GrowthOutreachCenter onProcessFixture={() => router.refresh()} />
+        </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>
   )

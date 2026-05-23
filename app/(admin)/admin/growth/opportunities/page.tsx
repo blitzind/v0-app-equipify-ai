@@ -3,7 +3,7 @@
 import { Target } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthOpportunityDashboard } from "@/components/growth/growth-opportunity-dashboard"
-import { GrowthLeadsSubnav } from "@/components/growth/growth-leads-subnav"
+import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -36,12 +36,11 @@ export default function AdminGrowthOpportunitiesPage() {
               </p>
             </div>
           </div>
-          <div className="mt-4">
-            <GrowthLeadsSubnav />
-          </div>
         </section>
 
-        <GrowthOpportunityDashboard />
+        <GrowthSectionLayout>
+          <GrowthOpportunityDashboard />
+        </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>
   )

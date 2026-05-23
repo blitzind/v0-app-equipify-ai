@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ArrowDown, Check, Loader2, Plus, RefreshCw, Sparkles, X } from "lucide-react"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -296,9 +295,6 @@ export function GrowthAiCopilotPlaybooksDashboard() {
           <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
             <RefreshCw className="mr-1 size-3.5" />
             Refresh
-          </Button>
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/admin/growth/copilot">Back to Copilot</Link>
           </Button>
         </div>
       </div>

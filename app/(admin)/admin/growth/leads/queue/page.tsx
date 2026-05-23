@@ -6,7 +6,7 @@ import { useAdmin } from "@/lib/admin-store"
 import { Button } from "@/components/ui/button"
 import { GrowthCallQueueTable } from "@/components/growth/growth-call-queue-table"
 import { GrowthLeadDrawer } from "@/components/growth/growth-lead-drawer"
-import { GrowthLeadsSubnav } from "@/components/growth/growth-leads-subnav"
+import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -180,9 +180,6 @@ export default function AdminGrowthCallQueuePage() {
                   </p>
                 </div>
               </div>
-              <div className="mt-4">
-                <GrowthLeadsSubnav />
-              </div>
             </div>
             <Button variant="outline" size="sm" onClick={() => void load(filter)} disabled={loading}>
               {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}
@@ -209,6 +206,7 @@ export default function AdminGrowthCallQueuePage() {
           </div>
         </section>
 
+        <GrowthSectionLayout>
         {error ? (
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             {error}
@@ -235,6 +233,7 @@ export default function AdminGrowthCallQueuePage() {
             recordingLeadId={recordingLeadId ?? openingLeadId}
           />
         )}
+        </GrowthSectionLayout>
       </div>
 
       <GrowthLeadDrawer

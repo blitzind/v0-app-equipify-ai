@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation"
 import { Upload } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthImportCenter } from "@/components/growth/growth-import-center"
-import { GrowthLeadsSubnav } from "@/components/growth/growth-leads-subnav"
+import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -38,12 +38,11 @@ export default function AdminGrowthImportsPage() {
               </p>
             </div>
           </div>
-          <div className="mt-4">
-            <GrowthLeadsSubnav />
-          </div>
         </section>
 
-        <GrowthImportCenter onUploaded={(batchId) => router.push(`/admin/growth/imports/${batchId}`)} />
+        <GrowthSectionLayout>
+          <GrowthImportCenter onUploaded={(batchId) => router.push(`/admin/growth/imports/${batchId}`)} />
+        </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>
   )

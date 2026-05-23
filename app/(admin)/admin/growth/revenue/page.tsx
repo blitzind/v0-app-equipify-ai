@@ -3,7 +3,7 @@
 import { TrendingUp } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthRevenueForecastDashboard } from "@/components/growth/growth-revenue-forecast-dashboard"
-import { GrowthLeadsSubnav } from "@/components/growth/growth-leads-subnav"
+import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -36,12 +36,11 @@ export default function AdminGrowthRevenuePage() {
               </p>
             </div>
           </div>
-          <div className="mt-4">
-            <GrowthLeadsSubnav />
-          </div>
         </section>
 
-        <GrowthRevenueForecastDashboard />
+        <GrowthSectionLayout>
+          <GrowthRevenueForecastDashboard />
+        </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>
   )

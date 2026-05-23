@@ -3,7 +3,7 @@
 import { Crown } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthExecutiveOperatingDashboard } from "@/components/growth/growth-executive-operating-dashboard"
-import { GrowthLeadsSubnav } from "@/components/growth/growth-leads-subnav"
+import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -36,12 +36,11 @@ export default function AdminGrowthExecutivePage() {
               </p>
             </div>
           </div>
-          <div className="mt-4">
-            <GrowthLeadsSubnav />
-          </div>
         </section>
 
-        <GrowthExecutiveOperatingDashboard />
+        <GrowthSectionLayout>
+          <GrowthExecutiveOperatingDashboard />
+        </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>
   )
