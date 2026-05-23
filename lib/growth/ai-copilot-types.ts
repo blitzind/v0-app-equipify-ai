@@ -122,6 +122,8 @@ export type GrowthCopilotSettings = {
   aiCopilotPlaybookEnabled: boolean
   aiCopilotPlaybookMaxRulesPerGeneration: number
   aiCopilotPlaybookSourceRetentionDays: number
+  callCopilotEnabled: boolean
+  callCopilotRequireSummaryApproval: boolean
   updatedBy: string | null
   createdAt: string
   updatedAt: string

@@ -26,7 +26,7 @@ function effectivenessTable(admin: SupabaseClient) {
 }
 
 const SETTINGS_SELECT =
-  "id, ai_copilot_enabled, ai_copilot_human_approval_required, ai_copilot_store_generations, ai_copilot_generation_retention_days, ai_copilot_default_prompt_variant, ai_copilot_playbook_enabled, ai_copilot_playbook_max_rules_per_generation, ai_copilot_playbook_source_retention_days, updated_by, created_at, updated_at"
+  "id, ai_copilot_enabled, ai_copilot_human_approval_required, ai_copilot_store_generations, ai_copilot_generation_retention_days, ai_copilot_default_prompt_variant, ai_copilot_playbook_enabled, ai_copilot_playbook_max_rules_per_generation, ai_copilot_playbook_source_retention_days, call_copilot_enabled, call_copilot_require_summary_approval, updated_by, created_at, updated_at"
 
 const RULES_SELECT =
   "id, rule_key, label, description, enabled, rule_config, sort_order, created_at, updated_at"
@@ -44,6 +44,8 @@ type SettingsRow = {
   ai_copilot_playbook_enabled: boolean
   ai_copilot_playbook_max_rules_per_generation: number
   ai_copilot_playbook_source_retention_days: number
+  call_copilot_enabled: boolean
+  call_copilot_require_summary_approval: boolean
   updated_by: string | null
   created_at: string
   updated_at: string
@@ -162,6 +164,10 @@ export async function updateGrowthCopilotSettings(
   }
   if (input.aiCopilotPlaybookSourceRetentionDays !== undefined) {
     patch.ai_copilot_playbook_source_retention_days = input.aiCopilotPlaybookSourceRetentionDays
+  }
+  if (input.callCopilotEnabled !== undefined) patch.call_copilot_enabled = input.callCopilotEnabled
+  if (input.callCopilotRequireSummaryApproval !== undefined) {
+    patch.call_copilot_require_summary_approval = input.callCopilotRequireSummaryApproval
   }
 
   const { data, error } = await copilotSettingsTable(admin)

@@ -143,6 +143,13 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
         consoleKey: "playbooks",
       },
       {
+        href: "/admin/growth/calls",
+        label: "Calls",
+        icon: Phone,
+        match: (path) => path.startsWith("/admin/growth/calls"),
+        consoleKey: "calls",
+      },
+      {
         href: "/admin/growth/outreach",
         label: "Outreach",
         icon: Mail,

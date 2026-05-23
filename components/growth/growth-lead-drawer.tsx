@@ -12,6 +12,7 @@ import { GrowthRevenueForecast } from "@/components/growth/growth-revenue-foreca
 import { GrowthExecutiveOperatingIntelligence } from "@/components/growth/growth-executive-operating-intelligence"
 import { GrowthOperationalCapacityIntelligence } from "@/components/growth/growth-operational-capacity-intelligence"
 import { GrowthAiCopilot } from "@/components/growth/growth-ai-copilot"
+import { GrowthCallCopilot } from "@/components/growth/growth-call-copilot"
 import { GrowthLeadCommandCenter } from "@/components/growth/growth-lead-command-center"
 import { GrowthLeadResearchPanel } from "@/components/growth/growth-lead-research-panel"
 import { GrowthLeadTimelinePanel } from "@/components/growth/growth-lead-timeline-panel"
@@ -88,6 +89,8 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated }: Gr
       <GrowthOutboundPanel lead={activeLead} />
 
       <GrowthAiCopilot lead={activeLead} />
+
+      <GrowthCallCopilot lead={activeLead} />
 
       <GrowthLeadResearchPanel
         id="growth-research"

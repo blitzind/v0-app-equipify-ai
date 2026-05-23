@@ -732,3 +732,85 @@ export async function emitGrowthLeadPlaybookConflictDetectedTimeline(
     actor: input.actor,
   })
 }
+
+export async function emitGrowthLeadCallCopilotSessionStartedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    sessionId: string
+    highRiskCall: boolean
+    actor?: { userId: string | null; email: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "call_copilot_session_started",
+    title: "Call Copilot session started",
+    summary: input.highRiskCall ? "High risk call — briefing active." : "Call Copilot in-call guidance active.",
+    payload: { sessionId: input.sessionId, highRiskCall: input.highRiskCall },
+    actor: input.actor,
+  })
+}
+
+export async function emitGrowthLeadCallCopilotObjectionCapturedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    sessionId: string
+    objectionPreview: string
+    actor?: { userId: string | null; email: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "call_copilot_objection_captured",
+    title: "Call Copilot objection captured",
+    summary: input.objectionPreview,
+    payload: { sessionId: input.sessionId },
+    actor: input.actor,
+  })
+}
+
+export async function emitGrowthLeadCallCopilotSessionCompletedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    sessionId: string
+    suggestedDisposition: string | null
+    callOutcomeConfidence: number
+    actor?: { userId: string | null; email: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "call_copilot_session_completed",
+    title: "Call Copilot session completed",
+    summary: input.suggestedDisposition
+      ? `Suggested ${input.suggestedDisposition} · confidence ${input.callOutcomeConfidence}`
+      : `Confidence ${input.callOutcomeConfidence}`,
+    payload: {
+      sessionId: input.sessionId,
+      suggestedDisposition: input.suggestedDisposition,
+      callOutcomeConfidence: input.callOutcomeConfidence,
+    },
+    actor: input.actor,
+  })
+}
+
+export async function emitGrowthLeadCallCopilotSummaryApprovedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    sessionId: string
+    actor?: { userId: string | null; email: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "call_copilot_summary_approved",
+    title: "Call Copilot summary approved",
+    summary: "Post-call summary approved by rep.",
+    payload: { sessionId: input.sessionId },
+    actor: input.actor,
+  })
+}

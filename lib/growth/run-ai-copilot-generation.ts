@@ -26,6 +26,7 @@ import {
   GROWTH_AI_COPILOT_PROMPT_VERSION,
   type GrowthAiCopilotGeneration,
   type GrowthAiCopilotGenerationType,
+  type GrowthAiCopilotInputSnapshot,
   type GrowthAiCopilotPromptVariant,
 } from "@/lib/growth/ai-copilot-types"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
@@ -51,6 +52,7 @@ export type RunGrowthAiCopilotGenerationInput = {
   generationType: GrowthAiCopilotGenerationType
   promptVariant?: GrowthAiCopilotPromptVariant | string
   sourceReplyId?: string | null
+  snapshotOverrides?: Partial<GrowthAiCopilotInputSnapshot>
   actingUserId: string
   actingUserEmail: string
 }
@@ -94,9 +96,12 @@ export async function runGrowthAiCopilotGeneration(
   }
 
   const promptVariant = input.promptVariant ?? settings.aiCopilotDefaultPromptVariant
-  const snapshot = await buildGrowthAiCopilotInput(input.admin, lead, {
-    sourceReplyId: input.sourceReplyId,
-  })
+  const snapshot = {
+    ...(await buildGrowthAiCopilotInput(input.admin, lead, {
+      sourceReplyId: input.sourceReplyId,
+    })),
+    ...(input.snapshotOverrides ?? {}),
+  }
   const inputHash = growthAiCopilotInputHash({
     generationType: input.generationType,
     promptVariant,

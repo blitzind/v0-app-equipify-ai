@@ -32,6 +32,7 @@ export type GrowthSidebarConsoleKey =
   | "capacity"
   | "copilot"
   | "playbooks"
+  | "calls"
   | "outreach"
   | "providers"
 
@@ -82,6 +83,7 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
       executiveRes,
       capacityRes,
       playbooksRes,
+      callsRes,
       engagementRes,
       relationshipsRes,
       opportunitiesRes,
@@ -120,6 +122,9 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
         }
       }>("/api/platform/growth/capacity/dashboard"),
       fetchJson<{ ok?: boolean; draftRules?: unknown[] }>("/api/platform/growth/copilot/playbooks"),
+      fetchJson<{ ok?: boolean; dashboard?: { stats?: { activeCount?: number; highRiskActive?: number } } }>(
+        "/api/platform/growth/calls/dashboard",
+      ),
       fetchJson<{
         ok?: boolean
         dashboard?: {
@@ -153,6 +158,7 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
     const executive = executiveRes?.dashboard
     const capacity = capacityRes?.dashboard
     const playbooksDraftCount = playbooksRes?.draftRules?.length ?? 0
+    const calls = callsRes?.dashboard
     const engagement = engagementRes?.dashboard
     const relationships = relationshipsRes?.dashboard
     const opportunities = opportunitiesRes?.dashboard
@@ -176,6 +182,7 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
         revenue: revenueAttention > 0 ? revenueAttention : undefined,
         executive: executiveTier.executive_now ?? undefined,
         playbooks: playbooksDraftCount > 0 ? playbooksDraftCount : undefined,
+        calls: calls?.stats?.activeCount ? calls.stats.activeCount : undefined,
         engagement: engagement?.hotLeads?.length ?? undefined,
         opportunities: opportunities?.priorityOpportunities?.length ?? undefined,
       },
@@ -214,6 +221,10 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
           { label: "Blocked", value: opportunities?.blockedOpportunities?.length ?? 0 },
         ],
         playbooks: [{ label: "Draft rules", value: playbooksDraftCount }],
+        calls: [
+          { label: "Active", value: calls?.stats?.activeCount ?? 0 },
+          { label: "High risk", value: calls?.stats?.highRiskActive ?? 0 },
+        ],
       },
       health: {
         revenueRisk: regressionCount,

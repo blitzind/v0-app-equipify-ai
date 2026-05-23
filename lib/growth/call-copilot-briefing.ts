@@ -1,0 +1,125 @@
+import "server-only"
+
+import type { SupabaseClient } from "@supabase/supabase-js"
+import { buildGrowthAiCopilotInput } from "@/lib/growth/ai-copilot-input"
+import {
+  describeFrameworkKeys,
+  GROWTH_AI_COPILOT_OBJECTION_FRAMEWORK,
+  resolveGrowthAiCopilotFrameworkKeys,
+} from "@/lib/growth/ai-copilot-frameworks"
+import { fetchGrowthCopilotSettings } from "@/lib/growth/ai-copilot-repository"
+import { buildPlaybookAttribution, computePlaybookInfluenceScore } from "@/lib/growth/ai-copilot-playbook-influence"
+import { resolveGrowthAiCopilotPlaybookRules } from "@/lib/growth/ai-copilot-playbook-resolver"
+import type { GrowthCallCopilotBriefing } from "@/lib/growth/call-copilot-types"
+import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
+import type { GrowthLead } from "@/lib/growth/types"
+
+export {
+  computeBriefEffectivenessScore,
+  computeCallOutcomeConfidence,
+  suggestCallDisposition,
+} from "@/lib/growth/call-copilot-heuristics"
+
+function isHighRiskCall(lead: GrowthLead, riskWarnings: string[]): boolean {
+  if (lead.executivePriorityTier === "executive_now") return true
+  if (lead.operationalCapacityTier === "critical") return true
+  if ((lead.intelligenceConflictSeverityScore ?? 0) >= 50) return true
+  if (lead.opportunityBlockers.some((b) => b.key === "suppressed" || b.key === "not_interested")) return true
+  return riskWarnings.length >= 3
+}
+
+export async function buildGrowthCallCopilotBriefing(
+  admin: SupabaseClient,
+  lead: GrowthLead,
+): Promise<GrowthCallCopilotBriefing> {
+  const [decisionMakers, inputSnapshot, settings] = await Promise.all([
+    listGrowthLeadDecisionMakers(admin, lead.id),
+    buildGrowthAiCopilotInput(admin, lead),
+    fetchGrowthCopilotSettings(admin),
+  ])
+
+  const frameworks = resolveGrowthAiCopilotFrameworkKeys(lead)
+  const likelyObjections = describeFrameworkKeys(
+    frameworks.objections,
+    GROWTH_AI_COPILOT_OBJECTION_FRAMEWORK,
+  )
+
+  const playbookRules = settings.aiCopilotPlaybookEnabled
+    ? (
+        await resolveGrowthAiCopilotPlaybookRules(admin, {
+          generationType: "call_opening",
+          maxRules: settings.aiCopilotPlaybookMaxRulesPerGeneration,
+          leadIndustryTags: [],
+        })
+      ).rules
+    : []
+
+  const doNotSay: string[] = []
+  for (const rule of playbookRules) {
+    if (rule.category === "words_to_avoid") doNotSay.push(rule.title)
+  }
+  if (lead.opportunityBlockers.some((b) => b.key === "suppressed")) {
+    doNotSay.push("Do not pitch — lead is suppressed.")
+  }
+
+  const riskWarnings: string[] = []
+  if (lead.executivePriorityTier === "executive_now") {
+    riskWarnings.push("Executive intervention tier — leadership attention required.")
+  }
+  if (lead.operationalCapacityTier === "constrained" || lead.operationalCapacityTier === "critical") {
+    riskWarnings.push(`Capacity ${lead.operationalCapacityTier} — protect close motion pacing.`)
+  }
+  if ((lead.intelligenceConflictSeverityScore ?? 0) >= 40) {
+    riskWarnings.push("Intelligence conflicts detected across caches.")
+  }
+  if (lead.revenueTrajectory === "at_risk" || lead.revenueTrajectory === "slowing") {
+    riskWarnings.push("Revenue trajectory slowing or at risk.")
+  }
+  if (lead.decisionMakerStatus !== "confirmed" && lead.decisionMakerStatus !== "verified_contactable") {
+    riskWarnings.push("Decision maker not confirmed.")
+  }
+
+  const whyNow =
+    lead.nextBestActionReason?.trim() ||
+    lead.executiveRecommendation?.trim() ||
+    `NBA: ${lead.nextBestAction ?? "call_now"} with ${lead.engagementTier ?? "unknown"} engagement.`
+
+  const openingLine = lead.contactName
+    ? `Hi ${lead.contactName.split(" ")[0]} — calling from Equipify about ${lead.companyName}.`
+    : `Hi — calling about ${lead.companyName}.`
+
+  const recommendedCta =
+    lead.nextBestAction === "call_now" || lead.nextBestAction === "call_immediately"
+      ? "Confirm a short follow-up or demo slot before ending the call."
+      : "Agree on one concrete next step with a date."
+
+  const influenceScore = computePlaybookInfluenceScore(playbookRules)
+  const attribution = buildPlaybookAttribution({ rules: playbookRules, conflicts: [] })
+
+  const briefing: GrowthCallCopilotBriefing = {
+    whoToCall: {
+      contactName: lead.contactName,
+      companyName: lead.companyName,
+      phone: lead.contactPhone,
+      decisionMakers: decisionMakers.slice(0, 4).map((dm) => ({
+        name: dm.fullName,
+        title: dm.title,
+        status: dm.status,
+      })),
+    },
+    whyNow,
+    likelyObjections,
+    openingLine,
+    recommendedCta,
+    doNotSay,
+    riskWarnings,
+    highRiskCall: isHighRiskCall(lead, riskWarnings),
+    playbookInfluence:
+      playbookRules.length > 0
+        ? { score: influenceScore, ruleTitles: attribution.ruleTitles }
+        : undefined,
+  }
+
+  void inputSnapshot
+  return briefing
+}
