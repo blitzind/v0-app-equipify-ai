@@ -17,9 +17,11 @@ import {
   describeSequenceStartUnavailable,
   formatEnrollmentCurrentStepLabel,
   formatEnrollmentStatusLabel,
-  formatStepStatusDetail,
+  formatSequenceUserMessage,
+  formatStepStatusMeta,
   formatStepStatusLabel,
   growthSequenceEnrollmentActionRequired,
+  formatSequenceUserMessage,
   mapPreflightCodeToMessage,
 } from "../lib/growth/sequence-enrollment/sequence-enrollment-ui"
 import type { GrowthLead } from "../lib/growth/types"
@@ -162,23 +164,24 @@ const draftEnrollment = {
   steps: [{ stepOrder: 1, channel: "email", status: "pending", stepExecutionConfidence: 20 }],
 } as unknown as GrowthSequenceEnrollmentWithSteps
 
-assert.equal(formatEnrollmentCurrentStepLabel(draftEnrollment), "Planning")
+assert.equal(formatEnrollmentCurrentStepLabel(draftEnrollment), "Awaiting Confirmation")
 assert.equal(formatEnrollmentStatusLabel("active"), "Active Sequence")
 assert.equal(formatStepStatusLabel("draft_created"), "Pending Approval")
-assert.equal(formatStepStatusDetail({ status: "skipped", stepExecutionConfidence: 20 } as GrowthSequenceEnrollmentStep), "Skipped")
+assert.equal(formatStepStatusMeta({ status: "skipped", stepExecutionConfidence: 20 } as GrowthSequenceEnrollmentStep), "Skipped")
 assert.equal(
-  formatStepStatusDetail({ status: "queued", stepExecutionConfidence: 20 } as GrowthSequenceEnrollmentStep),
-  "Pending Queue · Confidence 20%",
+  formatStepStatusMeta({ status: "queued", stepExecutionConfidence: 20 } as GrowthSequenceEnrollmentStep),
+  "Pending Queue • Confidence 20%",
 )
-assert.equal(growthSequenceEnrollmentActionRequired(draftEnrollment), true)
+assert.equal(growthSequenceEnrollmentActionRequired(draftEnrollment), false)
 assert.equal(
   growthSequenceEnrollmentActionRequired({
     ...draftEnrollment,
     status: "active",
-    currentStepOrder: 1,
-    steps: [{ stepOrder: 2, channel: "manual_call", status: "executed", stepExecutionConfidence: 80 }],
+    currentStepOrder: 0,
+    steps: [{ stepOrder: 1, channel: "email", status: "draft_created", stepExecutionConfidence: 20 }],
   } as unknown as GrowthSequenceEnrollmentWithSteps),
-  false,
+  true,
 )
+assert.equal(formatSequenceUserMessage({ code: "active_enrollment", message: "active_enrollment" }), "Existing sequence active")
 
 console.log("growth-sequence-execution: all assertions passed")

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { GitBranch, Loader2 } from "lucide-react"
+import { Clock3, GitBranch, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -24,9 +24,11 @@ import type {
 } from "@/lib/growth/sequence-enrollment-types"
 import {
   GROWTH_SEQUENCE_TEST_PATTERN_KEYS,
+  buildSequenceProgressStages,
   enrollmentStatusTone,
   formatEnrollmentCollapsedSummary,
   formatEnrollmentCurrentStepLabel,
+  formatEnrollmentDisplayConfidence,
   formatEnrollmentNextAction,
   formatEnrollmentStatusLabel,
   formatHumanPhrase,
@@ -36,9 +38,12 @@ import {
   formatSequencePatternTitle,
   formatSequencePatternTitleFromPattern,
   formatSequenceChannelLabel,
-  formatStepStatusDetail,
+  formatSequenceScheduledFor,
+  formatSequenceUserMessage,
   formatStepStatusLabel,
+  formatStepStatusMeta,
   getEnrollmentCurrentStep,
+  getSequenceProgressStageKey,
   growthSequenceEnrollmentActionRequired,
   mapPreflightCodeToMessage,
   stepStatusTone,
@@ -70,6 +75,38 @@ function isNextStep(value: GrowthLead["recommendedSequenceNextStep"]): value is 
   return typeof value === "object" && value != null && "stepOrder" in value
 }
 
+function SequenceProgressBar({ enrollment }: { enrollment: GrowthSequenceEnrollmentWithSteps }) {
+  const stages = buildSequenceProgressStages(enrollment)
+  const activeKey = getSequenceProgressStageKey(enrollment)
+
+  return (
+    <div className="overflow-x-auto pb-1">
+      <div className="flex min-w-max items-center gap-1.5 text-xs">
+        {stages.map((stage, index) => {
+          const isActive = stage.key === activeKey
+          const isPast = stages.findIndex((entry) => entry.key === activeKey) > index
+          return (
+            <div key={stage.key} className="flex items-center gap-1.5">
+              {index > 0 ? <span className="text-muted-foreground">→</span> : null}
+              <span
+                className={`rounded-full border px-2.5 py-1 font-medium ${
+                  isActive
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+                    : isPast
+                      ? "border-border bg-muted/30 text-foreground"
+                      : "border-border bg-background text-muted-foreground"
+                }`}
+              >
+                {stage.label}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function EnrollmentHeader({
   enrollment,
   patternTitle,
@@ -81,27 +118,45 @@ function EnrollmentHeader({
 }) {
   const currentStepLabel = formatEnrollmentCurrentStepLabel(enrollment)
   const nextAction = formatEnrollmentNextAction(enrollment, currentStep)
+  const confidence = formatEnrollmentDisplayConfidence(enrollment, currentStep)
+  const awaitingConfirmation = enrollment.status === "draft" || currentStepLabel === "Awaiting Confirmation"
 
   return (
     <div className="space-y-3">
-      <div>
-        <p className="text-lg font-semibold">{patternTitle}</p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <GrowthBadge label={formatEnrollmentStatusLabel(enrollment.status)} tone={enrollmentStatusTone(enrollment.status)} />
-          {enrollment.enrollmentStalled ? <GrowthBadge label="Execution stalled" tone="warning" /> : null}
-        </div>
+      <p className="text-lg font-semibold">{patternTitle}</p>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <GrowthBadge
+          label={formatEnrollmentStatusLabel(enrollment.status)}
+          tone={enrollment.status === "draft" ? "neutral" : enrollmentStatusTone(enrollment.status)}
+        />
+        <span className="text-sm text-muted-foreground">
+          Health <span className="font-semibold tabular-nums text-foreground">{enrollment.enrollmentHealthScore}</span>
+        </span>
+        {confidence != null ? (
+          <span className="text-sm text-muted-foreground">
+            Confidence <span className="font-semibold tabular-nums text-foreground">{confidence}%</span>
+          </span>
+        ) : null}
+        {enrollment.enrollmentStalled ? <GrowthBadge label="Execution stalled" tone="warning" /> : null}
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Metric label="Health" value={enrollment.enrollmentHealthScore} />
-        <Metric label="Current Step" value={currentStepLabel} />
-        {currentStep && currentStep.status !== "skipped" && currentStep.status !== "failed" ? (
-          <Metric label="Confidence" value={`${currentStep.stepExecutionConfidence}%`} />
-        ) : null}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border border-border px-3 py-2 text-sm">
+          <p className="text-muted-foreground">Current Step</p>
+          {awaitingConfirmation ? (
+            <p className="mt-1 flex items-center gap-2 font-medium">
+              <Clock3 className="size-4 text-muted-foreground" />
+              Awaiting Confirmation
+            </p>
+          ) : (
+            <p className="mt-1 font-medium">{currentStepLabel}</p>
+          )}
+        </div>
         {nextAction ? (
-          <div className="rounded-lg border border-border px-3 py-2 text-sm sm:col-span-2">
+          <div className="rounded-lg border border-border px-3 py-2 text-sm">
             <p className="text-muted-foreground">Next Action</p>
-            <p className="font-medium">{nextAction}</p>
+            <p className="mt-1 font-medium">{nextAction}</p>
           </div>
         ) : null}
       </div>
@@ -135,17 +190,19 @@ function StepProgress({
             key={step.id}
             className={`rounded-lg border px-3 py-2 text-sm ${isCurrent ? "border-emerald-300 bg-emerald-50/50" : "border-border"}`}
           >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-medium">
-                Step {step.stepOrder}: {formatSequenceChannelLabel(step.channel)}
-              </span>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="space-y-1">
+                <p className="font-medium">{formatSequenceChannelLabel(step.channel)}</p>
+                <p className="text-xs text-muted-foreground">{formatStepStatusMeta(step)}</p>
+                {step.scheduledFor ? (
+                  <p className="text-xs text-muted-foreground">
+                    Scheduled: {formatSequenceScheduledFor(step.scheduledFor)}
+                  </p>
+                ) : null}
+                {step.failureReason ? <p className="text-xs text-destructive">{step.failureReason}</p> : null}
+              </div>
               <GrowthBadge label={formatStepStatusLabel(step.status)} tone={stepStatusTone(step.status)} />
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">{formatStepStatusDetail(step)}</p>
-            {step.scheduledFor ? (
-              <p className="text-xs text-muted-foreground">Scheduled {new Date(step.scheduledFor).toLocaleString()}</p>
-            ) : null}
-            {step.failureReason ? <p className="text-xs text-destructive">{step.failureReason}</p> : null}
           </li>
         )
       })}
@@ -226,8 +283,10 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
     setError(null)
     try {
       const res = await fetch(`/api/platform/growth/leads/${lead.id}/sequence-enrollments`, { cache: "no-store" })
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string } & SequenceDrawerPayload
-      if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not load sequence state.")
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string; error?: string } & SequenceDrawerPayload
+      if (!res.ok || !data.ok) {
+        throw new Error(formatSequenceUserMessage({ code: data.error, message: data.message, fallback: "Could not load sequence state." }))
+      }
       setEnrollment(data.enrollment ?? null)
       setStartAvailability(data.startAvailability ?? null)
       setSequenceMeta(data.sequence)
@@ -291,7 +350,7 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
         error?: string
       }
       if (!res.ok || !data.ok) {
-        throw new Error(data.message ?? data.error ?? "Action failed.")
+        throw new Error(formatSequenceUserMessage({ code: data.error, message: data.message, fallback: "Action failed." }))
       }
       if (data.enrollment) setEnrollment(data.enrollment)
       await loadDrawerState()
@@ -317,7 +376,9 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
         message?: string
         error?: string
       }
-      if (!res.ok || !data.ok) throw new Error(data.message ?? data.error ?? "Step action failed.")
+      if (!res.ok || !data.ok) {
+        throw new Error(formatSequenceUserMessage({ code: data.error, message: data.message, fallback: "Step action failed." }))
+      }
       if (data.enrollment) setEnrollment(data.enrollment)
       else await loadDrawerState()
     } catch (e) {
@@ -331,7 +392,14 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
   const currentStep = enrollment ? getEnrollmentCurrentStep(enrollment) : null
   const actionRequired = growthSequenceEnrollmentActionRequired(enrollment)
   const canStartRecommended = startAvailability?.canStart === true && !enrollment
-  const unavailableMessage = startAvailability?.canStart === false ? startAvailability.message : null
+  const unavailableMessage =
+    startAvailability?.canStart === false
+      ? formatSequenceUserMessage({
+          code: startAvailability.code,
+          message: startAvailability.message,
+          fallback: "Sequence enrollment unavailable.",
+        })
+      : null
   const hasRecommendation = Boolean(sequenceMeta?.recommendedPatternId ?? lead.recommendedSequencePatternId)
 
   const enrollmentPatternTitle = enrollment
@@ -379,6 +447,8 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
                 patternTitle={enrollmentPatternTitle}
                 currentStep={currentStep}
               />
+
+              <SequenceProgressBar enrollment={enrollment} />
 
               <StepProgress steps={enrollment.steps} currentStepOrder={enrollment.currentStepOrder} />
 
