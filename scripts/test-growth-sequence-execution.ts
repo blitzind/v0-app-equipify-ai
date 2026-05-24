@@ -11,7 +11,17 @@ import {
 import type {
   GrowthSequenceEnrollment,
   GrowthSequenceEnrollmentStep,
+  GrowthSequenceEnrollmentWithSteps,
 } from "../lib/growth/sequence-enrollment-types"
+import {
+  describeSequenceStartUnavailable,
+  formatEnrollmentCurrentStepLabel,
+  formatEnrollmentStatusLabel,
+  formatStepStatusDetail,
+  formatStepStatusLabel,
+  growthSequenceEnrollmentActionRequired,
+  mapPreflightCodeToMessage,
+} from "../lib/growth/sequence-enrollment/sequence-enrollment-ui"
 import type { GrowthLead } from "../lib/growth/types"
 
 const NOW = Date.now()
@@ -122,12 +132,6 @@ assert.ok(drift.some((signal) => signal.driftKind === "channel_mismatch"))
 assert.ok(drift.some((signal) => signal.driftKind === "queue_failed"))
 assert.ok(drift.some((signal) => signal.driftKind === "skipped_gap"))
 
-import {
-  describeSequenceStartUnavailable,
-  mapPreflightCodeToMessage,
-} from "../lib/growth/sequence-enrollment/sequence-enrollment-ui"
-import type { GrowthLead } from "../lib/growth/types"
-
 const leadWithRec = {
   recommendedSequencePatternId: "pattern-1",
   recommendedSequenceConfidence: 72,
@@ -151,5 +155,30 @@ assert.equal(
   "High fatigue risk",
 )
 assert.equal(mapPreflightCodeToMessage("low_confidence"), "Need more outreach activity")
+
+const draftEnrollment = {
+  status: "draft",
+  currentStepOrder: 0,
+  steps: [{ stepOrder: 1, channel: "email", status: "pending", stepExecutionConfidence: 20 }],
+} as unknown as GrowthSequenceEnrollmentWithSteps
+
+assert.equal(formatEnrollmentCurrentStepLabel(draftEnrollment), "Planning")
+assert.equal(formatEnrollmentStatusLabel("active"), "Active Sequence")
+assert.equal(formatStepStatusLabel("draft_created"), "Pending Approval")
+assert.equal(formatStepStatusDetail({ status: "skipped", stepExecutionConfidence: 20 } as GrowthSequenceEnrollmentStep), "Skipped")
+assert.equal(
+  formatStepStatusDetail({ status: "queued", stepExecutionConfidence: 20 } as GrowthSequenceEnrollmentStep),
+  "Pending Queue · Confidence 20%",
+)
+assert.equal(growthSequenceEnrollmentActionRequired(draftEnrollment), true)
+assert.equal(
+  growthSequenceEnrollmentActionRequired({
+    ...draftEnrollment,
+    status: "active",
+    currentStepOrder: 1,
+    steps: [{ stepOrder: 2, channel: "manual_call", status: "executed", stepExecutionConfidence: 80 }],
+  } as unknown as GrowthSequenceEnrollmentWithSteps),
+  false,
+)
 
 console.log("growth-sequence-execution: all assertions passed")

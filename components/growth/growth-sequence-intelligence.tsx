@@ -17,7 +17,6 @@ import {
   GrowthActionRequiredBadge,
   GrowthCollapsibleEngineCard,
 } from "@/components/growth/growth-ui-utils"
-import { growthLeadSequenceActionRequired } from "@/lib/growth/growth-lead-drawer-badges"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type {
   GrowthSequenceEnrollmentStep,
@@ -25,7 +24,24 @@ import type {
 } from "@/lib/growth/sequence-enrollment-types"
 import {
   GROWTH_SEQUENCE_TEST_PATTERN_KEYS,
+  enrollmentStatusTone,
+  formatEnrollmentCollapsedSummary,
+  formatEnrollmentCurrentStepLabel,
+  formatEnrollmentNextAction,
+  formatEnrollmentStatusLabel,
+  formatHumanPhrase,
+  formatRecommendedNextStepLabel,
+  formatSequenceFatigueLabel,
+  formatSequenceFatigueTone,
+  formatSequencePatternTitle,
+  formatSequencePatternTitleFromPattern,
+  formatSequenceChannelLabel,
+  formatStepStatusDetail,
+  formatStepStatusLabel,
+  getEnrollmentCurrentStep,
+  growthSequenceEnrollmentActionRequired,
   mapPreflightCodeToMessage,
+  stepStatusTone,
   type SequenceStartAvailability,
 } from "@/lib/growth/sequence-enrollment/sequence-enrollment-ui"
 import type { GrowthSequencePattern, GrowthSequenceRecommendedNextStep } from "@/lib/growth/sequence-types"
@@ -54,14 +70,62 @@ function isNextStep(value: GrowthLead["recommendedSequenceNextStep"]): value is 
   return typeof value === "object" && value != null && "stepOrder" in value
 }
 
-function stepStatusTone(status: GrowthSequenceEnrollmentStep["status"]): "healthy" | "attention" | "warning" | "neutral" {
-  if (status === "executed") return "healthy"
-  if (status === "failed") return "warning"
-  if (status === "queued" || status === "draft_created" || status === "approved") return "attention"
-  return "neutral"
+function EnrollmentHeader({
+  enrollment,
+  patternTitle,
+  currentStep,
+}: {
+  enrollment: GrowthSequenceEnrollmentWithSteps
+  patternTitle: string
+  currentStep: GrowthSequenceEnrollmentStep | null
+}) {
+  const currentStepLabel = formatEnrollmentCurrentStepLabel(enrollment)
+  const nextAction = formatEnrollmentNextAction(enrollment, currentStep)
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-lg font-semibold">{patternTitle}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <GrowthBadge label={formatEnrollmentStatusLabel(enrollment.status)} tone={enrollmentStatusTone(enrollment.status)} />
+          {enrollment.enrollmentStalled ? <GrowthBadge label="Execution stalled" tone="warning" /> : null}
+        </div>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Metric label="Health" value={enrollment.enrollmentHealthScore} />
+        <Metric label="Current Step" value={currentStepLabel} />
+        {currentStep && currentStep.status !== "skipped" && currentStep.status !== "failed" ? (
+          <Metric label="Confidence" value={`${currentStep.stepExecutionConfidence}%`} />
+        ) : null}
+        {nextAction ? (
+          <div className="rounded-lg border border-border px-3 py-2 text-sm sm:col-span-2">
+            <p className="text-muted-foreground">Next Action</p>
+            <p className="font-medium">{nextAction}</p>
+          </div>
+        ) : null}
+      </div>
+
+      {enrollment.status === "draft" ? (
+        <p className="text-sm text-muted-foreground">
+          Confirm enrollment to create guided execution steps.
+        </p>
+      ) : null}
+
+      {enrollment.pauseReason ? (
+        <p className="text-sm text-muted-foreground">Pause reason: {enrollment.pauseReason}</p>
+      ) : null}
+    </div>
+  )
 }
 
-function StepProgress({ steps, currentStepOrder }: { steps: GrowthSequenceEnrollmentStep[]; currentStepOrder: number }) {
+function StepProgress({
+  steps,
+  currentStepOrder,
+}: {
+  steps: GrowthSequenceEnrollmentStep[]
+  currentStepOrder: number
+}) {
   return (
     <ol className="space-y-2">
       {steps.map((step) => {
@@ -72,14 +136,12 @@ function StepProgress({ steps, currentStepOrder }: { steps: GrowthSequenceEnroll
             className={`rounded-lg border px-3 py-2 text-sm ${isCurrent ? "border-emerald-300 bg-emerald-50/50" : "border-border"}`}
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-medium capitalize">
-                Step {step.stepOrder}: {step.channel.replace(/_/g, " ")}
+              <span className="font-medium">
+                Step {step.stepOrder}: {formatSequenceChannelLabel(step.channel)}
               </span>
-              <div className="flex flex-wrap items-center gap-2">
-                <GrowthBadge label={step.status.replace(/_/g, " ")} tone={stepStatusTone(step.status)} />
-                <span className="text-xs tabular-nums text-muted-foreground">conf {step.stepExecutionConfidence}</span>
-              </div>
+              <GrowthBadge label={formatStepStatusLabel(step.status)} tone={stepStatusTone(step.status)} />
             </div>
+            <p className="mt-1 text-xs text-muted-foreground">{formatStepStatusDetail(step)}</p>
             {step.scheduledFor ? (
               <p className="text-xs text-muted-foreground">Scheduled {new Date(step.scheduledFor).toLocaleString()}</p>
             ) : null}
@@ -91,19 +153,27 @@ function StepProgress({ steps, currentStepOrder }: { steps: GrowthSequenceEnroll
   )
 }
 
-function SequenceCacheSummary({ lead, sequence }: { lead: GrowthLead; sequence?: SequenceDrawerPayload["sequence"] }) {
-  const patternId = sequence?.recommendedPatternId ?? lead.recommendedSequencePatternId
-  const reason = sequence?.recommendedReason ?? lead.recommendedSequenceReason
+function SequenceRecommendationSummary({
+  lead,
+  sequence,
+  pattern,
+  hasEnrollment,
+}: {
+  lead: GrowthLead
+  sequence?: SequenceDrawerPayload["sequence"]
+  pattern: GrowthSequencePattern | null
+  hasEnrollment: boolean
+}) {
   const confidence = sequence?.recommendedConfidence ?? lead.recommendedSequenceConfidence
   const fatigue = sequence?.fatigueRisk ?? lead.sequenceFatigueRisk
-  const activeEnrollmentId = sequence?.activeEnrollmentId ?? lead.activeSequenceEnrollmentId
+  const reason = sequence?.recommendedReason ?? lead.recommendedSequenceReason
 
   return (
     <div className="grid gap-2 sm:grid-cols-2">
-      <Metric label="Recommended pattern" value={patternId ? `${patternId.slice(0, 8)}…` : "—"} />
+      <Metric label="Recommended sequence" value={pattern ? formatSequencePatternTitleFromPattern(pattern) : "Not available yet"} />
       <Metric label="Confidence" value={confidence ?? "—"} />
-      <Metric label="Fatigue risk" value={fatigue ?? "—"} />
-      <Metric label="Active enrollment" value={activeEnrollmentId ? `${activeEnrollmentId.slice(0, 8)}…` : "None"} />
+      <Metric label="Fatigue" value={formatSequenceFatigueLabel(fatigue)} />
+      <Metric label="Enrollment" value={hasEnrollment ? "In progress" : "None"} />
       {reason ? (
         <div className="rounded-lg border border-border px-3 py-2 text-sm sm:col-span-2">
           <p className="text-muted-foreground">Recommendation reason</p>
@@ -258,24 +328,28 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
   }
 
   const nextStep = isNextStep(lead.recommendedSequenceNextStep) ? lead.recommendedSequenceNextStep : null
-  const currentStep = enrollment?.steps.find((step) => step.stepOrder === (enrollment.currentStepOrder ?? 0) + 1) ?? null
-  const actionRequired =
-    growthLeadSequenceActionRequired(lead) ||
-    enrollment?.enrollmentStalled === true ||
-    enrollment?.status === "draft"
-
+  const currentStep = enrollment ? getEnrollmentCurrentStep(enrollment) : null
+  const actionRequired = growthSequenceEnrollmentActionRequired(enrollment)
   const canStartRecommended = startAvailability?.canStart === true && !enrollment
   const unavailableMessage = startAvailability?.canStart === false ? startAvailability.message : null
   const hasRecommendation = Boolean(sequenceMeta?.recommendedPatternId ?? lead.recommendedSequencePatternId)
 
+  const enrollmentPatternTitle = enrollment
+    ? enrollment.steps.length > 0
+      ? formatSequencePatternTitle(enrollment.steps)
+      : recommendedPattern
+        ? formatSequencePatternTitleFromPattern(recommendedPattern)
+        : (enrollment.patternLabel?.replace(/\bthen\b/gi, "→").replace(/\s+/g, " ").trim() ?? "Sequence")
+    : ""
+
   const collapsedSummary = enrollment
-    ? `${enrollment.status} · health ${enrollment.enrollmentHealthScore}${enrollment.enrollmentStalled ? " · stalled" : ""}`
+    ? formatEnrollmentCollapsedSummary(enrollment)
     : [
-        recommendedPattern?.label ?? null,
+        recommendedPattern ? formatSequencePatternTitleFromPattern(recommendedPattern) : null,
         (sequenceMeta?.recommendedConfidence ?? lead.recommendedSequenceConfidence) != null
-          ? `${sequenceMeta?.recommendedConfidence ?? lead.recommendedSequenceConfidence}`
+          ? `Confidence ${sequenceMeta?.recommendedConfidence ?? lead.recommendedSequenceConfidence}`
           : null,
-        sequenceMeta?.fatigueRisk ?? lead.sequenceFatigueRisk ?? null,
+        fatigueSummaryLabel(sequenceMeta?.fatigueRisk ?? lead.sequenceFatigueRisk),
       ]
         .filter(Boolean)
         .join(" · ")
@@ -300,15 +374,11 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
             </div>
           ) : enrollment ? (
             <div className="space-y-3 rounded-lg border border-border p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold">{enrollment.patternLabel ?? recommendedPattern?.label ?? "Sequence enrollment"}</span>
-                <GrowthBadge label={enrollment.status} tone={enrollment.status === "active" ? "healthy" : "neutral"} />
-                {enrollment.enrollmentStalled ? <GrowthBadge label="stalled" tone="warning" /> : null}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Health {enrollment.enrollmentHealthScore} · step {enrollment.currentStepOrder}
-                {enrollment.pauseReason ? ` · paused: ${enrollment.pauseReason}` : ""}
-              </p>
+              <EnrollmentHeader
+                enrollment={enrollment}
+                patternTitle={enrollmentPatternTitle}
+                currentStep={currentStep}
+              />
 
               <StepProgress steps={enrollment.steps} currentStepOrder={enrollment.currentStepOrder} />
 
@@ -319,7 +389,7 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
                     disabled={acting !== null}
                     onClick={() => void postEnrollment(`/sequence-enrollments/${enrollment.id}/confirm`)}
                   >
-                    Confirm enrollment
+                    Confirm Enrollment
                   </Button>
                 ) : null}
                 {enrollment.status === "active" ? (
@@ -387,16 +457,16 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
                 <div className="flex flex-wrap gap-2 border-t border-border pt-3">
                   {currentStep.status === "draft_created" && currentStep.channel === "email" ? (
                     <Button size="sm" disabled={acting !== null} onClick={() => void postStep(currentStep.id, "queue")}>
-                      Queue email step
+                      Queue Email Step
                     </Button>
                   ) : null}
                   {currentStep.channel !== "email" ? (
                     <>
                       <Button size="sm" variant="outline" disabled={acting !== null} onClick={() => void postStep(currentStep.id, "complete")}>
-                        Mark complete
+                        Mark Complete
                       </Button>
                       <Button size="sm" variant="outline" disabled={acting !== null} onClick={() => void postStep(currentStep.id, "skip")}>
-                        Skip step
+                        Skip Step
                       </Button>
                     </>
                   ) : null}
@@ -405,29 +475,26 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
             </div>
           ) : (
             <>
-              <SequenceCacheSummary lead={lead} sequence={sequenceMeta} />
+              <SequenceRecommendationSummary
+                lead={lead}
+                sequence={sequenceMeta}
+                pattern={recommendedPattern}
+                hasEnrollment={Boolean(sequenceMeta?.activeEnrollmentId)}
+              />
 
               {recommendedPattern ? (
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-lg font-semibold">{recommendedPattern.label}</span>
-                  <GrowthBadge label={`v${recommendedPattern.sequenceVersion}`} tone="neutral" />
+                  <span className="text-lg font-semibold">{formatSequencePatternTitleFromPattern(recommendedPattern)}</span>
+                  <GrowthBadge label={`Version ${recommendedPattern.sequenceVersion}`} tone="neutral" />
                   {(sequenceMeta?.fatigueRisk ?? lead.sequenceFatigueRisk) ? (
                     <GrowthBadge
-                      label={`fatigue ${sequenceMeta?.fatigueRisk ?? lead.sequenceFatigueRisk}`}
-                      tone={(sequenceMeta?.fatigueRisk ?? lead.sequenceFatigueRisk) === "high" ? "warning" : "neutral"}
+                      label={formatSequenceFatigueLabel(sequenceMeta?.fatigueRisk ?? lead.sequenceFatigueRisk)}
+                      tone={formatSequenceFatigueTone(sequenceMeta?.fatigueRisk ?? lead.sequenceFatigueRisk)}
                     />
                   ) : null}
                 </div>
               ) : hasRecommendation ? (
-                <p className="text-sm text-muted-foreground">
-                  Recommended pattern id is cached but catalog label is still loading or unavailable.
-                </p>
-              ) : null}
-
-              {(sequenceMeta?.recommendedReason ?? lead.recommendedSequenceReason) ? (
-                <p className="text-sm text-muted-foreground">
-                  {sequenceMeta?.recommendedReason ?? lead.recommendedSequenceReason}
-                </p>
+                <p className="text-sm text-muted-foreground">Loading recommended sequence details…</p>
               ) : null}
 
               {unavailableMessage ? (
@@ -444,13 +511,13 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
 
               {nextStep ? (
                 <div className="rounded-lg border border-border px-3 py-2 text-sm">
-                  <p className="text-muted-foreground">Next step</p>
-                  <p className="font-medium capitalize">
-                    {nextStep.channel.replace(/_/g, " ")}
-                    {nextStep.generationType ? ` · ${nextStep.generationType.replace(/_/g, " ")}` : ""}
+                  <p className="text-muted-foreground">Suggested next step</p>
+                  <p className="font-medium">
+                    {formatRecommendedNextStepLabel(nextStep.channel)}
+                    {nextStep.generationType ? ` · ${formatHumanPhrase(nextStep.generationType)}` : ""}
                   </p>
                   <p className="text-muted-foreground">
-                    Delay {nextStep.delayDays}d · expect {nextStep.expectedSignal.replace(/_/g, " ")}
+                    Delay {nextStep.delayDays} days · expect {formatHumanPhrase(nextStep.expectedSignal)}
                     {nextStep.requiredHumanApproval ? " · approval required" : ""}
                   </p>
                 </div>
@@ -488,8 +555,8 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
                   <Metric label="Quality score" value={recommendedPattern.sequenceQualityScore} />
                   <Metric label="Positive reply rate" value={`${Math.round(recommendedPattern.positiveReplyRate * 100)}%`} />
                   <Metric label="Abandonment rate" value={`${Math.round(recommendedPattern.sequenceAbandonmentRate * 100)}%`} />
-                  <Metric label="Opp lift" value={recommendedPattern.opportunityLift.toFixed(1)} />
-                  <Metric label="Rev lift" value={recommendedPattern.revenueProbabilityLift.toFixed(1)} />
+                  <Metric label="Opportunity lift" value={recommendedPattern.opportunityLift.toFixed(1)} />
+                  <Metric label="Revenue lift" value={recommendedPattern.revenueProbabilityLift.toFixed(1)} />
                   <Metric label="Conversation lift" value={recommendedPattern.conversationHealthLift.toFixed(1)} />
                 </div>
               ) : null}
@@ -522,8 +589,8 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
                     }`}
                     onClick={() => setSelectedTestPatternId(pattern.id)}
                   >
-                    <p className="font-medium">{pattern.label}</p>
-                    <p className="text-muted-foreground">{pattern.key.replace(/_/g, " ")}</p>
+                    <p className="font-medium">{formatSequencePatternTitleFromPattern(pattern)}</p>
+                    <p className="text-muted-foreground">{pattern.description ?? pattern.label}</p>
                   </button>
                 )
               })
@@ -551,13 +618,18 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
               }
               onClick={() => void postEnrollment("/sequence-enrollments", { patternId: selectedTestPatternId })}
             >
-              Create draft enrollment
+              Create Draft Enrollment
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
   )
+}
+
+function fatigueSummaryLabel(risk: string | null | undefined): string | null {
+  if (!risk) return null
+  return formatSequenceFatigueLabel(risk)
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) {
