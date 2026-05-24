@@ -76,6 +76,8 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "competitor_detected",
   "urgency_detected",
   "conversation_risk_detected",
+  "sequence_pattern_detected",
+  "sequence_recommendation_changed",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]

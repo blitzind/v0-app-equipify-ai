@@ -15,12 +15,9 @@ import type { GrowthExecutivePriorityTier } from "@/lib/growth/executive-operati
 import type { GrowthOperationalCapacityTier } from "@/lib/growth/operational-capacity-types"
 import type { GrowthWorkflowHealthStatus } from "@/lib/growth/workflow-health-types"
 import type {
-  GrowthConversationBuyingIntent,
-  GrowthConversationHealthTier,
-  GrowthConversationMomentum,
-  GrowthConversationSentiment,
-  GrowthConversationUrgencyLevel,
-} from "@/lib/growth/conversation-types"
+  GrowthSequenceFatigueRisk,
+} from "@/lib/growth/sequence-types"
+import { computeExecutiveSequenceWeight } from "@/lib/growth/sequence/sequence-effectiveness-score"
 import {
   GROWTH_NEXT_BEST_ACTION_LABELS,
   type GrowthNextBestAction,
@@ -68,6 +65,9 @@ export type NextBestActionInput = {
   conversationCompetitorPressure?: number
   conversationMomentum?: GrowthConversationMomentum | null
   conversationTrend?: string | null
+  recommendedSequencePatternId?: string | null
+  recommendedSequenceConfidence?: number | null
+  sequenceFatigueRisk?: GrowthSequenceFatigueRisk | null
   now?: Date
 }
 
@@ -249,6 +249,53 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
       "Negative or mixed conversation sentiment — relationship recovery recommended.",
       [],
       "medium",
+    )
+  }
+
+  const sequencePatternId = input.recommendedSequencePatternId ?? null
+  const sequenceConfidence = input.recommendedSequenceConfidence ?? 0
+  const sequenceFatigue = input.sequenceFatigueRisk ?? null
+  const executiveSequenceWeight = computeExecutiveSequenceWeight({
+    executivePriorityTier: executiveTier,
+    relationshipStrengthTier: input.relationshipStrengthTier ?? null,
+    fitScore: fit,
+  })
+
+  if (
+    sequencePatternId &&
+    sequenceConfidence >= 60 &&
+    sequenceFatigue !== "high" &&
+    executiveSequenceWeight >= 55 &&
+    (executiveTier === "priority" || executiveTier === "executive_now")
+  ) {
+    return buildResult(
+      "use_executive_sequence",
+      "High-value executive lead — use executive sequence pattern.",
+      [],
+      "high",
+    )
+  }
+
+  if (
+    sequencePatternId &&
+    sequenceConfidence >= 60 &&
+    sequenceFatigue !== "high" &&
+    (input.workflowHealth === "stalled" || input.workflowHealth === "blocked")
+  ) {
+    return buildResult(
+      "switch_sequence_pattern",
+      "Stalled workflow with an available sequence pattern — switch sequence pattern.",
+      ["Workflow stalled"],
+      "medium",
+    )
+  }
+
+  if (sequencePatternId && sequenceConfidence >= 60 && sequenceFatigue !== "high") {
+    return buildResult(
+      "start_recommended_sequence",
+      "Recommended sequence pattern available — start recommended sequence (human approval required).",
+      [],
+      "high",
     )
   }
 

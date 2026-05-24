@@ -984,3 +984,26 @@ export async function emitGrowthLeadConversationRiskDetectedTimeline(
     payload: { tier: input.tier, momentum: input.momentum },
   })
 }
+
+export async function emitGrowthLeadSequenceRecommendationChangedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    fromPatternId: string | null
+    toPatternId: string | null
+    reason: string | null
+    confidence: number
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "sequence_recommendation_changed",
+    title: "Sequence recommendation changed",
+    summary: input.reason ?? `Confidence ${input.confidence}`,
+    payload: {
+      fromPatternId: input.fromPatternId,
+      toPatternId: input.toPatternId,
+      confidence: input.confidence,
+    },
+  })
+}

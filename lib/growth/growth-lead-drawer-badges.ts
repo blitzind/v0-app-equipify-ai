@@ -38,3 +38,11 @@ export function growthLeadConversationActionRequired(lead: GrowthLead): boolean 
     lead.conversationTrend === "at_risk"
   )
 }
+
+export function growthLeadSequenceActionRequired(lead: GrowthLead): boolean {
+  return (
+    (lead.recommendedSequenceConfidence ?? 0) >= 70 &&
+    lead.sequenceFatigueRisk !== "high" &&
+    lead.recommendedSequencePatternId != null
+  )
+}

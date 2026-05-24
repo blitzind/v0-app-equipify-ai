@@ -36,6 +36,9 @@ export const GROWTH_NEXT_BEST_ACTIONS = [
   "competitive_response_motion",
   "immediate_follow_up",
   "conversation_recovery_motion",
+  "start_recommended_sequence",
+  "switch_sequence_pattern",
+  "use_executive_sequence",
 ] as const
 
 export type GrowthNextBestAction = (typeof GROWTH_NEXT_BEST_ACTIONS)[number]
@@ -76,6 +79,9 @@ export const GROWTH_NEXT_BEST_ACTION_LABELS: Record<GrowthNextBestAction, string
   competitive_response_motion: "Competitive response motion",
   immediate_follow_up: "Immediate follow-up",
   conversation_recovery_motion: "Conversation recovery motion",
+  start_recommended_sequence: "Start recommended sequence",
+  switch_sequence_pattern: "Switch sequence pattern",
+  use_executive_sequence: "Use executive sequence",
 }
 
 export type GrowthNextBestActionResult = {

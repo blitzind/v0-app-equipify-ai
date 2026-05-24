@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Crown,
   Gauge,
+  GitBranch,
   Inbox,
   Mail,
   MessageSquare,
@@ -94,6 +95,13 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
         icon: MessageSquare,
         match: (path) => path.startsWith("/admin/growth/conversations"),
         consoleKey: "conversations",
+      },
+      {
+        href: "/admin/growth/sequences",
+        label: "Sequences",
+        icon: GitBranch,
+        match: (path) => path.startsWith("/admin/growth/sequences"),
+        consoleKey: "sequences",
       },
       {
         href: "/admin/growth/relationships",

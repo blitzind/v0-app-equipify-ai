@@ -49,7 +49,10 @@ import type {
   GrowthOperationalCapacityTopConstraint,
   GrowthOperationalConstraint,
 } from "@/lib/growth/operational-capacity-types"
-import type { GrowthWorkflowHealthStatus } from "@/lib/growth/workflow-health-types"
+import type {
+  GrowthSequenceFatigueRisk,
+  GrowthSequenceRecommendedNextStep,
+} from "@/lib/growth/sequence-types"
 import type {
   GrowthConversationBuyingIntent,
   GrowthConversationCompetitorMention,
@@ -233,6 +236,12 @@ export type GrowthLead = {
   conversationMomentum: GrowthConversationMomentum | null
   conversationResponsePattern: GrowthConversationResponsePattern | null
   conversationComputedAt: string | null
+  recommendedSequencePatternId: string | null
+  recommendedSequenceReason: string | null
+  recommendedSequenceConfidence: number | null
+  recommendedSequenceNextStep: GrowthSequenceRecommendedNextStep | Record<string, never>
+  sequenceFatigueRisk: GrowthSequenceFatigueRisk | null
+  recommendedSequenceComputedAt: string | null
   createdBy: string | null
   assignedTo: string | null
   createdAt: string
