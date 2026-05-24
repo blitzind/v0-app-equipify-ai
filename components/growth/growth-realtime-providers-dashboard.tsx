@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react"
 import { AlertTriangle, Loader2, Plug, RefreshCw, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthLiveCoachingProviderComparisonTable } from "@/components/growth/growth-live-coaching-provider-selection"
+import type { LiveCoachingProviderComparisonRow } from "@/lib/growth/realtime/live-coaching/live-coaching-provider-selection"
 import type { RealtimeProviderConnection } from "@/lib/growth/realtime/providers/provider-types"
 import type { RealtimeProviderDiagnostics } from "@/lib/growth/realtime/providers/realtime-provider-readiness-types"
 
@@ -24,6 +26,17 @@ type DashboardPayload = {
   }
   connections: RealtimeProviderConnection[]
   diagnostics: RealtimeProviderDiagnostics[]
+  providerComparison: LiveCoachingProviderComparisonRow[]
+  providerRecommendation: {
+    connectionId: string | null
+    label: string | null
+    reason: string | null
+  }
+  qaProof: {
+    marker: string
+    label: string
+    verified: boolean
+  }
   coachingResponsiveness: {
     averageGuidanceLatencyMs: number
     p95GuidanceLatencyMs: number
@@ -127,7 +140,12 @@ export function GrowthRealtimeProvidersDashboard() {
           <StatTile label="Avg reliability" value={dashboard.stats.averageReliabilityScore} />
           <StatTile label="Avg transcript quality" value={dashboard.stats.averageTranscriptQualityScore} />
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col items-end gap-2">
+          <GrowthBadge
+            label={dashboard.qaProof.label}
+            tone={dashboard.qaProof.verified ? "healthy" : "neutral"}
+          />
+          <span className="text-xs text-muted-foreground">Diagnostic: {dashboard.qaProof.marker}</span>
           <Button type="button" variant="outline" size="sm" onClick={() => void runCleanup()} disabled={acting === "cleanup"}>
             {acting === "cleanup" ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
             Run cleanup
@@ -163,6 +181,13 @@ export function GrowthRealtimeProvidersDashboard() {
         </div>
       </GrowthEngineCard>
 
+      <GrowthEngineCard title="Provider comparison">
+        {dashboard.providerRecommendation.reason ? (
+          <p className="mb-3 text-sm text-muted-foreground">{dashboard.providerRecommendation.reason}</p>
+        ) : null}
+        <GrowthLiveCoachingProviderComparisonTable rows={dashboard.providerComparison} />
+      </GrowthEngineCard>
+
       <GrowthEngineCard title="Provider reliability">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile label="Failovers" value={dashboard.stats.providerFailoverCount} />
@@ -174,7 +199,13 @@ export function GrowthRealtimeProvidersDashboard() {
 
       <GrowthEngineCard title="Provider connections">
         {dashboard.connections.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No realtime transcript providers configured yet.</p>
+          <div className="space-y-2 rounded-lg border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
+            <p>No realtime transcript providers configured yet.</p>
+            <p>
+              Add a Deepgram, AssemblyAI, or OpenAI Realtime connection, run Test Connection, then select it in Live
+              Coaching settings before starting browser mic capture.
+            </p>
+          </div>
         ) : (
           <ul className="space-y-3">
             {dashboard.connections.map((connection) => {

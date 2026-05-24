@@ -2,10 +2,18 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react"
 import { GROWTH_CALL_AUDIO_CAPTURE_ENABLED } from "@/lib/growth/call-workflow-copy"
+import { evaluateBrowserAudioCaptureEnvironment } from "@/lib/growth/realtime/browser-audio/browser-audio-browser-compat"
 import { browserAudioCaptureReducer } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-reducer"
+import {
+  canStartBrowserAudioCaptureGuard,
+} from "@/lib/growth/realtime/browser-audio/browser-audio-capture-guards"
 import type { GrowthBrowserAudioCaptureCapability } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-types"
-import type { GrowthBrowserAudioStreamState } from "@/lib/growth/realtime/browser-audio/browser-audio-stream-types"
 import { initialBrowserAudioCaptureState } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-types"
+import type { GrowthBrowserAudioStreamState } from "@/lib/growth/realtime/browser-audio/browser-audio-stream-types"
+import {
+  BROWSER_AUDIO_TROUBLESHOOTING,
+  resolveMicrophonePermissionError,
+} from "@/lib/growth/realtime/browser-audio/browser-audio-troubleshooting"
 import type { GrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-types"
 
 type UseGrowthBrowserAudioCaptureInput = {
@@ -55,6 +63,8 @@ export function useGrowthBrowserAudioCapture({
   const recorderRef = useRef<MediaRecorder | null>(null)
   const sequenceRef = useRef(0)
   const mutedRef = useRef(false)
+  const startingRef = useRef(false)
+  const boundSessionIdRef = useRef<string | null>(null)
 
   const cleanupCapture = useCallback(() => {
     recorderRef.current?.stop()
@@ -75,9 +85,32 @@ export function useGrowthBrowserAudioCapture({
   }, [cleanupCapture])
 
   useEffect(() => {
+    if (!session) {
+      boundSessionIdRef.current = null
+      return
+    }
+
+    if (boundSessionIdRef.current && boundSessionIdRef.current !== session.id) {
+      cleanupCapture()
+      dispatch({ type: "reset" })
+      setStreamState(null)
+      dispatch({
+        type: "capture_failed",
+        error: BROWSER_AUDIO_TROUBLESHOOTING.staleSession,
+      })
+    }
+
+    boundSessionIdRef.current = session.id
+  }, [session?.id, cleanupCapture])
+
+  useEffect(() => {
     if (!session || session.status === "completed" || session.status === "discarded") {
       cleanupCapture()
       dispatch({ type: "capture_stopped" })
+      setStreamState(null)
+      if (session && (session.status === "completed" || session.status === "discarded")) {
+        void syncStatus("stop").catch(() => undefined)
+      }
     }
   }, [session?.id, session?.status, cleanupCapture])
 
@@ -108,6 +141,7 @@ export function useGrowthBrowserAudioCapture({
 
   async function sendChunk(blob: Blob, encoding: string) {
     if (!session || mutedRef.current || blob.size === 0) return
+    if (boundSessionIdRef.current && boundSessionIdRef.current !== session.id) return
     const started = Date.now()
     try {
       const payloadBase64 = await blobToBase64(blob)
@@ -143,22 +177,39 @@ export function useGrowthBrowserAudioCapture({
 
   const startCapture = useCallback(async () => {
     if (!GROWTH_CALL_AUDIO_CAPTURE_ENABLED || !session || !capability?.canStart) return
-    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      dispatch({ type: "capture_failed", error: "Browser microphone capture is not supported here." })
+
+    const startGuard = canStartBrowserAudioCaptureGuard({
+      captureStatus: state.status,
+      starting: startingRef.current,
+    })
+    if (!startGuard.allowed) {
+      dispatch({
+        type: "capture_failed",
+        error: BROWSER_AUDIO_TROUBLESHOOTING.doubleStartBlocked,
+      })
       return
     }
 
+    const environment = evaluateBrowserAudioCaptureEnvironment()
+    if (!environment.supported) {
+      dispatch({
+        type: "capture_failed",
+        error: environment.blockedReason ?? BROWSER_AUDIO_TROUBLESHOOTING.unsupportedBrowser,
+      })
+      return
+    }
+
+    startingRef.current = true
     dispatch({ type: "request_permission" })
     try {
       await syncStatus("request")
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : "audio/webm"
+      const mimeType = environment.preferredMimeType ?? "audio/webm"
       const recorder = new MediaRecorder(stream, { mimeType })
       recorderRef.current = recorder
       sequenceRef.current = 0
+      boundSessionIdRef.current = session.id
 
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -177,11 +228,15 @@ export function useGrowthBrowserAudioCapture({
       dispatch({ type: "capture_active" })
     } catch (e) {
       cleanupCapture()
-      const message = e instanceof Error ? e.message : "Microphone permission denied."
+      const message = resolveMicrophonePermissionError(
+        e instanceof Error ? e.message : BROWSER_AUDIO_TROUBLESHOOTING.microphonePermissionDenied,
+      )
       dispatch({ type: "capture_failed", error: message })
       await syncStatus("fail", message).catch(() => undefined)
+    } finally {
+      startingRef.current = false
     }
-  }, [capability?.canStart, cleanupCapture, session, leadId])
+  }, [capability?.canStart, cleanupCapture, session, state.status, leadId])
 
   const pauseCapture = useCallback(async () => {
     if (!session) return

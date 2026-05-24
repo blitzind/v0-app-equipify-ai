@@ -3,9 +3,12 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   getBrowserAudioCaptureMetrics,
+  getBrowserAudioLastChunkSequence,
   recordBrowserAudioChunkFailure,
+  recordBrowserAudioChunkSequence,
   recordBrowserAudioChunkSuccess,
 } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-service"
+import { isDuplicateBrowserAudioChunkSequence } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-guards"
 import { evaluateBrowserAudioCaptureCapability } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-capability"
 import type { GrowthBrowserAudioCaptureMetrics } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-types"
 import {
@@ -64,6 +67,16 @@ export async function ingestBrowserAudioChunk(
     throw new ProviderStreamingUnavailableError()
   }
 
+  if (
+    isDuplicateBrowserAudioChunkSequence({
+      lastSequenceNumber: getBrowserAudioLastChunkSequence(input.sessionId),
+      nextSequenceNumber: input.sequenceNumber,
+    })
+  ) {
+    recordBrowserAudioChunkFailure(input.sessionId)
+    throw new Error("duplicate_audio_chunk")
+  }
+
   try {
     const forwarded = await ingestBrowserAudioProviderChunk(admin, session, input)
     const latencyMs = Date.now() - started
@@ -71,6 +84,7 @@ export async function ingestBrowserAudioChunk(
       latencyMs,
       providerTranscriptLatencyMs: forwarded.providerTranscriptLatencyMs,
     })
+    recordBrowserAudioChunkSequence(input.sessionId, input.sequenceNumber)
 
     return {
       session,

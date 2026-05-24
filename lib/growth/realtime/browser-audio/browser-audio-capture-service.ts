@@ -96,6 +96,7 @@ export async function updateBrowserAudioCaptureStatus(
     patch.browserAudioCaptureEnabled = false
     patch.browserAudioEndedAt = session.browserAudioEndedAt ?? now
     clearBrowserAudioCaptureMetrics(input.sessionId)
+    clearBrowserAudioChunkSequence(input.sessionId)
   }
 
   return updateGrowthRealtimeCallSession(admin, input.sessionId, patch)
@@ -119,8 +120,27 @@ export async function stopBrowserAudioCaptureForSession(
   await closeBrowserAudioProviderStream(sessionId, { admin, session })
   clearBrowserAudioStreamState(sessionId)
   clearBrowserAudioCaptureMetrics(sessionId)
+  clearBrowserAudioChunkSequence(sessionId)
+}
+
+const lastChunkSequenceBySession = new Map<string, number>()
+
+export function getBrowserAudioLastChunkSequence(sessionId: string): number | null {
+  return lastChunkSequenceBySession.get(sessionId) ?? null
+}
+
+export function clearBrowserAudioChunkSequence(sessionId: string): void {
+  lastChunkSequenceBySession.delete(sessionId)
+}
+
+export function recordBrowserAudioChunkSequence(sessionId: string, sequenceNumber: number): void {
+  lastChunkSequenceBySession.set(sessionId, sequenceNumber)
 }
 
 export function resetBrowserAudioCaptureMetricsForTests(): void {
   metricsBySession.clear()
+}
+
+export function resetBrowserAudioChunkSequenceForTests(): void {
+  lastChunkSequenceBySession.clear()
 }

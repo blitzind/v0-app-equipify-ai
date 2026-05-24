@@ -424,6 +424,12 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
               </p>
             ) : null}
 
+            {browserAudio.state.error ? (
+              <p className="rounded-md border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-xs text-amber-950">
+                {browserAudio.state.error}
+              </p>
+            ) : null}
+
             {browserAudio.streamState && browserAudio.streamState.status !== "inactive" ? (
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <GrowthBadge

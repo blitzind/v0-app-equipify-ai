@@ -1,23 +1,52 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { GrowthEngineCard } from "@/components/growth/growth-ui-utils"
-import type { GrowthLiveCoachingSettings } from "@/lib/growth/realtime/providers/provider-types"
-
-type ConnectionOption = { id: string; label: string; provider: string; status: string }
+import { GrowthEngineCard, GrowthBadge } from "@/components/growth/growth-ui-utils"
+import { GrowthLiveCoachingProviderComparisonTable } from "@/components/growth/growth-live-coaching-provider-selection"
+import {
+  buildLiveCoachingProviderComparisonRows,
+  buildLiveCoachingProviderReadiness,
+  explainLiveCoachingProviderFallback,
+  recommendLiveCoachingProvider,
+} from "@/lib/growth/realtime/live-coaching/live-coaching-provider-selection"
+import { LIVE_COACHING_QA_PROOF_MARKER } from "@/lib/growth/realtime/live-coaching/live-coaching-production-proof"
+import type { GrowthLiveCoachingSettings, RealtimeProviderConnection } from "@/lib/growth/realtime/providers/provider-types"
 
 export function GrowthLiveCoachingSettingsPanel() {
   const [settings, setSettings] = useState<GrowthLiveCoachingSettings | null>(null)
-  const [connections, setConnections] = useState<ConnectionOption[]>([])
+  const [connections, setConnections] = useState<RealtimeProviderConnection[]>([])
   const [keywordsDraft, setKeywordsDraft] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testMessage, setTestMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const recommendation = useMemo(() => recommendLiveCoachingProvider(connections), [connections])
+  const comparisonRows = useMemo(
+    () =>
+      buildLiveCoachingProviderComparisonRows({
+        connections,
+        activeProviderConnectionId: settings?.activeProviderConnectionId ?? null,
+        recommendedConnectionId: recommendation.connectionId,
+      }),
+    [connections, recommendation.connectionId, settings?.activeProviderConnectionId],
+  )
+  const fallbackExplanation = useMemo(
+    () =>
+      explainLiveCoachingProviderFallback({
+        activeProviderConnectionId: settings?.activeProviderConnectionId ?? null,
+        connections,
+      }),
+    [connections, settings?.activeProviderConnectionId],
+  )
+  const activeReadiness = useMemo(() => {
+    const active = connections.find((connection) => connection.id === settings?.activeProviderConnectionId)
+    return active ? buildLiveCoachingProviderReadiness(active) : null
+  }, [connections, settings?.activeProviderConnectionId])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -33,7 +62,7 @@ export function GrowthLiveCoachingSettingsPanel() {
       }
       const connectionsData = (await connectionsRes.json().catch(() => ({}))) as {
         ok?: boolean
-        connections?: ConnectionOption[]
+        connections?: RealtimeProviderConnection[]
       }
       if (!settingsRes.ok || !settingsData.ok || !settingsData.settings) {
         throw new Error("Could not load live coaching settings.")
@@ -118,8 +147,35 @@ export function GrowthLiveCoachingSettingsPanel() {
 
   return (
     <GrowthEngineCard title="Live Coaching">
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <GrowthBadge label={LIVE_COACHING_QA_PROOF_MARKER} tone="neutral" />
+        <span>Platform-admin live coaching configuration</span>
+      </div>
+
       {error ? <p className="mb-3 text-sm text-destructive">{error}</p> : null}
+
       <div className="space-y-4">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-medium">Provider comparison</span>
+            {recommendation.connectionId ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={saving || settings.activeProviderConnectionId === recommendation.connectionId}
+                onClick={() => void save({ activeProviderConnectionId: recommendation.connectionId })}
+              >
+                Use recommended provider
+              </Button>
+            ) : null}
+          </div>
+          {recommendation.reason ? (
+            <p className="text-xs text-muted-foreground">{recommendation.reason}</p>
+          ) : null}
+          <GrowthLiveCoachingProviderComparisonTable rows={comparisonRows} />
+        </div>
+
         <label className="block space-y-1 text-sm">
           <span className="font-medium">Active transcript provider</span>
           <select
@@ -135,7 +191,7 @@ export function GrowthLiveCoachingSettingsPanel() {
             <option value="">Manual / stub fallback</option>
             {connections.map((connection) => (
               <option key={connection.id} value={connection.id}>
-                {connection.label} ({connection.provider})
+                {connection.label} ({connection.provider.replace(/_/g, " ")})
               </option>
             ))}
           </select>
@@ -143,6 +199,23 @@ export function GrowthLiveCoachingSettingsPanel() {
 
         {settings.activeProviderConnectionId ? (
           <div className="space-y-2 rounded-lg border border-border bg-muted/20 px-3 py-3">
+            {activeReadiness ? (
+              <div className="flex flex-wrap gap-2 text-xs">
+                <GrowthBadge label={activeReadiness.configured ? "Configured" : "Not configured"} tone="neutral" />
+                <GrowthBadge label={activeReadiness.validated ? "Validated" : "Not validated"} tone="neutral" />
+                <GrowthBadge
+                  label={activeReadiness.browserMicSupported ? "Browser mic supported" : "No browser mic"}
+                  tone="neutral"
+                />
+                {activeReadiness.circuitOpen ? (
+                  <GrowthBadge label="Circuit open" tone="attention" />
+                ) : activeReadiness.degraded ? (
+                  <GrowthBadge label="Degraded" tone="attention" />
+                ) : (
+                  <GrowthBadge label={activeReadiness.readinessStatus.replace(/_/g, " ")} tone="healthy" />
+                )}
+              </div>
+            ) : null}
             <Button
               type="button"
               variant="outline"
@@ -154,10 +227,13 @@ export function GrowthLiveCoachingSettingsPanel() {
               Test Connection
             </Button>
             {testMessage ? <p className="text-xs text-muted-foreground">{testMessage}</p> : null}
+            {!activeReadiness?.eligibleForRecommendation ? (
+              <p className="text-xs text-amber-950">{fallbackExplanation}</p>
+            ) : null}
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Manual transcript mode active until a provider is selected. Deepgram, AssemblyAI, and OpenAI Realtime
+            Manual transcript mode is active until a provider is selected. Deepgram, AssemblyAI, and OpenAI Realtime
             support browser mic transcription when connected and ready. OpenAI is transcription-only — no voice
             output.
           </p>

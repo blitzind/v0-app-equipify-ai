@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
@@ -6,12 +7,18 @@ import {
   updateBrowserAudioCaptureStatus,
 } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-service"
 import { evaluateBrowserAudioCaptureCapability } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-capability"
+import { BROWSER_AUDIO_TROUBLESHOOTING } from "@/lib/growth/realtime/browser-audio/browser-audio-troubleshooting"
 import {
   closeBrowserAudioProviderStream,
   getBrowserAudioStreamState,
   openBrowserAudioProviderStream,
   retryBrowserAudioProviderStream,
 } from "@/lib/growth/realtime/browser-audio/browser-audio-stream-manager"
+import { buildLiveCoachingQaProofMarker } from "@/lib/growth/realtime/live-coaching/live-coaching-production-proof"
+import { countLiveCoachingReadyProviders } from "@/lib/growth/realtime/live-coaching/live-coaching-provider-selection"
+import { fetchRealtimeProviderConnection } from "@/lib/growth/realtime/providers/realtime-provider-connection-repository"
+import { isRealtimeProviderCircuitOpen } from "@/lib/growth/realtime/providers/realtime-provider-circuit-breaker"
+import { listRealtimeProviderConnections } from "@/lib/growth/realtime/providers/realtime-provider-connection-repository"
 import { fetchGrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-repository"
 import { mapBrowserAudioChunkError } from "@/lib/growth/realtime/browser-audio/ingest-browser-audio-chunk"
 
@@ -24,6 +31,25 @@ const BodySchema = z.object({
   action: z.enum(["request", "start", "pause", "stop", "fail", "retry"]),
   error: z.string().trim().max(500).optional().nullable(),
 })
+
+async function resolveProviderConnectionForSession(
+  admin: SupabaseClient,
+  session: NonNullable<Awaited<ReturnType<typeof fetchGrowthRealtimeCallSession>>>,
+) {
+  if (!session.realtimeProviderConnectionId) return null
+  return fetchRealtimeProviderConnection(admin, session.realtimeProviderConnectionId)
+}
+
+function evaluateCaptureCapabilityForSession(
+  session: NonNullable<Awaited<ReturnType<typeof fetchGrowthRealtimeCallSession>>>,
+  providerConnection: Awaited<ReturnType<typeof resolveProviderConnectionForSession>>,
+) {
+  return evaluateBrowserAudioCaptureCapability({
+    session,
+    providerConnection,
+    providerHealthy: session.transcriptStatus === "live",
+  })
+}
 
 export async function PATCH(
   request: Request,
@@ -49,7 +75,28 @@ export async function PATCH(
     }
 
     if (parsed.data.action === "start" || parsed.data.action === "retry") {
-      const capability = evaluateBrowserAudioCaptureCapability({ session: existing })
+      if (parsed.data.action === "start" && existing.browserAudioCaptureStatus === "active") {
+        return NextResponse.json(
+          {
+            error: "duplicate_capture_start",
+            message: BROWSER_AUDIO_TROUBLESHOOTING.doubleStartBlocked,
+          },
+          { status: 409 },
+        )
+      }
+
+      const providerConnection = await resolveProviderConnectionForSession(access.admin, existing)
+      if (providerConnection && isRealtimeProviderCircuitOpen(providerConnection)) {
+        return NextResponse.json(
+          {
+            error: "provider_circuit_open",
+            message: BROWSER_AUDIO_TROUBLESHOOTING.providerCircuitOpen,
+          },
+          { status: 409 },
+        )
+      }
+
+      const capability = evaluateCaptureCapabilityForSession(existing, providerConnection)
       if (!capability.canStart) {
         return NextResponse.json(
           {
@@ -76,7 +123,10 @@ export async function PATCH(
         session,
         metrics: getBrowserAudioCaptureMetrics(sessionId),
         stream,
-        capability: evaluateBrowserAudioCaptureCapability({ session }),
+        capability: evaluateCaptureCapabilityForSession(
+          session,
+          await resolveProviderConnectionForSession(access.admin, session),
+        ),
       })
     }
 
@@ -107,12 +157,13 @@ export async function PATCH(
       stream = await closeBrowserAudioProviderStream(sessionId, { admin: access.admin, session })
     }
 
+    const providerConnection = await resolveProviderConnectionForSession(access.admin, session)
     return NextResponse.json({
       ok: true,
       session,
       metrics: getBrowserAudioCaptureMetrics(sessionId),
       stream,
-      capability: evaluateBrowserAudioCaptureCapability({ session }),
+      capability: evaluateCaptureCapabilityForSession(session, providerConnection),
     })
   } catch (e) {
     const mapped = mapBrowserAudioChunkError(e)
@@ -137,11 +188,19 @@ export async function GET(
     return NextResponse.json({ error: "not_found", message: "Session not found." }, { status: 404 })
   }
 
+  const providerConnection = await resolveProviderConnectionForSession(access.admin, session)
+  const connections = await listRealtimeProviderConnections(access.admin)
+  const qaProof = buildLiveCoachingQaProofMarker({
+    providerCount: connections.length,
+    readyProviderCount: countLiveCoachingReadyProviders(connections),
+  })
+
   return NextResponse.json({
     ok: true,
     session,
     metrics: getBrowserAudioCaptureMetrics(sessionId),
     stream: getBrowserAudioStreamState(sessionId),
-    capability: evaluateBrowserAudioCaptureCapability({ session }),
+    capability: evaluateCaptureCapabilityForSession(session, providerConnection),
+    qaProof,
   })
 }

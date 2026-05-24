@@ -98,8 +98,8 @@ function parseCapabilities(value: unknown): RealtimeProviderCapabilitySnapshot {
     speakerDetection: Boolean(raw.speakerDetection),
     keywordEvents: Boolean(raw.keywordEvents),
     browserAudioStreaming: Boolean(raw.browserAudioStreaming),
-    liveTranscriptStreaming: Boolean(raw.liveTranscriptStreaming),
-    liveGuidanceCompatible: Boolean(raw.liveGuidanceCompatible),
+    liveTranscriptStreaming: Boolean(raw.liveTranscriptStreaming ?? raw.browserAudioStreaming),
+    liveGuidanceCompatible: Boolean(raw.liveGuidanceCompatible ?? raw.realtime),
     latencyMs: typeof raw.latencyMs === "number" ? raw.latencyMs : 0,
   }
 }

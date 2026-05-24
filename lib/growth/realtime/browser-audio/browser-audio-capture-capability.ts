@@ -3,17 +3,31 @@ import {
   GROWTH_BROWSER_AUDIO_PROVIDER_UNAVAILABLE_MESSAGE,
 } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-invariants"
 import type { GrowthBrowserAudioCaptureCapability } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-types"
+import { BROWSER_AUDIO_TROUBLESHOOTING } from "@/lib/growth/realtime/browser-audio/browser-audio-troubleshooting"
 import type { GrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-types"
 import { REALTIME_PROVIDER_LABELS } from "@/lib/growth/realtime/browser-audio/provider-labels"
 import { providerSupportsBrowserAudioStreaming } from "@/lib/growth/realtime/browser-audio/browser-audio-stream-types"
+import { isRealtimeProviderCircuitOpen } from "@/lib/growth/realtime/providers/realtime-provider-circuit-breaker"
+import type { RealtimeProviderConnection } from "@/lib/growth/realtime/providers/provider-types"
 
 type CapabilityInput = {
   session: GrowthRealtimeCallSession | null
   providerHealthy?: boolean
+  providerConnection?: RealtimeProviderConnection | null
+  browserSupported?: boolean
 }
 
 export function evaluateBrowserAudioCaptureCapability(input: CapabilityInput): GrowthBrowserAudioCaptureCapability {
   const session = input.session
+  if (input.browserSupported === false) {
+    return {
+      canStart: false,
+      disabledReason: BROWSER_AUDIO_TROUBLESHOOTING.unsupportedBrowser,
+      providerLabel: null,
+      providerHealthy: false,
+    }
+  }
+
   if (!session) {
     return {
       canStart: false,
@@ -67,6 +81,43 @@ export function evaluateBrowserAudioCaptureCapability(input: CapabilityInput): G
     return {
       canStart: false,
       disabledReason: GROWTH_BROWSER_AUDIO_PROVIDER_UNAVAILABLE_MESSAGE,
+      providerLabel,
+      providerHealthy: false,
+    }
+  }
+
+  if (!providerSupportsBrowserAudioStreaming(session.providerId)) {
+    return {
+      canStart: false,
+      disabledReason: BROWSER_AUDIO_TROUBLESHOOTING.providerUnavailable,
+      providerLabel,
+      providerHealthy: false,
+    }
+  }
+
+  const connection = input.providerConnection
+  if (connection && isRealtimeProviderCircuitOpen(connection)) {
+    return {
+      canStart: false,
+      disabledReason: BROWSER_AUDIO_TROUBLESHOOTING.providerCircuitOpen,
+      providerLabel,
+      providerHealthy: false,
+    }
+  }
+
+  if (connection && (connection.temporarilyDegraded || connection.readinessStatus === "degraded")) {
+    return {
+      canStart: false,
+      disabledReason: BROWSER_AUDIO_TROUBLESHOOTING.providerDegraded,
+      providerLabel,
+      providerHealthy: false,
+    }
+  }
+
+  if (connection && !connection.authConfigured) {
+    return {
+      canStart: false,
+      disabledReason: BROWSER_AUDIO_TROUBLESHOOTING.providerNotConfigured,
       providerLabel,
       providerHealthy: false,
     }

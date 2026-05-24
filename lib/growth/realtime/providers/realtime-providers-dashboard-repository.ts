@@ -6,6 +6,12 @@ import {
   sanitizeRealtimeProviderConnectionForApi,
 } from "@/lib/growth/realtime/providers/realtime-provider-connection-repository"
 import { fetchRealtimeProviderDiagnostics } from "@/lib/growth/realtime/providers/realtime-provider-diagnostics"
+import { buildLiveCoachingQaProofMarker } from "@/lib/growth/realtime/live-coaching/live-coaching-production-proof"
+import {
+  buildLiveCoachingProviderComparisonRows,
+  countLiveCoachingReadyProviders,
+  recommendLiveCoachingProvider,
+} from "@/lib/growth/realtime/live-coaching/live-coaching-provider-selection"
 import { listRecentGrowthRealtimeCallSessions } from "@/lib/growth/realtime/realtime-call-repository"
 
 export async function fetchGrowthRealtimeProvidersDashboard(admin: SupabaseClient) {
@@ -55,6 +61,17 @@ export async function fetchGrowthRealtimeProvidersDashboard(admin: SupabaseClien
     await Promise.all(connections.map((connection) => fetchRealtimeProviderDiagnostics(admin, connection.id)))
   ).filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
 
+  const recommendation = recommendLiveCoachingProvider(connections)
+  const providerComparison = buildLiveCoachingProviderComparisonRows({
+    connections,
+    activeProviderConnectionId: null,
+    recommendedConnectionId: recommendation.connectionId,
+  })
+  const qaProof = buildLiveCoachingQaProofMarker({
+    providerCount: connections.length,
+    readyProviderCount: countLiveCoachingReadyProviders(connections),
+  })
+
   return {
     stats: {
       connectionCount: connections.length,
@@ -72,6 +89,9 @@ export async function fetchGrowthRealtimeProvidersDashboard(admin: SupabaseClien
     },
     connections: connections.map(sanitizeRealtimeProviderConnectionForApi),
     diagnostics,
+    providerComparison,
+    providerRecommendation: recommendation,
+    qaProof,
     coachingResponsiveness: {
       averageGuidanceLatencyMs,
       p95GuidanceLatencyMs,
