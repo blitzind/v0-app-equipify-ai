@@ -261,6 +261,21 @@ export async function listGrowthOutreachQueueItemsWithLead(
   }))
 }
 
+export async function fetchGrowthOutreachQueueByEnrollmentStepId(
+  admin: SupabaseClient,
+  stepId: string,
+): Promise<GrowthOutreachQueueItem | null> {
+  const { data, error } = await queueTable(admin)
+    .select(QUEUE_SELECT)
+    .eq("sequence_enrollment_step_id", stepId)
+    .not("status", "eq", "cancelled")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return data ? mapQueueRow(data as QueueRow) : null
+}
+
 export async function listDueScheduledOutreachQueueItems(
   admin: SupabaseClient,
   limit = 25,

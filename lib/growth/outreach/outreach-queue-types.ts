@@ -42,6 +42,7 @@ export type GrowthOutreachQueuePayloadSnapshot = {
   campaignName?: string | null
   personalizationStrategyVersion?: string | null
   personalizationConfidence?: number | null
+  schedulerIdempotencyKey?: string | null
 }
 
 export type GrowthOutreachQueueItem = {

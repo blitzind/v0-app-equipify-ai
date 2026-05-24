@@ -102,6 +102,7 @@
     "test:growth-conversation-intelligence": "tsx scripts/test-growth-conversation-intelligence.ts",
     "test:growth-sequence-intelligence": "tsx scripts/test-growth-sequence-intelligence.ts",
     "test:growth-sequence-execution": "tsx scripts/test-growth-sequence-execution.ts",
+    "test:growth-sequence-scheduler": "tsx scripts/test-growth-sequence-scheduler.ts",
     "test:growth-command-center": "tsx scripts/test-growth-command-center.ts",
     "test:growth-realtime-call-intelligence": "tsx scripts/test-growth-realtime-call-intelligence.ts",
     "test:growth-live-guidance": "tsx scripts/test-growth-live-guidance.ts",

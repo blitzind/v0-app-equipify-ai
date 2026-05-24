@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { GitBranch, Loader2, RefreshCw } from "lucide-react"
+import { GitBranch, Loader2, Play, RefreshCw, TestTube2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import type {
@@ -9,6 +9,11 @@ import type {
   GrowthSequenceEnrollment,
   GrowthSequenceEnrollmentStep,
 } from "@/lib/growth/sequence-enrollment-types"
+import type {
+  GrowthSequenceSchedulerRunResult,
+  GrowthSequenceSchedulerStatus,
+} from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
+import { GROWTH_SEQUENCE_SCHEDULER_QA_MARKER } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
 import { cn } from "@/lib/utils"
 
 type DashboardPayload = {
@@ -76,23 +81,59 @@ export function GrowthSequenceExecutionDashboard({
   highlightEnrollmentId?: string | null
 }) {
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null)
+  const [schedulerStatus, setSchedulerStatus] = useState<GrowthSequenceSchedulerStatus | null>(null)
+  const [schedulerResult, setSchedulerResult] = useState<GrowthSequenceSchedulerRunResult | null>(null)
+  const [schedulerLoading, setSchedulerLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const loadSchedulerStatus = useCallback(async () => {
+    const res = await fetch("/api/platform/growth/sequences/scheduler/run", { cache: "no-store" })
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; status?: GrowthSequenceSchedulerStatus }
+    if (res.ok && data.status) setSchedulerStatus(data.status)
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/platform/growth/sequences/execution/dashboard", { cache: "no-store" })
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; dashboard?: DashboardPayload; message?: string }
-      if (!res.ok || !data.ok || !data.dashboard) throw new Error(data.message ?? "Load failed.")
+      const [dashboardRes] = await Promise.all([
+        fetch("/api/platform/growth/sequences/execution/dashboard", { cache: "no-store" }),
+        loadSchedulerStatus(),
+      ])
+      const data = (await dashboardRes.json().catch(() => ({}))) as { ok?: boolean; dashboard?: DashboardPayload; message?: string }
+      if (!dashboardRes.ok || !data.ok || !data.dashboard) throw new Error(data.message ?? "Load failed.")
       setDashboard(data.dashboard)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [loadSchedulerStatus])
+
+  async function runScheduler(dryRun: boolean) {
+    setSchedulerLoading(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/platform/growth/sequences/scheduler/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dryRun, limit: 25 }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        result?: GrowthSequenceSchedulerRunResult
+        message?: string
+      }
+      if (!res.ok || !data.ok || !data.result) throw new Error(data.message ?? "Scheduler run failed.")
+      setSchedulerResult(data.result)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Scheduler run failed.")
+    } finally {
+      setSchedulerLoading(false)
+    }
+  }
 
   useEffect(() => {
     void load()
@@ -131,6 +172,57 @@ export function GrowthSequenceExecutionDashboard({
 
   return (
     <div className="space-y-6">
+      <GrowthEngineCard title="Sequence Scheduler" icon={<GitBranch className="size-4" />}>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <GrowthBadge label={GROWTH_SEQUENCE_SCHEDULER_QA_MARKER} tone="neutral" />
+          {schedulerStatus?.providerConfigured ? (
+            <GrowthBadge label="Provider configured" tone="healthy" />
+          ) : (
+            <GrowthBadge label="No live email provider" tone="attention" />
+          )}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatTile label="Due steps" value={schedulerStatus?.dueStepsCount ?? 0} />
+          <StatTile label="Last queued" value={schedulerStatus?.lastRun?.queued ?? 0} />
+          <StatTile label="Last skipped" value={
+            (schedulerStatus?.lastRun?.skippedSuppressed ?? 0) +
+            (schedulerStatus?.lastRun?.skippedAlreadyQueued ?? 0) +
+            (schedulerStatus?.lastRun?.skippedMissingDraft ?? 0)
+          } />
+          <StatTile label="Last failed" value={schedulerStatus?.lastRun?.failed ?? 0} />
+        </div>
+
+        {schedulerStatus?.lastRun ? (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Last run {new Date(schedulerStatus.lastRun.startedAt).toLocaleString()} · scanned{" "}
+            {schedulerStatus.lastRun.scanned} · due {schedulerStatus.lastRun.due}
+          </p>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">No scheduler runs yet.</p>
+        )}
+
+        {schedulerResult ? (
+          <div className="mt-3 rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm">
+            {schedulerResult.dryRun ? "Dry run" : "Live run"} · scanned {schedulerResult.scanned} · due{" "}
+            {schedulerResult.due} · queued {schedulerResult.queued} · suppressed{" "}
+            {schedulerResult.skippedSuppressed} · already queued {schedulerResult.skippedAlreadyQueued} · failed{" "}
+            {schedulerResult.failed}
+          </div>
+        ) : null}
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button onClick={() => void runScheduler(false)} disabled={schedulerLoading}>
+            {schedulerLoading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Play className="mr-2 size-4" />}
+            Run Scheduler
+          </Button>
+          <Button variant="outline" onClick={() => void runScheduler(true)} disabled={schedulerLoading}>
+            <TestTube2 className="mr-2 size-4" />
+            Dry Run
+          </Button>
+        </div>
+      </GrowthEngineCard>
+
       <div className="flex items-center justify-between gap-3">
         <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <StatTile label="Avg health" value={dashboard.averageHealth} />

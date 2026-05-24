@@ -1106,6 +1106,40 @@ export async function emitGrowthLeadSequenceEnrollmentCancelledTimeline(
   })
 }
 
+export async function emitGrowthLeadSequenceStepDueTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; enrollmentId: string; stepId: string; stepOrder: number },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "sequence_step_due",
+    title: "Sequence step due",
+    summary: `Step ${input.stepOrder} is due for scheduling`,
+    payload: { enrollmentId: input.enrollmentId, stepId: input.stepId, stepOrder: input.stepOrder },
+  })
+}
+
+export async function emitGrowthLeadSequenceStepSkippedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    enrollmentId: string
+    stepId: string
+    reason: string
+    actor?: { userId?: string | null; email?: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "sequence_step_skipped",
+    title: "Sequence step skipped",
+    summary: input.reason,
+    payload: { enrollmentId: input.enrollmentId, stepId: input.stepId, reason: input.reason },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}
+
 export async function emitGrowthLeadLiveCallStartedTimeline(
   admin: SupabaseClient,
   input: {

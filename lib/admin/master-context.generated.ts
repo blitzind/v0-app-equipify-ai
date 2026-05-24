@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 572,
-  sqlMigrations: 240,
+  apiRouteHandlers: 574,
+  sqlMigrations: 241,
   dashboardPages: 65,
   componentsTsx: 397,
-  libTsFiles: 1295,
+  libTsFiles: 1298,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **572** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **240** |
+| API route handlers (\`app/api/**/route.ts\`) | **574** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **241** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
 | \`components/**/*.tsx\` | **397** |
-| \`lib/**/*.ts\` | **1295** |
+| \`lib/**/*.ts\` | **1298** |
 
 ### Vercel crons
 
@@ -46,6 +46,7 @@ cron/blitzpay-memberships/route.ts
 cron/blitzpay-reminders/route.ts
 cron/blitzpay-scheduled-payments/route.ts
 cron/growth-outreach-execute/route.ts
+cron/growth-sequence-scheduler/route.ts
 cron/maintenance-due/route.ts
 cron/process-ai-jobs/route.ts
 cron/process-import-runs/route.ts
@@ -554,6 +555,7 @@ platform/growth/revenue/dashboard/route.ts
 platform/growth/sequences/dashboard/route.ts
 platform/growth/sequences/execution/dashboard/route.ts
 platform/growth/sequences/patterns/route.ts
+platform/growth/sequences/scheduler/run/route.ts
 platform/growth/suppression/route.ts
 platform/growth/webhooks/outbound/[provider]/route.ts
 platform/import-operations/bulk-recover/route.ts
