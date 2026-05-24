@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
-import { probeRealtimeProviderHealth } from "@/lib/growth/realtime/providers/provider-health"
 import {
-  fetchRealtimeProviderConnection,
-  sanitizeRealtimeProviderConnectionForApi,
-} from "@/lib/growth/realtime/providers/realtime-provider-connection-repository"
+  RealtimeProviderValidationCooldownError,
+  validateRealtimeProviderConnection,
+} from "@/lib/growth/realtime/providers/realtime-provider-validation"
 
 export const runtime = "nodejs"
 
@@ -24,14 +23,31 @@ export async function POST(
   }
 
   try {
-    const health = await probeRealtimeProviderHealth(access.admin, connectionId)
-    const connection = await fetchRealtimeProviderConnection(access.admin, connectionId)
+    const result = await validateRealtimeProviderConnection(access.admin, {
+      connectionId,
+      actorUserId: access.userId,
+    })
     return NextResponse.json({
       ok: true,
-      health,
-      connection: connection ? sanitizeRealtimeProviderConnectionForApi(connection) : null,
+      health: {
+        healthStatus: result.validation.healthStatus,
+        latencyMs: result.validation.latencyMs,
+        message: result.validation.message,
+      },
+      validation: result.validation,
+      connection: result.connection,
     })
   } catch (e) {
+    if (e instanceof RealtimeProviderValidationCooldownError) {
+      return NextResponse.json(
+        {
+          error: "validation_cooldown",
+          message: "Test connection cooldown active. Try again shortly.",
+          cooldownRemainingMs: e.remainingMs,
+        },
+        { status: 429 },
+      )
+    }
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ error: "validate_failed", message }, { status: 500 })
   }

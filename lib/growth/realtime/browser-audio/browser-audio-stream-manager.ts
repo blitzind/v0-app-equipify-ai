@@ -18,6 +18,8 @@ import {
   isBrowserAudioStreamProvider,
 } from "@/lib/growth/realtime/providers/provider-session-manager"
 import { updateGrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-repository"
+import { recordRealtimeProviderOperationalEvent } from "@/lib/growth/realtime/providers/realtime-provider-metrics"
+import type { RealtimeProviderLifecycleEventType } from "@/lib/growth/realtime/providers/realtime-provider-readiness-types"
 
 const MAX_STREAM_RECONNECT_ATTEMPTS = 3
 const RECONNECT_BACKOFF_MS = [1000, 2000, 4000] as const
@@ -81,6 +83,30 @@ export function resetBrowserAudioStreamStateForTests(): void {
   streamSessions.clear()
 }
 
+function mapProviderErrorToLifecycleEvent(code: string): RealtimeProviderLifecycleEventType {
+  if (code === "provider_auth_failed") return "auth_failure"
+  if (code === "provider_rate_limited") return "rate_limit"
+  if (code === "stream_timeout") return "timeout"
+  return "provider_failure"
+}
+
+async function recordStreamOperationalEvent(
+  admin: SupabaseClient,
+  session: GrowthRealtimeCallSession,
+  eventType: RealtimeProviderLifecycleEventType,
+  message: string,
+  metadata?: Record<string, unknown>,
+) {
+  if (!session.realtimeProviderConnectionId) return
+  await recordRealtimeProviderOperationalEvent(admin, {
+    connectionId: session.realtimeProviderConnectionId,
+    sessionId: session.id,
+    eventType,
+    message,
+    metadata,
+  })
+}
+
 export async function openBrowserAudioProviderStream(
   admin: SupabaseClient,
   session: GrowthRealtimeCallSession,
@@ -122,8 +148,14 @@ export async function openBrowserAudioProviderStream(
         await updateGrowthRealtimeCallSession(admin, session.id, {
           transcriptStatus: "failed",
         })
+        if (session.realtimeProviderConnectionId) {
+          void recordStreamOperationalEvent(admin, session, mapProviderErrorToLifecycleEvent(mapped.code), mapped.message)
+        }
       })
     })
+    if (session.realtimeProviderConnectionId) {
+      await recordStreamOperationalEvent(admin, session, "stream_open", "Browser audio provider stream opened.")
+    }
   } catch (error) {
     const mapped = mapBrowserAudioProviderError(error)
     updateStreamMetrics(record, {
@@ -131,6 +163,14 @@ export async function openBrowserAudioProviderStream(
       streamFailureReason: mapped.message,
       reconnectAttempts: record.metrics.reconnectAttempts + 1,
     })
+    if (session.realtimeProviderConnectionId) {
+      await recordStreamOperationalEvent(
+        admin,
+        session,
+        mapProviderErrorToLifecycleEvent(mapped.code),
+        mapped.message,
+      )
+    }
     throw new ProviderStreamingUnavailableError(mapped.message)
   }
 
@@ -139,6 +179,7 @@ export async function openBrowserAudioProviderStream(
     streamOpenCount: record.metrics.streamOpenCount + 1,
     streamFailureReason: null,
     reconnectAttempts: 0,
+    lastActivityAt: new Date().toISOString(),
   })
 }
 
@@ -182,9 +223,16 @@ export async function ingestBrowserAudioProviderChunk(
       streamFailureReason: mapped.message,
       reconnectAttempts: record.metrics.reconnectAttempts + 1,
     })
+    await recordStreamOperationalEvent(
+      admin,
+      session,
+      mapProviderErrorToLifecycleEvent(mapped.code),
+      mapped.message,
+    )
     throw new ProviderStreamingUnavailableError(mapped.message)
   }
 
+  updateStreamMetrics(record, { lastActivityAt: new Date().toISOString() })
   const providerTranscriptLatencyMs = record.metrics.averageProviderTranscriptLatencyMs
   void started
   return {
@@ -193,7 +241,10 @@ export async function ingestBrowserAudioProviderChunk(
   }
 }
 
-export async function closeBrowserAudioProviderStream(sessionId: string): Promise<GrowthBrowserAudioStreamState> {
+export async function closeBrowserAudioProviderStream(
+  sessionId: string,
+  input?: { admin?: SupabaseClient; session?: GrowthRealtimeCallSession },
+): Promise<GrowthBrowserAudioStreamState> {
   const provider = getActiveProviderForSession(sessionId)
   if (provider && isBrowserAudioStreamProvider(provider)) {
     await provider.closeBrowserAudioStream?.()
@@ -201,6 +252,10 @@ export async function closeBrowserAudioProviderStream(sessionId: string): Promis
 
   const record = streamSessions.get(sessionId)
   if (!record) return initialBrowserAudioStreamState()
+
+  if (input?.admin && input?.session?.realtimeProviderConnectionId) {
+    await recordStreamOperationalEvent(input.admin, input.session, "stream_close", "Browser audio provider stream closed.")
+  }
 
   return updateStreamMetrics(record, {
     status: "closed",
@@ -221,6 +276,10 @@ export async function retryBrowserAudioProviderStream(
   const backoffMs = RECONNECT_BACKOFF_MS[record.metrics.reconnectAttempts] ?? 4000
   await new Promise((resolve) => setTimeout(resolve, backoffMs))
 
-  await closeBrowserAudioProviderStream(session.id)
+  if (session.realtimeProviderConnectionId) {
+    await recordStreamOperationalEvent(admin, session, "reconnect_attempt", "Retrying browser audio provider stream.")
+  }
+
+  await closeBrowserAudioProviderStream(session.id, { admin, session })
   return openBrowserAudioProviderStream(admin, session, actor)
 }

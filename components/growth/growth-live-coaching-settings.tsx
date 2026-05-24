@@ -15,6 +15,8 @@ export function GrowthLiveCoachingSettingsPanel() {
   const [keywordsDraft, setKeywordsDraft] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testMessage, setTestMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -73,6 +75,36 @@ export function GrowthLiveCoachingSettingsPanel() {
     }
   }
 
+  async function testActiveProvider() {
+    if (!settings?.activeProviderConnectionId) return
+    setTesting(true)
+    setTestMessage(null)
+    setError(null)
+    try {
+      const res = await fetch(
+        `/api/platform/growth/realtime/providers/connections/${settings.activeProviderConnectionId}/validate`,
+        { method: "POST" },
+      )
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        validation?: { message?: string; readinessStatus?: string }
+        message?: string
+        error?: string
+      }
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message ?? data.error ?? "Test connection failed.")
+      }
+      setTestMessage(
+        `${data.validation?.message ?? "Connection verified."} Readiness: ${data.validation?.readinessStatus?.replace(/_/g, " ") ?? "unknown"}.`,
+      )
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Test connection failed.")
+    } finally {
+      setTesting(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -108,6 +140,24 @@ export function GrowthLiveCoachingSettingsPanel() {
             ))}
           </select>
         </label>
+
+        {settings.activeProviderConnectionId ? (
+          <div className="space-y-2 rounded-lg border border-border bg-muted/20 px-3 py-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={testing || saving}
+              onClick={() => void testActiveProvider()}
+            >
+              {testing ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+              Test Connection
+            </Button>
+            {testMessage ? <p className="text-xs text-muted-foreground">{testMessage}</p> : null}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Manual transcript mode active until a provider is selected.</p>
+        )}
 
         <label className="flex items-center gap-2 text-sm">
           <input

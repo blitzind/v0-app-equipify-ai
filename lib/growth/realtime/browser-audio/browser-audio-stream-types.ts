@@ -17,6 +17,7 @@ export type GrowthBrowserAudioStreamMetrics = {
   averageProviderTranscriptLatencyMs: number
   reconnectAttempts: number
   canRetry: boolean
+  lastActivityAt: string | null
 }
 
 export type GrowthBrowserAudioStreamState = {
@@ -31,6 +32,7 @@ export const emptyBrowserAudioStreamMetrics = (): GrowthBrowserAudioStreamMetric
   averageProviderTranscriptLatencyMs: 0,
   reconnectAttempts: 0,
   canRetry: false,
+  lastActivityAt: null,
 })
 
 export const initialBrowserAudioStreamState = (): GrowthBrowserAudioStreamState => ({

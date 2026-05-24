@@ -5,6 +5,7 @@ import {
   listRealtimeProviderConnections,
   sanitizeRealtimeProviderConnectionForApi,
 } from "@/lib/growth/realtime/providers/realtime-provider-connection-repository"
+import { fetchRealtimeProviderDiagnostics } from "@/lib/growth/realtime/providers/realtime-provider-diagnostics"
 import { listRecentGrowthRealtimeCallSessions } from "@/lib/growth/realtime/realtime-call-repository"
 
 export async function fetchGrowthRealtimeProvidersDashboard(admin: SupabaseClient) {
@@ -45,6 +46,15 @@ export async function fetchGrowthRealtimeProvidersDashboard(admin: SupabaseClien
   const providerRecoverySuccessRate =
     totalRecoveryAttempts > 0 ? Math.round((totalRecoverySuccesses / totalRecoveryAttempts) * 100) : 0
 
+  const averageReliabilityScore =
+    connections.length > 0
+      ? Math.round(connections.reduce((sum, connection) => sum + connection.reliabilityScore, 0) / connections.length)
+      : 0
+
+  const diagnostics = (
+    await Promise.all(connections.map((connection) => fetchRealtimeProviderDiagnostics(admin, connection.id)))
+  ).filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+
   return {
     stats: {
       connectionCount: connections.length,
@@ -55,8 +65,13 @@ export async function fetchGrowthRealtimeProvidersDashboard(admin: SupabaseClien
       providerFailoverCount: totalFailovers,
       providerDisconnectCount: totalDisconnects,
       providerRecoverySuccessRate,
+      averageReliabilityScore,
+      totalStreamFailures: connections.reduce((sum, connection) => sum + connection.streamFailureCount, 0),
+      totalReconnects: connections.reduce((sum, connection) => sum + connection.reconnectCount, 0),
+      totalRateLimitEvents: connections.reduce((sum, connection) => sum + connection.rateLimitEventCount, 0),
     },
     connections: connections.map(sanitizeRealtimeProviderConnectionForApi),
+    diagnostics,
     coachingResponsiveness: {
       averageGuidanceLatencyMs,
       p95GuidanceLatencyMs,

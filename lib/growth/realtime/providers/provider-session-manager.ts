@@ -35,6 +35,10 @@ export function getActiveProviderForSession(sessionId: string): RealtimeTranscri
   return activeSessions.get(sessionId)?.provider ?? null
 }
 
+export function getActiveProviderSessionIds(): string[] {
+  return [...activeSessions.keys()]
+}
+
 export async function attachRealtimeProviderToSession(
   admin: SupabaseClient,
   session: GrowthRealtimeCallSession,

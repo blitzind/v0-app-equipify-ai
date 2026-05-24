@@ -73,6 +73,25 @@ export type RealtimeProviderConnection = {
   providerRecoveryAttemptCount: number
   providerRecoverySuccessCount: number
   providerRecoverySuccessRate: number
+  authConfigured: boolean
+  lastSuccessfulConnectionAt: string | null
+  reliabilityScore: number
+  streamFailureCount: number
+  reconnectCount: number
+  rateLimitEventCount: number
+  lastDisconnectReason: string | null
+  temporarilyDegraded: boolean
+  degradedReason: string | null
+  degradedUntil: string | null
+  circuitOpen: boolean
+  circuitOpenUntil: string | null
+  validationFailureCount: number
+  lastValidationAt: string | null
+  lastValidationSuccessAt: string | null
+  lastValidationDurationMs: number
+  nextValidationAllowedAt: string | null
+  readinessStatus: "not_ready" | "ready" | "degraded" | "circuit_open"
+  configurationWarnings: Array<{ code: string; message: string; severity: "info" | "warning" | "critical" }>
   createdBy: string | null
   createdAt: string
   updatedAt: string

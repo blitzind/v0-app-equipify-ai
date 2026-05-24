@@ -8,6 +8,7 @@ import {
   incrementRealtimeProviderMetric,
 } from "@/lib/growth/realtime/providers/realtime-provider-connection-repository"
 import { fetchGrowthLiveCoachingSettings } from "@/lib/growth/realtime/providers/live-coaching-settings-repository"
+import { isRealtimeProviderCircuitOpen } from "@/lib/growth/realtime/providers/realtime-provider-circuit-breaker"
 import { createRealtimeProviderInstance } from "@/lib/growth/realtime/providers/provider-registry"
 import type {
   RealtimeProviderRouteResult,
@@ -53,7 +54,12 @@ export async function resolveRealtimeProviderRoute(
   }
 
   const connection = await fetchRealtimeProviderConnectionInternal(admin, settings.activeProviderConnectionId)
-  if (!connection || connection.status === "error" || connection.healthStatus === "unhealthy") {
+  if (
+    !connection ||
+    connection.status === "error" ||
+    connection.healthStatus === "unhealthy" ||
+    isRealtimeProviderCircuitOpen(connection)
+  ) {
     if (connection) {
       await incrementRealtimeProviderMetric(admin, connection.id, "failover")
     }

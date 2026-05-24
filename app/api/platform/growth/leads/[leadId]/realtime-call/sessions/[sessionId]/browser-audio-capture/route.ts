@@ -104,7 +104,7 @@ export async function PATCH(
       })
     }
     if (parsed.data.action === "pause" || parsed.data.action === "stop" || parsed.data.action === "fail") {
-      stream = await closeBrowserAudioProviderStream(sessionId)
+      stream = await closeBrowserAudioProviderStream(sessionId, { admin: access.admin, session })
     }
 
     return NextResponse.json({

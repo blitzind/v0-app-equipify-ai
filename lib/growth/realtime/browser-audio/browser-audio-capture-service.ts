@@ -116,7 +116,7 @@ export async function stopBrowserAudioCaptureForSession(
     status: "stopped",
     enabled: false,
   })
-  await closeBrowserAudioProviderStream(sessionId)
+  await closeBrowserAudioProviderStream(sessionId, { admin, session })
   clearBrowserAudioStreamState(sessionId)
   clearBrowserAudioCaptureMetrics(sessionId)
 }
