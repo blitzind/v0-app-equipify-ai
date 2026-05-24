@@ -26,6 +26,7 @@ export class StubRealtimeTranscriptProvider implements RealtimeTranscriptProvide
         realtime: false,
         speakerDetection: false,
         keywordEvents: false,
+        browserAudioStreaming: false,
         latencyMs: 0,
       },
     }
@@ -44,6 +45,10 @@ export class StubRealtimeTranscriptProvider implements RealtimeTranscriptProvide
   }
 
   supportsKeywordEvents(): boolean {
+    return false
+  }
+
+  supportsBrowserAudioStreaming(): boolean {
     return false
   }
 }

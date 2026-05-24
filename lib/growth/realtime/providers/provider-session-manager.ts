@@ -13,16 +13,27 @@ import {
   clearRealtimeProviderStreamState,
   ingestRealtimeProviderTranscriptChunk,
 } from "@/lib/growth/realtime/providers/provider-stream-bridge"
+import type {
+  RealtimeTranscriptProvider,
+} from "@/lib/growth/realtime/providers/provider-types"
+import { closeBrowserAudioProviderStream } from "@/lib/growth/realtime/browser-audio/browser-audio-stream-manager"
 import type { GrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-types"
 import { updateGrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-repository"
+
+export { isBrowserAudioStreamProvider } from "@/lib/growth/realtime/browser-audio/browser-audio-stream-provider"
 
 type ActiveProviderSession = {
   sessionId: string
   connectionId: string | null
+  provider: RealtimeTranscriptProvider
   unsubscribe: () => void
 }
 
 const activeSessions = new Map<string, ActiveProviderSession>()
+
+export function getActiveProviderForSession(sessionId: string): RealtimeTranscriptProvider | null {
+  return activeSessions.get(sessionId)?.provider ?? null
+}
 
 export async function attachRealtimeProviderToSession(
   admin: SupabaseClient,
@@ -72,6 +83,7 @@ export async function attachRealtimeProviderToSession(
   activeSessions.set(session.id, {
     sessionId: session.id,
     connectionId: route.connectionId,
+    provider: route.provider,
     unsubscribe,
   })
 
@@ -93,6 +105,8 @@ export async function attachRealtimeProviderToSession(
 export async function detachRealtimeProviderFromSession(sessionId: string): Promise<void> {
   const active = activeSessions.get(sessionId)
   if (!active) return
+  await closeBrowserAudioProviderStream(sessionId)
+  await active.provider.disconnect()
   active.unsubscribe()
   activeSessions.delete(sessionId)
   clearRealtimeProviderStreamState(sessionId)
@@ -100,4 +114,8 @@ export async function detachRealtimeProviderFromSession(sessionId: string): Prom
 
 export function hasActiveRealtimeProviderSession(sessionId: string): boolean {
   return activeSessions.has(sessionId)
+}
+
+export function resetActiveProviderSessionsForTests(): void {
+  activeSessions.clear()
 }

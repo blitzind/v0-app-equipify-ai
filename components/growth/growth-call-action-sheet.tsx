@@ -13,8 +13,10 @@ import {
 import { useGrowthCallWorkflowOptional } from "@/components/growth/growth-call-workflow-context"
 import { buildGrowthCallDialOptions } from "@/lib/growth/communication/call-dial"
 import type { ResolvedGrowthDialPreferences } from "@/lib/growth/communication/types"
-import { GROWTH_CALL_DIALER_SAFETY_COPY } from "@/lib/growth/call-workflow-copy"
+import { GROWTH_CALL_AUDIO_CAPTURE_ENABLED, GROWTH_CALL_DIALER_SAFETY_COPY } from "@/lib/growth/call-workflow-copy"
 import { formatGrowthCallDialerNextStep } from "@/lib/growth/call-workflow"
+import { resolveCallSheetMicCaptureHint } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-capability"
+import { GROWTH_BROWSER_AUDIO_CAPTURE_SAFETY_COPY } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-invariants"
 import { GROWTH_LEAD_CALL_DISPOSITIONS, type GrowthLeadCallDisposition } from "@/lib/growth/call-types"
 import type { GrowthLead } from "@/lib/growth/types"
 import { cn } from "@/lib/utils"
@@ -60,6 +62,9 @@ export function GrowthCallActionSheet({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [micCaptureHint, setMicCaptureHint] = useState<"start_mic_capture" | "manual_transcript_mode">(
+    "manual_transcript_mode",
+  )
 
   const dialOptions = useMemo(() => {
     if (!resolved) return []
@@ -94,10 +99,45 @@ export function GrowthCallActionSheet({
       setDialLabel(null)
       setCopied(false)
       setError(null)
+      setMicCaptureHint("manual_transcript_mode")
       return
     }
     void loadPreferences()
   }, [open, loadPreferences])
+
+  const loadMicCaptureHint = useCallback(async () => {
+    if (!GROWTH_CALL_AUDIO_CAPTURE_ENABLED) {
+      setMicCaptureHint("manual_transcript_mode")
+      return
+    }
+    try {
+      const res = await fetch("/api/platform/growth/live-coaching/settings", { cache: "no-store" })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        settings?: {
+          activeProviderConnectionId?: string | null
+          fallbackProvider?: string | null
+        }
+      }
+      if (!res.ok || !data.ok || !data.settings) {
+        setMicCaptureHint("manual_transcript_mode")
+        return
+      }
+      setMicCaptureHint(
+        resolveCallSheetMicCaptureHint({
+          activeProviderConnectionId: data.settings.activeProviderConnectionId ?? null,
+          fallbackProvider: data.settings.fallbackProvider,
+        }),
+      )
+    } catch {
+      setMicCaptureHint("manual_transcript_mode")
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!open || !sessionId) return
+    void loadMicCaptureHint()
+  }, [open, sessionId, loadMicCaptureHint])
 
   async function copyNumber() {
     try {
@@ -330,6 +370,31 @@ export function GrowthCallActionSheet({
                         Start Call Copilot
                       </Button>
                     </div>
+
+                    {GROWTH_CALL_AUDIO_CAPTURE_ENABLED ? (
+                      <div className="mt-4 space-y-2 rounded-lg border border-border/80 bg-background/80 px-3 py-3">
+                        {micCaptureHint === "start_mic_capture" ? (
+                          <>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="min-h-11 w-full justify-center gap-2 whitespace-nowrap px-5 font-medium"
+                              disabled={busy}
+                              onClick={() => void startRealtimeCoaching()}
+                            >
+                              <Mic className="mr-2 h-4 w-4 shrink-0" />
+                              Start Mic Capture
+                            </Button>
+                            <p className="text-xs leading-relaxed text-muted-foreground">
+                              {GROWTH_BROWSER_AUDIO_CAPTURE_SAFETY_COPY} Enable mic capture in Realtime Call
+                              Intelligence after coaching goes live.
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-sm font-medium text-muted-foreground">Manual transcript mode active</p>
+                        )}
+                      </div>
+                    ) : null}
                   </section>
                 ) : (
                   <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-4 text-sm leading-relaxed text-muted-foreground">

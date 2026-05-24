@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type {
+  GrowthBrowserAudioCaptureStatus,
   GrowthRealtimeCallSession,
   GrowthRealtimeCallSessionStatus,
   GrowthRealtimeCallSpeaker,
@@ -29,6 +30,11 @@ type SessionRow = {
   transcript_quality_score: number
   guidance_latency_ms: number
   session_provider_failover_count: number
+  browser_audio_capture_enabled: boolean
+  browser_audio_capture_status: string
+  browser_audio_started_at: string | null
+  browser_audio_ended_at: string | null
+  browser_audio_error: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -45,7 +51,7 @@ type TranscriptRow = {
 }
 
 const SESSION_SELECT =
-  "id, lead_id, call_copilot_session_id, status, started_at, ended_at, live_guidance_mode, transcript_status, guidance_enabled, risk_monitoring_enabled, live_snapshot, realtime_provider_connection_id, provider_id, transcript_source, transcript_quality_score, guidance_latency_ms, session_provider_failover_count, created_by, created_at, updated_at"
+  "id, lead_id, call_copilot_session_id, status, started_at, ended_at, live_guidance_mode, transcript_status, guidance_enabled, risk_monitoring_enabled, live_snapshot, realtime_provider_connection_id, provider_id, transcript_source, transcript_quality_score, guidance_latency_ms, session_provider_failover_count, browser_audio_capture_enabled, browser_audio_capture_status, browser_audio_started_at, browser_audio_ended_at, browser_audio_error, created_by, created_at, updated_at"
 
 function sessionsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("realtime_call_sessions")
@@ -75,6 +81,12 @@ function mapSession(row: SessionRow): GrowthRealtimeCallSession {
     transcriptQualityScore: row.transcript_quality_score,
     guidanceLatencyMs: row.guidance_latency_ms,
     sessionProviderFailoverCount: row.session_provider_failover_count,
+    browserAudioCaptureEnabled: row.browser_audio_capture_enabled ?? false,
+    browserAudioCaptureStatus: (row.browser_audio_capture_status ??
+      "inactive") as GrowthBrowserAudioCaptureStatus,
+    browserAudioStartedAt: row.browser_audio_started_at ?? null,
+    browserAudioEndedAt: row.browser_audio_ended_at ?? null,
+    browserAudioError: row.browser_audio_error ?? null,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -153,6 +165,11 @@ export async function updateGrowthRealtimeCallSession(
     transcriptQualityScore: number
     guidanceLatencyMs: number
     sessionProviderFailoverCount: number
+    browserAudioCaptureEnabled: boolean
+    browserAudioCaptureStatus: GrowthBrowserAudioCaptureStatus
+    browserAudioStartedAt: string | null
+    browserAudioEndedAt: string | null
+    browserAudioError: string | null
   }>,
 ): Promise<GrowthRealtimeCallSession> {
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() }
@@ -170,6 +187,21 @@ export async function updateGrowthRealtimeCallSession(
   if (patch.guidanceLatencyMs !== undefined) update.guidance_latency_ms = patch.guidanceLatencyMs
   if (patch.sessionProviderFailoverCount !== undefined) {
     update.session_provider_failover_count = patch.sessionProviderFailoverCount
+  }
+  if (patch.browserAudioCaptureEnabled !== undefined) {
+    update.browser_audio_capture_enabled = patch.browserAudioCaptureEnabled
+  }
+  if (patch.browserAudioCaptureStatus !== undefined) {
+    update.browser_audio_capture_status = patch.browserAudioCaptureStatus
+  }
+  if (patch.browserAudioStartedAt !== undefined) {
+    update.browser_audio_started_at = patch.browserAudioStartedAt
+  }
+  if (patch.browserAudioEndedAt !== undefined) {
+    update.browser_audio_ended_at = patch.browserAudioEndedAt
+  }
+  if (patch.browserAudioError !== undefined) {
+    update.browser_audio_error = patch.browserAudioError
   }
 
   const { data, error } = await sessionsTable(admin)

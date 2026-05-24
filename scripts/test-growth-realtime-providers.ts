@@ -25,6 +25,7 @@ const runtimeConfig: RealtimeProviderRuntimeConfig = {
 const deepgram = createRealtimeProviderInstance("deepgram")
 assert.equal(deepgram.providerId, "deepgram")
 assert.equal(deepgram.supportsRealtime(), true)
+assert.equal(deepgram.supportsBrowserAudioStreaming(), true)
 assert.equal(deepgram.supportsSpeakerDetection(), true)
 assert.equal(deepgram.supportsKeywordEvents(), true)
 

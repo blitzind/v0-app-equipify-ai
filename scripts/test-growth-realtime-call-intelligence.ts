@@ -128,9 +128,9 @@ assert.ok(REALTIME_PROVIDER_IDS.includes("deepgram"))
 assert.equal(createRealtimeProviderInstance("deepgram").providerId, "deepgram")
 assert.equal(createRealtimeProviderInstance("assemblyai").providerId, "assemblyai")
 
-assert.equal(GROWTH_CALL_AUDIO_CAPTURE_ENABLED, false, "no browser audio capture invariant")
+assert.equal(GROWTH_CALL_AUDIO_CAPTURE_ENABLED, true, "browser audio capture enabled for slice 6.12A")
 assert.equal(GROWTH_CALL_AUTO_DISPOSITION_ENABLED, false, "no auto-disposition invariant")
-assert.match(GROWTH_CALL_DIALER_SAFETY_COPY, /does not record audio/)
+assert.match(GROWTH_CALL_DIALER_SAFETY_COPY, /Audio is not stored/)
 assert.ok(GROWTH_COMMAND_LEAD_FOCUS_VALUES.includes("realtime-call"))
 assert.ok(GROWTH_COMMAND_LEAD_FOCUS_VALUES.includes("call-copilot"))
 
@@ -145,6 +145,8 @@ const realtimeUiSource = fs.readFileSync(
 )
 assert.match(realtimeUiSource, /Start Realtime Coaching/, "realtime card coaching CTA")
 assert.match(realtimeUiSource, /Append Transcript/, "manual transcript append visible")
-assert.doesNotMatch(realtimeUiSource, /getUserMedia|MediaRecorder|navigator\.mediaDevices/, "no audio capture APIs")
+assert.match(realtimeUiSource, /Start Mic Capture/, "browser mic capture controls in realtime card")
+assert.match(realtimeUiSource, /useGrowthBrowserAudioCapture/, "realtime card uses browser audio hook")
+assert.doesNotMatch(realtimeUiSource, /getUserMedia|MediaRecorder|navigator\.mediaDevices/, "capture APIs live in hook only")
 
 console.log("growth-realtime-call-intelligence: all checks passed")

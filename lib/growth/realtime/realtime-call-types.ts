@@ -1,5 +1,15 @@
 /** Client-safe Growth Engine Realtime Call Intelligence types. */
 
+export const GROWTH_BROWSER_AUDIO_CAPTURE_STATUSES = [
+  "inactive",
+  "requesting",
+  "active",
+  "paused",
+  "stopped",
+  "failed",
+] as const
+export type GrowthBrowserAudioCaptureStatus = (typeof GROWTH_BROWSER_AUDIO_CAPTURE_STATUSES)[number]
+
 export const GROWTH_REALTIME_CALL_SESSION_STATUSES = [
   "preparing",
   "active",
@@ -139,10 +149,15 @@ export type GrowthRealtimeCallSession = {
   liveSnapshot: GrowthRealtimeLiveSnapshot
   realtimeProviderConnectionId: string | null
   providerId: string | null
-  transcriptSource: "manual" | "stub" | "provider"
+  transcriptSource: "manual" | "stub" | "provider" | "browser_mic"
   transcriptQualityScore: number
   guidanceLatencyMs: number
   sessionProviderFailoverCount: number
+  browserAudioCaptureEnabled: boolean
+  browserAudioCaptureStatus: GrowthBrowserAudioCaptureStatus
+  browserAudioStartedAt: string | null
+  browserAudioEndedAt: string | null
+  browserAudioError: string | null
   createdBy: string | null
   createdAt: string
   updatedAt: string

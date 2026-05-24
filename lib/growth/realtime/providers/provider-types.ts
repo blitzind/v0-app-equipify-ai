@@ -29,13 +29,14 @@ export const REALTIME_PROVIDER_HEALTH_STATUSES = [
 
 export type RealtimeProviderHealthStatus = (typeof REALTIME_PROVIDER_HEALTH_STATUSES)[number]
 
-export const REALTIME_TRANSCRIPT_SOURCES = ["manual", "stub", "provider"] as const
+export const REALTIME_TRANSCRIPT_SOURCES = ["manual", "stub", "provider", "browser_mic"] as const
 export type RealtimeTranscriptSource = (typeof REALTIME_TRANSCRIPT_SOURCES)[number]
 
 export type RealtimeProviderCapabilitySnapshot = {
   realtime: boolean
   speakerDetection: boolean
   keywordEvents: boolean
+  browserAudioStreaming: boolean
   latencyMs: number
 }
 
@@ -107,6 +108,14 @@ export type RealtimeTranscriptChunk = {
   keywords?: string[]
 }
 
+export type RealtimeBrowserAudioChunkInput = {
+  encoding: string
+  payload: Buffer
+  sequenceNumber: number
+  timestampMs: number
+  durationMs?: number
+}
+
 export type RealtimeTranscriptProvider = {
   readonly providerId: RealtimeProviderId
   connect(sessionId: string, config: RealtimeProviderRuntimeConfig): Promise<void>
@@ -116,6 +125,10 @@ export type RealtimeTranscriptProvider = {
   supportsRealtime(): boolean
   supportsSpeakerDetection(): boolean
   supportsKeywordEvents(): boolean
+  supportsBrowserAudioStreaming(): boolean
+  openBrowserAudioStream?(onChunk: (chunk: RealtimeTranscriptChunk) => void): Promise<void>
+  closeBrowserAudioStream?(): Promise<void>
+  ingestBrowserAudioChunk?(input: RealtimeBrowserAudioChunkInput): Promise<void>
 }
 
 export type RealtimeProviderRouteResult = {

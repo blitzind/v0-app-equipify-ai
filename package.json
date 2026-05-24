@@ -104,6 +104,8 @@
     "test:growth-realtime-call-intelligence": "tsx scripts/test-growth-realtime-call-intelligence.ts",
     "test:growth-live-guidance": "tsx scripts/test-growth-live-guidance.ts",
     "test:growth-realtime-providers": "tsx scripts/test-growth-realtime-providers.ts",
+    "test:growth-browser-audio-capture": "tsx scripts/test-growth-browser-audio-capture.ts",
+    "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
     "test:growth-leads-inbox": "tsx scripts/test-growth-leads-inbox.ts",
     "test:catalog-import-manufacturer": "tsx scripts/test-catalog-import-manufacturer.ts",
     "test:catalog-import-template": "tsx scripts/test-catalog-import-template.ts",

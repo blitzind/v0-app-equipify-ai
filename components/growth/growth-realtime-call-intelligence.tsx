@@ -1,14 +1,20 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import { Check, Copy, Loader2, Mic, Pause, Play, Square, StopCircle, X } from "lucide-react"
+import { Check, Copy, Loader2, Mic, MicOff, Pause, Play, Square, StopCircle, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useGrowthCallWorkflow } from "@/components/growth/growth-call-workflow-context"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
-import { GROWTH_CALL_DIALER_SAFETY_COPY } from "@/lib/growth/call-workflow-copy"
+import { useGrowthBrowserAudioCapture } from "@/hooks/growth/use-growth-browser-audio-capture"
+import { GROWTH_CALL_AUDIO_CAPTURE_ENABLED, GROWTH_CALL_DIALER_SAFETY_COPY } from "@/lib/growth/call-workflow-copy"
 import { formatGrowthCallDialerNextStep } from "@/lib/growth/call-workflow"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
+import { browserAudioCaptureStatusLabel } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-reducer"
+import { GROWTH_BROWSER_AUDIO_CAPTURE_SAFETY_COPY } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-invariants"
+import type { GrowthBrowserAudioCaptureCapability } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-types"
+import { growthBrowserAudioStreamStatusLabel } from "@/lib/growth/realtime/browser-audio/browser-audio-stream-types"
+import { REALTIME_PROVIDER_LABELS } from "@/lib/growth/realtime/browser-audio/provider-labels"
 import type {
   GrowthLiveCoachingState,
   GrowthLiveGuidanceEvent,
@@ -27,6 +33,16 @@ type GrowthRealtimeCallIntelligenceProps = {
   lead: GrowthLead
 }
 
+function formatTranscriptSourceLabel(session: GrowthRealtimeCallSession): string {
+  const providerLabel = session.providerId
+    ? REALTIME_PROVIDER_LABELS[session.providerId] ?? session.providerId
+    : null
+  if (session.transcriptSource === "browser_mic" && providerLabel) {
+    return `Browser Mic → ${providerLabel}`
+  }
+  return session.transcriptSource.replace(/_/g, " ")
+}
+
 export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntelligenceProps) {
   const { state: callWorkflow, expandToken, refreshToken, registerHandles } = useGrowthCallWorkflow()
   const [sessions, setSessions] = useState<GrowthRealtimeCallSession[]>([])
@@ -38,6 +54,7 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
   const [speaker, setSpeaker] = useState<GrowthRealtimeCallSpeaker>("rep")
   const [draft, setDraft] = useState("")
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [captureCapability, setCaptureCapability] = useState<GrowthBrowserAudioCaptureCapability | null>(null)
 
   const activeSession = useMemo(
     () => sessions.find((session) => ["preparing", "active", "paused"].includes(session.status)) ?? null,
@@ -91,6 +108,46 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
   useEffect(() => {
     void load()
   }, [load, refreshToken])
+
+  const loadCaptureCapability = useCallback(async (session: GrowthRealtimeCallSession) => {
+    try {
+      const res = await fetch(
+        `/api/platform/growth/leads/${lead.id}/realtime-call/sessions/${session.id}/browser-audio-capture`,
+        { cache: "no-store" },
+      )
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        capability?: GrowthBrowserAudioCaptureCapability
+        session?: GrowthRealtimeCallSession
+      }
+      if (res.ok && data.ok) {
+        setCaptureCapability(data.capability ?? null)
+        if (data.session) {
+          setSessions((prev) => prev.map((item) => (item.id === data.session!.id ? data.session! : item)))
+        }
+      }
+    } catch {
+      setCaptureCapability(null)
+    }
+  }, [lead.id])
+
+  useEffect(() => {
+    if (!activeSession) {
+      setCaptureCapability(null)
+      return
+    }
+    void loadCaptureCapability(activeSession)
+  }, [activeSession?.id, activeSession?.transcriptSource, activeSession?.status, loadCaptureCapability])
+
+  const browserAudio = useGrowthBrowserAudioCapture({
+    leadId: lead.id,
+    session: activeSession,
+    capability: captureCapability,
+    onSessionUpdated: (updated) => {
+      setSessions((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
+      void loadCaptureCapability(updated)
+    },
+  })
 
   async function createSession() {
     setActing("create")
@@ -281,7 +338,7 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
       icon={<Mic className="size-4" />}
       headerAside={
         activeSession
-          ? `${activeSession.status.replace(/_/g, " ")} · source ${activeSession.transcriptSource} · ${activeSession.transcriptStatus}`
+          ? `${activeSession.status.replace(/_/g, " ")} · ${formatTranscriptSourceLabel(activeSession)} · ${activeSession.transcriptStatus}`
           : callWorkflow.callWorkflowActive
             ? "Dial logged — start coaching"
             : "Live guidance"
@@ -339,11 +396,124 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
           )}
         </div>
 
+        {activeSession && activeSession.status !== "completed" && GROWTH_CALL_AUDIO_CAPTURE_ENABLED ? (
+          <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Browser mic capture</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <GrowthBadge
+                  label={browserAudioCaptureStatusLabel(
+                    activeSession.browserAudioCaptureStatus ?? browserAudio.state.status,
+                  )}
+                  tone={browserAudio.isMicActive ? "attention" : "neutral"}
+                />
+                {browserAudio.isMicActive ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700">
+                    <span className="size-2 animate-pulse rounded-full bg-amber-500" />
+                    Mic live
+                  </span>
+                ) : null}
+              </div>
+            </div>
+
+            <p className="text-xs leading-relaxed text-muted-foreground">{GROWTH_BROWSER_AUDIO_CAPTURE_SAFETY_COPY}</p>
+
+            {!captureCapability?.canStart && captureCapability?.disabledReason ? (
+              <p className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                {captureCapability.disabledReason}
+              </p>
+            ) : null}
+
+            {browserAudio.streamState && browserAudio.streamState.status !== "inactive" ? (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <GrowthBadge
+                  label={growthBrowserAudioStreamStatusLabel(browserAudio.streamState.status)}
+                  tone={browserAudio.streamState.status === "listening" ? "healthy" : "neutral"}
+                />
+                {browserAudio.streamState.metrics.streamFailureReason ? (
+                  <span>{browserAudio.streamState.metrics.streamFailureReason}</span>
+                ) : null}
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Button
+                size="sm"
+                className="min-h-11 w-full justify-center gap-2 px-5 font-medium whitespace-nowrap"
+                disabled={!captureCapability?.canStart || browserAudio.state.status === "active"}
+                onClick={() => void browserAudio.startCapture()}
+              >
+                <Mic className="mr-2 h-4 w-4 shrink-0" />
+                Start Mic Capture
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="min-h-11 w-full justify-center gap-2 px-5 font-medium whitespace-nowrap"
+                disabled={!["active", "paused"].includes(browserAudio.state.status)}
+                onClick={() => void browserAudio.pauseCapture()}
+              >
+                <Pause className="mr-2 h-4 w-4 shrink-0" />
+                Pause Mic Capture
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="min-h-11 w-full justify-center gap-2 px-5 font-medium whitespace-nowrap"
+                disabled={browserAudio.state.status === "inactive" || browserAudio.state.status === "stopped"}
+                onClick={() => void browserAudio.stopCapture()}
+              >
+                <StopCircle className="mr-2 h-4 w-4 shrink-0" />
+                Stop Mic Capture
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="min-h-11 w-full justify-center gap-2 px-5 font-medium whitespace-nowrap"
+                disabled={!["active", "paused"].includes(browserAudio.state.status)}
+                onClick={() => browserAudio.toggleMute()}
+              >
+                {browserAudio.state.muted ? (
+                  <MicOff className="mr-2 h-4 w-4 shrink-0" />
+                ) : (
+                  <Mic className="mr-2 h-4 w-4 shrink-0" />
+                )}
+                {browserAudio.state.muted ? "Unmute Capture" : "Mute Capture"}
+              </Button>
+              {browserAudio.streamState?.status === "interrupted" && browserAudio.streamState.metrics.canRetry ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="min-h-11 w-full justify-center gap-2 px-5 font-medium whitespace-nowrap sm:col-span-2"
+                  onClick={() => void browserAudio.retryStream()}
+                >
+                  Retry Stream
+                </Button>
+              ) : null}
+            </div>
+
+            {browserAudio.state.metrics.chunkCount > 0 || browserAudio.streamState ? (
+              <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                <p>Chunks sent: {browserAudio.state.metrics.chunkCount}</p>
+                <p>Failed chunks: {browserAudio.state.metrics.failedChunkCount}</p>
+                <p>Avg send latency: {browserAudio.state.metrics.averageChunkSendLatencyMs}ms</p>
+                <p>Provider latency: {browserAudio.state.metrics.providerTranscriptLatencyMs}ms</p>
+                {browserAudio.streamState ? (
+                  <>
+                    <p>Stream opens: {browserAudio.streamState.metrics.streamOpenCount}</p>
+                    <p>Stream closes: {browserAudio.streamState.metrics.streamCloseCount}</p>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         {activeSession && activeSession.status !== "completed" ? (
           <div className="space-y-2 rounded-lg border border-border p-3">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Manual transcript</p>
-              <GrowthBadge label={`source: ${activeSession.transcriptSource}`} tone="neutral" />
+              <GrowthBadge label={formatTranscriptSourceLabel(activeSession)} tone="neutral" />
               <GrowthBadge label={activeSession.transcriptStatus.replace(/_/g, " ")} tone="neutral" />
             </div>
             <div className="flex gap-2">

@@ -32,6 +32,7 @@ import {
   emitGrowthLeadRealtimeDiscoveryGapDetectedTimeline,
   emitGrowthLeadRealtimeObjectionDetectedTimeline,
 } from "@/lib/growth/timeline-emitter"
+import { stopBrowserAudioCaptureForSession } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-service"
 
 type Actor = { userId: string | null; email: string | null }
 
@@ -168,6 +169,7 @@ export async function pauseGrowthRealtimeCallSession(
   const session = await fetchGrowthRealtimeCallSession(admin, sessionId)
   if (!session) throw new Error("not_found")
   await detachRealtimeProviderFromSession(sessionId)
+  await stopBrowserAudioCaptureForSession(admin, sessionId)
   return updateGrowthRealtimeCallSession(admin, sessionId, { status: "paused" })
 }
 
@@ -180,6 +182,7 @@ export async function completeGrowthRealtimeCallSession(
 
   const refreshed = await recomputeAndPersistSnapshot(admin, session, input.actor)
   await detachRealtimeProviderFromSession(session.id)
+  await stopBrowserAudioCaptureForSession(admin, session.id)
   const updated = await updateGrowthRealtimeCallSession(admin, session.id, {
     status: "completed",
     endedAt: new Date().toISOString(),
@@ -203,6 +206,7 @@ export async function discardGrowthRealtimeCallSession(
   const session = await fetchGrowthRealtimeCallSession(admin, sessionId)
   if (!session) throw new Error("not_found")
   await detachRealtimeProviderFromSession(sessionId)
+  await stopBrowserAudioCaptureForSession(admin, sessionId)
   return updateGrowthRealtimeCallSession(admin, sessionId, {
     status: "discarded",
     endedAt: new Date().toISOString(),
