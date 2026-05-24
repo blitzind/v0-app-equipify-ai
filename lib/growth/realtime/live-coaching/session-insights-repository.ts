@@ -123,3 +123,22 @@ export async function listLiveCoachingSessionInsightsRollups(
   if (error) throw new Error(error.message)
   return ((data ?? []) as InsightsDbRow[]).map(mapInsightsRow)
 }
+
+const MAX_TRENDS_INSIGHTS_ROWS = 5000
+
+export async function listLiveCoachingSessionInsightsSince(
+  admin: SupabaseClient,
+  input: { sinceIso: string; limit?: number },
+): Promise<LiveCoachingSessionInsightsRollup[]> {
+  const limit = Math.min(input.limit ?? MAX_TRENDS_INSIGHTS_ROWS, MAX_TRENDS_INSIGHTS_ROWS)
+  const { data, error } = await insightsTable(admin)
+    .select(INSIGHTS_SELECT)
+    .gte("computed_at", input.sinceIso)
+    .order("computed_at", { ascending: true })
+    .limit(limit)
+
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as InsightsDbRow[]).map(mapInsightsRow)
+}
+
+export const LIVE_COACHING_TRENDS_MAX_INSIGHTS_ROWS = MAX_TRENDS_INSIGHTS_ROWS

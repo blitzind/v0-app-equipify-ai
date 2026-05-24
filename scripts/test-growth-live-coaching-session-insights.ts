@@ -98,8 +98,18 @@ const events: LiveCoachingSessionTimelineEvent[] = [
   }),
 ]
 
-const rollupA = buildLiveCoachingSessionInsightsRollup({ leadId, sessionId, events })
-const rollupB = buildLiveCoachingSessionInsightsRollup({ leadId, sessionId, events })
+const rollupA = buildLiveCoachingSessionInsightsRollup({
+  leadId,
+  sessionId,
+  events,
+  computedAt: "2026-05-18T12:05:00.000Z",
+})
+const rollupB = buildLiveCoachingSessionInsightsRollup({
+  leadId,
+  sessionId,
+  events,
+  computedAt: "2026-05-18T12:05:00.000Z",
+})
 
 assert.deepEqual(rollupA, rollupB, "rollup calculation is deterministic")
 assert.equal(rollupA.providerId, "deepgram")

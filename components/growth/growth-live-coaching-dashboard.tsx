@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import { GrowthLiveCoachingSessionTimeline } from "@/components/growth/growth-live-coaching-session-timeline"
 import { GrowthLiveCoachingSessionInsightsPreview } from "@/components/growth/growth-live-coaching-session-insights"
+import { GrowthLiveCoachingTrends } from "@/components/growth/growth-live-coaching-trends"
 
 type DashboardPayload = {
   stats: {
@@ -105,6 +106,8 @@ export function GrowthLiveCoachingDashboard() {
 
   return (
     <div className="space-y-6">
+      <GrowthLiveCoachingTrends />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile label="Avg execution score" value={dashboard.stats.averageExecutionScore} />
