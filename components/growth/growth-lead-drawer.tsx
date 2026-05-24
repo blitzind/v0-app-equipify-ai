@@ -16,6 +16,7 @@ import { GrowthExecutiveOperatingIntelligence } from "@/components/growth/growth
 import { GrowthOperationalCapacityIntelligence } from "@/components/growth/growth-operational-capacity-intelligence"
 import { GrowthAiCopilot } from "@/components/growth/growth-ai-copilot"
 import { GrowthCallCopilot } from "@/components/growth/growth-call-copilot"
+import { GrowthRealtimeCallIntelligence } from "@/components/growth/growth-realtime-call-intelligence"
 import { GrowthLeadCommandCenter } from "@/components/growth/growth-lead-command-center"
 import { GrowthLeadResearchPanel } from "@/components/growth/growth-lead-research-panel"
 import { GrowthLeadTimelinePanel } from "@/components/growth/growth-lead-timeline-panel"
@@ -89,6 +90,8 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, draw
         <GrowthLeadEngagement lead={activeLead} />
 
         <GrowthCallCopilot lead={activeLead} />
+
+        <GrowthRealtimeCallIntelligence lead={activeLead} />
 
         <GrowthAiCopilot lead={activeLead} />
 

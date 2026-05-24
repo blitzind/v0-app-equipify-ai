@@ -34,6 +34,8 @@ export type GrowthSidebarConsoleKey =
   | "copilot"
   | "playbooks"
   | "calls"
+  | "calls_live"
+  | "calls_live_coaching"
   | "outreach"
   | "outreach_approval"
   | "providers"
@@ -87,6 +89,8 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
       capacityRes,
       playbooksRes,
       callsRes,
+      callsLiveRes,
+      liveCoachingRes,
       engagementRes,
       relationshipsRes,
       opportunitiesRes,
@@ -131,6 +135,12 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
       fetchJson<{ ok?: boolean; dashboard?: { stats?: { activeCount?: number; highRiskActive?: number } } }>(
         "/api/platform/growth/calls/dashboard",
       ),
+      fetchJson<{ ok?: boolean; dashboard?: { stats?: { liveCount?: number } } }>(
+        "/api/platform/growth/calls/live/dashboard",
+      ),
+      fetchJson<{ ok?: boolean; dashboard?: { stats?: { activeGuidanceEvents?: number } } }>(
+        "/api/platform/growth/calls/live-coaching/dashboard",
+      ),
       fetchJson<{
         ok?: boolean
         dashboard?: {
@@ -166,6 +176,8 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
     const capacity = capacityRes?.dashboard
     const playbooksDraftCount = playbooksRes?.draftRules?.length ?? 0
     const calls = callsRes?.dashboard
+    const callsLiveCount = callsLiveRes?.dashboard?.stats?.liveCount ?? 0
+    const liveCoachingActive = liveCoachingRes?.dashboard?.stats?.activeGuidanceEvents ?? 0
     const engagement = engagementRes?.dashboard
     const relationships = relationshipsRes?.dashboard
     const opportunities = opportunitiesRes?.dashboard
@@ -191,6 +203,8 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
         executive: executiveTier.executive_now ?? undefined,
         playbooks: playbooksDraftCount > 0 ? playbooksDraftCount : undefined,
         calls: calls?.stats?.activeCount ? calls.stats.activeCount : undefined,
+        calls_live: callsLiveCount > 0 ? callsLiveCount : undefined,
+        calls_live_coaching: liveCoachingActive > 0 ? liveCoachingActive : undefined,
         engagement: engagement?.hotLeads?.length ?? undefined,
         opportunities: opportunities?.priorityOpportunities?.length ?? undefined,
       },

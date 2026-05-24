@@ -228,14 +228,16 @@ export function StatTile({
   label,
   value,
   hint,
+  className,
 }: {
-  icon: ReactNode
+  icon?: ReactNode
   label: string
   value: ReactNode
   hint?: string
+  className?: string
 }) {
   return (
-    <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
+    <div className={cn("rounded-lg border border-border/80 bg-muted/20 p-3", className)}>
       <div className="flex items-center gap-1.5 text-muted-foreground">
         {icon}
         <span className="text-[11px] font-semibold uppercase tracking-wide">{label}</span>

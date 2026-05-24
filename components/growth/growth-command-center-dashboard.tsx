@@ -307,36 +307,59 @@ export function GrowthCommandCenterDashboard() {
     <div className="space-y-6">
       {sprintPanel}
 
-      <GrowthEngineCard className="border-indigo-100 bg-gradient-to-br from-indigo-50/80 via-background to-background">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Mission Control</p>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight">Today&apos;s Pipeline Operations</h2>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <GrowthBadge label={mission.momentumLabel} tone={momentumTone(mission.momentumState)} />
-              <span className="text-sm text-muted-foreground">
-                Execution momentum · {dashboard.operatorRankLabel} ({dashboard.operatorScore} pts)
-              </span>
+      <GrowthEngineCard className="overflow-hidden rounded-xl border border-border bg-card p-0 shadow-sm">
+        <div className="relative p-4 ring-1 ring-violet-100/60 sm:p-5 bg-gradient-to-r from-violet-50 via-indigo-50 to-background dark:from-violet-950/30 dark:via-indigo-950/20 dark:to-background">
+          <div className="pointer-events-none absolute top-0 right-0 size-48 bg-violet-300/10 blur-3xl" />
+          <div className="relative flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Mission Control</p>
+              <h2 className="mt-1 text-4xl font-bold tracking-tight">Today&apos;s Pipeline Operations</h2>
+              <div className="mt-4 mb-6 flex flex-wrap items-center gap-2">
+                <GrowthBadge label={mission.momentumLabel} tone={momentumTone(mission.momentumState)} />
+                <span className="text-sm text-muted-foreground">
+                  Execution momentum · {dashboard.operatorRankLabel} ({dashboard.operatorScore} pts)
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="lg" className="gap-2" onClick={startSprint}>
+                <Zap className="size-4" />
+                Start 30 Minute Sprint
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+                {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                Refresh
+              </Button>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="lg" className="gap-2" onClick={startSprint}>
-              <Zap className="size-4" />
-              Start 30 Minute Sprint
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
-              {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-              Refresh
-            </Button>
-          </div>
-        </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <StatTile label="Critical Actions" value={mission.criticalActions} />
-          <StatTile label="Revenue At Risk" value={mission.revenueAtRisk} />
-          <StatTile label="Approvals Waiting" value={mission.approvalsWaiting} />
-          <StatTile label="Stalled Opportunities" value={mission.stalledOpportunities} />
-          <StatTile label="Pipeline Protected" value={mission.pipelineProtected} />
+          <div className="relative grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+            <StatTile
+              label="Critical Actions"
+              value={mission.criticalActions}
+              className="border-border/70 bg-card shadow-xs"
+            />
+            <StatTile
+              label="Revenue At Risk"
+              value={mission.revenueAtRisk}
+              className="border-border/70 bg-card shadow-xs"
+            />
+            <StatTile
+              label="Approvals Waiting"
+              value={mission.approvalsWaiting}
+              className="border-border/70 bg-card shadow-xs"
+            />
+            <StatTile
+              label="Stalled Opportunities"
+              value={mission.stalledOpportunities}
+              className="border-border/70 bg-card shadow-xs"
+            />
+            <StatTile
+              label="Pipeline Protected"
+              value={mission.pipelineProtected}
+              className="border-border/70 bg-card shadow-xs"
+            />
+          </div>
         </div>
       </GrowthEngineCard>
 

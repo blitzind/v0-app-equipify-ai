@@ -1105,3 +1105,155 @@ export async function emitGrowthLeadSequenceEnrollmentCancelledTimeline(
     actorEmail: input.actor?.email,
   })
 }
+
+export async function emitGrowthLeadLiveCallStartedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    sessionId: string
+    actor?: { userId: string | null; email: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "live_call_started",
+    title: "Live call intelligence started",
+    summary: "Realtime guidance session active.",
+    payload: { sessionId: input.sessionId },
+    actor: input.actor,
+  })
+}
+
+export async function emitGrowthLeadRealtimeBuyingSignalDetectedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    sessionId: string
+    signalKey: string
+    actor?: { userId: string | null; email: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "buying_signal_detected",
+    title: "Buying signal detected",
+    summary: input.signalKey.replace(/_/g, " "),
+    payload: { sessionId: input.sessionId, signalKey: input.signalKey },
+    actor: input.actor,
+  })
+}
+
+export async function emitGrowthLeadRealtimeObjectionDetectedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    sessionId: string
+    objectionKey: string
+    actor?: { userId: string | null; email: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "objection_detected",
+    title: "Objection detected",
+    summary: input.objectionKey.replace(/_/g, " "),
+    payload: { sessionId: input.sessionId, objectionKey: input.objectionKey },
+    actor: input.actor,
+  })
+}
+
+export async function emitGrowthLeadRealtimeDiscoveryGapDetectedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    sessionId: string
+    area: string
+    actor?: { userId: string | null; email: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "discovery_gap_detected",
+    title: "Discovery gap detected",
+    summary: input.area.replace(/_/g, " "),
+    payload: { sessionId: input.sessionId, area: input.area },
+    actor: input.actor,
+  })
+}
+
+export async function emitGrowthLeadRealtimeCallRiskDetectedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    sessionId: string
+    riskFlag: string
+    actor?: { userId: string | null; email: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "call_risk_detected",
+    title: "Call risk detected",
+    summary: input.riskFlag.replace(/_/g, " "),
+    payload: { sessionId: input.sessionId, riskFlag: input.riskFlag },
+    actor: input.actor,
+  })
+}
+
+export async function emitGrowthLeadLiveCallCompletedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    sessionId: string
+    actor?: { userId: string | null; email: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "live_call_completed",
+    title: "Live call intelligence completed",
+    summary: "Realtime session ended.",
+    payload: { sessionId: input.sessionId },
+    actor: input.actor,
+  })
+}
+
+export async function emitGrowthLeadLiveGuidanceGeneratedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    sessionId: string
+    guidanceId: string
+    title: string
+    actor?: { userId: string | null; email: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "live_guidance_generated",
+    title: "Live guidance surfaced",
+    summary: input.title,
+    payload: { sessionId: input.sessionId, guidanceId: input.guidanceId },
+    actor: input.actor,
+  })
+}
+
+export async function emitGrowthLeadLiveGuidanceUsedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    sessionId: string
+    guidanceId: string
+    title: string
+    actor?: { userId: string | null; email: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "live_guidance_used",
+    title: "Live guidance accepted",
+    summary: input.title,
+    payload: { sessionId: input.sessionId, guidanceId: input.guidanceId },
+    actor: input.actor,
+  })
+}

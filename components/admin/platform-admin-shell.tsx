@@ -36,7 +36,7 @@ export const PLATFORM_ADMIN_GROWTH_LEADS_TAB = {
   key: "growth_leads",
   label: "Growth Leads",
   icon: Target,
-  href: "/admin/growth/leads",
+  href: "/admin/growth/command",
 } as const
 
 const INLINE_TAB_KEYS = new Set<string>(PLATFORM_ADMIN_INLINE_TABS.map((tab) => tab.key))

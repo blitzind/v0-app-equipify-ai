@@ -154,4 +154,5 @@ export type GrowthLeadRealtimeIntelligenceInput = {
   revenueProbabilityTier?: string | null
   executivePriorityTier?: string | null
   recommendedSequenceNextStep?: { channel?: string | null } | null
+  conversationCompetitorPressure?: number | null
 }
