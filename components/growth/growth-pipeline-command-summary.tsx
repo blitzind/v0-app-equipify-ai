@@ -12,16 +12,29 @@ function formatCurrency(value: number): string {
 
 export function GrowthPipelineCommandSummary() {
   const [dashboard, setDashboard] = useState<GrowthOpportunityPipelineDashboard | null>(null)
+  const [setupMessage, setSetupMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setSetupMessage(null)
     try {
       const res = await fetch("/api/platform/growth/opportunities/pipeline?view=all_pipeline&limit=1", {
         cache: "no-store",
       })
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; dashboard?: GrowthOpportunityPipelineDashboard }
-      if (res.ok && data.ok) setDashboard(data.dashboard ?? null)
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        meta?: { schemaReady?: boolean; setupMessage?: string }
+        dashboard?: GrowthOpportunityPipelineDashboard | null
+      }
+      if (res.ok && data.ok) {
+        if (data.meta?.schemaReady === false) {
+          setSetupMessage(data.meta.setupMessage ?? null)
+          setDashboard(null)
+        } else {
+          setDashboard(data.dashboard ?? null)
+        }
+      }
     } finally {
       setLoading(false)
     }
@@ -53,6 +66,11 @@ export function GrowthPipelineCommandSummary() {
           Open pipeline
         </Link>
       </div>
+      {setupMessage ? (
+        <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-950">
+          {setupMessage}
+        </p>
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="Pipeline risk" value={dashboard?.atRiskCount ?? 0} />
         <StatTile label="Forecast commit" value={formatCurrency(dashboard?.forecastTotals.commit.weightedAmount ?? 0)} />

@@ -39,6 +39,13 @@ export const GROWTH_NOTIFICATION_TYPES = [
   "followup_needed",
   "close_date_passed",
   "owner_overloaded",
+  "forecast_gap",
+  "pipeline_coverage_low",
+  "commit_risk",
+  "stale_high_value_deal",
+  "close_date_slipped",
+  "owner_pipeline_overloaded",
+  "owner_pipeline_underloaded",
   "capacity_warning",
   "workload_imbalance",
 ] as const

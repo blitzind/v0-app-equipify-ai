@@ -106,6 +106,7 @@
     "test:growth-lead-assignment": "tsx scripts/test-growth-lead-assignment.ts",
     "test:growth-notifications": "tsx scripts/test-growth-notifications.ts",
     "test:growth-opportunity-pipeline": "tsx scripts/test-growth-opportunity-pipeline.ts",
+    "test:growth-revenue-operating": "tsx scripts/test-growth-revenue-operating.ts",
     "test:growth-command-center": "tsx scripts/test-growth-command-center.ts",
     "test:growth-realtime-call-intelligence": "tsx scripts/test-growth-realtime-call-intelligence.ts",
     "test:growth-live-guidance": "tsx scripts/test-growth-live-guidance.ts",

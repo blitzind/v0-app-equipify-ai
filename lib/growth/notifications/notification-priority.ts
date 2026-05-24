@@ -22,6 +22,13 @@ const TYPE_SEVERITY: Record<GrowthNotificationType, GrowthNotificationSeverity> 
   followup_needed: "medium",
   close_date_passed: "high",
   owner_overloaded: "medium",
+  forecast_gap: "high",
+  pipeline_coverage_low: "high",
+  commit_risk: "high",
+  stale_high_value_deal: "high",
+  close_date_slipped: "medium",
+  owner_pipeline_overloaded: "medium",
+  owner_pipeline_underloaded: "low",
   capacity_warning: "medium",
   workload_imbalance: "low",
 }

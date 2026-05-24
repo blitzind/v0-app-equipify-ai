@@ -67,8 +67,35 @@ const migrationSource = fs.readFileSync(
   "utf8",
 )
 assert.match(migrationSource, /growth\.opportunities/)
+assert.match(migrationSource, /opportunity_pipeline_settings/)
 assert.match(migrationSource, /opportunity_created/)
 assert.match(migrationSource, /stage_changed/)
+
+const pipelineMigration = "20270226120000_growth_engine_opportunity_pipeline.sql"
+const revenueMigration = "20270227120000_growth_engine_revenue_operating.sql"
+assert.ok(fs.existsSync(path.join(process.cwd(), "supabase/migrations", pipelineMigration)))
+assert.ok(fs.existsSync(path.join(process.cwd(), "supabase/migrations", revenueMigration)))
+assert.ok(pipelineMigration < revenueMigration)
+
+const schemaHealthSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/opportunity-pipeline/pipeline-schema-health.ts"),
+  "utf8",
+)
+assert.match(schemaHealthSource, /opportunity_pipeline_settings/)
+assert.match(schemaHealthSource, /GROWTH_OPPORTUNITY_PIPELINE_SETUP_MESSAGE/)
+assert.match(schemaHealthSource, /looksLikePostgrestMissingSchemaError/)
+assert.match(schemaHealthSource, /isGrowthOpportunityPipelineSchemaReady/)
+assert.match(schemaHealthSource, /resetGrowthOpportunityPipelineSchemaProbeCacheForTests/)
+
+const setupMessageMatch = schemaHealthSource.match(
+  /export const GROWTH_OPPORTUNITY_PIPELINE_SETUP_MESSAGE =\s*\n\s*"([^"]+)"/,
+)
+assert.ok(setupMessageMatch?.[1])
+assert.match(setupMessageMatch![1], /20270226120000_growth_engine_opportunity_pipeline/)
+assert.match(setupMessageMatch![1], /schema cache/i)
+
+assert.match(pipelineRoute, /probeGrowthOpportunityPipelineSchema/)
+assert.match(pipelineRoute, /schemaReady: false/)
 
 assert.ok(GROWTH_OPPORTUNITY_STAGE_KEYS.includes("closed_won"))
 assert.ok(GROWTH_OPPORTUNITY_STAGE_KEYS.includes("closed_lost"))

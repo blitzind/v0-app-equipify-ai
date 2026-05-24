@@ -23,6 +23,13 @@ export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificati
   stale_opportunity: 24 * 60,
   close_date_passed: 12 * 60,
   owner_overloaded: 6 * 60,
+  forecast_gap: 12 * 60,
+  pipeline_coverage_low: 12 * 60,
+  commit_risk: 6 * 60,
+  stale_high_value_deal: 24 * 60,
+  close_date_slipped: 12 * 60,
+  owner_pipeline_overloaded: 24 * 60,
+  owner_pipeline_underloaded: 24 * 60,
   followup_needed: 14 * 24 * 60,
 }
 

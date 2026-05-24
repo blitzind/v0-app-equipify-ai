@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import Link from "next/link"
 import { AlertTriangle, Loader2, Plug, RefreshCw, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
@@ -235,11 +236,15 @@ export function GrowthRealtimeProvidersDashboard() {
 
       <GrowthEngineCard title="Provider connections">
         {dashboard.connections.length === 0 ? (
-          <div className="space-y-2 rounded-lg border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
-            <p>No realtime transcript providers configured yet.</p>
+          <div className="space-y-3 rounded-lg border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
+            <p>No call transcript providers configured yet — live coaching is waiting on setup, not broken.</p>
             <p>
-              Add a Deepgram, AssemblyAI, or OpenAI Realtime connection, run Test Connection, then select it in Live
-              Coaching settings before starting browser mic capture.
+              Configure Deepgram, AssemblyAI, or OpenAI Realtime in Call Providers to enable browser mic coaching.
+              Add a connection here, run Test Connection, then choose the provider in{" "}
+              <Link href="/admin/growth/settings" className="font-medium text-indigo-600 hover:underline">
+                Growth Settings → Live Coaching
+              </Link>
+              .
             </p>
           </div>
         ) : (

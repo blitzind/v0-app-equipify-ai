@@ -11,6 +11,11 @@ import {
   GROWTH_OPPORTUNITY_PRIORITIES,
   GROWTH_OPPORTUNITY_STAGE_KEYS,
 } from "@/lib/growth/opportunity-pipeline/pipeline-types"
+import {
+  GROWTH_OPPORTUNITY_PIPELINE_SETUP_MESSAGE,
+  isGrowthOpportunityPipelineSchemaReady,
+  probeGrowthOpportunityPipelineSchema,
+} from "@/lib/growth/opportunity-pipeline/pipeline-schema-health"
 
 export const runtime = "nodejs"
 
@@ -71,6 +76,17 @@ export async function GET(request: Request) {
   const refresh = url.searchParams.get("refresh") === "true"
 
   try {
+    const schemaProbe = await probeGrowthOpportunityPipelineSchema(access.admin)
+    const schemaReady = isGrowthOpportunityPipelineSchemaReady(schemaProbe)
+    if (!schemaReady) {
+      return NextResponse.json({
+        ok: true,
+        meta: { schemaReady: false, setupMessage: GROWTH_OPPORTUNITY_PIPELINE_SETUP_MESSAGE },
+        feed: { items: [], total: 0, hasMore: false },
+        dashboard: null,
+      })
+    }
+
     if (refresh) await evaluateGrowthOpportunityPipelineSignals(access.admin)
 
     const [feed, dashboard] = await Promise.all([
@@ -87,9 +103,18 @@ export async function GET(request: Request) {
       fetchGrowthOpportunityPipelineDashboard(access.admin, ownerUserId ?? access.userId),
     ])
 
-    return NextResponse.json({ ok: true, feed, dashboard })
+    return NextResponse.json({
+      ok: true,
+      meta: { schemaReady: true },
+      feed,
+      dashboard,
+    })
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Could not load opportunity pipeline."
+    const rawMessage = e instanceof Error ? e.message : "Could not load opportunity pipeline."
+    const message =
+      rawMessage.includes("schema cache") || rawMessage.includes("could not find")
+        ? GROWTH_OPPORTUNITY_PIPELINE_SETUP_MESSAGE
+        : "Could not load opportunity pipeline."
     return NextResponse.json({ error: "fetch_failed", message }, { status: 500 })
   }
 }
@@ -100,6 +125,14 @@ export async function POST(request: Request) {
 
   try {
     const body = createSchema.parse(await request.json())
+    const schemaProbe = await probeGrowthOpportunityPipelineSchema(access.admin)
+    if (!isGrowthOpportunityPipelineSchemaReady(schemaProbe)) {
+      return NextResponse.json(
+        { error: "schema_not_ready", message: GROWTH_OPPORTUNITY_PIPELINE_SETUP_MESSAGE },
+        { status: 503 },
+      )
+    }
+
     const result = await createGrowthOpportunity(access.admin, {
       ...body,
       actor: { userId: access.userId, email: access.userEmail },
@@ -113,6 +146,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_body", message: "Invalid request body." }, { status: 400 })
     }
     const message = e instanceof Error ? e.message : "Could not create opportunity."
-    return NextResponse.json({ error: "create_failed", message }, { status: 500 })
+    const safeMessage =
+      message.includes("schema cache") || message.includes("could not find")
+        ? GROWTH_OPPORTUNITY_PIPELINE_SETUP_MESSAGE
+        : "Could not create opportunity."
+    return NextResponse.json({ error: "create_failed", message: safeMessage }, { status: 500 })
   }
 }

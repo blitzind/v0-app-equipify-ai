@@ -179,10 +179,12 @@ export function GrowthOpportunityPipelineDashboard() {
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [setupMessage, setSetupMessage] = useState<string | null>(null)
 
   const load = useCallback(async (activeView: GrowthOpportunityPipelineView, refresh = false) => {
     setLoading(true)
     setError(null)
+    setSetupMessage(null)
     try {
       const params = new URLSearchParams({ view: activeView, limit: "50", ownerUserId: "me" })
       if (activeView === "all_pipeline" || activeView === "owner_board" || activeView === "forecast") {
@@ -192,11 +194,18 @@ export function GrowthOpportunityPipelineDashboard() {
       const res = await fetch(`/api/platform/growth/opportunities/pipeline?${params.toString()}`, { cache: "no-store" })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
+        meta?: { schemaReady?: boolean; setupMessage?: string }
         feed?: { items?: GrowthOpportunity[] }
-        dashboard?: GrowthOpportunityPipelineDashboard
+        dashboard?: GrowthOpportunityPipelineDashboard | null
         message?: string
       }
       if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not load pipeline.")
+      if (data.meta?.schemaReady === false) {
+        setSetupMessage(data.meta.setupMessage ?? "Opportunity pipeline setup is required before this view can load.")
+        setItems([])
+        setDashboard(null)
+        return
+      }
       setItems(data.feed?.items ?? [])
       setDashboard(data.dashboard ?? null)
     } catch (e) {
@@ -308,7 +317,14 @@ export function GrowthOpportunityPipelineDashboard() {
         ))}
       </div>
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {setupMessage ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
+          <p className="font-medium">Pipeline setup required</p>
+          <p className="mt-1">{setupMessage}</p>
+        </div>
+      ) : null}
+
+      {error ? <p className="text-sm text-muted-foreground">{error}</p> : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <GrowthEngineCard title="Pipeline">

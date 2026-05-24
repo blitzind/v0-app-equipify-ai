@@ -3,6 +3,8 @@
  * Run: pnpm test:growth-sequence-execution
  */
 import assert from "node:assert/strict"
+import fs from "node:fs"
+import path from "node:path"
 import {
   computeEnrollmentHealthScore,
   computeStepExecutionConfidence,
@@ -21,7 +23,6 @@ import {
   formatStepStatusMeta,
   formatStepStatusLabel,
   growthSequenceEnrollmentActionRequired,
-  formatSequenceUserMessage,
   mapPreflightCodeToMessage,
 } from "../lib/growth/sequence-enrollment/sequence-enrollment-ui"
 import type { GrowthLead } from "../lib/growth/types"
@@ -184,5 +185,21 @@ assert.equal(
 )
 assert.equal(formatSequenceUserMessage({ code: "active_enrollment", message: "active_enrollment" }), "Existing sequence in progress.")
 assert.equal(formatSequenceUserMessage({ code: "draft_enrollment", message: "draft_enrollment" }), "Draft sequence ready for confirmation.")
+
+const executionRepoSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/sequence-enrollment/sequence-execution-dashboard-repository.ts"),
+  "utf8",
+)
+assert.doesNotMatch(executionRepoSource, /leads!inner/)
+assert.doesNotMatch(executionRepoSource, /\.select\([^)]*leads\(/)
+assert.match(executionRepoSource, /fetchLeadCompanyNamesByIds/)
+assert.match(executionRepoSource, /\.from\("leads"\)/)
+
+const executionRouteSource = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/sequences/execution/dashboard/route.ts"),
+  "utf8",
+)
+assert.match(executionRouteSource, /requireGrowthEnginePlatformAccess/)
+assert.doesNotMatch(executionRouteSource, /e\.message/)
 
 console.log("growth-sequence-execution: all assertions passed")

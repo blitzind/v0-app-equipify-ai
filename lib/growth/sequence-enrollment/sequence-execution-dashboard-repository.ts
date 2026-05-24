@@ -12,17 +12,49 @@ import {
   type StepRow,
 } from "@/lib/growth/sequence-enrollment/sequence-enrollment-mappers"
 
+async function fetchLeadCompanyNamesByIds(
+  admin: SupabaseClient,
+  leadIds: string[],
+): Promise<Map<string, string>> {
+  const uniqueIds = [...new Set(leadIds.filter(Boolean))]
+  if (uniqueIds.length === 0) return new Map()
+
+  const { data, error } = await admin
+    .schema("growth")
+    .from("leads")
+    .select("id, company_name")
+    .in("id", uniqueIds)
+
+  if (error) {
+    throw new Error("Could not load lead context for sequence execution dashboard.")
+  }
+
+  return new Map(
+    ((data ?? []) as Array<{ id: string; company_name: string }>).map((row) => [row.id, row.company_name]),
+  )
+}
+
 export async function fetchGrowthSequenceExecutionDashboard(admin: SupabaseClient) {
   const { data: enrollments, error } = await admin
     .schema("growth")
     .from("sequence_enrollments")
-    .select(`${ENROLLMENT_SELECT}, leads!inner(company_name)`)
+    .select(ENROLLMENT_SELECT)
     .order("updated_at", { ascending: false })
     .limit(200)
 
-  if (error) throw new Error(error.message)
+  if (error) throw new Error("Could not load sequence enrollments.")
 
-  const rows = (enrollments ?? []) as Array<EnrollmentRow & { leads: { company_name: string } }>
+  const enrollmentRows = (enrollments ?? []) as EnrollmentRow[]
+  const leadNames = await fetchLeadCompanyNamesByIds(
+    admin,
+    enrollmentRows.map((row) => row.lead_id),
+  )
+
+  const rows = enrollmentRows.map((row) => ({
+    ...row,
+    companyName: leadNames.get(row.lead_id) ?? "Unknown lead",
+  }))
+
   const active = rows.filter((row) => row.status === "active")
   const paused = rows.filter((row) => row.status === "paused")
   const executionStalled = rows.filter((row) => row.enrollment_stalled)
@@ -36,16 +68,25 @@ export async function fetchGrowthSequenceExecutionDashboard(admin: SupabaseClien
   const { data: steps, error: stepsError } = await admin
     .schema("growth")
     .from("sequence_enrollment_steps")
-    .select(`${STEP_SELECT}, leads!inner(company_name)`)
+    .select(STEP_SELECT)
     .in("status", ["queued", "draft_created", "failed"])
     .order("updated_at", { ascending: false })
     .limit(100)
 
-  if (stepsError) throw new Error(stepsError.message)
+  if (stepsError) throw new Error("Could not load sequence enrollment steps.")
 
-  const stepRows = (steps ?? []) as Array<StepRow & { leads: { company_name: string } }>
-  const awaitingApproval = stepRows.filter((row) => row.status === "queued" || row.status === "draft_created")
-  const failedSteps = stepRows.filter((row) => row.status === "failed")
+  const stepRows = (steps ?? []) as StepRow[]
+  const stepLeadNames = await fetchLeadCompanyNamesByIds(
+    admin,
+    stepRows.map((row) => row.lead_id),
+  )
+  const stepsWithNames = stepRows.map((row) => ({
+    ...row,
+    companyName: stepLeadNames.get(row.lead_id) ?? "Unknown lead",
+  }))
+
+  const awaitingApproval = stepsWithNames.filter((row) => row.status === "queued" || row.status === "draft_created")
+  const failedSteps = stepsWithNames.filter((row) => row.status === "failed")
 
   const patterns = await listGrowthSequencePatterns(admin)
   const driftSignals = []
@@ -61,7 +102,7 @@ export async function fetchGrowthSequenceExecutionDashboard(admin: SupabaseClien
       ...detectSequenceDrift({
         enrollmentId: enrollment.id,
         leadId: enrollment.lead_id,
-        companyName: enrollment.leads.company_name,
+        companyName: enrollment.companyName,
         patternKey: pattern?.key ?? null,
         steps: ((enrollmentSteps ?? []) as StepRow[]).map(mapGrowthSequenceEnrollmentStepRow),
         patternSteps: pattern?.steps ?? [],
@@ -81,27 +122,27 @@ export async function fetchGrowthSequenceExecutionDashboard(admin: SupabaseClien
     averageHealth,
     activeEnrollments: active.map((row) => ({
       ...mapGrowthSequenceEnrollmentRow(row),
-      companyName: row.leads.company_name,
+      companyName: row.companyName,
     })),
     pausedEnrollments: paused.map((row) => ({
       ...mapGrowthSequenceEnrollmentRow(row),
-      companyName: row.leads.company_name,
+      companyName: row.companyName,
     })),
     executionStalled: executionStalled.map((row) => ({
       ...mapGrowthSequenceEnrollmentRow(row),
-      companyName: row.leads.company_name,
+      companyName: row.companyName,
     })),
     awaitingApproval: awaitingApproval.map((row) => ({
       ...mapGrowthSequenceEnrollmentStepRow(row),
-      companyName: row.leads.company_name,
+      companyName: row.companyName,
     })),
     failedSteps: failedSteps.map((row) => ({
       ...mapGrowthSequenceEnrollmentStepRow(row),
-      companyName: row.leads.company_name,
+      companyName: row.companyName,
     })),
     completedRecently: completedRecently.map((row) => ({
       ...mapGrowthSequenceEnrollmentRow(row),
-      companyName: row.leads.company_name,
+      companyName: row.companyName,
     })),
     sequenceDriftWatch: driftSignals.slice(0, 20),
     sequenceExecutionHealth: {

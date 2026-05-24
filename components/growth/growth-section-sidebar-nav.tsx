@@ -144,10 +144,17 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
         consoleKey: "opportunities",
       },
       {
+        href: "/admin/growth/revenue-operating",
+        label: "Revenue Operating",
+        icon: Crown,
+        match: (path) => path.startsWith("/admin/growth/revenue-operating"),
+        consoleKey: "revenue",
+      },
+      {
         href: "/admin/growth/revenue",
         label: "Revenue",
         icon: TrendingUp,
-        match: (path) => path.startsWith("/admin/growth/revenue"),
+        match: (path) => path === "/admin/growth/revenue",
         consoleKey: "revenue",
         shortcutKey: "r",
       },

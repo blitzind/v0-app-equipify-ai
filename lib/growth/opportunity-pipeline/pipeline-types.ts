@@ -129,6 +129,11 @@ export type GrowthOpportunityPipelineListResult = {
   hasMore: boolean
 }
 
+export type GrowthOpportunityPipelineMeta = {
+  schemaReady: boolean
+  setupMessage?: string
+}
+
 export type GrowthOpportunityPipelineDashboard = {
   qaMarker: typeof GROWTH_OPPORTUNITY_PIPELINE_QA_MARKER
   pipelineByStage: Array<{ stageKey: string; stageLabel: string; count: number; amount: number; weightedAmount: number }>
