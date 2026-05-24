@@ -814,3 +814,108 @@ export async function emitGrowthLeadCallCopilotSummaryApprovedTimeline(
     actor: input.actor,
   })
 }
+
+export async function emitGrowthLeadOutreachQueuedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    queueId: string
+    channel: string
+    summary?: string | null
+    actor?: Actor
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "outreach_queued",
+    title: "Outreach queued",
+    summary: input.summary ?? input.channel,
+    payload: { queueId: input.queueId, channel: input.channel },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}
+
+export async function emitGrowthLeadOutreachApprovedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    queueId: string
+    channel: string
+    summary?: string | null
+    actor?: Actor
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "outreach_approved",
+    title: "Outreach approved",
+    summary: input.summary ?? "Approved for controlled execution.",
+    payload: { queueId: input.queueId, channel: input.channel },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}
+
+export async function emitGrowthLeadOutreachExecutedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    queueId: string
+    channel: string
+    summary?: string | null
+    actor?: Actor
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "outreach_executed",
+    title: "Outreach executed",
+    summary: input.summary ?? "Controlled outreach executed.",
+    payload: { queueId: input.queueId, channel: input.channel },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}
+
+export async function emitGrowthLeadOutreachFailedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    queueId: string
+    channel: string
+    summary?: string | null
+    actor?: Actor
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "outreach_failed",
+    title: "Outreach failed",
+    summary: input.summary ?? "Execution failed.",
+    payload: { queueId: input.queueId, channel: input.channel },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}
+
+export async function emitGrowthLeadOutreachCancelledTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    queueId: string
+    channel: string
+    summary?: string | null
+    actor?: Actor
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "outreach_cancelled",
+    title: "Outreach cancelled",
+    summary: input.summary ?? "Queue item cancelled.",
+    payload: { queueId: input.queueId, channel: input.channel },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}

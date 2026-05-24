@@ -34,6 +34,7 @@ export type GrowthSidebarConsoleKey =
   | "playbooks"
   | "calls"
   | "outreach"
+  | "outreach_approval"
   | "providers"
 
 const EMPTY_STATE: GrowthSidebarConsoleState = {

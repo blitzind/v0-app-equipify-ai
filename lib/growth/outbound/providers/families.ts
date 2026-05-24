@@ -1,7 +1,13 @@
 import type { GrowthProviderCapabilitySnapshot } from "@/lib/growth/outbound/provider-types"
 import { emptyGrowthProviderCapabilitySnapshot } from "@/lib/growth/outbound/capability-snapshot"
 import { buildFixtureValidationResult } from "@/lib/growth/outbound/providers/fixture-validation"
-import { envelopeToNormalized, type OutboundProviderAdapter } from "@/lib/growth/outbound/providers/types"
+import {
+  defaultCostEstimate,
+  defaultStubExecute,
+  defaultValidateExecution,
+  envelopeToNormalized,
+  type OutboundProviderAdapter,
+} from "@/lib/growth/outbound/providers/types"
 import type { OutboundFixtureEnvelope } from "@/lib/growth/outbound/types"
 
 function fixtureAdapter(input: {
@@ -42,6 +48,27 @@ function fixtureAdapter(input: {
     normalizeEvent(envelope) {
       return envelopeToNormalized(envelope)
     },
+    async validateExecution({ connection, credentials, message }) {
+      const validation = await buildFixtureValidationResult({
+        declared: input.declared,
+        config: connection.config,
+        credentials,
+        providerLabel: input.providerName,
+      })
+      if (!validation.healthy) {
+        return { ok: false, warnings: validation.warnings, message: "Provider connection unhealthy." }
+      }
+      if (!message.to?.trim()) {
+        return { ok: false, warnings: [], message: "Recipient email required." }
+      }
+      return defaultValidateExecution()
+    },
+    async execute({ message }) {
+      return defaultStubExecute(input.providerKey, message)
+    },
+    async costEstimate({ messageCount }) {
+      return defaultCostEstimate(messageCount)
+    },
   }
 }
 
@@ -54,7 +81,7 @@ const FULL_FIXTURE: GrowthProviderCapabilitySnapshot = {
   supports_reply_sync: "supported",
   supports_contact_sync: "supported",
   supports_campaign_sync: "partial",
-  supports_send: "disabled",
+  supports_send: "supported",
 }
 
 export const smartleadOutboundProviderAdapter = fixtureAdapter({

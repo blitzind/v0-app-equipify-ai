@@ -9,6 +9,7 @@ import type {
   GrowthAiCopilotGeneration,
   GrowthAiCopilotGenerationType,
 } from "@/lib/growth/ai-copilot-types"
+import type { GrowthOutreachQueueItem } from "@/lib/growth/outreach/outreach-queue-types"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthAiCopilotProps = {
@@ -58,6 +59,30 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
   const [actingId, setActingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [queueItems, setQueueItems] = useState<GrowthOutreachQueueItem[]>([])
+  const [queueEventsById, setQueueEventsById] = useState<Record<string, Array<{ eventType: string; createdAt: string }>>>({})
+
+  const loadQueueItems = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/platform/growth/outreach/queue?leadId=${lead.id}`, { cache: "no-store" })
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; items?: GrowthOutreachQueueItem[] }
+      if (!res.ok || !data.items) return
+      setQueueItems(data.items)
+      const events: Record<string, Array<{ eventType: string; createdAt: string }>> = {}
+      await Promise.all(
+        data.items.slice(0, 5).map(async (item) => {
+          const detailRes = await fetch(`/api/platform/growth/outreach/queue/${item.id}`, { cache: "no-store" })
+          const detail = (await detailRes.json().catch(() => ({}))) as {
+            events?: Array<{ eventType: string; createdAt: string }>
+          }
+          events[item.id] = detail.events ?? []
+        }),
+      )
+      setQueueEventsById(events)
+    } catch {
+      // ignore queue load failures in drawer
+    }
+  }, [lead.id])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -80,7 +105,8 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
 
   useEffect(() => {
     void load()
-  }, [load])
+    void loadQueueItems()
+  }, [load, loadQueueItems])
 
   async function generate(generationType: GrowthAiCopilotGenerationType) {
     setGenerating(generationType)
@@ -134,6 +160,35 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
     } finally {
       setActingId(null)
     }
+  }
+
+  async function queueGeneration(generationId: string, sendNow = false) {
+    setActingId(generationId)
+    try {
+      const createRes = await fetch("/api/platform/growth/outreach/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId: lead.id, generationId, channel: "email" }),
+      })
+      const created = (await createRes.json().catch(() => ({}))) as { ok?: boolean; item?: GrowthOutreachQueueItem }
+      if (!createRes.ok || !created.item) throw new Error("Queue failed.")
+      if (sendNow) {
+        await fetch(`/api/platform/growth/outreach/queue/${created.item.id}/approve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sendNow: true }),
+        })
+      }
+      await loadQueueItems()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Queue failed.")
+    } finally {
+      setActingId(null)
+    }
+  }
+
+  function queueItemForGeneration(generationId: string) {
+    return queueItems.find((item) => item.generationId === generationId)
   }
 
   const draftCount = generations.filter((entry) => entry.status === "draft").length
@@ -267,6 +322,42 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
                         >
                           {expanded ? "Hide" : "View"}
                         </Button>
+                        {entry.status === "approved" ? (
+                          <>
+                            {queueItemForGeneration(entry.id) ? (
+                              <GrowthBadge
+                                label={queueItemForGeneration(entry.id)!.status.replace(/_/g, " ")}
+                                tone={
+                                  queueItemForGeneration(entry.id)!.status === "executed"
+                                    ? "healthy"
+                                    : queueItemForGeneration(entry.id)!.status === "failed"
+                                      ? "attention"
+                                      : "warning"
+                                }
+                              />
+                            ) : (
+                              <>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={actingId === entry.id}
+                                  onClick={() => void queueGeneration(entry.id, false)}
+                                >
+                                  Approve + Queue
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={actingId === entry.id}
+                                  onClick={() => void queueGeneration(entry.id, true)}
+                                >
+                                  Queue & Execute
+                                </Button>
+                              </>
+                            )}
+                          </>
+                        ) : null}
                         {entry.status === "draft" ? (
                           <>
                             <Button

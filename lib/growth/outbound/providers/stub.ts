@@ -2,7 +2,13 @@ import { GROWTH_OUTBOUND_STUB_PROVIDER } from "@/lib/growth/outbound/constants"
 import { emptyGrowthProviderCapabilitySnapshot } from "@/lib/growth/outbound/capability-snapshot"
 import { buildFixtureValidationResult } from "@/lib/growth/outbound/providers/fixture-validation"
 import type { OutboundFixtureEnvelope } from "@/lib/growth/outbound/types"
-import { envelopeToNormalized, type OutboundProviderAdapter } from "@/lib/growth/outbound/providers/types"
+import {
+  defaultCostEstimate,
+  defaultStubExecute,
+  defaultValidateExecution,
+  envelopeToNormalized,
+  type OutboundProviderAdapter,
+} from "@/lib/growth/outbound/providers/types"
 
 const STUB_DECLARED = {
   ...emptyGrowthProviderCapabilitySnapshot(),
@@ -14,7 +20,7 @@ const STUB_DECLARED = {
   supports_reply_sync: "supported" as const,
   supports_contact_sync: "supported" as const,
   supports_campaign_sync: "partial" as const,
-  supports_send: "disabled" as const,
+  supports_send: "supported" as const,
 }
 
 export const stubOutboundProviderAdapter: OutboundProviderAdapter = {
@@ -52,5 +58,15 @@ export const stubOutboundProviderAdapter: OutboundProviderAdapter = {
   },
   normalizeEvent(envelope) {
     return envelopeToNormalized(envelope)
+  },
+  async validateExecution({ message }) {
+    if (!message.to?.trim()) return { ok: false, warnings: [], message: "Recipient email required." }
+    return defaultValidateExecution()
+  },
+  async execute({ message }) {
+    return defaultStubExecute(GROWTH_OUTBOUND_STUB_PROVIDER, message)
+  },
+  async costEstimate({ messageCount }) {
+    return defaultCostEstimate(messageCount)
   },
 }

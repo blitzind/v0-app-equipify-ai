@@ -62,6 +62,11 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "operational_risk_detected",
   "ai_copilot_generation_created",
   "ai_copilot_generation_approved",
+  "outreach_queued",
+  "outreach_approved",
+  "outreach_executed",
+  "outreach_failed",
+  "outreach_cancelled",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]

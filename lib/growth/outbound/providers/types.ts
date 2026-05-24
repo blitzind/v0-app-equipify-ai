@@ -44,6 +44,62 @@ export interface OutboundProviderAdapter {
   }): VerifyWebhookResult
   parseWebhookPayload(raw: unknown): ParsedWebhookEnvelope[]
   normalizeEvent(envelope: ParsedWebhookEnvelope): NormalizedOutboundEvent
+  validateExecution(input: {
+    connection: GrowthEmailProviderConnection
+    credentials: Record<string, unknown> | null
+    message: OutboundExecutionMessage
+  }): Promise<OutboundExecutionValidationResult>
+  execute(input: {
+    connection: GrowthEmailProviderConnection
+    credentials: Record<string, unknown> | null
+    message: OutboundExecutionMessage
+  }): Promise<OutboundExecutionResult>
+  costEstimate(input: {
+    connection: GrowthEmailProviderConnection
+    messageCount: number
+  }): Promise<OutboundExecutionCostEstimate>
+}
+
+export type OutboundExecutionMessage = {
+  to: string
+  subject: string
+  body: string
+  metadata?: Record<string, unknown>
+}
+
+export type OutboundExecutionValidationResult = {
+  ok: boolean
+  warnings: GrowthProviderValidationWarning[]
+  message?: string
+}
+
+export type OutboundExecutionResult =
+  | { ok: true; providerMessageId: string; raw: Record<string, unknown> }
+  | { ok: false; code: string; message: string }
+
+export type OutboundExecutionCostEstimate = {
+  estimatedCents: number
+  notes?: string
+}
+
+export function defaultValidateExecution(): OutboundExecutionValidationResult {
+  return { ok: true, warnings: [] }
+}
+
+export function defaultCostEstimate(messageCount: number): OutboundExecutionCostEstimate {
+  return { estimatedCents: messageCount * 2, notes: "Fixture estimate only." }
+}
+
+export async function defaultStubExecute(
+  providerKey: string,
+  message: OutboundExecutionMessage,
+): Promise<OutboundExecutionResult> {
+  const providerMessageId = `${providerKey}:msg:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`
+  return {
+    ok: true,
+    providerMessageId,
+    raw: { stub: true, to: message.to, subject: message.subject },
+  }
 }
 
 export function envelopeToNormalized(envelope: OutboundFixtureEnvelope): NormalizedOutboundEvent {
