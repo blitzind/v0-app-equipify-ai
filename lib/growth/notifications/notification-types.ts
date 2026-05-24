@@ -37,6 +37,8 @@ export const GROWTH_NOTIFICATION_TYPES = [
   "opportunity_at_risk",
   "stale_opportunity",
   "followup_needed",
+  "close_date_passed",
+  "owner_overloaded",
   "capacity_warning",
   "workload_imbalance",
 ] as const

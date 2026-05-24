@@ -20,6 +20,8 @@ const TYPE_SEVERITY: Record<GrowthNotificationType, GrowthNotificationSeverity> 
   opportunity_at_risk: "high",
   stale_opportunity: "medium",
   followup_needed: "medium",
+  close_date_passed: "high",
+  owner_overloaded: "medium",
   capacity_warning: "medium",
   workload_imbalance: "low",
 }

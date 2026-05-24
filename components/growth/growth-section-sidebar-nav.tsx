@@ -130,10 +130,17 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
         consoleKey: "relationships",
       },
       {
+        href: "/admin/growth/opportunities/pipeline",
+        label: "Pipeline",
+        icon: GitBranch,
+        match: (path) => path.startsWith("/admin/growth/opportunities/pipeline"),
+        consoleKey: "opportunities",
+      },
+      {
         href: "/admin/growth/opportunities",
         label: "Opportunities",
         icon: Target,
-        match: (path) => path.startsWith("/admin/growth/opportunities"),
+        match: (path) => path === "/admin/growth/opportunities",
         consoleKey: "opportunities",
       },
       {

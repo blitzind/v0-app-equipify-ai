@@ -104,6 +104,14 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "live_call_completed",
   "live_guidance_generated",
   "live_guidance_used",
+  "opportunity_created",
+  "stage_changed",
+  "forecast_changed",
+  "owner_changed",
+  "amount_changed",
+  "stale_detected",
+  "opportunity_closed_won",
+  "opportunity_closed_lost",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]

@@ -326,18 +326,22 @@ export async function emitGrowthOpportunityAtRiskNotification(
     companyName: string
     score: number
     ownerUserId?: string | null
+    opportunityId?: string | null
   },
 ): Promise<void> {
   await emitGrowthNotification(admin, {
     ownerUserId: input.ownerUserId ?? null,
     leadId: input.leadId,
+    opportunityId: input.opportunityId ?? null,
     notificationType: "opportunity_at_risk",
     title: "Opportunity at risk",
     body: `${input.companyName} readiness is declining (score ${input.score}).`,
     sourceSystem: "opportunity",
-    sourceId: input.leadId,
-    actionUrl: commandLeadFocusHref(input.leadId, "command"),
-    metadata: { score: input.score },
+    sourceId: input.opportunityId ?? input.leadId,
+    actionUrl: input.opportunityId
+      ? `/admin/growth/opportunities/pipeline?opportunityId=${input.opportunityId}`
+      : commandLeadFocusHref(input.leadId, "command"),
+    metadata: { score: input.score, opportunityId: input.opportunityId ?? null },
   })
 }
 
@@ -347,18 +351,22 @@ export async function emitGrowthStaleOpportunityNotification(
     leadId: string
     companyName: string
     ownerUserId?: string | null
+    opportunityId?: string | null
   },
 ): Promise<void> {
   await emitGrowthNotification(admin, {
     ownerUserId: input.ownerUserId ?? null,
     leadId: input.leadId,
+    opportunityId: input.opportunityId ?? null,
     notificationType: "stale_opportunity",
     title: "Stale opportunity",
     body: `${input.companyName} has stalled — review next steps.`,
     sourceSystem: "opportunity",
-    sourceId: input.leadId,
-    actionUrl: commandLeadFocusHref(input.leadId, "command"),
-    metadata: { companyName: input.companyName },
+    sourceId: input.opportunityId ?? input.leadId,
+    actionUrl: input.opportunityId
+      ? `/admin/growth/opportunities/pipeline?opportunityId=${input.opportunityId}`
+      : commandLeadFocusHref(input.leadId, "command"),
+    metadata: { companyName: input.companyName, opportunityId: input.opportunityId ?? null },
   })
 }
 
@@ -404,5 +412,53 @@ export async function emitGrowthWorkloadImbalanceNotification(
       minRepEmail: input.minRepEmail,
       spread: input.spread,
     },
+  })
+}
+
+export async function emitGrowthOpportunityCloseDatePassedNotification(
+  admin: SupabaseClient,
+  input: {
+    opportunityId: string
+    leadId: string
+    companyName: string
+    ownerUserId?: string | null
+    expectedCloseDate: string
+  },
+): Promise<void> {
+  await emitGrowthNotification(admin, {
+    ownerUserId: input.ownerUserId ?? null,
+    leadId: input.leadId,
+    opportunityId: input.opportunityId,
+    notificationType: "close_date_passed",
+    title: "Close date passed",
+    body: `${input.companyName} expected close date has passed.`,
+    sourceSystem: "opportunity",
+    sourceId: input.opportunityId,
+    actionUrl: `/admin/growth/opportunities/pipeline?opportunityId=${input.opportunityId}`,
+    metadata: { expectedCloseDate: input.expectedCloseDate },
+  })
+}
+
+export async function emitGrowthOpportunityOwnerOverloadedNotification(
+  admin: SupabaseClient,
+  input: {
+    opportunityId: string
+    leadId: string
+    companyName: string
+    ownerUserId: string | null
+  },
+): Promise<void> {
+  if (!input.ownerUserId) return
+  await emitGrowthNotification(admin, {
+    ownerUserId: input.ownerUserId,
+    leadId: input.leadId,
+    opportunityId: input.opportunityId,
+    notificationType: "owner_overloaded",
+    title: "Owner overloaded",
+    body: `${input.companyName} owner is at capacity — review deal load.`,
+    sourceSystem: "opportunity",
+    sourceId: input.opportunityId,
+    actionUrl: `/admin/growth/opportunities/pipeline?opportunityId=${input.opportunityId}`,
+    metadata: { companyName: input.companyName },
   })
 }

@@ -11,6 +11,7 @@ import {
   Phone,
   Search,
   Sparkles,
+  Target,
   User,
   Zap,
   Mail,
@@ -72,6 +73,15 @@ function eventMeta(eventType: GrowthLeadTimelineEventType): {
     case "notification_completed":
     case "notification_expired":
       return { icon: Activity }
+    case "opportunity_created":
+    case "stage_changed":
+    case "forecast_changed":
+    case "owner_changed":
+    case "amount_changed":
+    case "stale_detected":
+    case "opportunity_closed_won":
+    case "opportunity_closed_lost":
+      return { icon: Target }
     case "ai_copilot_generation_created":
     case "ai_copilot_generation_approved":
     case "playbook_conflict_detected":

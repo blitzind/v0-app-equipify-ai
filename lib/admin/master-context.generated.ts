@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 583,
-  sqlMigrations: 243,
+  apiRouteHandlers: 586,
+  sqlMigrations: 244,
   dashboardPages: 65,
-  componentsTsx: 400,
-  libTsFiles: 1314,
+  componentsTsx: 402,
+  libTsFiles: 1322,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **583** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **243** |
+| API route handlers (\`app/api/**/route.ts\`) | **586** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **244** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **400** |
-| \`lib/**/*.ts\` | **1314** |
+| \`components/**/*.tsx\` | **402** |
+| \`lib/**/*.ts\` | **1322** |
 
 ### Vercel crons
 
@@ -532,6 +532,9 @@ platform/growth/leads/bulk-archive/route.ts
 platform/growth/leads/route.ts
 platform/growth/live-coaching/settings/route.ts
 platform/growth/opportunities/dashboard/route.ts
+platform/growth/opportunities/pipeline/[opportunityId]/route.ts
+platform/growth/opportunities/pipeline/route.ts
+platform/growth/opportunities/pipeline/settings/route.ts
 platform/growth/outbound/connections/[connectionId]/route.ts
 platform/growth/outbound/connections/route.ts
 platform/growth/outbound/fixtures/process/route.ts

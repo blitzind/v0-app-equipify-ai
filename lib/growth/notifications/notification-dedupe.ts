@@ -20,8 +20,10 @@ export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificati
   provider_retry_warning: 6 * 60,
   high_fit_lead: 7 * 24 * 60,
   engagement_spike: 3 * 24 * 60,
+  stale_opportunity: 24 * 60,
+  close_date_passed: 12 * 60,
+  owner_overloaded: 6 * 60,
   followup_needed: 14 * 24 * 60,
-  stale_opportunity: 30 * 24 * 60,
 }
 
 export function buildGrowthNotificationDeterministicHash(input: {

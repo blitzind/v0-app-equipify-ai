@@ -1,0 +1,69 @@
+"use client"
+
+import { useCallback, useEffect, useState } from "react"
+import Link from "next/link"
+import { Loader2, TrendingUp } from "lucide-react"
+import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import type { GrowthOpportunityPipelineDashboard } from "@/lib/growth/opportunity-pipeline/pipeline-types"
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value)
+}
+
+export function GrowthPipelineCommandSummary() {
+  const [dashboard, setDashboard] = useState<GrowthOpportunityPipelineDashboard | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch("/api/platform/growth/opportunities/pipeline?view=all_pipeline&limit=1", {
+        cache: "no-store",
+      })
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; dashboard?: GrowthOpportunityPipelineDashboard }
+      if (res.ok && data.ok) setDashboard(data.dashboard ?? null)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  if (loading) {
+    return (
+      <GrowthEngineCard title="Pipeline & Forecast">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Loading pipeline summary…
+        </div>
+      </GrowthEngineCard>
+    )
+  }
+
+  return (
+    <GrowthEngineCard title="Pipeline & Forecast">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <TrendingUp className="size-4" />
+          Revenue operating layer — no autonomous stage movement.
+        </div>
+        <Link href="/admin/growth/opportunities/pipeline" className="text-sm text-indigo-600 hover:underline">
+          Open pipeline
+        </Link>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatTile label="Pipeline risk" value={dashboard?.atRiskCount ?? 0} />
+        <StatTile label="Forecast commit" value={formatCurrency(dashboard?.forecastTotals.commit.weightedAmount ?? 0)} />
+        <StatTile label="Deals needing action" value={dashboard?.dealsNeedingAction ?? 0} />
+        <StatTile label="Won revenue" value={formatCurrency(dashboard?.wonRevenue ?? 0)} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <GrowthBadge label={`Pipeline ${formatCurrency(dashboard?.forecastTotals.pipeline.weightedAmount ?? 0)}`} tone="medium" />
+        <GrowthBadge label={`Best case ${formatCurrency(dashboard?.forecastTotals.best_case.weightedAmount ?? 0)}`} tone="neutral" />
+        <GrowthBadge label={`Stale ${dashboard?.staleOpportunityCount ?? 0}`} tone="attention" />
+      </div>
+    </GrowthEngineCard>
+  )
+}

@@ -14,6 +14,7 @@ import {
   emitGrowthLeadUnassignedTimeline,
 } from "@/lib/growth/timeline-emitter"
 import { emitGrowthLeadAssignedNotification, emitGrowthLeadReassignedNotification } from "@/lib/growth/notifications/notification-integrations"
+import { syncGrowthOpportunityOwnerFromLead } from "@/lib/growth/opportunity-pipeline/mutate-opportunity"
 import type { GrowthLead } from "@/lib/growth/types"
 
 function leadsTable(admin: SupabaseClient) {
@@ -144,6 +145,8 @@ export async function assignGrowthLead(
       sourceId: input.source,
     })
   }
+
+  await syncGrowthOpportunityOwnerFromLead(admin, input.leadId)
 
   logGrowthEngine("lead_assigned", {
     leadId: input.leadId,
