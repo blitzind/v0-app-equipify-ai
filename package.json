@@ -106,6 +106,7 @@
     "test:growth-realtime-providers": "tsx scripts/test-growth-realtime-providers.ts",
     "test:growth-browser-audio-capture": "tsx scripts/test-growth-browser-audio-capture.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
+    "test:growth-assemblyai-browser-streaming": "tsx scripts/test-growth-assemblyai-browser-streaming.ts",
     "test:growth-realtime-provider-readiness": "tsx scripts/test-growth-realtime-provider-readiness.ts",
     "test:growth-leads-inbox": "tsx scripts/test-growth-leads-inbox.ts",
     "test:catalog-import-manufacturer": "tsx scripts/test-catalog-import-manufacturer.ts",

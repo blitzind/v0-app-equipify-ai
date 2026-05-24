@@ -30,7 +30,7 @@ const deepgram = createRealtimeProviderInstance("deepgram")
 assert.equal(deepgram.supportsBrowserAudioStreaming(), true)
 assert.equal(createRealtimeProviderInstance("stub").supportsBrowserAudioStreaming(), false)
 assert.equal(providerSupportsBrowserAudioStreaming("deepgram"), true)
-assert.equal(providerSupportsBrowserAudioStreaming("assemblyai"), false)
+assert.equal(providerSupportsBrowserAudioStreaming("assemblyai"), true)
 
 const parsed = parseDeepgramLiveTranscriptMessage(
   JSON.stringify({
@@ -116,7 +116,8 @@ const session: GrowthRealtimeCallSession = {
 }
 
 const assemblyCapability = evaluateBrowserAudioCaptureCapability({ session })
-assert.equal(assemblyCapability.canStart, false)
+assert.equal(assemblyCapability.canStart, true)
+assert.equal(assemblyCapability.providerLabel, "AssemblyAI")
 
 const ingestSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/realtime/browser-audio/ingest-browser-audio-chunk.ts"),

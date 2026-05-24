@@ -156,7 +156,10 @@ export function GrowthLiveCoachingSettingsPanel() {
             {testMessage ? <p className="text-xs text-muted-foreground">{testMessage}</p> : null}
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">Manual transcript mode active until a provider is selected.</p>
+          <p className="text-xs text-muted-foreground">
+            Manual transcript mode active until a provider is selected. Deepgram and AssemblyAI support
+            browser mic streaming when connected and ready.
+          </p>
         )}
 
         <label className="flex items-center gap-2 text-sm">

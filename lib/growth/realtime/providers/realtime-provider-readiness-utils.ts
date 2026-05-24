@@ -45,12 +45,21 @@ export function buildRealtimeProviderConfigurationWarnings(
   }
 
   if (
-    connection.provider === "deepgram" &&
+    (connection.provider === "deepgram" || connection.provider === "assemblyai") &&
     !providerSupportsBrowserAudioStreaming(connection.provider)
   ) {
     warnings.push({
       code: "browser_stream_unsupported",
       message: "Browser audio streaming is not available for this provider.",
+      severity: "warning",
+    })
+  }
+
+  if (connection.provider === "assemblyai" && !connection.configJson.model?.trim()) {
+    warnings.push({
+      code: "assemblyai_speech_model_default",
+      message:
+        "AssemblyAI browser streaming uses universal-streaming-english when no speech model is configured.",
       severity: "warning",
     })
   }

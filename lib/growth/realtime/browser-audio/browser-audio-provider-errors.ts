@@ -1,7 +1,7 @@
 import {
   ProviderStreamingUnavailableError,
 } from "@/lib/growth/realtime/browser-audio/browser-audio-chunk-errors"
-import { mapDeepgramProviderError } from "@/lib/growth/realtime/providers/deepgram-live-message-parser"
+import { mapLiveProviderStreamError } from "@/lib/growth/realtime/providers/live-provider-stream-error-mapper"
 
 export class ProviderAuthError extends Error {
   constructor(message = "Provider authentication failed. Check credentials in Live Coaching settings.") {
@@ -71,7 +71,7 @@ export function mapBrowserAudioProviderError(error: unknown): { code: string; me
 }
 
 export function classifyBrowserAudioProviderErrorCode(detail: string): Error {
-  const mapped = mapDeepgramProviderError(detail)
+  const mapped = mapLiveProviderStreamError(detail)
   switch (mapped.code) {
     case "provider_auth_failed":
       return new ProviderAuthError(mapped.message)
