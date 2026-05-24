@@ -47,6 +47,7 @@ export function GrowthCollapsibleEngineCard({
   compact = false,
   headerAside,
   headerTrailing,
+  expandToken = 0,
 }: {
   title: string
   icon?: ReactNode
@@ -58,6 +59,7 @@ export function GrowthCollapsibleEngineCard({
   compact?: boolean
   headerAside?: ReactNode
   headerTrailing?: ReactNode
+  expandToken?: number
 }) {
   const [open, setOpen] = useState(defaultOpen)
 
@@ -72,6 +74,18 @@ export function GrowthCollapsibleEngineCard({
       // ignore storage failures
     }
   }, [persistKey])
+
+  useEffect(() => {
+    if (!expandToken) return
+    setOpen(true)
+    if (persistKey) {
+      try {
+        localStorage.setItem(`${GROWTH_DRAWER_CARD_PERSIST_PREFIX}${persistKey}`, "true")
+      } catch {
+        // ignore storage failures
+      }
+    }
+  }, [expandToken, persistKey])
 
   function toggleOpen() {
     setOpen((value) => {

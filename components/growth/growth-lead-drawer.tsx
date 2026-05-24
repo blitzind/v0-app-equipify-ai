@@ -23,7 +23,8 @@ import { GrowthLeadTimelinePanel } from "@/components/growth/growth-lead-timelin
 import { GrowthOperationalIntelligence } from "@/components/growth/growth-operational-intelligence"
 import type { GrowthLeadResearchRun } from "@/lib/growth/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
-import { scrollGrowthCommandLeadFocusSection } from "@/lib/growth/command/command-lead-focus"
+import { GrowthCallWorkflowProvider } from "@/components/growth/growth-call-workflow-context"
+import { applyGrowthCommandLeadFocusExpand, scrollGrowthCommandLeadFocusSection } from "@/lib/growth/command/command-lead-focus"
 
 type GrowthLeadDrawerProps = {
   lead: GrowthLead | null
@@ -41,6 +42,7 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
 
   useEffect(() => {
     if (!open || !drawerFocus || !lead) return
+    applyGrowthCommandLeadFocusExpand(drawerFocus)
     scrollGrowthCommandLeadFocusSection(drawerFocus)
   }, [open, drawerFocus, lead?.id])
 
@@ -68,59 +70,61 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
       width="xl"
     >
       <div className={DRAWER_INNER_SCROLL_CANVAS}>
-        <GrowthLeadCommandCenter
-          lead={activeLead}
-          onLeadUpdated={handleLeadUpdated}
-          onLeadSaved={onLeadSaved}
-          onAddDecisionMaker={handleAddDecisionMaker}
-        />
+        <GrowthCallWorkflowProvider>
+          <GrowthLeadCommandCenter
+            lead={activeLead}
+            onLeadUpdated={handleLeadUpdated}
+            onLeadSaved={onLeadSaved}
+            onAddDecisionMaker={handleAddDecisionMaker}
+          />
 
-        <GrowthExecutiveOperatingIntelligence lead={activeLead} />
+          <GrowthExecutiveOperatingIntelligence lead={activeLead} />
 
-        <GrowthOperationalCapacityIntelligence lead={activeLead} />
+          <GrowthOperationalCapacityIntelligence lead={activeLead} />
 
-        <GrowthRevenueForecast lead={activeLead} />
+          <GrowthRevenueForecast lead={activeLead} />
 
-        <GrowthOpportunityReadiness lead={activeLead} />
+          <GrowthOpportunityReadiness lead={activeLead} />
 
-        <GrowthRelationshipIntelligence lead={activeLead} />
+          <GrowthRelationshipIntelligence lead={activeLead} />
 
-        <GrowthConversationIntelligence lead={activeLead} />
+          <GrowthConversationIntelligence lead={activeLead} />
 
-        <GrowthSequenceIntelligence lead={activeLead} />
+          <GrowthSequenceIntelligence lead={activeLead} />
 
-        <GrowthLeadEngagement lead={activeLead} />
+          <GrowthLeadEngagement lead={activeLead} />
 
-        <GrowthCallCopilot lead={activeLead} />
+          <GrowthCallCopilot lead={activeLead} />
 
-        <GrowthRealtimeCallIntelligence lead={activeLead} />
+          <GrowthRealtimeCallIntelligence lead={activeLead} />
 
-        <GrowthAiCopilot lead={activeLead} />
+          <GrowthAiCopilot lead={activeLead} />
 
-        <GrowthDecisionMakersPanel
-          id="growth-decision-makers"
-          lead={activeLead}
-          onLeadUpdated={handleLeadUpdated}
-          openAddForm={openAddDmForm}
-          onOpenAddFormChange={setOpenAddDmForm}
-        />
+          <GrowthDecisionMakersPanel
+            id="growth-decision-makers"
+            lead={activeLead}
+            onLeadUpdated={handleLeadUpdated}
+            openAddForm={openAddDmForm}
+            onOpenAddFormChange={setOpenAddDmForm}
+          />
 
-        <GrowthCompanyIntelligenceSnapshot lead={activeLead} latestRun={latestResearchRun} />
+          <GrowthCompanyIntelligenceSnapshot lead={activeLead} latestRun={latestResearchRun} />
 
-        <GrowthLeadResearchPanel
-          id="growth-research"
-          lead={activeLead}
-          onLeadUpdated={handleLeadUpdated}
-          onLatestRunChange={setLatestResearchRun}
-        />
+          <GrowthLeadResearchPanel
+            id="growth-research"
+            lead={activeLead}
+            onLeadUpdated={handleLeadUpdated}
+            onLatestRunChange={setLatestResearchRun}
+          />
 
-        <GrowthOutboundPanel lead={activeLead} />
+          <GrowthOutboundPanel lead={activeLead} />
 
-        <GrowthOperationalIntelligence lead={activeLead} />
+          <GrowthOperationalIntelligence lead={activeLead} />
 
-        <GrowthLeadActivityStream lead={activeLead} />
+          <GrowthLeadActivityStream lead={activeLead} />
 
-        <GrowthLeadTimelinePanel leadId={activeLead.id} refreshToken={timelineRefreshToken} />
+          <GrowthLeadTimelinePanel leadId={activeLead.id} refreshToken={timelineRefreshToken} />
+        </GrowthCallWorkflowProvider>
       </div>
     </DetailDrawer>
   )

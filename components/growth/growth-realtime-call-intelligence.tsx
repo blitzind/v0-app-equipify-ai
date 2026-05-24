@@ -4,7 +4,10 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { Check, Copy, Loader2, Mic, Pause, Play, Square, StopCircle, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { useGrowthCallWorkflow } from "@/components/growth/growth-call-workflow-context"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { GROWTH_CALL_DIALER_SAFETY_COPY } from "@/lib/growth/call-workflow-copy"
+import { formatGrowthCallDialerNextStep } from "@/lib/growth/call-workflow"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type {
   GrowthLiveCoachingState,
@@ -25,6 +28,7 @@ type GrowthRealtimeCallIntelligenceProps = {
 }
 
 export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntelligenceProps) {
+  const { state: callWorkflow, expandToken, refreshToken, registerHandles } = useGrowthCallWorkflow()
   const [sessions, setSessions] = useState<GrowthRealtimeCallSession[]>([])
   const [events, setEvents] = useState<GrowthRealtimeTranscriptEvent[]>([])
   const [coachingState, setCoachingState] = useState<GrowthLiveCoachingState | null>(null)
@@ -86,7 +90,7 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
 
   useEffect(() => {
     void load()
-  }, [load])
+  }, [load, refreshToken])
 
   async function createSession() {
     setActing("create")
@@ -129,6 +133,61 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
       setActing(null)
     }
   }
+
+  const startRealtimeCoachingFlow = useCallback(async () => {
+    let session = sessions.find((item) => ["preparing", "active", "paused"].includes(item.status)) ?? null
+
+    if (!session) {
+      setActing("create")
+      setError(null)
+      try {
+        const res = await fetch(`/api/platform/growth/leads/${lead.id}/realtime-call/sessions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        })
+        const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
+        if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not create session.")
+        await load()
+        const listRes = await fetch(`/api/platform/growth/leads/${lead.id}/realtime-call/sessions`, { cache: "no-store" })
+        const listData = (await listRes.json().catch(() => ({}))) as {
+          ok?: boolean
+          sessions?: GrowthRealtimeCallSession[]
+        }
+        session =
+          listData.sessions?.find((item) => ["preparing", "active", "paused"].includes(item.status)) ?? null
+      } finally {
+        setActing(null)
+      }
+    }
+
+    if (session && (session.status === "preparing" || session.status === "paused")) {
+      setActing("start")
+      setError(null)
+      try {
+        const res = await fetch(
+          `/api/platform/growth/leads/${lead.id}/realtime-call/sessions/${session.id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "start" }),
+          },
+        )
+        const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
+        if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not go live.")
+        await load()
+      } finally {
+        setActing(null)
+      }
+    }
+  }, [lead.id, load, sessions])
+
+  useEffect(() => {
+    registerHandles({
+      startRealtimeCoaching: startRealtimeCoachingFlow,
+      refreshCallPanels: load,
+    })
+  }, [registerHandles, startRealtimeCoachingFlow, load])
 
   async function appendTranscript() {
     if (!activeSession || !draft.trim()) return
@@ -210,6 +269,10 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
   }
 
   const snapshot = activeSession?.liveSnapshot
+  const dialNextStep =
+    callWorkflow.callWorkflowActive && callWorkflow.dialLabel
+      ? formatGrowthCallDialerNextStep(callWorkflow.dialLabel)
+      : null
 
   return (
     <GrowthCollapsibleEngineCard
@@ -218,13 +281,24 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
       icon={<Mic className="size-4" />}
       headerAside={
         activeSession
-          ? `${activeSession.status.replace(/_/g, " ")} · ${activeSession.transcriptSource} · ${activeSession.transcriptStatus}`
-          : "Live guidance"
+          ? `${activeSession.status.replace(/_/g, " ")} · source ${activeSession.transcriptSource} · ${activeSession.transcriptStatus}`
+          : callWorkflow.callWorkflowActive
+            ? "Dial logged — start coaching"
+            : "Live guidance"
       }
-      defaultOpen={false}
+      defaultOpen={callWorkflow.callWorkflowActive}
       persistKey={GROWTH_DRAWER_CARD_KEYS.realtimeCall}
+      expandToken={expandToken}
     >
       <div className="space-y-4">
+        <p className="text-xs text-muted-foreground">{GROWTH_CALL_DIALER_SAFETY_COPY}</p>
+
+        {dialNextStep && !activeSession ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-950">
+            {dialNextStep}
+          </div>
+        ) : null}
+
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -235,9 +309,9 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
 
         <div className="flex flex-wrap gap-2">
           {!activeSession ? (
-            <Button size="sm" disabled={acting !== null} onClick={() => void createSession()}>
+            <Button size="sm" disabled={acting !== null} onClick={() => void startRealtimeCoachingFlow()}>
               {acting === "create" ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Play className="mr-2 size-4" />}
-              Start Live Session
+              Start Realtime Coaching
             </Button>
           ) : (
             <>
@@ -267,7 +341,11 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
 
         {activeSession && activeSession.status !== "completed" ? (
           <div className="space-y-2 rounded-lg border border-border p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Manual transcript (stub provider)</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Manual transcript</p>
+              <GrowthBadge label={`source: ${activeSession.transcriptSource}`} tone="neutral" />
+              <GrowthBadge label={activeSession.transcriptStatus.replace(/_/g, " ")} tone="neutral" />
+            </div>
             <div className="flex gap-2">
               {(["rep", "prospect"] as const).map((value) => (
                 <Button
@@ -283,7 +361,7 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
             </div>
             <Textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={3} placeholder="Type utterance…" />
             <Button size="sm" disabled={acting !== null || !draft.trim()} onClick={() => void appendTranscript()}>
-              Add Transcript Line
+              Append Transcript
             </Button>
           </div>
         ) : null}

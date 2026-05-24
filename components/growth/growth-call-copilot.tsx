@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { AlertTriangle, Check, Loader2, Phone, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { useGrowthCallWorkflow } from "@/components/growth/growth-call-workflow-context"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import type { GrowthCallCopilotBriefing, GrowthCallCopilotSession } from "@/lib/growth/call-copilot-types"
 import {
@@ -38,6 +39,7 @@ function getBriefing(session: GrowthCallCopilotSession | null): GrowthCallCopilo
 }
 
 export function GrowthCallCopilot({ lead }: GrowthCallCopilotProps) {
+  const { state: callWorkflow, expandToken, refreshToken, registerHandles } = useGrowthCallWorkflow()
   const [sessions, setSessions] = useState<GrowthCallCopilotSession[]>([])
   const [activeSession, setActiveSession] = useState<GrowthCallCopilotSession | null>(null)
   const [loading, setLoading] = useState(true)
@@ -99,7 +101,74 @@ export function GrowthCallCopilot({ lead }: GrowthCallCopilotProps) {
 
   useEffect(() => {
     void load()
-  }, [load])
+  }, [load, refreshToken])
+
+  const startCallCopilotFlow = useCallback(async () => {
+    let session = sessions.find((item) => item.status === "pre_call" || item.status === "in_call") ?? null
+
+    if (!session) {
+      setActing("create")
+      setError(null)
+      try {
+        const res = await fetch(`/api/platform/growth/leads/${lead.id}/call-copilot/sessions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ callGoal: lead.nextBestActionReason ?? null }),
+        })
+        const data = (await res.json().catch(() => ({}))) as {
+          ok?: boolean
+          session?: GrowthCallCopilotSession
+          error?: string
+          message?: string
+        }
+        if (!res.ok || !data.ok || !data.session) {
+          if (isGrowthCallCopilotDisabledError(data.error)) {
+            setError(GROWTH_CALL_COPILOT_DISABLED_DRAWER_MESSAGE)
+            return
+          }
+          throw new Error(data.message ?? "Could not create briefing.")
+        }
+        session = data.session
+        setActiveSession(session)
+        setSessions((prev) => [session!, ...prev])
+        setLiveNotes("")
+      } finally {
+        setActing(null)
+      }
+    }
+
+    if (session?.status === "pre_call") {
+      setActing("start_call")
+      setError(null)
+      try {
+        const res = await fetch(
+          `/api/platform/growth/leads/${lead.id}/call-copilot/sessions/${session.id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "start_call" }),
+          },
+        )
+        const data = (await res.json().catch(() => ({}))) as {
+          ok?: boolean
+          session?: GrowthCallCopilotSession
+          message?: string
+        }
+        if (!res.ok || !data.ok || !data.session) throw new Error(data.message ?? "Action failed.")
+        setActiveSession(data.session)
+        setSessions((prev) => [data.session!, ...prev.filter((entry) => entry.id !== data.session!.id)])
+      } finally {
+        setActing(null)
+      }
+    }
+  }, [lead.id, lead.nextBestActionReason, sessions])
+
+  useEffect(() => {
+    registerHandles({
+      startCallCopilot: startCallCopilotFlow,
+      refreshCallPanels: load,
+    })
+  }, [registerHandles, startCallCopilotFlow, load])
 
   async function patchSession(body: Record<string, unknown>) {
     if (!activeSession) return
@@ -256,8 +325,9 @@ export function GrowthCallCopilot({ lead }: GrowthCallCopilotProps) {
       title="Call Copilot"
       icon={<Phone className="size-4" />}
       headerAside={collapsedSummary}
-      defaultOpen
+      defaultOpen={callWorkflow.callWorkflowActive}
       persistKey={GROWTH_DRAWER_CARD_KEYS.callCopilot}
+      expandToken={expandToken}
     >
       <div className="space-y-4">
         <p className="text-xs text-muted-foreground">
