@@ -67,6 +67,11 @@ function eventMeta(eventType: GrowthLeadTimelineEventType): {
     case "assignment_rule_applied":
     case "assignment_skipped":
       return { icon: User }
+    case "notification_created":
+    case "notification_acknowledged":
+    case "notification_completed":
+    case "notification_expired":
+      return { icon: Activity }
     case "ai_copilot_generation_created":
     case "ai_copilot_generation_approved":
     case "playbook_conflict_detected":

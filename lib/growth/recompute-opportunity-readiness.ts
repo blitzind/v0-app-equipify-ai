@@ -15,6 +15,10 @@ import {
   fetchGrowthLeadOpportunityReadinessInput,
 } from "@/lib/growth/opportunity-signals"
 import {
+  emitGrowthOpportunityAtRiskNotification,
+  emitGrowthStaleOpportunityNotification,
+} from "@/lib/growth/notifications/notification-integrations"
+import {
   emitGrowthLeadBecamePriorityOpportunityTimeline,
   emitGrowthLeadBecameSalesReadyTimeline,
   emitGrowthLeadOpportunityBlockerAddedTimeline,
@@ -124,6 +128,28 @@ export async function recomputeGrowthLeadOpportunityReadiness(
       key,
       label: prevBlocker?.label ?? key,
     })
+  }
+
+  const updatedLead = await fetchGrowthLeadById(admin, leadId)
+  if (updatedLead) {
+    if (
+      result.trend === "declining" &&
+      (result.tier === "sales_ready" || result.tier === "priority_opportunity")
+    ) {
+      await emitGrowthOpportunityAtRiskNotification(admin, {
+        leadId,
+        companyName: updatedLead.companyName,
+        score: result.score,
+        ownerUserId: updatedLead.assignedTo,
+      })
+    }
+    if (result.ageBucket === "stalled") {
+      await emitGrowthStaleOpportunityNotification(admin, {
+        leadId,
+        companyName: updatedLead.companyName,
+        ownerUserId: updatedLead.assignedTo,
+      })
+    }
   }
 
   logGrowthEngine("opportunity_readiness_recomputed", {

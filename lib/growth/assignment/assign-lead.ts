@@ -13,6 +13,7 @@ import {
   emitGrowthLeadReassignedTimeline,
   emitGrowthLeadUnassignedTimeline,
 } from "@/lib/growth/timeline-emitter"
+import { emitGrowthLeadAssignedNotification, emitGrowthLeadReassignedNotification } from "@/lib/growth/notifications/notification-integrations"
 import type { GrowthLead } from "@/lib/growth/types"
 
 function leadsTable(admin: SupabaseClient) {
@@ -127,6 +128,22 @@ export async function assignGrowthLead(
   await touchGrowthRepLastAssigned(admin, input.assignedToUserId)
 
   const enriched = (await recomputeGrowthLeadWorkflowSignals(admin, input.leadId)) ?? updated
+
+  if (!previousOwnerId) {
+    await emitGrowthLeadAssignedNotification(admin, {
+      leadId: input.leadId,
+      ownerUserId: input.assignedToUserId,
+      companyName: enriched.companyName,
+      sourceId: input.source,
+    })
+  } else {
+    await emitGrowthLeadReassignedNotification(admin, {
+      leadId: input.leadId,
+      ownerUserId: input.assignedToUserId,
+      companyName: enriched.companyName,
+      sourceId: input.source,
+    })
+  }
 
   logGrowthEngine("lead_assigned", {
     leadId: input.leadId,

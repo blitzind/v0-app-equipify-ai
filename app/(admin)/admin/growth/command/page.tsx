@@ -3,6 +3,7 @@
 import { LayoutDashboard } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthCommandCenterDashboard } from "@/components/growth/growth-command-center-dashboard"
+import { GrowthAttentionCenter } from "@/components/growth/growth-attention-center"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -39,6 +40,7 @@ export default function AdminGrowthCommandPage() {
         </section>
 
         <GrowthSectionLayout>
+          <GrowthAttentionCenter />
           <GrowthCommandCenterDashboard />
         </GrowthSectionLayout>
       </div>

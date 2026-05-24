@@ -6,6 +6,7 @@ import { fetchGrowthLeadEngagementInput } from "@/lib/growth/engagement-signals"
 import { computeGrowthLeadEngagementScore } from "@/lib/growth/engagement-score"
 import { isEngagementDormant } from "@/lib/growth/engagement-decay"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { emitGrowthEngagementSpikeNotification } from "@/lib/growth/notifications/notification-integrations"
 import {
   emitGrowthLeadBecameDormantTimeline,
   emitGrowthLeadBecameHotTimeline,
@@ -56,6 +57,15 @@ export async function recomputeGrowthLeadEngagementIntelligence(
       to: result.score,
       summary: result.summary,
     })
+    if (result.score - prevScore >= 20) {
+      await emitGrowthEngagementSpikeNotification(admin, {
+        leadId,
+        companyName: lead.companyName,
+        fromScore: prevScore,
+        toScore: result.score,
+        ownerUserId: lead.assignedTo,
+      })
+    }
   }
 
   if (prevTier && prevTier !== result.tier) {

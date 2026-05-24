@@ -24,6 +24,7 @@ import {
   emitGrowthLeadOutreachExecutedTimeline,
   emitGrowthLeadOutreachFailedTimeline,
 } from "@/lib/growth/timeline-emitter"
+import { emitGrowthProviderExecutionFailedNotification } from "@/lib/growth/notifications/notification-integrations"
 import { parseLemlistConnectionConfig } from "@/lib/growth/outbound/providers/lemlist/lemlist-config"
 import { LEMLIST_PROVIDER_KEY } from "@/lib/growth/outbound/providers/lemlist/lemlist-labels"
 
@@ -175,6 +176,13 @@ export async function executeGrowthOutreachQueueItem(
       summary: validation.message ?? "Execution validation failed.",
       actor: { userId: input.actingUserId, email: input.actingUserEmail },
     })
+    await emitGrowthProviderExecutionFailedNotification(admin, {
+      leadId: lead.id,
+      queueId: input.queueItem.id,
+      companyName: lead.companyName,
+      reason: validation.message ?? "Execution validation failed.",
+      ownerUserId: lead.assignedTo,
+    })
     throw new Error("validation_failed")
   }
 
@@ -214,6 +222,13 @@ export async function executeGrowthOutreachQueueItem(
       channel: input.queueItem.channel,
       summary: result.message,
       actor: { userId: input.actingUserId, email: input.actingUserEmail },
+    })
+    await emitGrowthProviderExecutionFailedNotification(admin, {
+      leadId: lead.id,
+      queueId: input.queueItem.id,
+      companyName: lead.companyName,
+      reason: result.message,
+      ownerUserId: lead.assignedTo,
     })
     throw new Error("execution_failed")
   }

@@ -1397,3 +1397,69 @@ export async function emitGrowthLeadAssignmentSkippedTimeline(
     actorEmail: input.actor?.email,
   })
 }
+
+export async function emitGrowthLeadNotificationCreatedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; notificationId: string; notificationType: string; title: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "notification_created",
+    title: "Notification created",
+    summary: input.title,
+    payload: { notificationId: input.notificationId, notificationType: input.notificationType },
+  })
+}
+
+export async function emitGrowthLeadNotificationAcknowledgedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    notificationId: string
+    title: string
+    actor?: Actor
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "notification_acknowledged",
+    title: "Notification acknowledged",
+    summary: input.title,
+    payload: { notificationId: input.notificationId },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}
+
+export async function emitGrowthLeadNotificationCompletedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    notificationId: string
+    title: string
+    actor?: Actor
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "notification_completed",
+    title: "Notification completed",
+    summary: input.title,
+    payload: { notificationId: input.notificationId },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}
+
+export async function emitGrowthLeadNotificationExpiredTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; notificationId: string; title: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "notification_expired",
+    title: "Notification expired",
+    summary: input.title,
+    payload: { notificationId: input.notificationId },
+  })
+}

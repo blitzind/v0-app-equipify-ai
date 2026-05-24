@@ -20,6 +20,8 @@ import {
 import { updateGrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-repository"
 import { recordRealtimeProviderOperationalEvent } from "@/lib/growth/realtime/providers/realtime-provider-metrics"
 import type { RealtimeProviderLifecycleEventType } from "@/lib/growth/realtime/providers/realtime-provider-readiness-types"
+import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { emitGrowthProviderRetryWarningNotification } from "@/lib/growth/notifications/notification-integrations"
 import {
   emitLiveCoachingProviderConnectedTimeline,
   emitLiveCoachingProviderConnectingTimeline,
@@ -310,6 +312,16 @@ export async function retryBrowserAudioProviderStream(
   await emitLiveCoachingProviderRetryTimeline(admin, session, {
     attempt: record.metrics.reconnectAttempts + 1,
   })
+  const lead = await fetchGrowthLeadById(admin, session.leadId)
+  if (lead) {
+    await emitGrowthProviderRetryWarningNotification(admin, {
+      leadId: session.leadId,
+      sessionId: session.id,
+      providerId: session.providerId,
+      attempt: record.metrics.reconnectAttempts + 1,
+      ownerUserId: lead.assignedTo,
+    })
+  }
 
   await closeBrowserAudioProviderStream(session.id, { admin, session })
   return openBrowserAudioProviderStream(admin, session, actor)

@@ -46,6 +46,11 @@ import {
   emitGrowthLeadSequenceStepQueuedTimeline,
   emitGrowthLeadSequenceStepSkippedTimeline,
 } from "@/lib/growth/timeline-emitter"
+import {
+  emitGrowthApprovalRequiredNotification,
+  emitGrowthSequenceFailedNotification,
+  emitGrowthSuppressionBlockedNotification,
+} from "@/lib/growth/notifications/notification-integrations"
 
 function buildQueuePayloadFromGeneration(input: {
   generation: {
@@ -104,6 +109,16 @@ async function skipSequenceStep(
     reason: input.reason,
     actor: { userId: input.actingUserId, email: input.actingUserEmail },
   })
+  if (input.reason.toLowerCase().includes("suppress")) {
+    const lead = await fetchGrowthLeadById(admin, input.step.leadId)
+    if (lead) {
+      await emitGrowthSuppressionBlockedNotification(admin, {
+        leadId: lead.id,
+        companyName: lead.companyName,
+        ownerUserId: lead.assignedTo,
+      })
+    }
+  }
 }
 
 async function queueSequenceStepOutreach(
@@ -225,6 +240,13 @@ async function queueSequenceStepOutreach(
     enrollmentId: input.enrollmentId,
     stepId: input.step.id,
     queueId: queueItem.id,
+  })
+
+  await emitGrowthApprovalRequiredNotification(admin, {
+    leadId: lead.id,
+    queueId: queueItem.id,
+    companyName: lead.companyName,
+    ownerUserId: lead.assignedTo,
   })
 
   return { queued: true }
@@ -356,6 +378,15 @@ export async function runGrowthSequenceScheduler(
       }
       if (!result.queued) {
         counts.failed += 1
+        if (!dryRun) {
+          await emitGrowthSequenceFailedNotification(admin, {
+            leadId: step.leadId,
+            stepId: step.id,
+            companyName: lead?.companyName ?? "Lead",
+            reason: result.reason ?? "Scheduler could not queue step",
+            ownerUserId: lead?.assignedTo ?? null,
+          })
+        }
         continue
       }
 

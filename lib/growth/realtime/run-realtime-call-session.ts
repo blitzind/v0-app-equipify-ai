@@ -25,6 +25,10 @@ import {
   detachRealtimeProviderFromSession,
 } from "@/lib/growth/realtime/providers/provider-session-manager"
 import {
+  emitGrowthBuyingSignalDetectedNotification,
+  emitGrowthCoachingSignalNotification,
+} from "@/lib/growth/notifications/notification-integrations"
+import {
   emitGrowthLeadLiveCallCompletedTimeline,
   emitGrowthLeadLiveCallStartedTimeline,
   emitGrowthLeadRealtimeBuyingSignalDetectedTimeline,
@@ -74,6 +78,13 @@ async function recomputeAndPersistSnapshot(
         signalKey,
         actor,
       })
+      await emitGrowthBuyingSignalDetectedNotification(admin, {
+        leadId: session.leadId,
+        companyName: lead.companyName,
+        signalKey,
+        ownerUserId: lead.assignedTo,
+        sessionId: session.id,
+      })
     }
     for (const objectionKey of diff.newObjections) {
       await emitGrowthLeadRealtimeObjectionDetectedTimeline(admin, {
@@ -82,6 +93,14 @@ async function recomputeAndPersistSnapshot(
         objectionKey,
         actor,
       })
+      await emitGrowthCoachingSignalNotification(admin, {
+        leadId: session.leadId,
+        companyName: lead.companyName,
+        notificationType: "objection_detected",
+        signalKey: objectionKey,
+        ownerUserId: lead.assignedTo,
+        sessionId: session.id,
+      })
     }
     for (const area of diff.newDiscoveryGaps) {
       await emitGrowthLeadRealtimeDiscoveryGapDetectedTimeline(admin, {
@@ -89,6 +108,14 @@ async function recomputeAndPersistSnapshot(
         sessionId: session.id,
         area,
         actor,
+      })
+      await emitGrowthCoachingSignalNotification(admin, {
+        leadId: session.leadId,
+        companyName: lead.companyName,
+        notificationType: "discovery_gap_detected",
+        signalKey: area,
+        ownerUserId: lead.assignedTo,
+        sessionId: session.id,
       })
     }
     for (const riskFlag of diff.newRiskFlags) {
