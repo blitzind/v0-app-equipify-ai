@@ -8,6 +8,12 @@ import path from "node:path"
 import { z } from "zod"
 import { GROWTH_LEAD_HARD_DELETE_ENABLED } from "../lib/growth/lead-archive"
 import {
+  GROWTH_LEAD_ARCHIVE_SCHEMA_PUBLIC_MESSAGE,
+  GrowthLeadArchiveSchemaIncompleteError,
+  isGrowthLeadArchiveSchemaIncompleteErrorCode,
+  mapGrowthLeadArchiveApiError,
+} from "../lib/growth/lead-archive-api-errors"
+import {
   friendlyLeadContactValidationError,
   normalizeLeadContactPhone,
   normalizeLeadContactWebsite,
@@ -43,17 +49,42 @@ assert.ok(BulkArchiveBodySchema.safeParse({ leadIds: sampleIds }).success)
 assert.ok(!BulkArchiveBodySchema.safeParse({ leadIds: [] }).success)
 assert.ok(!BulkArchiveBodySchema.safeParse({ leadIds: ["not-a-uuid"] }).success)
 
+const schemaIncomplete = mapGrowthLeadArchiveApiError(new GrowthLeadArchiveSchemaIncompleteError())
+assert.equal(schemaIncomplete.status, 503)
+assert.equal(schemaIncomplete.error, "growth_lead_archive_schema_incomplete")
+assert.equal(schemaIncomplete.message, GROWTH_LEAD_ARCHIVE_SCHEMA_PUBLIC_MESSAGE)
+assert.ok(isGrowthLeadArchiveSchemaIncompleteErrorCode(schemaIncomplete.error))
+
 const repoSource = fs.readFileSync(path.join(process.cwd(), "lib/growth/lead-repository.ts"), "utf8")
-assert.match(repoSource, /\.is\("archived_at", null\)/, "listGrowthLeads excludes archived rows by default")
-assert.match(repoSource, /archived_at: now/, "archiveGrowthLeads sets archived_at")
-assert.match(repoSource, /status: "archived"/, "archiveGrowthLeads sets status archived")
+assert.match(repoSource, /probeGrowthLeadArchiveSchema/, "lead repository probes archive schema")
+assert.match(repoSource, /LEAD_SELECT_CORE/, "lead repository has core select without archive columns")
+assert.match(repoSource, /leadSelectFor\(archiveReady\)/, "lead repository chooses select based on schema")
+assert.match(repoSource, /\.is\("archived_at", null\)/, "listGrowthLeads excludes archived rows when schema ready")
+assert.match(repoSource, /\.neq\("status", "archived"\)/, "listGrowthLeads fallback excludes archived status pre-migration")
+assert.match(repoSource, /GrowthLeadArchiveSchemaIncompleteError/, "archive requires migration when schema missing")
 assert.doesNotMatch(repoSource, /\.delete\(\)/, "lead repository must not hard-delete growth.leads")
+
+const leadsRouteSource = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/leads/route.ts"),
+  "utf8",
+)
+assert.match(leadsRouteSource, /archiveSchemaReady/, "list API exposes archive schema readiness")
+
+const pageSource = fs.readFileSync(
+  path.join(process.cwd(), "app/(admin)/admin/growth/leads/page.tsx"),
+  "utf8",
+)
+assert.match(pageSource, /onArchiveLead=\{archiveLead\}/, "page wires archiveLead handler")
+assert.match(pageSource, /onBulkArchive=\{bulkArchiveLeads\}/, "page wires bulkArchiveLeads handler")
+assert.match(pageSource, /archiveAvailable=\{archiveSchemaReady\}/, "page passes archive availability to table")
+assert.doesNotMatch(pageSource, /onDeleteLead|updateLeadStatus|deletingLeadId/, "page no longer uses delete/status props")
 
 const deleteRoute = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/leads/[leadId]/route.ts"),
   "utf8",
 )
 assert.match(deleteRoute, /archiveGrowthLeads|deleteGrowthLead/, "DELETE route archives instead of hard delete")
+assert.match(deleteRoute, /mapGrowthLeadArchiveApiError/, "DELETE route maps migration-needed errors")
 
 const tableSource = fs.readFileSync(path.join(process.cwd(), "components/growth/growth-leads-table.tsx"), "utf8")
 assert.match(tableSource, /GrowthCallActionSheet/, "table uses GrowthCallActionSheet for calls")
@@ -61,7 +92,8 @@ assert.match(tableSource, /mailto:/, "table exposes mailto when email exists")
 assert.match(tableSource, /No email on lead/, "email quick action disabled tooltip")
 assert.match(tableSource, /No phone on lead/, "phone quick action disabled tooltip")
 assert.match(tableSource, /Archive Selected/, "bulk archive toolbar label")
-assert.match(tableSource, /Archive Lead/, "row archive action")
+assert.match(tableSource, /archiveAvailable/, "table respects archive availability")
+assert.match(tableSource, /sourceKind\?\.replace/, "table handles missing source kind safely")
 
 const editDialogSource = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-lead-edit-contact-dialog.tsx"),
@@ -90,5 +122,17 @@ assert.deepEqual(quickActionsAvailable({ contactEmail: "", contactPhone: null })
   emailEnabled: false,
   openEnabled: true,
 })
+assert.deepEqual(quickActionsAvailable({ contactEmail: undefined, contactPhone: undefined }), {
+  callEnabled: false,
+  emailEnabled: false,
+  openEnabled: true,
+})
+
+function leadSelectFor(archiveReady: boolean): "full" | "core" {
+  return archiveReady ? "full" : "core"
+}
+
+assert.equal(leadSelectFor(false), "core", "list loads without archive columns")
+assert.equal(leadSelectFor(true), "full", "list uses archive columns when ready")
 
 console.log("growth leads inbox tests passed")

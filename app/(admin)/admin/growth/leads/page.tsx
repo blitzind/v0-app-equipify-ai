@@ -16,6 +16,7 @@ import {
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import type { GrowthLead } from "@/lib/growth/types"
+import { GROWTH_LEAD_ARCHIVE_SCHEMA_PUBLIC_MESSAGE, isGrowthLeadArchiveSchemaIncompleteErrorCode } from "@/lib/growth/lead-archive-api-errors"
 import {
   applyGrowthCommandLeadFocusExpand,
   scrollGrowthCommandLeadFocusSection,
@@ -37,6 +38,7 @@ export default function AdminGrowthLeadsPage() {
   const [saving, setSaving] = useState(false)
   const [archivingLeadId, setArchivingLeadId] = useState<string | null>(null)
   const [bulkArchiving, setBulkArchiving] = useState(false)
+  const [archiveSchemaReady, setArchiveSchemaReady] = useState(true)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [selectedLead, setSelectedLead] = useState<GrowthLead | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -59,6 +61,7 @@ export default function AdminGrowthLeadsPage() {
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
         leads?: GrowthLead[]
+        meta?: { archiveSchemaReady?: boolean }
         message?: string
         error?: string
       }
@@ -66,6 +69,7 @@ export default function AdminGrowthLeadsPage() {
         throw new Error(data.message ?? data.error ?? "Could not load growth leads.")
       }
       setLeads(data.leads ?? [])
+      setArchiveSchemaReady(data.meta?.archiveSchemaReady ?? true)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load growth leads.")
     } finally {
@@ -141,19 +145,37 @@ export default function AdminGrowthLeadsPage() {
     setSelectedLead((prev) => (prev && prev.id === leadId ? { ...prev, ...patch } : prev))
   }
 
-  async function deleteLead(lead: GrowthLead) {
-    setDeletingLeadId(lead.id)
+  function handleLeadSaved(lead: GrowthLead) {
+    setLeads((prev) => prev.map((item) => (item.id === lead.id ? lead : item)))
+    setSelectedLead((prev) => (prev && prev.id === lead.id ? lead : prev))
+    setSuccessMessage(`Updated contact info for “${lead.companyName}”.`)
+  }
+
+  function archiveErrorMessage(data: { message?: string; error?: string }): string {
+    if (isGrowthLeadArchiveSchemaIncompleteErrorCode(data.error)) {
+      return data.message ?? GROWTH_LEAD_ARCHIVE_SCHEMA_PUBLIC_MESSAGE
+    }
+    return data.message ?? data.error ?? "Could not archive growth lead."
+  }
+
+  async function archiveLead(lead: GrowthLead) {
+    setArchivingLeadId(lead.id)
     setError(null)
     setSuccessMessage(null)
     try {
-      const res = await fetch(`/api/platform/growth/leads/${lead.id}`, { method: "DELETE" })
+      const res = await fetch("/api/platform/growth/leads/bulk-archive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadIds: [lead.id] }),
+      })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
+        archivedCount?: number
         message?: string
         error?: string
       }
       if (!res.ok || !data.ok) {
-        throw new Error(data.message ?? data.error ?? "Could not delete growth lead.")
+        throw new Error(archiveErrorMessage(data))
       }
 
       setLeads((prev) => prev.filter((item) => item.id !== lead.id))
@@ -161,11 +183,46 @@ export default function AdminGrowthLeadsPage() {
         setSelectedLead(null)
         setDrawerOpen(false)
       }
-      setSuccessMessage(`Deleted Growth Lead “${lead.companyName}”. Customer Prospects were not affected.`)
+      setSuccessMessage(`Archived Growth Lead “${lead.companyName}”. Timeline and call history were preserved.`)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not delete growth lead.")
+      setError(e instanceof Error ? e.message : "Could not archive growth lead.")
     } finally {
-      setDeletingLeadId(null)
+      setArchivingLeadId(null)
+    }
+  }
+
+  async function bulkArchiveLeads(leadIds: string[]) {
+    if (leadIds.length === 0) return
+    setBulkArchiving(true)
+    setError(null)
+    setSuccessMessage(null)
+    try {
+      const res = await fetch("/api/platform/growth/leads/bulk-archive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadIds }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        archivedCount?: number
+        message?: string
+        error?: string
+      }
+      if (!res.ok || !data.ok) {
+        throw new Error(archiveErrorMessage(data))
+      }
+
+      const archivedSet = new Set(leadIds)
+      setLeads((prev) => prev.filter((item) => !archivedSet.has(item.id)))
+      if (selectedLead && archivedSet.has(selectedLead.id)) {
+        setSelectedLead(null)
+        setDrawerOpen(false)
+      }
+      setSuccessMessage(`Archived ${data.archivedCount ?? leadIds.length} growth leads. Timeline and call history were preserved.`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not archive selected leads.")
+    } finally {
+      setBulkArchiving(false)
     }
   }
 
@@ -224,6 +281,12 @@ export default function AdminGrowthLeadsPage() {
           </div>
         ) : null}
 
+        {!archiveSchemaReady ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            {GROWTH_LEAD_ARCHIVE_SCHEMA_PUBLIC_MESSAGE} Archive actions stay disabled until the migration is applied.
+          </div>
+        ) : null}
+
         {loading ? (
           <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
             <Loader2 className="mr-2 size-4 animate-spin" />
@@ -232,11 +295,12 @@ export default function AdminGrowthLeadsPage() {
         ) : (
           <GrowthLeadsTable
             leads={leads}
-            onStatusChange={updateLeadStatus}
             onOpenLead={openLead}
-            onDeleteLead={deleteLead}
-            updatingLeadId={updatingLeadId}
-            deletingLeadId={deletingLeadId}
+            onArchiveLead={archiveLead}
+            onBulkArchive={bulkArchiveLeads}
+            archivingLeadId={archivingLeadId}
+            bulkArchiving={bulkArchiving}
+            archiveAvailable={archiveSchemaReady}
           />
         )}
         </GrowthSectionLayout>

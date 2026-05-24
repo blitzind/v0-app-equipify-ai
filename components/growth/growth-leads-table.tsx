@@ -39,6 +39,7 @@ type GrowthLeadsTableProps = {
   onBulkArchive?: (leadIds: string[]) => Promise<void>
   archivingLeadId?: string | null
   bulkArchiving?: boolean
+  archiveAvailable?: boolean
 }
 
 export function GrowthLeadsTable({
@@ -48,12 +49,13 @@ export function GrowthLeadsTable({
   onBulkArchive,
   archivingLeadId = null,
   bulkArchiving = false,
+  archiveAvailable = true,
 }: GrowthLeadsTableProps) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [archiveTarget, setArchiveTarget] = useState<GrowthLead | "bulk" | null>(null)
   const [callTarget, setCallTarget] = useState<GrowthLead | null>(null)
 
-  const visibleIds = useMemo(() => leads.map((lead) => lead.id), [leads])
+  const visibleIds = useMemo(() => (Array.isArray(leads) ? leads : []).map((lead) => lead.id), [leads])
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id))
   const someVisibleSelected = visibleIds.some((id) => selectedIds.has(id))
 
@@ -110,7 +112,7 @@ export function GrowthLeadsTable({
   return (
     <TooltipProvider delayDuration={200}>
       <>
-        {selectedCount > 0 ? (
+        {selectedCount > 0 && archiveAvailable ? (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
             <p className="text-sm font-medium">{selectedCount} selected</p>
             <div className="flex flex-wrap gap-2">
@@ -118,7 +120,7 @@ export function GrowthLeadsTable({
                 size="sm"
                 variant="outline"
                 className="text-destructive hover:text-destructive"
-                disabled={bulkArchiving}
+                disabled={bulkArchiving || !archiveAvailable}
                 onClick={() => setArchiveTarget("bulk")}
               >
                 {bulkArchiving ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Archive className="mr-2 size-4" />}
@@ -157,6 +159,8 @@ export function GrowthLeadsTable({
                 const nbaLabel = lead.nextBestAction
                   ? GROWTH_NEXT_BEST_ACTION_LABELS[lead.nextBestAction] ?? lead.nextBestAction.replace(/_/g, " ")
                   : "—"
+                const sourceLabel = lead.sourceChannel ?? lead.sourceKind?.replace(/_/g, " ") ?? "—"
+                const priorityLabel = lead.researchPriority ?? "—"
 
                 return (
                   <tr key={lead.id} className="hover:bg-muted/30">
@@ -179,10 +183,10 @@ export function GrowthLeadsTable({
                       {phone ? <div className="text-xs text-muted-foreground">{phone}</div> : null}
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <div className="capitalize">{lead.sourceChannel ?? lead.sourceKind.replace(/_/g, " ")}</div>
+                      <div className="capitalize">{sourceLabel}</div>
                       {lead.sourceCampaign ? <div className="text-xs text-muted-foreground">{lead.sourceCampaign}</div> : null}
                     </td>
-                    <td className="px-4 py-3 align-top capitalize text-muted-foreground">{lead.researchPriority}</td>
+                    <td className="px-4 py-3 align-top capitalize text-muted-foreground">{priorityLabel}</td>
                     <td className="px-4 py-3 align-top text-muted-foreground">{nbaLabel}</td>
                     <td className="px-4 py-3 align-top">
                       <div className="flex flex-wrap items-center gap-1">
@@ -238,12 +242,14 @@ export function GrowthLeadsTable({
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => onOpenLead?.(lead)}>Open Lead</DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => setArchiveTarget(lead)}
-                            >
-                              Archive Lead
-                            </DropdownMenuItem>
+                            {archiveAvailable ? (
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => setArchiveTarget(lead)}
+                              >
+                                Archive Lead
+                              </DropdownMenuItem>
+                            ) : null}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>

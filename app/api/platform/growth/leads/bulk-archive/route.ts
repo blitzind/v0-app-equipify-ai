@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { archiveGrowthLeads, fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { mapGrowthLeadArchiveApiError } from "@/lib/growth/lead-archive-api-errors"
 import { emitGrowthLeadStatusChangedTimeline } from "@/lib/growth/timeline-emitter"
 
 export const runtime = "nodejs"
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, archived, archivedCount: archived.length })
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "archive_failed", message }, { status: 500 })
+    const mapped = mapGrowthLeadArchiveApiError(e)
+    return NextResponse.json({ error: mapped.error, message: mapped.message }, { status: mapped.status })
   }
 }

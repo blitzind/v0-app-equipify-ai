@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
-import { createGrowthLead, listGrowthLeads } from "@/lib/growth/lead-repository"
+import { createGrowthLead, isGrowthLeadArchiveSchemaReady, listGrowthLeads } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { emitGrowthLeadCreatedTimeline } from "@/lib/growth/timeline-emitter"
 import { GROWTH_LEAD_SOURCE_KINDS, GROWTH_LEAD_STATUSES, GROWTH_LEAD_RESEARCH_PRIORITIES } from "@/lib/growth/types"
@@ -47,13 +47,17 @@ export async function GET(request: Request) {
       : undefined
 
   try {
-    const leads = await listGrowthLeads(access.admin, { status: statusParsed })
+    const [leads, archiveSchemaReady] = await Promise.all([
+      listGrowthLeads(access.admin, { status: statusParsed }),
+      isGrowthLeadArchiveSchemaReady(access.admin),
+    ])
     logGrowthEngine("lead_list_success", {
       count: leads.length,
       statusFilter: statusParsed ?? null,
+      archiveSchemaReady,
       actorEmail: access.userEmail,
     })
-    return NextResponse.json({ ok: true, leads })
+    return NextResponse.json({ ok: true, leads, meta: { archiveSchemaReady } })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ error: "query_failed", message }, { status: 500 })

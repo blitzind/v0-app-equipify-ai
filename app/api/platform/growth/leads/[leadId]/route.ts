@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchGrowthLeadById, updateGrowthLead, archiveGrowthLeads } from "@/lib/growth/lead-repository"
+import { mapGrowthLeadArchiveApiError } from "@/lib/growth/lead-archive-api-errors"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import {
@@ -255,7 +256,7 @@ export async function DELETE(
 
     return NextResponse.json({ ok: true, leadId, lead: archived[0] })
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "archive_failed", message }, { status: 500 })
+    const mapped = mapGrowthLeadArchiveApiError(e)
+    return NextResponse.json({ error: mapped.error, message: mapped.message }, { status: mapped.status })
   }
 }
