@@ -149,6 +149,7 @@ export function GrowthLeadsTable({
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Source</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Priority</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Next Best Action</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Owner</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Quick Actions</th>
               </tr>
             </thead>
@@ -188,6 +189,13 @@ export function GrowthLeadsTable({
                     </td>
                     <td className="px-4 py-3 align-top capitalize text-muted-foreground">{priorityLabel}</td>
                     <td className="px-4 py-3 align-top text-muted-foreground">{nbaLabel}</td>
+                    <td className="px-4 py-3 align-top">
+                      {lead.assignedTo ? (
+                        <span className="text-sm text-foreground">Assigned</span>
+                      ) : (
+                        <span className="text-sm text-amber-700">Unassigned</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 align-top">
                       <div className="flex flex-wrap items-center gap-1">
                         {phone ? (

@@ -27,6 +27,10 @@ export async function GET(request: Request) {
   const offsetParam = url.searchParams.get("offset")
   const limitParsed = limitParam ? z.coerce.number().int().min(1).max(100).safeParse(limitParam) : { success: true, data: 50 }
   const offsetParsed = offsetParam ? z.coerce.number().int().min(0).safeParse(offsetParam) : { success: true, data: 0 }
+  const assignedToParam = url.searchParams.get("assignedTo")
+  const unassignedParam = url.searchParams.get("unassigned") === "true"
+  const assignedToParsed =
+    assignedToParam && z.string().uuid().safeParse(assignedToParam).success ? assignedToParam : undefined
 
   if (!limitParsed.success || !offsetParsed.success) {
     return NextResponse.json({ error: "invalid_pagination", message: "Invalid limit or offset." }, { status: 400 })
@@ -37,6 +41,8 @@ export async function GET(request: Request) {
       filter: filterParsed,
       limit: limitParsed.data,
       offset: offsetParsed.data,
+      assignedTo: assignedToParsed,
+      unassigned: unassignedParam || undefined,
     })
 
     logGrowthEngine("call_queue_list_success", {

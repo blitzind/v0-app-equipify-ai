@@ -76,6 +76,7 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
             onLeadUpdated={handleLeadUpdated}
             onLeadSaved={onLeadSaved}
             onAddDecisionMaker={handleAddDecisionMaker}
+            onTimelineRefresh={() => setTimelineRefreshToken((token) => token + 1)}
           />
 
           <GrowthExecutiveOperatingIntelligence lead={activeLead} />

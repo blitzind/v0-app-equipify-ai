@@ -148,6 +148,7 @@ export function GrowthCallQueueTable({
               <th className="px-3 py-3 text-left font-medium text-muted-foreground">Engagement</th>
               <th className="px-3 py-3 text-left font-medium text-muted-foreground">Health</th>
               <th className="px-3 py-3 text-left font-medium text-muted-foreground">Company</th>
+              <th className="px-3 py-3 text-left font-medium text-muted-foreground">Owner</th>
               <th className="px-3 py-3 text-left font-medium text-muted-foreground">Decision maker</th>
               <th className="px-3 py-3 text-left font-medium text-muted-foreground">Contact</th>
               <th className="px-3 py-3 text-left font-medium text-muted-foreground">Next action</th>
@@ -202,6 +203,13 @@ export function GrowthCallQueueTable({
                         </div>
                       ) : null}
                     </button>
+                  </td>
+                  <td className="px-3 py-3 align-top">
+                    {row.assignedToLabel ? (
+                      <span className="text-sm">{row.assignedToLabel}</span>
+                    ) : (
+                      <span className="text-sm text-amber-700">Unassigned</span>
+                    )}
                   </td>
                   <td className="px-3 py-3 align-top max-w-[8rem]">
                     <div className="text-sm">{row.primaryDecisionMakerName ?? "—"}</div>

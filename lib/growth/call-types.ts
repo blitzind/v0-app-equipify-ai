@@ -122,4 +122,7 @@ export type GrowthCallQueueRow = {
   executiveInterventionAgeBucket: string | null
   operationalCapacityScore: number | null
   capacityPressureLevel: number | null
+  assignedTo: string | null
+  assignedToLabel: string | null
+  assignmentSource: string | null
 }

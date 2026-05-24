@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { GrowthNextBestActionBanner } from "@/components/growth/growth-next-best-action-banner"
+import { GrowthLeadAssignmentPanel } from "@/components/growth/growth-lead-assignment-panel"
 import { GrowthCallActionSheet } from "@/components/growth/growth-call-action-sheet"
 import {
   GrowthBadge,
@@ -340,6 +341,13 @@ export function GrowthLeadCommandCenter({
           ) : null}
         </div>
       </GrowthEngineCard>
+
+      <GrowthLeadAssignmentPanel
+        lead={lead}
+        compact
+        onLeadUpdated={onLeadUpdated}
+        onTimelineRefresh={onTimelineRefresh}
+      />
 
       <Dialog open={followUpOpen} onOpenChange={(open) => !followUpSaving && setFollowUpOpen(open)}>
         <DialogContent>

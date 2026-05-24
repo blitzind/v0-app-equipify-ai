@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 574,
-  sqlMigrations: 241,
+  apiRouteHandlers: 579,
+  sqlMigrations: 242,
   dashboardPages: 65,
-  componentsTsx: 397,
-  libTsFiles: 1298,
+  componentsTsx: 399,
+  libTsFiles: 1306,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **574** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **241** |
+| API route handlers (\`app/api/**/route.ts\`) | **579** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **242** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **397** |
-| \`lib/**/*.ts\` | **1298** |
+| \`components/**/*.tsx\` | **399** |
+| \`lib/**/*.ts\` | **1306** |
 
 ### Vercel crons
 
@@ -450,6 +450,10 @@ platform/blitzpay/reminder-dispatch/route.ts
 platform/blitzpay/reminder-runs/route.ts
 platform/blitzpay/revenue-rollup/route.ts
 platform/feature-requests/route.ts
+platform/growth/assignment/dashboard/route.ts
+platform/growth/assignment/reps/route.ts
+platform/growth/assignment/run/route.ts
+platform/growth/assignment/settings/route.ts
 platform/growth/call-queue/route.ts
 platform/growth/calls/dashboard/route.ts
 platform/growth/calls/live-coaching/dashboard/route.ts
@@ -483,6 +487,7 @@ platform/growth/import-batches/route.ts
 platform/growth/import-mapping-profiles/route.ts
 platform/growth/import-vendors/route.ts
 platform/growth/leads/[leadId]/activity-stream/route.ts
+platform/growth/leads/[leadId]/assign/route.ts
 platform/growth/leads/[leadId]/call-copilot/sessions/[sessionId]/approve-disposition/route.ts
 platform/growth/leads/[leadId]/call-copilot/sessions/[sessionId]/approve-summary/route.ts
 platform/growth/leads/[leadId]/call-copilot/sessions/[sessionId]/complete/route.ts

@@ -88,6 +88,9 @@ export async function recomputeGrowthLeadNextBestAction(
     recommendedSequencePatternId: lead.recommendedSequencePatternId,
     recommendedSequenceConfidence: lead.recommendedSequenceConfidence,
     sequenceFatigueRisk: lead.sequenceFatigueRisk,
+    assignedTo: lead.assignedTo,
+    assignedAt: lead.assignedAt,
+    lastHumanTouchAt: lead.lastHumanTouchAt,
   })
 
   const now = new Date().toISOString()

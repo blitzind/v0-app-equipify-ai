@@ -197,7 +197,7 @@ async function queueSequenceStepOutreach(
     }),
     providerConnectionId: input.providerConnectionId,
     payloadSnapshot: payload,
-    createdBy: input.actingUserId,
+    createdBy: lead.assignedTo ?? input.actingUserId,
     sequencePatternId: input.sequencePatternId,
     sequenceEnrollmentStepId: input.step.id,
   })
@@ -216,6 +216,7 @@ async function queueSequenceStepOutreach(
       sequenceEnrollmentId: input.enrollmentId,
       sequenceStepId: input.step.id,
       schedulerIdempotencyKey: idempotencyKey,
+      ownerUserId: lead.assignedTo,
     },
   })
 

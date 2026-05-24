@@ -333,7 +333,7 @@ export function GrowthCommandCenterDashboard() {
             </div>
           </div>
 
-          <div className="relative grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="relative grid gap-5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
             <StatTile
               label="Critical Actions"
               value={mission.criticalActions}
@@ -352,6 +352,16 @@ export function GrowthCommandCenterDashboard() {
             <StatTile
               label="Stalled Opportunities"
               value={mission.stalledOpportunities}
+              className="border-border/70 bg-card shadow-xs"
+            />
+            <StatTile
+              label="Unassigned"
+              value={mission.ownershipGaps}
+              className="border-border/70 bg-card shadow-xs"
+            />
+            <StatTile
+              label="High-priority unassigned"
+              value={mission.unassignedHighPriority}
               className="border-border/70 bg-card shadow-xs"
             />
             <StatTile

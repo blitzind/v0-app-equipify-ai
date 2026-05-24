@@ -7,6 +7,9 @@ export const GROWTH_LEAD_SOURCE_KINDS = [
   "other",
 ] as const
 
+import type { GrowthLeadAssignmentSource } from "@/lib/growth/assignment/assignment-types"
+
+export type { GrowthLeadAssignmentSource } from "@/lib/growth/assignment/assignment-types"
 import type { GrowthContactTemperature } from "@/lib/growth/outbound/types"
 import type { GrowthEngagementTier, GrowthEngagementTopSignal } from "@/lib/growth/engagement-types"
 import type {
@@ -248,6 +251,9 @@ export type GrowthLead = {
   archiveReason: string | null
   createdBy: string | null
   assignedTo: string | null
+  assignedAt: string | null
+  assignedBy: string | null
+  assignmentSource: GrowthLeadAssignmentSource | null
   createdAt: string
   updatedAt: string
 }
@@ -324,6 +330,9 @@ export type UpdateGrowthLeadInput = {
 export type ListGrowthLeadsInput = {
   status?: GrowthLeadStatus
   includeArchived?: boolean
+  assignedTo?: string
+  unassigned?: boolean
+  assignmentSource?: GrowthLeadAssignmentSource
   limit?: number
   offset?: number
 }

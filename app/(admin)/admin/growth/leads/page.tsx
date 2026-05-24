@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Loader2, Plus, RefreshCw, Target } from "lucide-react"
+import Link from "next/link"
+import { Loader2, Plus, RefreshCw, Target, Users } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useAdmin } from "@/lib/admin-store"
 import { Button } from "@/components/ui/button"
@@ -44,6 +45,8 @@ export default function AdminGrowthLeadsPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const drawerFocus = searchParams.get("focus")
   const deepLinkLeadId = searchParams.get("open")
+  const assignedToFilter = searchParams.get("assignedTo")
+  const unassignedFilter = searchParams.get("unassigned") === "true"
 
   const counts = useMemo(() => {
     return leads.reduce<Record<string, number>>((acc, lead) => {
@@ -57,7 +60,11 @@ export default function AdminGrowthLeadsPage() {
     setError(null)
     setSuccessMessage(null)
     try {
-      const res = await fetch("/api/platform/growth/leads", { cache: "no-store" })
+      const params = new URLSearchParams()
+      if (assignedToFilter) params.set("assignedTo", assignedToFilter)
+      if (unassignedFilter) params.set("unassigned", "true")
+      const query = params.toString()
+      const res = await fetch(`/api/platform/growth/leads${query ? `?${query}` : ""}`, { cache: "no-store" })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
         leads?: GrowthLead[]
@@ -79,7 +86,7 @@ export default function AdminGrowthLeadsPage() {
 
   useEffect(() => {
     void load()
-  }, [])
+  }, [assignedToFilter, unassignedFilter])
 
   useEffect(() => {
     if (!deepLinkLeadId || loading) return
@@ -247,6 +254,21 @@ export default function AdminGrowthLeadsPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/admin/growth/ownership">
+                  <Users className="mr-2 size-4" />
+                  Ownership
+                </Link>
+              </Button>
+              <Button
+                variant={unassignedFilter ? "default" : "outline"}
+                size="sm"
+                asChild
+              >
+                <Link href={unassignedFilter ? "/admin/growth/leads" : "/admin/growth/leads?unassigned=true"}>
+                  Unassigned
+                </Link>
+              </Button>
               <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
                 {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}
                 Refresh

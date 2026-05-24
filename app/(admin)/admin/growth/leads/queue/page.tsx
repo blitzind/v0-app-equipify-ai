@@ -71,13 +71,16 @@ export default function AdminGrowthCallQueuePage() {
   const [selectedLead, setSelectedLead] = useState<GrowthLead | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [openingLeadId, setOpeningLeadId] = useState<string | null>(null)
+  const [ownerFilter, setOwnerFilter] = useState<"all" | "unassigned" | "mine">("all")
 
   const load = useCallback(async (activeFilter: GrowthCallQueueFilter) => {
     setLoading(true)
     setError(null)
     setSuccessMessage(null)
     try {
-      const res = await fetch(`/api/platform/growth/call-queue?filter=${activeFilter}`, { cache: "no-store" })
+      const params = new URLSearchParams({ filter: activeFilter })
+      if (ownerFilter === "unassigned") params.set("unassigned", "true")
+      const res = await fetch(`/api/platform/growth/call-queue?${params.toString()}`, { cache: "no-store" })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
         rows?: GrowthCallQueueRow[]
@@ -93,11 +96,11 @@ export default function AdminGrowthCallQueuePage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [ownerFilter])
 
   useEffect(() => {
     void load(filter)
-  }, [filter, load])
+  }, [filter, load, ownerFilter])
 
   async function openLead(leadId: string) {
     setOpeningLeadId(leadId)
@@ -188,6 +191,24 @@ export default function AdminGrowthCallQueuePage() {
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
+            {(["all", "unassigned"] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setOwnerFilter(item)}
+                className={cn(
+                  "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                  ownerFilter === item
+                    ? "border-indigo-200 bg-indigo-50 text-indigo-800"
+                    : "border-border bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                )}
+              >
+                {item === "all" ? "All owners" : "Unassigned only"}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
             {GROWTH_CALL_QUEUE_FILTERS.map((item) => (
               <button
                 key={item}

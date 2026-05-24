@@ -40,6 +40,9 @@ export type NextBestActionInput = {
   recommendedNextAction: string | null
   decisionMakerStatus: GrowthDecisionMakerPresenceStatus | null
   primaryDecisionMakerPhone: string | null
+  assignedTo?: string | null
+  assignedAt?: string | null
+  lastHumanTouchAt?: string | null
   emailSummary?: GrowthLeadEmailEventSummary
   engagementTier?: GrowthEngagementTier | null
   engagementLastActivityAt?: string | null
@@ -153,6 +156,27 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
   const capacityTier = input.operationalCapacityTier ?? null
   const capacityConstraints = new Set(input.operationalConstraintKeys ?? [])
   const isProtected = input.isProtectedOpportunity ?? false
+
+  if (
+    !input.assignedTo &&
+    (executiveTier === "executive_now" || executiveTier === "priority" || (engagementTier === "hot" && fit >= 70))
+  ) {
+    return buildResult(
+      "escalate_owner_review",
+      "High-priority lead has no assigned owner — assign ownership before next action.",
+      ["Unassigned ownership gap"],
+      "high",
+    )
+  }
+
+  if (input.assignedTo && !input.lastHumanTouchAt && fit >= 60) {
+    return buildResult(
+      "owner_follow_up",
+      "Assigned owner should take first follow-up on this lead.",
+      ["Assigned owner action"],
+      "medium",
+    )
+  }
 
   if (executiveTier === "executive_now") {
     return buildResult(

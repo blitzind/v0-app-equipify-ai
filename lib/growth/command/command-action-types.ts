@@ -83,6 +83,8 @@ export type GrowthCommandMissionControl = {
   approvalsWaiting: number
   stalledOpportunities: number
   pipelineProtected: number
+  unassignedHighPriority: number
+  ownershipGaps: number
   momentumState: GrowthCommandMomentumState
   momentumLabel: string
 }

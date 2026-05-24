@@ -1291,3 +1291,109 @@ export async function emitGrowthLeadLiveGuidanceUsedTimeline(
     actor: input.actor,
   })
 }
+
+export async function emitGrowthLeadAssignedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    assignedToUserId: string
+    assignedToLabel: string
+    source: string
+    actor?: Actor
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "lead_assigned",
+    title: "Lead assigned",
+    summary: input.assignedToLabel,
+    payload: { assignedToUserId: input.assignedToUserId, source: input.source },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}
+
+export async function emitGrowthLeadReassignedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    fromUserId: string
+    toUserId: string
+    toLabel: string
+    source: string
+    actor?: Actor
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "lead_reassigned",
+    title: "Lead reassigned",
+    summary: input.toLabel,
+    payload: { fromUserId: input.fromUserId, toUserId: input.toUserId, source: input.source },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}
+
+export async function emitGrowthLeadUnassignedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    previousOwnerId: string
+    reason?: string | null
+    actor?: Actor
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "lead_unassigned",
+    title: "Lead unassigned",
+    summary: input.reason ?? "Ownership cleared",
+    payload: { previousOwnerId: input.previousOwnerId, reason: input.reason ?? null },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}
+
+export async function emitGrowthLeadAssignmentRuleAppliedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    assignedToUserId: string
+    assignedToLabel: string
+    reasons: string[]
+    actor?: Actor
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "assignment_rule_applied",
+    title: "Assignment rule applied",
+    summary: input.assignedToLabel,
+    payload: {
+      assignedToUserId: input.assignedToUserId,
+      reasons: input.reasons,
+    },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}
+
+export async function emitGrowthLeadAssignmentSkippedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    reason: string
+    actor?: Actor
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "assignment_skipped",
+    title: "Assignment skipped",
+    summary: input.reason.replace(/_/g, " "),
+    payload: { reason: input.reason },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}

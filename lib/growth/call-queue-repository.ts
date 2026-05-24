@@ -5,6 +5,7 @@ import { computeGrowthCallPriority, matchesCallQueueFilter } from "@/lib/growth/
 import type { GrowthCallQueueFilter, GrowthCallQueueRow } from "@/lib/growth/call-types"
 import { fetchGrowthLeadDecisionMakerById } from "@/lib/growth/decision-maker-repository"
 import { listGrowthLeads } from "@/lib/growth/lead-repository"
+import { resolveGrowthRepLabels } from "@/lib/growth/assignment/rep-roster-repository"
 import {
   fetchGrowthLeadResearchNotes,
   fetchLatestUsableGrowthLeadResearchRun,
@@ -25,9 +26,20 @@ export async function listGrowthCallQueue(
     filter: GrowthCallQueueFilter
     limit?: number
     offset?: number
+    assignedTo?: string | null
+    unassigned?: boolean
   },
 ): Promise<GrowthCallQueueRow[]> {
-  const leads = await listGrowthLeads(admin, { limit: 200, offset: 0 })
+  const leads = await listGrowthLeads(admin, {
+    limit: 200,
+    offset: 0,
+    assignedTo: input.assignedTo ?? undefined,
+    unassigned: input.unassigned,
+  })
+  const ownerLabels = await resolveGrowthRepLabels(
+    admin,
+    leads.map((lead) => lead.assignedTo).filter(Boolean) as string[],
+  )
   const now = new Date()
   const enriched: GrowthCallQueueRow[] = []
 
@@ -103,6 +115,7 @@ export async function listGrowthCallQueue(
         priority.whySummary,
         latestRun?.result?.recommendedNextAction ?? null,
         websiteFetchStatus,
+        lead.assignedTo ? ownerLabels.get(lead.assignedTo) ?? null : null,
       ),
     )
   }
@@ -145,6 +158,7 @@ async function buildQueueRow(
   whySummary: string,
   recommendedNextAction: string | null,
   websiteFetchStatus: string | null,
+  assignedToLabel: string | null,
 ): Promise<GrowthCallQueueRow> {
   let primaryDecisionMakerName: string | null = null
   if (lead.primaryDecisionMakerId) {
@@ -214,5 +228,8 @@ async function buildQueueRow(
     executiveInterventionAgeBucket: lead.executiveInterventionAgeBucket,
     operationalCapacityScore: lead.operationalCapacityScore,
     capacityPressureLevel: lead.capacityPressureLevel,
+    assignedTo: lead.assignedTo,
+    assignedToLabel,
+    assignmentSource: lead.assignmentSource,
   }
 }

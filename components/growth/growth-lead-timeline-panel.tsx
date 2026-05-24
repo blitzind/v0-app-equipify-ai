@@ -61,6 +61,12 @@ function eventMeta(eventType: GrowthLeadTimelineEventType): {
     case "import_updated":
     case "lead_created":
       return { icon: AlertTriangle }
+    case "lead_assigned":
+    case "lead_reassigned":
+    case "lead_unassigned":
+    case "assignment_rule_applied":
+    case "assignment_skipped":
+      return { icon: User }
     case "ai_copilot_generation_created":
     case "ai_copilot_generation_approved":
     case "playbook_conflict_detected":

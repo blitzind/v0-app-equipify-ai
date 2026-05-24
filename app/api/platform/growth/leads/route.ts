@@ -5,6 +5,7 @@ import { createGrowthLead, isGrowthLeadArchiveSchemaReady, listGrowthLeads } fro
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { emitGrowthLeadCreatedTimeline } from "@/lib/growth/timeline-emitter"
 import { GROWTH_LEAD_SOURCE_KINDS, GROWTH_LEAD_STATUSES, GROWTH_LEAD_RESEARCH_PRIORITIES } from "@/lib/growth/types"
+import { GROWTH_LEAD_ASSIGNMENT_SOURCES } from "@/lib/growth/assignment/assignment-types"
 
 export const runtime = "nodejs"
 
@@ -46,9 +47,28 @@ export async function GET(request: Request) {
       ? (statusParam as (typeof GROWTH_LEAD_STATUSES)[number])
       : undefined
 
+  const assignedToParam = url.searchParams.get("assignedTo")
+  const unassignedParam = url.searchParams.get("unassigned") === "true"
+  const assignmentSourceParam = url.searchParams.get("assignmentSource")
+  const assignmentSourceParsed =
+    assignmentSourceParam &&
+    GROWTH_LEAD_ASSIGNMENT_SOURCES.includes(
+      assignmentSourceParam as (typeof GROWTH_LEAD_ASSIGNMENT_SOURCES)[number],
+    )
+      ? (assignmentSourceParam as (typeof GROWTH_LEAD_ASSIGNMENT_SOURCES)[number])
+      : undefined
+
+  const assignedToParsed =
+    assignedToParam && z.string().uuid().safeParse(assignedToParam).success ? assignedToParam : undefined
+
   try {
     const [leads, archiveSchemaReady] = await Promise.all([
-      listGrowthLeads(access.admin, { status: statusParsed }),
+      listGrowthLeads(access.admin, {
+        status: statusParsed,
+        assignedTo: assignedToParsed,
+        unassigned: unassignedParam || undefined,
+        assignmentSource: assignmentSourceParsed,
+      }),
       isGrowthLeadArchiveSchemaReady(access.admin),
     ])
     logGrowthEngine("lead_list_success", {

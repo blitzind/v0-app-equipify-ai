@@ -32,7 +32,7 @@ import {
 import { isForecastRegression } from "@/lib/growth/revenue-forecast-trajectory"
 
 const LEAD_SCAN_SELECT =
-  "id, company_name, status, follow_up_at, next_best_action, next_best_action_reason, executive_priority_tier, revenue_probability_score, revenue_probability_tier, revenue_trajectory, revenue_probability_previous_score, forecast_contribution_weight, forecast_attention_level, conversation_urgency_level, conversation_health_tier, relationship_trend, engagement_tier, opportunity_readiness_tier, decision_maker_status, last_researched_at, operational_capacity_tier, workflow_health, contact_temperature"
+  "id, company_name, status, follow_up_at, next_best_action, next_best_action_reason, executive_priority_tier, revenue_probability_score, revenue_probability_tier, revenue_trajectory, revenue_probability_previous_score, forecast_contribution_weight, forecast_attention_level, conversation_urgency_level, conversation_health_tier, relationship_trend, engagement_tier, opportunity_readiness_tier, decision_maker_status, last_researched_at, operational_capacity_tier, workflow_health, contact_temperature, assigned_to, call_priority_tier, score"
 
 const WIN_EVENT_TYPES = new Set([
   "sequence_step_executed",
@@ -468,6 +468,17 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
   const protectionCurrent = todayStats.relationshipsRecovered + todayStats.forecastProtected
   const growthCurrent = todayStats.researchCompleted + todayStats.sequencesAdvanced
 
+  const unassignedHighPriority = leads.filter(
+    (lead) =>
+      !lead.assigned_to &&
+      (lead.executive_priority_tier === "executive_now" ||
+        lead.executive_priority_tier === "priority" ||
+        lead.call_priority_tier === "critical" ||
+        lead.call_priority_tier === "high" ||
+        (lead.score ?? 0) >= 70),
+  ).length
+  const ownershipGaps = leads.filter((lead) => !lead.assigned_to).length
+
   return {
     generatedAt: now,
     missionControl: {
@@ -476,6 +487,8 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
       approvalsWaiting,
       stalledOpportunities,
       pipelineProtected: protectionCurrent + growthCurrent,
+      unassignedHighPriority,
+      ownershipGaps,
       momentumState: momentum.state,
       momentumLabel: momentum.label,
     },
