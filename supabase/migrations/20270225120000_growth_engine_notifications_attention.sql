@@ -26,8 +26,7 @@ create table if not exists growth.notifications (
 
 create index if not exists idx_growth_notifications_owner_open
   on growth.notifications (owner_user_id, priority_score desc, created_at desc)
-  where completed_at is null
-    and (expires_at is null or expires_at > now());
+  where completed_at is null;
 
 create index if not exists idx_growth_notifications_lead
   on growth.notifications (lead_id, created_at desc)
@@ -41,8 +40,7 @@ create index if not exists idx_growth_notifications_hash
 
 create unique index if not exists idx_growth_notifications_active_hash
   on growth.notifications (deterministic_hash)
-  where completed_at is null
-    and (expires_at is null or expires_at > now());
+  where completed_at is null;
 
 alter table growth.lead_timeline_events
   drop constraint if exists lead_timeline_events_event_type_check;
