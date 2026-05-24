@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 566,
-  sqlMigrations: 235,
+  apiRouteHandlers: 567,
+  sqlMigrations: 236,
   dashboardPages: 65,
-  componentsTsx: 392,
-  libTsFiles: 1258,
+  componentsTsx: 393,
+  libTsFiles: 1267,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **566** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **235** |
+| API route handlers (\`app/api/**/route.ts\`) | **567** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **236** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **392** |
-| \`lib/**/*.ts\` | **1258** |
+| \`components/**/*.tsx\` | **393** |
+| \`lib/**/*.ts\` | **1267** |
 
 ### Vercel crons
 
@@ -498,6 +498,7 @@ platform/growth/leads/[leadId]/realtime-call/sessions/[sessionId]/audio-chunk/ro
 platform/growth/leads/[leadId]/realtime-call/sessions/[sessionId]/browser-audio-capture/route.ts
 platform/growth/leads/[leadId]/realtime-call/sessions/[sessionId]/guidance/[eventId]/route.ts
 platform/growth/leads/[leadId]/realtime-call/sessions/[sessionId]/route.ts
+platform/growth/leads/[leadId]/realtime-call/sessions/[sessionId]/timeline/route.ts
 platform/growth/leads/[leadId]/realtime-call/sessions/[sessionId]/transcript/route.ts
 platform/growth/leads/[leadId]/realtime-call/sessions/route.ts
 platform/growth/leads/[leadId]/research/notes/route.ts

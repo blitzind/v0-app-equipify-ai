@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useGrowthCallWorkflow } from "@/components/growth/growth-call-workflow-context"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthLiveCoachingSessionTimeline } from "@/components/growth/growth-live-coaching-session-timeline"
 import { useGrowthBrowserAudioCapture } from "@/hooks/growth/use-growth-browser-audio-capture"
 import { GROWTH_CALL_AUDIO_CAPTURE_ENABLED, GROWTH_CALL_DIALER_SAFETY_COPY } from "@/lib/growth/call-workflow-copy"
 import { formatGrowthCallDialerNextStep } from "@/lib/growth/call-workflow"
@@ -324,6 +325,11 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
       setError("Could not copy to clipboard.")
     }
   }
+
+  const timelineSessionId = useMemo(
+    () => activeSession?.id ?? sessions.find((session) => session.status === "completed")?.id ?? null,
+    [activeSession?.id, sessions],
+  )
 
   const snapshot = activeSession?.liveSnapshot
   const dialNextStep =
@@ -677,6 +683,12 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
           </>
         ) : null}
       </div>
+
+      <GrowthLiveCoachingSessionTimeline
+        leadId={lead.id}
+        sessionId={timelineSessionId}
+        refreshToken={refreshToken}
+      />
     </GrowthCollapsibleEngineCard>
   )
 }

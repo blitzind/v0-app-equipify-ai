@@ -21,6 +21,10 @@ import { isRealtimeProviderCircuitOpen } from "@/lib/growth/realtime/providers/r
 import { listRealtimeProviderConnections } from "@/lib/growth/realtime/providers/realtime-provider-connection-repository"
 import { fetchGrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-repository"
 import { mapBrowserAudioChunkError } from "@/lib/growth/realtime/browser-audio/ingest-browser-audio-chunk"
+import {
+  emitLiveCoachingMicPermissionTimeline,
+  emitLiveCoachingSessionStoppedTimeline,
+} from "@/lib/growth/realtime/live-coaching/session-timeline-emitter"
 
 export const runtime = "nodejs"
 
@@ -155,6 +159,19 @@ export async function PATCH(
     }
     if (parsed.data.action === "pause" || parsed.data.action === "stop" || parsed.data.action === "fail") {
       stream = await closeBrowserAudioProviderStream(sessionId, { admin: access.admin, session })
+    }
+
+    if (parsed.data.action === "start") {
+      await emitLiveCoachingMicPermissionTimeline(access.admin, session, { granted: true })
+    }
+    if (parsed.data.action === "fail") {
+      await emitLiveCoachingMicPermissionTimeline(access.admin, session, {
+        granted: false,
+        errorCode: parsed.data.error ?? "mic_permission_denied",
+      })
+    }
+    if (parsed.data.action === "stop") {
+      await emitLiveCoachingSessionStoppedTimeline(access.admin, session)
     }
 
     const providerConnection = await resolveProviderConnectionForSession(access.admin, session)

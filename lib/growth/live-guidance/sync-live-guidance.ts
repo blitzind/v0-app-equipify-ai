@@ -24,6 +24,8 @@ import {
   emitGrowthLeadLiveGuidanceUsedTimeline,
 } from "@/lib/growth/timeline-emitter"
 import { fetchGrowthLiveCoachingSettings } from "@/lib/growth/realtime/providers/live-coaching-settings-repository"
+import { emitLiveCoachingGuidanceGeneratedTimeline } from "@/lib/growth/realtime/live-coaching/session-timeline-emitter"
+import { fetchGrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-repository"
 import type { GrowthLiveGuidanceCandidate } from "@/lib/growth/live-guidance/live-guidance-types"
 
 type Actor = { userId: string | null; email: string | null }
@@ -80,6 +82,14 @@ export async function syncLiveGuidanceForSession(
         guidanceId: inserted.id,
         title: inserted.title,
         actor: input.actor,
+      })
+    }
+    const session = await fetchGrowthRealtimeCallSession(admin, input.sessionId)
+    if (session) {
+      await emitLiveCoachingGuidanceGeneratedTimeline(admin, session, {
+        guidanceId: inserted.id,
+        guidanceType: inserted.eventType,
+        severity: inserted.severity,
       })
     }
   }

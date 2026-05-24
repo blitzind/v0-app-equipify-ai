@@ -33,6 +33,15 @@ import {
   emitGrowthLeadRealtimeObjectionDetectedTimeline,
 } from "@/lib/growth/timeline-emitter"
 import { stopBrowserAudioCaptureForSession } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-service"
+import { computeCallExecutionScore } from "@/lib/growth/live-guidance/live-execution-score"
+import {
+  emitLiveCoachingSessionCompletedTimeline,
+  emitLiveCoachingSessionDiscardedTimeline,
+  emitLiveCoachingSessionPausedTimeline,
+  emitLiveCoachingSessionResumedTimeline,
+  emitLiveCoachingSessionStartedTimeline,
+  emitLiveCoachingSnapshotDiffTimeline,
+} from "@/lib/growth/realtime/live-coaching/session-timeline-emitter"
 
 type Actor = { userId: string | null; email: string | null }
 
@@ -51,6 +60,11 @@ async function recomputeAndPersistSnapshot(
   })
 
   const diff = diffRealtimeSnapshot(session.liveSnapshot, snapshot)
+  const previousExecutionScore = computeCallExecutionScore({
+    snapshot: session.liveSnapshot,
+    events,
+  }).score
+
   if (actor) {
     for (const signalKey of diff.newBuyingSignals) {
       await emitGrowthLeadRealtimeBuyingSignalDetectedTimeline(admin, {
@@ -85,6 +99,14 @@ async function recomputeAndPersistSnapshot(
       })
     }
   }
+
+  await emitLiveCoachingSnapshotDiffTimeline(admin, {
+    session,
+    previousSnapshot: session.liveSnapshot,
+    nextSnapshot: snapshot,
+    events,
+    previousExecutionScore,
+  })
 
   const updated = await updateGrowthRealtimeCallSession(admin, session.id, { liveSnapshot: snapshot })
 
@@ -136,6 +158,8 @@ export async function startGrowthRealtimeCallSession(
     throw new Error("session_closed")
   }
 
+  const wasPaused = session.status === "paused"
+
   const provider = createRealtimeTranscriptProvider("stub")
   await provider.connect(session.id)
 
@@ -159,6 +183,11 @@ export async function startGrowthRealtimeCallSession(
     actor: input.actor,
   })
 
+  await emitLiveCoachingSessionStartedTimeline(admin, finalSession)
+  if (wasPaused) {
+    await emitLiveCoachingSessionResumedTimeline(admin, finalSession)
+  }
+
   return finalSession
 }
 
@@ -170,7 +199,9 @@ export async function pauseGrowthRealtimeCallSession(
   if (!session) throw new Error("not_found")
   await detachRealtimeProviderFromSession(sessionId)
   await stopBrowserAudioCaptureForSession(admin, sessionId)
-  return updateGrowthRealtimeCallSession(admin, sessionId, { status: "paused" })
+  const updated = await updateGrowthRealtimeCallSession(admin, sessionId, { status: "paused" })
+  await emitLiveCoachingSessionPausedTimeline(admin, updated)
+  return updated
 }
 
 export async function completeGrowthRealtimeCallSession(
@@ -196,6 +227,8 @@ export async function completeGrowthRealtimeCallSession(
     actor: input.actor,
   })
 
+  await emitLiveCoachingSessionCompletedTimeline(admin, updated)
+
   return updated
 }
 
@@ -207,11 +240,13 @@ export async function discardGrowthRealtimeCallSession(
   if (!session) throw new Error("not_found")
   await detachRealtimeProviderFromSession(sessionId)
   await stopBrowserAudioCaptureForSession(admin, sessionId)
-  return updateGrowthRealtimeCallSession(admin, sessionId, {
+  const updated = await updateGrowthRealtimeCallSession(admin, sessionId, {
     status: "discarded",
     endedAt: new Date().toISOString(),
     transcriptStatus: "inactive",
   })
+  await emitLiveCoachingSessionDiscardedTimeline(admin, updated)
+  return updated
 }
 
 export async function appendGrowthRealtimeCallTranscript(

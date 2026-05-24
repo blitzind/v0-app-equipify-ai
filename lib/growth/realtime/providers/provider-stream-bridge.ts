@@ -14,6 +14,11 @@ import { analyzeRealtimeCallTranscript } from "@/lib/growth/realtime/realtime-se
 import { computeTranscriptQualityScore } from "@/lib/growth/realtime/providers/transcript-quality"
 import type { RealtimeTranscriptChunk } from "@/lib/growth/realtime/providers/provider-types"
 import { fetchGrowthLiveCoachingSettings } from "@/lib/growth/realtime/providers/live-coaching-settings-repository"
+import { computeCallExecutionScore } from "@/lib/growth/live-guidance/live-execution-score"
+import {
+  emitLiveCoachingSnapshotDiffTimeline,
+  emitLiveCoachingTranscriptChunkTimeline,
+} from "@/lib/growth/realtime/live-coaching/session-timeline-emitter"
 
 type SessionStreamState = {
   confidenceTotal: number
@@ -30,9 +35,19 @@ export async function ingestRealtimeProviderTranscriptChunk(
     session: GrowthRealtimeCallSession
     chunk: RealtimeTranscriptChunk
     actor?: { userId: string | null; email: string | null }
+    latencyMs?: number
   },
 ): Promise<GrowthRealtimeCallSession> {
   const settings = await fetchGrowthLiveCoachingSettings(admin)
+  const existingEvents = await listGrowthRealtimeTranscriptEvents(admin, input.session.id)
+  await emitLiveCoachingTranscriptChunkTimeline(admin, input.session, {
+    sequenceNumber: existingEvents.length,
+    speaker: input.chunk.speaker,
+    isFinal: input.chunk.isFinal,
+    latencyMs: input.latencyMs,
+    confidence: input.chunk.confidence,
+  })
+
   if (!input.chunk.isFinal) return input.session
   if (
     input.chunk.confidence !== undefined &&
@@ -41,7 +56,7 @@ export async function ingestRealtimeProviderTranscriptChunk(
     return input.session
   }
 
-  const events = await listGrowthRealtimeTranscriptEvents(admin, input.session.id)
+  const events = existingEvents
   await appendGrowthRealtimeTranscriptEvent(admin, {
     sessionId: input.session.id,
     speaker: input.chunk.speaker,
@@ -66,6 +81,11 @@ export async function ingestRealtimeProviderTranscriptChunk(
 
   const lead = await fetchGrowthLeadById(admin, input.session.leadId)
   if (!lead) throw new Error("not_found")
+  const previousSnapshot = input.session.liveSnapshot
+  const previousExecutionScore = computeCallExecutionScore({
+    snapshot: previousSnapshot,
+    events,
+  }).score
   const nextEvents = await listGrowthRealtimeTranscriptEvents(admin, input.session.id)
   const snapshot = analyzeRealtimeCallTranscript({
     events: nextEvents,
@@ -89,6 +109,14 @@ export async function ingestRealtimeProviderTranscriptChunk(
     keywordHitRate: metrics.finalChunkCount > 0 ? metrics.keywordHits / metrics.finalChunkCount : 0,
     speakerSeparationEnabled: settings.speakerSeparationEnabled,
     speakerLabelsPresent: metrics.speakerLabelsPresent,
+  })
+
+  await emitLiveCoachingSnapshotDiffTimeline(admin, {
+    session: input.session,
+    previousSnapshot,
+    nextSnapshot: snapshot,
+    events: nextEvents,
+    previousExecutionScore,
   })
 
   return updateGrowthRealtimeCallSession(admin, input.session.id, {

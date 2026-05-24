@@ -20,6 +20,13 @@ import {
 import { updateGrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-repository"
 import { recordRealtimeProviderOperationalEvent } from "@/lib/growth/realtime/providers/realtime-provider-metrics"
 import type { RealtimeProviderLifecycleEventType } from "@/lib/growth/realtime/providers/realtime-provider-readiness-types"
+import {
+  emitLiveCoachingProviderConnectedTimeline,
+  emitLiveCoachingProviderConnectingTimeline,
+  emitLiveCoachingProviderDegradedTimeline,
+  emitLiveCoachingProviderDisconnectedTimeline,
+  emitLiveCoachingProviderRetryTimeline,
+} from "@/lib/growth/realtime/live-coaching/session-timeline-emitter"
 
 const MAX_STREAM_RECONNECT_ATTEMPTS = 3
 const RECONNECT_BACKOFF_MS = [1000, 2000, 4000] as const
@@ -123,6 +130,7 @@ export async function openBrowserAudioProviderStream(
 
   const record = getOrCreateStreamSession(session.id, session.providerId)
   updateStreamMetrics(record, { status: "connecting", streamFailureReason: null })
+  await emitLiveCoachingProviderConnectingTimeline(admin, session)
 
   const transcriptStarted = Date.now()
   try {
@@ -139,6 +147,7 @@ export async function openBrowserAudioProviderStream(
         session,
         chunk,
         actor,
+        latencyMs,
       }).catch(async (error) => {
         const mapped = mapBrowserAudioProviderError(error)
         updateStreamMetrics(record, {
@@ -147,6 +156,9 @@ export async function openBrowserAudioProviderStream(
         })
         await updateGrowthRealtimeCallSession(admin, session.id, {
           transcriptStatus: "failed",
+        })
+        await emitLiveCoachingProviderDegradedTimeline(admin, session, {
+          reasonCode: mapped.code,
         })
         if (session.realtimeProviderConnectionId) {
           void recordStreamOperationalEvent(admin, session, mapProviderErrorToLifecycleEvent(mapped.code), mapped.message)
@@ -174,13 +186,15 @@ export async function openBrowserAudioProviderStream(
     throw new ProviderStreamingUnavailableError(mapped.message)
   }
 
-  return updateStreamMetrics(record, {
+  const state = updateStreamMetrics(record, {
     status: "listening",
     streamOpenCount: record.metrics.streamOpenCount + 1,
     streamFailureReason: null,
     reconnectAttempts: 0,
     lastActivityAt: new Date().toISOString(),
   })
+  await emitLiveCoachingProviderConnectedTimeline(admin, session)
+  return state
 }
 
 export async function ingestBrowserAudioProviderChunk(
@@ -256,6 +270,11 @@ export async function closeBrowserAudioProviderStream(
   if (input?.admin && input?.session?.realtimeProviderConnectionId) {
     await recordStreamOperationalEvent(input.admin, input.session, "stream_close", "Browser audio provider stream closed.")
   }
+  if (input?.admin && input?.session) {
+    await emitLiveCoachingProviderDisconnectedTimeline(input.admin, input.session, {
+      reasonCode: record.metrics.streamFailureReason,
+    })
+  }
 
   return updateStreamMetrics(record, {
     status: "closed",
@@ -279,6 +298,9 @@ export async function retryBrowserAudioProviderStream(
   if (session.realtimeProviderConnectionId) {
     await recordStreamOperationalEvent(admin, session, "reconnect_attempt", "Retrying browser audio provider stream.")
   }
+  await emitLiveCoachingProviderRetryTimeline(admin, session, {
+    attempt: record.metrics.reconnectAttempts + 1,
+  })
 
   await closeBrowserAudioProviderStream(session.id, { admin, session })
   return openBrowserAudioProviderStream(admin, session, actor)

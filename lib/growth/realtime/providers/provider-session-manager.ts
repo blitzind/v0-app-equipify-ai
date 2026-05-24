@@ -19,6 +19,7 @@ import type {
 import { closeBrowserAudioProviderStream } from "@/lib/growth/realtime/browser-audio/browser-audio-stream-manager"
 import type { GrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-types"
 import { updateGrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-repository"
+import { emitLiveCoachingProviderFallbackTimeline } from "@/lib/growth/realtime/live-coaching/session-timeline-emitter"
 
 export { isBrowserAudioStreamProvider } from "@/lib/growth/realtime/browser-audio/browser-audio-stream-provider"
 
@@ -95,7 +96,7 @@ export async function attachRealtimeProviderToSession(
     await updateRealtimeProviderConnection(admin, route.connectionId, { status: "connected" })
   }
 
-  return updateGrowthRealtimeCallSession(admin, session.id, {
+  const updatedSession = await updateGrowthRealtimeCallSession(admin, session.id, {
     realtimeProviderConnectionId: route.connectionId,
     providerId: route.providerId,
     transcriptSource: route.transcriptSource,
@@ -104,6 +105,15 @@ export async function attachRealtimeProviderToSession(
       ? session.sessionProviderFailoverCount + 1
       : session.sessionProviderFailoverCount,
   })
+
+  if (route.failoverApplied) {
+    await emitLiveCoachingProviderFallbackTimeline(admin, updatedSession, {
+      providerId: route.providerId,
+      failoverCount: updatedSession.sessionProviderFailoverCount,
+    })
+  }
+
+  return updatedSession
 }
 
 export async function detachRealtimeProviderFromSession(sessionId: string): Promise<void> {

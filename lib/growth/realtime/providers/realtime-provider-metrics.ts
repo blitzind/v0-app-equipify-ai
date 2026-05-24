@@ -15,6 +15,8 @@ import {
   shouldOpenRealtimeProviderCircuit,
 } from "@/lib/growth/realtime/providers/realtime-provider-circuit-breaker"
 import { resolveRealtimeProviderReadinessStatus } from "@/lib/growth/realtime/providers/realtime-provider-circuit-breaker"
+import { fetchGrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-repository"
+import { emitLiveCoachingCircuitBreakerTimeline } from "@/lib/growth/realtime/live-coaching/session-timeline-emitter"
 
 export async function recordRealtimeProviderOperationalEvent(
   admin: SupabaseClient,
@@ -67,6 +69,7 @@ export async function recordRealtimeProviderOperationalEvent(
   }
 
   const merged = { ...connection, ...patch, authConfigured: connection.authConfigured }
+  let circuitOpened = false
   if (
     input.eventType === "provider_failure" ||
     input.eventType === "auth_failure" ||
@@ -76,6 +79,7 @@ export async function recordRealtimeProviderOperationalEvent(
       patch.circuitOpen = true
       patch.circuitOpenUntil = nextRealtimeProviderCircuitOpenUntil()
       patch.readinessStatus = "circuit_open"
+      circuitOpened = true
     }
   }
 
@@ -90,4 +94,11 @@ export async function recordRealtimeProviderOperationalEvent(
     message: input.message,
     metadata: input.metadata,
   })
+
+  if (circuitOpened && input.sessionId) {
+    const session = await fetchGrowthRealtimeCallSession(admin, input.sessionId)
+    if (session) {
+      await emitLiveCoachingCircuitBreakerTimeline(admin, session)
+    }
+  }
 }

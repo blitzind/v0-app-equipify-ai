@@ -5,6 +5,7 @@ import { Loader2, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthLiveCoachingSessionTimeline } from "@/components/growth/growth-live-coaching-session-timeline"
 
 type DashboardPayload = {
   stats: {
@@ -51,6 +52,7 @@ export function GrowthLiveCoachingDashboard() {
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [timelineSession, setTimelineSession] = useState<{ leadId: string; sessionId: string } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -192,6 +194,16 @@ export function GrowthLiveCoachingDashboard() {
                   <div className="flex items-center gap-2">
                     <GrowthBadge label={call.riskLevel} tone="attention" />
                     <span className="font-semibold tabular-nums">Score {call.executionScore}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setTimelineSession({ leadId: call.leadId, sessionId: call.sessionId })
+                      }
+                    >
+                      View timeline
+                    </Button>
                   </div>
                 </div>
                 <div className="mt-1 flex flex-wrap gap-1">
@@ -204,6 +216,13 @@ export function GrowthLiveCoachingDashboard() {
           </ul>
         )}
       </GrowthEngineCard>
+
+      {timelineSession ? (
+        <GrowthLiveCoachingSessionTimeline
+          leadId={timelineSession.leadId}
+          sessionId={timelineSession.sessionId}
+        />
+      ) : null}
     </div>
   )
 }
