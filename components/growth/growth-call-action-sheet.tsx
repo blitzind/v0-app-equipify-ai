@@ -301,31 +301,31 @@ export function GrowthCallActionSheet({
                       <p className="mt-1.5 text-sm leading-relaxed text-emerald-950/90">{nextStepCopy}</p>
                     ) : null}
 
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    <div className="mt-4 grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2">
                       <Button
                         type="button"
-                        className="min-h-11 w-full justify-start"
+                        className="min-h-11 w-full min-w-0 justify-center gap-2 whitespace-nowrap px-5 font-medium sm:min-w-[220px] sm:flex-[1.2]"
                         disabled={busy}
                         onClick={() => void startRealtimeCoaching()}
                       >
                         {busy ? (
-                          <Loader2 className="mr-2 size-4 animate-spin" />
+                          <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" />
                         ) : (
-                          <Mic className="mr-2 size-4 shrink-0" />
+                          <Mic className="mr-2 h-4 w-4 shrink-0" />
                         )}
                         Start Realtime Coaching
                       </Button>
                       <Button
                         type="button"
                         variant="secondary"
-                        className="min-h-11 w-full justify-start"
+                        className="min-h-11 w-full min-w-0 justify-center gap-2 whitespace-nowrap px-5 font-medium"
                         disabled={busy}
                         onClick={() => void startCallCopilot()}
                       >
                         {busy ? (
-                          <Loader2 className="mr-2 size-4 animate-spin" />
+                          <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" />
                         ) : (
-                          <Sparkles className="mr-2 size-4 shrink-0" />
+                          <Sparkles className="mr-2 h-4 w-4 shrink-0" />
                         )}
                         Start Call Copilot
                       </Button>
