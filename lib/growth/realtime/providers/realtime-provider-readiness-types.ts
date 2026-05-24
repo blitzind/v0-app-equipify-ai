@@ -20,6 +20,8 @@ export type RealtimeProviderCapabilityMatrix = {
   speakerDetection: boolean
   keywordEvents: boolean
   browserAudioStreaming: boolean
+  liveTranscriptStreaming: boolean
+  liveGuidanceCompatible: boolean
 }
 
 export type RealtimeProviderDiagnostics = {

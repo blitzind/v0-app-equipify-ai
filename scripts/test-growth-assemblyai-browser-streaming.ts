@@ -33,7 +33,7 @@ import type { RealtimeProviderRuntimeConfig } from "../lib/growth/realtime/provi
 const assemblyai = createRealtimeProviderInstance("assemblyai")
 assert.equal(assemblyai.supportsBrowserAudioStreaming(), true)
 assert.equal(providerSupportsBrowserAudioStreaming("assemblyai"), true)
-assert.equal(providerSupportsBrowserAudioStreaming("openai_realtime"), false)
+assert.equal(providerSupportsBrowserAudioStreaming("openai_realtime"), true)
 
 const runtimeConfig: RealtimeProviderRuntimeConfig = {
   connectionId: "11111111-1111-4111-8111-111111111111",

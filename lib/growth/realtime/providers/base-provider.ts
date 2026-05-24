@@ -24,6 +24,12 @@ export abstract class BaseRealtimeTranscriptProvider implements RealtimeTranscri
   supportsBrowserAudioStreaming(): boolean {
     return false
   }
+  supportsLiveTranscriptStreaming(): boolean {
+    return this.supportsBrowserAudioStreaming()
+  }
+  supportsLiveGuidanceCompatible(): boolean {
+    return this.supportsRealtime()
+  }
   protected abstract credentialEnvKey(): string
   protected abstract providerLabel(): string
 
@@ -53,6 +59,8 @@ export abstract class BaseRealtimeTranscriptProvider implements RealtimeTranscri
         speakerDetection: this.supportsSpeakerDetection(),
         keywordEvents: this.supportsKeywordEvents(),
         browserAudioStreaming: this.supportsBrowserAudioStreaming(),
+        liveTranscriptStreaming: this.supportsLiveTranscriptStreaming(),
+        liveGuidanceCompatible: this.supportsLiveGuidanceCompatible(),
         latencyMs,
       },
     }

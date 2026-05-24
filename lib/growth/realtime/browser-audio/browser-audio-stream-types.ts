@@ -40,8 +40,8 @@ export const initialBrowserAudioStreamState = (): GrowthBrowserAudioStreamState 
   metrics: emptyBrowserAudioStreamMetrics(),
 })
 
-/** Providers that support live browser mic → provider streaming (slices 6.12B/6.12D). */
-export const BROWSER_AUDIO_STREAMING_PROVIDER_IDS = ["deepgram", "assemblyai"] as const
+/** Providers that support live browser mic → provider streaming (slices 6.12B/6.12D/6.12E). */
+export const BROWSER_AUDIO_STREAMING_PROVIDER_IDS = ["deepgram", "assemblyai", "openai_realtime"] as const
 
 export type BrowserAudioStreamingProviderId = (typeof BROWSER_AUDIO_STREAMING_PROVIDER_IDS)[number]
 

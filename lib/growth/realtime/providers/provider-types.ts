@@ -37,6 +37,8 @@ export type RealtimeProviderCapabilitySnapshot = {
   speakerDetection: boolean
   keywordEvents: boolean
   browserAudioStreaming: boolean
+  liveTranscriptStreaming: boolean
+  liveGuidanceCompatible: boolean
   latencyMs: number
 }
 
@@ -145,6 +147,8 @@ export type RealtimeTranscriptProvider = {
   supportsSpeakerDetection(): boolean
   supportsKeywordEvents(): boolean
   supportsBrowserAudioStreaming(): boolean
+  supportsLiveTranscriptStreaming(): boolean
+  supportsLiveGuidanceCompatible(): boolean
   openBrowserAudioStream?(onChunk: (chunk: RealtimeTranscriptChunk) => void): Promise<void>
   closeBrowserAudioStream?(): Promise<void>
   ingestBrowserAudioChunk?(input: RealtimeBrowserAudioChunkInput): Promise<void>

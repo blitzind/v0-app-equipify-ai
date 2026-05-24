@@ -1,7 +1,7 @@
 import {
   ProviderStreamingUnavailableError,
 } from "@/lib/growth/realtime/browser-audio/browser-audio-chunk-errors"
-import { mapLiveProviderStreamError } from "@/lib/growth/realtime/providers/live-provider-stream-error-mapper"
+import { mapOpenAiRealtimeProviderError } from "@/lib/growth/realtime/providers/openai-realtime-live-message-parser"
 
 export class ProviderAuthError extends Error {
   constructor(message = "Provider authentication failed. Check credentials in Live Coaching settings.") {
@@ -62,22 +62,32 @@ export function mapBrowserAudioProviderError(error: unknown): { code: string; me
     return { code: "provider_disconnected", message: error.message, status: 409 }
   }
 
-  const mapped = mapDeepgramProviderError(error instanceof Error ? error : String(error))
+  const mapped = mapOpenAiRealtimeProviderError(error instanceof Error ? error : String(error))
   return {
     code: mapped.code,
     message: mapped.message,
-    status: mapped.code === "provider_auth_failed" ? 401 : 409,
+    status:
+      mapped.code === "provider_auth_failed"
+        ? 401
+        : mapped.code === "provider_rate_limited"
+          ? 429
+          : mapped.code === "stream_timeout"
+            ? 408
+            : mapped.code === "unsupported_audio_format" || mapped.code === "unsupported_model"
+              ? 415
+              : 409,
   }
 }
 
 export function classifyBrowserAudioProviderErrorCode(detail: string): Error {
-  const mapped = mapLiveProviderStreamError(detail)
+  const mapped = mapOpenAiRealtimeProviderError(detail)
   switch (mapped.code) {
     case "provider_auth_failed":
       return new ProviderAuthError(mapped.message)
     case "provider_rate_limited":
       return new ProviderRateLimitError(mapped.message)
     case "unsupported_audio_format":
+    case "unsupported_model":
       return new UnsupportedAudioFormatError(mapped.message)
     case "stream_timeout":
       return new StreamTimeoutError(mapped.message)

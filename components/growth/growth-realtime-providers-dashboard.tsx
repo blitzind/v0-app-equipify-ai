@@ -229,7 +229,9 @@ export function GrowthRealtimeProvidersDashboard() {
                       Capability matrix: realtime {diagnostics.capabilityMatrix.realtime ? "yes" : "no"} · speaker{" "}
                       {diagnostics.capabilityMatrix.speakerDetection ? "yes" : "no"} · keywords{" "}
                       {diagnostics.capabilityMatrix.keywordEvents ? "yes" : "no"} · browser mic{" "}
-                      {diagnostics.capabilityMatrix.browserAudioStreaming ? "yes" : "no"}
+                      {diagnostics.capabilityMatrix.browserAudioStreaming ? "yes" : "no"} · live transcript{" "}
+                      {diagnostics.capabilityMatrix.liveTranscriptStreaming ? "yes" : "no"} · live guidance{" "}
+                      {diagnostics.capabilityMatrix.liveGuidanceCompatible ? "yes" : "no"}
                     </div>
                   ) : null}
 

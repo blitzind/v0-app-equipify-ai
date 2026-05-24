@@ -37,6 +37,8 @@ function connectionFixture(overrides: Partial<RealtimeProviderConnection> = {}):
       speakerDetection: true,
       keywordEvents: true,
       browserAudioStreaming: true,
+      liveTranscriptStreaming: true,
+      liveGuidanceCompatible: true,
       latencyMs: 120,
     },
     averageLatencyMs: 120,
@@ -106,6 +108,7 @@ assert.ok(warnings.some((warning) => warning.code === "auth_missing"))
 
 assert.equal(createRealtimeProviderInstance("deepgram").supportsBrowserAudioStreaming(), true)
 assert.equal(createRealtimeProviderInstance("assemblyai").supportsBrowserAudioStreaming(), true)
+assert.equal(createRealtimeProviderInstance("openai_realtime").supportsBrowserAudioStreaming(), true)
 assert.equal(REALTIME_PROVIDER_VALIDATION_COOLDOWN_MS, 30_000)
 assert.equal(REALTIME_PROVIDER_CIRCUIT_FAILURE_THRESHOLD, 5)
 assert.ok(REALTIME_PROVIDER_LIFECYCLE_EVENT_TYPES.includes("stream_open"))

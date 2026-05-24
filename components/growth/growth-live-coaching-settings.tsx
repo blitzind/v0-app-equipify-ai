@@ -157,8 +157,9 @@ export function GrowthLiveCoachingSettingsPanel() {
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Manual transcript mode active until a provider is selected. Deepgram and AssemblyAI support
-            browser mic streaming when connected and ready.
+            Manual transcript mode active until a provider is selected. Deepgram, AssemblyAI, and OpenAI Realtime
+            support browser mic transcription when connected and ready. OpenAI is transcription-only — no voice
+            output.
           </p>
         )}
 

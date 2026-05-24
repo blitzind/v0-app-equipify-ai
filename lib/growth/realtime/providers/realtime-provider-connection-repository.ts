@@ -87,6 +87,8 @@ function parseCapabilities(value: unknown): RealtimeProviderCapabilitySnapshot {
       speakerDetection: false,
       keywordEvents: false,
       browserAudioStreaming: false,
+      liveTranscriptStreaming: false,
+      liveGuidanceCompatible: false,
       latencyMs: 0,
     }
   }
@@ -96,6 +98,8 @@ function parseCapabilities(value: unknown): RealtimeProviderCapabilitySnapshot {
     speakerDetection: Boolean(raw.speakerDetection),
     keywordEvents: Boolean(raw.keywordEvents),
     browserAudioStreaming: Boolean(raw.browserAudioStreaming),
+    liveTranscriptStreaming: Boolean(raw.liveTranscriptStreaming),
+    liveGuidanceCompatible: Boolean(raw.liveGuidanceCompatible),
     latencyMs: typeof raw.latencyMs === "number" ? raw.latencyMs : 0,
   }
 }

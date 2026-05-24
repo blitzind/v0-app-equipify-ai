@@ -1,4 +1,5 @@
 import { providerSupportsBrowserAudioStreaming } from "@/lib/growth/realtime/browser-audio/browser-audio-stream-types"
+import { isOpenAiRealtimeTranscriptionModelSupported } from "@/lib/growth/realtime/providers/openai-realtime-browser-audio-config"
 import {
   isRealtimeProviderCircuitOpen,
   resolveRealtimeProviderReadinessStatus,
@@ -19,6 +20,8 @@ export function buildRealtimeProviderCapabilityMatrix(
     speakerDetection: provider.supportsSpeakerDetection(),
     keywordEvents: provider.supportsKeywordEvents(),
     browserAudioStreaming: provider.supportsBrowserAudioStreaming(),
+    liveTranscriptStreaming: provider.supportsLiveTranscriptStreaming(),
+    liveGuidanceCompatible: provider.supportsLiveGuidanceCompatible(),
   }
 }
 
@@ -45,7 +48,9 @@ export function buildRealtimeProviderConfigurationWarnings(
   }
 
   if (
-    (connection.provider === "deepgram" || connection.provider === "assemblyai") &&
+    (connection.provider === "deepgram" ||
+      connection.provider === "assemblyai" ||
+      connection.provider === "openai_realtime") &&
     !providerSupportsBrowserAudioStreaming(connection.provider)
   ) {
     warnings.push({
@@ -62,6 +67,24 @@ export function buildRealtimeProviderConfigurationWarnings(
         "AssemblyAI browser streaming uses universal-streaming-english when no speech model is configured.",
       severity: "warning",
     })
+  }
+
+  if (connection.provider === "openai_realtime") {
+    warnings.push({
+      code: "openai_transcription_only",
+      message:
+        "OpenAI Realtime is configured for transcription-only live coaching. No voice output or autonomous speaking is enabled.",
+      severity: "info",
+    })
+    const model = connection.configJson.model?.trim() ?? ""
+    if (model && !isOpenAiRealtimeTranscriptionModelSupported(model)) {
+      warnings.push({
+        code: "openai_model_transcription_mismatch",
+        message:
+          "Configured OpenAI model may not support transcription-only browser streaming. Prefer gpt-realtime-whisper.",
+        severity: "warning",
+      })
+    }
   }
 
   if (isRealtimeProviderCircuitOpen(connection)) {

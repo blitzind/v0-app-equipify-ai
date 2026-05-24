@@ -107,6 +107,8 @@ export async function validateRealtimeProviderConnection(
     speakerDetection: health.capabilities?.speakerDetection ?? provider.supportsSpeakerDetection(),
     keywordEvents: health.capabilities?.keywordEvents ?? provider.supportsKeywordEvents(),
     browserAudioStreaming: provider.supportsBrowserAudioStreaming(),
+    liveTranscriptStreaming: provider.supportsLiveTranscriptStreaming(),
+    liveGuidanceCompatible: provider.supportsLiveGuidanceCompatible(),
     latencyMs: health.latencyMs ?? 0,
   }
 
@@ -192,6 +194,8 @@ export async function validateRealtimeProviderConnection(
       speakerDetection: capabilitySnapshot.speakerDetection,
       keywordEvents: capabilitySnapshot.keywordEvents,
       browserAudioStreaming: capabilitySnapshot.browserAudioStreaming,
+      liveTranscriptStreaming: capabilitySnapshot.liveTranscriptStreaming,
+      liveGuidanceCompatible: capabilitySnapshot.liveGuidanceCompatible,
     },
     readinessStatus: updated.readinessStatus,
     cooldownRemainingMs: REALTIME_PROVIDER_VALIDATION_COOLDOWN_MS,
