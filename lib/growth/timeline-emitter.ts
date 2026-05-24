@@ -919,3 +919,68 @@ export async function emitGrowthLeadOutreachCancelledTimeline(
     actorEmail: input.actor?.email,
   })
 }
+
+export async function emitGrowthLeadConversationHealthChangedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; from: number; to: number; summary: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "conversation_health_changed",
+    title: "Conversation health changed",
+    summary: `${input.from} → ${input.to}: ${input.summary}`,
+    payload: { from: input.from, to: input.to },
+  })
+}
+
+export async function emitGrowthLeadBuyingIntentDetectedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; intent: string; summary: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "buying_intent_detected",
+    title: "Buying intent detected",
+    summary: `${input.intent}: ${input.summary}`,
+    payload: { intent: input.intent },
+  })
+}
+
+export async function emitGrowthLeadCompetitorDetectedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; pressure: number; mentions: string[] },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "competitor_detected",
+    title: "Competitor detected",
+    summary: `Pressure ${input.pressure} — ${input.mentions.join(", ") || "competitor mention"}`,
+    payload: { pressure: input.pressure, mentions: input.mentions },
+  })
+}
+
+export async function emitGrowthLeadUrgencyDetectedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; urgency: string; summary: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "urgency_detected",
+    title: "Urgency detected",
+    summary: `${input.urgency}: ${input.summary}`,
+    payload: { urgency: input.urgency },
+  })
+}
+
+export async function emitGrowthLeadConversationRiskDetectedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; tier: string; momentum: string; summary: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "conversation_risk_detected",
+    title: "Conversation risk detected",
+    summary: `${input.tier} · ${input.momentum}: ${input.summary}`,
+    payload: { tier: input.tier, momentum: input.momentum },
+  })
+}

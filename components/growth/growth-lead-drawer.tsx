@@ -8,6 +8,7 @@ import { GrowthOutboundPanel } from "@/components/growth/growth-outbound-panel"
 import { GrowthLeadActivityStream } from "@/components/growth/growth-lead-activity-stream"
 import { GrowthLeadEngagement } from "@/components/growth/growth-lead-engagement"
 import { GrowthRelationshipIntelligence } from "@/components/growth/growth-relationship-intelligence"
+import { GrowthConversationIntelligence } from "@/components/growth/growth-conversation-intelligence"
 import { GrowthOpportunityReadiness } from "@/components/growth/growth-opportunity-readiness"
 import { GrowthRevenueForecast } from "@/components/growth/growth-revenue-forecast"
 import { GrowthExecutiveOperatingIntelligence } from "@/components/growth/growth-executive-operating-intelligence"
@@ -72,6 +73,8 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated }: Gr
         <GrowthOpportunityReadiness lead={activeLead} />
 
         <GrowthRelationshipIntelligence lead={activeLead} />
+
+        <GrowthConversationIntelligence lead={activeLead} />
 
         <GrowthLeadEngagement lead={activeLead} />
 

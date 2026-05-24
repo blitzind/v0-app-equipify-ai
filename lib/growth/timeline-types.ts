@@ -67,6 +67,15 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "outreach_executed",
   "outreach_failed",
   "outreach_cancelled",
+  "call_copilot_session_started",
+  "call_copilot_objection_captured",
+  "call_copilot_session_completed",
+  "call_copilot_summary_approved",
+  "conversation_health_changed",
+  "buying_intent_detected",
+  "competitor_detected",
+  "urgency_detected",
+  "conversation_risk_detected",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]

@@ -14,6 +14,13 @@ import type { GrowthRevenueProbabilityTier, GrowthRevenueTrajectory } from "@/li
 import type { GrowthExecutivePriorityTier } from "@/lib/growth/executive-operating-types"
 import type { GrowthOperationalCapacityTier } from "@/lib/growth/operational-capacity-types"
 import type { GrowthWorkflowHealthStatus } from "@/lib/growth/workflow-health-types"
+import type {
+  GrowthConversationBuyingIntent,
+  GrowthConversationHealthTier,
+  GrowthConversationMomentum,
+  GrowthConversationSentiment,
+  GrowthConversationUrgencyLevel,
+} from "@/lib/growth/conversation-types"
 import {
   GROWTH_NEXT_BEST_ACTION_LABELS,
   type GrowthNextBestAction,
@@ -54,6 +61,13 @@ export type NextBestActionInput = {
   operationalConstraintKeys?: string[]
   isProtectedOpportunity?: boolean
   workflowHealth?: GrowthWorkflowHealthStatus | null
+  conversationHealthTier?: GrowthConversationHealthTier | null
+  conversationSentiment?: GrowthConversationSentiment | null
+  conversationUrgencyLevel?: GrowthConversationUrgencyLevel | null
+  conversationBuyingIntent?: GrowthConversationBuyingIntent | null
+  conversationCompetitorPressure?: number
+  conversationMomentum?: GrowthConversationMomentum | null
+  conversationTrend?: string | null
   now?: Date
 }
 
@@ -178,6 +192,63 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
       "Protected close motion — preserve capacity for forecasted revenue opportunity.",
       [],
       "high",
+    )
+  }
+
+  const conversationBuyingIntent = input.conversationBuyingIntent ?? null
+  const conversationSentiment = input.conversationSentiment ?? null
+  const conversationUrgency = input.conversationUrgencyLevel ?? null
+  const conversationMomentum = input.conversationMomentum ?? null
+  const competitorPressure = input.conversationCompetitorPressure ?? 0
+  const conversationTier = input.conversationHealthTier ?? null
+  const conversationTrend = input.conversationTrend ?? null
+
+  if (conversationUrgency === "critical" || conversationUrgency === "high") {
+    return buildResult(
+      "immediate_follow_up",
+      "High conversation urgency detected — immediate follow-up required.",
+      [],
+      "high",
+    )
+  }
+
+  if (conversationBuyingIntent === "urgent" || conversationBuyingIntent === "strong") {
+    return buildResult(
+      "accelerate_close_motion",
+      "Strong buying intent in recent conversations — accelerate close motion.",
+      [],
+      "high",
+    )
+  }
+
+  if (competitorPressure >= 50) {
+    return buildResult(
+      "competitive_response_motion",
+      "Elevated competitor pressure — prepare competitive response.",
+      ["Competitive pressure"],
+      "high",
+    )
+  }
+
+  if (
+    conversationMomentum === "recovering" ||
+    (conversationTrend === "improving" &&
+      (conversationTier === "critical" || conversationTier === "cold"))
+  ) {
+    return buildResult(
+      "conversation_recovery_motion",
+      "Conversation momentum recovering — sustain recovery motion.",
+      [],
+      "medium",
+    )
+  }
+
+  if (conversationSentiment === "negative" || conversationSentiment === "mixed") {
+    return buildResult(
+      "relationship_recovery",
+      "Negative or mixed conversation sentiment — relationship recovery recommended.",
+      [],
+      "medium",
     )
   }
 

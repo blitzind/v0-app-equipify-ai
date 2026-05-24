@@ -20,6 +20,10 @@ import { closeGrowthLeadCallSession } from "@/lib/growth/communication/call-sess
 import { recordGrowthLeadCallEvent } from "@/lib/growth/call-events-repository"
 import { runGrowthAiCopilotGeneration } from "@/lib/growth/run-ai-copilot-generation"
 import { emitGrowthLeadCallCopilotSummaryApprovedTimeline } from "@/lib/growth/timeline-emitter"
+import {
+  recomputeGrowthLeadConversationIntelligence,
+} from "@/lib/growth/recompute-conversation-intelligence"
+import { recomputeGrowthLeadNextBestAction } from "@/lib/growth/recompute-lead-next-best-action"
 
 function buildCallSummaryContext(session: GrowthCallCopilotSession): string {
   return JSON.stringify(
@@ -152,6 +156,9 @@ export async function approveGrowthCallCopilotSummary(
       actor: { userId: input.approvedBy, email: input.actorEmail ?? null },
     })
   }
+
+  await recomputeGrowthLeadConversationIntelligence(admin, input.leadId)
+  await recomputeGrowthLeadNextBestAction(admin, input.leadId)
 
   return session
 }

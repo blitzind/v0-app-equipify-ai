@@ -50,6 +50,18 @@ import type {
   GrowthOperationalConstraint,
 } from "@/lib/growth/operational-capacity-types"
 import type { GrowthWorkflowHealthStatus } from "@/lib/growth/workflow-health-types"
+import type {
+  GrowthConversationBuyingIntent,
+  GrowthConversationCompetitorMention,
+  GrowthConversationHealthTier,
+  GrowthConversationMomentum,
+  GrowthConversationObjectionProfile,
+  GrowthConversationResponsePattern,
+  GrowthConversationSentiment,
+  GrowthConversationTopSignal,
+  GrowthConversationTrend,
+  GrowthConversationUrgencyLevel,
+} from "@/lib/growth/conversation-types"
 
 export type GrowthLeadSourceKind = (typeof GROWTH_LEAD_SOURCE_KINDS)[number]
 
@@ -204,6 +216,23 @@ export type GrowthLead = {
   capacityRecoveryDirection: GrowthCapacityRecoveryDirection
   operationalCapacityPreviousScore: number | null
   operationalCapacityComputedAt: string | null
+  conversationHealthScore: number | null
+  conversationHealthTier: GrowthConversationHealthTier | null
+  conversationSummary: string | null
+  conversationTopSignals: GrowthConversationTopSignal[]
+  conversationSentiment: GrowthConversationSentiment | null
+  conversationUrgencyLevel: GrowthConversationUrgencyLevel | null
+  conversationBuyingIntent: GrowthConversationBuyingIntent | null
+  conversationObjectionProfile: GrowthConversationObjectionProfile
+  conversationCompetitorMentions: GrowthConversationCompetitorMention[]
+  conversationCompetitorPressure: number | null
+  conversationLastMeaningfulConversationAt: string | null
+  conversationPreviousScore: number | null
+  conversationTrend: GrowthConversationTrend | null
+  conversationConfidence: number | null
+  conversationMomentum: GrowthConversationMomentum | null
+  conversationResponsePattern: GrowthConversationResponsePattern | null
+  conversationComputedAt: string | null
   createdBy: string | null
   assignedTo: string | null
   createdAt: string

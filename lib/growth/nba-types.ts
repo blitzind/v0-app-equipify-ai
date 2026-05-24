@@ -31,6 +31,11 @@ export const GROWTH_NEXT_BEST_ACTIONS = [
   "retry_call",
   "review_disqualified",
   "manual_review",
+  "accelerate_close_motion",
+  "relationship_recovery",
+  "competitive_response_motion",
+  "immediate_follow_up",
+  "conversation_recovery_motion",
 ] as const
 
 export type GrowthNextBestAction = (typeof GROWTH_NEXT_BEST_ACTIONS)[number]
@@ -66,6 +71,11 @@ export const GROWTH_NEXT_BEST_ACTION_LABELS: Record<GrowthNextBestAction, string
   retry_call: "Retry call",
   review_disqualified: "Review disqualified",
   manual_review: "Manual review",
+  accelerate_close_motion: "Accelerate close motion",
+  relationship_recovery: "Relationship recovery",
+  competitive_response_motion: "Competitive response motion",
+  immediate_follow_up: "Immediate follow-up",
+  conversation_recovery_motion: "Conversation recovery motion",
 }
 
 export type GrowthNextBestActionResult = {

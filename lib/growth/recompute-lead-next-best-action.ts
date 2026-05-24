@@ -12,6 +12,7 @@ import { recomputeGrowthLeadOpportunityReadiness } from "@/lib/growth/recompute-
 import { recomputeGrowthLeadRevenueForecast } from "@/lib/growth/recompute-revenue-forecast"
 import { recomputeGrowthLeadExecutiveOperatingIntelligence } from "@/lib/growth/recompute-executive-operating-intelligence"
 import { recomputeGrowthLeadOperationalCapacity } from "@/lib/growth/recompute-operational-capacity"
+import { recomputeGrowthLeadConversationIntelligence } from "@/lib/growth/recompute-conversation-intelligence"
 import { isProtectedGrowthOpportunityFromLead } from "@/lib/growth/operational-capacity-score"
 import { recomputeGrowthLeadWorkflowIntelligence } from "@/lib/growth/recompute-workflow-intelligence"
 import { recomputeGrowthLeadCallPriority } from "@/lib/growth/recompute-lead-call-priority"
@@ -76,6 +77,13 @@ export async function recomputeGrowthLeadNextBestAction(
     operationalConstraintKeys: lead.operationalConstraints.map((entry) => entry.key),
     isProtectedOpportunity: isProtectedGrowthOpportunityFromLead(lead),
     workflowHealth: lead.workflowHealth,
+    conversationHealthTier: lead.conversationHealthTier,
+    conversationSentiment: lead.conversationSentiment,
+    conversationUrgencyLevel: lead.conversationUrgencyLevel,
+    conversationBuyingIntent: lead.conversationBuyingIntent,
+    conversationCompetitorPressure: lead.conversationCompetitorPressure ?? 0,
+    conversationMomentum: lead.conversationMomentum,
+    conversationTrend: lead.conversationTrend,
   })
 
   const now = new Date().toISOString()
@@ -125,6 +133,7 @@ export async function recomputeGrowthLeadWorkflowSignals(
   await recomputeGrowthLeadRevenueForecast(admin, leadId)
   await recomputeGrowthLeadExecutiveOperatingIntelligence(admin, leadId)
   await recomputeGrowthLeadOperationalCapacity(admin, leadId)
+  await recomputeGrowthLeadConversationIntelligence(admin, leadId)
   await recomputeGrowthLeadNextBestAction(admin, leadId)
   return fetchGrowthLeadById(admin, leadId)
 }

@@ -29,3 +29,12 @@ export function growthLeadOpportunityActionRequired(lead: GrowthLead): boolean {
 export function growthLeadRelationshipActionRequired(lead: GrowthLead): boolean {
   return lead.relationshipTrend === "cooling"
 }
+
+export function growthLeadConversationActionRequired(lead: GrowthLead): boolean {
+  return (
+    lead.conversationHealthTier === "critical" ||
+    lead.conversationMomentum === "stalling" ||
+    lead.conversationUrgencyLevel === "critical" ||
+    lead.conversationTrend === "at_risk"
+  )
+}

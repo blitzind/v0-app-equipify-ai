@@ -14,6 +14,7 @@ import {
   Gauge,
   Inbox,
   Mail,
+  MessageSquare,
   Phone,
   Plug,
   Plus,
@@ -86,6 +87,13 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
         icon: Activity,
         match: (path) => path.startsWith("/admin/growth/engagement"),
         consoleKey: "engagement",
+      },
+      {
+        href: "/admin/growth/conversations",
+        label: "Conversations",
+        icon: MessageSquare,
+        match: (path) => path.startsWith("/admin/growth/conversations"),
+        consoleKey: "conversations",
       },
       {
         href: "/admin/growth/relationships",

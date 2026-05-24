@@ -30,6 +30,8 @@ import {
   emitGrowthLeadCallCopilotSessionStartedTimeline,
   emitGrowthLeadCallCopilotSessionCompletedTimeline,
 } from "@/lib/growth/timeline-emitter"
+import { recomputeGrowthLeadConversationIntelligence } from "@/lib/growth/recompute-conversation-intelligence"
+import { recomputeGrowthLeadNextBestAction } from "@/lib/growth/recompute-lead-next-best-action"
 import { runGrowthCallCopilotComplete } from "@/lib/growth/run-call-copilot-summary"
 
 export async function createGrowthCallCopilotPrepSession(
@@ -266,6 +268,9 @@ export async function completeGrowthCallCopilotSession(
     callOutcomeConfidence: session.callOutcomeConfidence,
     actor: { userId: input.actingUserId, email: input.actingUserEmail },
   })
+
+  await recomputeGrowthLeadConversationIntelligence(admin, input.leadId)
+  await recomputeGrowthLeadNextBestAction(admin, input.leadId)
 
   return session
 }

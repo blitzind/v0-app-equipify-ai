@@ -97,6 +97,7 @@
     "test:growth-ai-copilot-playbooks": "tsx scripts/test-growth-ai-copilot-playbooks.ts",
     "test:growth-call-copilot": "tsx scripts/test-growth-call-copilot.ts",
     "test:growth-outreach-execution": "tsx scripts/test-growth-outreach-execution.ts",
+    "test:growth-conversation-intelligence": "tsx scripts/test-growth-conversation-intelligence.ts",
     "test:catalog-import-manufacturer": "tsx scripts/test-catalog-import-manufacturer.ts",
     "test:catalog-import-template": "tsx scripts/test-catalog-import-template.ts",
     "test:extract-price-list-from-csv": "tsx scripts/test-extract-price-list-from-csv.ts",
