@@ -7,7 +7,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -18,6 +17,7 @@ import { GROWTH_CALL_DIALER_SAFETY_COPY } from "@/lib/growth/call-workflow-copy"
 import { formatGrowthCallDialerNextStep } from "@/lib/growth/call-workflow"
 import { GROWTH_LEAD_CALL_DISPOSITIONS, type GrowthLeadCallDisposition } from "@/lib/growth/call-types"
 import type { GrowthLead } from "@/lib/growth/types"
+import { cn } from "@/lib/utils"
 
 const QUICK_DISPOSITIONS: GrowthLeadCallDisposition[] = [
   "no_answer",
@@ -219,127 +219,195 @@ export function GrowthCallActionSheet({
   }
 
   const nextStepCopy = dialLabel ? formatGrowthCallDialerNextStep(dialLabel) : null
+  const otherOutcomes = GROWTH_LEAD_CALL_DISPOSITIONS.filter((d) => !QUICK_DISPOSITIONS.includes(d)).map(
+    (d) => DISPOSITION_LABELS[d],
+  )
 
   return (
     <Dialog open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent
+        className={cn(
+          "flex max-h-[min(90vh,880px)] w-full max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0",
+          "sm:max-w-[760px] 2xl:max-w-[820px]",
+        )}
+      >
+        <DialogHeader className="shrink-0 border-b px-6 py-5 text-left">
           <DialogTitle>Call {contactLabel ?? "contact"}</DialogTitle>
           <DialogDescription>
             Dial via your configured channel, then start Realtime Coaching or Call Copilot in the lead drawer.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm font-medium tabular-nums">{phone}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          <div className="flex flex-col gap-5">
+            {error ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                {error}
+              </div>
+            ) : null}
 
-          <p className="rounded-lg border border-sky-200 bg-sky-50/60 px-3 py-2 text-xs text-sky-950">{GROWTH_CALL_DIALER_SAFETY_COPY}</p>
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-start">
+              {/* Left column — dial + coaching workflow */}
+              <div className="flex min-w-0 flex-col gap-5">
+                <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-base font-medium tabular-nums">
+                  {phone}
+                </div>
 
-          {loadingPrefs ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Loading dial preferences…
-            </div>
-          ) : null}
+                <p className="rounded-lg border border-sky-200 bg-sky-50/60 px-4 py-3 text-xs leading-relaxed text-sky-950">
+                  {GROWTH_CALL_DIALER_SAFETY_COPY}
+                </p>
 
-          {error ? (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-              {error}
-            </div>
-          ) : null}
+                <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dial</p>
 
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dial</p>
-            <div className="grid gap-2">
-              {dialOptions.map((option) => (
-                <Button
-                  key={`${option.mode}-${option.href}`}
-                  className="justify-start gap-2"
-                  disabled={busy}
-                  onClick={() => void startDial(option.mode, option.href, option.label)}
-                >
-                  <Phone className="size-4" />
-                  {option.label}
-                  <ExternalLink className="ml-auto size-3.5 opacity-60" />
-                </Button>
-              ))}
+                  {loadingPrefs ? (
+                    <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="size-4 animate-spin" />
+                      Loading dial preferences…
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex flex-col gap-2">
+                      {dialOptions.map((option) => (
+                        <Button
+                          key={`${option.mode}-${option.href}`}
+                          className="min-h-11 w-full justify-start gap-2"
+                          disabled={busy}
+                          onClick={() => void startDial(option.mode, option.href, option.label)}
+                        >
+                          <Phone className="size-4 shrink-0" />
+                          <span className="truncate">{option.label}</span>
+                          <ExternalLink className="ml-auto size-3.5 shrink-0 opacity-60" />
+                        </Button>
+                      ))}
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="min-h-11 w-full justify-start"
+                        disabled={busy}
+                        onClick={() => void copyNumber()}
+                      >
+                        <Copy className="mr-2 size-4 shrink-0" />
+                        {copied ? "Copied" : "Copy number"}
+                      </Button>
+                    </div>
+                  )}
+                </section>
+
+                {sessionId ? (
+                  <section className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-sm">
+                    <p className="text-sm font-semibold text-emerald-900">Call session started</p>
+                    {nextStepCopy ? (
+                      <p className="mt-1.5 text-sm leading-relaxed text-emerald-950/90">{nextStepCopy}</p>
+                    ) : null}
+
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      <Button
+                        type="button"
+                        className="min-h-11 w-full justify-start"
+                        disabled={busy}
+                        onClick={() => void startRealtimeCoaching()}
+                      >
+                        {busy ? (
+                          <Loader2 className="mr-2 size-4 animate-spin" />
+                        ) : (
+                          <Mic className="mr-2 size-4 shrink-0" />
+                        )}
+                        Start Realtime Coaching
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="min-h-11 w-full justify-start"
+                        disabled={busy}
+                        onClick={() => void startCallCopilot()}
+                      >
+                        {busy ? (
+                          <Loader2 className="mr-2 size-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="mr-2 size-4 shrink-0" />
+                        )}
+                        Start Call Copilot
+                      </Button>
+                    </div>
+                  </section>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-4 text-sm leading-relaxed text-muted-foreground">
+                    Choose a dial option to log a call session, then start Realtime Coaching from here or the drawer
+                    cards below.
+                  </div>
+                )}
+              </div>
+
+              {/* Right column — outcome logging */}
+              <section className="rounded-xl border border-border bg-card p-4 shadow-sm lg:min-h-[280px]">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Outcome logging</p>
+
+                {!sessionId ? (
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                    Start a dial session to unlock outcome logging for this call.
+                  </p>
+                ) : (
+                  <div className="mt-4 flex flex-col gap-5">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="min-h-11 w-full px-3"
+                        disabled={busy}
+                        onClick={() => void recordDisposition("no_answer", false)}
+                      >
+                        Log No Answer
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="min-h-11 w-full px-3"
+                        disabled={busy}
+                        onClick={() => void recordDisposition("call_attempted")}
+                      >
+                        Complete Call
+                      </Button>
+                    </div>
+
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Quick dispositions
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {QUICK_DISPOSITIONS.map((disposition) => (
+                          <Button
+                            key={disposition}
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="h-8 shrink-0"
+                            disabled={busy}
+                            onClick={() => void recordDisposition(disposition)}
+                          >
+                            {DISPOSITION_LABELS[disposition]}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Other outcomes: {otherOutcomes.join(", ")} — use the call queue menu.
+                    </p>
+                  </div>
+                )}
+              </section>
             </div>
           </div>
-
-          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void copyNumber()}>
-            <Copy className="mr-2 size-4" />
-            {copied ? "Copied" : "Copy number"}
-          </Button>
-
-          {sessionId ? (
-            <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
-              <div>
-                <p className="text-sm font-medium text-emerald-900">Call session started</p>
-                {nextStepCopy ? <p className="mt-1 text-sm text-emerald-950/90">{nextStepCopy}</p> : null}
-              </div>
-
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Button type="button" size="sm" disabled={busy} onClick={() => void startRealtimeCoaching()}>
-                  {busy ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Mic className="mr-2 size-4" />}
-                  Start Realtime Coaching
-                </Button>
-                <Button type="button" size="sm" variant="secondary" disabled={busy} onClick={() => void startCallCopilot()}>
-                  {busy ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Sparkles className="mr-2 size-4" />}
-                  Start Call Copilot
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => void recordDisposition("no_answer", false)}
-                >
-                  Log No Answer
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => void recordDisposition("call_attempted")}
-                >
-                  Complete Call
-                </Button>
-              </div>
-
-              <div className="space-y-2 border-t border-emerald-200/80 pt-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80">Log outcome</p>
-                <div className="flex flex-wrap gap-2">
-                  {QUICK_DISPOSITIONS.map((disposition) => (
-                    <Button
-                      key={disposition}
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      disabled={busy}
-                      onClick={() => void recordDisposition(disposition)}
-                    >
-                      {DISPOSITION_LABELS[disposition]}
-                    </Button>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Other outcomes: {GROWTH_LEAD_CALL_DISPOSITIONS.filter((d) => !QUICK_DISPOSITIONS.includes(d)).map((d) => DISPOSITION_LABELS[d]).join(", ")} — use the call queue menu.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
-              Choose a dial option to log a call session, then start Realtime Coaching from here or the drawer cards below.
-            </div>
-          )}
         </div>
 
-        <DialogFooter>
-          <Button type="button" variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-        </DialogFooter>
+        <div className="sticky bottom-0 shrink-0 border-t bg-background px-6 py-4">
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" className="min-w-[7.5rem]" disabled={busy} onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   )
