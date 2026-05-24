@@ -99,6 +99,7 @@
     "test:growth-outreach-execution": "tsx scripts/test-growth-outreach-execution.ts",
     "test:growth-conversation-intelligence": "tsx scripts/test-growth-conversation-intelligence.ts",
     "test:growth-sequence-intelligence": "tsx scripts/test-growth-sequence-intelligence.ts",
+    "test:growth-sequence-execution": "tsx scripts/test-growth-sequence-execution.ts",
     "test:catalog-import-manufacturer": "tsx scripts/test-catalog-import-manufacturer.ts",
     "test:catalog-import-template": "tsx scripts/test-catalog-import-template.ts",
     "test:extract-price-list-from-csv": "tsx scripts/test-extract-price-list-from-csv.ts",

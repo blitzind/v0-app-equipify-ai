@@ -24,6 +24,25 @@ import {
   emitGrowthLeadOutreachFailedTimeline,
 } from "@/lib/growth/timeline-emitter"
 
+async function maybeAdvanceSequenceEnrollmentAfterExecute(
+  admin: SupabaseClient,
+  input: {
+    queueItem: GrowthOutreachQueueItem
+    actingUserId: string
+    actingUserEmail: string
+  },
+): Promise<void> {
+  if (!input.queueItem.sequenceEnrollmentStepId) return
+  const { advanceGrowthSequenceEnrollmentAfterStep } = await import(
+    "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
+  )
+  await advanceGrowthSequenceEnrollmentAfterStep(admin, {
+    enrollmentStepId: input.queueItem.sequenceEnrollmentStepId,
+    actingUserId: input.actingUserId,
+    actingUserEmail: input.actingUserEmail,
+  })
+}
+
 export async function executeGrowthOutreachQueueItem(
   admin: SupabaseClient,
   input: {
@@ -78,6 +97,7 @@ export async function executeGrowthOutreachQueueItem(
       summary: updated.payloadSnapshot.subject ?? updated.channel,
       actor: { userId: input.actingUserId, email: input.actingUserEmail },
     })
+    await maybeAdvanceSequenceEnrollmentAfterExecute(admin, input)
     return updated
   }
 
@@ -207,6 +227,8 @@ export async function executeGrowthOutreachQueueItem(
     summary: subject,
     actor: { userId: input.actingUserId, email: input.actingUserEmail },
   })
+
+  await maybeAdvanceSequenceEnrollmentAfterExecute(admin, input)
 
   return updated
 }

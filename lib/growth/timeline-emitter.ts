@@ -1007,3 +1007,101 @@ export async function emitGrowthLeadSequenceRecommendationChangedTimeline(
     },
   })
 }
+
+export async function emitGrowthLeadSequenceEnrollmentCreatedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    enrollmentId: string
+    patternKey: string
+    actor?: { userId?: string | null; email?: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "sequence_enrollment_created",
+    title: "Sequence enrollment created",
+    summary: input.patternKey,
+    payload: { enrollmentId: input.enrollmentId, patternKey: input.patternKey },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}
+
+export async function emitGrowthLeadSequenceStepCreatedTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    enrollmentId: string
+    stepId: string
+    stepOrder: number
+    channel: string
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "sequence_step_created",
+    title: "Sequence step created",
+    summary: `Step ${input.stepOrder} (${input.channel})`,
+    payload: { enrollmentId: input.enrollmentId, stepId: input.stepId, stepOrder: input.stepOrder },
+  })
+}
+
+export async function emitGrowthLeadSequenceStepQueuedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; enrollmentId: string; stepId: string; queueId: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "sequence_step_queued",
+    title: "Sequence step queued",
+    summary: `Queue ${input.queueId}`,
+    payload: { enrollmentId: input.enrollmentId, stepId: input.stepId, queueId: input.queueId },
+  })
+}
+
+export async function emitGrowthLeadSequenceStepExecutedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; enrollmentId: string; stepId: string; stepOrder: number },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "sequence_step_executed",
+    title: "Sequence step executed",
+    summary: `Step ${input.stepOrder} completed`,
+    payload: { enrollmentId: input.enrollmentId, stepId: input.stepId },
+  })
+}
+
+export async function emitGrowthLeadSequenceEnrollmentCompletedTimeline(
+  admin: SupabaseClient,
+  input: { leadId: string; enrollmentId: string },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "sequence_enrollment_completed",
+    title: "Sequence enrollment completed",
+    summary: "All steps completed",
+    payload: { enrollmentId: input.enrollmentId },
+  })
+}
+
+export async function emitGrowthLeadSequenceEnrollmentCancelledTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    enrollmentId: string
+    reason: string
+    actor?: { userId?: string | null; email?: string | null }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "sequence_enrollment_cancelled",
+    title: "Sequence enrollment cancelled",
+    summary: input.reason,
+    payload: { enrollmentId: input.enrollmentId },
+    actorUserId: input.actor?.userId,
+    actorEmail: input.actor?.email,
+  })
+}

@@ -63,6 +63,8 @@ export type GrowthOutreachQueueItem = {
   payloadSnapshot: GrowthOutreachQueuePayloadSnapshot
   generationVersion: number
   parentQueueId: string | null
+  sequencePatternId: string | null
+  sequenceEnrollmentStepId: string | null
   createdBy: string | null
   cancelledAt: string | null
   cancelledBy: string | null

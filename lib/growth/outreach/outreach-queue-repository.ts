@@ -32,6 +32,8 @@ type QueueRow = {
   payload_snapshot: Record<string, unknown> | null
   generation_version: number
   parent_queue_id: string | null
+  sequence_pattern_id: string | null
+  sequence_enrollment_step_id: string | null
   created_by: string | null
   cancelled_at: string | null
   cancelled_by: string | null
@@ -49,7 +51,7 @@ type QueueEventRow = {
 }
 
 const QUEUE_SELECT =
-  "id, lead_id, generation_id, campaign_id, channel, status, priority, execution_confidence, scheduled_for, approved_at, approved_by, approval_note, executed_at, failed_at, failure_reason, provider_connection_id, outbound_message_id, payload_snapshot, generation_version, parent_queue_id, created_by, cancelled_at, cancelled_by, created_at, updated_at"
+  "id, lead_id, generation_id, campaign_id, channel, status, priority, execution_confidence, scheduled_for, approved_at, approved_by, approval_note, executed_at, failed_at, failure_reason, provider_connection_id, outbound_message_id, payload_snapshot, generation_version, parent_queue_id, sequence_pattern_id, sequence_enrollment_step_id, created_by, cancelled_at, cancelled_by, created_at, updated_at"
 
 function queueTable(admin: SupabaseClient) {
   return admin.schema("growth").from("outreach_queue")
@@ -81,6 +83,8 @@ function mapQueueRow(row: QueueRow): GrowthOutreachQueueItem {
     payloadSnapshot: (row.payload_snapshot ?? {}) as GrowthOutreachQueuePayloadSnapshot,
     generationVersion: row.generation_version,
     parentQueueId: row.parent_queue_id,
+    sequencePatternId: row.sequence_pattern_id,
+    sequenceEnrollmentStepId: row.sequence_enrollment_step_id,
     createdBy: row.created_by,
     cancelledAt: row.cancelled_at,
     cancelledBy: row.cancelled_by,
@@ -115,6 +119,8 @@ export async function insertGrowthOutreachQueueItem(
     payloadSnapshot: GrowthOutreachQueuePayloadSnapshot
     generationVersion?: number
     parentQueueId?: string | null
+    sequencePatternId?: string | null
+    sequenceEnrollmentStepId?: string | null
     createdBy?: string | null
   },
 ): Promise<GrowthOutreachQueueItem> {
@@ -132,6 +138,8 @@ export async function insertGrowthOutreachQueueItem(
       payload_snapshot: input.payloadSnapshot,
       generation_version: input.generationVersion ?? 1,
       parent_queue_id: input.parentQueueId ?? null,
+      sequence_pattern_id: input.sequencePatternId ?? null,
+      sequence_enrollment_step_id: input.sequenceEnrollmentStepId ?? null,
       created_by: input.createdBy ?? null,
     })
     .select(QUEUE_SELECT)

@@ -242,6 +242,7 @@ export type GrowthLead = {
   recommendedSequenceNextStep: GrowthSequenceRecommendedNextStep | Record<string, never>
   sequenceFatigueRisk: GrowthSequenceFatigueRisk | null
   recommendedSequenceComputedAt: string | null
+  activeSequenceEnrollmentId: string | null
   createdBy: string | null
   assignedTo: string | null
   createdAt: string
