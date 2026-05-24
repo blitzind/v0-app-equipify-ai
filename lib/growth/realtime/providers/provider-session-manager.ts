@@ -10,13 +10,13 @@ import {
   resolveRealtimeProviderRoute,
 } from "@/lib/growth/realtime/providers/provider-router"
 import {
-  clearRealtimeProviderStreamState,
   ingestRealtimeProviderTranscriptChunk,
 } from "@/lib/growth/realtime/providers/provider-stream-bridge"
 import type {
   RealtimeTranscriptProvider,
 } from "@/lib/growth/realtime/providers/provider-types"
 import { closeBrowserAudioProviderStream } from "@/lib/growth/realtime/browser-audio/browser-audio-stream-manager"
+import { clearLiveCoachingSessionMemory } from "@/lib/growth/realtime/live-coaching/live-coaching-session-memory"
 import type { GrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-types"
 import { updateGrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-repository"
 import { emitLiveCoachingProviderFallbackTimeline } from "@/lib/growth/realtime/live-coaching/session-timeline-emitter"
@@ -123,7 +123,7 @@ export async function detachRealtimeProviderFromSession(sessionId: string): Prom
   await active.provider.disconnect()
   active.unsubscribe()
   activeSessions.delete(sessionId)
-  clearRealtimeProviderStreamState(sessionId)
+  clearLiveCoachingSessionMemory(sessionId)
 }
 
 export function hasActiveRealtimeProviderSession(sessionId: string): boolean {

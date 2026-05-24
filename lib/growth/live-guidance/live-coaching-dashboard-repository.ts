@@ -13,6 +13,14 @@ export async function fetchGrowthLiveCoachingDashboard(admin: SupabaseClient) {
   const recentSessions = await listRecentGrowthRealtimeCallSessions(admin, 100)
   const guidanceEvents = await listRecentLiveGuidanceEvents(admin, 400)
 
+  const guidanceBySessionId = new Map<string, typeof guidanceEvents>()
+  for (const event of guidanceEvents) {
+    if (!event.realtimeCallSessionId) continue
+    const bucket = guidanceBySessionId.get(event.realtimeCallSessionId) ?? []
+    bucket.push(event)
+    guidanceBySessionId.set(event.realtimeCallSessionId, bucket)
+  }
+
   const completedSessions = recentSessions.filter((session) => session.status === "completed")
   const objectionCounts = new Map<string, number>()
   const talkRatioBuckets = { underGoal: 0, inGoal: 0, overGoal: 0, sampleSize: 0 }
@@ -51,7 +59,7 @@ export async function fetchGrowthLiveCoachingDashboard(admin: SupabaseClient) {
     const discoveryPct = Math.round((snapshot.discovery.covered.length / DISCOVERY_AREAS) * 100)
     discoveryCompletionScores.push(discoveryPct)
 
-    const sessionGuidance = guidanceEvents.filter((event) => event.realtimeCallSessionId === session.id)
+    const sessionGuidance = guidanceBySessionId.get(session.id) ?? []
     const acceptedCount = sessionGuidance.filter((event) => event.acceptedAt).length
     const score = computeCallExecutionScore({
       snapshot,

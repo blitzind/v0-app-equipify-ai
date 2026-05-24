@@ -61,6 +61,11 @@ export type LiveCoachingSessionTimelineDiagnostics = {
 export type LiveCoachingSessionTimelinePayload = {
   events: LiveCoachingSessionTimelineEvent[]
   diagnostics: LiveCoachingSessionTimelineDiagnostics
+  meta: {
+    total: number
+    limit: number
+    truncated: boolean
+  }
   qaProof: {
     marker: string
     label: string

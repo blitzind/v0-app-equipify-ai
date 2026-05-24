@@ -73,6 +73,7 @@ const rollups: LiveCoachingSessionInsightsRollup[] = [
 const payload = buildCoachingTrendsPayload({
   rollups,
   filters: { dateRangeDays: 30, providerId: null, riskLevel: null },
+  meta: { total: rollups.length, limit: 5000, truncated: false },
   qaProof: buildLiveCoachingTrendsQaProofMarker({ sessionCount: rollups.length }),
 })
 
@@ -87,6 +88,7 @@ assert.equal(payload.dailyTrend[1]?.sessionCount, 2)
 const providerFiltered = buildCoachingTrendsPayload({
   rollups: filterCoachingTrendsRollups(rollups, { providerId: "deepgram", riskLevel: null }),
   filters: { dateRangeDays: 30, providerId: "deepgram", riskLevel: null },
+  meta: { total: 2, limit: 5000, truncated: false },
   qaProof: buildLiveCoachingTrendsQaProofMarker({ sessionCount: 2 }),
 })
 assert.equal(providerFiltered.summary.sessionCount, 2)
@@ -94,6 +96,7 @@ assert.equal(providerFiltered.summary.sessionCount, 2)
 const riskFiltered = buildCoachingTrendsPayload({
   rollups: filterCoachingTrendsRollups(rollups, { providerId: null, riskLevel: "medium" }),
   filters: { dateRangeDays: 30, providerId: null, riskLevel: "medium" },
+  meta: { total: 1, limit: 5000, truncated: false },
   qaProof: buildLiveCoachingTrendsQaProofMarker({ sessionCount: 1 }),
 })
 assert.equal(riskFiltered.summary.sessionCount, 1)
@@ -112,6 +115,10 @@ assert.equal(parseCoachingTrendsRiskFilter("invalid"), null)
 
 const proof = buildLiveCoachingTrendsQaProofMarker({ sessionCount: 3 })
 assert.equal(proof.marker, LIVE_COACHING_TRENDS_QA_PROOF_MARKER)
+assert.equal(proof.verified, true)
+
+const truncatedProof = buildLiveCoachingTrendsQaProofMarker({ sessionCount: 5000, truncated: true })
+assert.equal(truncatedProof.verified, false)
 
 const trendsRoute = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/calls/live-coaching/trends/route.ts"),

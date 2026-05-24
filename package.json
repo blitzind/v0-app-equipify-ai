@@ -112,6 +112,7 @@
     "test:growth-live-coaching-session-timeline": "tsx scripts/test-growth-live-coaching-session-timeline.ts",
     "test:growth-live-coaching-session-insights": "tsx scripts/test-growth-live-coaching-session-insights.ts",
     "test:growth-live-coaching-trends": "tsx scripts/test-growth-live-coaching-trends.ts",
+    "test:growth-live-coaching-production-hardening": "tsx scripts/test-growth-live-coaching-production-hardening.ts",
     "test:growth-realtime-provider-readiness": "tsx scripts/test-growth-realtime-provider-readiness.ts",
     "test:growth-leads-inbox": "tsx scripts/test-growth-leads-inbox.ts",
     "test:catalog-import-manufacturer": "tsx scripts/test-catalog-import-manufacturer.ts",

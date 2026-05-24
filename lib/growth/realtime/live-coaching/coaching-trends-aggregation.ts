@@ -129,6 +129,7 @@ export function buildCoachingTrendsDailySeries(
 export function buildCoachingTrendsPayload(input: {
   rollups: LiveCoachingSessionInsightsRollup[]
   filters: CoachingTrendsFilters
+  meta: CoachingTrendsPayload["meta"]
   qaProof: CoachingTrendsPayload["qaProof"]
 }): CoachingTrendsPayload {
   const filtered = filterCoachingTrendsRollups(input.rollups, input.filters)
@@ -139,6 +140,7 @@ export function buildCoachingTrendsPayload(input: {
     riskDistribution: buildCoachingTrendsRiskDistribution(filtered),
     sessionsByProvider: buildCoachingTrendsSessionsByProvider(filtered),
     dailyTrend: buildCoachingTrendsDailySeries(filtered),
+    meta: input.meta,
     qaProof: input.qaProof,
   }
 }

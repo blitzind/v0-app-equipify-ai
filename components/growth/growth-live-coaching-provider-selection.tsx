@@ -23,7 +23,39 @@ export function GrowthLiveCoachingProviderComparisonTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <>
+      <div className="space-y-3 md:hidden">
+        {rows.map((row) => (
+          <div key={row.connectionId} className="rounded-lg border border-border p-3 text-xs">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-sm font-medium text-foreground">{row.label}</span>
+              <GrowthBadge label={row.providerLabel} tone="neutral" />
+              {row.recommended ? <GrowthBadge label="Recommended" tone="healthy" /> : null}
+              {row.active ? <GrowthBadge label="Active" tone="attention" /> : null}
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <MetricBadge label="Configured" value={row.configured} />
+              <MetricBadge label="Validated" value={row.validated} />
+              <MetricBadge label="Browser mic" value={row.browserMicSupported} />
+              <MetricBadge label="Live transcript" value={row.liveTranscriptSupported} />
+              <MetricBadge label="Guidance" value={row.liveGuidanceCompatible} />
+              <MetricBadge label="Latency" value={`${row.averageTranscriptLatencyMs}ms`} text />
+              <MetricBadge label="Reliability" value={String(row.reliabilityScore)} text />
+            </div>
+            <div className="mt-2">
+              {row.circuitOpen ? (
+                <GrowthBadge label="Circuit open" tone="attention" />
+              ) : row.degraded ? (
+                <GrowthBadge label="Degraded" tone="attention" />
+              ) : (
+                <GrowthBadge label={row.readinessStatus.replace(/_/g, " ")} tone="neutral" />
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-lg border border-border md:block">
       <table className="min-w-full text-left text-xs">
         <thead className="bg-muted/30 text-muted-foreground">
           <tr>
@@ -88,6 +120,34 @@ export function GrowthLiveCoachingProviderComparisonTable({
           ))}
         </tbody>
       </table>
+      </div>
+    </>
+  )
+}
+
+function MetricBadge({
+  label,
+  value,
+  text = false,
+}: {
+  label: string
+  value: boolean | string
+  text?: boolean
+}) {
+  if (text) {
+    return (
+      <div className="rounded-md bg-muted/30 px-2 py-1">
+        <p className="text-[10px] text-muted-foreground">{label}</p>
+        <p className="font-medium text-foreground">{value}</p>
+      </div>
+    )
+  }
+
+  const boolValue = Boolean(value)
+  return (
+    <div className="rounded-md bg-muted/30 px-2 py-1">
+      <p className="text-[10px] text-muted-foreground">{label}</p>
+      <GrowthBadge label={boolValue ? "Yes" : "No"} tone={readinessTone(boolValue)} />
     </div>
   )
 }

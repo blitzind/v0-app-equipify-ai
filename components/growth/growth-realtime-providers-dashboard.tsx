@@ -57,6 +57,11 @@ export function GrowthRealtimeProvidersDashboard() {
   const [acting, setActing] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [validationFeedback, setValidationFeedback] = useState<ValidationFeedback | null>(null)
+  const [cleanupFeedback, setCleanupFeedback] = useState<{
+    ok: boolean
+    message: string
+    result?: { staleStreamsClosed: number; orphanSessionsDetached: number; stuckStreamsDetected: number }
+  } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -109,8 +114,20 @@ export function GrowthRealtimeProvidersDashboard() {
 
   async function runCleanup() {
     setActing("cleanup")
+    setCleanupFeedback(null)
     try {
-      await fetch("/api/platform/growth/realtime/providers/operations/cleanup", { method: "POST" })
+      const res = await fetch("/api/platform/growth/realtime/providers/operations/cleanup", { method: "POST" })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        result?: { staleStreamsClosed: number; orphanSessionsDetached: number; stuckStreamsDetected: number }
+        qaProof?: { label: string }
+        message?: string
+      }
+      setCleanupFeedback({
+        ok: res.ok && Boolean(data.ok),
+        message: data.qaProof?.label ?? data.message ?? "Cleanup completed.",
+        result: data.result,
+      })
       await load()
     } finally {
       setActing(null)
@@ -156,6 +173,25 @@ export function GrowthRealtimeProvidersDashboard() {
           </Button>
         </div>
       </div>
+
+      {cleanupFeedback ? (
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            cleanupFeedback.ok
+              ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+              : "border-amber-200 bg-amber-50 text-amber-950"
+          }`}
+        >
+          <p>{cleanupFeedback.message}</p>
+          {cleanupFeedback.result ? (
+            <p className="mt-1 text-xs">
+              Stale streams closed: {cleanupFeedback.result.staleStreamsClosed} · Orphan sessions detached:{" "}
+              {cleanupFeedback.result.orphanSessionsDetached} · Stuck streams detected:{" "}
+              {cleanupFeedback.result.stuckStreamsDetected}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {validationFeedback ? (
         <div

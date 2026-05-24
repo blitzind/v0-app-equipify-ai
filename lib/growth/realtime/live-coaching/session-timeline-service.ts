@@ -6,6 +6,7 @@ import { buildSessionTimelineDiagnostics } from "@/lib/growth/realtime/live-coac
 import {
   countLiveCoachingSessionTimelineEvents,
   listLiveCoachingSessionTimelineEvents,
+  LIVE_COACHING_SESSION_TIMELINE_MAX_EVENTS,
 } from "@/lib/growth/realtime/live-coaching/session-timeline-repository"
 import type { LiveCoachingSessionTimelinePayload } from "@/lib/growth/realtime/live-coaching/session-timeline-types"
 
@@ -13,13 +14,21 @@ export async function getLiveCoachingSessionTimelinePayload(
   admin: SupabaseClient,
   input: { leadId: string; sessionId: string },
 ): Promise<LiveCoachingSessionTimelinePayload> {
-  const events = await listLiveCoachingSessionTimelineEvents(admin, input)
+  const limit = LIVE_COACHING_SESSION_TIMELINE_MAX_EVENTS
+  const [events, eventCount] = await Promise.all([
+    listLiveCoachingSessionTimelineEvents(admin, { ...input, limit }),
+    countLiveCoachingSessionTimelineEvents(admin, input.sessionId),
+  ])
   const diagnostics = buildSessionTimelineDiagnostics(events)
-  const eventCount = await countLiveCoachingSessionTimelineEvents(admin, input.sessionId)
 
   return {
     events,
     diagnostics,
+    meta: {
+      total: eventCount,
+      limit,
+      truncated: eventCount > events.length,
+    },
     qaProof: buildLiveCoachingSessionTimelineQaProofMarker({ eventCount }),
   }
 }

@@ -37,6 +37,7 @@ type StreamSessionRecord = GrowthBrowserAudioStreamState & {
   transcriptLatencyTotalMs: number
   transcriptLatencyCount: number
   lastIngestAt: number | null
+  statusChangedAt: string | null
 }
 
 const streamSessions = new Map<string, StreamSessionRecord>()
@@ -51,6 +52,7 @@ function getOrCreateStreamSession(sessionId: string, providerId: string | null):
     transcriptLatencyTotalMs: 0,
     transcriptLatencyCount: 0,
     lastIngestAt: null,
+    statusChangedAt: new Date().toISOString(),
   }
   streamSessions.set(sessionId, created)
   return created
@@ -60,7 +62,10 @@ function updateStreamMetrics(
   record: StreamSessionRecord,
   patch: Partial<GrowthBrowserAudioStreamMetrics> & { status?: GrowthBrowserAudioStreamStatus },
 ): GrowthBrowserAudioStreamState {
-  if (patch.status) record.status = patch.status
+  if (patch.status) {
+    record.status = patch.status
+    record.statusChangedAt = new Date().toISOString()
+  }
   record.metrics = {
     ...record.metrics,
     ...patch,
@@ -280,6 +285,10 @@ export async function closeBrowserAudioProviderStream(
     status: "closed",
     streamCloseCount: record.metrics.streamCloseCount + 1,
   })
+}
+
+export function getBrowserAudioStreamStatusChangedAt(sessionId: string): string | null {
+  return streamSessions.get(sessionId)?.statusChangedAt ?? null
 }
 
 export async function retryBrowserAudioProviderStream(

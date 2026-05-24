@@ -281,3 +281,17 @@ export async function listRecentGrowthRealtimeCallSessions(
     companyName: row.leads.company_name,
   }))
 }
+
+export async function fetchGrowthRealtimeCallSessionsByIds(
+  admin: SupabaseClient,
+  sessionIds: string[],
+): Promise<GrowthRealtimeCallSession[]> {
+  if (sessionIds.length === 0) return []
+
+  const { data, error } = await sessionsTable(admin)
+    .select(SESSION_SELECT)
+    .in("id", sessionIds)
+  if (error) throw new Error(error.message)
+
+  return ((data ?? []) as SessionRow[]).map(mapSession)
+}

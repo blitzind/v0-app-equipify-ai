@@ -57,6 +57,7 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
   const [draft, setDraft] = useState("")
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [captureCapability, setCaptureCapability] = useState<GrowthBrowserAudioCaptureCapability | null>(null)
+  const [captureQaProof, setCaptureQaProof] = useState<{ marker: string; verified: boolean } | null>(null)
 
   const activeSession = useMemo(
     () => sessions.find((session) => ["preparing", "active", "paused"].includes(session.status)) ?? null,
@@ -121,9 +122,11 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
         ok?: boolean
         capability?: GrowthBrowserAudioCaptureCapability
         session?: GrowthRealtimeCallSession
+        qaProof?: { marker: string; verified: boolean }
       }
       if (res.ok && data.ok) {
         setCaptureCapability(data.capability ?? null)
+        setCaptureQaProof(data.qaProof ?? null)
         if (data.session) {
           setSessions((prev) => prev.map((item) => (item.id === data.session!.id ? data.session! : item)))
         }
@@ -136,6 +139,7 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
   useEffect(() => {
     if (!activeSession) {
       setCaptureCapability(null)
+      setCaptureQaProof(null)
       return
     }
     void loadCaptureCapability(activeSession)
@@ -414,6 +418,12 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
                   )}
                   tone={browserAudio.isMicActive ? "attention" : "neutral"}
                 />
+                {captureQaProof ? (
+                  <GrowthBadge
+                    label={captureQaProof.marker}
+                    tone={captureQaProof.verified ? "healthy" : "attention"}
+                  />
+                ) : null}
                 {browserAudio.isMicActive ? (
                   <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700">
                     <span className="size-2 animate-pulse rounded-full bg-amber-500" />

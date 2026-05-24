@@ -62,6 +62,11 @@ export type CoachingTrendsPayload = {
   riskDistribution: CoachingTrendsRiskDistribution
   sessionsByProvider: CoachingTrendsProviderSummary[]
   dailyTrend: CoachingTrendsDailyPoint[]
+  meta: {
+    total: number
+    limit: number
+    truncated: boolean
+  }
   qaProof: {
     marker: string
     label: string

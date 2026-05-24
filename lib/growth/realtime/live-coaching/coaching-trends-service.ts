@@ -25,13 +25,23 @@ export async function fetchLiveCoachingTrendsPayload(
   const riskLevel = parseCoachingTrendsRiskFilter(input.risk)
   const sinceIso = coachingTrendsSinceIso(dateRangeDays)
 
-  const rollups = await listLiveCoachingSessionInsightsSince(admin, { sinceIso })
+  const queryResult = await listLiveCoachingSessionInsightsSince(admin, {
+    sinceIso,
+    providerId,
+    riskLevel,
+  })
 
   return buildCoachingTrendsPayload({
-    rollups,
+    rollups: queryResult.rollups,
     filters: { dateRangeDays, providerId, riskLevel },
+    meta: {
+      total: queryResult.total,
+      limit: queryResult.limit,
+      truncated: queryResult.truncated,
+    },
     qaProof: buildLiveCoachingTrendsQaProofMarker({
-      sessionCount: rollups.length,
+      sessionCount: queryResult.rollups.length,
+      truncated: queryResult.truncated,
     }),
   })
 }

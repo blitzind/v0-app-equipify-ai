@@ -61,6 +61,7 @@ type DashboardPayload = {
 
 export function GrowthLiveCoachingDashboard() {
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null)
+  const [qaProof, setQaProof] = useState<{ marker: string; label: string; verified: boolean } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [timelineSession, setTimelineSession] = useState<{ leadId: string; sessionId: string } | null>(null)
@@ -73,12 +74,14 @@ export function GrowthLiveCoachingDashboard() {
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
         dashboard?: DashboardPayload
+        qaProof?: { marker: string; label: string; verified: boolean }
         message?: string
       }
       if (!res.ok || !data.ok || !data.dashboard) {
         throw new Error(data.message ?? "Could not load live coaching dashboard.")
       }
       setDashboard(data.dashboard)
+      setQaProof(data.qaProof ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
     } finally {
@@ -106,6 +109,13 @@ export function GrowthLiveCoachingDashboard() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {qaProof ? (
+          <GrowthBadge label={qaProof.marker} tone={qaProof.verified ? "healthy" : "attention"} />
+        ) : null}
+        <p className="text-xs text-muted-foreground">{qaProof?.label}</p>
+      </div>
+
       <GrowthLiveCoachingTrends />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -200,17 +210,18 @@ export function GrowthLiveCoachingDashboard() {
           <ul className="space-y-2">
             {dashboard.highRiskCalls.map((call) => (
               <li key={call.sessionId} className="rounded-lg border border-rose-200 bg-rose-50/40 px-3 py-2 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                   <Link href={`/admin/growth/leads?open=${call.leadId}&focus=call-copilot`} className="font-medium hover:underline">
                     {call.companyName}
                   </Link>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <GrowthBadge label={call.riskLevel} tone="attention" />
                     <span className="font-semibold tabular-nums">Score {call.executionScore}</span>
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
+                      className="w-full sm:w-auto"
                       onClick={() =>
                         setTimelineSession({ leadId: call.leadId, sessionId: call.sessionId })
                       }

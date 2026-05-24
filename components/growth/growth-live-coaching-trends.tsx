@@ -71,6 +71,12 @@ export function GrowthLiveCoachingTrends() {
               tone={trends.qaProof.verified ? "healthy" : "attention"}
             />
           ) : null}
+          {trends?.meta.truncated ? (
+            <GrowthBadge
+              label={`Showing ${trends.meta.limit} of ${trends.meta.total}`}
+              tone="attention"
+            />
+          ) : null}
           <Button type="button" size="sm" variant="outline" disabled={loading} onClick={() => void load()}>
             {loading ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
           </Button>

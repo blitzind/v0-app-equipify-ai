@@ -113,6 +113,12 @@ export function GrowthLiveCoachingSessionTimeline({
             tone={payload.qaProof.verified ? "healthy" : "attention"}
           />
         ) : null}
+        {payload?.meta.truncated ? (
+          <GrowthBadge
+            label={`Showing ${payload.meta.limit} of ${payload.meta.total} events`}
+            tone="attention"
+          />
+        ) : null}
       </div>
       {loading && !payload ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -145,7 +151,7 @@ export function GrowthLiveCoachingSessionTimeline({
             />
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <FilterSelect
               label="Provider"
               value={providerFilter}

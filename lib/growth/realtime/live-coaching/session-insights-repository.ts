@@ -126,19 +126,54 @@ export async function listLiveCoachingSessionInsightsRollups(
 
 const MAX_TRENDS_INSIGHTS_ROWS = 5000
 
+export type LiveCoachingSessionInsightsQueryResult = {
+  rollups: LiveCoachingSessionInsightsRollup[]
+  total: number
+  limit: number
+  truncated: boolean
+}
+
 export async function listLiveCoachingSessionInsightsSince(
   admin: SupabaseClient,
-  input: { sinceIso: string; limit?: number },
-): Promise<LiveCoachingSessionInsightsRollup[]> {
+  input: {
+    sinceIso: string
+    limit?: number
+    providerId?: string | null
+    riskLevel?: LiveCoachingSessionInsightsRollup["riskLevel"] | null
+  },
+): Promise<LiveCoachingSessionInsightsQueryResult> {
   const limit = Math.min(input.limit ?? MAX_TRENDS_INSIGHTS_ROWS, MAX_TRENDS_INSIGHTS_ROWS)
-  const { data, error } = await insightsTable(admin)
-    .select(INSIGHTS_SELECT)
+
+  let query = insightsTable(admin)
+    .select(INSIGHTS_SELECT, { count: "exact" })
     .gte("computed_at", input.sinceIso)
     .order("computed_at", { ascending: true })
     .limit(limit)
 
+  if (input.riskLevel) {
+    query = query.eq("risk_level", input.riskLevel)
+  }
+
+  if (input.providerId) {
+    if (input.providerId === "manual") {
+      query = query.is("provider_id", null)
+    } else {
+      query = query.eq("provider_id", input.providerId)
+    }
+  }
+
+  const { data, error, count } = await query
   if (error) throw new Error(error.message)
-  return ((data ?? []) as InsightsDbRow[]).map(mapInsightsRow)
+
+  const total = count ?? 0
+  const rollups = ((data ?? []) as InsightsDbRow[]).map(mapInsightsRow)
+
+  return {
+    rollups,
+    total,
+    limit,
+    truncated: total > rollups.length,
+  }
 }
 
 export const LIVE_COACHING_TRENDS_MAX_INSIGHTS_ROWS = MAX_TRENDS_INSIGHTS_ROWS
