@@ -36,7 +36,11 @@ function buildPayloadFromGeneration(generation: {
   promptVersion: string
   promptVariant: string
   inputHash: string | null
+  classification?: Record<string, unknown>
 }): GrowthOutreachQueuePayloadSnapshot {
+  const personalization = generation.classification?.personalization as
+    | { variationKey?: string; strategyVersion?: string; confidenceScore?: number }
+    | undefined
   return {
     subject: generation.generatedSubject,
     body: generation.generatedContent,
@@ -44,6 +48,9 @@ function buildPayloadFromGeneration(generation: {
     promptVersion: generation.promptVersion,
     promptVariant: generation.promptVariant,
     inputHash: generation.inputHash,
+    variantKey: personalization?.variationKey ?? null,
+    personalizationStrategyVersion: personalization?.strategyVersion ?? generation.promptVersion,
+    personalizationConfidence: personalization?.confidenceScore ?? null,
   }
 }
 

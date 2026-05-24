@@ -32,6 +32,11 @@ import {
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { fetchGrowthLeadEmailEventSummary } from "@/lib/growth/outbound/email-event-summary"
 import {
+  isOutreachPersonalizationEmailType,
+  OUTREACH_PERSONALIZATION_STRATEGY_VERSION,
+} from "@/lib/growth/outreach/personalization/personalization-types"
+import { runOutreachPersonalizationGeneration } from "@/lib/growth/outreach/personalization/run-outreach-personalization"
+import {
   emitGrowthLeadAiCopilotGenerationApprovedTimeline,
   emitGrowthLeadAiCopilotGenerationCreatedTimeline,
   emitGrowthLeadPlaybookConflictDetectedTimeline,
@@ -122,6 +127,117 @@ export async function runGrowthAiCopilotGeneration(
     rules: playbookResolution.rules,
     conflicts: playbookResolution.conflicts,
   })
+
+  const useOutreachPersonalization =
+    settings.outreachPersonalizationEnabled && isOutreachPersonalizationEmailType(input.generationType)
+
+  if (useOutreachPersonalization) {
+    const personalized = await runOutreachPersonalizationGeneration(input.admin, {
+      lead,
+      generationType: input.generationType,
+      actingUserId: input.actingUserId,
+      maxWords: settings.outreachPersonalizationMaxWords,
+      aiRefinementEnabled: settings.aiCopilotEnabled,
+    })
+
+    const mapped = {
+      generatedSubject: personalized.subject,
+      generatedContent: personalized.content,
+      classification: {
+        confidence: personalized.audit.confidenceScore / 100,
+        personalization: personalized.audit,
+      },
+    }
+
+    const promptVersion = OUTREACH_PERSONALIZATION_STRATEGY_VERSION
+    const personalizedInputHash = growthAiCopilotInputHash({
+      generationType: input.generationType,
+      promptVariant,
+      snapshot: {
+        ...snapshot,
+        personalizationStrategyVersion: promptVersion,
+        personalizationVariationKey: personalized.audit.variationKey,
+      },
+    })
+
+    if (!settings.aiCopilotStoreGenerations) {
+      const ephemeral: GrowthAiCopilotGeneration = {
+        id: "ephemeral",
+        leadId: lead.id,
+        generationType: input.generationType,
+        promptVersion,
+        promptVariant,
+        inputSnapshot: snapshot,
+        generatedContent: mapped.generatedContent,
+        generatedSubject: mapped.generatedSubject,
+        classification: mapped.classification,
+        status: "draft",
+        sourceReplyId: input.sourceReplyId ?? null,
+        inputHash: personalizedInputHash,
+        playbookInfluenceScore,
+        playbookAttribution,
+        approvedAt: null,
+        approvedBy: null,
+        sentAt: null,
+        createdBy: input.actingUserId,
+        createdAt: new Date().toISOString(),
+      }
+      return { ok: true, generation: ephemeral }
+    }
+
+    const generation = await insertGrowthAiCopilotGeneration(input.admin, {
+      leadId: lead.id,
+      generationType: input.generationType,
+      promptVersion,
+      promptVariant,
+      inputSnapshot: snapshot,
+      generatedContent: mapped.generatedContent,
+      generatedSubject: mapped.generatedSubject,
+      classification: mapped.classification,
+      sourceReplyId: input.sourceReplyId ?? null,
+      inputHash: personalizedInputHash,
+      playbookInfluenceScore,
+      playbookAttribution,
+      createdBy: input.actingUserId,
+    })
+
+    await insertGrowthAiCopilotEffectiveness(input.admin, {
+      generationId: generation.id,
+      leadId: lead.id,
+      generationType: generation.generationType,
+      promptVariant: generation.promptVariant,
+      promptVersion: generation.promptVersion,
+      outcome: "generated",
+      classificationPrimary: generation.classification.primary ?? null,
+      effectivenessScore: computeGrowthAiCopilotEffectivenessScore({
+        outcome: "generated",
+        classificationConfidence: generation.classification.confidence,
+      }),
+      metadata: {
+        personalization: true,
+        confidenceScore: personalized.audit.confidenceScore,
+        variationKey: personalized.audit.variationKey,
+      },
+    })
+
+    await emitGrowthLeadAiCopilotGenerationCreatedTimeline(input.admin, {
+      leadId: lead.id,
+      generationId: generation.id,
+      generationType: generation.generationType,
+      summary: generation.generatedSubject ?? generation.generationType.replace(/_/g, " "),
+      actor: { userId: input.actingUserId, email: input.actingUserEmail },
+    })
+
+    logGrowthEngine("ai_copilot_personalized_generation_created", {
+      leadId: lead.id,
+      generationId: generation.id,
+      generationType: generation.generationType,
+      confidenceScore: personalized.audit.confidenceScore,
+      variationKey: personalized.audit.variationKey,
+    })
+
+    return { ok: true, generation }
+  }
 
   const systemPrompt = buildGrowthAiCopilotSystemPrompt(
     input.generationType,

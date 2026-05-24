@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Bot, Check, Copy, Loader2, Sparkles, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { GrowthOutreachPersonalizationPreview } from "@/components/growth/growth-outreach-personalization-preview"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type {
@@ -397,12 +398,22 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
                     </div>
                     {expanded ? (
                       <div className="mt-3 space-y-2">
-                        {entry.generatedSubject ? (
-                          <p className="font-medium">Subject: {entry.generatedSubject}</p>
-                        ) : null}
-                        <pre className="whitespace-pre-wrap rounded-md bg-muted/40 p-2 text-xs">
-                          {entry.generatedContent}
-                        </pre>
+                        {entry.classification.personalization ? (
+                          <GrowthOutreachPersonalizationPreview
+                            audit={entry.classification.personalization}
+                            generatedSubject={entry.generatedSubject}
+                            generatedContent={entry.generatedContent}
+                          />
+                        ) : (
+                          <>
+                            {entry.generatedSubject ? (
+                              <p className="font-medium">Subject: {entry.generatedSubject}</p>
+                            ) : null}
+                            <pre className="whitespace-pre-wrap rounded-md bg-muted/40 p-2 text-xs">
+                              {entry.generatedContent}
+                            </pre>
+                          </>
+                        )}
                         {entry.classification.callPrep ? (
                           <div className="rounded-md border border-amber-200 bg-amber-50/40 p-2 text-xs">
                             <p className="font-medium">Call prep</p>

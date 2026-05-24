@@ -1,5 +1,7 @@
 /** Client-safe Growth Engine AI copilot types. */
 
+import type { OutreachPersonalizationAudit } from "@/lib/growth/outreach/personalization/personalization-types"
+
 export const GROWTH_AI_COPILOT_GENERATION_TYPES = [
   "cold_email",
   "follow_up_email",
@@ -62,6 +64,7 @@ export type GrowthAiCopilotClassification = {
     recommendedCta?: string
     riskSummary?: string
   }
+  personalization?: OutreachPersonalizationAudit
 }
 
 export type GrowthAiCopilotGeneration = {
@@ -122,6 +125,8 @@ export type GrowthCopilotSettings = {
   aiCopilotPlaybookEnabled: boolean
   aiCopilotPlaybookMaxRulesPerGeneration: number
   aiCopilotPlaybookSourceRetentionDays: number
+  outreachPersonalizationEnabled: boolean
+  outreachPersonalizationMaxWords: number
   callCopilotEnabled: boolean
   callCopilotRequireSummaryApproval: boolean
   updatedBy: string | null

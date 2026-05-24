@@ -30,7 +30,7 @@ function effectivenessTable(admin: SupabaseClient) {
 }
 
 const SETTINGS_SELECT =
-  "id, ai_copilot_enabled, ai_copilot_human_approval_required, ai_copilot_store_generations, ai_copilot_generation_retention_days, ai_copilot_default_prompt_variant, ai_copilot_playbook_enabled, ai_copilot_playbook_max_rules_per_generation, ai_copilot_playbook_source_retention_days, call_copilot_enabled, call_copilot_require_summary_approval, updated_by, created_at, updated_at"
+  "id, ai_copilot_enabled, ai_copilot_human_approval_required, ai_copilot_store_generations, ai_copilot_generation_retention_days, ai_copilot_default_prompt_variant, ai_copilot_playbook_enabled, ai_copilot_playbook_max_rules_per_generation, ai_copilot_playbook_source_retention_days, outreach_personalization_enabled, outreach_personalization_max_words, call_copilot_enabled, call_copilot_require_summary_approval, updated_by, created_at, updated_at"
 
 const RULES_SELECT =
   "id, rule_key, label, description, enabled, rule_config, sort_order, created_at, updated_at"
@@ -48,6 +48,8 @@ type SettingsRow = {
   ai_copilot_playbook_enabled: boolean
   ai_copilot_playbook_max_rules_per_generation: number
   ai_copilot_playbook_source_retention_days: number
+  outreach_personalization_enabled: boolean
+  outreach_personalization_max_words: number
   call_copilot_enabled: boolean
   call_copilot_require_summary_approval: boolean
   updated_by: string | null
@@ -88,6 +90,8 @@ function mapSettings(row: SettingsRow): GrowthCopilotSettings {
     aiCopilotPlaybookEnabled: row.ai_copilot_playbook_enabled ?? true,
     aiCopilotPlaybookMaxRulesPerGeneration: row.ai_copilot_playbook_max_rules_per_generation ?? 12,
     aiCopilotPlaybookSourceRetentionDays: row.ai_copilot_playbook_source_retention_days ?? 30,
+    outreachPersonalizationEnabled: row.outreach_personalization_enabled ?? true,
+    outreachPersonalizationMaxWords: row.outreach_personalization_max_words ?? 120,
     callCopilotEnabled: resolveGrowthCallCopilotEnabled({
       callCopilotEnabled: row.call_copilot_enabled,
       aiCopilotEnabled: row.ai_copilot_enabled,
@@ -148,6 +152,8 @@ export async function updateGrowthCopilotSettings(
     aiCopilotPlaybookEnabled?: boolean
     aiCopilotPlaybookMaxRulesPerGeneration?: number
     aiCopilotPlaybookSourceRetentionDays?: number
+    outreachPersonalizationEnabled?: boolean
+    outreachPersonalizationMaxWords?: number
     updatedBy: string
   },
 ): Promise<GrowthCopilotSettings> {
@@ -175,6 +181,12 @@ export async function updateGrowthCopilotSettings(
   }
   if (input.aiCopilotPlaybookSourceRetentionDays !== undefined) {
     patch.ai_copilot_playbook_source_retention_days = input.aiCopilotPlaybookSourceRetentionDays
+  }
+  if (input.outreachPersonalizationEnabled !== undefined) {
+    patch.outreach_personalization_enabled = input.outreachPersonalizationEnabled
+  }
+  if (input.outreachPersonalizationMaxWords !== undefined) {
+    patch.outreach_personalization_max_words = input.outreachPersonalizationMaxWords
   }
   if (input.callCopilotEnabled !== undefined) patch.call_copilot_enabled = input.callCopilotEnabled
   if (input.callCopilotRequireSummaryApproval !== undefined) {

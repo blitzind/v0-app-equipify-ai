@@ -40,6 +40,8 @@ export type GrowthOutreachQueuePayloadSnapshot = {
   sequenceStep?: number | null
   variantKey?: string | null
   campaignName?: string | null
+  personalizationStrategyVersion?: string | null
+  personalizationConfidence?: number | null
 }
 
 export type GrowthOutreachQueueItem = {

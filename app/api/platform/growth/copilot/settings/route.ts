@@ -22,6 +22,8 @@ const PatchSettingsSchema = z.object({
   aiCopilotPlaybookSourceRetentionDays: z.number().int().min(1).max(3650).optional(),
   callCopilotEnabled: z.boolean().optional(),
   callCopilotRequireSummaryApproval: z.boolean().optional(),
+  outreachPersonalizationEnabled: z.boolean().optional(),
+  outreachPersonalizationMaxWords: z.number().int().min(60).max(200).optional(),
 })
 
 const PatchRuleSchema = z.object({
