@@ -249,15 +249,23 @@ export function describeSequenceStartUnavailable(
   lead: GrowthLead,
   input: {
     hasEnrollment: boolean
+    enrollmentStatus?: "draft" | "active" | "paused" | "completed" | "cancelled" | null
     preflightCode?: string | null
     preflightReason?: string | null
   },
 ): SequenceStartAvailability {
   if (input.hasEnrollment) {
+    if (input.enrollmentStatus === "draft") {
+      return {
+        canStart: false,
+        code: "draft_enrollment",
+        message: "Draft sequence ready for confirmation.",
+      }
+    }
     return {
       canStart: false,
       code: "active_enrollment",
-      message: "Existing sequence active",
+      message: "Existing sequence in progress.",
     }
   }
 
@@ -305,7 +313,9 @@ export function mapPreflightCodeToMessage(code: string, reason?: string | null):
     case "fatigue_blocked":
       return "High fatigue risk"
     case "active_enrollment":
-      return "Existing sequence active"
+      return "Existing sequence in progress."
+    case "draft_enrollment":
+      return "Draft sequence ready for confirmation."
     case "lead_blocked":
       return reason ?? "Lead is not eligible for sequence enrollment."
     case "suppressed":

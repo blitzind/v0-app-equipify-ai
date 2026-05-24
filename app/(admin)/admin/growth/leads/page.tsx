@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Loader2, Plus, RefreshCw, Target } from "lucide-react"
+import { useSearchParams } from "next/navigation"
 import { useAdmin } from "@/lib/admin-store"
 import { Button } from "@/components/ui/button"
 import { GrowthLeadFormDialog, type GrowthLeadFormValues } from "@/components/growth/growth-lead-form-dialog"
@@ -15,8 +16,13 @@ import {
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import type { GrowthLead, GrowthLeadStatus } from "@/lib/growth/types"
+import {
+  applyGrowthCommandLeadFocusExpand,
+  scrollGrowthCommandLeadFocusSection,
+} from "@/lib/growth/command/command-lead-focus"
 
 export default function AdminGrowthLeadsPage() {
+  const searchParams = useSearchParams()
   const { sessionIdentity } = useAdmin()
   const header = usePlatformAdminHeaderIdentity({
     displayName: sessionIdentity?.displayName,
@@ -34,6 +40,8 @@ export default function AdminGrowthLeadsPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [selectedLead, setSelectedLead] = useState<GrowthLead | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const drawerFocus = searchParams.get("focus")
+  const deepLinkLeadId = searchParams.get("open")
 
   const counts = useMemo(() => {
     return leads.reduce<Record<string, number>>((acc, lead) => {
@@ -68,6 +76,20 @@ export default function AdminGrowthLeadsPage() {
   useEffect(() => {
     void load()
   }, [])
+
+  useEffect(() => {
+    if (!deepLinkLeadId || loading) return
+    const lead = leads.find((item) => item.id === deepLinkLeadId)
+    if (!lead) return
+    if (drawerFocus) applyGrowthCommandLeadFocusExpand(drawerFocus)
+    setSelectedLead(lead)
+    setDrawerOpen(true)
+  }, [deepLinkLeadId, drawerFocus, leads, loading])
+
+  useEffect(() => {
+    if (!drawerOpen || !drawerFocus) return
+    scrollGrowthCommandLeadFocusSection(drawerFocus)
+  }, [drawerOpen, drawerFocus, selectedLead?.id])
 
   async function createLead(values: GrowthLeadFormValues) {
     setSaving(true)
@@ -252,6 +274,7 @@ export default function AdminGrowthLeadsPage() {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         onLeadUpdated={handleLeadUpdated}
+        drawerFocus={drawerFocus}
       />
 
       <GrowthLeadFormDialog open={createOpen} onOpenChange={setCreateOpen} onSubmit={createLead} saving={saving} />

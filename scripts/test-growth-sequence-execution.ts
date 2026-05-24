@@ -182,6 +182,7 @@ assert.equal(
   } as unknown as GrowthSequenceEnrollmentWithSteps),
   true,
 )
-assert.equal(formatSequenceUserMessage({ code: "active_enrollment", message: "active_enrollment" }), "Existing sequence active")
+assert.equal(formatSequenceUserMessage({ code: "active_enrollment", message: "active_enrollment" }), "Existing sequence in progress.")
+assert.equal(formatSequenceUserMessage({ code: "draft_enrollment", message: "draft_enrollment" }), "Draft sequence ready for confirmation.")
 
 console.log("growth-sequence-execution: all assertions passed")

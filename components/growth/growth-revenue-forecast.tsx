@@ -39,6 +39,7 @@ export function GrowthRevenueForecast({ lead }: GrowthRevenueForecastProps) {
 
   return (
     <GrowthCollapsibleEngineCard
+      id="growth-revenue"
       title="Revenue Forecast"
       icon={<TrendingUp className="size-4" />}
       headerAside={collapsedSummary || "No forecast data"}

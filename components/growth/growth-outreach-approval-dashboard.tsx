@@ -9,6 +9,7 @@ import {
   GROWTH_OUTREACH_QUEUE_CHANNEL_LABELS,
   GROWTH_OUTREACH_QUEUE_PRIORITY_LABELS,
 } from "@/lib/growth/outreach/outreach-queue-types"
+import { cn } from "@/lib/utils"
 
 type DashboardPayload = {
   sections: {
@@ -51,11 +52,13 @@ function QueueList({
   items,
   onAction,
   actingId,
+  highlightQueueId,
 }: {
   title: string
   items: GrowthOutreachQueueItemWithLead[]
   onAction: (action: "approve" | "execute" | "cancel", queueId: string) => void
   actingId: string | null
+  highlightQueueId?: string | null
 }) {
   return (
     <GrowthEngineCard title={title}>
@@ -64,7 +67,14 @@ function QueueList({
       ) : (
         <ul className="space-y-2">
           {items.map((item) => (
-            <li key={item.id} className="rounded-lg border px-3 py-2 text-sm">
+            <li
+              key={item.id}
+              id={`outreach-queue-${item.id}`}
+              className={cn(
+                "rounded-lg border px-3 py-2 text-sm",
+                highlightQueueId === item.id ? "border-indigo-300 bg-indigo-50/50 ring-2 ring-indigo-200" : "",
+              )}
+            >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="font-medium">{item.companyName}</p>
@@ -130,7 +140,7 @@ function formatDuration(ms: number | null): string {
   return `${Math.round(hours / 24)}d`
 }
 
-export function GrowthOutreachApprovalDashboard() {
+export function GrowthOutreachApprovalDashboard({ highlightQueueId }: { highlightQueueId?: string | null }) {
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -154,6 +164,13 @@ export function GrowthOutreachApprovalDashboard() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (!highlightQueueId || !dashboard) return
+    requestAnimationFrame(() => {
+      document.getElementById(`outreach-queue-${highlightQueueId}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
+    })
+  }, [highlightQueueId, dashboard])
 
   async function handleAction(action: "approve" | "execute" | "cancel", queueId: string) {
     setActingId(queueId)
@@ -258,14 +275,28 @@ export function GrowthOutreachApprovalDashboard() {
         items={dashboard.sections.pendingApproval}
         onAction={handleAction}
         actingId={actingId}
+        highlightQueueId={highlightQueueId}
       />
-      <QueueList title="Scheduled" items={dashboard.sections.scheduled} onAction={handleAction} actingId={actingId} />
-      <QueueList title="Failed" items={dashboard.sections.failed} onAction={handleAction} actingId={actingId} />
+      <QueueList
+        title="Scheduled"
+        items={dashboard.sections.scheduled}
+        onAction={handleAction}
+        actingId={actingId}
+        highlightQueueId={highlightQueueId}
+      />
+      <QueueList
+        title="Failed"
+        items={dashboard.sections.failed}
+        onAction={handleAction}
+        actingId={actingId}
+        highlightQueueId={highlightQueueId}
+      />
       <QueueList
         title="Executed recently"
         items={dashboard.sections.executedRecently}
         onAction={handleAction}
         actingId={actingId}
+        highlightQueueId={highlightQueueId}
       />
 
       {dashboard.sections.followUpDraftsPendingApproval.length > 0 ? (

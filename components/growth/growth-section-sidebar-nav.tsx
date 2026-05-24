@@ -14,6 +14,7 @@ import {
   Gauge,
   GitBranch,
   Inbox,
+  LayoutDashboard,
   Mail,
   MessageSquare,
   Phone,
@@ -55,6 +56,14 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
   {
     label: "Core",
     items: [
+      {
+        href: "/admin/growth/command",
+        label: "Command Center",
+        icon: LayoutDashboard,
+        match: (path) => path.startsWith("/admin/growth/command"),
+        consoleKey: "command",
+        shortcutKey: "m",
+      },
       {
         href: "/admin/growth/leads",
         label: "Inbox",

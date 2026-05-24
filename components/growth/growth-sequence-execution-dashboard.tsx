@@ -9,6 +9,7 @@ import type {
   GrowthSequenceEnrollment,
   GrowthSequenceEnrollmentStep,
 } from "@/lib/growth/sequence-enrollment-types"
+import { cn } from "@/lib/utils"
 
 type DashboardPayload = {
   averageHealth: number
@@ -31,9 +32,11 @@ type DashboardPayload = {
 function EnrollmentList({
   title,
   rows,
+  highlightEnrollmentId,
 }: {
   title: string
   rows: Array<GrowthSequenceEnrollment & { companyName: string }>
+  highlightEnrollmentId?: string | null
 }) {
   return (
     <GrowthEngineCard title={title}>
@@ -42,7 +45,14 @@ function EnrollmentList({
       ) : (
         <ul className="space-y-2">
           {rows.map((row) => (
-            <li key={row.id} className="rounded-lg border border-border px-3 py-2 text-sm">
+            <li
+              key={row.id}
+              id={`sequence-enrollment-${row.id}`}
+              className={cn(
+                "rounded-lg border border-border px-3 py-2 text-sm",
+                highlightEnrollmentId === row.id ? "border-indigo-300 bg-indigo-50/50 ring-2 ring-indigo-200" : "",
+              )}
+            >
               <div className="flex items-center justify-between gap-2">
                 <p className="font-medium">{row.companyName}</p>
                 <span className="tabular-nums font-semibold">{row.enrollmentHealthScore}</span>
@@ -60,7 +70,11 @@ function EnrollmentList({
   )
 }
 
-export function GrowthSequenceExecutionDashboard() {
+export function GrowthSequenceExecutionDashboard({
+  highlightEnrollmentId,
+}: {
+  highlightEnrollmentId?: string | null
+}) {
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -83,6 +97,15 @@ export function GrowthSequenceExecutionDashboard() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (!highlightEnrollmentId || !dashboard) return
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`sequence-enrollment-${highlightEnrollmentId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" })
+    })
+  }, [highlightEnrollmentId, dashboard])
 
   if (loading && !dashboard) {
     return (
@@ -128,7 +151,14 @@ export function GrowthSequenceExecutionDashboard() {
         ) : (
           <ul className="space-y-2">
             {dashboard.executionStalled.map((row) => (
-              <li key={row.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
+              <li
+                key={row.id}
+                id={`sequence-enrollment-${row.id}`}
+                className={cn(
+                  "flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm",
+                  highlightEnrollmentId === row.id ? "border-indigo-300 bg-indigo-50/50 ring-2 ring-indigo-200" : "",
+                )}
+              >
                 <span>{row.companyName}</span>
                 <GrowthBadge label={`health ${row.enrollmentHealthScore}`} tone="warning" />
               </li>
@@ -153,8 +183,8 @@ export function GrowthSequenceExecutionDashboard() {
       </GrowthEngineCard>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <EnrollmentList title="Active enrollments" rows={dashboard.activeEnrollments} />
-        <EnrollmentList title="Paused enrollments" rows={dashboard.pausedEnrollments} />
+        <EnrollmentList title="Active enrollments" rows={dashboard.activeEnrollments} highlightEnrollmentId={highlightEnrollmentId} />
+        <EnrollmentList title="Paused enrollments" rows={dashboard.pausedEnrollments} highlightEnrollmentId={highlightEnrollmentId} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -186,7 +216,7 @@ export function GrowthSequenceExecutionDashboard() {
         </GrowthEngineCard>
       </div>
 
-      <EnrollmentList title="Completed recently" rows={dashboard.completedRecently} />
+      <EnrollmentList title="Completed recently" rows={dashboard.completedRecently} highlightEnrollmentId={highlightEnrollmentId} />
     </div>
   )
 }

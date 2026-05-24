@@ -35,6 +35,7 @@ export function GrowthOperationalCapacityIntelligence({ lead }: GrowthOperationa
 
   return (
     <GrowthCollapsibleEngineCard
+      id="growth-capacity"
       title="Operational Capacity"
       icon={<Shield className="size-4" />}
       headerAside={collapsedSummary || "No capacity data"}

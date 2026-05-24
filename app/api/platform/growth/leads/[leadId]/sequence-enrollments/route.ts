@@ -50,6 +50,7 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
 
   const startAvailability = describeSequenceStartUnavailable(lead, {
     hasEnrollment: enrollment != null,
+    enrollmentStatus: enrollment?.status ?? null,
     preflightCode: recommendedPreflight.allowed ? null : recommendedPreflight.code ?? null,
     preflightReason: recommendedPreflight.reason ?? null,
   })

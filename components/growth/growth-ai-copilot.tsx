@@ -205,6 +205,7 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
 
   return (
     <GrowthCollapsibleEngineCard
+      id="growth-ai-copilot"
       title="AI Copilot"
       icon={<Bot className="size-4" />}
       headerAside={<span className="text-xs text-muted-foreground">{collapsedSummary}</span>}

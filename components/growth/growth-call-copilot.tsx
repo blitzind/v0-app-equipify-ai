@@ -252,6 +252,7 @@ export function GrowthCallCopilot({ lead }: GrowthCallCopilotProps) {
 
   return (
     <GrowthCollapsibleEngineCard
+      id="growth-call-copilot"
       title="Call Copilot"
       icon={<Phone className="size-4" />}
       headerAside={collapsedSummary}

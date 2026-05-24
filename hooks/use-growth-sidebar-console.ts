@@ -21,6 +21,7 @@ export type GrowthSidebarConsoleState = {
 }
 
 export type GrowthSidebarConsoleKey =
+  | "command"
   | "inbox"
   | "callQueue"
   | "imports"
@@ -77,6 +78,7 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true }))
     const [
+      commandRes,
       leadsRes,
       callQueueRes,
       copilotRes,
@@ -89,6 +91,9 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
       relationshipsRes,
       opportunitiesRes,
     ] = await Promise.all([
+      fetchJson<{ ok?: boolean; dashboard?: { missionControl?: { criticalActions?: number } } }>(
+        "/api/platform/growth/command/dashboard",
+      ),
       fetchJson<{ ok?: boolean; leads?: Array<{ status: string }> }>("/api/platform/growth/leads"),
       fetchJson<{ ok?: boolean; rows?: unknown[] }>(
         "/api/platform/growth/call-queue?filter=call_ready&limit=100",
@@ -153,6 +158,7 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
     ])
 
     const activeLeads = (leadsRes?.leads ?? []).filter((lead) => !TERMINAL_LEAD_STATUSES.has(lead.status))
+    const commandCritical = commandRes?.dashboard?.missionControl?.criticalActions ?? 0
     const callQueueCount = callQueueRes?.rows?.length ?? 0
     const approvalQueueCount = copilotRes?.dashboard?.approvalQueue?.length ?? 0
     const revenue = revenueRes?.dashboard
@@ -177,6 +183,7 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
     setState({
       loading: false,
       badges: {
+        command: commandCritical > 0 ? commandCritical : undefined,
         inbox: activeLeads.length,
         callQueue: callQueueCount,
         copilot: approvalQueueCount,
@@ -210,6 +217,7 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
         ],
         copilot: [{ label: "Approval queue", value: approvalQueueCount }],
         callQueue: [{ label: "Call ready", value: callQueueCount }],
+        command: [{ label: "Critical actions", value: commandCritical }],
         inbox: [{ label: "Active leads", value: activeLeads.length }],
         relationships: [
           { label: "Trusted", value: relationships?.trustedRelationships?.length ?? 0 },

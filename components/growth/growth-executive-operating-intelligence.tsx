@@ -31,6 +31,7 @@ export function GrowthExecutiveOperatingIntelligence({ lead }: GrowthExecutiveOp
 
   return (
     <GrowthCollapsibleEngineCard
+      id="growth-executive"
       title="Executive Intelligence"
       icon={<Crown className="size-4" />}
       headerAside={collapsedSummary || "No executive data"}

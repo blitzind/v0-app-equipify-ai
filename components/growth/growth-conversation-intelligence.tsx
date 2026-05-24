@@ -23,6 +23,7 @@ export function GrowthConversationIntelligence({ lead }: GrowthConversationIntel
 
   return (
     <GrowthCollapsibleEngineCard
+      id="growth-conversation"
       title="Conversation Intelligence"
       icon={<MessageSquare className="size-4" />}
       headerAside={collapsedSummary || "No conversation data"}

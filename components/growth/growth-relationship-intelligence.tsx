@@ -47,6 +47,7 @@ export function GrowthRelationshipIntelligence({ lead }: GrowthRelationshipIntel
 
   return (
     <GrowthCollapsibleEngineCard
+      id="growth-relationship"
       title="Relationship Intelligence"
       icon={<Handshake className="size-4" />}
       headerAside={collapsedSummary || "No relationship data"}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { DetailDrawer, DRAWER_INNER_SCROLL_CANVAS } from "@/components/detail-drawer"
 import { GrowthCompanyIntelligenceSnapshot } from "@/components/growth/growth-company-intelligence-snapshot"
 import { GrowthDecisionMakersPanel } from "@/components/growth/growth-decision-makers-panel"
@@ -22,18 +22,25 @@ import { GrowthLeadTimelinePanel } from "@/components/growth/growth-lead-timelin
 import { GrowthOperationalIntelligence } from "@/components/growth/growth-operational-intelligence"
 import type { GrowthLeadResearchRun } from "@/lib/growth/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
+import { scrollGrowthCommandLeadFocusSection } from "@/lib/growth/command/command-lead-focus"
 
 type GrowthLeadDrawerProps = {
   lead: GrowthLead | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onLeadUpdated?: (leadId: string, patch: Partial<GrowthLead>) => void
+  drawerFocus?: string | null
 }
 
-export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated }: GrowthLeadDrawerProps) {
+export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, drawerFocus }: GrowthLeadDrawerProps) {
   const [latestResearchRun, setLatestResearchRun] = useState<GrowthLeadResearchRun | null>(null)
   const [openAddDmForm, setOpenAddDmForm] = useState(false)
   const [timelineRefreshToken, setTimelineRefreshToken] = useState(0)
+
+  useEffect(() => {
+    if (!open || !drawerFocus || !lead) return
+    scrollGrowthCommandLeadFocusSection(drawerFocus)
+  }, [open, drawerFocus, lead?.id])
 
   if (!lead) return null
 

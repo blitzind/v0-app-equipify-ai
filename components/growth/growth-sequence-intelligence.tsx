@@ -393,13 +393,16 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
   const actionRequired = growthSequenceEnrollmentActionRequired(enrollment)
   const canStartRecommended = startAvailability?.canStart === true && !enrollment
   const unavailableMessage =
-    startAvailability?.canStart === false
+    startAvailability?.canStart === false && !enrollment
       ? formatSequenceUserMessage({
           code: startAvailability.code,
           message: startAvailability.message,
           fallback: "Sequence enrollment unavailable.",
         })
       : null
+  const unavailableIsBlocked = ["fatigue_blocked", "lead_blocked", "suppressed", "low_confidence"].includes(
+    startAvailability?.code ?? "",
+  )
   const hasRecommendation = Boolean(sequenceMeta?.recommendedPatternId ?? lead.recommendedSequencePatternId)
 
   const enrollmentPatternTitle = enrollment
@@ -425,6 +428,7 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
   return (
     <>
       <GrowthCollapsibleEngineCard
+        id="growth-sequence"
         title="Sequence Intelligence"
         icon={<GitBranch className="size-4" />}
         headerAside={collapsedSummary || unavailableMessage || "Sequence execution"}
@@ -568,7 +572,13 @@ export function GrowthSequenceIntelligence({ lead }: GrowthSequenceIntelligenceP
               ) : null}
 
               {unavailableMessage ? (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                <div
+                  className={
+                    unavailableIsBlocked
+                      ? "rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+                      : "rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground"
+                  }
+                >
                   {unavailableMessage}
                 </div>
               ) : null}

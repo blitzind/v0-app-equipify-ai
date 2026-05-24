@@ -1,5 +1,6 @@
 "use client"
 
+import { useSearchParams } from "next/navigation"
 import { PlayCircle } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthSequenceExecutionDashboard } from "@/components/growth/growth-sequence-execution-dashboard"
@@ -12,6 +13,8 @@ import {
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 export default function AdminGrowthSequenceExecutionPage() {
+  const searchParams = useSearchParams()
+  const highlightEnrollmentId = searchParams.get("highlight")
   const { sessionIdentity } = useAdmin()
   const header = usePlatformAdminHeaderIdentity({
     displayName: sessionIdentity?.displayName,
@@ -39,7 +42,7 @@ export default function AdminGrowthSequenceExecutionPage() {
         </section>
 
         <GrowthSectionLayout>
-          <GrowthSequenceExecutionDashboard />
+          <GrowthSequenceExecutionDashboard highlightEnrollmentId={highlightEnrollmentId} />
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>
