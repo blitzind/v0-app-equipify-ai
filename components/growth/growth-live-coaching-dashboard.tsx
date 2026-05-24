@@ -6,6 +6,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import { GrowthLiveCoachingSessionTimeline } from "@/components/growth/growth-live-coaching-session-timeline"
+import { GrowthLiveCoachingSessionInsightsPreview } from "@/components/growth/growth-live-coaching-session-insights"
 
 type DashboardPayload = {
   stats: {
@@ -45,6 +46,15 @@ type DashboardPayload = {
     riskFlags: string[]
     executionScore: number
     updatedAt: string
+    insightsPreview: {
+      sessionHealthScore: number
+      riskLevel: string
+      providerId: string | null
+      transcriptFinalizedCount: number
+      providerInterruptions: number
+      retryAttempts: number
+      sessionDurationMs: number
+    } | null
   }>
 }
 
@@ -211,6 +221,7 @@ export function GrowthLiveCoachingDashboard() {
                     <GrowthBadge key={flag} label={flag.replace(/_/g, " ")} tone="neutral" />
                   ))}
                 </div>
+                <GrowthLiveCoachingSessionInsightsPreview insightsPreview={call.insightsPreview} />
               </li>
             ))}
           </ul>

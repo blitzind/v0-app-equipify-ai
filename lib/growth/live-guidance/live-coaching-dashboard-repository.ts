@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { computeCallExecutionScore, computeLiveRiskLevel } from "@/lib/growth/live-guidance/live-execution-score"
 import { listRecentLiveGuidanceEvents } from "@/lib/growth/live-guidance/live-guidance-repository"
 import { listRecentGrowthRealtimeCallSessions } from "@/lib/growth/realtime/realtime-call-repository"
+import { listLiveCoachingSessionInsightsRollups } from "@/lib/growth/realtime/live-coaching/session-insights-repository"
+import { toLiveCoachingSessionInsightsPreview } from "@/lib/growth/realtime/live-coaching/session-insights-rollup"
 
 const DISCOVERY_AREAS = 5
 
@@ -27,6 +29,7 @@ export async function fetchGrowthLiveCoachingDashboard(admin: SupabaseClient) {
     riskFlags: string[]
     executionScore: number
     updatedAt: string
+    insightsPreview: ReturnType<typeof toLiveCoachingSessionInsightsPreview> | null
   }> = []
 
   for (const session of completedSessions) {
@@ -74,7 +77,18 @@ export async function fetchGrowthLiveCoachingDashboard(admin: SupabaseClient) {
         riskFlags: snapshot.riskFlags,
         executionScore: score.score,
         updatedAt: session.updatedAt,
+        insightsPreview: null,
       })
+    }
+  }
+
+  const highRiskSessionIds = highRiskCalls.map((call) => call.sessionId)
+  const insightRollups = await listLiveCoachingSessionInsightsRollups(admin, highRiskSessionIds)
+  const insightBySessionId = new Map(insightRollups.map((rollup) => [rollup.sessionId, rollup]))
+  for (const call of highRiskCalls) {
+    const rollup = insightBySessionId.get(call.sessionId)
+    if (rollup) {
+      call.insightsPreview = toLiveCoachingSessionInsightsPreview(rollup)
     }
   }
 

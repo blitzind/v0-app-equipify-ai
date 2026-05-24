@@ -42,6 +42,7 @@ import {
   emitLiveCoachingSessionStartedTimeline,
   emitLiveCoachingSnapshotDiffTimeline,
 } from "@/lib/growth/realtime/live-coaching/session-timeline-emitter"
+import { recomputeLiveCoachingSessionInsights } from "@/lib/growth/realtime/live-coaching/session-insights-service"
 
 type Actor = { userId: string | null; email: string | null }
 
@@ -229,6 +230,11 @@ export async function completeGrowthRealtimeCallSession(
 
   await emitLiveCoachingSessionCompletedTimeline(admin, updated)
 
+  void recomputeLiveCoachingSessionInsights(admin, {
+    leadId: session.leadId,
+    sessionId: session.id,
+  }).catch(() => undefined)
+
   return updated
 }
 
@@ -246,6 +252,10 @@ export async function discardGrowthRealtimeCallSession(
     transcriptStatus: "inactive",
   })
   await emitLiveCoachingSessionDiscardedTimeline(admin, updated)
+  void recomputeLiveCoachingSessionInsights(admin, {
+    leadId: updated.leadId,
+    sessionId: updated.id,
+  }).catch(() => undefined)
   return updated
 }
 

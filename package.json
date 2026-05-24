@@ -110,6 +110,7 @@
     "test:growth-openai-realtime-browser-streaming": "tsx scripts/test-growth-openai-realtime-browser-streaming.ts",
     "test:growth-live-coaching-provider-selection": "tsx scripts/test-growth-live-coaching-provider-selection.ts",
     "test:growth-live-coaching-session-timeline": "tsx scripts/test-growth-live-coaching-session-timeline.ts",
+    "test:growth-live-coaching-session-insights": "tsx scripts/test-growth-live-coaching-session-insights.ts",
     "test:growth-realtime-provider-readiness": "tsx scripts/test-growth-realtime-provider-readiness.ts",
     "test:growth-leads-inbox": "tsx scripts/test-growth-leads-inbox.ts",
     "test:catalog-import-manufacturer": "tsx scripts/test-catalog-import-manufacturer.ts",

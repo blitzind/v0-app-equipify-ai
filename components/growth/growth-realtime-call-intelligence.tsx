@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useGrowthCallWorkflow } from "@/components/growth/growth-call-workflow-context"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import { GrowthLiveCoachingSessionTimeline } from "@/components/growth/growth-live-coaching-session-timeline"
+import { GrowthLiveCoachingSessionInsights } from "@/components/growth/growth-live-coaching-session-insights"
 import { useGrowthBrowserAudioCapture } from "@/hooks/growth/use-growth-browser-audio-capture"
 import { GROWTH_CALL_AUDIO_CAPTURE_ENABLED, GROWTH_CALL_DIALER_SAFETY_COPY } from "@/lib/growth/call-workflow-copy"
 import { formatGrowthCallDialerNextStep } from "@/lib/growth/call-workflow"
@@ -683,6 +684,12 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
           </>
         ) : null}
       </div>
+
+      <GrowthLiveCoachingSessionInsights
+        leadId={lead.id}
+        sessionId={timelineSessionId}
+        refreshToken={refreshToken}
+      />
 
       <GrowthLiveCoachingSessionTimeline
         leadId={lead.id}
