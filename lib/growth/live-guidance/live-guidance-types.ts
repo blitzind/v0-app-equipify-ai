@@ -90,6 +90,7 @@ export type GrowthLiveCoachingState = {
   riskLevel: "low" | "medium" | "high"
   momentum: "building" | "stable" | "slowing" | "at_risk"
   activeGuidance: GrowthLiveGuidanceEvent[]
+  guidanceLatencyMs: number
 }
 
 /** Guidance never triggers autonomous actions — navigation/coaching only. */

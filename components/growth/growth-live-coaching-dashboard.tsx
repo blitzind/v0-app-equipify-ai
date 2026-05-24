@@ -13,6 +13,8 @@ type DashboardPayload = {
     buyingSignalCapturePercent: number
     discoveryCompletionPercent: number
     activeGuidanceEvents: number
+    averageGuidanceLatencyMs: number
+    p95GuidanceLatencyMs: number
   }
   topObjections: Array<{ key: string; count: number }>
   talkRatioDistribution: {
@@ -103,6 +105,13 @@ export function GrowthLiveCoachingDashboard() {
           Refresh
         </Button>
       </div>
+
+      <GrowthEngineCard title="Coaching Responsiveness">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <StatTile label="Avg guidance latency" value={`${dashboard.stats.averageGuidanceLatencyMs}ms`} />
+          <StatTile label="P95 guidance latency" value={`${dashboard.stats.p95GuidanceLatencyMs}ms`} />
+        </div>
+      </GrowthEngineCard>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <GrowthEngineCard title="Top objections">

@@ -23,8 +23,18 @@ import {
   emitGrowthLeadLiveGuidanceGeneratedTimeline,
   emitGrowthLeadLiveGuidanceUsedTimeline,
 } from "@/lib/growth/timeline-emitter"
+import { fetchGrowthLiveCoachingSettings } from "@/lib/growth/realtime/providers/live-coaching-settings-repository"
+import type { GrowthLiveGuidanceCandidate } from "@/lib/growth/live-guidance/live-guidance-types"
 
 type Actor = { userId: string | null; email: string | null }
+
+function passesGuidanceThreshold(
+  candidate: GrowthLiveGuidanceCandidate,
+  thresholds: { critical: number; normal: number },
+): boolean {
+  const minimum = candidate.severity === "high" ? thresholds.critical : thresholds.normal
+  return candidate.confidenceScore >= minimum
+}
 
 export async function syncLiveGuidanceForSession(
   admin: SupabaseClient,
@@ -38,11 +48,18 @@ export async function syncLiveGuidanceForSession(
     actor?: Actor
   },
 ): Promise<GrowthLiveCoachingState> {
+  const startedAt = Date.now()
+  const settings = await fetchGrowthLiveCoachingSettings(admin)
   const candidates = generateLiveGuidanceCandidates({
     snapshot: input.snapshot,
     events: input.events,
     lead: input.lead,
-  })
+  }).filter((candidate) =>
+    passesGuidanceThreshold(candidate, {
+      critical: settings.criticalGuidanceThreshold,
+      normal: settings.normalGuidanceThreshold,
+    }),
+  )
 
   const active = await listActiveLiveGuidanceEvents(admin, input.sessionId)
   const activeTypes = new Set(active.map((event) => event.eventType))
@@ -81,6 +98,7 @@ export async function syncLiveGuidanceForSession(
     riskLevel: computeLiveRiskLevel(input.snapshot),
     momentum: computeLiveMomentum(input.snapshot),
     activeGuidance: activeGuidance,
+    guidanceLatencyMs: Date.now() - startedAt,
   }
 }
 

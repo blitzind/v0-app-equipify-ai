@@ -186,6 +186,13 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
         consoleKey: "calls",
       },
       {
+        href: "/admin/growth/calls/providers",
+        label: "Call Providers",
+        icon: Plug,
+        match: (path) => path.startsWith("/admin/growth/calls/providers"),
+        consoleKey: "calls_providers",
+      },
+      {
         href: "/admin/growth/calls/live",
         label: "Live Calls",
         icon: Radio,

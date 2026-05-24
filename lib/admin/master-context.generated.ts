@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 555,
-  sqlMigrations: 230,
+  apiRouteHandlers: 561,
+  sqlMigrations: 231,
   dashboardPages: 65,
-  componentsTsx: 387,
-  libTsFiles: 1199,
+  componentsTsx: 389,
+  libTsFiles: 1216,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **555** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **230** |
+| API route handlers (\`app/api/**/route.ts\`) | **561** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **231** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **387** |
-| \`lib/**/*.ts\` | **1199** |
+| \`components/**/*.tsx\` | **389** |
+| \`lib/**/*.ts\` | **1216** |
 
 ### Vercel crons
 
@@ -452,6 +452,7 @@ platform/growth/call-queue/route.ts
 platform/growth/calls/dashboard/route.ts
 platform/growth/calls/live-coaching/dashboard/route.ts
 platform/growth/calls/live/dashboard/route.ts
+platform/growth/calls/providers/dashboard/route.ts
 platform/growth/capacity/dashboard/route.ts
 platform/growth/command/dashboard/route.ts
 platform/growth/communication-preferences/route.ts
@@ -511,6 +512,7 @@ platform/growth/leads/[leadId]/sequence-enrollments/route.ts
 platform/growth/leads/[leadId]/timeline/manual-touch/route.ts
 platform/growth/leads/[leadId]/timeline/route.ts
 platform/growth/leads/route.ts
+platform/growth/live-coaching/settings/route.ts
 platform/growth/opportunities/dashboard/route.ts
 platform/growth/outbound/connections/[connectionId]/route.ts
 platform/growth/outbound/connections/route.ts
@@ -532,6 +534,10 @@ platform/growth/providers/connections/[connectionId]/route.ts
 platform/growth/providers/connections/[connectionId]/timeline/route.ts
 platform/growth/providers/connections/[connectionId]/validate/route.ts
 platform/growth/providers/connections/route.ts
+platform/growth/realtime/providers/connections/[connectionId]/credentials/route.ts
+platform/growth/realtime/providers/connections/[connectionId]/route.ts
+platform/growth/realtime/providers/connections/[connectionId]/validate/route.ts
+platform/growth/realtime/providers/connections/route.ts
 platform/growth/relationships/dashboard/route.ts
 platform/growth/revenue/dashboard/route.ts
 platform/growth/sequences/dashboard/route.ts

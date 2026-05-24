@@ -21,6 +21,10 @@ import { toGrowthLeadRealtimeIntelligenceInput } from "@/lib/growth/realtime/rea
 import { analyzeRealtimeCallTranscript, diffRealtimeSnapshot } from "@/lib/growth/realtime/realtime-session-analyzer"
 import { createRealtimeTranscriptProvider } from "@/lib/growth/realtime/realtime-transcript-provider"
 import {
+  attachRealtimeProviderToSession,
+  detachRealtimeProviderFromSession,
+} from "@/lib/growth/realtime/providers/provider-session-manager"
+import {
   emitGrowthLeadLiveCallCompletedTimeline,
   emitGrowthLeadLiveCallStartedTimeline,
   emitGrowthLeadRealtimeBuyingSignalDetectedTimeline,
@@ -93,6 +97,9 @@ async function recomputeAndPersistSnapshot(
       lead: toGrowthLeadRealtimeIntelligenceInput(lead),
       actor,
     })
+    await updateGrowthRealtimeCallSession(admin, session.id, {
+      guidanceLatencyMs: coachingState.guidanceLatencyMs,
+    })
   }
 
   return { session: updated, coachingState }
@@ -132,10 +139,17 @@ export async function startGrowthRealtimeCallSession(
   await provider.connect(session.id)
 
   const now = new Date().toISOString()
-  const updated = await updateGrowthRealtimeCallSession(admin, session.id, {
+  await updateGrowthRealtimeCallSession(admin, session.id, {
     status: "active",
     startedAt: session.startedAt ?? now,
-    transcriptStatus: "live",
+    transcriptStatus: "connecting",
+  })
+
+  const updated = await attachRealtimeProviderToSession(admin, session, input.actor)
+
+  const finalSession = await updateGrowthRealtimeCallSession(admin, session.id, {
+    status: "active",
+    transcriptStatus: updated.transcriptStatus === "failed" ? "failed" : "live",
   })
 
   await emitGrowthLeadLiveCallStartedTimeline(admin, {
@@ -144,7 +158,7 @@ export async function startGrowthRealtimeCallSession(
     actor: input.actor,
   })
 
-  return updated
+  return finalSession
 }
 
 export async function pauseGrowthRealtimeCallSession(
@@ -153,6 +167,7 @@ export async function pauseGrowthRealtimeCallSession(
 ): Promise<GrowthRealtimeCallSession> {
   const session = await fetchGrowthRealtimeCallSession(admin, sessionId)
   if (!session) throw new Error("not_found")
+  await detachRealtimeProviderFromSession(sessionId)
   return updateGrowthRealtimeCallSession(admin, sessionId, { status: "paused" })
 }
 
@@ -164,6 +179,7 @@ export async function completeGrowthRealtimeCallSession(
   if (!session) throw new Error("not_found")
 
   const refreshed = await recomputeAndPersistSnapshot(admin, session, input.actor)
+  await detachRealtimeProviderFromSession(session.id)
   const updated = await updateGrowthRealtimeCallSession(admin, session.id, {
     status: "completed",
     endedAt: new Date().toISOString(),
@@ -186,6 +202,7 @@ export async function discardGrowthRealtimeCallSession(
 ): Promise<GrowthRealtimeCallSession> {
   const session = await fetchGrowthRealtimeCallSession(admin, sessionId)
   if (!session) throw new Error("not_found")
+  await detachRealtimeProviderFromSession(sessionId)
   return updateGrowthRealtimeCallSession(admin, sessionId, {
     status: "discarded",
     endedAt: new Date().toISOString(),
@@ -237,7 +254,7 @@ export async function getGrowthRealtimeCallSessionDetail(
     events,
     lead: toGrowthLeadRealtimeIntelligenceInput(lead),
   })
-  const refreshed = await updateGrowthRealtimeCallSession(admin, sessionId, { liveSnapshot: snapshot })
+  let refreshed = await updateGrowthRealtimeCallSession(admin, sessionId, { liveSnapshot: snapshot })
 
   let coachingState: GrowthLiveCoachingState | null = null
   if (refreshed.guidanceEnabled) {
@@ -247,6 +264,9 @@ export async function getGrowthRealtimeCallSessionDetail(
       snapshot,
       events,
       lead: toGrowthLeadRealtimeIntelligenceInput(lead),
+    })
+    refreshed = await updateGrowthRealtimeCallSession(admin, sessionId, {
+      guidanceLatencyMs: coachingState.guidanceLatencyMs,
     })
   }
 

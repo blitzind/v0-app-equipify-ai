@@ -218,7 +218,7 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
       icon={<Mic className="size-4" />}
       headerAside={
         activeSession
-          ? `${activeSession.status.replace(/_/g, " ")} · ${activeSession.transcriptStatus}`
+          ? `${activeSession.status.replace(/_/g, " ")} · ${activeSession.transcriptSource} · ${activeSession.transcriptStatus}`
           : "Live guidance"
       }
       defaultOpen={false}
@@ -451,6 +451,7 @@ function ExecutionScoreBanner({
           <StatPill label="Discovery" value={`${discoveryPct}%`} />
           <StatPill label="Risk" value={coachingState.riskLevel} />
           <StatPill label="Momentum" value={coachingState.momentum.replace(/_/g, " ")} />
+          <StatPill label="Guidance latency" value={`${coachingState.guidanceLatencyMs}ms`} />
         </div>
       </div>
     </div>

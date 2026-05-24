@@ -34,6 +34,7 @@ export type GrowthSidebarConsoleKey =
   | "copilot"
   | "playbooks"
   | "calls"
+  | "calls_providers"
   | "calls_live"
   | "calls_live_coaching"
   | "outreach"

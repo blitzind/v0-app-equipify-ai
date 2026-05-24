@@ -103,6 +103,18 @@ export async function fetchGrowthLiveCoachingDashboard(admin: SupabaseClient) {
         )
       : 0
 
+  const guidanceLatencies = completedSessions
+    .map((session) => session.guidanceLatencyMs)
+    .filter((value) => value > 0)
+  const averageGuidanceLatencyMs =
+    guidanceLatencies.length > 0
+      ? Math.round(guidanceLatencies.reduce((sum, value) => sum + value, 0) / guidanceLatencies.length)
+      : 0
+  const p95GuidanceLatencyMs =
+    guidanceLatencies.length > 0
+      ? [...guidanceLatencies].sort((a, b) => a - b)[Math.floor(guidanceLatencies.length * 0.95)] ?? 0
+      : 0
+
   return {
     stats: {
       completedSessions: completedSessions.length,
@@ -110,6 +122,8 @@ export async function fetchGrowthLiveCoachingDashboard(admin: SupabaseClient) {
       buyingSignalCapturePercent,
       discoveryCompletionPercent,
       activeGuidanceEvents: guidanceEvents.filter((event) => !event.dismissedAt && !event.acceptedAt).length,
+      averageGuidanceLatencyMs,
+      p95GuidanceLatencyMs,
     },
     topObjections: [...objectionCounts.entries()]
       .sort((a, b) => b[1] - a[1])

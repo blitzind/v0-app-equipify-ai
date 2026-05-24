@@ -23,6 +23,12 @@ type SessionRow = {
   guidance_enabled: boolean
   risk_monitoring_enabled: boolean
   live_snapshot: unknown
+  realtime_provider_connection_id: string | null
+  provider_id: string | null
+  transcript_source: string
+  transcript_quality_score: number
+  guidance_latency_ms: number
+  session_provider_failover_count: number
   created_by: string | null
   created_at: string
   updated_at: string
@@ -39,7 +45,7 @@ type TranscriptRow = {
 }
 
 const SESSION_SELECT =
-  "id, lead_id, call_copilot_session_id, status, started_at, ended_at, live_guidance_mode, transcript_status, guidance_enabled, risk_monitoring_enabled, live_snapshot, created_by, created_at, updated_at"
+  "id, lead_id, call_copilot_session_id, status, started_at, ended_at, live_guidance_mode, transcript_status, guidance_enabled, risk_monitoring_enabled, live_snapshot, realtime_provider_connection_id, provider_id, transcript_source, transcript_quality_score, guidance_latency_ms, session_provider_failover_count, created_by, created_at, updated_at"
 
 function sessionsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("realtime_call_sessions")
@@ -63,6 +69,12 @@ function mapSession(row: SessionRow): GrowthRealtimeCallSession {
     guidanceEnabled: row.guidance_enabled,
     riskMonitoringEnabled: row.risk_monitoring_enabled,
     liveSnapshot: snapshot,
+    realtimeProviderConnectionId: row.realtime_provider_connection_id,
+    providerId: row.provider_id,
+    transcriptSource: row.transcript_source as GrowthRealtimeCallSession["transcriptSource"],
+    transcriptQualityScore: row.transcript_quality_score,
+    guidanceLatencyMs: row.guidance_latency_ms,
+    sessionProviderFailoverCount: row.session_provider_failover_count,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -135,6 +147,12 @@ export async function updateGrowthRealtimeCallSession(
     endedAt: string | null
     transcriptStatus: GrowthRealtimeCallTranscriptStatus
     liveSnapshot: GrowthRealtimeLiveSnapshot
+    realtimeProviderConnectionId: string | null
+    providerId: string | null
+    transcriptSource: GrowthRealtimeCallSession["transcriptSource"]
+    transcriptQualityScore: number
+    guidanceLatencyMs: number
+    sessionProviderFailoverCount: number
   }>,
 ): Promise<GrowthRealtimeCallSession> {
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() }
@@ -143,6 +161,16 @@ export async function updateGrowthRealtimeCallSession(
   if (patch.endedAt !== undefined) update.ended_at = patch.endedAt
   if (patch.transcriptStatus !== undefined) update.transcript_status = patch.transcriptStatus
   if (patch.liveSnapshot !== undefined) update.live_snapshot = patch.liveSnapshot
+  if (patch.realtimeProviderConnectionId !== undefined) {
+    update.realtime_provider_connection_id = patch.realtimeProviderConnectionId
+  }
+  if (patch.providerId !== undefined) update.provider_id = patch.providerId
+  if (patch.transcriptSource !== undefined) update.transcript_source = patch.transcriptSource
+  if (patch.transcriptQualityScore !== undefined) update.transcript_quality_score = patch.transcriptQualityScore
+  if (patch.guidanceLatencyMs !== undefined) update.guidance_latency_ms = patch.guidanceLatencyMs
+  if (patch.sessionProviderFailoverCount !== undefined) {
+    update.session_provider_failover_count = patch.sessionProviderFailoverCount
+  }
 
   const { data, error } = await sessionsTable(admin)
     .update(update)

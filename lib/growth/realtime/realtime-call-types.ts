@@ -137,6 +137,12 @@ export type GrowthRealtimeCallSession = {
   guidanceEnabled: boolean
   riskMonitoringEnabled: boolean
   liveSnapshot: GrowthRealtimeLiveSnapshot
+  realtimeProviderConnectionId: string | null
+  providerId: string | null
+  transcriptSource: "manual" | "stub" | "provider"
+  transcriptQualityScore: number
+  guidanceLatencyMs: number
+  sessionProviderFailoverCount: number
   createdBy: string | null
   createdAt: string
   updatedAt: string

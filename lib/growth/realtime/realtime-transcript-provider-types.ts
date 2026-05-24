@@ -3,6 +3,8 @@ export type RealtimeTranscriptChunk = {
   content: string
   timestampMs: number
   isFinal: boolean
+  confidence?: number
+  keywords?: string[]
 }
 
 export type RealtimeTranscriptProviderHealth = {
@@ -10,4 +12,5 @@ export type RealtimeTranscriptProviderHealth = {
   providerId: string
   mode: "stub" | "live"
   message: string
+  latencyMs?: number
 }
