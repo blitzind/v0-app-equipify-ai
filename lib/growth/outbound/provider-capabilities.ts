@@ -49,6 +49,16 @@ const BASE_CAPABILITIES: Record<OutboundProviderCapabilityKey, OutboundProviderC
 
 export const GROWTH_OUTBOUND_PROVIDER_CAPABILITIES: OutboundProviderCapabilities[] = [
   {
+    providerFamily: "lemlist",
+    displayName: "Lemlist",
+    summary: "Live sequence outbound via Lemlist campaign lead push and webhook events.",
+    capabilities: {
+      ...BASE_CAPABILITIES,
+      multi_inbox_warmup: "partial",
+    },
+    fixtureOnly: false,
+  },
+  {
     providerFamily: "smartlead",
     displayName: "Smartlead",
     summary: "Sequence outbound with webhook event ingestion (fixture-only until live adapter).",

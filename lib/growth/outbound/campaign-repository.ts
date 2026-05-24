@@ -178,3 +178,41 @@ export async function fetchGrowthOutboundCampaignById(
   if (error) throw new Error(error.message)
   return data ? mapRow(data as CampaignDbRow) : null
 }
+
+export async function updateGrowthOutboundCampaignProviderStats(
+  admin: SupabaseClient,
+  campaignId: string,
+  input: {
+    sentCount: number
+    replyCount: number
+    positiveReplyCount: number
+    unsubscribeCount: number
+    bounceCount: number
+    metadata?: Record<string, unknown>
+  },
+): Promise<GrowthOutboundCampaign | null> {
+  const openCount = 0
+  const clickCount = 0
+  const engagementScore =
+    input.sentCount === 0
+      ? 0
+      : Math.round(((input.replyCount * 3 + clickCount * 2 + openCount) / input.sentCount) * 100) / 100
+
+  const { data, error } = await campaignsTable(admin)
+    .update({
+      sent_count: input.sentCount,
+      reply_count: input.replyCount,
+      positive_reply_count: input.positiveReplyCount,
+      unsubscribe_count: input.unsubscribeCount,
+      bounce_count: input.bounceCount,
+      engagement_score: engagementScore,
+      metadata: input.metadata ?? {},
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", campaignId)
+    .select(SELECT)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return data ? mapRow(data as CampaignDbRow) : null
+}

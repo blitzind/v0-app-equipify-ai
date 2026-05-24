@@ -33,6 +33,7 @@ import {
   type GrowthProviderLifecycleStatus,
   type GrowthProviderValidationResult,
 } from "@/lib/growth/outbound/provider-types"
+import { GrowthLemlistProviderSettings } from "@/components/growth/growth-lemlist-provider-settings"
 import { GROWTH_OUTBOUND_PROVIDER_FAMILIES, type GrowthOutboundProviderFamily } from "@/lib/growth/outbound/types"
 
 const LIFECYCLE_TONE: Record<
@@ -85,7 +86,7 @@ export function GrowthProvidersDashboard() {
   const [timeline, setTimeline] = useState<GrowthPlatformTimelineEvent[]>([])
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
-  const [newFamily, setNewFamily] = useState<GrowthOutboundProviderFamily>("smartlead")
+  const [newFamily, setNewFamily] = useState<GrowthOutboundProviderFamily>("lemlist")
   const [newLabel, setNewLabel] = useState("")
   const [credentialApiKey, setCredentialApiKey] = useState("")
 
@@ -495,6 +496,10 @@ export function GrowthProvidersDashboard() {
                 )}
               </div>
             </GrowthEngineCard>
+
+            {selected.providerFamily === "lemlist" ? (
+              <GrowthLemlistProviderSettings connection={selected} onUpdated={load} />
+            ) : null}
 
             <GrowthEngineCard title="Credentials (write-only)">
               <p className="mb-3 text-sm text-muted-foreground">

@@ -12,6 +12,14 @@ import {
   updateGrowthProviderWebhook,
 } from "@/lib/growth/outbound/webhook-repository"
 
+function toHeaders(headers?: Record<string, unknown>): Headers {
+  const result = new Headers()
+  for (const [key, value] of Object.entries(headers ?? {})) {
+    if (typeof value === "string") result.set(key, value)
+  }
+  return result
+}
+
 export async function ingestOutboundWebhookPayload(
   admin: SupabaseClient,
   input: {
@@ -20,6 +28,8 @@ export async function ingestOutboundWebhookPayload(
     payload: unknown
     connectionId?: string
     actorUserId?: string | null
+    signaturePreVerified?: boolean
+    querySecret?: string | null
   },
 ): Promise<{ webhookId: string; results: ProcessOutboundEventResult[] }> {
   const adapter = getOutboundProviderAdapter(input.provider)
@@ -33,11 +43,18 @@ export async function ingestOutboundWebhookPayload(
   }
   const connection = resolvedConnection
 
-  const verify = adapter.verifyWebhookSignature({
-    headers: new Headers(),
-    rawBody: JSON.stringify(input.payload),
-    secret: connection.webhookSecret,
-  })
+  const rawBody = JSON.stringify(input.payload)
+  const verify = input.signaturePreVerified
+    ? { ok: true, mode: "verified" as const }
+    : adapter.verifyWebhookSignature({
+        headers: toHeaders(input.headers),
+        rawBody,
+        secret: connection.webhookSecret,
+      })
+
+  if (!verify.ok && input.provider === "lemlist") {
+    throw new Error("webhook_signature_invalid")
+  }
 
   const envelopes = adapter.parseWebhookPayload(input.payload)
   const payloadRecord =
@@ -71,6 +88,7 @@ export async function ingestOutboundWebhookPayload(
     resolvedLeadId: results.find((r) => r.leadId)?.leadId ?? null,
   })
 
+  void input.querySecret
   return { webhookId: webhook.id, results }
 }
 

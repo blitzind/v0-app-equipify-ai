@@ -6,10 +6,12 @@ import {
   smartleadOutboundProviderAdapter,
 } from "@/lib/growth/outbound/providers/families"
 import { stubOutboundProviderAdapter } from "@/lib/growth/outbound/providers/stub"
+import { lemlistOutboundProviderAdapter } from "@/lib/growth/outbound/providers/lemlist/lemlist-adapter"
 import type { OutboundProviderAdapter } from "@/lib/growth/outbound/providers/types"
 
 const REGISTRY = new Map<string, OutboundProviderAdapter>([
   [stubOutboundProviderAdapter.providerKey(), stubOutboundProviderAdapter],
+  [lemlistOutboundProviderAdapter.providerKey(), lemlistOutboundProviderAdapter],
   [smartleadOutboundProviderAdapter.providerKey(), smartleadOutboundProviderAdapter],
   [instantlyOutboundProviderAdapter.providerKey(), instantlyOutboundProviderAdapter],
   [emailbisonOutboundProviderAdapter.providerKey(), emailbisonOutboundProviderAdapter],

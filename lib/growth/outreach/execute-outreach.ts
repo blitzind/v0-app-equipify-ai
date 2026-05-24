@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { fetchGrowthPlatformCommunicationSettings } from "@/lib/growth/communication/settings-repository"
 import { fetchGrowthOutboundConnectionById } from "@/lib/growth/outbound/connection-repository"
+import { upsertGrowthOutboundCampaign } from "@/lib/growth/outbound/campaign-repository"
 import { upsertGrowthOutboundContact } from "@/lib/growth/outbound/contact-repository"
 import { upsertGrowthOutboundMessage } from "@/lib/growth/outbound/message-repository"
 import { getOutboundProviderAdapter } from "@/lib/growth/outbound/providers/registry"
@@ -23,6 +24,8 @@ import {
   emitGrowthLeadOutreachExecutedTimeline,
   emitGrowthLeadOutreachFailedTimeline,
 } from "@/lib/growth/timeline-emitter"
+import { parseLemlistConnectionConfig } from "@/lib/growth/outbound/providers/lemlist/lemlist-config"
+import { LEMLIST_PROVIDER_KEY } from "@/lib/growth/outbound/providers/lemlist/lemlist-labels"
 
 async function maybeAdvanceSequenceEnrollmentAfterExecute(
   admin: SupabaseClient,
@@ -120,10 +123,37 @@ export async function executeGrowthOutreachQueueItem(
   const subject = input.queueItem.payloadSnapshot.subject ?? "Follow up"
   const body = input.queueItem.payloadSnapshot.body ?? ""
 
+  let localCampaignId = input.queueItem.campaignId
+  if (connection.provider === LEMLIST_PROVIDER_KEY) {
+    const lemlistConfig = parseLemlistConnectionConfig(connection.config)
+    const providerCampaignId = lemlistConfig.defaultCampaignId
+    if (!providerCampaignId) throw new Error("lemlist_campaign_not_configured")
+    const campaign = await upsertGrowthOutboundCampaign(admin, {
+      connectionId: connection.id,
+      provider: connection.provider,
+      providerCampaignId,
+      name: input.queueItem.payloadSnapshot.campaignName ?? "Lemlist campaign",
+      sourceChannel: lead.sourceChannel,
+      sourceCampaign: lead.sourceCampaign,
+    })
+    localCampaignId = campaign.id
+  }
+
   const validation = await adapter.validateExecution({
     connection,
     credentials,
-    message: { to: to!, subject, body },
+    message: {
+      to: to!,
+      subject,
+      body,
+      metadata: {
+        queueId: input.queueItem.id,
+        leadId: lead.id,
+        contactName: lead.contactName,
+        companyName: lead.companyName,
+        campaignId: parseLemlistConnectionConfig(connection.config).defaultCampaignId,
+      },
+    },
   })
   if (!validation.ok) {
     const now = new Date().toISOString()
@@ -151,7 +181,18 @@ export async function executeGrowthOutreachQueueItem(
   const result = await adapter.execute({
     connection,
     credentials,
-    message: { to: to!, subject, body, metadata: { queueId: input.queueItem.id } },
+    message: {
+      to: to!,
+      subject,
+      body,
+      metadata: {
+        queueId: input.queueItem.id,
+        leadId: lead.id,
+        contactName: lead.contactName,
+        companyName: lead.companyName,
+        campaignId: parseLemlistConnectionConfig(connection.config).defaultCampaignId,
+      },
+    },
   })
 
   if (!result.ok) {
@@ -181,20 +222,29 @@ export async function executeGrowthOutreachQueueItem(
     connectionId: connection.id,
     leadId: lead.id,
     email: to!,
-    campaignId: input.queueItem.campaignId,
+    campaignId: localCampaignId,
+    providerContactId:
+      typeof result.raw.contactId === "string" ? result.raw.contactId : typeof result.raw.leadId === "string" ? result.raw.leadId : null,
   })
 
   const message = await upsertGrowthOutboundMessage(admin, {
     connectionId: connection.id,
     contactId: contact.id,
     leadId: lead.id,
-    campaignId: input.queueItem.campaignId,
+    campaignId: localCampaignId,
     providerMessageId: result.providerMessageId,
     subject,
     bodyPreview: body,
     sentAt: new Date().toISOString(),
     status: "sent",
-    metadata: { outreachQueueId: input.queueItem.id, stub: result.raw.stub === true },
+    metadata: {
+      outreachQueueId: input.queueItem.id,
+      provider: connection.provider,
+      providerSubmission: result.raw.stub !== true,
+      providerCampaignId:
+        typeof result.raw.campaignId === "string" ? result.raw.campaignId : null,
+      providerLeadId: typeof result.raw.leadId === "string" ? result.raw.leadId : null,
+    },
   })
 
   const now = new Date().toISOString()

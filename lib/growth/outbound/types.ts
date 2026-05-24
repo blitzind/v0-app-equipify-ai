@@ -1,6 +1,6 @@
 /** Client-safe Growth Engine outbound types. */
 
-export const GROWTH_OUTBOUND_PROVIDER_FAMILIES = ["emailbison", "smartlead", "instantly", "custom"] as const
+export const GROWTH_OUTBOUND_PROVIDER_FAMILIES = ["emailbison", "smartlead", "instantly", "lemlist", "custom"] as const
 export type GrowthOutboundProviderFamily = (typeof GROWTH_OUTBOUND_PROVIDER_FAMILIES)[number]
 
 export const GROWTH_OUTBOUND_CONNECTION_STATUSES = ["active", "disabled", "error"] as const

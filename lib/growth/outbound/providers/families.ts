@@ -13,7 +13,7 @@ import type { OutboundFixtureEnvelope } from "@/lib/growth/outbound/types"
 function fixtureAdapter(input: {
   providerKey: string
   providerName: string
-  providerFamily: "smartlead" | "instantly" | "emailbison" | "custom"
+  providerFamily: "smartlead" | "instantly" | "emailbison" | "lemlist" | "custom"
   declared: GrowthProviderCapabilitySnapshot
 }): OutboundProviderAdapter {
   return {
