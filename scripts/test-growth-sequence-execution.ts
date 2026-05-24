@@ -122,4 +122,34 @@ assert.ok(drift.some((signal) => signal.driftKind === "channel_mismatch"))
 assert.ok(drift.some((signal) => signal.driftKind === "queue_failed"))
 assert.ok(drift.some((signal) => signal.driftKind === "skipped_gap"))
 
+import {
+  describeSequenceStartUnavailable,
+  mapPreflightCodeToMessage,
+} from "../lib/growth/sequence-enrollment/sequence-enrollment-ui"
+import type { GrowthLead } from "../lib/growth/types"
+
+const leadWithRec = {
+  recommendedSequencePatternId: "pattern-1",
+  recommendedSequenceConfidence: 72,
+  sequenceFatigueRisk: "low",
+} as GrowthLead
+
+assert.equal(
+  describeSequenceStartUnavailable(leadWithRec, { hasEnrollment: false }).canStart,
+  true,
+)
+assert.equal(
+  describeSequenceStartUnavailable({ ...leadWithRec, recommendedSequencePatternId: null } as GrowthLead, {
+    hasEnrollment: false,
+  }).message,
+  "No recommended sequence yet",
+)
+assert.equal(
+  describeSequenceStartUnavailable({ ...leadWithRec, sequenceFatigueRisk: "high" } as GrowthLead, {
+    hasEnrollment: false,
+  }).message,
+  "High fatigue risk",
+)
+assert.equal(mapPreflightCodeToMessage("low_confidence"), "Need more outreach activity")
+
 console.log("growth-sequence-execution: all assertions passed")

@@ -45,7 +45,7 @@ export async function runSequenceEnrollmentPreflight(
     .from("sequence_enrollments")
     .select("id")
     .eq("lead_id", lead.id)
-    .in("status", ["active", "paused"])
+    .in("status", ["draft", "active", "paused"])
     .limit(1)
     .maybeSingle()
 
