@@ -15,7 +15,7 @@ import {
   usePlatformAdminHeaderIdentity,
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
-import type { GrowthLead, GrowthLeadStatus } from "@/lib/growth/types"
+import type { GrowthLead } from "@/lib/growth/types"
 import {
   applyGrowthCommandLeadFocusExpand,
   scrollGrowthCommandLeadFocusSection,
@@ -35,8 +35,8 @@ export default function AdminGrowthLeadsPage() {
   const [error, setError] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [updatingLeadId, setUpdatingLeadId] = useState<string | null>(null)
-  const [deletingLeadId, setDeletingLeadId] = useState<string | null>(null)
+  const [archivingLeadId, setArchivingLeadId] = useState<string | null>(null)
+  const [bulkArchiving, setBulkArchiving] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [selectedLead, setSelectedLead] = useState<GrowthLead | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -128,33 +128,6 @@ export default function AdminGrowthLeadsPage() {
       setError(e instanceof Error ? e.message : "Could not create growth lead.")
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function updateLeadStatus(leadId: string, status: GrowthLeadStatus) {
-    setUpdatingLeadId(leadId)
-    setError(null)
-    try {
-      const res = await fetch(`/api/platform/growth/leads/${leadId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      })
-      const data = (await res.json().catch(() => ({}))) as {
-        ok?: boolean
-        lead?: GrowthLead
-        message?: string
-        error?: string
-      }
-      if (!res.ok || !data.ok || !data.lead) {
-        throw new Error(data.message ?? data.error ?? "Could not update growth lead.")
-      }
-      setLeads((prev) => prev.map((lead) => (lead.id === leadId ? data.lead! : lead)))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not update growth lead.")
-      void load()
-    } finally {
-      setUpdatingLeadId(null)
     }
   }
 
@@ -274,6 +247,7 @@ export default function AdminGrowthLeadsPage() {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         onLeadUpdated={handleLeadUpdated}
+        onLeadSaved={handleLeadSaved}
         drawerFocus={drawerFocus}
       />
 

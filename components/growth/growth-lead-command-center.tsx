@@ -7,10 +7,12 @@ import {
   ExternalLink,
   Loader2,
   Mail,
+  Pencil,
   Phone,
   Search,
   UserPlus,
 } from "lucide-react"
+import { GrowthLeadEditContactDialog } from "@/components/growth/growth-lead-edit-contact-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -41,6 +43,7 @@ import { cn } from "@/lib/utils"
 type GrowthLeadCommandCenterProps = {
   lead: GrowthLead
   onLeadUpdated?: (patch: Partial<GrowthLead>) => void
+  onLeadSaved?: (lead: GrowthLead) => void
   onAddDecisionMaker?: () => void
   onTimelineRefresh?: () => void
 }
@@ -79,6 +82,7 @@ export function GrowthLeadCommandCenter({
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionSuccess, setActionSuccess] = useState<string | null>(null)
   const [callSheetOpen, setCallSheetOpen] = useState(false)
+  const [editContactOpen, setEditContactOpen] = useState(false)
 
   const phone = lead.contactPhone?.trim() || null
   const email = lead.contactEmail?.trim() || null
@@ -213,13 +217,19 @@ export function GrowthLeadCommandCenter({
     <>
       <GrowthEngineCard>
         <div className="space-y-4">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-foreground">{lead.companyName}</h2>
-            {[lead.city, lead.state].filter(Boolean).length ? (
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {[lead.city, lead.state].filter(Boolean).join(", ")}
-              </p>
-            ) : null}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold tracking-tight text-foreground">{lead.companyName}</h2>
+              {[lead.city, lead.state].filter(Boolean).length ? (
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {[lead.city, lead.state].filter(Boolean).join(", ")}
+                </p>
+              ) : null}
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setEditContactOpen(true)}>
+              <Pencil className="mr-2 size-3.5" />
+              Edit Contact Info
+            </Button>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -400,6 +410,17 @@ export function GrowthLeadCommandCenter({
           }}
         />
       ) : null}
+
+      <GrowthLeadEditContactDialog
+        lead={lead}
+        open={editContactOpen}
+        onOpenChange={setEditContactOpen}
+        onSaved={(updated) => {
+          onLeadUpdated?.(updated)
+          onLeadSaved?.(updated)
+          onTimelineRefresh?.()
+        }}
+      />
     </>
   )
 }

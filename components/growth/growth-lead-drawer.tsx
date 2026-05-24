@@ -30,10 +30,11 @@ type GrowthLeadDrawerProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   onLeadUpdated?: (leadId: string, patch: Partial<GrowthLead>) => void
+  onLeadSaved?: (lead: GrowthLead) => void
   drawerFocus?: string | null
 }
 
-export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, drawerFocus }: GrowthLeadDrawerProps) {
+export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLeadSaved, drawerFocus }: GrowthLeadDrawerProps) {
   const [latestResearchRun, setLatestResearchRun] = useState<GrowthLeadResearchRun | null>(null)
   const [openAddDmForm, setOpenAddDmForm] = useState(false)
   const [timelineRefreshToken, setTimelineRefreshToken] = useState(0)
@@ -70,6 +71,7 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, draw
         <GrowthLeadCommandCenter
           lead={activeLead}
           onLeadUpdated={handleLeadUpdated}
+          onLeadSaved={onLeadSaved}
           onAddDecisionMaker={handleAddDecisionMaker}
         />
 

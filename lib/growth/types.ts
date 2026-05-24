@@ -243,6 +243,9 @@ export type GrowthLead = {
   sequenceFatigueRisk: GrowthSequenceFatigueRisk | null
   recommendedSequenceComputedAt: string | null
   activeSequenceEnrollmentId: string | null
+  archivedAt: string | null
+  archivedBy: string | null
+  archiveReason: string | null
   createdBy: string | null
   assignedTo: string | null
   createdAt: string
@@ -320,6 +323,7 @@ export type UpdateGrowthLeadInput = {
 
 export type ListGrowthLeadsInput = {
   status?: GrowthLeadStatus
+  includeArchived?: boolean
   limit?: number
   offset?: number
 }

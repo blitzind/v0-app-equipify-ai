@@ -11,7 +11,7 @@ import type {
 } from "@/lib/growth/types"
 
 const LEAD_SELECT =
-  "id, source_kind, source_detail, external_ref, company_name, contact_name, contact_email, contact_phone, website, address_line1, city, state, postal_code, country, status, promoted_organization_id, promoted_prospect_id, promoted_at, score, notes, metadata, latest_research_run_id, last_researched_at, research_priority, call_disposition, call_disposition_at, last_call_at, follow_up_at, call_priority_score, call_priority_tier, call_priority_computed_at, call_priority_override, last_human_touch_at, decision_maker_status, primary_decision_maker_id, next_best_action, next_best_action_reason, next_best_action_computed_at, estimated_annual_revenue, estimated_employee_count, fleet_size_estimate, crm_detected, field_service_stack_detected, momentum_score, momentum_tier, momentum_why_summary, momentum_computed_at, workflow_health, workflow_health_reason, workflow_health_computed_at, source_channel, source_campaign, source_import_batch_id, source_vendor, aging_days, aging_bucket, first_human_touch_at, time_to_first_touch_hours, contact_temperature, call_attempt_count, voicemail_count, connected_call_count, engagement_score, engagement_tier, engagement_last_activity_at, engagement_summary, engagement_top_signals, engagement_dormancy_exempt_until, engagement_computed_at, relationship_strength_score, relationship_strength_tier, relationship_last_meaningful_touch_at, relationship_summary, relationship_top_signals, relationship_trend, relationship_previous_score, relationship_owner_attention_level, relationship_recovery_attempt_count, relationship_computed_at, opportunity_readiness_score, opportunity_readiness_tier, opportunity_readiness_summary, opportunity_readiness_top_signals, opportunity_blockers, opportunity_accelerators, opportunity_readiness_trend, opportunity_readiness_previous_score, opportunity_buying_signal_strength, opportunity_readiness_confidence, opportunity_age_bucket, opportunity_readiness_computed_at, revenue_probability_score, revenue_probability_tier, revenue_probability_summary, revenue_probability_top_signals, revenue_probability_confidence, revenue_probability_previous_score, revenue_trajectory, revenue_probability_volatility, forecast_contribution_weight, forecast_attention_level, forecast_attention_last_changed_at, revenue_forecast_computed_at, executive_priority_score, executive_priority_tier, executive_priority_summary, executive_priority_top_signals, executive_priority_volatility, executive_priority_previous_score, intelligence_conflicts, intelligence_conflict_severity_score, executive_recommendation, executive_owner, executive_intervention_opened_at, executive_intervention_age_bucket, executive_operating_computed_at, operational_capacity_score, operational_capacity_tier, operational_capacity_summary, operational_capacity_top_constraints, capacity_pressure_level, capacity_pressure_volatility, protected_pipeline_coverage, operational_constraints, capacity_conflicts, capacity_protection_recommendation, constraint_opened_at, constraint_age_bucket, capacity_recovery_direction, operational_capacity_previous_score, operational_capacity_computed_at, conversation_health_score, conversation_health_tier, conversation_summary, conversation_top_signals, conversation_sentiment, conversation_urgency_level, conversation_buying_intent, conversation_objection_profile, conversation_competitor_mentions, conversation_competitor_pressure, conversation_last_meaningful_conversation_at, conversation_previous_score, conversation_trend, conversation_confidence, conversation_momentum, conversation_response_pattern, conversation_computed_at, recommended_sequence_pattern_id, recommended_sequence_reason, recommended_sequence_confidence, recommended_sequence_next_step, sequence_fatigue_risk, recommended_sequence_computed_at, active_sequence_enrollment_id, created_by, assigned_to, created_at, updated_at"
+  "id, source_kind, source_detail, external_ref, company_name, contact_name, contact_email, contact_phone, website, address_line1, city, state, postal_code, country, status, promoted_organization_id, promoted_prospect_id, promoted_at, score, notes, metadata, latest_research_run_id, last_researched_at, research_priority, call_disposition, call_disposition_at, last_call_at, follow_up_at, call_priority_score, call_priority_tier, call_priority_computed_at, call_priority_override, last_human_touch_at, decision_maker_status, primary_decision_maker_id, next_best_action, next_best_action_reason, next_best_action_computed_at, estimated_annual_revenue, estimated_employee_count, fleet_size_estimate, crm_detected, field_service_stack_detected, momentum_score, momentum_tier, momentum_why_summary, momentum_computed_at, workflow_health, workflow_health_reason, workflow_health_computed_at, source_channel, source_campaign, source_import_batch_id, source_vendor, aging_days, aging_bucket, first_human_touch_at, time_to_first_touch_hours, contact_temperature, call_attempt_count, voicemail_count, connected_call_count, engagement_score, engagement_tier, engagement_last_activity_at, engagement_summary, engagement_top_signals, engagement_dormancy_exempt_until, engagement_computed_at, relationship_strength_score, relationship_strength_tier, relationship_last_meaningful_touch_at, relationship_summary, relationship_top_signals, relationship_trend, relationship_previous_score, relationship_owner_attention_level, relationship_recovery_attempt_count, relationship_computed_at, opportunity_readiness_score, opportunity_readiness_tier, opportunity_readiness_summary, opportunity_readiness_top_signals, opportunity_blockers, opportunity_accelerators, opportunity_readiness_trend, opportunity_readiness_previous_score, opportunity_buying_signal_strength, opportunity_readiness_confidence, opportunity_age_bucket, opportunity_readiness_computed_at, revenue_probability_score, revenue_probability_tier, revenue_probability_summary, revenue_probability_top_signals, revenue_probability_confidence, revenue_probability_previous_score, revenue_trajectory, revenue_probability_volatility, forecast_contribution_weight, forecast_attention_level, forecast_attention_last_changed_at, revenue_forecast_computed_at, executive_priority_score, executive_priority_tier, executive_priority_summary, executive_priority_top_signals, executive_priority_volatility, executive_priority_previous_score, intelligence_conflicts, intelligence_conflict_severity_score, executive_recommendation, executive_owner, executive_intervention_opened_at, executive_intervention_age_bucket, executive_operating_computed_at, operational_capacity_score, operational_capacity_tier, operational_capacity_summary, operational_capacity_top_constraints, capacity_pressure_level, capacity_pressure_volatility, protected_pipeline_coverage, operational_constraints, capacity_conflicts, capacity_protection_recommendation, constraint_opened_at, constraint_age_bucket, capacity_recovery_direction, operational_capacity_previous_score, operational_capacity_computed_at, conversation_health_score, conversation_health_tier, conversation_summary, conversation_top_signals, conversation_sentiment, conversation_urgency_level, conversation_buying_intent, conversation_objection_profile, conversation_competitor_mentions, conversation_competitor_pressure, conversation_last_meaningful_conversation_at, conversation_previous_score, conversation_trend, conversation_confidence, conversation_momentum, conversation_response_pattern, conversation_computed_at, recommended_sequence_pattern_id, recommended_sequence_reason, recommended_sequence_confidence, recommended_sequence_next_step, sequence_fatigue_risk, recommended_sequence_computed_at, active_sequence_enrollment_id, archived_at, archived_by, archive_reason, created_by, assigned_to, created_at, updated_at"
 
 type GrowthLeadDbRow = {
   id: string
@@ -169,6 +169,9 @@ type GrowthLeadDbRow = {
   sequence_fatigue_risk: string | null
   recommended_sequence_computed_at: string | null
   active_sequence_enrollment_id: string | null
+  archived_at: string | null
+  archived_by: string | null
+  archive_reason: string | null
   created_by: string | null
   assigned_to: string | null
   created_at: string
@@ -377,6 +380,9 @@ function mapGrowthLeadRow(row: GrowthLeadDbRow): GrowthLead {
     sequenceFatigueRisk: row.sequence_fatigue_risk as GrowthLead["sequenceFatigueRisk"],
     recommendedSequenceComputedAt: row.recommended_sequence_computed_at,
     activeSequenceEnrollmentId: row.active_sequence_enrollment_id,
+    archivedAt: row.archived_at,
+    archivedBy: row.archived_by,
+    archiveReason: row.archive_reason,
     createdBy: row.created_by,
     assignedTo: row.assigned_to,
     createdAt: row.created_at,
@@ -400,6 +406,10 @@ export async function listGrowthLeads(
 
   if (input.status) {
     query = query.eq("status", input.status)
+  }
+
+  if (!input.includeArchived) {
+    query = query.is("archived_at", null)
   }
 
   const { data, error } = await query.range(offset, offset + limit - 1)
@@ -654,22 +664,49 @@ export async function markGrowthLeadResearchCompleted(
   return lead
 }
 
-export async function deleteGrowthLead(admin: SupabaseClient, leadId: string): Promise<boolean> {
-  const { data, error } = await growthLeadsTable(admin).delete().eq("id", leadId).select("id").maybeSingle()
+export async function archiveGrowthLeads(
+  admin: SupabaseClient,
+  input: {
+    leadIds: string[]
+    archivedBy?: string | null
+    reason?: string | null
+  },
+): Promise<GrowthLead[]> {
+  if (input.leadIds.length === 0) return []
+
+  const now = new Date().toISOString()
+  const { data, error } = await growthLeadsTable(admin)
+    .update({
+      archived_at: now,
+      archived_by: input.archivedBy ?? null,
+      archive_reason: trimOrNull(input.reason),
+      status: "archived",
+      updated_at: now,
+    })
+    .in("id", input.leadIds)
+    .is("archived_at", null)
+    .select(LEAD_SELECT)
 
   if (error) {
-    logGrowthEngine("lead_delete_failed", {
+    logGrowthEngine("lead_archive_failed", {
       table: "growth.leads",
-      action: "delete",
-      leadId,
+      action: "update",
+      leadIds: input.leadIds,
       code: error.code ?? null,
       message: error.message,
     })
     throw new Error(error.message)
   }
 
-  if (!data) return false
+  const leads = ((data ?? []) as GrowthLeadDbRow[]).map(mapGrowthLeadRow)
+  for (const lead of leads) {
+    logGrowthEngine("lead_archived", { leadId: lead.id, archivedBy: input.archivedBy ?? null })
+  }
+  return leads
+}
 
-  logGrowthEngine("lead_deleted", { leadId })
-  return true
+/** @deprecated Use archiveGrowthLeads — hard delete is disabled for Growth leads. */
+export async function deleteGrowthLead(admin: SupabaseClient, leadId: string): Promise<boolean> {
+  const archived = await archiveGrowthLeads(admin, { leadIds: [leadId] })
+  return archived.length > 0
 }

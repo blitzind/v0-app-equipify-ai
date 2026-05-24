@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
-import { fetchGrowthLeadById, updateGrowthLead, deleteGrowthLead } from "@/lib/growth/lead-repository"
+import { fetchGrowthLeadById, updateGrowthLead, archiveGrowthLeads } from "@/lib/growth/lead-repository"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import {
@@ -10,6 +10,12 @@ import {
   emitGrowthLeadStatusChangedTimeline,
   emitGrowthLeadWebsiteChangedTimeline,
 } from "@/lib/growth/timeline-emitter"
+import {
+  friendlyLeadContactValidationError,
+  normalizeLeadContactPhone,
+  normalizeLeadContactWebsite,
+  validateLeadContactEmail,
+} from "@/lib/growth/lead-contact-validation"
 import { GROWTH_LEAD_SOURCE_KINDS, GROWTH_LEAD_STATUSES, GROWTH_LEAD_RESEARCH_PRIORITIES } from "@/lib/growth/types"
 
 export const runtime = "nodejs"
@@ -38,6 +44,8 @@ const UpdateLeadSchema = z
     researchPriority: z.enum(GROWTH_LEAD_RESEARCH_PRIORITIES).optional(),
     assignedTo: z.string().uuid().optional().nullable(),
     callPriorityOverride: z.number().int().min(0).max(100).optional().nullable(),
+    sourceChannel: optionalText,
+    sourceCampaign: optionalText,
   })
   .refine((value) => Object.keys(value).length > 0, { message: "empty_patch" })
 
@@ -89,12 +97,24 @@ export async function PATCH(
   }
 
   const body = parsed.data
-  const contactEmail = body.contactEmail !== undefined ? (body.contactEmail?.trim() ? body.contactEmail.trim() : null) : undefined
 
   try {
     const existing = await fetchGrowthLeadById(access.admin, leadId)
     if (!existing) {
       return NextResponse.json({ error: "not_found", message: "Lead not found." }, { status: 404 })
+    }
+
+    let contactEmail: string | null | undefined
+    if (body.contactEmail !== undefined) {
+      contactEmail = body.contactEmail?.trim() ? validateLeadContactEmail(body.contactEmail) : null
+    }
+    let contactPhone: string | null | undefined
+    if (body.contactPhone !== undefined) {
+      contactPhone = body.contactPhone?.trim() ? normalizeLeadContactPhone(body.contactPhone) : null
+    }
+    let website: string | null | undefined
+    if (body.website !== undefined) {
+      website = body.website?.trim() ? normalizeLeadContactWebsite(body.website) : null
     }
 
     let lead = await updateGrowthLead(access.admin, leadId, {
@@ -104,8 +124,8 @@ export async function PATCH(
       companyName: body.companyName,
       contactName: body.contactName,
       contactEmail,
-      contactPhone: body.contactPhone,
-      website: body.website,
+      contactPhone,
+      website,
       addressLine1: body.addressLine1,
       city: body.city,
       state: body.state,
@@ -117,6 +137,8 @@ export async function PATCH(
       researchPriority: body.researchPriority,
       assignedTo: body.assignedTo,
       callPriorityOverride: body.callPriorityOverride,
+      sourceChannel: body.sourceChannel,
+      sourceCampaign: body.sourceCampaign,
     })
 
     if (!lead) {
@@ -180,6 +202,12 @@ export async function PATCH(
     if (message === "empty_patch") {
       return NextResponse.json({ error: "empty_patch", message: "No changes provided." }, { status: 400 })
     }
+    if (message === "invalid_email" || message === "invalid_phone") {
+      return NextResponse.json({
+        error: "invalid_body",
+        message: friendlyLeadContactValidationError(message),
+      }, { status: 400 })
+    }
     return NextResponse.json({ error: "update_failed", message }, { status: 500 })
   }
 }
@@ -197,19 +225,37 @@ export async function DELETE(
   }
 
   try {
-    const deleted = await deleteGrowthLead(access.admin, leadId)
-    if (!deleted) {
+    const existing = await fetchGrowthLeadById(access.admin, leadId)
+    if (!existing || existing.archivedAt) {
       return NextResponse.json({ error: "not_found", message: "Lead not found." }, { status: 404 })
     }
 
-    logGrowthEngine("lead_delete_success", {
+    const archived = await archiveGrowthLeads(access.admin, {
+      leadIds: [leadId],
+      archivedBy: access.userId,
+      reason: "Archived from Growth Leads inbox",
+    })
+    if (archived.length === 0) {
+      return NextResponse.json({ error: "not_found", message: "Lead not found." }, { status: 404 })
+    }
+
+    if (existing.status !== "archived") {
+      await emitGrowthLeadStatusChangedTimeline(access.admin, {
+        leadId,
+        from: existing.status,
+        to: "archived",
+        actor: { userId: access.userId, email: access.userEmail },
+      })
+    }
+
+    logGrowthEngine("lead_archive_success", {
       leadId,
       actorEmail: access.userEmail,
     })
 
-    return NextResponse.json({ ok: true, leadId })
+    return NextResponse.json({ ok: true, leadId, lead: archived[0] })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "delete_failed", message }, { status: 500 })
+    return NextResponse.json({ error: "archive_failed", message }, { status: 500 })
   }
 }
