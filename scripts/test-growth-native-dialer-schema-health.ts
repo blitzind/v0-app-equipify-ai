@@ -1,6 +1,10 @@
 /**
  * Regression checks for native dialer schema health v2.
  * Run: pnpm test:growth-native-dialer-schema-health
+ *
+ * Manual QA:
+ * - If probeUncertain persists, reload Supabase PostgREST schema cache.
+ * - After 20270315123000 service_role grants, verify start / end / wrap-up succeed.
  */
 import assert from "node:assert/strict"
 import fs from "node:fs"
@@ -25,6 +29,8 @@ assert.match(schemaHealthSource, /isPostgrestSchemaCacheStaleError/)
 assert.match(schemaHealthSource, /Accept-Profile/)
 assert.match(schemaHealthSource, /probeUncertain/)
 assert.match(schemaHealthSource, /Dialer setup verification incomplete/)
+assert.match(schemaHealthSource, /reload the Supabase PostgREST schema cache/)
+assert.match(schemaHealthSource, /20270315123000_growth_engine_native_dialer_service_role_grants/)
 assert.doesNotMatch(schemaHealthSource, /\.from\("growth\.native/)
 
 const migration = fs.readFileSync(

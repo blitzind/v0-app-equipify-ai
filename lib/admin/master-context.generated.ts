@@ -5,7 +5,7 @@
 
 export const MCG_SCAN_COUNTS = {
   apiRouteHandlers: 652,
-  sqlMigrations: 264,
+  sqlMigrations: 265,
   dashboardPages: 65,
   componentsTsx: 458,
   libTsFiles: 1498,
@@ -18,7 +18,7 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 | Metric | Count |
 |--------|------:|
 | API route handlers (\`app/api/**/route.ts\`) | **652** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **264** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **265** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
 | \`components/**/*.tsx\` | **458** |
 | \`lib/**/*.ts\` | **1498** |
@@ -270,10 +270,10 @@ organizations/[organizationId]/catalog-items/[itemId]/verification/route.ts
 organizations/[organizationId]/catalog-items/bulk-archive/route.ts
 organizations/[organizationId]/catalog-items/route.ts
 organizations/[organizationId]/communications/[communicationId]/ai-assist/route.ts
+organizations/[organizationId]/communications/[communicationId]/read/route.ts
+organizations/[organizationId]/communications/[communicationId]/retry/route.ts
 organizations/[organizationId]/communications/[communicationId]/route.ts
 organizations/[organizationId]/communications/[communicationId]/send/route.ts
-organizations/[organizationId]/communications/[eventId]/read/route.ts
-organizations/[organizationId]/communications/[eventId]/retry/route.ts
 organizations/[organizationId]/communications/automations/route.ts
 organizations/[organizationId]/communications/drafts/route.ts
 organizations/[organizationId]/communications/feed/route.ts

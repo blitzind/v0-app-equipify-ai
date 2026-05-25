@@ -3,6 +3,15 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { looksLikePostgrestMissingSchemaError } from "@/lib/blitzpay/blitzpay-schema-health-detect"
 
+/**
+ * Manual QA (native dialer schema health v2):
+ * - If probeUncertain persists after migrations, reload the Supabase PostgREST schema cache
+ *   (Dashboard → Settings → API → Reload schema, or `supabase db reset` locally).
+ * - Apply 20270315123000_growth_engine_native_dialer_service_role_grants.sql when dial CRUD
+ *   fails despite tables existing (missing service_role GRANTs from 20270315120000).
+ * - After grants + cache reload, start / end / wrap-up API routes should succeed.
+ */
+
 export const GROWTH_NATIVE_DIALER_SCHEMA_HEALTH_QA_MARKER = "native-dialer-schema-health-v2" as const
 export const GROWTH_NATIVE_DIALER_SCHEMA_PROBE_VERSION = "v2" as const
 

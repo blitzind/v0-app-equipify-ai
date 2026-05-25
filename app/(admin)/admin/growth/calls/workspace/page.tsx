@@ -26,7 +26,7 @@ export default function AdminGrowthCallWorkspacePage() {
 
   return (
     <PlatformAdminPageShell header={header}>
-      <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-6 py-8">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-6 py-8 xl:px-8">
         <PlatformAdminTabNav activeKey="growth_leads" />
 
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">

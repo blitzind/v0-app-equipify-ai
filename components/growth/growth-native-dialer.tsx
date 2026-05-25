@@ -51,7 +51,7 @@ export function GrowthNativeDialer({
         value={phone}
         onChange={(e) => onPhoneChange(e.target.value)}
         placeholder="Enter phone number"
-        className="text-center text-lg font-semibold tracking-wide"
+        className="h-14 border-0 bg-muted/40 text-center font-mono text-3xl tracking-wide shadow-none focus-visible:ring-1"
       />
 
       <div className="grid grid-cols-3 gap-2">
@@ -60,7 +60,7 @@ export function GrowthNativeDialer({
             key={key}
             type="button"
             variant="outline"
-            className="h-12 text-lg font-semibold"
+            className="h-16 w-full rounded-xl text-2xl font-semibold"
             disabled={disabled}
             onClick={() => appendKey(key)}
           >
@@ -70,19 +70,19 @@ export function GrowthNativeDialer({
       </div>
 
       <div className="flex gap-2">
-        <Button type="button" variant="outline" className="flex-1" disabled={disabled} onClick={backspace}>
-          <Delete className="mr-2 size-4" />
+        <Button type="button" variant="outline" className="h-16 flex-1 rounded-xl" disabled={disabled} onClick={backspace}>
+          <Delete className="mr-2 size-5" />
           Back
         </Button>
         <Button
           type="button"
-          className={cn("flex-[2]", "bg-emerald-600 hover:bg-emerald-700")}
+          className={cn("h-16 flex-[2] rounded-xl font-semibold", "bg-emerald-600 hover:bg-emerald-700")}
           disabled={disabled || !phone.trim() || loading}
           onClick={onDial}
         >
           {loading ? "Starting…" : (
             <>
-              <Phone className="mr-2 size-4" />
+              <Phone className="mr-2 size-5" />
               Call
             </>
           )}

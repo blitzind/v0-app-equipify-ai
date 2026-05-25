@@ -6,12 +6,12 @@ export const runtime = "nodejs"
 
 export async function POST(
   _request: Request,
-  context: { params: Promise<{ organizationId: string; eventId: string }> },
+  context: { params: Promise<{ organizationId: string; communicationId: string }> },
 ) {
-  const { organizationId: rawOrg, eventId: rawEvent } = await context.params
+  const { organizationId: rawOrg, communicationId: rawEvent } = await context.params
   const organizationId = parseUuid(rawOrg)
-  const eventId = parseUuid(rawEvent)
-  if (!organizationId || !eventId) {
+  const communicationId = parseUuid(rawEvent)
+  if (!organizationId || !communicationId) {
     return NextResponse.json({ error: "invalid_ids", message: "Invalid ids." }, { status: 400 })
   }
 
@@ -32,7 +32,7 @@ export async function POST(
   const { data: ev, error: evErr } = await supabase
     .from("communication_events")
     .select("id, organization_id")
-    .eq("id", eventId)
+    .eq("id", communicationId)
     .maybeSingle()
 
   if (evErr || !ev || (ev as { organization_id: string }).organization_id !== organizationId) {
@@ -42,7 +42,7 @@ export async function POST(
   const now = new Date().toISOString()
   const { error: insErr } = await supabase.from("communication_event_reads").upsert(
     {
-      communication_event_id: eventId,
+      communication_event_id: communicationId,
       user_id: user.id,
       read_at: now,
     },

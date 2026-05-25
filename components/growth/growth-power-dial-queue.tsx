@@ -32,7 +32,7 @@ export function GrowthPowerDialQueue({
   }
 
   return (
-    <ul className="space-y-2">
+    <ul className="max-h-[260px] space-y-2 overflow-auto pr-1">
       {items.map((item) => (
         <li key={item.id} className="rounded-lg border border-border/80 p-3">
           <div className="flex flex-wrap items-start justify-between gap-2">

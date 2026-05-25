@@ -26,12 +26,12 @@ function logCommunicationRetry(payload: Record<string, unknown>) {
  */
 export async function POST(
   request: NextRequest,
-  context: { params: Promise<{ organizationId: string; eventId: string }> },
+  context: { params: Promise<{ organizationId: string; communicationId: string }> },
 ) {
-  const { organizationId: rawOrg, eventId: rawEv } = await context.params
+  const { organizationId: rawOrg, communicationId: rawEv } = await context.params
   const organizationId = parseUuid(rawOrg)
-  const eventId = parseUuid(rawEv)
-  if (!organizationId || !eventId) {
+  const communicationId = parseUuid(rawEv)
+  if (!organizationId || !communicationId) {
     return NextResponse.json({ error: "invalid_ids", message: "Invalid ids." }, { status: 400 })
   }
 
@@ -66,7 +66,7 @@ export async function POST(
   const { data: evRaw, error: loadErr } = await supabase
     .from("communication_events")
     .select("*")
-    .eq("id", eventId)
+    .eq("id", communicationId)
     .maybeSingle()
 
   if (loadErr || !evRaw || (evRaw as { organization_id: string }).organization_id !== organizationId) {
@@ -123,7 +123,7 @@ export async function POST(
   if (plan.kind === "unsupported") {
     logCommunicationRetry({
       organizationId,
-      eventId,
+      communicationId,
       channel: ev.channel,
       outcome: "blocked",
       reason: "retry_unavailable",
@@ -137,7 +137,7 @@ export async function POST(
   if (plan.kind === "missing_field") {
     logCommunicationRetry({
       organizationId,
-      eventId,
+      communicationId,
       channel: ev.channel,
       outcome: "blocked",
       reason: plan.kind,
@@ -168,7 +168,7 @@ export async function POST(
       error_message: null,
       metadata: metaQueued,
     })
-    .eq("id", eventId)
+    .eq("id", communicationId)
     .eq("organization_id", organizationId)
     .in("delivery_status", ["failed", "bounced"])
     .select("id")
@@ -228,12 +228,12 @@ export async function POST(
           retry_http_status: liveStatus,
         },
       })
-      .eq("id", eventId)
+      .eq("id", communicationId)
       .eq("organization_id", organizationId)
 
     logCommunicationRetry({
       organizationId,
-      eventId,
+      communicationId,
       channel: ev.channel,
       route: plan.target.path,
       routeLabel: plan.target.routeLabel,
@@ -271,12 +271,12 @@ export async function POST(
         retry_http_status: liveStatus,
       },
     })
-    .eq("id", eventId)
+    .eq("id", communicationId)
     .eq("organization_id", organizationId)
 
   logCommunicationRetry({
     organizationId,
-    eventId,
+    communicationId,
     channel: ev.channel,
     route: plan.target.path,
     routeLabel: plan.target.routeLabel,

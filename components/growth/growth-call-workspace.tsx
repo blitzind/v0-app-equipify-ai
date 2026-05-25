@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { Headphones, Loader2, Phone, RefreshCw } from "lucide-react"
+import { BarChart3, Brain, CalendarCheck, Loader2, Phone, PhoneCall, RefreshCw, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthActiveCallPanel } from "@/components/growth/growth-active-call-panel"
 import { GrowthIncomingCallPanel } from "@/components/growth/growth-incoming-call-panel"
@@ -20,6 +20,7 @@ import type {
   NativeDialerQueueItemPublicView,
 } from "@/lib/growth/native-dialer/native-dialer-types"
 import {
+  GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER,
   GROWTH_NATIVE_DIALER_QA_MARKER,
   NATIVE_DIALER_PROVIDER_LABELS,
 } from "@/lib/growth/native-dialer/native-dialer-types"
@@ -245,14 +246,19 @@ export function GrowthCallWorkspace() {
   }
 
   return (
-    <div className="space-y-6" data-qa-marker={GROWTH_NATIVE_DIALER_QA_MARKER}>
+    <div
+      className="mx-auto w-full max-w-[1600px] space-y-6 px-6 xl:px-8"
+      data-qa-marker={GROWTH_NATIVE_DIALER_QA_MARKER}
+      data-layout-qa-marker={GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold">Unified Call Workspace</h2>
           <p className="text-sm text-muted-foreground">Native in-app dialer — operator controlled, no autonomous outbound.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <GrowthBadge label={GROWTH_NATIVE_DIALER_QA_MARKER} tone="healthy" />
+          <GrowthBadge label={GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER} tone="healthy" />
+          <GrowthBadge label={GROWTH_NATIVE_DIALER_QA_MARKER} tone="neutral" />
           {dashboard ? (
             <GrowthBadge
               label={`Provider ${NATIVE_DIALER_PROVIDER_LABELS[dashboard.primaryProvider]}`}
@@ -291,8 +297,8 @@ export function GrowthCallWorkspace() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
-        <aside className="space-y-4">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[340px_minmax(0,1fr)_320px]">
+        <aside className="w-full min-w-0 space-y-4 lg:max-w-[360px]">
           <GrowthEngineCard title="Dialer" icon={<Phone className="size-4" />}>
             <GrowthNativeDialer
               phone={phone}
@@ -303,7 +309,7 @@ export function GrowthCallWorkspace() {
             />
           </GrowthEngineCard>
 
-          <GrowthEngineCard title="Call queue" subtitle="Human controlled">
+          <GrowthEngineCard title="Call queue">
             <GrowthPowerDialQueue
               items={queue}
               dialingId={dialingQueueId}
@@ -321,7 +327,7 @@ export function GrowthCallWorkspace() {
 
           {dashboard?.recentSessions.length ? (
             <GrowthEngineCard title="Recent calls">
-              <ul className="space-y-2 text-sm">
+              <ul className="max-h-[260px] space-y-2 overflow-auto pr-1 text-sm">
                 {dashboard.recentSessions.slice(0, 5).map((session) => (
                   <li key={session.id} className="rounded border border-border/80 px-2 py-1.5">
                     <p className="font-medium">{session.companyName ?? session.phoneNumber}</p>
@@ -333,8 +339,8 @@ export function GrowthCallWorkspace() {
           ) : null}
 
           {dashboard?.queuePreview.length ? (
-            <GrowthEngineCard title="Active tasks" subtitle="Operator queue preview">
-              <ul className="space-y-2 text-sm">
+            <GrowthEngineCard title="Active tasks">
+              <ul className="max-h-[260px] space-y-2 overflow-auto pr-1 text-sm">
                 {dashboard.queuePreview.slice(0, 4).map((item) => (
                   <li key={item.id} className="rounded border border-border/80 px-2 py-1.5">
                     <p className="font-medium">{item.companyName ?? item.contactName ?? "Lead"}</p>
@@ -346,13 +352,41 @@ export function GrowthCallWorkspace() {
           ) : null}
         </aside>
 
-        <main className="space-y-4">
+        <main className="min-w-0 space-y-4">
           {workspacePhase === "idle" ? (
-            <GrowthEngineCard title="Ready to call" icon={<Headphones className="size-4" />}>
-              <p className="text-sm text-muted-foreground">
-                Enter a number or pick a queue item. During calls, live coaching and realtime intelligence appear here.
-                After the call, complete operator wrap-up before moving on.
-              </p>
+            <GrowthEngineCard className="min-h-[420px]">
+              <div className="flex flex-col items-center px-4 py-8 text-center">
+                <span className="mb-5 flex size-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                  <PhoneCall className="size-8" />
+                </span>
+                <h3 className="text-2xl font-semibold tracking-tight">Ready to connect</h3>
+                <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                  Search a lead, select a queue item, or dial a number to begin.
+                </p>
+                <div className="mt-8 grid w-full max-w-2xl gap-3 sm:grid-cols-2">
+                  {[
+                    { title: "Live Coaching", icon: Sparkles, detail: "Realtime suggestions during active calls" },
+                    { title: "Prospect Intelligence", icon: Brain, detail: "Deal and execution context for the lead" },
+                    { title: "Call Intelligence", icon: BarChart3, detail: "Scorecards, objections, and call quality" },
+                    { title: "Meeting Outcomes", icon: CalendarCheck, detail: "Follow-up recommendations after meetings" },
+                  ].map((panel) => (
+                    <div
+                      key={panel.title}
+                      className="rounded-xl border border-dashed border-border/80 bg-muted/20 p-4 text-left opacity-50"
+                      aria-disabled="true"
+                    >
+                      <div className="mb-2 flex items-center gap-2">
+                        <panel.icon className="size-4 text-muted-foreground" />
+                        <p className="text-sm font-medium">{panel.title}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{panel.detail}</p>
+                      <p className="mt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Available during active call
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </GrowthEngineCard>
           ) : null}
 
@@ -375,26 +409,53 @@ export function GrowthCallWorkspace() {
           ) : null}
         </main>
 
-        <aside className="space-y-4">
-          <GrowthEngineCard title="Prospect intelligence" subtitle="Recommendations only">
+        <aside className="w-full min-w-0 max-w-[320px] space-y-4 lg:justify-self-end">
+          <GrowthEngineCard title="Prospect intelligence">
             {!leadContext ? (
-              <p className="text-sm text-muted-foreground">Select a lead to load deal, execution, and meeting outcome context.</p>
+              <p className="text-sm text-muted-foreground">
+                Select a lead to load deal, execution, and meeting outcome context.
+              </p>
             ) : (
-              <div className="space-y-3 text-sm">
-                <div>
+              <div className="space-y-3">
+                <div className="rounded-lg border border-border/80 p-3">
                   <p className="font-medium">{leadContext.companyName}</p>
-                  <p className="text-muted-foreground">{leadContext.contactName ?? "Contact"}</p>
+                  <p className="text-sm text-muted-foreground">{leadContext.contactName ?? "Contact"}</p>
                 </div>
-                <div className="grid gap-2">
-                  <StatTile label="Deal close %" value={leadContext.dealCloseProbability != null ? `${leadContext.dealCloseProbability}%` : "—"} />
-                  <StatTile label="Execution readiness" value={leadContext.executionReadinessScore != null ? String(leadContext.executionReadinessScore) : "—"} />
-                  <StatTile label="Meeting outcome" value={leadContext.meetingOutcomeScore != null ? String(leadContext.meetingOutcomeScore) : "—"} />
-                  <StatTile label="Open tasks" value={String(leadContext.openTaskCount)} />
+
+                <div className="rounded-lg border border-border/80 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Deal Readiness</p>
+                  <p className="mt-1 text-lg font-semibold">
+                    {leadContext.dealCloseProbability != null ? `${leadContext.dealCloseProbability}% close` : "—"}
+                  </p>
                 </div>
-                {leadContext.recommendedNextAction ? (
-                  <p className="text-muted-foreground">Next action: {leadContext.recommendedNextAction}</p>
-                ) : null}
-                <Button asChild size="sm" variant="outline">
+
+                <div className="rounded-lg border border-border/80 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Execution Readiness</p>
+                  <p className="mt-1 text-lg font-semibold">
+                    {leadContext.executionReadinessScore != null ? leadContext.executionReadinessScore : "—"}
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-border/80 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Open Tasks</p>
+                  <p className="mt-1 text-lg font-semibold">{leadContext.openTaskCount}</p>
+                </div>
+
+                <div className="rounded-lg border border-border/80 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Recommended Next Action</p>
+                  <p className="mt-1 text-sm text-foreground">
+                    {leadContext.recommendedNextAction ?? "No recommendation yet"}
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-border/80 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Meeting Intelligence</p>
+                  <p className="mt-1 text-lg font-semibold">
+                    {leadContext.meetingOutcomeScore != null ? leadContext.meetingOutcomeScore : "—"}
+                  </p>
+                </div>
+
+                <Button asChild size="sm" variant="outline" className="w-full">
                   <Link href={commandLeadFocusHref(leadContext.leadId, "command")}>Open lead</Link>
                 </Button>
               </div>
