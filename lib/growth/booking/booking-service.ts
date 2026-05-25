@@ -16,6 +16,8 @@ import { createGrowthMeeting } from "@/lib/growth/meeting-intelligence/mutate-me
 import { updateGrowthMeetingRow, fetchGrowthMeetingById } from "@/lib/growth/meeting-intelligence/meeting-repository"
 import { resolveOutboundLeadByEmail } from "@/lib/growth/outbound/resolve-lead-by-email"
 import { normalizeEmail } from "@/lib/growth/import/normalize"
+import { fetchGrowthMeetingLocationPlatformContext } from "@/lib/growth/meeting-location/meeting-location-settings-server"
+import { resolveMeetingLocation } from "@/lib/growth/meeting-location/resolve-meeting-location"
 
 export type PublicBookingSlotsResult =
   | { ok: true; slots: GrowthBookingSlot[]; timezone: string }
@@ -97,10 +99,19 @@ async function resolveLeadForBooking(
   return lead.id
 }
 
-function meetingProviderForPage(page: GrowthBookingPage): "google_meet" | "phone" | "other" {
-  if (page.locationType === "google_meet") return "google_meet"
-  if (page.locationType === "phone_call") return "phone"
-  return "other"
+function resolveBookingMeetingLocation(
+  page: GrowthBookingPage,
+  platform: Awaited<ReturnType<typeof fetchGrowthMeetingLocationPlatformContext>>,
+) {
+  return resolveMeetingLocation({
+    platform: platform.settings,
+    googleCalendarConnected: platform.googleCalendarConnected,
+    bookingOverride: page.meetingProviderOverride,
+    bookingAutoCreateOverride: page.autoCreateMeetingLinkOverride,
+    legacyLocationType: page.locationType,
+    manualMeetingUrl: page.manualMeetingUrl,
+    meetingLocationLabel: page.customLocation,
+  })
 }
 
 export async function submitPublicBooking(
@@ -160,6 +171,8 @@ export async function submitPublicBooking(
   }
 
   try {
+    const platformContext = await fetchGrowthMeetingLocationPlatformContext(admin, page.ownerUserId)
+    const resolvedLocation = resolveBookingMeetingLocation(page, platformContext)
     const leadId = await resolveLeadForBooking(admin, page, input)
     const title = page.meetingType?.trim() || `${page.name} — ${name}`
     const meetingResult = await createGrowthMeeting(admin, {
@@ -169,7 +182,11 @@ export async function submitPublicBooking(
       startAt: slot.startAt,
       endAt: slot.endAt,
       source: "calendar_sync",
-      provider: meetingProviderForPage(page),
+      meetingLocationType: resolvedLocation.locationProvider,
+      autoCreateMeetingLink: resolvedLocation.autoCreateMeetingLink,
+      manualMeetingUrl: resolvedLocation.manualMeetingUrl,
+      meetingLocationLabel: resolvedLocation.meetingLocationLabel,
+      meetingUrl: resolvedLocation.meetingUrl,
       notes: input.notes ?? null,
       attendeeEmails: [email],
       timezone: page.timezone,

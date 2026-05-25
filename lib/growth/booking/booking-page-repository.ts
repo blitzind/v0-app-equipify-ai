@@ -5,6 +5,7 @@ import {
   GROWTH_BOOKING_PAGES_QA_MARKER,
   type GrowthBookingAvailabilityWindow,
   type GrowthBookingLocationType,
+  type GrowthBookingMeetingProviderOverride,
   type GrowthBookingPage,
   type GrowthBookingPageBookingSummary,
   type GrowthBookingPagePublicView,
@@ -14,7 +15,7 @@ import { isValidBookingPageSlug, normalizeBookingPageSlug } from "@/lib/growth/b
 export { isValidBookingPageSlug, normalizeBookingPageSlug }
 
 const PAGE_SELECT =
-  "id, owner_user_id, calendar_connection_id, name, slug, description, logo_url, brand_color, meeting_type, duration_minutes, buffer_minutes, availability_windows, timezone, location_type, custom_location, confirmation_message, reminder_email_subject, reminder_email_body, enabled, created_at, updated_at"
+  "id, owner_user_id, calendar_connection_id, name, slug, description, logo_url, brand_color, meeting_type, duration_minutes, buffer_minutes, availability_windows, timezone, location_type, custom_location, meeting_provider_override, auto_create_meeting_link_override, manual_meeting_url, confirmation_message, reminder_email_subject, reminder_email_body, enabled, created_at, updated_at"
 
 type PageRow = {
   id: string
@@ -32,6 +33,9 @@ type PageRow = {
   timezone: string
   location_type: string
   custom_location: string | null
+  meeting_provider_override: string
+  auto_create_meeting_link_override: boolean | null
+  manual_meeting_url: string | null
   confirmation_message: string | null
   reminder_email_subject: string | null
   reminder_email_body: string | null
@@ -65,6 +69,9 @@ function mapPage(row: PageRow): GrowthBookingPage {
     timezone: row.timezone,
     locationType: row.location_type as GrowthBookingLocationType,
     customLocation: row.custom_location,
+    meetingProviderOverride: row.meeting_provider_override as GrowthBookingMeetingProviderOverride,
+    autoCreateMeetingLinkOverride: row.auto_create_meeting_link_override,
+    manualMeetingUrl: row.manual_meeting_url,
     confirmationMessage: row.confirmation_message,
     reminderEmailSubject: row.reminder_email_subject,
     reminderEmailBody: row.reminder_email_body,
@@ -152,6 +159,9 @@ export async function insertGrowthBookingPage(
     timezone?: string
     locationType?: GrowthBookingLocationType
     customLocation?: string | null
+    meetingProviderOverride?: GrowthBookingMeetingProviderOverride
+    autoCreateMeetingLinkOverride?: boolean | null
+    manualMeetingUrl?: string | null
     confirmationMessage?: string | null
     reminderEmailSubject?: string | null
     reminderEmailBody?: string | null
@@ -175,6 +185,9 @@ export async function insertGrowthBookingPage(
       timezone: input.timezone ?? "UTC",
       location_type: input.locationType ?? "google_meet",
       custom_location: input.customLocation ?? null,
+      meeting_provider_override: input.meetingProviderOverride ?? "inherit",
+      auto_create_meeting_link_override: input.autoCreateMeetingLinkOverride ?? null,
+      manual_meeting_url: input.manualMeetingUrl ?? null,
       confirmation_message: input.confirmationMessage ?? null,
       reminder_email_subject: input.reminderEmailSubject ?? null,
       reminder_email_body: input.reminderEmailBody ?? null,

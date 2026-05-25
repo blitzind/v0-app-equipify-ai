@@ -8,6 +8,7 @@ import { GrowthAiCopilotSettingsPanel } from "@/components/growth/growth-ai-copi
 import { GrowthLiveCoachingSettingsPanel } from "@/components/growth/growth-live-coaching-settings"
 import { GrowthGoogleCalendarSettingsPanel } from "@/components/growth/growth-google-calendar-settings-panel"
 import { GrowthBookingPagesPanel } from "@/components/growth/growth-booking-pages-panel"
+import { GrowthMeetingLocationSettingsPanel } from "@/components/growth/growth-meeting-location-settings-panel"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import { GROWTH_SETTINGS_UI_QA_MARKER, GrowthSettingsBadge } from "@/components/growth/growth-settings-ui"
 import {
@@ -51,6 +52,9 @@ export default function AdminGrowthSettingsPage() {
         <GrowthSectionLayout>
           <Suspense fallback={null}>
             <GrowthGoogleCalendarSettingsPanel />
+          </Suspense>
+          <Suspense fallback={null}>
+            <GrowthMeetingLocationSettingsPanel />
           </Suspense>
           <Suspense fallback={null}>
             <GrowthBookingPagesPanel />

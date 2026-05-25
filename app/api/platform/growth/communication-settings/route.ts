@@ -6,6 +6,9 @@ import {
   fetchGrowthPlatformCommunicationSettings,
   updateGrowthPlatformCommunicationSettings,
 } from "@/lib/growth/communication/settings-repository"
+import { fetchGrowthCalendarConnectionForUser } from "@/lib/growth/calendar/calendar-connection-repository"
+import { GROWTH_MEETING_LOCATION_PROVIDERS } from "@/lib/growth/meeting-location/meeting-location-provider-types"
+import { buildMeetingLocationProviderReadiness } from "@/lib/growth/meeting-location/meeting-location-provider-types"
 
 /** Platform-admin internal only. Future org add-ons use org-scoped routes + membership gates. */
 
@@ -16,6 +19,8 @@ const PatchSchema = z.object({
   callDialMode: z.enum(GROWTH_CALL_DIAL_MODES).optional(),
   customUrlTemplate: z.string().trim().max(2000).nullable().optional(),
   showAlternateDialers: z.boolean().optional(),
+  defaultMeetingProvider: z.enum(GROWTH_MEETING_LOCATION_PROVIDERS).optional(),
+  autoCreateMeetingLink: z.boolean().optional(),
 })
 
 export async function GET() {
@@ -24,7 +29,16 @@ export async function GET() {
 
   try {
     const settings = await fetchGrowthPlatformCommunicationSettings(access.admin)
-    return NextResponse.json({ ok: true, settings })
+    const calendarConnected = Boolean(
+      await fetchGrowthCalendarConnectionForUser(access.admin, access.userId),
+    )
+    return NextResponse.json({
+      ok: true,
+      settings,
+      providerReadiness: buildMeetingLocationProviderReadiness({
+        googleCalendarConnected: calendarConnected,
+      }),
+    })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ error: "fetch_failed", message }, { status: 500 })
@@ -47,9 +61,20 @@ export async function PATCH(request: Request) {
       callDialMode: parsed.data.callDialMode,
       customUrlTemplate: parsed.data.customUrlTemplate,
       showAlternateDialers: parsed.data.showAlternateDialers,
+      defaultMeetingProvider: parsed.data.defaultMeetingProvider,
+      autoCreateMeetingLink: parsed.data.autoCreateMeetingLink,
       updatedBy: access.userId,
     })
-    return NextResponse.json({ ok: true, settings })
+    const calendarConnected = Boolean(
+      await fetchGrowthCalendarConnectionForUser(access.admin, access.userId),
+    )
+    return NextResponse.json({
+      ok: true,
+      settings,
+      providerReadiness: buildMeetingLocationProviderReadiness({
+        googleCalendarConnected: calendarConnected,
+      }),
+    })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ error: "update_failed", message }, { status: 500 })

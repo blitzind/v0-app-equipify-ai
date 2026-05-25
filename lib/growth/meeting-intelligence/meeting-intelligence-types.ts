@@ -1,6 +1,7 @@
 /** Client-safe Growth Engine meeting intelligence types (slice 6.23A). */
 
 import type { GrowthCalendarSyncStatus } from "@/lib/growth/calendar/google-calendar-types"
+import type { GrowthMeetingLocationProvider } from "@/lib/growth/meeting-location/meeting-location-provider-types"
 
 export const GROWTH_MEETING_INTELLIGENCE_QA_MARKER = "meeting-intelligence-v1" as const
 
@@ -82,6 +83,11 @@ export type GrowthMeeting = {
   calendarSyncedAt: string | null
   calendarLastSyncAt: string | null
   meetingUrl: string | null
+  manualMeetingUrl: string | null
+  meetingLocationType: GrowthMeetingLocationProvider | null
+  meetingLocationLabel: string | null
+  autoCreateMeetingLink: boolean | null
+  providerConnectionRequired: boolean
   notes: string | null
   attendeeEmails: string[]
   timezone: string
@@ -135,6 +141,10 @@ export type CreateGrowthMeetingInput = {
   provider?: GrowthMeetingProvider | null
   calendarEventId?: string | null
   meetingUrl?: string | null
+  manualMeetingUrl?: string | null
+  meetingLocationType?: GrowthMeetingLocationProvider | null
+  meetingLocationLabel?: string | null
+  autoCreateMeetingLink?: boolean | null
   notes?: string | null
   attendeeEmails?: string[]
   timezone?: string | null
@@ -155,6 +165,10 @@ export type UpdateGrowthMeetingInput = {
   provider?: GrowthMeetingProvider | null
   calendarEventId?: string | null
   meetingUrl?: string | null
+  manualMeetingUrl?: string | null
+  meetingLocationType?: GrowthMeetingLocationProvider | null
+  meetingLocationLabel?: string | null
+  autoCreateMeetingLink?: boolean | null
   notes?: string | null
   attendeeEmails?: string[]
   timezone?: string | null

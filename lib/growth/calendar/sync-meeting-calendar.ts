@@ -72,7 +72,11 @@ export async function syncGrowthMeetingToGoogleCalendar(
         meeting: input.meeting,
         attendeeEmails: attendeeEmails(input.meeting),
         appOrigin: input.appOrigin,
-        includeGoogleMeet: input.meeting.provider === "google_meet" || !input.meeting.provider,
+        includeGoogleMeet:
+          input.meeting.meetingLocationType === "google_meet" &&
+          (input.meeting.autoCreateMeetingLink ?? true),
+        locationLabel: input.meeting.meetingLocationLabel,
+        manualMeetingUrl: input.meeting.manualMeetingUrl,
       })
 
       const meeting = await patchMeetingSyncState(admin, input.meeting.id, {
@@ -80,7 +84,7 @@ export async function syncGrowthMeetingToGoogleCalendar(
         calendar_sync_status: "synced",
         calendar_sync_error: null,
         calendar_synced_at: new Date().toISOString(),
-        meeting_url: created.meetingUrl,
+        meeting_url: created.meetingUrl ?? input.meeting.meetingUrl ?? input.meeting.manualMeetingUrl,
         source: input.meeting.source === "reply_intent" ? "reply_intent" : input.meeting.source,
         status: input.meeting.status === "proposed" ? "scheduled" : input.meeting.status,
         scheduled_at: input.meeting.scheduledAt ?? new Date().toISOString(),

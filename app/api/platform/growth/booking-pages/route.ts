@@ -10,6 +10,7 @@ import {
   normalizeBookingPageSlug,
 } from "@/lib/growth/booking/booking-page-repository"
 import { GROWTH_BOOKING_LOCATION_TYPES } from "@/lib/growth/booking/booking-page-types"
+import { GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDES } from "@/lib/growth/meeting-location/meeting-location-provider-types"
 import { fetchGrowthCalendarConnectionForUser } from "@/lib/growth/calendar/calendar-connection-repository"
 import { isValidGrowthCalendarTimezone } from "@/lib/growth/calendar/calendar-timezone"
 
@@ -56,6 +57,9 @@ const createSchema = z.object({
   timezone: z.string().optional(),
   locationType: z.enum(GROWTH_BOOKING_LOCATION_TYPES).optional(),
   customLocation: z.string().max(500).nullable().optional(),
+  meetingProviderOverride: z.enum(GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDES).optional(),
+  autoCreateMeetingLinkOverride: z.boolean().nullable().optional(),
+  manualMeetingUrl: z.string().max(500).nullable().optional(),
   confirmationMessage: z.string().max(2000).nullable().optional(),
   reminderEmailSubject: z.string().max(200).nullable().optional(),
   reminderEmailBody: z.string().max(4000).nullable().optional(),

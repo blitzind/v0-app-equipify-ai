@@ -11,6 +11,7 @@ import {
   updateGrowthBookingPage,
 } from "@/lib/growth/booking/booking-page-repository"
 import { GROWTH_BOOKING_LOCATION_TYPES } from "@/lib/growth/booking/booking-page-types"
+import { GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDES } from "@/lib/growth/meeting-location/meeting-location-provider-types"
 import { isValidGrowthCalendarTimezone } from "@/lib/growth/calendar/calendar-timezone"
 
 export const runtime = "nodejs"
@@ -67,6 +68,9 @@ const patchSchema = z.object({
   timezone: z.string().optional(),
   locationType: z.enum(GROWTH_BOOKING_LOCATION_TYPES).optional(),
   customLocation: z.string().max(500).nullable().optional(),
+  meetingProviderOverride: z.enum(GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDES).optional(),
+  autoCreateMeetingLinkOverride: z.boolean().nullable().optional(),
+  manualMeetingUrl: z.string().max(500).nullable().optional(),
   confirmationMessage: z.string().max(2000).nullable().optional(),
   reminderEmailSubject: z.string().max(200).nullable().optional(),
   reminderEmailBody: z.string().max(4000).nullable().optional(),
@@ -119,6 +123,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
   if (parsed.data.locationType !== undefined) patch.location_type = parsed.data.locationType
   if (parsed.data.customLocation !== undefined) patch.custom_location = parsed.data.customLocation
+  if (parsed.data.meetingProviderOverride !== undefined) {
+    patch.meeting_provider_override = parsed.data.meetingProviderOverride
+  }
+  if (parsed.data.autoCreateMeetingLinkOverride !== undefined) {
+    patch.auto_create_meeting_link_override = parsed.data.autoCreateMeetingLinkOverride
+  }
+  if (parsed.data.manualMeetingUrl !== undefined) patch.manual_meeting_url = parsed.data.manualMeetingUrl
   if (parsed.data.confirmationMessage !== undefined) patch.confirmation_message = parsed.data.confirmationMessage
   if (parsed.data.reminderEmailSubject !== undefined) patch.reminder_email_subject = parsed.data.reminderEmailSubject
   if (parsed.data.reminderEmailBody !== undefined) patch.reminder_email_body = parsed.data.reminderEmailBody

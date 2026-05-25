@@ -1,9 +1,20 @@
 /** Client-safe Growth booking page types (slice 6.27B). */
 
+import type { GrowthBookingMeetingProviderOverride } from "@/lib/growth/meeting-location/meeting-location-provider-types"
+
 export const GROWTH_BOOKING_PAGES_QA_MARKER = "booking-pages-v1" as const
 
-export const GROWTH_BOOKING_LOCATION_TYPES = ["google_meet", "phone_call", "custom_location"] as const
+export const GROWTH_BOOKING_LOCATION_TYPES = [
+  "google_meet",
+  "zoom",
+  "teams",
+  "phone_call",
+  "custom_location",
+  "no_auto_link",
+] as const
 export type GrowthBookingLocationType = (typeof GROWTH_BOOKING_LOCATION_TYPES)[number]
+
+export type { GrowthBookingMeetingProviderOverride }
 
 export const GROWTH_BOOKING_PAGE_STATUSES = ["enabled", "disabled"] as const
 
@@ -29,6 +40,9 @@ export type GrowthBookingPage = {
   timezone: string
   locationType: GrowthBookingLocationType
   customLocation: string | null
+  meetingProviderOverride: GrowthBookingMeetingProviderOverride
+  autoCreateMeetingLinkOverride: boolean | null
+  manualMeetingUrl: string | null
   confirmationMessage: string | null
   reminderEmailSubject: string | null
   reminderEmailBody: string | null

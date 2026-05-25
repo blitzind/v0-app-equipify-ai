@@ -8,6 +8,7 @@ import {
   GROWTH_MEETING_SOURCES,
   GROWTH_MEETING_STATUSES,
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
+import { GROWTH_MEETING_LOCATION_PROVIDERS } from "@/lib/growth/meeting-location/meeting-location-provider-types"
 import {
   GROWTH_MEETING_SCHEMA_SETUP_MESSAGE,
   isGrowthMeetingSchemaReady,
@@ -22,6 +23,11 @@ const createSchema = z.object({
   endAt: z.string().datetime().nullable().optional(),
   source: z.enum(GROWTH_MEETING_SOURCES).optional(),
   provider: z.enum(GROWTH_MEETING_PROVIDERS).nullable().optional(),
+  meetingLocationType: z.enum(GROWTH_MEETING_LOCATION_PROVIDERS).nullable().optional(),
+  meetingLocationLabel: z.string().max(500).nullable().optional(),
+  manualMeetingUrl: z.string().max(500).nullable().optional(),
+  autoCreateMeetingLink: z.boolean().nullable().optional(),
+  meetingUrl: z.string().max(500).nullable().optional(),
   calendarEventId: z.string().max(200).nullable().optional(),
   outboundReplyId: z.string().uuid().nullable().optional(),
   realtimeCallSessionId: z.string().uuid().nullable().optional(),

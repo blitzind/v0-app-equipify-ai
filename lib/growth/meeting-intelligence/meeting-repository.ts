@@ -10,7 +10,7 @@ import type {
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 
 const MEETING_SELECT =
-  "id, lead_id, owner_user_id, opportunity_id, outbound_reply_id, realtime_call_session_id, title, status, start_at, end_at, source, provider, calendar_event_id, calendar_sync_status, calendar_sync_error, calendar_synced_at, calendar_last_sync_at, meeting_url, notes, attendee_emails, timezone, outcome, next_action, follow_up_due_at, no_show_reason, scheduled_at, completed_at, canceled_at, no_show_at, outcome_recorded_at, booking_page_id, created_by, created_at, updated_at"
+  "id, lead_id, owner_user_id, opportunity_id, outbound_reply_id, realtime_call_session_id, title, status, start_at, end_at, source, provider, calendar_event_id, calendar_sync_status, calendar_sync_error, calendar_synced_at, calendar_last_sync_at, meeting_url, manual_meeting_url, meeting_location_type, meeting_location_label, auto_create_meeting_link, provider_connection_required, notes, attendee_emails, timezone, outcome, next_action, follow_up_due_at, no_show_reason, scheduled_at, completed_at, canceled_at, no_show_at, outcome_recorded_at, booking_page_id, created_by, created_at, updated_at"
 
 type MeetingDbRow = {
   id: string
@@ -31,6 +31,11 @@ type MeetingDbRow = {
   calendar_synced_at: string | null
   calendar_last_sync_at: string | null
   meeting_url: string | null
+  manual_meeting_url: string | null
+  meeting_location_type: string | null
+  meeting_location_label: string | null
+  auto_create_meeting_link: boolean | null
+  provider_connection_required: boolean
   notes: string | null
   attendee_emails: string[] | null
   timezone: string
@@ -73,6 +78,11 @@ export function mapGrowthMeetingRow(row: MeetingDbRow): GrowthMeeting {
     calendarSyncedAt: row.calendar_synced_at,
     calendarLastSyncAt: row.calendar_last_sync_at,
     meetingUrl: row.meeting_url,
+    manualMeetingUrl: row.manual_meeting_url,
+    meetingLocationType: (row.meeting_location_type as GrowthMeeting["meetingLocationType"]) ?? null,
+    meetingLocationLabel: row.meeting_location_label,
+    autoCreateMeetingLink: row.auto_create_meeting_link,
+    providerConnectionRequired: row.provider_connection_required ?? false,
     notes: row.notes,
     attendeeEmails: row.attendee_emails ?? [],
     timezone: row.timezone ?? "UTC",

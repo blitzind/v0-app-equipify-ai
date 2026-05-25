@@ -15,6 +15,16 @@ import {
 } from "@/components/growth/growth-settings-ui"
 import type { GrowthBookingPageListItem } from "@/lib/growth/booking/booking-page-types"
 import { GROWTH_BOOKING_PAGES_QA_MARKER } from "@/lib/growth/booking/booking-page-types"
+import {
+  GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDE_LABELS,
+  GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDES,
+  GROWTH_MEETING_LOCATION_HELPER_COPY,
+  legacyBookingLocationToProvider,
+  meetingLocationNeedsLocationLabel,
+  meetingLocationNeedsManualUrl,
+  type GrowthBookingMeetingProviderOverride,
+  type GrowthMeetingLocationProvider,
+} from "@/lib/growth/meeting-location/meeting-location-provider-types"
 
 const DEFAULT_FORM = {
   name: "",
@@ -27,6 +37,12 @@ const DEFAULT_FORM = {
   meetingType: "Intro call",
   confirmationMessage: "Thanks — your meeting is confirmed.",
   enabled: false,
+  meetingProviderOverride: "inherit" as GrowthBookingMeetingProviderOverride,
+}
+
+function effectiveBookingProvider(page: GrowthBookingPageListItem): GrowthMeetingLocationProvider {
+  if (page.meetingProviderOverride !== "inherit") return page.meetingProviderOverride
+  return legacyBookingLocationToProvider(page.locationType)
 }
 
 export function GrowthBookingPagesPanel() {
@@ -72,7 +88,7 @@ export function GrowthBookingPagesPanel() {
           meetingType: form.meetingType,
           confirmationMessage: form.confirmationMessage,
           enabled: form.enabled,
-          locationType: "google_meet",
+          meetingProviderOverride: form.meetingProviderOverride,
         }),
       })
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; page?: GrowthBookingPageListItem; message?: string }
@@ -236,6 +252,76 @@ export function GrowthBookingPagesPanel() {
                         defaultValue={selected.description ?? ""}
                         onBlur={(e) => void updatePage({ description: e.target.value || null })}
                       />
+                    </div>
+                    <div className="space-y-2 rounded-md border border-border/70 p-2.5 dark:border-[#25324C]">
+                      <p className="text-xs font-medium">Meeting location</p>
+                      <p className="text-[11px] text-muted-foreground">{GROWTH_MEETING_LOCATION_HELPER_COPY}</p>
+                      <div className={GROWTH_SETTINGS_FORM_GAP}>
+                        <Label className="text-xs">Meeting provider override</Label>
+                        <select
+                          className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
+                          value={selected.meetingProviderOverride}
+                          onChange={(event) =>
+                            void updatePage({
+                              meetingProviderOverride: event.target.value as GrowthBookingMeetingProviderOverride,
+                            })
+                          }
+                          disabled={saving}
+                        >
+                          {GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDES.map((option) => (
+                            <option key={option} value={option}>
+                              {GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDE_LABELS[option]}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className={GROWTH_SETTINGS_FORM_GAP}>
+                        <Label className="text-xs">Auto-create meeting link</Label>
+                        <select
+                          className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
+                          value={
+                            selected.autoCreateMeetingLinkOverride === null
+                              ? "inherit"
+                              : selected.autoCreateMeetingLinkOverride
+                                ? "on"
+                                : "off"
+                          }
+                          onChange={(event) => {
+                            const value = event.target.value
+                            void updatePage({
+                              autoCreateMeetingLinkOverride:
+                                value === "inherit" ? null : value === "on",
+                            })
+                          }}
+                          disabled={saving}
+                        >
+                          <option value="inherit">Inherit platform default</option>
+                          <option value="on">On</option>
+                          <option value="off">Off</option>
+                        </select>
+                      </div>
+                      {meetingLocationNeedsManualUrl(effectiveBookingProvider(selected)) ? (
+                        <div className={GROWTH_SETTINGS_FORM_GAP}>
+                          <Label className="text-xs">Manual meeting URL</Label>
+                          <Input
+                            className="h-9"
+                            defaultValue={selected.manualMeetingUrl ?? ""}
+                            placeholder="https://zoom.us/j/… or Teams link"
+                            onBlur={(e) => void updatePage({ manualMeetingUrl: e.target.value.trim() || null })}
+                          />
+                        </div>
+                      ) : null}
+                      {meetingLocationNeedsLocationLabel(effectiveBookingProvider(selected)) ? (
+                        <div className={GROWTH_SETTINGS_FORM_GAP}>
+                          <Label className="text-xs">Phone number or location text</Label>
+                          <Input
+                            className="h-9"
+                            defaultValue={selected.customLocation ?? ""}
+                            placeholder="Phone number, address, or call notes"
+                            onBlur={(e) => void updatePage({ customLocation: e.target.value.trim() || null })}
+                          />
+                        </div>
+                      ) : null}
                     </div>
                     <p className="text-[11px] text-muted-foreground">
                       Recent bookings: {selected.recentBookingsCount}

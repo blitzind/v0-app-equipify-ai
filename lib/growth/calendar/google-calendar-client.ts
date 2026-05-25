@@ -65,6 +65,8 @@ export async function createGoogleCalendarEvent(input: {
   attendeeEmails?: string[]
   appOrigin: string
   includeGoogleMeet?: boolean
+  locationLabel?: string | null
+  manualMeetingUrl?: string | null
 }): Promise<{ eventId: string; meetingUrl: string | null; etag: string | null }> {
   const { startAt, endAt } = assertGrowthMeetingScheduleTimes({
     startAt: input.meeting.startAt!,
@@ -96,6 +98,16 @@ export async function createGoogleCalendarEvent(input: {
         conferenceSolutionKey: { type: "hangoutsMeet" },
       },
     }
+  }
+
+  const locationText =
+    input.locationLabel?.trim() ||
+    input.manualMeetingUrl?.trim() ||
+    input.meeting.manualMeetingUrl?.trim() ||
+    input.meeting.meetingLocationLabel?.trim() ||
+    null
+  if (locationText) {
+    body.location = locationText
   }
 
   const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1", {

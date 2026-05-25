@@ -24,9 +24,16 @@ import {
 import type {
   CreateGrowthMeetingInput,
   GrowthMeeting,
+  GrowthMeetingProvider,
   UpdateGrowthMeetingInput,
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import { recomputeGrowthLeadNextBestAction } from "@/lib/growth/recompute-lead-next-best-action"
+import { fetchGrowthMeetingLocationPlatformContext } from "@/lib/growth/meeting-location/meeting-location-settings-server"
+import {
+  applyResolvedMeetingLocationPatch,
+  resolveMeetingLocation,
+} from "@/lib/growth/meeting-location/resolve-meeting-location"
+import type { GrowthMeetingLocationProvider } from "@/lib/growth/meeting-location/meeting-location-provider-types"
 
 type Actor = { userId?: string | null; email?: string | null }
 
@@ -54,6 +61,41 @@ async function resolveOpportunityId(
   return opportunity?.id ?? null
 }
 
+function providerToLocationType(provider: GrowthMeetingProvider | null | undefined): GrowthMeetingLocationProvider | null {
+  if (!provider) return "no_auto_link"
+  if (provider === "google_meet") return "google_meet"
+  if (provider === "zoom") return "zoom"
+  if (provider === "teams") return "teams"
+  if (provider === "phone") return "phone_call"
+  return "custom_location"
+}
+
+async function buildMeetingLocationPatch(
+  admin: SupabaseClient,
+  actorUserId: string | null | undefined,
+  input: {
+    meetingLocationType?: GrowthMeetingLocationProvider | null
+    autoCreateMeetingLink?: boolean | null
+    manualMeetingUrl?: string | null
+    meetingLocationLabel?: string | null
+    meetingUrl?: string | null
+    provider?: GrowthMeetingProvider | null
+  },
+): Promise<Record<string, unknown>> {
+  const platformContext = await fetchGrowthMeetingLocationPlatformContext(admin, actorUserId ?? "")
+  const resolved = resolveMeetingLocation({
+    platform: platformContext.settings,
+    googleCalendarConnected: platformContext.googleCalendarConnected,
+    meetingLocationType:
+      input.meetingLocationType ?? providerToLocationType(input.provider) ?? platformContext.settings.defaultMeetingProvider,
+    meetingAutoCreate: input.autoCreateMeetingLink,
+    manualMeetingUrl: input.manualMeetingUrl,
+    meetingLocationLabel: input.meetingLocationLabel,
+    existingMeetingUrl: input.meetingUrl ?? null,
+  })
+  return applyResolvedMeetingLocationPatch(resolved)
+}
+
 export async function createGrowthMeeting(
   admin: SupabaseClient,
   input: CreateGrowthMeetingInput & { actor?: Actor },
@@ -65,6 +107,7 @@ export async function createGrowthMeeting(
   const opportunityId = await resolveOpportunityId(admin, input.leadId, input.opportunityId)
   const status = input.status ?? "proposed"
   const now = new Date().toISOString()
+  const locationPatch = await buildMeetingLocationPatch(admin, ownerUserId ?? input.actor?.userId, input)
 
   const meeting = await insertGrowthMeetingRow(admin, {
     lead_id: input.leadId,
@@ -77,9 +120,6 @@ export async function createGrowthMeeting(
     start_at: input.startAt ?? null,
     end_at: input.endAt ?? null,
     source: input.source ?? "manual",
-    provider: input.provider ?? null,
-    calendar_event_id: input.calendarEventId ?? null,
-    meeting_url: input.meetingUrl ?? null,
     notes: input.notes ?? null,
     attendee_emails: input.attendeeEmails ?? [],
     timezone: input.timezone ?? "UTC",
@@ -89,6 +129,7 @@ export async function createGrowthMeeting(
     created_by: input.actor?.userId ?? null,
     scheduled_at: status === "scheduled" ? now : null,
     completed_at: status === "completed" ? now : null,
+    ...locationPatch,
   })
 
   await emitMeetingCreatedTimeline(admin, {
@@ -141,6 +182,28 @@ export async function updateGrowthMeeting(
   if (input.followUpDueAt !== undefined) patch.follow_up_due_at = input.followUpDueAt
   if (input.noShowReason !== undefined) patch.no_show_reason = input.noShowReason?.trim() || null
   if (input.realtimeCallSessionId !== undefined) patch.realtime_call_session_id = input.realtimeCallSessionId
+
+  const locationFieldsTouched =
+    input.meetingLocationType !== undefined ||
+    input.autoCreateMeetingLink !== undefined ||
+    input.manualMeetingUrl !== undefined ||
+    input.meetingLocationLabel !== undefined ||
+    input.meetingUrl !== undefined ||
+    input.provider !== undefined
+
+  if (locationFieldsTouched) {
+    Object.assign(
+      patch,
+      await buildMeetingLocationPatch(admin, existing.ownerUserId ?? input.actor?.userId, {
+        meetingLocationType: input.meetingLocationType ?? existing.meetingLocationType,
+        autoCreateMeetingLink: input.autoCreateMeetingLink ?? existing.autoCreateMeetingLink,
+        manualMeetingUrl: input.manualMeetingUrl ?? existing.manualMeetingUrl,
+        meetingLocationLabel: input.meetingLocationLabel ?? existing.meetingLocationLabel,
+        meetingUrl: input.meetingUrl ?? existing.meetingUrl,
+        provider: input.provider ?? existing.provider,
+      }),
+    )
+  }
 
   const nextStatus = input.status ?? existing.status
   if (input.status && input.status !== existing.status) {
