@@ -17,6 +17,7 @@ export const GROWTH_COMMAND_LEAD_FOCUS_VALUES = [
   "decision-makers",
   "research",
   "meetings",
+  "execution",
 ] as const
 
 export type GrowthCommandLeadFocus = (typeof GROWTH_COMMAND_LEAD_FOCUS_VALUES)[number]
@@ -49,6 +50,7 @@ export const GROWTH_COMMAND_FOCUS_SECTION_IDS: Partial<Record<GrowthCommandLeadF
   "decision-makers": "growth-decision-makers",
   research: "growth-research",
   meetings: "growth-meeting-intelligence",
+  execution: "growth-execution-readiness",
 }
 
 export function applyGrowthCommandLeadFocusExpand(focus: string | null | undefined): void {

@@ -15,6 +15,7 @@ export const GROWTH_NOTIFICATION_SOURCE_SYSTEMS = [
   "opportunity",
   "rep_ops",
   "post_close",
+  "human_execution",
 ] as const
 export type GrowthNotificationSourceSystem = (typeof GROWTH_NOTIFICATION_SOURCE_SYSTEMS)[number]
 
@@ -93,6 +94,11 @@ export const GROWTH_NOTIFICATION_TYPES = [
   "unresolved_objection",
   "strong_buying_signal",
   "call_followup_due",
+  "execution_ready",
+  "execution_approval_needed",
+  "execution_stalled",
+  "fatigue_protection_triggered",
+  "call_now_opportunity",
 ] as const
 export type GrowthNotificationType = (typeof GROWTH_NOTIFICATION_TYPES)[number]
 

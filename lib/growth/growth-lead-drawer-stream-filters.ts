@@ -146,6 +146,7 @@ export const GROWTH_DRAWER_CARD_KEYS = {
   operationalIntelligence: "operational-intelligence",
   meetings: "meeting-intelligence",
   cadence: "cadence",
+  execution: "execution-readiness",
   customerLifecycle: "customer-lifecycle",
   activityStream: "activity-stream",
   timeline: "timeline",
