@@ -17,6 +17,7 @@ export function GrowthPostCallWrapup({
   session,
   onSubmit,
   submitting,
+  embedded,
 }: {
   session: NativeCallWorkspaceSessionPublicView
   onSubmit: (input: {
@@ -31,6 +32,7 @@ export function GrowthPostCallWrapup({
     notes?: string
   }) => Promise<NativeCallWrapupPublicView | null>
   submitting?: boolean
+  embedded?: boolean
 }) {
   const [outcome, setOutcome] = useState<NativeCallWrapupOutcome>("connected")
   const [objectionCategory, setObjectionCategory] = useState("")
@@ -62,30 +64,33 @@ export function GrowthPostCallWrapup({
   }
 
   if (saved) {
+    const savedContent = (
+      <div className="flex items-start gap-3">
+        <CheckCircle2 className="mt-0.5 size-5 text-emerald-600" />
+        <div className="space-y-2">
+          <p className="text-sm font-medium">{NATIVE_CALL_WRAPUP_OUTCOME_LABELS[saved.outcome]}</p>
+          {saved.suggestedNextActions.length > 0 ? (
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {saved.suggestedNextActions.map((action) => (
+                <li key={action}>• {action}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      </div>
+    )
+
+    if (embedded) return <div className="flex flex-1 flex-col overflow-auto">{savedContent}</div>
+
     return (
       <GrowthEngineCard title="Wrap-up saved" subtitle="Operator confirmed — no autonomous CRM movement">
-        <div className="flex items-start gap-3">
-          <CheckCircle2 className="mt-0.5 size-5 text-emerald-600" />
-          <div className="space-y-2">
-            <p className="text-sm font-medium">{NATIVE_CALL_WRAPUP_OUTCOME_LABELS[saved.outcome]}</p>
-            {saved.suggestedNextActions.length > 0 ? (
-              <ul className="space-y-1 text-sm text-muted-foreground">
-                {saved.suggestedNextActions.map((action) => (
-                  <li key={action}>• {action}</li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-        </div>
+        {savedContent}
       </GrowthEngineCard>
     )
   }
 
-  return (
-    <GrowthEngineCard
-      title="Post-call wrap-up"
-      subtitle="Required operator confirmation — recommendations only, no autonomous actions"
-    >
+  const formContent = (
+    <>
       <p className="mb-4 text-sm text-muted-foreground">
         {session.companyName ?? "Lead"} · {session.phoneNumber}
       </p>
@@ -146,6 +151,17 @@ export function GrowthPostCallWrapup({
           {submitting ? "Saving…" : "Confirm wrap-up"}
         </Button>
       </div>
+    </>
+  )
+
+  if (embedded) return <div className="flex flex-1 flex-col overflow-auto">{formContent}</div>
+
+  return (
+    <GrowthEngineCard
+      title="Post-call wrap-up"
+      subtitle="Required operator confirmation — recommendations only, no autonomous actions"
+    >
+      {formContent}
     </GrowthEngineCard>
   )
 }

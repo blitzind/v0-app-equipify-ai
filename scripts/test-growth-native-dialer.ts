@@ -14,7 +14,7 @@ import { createNativeDialerProviderInstance } from "../lib/growth/native-dialer/
 import { GROWTH_NATIVE_DIALER_QA_MARKER, GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER } from "../lib/growth/native-dialer/native-dialer-types"
 
 assert.equal(GROWTH_NATIVE_DIALER_QA_MARKER, "native-dialer-v1")
-assert.equal(GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER, "native-dialer-layout-v2")
+assert.equal(GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER, "native-dialer-layout-v3")
 
 assert.match(
   nativeCallWorkspaceHref({ leadId: "00000000-0000-4000-8000-000000000001", phone: "+15551234567" }),
@@ -62,32 +62,51 @@ const workspacePage = fs.readFileSync(
   "utf8",
 )
 assert.match(workspacePage, /GrowthCallWorkspace/)
+assert.match(workspacePage, /max-w-\[1700px\]/)
+assert.match(workspacePage, /GROWTH_NATIVE_DIALER_QA_MARKER/)
+assert.match(workspacePage, /operator controlled/)
 
 const workspaceComponent = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-workspace.tsx"),
   "utf8",
 )
-assert.match(workspaceComponent, /GrowthNativeDialer/)
-assert.match(workspaceComponent, /GrowthPostCallWrapup/)
-assert.match(workspaceComponent, /GrowthIncomingCallPanel/)
+assert.match(workspaceComponent, /GrowthCallWorkspaceCenterPanel/)
+assert.match(workspaceComponent, /GrowthCallWorkspaceDialerCard/)
+assert.match(workspaceComponent, /GrowthCallWorkspaceIntelligenceRail/)
 assert.match(workspaceComponent, /GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER/)
-assert.match(workspaceComponent, /max-w-\[1600px\]/)
-assert.match(workspaceComponent, /lg:grid-cols-\[340px_minmax\(0,1fr\)_320px\]/)
-assert.match(workspaceComponent, /Ready to connect/)
-assert.match(workspaceComponent, /Prospect Intelligence/)
+assert.match(workspaceComponent, /lg:grid-cols-\[320px_minmax\(0,1fr\)_320px\]/)
+
+const centerPanel = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace-center-panel.tsx"),
+  "utf8",
+)
+assert.match(centerPanel, /Ready to call/)
+assert.match(centerPanel, /No active call/)
+assert.match(centerPanel, /GROWTH_CALL_WORKSPACE_GLASS_DOCK/)
+assert.match(centerPanel, /Live Coaching/)
 
 const dialerComponent = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-native-dialer.tsx"),
   "utf8",
 )
-assert.match(dialerComponent, /h-16 w-full rounded-xl text-2xl/)
-assert.match(dialerComponent, /font-mono text-3xl tracking-wide/)
+assert.match(dialerComponent, /h-14 w-full/)
+assert.match(dialerComponent, /font-mono text-3xl/)
+assert.match(dialerComponent, /bg-gradient-to-r from-emerald-600/)
 
-const queueComponent = fs.readFileSync(
-  path.join(process.cwd(), "components/growth/growth-power-dial-queue.tsx"),
+const queueCard = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace-queue-card.tsx"),
   "utf8",
 )
-assert.match(queueComponent, /max-h-\[260px\].*overflow-auto/s)
+assert.match(queueCard, /max-h-\[280px\].*overflow-auto/s)
+assert.match(queueCard, /View all/)
+assert.match(queueCard, /Power Dial/)
+
+const intelligenceRail = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace-intelligence-rail.tsx"),
+  "utf8",
+)
+assert.match(intelligenceRail, /Prospect Intelligence/)
+assert.match(intelligenceRail, /max-w-\[320px\]/)
 
 const sidebar = fs.readFileSync(path.join(process.cwd(), "components/growth/growth-section-sidebar-nav.tsx"), "utf8")
 assert.match(sidebar, /\/admin\/growth\/calls\/workspace/)

@@ -12,15 +12,17 @@ export function GrowthIncomingCallPanel({
   onDecline,
   answering,
   declining,
+  embedded,
 }: {
   session: NativeCallWorkspaceSessionPublicView
   onAnswer: () => void
   onDecline: () => void
   answering?: boolean
   declining?: boolean
+  embedded?: boolean
 }) {
-  return (
-    <GrowthEngineCard title="Incoming call" subtitle="Operator must answer — no autonomous pickup">
+  const content = (
+    <>
       <div className="mb-4 flex flex-wrap gap-2">
         <GrowthBadge label={session.direction === "inbound" ? "Inbound" : "Outbound ringing"} tone="attention" />
         <GrowthBadge label={NATIVE_DIALER_PROVIDER_LABELS[session.provider]} tone="neutral" />
@@ -48,6 +50,14 @@ export function GrowthIncomingCallPanel({
           {declining ? "Declining…" : "Decline"}
         </Button>
       </div>
+    </>
+  )
+
+  if (embedded) return <div className="flex flex-1 flex-col">{content}</div>
+
+  return (
+    <GrowthEngineCard title="Incoming call" subtitle="Operator must answer — no autonomous pickup">
+      {content}
     </GrowthEngineCard>
   )
 }

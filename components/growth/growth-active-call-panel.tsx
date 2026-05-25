@@ -19,11 +19,13 @@ export function GrowthActiveCallPanel({
   onEndCall,
   onNotesChange,
   ending,
+  embedded,
 }: {
   session: NativeCallWorkspaceSessionPublicView
   onEndCall: () => void
   onNotesChange: (notes: string) => void
   ending?: boolean
+  embedded?: boolean
 }) {
   const [elapsed, setElapsed] = useState(session.durationSeconds)
 
@@ -36,8 +38,8 @@ export function GrowthActiveCallPanel({
     return () => window.clearInterval(id)
   }, [session.connectedAt, session.startedAt, session.status])
 
-  return (
-    <GrowthEngineCard title="Active call" subtitle="Live coaching + operator controls — no autonomous actions">
+  const content = (
+    <>
       <div className="mb-4 flex flex-wrap gap-2">
         <GrowthBadge label={session.status} tone="healthy" />
         <GrowthBadge label={NATIVE_DIALER_PROVIDER_LABELS[session.provider]} tone="neutral" />
@@ -70,27 +72,37 @@ export function GrowthActiveCallPanel({
         rows={3}
       />
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="outline" disabled>
-          {session.muted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
-          Mute
-        </Button>
-        <Button type="button" size="sm" variant="outline" disabled>
-          <Pause className="size-4" />
-          Hold
-        </Button>
-        <Button type="button" size="sm" variant="outline" disabled>
-          Transfer
-        </Button>
-        <Button type="button" size="sm" variant="outline" disabled>
-          <Square className="size-4" />
-          Keypad
-        </Button>
-        <Button type="button" size="sm" variant="destructive" disabled={ending} onClick={onEndCall}>
-          <PhoneOff className="mr-2 size-4" />
-          {ending ? "Ending…" : "End call"}
-        </Button>
-      </div>
+      {!embedded ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant="outline" disabled>
+            {session.muted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
+            Mute
+          </Button>
+          <Button type="button" size="sm" variant="outline" disabled>
+            <Pause className="size-4" />
+            Hold
+          </Button>
+          <Button type="button" size="sm" variant="outline" disabled>
+            Transfer
+          </Button>
+          <Button type="button" size="sm" variant="outline" disabled>
+            <Square className="size-4" />
+            Keypad
+          </Button>
+          <Button type="button" size="sm" variant="destructive" disabled={ending} onClick={onEndCall}>
+            <PhoneOff className="mr-2 size-4" />
+            {ending ? "Ending…" : "End call"}
+          </Button>
+        </div>
+      ) : null}
+    </>
+  )
+
+  if (embedded) return <div className="flex flex-1 flex-col overflow-auto">{content}</div>
+
+  return (
+    <GrowthEngineCard title="Active call" subtitle="Live coaching + operator controls — no autonomous actions">
+      {content}
     </GrowthEngineCard>
   )
 }
