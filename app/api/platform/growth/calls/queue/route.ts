@@ -3,8 +3,8 @@ import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchGrowthNativeDialerQueue } from "@/lib/growth/native-dialer/native-dialer-service"
 import { GROWTH_NATIVE_DIALER_QA_MARKER, NATIVE_DIALER_QUEUE_MODES } from "@/lib/growth/native-dialer/native-dialer-types"
 import {
-  GROWTH_NATIVE_DIALER_SCHEMA_SETUP_MESSAGE,
-  isGrowthNativeDialerSchemaReady,
+  growthNativeDialerSchemaResponseMeta,
+  probeGrowthNativeDialerSchemaHealth,
 } from "@/lib/growth/native-dialer/native-dialer-schema-health"
 
 export const runtime = "nodejs"
@@ -13,11 +13,13 @@ export async function GET(request: Request) {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 
-  if (!(await isGrowthNativeDialerSchemaReady(access.admin))) {
+  const schemaProbe = await probeGrowthNativeDialerSchemaHealth(access.admin)
+  const meta = growthNativeDialerSchemaResponseMeta(schemaProbe)
+  if (!schemaProbe.schemaReady) {
     return NextResponse.json({
       ok: true,
       qaMarker: GROWTH_NATIVE_DIALER_QA_MARKER,
-      meta: { schemaReady: false, setupMessage: GROWTH_NATIVE_DIALER_SCHEMA_SETUP_MESSAGE },
+      meta,
       queue: [],
     })
   }
@@ -35,7 +37,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       qaMarker: GROWTH_NATIVE_DIALER_QA_MARKER,
-      meta: { schemaReady: true },
+      meta,
       queue,
     })
   } catch (e) {

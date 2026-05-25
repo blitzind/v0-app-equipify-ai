@@ -4,8 +4,8 @@ import { fetchGrowthCallCopilotDashboard } from "@/lib/growth/call-copilot-dashb
 import { fetchGrowthNativeCallWorkspaceDashboard } from "@/lib/growth/native-dialer/native-dialer-service"
 import { GROWTH_NATIVE_DIALER_QA_MARKER } from "@/lib/growth/native-dialer/native-dialer-types"
 import {
-  GROWTH_NATIVE_DIALER_SCHEMA_SETUP_MESSAGE,
-  isGrowthNativeDialerSchemaReady,
+  growthNativeDialerSchemaResponseMeta,
+  probeGrowthNativeDialerSchemaHealth,
 } from "@/lib/growth/native-dialer/native-dialer-schema-health"
 
 export const runtime = "nodejs"
@@ -16,8 +16,8 @@ export async function GET() {
 
   try {
     const copilotDashboard = await fetchGrowthCallCopilotDashboard(access.admin)
-    const schemaReady = await isGrowthNativeDialerSchemaReady(access.admin)
-    const workspaceDashboard = schemaReady
+    const schemaProbe = await probeGrowthNativeDialerSchemaHealth(access.admin)
+    const workspaceDashboard = schemaProbe.schemaReady
       ? await fetchGrowthNativeCallWorkspaceDashboard(access.admin, access.userId)
       : null
 
@@ -26,7 +26,7 @@ export async function GET() {
       qaMarker: GROWTH_NATIVE_DIALER_QA_MARKER,
       dashboard: copilotDashboard,
       workspaceDashboard,
-      meta: schemaReady ? { schemaReady: true } : { schemaReady: false, setupMessage: GROWTH_NATIVE_DIALER_SCHEMA_SETUP_MESSAGE },
+      meta: growthNativeDialerSchemaResponseMeta(schemaProbe),
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not load calls dashboard."

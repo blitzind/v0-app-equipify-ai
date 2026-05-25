@@ -132,6 +132,7 @@
     "test:growth-human-approved-execution": "tsx scripts/test-growth-human-approved-execution.ts",
     "test:growth-meeting-outcome-intelligence": "tsx scripts/test-growth-meeting-outcome-intelligence.ts",
     "test:growth-native-dialer": "tsx scripts/test-growth-native-dialer.ts",
+    "test:growth-native-dialer-schema-health": "tsx scripts/test-growth-native-dialer-schema-health.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
     "test:growth-assemblyai-browser-streaming": "tsx scripts/test-growth-assemblyai-browser-streaming.ts",
     "test:growth-openai-realtime-browser-streaming": "tsx scripts/test-growth-openai-realtime-browser-streaming.ts",

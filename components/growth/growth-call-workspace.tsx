@@ -38,6 +38,7 @@ export function GrowthCallWorkspace() {
   const [phone, setPhone] = useState(initialPhone ?? "")
   const [loading, setLoading] = useState(true)
   const [setupMessage, setSetupMessage] = useState<string | null>(null)
+  const [setupWarning, setSetupWarning] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [starting, setStarting] = useState(false)
   const [ending, setEnding] = useState(false)
@@ -56,15 +57,23 @@ export function GrowthCallWorkspace() {
       ])
       const dashData = (await dashRes.json().catch(() => ({}))) as {
         workspaceDashboard?: NativeCallWorkspaceDashboard | null
-        meta?: { schemaReady?: boolean; setupMessage?: string }
+        meta?: {
+          schemaReady?: boolean
+          probeUncertain?: boolean
+          setupMessage?: string
+        }
       }
       const queueData = (await queueRes.json().catch(() => ({}))) as { queue?: NativeDialerQueueItemPublicView[] }
 
       if (dashData.meta?.schemaReady === false) {
         setSetupMessage(dashData.meta.setupMessage ?? null)
+        setSetupWarning(null)
         setDashboard(null)
       } else {
         setSetupMessage(null)
+        setSetupWarning(
+          dashData.meta?.probeUncertain ? dashData.meta.setupMessage ?? null : null,
+        )
         setDashboard(dashData.workspaceDashboard ?? null)
         setActiveSession(dashData.workspaceDashboard?.activeSession ?? null)
       }
@@ -258,6 +267,10 @@ export function GrowthCallWorkspace() {
       </div>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+      {setupWarning ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">{setupWarning}</p>
+      ) : null}
 
       {dashboard ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">

@@ -4,8 +4,8 @@ import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { endGrowthNativeCall } from "@/lib/growth/native-dialer/native-dialer-service"
 import { GROWTH_NATIVE_DIALER_QA_MARKER } from "@/lib/growth/native-dialer/native-dialer-types"
 import {
-  GROWTH_NATIVE_DIALER_SCHEMA_SETUP_MESSAGE,
-  isGrowthNativeDialerSchemaReady,
+  growthNativeDialerSchemaResponseMeta,
+  probeGrowthNativeDialerSchemaHealth,
 } from "@/lib/growth/native-dialer/native-dialer-schema-health"
 
 export const runtime = "nodejs"
@@ -14,8 +14,16 @@ export async function POST(request: Request) {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 
-  if (!(await isGrowthNativeDialerSchemaReady(access.admin))) {
-    return NextResponse.json({ ok: false, message: GROWTH_NATIVE_DIALER_SCHEMA_SETUP_MESSAGE }, { status: 503 })
+  const schemaProbe = await probeGrowthNativeDialerSchemaHealth(access.admin)
+  if (!schemaProbe.schemaReady) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: schemaProbe.setupMessage,
+        meta: growthNativeDialerSchemaResponseMeta(schemaProbe),
+      },
+      { status: 503 },
+    )
   }
 
   const parsed = z.object({ sessionId: z.string().uuid() }).safeParse(await request.json().catch(() => ({})))

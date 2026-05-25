@@ -4,8 +4,8 @@ import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchGrowthNativeDialerLeadContext } from "@/lib/growth/native-dialer/native-dialer-service"
 import { GROWTH_NATIVE_DIALER_QA_MARKER } from "@/lib/growth/native-dialer/native-dialer-types"
 import {
-  GROWTH_NATIVE_DIALER_SCHEMA_SETUP_MESSAGE,
-  isGrowthNativeDialerSchemaReady,
+  growthNativeDialerSchemaResponseMeta,
+  probeGrowthNativeDialerSchemaHealth,
 } from "@/lib/growth/native-dialer/native-dialer-schema-health"
 
 export const runtime = "nodejs"
@@ -19,11 +19,13 @@ export async function GET(_request: Request, context: { params: Promise<{ leadId
     return NextResponse.json({ error: "invalid_id", message: "Invalid lead id." }, { status: 400 })
   }
 
-  if (!(await isGrowthNativeDialerSchemaReady(access.admin))) {
+  const schemaProbe = await probeGrowthNativeDialerSchemaHealth(access.admin)
+  const meta = growthNativeDialerSchemaResponseMeta(schemaProbe)
+  if (!schemaProbe.schemaReady) {
     return NextResponse.json({
       ok: true,
       qaMarker: GROWTH_NATIVE_DIALER_QA_MARKER,
-      meta: { schemaReady: false, setupMessage: GROWTH_NATIVE_DIALER_SCHEMA_SETUP_MESSAGE },
+      meta,
       leadContext: null,
     })
   }
@@ -31,7 +33,7 @@ export async function GET(_request: Request, context: { params: Promise<{ leadId
   try {
     const leadContext = await fetchGrowthNativeDialerLeadContext(access.admin, leadId)
     if (!leadContext) return NextResponse.json({ error: "not_found", message: "Lead not found." }, { status: 404 })
-    return NextResponse.json({ ok: true, qaMarker: GROWTH_NATIVE_DIALER_QA_MARKER, leadContext })
+    return NextResponse.json({ ok: true, qaMarker: GROWTH_NATIVE_DIALER_QA_MARKER, meta, leadContext })
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not load lead context."
     return NextResponse.json({ error: "fetch_failed", message }, { status: 500 })
