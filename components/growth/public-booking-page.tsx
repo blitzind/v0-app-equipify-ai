@@ -1,12 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react"
 import { ArrowLeft, CalendarDays, CheckCircle2, Clock3, Loader2, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { PublicBookingCalendar } from "@/components/growth/public-booking/public-booking-calendar"
 import {
   calendarDateToSlotKey,
   datesWithAvailableSlots,
@@ -17,11 +17,19 @@ import {
   parseDateKey,
 } from "@/lib/growth/booking/booking-availability-ui"
 import { GROWTH_BOOKING_PAGE_UI_QA_MARKER } from "@/lib/growth/booking/booking-page-ui-types"
+import {
+  formatTimezoneLabel,
+  resolveVisitorTimezone,
+  visitorTimezoneHelperCopy,
+} from "@/lib/growth/booking/booking-public-timezone"
 import type { GrowthBookingPagePublicView, GrowthBookingSlot } from "@/lib/growth/booking/booking-page-types"
+import { cn } from "@/lib/utils"
 
 type BookingPageProps = {
   slug: string
 }
+
+type BookingStep = "date" | "time" | "details"
 
 type BookingSuccessState = {
   message: string
@@ -32,41 +40,181 @@ type BookingSuccessState = {
   locationUrl: string | null
 }
 
-function EventDetailsPanel({ page, timezone }: { page: GrowthBookingPagePublicView; timezone: string }) {
+function EventDetailsPanel({
+  page,
+  displayTimezone,
+  pageTimezone,
+}: {
+  page: GrowthBookingPagePublicView
+  displayTimezone: string
+  pageTimezone: string
+}) {
+  const accentColor = page.accentColor ?? page.brandColor ?? "#2563eb"
+  const brandColor = page.brandColor ?? accentColor
+
   return (
-    <div className="space-y-4">
+    <div className="relative overflow-hidden rounded-2xl lg:rounded-none lg:rounded-l-2xl">
       {page.heroImageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={page.heroImageUrl} alt="" className="h-32 w-full rounded-xl object-cover" />
-      ) : null}
-      {page.logoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={page.logoUrl} alt="" className="h-10 w-auto object-contain" />
-      ) : null}
-      {page.brandName ? (
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{page.brandName}</p>
-      ) : null}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground" style={{ color: page.brandColor }}>
-          {page.pageTitle}
-        </h1>
-        {page.description ? <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{page.description}</p> : null}
+        <img src={page.heroImageUrl} alt="" className="h-36 w-full object-cover lg:h-40" />
+      ) : (
+        <div
+          className="h-28 w-full lg:h-32"
+          style={{
+            background: `linear-gradient(135deg, ${brandColor}22 0%, ${accentColor}44 55%, ${brandColor}18 100%)`,
+          }}
+        />
+      )}
+
+      <div
+        className="absolute left-0 top-0 h-full w-1.5"
+        style={{ backgroundColor: accentColor }}
+        aria-hidden
+      />
+
+      <div className="space-y-5 p-6 lg:p-8">
+        {page.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={page.logoUrl} alt="" className="max-h-10 w-auto max-w-[180px] object-contain" />
+        ) : null}
+
+        {page.brandName ? (
+          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: accentColor }}>
+            {page.brandName}
+          </p>
+        ) : null}
+
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[1.75rem]" style={{ color: brandColor }}>
+            {page.pageTitle}
+          </h1>
+          {page.description ? (
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-[0.9375rem]">{page.description}</p>
+          ) : null}
+        </div>
+
+        <dl className="space-y-3 text-sm">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex size-9 shrink-0 items-center justify-center rounded-lg"
+              style={{ backgroundColor: `${accentColor}18`, color: accentColor }}
+            >
+              <Clock3 className="size-4" aria-hidden />
+            </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Duration</dt>
+              <dd className="font-medium text-foreground">{page.durationMinutes} minutes</dd>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div
+              className="flex size-9 shrink-0 items-center justify-center rounded-lg"
+              style={{ backgroundColor: `${accentColor}18`, color: accentColor }}
+            >
+              <CalendarDays className="size-4" aria-hidden />
+            </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Timezone</dt>
+              <dd className="font-medium text-foreground">{formatTimezoneLabel(displayTimezone)}</dd>
+              {displayTimezone !== pageTimezone ? (
+                <dd className="text-xs text-muted-foreground">Host: {formatTimezoneLabel(pageTimezone)}</dd>
+              ) : null}
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div
+              className="flex size-9 shrink-0 items-center justify-center rounded-lg"
+              style={{ backgroundColor: `${accentColor}18`, color: accentColor }}
+            >
+              <MapPin className="size-4" aria-hidden />
+            </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Location</dt>
+              <dd className="font-medium text-foreground">{page.locationLabel}</dd>
+            </div>
+          </div>
+        </dl>
+
+        {page.footerNote ? <p className="border-t border-border/60 pt-4 text-xs leading-relaxed text-muted-foreground">{page.footerNote}</p> : null}
       </div>
-      <dl className="space-y-2 text-sm">
-        <div className="flex items-start gap-2 text-muted-foreground">
-          <Clock3 className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <dd>{page.durationMinutes} minutes</dd>
-        </div>
-        <div className="flex items-start gap-2 text-muted-foreground">
-          <CalendarDays className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <dd>{timezone.replace(/_/g, " ")}</dd>
-        </div>
-        <div className="flex items-start gap-2 text-muted-foreground">
-          <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <dd>{page.locationLabel}</dd>
-        </div>
-      </dl>
-      {page.footerNote ? <p className="text-xs text-muted-foreground">{page.footerNote}</p> : null}
+    </div>
+  )
+}
+
+function StepIndicator({ step, accentColor }: { step: BookingStep; accentColor: string }) {
+  const steps: { id: BookingStep; label: string }[] = [
+    { id: "date", label: "Date" },
+    { id: "time", label: "Time" },
+    { id: "details", label: "Details" },
+  ]
+  const activeIndex = steps.findIndex((item) => item.id === step)
+
+  return (
+    <ol className="mb-6 flex items-center gap-2 text-xs font-medium sm:text-sm" aria-label="Booking steps">
+      {steps.map((item, index) => {
+        const isActive = index === activeIndex
+        const isComplete = index < activeIndex
+        return (
+          <li key={item.id} className="flex items-center gap-2">
+            {index > 0 ? <span className="text-muted-foreground/50">/</span> : null}
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 transition-colors",
+                isActive && "font-semibold text-foreground",
+                isComplete && "text-muted-foreground",
+                !isActive && !isComplete && "text-muted-foreground/70",
+              )}
+              style={isActive ? { backgroundColor: `${accentColor}18`, color: accentColor } : undefined}
+            >
+              <span
+                className={cn(
+                  "inline-flex size-5 items-center justify-center rounded-full text-[11px]",
+                  isActive || isComplete ? "text-white" : "bg-muted text-muted-foreground",
+                )}
+                style={isActive || isComplete ? { backgroundColor: accentColor } : undefined}
+              >
+                {index + 1}
+              </span>
+              {item.label}
+            </span>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+function TimezoneSelect({
+  displayTimezone,
+  pageTimezone,
+  visitorTimezone,
+  onChange,
+}: {
+  displayTimezone: string
+  pageTimezone: string
+  visitorTimezone: string
+  onChange: (value: string) => void
+}) {
+  const options = useMemo(() => [...new Set([visitorTimezone, pageTimezone])], [visitorTimezone, pageTimezone])
+
+  return (
+    <div className="space-y-1">
+      <Label htmlFor="booking-display-timezone" className="text-xs text-muted-foreground">
+        Timezone
+      </Label>
+      <select
+        id="booking-display-timezone"
+        value={displayTimezone}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
+        {options.map((tz) => (
+          <option key={tz} value={tz}>
+            {tz === visitorTimezone ? `${formatTimezoneLabel(tz)} (your timezone)` : `${formatTimezoneLabel(tz)} (host)`}
+          </option>
+        ))}
+      </select>
+      <p className="text-xs text-muted-foreground">{visitorTimezoneHelperCopy(displayTimezone)}</p>
     </div>
   )
 }
@@ -74,7 +222,10 @@ function EventDetailsPanel({ page, timezone }: { page: GrowthBookingPagePublicVi
 export default function PublicBookingPage({ slug }: BookingPageProps) {
   const [page, setPage] = useState<GrowthBookingPagePublicView | null>(null)
   const [slots, setSlots] = useState<GrowthBookingSlot[]>([])
-  const [timezone, setTimezone] = useState("UTC")
+  const [pageTimezone, setPageTimezone] = useState("UTC")
+  const [visitorTimezone, setVisitorTimezone] = useState("UTC")
+  const [displayTimezone, setDisplayTimezone] = useState("UTC")
+  const [step, setStep] = useState<BookingStep>("date")
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<GrowthBookingSlot | null>(null)
   const [visibleMonth, setVisibleMonth] = useState<Date>(() => new Date())
@@ -105,9 +256,13 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
       if (!slotsRes.ok || !slotsData.ok) {
         throw new Error(slotsData.message ?? "Could not load availability.")
       }
+      const canonicalTimezone = slotsData.timezone ?? pageData.page.timezone
+      const detectedTimezone = resolveVisitorTimezone(canonicalTimezone)
       setPage(pageData.page)
       setSlots(slotsData.slots ?? [])
-      setTimezone(slotsData.timezone ?? pageData.page.timezone)
+      setPageTimezone(canonicalTimezone)
+      setVisitorTimezone(detectedTimezone)
+      setDisplayTimezone(detectedTimezone)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Booking page unavailable.")
     } finally {
@@ -119,13 +274,12 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
     void load()
   }, [load])
 
-  const slotsByDate = useMemo(() => groupSlotsByDateKey(slots, timezone), [slots, timezone])
-  const availableDateKeys = useMemo(() => datesWithAvailableSlots(slots, timezone), [slots, timezone])
-  const todayKey = useMemo(() => calendarDateToSlotKey(new Date(), timezone), [timezone])
+  const slotsByDate = useMemo(() => groupSlotsByDateKey(slots, displayTimezone), [slots, displayTimezone])
+  const availableDateKeys = useMemo(() => datesWithAvailableSlots(slots, displayTimezone), [slots, displayTimezone])
+  const todayKey = useMemo(() => calendarDateToSlotKey(new Date(), displayTimezone), [displayTimezone])
   const selectedDaySlots = selectedDateKey ? slotsByDate.get(selectedDateKey) ?? [] : []
   const accentColor = page?.accentColor ?? page?.brandColor ?? "#2563eb"
   const selectedCalendarDate = selectedDateKey ? parseDateKey(selectedDateKey) : undefined
-  const showDetailsForm = Boolean(selectedSlot)
 
   async function submitBooking() {
     if (!selectedSlot || !page) return
@@ -190,35 +344,43 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
   if (success) {
     return (
       <div className="min-h-screen bg-slate-50 px-4 py-10 dark:bg-slate-950" data-qa-marker={GROWTH_BOOKING_PAGE_UI_QA_MARKER}>
-        <div className="mx-auto max-w-lg rounded-2xl border border-border/70 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="size-8 text-emerald-600" aria-hidden />
-            <div>
-              <h1 className="text-xl font-semibold">You&apos;re scheduled</h1>
-              <p className="text-sm text-muted-foreground">{success.message}</p>
-            </div>
-          </div>
-          <div className="mt-6 rounded-xl border border-border/60 bg-slate-50/80 p-4 text-sm dark:border-slate-800 dark:bg-slate-950/50">
-            <p className="font-medium">{formatSlotDateTimeLabel(success.slotStartAt, timezone)}</p>
-            <p className="mt-1 text-muted-foreground">{timezone.replace(/_/g, " ")}</p>
-            {success.locationLabel ? (
-              <p className="mt-3 text-muted-foreground">
-                <span className="font-medium text-foreground">Location:</span> {success.locationLabel}
-              </p>
-            ) : null}
-            {success.meetingUrl || success.locationUrl ? (
-              <a
-                href={success.meetingUrl ?? success.locationUrl ?? "#"}
-                className="mt-3 inline-flex text-sm font-medium underline-offset-4 hover:underline"
-                style={{ color: accentColor }}
-                target="_blank"
-                rel="noreferrer"
+        <div className="mx-auto max-w-lg overflow-hidden rounded-2xl border border-border/70 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="h-1.5 w-full" style={{ backgroundColor: accentColor }} />
+          <div className="p-8">
+            <div className="flex items-start gap-4">
+              <div
+                className="flex size-12 shrink-0 items-center justify-center rounded-full"
+                style={{ backgroundColor: `${accentColor}18`, color: accentColor }}
               >
-                Open meeting link
-              </a>
-            ) : (
-              <p className="mt-3 text-xs text-muted-foreground">A calendar invitation will be sent to your email.</p>
-            )}
+                <CheckCircle2 className="size-7" aria-hidden />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold tracking-tight">You&apos;re scheduled</h1>
+                <p className="mt-1 text-sm text-muted-foreground">{success.message}</p>
+              </div>
+            </div>
+            <div className="mt-6 space-y-2 rounded-xl bg-muted/30 p-5 text-sm dark:bg-slate-950/50">
+              <p className="text-base font-semibold">{formatSlotDateTimeLabel(success.slotStartAt, displayTimezone)}</p>
+              <p className="text-muted-foreground">{formatTimezoneLabel(displayTimezone)}</p>
+              {success.locationLabel ? (
+                <p className="pt-2 text-muted-foreground">
+                  <span className="font-medium text-foreground">Location:</span> {success.locationLabel}
+                </p>
+              ) : null}
+              {success.meetingUrl || success.locationUrl ? (
+                <a
+                  href={success.meetingUrl ?? success.locationUrl ?? "#"}
+                  className="inline-flex pt-2 text-sm font-semibold underline-offset-4 hover:underline"
+                  style={{ color: accentColor }}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open meeting link
+                </a>
+              ) : (
+                <p className="pt-2 text-xs text-muted-foreground">A calendar invitation will be sent to your email.</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -226,127 +388,175 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8 dark:bg-slate-950 sm:py-10" data-qa-marker={GROWTH_BOOKING_PAGE_UI_QA_MARKER}>
-      <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:gap-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-border/70 lg:bg-white lg:shadow-sm dark:lg:border-slate-800 dark:lg:bg-slate-900">
-        <aside className="lg:border-r lg:border-border/70 lg:p-8 dark:lg:border-slate-800">
-          <EventDetailsPanel page={page} timezone={timezone} />
+    <div className="min-h-screen bg-slate-50 px-4 py-6 dark:bg-slate-950 sm:py-10" data-qa-marker={GROWTH_BOOKING_PAGE_UI_QA_MARKER}>
+      <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[minmax(360px,400px)_minmax(0,1fr)] lg:gap-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-border/70 lg:bg-white lg:shadow-sm dark:lg:border-slate-800 dark:lg:bg-slate-900">
+        <aside className="overflow-hidden rounded-2xl border border-border/70 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:rounded-none lg:border-0 lg:shadow-none">
+          <EventDetailsPanel page={page} displayTimezone={displayTimezone} pageTimezone={pageTimezone} />
         </aside>
 
-        <section className="rounded-2xl border border-border/70 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:rounded-none lg:border-0 lg:p-8 lg:shadow-none">
-          {!showDetailsForm ? (
-            <div className="space-y-6">
+        <section className="flex min-h-[32rem] flex-col rounded-2xl border border-border/70 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8 lg:min-h-[36rem] lg:rounded-none lg:border-0 lg:p-10 lg:shadow-none">
+          <StepIndicator step={step} accentColor={accentColor} />
+
+          {step === "date" ? (
+            <div className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center space-y-5">
               <div>
-                <h2 className="text-lg font-semibold">Select a date & time</h2>
-                <p className="text-sm text-muted-foreground">{timezone.replace(/_/g, " ")}</p>
+                <h2 className="text-xl font-semibold tracking-tight">Select a date</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Choose an available day to see open times.</p>
               </div>
 
-              <Calendar
-                mode="single"
+              <PublicBookingCalendar
+                accentColor={accentColor}
                 month={visibleMonth}
                 onMonthChange={setVisibleMonth}
                 selected={selectedCalendarDate}
                 onSelect={(date) => {
                   if (!date) return
-                  setSelectedDateKey(calendarDateToSlotKey(date, timezone))
+                  const key = calendarDateToSlotKey(date, displayTimezone)
+                  if (key < todayKey || !availableDateKeys.has(key)) return
+                  setSelectedDateKey(key)
                   setSelectedSlot(null)
                   setError(null)
+                  setStep("time")
                 }}
                 disabled={(date) => {
-                  const key = calendarDateToSlotKey(date, timezone)
+                  const key = calendarDateToSlotKey(date, displayTimezone)
                   return key < todayKey || !availableDateKeys.has(key)
                 }}
-                modifiers={{
-                  available: (date) => availableDateKeys.has(calendarDateToSlotKey(date, timezone)),
-                }}
-                modifiersClassNames={{
-                  available:
-                    "after:absolute after:bottom-1 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-emerald-500",
-                }}
-                className="mx-auto rounded-xl border border-border/60 p-2 dark:border-slate-800"
+                available={(date) => availableDateKeys.has(calendarDateToSlotKey(date, displayTimezone))}
               />
-
-              {selectedDateKey ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-sm font-medium">{formatDateKeyLabel(selectedDateKey, timezone)}</h3>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-xs"
-                      onClick={() => {
-                        setSelectedDateKey(null)
-                        setSelectedSlot(null)
-                      }}
-                    >
-                      Change date
-                    </Button>
-                  </div>
-                  {selectedDaySlots.length === 0 ? (
-                    <p className="rounded-lg border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground dark:border-slate-800">
-                      No available times this day. Pick another date.
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2 sm:max-w-md">
-                      {selectedDaySlots.map((slot) => (
-                        <Button
-                          key={slot.startAt}
-                          type="button"
-                          variant="outline"
-                          className="h-10 justify-center text-sm font-medium hover:border-transparent hover:text-white"
-                          style={{ borderColor: accentColor, color: accentColor }}
-                          onClick={() => {
-                            setSelectedSlot(slot)
-                            setError(null)
-                          }}
-                        >
-                          {formatSlotTimeLabel(slot.startAt, timezone)}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Choose a highlighted date to see available times.</p>
-              )}
             </div>
-          ) : (
-            <div className="space-y-5">
+          ) : null}
+
+          {step === "time" ? (
+            <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center space-y-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-lg font-semibold">Enter your details</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {formatSlotDateTimeLabel(selectedSlot!.startAt, timezone)}
+                  <h2 className="text-xl font-semibold tracking-tight">Select a time</h2>
+                  <p className="mt-1 text-sm font-medium text-foreground">
+                    {selectedDateKey ? formatDateKeyLabel(selectedDateKey, displayTimezone) : ""}
                   </p>
                 </div>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-8 px-2 text-xs"
-                  onClick={() => setSelectedSlot(null)}
+                  className="h-9 shrink-0 px-2 text-xs font-medium"
+                  style={{ color: accentColor }}
+                  onClick={() => {
+                    setStep("date")
+                    setSelectedSlot(null)
+                    setError(null)
+                  }}
                 >
-                  <ArrowLeft className="mr-1 size-3" />
+                  Change date
+                </Button>
+              </div>
+
+              <TimezoneSelect
+                displayTimezone={displayTimezone}
+                pageTimezone={pageTimezone}
+                visitorTimezone={visitorTimezone}
+                onChange={(value) => {
+                  setDisplayTimezone(value)
+                  if (selectedDateKey) {
+                    const stillAvailable = groupSlotsByDateKey(slots, value).has(selectedDateKey)
+                    if (!stillAvailable) {
+                      setSelectedDateKey(null)
+                      setStep("date")
+                    }
+                  }
+                }}
+              />
+
+              {selectedDaySlots.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-border/70 px-4 py-8 text-center text-sm text-muted-foreground dark:border-slate-800">
+                  No available times this day. Pick another date.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2.5" style={{ "--booking-accent": accentColor } as CSSProperties}>
+                  {selectedDaySlots.map((slot) => {
+                    const isSelected = selectedSlot?.startAt === slot.startAt
+                    return (
+                      <Button
+                        key={slot.startAt}
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                          "h-11 justify-center text-sm font-semibold transition-colors",
+                          isSelected
+                            ? "border-transparent bg-[var(--booking-accent)] text-white shadow-sm"
+                            : "border-[color-mix(in_srgb,var(--booking-accent)_40%,transparent)] bg-background text-[var(--booking-accent)] hover:border-[var(--booking-accent)] hover:bg-[var(--booking-accent)] hover:text-white",
+                        )}
+                        onClick={() => {
+                          setSelectedSlot(slot)
+                          setError(null)
+                          setStep("details")
+                        }}
+                      >
+                        {formatSlotTimeLabel(slot.startAt, displayTimezone)}
+                      </Button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {step === "details" && selectedSlot ? (
+            <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center space-y-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold tracking-tight">Enter your details</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Almost done — confirm your booking below.</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 shrink-0 px-2 text-xs"
+                  onClick={() => {
+                    setStep("time")
+                    setError(null)
+                  }}
+                >
+                  <ArrowLeft className="mr-1 size-3.5" />
                   Back
                 </Button>
+              </div>
+
+              <div
+                className="space-y-2 rounded-xl border p-4 text-sm"
+                style={{ borderColor: `${accentColor}33`, backgroundColor: `${accentColor}08` }}
+              >
+                <p className="font-semibold">{formatSlotDateTimeLabel(selectedSlot.startAt, displayTimezone)}</p>
+                <p className="text-muted-foreground">{formatTimezoneLabel(displayTimezone)}</p>
+                <p className="text-muted-foreground">
+                  <span className="font-medium text-foreground">Location:</span> {page.locationLabel}
+                </p>
               </div>
 
               <div className="space-y-3">
                 <div>
                   <Label htmlFor="booking-name">Name</Label>
-                  <Input id="booking-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                  <Input id="booking-name" className="h-11" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
                 </div>
                 <div>
                   <Label htmlFor="booking-email">Email</Label>
-                  <Input id="booking-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                  <Input
+                    id="booking-email"
+                    type="email"
+                    className="h-11"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="booking-company">Company</Label>
-                  <Input id="booking-company" value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
+                  <Input id="booking-company" className="h-11" value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
                 </div>
                 <div>
                   <Label htmlFor="booking-phone">Phone (optional)</Label>
-                  <Input id="booking-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                  <Input id="booking-phone" className="h-11" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
                 </div>
                 <div>
                   <Label htmlFor="booking-notes">Notes (optional)</Label>
@@ -358,7 +568,7 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
 
               <Button
                 type="button"
-                className="w-full text-white"
+                className="h-11 w-full text-base font-semibold text-white"
                 disabled={submitting || !form.name.trim() || !form.email.trim()}
                 style={{ backgroundColor: accentColor }}
                 onClick={() => void submitBooking()}
@@ -367,7 +577,7 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
                 Confirm Booking
               </Button>
             </div>
-          )}
+          ) : null}
         </section>
       </div>
     </div>

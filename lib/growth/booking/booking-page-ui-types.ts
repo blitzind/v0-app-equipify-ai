@@ -1,8 +1,8 @@
-/** Client-safe booking page UI types (booking-page-ui-v2). */
+/** Client-safe booking page UI types (booking-page-ui-v3). */
 
 import type { GrowthBookingAvailabilityWindow } from "@/lib/growth/booking/booking-page-types"
 
-export const GROWTH_BOOKING_PAGE_UI_QA_MARKER = "booking-page-ui-v2" as const
+export const GROWTH_BOOKING_PAGE_UI_QA_MARKER = "booking-page-ui-v3" as const
 
 export const BOOKING_WEEKDAY_LABELS = [
   "Sunday",
