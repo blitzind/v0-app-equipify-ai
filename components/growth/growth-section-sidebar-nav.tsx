@@ -9,6 +9,7 @@ import {
   BookOpen,
   Bot,
   CalendarClock,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Crown,
@@ -41,6 +42,10 @@ import {
 } from "@/hooks/use-growth-sidebar-console"
 import { cn } from "@/lib/utils"
 
+export const GROWTH_SIDEBAR_NAV_QA_MARKER = "growth-sidebar-nav-v2" as const
+
+export const GROWTH_SIDEBAR_GROUPS_COLLAPSED_STORAGE_KEY = "equipify-growth-sidebar-groups-collapsed"
+
 type GrowthNavItem = {
   href: string
   label: string
@@ -51,12 +56,14 @@ type GrowthNavItem = {
 }
 
 type GrowthNavGroup = {
+  id: string
   label: string
   items: GrowthNavItem[]
 }
 
 const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
   {
+    id: "core",
     label: "Core",
     items: [
       {
@@ -105,6 +112,7 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
     ],
   },
   {
+    id: "intelligence",
     label: "Intelligence",
     items: [
       {
@@ -189,6 +197,7 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
     ],
   },
   {
+    id: "ai-channels",
     label: "AI & Channels",
     items: [
       {
@@ -258,6 +267,7 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
     ],
   },
   {
+    id: "settings",
     label: "Settings",
     items: [
       {
@@ -276,10 +286,107 @@ const QUICK_ACTIONS = [
   { href: "/admin/growth/copilot", label: "Generate Copilot Draft" },
 ] as const
 
-function NavBadge({ count }: { count?: number }) {
+const QUICK_ACTIONS_GROUP: GrowthNavGroup = {
+  id: "quick-actions",
+  label: "Quick Actions",
+  items: QUICK_ACTIONS.map((action) => ({
+    href: action.href,
+    label: action.label,
+    icon: Plus,
+    match: (path: string) => path === action.href || path.startsWith(`${action.href}/`),
+  })),
+}
+
+const GROWTH_SIDEBAR_ALL_GROUPS: GrowthNavGroup[] = [...GROWTH_NAV_GROUPS, QUICK_ACTIONS_GROUP]
+
+function readCollapsedGrowthGroups(): Set<string> {
+  if (typeof window === "undefined") return new Set()
+  try {
+    const raw = window.localStorage.getItem(GROWTH_SIDEBAR_GROUPS_COLLAPSED_STORAGE_KEY)
+    if (!raw) return new Set()
+    const parsed = JSON.parse(raw) as unknown
+    if (Array.isArray(parsed)) return new Set(parsed.filter((x): x is string => typeof x === "string"))
+    return new Set()
+  } catch {
+    return new Set()
+  }
+}
+
+function writeCollapsedGrowthGroups(set: Set<string>) {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(GROWTH_SIDEBAR_GROUPS_COLLAPSED_STORAGE_KEY, JSON.stringify(Array.from(set)))
+  } catch {
+    // localStorage may be unavailable; collapse state stays in memory.
+  }
+}
+
+function groupHasActiveRoute(group: GrowthNavGroup, pathname: string): boolean {
+  return group.items.some((item) => item.match(pathname))
+}
+
+function useGrowthSidebarGroupCollapse(pathname: string, groups: GrowthNavGroup[]) {
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
+
+  useEffect(() => {
+    setCollapsedGroups(readCollapsedGrowthGroups())
+  }, [])
+
+  useEffect(() => {
+    setCollapsedGroups((prev) => {
+      let mutated = false
+      const next = new Set(prev)
+      for (const group of groups) {
+        if (!next.has(group.id)) continue
+        if (groupHasActiveRoute(group, pathname)) {
+          next.delete(group.id)
+          mutated = true
+        }
+      }
+      if (mutated) writeCollapsedGrowthGroups(next)
+      return mutated ? next : prev
+    })
+  }, [pathname, groups])
+
+  const toggleGroup = useCallback((groupId: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(groupId)) next.delete(groupId)
+      else next.add(groupId)
+      writeCollapsedGrowthGroups(next)
+      return next
+    })
+  }, [])
+
+  return { collapsedGroups, toggleGroup }
+}
+
+const GROWTH_NAV_ROW_MOTION = "rounded-lg text-sm transition-all duration-150"
+
+const GROWTH_NAV_ROW_INACTIVE =
+  "border border-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/40 hover:text-foreground dark:hover:bg-blue-500/[0.08] dark:hover:text-foreground"
+
+const GROWTH_NAV_ROW_ACTIVE =
+  "border border-blue-200/70 bg-blue-50/90 font-medium text-foreground dark:border-cyan-500/25 dark:bg-slate-800/90 dark:text-white"
+
+const GROWTH_NAV_ICON_INACTIVE =
+  "text-muted-foreground/70 group-hover:text-foreground dark:text-muted-foreground/55 dark:group-hover:text-foreground/90"
+
+const GROWTH_NAV_ICON_ACTIVE = "text-blue-600 dark:text-cyan-300"
+
+const GROWTH_NAV_ACTIVE_RAIL = "bg-cyan-500 dark:bg-cyan-400"
+
+function NavBadge({ count, active }: { count?: number; active?: boolean }) {
   if (!count || count <= 0) return null
   return (
-    <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-emerald-800">
+    <span
+      className={cn(
+        "ml-2 inline-flex min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+        active
+          ? "bg-blue-100 text-blue-800 dark:bg-cyan-500/20 dark:text-cyan-100"
+          : "bg-emerald-100 text-emerald-800 dark:bg-slate-700 dark:text-slate-200",
+      )}
+    >
       {count > 99 ? "99+" : count}
     </span>
   )
@@ -328,19 +435,32 @@ function GrowthNavLink({
     <Link
       href={item.href}
       className={cn(
-        "flex items-center gap-2 rounded-lg border text-sm font-medium transition-colors",
+        "group relative flex min-w-0 items-center gap-2",
+        GROWTH_NAV_ROW_MOTION,
         compact ? "shrink-0 px-3 py-2" : "px-3 py-2",
         collapsed && !compact ? "justify-center px-2" : "",
-        active
-          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-          : "border-transparent text-muted-foreground hover:border-border hover:bg-muted/40 hover:text-foreground",
+        active ? GROWTH_NAV_ROW_ACTIVE : GROWTH_NAV_ROW_INACTIVE,
       )}
     >
-      <Icon className="size-4 shrink-0" aria-hidden />
-      {!collapsed || compact ? <span className="truncate">{item.label}</span> : null}
-      {!collapsed && !compact ? <NavBadge count={badge} /> : null}
+      {active && !collapsed && !compact ? (
+        <span
+          className={cn("absolute left-0 top-1/2 z-[1] h-5 w-0.5 -translate-y-1/2 rounded-r-full", GROWTH_NAV_ACTIVE_RAIL)}
+          aria-hidden
+        />
+      ) : null}
+      {active && collapsed && !compact ? (
+        <span
+          className={cn("absolute bottom-1 left-1/2 z-[1] h-1.5 w-1.5 -translate-x-1/2 rounded-full", GROWTH_NAV_ACTIVE_RAIL)}
+          aria-hidden
+        />
+      ) : null}
+      <Icon className={cn("size-4 shrink-0", active ? GROWTH_NAV_ICON_ACTIVE : GROWTH_NAV_ICON_INACTIVE)} aria-hidden />
+      {!collapsed || compact ? (
+        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      ) : null}
+      {!collapsed && !compact ? <NavBadge count={badge} active={active} /> : null}
       {compact && badge ? (
-        <span className="rounded-full bg-emerald-100 px-1.5 text-[10px] font-semibold text-emerald-800">{badge}</span>
+        <NavBadge count={badge} active={active} />
       ) : null}
     </Link>
   )
@@ -376,73 +496,90 @@ function GrowthNavGroups({
   compact,
   badges,
   previews,
+  collapsedGroups,
+  toggleGroup,
+  groups = GROWTH_NAV_GROUPS,
+  showQuickActions = false,
 }: {
   pathname: string
   collapsed?: boolean
   compact?: boolean
   badges: Partial<Record<GrowthSidebarConsoleKey, number>>
   previews: Partial<Record<GrowthSidebarConsoleKey, GrowthSidebarPreviewLine[]>>
+  collapsedGroups?: Set<string>
+  toggleGroup?: (groupId: string) => void
+  groups?: GrowthNavGroup[]
+  showQuickActions?: boolean
 }) {
+  const navGroups = showQuickActions ? GROWTH_SIDEBAR_ALL_GROUPS : groups
+
   return (
     <>
-      {GROWTH_NAV_GROUPS.map((group) => (
-        <div key={group.label} className={cn(compact ? "shrink-0" : "space-y-1")}>
-          {!compact && !collapsed ? (
-            <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground first:pt-0">
-              {group.label}
-            </p>
-          ) : null}
-          <div className={cn(compact ? "flex gap-2" : "space-y-0.5")}>
-            {group.items.map((item) => (
-              <GrowthNavLink
-                key={item.href}
-                item={item}
-                pathname={pathname}
-                collapsed={collapsed}
-                compact={compact}
-                badge={item.consoleKey ? badges[item.consoleKey] : undefined}
-                previewLines={item.consoleKey ? previews[item.consoleKey] : undefined}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-    </>
-  )
-}
+      {navGroups.map((group, groupIndex) => {
+        const groupCollapsed = collapsedGroups?.has(group.id) ?? false
+        const groupActive = groupHasActiveRoute(group, pathname)
+        const showHeader = !compact && !collapsed && toggleGroup
+        const hideItems = showHeader && groupCollapsed
 
-function GrowthSidebarQuickActions({ collapsed }: { collapsed: boolean }) {
-  return (
-    <div className={cn("space-y-1 border-t border-border pt-3", collapsed ? "px-1" : "px-1")}>
-      {!collapsed ? (
-        <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Quick actions</p>
-      ) : null}
-      {QUICK_ACTIONS.map((action) => {
-        const button = (
-          <Link
-            href={action.href}
+        return (
+          <div
+            key={group.id}
             className={cn(
-              "flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground",
-              collapsed ? "justify-center" : "",
+              compact ? "min-w-0 shrink-0" : "min-w-0",
+              !compact && groupIndex > 0 ? "mt-4 border-t border-border/50 pt-3 dark:border-border/40" : "",
+              !compact && groupIndex === 0 ? "mt-0" : "",
             )}
           >
-            <Plus className="size-3.5 shrink-0 opacity-70" aria-hidden />
-            {!collapsed ? <span className="truncate">{action.label}</span> : null}
-          </Link>
+            {showHeader ? (
+              <button
+                type="button"
+                onClick={() => toggleGroup(group.id)}
+                aria-expanded={!groupCollapsed}
+                aria-controls={`growth-nav-group-${group.id}`}
+                className={cn(
+                  "mb-1.5 flex w-full items-center justify-between gap-2 rounded-md px-3 py-1",
+                  "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground",
+                  "select-none transition-colors hover:text-foreground dark:hover:text-foreground/90",
+                )}
+              >
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate">{group.label}</span>
+                  {groupCollapsed && groupActive ? (
+                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", GROWTH_NAV_ACTIVE_RAIL)} aria-hidden />
+                  ) : null}
+                </span>
+                <ChevronDown
+                  className={cn("size-3.5 shrink-0 transition-transform duration-150", groupCollapsed && "-rotate-90")}
+                  aria-hidden
+                />
+              </button>
+            ) : null}
+            {!showHeader && !compact && !collapsed ? (
+              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {group.label}
+              </p>
+            ) : null}
+            <div
+              id={`growth-nav-group-${group.id}`}
+              hidden={hideItems}
+              className={cn(compact ? "space-y-0.5" : "space-y-0.5 pb-0.5")}
+            >
+              {group.items.map((item) => (
+                <GrowthNavLink
+                  key={item.href}
+                  item={item}
+                  pathname={pathname}
+                  collapsed={collapsed}
+                  compact={compact}
+                  badge={item.consoleKey ? badges[item.consoleKey] : undefined}
+                  previewLines={item.consoleKey ? previews[item.consoleKey] : undefined}
+                />
+              ))}
+            </div>
+          </div>
         )
-
-        if (collapsed) {
-          return (
-            <Tooltip key={action.href}>
-              <TooltipTrigger asChild>{button}</TooltipTrigger>
-              <TooltipContent side="right">{action.label}</TooltipContent>
-            </Tooltip>
-          )
-        }
-
-        return <div key={action.href}>{button}</div>
       })}
-    </div>
+    </>
   )
 }
 
@@ -564,6 +701,7 @@ export function GrowthSectionSidebarNav() {
   const pathname = usePathname()
   const consoleState = useGrowthSidebarConsole()
   const [collapsed, setCollapsed] = useState(false)
+  const { collapsedGroups, toggleGroup } = useGrowthSidebarGroupCollapse(pathname, GROWTH_SIDEBAR_ALL_GROUPS)
 
   useGrowthSidebarKeyboardShortcuts()
 
@@ -592,9 +730,10 @@ export function GrowthSectionSidebarNav() {
     <TooltipProvider delayDuration={200}>
       <nav
         aria-label="Growth Engine"
+        data-qa-marker={GROWTH_SIDEBAR_NAV_QA_MARKER}
         className={cn("hidden shrink-0 lg:block", collapsed ? "w-[4.5rem]" : "w-60")}
       >
-        <div className="sticky top-6 flex flex-col rounded-2xl border border-border bg-card p-3 shadow-sm">
+        <div className="sticky top-6 flex flex-col rounded-2xl border border-border bg-card p-3 shadow-sm dark:border-border/80 dark:bg-card/95">
           <div className={cn("mb-2 flex items-center gap-1", collapsed ? "justify-center" : "justify-between")}>
             {!collapsed ? (
               <p className="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Growth Engine</p>
@@ -611,14 +750,35 @@ export function GrowthSectionSidebarNav() {
             </Button>
           </div>
 
-          <GrowthNavGroups
-            pathname={pathname}
-            collapsed={collapsed}
-            badges={consoleState.badges}
-            previews={consoleState.previews}
-          />
+          {collapsed ? (
+            <>
+              {GROWTH_SIDEBAR_ALL_GROUPS.map((group, groupIndex) => (
+                <div key={group.id} className={cn("space-y-0.5", groupIndex > 0 ? "mt-3 border-t border-border/50 pt-3 dark:border-border/40" : "")}>
+                  {group.items.map((item) => (
+                    <GrowthNavLink
+                      key={item.href}
+                      item={item}
+                      pathname={pathname}
+                      collapsed
+                      badge={item.consoleKey ? consoleState.badges[item.consoleKey] : undefined}
+                      previewLines={item.consoleKey ? consoleState.previews[item.consoleKey] : undefined}
+                    />
+                  ))}
+                </div>
+              ))}
+            </>
+          ) : (
+            <GrowthNavGroups
+              pathname={pathname}
+              collapsed={collapsed}
+              badges={consoleState.badges}
+              previews={consoleState.previews}
+              collapsedGroups={collapsedGroups}
+              toggleGroup={toggleGroup}
+              showQuickActions
+            />
+          )}
 
-          <GrowthSidebarQuickActions collapsed={collapsed} />
           <GrowthSidebarHealthStrip collapsed={collapsed} health={consoleState.health} loading={consoleState.loading} />
 
           {!collapsed ? (
@@ -627,16 +787,16 @@ export function GrowthSectionSidebarNav() {
         </div>
       </nav>
 
-      <nav aria-label="Growth Engine" className="lg:hidden">
-        <div className="-mx-1 overflow-x-auto px-1 pb-1">
-          <div className="flex min-w-max gap-2 rounded-xl border border-border bg-card p-2 shadow-sm">
-            <GrowthNavGroups
-              pathname={pathname}
-              compact
-              badges={consoleState.badges}
-              previews={consoleState.previews}
-            />
-          </div>
+      <nav aria-label="Growth Engine" data-qa-marker={GROWTH_SIDEBAR_NAV_QA_MARKER} className="lg:hidden">
+        <div className="min-w-0 rounded-xl border border-border bg-card p-2 shadow-sm dark:border-border/80 dark:bg-card/95">
+          <GrowthNavGroups
+            pathname={pathname}
+            badges={consoleState.badges}
+            previews={consoleState.previews}
+            collapsedGroups={collapsedGroups}
+            toggleGroup={toggleGroup}
+            showQuickActions
+          />
         </div>
       </nav>
     </TooltipProvider>
