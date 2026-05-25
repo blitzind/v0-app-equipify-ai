@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { GrowthProspectIntelligenceCard } from "@/components/growth/growth-prospect-intelligence-card"
 import { GrowthLeadResearchHistory } from "@/components/growth/growth-lead-research-history"
 import { GrowthLeadResearchRunCard } from "@/components/growth/growth-lead-research-run-card"
 import { GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
@@ -12,6 +13,7 @@ import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-
 import { growthLeadResearchErrorMessage } from "@/lib/growth/research-error-messages"
 import type { GrowthLead } from "@/lib/growth/types"
 import type { GrowthLeadResearchBundle, GrowthLeadResearchRun } from "@/lib/growth/research-types"
+import type { GrowthProspectIntelligenceBundle } from "@/lib/growth/research/research-types"
 
 type GrowthLeadResearchPanelProps = {
   lead: GrowthLead
@@ -29,6 +31,7 @@ type ResearchApiPayload = GrowthLeadResearchBundle & {
   leadScore?: number | null
   lead?: GrowthLead | null
   cached?: boolean
+  prospectIntelligence?: GrowthProspectIntelligenceBundle
 }
 
 function mergeRunIntoBundle(
@@ -56,8 +59,11 @@ function pickDisplayRun(bundle: GrowthLeadResearchBundle | null): GrowthLeadRese
 
 export function GrowthLeadResearchPanel({ lead, onLeadUpdated, onLatestRunChange, id }: GrowthLeadResearchPanelProps) {
   const [bundle, setBundle] = useState<GrowthLeadResearchBundle | null>(null)
+  const [prospectIntelligence, setProspectIntelligence] = useState<GrowthProspectIntelligenceBundle | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [prospectRunning, setProspectRunning] = useState(false)
+  const [prospectError, setProspectError] = useState<string | null>(null)
   const [savingNotes, setSavingNotes] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cacheNotice, setCacheNotice] = useState<string | null>(null)
@@ -83,6 +89,7 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated, onLatestRunChange
           manualNotes: data.manualNotes ?? null,
         }
         setBundle(nextBundle)
+        setProspectIntelligence(data.prospectIntelligence ?? null)
         onLatestRunChange?.(nextBundle.latestRun ?? pickDisplayRun(nextBundle))
         setNotesDraft(data.manualNotes?.body ?? "")
       } catch (e) {
@@ -99,6 +106,36 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated, onLatestRunChange
   useEffect(() => {
     void loadResearch()
   }, [loadResearch])
+
+  async function runProspectResearch(rebuild = false) {
+    setProspectRunning(true)
+    setProspectError(null)
+    try {
+      const endpoint = rebuild ? "rebuild" : "run"
+      const res = await fetch(`/api/platform/growth/leads/${lead.id}/research/${endpoint}`, { method: "POST" })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        message?: string
+        error?: string
+        run?: GrowthProspectIntelligenceBundle["latestRun"]
+        lead?: GrowthLead | null
+      }
+      if (!res.ok || !data.ok || !data.run) {
+        throw new Error(data.message ?? data.error ?? "Prospect research failed.")
+      }
+      setProspectIntelligence((prev) => ({
+        leadId: lead.id,
+        latestRun: data.run ?? null,
+        runs: [data.run!, ...(prev?.runs.filter((item) => item.id !== data.run?.id) ?? [])],
+      }))
+      if (data.lead) onLeadUpdated?.(data.lead)
+      await loadResearch({ clearError: false, silent: true })
+    } catch (e) {
+      setProspectError(e instanceof Error ? e.message : "Prospect research failed.")
+    } finally {
+      setProspectRunning(false)
+    }
+  }
 
   async function generateResearch(regenerate = false) {
     setGenerating(true)
@@ -210,6 +247,15 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated, onLatestRunChange
         </div>
       ) : (
         <div className="space-y-4">
+          <GrowthProspectIntelligenceCard
+            companyName={lead.companyName}
+            run={prospectIntelligence?.latestRun ?? null}
+            running={prospectRunning}
+            error={prospectError}
+            onRunResearch={() => void runProspectResearch(false)}
+            onRebuildResearch={() => void runProspectResearch(true)}
+          />
+
           <p className="text-[11px] leading-relaxed text-muted-foreground">
             Internal AI research only — human review required. Not verified; nothing is sent to prospects.
           </p>

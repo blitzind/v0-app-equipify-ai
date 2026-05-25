@@ -7,6 +7,7 @@ import type { GrowthAiCopilotInputSnapshot } from "@/lib/growth/ai-copilot-types
 import { listGrowthOutboundMessagesForLead } from "@/lib/growth/outbound/message-repository"
 import { listGrowthOutboundRepliesForLead } from "@/lib/growth/outbound/reply-repository"
 import { fetchLatestUsableGrowthLeadResearchRun } from "@/lib/growth/research-repository"
+import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
 import type { GrowthLead } from "@/lib/growth/types"
 
 function truncate(value: string | null | undefined, max = 240): string {
@@ -20,12 +21,15 @@ export async function buildGrowthAiCopilotInput(
   lead: GrowthLead,
   options?: { sourceReplyId?: string | null },
 ): Promise<GrowthAiCopilotInputSnapshot> {
-  const [decisionMakers, messages, replies, researchRun] = await Promise.all([
+  const [decisionMakers, messages, replies, researchRun, prospectRun] = await Promise.all([
     listGrowthLeadDecisionMakers(admin, lead.id),
     listGrowthOutboundMessagesForLead(admin, lead.id),
     listGrowthOutboundRepliesForLead(admin, lead.id),
     lead.latestResearchRunId
       ? fetchLatestUsableGrowthLeadResearchRun(admin, lead.id)
+      : Promise.resolve(null),
+    lead.latestProspectResearchRunId
+      ? fetchLatestCompletedProspectResearchRun(admin, lead.id)
       : Promise.resolve(null),
   ])
 
@@ -67,8 +71,11 @@ export async function buildGrowthAiCopilotInput(
     executiveRecommendation: truncate(lead.executiveRecommendation, 160),
     capacityTier: lead.operationalCapacityTier,
     capacityProtection: truncate(lead.capacityProtectionRecommendation, 160),
-    researchSummary: truncate(researchRun?.result?.companySummary ?? lead.notes, 200),
-    researchNextAction: truncate(researchRun?.result?.recommendedNextAction ?? null, 120),
+    researchSummary: truncate(prospectRun?.researchSummary ?? researchRun?.result?.companySummary ?? lead.notes, 200),
+    researchNextAction: truncate(
+      prospectRun?.recommendedNextAction ?? researchRun?.result?.recommendedNextAction ?? null,
+      120,
+    ),
     decisionMakers: decisionMakers.slice(0, 4).map((dm) => ({
       name: dm.fullName,
       title: dm.title,

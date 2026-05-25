@@ -3,6 +3,7 @@ import { z } from "zod"
 import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { loadGrowthLeadResearchBundle } from "@/lib/growth/research-repository"
+import { loadProspectIntelligenceBundle } from "@/lib/growth/research/research-repository"
 import { runGrowthLeadResearch } from "@/lib/growth/run-lead-research"
 
 export const runtime = "nodejs"
@@ -29,13 +30,17 @@ export async function GET(
       return NextResponse.json({ error: "not_found", message: "Lead not found." }, { status: 404 })
     }
 
-    const bundle = await loadGrowthLeadResearchBundle(access.admin, leadId)
+    const [bundle, prospectIntelligence] = await Promise.all([
+      loadGrowthLeadResearchBundle(access.admin, leadId),
+      loadProspectIntelligenceBundle(access.admin, leadId),
+    ])
     return NextResponse.json({
       ok: true,
       leadId,
       latestRun: bundle.latestRun,
       runs: bundle.runs,
       manualNotes: bundle.manualNotes,
+      prospectIntelligence,
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)

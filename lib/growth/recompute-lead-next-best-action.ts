@@ -57,7 +57,13 @@ export async function recomputeGrowthLeadNextBestAction(
     contactPhone: lead.contactPhone,
     callDisposition: lead.callDisposition,
     followUpAt: lead.followUpAt,
-    recommendedNextAction: latestRun?.result?.recommendedNextAction ?? null,
+    recommendedNextAction:
+      lead.prospectRecommendedNextAction ??
+      latestRun?.result?.recommendedNextAction ??
+      null,
+    prospectRecommendedNextAction: lead.prospectRecommendedNextAction,
+    lastProspectResearchedAt: lead.lastProspectResearchedAt,
+    latestProspectResearchRunId: lead.latestProspectResearchRunId,
     decisionMakerStatus: lead.decisionMakerStatus,
     primaryDecisionMakerPhone,
     emailSummary,

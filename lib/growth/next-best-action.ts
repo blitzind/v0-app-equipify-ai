@@ -24,6 +24,10 @@ import {
   type GrowthNextBestActionResult,
 } from "@/lib/growth/nba-types"
 import { hasUsableResearch } from "@/lib/growth/call-priority"
+import {
+  mapProspectResearchRecommendationToNba,
+  prospectResearchNbaReason,
+} from "@/lib/growth/research/nba-research-bridge"
 import { isForecastRegression } from "@/lib/growth/revenue-forecast-trajectory"
 import type { GrowthLeadStatus } from "@/lib/growth/types"
 
@@ -34,6 +38,9 @@ export type NextBestActionInput = {
   websiteFetchStatus: string | null
   lastResearchedAt: string | null
   latestResearchRunId: string | null
+  latestProspectResearchRunId?: string | null
+  lastProspectResearchedAt?: string | null
+  prospectRecommendedNextAction?: string | null
   contactPhone: string | null
   callDisposition: GrowthLeadCallDisposition | null
   followUpAt: string | null
@@ -523,10 +530,10 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
     return buildResult("wait_for_email_reply", "Outreach sent — waiting for email reply.", [], "medium")
   }
 
-  if (!usable) {
+  if (!usable && !input.latestProspectResearchRunId) {
     return buildResult(
       "run_research",
-      "No usable AI research on this lead yet.",
+      "No usable research on this lead yet.",
       ["Research not completed"],
       "high",
     )
@@ -639,6 +646,19 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
   }
 
   if (!leadPhone && !dmPhone) blockers.push("No callable phone")
+
+  const prospectNba = mapProspectResearchRecommendationToNba(input.prospectRecommendedNextAction)
+  const prospectAge = researchAgeDays(input.lastProspectResearchedAt ?? null, now)
+  if (prospectNba && prospectAge != null && prospectAge <= 30) {
+    return buildResult(
+      prospectNba,
+      prospectResearchNbaReason(input.prospectRecommendedNextAction) ??
+        "Prospect intelligence recommends the next operator action.",
+      blockers,
+      "medium",
+    )
+  }
+
   return buildResult(
     "manual_review",
     "Signals are mixed — review research and contacts manually.",

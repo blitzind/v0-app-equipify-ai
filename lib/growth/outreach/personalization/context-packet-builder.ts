@@ -7,6 +7,7 @@ import { listGrowthOutboundRepliesForLead } from "@/lib/growth/outbound/reply-re
 import type { OutreachContextPacket } from "@/lib/growth/outreach/personalization/personalization-types"
 import { listGrowthOutreachQueueItems } from "@/lib/growth/outreach/outreach-queue-repository"
 import { fetchLatestUsableGrowthLeadResearchRun } from "@/lib/growth/research-repository"
+import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
 import { listGrowthLeadTimelineEvents } from "@/lib/growth/timeline-repository"
 import type { GrowthLead } from "@/lib/growth/types"
 
@@ -36,12 +37,15 @@ export async function buildOutreachContextPacket(
   admin: SupabaseClient,
   lead: GrowthLead,
 ): Promise<OutreachContextPacket> {
-  const [decisionMakers, messages, replies, researchRun, queueItems, timelineEvents] = await Promise.all([
+  const [decisionMakers, messages, replies, researchRun, prospectRun, queueItems, timelineEvents] = await Promise.all([
     listGrowthLeadDecisionMakers(admin, lead.id),
     listGrowthOutboundMessagesForLead(admin, lead.id),
     listGrowthOutboundRepliesForLead(admin, lead.id),
     lead.latestResearchRunId
       ? fetchLatestUsableGrowthLeadResearchRun(admin, lead.id)
+      : Promise.resolve(null),
+    lead.latestProspectResearchRunId
+      ? fetchLatestCompletedProspectResearchRun(admin, lead.id)
       : Promise.resolve(null),
     listGrowthOutreachQueueItems(admin, { leadId: lead.id, limit: 5 }),
     listGrowthLeadTimelineEvents(admin, { leadId: lead.id, limit: 8 }),
@@ -51,6 +55,7 @@ export async function buildOutreachContextPacket(
   const research = researchRun?.result
 
   const websiteFindings = [
+    prospectRun?.researchSummary ? truncate(prospectRun.researchSummary, 160) : null,
     research?.websiteSummary ? truncate(research.websiteSummary, 160) : null,
     ...(research?.serviceAreaClues ?? []).map((entry) => truncate(entry, 80)),
     ...(research?.equipmentServiceIndicators ?? []).map((entry) => truncate(entry, 80)),

@@ -30,6 +30,7 @@ import {
   detectComboChains,
 } from "@/lib/growth/command/command-dashboard-helpers"
 import { isForecastRegression } from "@/lib/growth/revenue-forecast-trajectory"
+import { fetchProspectResearchCoverageSummary } from "@/lib/growth/research/research-repository"
 
 const LEAD_SCAN_SELECT =
   "id, company_name, status, follow_up_at, next_best_action, next_best_action_reason, executive_priority_tier, revenue_probability_score, revenue_probability_tier, revenue_trajectory, revenue_probability_previous_score, forecast_contribution_weight, forecast_attention_level, conversation_urgency_level, conversation_health_tier, relationship_trend, engagement_tier, opportunity_readiness_tier, decision_maker_status, last_researched_at, operational_capacity_tier, workflow_health, contact_temperature, assigned_to, call_priority_tier, score"
@@ -117,7 +118,7 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
   const todayIso = startOfTodayIso()
   const now = new Date().toISOString()
 
-  const [leadsRes, enrollmentsRes, stepsRes, outreachRes, copilotRes, timelineRes] = await Promise.all([
+  const [leadsRes, enrollmentsRes, stepsRes, outreachRes, copilotRes, timelineRes, researchCoverage] = await Promise.all([
     admin.schema("growth").from("leads").select(LEAD_SCAN_SELECT).limit(300),
     admin
       .schema("growth")
@@ -150,6 +151,7 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
       .gte("occurred_at", todayIso)
       .order("occurred_at", { ascending: false })
       .limit(200),
+    fetchProspectResearchCoverageSummary(admin),
   ])
 
   if (leadsRes.error) throw new Error(leadsRes.error.message)
@@ -517,5 +519,6 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
       tomorrowTopActions: rankedActions.slice(0, 3),
     },
     todayStats,
+    researchCoverage,
   }
 }

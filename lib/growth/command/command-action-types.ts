@@ -145,6 +145,8 @@ export type GrowthCommandDebrief = {
   tomorrowTopActions: GrowthCommandAction[]
 }
 
+import type { GrowthResearchCoverageSummary } from "@/lib/growth/research/research-types"
+
 export type GrowthCommandDashboard = {
   generatedAt: string
   missionControl: GrowthCommandMissionControl
@@ -169,4 +171,5 @@ export type GrowthCommandDashboard = {
     researchCompleted: number
     outreachExecuted: number
   }
+  researchCoverage: GrowthResearchCoverageSummary
 }

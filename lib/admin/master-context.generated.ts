@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 624,
-  sqlMigrations: 255,
+  apiRouteHandlers: 626,
+  sqlMigrations: 256,
   dashboardPages: 65,
-  componentsTsx: 431,
-  libTsFiles: 1409,
+  componentsTsx: 433,
+  libTsFiles: 1423,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **624** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **255** |
+| API route handlers (\`app/api/**/route.ts\`) | **626** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **256** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **431** |
-| \`lib/**/*.ts\` | **1409** |
+| \`components/**/*.tsx\` | **433** |
+| \`lib/**/*.ts\` | **1423** |
 
 ### Vercel crons
 
@@ -541,7 +541,9 @@ platform/growth/leads/[leadId]/realtime-call/sessions/[sessionId]/timeline/route
 platform/growth/leads/[leadId]/realtime-call/sessions/[sessionId]/transcript/route.ts
 platform/growth/leads/[leadId]/realtime-call/sessions/route.ts
 platform/growth/leads/[leadId]/research/notes/route.ts
+platform/growth/leads/[leadId]/research/rebuild/route.ts
 platform/growth/leads/[leadId]/research/route.ts
+platform/growth/leads/[leadId]/research/run/route.ts
 platform/growth/leads/[leadId]/route.ts
 platform/growth/leads/[leadId]/sequence-enrollment-steps/[stepId]/complete/route.ts
 platform/growth/leads/[leadId]/sequence-enrollment-steps/[stepId]/queue/route.ts

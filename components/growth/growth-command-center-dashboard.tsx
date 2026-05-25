@@ -21,6 +21,7 @@ import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/gro
 import { GrowthCommandCommunicationOpsSection } from "@/components/growth/growth-command-communication-ops-section"
 import { GrowthCommandDogfoodCompactSection } from "@/components/growth/growth-command-dogfood-compact-section"
 import { GrowthCommandLifecycleCompactSection } from "@/components/growth/growth-command-lifecycle-compact-section"
+import { GrowthCommandResearchCoverageSection } from "@/components/growth/growth-command-research-coverage-section"
 import { GrowthCommandPipelineRevenueSection } from "@/components/growth/growth-command-pipeline-revenue-section"
 import { GrowthCommandQuickActionsRail } from "@/components/growth/growth-command-quick-actions-rail"
 import { GrowthCommandSectionTabs } from "@/components/growth/growth-command-section-tabs"
@@ -430,6 +431,11 @@ export function GrowthCommandCenterDashboard() {
           {/* 4. Pipeline + Revenue */}
           <div id="cc-revenue" className={SECTION_SCROLL_CLASS}>
           <GrowthCommandPipelineRevenueSection atRiskActions={dashboard.revenueRescueQueue} />
+          </div>
+
+          {/* 5. Research Coverage */}
+          <div id="cc-research" className={SECTION_SCROLL_CLASS}>
+          <GrowthCommandResearchCoverageSection coverage={dashboard.researchCoverage} />
           </div>
 
           {/* 6. Customer Lifecycle */}

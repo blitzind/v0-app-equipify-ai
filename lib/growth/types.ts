@@ -114,6 +114,9 @@ export type GrowthLead = {
   metadata: Record<string, unknown>
   latestResearchRunId: string | null
   lastResearchedAt: string | null
+  latestProspectResearchRunId: string | null
+  lastProspectResearchedAt: string | null
+  prospectRecommendedNextAction: string | null
   researchPriority: GrowthLeadResearchPriority
   callDisposition: GrowthLeadCallDisposition | null
   callDispositionAt: string | null
