@@ -4,7 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/admin"
 
 export const runtime = "nodejs"
 
-export async function GET(_request: Request, context: { params: Promise<{ slug: string }> }) {
+export async function GET(request: Request, context: { params: Promise<{ slug: string }> }) {
   const { slug } = await context.params
   const normalized = String(slug ?? "").trim().toLowerCase()
   if (!normalized) {
@@ -16,10 +16,21 @@ export async function GET(_request: Request, context: { params: Promise<{ slug: 
     return NextResponse.json({ error: "unavailable", message: "Booking is temporarily unavailable." }, { status: 503 })
   }
 
-  const result = await fetchPublicBookingSlots(admin, normalized)
+  const url = new URL(request.url)
+  const month = url.searchParams.get("month")
+
+  const result = await fetchPublicBookingSlots(admin, normalized, { month })
   if (!result.ok) {
     return NextResponse.json({ error: result.code, message: result.message }, { status: result.code === "page_disabled" ? 404 : 503 })
   }
 
-  return NextResponse.json({ ok: true, slots: result.slots, timezone: result.timezone })
+  return NextResponse.json({
+    ok: true,
+    slots: result.slots,
+    timezone: result.timezone,
+    timezoneMode: result.timezoneMode,
+    schedulingHorizonDays: result.schedulingHorizonDays,
+    horizonEndAt: result.horizonEndAt,
+    monthKey: result.monthKey,
+  })
 }

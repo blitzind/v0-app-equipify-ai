@@ -12,6 +12,8 @@ type PublicBookingCalendarProps = {
   onSelect: (date: Date | undefined) => void
   disabled: (date: Date) => boolean
   available: (date: Date) => boolean
+  startMonth?: Date
+  endMonth?: Date
 }
 
 export function PublicBookingCalendar({
@@ -22,6 +24,8 @@ export function PublicBookingCalendar({
   onSelect,
   disabled,
   available,
+  startMonth,
+  endMonth,
 }: PublicBookingCalendarProps) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -41,6 +45,8 @@ export function PublicBookingCalendar({
         selected={selected}
         onSelect={onSelect}
         disabled={disabled}
+        startMonth={startMonth}
+        endMonth={endMonth}
         modifiers={{ available, today: (date) => calendarDateKey(date) === calendarDateKey(today) }}
         modifiersClassNames={{
           available:

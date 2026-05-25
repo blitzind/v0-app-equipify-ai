@@ -15,6 +15,12 @@ export function mapGrowthBookingPagePatch(parsed: Record<string, unknown>): Reco
   if (parsed.meetingType !== undefined) patch.meeting_type = parsed.meetingType
   if (parsed.durationMinutes !== undefined) patch.duration_minutes = parsed.durationMinutes
   if (parsed.bufferMinutes !== undefined) patch.buffer_minutes = parsed.bufferMinutes
+  if (parsed.bufferBeforeMinutes !== undefined) patch.buffer_before_minutes = parsed.bufferBeforeMinutes
+  if (parsed.bufferAfterMinutes !== undefined) patch.buffer_after_minutes = parsed.bufferAfterMinutes
+  if (parsed.minimumNoticeHours !== undefined) patch.minimum_notice_hours = parsed.minimumNoticeHours
+  if (parsed.schedulingHorizonDays !== undefined) patch.scheduling_horizon_days = parsed.schedulingHorizonDays
+  if (parsed.maxMeetingsPerDay !== undefined) patch.max_meetings_per_day = parsed.maxMeetingsPerDay
+  if (parsed.timezoneMode !== undefined) patch.timezone_mode = parsed.timezoneMode
   if (parsed.availabilityWindows !== undefined) patch.availability_windows = parsed.availabilityWindows
   if (parsed.timezone !== undefined) patch.timezone = parsed.timezone
   if (parsed.locationType !== undefined) patch.location_type = parsed.locationType
@@ -46,7 +52,21 @@ export function growthBookingPageToEditorState(page: GrowthBookingPage) {
     meetingType: page.meetingType ?? "",
     durationMinutes: String(page.durationMinutes),
     bufferMinutes: String(page.bufferMinutes),
+    bufferBeforeMinutes: String(page.bufferBeforeMinutes),
+    bufferAfterMinutes: String(page.bufferAfterMinutes),
+    minimumNoticeHours: String(page.minimumNoticeHours),
+    schedulingHorizonDays: String(page.schedulingHorizonDays),
+    schedulingHorizonPreset:
+      page.schedulingHorizonDays === 30 ||
+      page.schedulingHorizonDays === 60 ||
+      page.schedulingHorizonDays === 90 ||
+      page.schedulingHorizonDays === 180 ||
+      page.schedulingHorizonDays === 365
+        ? String(page.schedulingHorizonDays)
+        : "custom",
+    maxMeetingsPerDay: page.maxMeetingsPerDay != null ? String(page.maxMeetingsPerDay) : "",
     timezone: page.timezone,
+    timezoneMode: page.timezoneMode,
     confirmationMessage: page.confirmationMessage ?? "",
     meetingProviderOverride: page.meetingProviderOverride,
     autoCreateMeetingLinkOverride: page.autoCreateMeetingLinkOverride,

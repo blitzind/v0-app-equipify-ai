@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { ArrowLeft, CalendarDays, Loader2, Shield, Sparkles, Users, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PublicBookingBrandPanel } from "@/components/growth/public-booking/public-booking-brand-panel"
@@ -19,9 +19,23 @@ import {
   parseDateKey,
 } from "@/lib/growth/booking/booking-availability-ui"
 import { GROWTH_BOOKING_PAGE_UI_QA_MARKER } from "@/lib/growth/booking/booking-page-ui-types"
-import { formatTimezoneLabel, resolveVisitorTimezone } from "@/lib/growth/booking/booking-public-timezone"
+import type { GrowthBookingTimezoneMode } from "@/lib/growth/booking/booking-page-types"
+import {
+  formatDateKeyInTimezone,
+  resolveBookingTimezone,
+} from "@/lib/growth/booking/booking-timezone-utils"
+import {
+  formatTimezoneLabel,
+  persistPublicBookingTimezone,
+  resolvePublicBookingDisplayTimezone,
+  resolveVisitorTimezone,
+} from "@/lib/growth/booking/booking-public-timezone"
 import type { GrowthBookingPagePublicView, GrowthBookingSlot } from "@/lib/growth/booking/booking-page-types"
 import { cn } from "@/lib/utils"
+
+function monthKeyFromDate(date: Date, timeZone: string): string {
+  return formatDateKeyInTimezone(date, timeZone).slice(0, 7)
+}
 
 type BookingPageProps = {
   slug: string
@@ -80,6 +94,11 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
   const [page, setPage] = useState<GrowthBookingPagePublicView | null>(null)
   const [slots, setSlots] = useState<GrowthBookingSlot[]>([])
   const [pageTimezone, setPageTimezone] = useState("UTC")
+  const [timezoneMode, setTimezoneMode] = useState<GrowthBookingTimezoneMode>("visitor_local")
+  const [schedulingHorizonDays, setSchedulingHorizonDays] = useState(90)
+  const [horizonEndAt, setHorizonEndAt] = useState<string | null>(null)
+  const [loadedMonths, setLoadedMonths] = useState<string[]>([])
+  const [loadingMonths, setLoadingMonths] = useState<string[]>([])
   const [visitorTimezone, setVisitorTimezone] = useState("UTC")
   const [displayTimezone, setDisplayTimezone] = useState("UTC")
   const [step, setStep] = useState<BookingStep>("date")
@@ -91,56 +110,132 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<BookingSuccessState | null>(null)
   const [form, setForm] = useState({ name: "", email: "", company: "", phone: "", notes: "" })
+  const loadedMonthsRef = useRef<Set<string>>(new Set())
+  const pendingMonthsRef = useRef<Set<string>>(new Set())
+
+  const loadSlotsForMonth = useCallback(async (monthKey: string, hostTimezone: string) => {
+    if (loadedMonthsRef.current.has(monthKey) || pendingMonthsRef.current.has(monthKey)) return
+    pendingMonthsRef.current.add(monthKey)
+    setLoadingMonths(Array.from(pendingMonthsRef.current))
+    try {
+      const res = await fetch(`/api/book/${encodeURIComponent(slug)}/slots?month=${monthKey}`, { cache: "no-store" })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        slots?: GrowthBookingSlot[]
+        timezone?: string
+        timezoneMode?: GrowthBookingTimezoneMode
+        schedulingHorizonDays?: number
+        horizonEndAt?: string
+        message?: string
+      }
+      if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not load availability.")
+      setSlots((current) => {
+        const merged = new Map(current.map((slot) => [slot.startAt, slot]))
+        for (const slot of data.slots ?? []) merged.set(slot.startAt, slot)
+        return [...merged.values()].sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt))
+      })
+      setPageTimezone(data.timezone ?? hostTimezone)
+      if (data.timezoneMode) setTimezoneMode(data.timezoneMode)
+      if (data.schedulingHorizonDays) setSchedulingHorizonDays(data.schedulingHorizonDays)
+      if (data.horizonEndAt) setHorizonEndAt(data.horizonEndAt)
+      loadedMonthsRef.current.add(monthKey)
+      setLoadedMonths(Array.from(loadedMonthsRef.current))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load availability.")
+    } finally {
+      pendingMonthsRef.current.delete(monthKey)
+      setLoadingMonths(Array.from(pendingMonthsRef.current))
+    }
+  }, [slug])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [pageRes, slotsRes] = await Promise.all([
-        fetch(`/api/book/${encodeURIComponent(slug)}`, { cache: "no-store" }),
-        fetch(`/api/book/${encodeURIComponent(slug)}/slots`, { cache: "no-store" }),
-      ])
-      const pageData = (await pageRes.json().catch(() => ({}))) as { ok?: boolean; page?: GrowthBookingPagePublicView; message?: string }
-      const slotsData = (await slotsRes.json().catch(() => ({}))) as {
+      const pageRes = await fetch(`/api/book/${encodeURIComponent(slug)}`, { cache: "no-store" })
+      const pageData = (await pageRes.json().catch(() => ({}))) as {
         ok?: boolean
-        slots?: GrowthBookingSlot[]
-        timezone?: string
+        page?: GrowthBookingPagePublicView
         message?: string
       }
       if (!pageRes.ok || !pageData.ok || !pageData.page) {
         throw new Error(pageData.message ?? "Booking page not found.")
       }
-      if (!slotsRes.ok || !slotsData.ok) {
-        throw new Error(slotsData.message ?? "Could not load availability.")
-      }
-      const canonicalTimezone = slotsData.timezone ?? pageData.page.timezone
+
+      const canonicalTimezone = resolveBookingTimezone(pageData.page.timezone)
       const detectedTimezone = resolveVisitorTimezone(canonicalTimezone)
+      const initialDisplayTimezone = resolvePublicBookingDisplayTimezone({
+        slug,
+        timezoneMode: pageData.page.timezoneMode,
+        hostTimezone: canonicalTimezone,
+        visitorTimezone: detectedTimezone,
+      })
+
       setPage(pageData.page)
-      setSlots(slotsData.slots ?? [])
       setPageTimezone(canonicalTimezone)
+      setTimezoneMode(pageData.page.timezoneMode)
+      setSchedulingHorizonDays(pageData.page.schedulingHorizonDays)
       setVisitorTimezone(detectedTimezone)
-      setDisplayTimezone(detectedTimezone)
+      setDisplayTimezone(initialDisplayTimezone)
+      setSlots([])
+      setLoadedMonths([])
+      setLoadingMonths([])
+      loadedMonthsRef.current = new Set()
+      pendingMonthsRef.current = new Set()
+      setHorizonEndAt(null)
+
+      const initialMonth = monthKeyFromDate(new Date(), initialDisplayTimezone)
+      await loadSlotsForMonth(initialMonth, canonicalTimezone)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Booking page unavailable.")
     } finally {
       setLoading(false)
     }
-  }, [slug])
+  }, [loadSlotsForMonth, slug])
 
   useEffect(() => {
     void load()
   }, [load])
 
+  useEffect(() => {
+    if (!page) return
+    const monthKey = monthKeyFromDate(visibleMonth, displayTimezone)
+    void loadSlotsForMonth(monthKey, pageTimezone)
+  }, [displayTimezone, loadSlotsForMonth, page, pageTimezone, visibleMonth])
+
   const slotsByDate = useMemo(() => groupSlotsByDateKey(slots, displayTimezone), [slots, displayTimezone])
   const availableDateKeys = useMemo(() => datesWithAvailableSlots(slots, displayTimezone), [slots, displayTimezone])
   const todayKey = useMemo(() => calendarDateToSlotKey(new Date(), displayTimezone), [displayTimezone])
+  const horizonEndKey = useMemo(
+    () => (horizonEndAt ? calendarDateToSlotKey(new Date(horizonEndAt), displayTimezone) : null),
+    [displayTimezone, horizonEndAt],
+  )
+  const calendarStartMonth = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return today
+  }, [])
+  const calendarEndMonth = useMemo(() => {
+    if (!horizonEndAt) {
+      const fallback = new Date()
+      fallback.setDate(fallback.getDate() + schedulingHorizonDays)
+      return fallback
+    }
+    return new Date(horizonEndAt)
+  }, [horizonEndAt, schedulingHorizonDays])
+  const visibleMonthKey = useMemo(() => monthKeyFromDate(visibleMonth, displayTimezone), [displayTimezone, visibleMonth])
+  const monthAvailabilityLoading = loadingMonths.includes(visibleMonthKey)
   const selectedDaySlots = selectedDateKey ? slotsByDate.get(selectedDateKey) ?? [] : []
   const accentColor = page?.accentColor ?? page?.brandColor ?? "#2563eb"
   const selectedCalendarDate = selectedDateKey ? parseDateKey(selectedDateKey) : undefined
 
   function handleTimezoneChange(value: string) {
-    setDisplayTimezone(value)
-    if (selectedDateKey && !groupSlotsByDateKey(slots, value).has(selectedDateKey)) {
+    const safe = resolveBookingTimezone(value, pageTimezone)
+    setDisplayTimezone(safe)
+    if (timezoneMode === "visitor_override") {
+      persistPublicBookingTimezone(slug, safe)
+    }
+    if (selectedDateKey && !groupSlotsByDateKey(slots, safe).has(selectedDateKey)) {
       setSelectedDateKey(null)
       setSelectedSlot(null)
       setStep("date")
@@ -256,6 +351,7 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
                     displayTimezone={displayTimezone}
                     pageTimezone={pageTimezone}
                     visitorTimezone={visitorTimezone}
+                    timezoneMode={timezoneMode}
                     onChange={handleTimezoneChange}
                     className="sm:shrink-0"
                   />
@@ -263,15 +359,27 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
 
                 <div className="flex flex-1 flex-col gap-6 xl:flex-row xl:items-start">
                   <div className="w-full xl:max-w-[680px] xl:flex-1">
+                    {monthAvailabilityLoading ? (
+                      <p className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="size-3.5 animate-spin" />
+                        Loading availability for this month…
+                      </p>
+                    ) : null}
                     <PublicBookingCalendar
                       accentColor={accentColor}
                       month={visibleMonth}
                       onMonthChange={setVisibleMonth}
                       selected={selectedCalendarDate}
+                      startMonth={calendarStartMonth}
+                      endMonth={calendarEndMonth}
                       onSelect={(date) => {
                         if (!date) return
                         const key = calendarDateToSlotKey(date, displayTimezone)
-                        if (key < todayKey || !availableDateKeys.has(key)) return
+                        if (key < todayKey) return
+                        if (horizonEndKey && key > horizonEndKey) return
+                        const monthKey = monthKeyFromDate(date, displayTimezone)
+                        if (!loadedMonths.includes(monthKey)) return
+                        if (!availableDateKeys.has(key)) return
                         setSelectedDateKey(key)
                         setSelectedSlot(null)
                         setError(null)
@@ -279,7 +387,11 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
                       }}
                       disabled={(date) => {
                         const key = calendarDateToSlotKey(date, displayTimezone)
-                        return key < todayKey || !availableDateKeys.has(key)
+                        if (key < todayKey) return true
+                        if (horizonEndKey && key > horizonEndKey) return true
+                        const monthKey = monthKeyFromDate(date, displayTimezone)
+                        if (!loadedMonths.includes(monthKey)) return true
+                        return !availableDateKeys.has(key)
                       }}
                       available={(date) => availableDateKeys.has(calendarDateToSlotKey(date, displayTimezone))}
                     />
@@ -337,6 +449,7 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
                   displayTimezone={displayTimezone}
                   pageTimezone={pageTimezone}
                   visitorTimezone={visitorTimezone}
+                  timezoneMode={timezoneMode}
                   onChange={handleTimezoneChange}
                 />
 

@@ -11,9 +11,11 @@ import {
 import { GROWTH_BOOKING_PAGES_QA_MARKER } from "../lib/growth/booking/booking-page-types"
 import {
   buildBookingSlots,
+  countWeekdaySlotsInHorizon,
   isSlotStillAvailable,
   resolveBookingAvailabilityWindows,
 } from "../lib/growth/booking/booking-availability"
+import { zonedLocalToUtc } from "../lib/growth/booking/booking-timezone-utils"
 import {
   isValidBookingPageSlug,
   normalizeBookingPageSlug,
@@ -36,9 +38,42 @@ const slots = buildBookingSlots({
   bufferMinutes: 0,
   availabilityWindows: [{ dayOfWeek: 1, startTime: "09:00", endTime: "12:00" }],
   now: new Date("2026-05-18T08:00:00.000Z"),
-  daysAhead: 7,
+  schedulingHorizonDays: 7,
 })
 assert.ok(Array.isArray(slots))
+
+const weekdayCount = countWeekdaySlotsInHorizon({
+  timezone: "UTC",
+  schedulingHorizonDays: 14,
+  availabilityWindows: resolveBookingAvailabilityWindows([]),
+  now: new Date("2026-05-18T08:00:00.000Z"),
+})
+assert.equal(weekdayCount, 10)
+
+const nySlot = zonedLocalToUtc({
+  dateKey: "2026-05-19",
+  hour: 10,
+  minute: 0,
+  timeZone: "America/New_York",
+})
+const laParts = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Los_Angeles",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+}).format(nySlot)
+assert.match(laParts, /7:00 AM/)
+
+const horizonSlots = buildBookingSlots({
+  timezone: "America/New_York",
+  durationMinutes: 30,
+  bufferBeforeMinutes: 0,
+  bufferAfterMinutes: 0,
+  availabilityWindows: resolveBookingAvailabilityWindows([]),
+  now: new Date("2026-05-18T12:00:00.000Z"),
+  schedulingHorizonDays: 90,
+})
+assert.ok(horizonSlots.length >= 40)
 
 const sampleSlot = { startAt: "2026-05-18T10:00:00.000Z", endAt: "2026-05-18T10:30:00.000Z" }
 assert.equal(
@@ -55,6 +90,35 @@ const migrationSource = fs.readFileSync(
 assert.match(migrationSource, /calendar_sync_runs/)
 assert.match(migrationSource, /booking_pages/)
 
+const horizonMigration = fs.readFileSync(
+  path.join(process.cwd(), "supabase/migrations/20270310120000_growth_engine_booking_scheduling_horizon_timezone.sql"),
+  "utf8",
+)
+assert.match(horizonMigration, /scheduling_horizon_days/)
+assert.match(horizonMigration, /timezone_mode/)
+
+const slotsRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/book/[slug]/slots/route.ts"),
+  "utf8",
+)
+assert.match(slotsRoute, /month/)
+assert.match(slotsRoute, /horizonEndAt/)
+
+const publicBookingPage = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/public-booking-page.tsx"),
+  "utf8",
+)
+assert.match(publicBookingPage, /loadSlotsForMonth/)
+assert.match(publicBookingPage, /horizonEndKey/)
+
+const bookingPanel = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-booking-pages-panel.tsx"),
+  "utf8",
+)
+assert.match(bookingPanel, /GrowthIanaTimezoneSelect/)
+assert.match(bookingPanel, /schedulingHorizonPreset/)
+assert.match(bookingPanel, /Booking Pages/)
+
 const syncRoute = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/calendar/sync/route.ts"),
   "utf8",
@@ -70,11 +134,5 @@ const settingsPanel = fs.readFileSync(
   "utf8",
 )
 assert.match(settingsPanel, /Force Sync/)
-
-const bookingPanel = fs.readFileSync(
-  path.join(process.cwd(), "components/growth/growth-booking-pages-panel.tsx"),
-  "utf8",
-)
-assert.match(bookingPanel, /Booking Pages/)
 
 console.log("growth-calendar-sync-booking: all checks passed")

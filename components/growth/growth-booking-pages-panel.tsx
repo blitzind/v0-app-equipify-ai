@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { GrowthBookingAvailabilityEditor } from "@/components/growth/growth-booking-availability-editor"
+import { GrowthIanaTimezoneSelect } from "@/components/growth/growth-iana-timezone-select"
 import {
   GROWTH_SETTINGS_FORM_GAP,
   GROWTH_SETTINGS_INNER_GAP,
@@ -15,7 +16,7 @@ import {
   GrowthSettingsToggleRow,
 } from "@/components/growth/growth-settings-ui"
 import type { GrowthBookingPageListItem } from "@/lib/growth/booking/booking-page-types"
-import { GROWTH_BOOKING_PAGES_QA_MARKER } from "@/lib/growth/booking/booking-page-types"
+import { GROWTH_BOOKING_PAGES_QA_MARKER, GROWTH_BOOKING_TIMEZONE_MODES } from "@/lib/growth/booking/booking-page-types"
 import { GROWTH_BOOKING_PAGE_UI_QA_MARKER } from "@/lib/growth/booking/booking-page-ui-types"
 import { growthBookingPageToEditorState } from "@/lib/growth/booking/booking-page-editor-state"
 import {
@@ -29,10 +30,23 @@ import {
   type GrowthMeetingLocationProvider,
 } from "@/lib/growth/meeting-location/meeting-location-provider-types"
 import {
+  formatIanaTimezoneOption,
+  resolveBookingTimezone,
+} from "@/lib/growth/booking/booking-timezone-utils"
+
+import {
   weeklyScheduleToWindows,
   windowsToWeeklySchedule,
   type BookingWeeklyDaySchedule,
 } from "@/lib/growth/booking/booking-page-ui-types"
+
+const TIMEZONE_MODE_LABELS: Record<(typeof GROWTH_BOOKING_TIMEZONE_MODES)[number], string> = {
+  fixed_host: "Fixed host timezone",
+  visitor_local: "Visitor local timezone (recommended)",
+  visitor_override: "Allow visitor override",
+}
+
+const HORIZON_PRESETS = ["30", "60", "90", "180", "365", "custom"] as const
 
 const DEFAULT_FORM = {
   name: "",
@@ -47,7 +61,14 @@ const DEFAULT_FORM = {
   footerNote: "",
   durationMinutes: "30",
   bufferMinutes: "0",
+  bufferBeforeMinutes: "0",
+  bufferAfterMinutes: "0",
+  minimumNoticeHours: "0",
+  schedulingHorizonPreset: "90",
+  schedulingHorizonDays: "90",
+  maxMeetingsPerDay: "",
   timezone: "America/New_York",
+  timezoneMode: "visitor_local" as (typeof GROWTH_BOOKING_TIMEZONE_MODES)[number],
   meetingType: "Intro call",
   confirmationMessage: "Thanks — your meeting is confirmed.",
   enabled: false,
@@ -124,7 +145,16 @@ export function GrowthBookingPagesPanel() {
           footerNote: form.footerNote || null,
           durationMinutes: Number(form.durationMinutes),
           bufferMinutes: Number(form.bufferMinutes),
+          bufferBeforeMinutes: Number(form.bufferBeforeMinutes),
+          bufferAfterMinutes: Number(form.bufferAfterMinutes),
+          minimumNoticeHours: Number(form.minimumNoticeHours),
+          schedulingHorizonDays:
+            form.schedulingHorizonPreset === "custom"
+              ? Number(form.schedulingHorizonDays)
+              : Number(form.schedulingHorizonPreset),
+          maxMeetingsPerDay: form.maxMeetingsPerDay ? Number(form.maxMeetingsPerDay) : null,
           timezone: form.timezone,
+          timezoneMode: form.timezoneMode,
           meetingType: form.meetingType,
           confirmationMessage: form.confirmationMessage,
           enabled: form.enabled,
@@ -166,7 +196,16 @@ export function GrowthBookingPagesPanel() {
           meetingType: editor.meetingType || null,
           durationMinutes: Number(editor.durationMinutes),
           bufferMinutes: Number(editor.bufferMinutes),
+          bufferBeforeMinutes: Number(editor.bufferBeforeMinutes),
+          bufferAfterMinutes: Number(editor.bufferAfterMinutes),
+          minimumNoticeHours: Number(editor.minimumNoticeHours),
+          schedulingHorizonDays:
+            editor.schedulingHorizonPreset === "custom"
+              ? Number(editor.schedulingHorizonDays)
+              : Number(editor.schedulingHorizonPreset),
+          maxMeetingsPerDay: editor.maxMeetingsPerDay ? Number(editor.maxMeetingsPerDay) : null,
           timezone: editor.timezone,
+          timezoneMode: editor.timezoneMode,
           confirmationMessage: editor.confirmationMessage || null,
           enabled: editor.enabled,
           meetingProviderOverride: editor.meetingProviderOverride,
@@ -338,12 +377,76 @@ export function GrowthBookingPagesPanel() {
                       <Input className="h-9" value={editor.durationMinutes} onChange={(e) => setEditor({ ...editor, durationMinutes: e.target.value })} />
                     </div>
                     <div className={GROWTH_SETTINGS_FORM_GAP}>
-                      <Label className="text-xs">Buffer (minutes)</Label>
-                      <Input className="h-9" value={editor.bufferMinutes} onChange={(e) => setEditor({ ...editor, bufferMinutes: e.target.value })} />
+                      <Label className="text-xs">Buffer before (minutes)</Label>
+                      <Input className="h-9" value={editor.bufferBeforeMinutes} onChange={(e) => setEditor({ ...editor, bufferBeforeMinutes: e.target.value })} />
                     </div>
                     <div className={GROWTH_SETTINGS_FORM_GAP}>
-                      <Label className="text-xs">Timezone</Label>
-                      <Input className="h-9" value={editor.timezone} onChange={(e) => setEditor({ ...editor, timezone: e.target.value })} />
+                      <Label className="text-xs">Buffer after (minutes)</Label>
+                      <Input className="h-9" value={editor.bufferAfterMinutes} onChange={(e) => setEditor({ ...editor, bufferAfterMinutes: e.target.value })} />
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Minimum notice (hours)</Label>
+                      <Input className="h-9" value={editor.minimumNoticeHours} onChange={(e) => setEditor({ ...editor, minimumNoticeHours: e.target.value })} />
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Max meetings per day</Label>
+                      <Input className="h-9" placeholder="Unlimited" value={editor.maxMeetingsPerDay} onChange={(e) => setEditor({ ...editor, maxMeetingsPerDay: e.target.value })} />
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Scheduling horizon</Label>
+                      <select
+                        className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
+                        value={editor.schedulingHorizonPreset}
+                        onChange={(event) =>
+                          setEditor({
+                            ...editor,
+                            schedulingHorizonPreset: event.target.value,
+                            schedulingHorizonDays:
+                              event.target.value === "custom" ? editor.schedulingHorizonDays : event.target.value,
+                          })
+                        }
+                      >
+                        {HORIZON_PRESETS.map((preset) => (
+                          <option key={preset} value={preset}>
+                            {preset === "custom" ? "Custom days" : `${preset} days`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {editor.schedulingHorizonPreset === "custom" ? (
+                      <div className={GROWTH_SETTINGS_FORM_GAP}>
+                        <Label className="text-xs">Custom horizon (days)</Label>
+                        <Input className="h-9" value={editor.schedulingHorizonDays} onChange={(e) => setEditor({ ...editor, schedulingHorizonDays: e.target.value })} />
+                      </div>
+                    ) : null}
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Host timezone</Label>
+                      <GrowthIanaTimezoneSelect
+                        value={editor.timezone}
+                        onChange={(timezone) => setEditor({ ...editor, timezone })}
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Preview: {formatIanaTimezoneOption(resolveBookingTimezone(editor.timezone))}
+                      </p>
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Timezone mode</Label>
+                      <select
+                        className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
+                        value={editor.timezoneMode}
+                        onChange={(event) =>
+                          setEditor({
+                            ...editor,
+                            timezoneMode: event.target.value as EditorState["timezoneMode"],
+                          })
+                        }
+                      >
+                        {GROWTH_BOOKING_TIMEZONE_MODES.map((mode) => (
+                          <option key={mode} value={mode}>
+                            {TIMEZONE_MODE_LABELS[mode]}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div className={GROWTH_SETTINGS_FORM_GAP}>
                       <Label className="text-xs">Meeting type label</Label>

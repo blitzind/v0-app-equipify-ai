@@ -18,6 +18,9 @@ export type { GrowthBookingMeetingProviderOverride }
 
 export const GROWTH_BOOKING_PAGE_STATUSES = ["enabled", "disabled"] as const
 
+export const GROWTH_BOOKING_TIMEZONE_MODES = ["fixed_host", "visitor_local", "visitor_override"] as const
+export type GrowthBookingTimezoneMode = (typeof GROWTH_BOOKING_TIMEZONE_MODES)[number]
+
 export type GrowthBookingAvailabilityWindow = {
   dayOfWeek: number
   startTime: string
@@ -41,6 +44,12 @@ export type GrowthBookingPage = {
   meetingType: string | null
   durationMinutes: number
   bufferMinutes: number
+  bufferBeforeMinutes: number
+  bufferAfterMinutes: number
+  minimumNoticeHours: number
+  schedulingHorizonDays: number
+  maxMeetingsPerDay: number | null
+  timezoneMode: GrowthBookingTimezoneMode
   availabilityWindows: GrowthBookingAvailabilityWindow[]
   timezone: string
   locationType: GrowthBookingLocationType
@@ -70,6 +79,9 @@ export type GrowthBookingPagePublicView = {
   meetingType: string | null
   durationMinutes: number
   timezone: string
+  timezoneMode: GrowthBookingTimezoneMode
+  schedulingHorizonDays: number
+  minimumNoticeHours: number
   locationType: GrowthBookingLocationType
   locationLabel: string
   locationUrl: string | null

@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { GROWTH_BOOKING_LOCATION_TYPES } from "@/lib/growth/booking/booking-page-types"
+import { GROWTH_BOOKING_LOCATION_TYPES, GROWTH_BOOKING_TIMEZONE_MODES } from "@/lib/growth/booking/booking-page-types"
 import { GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDES } from "@/lib/growth/meeting-location/meeting-location-provider-types"
 
 const optionalUrlField = z
@@ -29,6 +29,12 @@ const sharedFields = {
   meetingType: z.string().max(120).nullable().optional(),
   durationMinutes: z.number().int().min(5).max(480).optional(),
   bufferMinutes: z.number().int().min(0).max(120).optional(),
+  bufferBeforeMinutes: z.number().int().min(0).max(240).optional(),
+  bufferAfterMinutes: z.number().int().min(0).max(240).optional(),
+  minimumNoticeHours: z.number().int().min(0).max(168).optional(),
+  schedulingHorizonDays: z.number().int().min(1).max(730).optional(),
+  maxMeetingsPerDay: z.number().int().min(1).max(50).nullable().optional(),
+  timezoneMode: z.enum(GROWTH_BOOKING_TIMEZONE_MODES).optional(),
   availabilityWindows: z.array(growthBookingAvailabilityWindowSchema).optional(),
   timezone: z.string().optional(),
   locationType: z.enum(GROWTH_BOOKING_LOCATION_TYPES).optional(),

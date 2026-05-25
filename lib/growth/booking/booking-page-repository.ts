@@ -20,7 +20,7 @@ import {
 export { isValidBookingPageSlug, normalizeBookingPageSlug }
 
 const PAGE_SELECT =
-  "id, owner_user_id, calendar_connection_id, name, slug, page_title, brand_name, description, logo_url, hero_image_url, brand_color, accent_color, footer_note, meeting_type, duration_minutes, buffer_minutes, availability_windows, timezone, location_type, custom_location, meeting_provider_override, auto_create_meeting_link_override, manual_meeting_url, confirmation_message, reminder_email_subject, reminder_email_body, enabled, created_at, updated_at"
+  "id, owner_user_id, calendar_connection_id, name, slug, page_title, brand_name, description, logo_url, hero_image_url, brand_color, accent_color, footer_note, meeting_type, duration_minutes, buffer_minutes, buffer_before_minutes, buffer_after_minutes, minimum_notice_hours, scheduling_horizon_days, max_meetings_per_day, timezone_mode, availability_windows, timezone, location_type, custom_location, meeting_provider_override, auto_create_meeting_link_override, manual_meeting_url, confirmation_message, reminder_email_subject, reminder_email_body, enabled, created_at, updated_at"
 
 type PageRow = {
   id: string
@@ -39,6 +39,12 @@ type PageRow = {
   meeting_type: string | null
   duration_minutes: number
   buffer_minutes: number
+  buffer_before_minutes: number | null
+  buffer_after_minutes: number | null
+  minimum_notice_hours: number | null
+  scheduling_horizon_days: number | null
+  max_meetings_per_day: number | null
+  timezone_mode: string | null
   availability_windows: GrowthBookingAvailabilityWindow[] | null
   timezone: string
   location_type: string
@@ -80,6 +86,12 @@ function mapPage(row: PageRow): GrowthBookingPage {
     meetingType: row.meeting_type,
     durationMinutes: row.duration_minutes,
     bufferMinutes: row.buffer_minutes,
+    bufferBeforeMinutes: row.buffer_before_minutes ?? 0,
+    bufferAfterMinutes: row.buffer_after_minutes ?? row.buffer_minutes ?? 0,
+    minimumNoticeHours: row.minimum_notice_hours ?? 0,
+    schedulingHorizonDays: row.scheduling_horizon_days ?? 90,
+    maxMeetingsPerDay: row.max_meetings_per_day ?? null,
+    timezoneMode: (row.timezone_mode ?? "visitor_local") as GrowthBookingPage["timezoneMode"],
     availabilityWindows: row.availability_windows ?? [],
     timezone: row.timezone,
     locationType: row.location_type as GrowthBookingLocationType,
@@ -112,6 +124,9 @@ export function toPublicBookingPageView(page: GrowthBookingPage): GrowthBookingP
     meetingType: page.meetingType,
     durationMinutes: page.durationMinutes,
     timezone: page.timezone,
+    timezoneMode: page.timezoneMode,
+    schedulingHorizonDays: page.schedulingHorizonDays,
+    minimumNoticeHours: page.minimumNoticeHours,
     locationType: page.locationType,
     locationLabel: location.label,
     locationUrl: location.url,
@@ -182,6 +197,12 @@ export async function insertGrowthBookingPage(
     meetingType?: string | null
     durationMinutes?: number
     bufferMinutes?: number
+    bufferBeforeMinutes?: number
+    bufferAfterMinutes?: number
+    minimumNoticeHours?: number
+    schedulingHorizonDays?: number
+    maxMeetingsPerDay?: number | null
+    timezoneMode?: GrowthBookingPage["timezoneMode"]
     availabilityWindows?: GrowthBookingAvailabilityWindow[]
     timezone?: string
     locationType?: GrowthBookingLocationType
@@ -213,6 +234,12 @@ export async function insertGrowthBookingPage(
       meeting_type: input.meetingType ?? null,
       duration_minutes: input.durationMinutes ?? 30,
       buffer_minutes: input.bufferMinutes ?? 0,
+      buffer_before_minutes: input.bufferBeforeMinutes ?? 0,
+      buffer_after_minutes: input.bufferAfterMinutes ?? input.bufferMinutes ?? 0,
+      minimum_notice_hours: input.minimumNoticeHours ?? 0,
+      scheduling_horizon_days: input.schedulingHorizonDays ?? 90,
+      max_meetings_per_day: input.maxMeetingsPerDay ?? null,
+      timezone_mode: input.timezoneMode ?? "visitor_local",
       availability_windows: input.availabilityWindows ?? [],
       timezone: input.timezone ?? "UTC",
       location_type: input.locationType ?? "google_meet",

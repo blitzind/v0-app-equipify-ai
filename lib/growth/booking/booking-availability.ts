@@ -1,5 +1,12 @@
 import type { GrowthBookingAvailabilityWindow, GrowthBookingSlot } from "@/lib/growth/booking/booking-page-types"
-import { isValidGrowthCalendarTimezone } from "@/lib/growth/calendar/calendar-timezone"
+import {
+  addDaysToDateKey,
+  computeBookingHorizonEnd,
+  formatDateKeyInTimezone,
+  iterateDateKeys,
+  resolveBookingTimezone,
+  zonedLocalToUtc,
+} from "@/lib/growth/booking/booking-timezone-utils"
 
 const DEFAULT_WINDOWS: GrowthBookingAvailabilityWindow[] = [
   { dayOfWeek: 1, startTime: "09:00", endTime: "17:00" },
@@ -22,21 +29,10 @@ function zonedParts(date: Date, timeZone: string) {
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone,
     weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
   })
-  const parts = formatter.formatToParts(date)
-  const lookup = Object.fromEntries(parts.filter((p) => p.type !== "literal").map((p) => [p.type, p.value]))
+  const weekday = formatter.format(date)
   const weekdayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
-  return {
-    dayOfWeek: weekdayMap[lookup.weekday] ?? 0,
-    hour: Number(lookup.hour),
-    minute: Number(lookup.minute),
-  }
+  return { dayOfWeek: weekdayMap[weekday] ?? 0 }
 }
 
 function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
@@ -57,76 +53,177 @@ export function resolveBookingAvailabilityWindows(
   return DEFAULT_WINDOWS
 }
 
+export function resolveBookingBufferMinutes(input: {
+  bufferBeforeMinutes?: number | null
+  bufferAfterMinutes?: number | null
+  bufferMinutes?: number | null
+}): { bufferBeforeMinutes: number; bufferAfterMinutes: number } {
+  const legacyAfter = input.bufferMinutes ?? 0
+  return {
+    bufferBeforeMinutes: Math.max(0, input.bufferBeforeMinutes ?? 0),
+    bufferAfterMinutes: Math.max(0, input.bufferAfterMinutes ?? legacyAfter),
+  }
+}
+
 export function buildBookingSlots(input: {
   timezone: string
   durationMinutes: number
-  bufferMinutes: number
+  bufferBeforeMinutes?: number
+  bufferAfterMinutes?: number
+  bufferMinutes?: number
+  minimumNoticeHours?: number
+  maxMeetingsPerDay?: number | null
+  schedulingHorizonDays?: number
   availabilityWindows: GrowthBookingAvailabilityWindow[]
-  daysAhead?: number
+  rangeStart?: Date
+  rangeEnd?: Date
   now?: Date
   busyIntervals?: Array<{ start: string; end: string }>
   existingBookings?: Array<{ startAt: string; endAt: string }>
+  maxSlots?: number
 }): GrowthBookingSlot[] {
-  const timezone = isValidGrowthCalendarTimezone(input.timezone) ? input.timezone : "UTC"
+  const timezone = resolveBookingTimezone(input.timezone)
   const windows = resolveBookingAvailabilityWindows(input.availabilityWindows)
   const now = input.now ?? new Date()
-  const daysAhead = input.daysAhead ?? 14
-  const slots: GrowthBookingSlot[] = []
+  const horizonDays = Math.max(1, Math.min(730, input.schedulingHorizonDays ?? 90))
+  const horizonEnd = computeBookingHorizonEnd(now, horizonDays)
+  const { bufferBeforeMinutes, bufferAfterMinutes } = resolveBookingBufferMinutes(input)
+  const minimumNoticeMs = Math.max(0, input.minimumNoticeHours ?? 0) * 60 * 60 * 1000
+  const earliestBookableMs = now.getTime() + minimumNoticeMs
   const durationMs = input.durationMinutes * 60 * 1000
-  const bufferMs = input.bufferMinutes * 60 * 1000
+  const bufferBeforeMs = bufferBeforeMinutes * 60 * 1000
+  const bufferAfterMs = bufferAfterMinutes * 60 * 1000
+  const slotStepMs = durationMs + bufferAfterMs
 
-  for (let dayOffset = 0; dayOffset < daysAhead; dayOffset += 1) {
-    const day = new Date(now.getTime() + dayOffset * 24 * 60 * 60 * 1000)
-    const parts = zonedParts(day, timezone)
-    const dayWindows = windows.filter((window) => window.dayOfWeek === parts.dayOfWeek)
+  const todayKey = formatDateKeyInTimezone(now, timezone)
+  const horizonEndKey = formatDateKeyInTimezone(horizonEnd, timezone)
+  const rangeStartKey = input.rangeStart
+    ? formatDateKeyInTimezone(input.rangeStart, timezone)
+    : todayKey
+  const rangeEndKey = input.rangeEnd
+    ? formatDateKeyInTimezone(new Date(input.rangeEnd.getTime() - 1), timezone)
+    : addDaysToDateKey(todayKey, horizonDays - 1, timezone)
+
+  const fromKey = rangeStartKey > todayKey ? rangeStartKey : todayKey
+  const toKey = rangeEndKey < horizonEndKey ? rangeEndKey : horizonEndKey
+  if (fromKey > toKey) return []
+
+  const bookingsByDay = new Map<string, number>()
+  for (const booking of input.existingBookings ?? []) {
+    const key = formatDateKeyInTimezone(new Date(booking.startAt), timezone)
+    bookingsByDay.set(key, (bookingsByDay.get(key) ?? 0) + 1)
+  }
+
+  const slots: GrowthBookingSlot[] = []
+  const maxSlots = input.maxSlots ?? 500
+
+  for (const dateKey of iterateDateKeys(fromKey, toKey, timezone)) {
+    if (input.maxMeetingsPerDay != null && (bookingsByDay.get(dateKey) ?? 0) >= input.maxMeetingsPerDay) {
+      continue
+    }
+
+    const dayAnchor = zonedLocalToUtc({ dateKey, hour: 12, minute: 0, timeZone: timezone })
+    const dayOfWeek = zonedParts(dayAnchor, timezone).dayOfWeek
+    const dayWindows = windows.filter((window) => window.dayOfWeek === dayOfWeek)
+
     for (const window of dayWindows) {
       const startParts = parseTimeParts(window.startTime)
       const endParts = parseTimeParts(window.endTime)
       if (!startParts || !endParts) continue
 
-      let cursor = new Date(day)
-      cursor.setUTCHours(startParts.hour, startParts.minute, 0, 0)
-      const windowEnd = new Date(day)
-      windowEnd.setUTCHours(endParts.hour, endParts.minute, 0, 0)
+      let cursor = zonedLocalToUtc({
+        dateKey,
+        hour: startParts.hour,
+        minute: startParts.minute,
+        timeZone: timezone,
+      })
+      const windowEnd = zonedLocalToUtc({
+        dateKey,
+        hour: endParts.hour,
+        minute: endParts.minute,
+        timeZone: timezone,
+      })
 
       while (cursor.getTime() + durationMs <= windowEnd.getTime()) {
         const slotStart = new Date(cursor)
         const slotEnd = new Date(cursor.getTime() + durationMs)
-        if (slotStart.getTime() > now.getTime() + bufferMs) {
-          const blocked = [...(input.busyIntervals ?? []), ...(input.existingBookings ?? [])].some((interval) => {
-            const bounds = intervalBounds(interval)
-            if (!bounds) return false
-            return overlaps(
-              slotStart.getTime() - bufferMs,
-              slotEnd.getTime() + bufferMs,
-              bounds.startMs,
-              bounds.endMs,
-            )
-          })
-          if (!blocked) {
-            slots.push({ startAt: slotStart.toISOString(), endAt: slotEnd.toISOString() })
-          }
+
+        if (input.rangeStart && slotStart.getTime() < input.rangeStart.getTime()) {
+          cursor = new Date(cursor.getTime() + slotStepMs)
+          continue
         }
-        cursor = new Date(cursor.getTime() + durationMs + bufferMs)
+        if (input.rangeEnd && slotStart.getTime() >= input.rangeEnd.getTime()) {
+          break
+        }
+        if (slotStart.getTime() < earliestBookableMs) {
+          cursor = new Date(cursor.getTime() + slotStepMs)
+          continue
+        }
+        if (slotEnd.getTime() > horizonEnd.getTime()) {
+          break
+        }
+
+        const blocked = [...(input.busyIntervals ?? []), ...(input.existingBookings ?? [])].some((interval) => {
+          const bounds = intervalBounds(interval)
+          if (!bounds) return false
+          return overlaps(
+            slotStart.getTime() - bufferBeforeMs,
+            slotEnd.getTime() + bufferAfterMs,
+            bounds.startMs,
+            bounds.endMs,
+          )
+        })
+
+        if (!blocked) {
+          slots.push({ startAt: slotStart.toISOString(), endAt: slotEnd.toISOString() })
+          if (slots.length >= maxSlots) return slots
+        }
+
+        cursor = new Date(cursor.getTime() + slotStepMs)
       }
     }
   }
 
-  return slots.slice(0, 200)
+  return slots
 }
 
 export function isSlotStillAvailable(
   slot: GrowthBookingSlot,
   busyIntervals: Array<{ start: string; end: string }>,
   existingBookings: Array<{ startAt: string; endAt: string }>,
-  bufferMinutes: number,
+  bufferInput: number | { bufferBeforeMinutes?: number; bufferAfterMinutes?: number; bufferMinutes?: number },
 ): boolean {
-  const bufferMs = bufferMinutes * 60 * 1000
-  const startMs = new Date(slot.startAt).getTime() - bufferMs
-  const endMs = new Date(slot.endAt).getTime() + bufferMs
+  const { bufferBeforeMinutes, bufferAfterMinutes } =
+    typeof bufferInput === "number"
+      ? { bufferBeforeMinutes: 0, bufferAfterMinutes: bufferInput }
+      : resolveBookingBufferMinutes(bufferInput)
+  const bufferBeforeMs = bufferBeforeMinutes * 60 * 1000
+  const bufferAfterMs = bufferAfterMinutes * 60 * 1000
+  const startMs = new Date(slot.startAt).getTime() - bufferBeforeMs
+  const endMs = new Date(slot.endAt).getTime() + bufferAfterMs
   return ![...busyIntervals, ...existingBookings].some((interval) => {
     const bounds = intervalBounds(interval)
     if (!bounds) return false
     return overlaps(startMs, endMs, bounds.startMs, bounds.endMs)
   })
+}
+
+export function countWeekdaySlotsInHorizon(input: {
+  timezone: string
+  schedulingHorizonDays: number
+  availabilityWindows: GrowthBookingAvailabilityWindow[]
+  now?: Date
+}): number {
+  const timezone = resolveBookingTimezone(input.timezone)
+  const now = input.now ?? new Date()
+  const todayKey = formatDateKeyInTimezone(now, timezone)
+  const endKey = addDaysToDateKey(todayKey, Math.max(1, input.schedulingHorizonDays) - 1, timezone)
+  const windows = resolveBookingAvailabilityWindows(input.availabilityWindows)
+  const enabledDays = new Set(windows.map((window) => window.dayOfWeek))
+  let count = 0
+  for (const dateKey of iterateDateKeys(todayKey, endKey, timezone)) {
+    const dayAnchor = zonedLocalToUtc({ dateKey, hour: 12, minute: 0, timeZone: timezone })
+    if (enabledDays.has(zonedParts(dayAnchor, timezone).dayOfWeek)) count += 1
+  }
+  return count
 }

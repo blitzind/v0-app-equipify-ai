@@ -1,13 +1,22 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { buildBookingSlots, isSlotStillAvailable } from "@/lib/growth/booking/booking-availability"
+import {
+  buildBookingSlots,
+  isSlotStillAvailable,
+} from "@/lib/growth/booking/booking-availability"
 import {
   fetchGrowthBookingPageBySlug,
   insertGrowthBookingPageBooking,
   listConfirmedBookingsInRange,
 } from "@/lib/growth/booking/booking-page-repository"
 import type { GrowthBookingPage, GrowthBookingSlot } from "@/lib/growth/booking/booking-page-types"
+import {
+  computeBookingHorizonEnd,
+  formatDateKeyInTimezone,
+  monthRangeInTimezone,
+  resolveBookingTimezone,
+} from "@/lib/growth/booking/booking-timezone-utils"
 import { getGrowthCalendarConnectionWithFreshAccessToken } from "@/lib/growth/calendar/calendar-connection-service"
 import { fetchGoogleCalendarBusyIntervals } from "@/lib/growth/calendar/google-calendar-client"
 import { syncGrowthMeetingToGoogleCalendar } from "@/lib/growth/calendar/sync-meeting-calendar"
@@ -20,7 +29,15 @@ import { fetchGrowthMeetingLocationPlatformContext } from "@/lib/growth/meeting-
 import { resolveMeetingLocation } from "@/lib/growth/meeting-location/resolve-meeting-location"
 
 export type PublicBookingSlotsResult =
-  | { ok: true; slots: GrowthBookingSlot[]; timezone: string }
+  | {
+      ok: true
+      slots: GrowthBookingSlot[]
+      timezone: string
+      timezoneMode: GrowthBookingPage["timezoneMode"]
+      schedulingHorizonDays: number
+      horizonEndAt: string
+      monthKey: string | null
+    }
   | { ok: false; code: string; message: string }
 
 export type PublicBookingSubmitResult =
@@ -40,16 +57,45 @@ export type PublicBookingSubmitResult =
 import { publicBookingErrorMessage } from "@/lib/growth/booking/booking-public-errors"
 import { resolvePublicBookingLocationDisplay } from "@/lib/growth/booking/booking-public-display"
 
+function resolveMonthKey(month: string | null | undefined, now: Date, timeZone: string): string {
+  if (month && /^\d{4}-\d{2}$/.test(month)) return month
+  return formatDateKeyInTimezone(now, timeZone).slice(0, 7)
+}
+
 export async function fetchPublicBookingSlots(
   admin: SupabaseClient,
   slug: string,
+  options?: { month?: string | null },
 ): Promise<PublicBookingSlotsResult> {
   const page = await fetchGrowthBookingPageBySlug(admin, slug, true)
   if (!page) return { ok: false, code: "page_disabled", message: publicBookingErrorMessage("page_disabled") }
 
   const now = new Date()
-  const timeMax = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString()
-  const existingBookings = await listConfirmedBookingsInRange(admin, page.id, now.toISOString(), timeMax)
+  const timeZone = resolveBookingTimezone(page.timezone)
+  const monthKey = resolveMonthKey(options?.month, now, timeZone)
+  const monthRange = monthRangeInTimezone(monthKey, timeZone)
+  if (!monthRange) return { ok: false, code: "invalid_month", message: publicBookingErrorMessage("invalid_month") }
+
+  const horizonEnd = computeBookingHorizonEnd(now, page.schedulingHorizonDays)
+  const rangeStart = monthRange.rangeStart.getTime() < now.getTime() ? now : monthRange.rangeStart
+  const rangeEnd =
+    monthRange.rangeEnd.getTime() > horizonEnd.getTime() ? horizonEnd : monthRange.rangeEnd
+
+  if (rangeStart.getTime() >= rangeEnd.getTime()) {
+    return {
+      ok: true,
+      slots: [],
+      timezone: page.timezone,
+      timezoneMode: page.timezoneMode,
+      schedulingHorizonDays: page.schedulingHorizonDays,
+      horizonEndAt: horizonEnd.toISOString(),
+      monthKey,
+    }
+  }
+
+  const timeMin = rangeStart.toISOString()
+  const timeMax = rangeEnd.toISOString()
+  const existingBookings = await listConfirmedBookingsInRange(admin, page.id, timeMin, timeMax)
 
   let busyIntervals: Array<{ start: string; end: string }> = []
   try {
@@ -57,7 +103,7 @@ export async function fetchPublicBookingSlots(
     if (connection) {
       busyIntervals = await fetchGoogleCalendarBusyIntervals({
         accessToken: connection.accessToken,
-        timeMin: now.toISOString(),
+        timeMin,
         timeMax,
         timezone: page.timezone,
       })
@@ -69,13 +115,29 @@ export async function fetchPublicBookingSlots(
   const slots = buildBookingSlots({
     timezone: page.timezone,
     durationMinutes: page.durationMinutes,
+    bufferBeforeMinutes: page.bufferBeforeMinutes,
+    bufferAfterMinutes: page.bufferAfterMinutes,
     bufferMinutes: page.bufferMinutes,
+    minimumNoticeHours: page.minimumNoticeHours,
+    maxMeetingsPerDay: page.maxMeetingsPerDay,
+    schedulingHorizonDays: page.schedulingHorizonDays,
     availabilityWindows: page.availabilityWindows,
+    rangeStart,
+    rangeEnd,
+    now,
     busyIntervals,
     existingBookings,
   })
 
-  return { ok: true, slots, timezone: page.timezone }
+  return {
+    ok: true,
+    slots,
+    timezone: page.timezone,
+    timezoneMode: page.timezoneMode,
+    schedulingHorizonDays: page.schedulingHorizonDays,
+    horizonEndAt: horizonEnd.toISOString(),
+    monthKey,
+  }
 }
 
 async function resolveLeadForBooking(
@@ -143,7 +205,16 @@ export async function submitPublicBooking(
   }
 
   const slot: GrowthBookingSlot = { startAt: input.slotStartAt, endAt: input.slotEndAt }
-  const slotsResult = await fetchPublicBookingSlots(admin, input.slug)
+  const now = new Date()
+  const horizonEnd = computeBookingHorizonEnd(now, page.schedulingHorizonDays)
+  const slotStartMs = new Date(slot.startAt).getTime()
+  const minimumNoticeMs = page.minimumNoticeHours * 60 * 60 * 1000
+  if (slotStartMs < now.getTime() + minimumNoticeMs || slotStartMs > horizonEnd.getTime()) {
+    return { ok: false, code: "slot_unavailable", message: publicBookingErrorMessage("slot_unavailable") }
+  }
+
+  const monthKey = formatDateKeyInTimezone(new Date(slot.startAt), page.timezone).slice(0, 7)
+  const slotsResult = await fetchPublicBookingSlots(admin, input.slug, { month: monthKey })
   if (!slotsResult.ok) return { ok: false, code: slotsResult.code, message: slotsResult.message }
 
   const slotAllowed = slotsResult.slots.some(
@@ -171,7 +242,13 @@ export async function submitPublicBooking(
   }
 
   const existingBookings = await listConfirmedBookingsInRange(admin, page.id, slot.startAt, slot.endAt)
-  if (!isSlotStillAvailable(slot, busyIntervals, existingBookings, page.bufferMinutes)) {
+  if (
+    !isSlotStillAvailable(slot, busyIntervals, existingBookings, {
+      bufferBeforeMinutes: page.bufferBeforeMinutes,
+      bufferAfterMinutes: page.bufferAfterMinutes,
+      bufferMinutes: page.bufferMinutes,
+    })
+  ) {
     return { ok: false, code: "slot_unavailable", message: publicBookingErrorMessage("slot_unavailable") }
   }
 
