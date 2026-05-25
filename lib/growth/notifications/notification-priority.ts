@@ -49,6 +49,15 @@ const TYPE_SEVERITY: Record<GrowthNotificationType, GrowthNotificationSeverity> 
   cadence_task_skipped: "medium",
   manual_call_due: "high",
   linkedin_task_due: "medium",
+  onboarding_overdue: "high",
+  review_request_due: "medium",
+  review_received: "low",
+  referral_eligible: "medium",
+  renewal_due: "high",
+  renewal_risk: "critical",
+  expansion_candidate: "medium",
+  churn_risk: "high",
+  followup_missing: "medium",
 }
 
 const SEVERITY_BASE: Record<GrowthNotificationSeverity, number> = {

@@ -31,6 +31,15 @@ export const GROWTH_NOTIFICATION_COOLDOWN_MINUTES: Partial<Record<GrowthNotifica
   cadence_task_skipped: 60,
   manual_call_due: 30,
   linkedin_task_due: 60,
+  onboarding_overdue: 60,
+  review_request_due: 120,
+  review_received: 30,
+  referral_eligible: 120,
+  renewal_due: 60,
+  renewal_risk: 60,
+  expansion_candidate: 120,
+  churn_risk: 60,
+  followup_missing: 120,
 }
 
 export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificationType, number>> = {
@@ -67,6 +76,15 @@ export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificati
   cadence_task_skipped: 7 * 24 * 60,
   manual_call_due: 7 * 24 * 60,
   linkedin_task_due: 7 * 24 * 60,
+  onboarding_overdue: 7 * 24 * 60,
+  review_request_due: 14 * 24 * 60,
+  review_received: 7 * 24 * 60,
+  referral_eligible: 14 * 24 * 60,
+  renewal_due: 7 * 24 * 60,
+  renewal_risk: 3 * 24 * 60,
+  expansion_candidate: 14 * 24 * 60,
+  churn_risk: 7 * 24 * 60,
+  followup_missing: 7 * 24 * 60,
 }
 
 export function buildGrowthNotificationDeterministicHash(input: {

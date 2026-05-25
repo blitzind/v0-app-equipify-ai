@@ -101,6 +101,18 @@ export const GROWTH_DRAWER_TIMELINE_EVENT_TYPES = new Set<string>([
   "cadence_task_skipped",
   "cadence_step_completed",
   "cadence_step_skipped",
+  "customer_created",
+  "onboarding_started",
+  "onboarding_completed",
+  "activation_recorded",
+  "review_requested",
+  "review_received",
+  "referral_requested",
+  "referral_received",
+  "renewal_window_opened",
+  "renewal_due",
+  "expansion_candidate_detected",
+  "churn_risk_detected",
 ])
 
 export function isGrowthDrawerActivityStreamItem(item: GrowthLeadActivityStreamItem): boolean {
@@ -134,6 +146,7 @@ export const GROWTH_DRAWER_CARD_KEYS = {
   operationalIntelligence: "operational-intelligence",
   meetings: "meeting-intelligence",
   cadence: "cadence",
+  customerLifecycle: "customer-lifecycle",
   activityStream: "activity-stream",
   timeline: "timeline",
 } as const

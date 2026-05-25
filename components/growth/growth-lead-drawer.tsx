@@ -20,6 +20,7 @@ import { GrowthRealtimeCallIntelligence } from "@/components/growth/growth-realt
 import { GrowthLeadCommandCenter } from "@/components/growth/growth-lead-command-center"
 import { GrowthLeadMeetingIntelligence } from "@/components/growth/growth-lead-meeting-intelligence"
 import { GrowthLeadCadencePanel } from "@/components/growth/growth-lead-cadence-panel"
+import { GrowthLeadCustomerLifecyclePanel } from "@/components/growth/growth-lead-customer-lifecycle-panel"
 import { GrowthLeadResearchPanel } from "@/components/growth/growth-lead-research-panel"
 import { GrowthLeadTimelinePanel } from "@/components/growth/growth-lead-timeline-panel"
 import { GrowthOperationalIntelligence } from "@/components/growth/growth-operational-intelligence"
@@ -105,6 +106,11 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
           <GrowthSequenceIntelligence lead={activeLead} />
 
           <GrowthLeadCadencePanel
+            lead={activeLead}
+            onTimelineRefresh={() => setTimelineRefreshToken((token) => token + 1)}
+          />
+
+          <GrowthLeadCustomerLifecyclePanel
             lead={activeLead}
             onTimelineRefresh={() => setTimelineRefreshToken((token) => token + 1)}
           />

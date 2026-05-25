@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 602,
-  sqlMigrations: 249,
+  apiRouteHandlers: 608,
+  sqlMigrations: 250,
   dashboardPages: 65,
-  componentsTsx: 411,
-  libTsFiles: 1362,
+  componentsTsx: 414,
+  libTsFiles: 1373,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **602** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **249** |
+| API route handlers (\`app/api/**/route.ts\`) | **608** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **250** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **411** |
-| \`lib/**/*.ts\` | **1362** |
+| \`components/**/*.tsx\` | **414** |
+| \`lib/**/*.ts\` | **1373** |
 
 ### Vercel crons
 
@@ -483,6 +483,11 @@ platform/growth/copilot/playbooks/drafts/route.ts
 platform/growth/copilot/playbooks/route.ts
 platform/growth/copilot/playbooks/sources/[sourceId]/extract/route.ts
 platform/growth/copilot/settings/route.ts
+platform/growth/customer-lifecycle/command-summary/route.ts
+platform/growth/customer-lifecycle/customers/[customerId]/route.ts
+platform/growth/customer-lifecycle/customers/route.ts
+platform/growth/customer-lifecycle/dashboard/route.ts
+platform/growth/customer-lifecycle/onboarding-tasks/[taskId]/route.ts
 platform/growth/engagement/dashboard/route.ts
 platform/growth/executive/dashboard/route.ts
 platform/growth/import-batches/[batchId]/commit/route.ts
@@ -507,6 +512,7 @@ platform/growth/leads/[leadId]/call-sessions/[sessionId]/route.ts
 platform/growth/leads/[leadId]/call-sessions/route.ts
 platform/growth/leads/[leadId]/copilot/generate/route.ts
 platform/growth/leads/[leadId]/copilot/generations/route.ts
+platform/growth/leads/[leadId]/customer-lifecycle/route.ts
 platform/growth/leads/[leadId]/decision-makers/[dmId]/route.ts
 platform/growth/leads/[leadId]/decision-makers/route.ts
 platform/growth/leads/[leadId]/meetings/route.ts

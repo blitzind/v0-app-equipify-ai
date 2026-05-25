@@ -14,6 +14,7 @@ export const GROWTH_NOTIFICATION_SOURCE_SYSTEMS = [
   "coaching",
   "opportunity",
   "rep_ops",
+  "post_close",
 ] as const
 export type GrowthNotificationSourceSystem = (typeof GROWTH_NOTIFICATION_SOURCE_SYSTEMS)[number]
 
@@ -66,6 +67,15 @@ export const GROWTH_NOTIFICATION_TYPES = [
   "cadence_task_skipped",
   "manual_call_due",
   "linkedin_task_due",
+  "onboarding_overdue",
+  "review_request_due",
+  "review_received",
+  "referral_eligible",
+  "renewal_due",
+  "renewal_risk",
+  "expansion_candidate",
+  "churn_risk",
+  "followup_missing",
 ] as const
 export type GrowthNotificationType = (typeof GROWTH_NOTIFICATION_TYPES)[number]
 

@@ -130,6 +130,18 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "cadence_task_skipped",
   "cadence_step_completed",
   "cadence_step_skipped",
+  "customer_created",
+  "onboarding_started",
+  "onboarding_completed",
+  "activation_recorded",
+  "review_requested",
+  "review_received",
+  "referral_requested",
+  "referral_received",
+  "renewal_window_opened",
+  "renewal_due",
+  "expansion_candidate_detected",
+  "churn_risk_detected",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]
