@@ -17,6 +17,11 @@ import {
   selectFocusSprintActions,
 } from "../lib/growth/command/command-action-engine"
 import type { GrowthCommandAction } from "../lib/growth/command/command-action-types"
+import {
+  commandActionImpactTone,
+  displayCommandActionImpact,
+  GROWTH_COMMAND_CENTER_QA_MARKER,
+} from "../lib/growth/command/command-action-types"
 import { buildBossBattles, buildCoachTips, buildHeatMap, detectComboChains } from "../lib/growth/command/command-dashboard-helpers"
 import { describeSequenceStartUnavailable } from "../lib/growth/sequence-enrollment/sequence-enrollment-ui"
 import type { GrowthLead } from "../lib/growth/types"
@@ -158,5 +163,20 @@ assert.match(activeUnavailable.message ?? "", /Existing sequence in progress/i)
 assert.match(commandLeadFocusHref("lead-1", "call-copilot"), /open=lead-1/)
 assert.match(commandLeadFocusHref("lead-1", "call-copilot"), /focus=call-copilot/)
 assert.match(commandOutreachHref("queue-1"), /highlight=queue-1/)
+
+assert.equal(GROWTH_COMMAND_CENTER_QA_MARKER, "command-center-v2")
+
+assert.equal(displayCommandActionImpact(95), 10)
+assert.equal(displayCommandActionImpact(92), 9)
+assert.equal(displayCommandActionImpact(85), 9)
+assert.equal(displayCommandActionImpact(60), 6)
+assert.equal(displayCommandActionImpact(55), 6)
+assert.equal(displayCommandActionImpact(45), 5)
+
+assert.equal(commandActionImpactTone(95), "critical")
+assert.equal(commandActionImpactTone(85), "critical")
+assert.equal(commandActionImpactTone(75), "high")
+assert.equal(commandActionImpactTone(60), "high")
+assert.equal(commandActionImpactTone(45), "neutral")
 
 console.log("growth-command-center: all checks passed")

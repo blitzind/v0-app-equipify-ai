@@ -3,14 +3,6 @@
 import { LayoutDashboard } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthCommandCenterDashboard } from "@/components/growth/growth-command-center-dashboard"
-import { GrowthAttentionCenter } from "@/components/growth/growth-attention-center"
-import { GrowthExecutiveRevenueSummary } from "@/components/growth/growth-executive-revenue-summary"
-import { GrowthCadenceCommandSummary } from "@/components/growth/growth-cadence-command-summary"
-import { GrowthCustomerLifecycleCommandSummary } from "@/components/growth/growth-customer-lifecycle-command-summary"
-import { GrowthDogfoodCommandSummary } from "@/components/growth/growth-dogfood-command-summary"
-import { GrowthMeetingCommandSummary } from "@/components/growth/growth-meeting-command-summary"
-import { GrowthPipelineCommandSummary } from "@/components/growth/growth-pipeline-command-summary"
-import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -45,16 +37,7 @@ export default function AdminGrowthCommandPage() {
           </div>
         </section>
 
-        <GrowthSectionLayout>
-          <GrowthAttentionCenter />
-          <GrowthExecutiveRevenueSummary />
-          <GrowthMeetingCommandSummary />
-          <GrowthCadenceCommandSummary />
-          <GrowthCustomerLifecycleCommandSummary />
-          <GrowthDogfoodCommandSummary />
-          <GrowthPipelineCommandSummary />
-          <GrowthCommandCenterDashboard />
-        </GrowthSectionLayout>
+        <GrowthCommandCenterDashboard />
       </div>
     </PlatformAdminPageShell>
   )

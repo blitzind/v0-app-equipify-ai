@@ -148,4 +148,5 @@ export type GrowthCustomerLifecycleCommandSummary = {
   churnRisksCount: number
   reviewOpportunitiesCount: number
   referralOpportunitiesCount: number
+  onboardingOverdueCount: number
 }

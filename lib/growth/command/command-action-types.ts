@@ -1,5 +1,19 @@
 /** Client-safe Growth Command Center types. */
 
+export const GROWTH_COMMAND_CENTER_QA_MARKER = "command-center-v2" as const
+
+/** Maps internal 0–100 impact scores to operator-facing 1–10 badges. */
+export function displayCommandActionImpact(score: number): number {
+  return Math.max(1, Math.min(10, Math.round(score / 10)))
+}
+
+export function commandActionImpactTone(score: number): "critical" | "high" | "neutral" {
+  const display = displayCommandActionImpact(score)
+  if (display >= 9) return "critical"
+  if (display >= 6) return "high"
+  return "neutral"
+}
+
 export const GROWTH_COMMAND_ACTION_KINDS = [
   "executive_intervention",
   "revenue_rescue",

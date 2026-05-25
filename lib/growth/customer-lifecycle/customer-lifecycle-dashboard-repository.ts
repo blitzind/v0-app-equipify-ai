@@ -80,12 +80,24 @@ export async function fetchGrowthCustomerLifecycleDashboard(
   }
 }
 
+async function countOnboardingOverdueTasks(admin: SupabaseClient, nowIso: string): Promise<number> {
+  const { count, error } = await admin
+    .schema("growth")
+    .from("customer_onboarding_tasks")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "open")
+    .lt("due_at", nowIso)
+  if (error) throw new Error(error.message)
+  return count ?? 0
+}
+
 export async function fetchGrowthCustomerLifecycleCommandSummary(
   admin: SupabaseClient,
 ): Promise<GrowthCustomerLifecycleCommandSummary> {
   await evaluateGrowthCustomerLifecycleNotifications(admin)
   const profiles = await listGrowthCustomerProfilesForScan(admin)
   const stats = aggregateProfiles(profiles)
+  const onboardingOverdueCount = await countOnboardingOverdueTasks(admin, new Date().toISOString())
 
   return {
     qaMarker: GROWTH_POST_CLOSE_REVENUE_QA_MARKER,
@@ -94,6 +106,7 @@ export async function fetchGrowthCustomerLifecycleCommandSummary(
     churnRisksCount: stats.churnRiskCount,
     reviewOpportunitiesCount: stats.reviewPendingCount,
     referralOpportunitiesCount: stats.referralEligibleCount,
+    onboardingOverdueCount,
   }
 }
 
