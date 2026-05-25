@@ -6,6 +6,7 @@ import { ChevronRight, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import { GrowthPredictiveDealIntelligenceCard } from "@/components/growth/growth-predictive-deal-intelligence-card"
+import { GrowthCallIntelligenceScorecardCard } from "@/components/growth/growth-call-intelligence-scorecard-card"
 import type {
   GrowthOpportunity,
   GrowthOpportunityDetail,
@@ -131,6 +132,11 @@ function OpportunityDetailPanel({
 
       <GrowthPredictiveDealIntelligenceCard
         opportunityId={detail.id}
+        leadId={detail.leadId}
+        companyName={detail.companyName}
+      />
+
+      <GrowthCallIntelligenceScorecardCard
         leadId={detail.leadId}
         companyName={detail.companyName}
       />

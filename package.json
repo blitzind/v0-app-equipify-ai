@@ -125,6 +125,7 @@
     "test:growth-booking-page-ui": "tsx scripts/test-growth-booking-page-ui.ts",
     "test:growth-ai-research-agent": "tsx scripts/test-growth-ai-research-agent.ts",
     "test:growth-predictive-deal-intelligence": "tsx scripts/test-growth-predictive-deal-intelligence.ts",
+    "test:growth-true-call-intelligence": "tsx scripts/test-growth-true-call-intelligence.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
     "test:growth-assemblyai-browser-streaming": "tsx scripts/test-growth-assemblyai-browser-streaming.ts",
     "test:growth-openai-realtime-browser-streaming": "tsx scripts/test-growth-openai-realtime-browser-streaming.ts",

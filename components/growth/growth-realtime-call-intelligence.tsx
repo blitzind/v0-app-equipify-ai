@@ -8,6 +8,7 @@ import { useGrowthCallWorkflow } from "@/components/growth/growth-call-workflow-
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import { GrowthLiveCoachingSessionTimeline } from "@/components/growth/growth-live-coaching-session-timeline"
 import { GrowthLiveCoachingSessionInsights } from "@/components/growth/growth-live-coaching-session-insights"
+import { GrowthCallIntelligenceScorecardCard } from "@/components/growth/growth-call-intelligence-scorecard-card"
 import { useGrowthBrowserAudioCapture } from "@/hooks/growth/use-growth-browser-audio-capture"
 import { GROWTH_CALL_AUDIO_CAPTURE_ENABLED, GROWTH_CALL_DIALER_SAFETY_COPY } from "@/lib/growth/call-workflow-copy"
 import { formatGrowthCallDialerNextStep } from "@/lib/growth/call-workflow"
@@ -767,6 +768,13 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
         leadId={lead.id}
         sessionId={timelineSessionId}
         refreshToken={refreshToken}
+      />
+
+      <GrowthCallIntelligenceScorecardCard
+        leadId={lead.id}
+        companyName={lead.companyName}
+        realtimeSessionId={timelineSessionId}
+        compact
       />
 
       <GrowthLiveCoachingSessionTimeline

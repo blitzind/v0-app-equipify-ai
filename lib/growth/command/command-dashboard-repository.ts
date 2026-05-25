@@ -33,6 +33,8 @@ import { isForecastRegression } from "@/lib/growth/revenue-forecast-trajectory"
 import { fetchProspectResearchCoverageSummary } from "@/lib/growth/research/research-repository"
 import { fetchDealIntelligenceDashboardSummary } from "@/lib/growth/deal-intelligence/deal-intelligence-repository"
 import { dealIntelligenceActionImpactBoost } from "@/lib/growth/deal-intelligence/nba-deal-intelligence-bridge"
+import { fetchCallIntelligenceDashboardSummary } from "@/lib/growth/call-intelligence/call-intelligence-repository"
+import { callIntelligenceActionImpactBoost } from "@/lib/growth/call-intelligence/call-intelligence-nba-bridge"
 
 const LEAD_SCAN_SELECT =
   "id, company_name, status, follow_up_at, next_best_action, next_best_action_reason, executive_priority_tier, revenue_probability_score, revenue_probability_tier, revenue_trajectory, revenue_probability_previous_score, forecast_contribution_weight, forecast_attention_level, conversation_urgency_level, conversation_health_tier, relationship_trend, engagement_tier, opportunity_readiness_tier, decision_maker_status, last_researched_at, operational_capacity_tier, workflow_health, contact_temperature, assigned_to, call_priority_tier, score"
@@ -120,7 +122,7 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
   const todayIso = startOfTodayIso()
   const now = new Date().toISOString()
 
-  const [leadsRes, enrollmentsRes, stepsRes, outreachRes, copilotRes, timelineRes, researchCoverage, dealIntelligence] = await Promise.all([
+  const [leadsRes, enrollmentsRes, stepsRes, outreachRes, copilotRes, timelineRes, researchCoverage, dealIntelligence, callIntelligence] = await Promise.all([
     admin.schema("growth").from("leads").select(LEAD_SCAN_SELECT).limit(300),
     admin
       .schema("growth")
@@ -164,6 +166,17 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
       topRecommendedActions: [],
       averageCloseProbability: 0,
     })),
+    fetchCallIntelligenceDashboardSummary(admin).catch(() => ({
+      qaMarker: "true-call-intelligence-v1" as const,
+      averageCallScore: 0,
+      criticalCallRisks: 0,
+      callsNeedingFollowUp: 0,
+      unresolvedObjections: 0,
+      competitorMentions: 0,
+      nextStepMissingCount: 0,
+      topCoachingOpportunities: [],
+      scoredCalls: 0,
+    })),
   ])
 
   if (leadsRes.error) throw new Error(leadsRes.error.message)
@@ -196,11 +209,46 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
     // Schema may not be migrated yet — command center remains usable.
   }
 
+  const callScoreByLead = new Map<
+    string,
+    {
+      overallScore: number
+      riskLevel: string | null
+      nextStepScore: number
+      objectionCount: number
+      recommendedNextAction: string | null
+    }
+  >()
+  try {
+    const { data: callScores } = await admin
+      .schema("growth")
+      .from("call_intelligence_scorecards")
+      .select("lead_id, overall_score, risk_level, next_step_score, detected_objections, recommended_next_action, metrics")
+      .order("computed_at", { ascending: false })
+      .limit(300)
+    for (const row of callScores ?? []) {
+      const leadId = row.lead_id as string
+      if (callScoreByLead.has(leadId)) continue
+      const metrics = row.metrics as { incomplete?: boolean } | null
+      if (metrics?.incomplete) continue
+      callScoreByLead.set(leadId, {
+        overallScore: Number(row.overall_score ?? 0),
+        riskLevel: row.risk_level as string | null,
+        nextStepScore: Number(row.next_step_score ?? 0),
+        objectionCount: Array.isArray(row.detected_objections) ? row.detected_objections.length : 0,
+        recommendedNextAction: row.recommended_next_action as string | null,
+      })
+    }
+  } catch {
+    // Schema may not be migrated yet — command center remains usable.
+  }
+
   const actions: GrowthCommandAction[] = []
 
   for (const lead of leads) {
     const leadId = lead.id as string
     const dealScore = dealScoreByLead.get(leadId)
+    const callScore = callScoreByLead.get(leadId)
     const baseImpact = {
       executivePriorityTier: lead.executive_priority_tier as string | null,
       revenueTrajectory: lead.revenue_trajectory as string | null,
@@ -214,6 +262,14 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
             recommendedOperatorAction: dealScore.recommendedOperatorAction as Parameters<
               typeof dealIntelligenceActionImpactBoost
             >[0]["recommendedOperatorAction"],
+          })
+        : 0,
+      callIntelligenceBoost: callScore
+        ? callIntelligenceActionImpactBoost({
+            overallScore: callScore.overallScore,
+            riskLevel: callScore.riskLevel,
+            nextStepScore: callScore.nextStepScore,
+            objectionCount: callScore.objectionCount,
           })
         : 0,
     }
@@ -274,6 +330,51 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
           companyName: lead.company_name as string,
           why: "Conversation urgency is elevated.",
           ctaHref: commandLeadFocusHref(leadId, "conversation"),
+          impactInput: baseImpact,
+          revenueInput,
+        }),
+      )
+    }
+
+    if (callScore && (callScore.riskLevel === "critical" || callScore.overallScore < 45)) {
+      actions.push(
+        buildAction({
+          id: `call-risk:${leadId}`,
+          kind: "conversation_recovery",
+          leadId,
+          companyName: lead.company_name as string,
+          why: "Critical call intelligence risk detected — review coaching opportunities.",
+          ctaHref: commandLeadFocusHref(leadId, "realtime-call"),
+          impactInput: baseImpact,
+          revenueInput,
+        }),
+      )
+    }
+
+    if (callScore && callScore.nextStepScore < 45) {
+      actions.push(
+        buildAction({
+          id: `call-next:${leadId}`,
+          kind: "follow_up_now",
+          leadId,
+          companyName: lead.company_name as string,
+          why: callScore.recommendedNextAction ?? "Call ended without a clear next step commitment.",
+          ctaHref: commandLeadFocusHref(leadId, "realtime-call"),
+          impactInput: baseImpact,
+          revenueInput,
+        }),
+      )
+    }
+
+    if (callScore && callScore.objectionCount >= 2) {
+      actions.push(
+        buildAction({
+          id: `call-obj:${leadId}`,
+          kind: "conversation_recovery",
+          leadId,
+          companyName: lead.company_name as string,
+          why: "Unresolved objections detected on recent call scorecard.",
+          ctaHref: commandLeadFocusHref(leadId, "realtime-call"),
           impactInput: baseImpact,
           revenueInput,
         }),
@@ -565,5 +666,6 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
     todayStats,
     researchCoverage,
     dealIntelligence,
+    callIntelligence,
   }
 }

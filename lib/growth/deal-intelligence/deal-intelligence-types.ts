@@ -59,6 +59,12 @@ export type DealIntelligenceScoreInputs = {
   buyingIntent?: string | null
   closeDateOverdue?: boolean
   cadenceTasksOverdue?: number
+  callOverallScore?: number | null
+  callBuyingSignalScore?: number | null
+  callCompetitorRiskScore?: number | null
+  callNextStepScore?: number | null
+  callOutcome?: string | null
+  meetingCompletedWithHighScore?: boolean
 }
 
 export type DealIntelligenceScorePublicView = {

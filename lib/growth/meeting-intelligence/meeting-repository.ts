@@ -125,6 +125,20 @@ export async function fetchGrowthMeetingByReplyId(
   return data ? mapGrowthMeetingRow(data as MeetingDbRow) : null
 }
 
+export async function fetchGrowthMeetingByRealtimeSessionId(
+  admin: SupabaseClient,
+  realtimeSessionId: string,
+): Promise<GrowthMeeting | null> {
+  const { data, error } = await meetingsTable(admin)
+    .select(MEETING_SELECT)
+    .eq("realtime_call_session_id", realtimeSessionId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return data ? mapGrowthMeetingRow(data as MeetingDbRow) : null
+}
+
 export async function insertGrowthMeetingRow(
   admin: SupabaseClient,
   row: Record<string, unknown>,

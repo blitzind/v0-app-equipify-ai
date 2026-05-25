@@ -7,6 +7,7 @@ import { fetchGrowthOpportunityDetail } from "@/lib/growth/opportunity-pipeline/
 import type { GrowthOpportunityDetail } from "@/lib/growth/opportunity-pipeline/pipeline-types"
 import { listGrowthOutboundRepliesForLead } from "@/lib/growth/outbound/reply-repository"
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
+import { fetchLatestCallIntelligenceScorecardForLead } from "@/lib/growth/call-intelligence/call-intelligence-repository"
 import type { DealIntelligenceScoreInputs } from "@/lib/growth/deal-intelligence/deal-intelligence-types"
 import type { GrowthLead } from "@/lib/growth/types"
 
@@ -28,7 +29,7 @@ export async function gatherDealScoreContext(
   const lead = await fetchGrowthLeadById(input.admin, input.leadId)
   if (!lead) throw new Error("Lead not found.")
 
-  const [opportunity, meetings, replies, research, cadenceOverdue] = await Promise.all([
+  const [opportunity, meetings, replies, research, cadenceOverdue, callScorecard] = await Promise.all([
     input.opportunityId ? fetchGrowthOpportunityDetail(input.admin, input.opportunityId) : Promise.resolve(null),
     listGrowthMeetingsForLead(input.admin, input.leadId, 20),
     listGrowthOutboundRepliesForLead(input.admin, input.leadId),
@@ -36,6 +37,7 @@ export async function gatherDealScoreContext(
       ? fetchLatestCompletedProspectResearchRun(input.admin, input.leadId)
       : Promise.resolve(null),
     countOverdueCadenceTasks(input.admin, input.leadId),
+    fetchLatestCallIntelligenceScorecardForLead(input.admin, input.leadId).catch(() => null),
   ])
 
   const now = Date.now()
@@ -69,6 +71,17 @@ export async function gatherDealScoreContext(
     buyingIntent: lead.conversationBuyingIntent,
     closeDateOverdue,
     cadenceTasksOverdue: cadenceOverdue,
+    callOverallScore: callScorecard?.overallScore ?? null,
+    callBuyingSignalScore: callScorecard?.buyingSignalScore ?? null,
+    callCompetitorRiskScore: callScorecard?.competitorRiskScore ?? null,
+    callNextStepScore: callScorecard?.nextStepScore ?? null,
+    callOutcome: callScorecard?.outcome ?? null,
+    meetingCompletedWithHighScore: Boolean(
+      callScorecard &&
+        !callScorecard.metrics.incomplete &&
+        meetings.some((m) => m.status === "completed") &&
+        callScorecard.overallScore >= 65,
+    ),
   }
 
   return { opportunity, lead, scoreInputs }

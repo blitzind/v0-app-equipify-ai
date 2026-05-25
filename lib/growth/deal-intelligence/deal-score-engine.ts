@@ -15,6 +15,7 @@ import {
   computeDealResearchFitScore,
   computeDealStageHealthScore,
 } from "@/lib/growth/deal-intelligence/deal-momentum-score"
+import { applyCallIntelligenceToDealScoreInputs } from "@/lib/growth/call-intelligence/call-intelligence-deal-adjustments"
 import { recommendDealOperatorAction } from "@/lib/growth/deal-intelligence/deal-recommendation-engine"
 import {
   computeDealRiskScore,
@@ -48,7 +49,7 @@ export function computeDealIntelligenceScore(input: {
   scoreInputs: DealIntelligenceScoreInputs
   expectedCloseDate?: string | null
 }): ComputedDealIntelligenceScore {
-  const momentumScore = computeDealMomentumScore(input.scoreInputs)
+  const momentumScoreBase = computeDealMomentumScore(input.scoreInputs)
   const engagementScore = computeDealEngagementScore(input.scoreInputs)
   const meetingScore = computeDealMeetingScore(input.scoreInputs)
   const replyScore = computeDealReplyScore(input.scoreInputs)
@@ -59,13 +60,12 @@ export function computeDealIntelligenceScore(input: {
   const riskFactors = detectDealRiskFactors(input.scoreInputs)
   const positiveSignals = detectDealPositiveSignals(input.scoreInputs)
 
-  const dealRiskScore = computeDealRiskScore({
+  let dealRiskScore = computeDealRiskScore({
     scoreInputs: input.scoreInputs,
     riskFactors,
     stageHealthScore,
     followupDisciplineScore,
   })
-  const riskLevel = mapDealRiskLevel(dealRiskScore, riskFactors.length)
 
   let closeProbability = Math.round(
     engagementScore * 0.15 +
@@ -74,7 +74,7 @@ export function computeDealIntelligenceScore(input: {
       researchFitScore * 0.1 +
       stageHealthScore * 0.2 +
       followupDisciplineScore * 0.1 +
-      momentumScore * 0.1,
+      momentumScoreBase * 0.1,
   )
 
   if (input.scoreInputs.probability != null) {
@@ -99,7 +99,21 @@ export function computeDealIntelligenceScore(input: {
   if (input.scoreInputs.closeDateOverdue) closeProbability = Math.max(0, closeProbability - 12)
   if (input.scoreInputs.isStale) closeProbability = Math.max(0, closeProbability - 8)
 
+  const callAdjustments = applyCallIntelligenceToDealScoreInputs(input.scoreInputs)
+  closeProbability = Math.max(
+    0,
+    Math.min(100, closeProbability + callAdjustments.closeProbabilityBoost),
+  )
+  let momentumScore = Math.max(0, Math.min(100, momentumScoreBase + callAdjustments.momentumBoost))
+
   closeProbability = Math.max(0, Math.min(100, closeProbability))
+
+  dealRiskScore = Math.max(
+    0,
+    Math.min(100, dealRiskScore + callAdjustments.riskBoost),
+  )
+
+  const riskLevel = mapDealRiskLevel(dealRiskScore, riskFactors.length)
 
   const forecastConfidence = Math.max(
     0,
@@ -110,7 +124,9 @@ export function computeDealIntelligenceScore(input: {
           stageHealthScore * 0.25 +
           followupDisciplineScore * 0.2 +
           (input.scoreInputs.forecastCategory === "commit" ? 15 : input.scoreInputs.forecastCategory === "best_case" ? 8 : 0),
-      ) - Math.round(dealRiskScore * 0.15),
+      ) -
+        Math.round(dealRiskScore * 0.15) +
+        callAdjustments.confidenceBoost,
     ),
   )
 
@@ -185,5 +201,11 @@ export function sanitizeScoreInputs(input: DealIntelligenceScoreInputs): DealInt
     buyingIntent: input.buyingIntent,
     closeDateOverdue: input.closeDateOverdue,
     cadenceTasksOverdue: input.cadenceTasksOverdue,
+    callOverallScore: input.callOverallScore,
+    callBuyingSignalScore: input.callBuyingSignalScore,
+    callCompetitorRiskScore: input.callCompetitorRiskScore,
+    callNextStepScore: input.callNextStepScore,
+    callOutcome: input.callOutcome,
+    meetingCompletedWithHighScore: input.meetingCompletedWithHighScore,
   }
 }

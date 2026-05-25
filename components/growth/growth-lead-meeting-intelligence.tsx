@@ -24,6 +24,7 @@ import {
   type GrowthMeeting,
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import type { GrowthLead } from "@/lib/growth/types"
+import { GrowthCallIntelligenceScorecardCard } from "@/components/growth/growth-call-intelligence-scorecard-card"
 
 type GrowthLeadMeetingIntelligenceProps = {
   lead: GrowthLead
@@ -526,6 +527,14 @@ export function GrowthLeadMeetingIntelligence({
                 Completed meeting may warrant stage review — no automatic stage movement.
               </p>
             ) : null}
+
+            <GrowthCallIntelligenceScorecardCard
+              leadId={lead.id}
+              companyName={lead.companyName}
+              meetingId={selected.id}
+              realtimeSessionId={selected.realtimeCallSessionId}
+              compact
+            />
           </div>
         ) : null}
       </div>

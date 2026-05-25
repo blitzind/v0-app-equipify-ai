@@ -87,6 +87,12 @@ export const GROWTH_NOTIFICATION_TYPES = [
   "forecast_confidence_dropped",
   "close_window_detected",
   "deal_needs_action",
+  "call_score_low",
+  "next_step_missing",
+  "competitor_risk_detected",
+  "unresolved_objection",
+  "strong_buying_signal",
+  "call_followup_due",
 ] as const
 export type GrowthNotificationType = (typeof GROWTH_NOTIFICATION_TYPES)[number]
 

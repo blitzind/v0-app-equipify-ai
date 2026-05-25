@@ -15,6 +15,7 @@ import {
   emitMeetingNoShowNotification,
   emitMeetingScheduledNotification,
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-notifications"
+import { generateCallIntelligenceScorecard } from "@/lib/growth/call-intelligence/call-intelligence-service"
 import {
   fetchGrowthMeetingById,
   fetchGrowthMeetingByReplyId,
@@ -268,6 +269,28 @@ export async function updateGrowthMeeting(
       suggestStageAdvance,
       sessionId: meeting.realtimeCallSessionId,
     })
+
+    void generateCallIntelligenceScorecard({
+      admin,
+      leadId: meeting.leadId,
+      meetingId: meeting.id,
+      realtimeSessionId: meeting.realtimeCallSessionId,
+      trigger: "meeting_outcome",
+    }).catch(() => undefined)
+  }
+
+  if (
+    (input.status === "completed" || input.status === "no_show") &&
+    input.status !== existing.status &&
+    meeting.realtimeCallSessionId
+  ) {
+    void generateCallIntelligenceScorecard({
+      admin,
+      leadId: meeting.leadId,
+      meetingId: meeting.id,
+      realtimeSessionId: meeting.realtimeCallSessionId,
+      trigger: "meeting_outcome",
+    }).catch(() => undefined)
   }
 
   return { ok: true, meeting }

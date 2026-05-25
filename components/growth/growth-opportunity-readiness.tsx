@@ -3,6 +3,7 @@
 import { ArrowDownRight, ArrowRight, ArrowUpRight, Target } from "lucide-react"
 import { GrowthBadge, GrowthActionRequiredBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import { GrowthPredictiveDealIntelligenceCard } from "@/components/growth/growth-predictive-deal-intelligence-card"
+import { GrowthCallIntelligenceScorecardCard } from "@/components/growth/growth-call-intelligence-scorecard-card"
 import { growthLeadOpportunityActionRequired } from "@/lib/growth/growth-lead-drawer-badges"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { GrowthLead } from "@/lib/growth/types"
@@ -121,6 +122,7 @@ export function GrowthOpportunityReadiness({ lead }: GrowthOpportunityReadinessP
         ) : null}
 
         <GrowthPredictiveDealIntelligenceCard leadId={lead.id} companyName={lead.companyName} compact />
+        <GrowthCallIntelligenceScorecardCard leadId={lead.id} companyName={lead.companyName} compact />
       </div>
     </GrowthCollapsibleEngineCard>
   )

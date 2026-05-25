@@ -47,6 +47,7 @@ import {
   emitLiveCoachingSnapshotDiffTimeline,
 } from "@/lib/growth/realtime/live-coaching/session-timeline-emitter"
 import { recomputeLiveCoachingSessionInsights } from "@/lib/growth/realtime/live-coaching/session-insights-service"
+import { generateCallIntelligenceScorecard } from "@/lib/growth/call-intelligence/call-intelligence-service"
 
 type Actor = { userId: string | null; email: string | null }
 
@@ -260,6 +261,13 @@ export async function completeGrowthRealtimeCallSession(
   void recomputeLiveCoachingSessionInsights(admin, {
     leadId: session.leadId,
     sessionId: session.id,
+  }).catch(() => undefined)
+
+  void generateCallIntelligenceScorecard({
+    admin,
+    leadId: session.leadId,
+    realtimeSessionId: session.id,
+    trigger: "session_complete",
   }).catch(() => undefined)
 
   return updated

@@ -69,6 +69,12 @@ const TYPE_SEVERITY: Record<GrowthNotificationType, GrowthNotificationSeverity> 
   forecast_confidence_dropped: "high",
   close_window_detected: "medium",
   deal_needs_action: "high",
+  call_score_low: "high",
+  next_step_missing: "medium",
+  competitor_risk_detected: "high",
+  unresolved_objection: "medium",
+  strong_buying_signal: "medium",
+  call_followup_due: "medium",
 }
 
 const SEVERITY_BASE: Record<GrowthNotificationSeverity, number> = {

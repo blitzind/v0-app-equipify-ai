@@ -23,6 +23,7 @@ import { GrowthCommandDogfoodCompactSection } from "@/components/growth/growth-c
 import { GrowthCommandLifecycleCompactSection } from "@/components/growth/growth-command-lifecycle-compact-section"
 import { GrowthCommandResearchCoverageSection } from "@/components/growth/growth-command-research-coverage-section"
 import { GrowthCommandDealIntelligenceSection } from "@/components/growth/growth-command-deal-intelligence-section"
+import { GrowthCommandCallIntelligenceSection } from "@/components/growth/growth-command-call-intelligence-section"
 import { GrowthCommandPipelineRevenueSection } from "@/components/growth/growth-command-pipeline-revenue-section"
 import { GrowthCommandQuickActionsRail } from "@/components/growth/growth-command-quick-actions-rail"
 import { GrowthCommandSectionTabs } from "@/components/growth/growth-command-section-tabs"
@@ -438,6 +439,7 @@ export function GrowthCommandCenterDashboard() {
           <div id="cc-research" className={SECTION_SCROLL_CLASS}>
           <GrowthCommandResearchCoverageSection coverage={dashboard.researchCoverage} />
           <GrowthCommandDealIntelligenceSection summary={dashboard.dealIntelligence} />
+          <GrowthCommandCallIntelligenceSection summary={dashboard.callIntelligence} />
           </div>
 
           {/* 6. Customer Lifecycle */}
