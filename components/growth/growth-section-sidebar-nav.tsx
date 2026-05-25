@@ -8,6 +8,7 @@ import {
   Activity,
   BookOpen,
   Bot,
+  CalendarClock,
   ChevronLeft,
   ChevronRight,
   Crown,
@@ -79,6 +80,12 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
         label: "Reply Inbox",
         icon: Mail,
         match: (path) => path.startsWith("/admin/growth/replies"),
+      },
+      {
+        href: "/admin/growth/meetings",
+        label: "Meetings",
+        icon: CalendarClock,
+        match: (path) => path.startsWith("/admin/growth/meetings"),
       },
       {
         href: "/admin/growth/leads/queue",

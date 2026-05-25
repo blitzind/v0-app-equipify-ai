@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 592,
-  sqlMigrations: 247,
+  apiRouteHandlers: 598,
+  sqlMigrations: 248,
   dashboardPages: 65,
-  componentsTsx: 405,
-  libTsFiles: 1344,
+  componentsTsx: 408,
+  libTsFiles: 1353,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **592** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **247** |
+| API route handlers (\`app/api/**/route.ts\`) | **598** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **248** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **405** |
-| \`lib/**/*.ts\` | **1344** |
+| \`components/**/*.tsx\` | **408** |
+| \`lib/**/*.ts\` | **1353** |
 
 ### Vercel crons
 
@@ -505,6 +505,7 @@ platform/growth/leads/[leadId]/copilot/generate/route.ts
 platform/growth/leads/[leadId]/copilot/generations/route.ts
 platform/growth/leads/[leadId]/decision-makers/[dmId]/route.ts
 platform/growth/leads/[leadId]/decision-makers/route.ts
+platform/growth/leads/[leadId]/meetings/route.ts
 platform/growth/leads/[leadId]/outbound/route.ts
 platform/growth/leads/[leadId]/realtime-call/sessions/[sessionId]/audio-chunk/route.ts
 platform/growth/leads/[leadId]/realtime-call/sessions/[sessionId]/browser-audio-capture/route.ts
@@ -531,6 +532,11 @@ platform/growth/leads/[leadId]/timeline/route.ts
 platform/growth/leads/bulk-archive/route.ts
 platform/growth/leads/route.ts
 platform/growth/live-coaching/settings/route.ts
+platform/growth/meetings/[meetingId]/route.ts
+platform/growth/meetings/command-summary/route.ts
+platform/growth/meetings/dashboard/route.ts
+platform/growth/meetings/inbox/route.ts
+platform/growth/meetings/route.ts
 platform/growth/opportunities/dashboard/route.ts
 platform/growth/opportunities/pipeline/[opportunityId]/route.ts
 platform/growth/opportunities/pipeline/route.ts

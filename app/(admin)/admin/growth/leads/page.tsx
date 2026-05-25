@@ -45,6 +45,8 @@ export default function AdminGrowthLeadsPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const drawerFocus = searchParams.get("focus")
   const deepLinkLeadId = searchParams.get("open")
+  const highlightMeetingId = searchParams.get("highlight")
+  const pendingReplyId = searchParams.get("replyId")
   const assignedToFilter = searchParams.get("assignedTo")
   const unassignedFilter = searchParams.get("unassigned") === "true"
 
@@ -335,6 +337,8 @@ export default function AdminGrowthLeadsPage() {
         onLeadUpdated={handleLeadUpdated}
         onLeadSaved={handleLeadSaved}
         drawerFocus={drawerFocus}
+        highlightMeetingId={highlightMeetingId}
+        pendingReplyId={pendingReplyId}
       />
 
       <GrowthLeadFormDialog open={createOpen} onOpenChange={setCreateOpen} onSubmit={createLead} saving={saving} />

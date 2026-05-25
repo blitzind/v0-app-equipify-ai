@@ -1,0 +1,316 @@
+"use client"
+
+import { useCallback, useEffect, useState } from "react"
+import Link from "next/link"
+import { CalendarClock, Loader2, Video } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
+import {
+  GROWTH_MEETING_PROVIDER_LABELS,
+  GROWTH_MEETING_PROVIDERS,
+  GROWTH_MEETING_STATUS_LABELS,
+  type GrowthMeeting,
+  type GrowthMeetingProvider,
+} from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
+import type { GrowthLead } from "@/lib/growth/types"
+
+type GrowthLeadMeetingIntelligenceProps = {
+  lead: GrowthLead
+  highlightMeetingId?: string | null
+  pendingReplyId?: string | null
+  onTimelineRefresh?: () => void
+}
+
+function formatWhen(iso: string | null): string {
+  if (!iso) return "Not scheduled"
+  return new Date(iso).toLocaleString()
+}
+
+export function GrowthLeadMeetingIntelligence({
+  lead,
+  highlightMeetingId,
+  pendingReplyId,
+  onTimelineRefresh,
+}: GrowthLeadMeetingIntelligenceProps) {
+  const [meetings, setMeetings] = useState<GrowthMeeting[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [setupMessage, setSetupMessage] = useState<string | null>(null)
+  const [title, setTitle] = useState(`Meeting with ${lead.companyName}`)
+  const [startAt, setStartAt] = useState("")
+  const [provider, setProvider] = useState<GrowthMeetingProvider>("google_meet")
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [outcome, setOutcome] = useState("")
+  const [nextAction, setNextAction] = useState("")
+  const [noShowReason, setNoShowReason] = useState("")
+  const [sessionId, setSessionId] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/platform/growth/leads/${lead.id}/meetings`, { cache: "no-store" })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        meta?: { schemaReady?: boolean; setupMessage?: string }
+        meetings?: GrowthMeeting[]
+        message?: string
+      }
+      if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not load meetings.")
+      if (data.meta?.schemaReady === false) {
+        setSetupMessage(data.meta.setupMessage ?? null)
+        setMeetings([])
+        return
+      }
+      setSetupMessage(null)
+      setMeetings(data.meetings ?? [])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Load failed.")
+    } finally {
+      setLoading(false)
+    }
+  }, [lead.id])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  useEffect(() => {
+    if (highlightMeetingId) setSelectedId(highlightMeetingId)
+  }, [highlightMeetingId])
+
+  async function createMeeting(status: "proposed" | "scheduled") {
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/platform/growth/leads/${lead.id}/meetings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          status,
+          startAt: startAt ? new Date(startAt).toISOString() : null,
+          provider,
+          outboundReplyId: pendingReplyId ?? null,
+          source: pendingReplyId ? "reply_intent" : "manual",
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
+      if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not create meeting.")
+      await load()
+      onTimelineRefresh?.()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Create failed.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function patchMeeting(
+    meetingId: string,
+    patch: Record<string, unknown>,
+  ) {
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/platform/growth/meetings/${meetingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      })
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
+      if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not update meeting.")
+      await load()
+      onTimelineRefresh?.()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Update failed.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const selected = meetings.find((m) => m.id === selectedId) ?? null
+  const openCount = meetings.filter((m) => m.status === "proposed" || m.status === "scheduled").length
+
+  return (
+    <GrowthCollapsibleEngineCard
+      id="growth-meeting-intelligence"
+      title="Meeting Intelligence"
+      icon={<Video className="size-4" />}
+      headerAside={openCount > 0 ? `${openCount} open` : "Track meetings"}
+      defaultOpen={Boolean(pendingReplyId || highlightMeetingId)}
+      persistKey={GROWTH_DRAWER_CARD_KEYS.meetings}
+    >
+      <div className="space-y-4">
+        {setupMessage ? (
+          <p className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-950">
+            {setupMessage}
+          </p>
+        ) : null}
+        {pendingReplyId ? (
+          <p className="rounded-lg border border-indigo-200 bg-indigo-50/70 px-3 py-2 text-sm text-indigo-950">
+            Reply requested a meeting — confirm details before scheduling. No automatic calendar writes.
+          </p>
+        ) : null}
+        {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Title</label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Start</label>
+            <Input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Provider</label>
+            <select
+              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+              value={provider}
+              onChange={(e) => setProvider(e.target.value as GrowthMeetingProvider)}
+            >
+              {GROWTH_MEETING_PROVIDERS.map((option) => (
+                <option key={option} value={option}>
+                  {GROWTH_MEETING_PROVIDER_LABELS[option]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" disabled={saving} onClick={() => void createMeeting("proposed")}>
+            Save as proposed
+          </Button>
+          <Button size="sm" disabled={saving} onClick={() => void createMeeting("scheduled")}>
+            Schedule meeting
+          </Button>
+          <Link href="/admin/growth/meetings" className="text-sm text-indigo-600 hover:underline self-center">
+            Open meetings dashboard
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Loading meetings…
+          </div>
+        ) : meetings.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No meetings tracked for this lead yet.</p>
+        ) : (
+          <ul className="divide-y divide-border rounded-lg border border-border">
+            {meetings.map((meeting) => (
+              <li
+                key={meeting.id}
+                className={`px-3 py-2 ${selectedId === meeting.id ? "bg-indigo-50/60" : ""}`}
+              >
+                <button
+                  type="button"
+                  className="w-full text-left"
+                  onClick={() => setSelectedId(meeting.id)}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{meeting.title}</span>
+                    <GrowthBadge label={GROWTH_MEETING_STATUS_LABELS[meeting.status]} tone="neutral" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    <CalendarClock className="mr-1 inline size-3" />
+                    {formatWhen(meeting.startAt)}
+                  </p>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {selected ? (
+          <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
+            <p className="text-sm font-medium">Update {selected.title}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={saving}
+                onClick={() => void patchMeeting(selected.id, { status: "completed" })}
+              >
+                Mark completed
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={saving}
+                onClick={() =>
+                  void patchMeeting(selected.id, { status: "no_show", noShowReason: noShowReason || "Prospect no-show" })
+                }
+              >
+                Mark no-show
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={saving}
+                onClick={() => void patchMeeting(selected.id, { status: "canceled" })}
+              >
+                Cancel
+              </Button>
+            </div>
+            <Textarea
+              placeholder="Outcome (human-entered)"
+              value={outcome}
+              onChange={(e) => setOutcome(e.target.value)}
+              rows={2}
+            />
+            <Input
+              placeholder="Next action"
+              value={nextAction}
+              onChange={(e) => setNextAction(e.target.value)}
+            />
+            <Input
+              placeholder="No-show reason (optional)"
+              value={noShowReason}
+              onChange={(e) => setNoShowReason(e.target.value)}
+            />
+            <Input
+              placeholder="Live coaching session id (optional link)"
+              value={sessionId}
+              onChange={(e) => setSessionId(e.target.value)}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                disabled={saving || !outcome.trim()}
+                onClick={() =>
+                  void patchMeeting(selected.id, {
+                    outcome,
+                    nextAction: nextAction || null,
+                    realtimeCallSessionId: sessionId.trim() || selected.realtimeCallSessionId,
+                  })
+                }
+              >
+                Save outcome
+              </Button>
+              {selected.opportunityId ? (
+                <Link
+                  href={`/admin/growth/opportunities/pipeline?opportunityId=${selected.opportunityId}`}
+                  className="text-sm text-indigo-600 hover:underline self-center"
+                >
+                  Review opportunity stage
+                </Link>
+              ) : null}
+            </div>
+            {selected.status === "completed" && selected.opportunityId ? (
+              <p className="text-xs text-muted-foreground">
+                Completed meeting may warrant stage review — no automatic stage movement.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </GrowthCollapsibleEngineCard>
+  )
+}

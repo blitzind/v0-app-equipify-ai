@@ -23,6 +23,7 @@ import {
 import { scoreReplyPriorityFromClassification } from "@/lib/growth/reply-intelligence/reply-priority-scorer"
 import { computeReplySlaDueAt, computeOwnerResponseGapMs } from "@/lib/growth/reply-intelligence/reply-sla-tracker"
 import { computeReplyThreadIntelligence } from "@/lib/growth/reply-intelligence/reply-thread-intelligence"
+import { processReplyMeetingIntelligence } from "@/lib/growth/meeting-intelligence/process-meeting-intelligence"
 import type { GrowthReplyIntelligenceRecord } from "@/lib/growth/reply-intelligence/reply-intent-types"
 import {
   listGrowthOutboundRepliesForLead,
@@ -110,6 +111,12 @@ export async function processReplyIntelligence(
 
   if (classified.intent === "meeting_request") {
     await emitMeetingRequestedTimeline(admin, { leadId: input.lead.id, replyId: input.reply.id })
+    await processReplyMeetingIntelligence(admin, {
+      leadId: input.lead.id,
+      replyId: input.reply.id,
+      companyName: input.lead.companyName,
+      ownerUserId,
+    })
     await emitMeetingRequestReceivedNotification(admin, {
       leadId: input.lead.id,
       replyId: input.reply.id,

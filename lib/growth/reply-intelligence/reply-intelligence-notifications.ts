@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { emitGrowthNotification } from "@/lib/growth/notifications/emit-growth-notification"
+import { growthMeetingScheduleHref } from "@/lib/growth/meeting-intelligence/process-meeting-intelligence"
 import type { GrowthReplyIntent, GrowthReplyPriority } from "@/lib/growth/reply-intelligence/reply-intent-types"
 import { isReplyOverdue } from "@/lib/growth/reply-intelligence/reply-sla-tracker"
 
@@ -74,7 +75,7 @@ export async function emitMeetingRequestReceivedNotification(
     body: `${input.companyName} requested a meeting.`,
     sourceSystem: "outreach",
     sourceId: input.replyId,
-    actionUrl: replyInboxHref(input.replyId),
+    actionUrl: growthMeetingScheduleHref({ leadId: input.leadId, replyId: input.replyId }),
     metadata: { companyName: input.companyName },
   })
 }

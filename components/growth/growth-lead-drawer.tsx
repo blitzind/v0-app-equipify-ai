@@ -18,6 +18,7 @@ import { GrowthAiCopilot } from "@/components/growth/growth-ai-copilot"
 import { GrowthCallCopilot } from "@/components/growth/growth-call-copilot"
 import { GrowthRealtimeCallIntelligence } from "@/components/growth/growth-realtime-call-intelligence"
 import { GrowthLeadCommandCenter } from "@/components/growth/growth-lead-command-center"
+import { GrowthLeadMeetingIntelligence } from "@/components/growth/growth-lead-meeting-intelligence"
 import { GrowthLeadResearchPanel } from "@/components/growth/growth-lead-research-panel"
 import { GrowthLeadTimelinePanel } from "@/components/growth/growth-lead-timeline-panel"
 import { GrowthOperationalIntelligence } from "@/components/growth/growth-operational-intelligence"
@@ -33,9 +34,11 @@ type GrowthLeadDrawerProps = {
   onLeadUpdated?: (leadId: string, patch: Partial<GrowthLead>) => void
   onLeadSaved?: (lead: GrowthLead) => void
   drawerFocus?: string | null
+  highlightMeetingId?: string | null
+  pendingReplyId?: string | null
 }
 
-export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLeadSaved, drawerFocus }: GrowthLeadDrawerProps) {
+export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLeadSaved, drawerFocus, highlightMeetingId, pendingReplyId }: GrowthLeadDrawerProps) {
   const [latestResearchRun, setLatestResearchRun] = useState<GrowthLeadResearchRun | null>(null)
   const [openAddDmForm, setOpenAddDmForm] = useState(false)
   const [timelineRefreshToken, setTimelineRefreshToken] = useState(0)
@@ -90,6 +93,13 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
           <GrowthRelationshipIntelligence lead={activeLead} />
 
           <GrowthConversationIntelligence lead={activeLead} />
+
+          <GrowthLeadMeetingIntelligence
+            lead={activeLead}
+            highlightMeetingId={highlightMeetingId}
+            pendingReplyId={pendingReplyId}
+            onTimelineRefresh={() => setTimelineRefreshToken((token) => token + 1)}
+          />
 
           <GrowthSequenceIntelligence lead={activeLead} />
 

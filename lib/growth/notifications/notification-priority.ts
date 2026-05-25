@@ -37,6 +37,12 @@ const TYPE_SEVERITY: Record<GrowthNotificationType, GrowthNotificationSeverity> 
   competitor_mentioned: "high",
   high_priority_reply: "high",
   owner_response_gap: "medium",
+  meeting_requested: "critical",
+  meeting_scheduled: "medium",
+  meeting_starting_soon: "high",
+  meeting_no_show: "high",
+  post_meeting_followup_due: "medium",
+  meeting_outcome_missing: "medium",
 }
 
 const SEVERITY_BASE: Record<GrowthNotificationSeverity, number> = {

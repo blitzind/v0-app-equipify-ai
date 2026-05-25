@@ -117,6 +117,13 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "reply_assigned",
   "reply_overdue",
   "meeting_requested",
+  "meeting_created",
+  "meeting_scheduled",
+  "meeting_completed",
+  "meeting_no_show",
+  "meeting_canceled",
+  "meeting_followup_due",
+  "meeting_outcome_recorded",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]

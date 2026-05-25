@@ -83,6 +83,18 @@ export const GROWTH_DRAWER_TIMELINE_EVENT_TYPES = new Set<string>([
   "decision_maker_rejected",
   "follow_up_created",
   "notes_updated",
+  "reply_received",
+  "reply_classified",
+  "reply_assigned",
+  "reply_overdue",
+  "meeting_requested",
+  "meeting_created",
+  "meeting_scheduled",
+  "meeting_completed",
+  "meeting_no_show",
+  "meeting_canceled",
+  "meeting_followup_due",
+  "meeting_outcome_recorded",
 ])
 
 export function isGrowthDrawerActivityStreamItem(item: GrowthLeadActivityStreamItem): boolean {
@@ -114,6 +126,7 @@ export const GROWTH_DRAWER_CARD_KEYS = {
   research: "research",
   outbound: "outbound-activity",
   operationalIntelligence: "operational-intelligence",
+  meetings: "meeting-intelligence",
   activityStream: "activity-stream",
   timeline: "timeline",
 } as const

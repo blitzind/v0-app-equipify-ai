@@ -54,6 +54,12 @@ export const GROWTH_NOTIFICATION_TYPES = [
   "competitor_mentioned",
   "high_priority_reply",
   "owner_response_gap",
+  "meeting_requested",
+  "meeting_scheduled",
+  "meeting_starting_soon",
+  "meeting_no_show",
+  "post_meeting_followup_due",
+  "meeting_outcome_missing",
 ] as const
 export type GrowthNotificationType = (typeof GROWTH_NOTIFICATION_TYPES)[number]
 

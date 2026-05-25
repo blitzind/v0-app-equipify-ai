@@ -16,6 +16,7 @@ export const GROWTH_COMMAND_LEAD_FOCUS_VALUES = [
   "ai-copilot",
   "decision-makers",
   "research",
+  "meetings",
 ] as const
 
 export type GrowthCommandLeadFocus = (typeof GROWTH_COMMAND_LEAD_FOCUS_VALUES)[number]
@@ -32,6 +33,7 @@ const FOCUS_CARD_KEY: Partial<Record<GrowthCommandLeadFocus, (typeof GROWTH_DRAW
   "ai-copilot": GROWTH_DRAWER_CARD_KEYS.aiCopilot,
   "decision-makers": GROWTH_DRAWER_CARD_KEYS.decisionMakers,
   research: GROWTH_DRAWER_CARD_KEYS.research,
+  meetings: GROWTH_DRAWER_CARD_KEYS.meetings,
 }
 
 export const GROWTH_COMMAND_FOCUS_SECTION_IDS: Partial<Record<GrowthCommandLeadFocus, string>> = {
@@ -46,6 +48,7 @@ export const GROWTH_COMMAND_FOCUS_SECTION_IDS: Partial<Record<GrowthCommandLeadF
   "ai-copilot": "growth-ai-copilot",
   "decision-makers": "growth-decision-makers",
   research: "growth-research",
+  meetings: "growth-meeting-intelligence",
 }
 
 export function applyGrowthCommandLeadFocusExpand(focus: string | null | undefined): void {

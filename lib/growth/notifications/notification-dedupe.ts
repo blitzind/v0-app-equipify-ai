@@ -19,6 +19,12 @@ export const GROWTH_NOTIFICATION_COOLDOWN_MINUTES: Partial<Record<GrowthNotifica
   competitor_mentioned: 60,
   high_priority_reply: 30,
   owner_response_gap: 120,
+  meeting_requested: 15,
+  meeting_scheduled: 30,
+  meeting_starting_soon: 15,
+  meeting_no_show: 60,
+  post_meeting_followup_due: 60,
+  meeting_outcome_missing: 120,
 }
 
 export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificationType, number>> = {
@@ -43,6 +49,12 @@ export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificati
   competitor_mentioned: 7 * 24 * 60,
   high_priority_reply: 7 * 24 * 60,
   owner_response_gap: 3 * 24 * 60,
+  meeting_requested: 7 * 24 * 60,
+  meeting_scheduled: 7 * 24 * 60,
+  meeting_starting_soon: 24 * 60,
+  meeting_no_show: 7 * 24 * 60,
+  post_meeting_followup_due: 7 * 24 * 60,
+  meeting_outcome_missing: 3 * 24 * 60,
 }
 
 export function buildGrowthNotificationDeterministicHash(input: {
