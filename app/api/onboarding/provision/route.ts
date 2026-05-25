@@ -18,6 +18,7 @@ import {
 import { sendSignupProvisionEmailsIfNeeded } from "@/lib/email/signup-provision-emails"
 import { parseHowHeardAboutEquipifyInput } from "@/lib/onboarding/how-heard-about-equipify"
 import {
+  parseOnboardingExplicitRedirect,
   resolveOnboardingRedirectTarget,
   type OnboardingSampleDataStatus,
 } from "@/lib/onboarding/provision-finalization"
@@ -30,6 +31,10 @@ type Body = {
   /** Paid plan chosen in onboarding; trial access is always Scale until checkout. */
   selectedPlan?: string | null
   billingCycle?: string | null
+  /** Optional safe internal post-onboarding redirect (`?redirect=` / `?next=`). */
+  explicitRedirect?: string | null
+  /** When true, finish onboarding on billing (explicit user intent only). */
+  billingIntent?: boolean | null
   firstName?: string | null
   lastName?: string | null
   phone?: string | null
@@ -465,9 +470,10 @@ export async function POST(request: Request) {
     seedFailed,
     sampleCustomerCount,
   })
-  const redirectTarget = resolveOnboardingRedirectTarget({
+  const redirectResolution = resolveOnboardingRedirectTarget({
     inviteFlow: false,
-    selectedPlanFromQuery: Boolean(body.selectedPlan),
+    explicitRedirect: parseOnboardingExplicitRedirect(body.explicitRedirect),
+    billingIntent: body.billingIntent === true,
     selectedPlan: String(body.selectedPlan ?? "growth"),
   })
 
@@ -496,7 +502,8 @@ export async function POST(request: Request) {
     createdNewOrganization,
     sampleDataStatus,
     sampleCustomerCount,
-    redirectTarget,
+    redirectTarget: redirectResolution.href,
+    redirectReason: redirectResolution.redirectReason,
     seedFailed,
     ...(seedFailureMessage ? { seedFailureMessage: seedFailureMessage.slice(0, 200) } : {}),
   })
@@ -506,7 +513,8 @@ export async function POST(request: Request) {
     onboardingCompleted: true,
     organizationId,
     sampleDataStatus,
-    redirectTarget,
+    redirectTarget: redirectResolution.href,
+    redirectReason: redirectResolution.redirectReason,
     seeded,
     seedSkipped,
     seededIndustry,

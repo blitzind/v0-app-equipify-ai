@@ -45,8 +45,10 @@ import {
 import {
   isBlockingProvisioningFailure,
   ONBOARDING_SAMPLE_DATA_WARNING_STORAGE_KEY,
+  parseOnboardingRedirectInputs,
   resolveOnboardingRedirectTarget,
   sampleDataWarningMessage,
+  type OnboardingRedirectReason,
   type OnboardingSampleDataStatus,
 } from "@/lib/onboarding/provision-finalization"
 import {
@@ -348,8 +350,11 @@ function OnboardingPageContent() {
     let completedOrganizationId: string | null = null
     let completionFlow: "invite" | "self_serve" = "self_serve"
     let sampleDataStatus: OnboardingSampleDataStatus | null = null
-    let redirectTarget: string | null = null
+    let redirectHref: string | null = null
+    let redirectReason: OnboardingRedirectReason | null = null
     let redirectScheduled = false
+
+    const onboardingRedirectInputs = parseOnboardingRedirectInputs(searchParams)
 
     try {
       const { data: existingSessionData } = await supabase.auth.getSession()
@@ -439,11 +444,14 @@ function OnboardingPageContent() {
         }
         completedOrganizationId = acceptData.organizationId
         completionFlow = "invite"
-        redirectTarget = resolveOnboardingRedirectTarget({
+        const inviteRedirect = resolveOnboardingRedirectTarget({
           inviteFlow: true,
-          selectedPlanFromQuery: Boolean(parseOnboardingPlan(searchParams.get("plan"))),
+          explicitRedirect: onboardingRedirectInputs.explicitRedirect,
+          billingIntent: onboardingRedirectInputs.billingIntent,
           selectedPlan,
         })
+        redirectHref = inviteRedirect.href
+        redirectReason = inviteRedirect.redirectReason
       } else {
         const provisionRes = await fetch("/api/onboarding/provision", {
           method: "POST",
@@ -463,6 +471,8 @@ function OnboardingPageContent() {
               form.howHeardAboutEquipify === HOW_HEARD_ABOUT_EQUIPIFY_OTHER_VALUE
                 ? form.howHeardAboutEquipifyOther.trim() || undefined
                 : undefined,
+            explicitRedirect: onboardingRedirectInputs.explicitRedirect,
+            billingIntent: onboardingRedirectInputs.billingIntent,
           }),
         })
         const provisionData = (await provisionRes.json()) as {
@@ -471,6 +481,7 @@ function OnboardingPageContent() {
           organizationId?: string
           sampleDataStatus?: OnboardingSampleDataStatus
           redirectTarget?: string
+          redirectReason?: OnboardingRedirectReason
           onboardingCompleted?: boolean
         }
 
@@ -478,11 +489,14 @@ function OnboardingPageContent() {
           if (provisionData.organizationId) {
             completedOrganizationId = provisionData.organizationId
             sampleDataStatus = "failed_non_blocking"
-            redirectTarget = resolveOnboardingRedirectTarget({
+            const fallbackRedirect = resolveOnboardingRedirectTarget({
               inviteFlow: false,
-              selectedPlanFromQuery: Boolean(parseOnboardingPlan(searchParams.get("plan"))),
+              explicitRedirect: onboardingRedirectInputs.explicitRedirect,
+              billingIntent: onboardingRedirectInputs.billingIntent,
               selectedPlan,
             })
+            redirectHref = fallbackRedirect.href
+            redirectReason = fallbackRedirect.redirectReason
           } else {
             setSubmitError(provisionData.message ?? "Could not finish workspace setup. Please try again.")
             return
@@ -493,13 +507,19 @@ function OnboardingPageContent() {
         } else {
           completedOrganizationId = provisionData.organizationId ?? null
           sampleDataStatus = provisionData.sampleDataStatus ?? null
-          redirectTarget =
-            provisionData.redirectTarget ??
-            resolveOnboardingRedirectTarget({
+          if (provisionData.redirectTarget && provisionData.redirectReason) {
+            redirectHref = provisionData.redirectTarget
+            redirectReason = provisionData.redirectReason
+          } else {
+            const resolvedRedirect = resolveOnboardingRedirectTarget({
               inviteFlow: false,
-              selectedPlanFromQuery: Boolean(parseOnboardingPlan(searchParams.get("plan"))),
+              explicitRedirect: onboardingRedirectInputs.explicitRedirect,
+              billingIntent: onboardingRedirectInputs.billingIntent,
               selectedPlan,
             })
+            redirectHref = resolvedRedirect.href
+            redirectReason = resolvedRedirect.redirectReason
+          }
         }
         completionFlow = "self_serve"
       }
@@ -584,27 +604,30 @@ function OnboardingPageContent() {
         }
       }
 
-      const redirectHref =
-        redirectTarget ??
-        resolveOnboardingRedirectTarget({
-          inviteFlow: Boolean(inviteTokenParam),
-          selectedPlanFromQuery: Boolean(parseOnboardingPlan(searchParams.get("plan"))),
-          selectedPlan,
-        })
+      const finalRedirect =
+        redirectHref && redirectReason
+          ? { href: redirectHref, redirectReason }
+          : resolveOnboardingRedirectTarget({
+              inviteFlow: Boolean(inviteTokenParam),
+              explicitRedirect: onboardingRedirectInputs.explicitRedirect,
+              billingIntent: onboardingRedirectInputs.billingIntent,
+              selectedPlan,
+            })
 
       onboardingAnalyticsDevLog("onboarding redirect", {
-        redirectHref,
+        redirectHref: finalRedirect.href,
+        redirectReason: finalRedirect.redirectReason,
         organizationId: completedOrganizationId,
         sampleDataStatus,
       })
 
       if (typeof window !== "undefined") {
         redirectScheduled = true
-        window.location.assign(redirectHref)
+        window.location.assign(finalRedirect.href)
         return
       }
       redirectScheduled = true
-      router.replace(redirectHref)
+      router.replace(finalRedirect.href)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Could not finish onboarding. Please try again.")
     } finally {
