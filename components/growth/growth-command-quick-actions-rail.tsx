@@ -31,15 +31,15 @@ export function GrowthCommandQuickActionsRail({ variant = "rail" }: GrowthComman
   if (variant === "chips") {
     return (
       <div className="xl:hidden">
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Quick actions</p>
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Quick actions</p>
+        <div className="flex gap-3 overflow-x-auto pb-1">
           {QUICK_ACTIONS.map((action) => (
             <Link
               key={action.href}
               href={action.href}
               className={cn(
-                "shrink-0 rounded-full border border-border bg-background px-3 py-1.5 text-sm",
-                "hover:border-indigo-200 hover:bg-indigo-50/40",
+                "shrink-0 rounded-full border border-border/80 bg-background px-4 py-2 text-sm",
+                "hover:border-indigo-200 hover:bg-indigo-50/40 dark:hover:border-indigo-500/30 dark:hover:bg-indigo-950/30",
               )}
             >
               {action.label}
@@ -51,15 +51,15 @@ export function GrowthCommandQuickActionsRail({ variant = "rail" }: GrowthComman
   }
 
   return (
-    <GrowthEngineCard title="Quick Actions" icon={<Zap className="size-4" />} className="sticky top-4">
-      <ul className="grid gap-2">
+    <GrowthEngineCard title="Quick Actions" icon={<Zap className="size-4" />} className="sticky top-4 p-5 shadow-sm sm:p-6 [&>div:first-child]:mb-5">
+      <ul className="grid gap-3">
         {QUICK_ACTIONS.map((action) => {
           const Icon = action.icon
           return (
             <li key={action.href}>
               <Link
                 href={action.href}
-                className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:border-indigo-200 hover:bg-indigo-50/40"
+                className="flex min-h-11 items-center gap-3 rounded-xl border border-border/80 px-4 py-3 text-sm transition-colors hover:border-indigo-200 hover:bg-indigo-50/40 dark:hover:border-indigo-500/30 dark:hover:bg-indigo-950/30"
               >
                 <Icon className="size-4 shrink-0 text-muted-foreground" />
                 {action.label}

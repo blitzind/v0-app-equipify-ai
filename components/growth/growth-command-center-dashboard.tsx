@@ -36,6 +36,7 @@ import {
   commandActionImpactTone,
   displayCommandActionImpact,
   GROWTH_COMMAND_CENTER_QA_MARKER,
+  GROWTH_COMMAND_CENTER_SPACING_QA_MARKER,
 } from "@/lib/growth/command/command-action-types"
 import type { GrowthCadenceCommandSummary } from "@/lib/growth/cadence/cadence-types"
 import type { GrowthMeetingCommandSummary } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
@@ -80,13 +81,20 @@ function ActionCard({
   showWhy?: boolean
 }) {
   return (
-    <div className={cn("rounded-lg border border-border bg-background", compact ? "px-3 py-2" : "px-4 py-3")}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="font-medium">{action.companyName}</p>
-          <p className="text-sm text-foreground">{action.title}</p>
-          {showWhy && !compact ? <p className="mt-1 text-sm text-muted-foreground">{action.why}</p> : null}
-          <div className="mt-2 flex flex-wrap gap-2">
+    <div
+      className={cn(
+        "rounded-xl border border-border/80 bg-background",
+        compact ? "px-3 py-2" : "px-5 py-4",
+      )}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="text-sm font-semibold text-foreground">{action.companyName}</p>
+          <p className="text-sm leading-snug text-foreground/90">{action.title}</p>
+          {showWhy && !compact ? (
+            <p className="pt-1 text-sm leading-relaxed text-muted-foreground">{action.why}</p>
+          ) : null}
+          <div className="flex flex-wrap gap-2 pt-2">
             <GrowthBadge
               label={`Impact ${displayCommandActionImpact(action.impactScore)}`}
               tone={commandActionImpactTone(action.impactScore)}
@@ -94,7 +102,7 @@ function ActionCard({
             <GrowthBadge label={`${action.effortMinutes} min`} tone="neutral" />
           </div>
         </div>
-        <Button asChild size="sm" className="shrink-0">
+        <Button asChild size="sm" className="shrink-0 self-center">
           <Link href={action.ctaHref}>{action.ctaLabel}</Link>
         </Button>
       </div>
@@ -303,63 +311,68 @@ export function GrowthCommandCenterDashboard() {
   ) : null
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6" data-qa-marker={GROWTH_COMMAND_CENTER_SPACING_QA_MARKER}>
       {sprintPanel}
 
       <div className="flex flex-wrap items-center gap-2">
         <GrowthBadge label={GROWTH_COMMAND_CENTER_QA_MARKER} tone="healthy" />
+        <GrowthBadge label={GROWTH_COMMAND_CENTER_SPACING_QA_MARKER} tone="neutral" />
         <GrowthBadge label="Navigation only · no auto-send" tone="neutral" />
       </div>
 
       <GrowthCommandSectionTabs />
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_220px]">
-        <div className="space-y-5">
-          {/* 1. Morning Focus */}
-          <div id="cc-today" className={SECTION_SCROLL_CLASS}>
-          <GrowthEngineCard className="overflow-hidden border-indigo-100 bg-gradient-to-r from-indigo-50/80 via-background to-background p-0 dark:from-indigo-950/20">
-            <div className="p-4 sm:p-5">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <p className="text-lg font-semibold">{greetingName(sessionIdentity?.displayName)}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_240px]">
+        <div className="space-y-6">
+          <div id="cc-today" className={cn(SECTION_SCROLL_CLASS, "space-y-6")}>
+          <GrowthEngineCard className="overflow-hidden border-0 p-0 shadow-lg shadow-indigo-500/10 ring-1 ring-indigo-200/70 dark:shadow-indigo-950/30 dark:ring-indigo-500/25">
+            <div className="bg-gradient-to-br from-indigo-50/95 via-white to-slate-50/60 p-6 sm:p-7 dark:from-indigo-950/55 dark:via-slate-900 dark:to-slate-950/90">
+              <div className="flex flex-wrap items-start justify-between gap-5">
+                <div className="min-w-0 flex-1 space-y-3">
+                  <p className="text-xl font-semibold tracking-tight sm:text-2xl">
+                    {greetingName(sessionIdentity?.displayName)}
+                  </p>
+                  <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
                     {topFocus
                       ? `Top focus: ${topFocus.companyName} — ${topFocus.title}`
                       : "Review your ranked queue and start a focus sprint."}
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 pt-1">
                     <GrowthBadge label={mission.momentumLabel} tone={momentumTone(mission.momentumState)} />
                     <GrowthBadge label={`${dashboard.operatorRankLabel} · ${dashboard.operatorScore} pts`} tone="neutral" />
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" onClick={startSprint} className="gap-2">
+                <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
+                  <Button type="button" onClick={startSprint} className="gap-2 shadow-sm">
                     <Zap className="size-4" />
                     Start 30 Minute Sprint
                   </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+                  <Button type="button" variant="outline" onClick={() => void load()} disabled={loading} className="gap-2">
                     {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
                     Refresh
                   </Button>
                 </div>
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-                <StatTile label="Critical actions" value={mission.criticalActions} />
-                <StatTile label="Revenue at risk" value={mission.revenueAtRisk} />
-                <StatTile label="Approvals waiting" value={mission.approvalsWaiting} />
-                <StatTile label="Meetings today" value={meetingsToday} />
-                <StatTile label="Calls due" value={callsDue} />
-                <StatTile label="Stalled" value={mission.stalledOpportunities} />
-                <StatTile label="Unassigned" value={mission.ownershipGaps} />
+              <div className="mt-6 grid grid-cols-2 gap-4 border-t border-indigo-100/80 pt-6 dark:border-indigo-500/20 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+                <StatTile label="Critical actions" value={mission.criticalActions} className="bg-background/80 p-3.5" />
+                <StatTile label="Revenue at risk" value={mission.revenueAtRisk} className="bg-background/80 p-3.5" />
+                <StatTile label="Approvals waiting" value={mission.approvalsWaiting} className="bg-background/80 p-3.5" />
+                <StatTile label="Meetings today" value={meetingsToday} className="bg-background/80 p-3.5" />
+                <StatTile label="Calls due" value={callsDue} className="bg-background/80 p-3.5" />
+                <StatTile label="Stalled" value={mission.stalledOpportunities} className="bg-background/80 p-3.5" />
+                <StatTile label="Unassigned" value={mission.ownershipGaps} className="bg-background/80 p-3.5" />
               </div>
             </div>
           </GrowthEngineCard>
 
           <GrowthCommandQuickActionsRail variant="chips" />
 
-          {/* Today's Pipeline Operations */}
-          <GrowthEngineCard title="Today's Pipeline Operations" icon={<LayoutDashboard className="size-4" />}>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+          <GrowthEngineCard
+            title="Today's Pipeline Operations"
+            icon={<LayoutDashboard className="size-4" />}
+            className="p-6 shadow-sm sm:p-6 [&>div:first-child]:mb-5"
+          >
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
               <StatTile label="Critical actions" value={mission.criticalActions} />
               <StatTile label="Revenue at risk" value={mission.revenueAtRisk} />
               <StatTile label="Approvals waiting" value={mission.approvalsWaiting} />
@@ -370,10 +383,13 @@ export function GrowthCommandCenterDashboard() {
             </div>
           </GrowthEngineCard>
 
-          {/* 2. Ranked Action Queue */}
-          <GrowthEngineCard title="Ranked Action Queue" icon={<ListOrdered className="size-4" />}>
+          <GrowthEngineCard
+            title="Ranked Action Queue"
+            icon={<ListOrdered className="size-4" />}
+            className="p-6 shadow-sm sm:p-6 [&>div:first-child]:mb-5"
+          >
             {battleFilter ? (
-              <p className="mb-3 text-sm text-muted-foreground">
+              <p className="mb-5 text-sm text-muted-foreground">
                 Filtered: <span className="font-medium capitalize">{battleFilter.replace(/_/g, " ")}</span>
                 <Button type="button" variant="link" className="h-auto px-2" onClick={() => setBattleFilter(null)}>
                   Clear
@@ -384,20 +400,20 @@ export function GrowthCommandCenterDashboard() {
               <p className="text-sm text-muted-foreground">Queue is clear — no ranked actions right now.</p>
             ) : (
               <>
-                <ul className="space-y-2">
+                <ul className="space-y-3">
                   {visibleActions.map((action) => (
-                    <li key={action.id}>
+                    <li key={action.id} className="border-b border-border/50 pb-3 last:border-b-0 last:pb-0">
                       <ActionCard action={action} />
                     </li>
                   ))}
                 </ul>
                 {!showAllActions && hiddenActionCount > 0 ? (
-                  <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setShowAllActions(true)}>
+                  <Button type="button" variant="outline" size="sm" className="mt-5" onClick={() => setShowAllActions(true)}>
                     Show {hiddenActionCount} more
                   </Button>
                 ) : null}
                 {showAllActions && filteredActions.length > DEFAULT_VISIBLE_ACTIONS ? (
-                  <Button type="button" variant="ghost" size="sm" className="mt-3" onClick={() => setShowAllActions(false)}>
+                  <Button type="button" variant="ghost" size="sm" className="mt-5" onClick={() => setShowAllActions(false)}>
                     Show less
                   </Button>
                 ) : null}

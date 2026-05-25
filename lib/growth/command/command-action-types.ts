@@ -1,6 +1,7 @@
 /** Client-safe Growth Command Center types. */
 
 export const GROWTH_COMMAND_CENTER_QA_MARKER = "command-center-v2" as const
+export const GROWTH_COMMAND_CENTER_SPACING_QA_MARKER = "command-center-v2-spacing-polish" as const
 
 /** Maps internal 0–100 impact scores to operator-facing 1–10 badges. */
 export function displayCommandActionImpact(score: number): number {
