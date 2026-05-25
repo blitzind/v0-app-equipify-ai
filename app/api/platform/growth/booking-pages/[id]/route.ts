@@ -10,8 +10,9 @@ import {
   normalizeBookingPageSlug,
   updateGrowthBookingPage,
 } from "@/lib/growth/booking/booking-page-repository"
-import { GROWTH_BOOKING_LOCATION_TYPES } from "@/lib/growth/booking/booking-page-types"
-import { GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDES } from "@/lib/growth/meeting-location/meeting-location-provider-types"
+import { growthBookingPagePatchSchema } from "@/lib/growth/booking/booking-page-api-schema"
+import { mapGrowthBookingPagePatch } from "@/lib/growth/booking/booking-page-editor-state"
+import { validateBookingAvailabilityWindows } from "@/lib/growth/booking/booking-availability-ui"
 import { isValidGrowthCalendarTimezone } from "@/lib/growth/calendar/calendar-timezone"
 
 export const runtime = "nodejs"
@@ -47,36 +48,6 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   })
 }
 
-const patchSchema = z.object({
-  name: z.string().min(2).max(120).optional(),
-  slug: z.string().min(2).max(64).optional(),
-  description: z.string().max(2000).nullable().optional(),
-  logoUrl: z.string().url().nullable().optional(),
-  brandColor: z.string().max(32).optional(),
-  meetingType: z.string().max(120).nullable().optional(),
-  durationMinutes: z.number().int().min(5).max(480).optional(),
-  bufferMinutes: z.number().int().min(0).max(120).optional(),
-  availabilityWindows: z
-    .array(
-      z.object({
-        dayOfWeek: z.number().int().min(0).max(6),
-        startTime: z.string(),
-        endTime: z.string(),
-      }),
-    )
-    .optional(),
-  timezone: z.string().optional(),
-  locationType: z.enum(GROWTH_BOOKING_LOCATION_TYPES).optional(),
-  customLocation: z.string().max(500).nullable().optional(),
-  meetingProviderOverride: z.enum(GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDES).optional(),
-  autoCreateMeetingLinkOverride: z.boolean().nullable().optional(),
-  manualMeetingUrl: z.string().max(500).nullable().optional(),
-  confirmationMessage: z.string().max(2000).nullable().optional(),
-  reminderEmailSubject: z.string().max(200).nullable().optional(),
-  reminderEmailBody: z.string().max(4000).nullable().optional(),
-  enabled: z.boolean().optional(),
-})
-
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
@@ -91,13 +62,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ error: "not_found", message: "Booking page not found." }, { status: 404 })
   }
 
-  const parsed = patchSchema.safeParse(await request.json().catch(() => null))
+  const parsed = growthBookingPagePatchSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid_body", message: "Invalid booking page update." }, { status: 400 })
   }
 
-  const patch: Record<string, unknown> = {}
-  if (parsed.data.name !== undefined) patch.name = parsed.data.name.trim()
   if (parsed.data.slug !== undefined) {
     const slug = normalizeBookingPageSlug(parsed.data.slug)
     if (!isValidBookingPageSlug(slug)) {
@@ -106,35 +75,21 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (await isGrowthBookingPageSlugTaken(access.admin, slug, id)) {
       return NextResponse.json({ error: "slug_taken", message: "That booking link slug is already in use." }, { status: 409 })
     }
-    patch.slug = slug
+    parsed.data.slug = slug
   }
-  if (parsed.data.description !== undefined) patch.description = parsed.data.description
-  if (parsed.data.logoUrl !== undefined) patch.logo_url = parsed.data.logoUrl
-  if (parsed.data.brandColor !== undefined) patch.brand_color = parsed.data.brandColor
-  if (parsed.data.meetingType !== undefined) patch.meeting_type = parsed.data.meetingType
-  if (parsed.data.durationMinutes !== undefined) patch.duration_minutes = parsed.data.durationMinutes
-  if (parsed.data.bufferMinutes !== undefined) patch.buffer_minutes = parsed.data.bufferMinutes
-  if (parsed.data.availabilityWindows !== undefined) patch.availability_windows = parsed.data.availabilityWindows
-  if (parsed.data.timezone !== undefined) {
-    if (!isValidGrowthCalendarTimezone(parsed.data.timezone)) {
-      return NextResponse.json({ error: "invalid_timezone", message: "Invalid timezone." }, { status: 400 })
-    }
-    patch.timezone = parsed.data.timezone
-  }
-  if (parsed.data.locationType !== undefined) patch.location_type = parsed.data.locationType
-  if (parsed.data.customLocation !== undefined) patch.custom_location = parsed.data.customLocation
-  if (parsed.data.meetingProviderOverride !== undefined) {
-    patch.meeting_provider_override = parsed.data.meetingProviderOverride
-  }
-  if (parsed.data.autoCreateMeetingLinkOverride !== undefined) {
-    patch.auto_create_meeting_link_override = parsed.data.autoCreateMeetingLinkOverride
-  }
-  if (parsed.data.manualMeetingUrl !== undefined) patch.manual_meeting_url = parsed.data.manualMeetingUrl
-  if (parsed.data.confirmationMessage !== undefined) patch.confirmation_message = parsed.data.confirmationMessage
-  if (parsed.data.reminderEmailSubject !== undefined) patch.reminder_email_subject = parsed.data.reminderEmailSubject
-  if (parsed.data.reminderEmailBody !== undefined) patch.reminder_email_body = parsed.data.reminderEmailBody
-  if (parsed.data.enabled !== undefined) patch.enabled = parsed.data.enabled
 
+  if (parsed.data.timezone !== undefined && !isValidGrowthCalendarTimezone(parsed.data.timezone)) {
+    return NextResponse.json({ error: "invalid_timezone", message: "Invalid timezone." }, { status: 400 })
+  }
+
+  if (parsed.data.availabilityWindows !== undefined) {
+    const availability = validateBookingAvailabilityWindows(parsed.data.availabilityWindows)
+    if (!availability.ok) {
+      return NextResponse.json({ error: "invalid_availability", message: availability.message }, { status: 400 })
+    }
+  }
+
+  const patch = mapGrowthBookingPagePatch(parsed.data)
   const page = await updateGrowthBookingPage(access.admin, id, patch)
   const origin = new URL(request.url).origin
   return NextResponse.json({

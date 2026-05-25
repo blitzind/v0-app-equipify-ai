@@ -29,11 +29,16 @@ export type PublicBookingSubmitResult =
       bookingId: string
       meetingId: string
       meetingUrl: string | null
+      locationLabel: string | null
+      locationUrl: string | null
+      slotStartAt: string
+      slotEndAt: string
       confirmationMessage: string | null
     }
   | { ok: false; code: string; message: string }
 
 import { publicBookingErrorMessage } from "@/lib/growth/booking/booking-public-errors"
+import { resolvePublicBookingLocationDisplay } from "@/lib/growth/booking/booking-public-display"
 
 export async function fetchPublicBookingSlots(
   admin: SupabaseClient,
@@ -249,11 +254,21 @@ export async function submitPublicBooking(
       meetingUrl: syncResult.meeting.meetingUrl,
     })
 
+    const locationDisplay = resolvePublicBookingLocationDisplay({
+      locationType: page.locationType,
+      customLocation: page.customLocation,
+      manualMeetingUrl: syncResult.meeting.meetingUrl ?? page.manualMeetingUrl,
+    })
+
     return {
       ok: true,
       bookingId: booking.id,
       meetingId: syncResult.meeting.id,
       meetingUrl: syncResult.meeting.meetingUrl,
+      locationLabel: locationDisplay.label,
+      locationUrl: syncResult.meeting.meetingUrl ?? locationDisplay.url,
+      slotStartAt: slot.startAt,
+      slotEndAt: slot.endAt,
       confirmationMessage: page.confirmationMessage,
     }
   } catch {

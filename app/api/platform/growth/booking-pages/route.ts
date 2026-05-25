@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server"
-import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import {
   countGrowthBookingPageBookings,
@@ -9,8 +8,8 @@ import {
   listGrowthBookingPagesForOwner,
   normalizeBookingPageSlug,
 } from "@/lib/growth/booking/booking-page-repository"
-import { GROWTH_BOOKING_LOCATION_TYPES } from "@/lib/growth/booking/booking-page-types"
-import { GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDES } from "@/lib/growth/meeting-location/meeting-location-provider-types"
+import { growthBookingPageCreateSchema } from "@/lib/growth/booking/booking-page-api-schema"
+import { validateBookingAvailabilityWindows } from "@/lib/growth/booking/booking-availability-ui"
 import { fetchGrowthCalendarConnectionForUser } from "@/lib/growth/calendar/calendar-connection-repository"
 import { isValidGrowthCalendarTimezone } from "@/lib/growth/calendar/calendar-timezone"
 
@@ -36,41 +35,11 @@ export async function GET(request: Request) {
   return NextResponse.json({ ok: true, pages: items })
 }
 
-const createSchema = z.object({
-  name: z.string().min(2).max(120),
-  slug: z.string().min(2).max(64).optional(),
-  description: z.string().max(2000).nullable().optional(),
-  logoUrl: z.string().url().nullable().optional(),
-  brandColor: z.string().max(32).optional(),
-  meetingType: z.string().max(120).nullable().optional(),
-  durationMinutes: z.number().int().min(5).max(480).optional(),
-  bufferMinutes: z.number().int().min(0).max(120).optional(),
-  availabilityWindows: z
-    .array(
-      z.object({
-        dayOfWeek: z.number().int().min(0).max(6),
-        startTime: z.string(),
-        endTime: z.string(),
-      }),
-    )
-    .optional(),
-  timezone: z.string().optional(),
-  locationType: z.enum(GROWTH_BOOKING_LOCATION_TYPES).optional(),
-  customLocation: z.string().max(500).nullable().optional(),
-  meetingProviderOverride: z.enum(GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDES).optional(),
-  autoCreateMeetingLinkOverride: z.boolean().nullable().optional(),
-  manualMeetingUrl: z.string().max(500).nullable().optional(),
-  confirmationMessage: z.string().max(2000).nullable().optional(),
-  reminderEmailSubject: z.string().max(200).nullable().optional(),
-  reminderEmailBody: z.string().max(4000).nullable().optional(),
-  enabled: z.boolean().optional(),
-})
-
 export async function POST(request: Request) {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 
-  const parsed = createSchema.safeParse(await request.json().catch(() => null))
+  const parsed = growthBookingPageCreateSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid_body", message: "Invalid booking page payload." }, { status: 400 })
   }
@@ -86,6 +55,13 @@ export async function POST(request: Request) {
   const timezone = parsed.data.timezone ?? "UTC"
   if (!isValidGrowthCalendarTimezone(timezone)) {
     return NextResponse.json({ error: "invalid_timezone", message: "Invalid timezone." }, { status: 400 })
+  }
+
+  if (parsed.data.availabilityWindows) {
+    const availability = validateBookingAvailabilityWindows(parsed.data.availabilityWindows)
+    if (!availability.ok) {
+      return NextResponse.json({ error: "invalid_availability", message: availability.message }, { status: 400 })
+    }
   }
 
   const connection = await fetchGrowthCalendarConnectionForUser(access.admin, access.userId)

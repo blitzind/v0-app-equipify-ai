@@ -30,9 +30,14 @@ export type GrowthBookingPage = {
   calendarConnectionId: string | null
   name: string
   slug: string
+  pageTitle: string | null
+  brandName: string | null
   description: string | null
   logoUrl: string | null
+  heroImageUrl: string | null
   brandColor: string
+  accentColor: string | null
+  footerNote: string | null
   meetingType: string | null
   durationMinutes: number
   bufferMinutes: number
@@ -54,14 +59,20 @@ export type GrowthBookingPage = {
 export type GrowthBookingPagePublicView = {
   slug: string
   name: string
+  pageTitle: string
+  brandName: string | null
   description: string | null
   logoUrl: string | null
+  heroImageUrl: string | null
   brandColor: string
+  accentColor: string
+  footerNote: string | null
   meetingType: string | null
   durationMinutes: number
   timezone: string
   locationType: GrowthBookingLocationType
-  customLocation: string | null
+  locationLabel: string
+  locationUrl: string | null
   confirmationMessage: string | null
 }
 

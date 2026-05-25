@@ -1,11 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Copy, ExternalLink, Link2, Loader2, Plus } from "lucide-react"
+import { Copy, ExternalLink, Link2, Loader2, Plus, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { GrowthBookingAvailabilityEditor } from "@/components/growth/growth-booking-availability-editor"
 import {
   GROWTH_SETTINGS_FORM_GAP,
   GROWTH_SETTINGS_INNER_GAP,
@@ -15,6 +16,8 @@ import {
 } from "@/components/growth/growth-settings-ui"
 import type { GrowthBookingPageListItem } from "@/lib/growth/booking/booking-page-types"
 import { GROWTH_BOOKING_PAGES_QA_MARKER } from "@/lib/growth/booking/booking-page-types"
+import { GROWTH_BOOKING_PAGE_UI_QA_MARKER } from "@/lib/growth/booking/booking-page-ui-types"
+import { growthBookingPageToEditorState } from "@/lib/growth/booking/booking-page-editor-state"
 import {
   GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDE_LABELS,
   GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDES,
@@ -25,12 +28,23 @@ import {
   type GrowthBookingMeetingProviderOverride,
   type GrowthMeetingLocationProvider,
 } from "@/lib/growth/meeting-location/meeting-location-provider-types"
+import {
+  weeklyScheduleToWindows,
+  windowsToWeeklySchedule,
+  type BookingWeeklyDaySchedule,
+} from "@/lib/growth/booking/booking-page-ui-types"
 
 const DEFAULT_FORM = {
   name: "",
   slug: "",
+  pageTitle: "",
+  brandName: "",
   description: "",
+  logoUrl: "",
+  heroImageUrl: "",
   brandColor: "#059669",
+  accentColor: "#2563eb",
+  footerNote: "",
   durationMinutes: "30",
   bufferMinutes: "0",
   timezone: "America/New_York",
@@ -40,9 +54,16 @@ const DEFAULT_FORM = {
   meetingProviderOverride: "inherit" as GrowthBookingMeetingProviderOverride,
 }
 
-function effectiveBookingProvider(page: GrowthBookingPageListItem): GrowthMeetingLocationProvider {
-  if (page.meetingProviderOverride !== "inherit") return page.meetingProviderOverride
-  return legacyBookingLocationToProvider(page.locationType)
+type EditorState = ReturnType<typeof growthBookingPageToEditorState> & {
+  weeklySchedule: BookingWeeklyDaySchedule[]
+}
+
+function effectiveBookingProvider(
+  meetingProviderOverride: GrowthBookingMeetingProviderOverride,
+  locationType: string,
+): GrowthMeetingLocationProvider {
+  if (meetingProviderOverride !== "inherit") return meetingProviderOverride
+  return legacyBookingLocationToProvider(locationType)
 }
 
 export function GrowthBookingPagesPanel() {
@@ -51,6 +72,7 @@ export function GrowthBookingPagesPanel() {
   const [saving, setSaving] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [form, setForm] = useState(DEFAULT_FORM)
+  const [editor, setEditor] = useState<EditorState | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
   const selected = pages.find((page) => page.id === selectedId) ?? null
@@ -70,6 +92,18 @@ export function GrowthBookingPagesPanel() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    if (!selected) {
+      setEditor(null)
+      return
+    }
+    const base = growthBookingPageToEditorState(selected)
+    setEditor({
+      ...base,
+      weeklySchedule: windowsToWeeklySchedule(selected.availabilityWindows),
+    })
+  }, [selected?.id, selected?.updatedAt])
+
   async function createPage() {
     setSaving(true)
     setMessage(null)
@@ -80,8 +114,14 @@ export function GrowthBookingPagesPanel() {
         body: JSON.stringify({
           name: form.name,
           slug: form.slug || undefined,
+          pageTitle: form.pageTitle || null,
+          brandName: form.brandName || null,
           description: form.description || null,
+          logoUrl: form.logoUrl || null,
+          heroImageUrl: form.heroImageUrl || null,
           brandColor: form.brandColor,
+          accentColor: form.accentColor,
+          footerNote: form.footerNote || null,
           durationMinutes: Number(form.durationMinutes),
           bufferMinutes: Number(form.bufferMinutes),
           timezone: form.timezone,
@@ -104,19 +144,41 @@ export function GrowthBookingPagesPanel() {
     }
   }
 
-  async function updatePage(patch: Record<string, unknown>) {
-    if (!selected) return
+  async function saveEditor() {
+    if (!selected || !editor) return
     setSaving(true)
     setMessage(null)
     try {
       const res = await fetch(`/api/platform/growth/booking-pages/${selected.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
+        body: JSON.stringify({
+          name: editor.name,
+          slug: editor.slug,
+          pageTitle: editor.pageTitle || null,
+          brandName: editor.brandName || null,
+          description: editor.description || null,
+          logoUrl: editor.logoUrl || null,
+          heroImageUrl: editor.heroImageUrl || null,
+          brandColor: editor.brandColor,
+          accentColor: editor.accentColor || null,
+          footerNote: editor.footerNote || null,
+          meetingType: editor.meetingType || null,
+          durationMinutes: Number(editor.durationMinutes),
+          bufferMinutes: Number(editor.bufferMinutes),
+          timezone: editor.timezone,
+          confirmationMessage: editor.confirmationMessage || null,
+          enabled: editor.enabled,
+          meetingProviderOverride: editor.meetingProviderOverride,
+          autoCreateMeetingLinkOverride: editor.autoCreateMeetingLinkOverride,
+          manualMeetingUrl: editor.manualMeetingUrl || null,
+          customLocation: editor.customLocation || null,
+          availabilityWindows: weeklyScheduleToWindows(editor.weeklySchedule),
+        }),
       })
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
       if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not update booking page.")
-      setMessage("Booking page updated.")
+      setMessage("Booking page saved.")
       await load()
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Could not update booking page.")
@@ -134,11 +196,20 @@ export function GrowthBookingPagesPanel() {
     }
   }
 
+  const provider = editor
+    ? effectiveBookingProvider(editor.meetingProviderOverride, selected?.locationType ?? "google_meet")
+    : "google_meet"
+
   return (
     <GrowthSettingsCard
       title="Booking Pages"
       icon={<Link2 className="size-4" />}
-      headerAside={<GrowthSettingsBadge label={GROWTH_BOOKING_PAGES_QA_MARKER} tone="neutral" />}
+      headerAside={
+        <div className="flex items-center gap-1.5">
+          <GrowthSettingsBadge label={GROWTH_BOOKING_PAGE_UI_QA_MARKER} tone="neutral" />
+          <GrowthSettingsBadge label={GROWTH_BOOKING_PAGES_QA_MARKER} tone="neutral" />
+        </div>
+      }
     >
       <div className={GROWTH_SETTINGS_INNER_GAP}>
         <p className="text-xs text-muted-foreground">
@@ -151,221 +222,264 @@ export function GrowthBookingPagesPanel() {
             Loading booking pages…
           </div>
         ) : (
-          <>
-            <div className="grid gap-2 lg:grid-cols-[220px_minmax(0,1fr)]">
-              <div className="space-y-1 rounded-md border border-border/70 p-2 dark:border-[#25324C]">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-xs font-medium">Pages</span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 px-2 text-[11px]"
-                    onClick={() => {
-                      setSelectedId(null)
-                      setForm(DEFAULT_FORM)
-                    }}
-                  >
-                    <Plus className="mr-1 size-3" />
-                    New
-                  </Button>
-                </div>
-                {pages.length === 0 ? (
-                  <p className="px-1 py-2 text-[11px] text-muted-foreground">No booking pages yet.</p>
-                ) : (
-                  pages.map((page) => (
-                    <button
-                      key={page.id}
-                      type="button"
-                      className={`flex w-full flex-col rounded px-2 py-1.5 text-left text-xs ${
-                        selectedId === page.id ? "bg-muted" : "hover:bg-muted/50"
-                      }`}
-                      onClick={() => setSelectedId(page.id)}
-                    >
-                      <span className="font-medium">{page.name}</span>
-                      <span className="text-muted-foreground">
-                        /book/{page.slug} · {page.enabled ? "Enabled" : "Disabled"}
-                      </span>
-                    </button>
-                  ))
-                )}
+          <div className="grid gap-2 lg:grid-cols-[220px_minmax(0,1fr)]">
+            <div className="space-y-1 rounded-md border border-border/70 p-2 dark:border-[#25324C]">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs font-medium">Pages</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-[11px]"
+                  onClick={() => {
+                    setSelectedId(null)
+                    setForm(DEFAULT_FORM)
+                  }}
+                >
+                  <Plus className="mr-1 size-3" />
+                  New
+                </Button>
               </div>
+              {pages.length === 0 ? (
+                <p className="px-1 py-2 text-[11px] text-muted-foreground">No booking pages yet.</p>
+              ) : (
+                pages.map((page) => (
+                  <button
+                    key={page.id}
+                    type="button"
+                    className={`flex w-full flex-col rounded px-2 py-1.5 text-left text-xs ${
+                      selectedId === page.id ? "bg-muted" : "hover:bg-muted/50"
+                    }`}
+                    onClick={() => setSelectedId(page.id)}
+                  >
+                    <span className="font-medium">{page.name}</span>
+                    <span className="text-muted-foreground">
+                      /book/{page.slug} · {page.enabled ? "Public" : "Disabled"}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
 
-              <div className="space-y-3 rounded-md border border-border/70 p-3 dark:border-[#25324C]">
-                {selected ? (
-                  <>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <GrowthSettingsBadge label={selected.enabled ? "Enabled" : "Disabled"} tone={selected.enabled ? "healthy" : "neutral"} />
-                      <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
-                        <a href={selected.bookingLink} target="_blank" rel="noreferrer">
-                          <ExternalLink className="mr-1 size-3" />
-                          Preview
-                        </a>
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => void copyLink(selected.bookingLink)}
-                      >
-                        <Copy className="mr-1 size-3" />
-                        Copy Link
-                      </Button>
-                    </div>
-                    <GrowthSettingsToggleRow
-                      label="Enable booking page"
-                      checked={selected.enabled}
-                      onCheckedChange={(enabled) => void updatePage({ enabled })}
-                      disabled={saving}
+            <div className="space-y-3 rounded-md border border-border/70 p-3 dark:border-[#25324C]">
+              {selected && editor ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <GrowthSettingsBadge
+                      label={editor.enabled ? "Public link active" : "Disabled"}
+                      tone={editor.enabled ? "healthy" : "neutral"}
                     />
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <div className={GROWTH_SETTINGS_FORM_GAP}>
-                        <Label className="text-xs">Name</Label>
-                        <Input className="h-9" defaultValue={selected.name} onBlur={(e) => void updatePage({ name: e.target.value })} />
-                      </div>
-                      <div className={GROWTH_SETTINGS_FORM_GAP}>
-                        <Label className="text-xs">Slug</Label>
-                        <Input className="h-9" defaultValue={selected.slug} onBlur={(e) => void updatePage({ slug: e.target.value })} />
-                      </div>
-                      <div className={GROWTH_SETTINGS_FORM_GAP}>
-                        <Label className="text-xs">Duration (minutes)</Label>
-                        <Input
-                          className="h-9"
-                          defaultValue={String(selected.durationMinutes)}
-                          onBlur={(e) => void updatePage({ durationMinutes: Number(e.target.value) })}
-                        />
-                      </div>
-                      <div className={GROWTH_SETTINGS_FORM_GAP}>
-                        <Label className="text-xs">Buffer (minutes)</Label>
-                        <Input
-                          className="h-9"
-                          defaultValue={String(selected.bufferMinutes)}
-                          onBlur={(e) => void updatePage({ bufferMinutes: Number(e.target.value) })}
-                        />
-                      </div>
+                    <GrowthSettingsBadge label={`${selected.recentBookingsCount} bookings`} tone="neutral" />
+                    <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
+                      <a href={selected.bookingLink} target="_blank" rel="noreferrer">
+                        <ExternalLink className="mr-1 size-3" />
+                        Preview
+                      </a>
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => void copyLink(selected.bookingLink)}
+                    >
+                      <Copy className="mr-1 size-3" />
+                      Copy Link
+                    </Button>
+                    <Button type="button" size="sm" className="h-7 px-2 text-xs" disabled={saving} onClick={() => void saveEditor()}>
+                      {saving ? <Loader2 className="mr-1 size-3 animate-spin" /> : <Save className="mr-1 size-3" />}
+                      Save
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground break-all">{selected.bookingLink}</p>
+
+                  <GrowthSettingsToggleRow
+                    label="Enable public booking page"
+                    checked={editor.enabled}
+                    onCheckedChange={(enabled) => setEditor({ ...editor, enabled })}
+                    disabled={saving}
+                  />
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Internal name</Label>
+                      <Input className="h-9" value={editor.name} onChange={(e) => setEditor({ ...editor, name: e.target.value })} />
                     </div>
                     <div className={GROWTH_SETTINGS_FORM_GAP}>
-                      <Label className="text-xs">Description</Label>
-                      <Textarea
-                        rows={2}
-                        defaultValue={selected.description ?? ""}
-                        onBlur={(e) => void updatePage({ description: e.target.value || null })}
-                      />
+                      <Label className="text-xs">Slug</Label>
+                      <Input className="h-9" value={editor.slug} onChange={(e) => setEditor({ ...editor, slug: e.target.value })} />
                     </div>
-                    <div className="space-y-2 rounded-md border border-border/70 p-2.5 dark:border-[#25324C]">
-                      <p className="text-xs font-medium">Meeting location</p>
-                      <p className="text-[11px] text-muted-foreground">{GROWTH_MEETING_LOCATION_HELPER_COPY}</p>
-                      <div className={GROWTH_SETTINGS_FORM_GAP}>
-                        <Label className="text-xs">Meeting provider override</Label>
-                        <select
-                          className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
-                          value={selected.meetingProviderOverride}
-                          onChange={(event) =>
-                            void updatePage({
-                              meetingProviderOverride: event.target.value as GrowthBookingMeetingProviderOverride,
-                            })
-                          }
-                          disabled={saving}
-                        >
-                          {GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDES.map((option) => (
-                            <option key={option} value={option}>
-                              {GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDE_LABELS[option]}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className={GROWTH_SETTINGS_FORM_GAP}>
-                        <Label className="text-xs">Auto-create meeting link</Label>
-                        <select
-                          className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
-                          value={
-                            selected.autoCreateMeetingLinkOverride === null
-                              ? "inherit"
-                              : selected.autoCreateMeetingLinkOverride
-                                ? "on"
-                                : "off"
-                          }
-                          onChange={(event) => {
-                            const value = event.target.value
-                            void updatePage({
-                              autoCreateMeetingLinkOverride:
-                                value === "inherit" ? null : value === "on",
-                            })
-                          }}
-                          disabled={saving}
-                        >
-                          <option value="inherit">Inherit platform default</option>
-                          <option value="on">On</option>
-                          <option value="off">Off</option>
-                        </select>
-                      </div>
-                      {meetingLocationNeedsManualUrl(effectiveBookingProvider(selected)) ? (
-                        <div className={GROWTH_SETTINGS_FORM_GAP}>
-                          <Label className="text-xs">Manual meeting URL</Label>
-                          <Input
-                            className="h-9"
-                            defaultValue={selected.manualMeetingUrl ?? ""}
-                            placeholder="https://zoom.us/j/… or Teams link"
-                            onBlur={(e) => void updatePage({ manualMeetingUrl: e.target.value.trim() || null })}
-                          />
-                        </div>
-                      ) : null}
-                      {meetingLocationNeedsLocationLabel(effectiveBookingProvider(selected)) ? (
-                        <div className={GROWTH_SETTINGS_FORM_GAP}>
-                          <Label className="text-xs">Phone number or location text</Label>
-                          <Input
-                            className="h-9"
-                            defaultValue={selected.customLocation ?? ""}
-                            placeholder="Phone number, address, or call notes"
-                            onBlur={(e) => void updatePage({ customLocation: e.target.value.trim() || null })}
-                          />
-                        </div>
-                      ) : null}
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Public page title</Label>
+                      <Input className="h-9" value={editor.pageTitle} onChange={(e) => setEditor({ ...editor, pageTitle: e.target.value })} />
                     </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      Recent bookings: {selected.recentBookingsCount}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-xs font-medium">Create Booking Page</p>
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Brand / company name</Label>
+                      <Input className="h-9" value={editor.brandName} onChange={(e) => setEditor({ ...editor, brandName: e.target.value })} />
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Logo URL</Label>
+                      <Input className="h-9" value={editor.logoUrl} onChange={(e) => setEditor({ ...editor, logoUrl: e.target.value })} />
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Hero / banner URL</Label>
+                      <Input className="h-9" value={editor.heroImageUrl} onChange={(e) => setEditor({ ...editor, heroImageUrl: e.target.value })} />
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Brand color</Label>
+                      <Input className="h-9" type="color" value={editor.brandColor} onChange={(e) => setEditor({ ...editor, brandColor: e.target.value })} />
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Accent button color</Label>
+                      <Input className="h-9" type="color" value={editor.accentColor} onChange={(e) => setEditor({ ...editor, accentColor: e.target.value })} />
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Duration (minutes)</Label>
+                      <Input className="h-9" value={editor.durationMinutes} onChange={(e) => setEditor({ ...editor, durationMinutes: e.target.value })} />
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Buffer (minutes)</Label>
+                      <Input className="h-9" value={editor.bufferMinutes} onChange={(e) => setEditor({ ...editor, bufferMinutes: e.target.value })} />
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Timezone</Label>
+                      <Input className="h-9" value={editor.timezone} onChange={(e) => setEditor({ ...editor, timezone: e.target.value })} />
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Meeting type label</Label>
+                      <Input className="h-9" value={editor.meetingType} onChange={(e) => setEditor({ ...editor, meetingType: e.target.value })} />
+                    </div>
+                  </div>
+
+                  <div className={GROWTH_SETTINGS_FORM_GAP}>
+                    <Label className="text-xs">Description</Label>
+                    <Textarea rows={2} value={editor.description} onChange={(e) => setEditor({ ...editor, description: e.target.value })} />
+                  </div>
+                  <div className={GROWTH_SETTINGS_FORM_GAP}>
+                    <Label className="text-xs">Footer note</Label>
+                    <Textarea rows={2} value={editor.footerNote} onChange={(e) => setEditor({ ...editor, footerNote: e.target.value })} />
+                  </div>
+                  <div className={GROWTH_SETTINGS_FORM_GAP}>
+                    <Label className="text-xs">Confirmation message</Label>
+                    <Textarea rows={2} value={editor.confirmationMessage} onChange={(e) => setEditor({ ...editor, confirmationMessage: e.target.value })} />
+                  </div>
+
+                  <GrowthBookingAvailabilityEditor
+                    schedule={editor.weeklySchedule}
+                    onChange={(weeklySchedule) => setEditor({ ...editor, weeklySchedule })}
+                    disabled={saving}
+                  />
+
+                  <div className="space-y-2 rounded-md border border-border/70 p-2.5 dark:border-[#25324C]">
+                    <p className="text-xs font-medium">Meeting location</p>
+                    <p className="text-[11px] text-muted-foreground">{GROWTH_MEETING_LOCATION_HELPER_COPY}</p>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Meeting provider override</Label>
+                      <select
+                        className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
+                        value={editor.meetingProviderOverride}
+                        onChange={(event) =>
+                          setEditor({
+                            ...editor,
+                            meetingProviderOverride: event.target.value as GrowthBookingMeetingProviderOverride,
+                          })
+                        }
+                        disabled={saving}
+                      >
+                        {GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDES.map((option) => (
+                          <option key={option} value={option}>
+                            {GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDE_LABELS[option]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Auto-create meeting link</Label>
+                      <select
+                        className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
+                        value={
+                          editor.autoCreateMeetingLinkOverride === null
+                            ? "inherit"
+                            : editor.autoCreateMeetingLinkOverride
+                              ? "on"
+                              : "off"
+                        }
+                        onChange={(event) => {
+                          const value = event.target.value
+                          setEditor({
+                            ...editor,
+                            autoCreateMeetingLinkOverride: value === "inherit" ? null : value === "on",
+                          })
+                        }}
+                        disabled={saving}
+                      >
+                        <option value="inherit">Inherit platform default</option>
+                        <option value="on">On</option>
+                        <option value="off">Off</option>
+                      </select>
+                    </div>
+                    {meetingLocationNeedsManualUrl(provider) ? (
                       <div className={GROWTH_SETTINGS_FORM_GAP}>
-                        <Label className="text-xs">Calendar name</Label>
-                        <Input className="h-9" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                      </div>
-                      <div className={GROWTH_SETTINGS_FORM_GAP}>
-                        <Label className="text-xs">Custom slug</Label>
-                        <Input className="h-9" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
-                      </div>
-                      <div className={GROWTH_SETTINGS_FORM_GAP}>
-                        <Label className="text-xs">Duration (minutes)</Label>
+                        <Label className="text-xs">Manual meeting URL</Label>
                         <Input
                           className="h-9"
-                          value={form.durationMinutes}
-                          onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })}
+                          value={editor.manualMeetingUrl}
+                          placeholder="https://zoom.us/j/… or Teams link"
+                          onChange={(e) => setEditor({ ...editor, manualMeetingUrl: e.target.value })}
                         />
                       </div>
+                    ) : null}
+                    {meetingLocationNeedsLocationLabel(provider) ? (
                       <div className={GROWTH_SETTINGS_FORM_GAP}>
-                        <Label className="text-xs">Timezone</Label>
-                        <Input className="h-9" value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} />
+                        <Label className="text-xs">Phone number or location text</Label>
+                        <Input
+                          className="h-9"
+                          value={editor.customLocation}
+                          placeholder="Phone number, address, or call notes"
+                          onChange={(e) => setEditor({ ...editor, customLocation: e.target.value })}
+                        />
                       </div>
+                    ) : null}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs font-medium">Create Booking Page</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Internal name</Label>
+                      <Input className="h-9" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
                     </div>
-                    <GrowthSettingsToggleRow
-                      label="Enable after create"
-                      checked={form.enabled}
-                      onCheckedChange={(enabled) => setForm({ ...form, enabled })}
-                    />
-                    <Button type="button" size="sm" disabled={saving || !form.name.trim()} onClick={() => void createPage()}>
-                      {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Plus className="mr-2 size-4" />}
-                      Create Booking Page
-                    </Button>
-                  </>
-                )}
-              </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Custom slug</Label>
+                      <Input className="h-9" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Public page title</Label>
+                      <Input className="h-9" value={form.pageTitle} onChange={(e) => setForm({ ...form, pageTitle: e.target.value })} />
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Duration (minutes)</Label>
+                      <Input className="h-9" value={form.durationMinutes} onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })} />
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Timezone</Label>
+                      <Input className="h-9" value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} />
+                    </div>
+                  </div>
+                  <GrowthSettingsToggleRow
+                    label="Enable after create"
+                    checked={form.enabled}
+                    onCheckedChange={(enabled) => setForm({ ...form, enabled })}
+                  />
+                  <Button type="button" size="sm" disabled={saving || !form.name.trim()} onClick={() => void createPage()}>
+                    {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Plus className="mr-2 size-4" />}
+                    Create Booking Page
+                  </Button>
+                </>
+              )}
             </div>
-          </>
+          </div>
         )}
 
         {message ? <p className="text-xs text-muted-foreground">{message}</p> : null}

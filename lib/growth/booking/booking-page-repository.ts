@@ -11,11 +11,16 @@ import {
   type GrowthBookingPagePublicView,
 } from "@/lib/growth/booking/booking-page-types"
 import { isValidBookingPageSlug, normalizeBookingPageSlug } from "@/lib/growth/booking/booking-page-slug"
+import {
+  resolveBookingPageAccentColor,
+  resolveBookingPageDisplayTitle,
+  resolvePublicBookingLocationFromPage,
+} from "@/lib/growth/booking/booking-public-display"
 
 export { isValidBookingPageSlug, normalizeBookingPageSlug }
 
 const PAGE_SELECT =
-  "id, owner_user_id, calendar_connection_id, name, slug, description, logo_url, brand_color, meeting_type, duration_minutes, buffer_minutes, availability_windows, timezone, location_type, custom_location, meeting_provider_override, auto_create_meeting_link_override, manual_meeting_url, confirmation_message, reminder_email_subject, reminder_email_body, enabled, created_at, updated_at"
+  "id, owner_user_id, calendar_connection_id, name, slug, page_title, brand_name, description, logo_url, hero_image_url, brand_color, accent_color, footer_note, meeting_type, duration_minutes, buffer_minutes, availability_windows, timezone, location_type, custom_location, meeting_provider_override, auto_create_meeting_link_override, manual_meeting_url, confirmation_message, reminder_email_subject, reminder_email_body, enabled, created_at, updated_at"
 
 type PageRow = {
   id: string
@@ -23,9 +28,14 @@ type PageRow = {
   calendar_connection_id: string | null
   name: string
   slug: string
+  page_title: string | null
+  brand_name: string | null
   description: string | null
   logo_url: string | null
+  hero_image_url: string | null
   brand_color: string
+  accent_color: string | null
+  footer_note: string | null
   meeting_type: string | null
   duration_minutes: number
   buffer_minutes: number
@@ -59,9 +69,14 @@ function mapPage(row: PageRow): GrowthBookingPage {
     calendarConnectionId: row.calendar_connection_id,
     name: row.name,
     slug: row.slug,
+    pageTitle: row.page_title,
+    brandName: row.brand_name,
     description: row.description,
     logoUrl: row.logo_url,
+    heroImageUrl: row.hero_image_url,
     brandColor: row.brand_color,
+    accentColor: row.accent_color,
+    footerNote: row.footer_note,
     meetingType: row.meeting_type,
     durationMinutes: row.duration_minutes,
     bufferMinutes: row.buffer_minutes,
@@ -82,17 +97,24 @@ function mapPage(row: PageRow): GrowthBookingPage {
 }
 
 export function toPublicBookingPageView(page: GrowthBookingPage): GrowthBookingPagePublicView {
+  const location = resolvePublicBookingLocationFromPage(page)
   return {
     slug: page.slug,
     name: page.name,
+    pageTitle: resolveBookingPageDisplayTitle(page),
+    brandName: page.brandName,
     description: page.description,
     logoUrl: page.logoUrl,
+    heroImageUrl: page.heroImageUrl,
     brandColor: page.brandColor,
+    accentColor: resolveBookingPageAccentColor(page),
+    footerNote: page.footerNote,
     meetingType: page.meetingType,
     durationMinutes: page.durationMinutes,
     timezone: page.timezone,
     locationType: page.locationType,
-    customLocation: page.customLocation,
+    locationLabel: location.label,
+    locationUrl: location.url,
     confirmationMessage: page.confirmationMessage,
   }
 }
@@ -149,9 +171,14 @@ export async function insertGrowthBookingPage(
     calendarConnectionId?: string | null
     name: string
     slug: string
+    pageTitle?: string | null
+    brandName?: string | null
     description?: string | null
     logoUrl?: string | null
+    heroImageUrl?: string | null
     brandColor?: string
+    accentColor?: string | null
+    footerNote?: string | null
     meetingType?: string | null
     durationMinutes?: number
     bufferMinutes?: number
@@ -175,9 +202,14 @@ export async function insertGrowthBookingPage(
       calendar_connection_id: input.calendarConnectionId ?? null,
       name: input.name.trim(),
       slug: input.slug,
+      page_title: input.pageTitle ?? null,
+      brand_name: input.brandName ?? null,
       description: input.description ?? null,
       logo_url: input.logoUrl ?? null,
+      hero_image_url: input.heroImageUrl ?? null,
       brand_color: input.brandColor ?? "#059669",
+      accent_color: input.accentColor ?? null,
+      footer_note: input.footerNote ?? null,
       meeting_type: input.meetingType ?? null,
       duration_minutes: input.durationMinutes ?? 30,
       buffer_minutes: input.bufferMinutes ?? 0,

@@ -122,6 +122,7 @@
     "test:growth-calendar-sync-booking": "tsx scripts/test-growth-calendar-sync-booking.ts",
     "test:growth-meeting-location-providers": "tsx scripts/test-growth-meeting-location-providers.ts",
     "test:growth-sidebar-nav": "tsx scripts/test-growth-sidebar-nav.ts",
+    "test:growth-booking-page-ui": "tsx scripts/test-growth-booking-page-ui.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
     "test:growth-assemblyai-browser-streaming": "tsx scripts/test-growth-assemblyai-browser-streaming.ts",
     "test:growth-openai-realtime-browser-streaming": "tsx scripts/test-growth-openai-realtime-browser-streaming.ts",
