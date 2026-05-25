@@ -57,6 +57,10 @@ export const GROWTH_NOTIFICATION_COOLDOWN_MINUTES: Partial<Record<GrowthNotifica
   unresolved_objection: 90,
   strong_buying_signal: 180,
   call_followup_due: 60,
+  meeting_follow_up_recommended: 60,
+  meeting_at_risk: 60,
+  meeting_high_quality: 120,
+  meeting_stalled: 60,
 }
 
 export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificationType, number>> = {
@@ -119,6 +123,10 @@ export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificati
   unresolved_objection: 3 * 24 * 60,
   strong_buying_signal: 7 * 24 * 60,
   call_followup_due: 3 * 24 * 60,
+  meeting_follow_up_recommended: 7 * 24 * 60,
+  meeting_at_risk: 3 * 24 * 60,
+  meeting_high_quality: 7 * 24 * 60,
+  meeting_stalled: 3 * 24 * 60,
 }
 
 export function buildGrowthNotificationDeterministicHash(input: {

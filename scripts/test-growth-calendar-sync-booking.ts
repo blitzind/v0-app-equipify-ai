@@ -23,6 +23,7 @@ import {
 } from "../lib/growth/booking/booking-availability-ui"
 import {
   GROWTH_BOOKING_AVAILABILITY_RENDER_FIX_QA_MARKER,
+  GROWTH_BOOKING_CALENDAR_AVAILABILITY_QA_MARKER,
   GROWTH_BOOKING_PUBLIC_THEME_QA_MARKER,
   GROWTH_BOOKING_SLOTS_API_QA_MARKER,
   normalizeMaxMeetingsPerDay,
@@ -38,7 +39,7 @@ import {
   normalizeBookingPageSlug,
 } from "../lib/growth/booking/booking-page-slug"
 import { publicBookingErrorMessage } from "../lib/growth/booking/booking-public-errors"
-import { zonedLocalToUtc } from "../lib/growth/booking/booking-timezone-utils"
+import { monthRangeInTimezone, zonedLocalToUtc } from "../lib/growth/booking/booking-timezone-utils"
 
 assert.equal(GROWTH_CALENDAR_SYNC_QA_MARKER, "calendar-sync-v1")
 assert.equal(GROWTH_BOOKING_PAGES_QA_MARKER, "booking-pages-v1")
@@ -67,6 +68,13 @@ const weekdayCount = countWeekdaySlotsInHorizon({
   now: new Date("2026-05-18T08:00:00.000Z"),
 })
 assert.equal(weekdayCount, 10)
+
+assert.equal(GROWTH_BOOKING_CALENDAR_AVAILABILITY_QA_MARKER, "booking-calendar-availability-v2")
+
+const julyRange = monthRangeInTimezone("2026-07", "America/New_York")
+assert.ok(julyRange)
+assert.equal(julyRange!.endKey, "2026-07-31")
+assert.ok(Number.isFinite(julyRange!.rangeEnd.getTime()))
 
 const nySlot = zonedLocalToUtc({
   dateKey: "2026-05-19",
@@ -167,7 +175,10 @@ const publicSlotsLib = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/booking/public-booking-slots.ts"),
   "utf8",
 )
+assert.match(slotsRoute, /availableDateKeys/)
 assert.match(publicSlotsLib, /fetchPublicBookingSlots/)
+assert.match(publicSlotsLib, /availableDateKeys/)
+assert.match(publicSlotsLib, /diagnostics/)
 assert.match(publicSlotsLib, /loadConfirmedBookingsInRange/)
 
 const middlewareSource = fs.readFileSync(path.join(process.cwd(), "middleware.ts"), "utf8")
@@ -183,7 +194,9 @@ const publicBookingPage = fs.readFileSync(
 assert.match(publicBookingPage, /loadSlotsForMonth/)
 assert.match(publicBookingPage, /\/api\/book\/\$\{encodeURIComponent\(slug\)\}\/slots\?month=/)
 assert.match(publicBookingPage, /horizonEndKey/)
-assert.match(publicBookingPage, /GROWTH_BOOKING_AVAILABILITY_RENDER_FIX_QA_MARKER/)
+assert.match(publicBookingPage, /GROWTH_BOOKING_CALENDAR_AVAILABILITY_QA_MARKER/)
+assert.match(publicBookingPage, /slotsLoadError/)
+assert.match(publicBookingPage, /Availability could not load/)
 assert.match(publicBookingPage, /No available times this month/)
 assert.match(publicBookingPage, /PublicBookingThemeShell/)
 assert.match(publicBookingPage, /previewTheme/)

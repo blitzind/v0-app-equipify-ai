@@ -65,6 +65,12 @@ export type DealIntelligenceScoreInputs = {
   callNextStepScore?: number | null
   callOutcome?: string | null
   meetingCompletedWithHighScore?: boolean
+  meetingOutcomeScore?: number | null
+  meetingQualityScore?: number | null
+  meetingNextStepConfidence?: number | null
+  meetingFollowUpRecommendation?: string | null
+  meetingBuyingSignalCount?: number
+  meetingNoShowRiskPattern?: boolean
 }
 
 export type DealIntelligenceScorePublicView = {

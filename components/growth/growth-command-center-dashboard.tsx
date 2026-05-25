@@ -25,6 +25,7 @@ import { GrowthCommandResearchCoverageSection } from "@/components/growth/growth
 import { GrowthCommandDealIntelligenceSection } from "@/components/growth/growth-command-deal-intelligence-section"
 import { GrowthCommandCallIntelligenceSection } from "@/components/growth/growth-command-call-intelligence-section"
 import { GrowthCommandHumanExecutionSection } from "@/components/growth/growth-command-human-execution-section"
+import { GrowthCommandMeetingOutcomesSection } from "@/components/growth/growth-command-meeting-outcomes-section"
 import {
   GrowthCommandMorningFocusMetrics,
   GrowthCommandPipelineMomentumBadge,
@@ -49,6 +50,7 @@ import {
 } from "@/lib/growth/command/command-action-types"
 import type { GrowthCadenceCommandSummary } from "@/lib/growth/cadence/cadence-types"
 import type { GrowthHumanExecutionDashboard } from "@/lib/growth/human-execution/human-execution-types"
+import type { MeetingOutcomeDashboardSummary } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-intelligence-types"
 import type { GrowthExecutionDashboard } from "@/lib/growth/execution/execution-priority-types"
 import type { GrowthMeetingCommandSummary } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import { cn } from "@/lib/utils"
@@ -138,18 +140,21 @@ export function GrowthCommandCenterDashboard() {
   const [callsDue, setCallsDue] = useState(0)
   const [executionDashboard, setExecutionDashboard] = useState<GrowthExecutionDashboard | null>(null)
   const [humanExecutionDashboard, setHumanExecutionDashboard] = useState<GrowthHumanExecutionDashboard | null>(null)
+  const [meetingOutcomesDashboard, setMeetingOutcomesDashboard] = useState<MeetingOutcomeDashboardSummary | null>(null)
   const [startingSprint, setStartingSprint] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [dashboardRes, meetingsRes, cadenceRes, executionRes, humanExecutionRes] = await Promise.all([
+      const [dashboardRes, meetingsRes, cadenceRes, executionRes, humanExecutionRes, meetingOutcomesRes] =
+        await Promise.all([
         fetch("/api/platform/growth/command/dashboard", { cache: "no-store" }),
         fetch("/api/platform/growth/meetings/command-summary", { cache: "no-store" }),
         fetch("/api/platform/growth/cadence/command-summary", { cache: "no-store" }),
         fetch("/api/platform/growth/execution/dashboard", { cache: "no-store" }),
         fetch("/api/platform/growth/human-execution/dashboard", { cache: "no-store" }),
+        fetch("/api/platform/growth/meeting-outcomes/dashboard", { cache: "no-store" }),
       ])
       const data = (await dashboardRes.json().catch(() => ({}))) as {
         ok?: boolean
@@ -170,6 +175,10 @@ export function GrowthCommandCenterDashboard() {
         ok?: boolean
         dashboard?: GrowthHumanExecutionDashboard | null
       }
+      const meetingOutcomesData = (await meetingOutcomesRes.json().catch(() => ({}))) as {
+        ok?: boolean
+        dashboard?: MeetingOutcomeDashboardSummary | null
+      }
       if (!dashboardRes.ok || !data.ok || !data.dashboard) {
         throw new Error(data.message ?? "Could not load command dashboard.")
       }
@@ -177,6 +186,9 @@ export function GrowthCommandCenterDashboard() {
       setExecutionDashboard(executionData.ok && executionData.dashboard ? executionData.dashboard : null)
       setHumanExecutionDashboard(
         humanExecutionData.ok && humanExecutionData.dashboard ? humanExecutionData.dashboard : null,
+      )
+      setMeetingOutcomesDashboard(
+        meetingOutcomesData.ok && meetingOutcomesData.dashboard ? meetingOutcomesData.dashboard : null,
       )
       setMeetingsToday(meetingsData.summary?.meetingsTodayCount ?? 0)
       setCallsDue(cadenceData.summary?.callTasksDueCount ?? 0)
@@ -505,6 +517,11 @@ export function GrowthCommandCenterDashboard() {
           {humanExecutionDashboard ? (
             <div className="mt-6">
               <GrowthCommandHumanExecutionSection dashboard={humanExecutionDashboard} />
+            </div>
+          ) : null}
+          {meetingOutcomesDashboard ? (
+            <div className="mt-6">
+              <GrowthCommandMeetingOutcomesSection dashboard={meetingOutcomesDashboard} />
             </div>
           ) : null}
           <GrowthCommandPipelineRevenueSection atRiskActions={dashboard.revenueRescueQueue} />

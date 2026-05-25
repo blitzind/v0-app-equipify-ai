@@ -99,6 +99,10 @@ export const GROWTH_NOTIFICATION_TYPES = [
   "execution_stalled",
   "fatigue_protection_triggered",
   "call_now_opportunity",
+  "meeting_follow_up_recommended",
+  "meeting_at_risk",
+  "meeting_high_quality",
+  "meeting_stalled",
 ] as const
 export type GrowthNotificationType = (typeof GROWTH_NOTIFICATION_TYPES)[number]
 

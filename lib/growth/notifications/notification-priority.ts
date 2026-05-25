@@ -75,6 +75,10 @@ const TYPE_SEVERITY: Record<GrowthNotificationType, GrowthNotificationSeverity> 
   unresolved_objection: "medium",
   strong_buying_signal: "medium",
   call_followup_due: "medium",
+  meeting_follow_up_recommended: "medium",
+  meeting_at_risk: "high",
+  meeting_high_quality: "medium",
+  meeting_stalled: "high",
 }
 
 const SEVERITY_BASE: Record<GrowthNotificationSeverity, number> = {

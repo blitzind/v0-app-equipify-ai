@@ -5,6 +5,7 @@ import type {
   ExecutionQueueItem,
 } from "@/lib/growth/execution/execution-priority-types"
 import { computeExecutionPriorityScore } from "@/lib/growth/execution/execution-priority-score"
+import { applyMeetingOutcomeToExecutionPriority } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-deal-adjustments"
 
 export type ExecutionLeadContext = {
   id: string
@@ -35,6 +36,9 @@ export type ExecutionLeadContext = {
   calendarConflict: boolean
   callQualityDecline: boolean
   opportunityAmount: number
+  meetingOutcomeScore?: number | null
+  meetingQualityScore?: number | null
+  meetingFollowUpRecommendation?: string | null
   referenceIds?: {
     outreachQueueId?: string | null
     enrollmentId?: string | null
@@ -146,7 +150,14 @@ export function buildExecutionQueueItem(ctx: ExecutionLeadContext): ExecutionQue
   const activeCount = Object.values(signalInput).filter(Boolean).length
   if (activeCount === 0) return null
 
-  const { executionPriorityScore, priorityBand, signals } = computeExecutionPriorityScore(signalInput)
+  const { executionPriorityScore: baseScore, signals } = computeExecutionPriorityScore(signalInput)
+  const outcomeWeight = applyMeetingOutcomeToExecutionPriority({
+    meetingQualityScore: ctx.meetingQualityScore,
+    meetingOutcomeScore: ctx.meetingOutcomeScore,
+    followUpRecommendation: ctx.meetingFollowUpRecommendation,
+  })
+  const executionPriorityScore = Math.max(0, Math.min(100, baseScore + outcomeWeight))
+  const priorityBand = resolveExecutionPriorityBand(executionPriorityScore)
   if (executionPriorityScore < 25) return null
 
   const category = resolveCategory(signalInput)

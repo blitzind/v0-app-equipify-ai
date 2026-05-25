@@ -16,6 +16,7 @@ import {
   computeDealStageHealthScore,
 } from "@/lib/growth/deal-intelligence/deal-momentum-score"
 import { applyCallIntelligenceToDealScoreInputs } from "@/lib/growth/call-intelligence/call-intelligence-deal-adjustments"
+import { applyMeetingOutcomeToDealScoreInputs } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-deal-adjustments"
 import { recommendDealOperatorAction } from "@/lib/growth/deal-intelligence/deal-recommendation-engine"
 import {
   computeDealRiskScore,
@@ -207,5 +208,11 @@ export function sanitizeScoreInputs(input: DealIntelligenceScoreInputs): DealInt
     callNextStepScore: input.callNextStepScore,
     callOutcome: input.callOutcome,
     meetingCompletedWithHighScore: input.meetingCompletedWithHighScore,
+    meetingOutcomeScore: input.meetingOutcomeScore,
+    meetingQualityScore: input.meetingQualityScore,
+    meetingNextStepConfidence: input.meetingNextStepConfidence,
+    meetingFollowUpRecommendation: input.meetingFollowUpRecommendation,
+    meetingBuyingSignalCount: input.meetingBuyingSignalCount,
+    meetingNoShowRiskPattern: input.meetingNoShowRiskPattern,
   }
 }

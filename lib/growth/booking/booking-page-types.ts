@@ -93,6 +93,8 @@ export type GrowthBookingPagePublicView = {
   publicThemeMode: GrowthBookingPublicThemeMode
   schedulingHorizonDays: number
   minimumNoticeHours: number
+  maxMeetingsPerDay: number | null
+  availabilityWindows: GrowthBookingAvailabilityWindow[]
   locationType: GrowthBookingLocationType
   locationLabel: string
   locationUrl: string | null

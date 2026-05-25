@@ -19,6 +19,7 @@ import {
   normalizePublicThemeMode,
   normalizeBufferMinutes,
 } from "@/lib/growth/booking/booking-page-defaults"
+import { resolveBookingAvailabilityWindows } from "@/lib/growth/booking/booking-availability"
 import {
   resolveBookingPageAccentColor,
   resolveBookingPageDisplayTitle,
@@ -26,6 +27,12 @@ import {
 } from "@/lib/growth/booking/booking-public-display"
 
 export { isValidBookingPageSlug, normalizeBookingPageSlug }
+
+function resolveBookingAvailabilityWindowsForPublic(
+  windows: GrowthBookingAvailabilityWindow[] | null | undefined,
+): GrowthBookingAvailabilityWindow[] {
+  return resolveBookingAvailabilityWindows(windows)
+}
 
 const PAGE_SELECT =
   "id, owner_user_id, calendar_connection_id, name, slug, page_title, brand_name, description, logo_url, hero_image_url, brand_color, accent_color, footer_note, meeting_type, duration_minutes, buffer_minutes, buffer_before_minutes, buffer_after_minutes, minimum_notice_hours, scheduling_horizon_days, max_meetings_per_day, timezone_mode, public_theme_mode, availability_windows, timezone, location_type, custom_location, meeting_provider_override, auto_create_meeting_link_override, manual_meeting_url, confirmation_message, reminder_email_subject, reminder_email_body, enabled, created_at, updated_at"
@@ -138,6 +145,8 @@ export function toPublicBookingPageView(page: GrowthBookingPage): GrowthBookingP
     publicThemeMode: page.publicThemeMode,
     schedulingHorizonDays: page.schedulingHorizonDays,
     minimumNoticeHours: page.minimumNoticeHours,
+    maxMeetingsPerDay: page.maxMeetingsPerDay,
+    availabilityWindows: resolveBookingAvailabilityWindowsForPublic(page.availabilityWindows),
     locationType: page.locationType,
     locationLabel: location.label,
     locationUrl: location.url,

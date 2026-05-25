@@ -57,7 +57,8 @@ const OPPORTUNITY_SELECT = "lead_id, amount, is_stale, owner_user_id, risk_score
 
 const REPLY_SELECT = "lead_id, unanswered, priority"
 
-const MEETING_SELECT = "id, lead_id, follow_up_due_at, status, outcome, calendar_sync_status"
+const MEETING_SELECT =
+  "id, lead_id, follow_up_due_at, status, outcome, calendar_sync_status, meeting_outcome_score, meeting_quality_score, meeting_outcome_recommendation, updated_at"
 
 type SprintRow = {
   id: string
@@ -201,6 +202,13 @@ async function loadExecutionContexts(admin: SupabaseClient): Promise<ExecutionLe
         !m.outcome,
     )
     const calendarConflict = meetings.some((m) => m.calendar_sync_status === "conflict")
+    const scoredMeetings = meetings
+      .filter((m) => m.meeting_outcome_score != null)
+      .sort(
+        (a, b) =>
+          Date.parse((b.updated_at as string) ?? 0) - Date.parse((a.updated_at as string) ?? 0),
+      )
+    const latestOutcomeMeeting = scoredMeetings[0]
     const buyingSignals = Array.isArray(call?.buying_signals) ? call!.buying_signals.length : 0
     const objections = Array.isArray(call?.detected_objections) ? call!.detected_objections.length : 0
     const competitorDetected =
@@ -238,6 +246,10 @@ async function loadExecutionContexts(admin: SupabaseClient): Promise<ExecutionLe
         call?.risk_level === "critical" ||
         ((call?.overall_score as number | null) !== null && (call!.overall_score as number) < 40),
       opportunityAmount: Number(opp?.amount ?? 0),
+      meetingOutcomeScore: (latestOutcomeMeeting?.meeting_outcome_score as number | null) ?? null,
+      meetingQualityScore: (latestOutcomeMeeting?.meeting_quality_score as number | null) ?? null,
+      meetingFollowUpRecommendation:
+        (latestOutcomeMeeting?.meeting_outcome_recommendation as string | null) ?? null,
       referenceIds: {
         outreachQueueId: outreachByLead.get(leadId) ?? null,
         enrollmentId: enrollmentByLead.get(leadId) ?? null,

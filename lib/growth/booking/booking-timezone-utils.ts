@@ -87,6 +87,17 @@ export function formatIanaTimezoneOption(timeZone: string, referenceDate = new D
   return `(${offset}) ${friendly} — ${safe}`
 }
 
+export function isValidBookingDateKey(dateKey: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey.trim())
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false
+  const probe = new Date(Date.UTC(year, month - 1, day))
+  return probe.getUTCFullYear() === year && probe.getUTCMonth() === month - 1 && probe.getUTCDate() === day
+}
+
 export function zonedLocalToUtc(input: {
   dateKey: string
   hour: number
@@ -94,6 +105,9 @@ export function zonedLocalToUtc(input: {
   timeZone: string
 }): Date {
   const timeZone = resolveBookingTimezone(input.timeZone)
+  if (!isValidBookingDateKey(input.dateKey)) {
+    throw new RangeError(`Invalid booking date key: ${input.dateKey}`)
+  }
   const [year, month, day] = input.dateKey.split("-").map(Number)
   let candidate = new Date(Date.UTC(year, month - 1, day, input.hour, input.minute, 0, 0))
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -167,13 +181,13 @@ export function monthRangeInTimezone(
   const startKey = `${monthKey}-01`
   const nextMonth = month === 12 ? 1 : month + 1
   const nextYear = month === 12 ? year + 1 : year
-  const nextMonthKey = `${nextYear}-${String(nextMonth).padStart(2, "0")}`
-  const endKey = addDaysToDateKey(`${nextMonthKey}-01`, -1, timeZone)
+  const nextMonthStartKey = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`
+  const endKey = addDaysToDateKey(nextMonthStartKey, -1, timeZone)
   return {
     startKey,
     endKey,
     rangeStart: zonedLocalToUtc({ dateKey: startKey, hour: 0, minute: 0, timeZone }),
-    rangeEnd: zonedLocalToUtc({ dateKey: nextMonthKey, hour: 0, minute: 0, timeZone }),
+    rangeEnd: zonedLocalToUtc({ dateKey: nextMonthStartKey, hour: 0, minute: 0, timeZone }),
   }
 }
 

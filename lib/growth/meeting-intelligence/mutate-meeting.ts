@@ -29,6 +29,7 @@ import type {
   UpdateGrowthMeetingInput,
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import { recomputeGrowthLeadNextBestAction } from "@/lib/growth/recompute-lead-next-best-action"
+import { recomputeMeetingOutcomeForMeeting } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-intelligence-service"
 import { fetchGrowthMeetingLocationPlatformContext } from "@/lib/growth/meeting-location/meeting-location-settings-server"
 import {
   applyResolvedMeetingLocationPatch,
@@ -277,6 +278,15 @@ export async function updateGrowthMeeting(
       realtimeSessionId: meeting.realtimeCallSessionId,
       trigger: "meeting_outcome",
     }).catch(() => undefined)
+  }
+
+  const shouldRecomputeMeetingOutcome =
+    Boolean(input.outcome?.trim()) ||
+    (input.status === "completed" && existing.status !== "completed") ||
+    (input.status === "no_show" && existing.status !== "no_show")
+
+  if (shouldRecomputeMeetingOutcome) {
+    void recomputeMeetingOutcomeForMeeting(admin, meetingId).catch(() => undefined)
   }
 
   if (

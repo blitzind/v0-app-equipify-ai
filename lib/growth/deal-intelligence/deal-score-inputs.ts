@@ -29,16 +29,28 @@ export async function gatherDealScoreContext(
   const lead = await fetchGrowthLeadById(input.admin, input.leadId)
   if (!lead) throw new Error("Lead not found.")
 
-  const [opportunity, meetings, replies, research, cadenceOverdue, callScorecard] = await Promise.all([
-    input.opportunityId ? fetchGrowthOpportunityDetail(input.admin, input.opportunityId) : Promise.resolve(null),
-    listGrowthMeetingsForLead(input.admin, input.leadId, 20),
-    listGrowthOutboundRepliesForLead(input.admin, input.leadId),
-    lead.latestProspectResearchRunId
-      ? fetchLatestCompletedProspectResearchRun(input.admin, input.leadId)
-      : Promise.resolve(null),
-    countOverdueCadenceTasks(input.admin, input.leadId),
-    fetchLatestCallIntelligenceScorecardForLead(input.admin, input.leadId).catch(() => null),
-  ])
+  const [opportunity, meetings, replies, research, cadenceOverdue, callScorecard, meetingOutcomeRes] =
+    await Promise.all([
+      input.opportunityId ? fetchGrowthOpportunityDetail(input.admin, input.opportunityId) : Promise.resolve(null),
+      listGrowthMeetingsForLead(input.admin, input.leadId, 20),
+      listGrowthOutboundRepliesForLead(input.admin, input.leadId),
+      lead.latestProspectResearchRunId
+        ? fetchLatestCompletedProspectResearchRun(input.admin, input.leadId)
+        : Promise.resolve(null),
+      countOverdueCadenceTasks(input.admin, input.leadId),
+      fetchLatestCallIntelligenceScorecardForLead(input.admin, input.leadId).catch(() => null),
+      input.admin
+        .schema("growth")
+        .from("meeting_outcome_intelligence_scores")
+        .select(
+          "meeting_outcome_score, meeting_quality_score, next_step_confidence, follow_up_recommendation, buying_signal_count, no_show_risk_pattern",
+        )
+        .eq("lead_id", input.leadId)
+        .order("computed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .catch(() => ({ data: null, error: null })),
+    ])
 
   const now = Date.now()
   const overdueFollowUp = Boolean(lead.followUpAt && Date.parse(lead.followUpAt) < now)
@@ -82,6 +94,12 @@ export async function gatherDealScoreContext(
         meetings.some((m) => m.status === "completed") &&
         callScorecard.overallScore >= 65,
     ),
+    meetingOutcomeScore: meetingOutcomeRes.data?.meeting_outcome_score as number | null,
+    meetingQualityScore: meetingOutcomeRes.data?.meeting_quality_score as number | null,
+    meetingNextStepConfidence: meetingOutcomeRes.data?.next_step_confidence as number | null,
+    meetingFollowUpRecommendation: meetingOutcomeRes.data?.follow_up_recommendation as string | null,
+    meetingBuyingSignalCount: meetingOutcomeRes.data?.buying_signal_count as number | undefined,
+    meetingNoShowRiskPattern: meetingOutcomeRes.data?.no_show_risk_pattern as boolean | undefined,
   }
 
   return { opportunity, lead, scoreInputs }

@@ -69,20 +69,22 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
       )
     }
 
-    return jsonResponse(
-      {
-        ok: true,
-        qaMarker: GROWTH_BOOKING_SLOTS_API_QA_MARKER,
-        meta: { route: PUBLIC_BOOKING_SLOTS_ROUTE_META },
-        slots: result.slots,
-        timezone: result.timezone,
-        timezoneMode: result.timezoneMode,
-        schedulingHorizonDays: result.schedulingHorizonDays,
-        horizonEndAt: result.horizonEndAt,
-        monthKey: result.monthKey,
-      },
-      200,
-    )
+    const body: Record<string, unknown> = {
+      ok: true,
+      qaMarker: GROWTH_BOOKING_SLOTS_API_QA_MARKER,
+      meta: { route: PUBLIC_BOOKING_SLOTS_ROUTE_META },
+      slots: result.slots,
+      availableDateKeys: result.availableDateKeys,
+      timezone: result.timezone,
+      timezoneMode: result.timezoneMode,
+      schedulingHorizonDays: result.schedulingHorizonDays,
+      horizonEndAt: result.horizonEndAt,
+      monthKey: result.monthKey,
+    }
+    if (result.warning) body.warning = result.warning
+    if (result.diagnostics) body.diagnostics = result.diagnostics
+
+    return jsonResponse(body, 200)
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not load booking availability."
     return jsonResponse(

@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 641,
-  sqlMigrations: 262,
+  apiRouteHandlers: 644,
+  sqlMigrations: 263,
   dashboardPages: 65,
-  componentsTsx: 448,
-  libTsFiles: 1480,
+  componentsTsx: 451,
+  libTsFiles: 1488,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **641** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **262** |
+| API route handlers (\`app/api/**/route.ts\`) | **644** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **263** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **448** |
-| \`lib/**/*.ts\` | **1480** |
+| \`components/**/*.tsx\` | **451** |
+| \`lib/**/*.ts\` | **1488** |
 
 ### Vercel crons
 
@@ -542,6 +542,8 @@ platform/growth/leads/[leadId]/copilot/generations/route.ts
 platform/growth/leads/[leadId]/customer-lifecycle/route.ts
 platform/growth/leads/[leadId]/decision-makers/[dmId]/route.ts
 platform/growth/leads/[leadId]/decision-makers/route.ts
+platform/growth/leads/[leadId]/meeting-outcomes/recompute/route.ts
+platform/growth/leads/[leadId]/meeting-outcomes/route.ts
 platform/growth/leads/[leadId]/meetings/route.ts
 platform/growth/leads/[leadId]/outbound/route.ts
 platform/growth/leads/[leadId]/realtime-call/sessions/[sessionId]/audio-chunk/route.ts
@@ -571,6 +573,7 @@ platform/growth/leads/[leadId]/timeline/route.ts
 platform/growth/leads/bulk-archive/route.ts
 platform/growth/leads/route.ts
 platform/growth/live-coaching/settings/route.ts
+platform/growth/meeting-outcomes/dashboard/route.ts
 platform/growth/meetings/[meetingId]/calendar/push/route.ts
 platform/growth/meetings/[meetingId]/calendar/resolve/route.ts
 platform/growth/meetings/[meetingId]/route.ts

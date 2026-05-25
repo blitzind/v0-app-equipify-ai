@@ -25,6 +25,8 @@ import {
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import type { GrowthLead } from "@/lib/growth/types"
 import { GrowthCallIntelligenceScorecardCard } from "@/components/growth/growth-call-intelligence-scorecard-card"
+import { GrowthMeetingOutcomeIntelligenceInline } from "@/components/growth/growth-meeting-outcome-intelligence-inline"
+import type { MeetingOutcomeIntelligenceScorePublicView } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-intelligence-types"
 
 type GrowthLeadMeetingIntelligenceProps = {
   lead: GrowthLead
@@ -81,6 +83,7 @@ export function GrowthLeadMeetingIntelligence({
   const [noShowReason, setNoShowReason] = useState("")
   const [sessionId, setSessionId] = useState("")
   const [saving, setSaving] = useState(false)
+  const [meetingOutcomeScores, setMeetingOutcomeScores] = useState<MeetingOutcomeIntelligenceScorePublicView[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -101,6 +104,11 @@ export function GrowthLeadMeetingIntelligence({
       }
       setSetupMessage(null)
       setMeetings(data.meetings ?? [])
+      const outcomeRes = await fetch(`/api/platform/growth/leads/${lead.id}/meeting-outcomes`, { cache: "no-store" })
+      const outcomeData = (await outcomeRes.json().catch(() => ({}))) as {
+        leadView?: { meetingScores?: MeetingOutcomeIntelligenceScorePublicView[] }
+      }
+      setMeetingOutcomeScores(outcomeData.leadView?.meetingScores ?? [])
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
     } finally {
@@ -200,6 +208,10 @@ export function GrowthLeadMeetingIntelligence({
   }
 
   const selected = meetings.find((m) => m.id === selectedId) ?? null
+  const selectedOutcomeScore =
+    selected != null
+      ? meetingOutcomeScores.find((score) => score.meetingId === selected.id) ?? null
+      : null
   const openCount = meetings.filter((m) => m.status === "proposed" || m.status === "scheduled").length
 
   useEffect(() => {
@@ -535,6 +547,8 @@ export function GrowthLeadMeetingIntelligence({
               realtimeSessionId={selected.realtimeCallSessionId}
               compact
             />
+
+            <GrowthMeetingOutcomeIntelligenceInline score={selectedOutcomeScore} />
           </div>
         ) : null}
       </div>

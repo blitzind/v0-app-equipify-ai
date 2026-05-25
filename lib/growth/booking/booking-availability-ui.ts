@@ -55,6 +55,24 @@ export function calendarDateToSlotKey(date: Date, timeZone: string): string {
   }).format(date)
 }
 
+/**
+ * Canonical display date key — use for slot grouping, available-date sets, and calendar matching.
+ * Pass an ISO string for slots; pass a Date for calendar day cells.
+ */
+export function resolveBookingDisplayDateKey(
+  value: Date | string,
+  displayTimezone: string,
+  timezoneMode: GrowthBookingTimezoneMode = "visitor_local",
+): string {
+  if (typeof value === "string") {
+    return formatSlotDateKey(value, displayTimezone)
+  }
+  if (timezoneMode === "fixed_host") {
+    return calendarDateToSlotKey(value, displayTimezone)
+  }
+  return dateKeyFromLocalDate(value)
+}
+
 export function formatDateKeyLabel(dateKey: string, timeZone: string): string {
   const [year, month, day] = dateKey.split("-").map(Number)
   const anchor = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
@@ -69,10 +87,11 @@ export function formatDateKeyLabel(dateKey: string, timeZone: string): string {
 export function groupSlotsByDateKey(
   slots: GrowthBookingSlot[],
   timeZone: string,
+  timezoneMode: GrowthBookingTimezoneMode = "visitor_local",
 ): Map<string, GrowthBookingSlot[]> {
   const groups = new Map<string, GrowthBookingSlot[]>()
   for (const slot of slots) {
-    const key = formatSlotDateKey(slot.startAt, timeZone)
+    const key = resolveBookingDisplayDateKey(slot.startAt, timeZone, timezoneMode)
     const list = groups.get(key) ?? []
     list.push(slot)
     groups.set(key, list)
@@ -87,8 +106,12 @@ export function datesWithAvailableSlots(slots: GrowthBookingSlot[], timeZone: st
   return buildAvailableDateKeys(slots, timeZone)
 }
 
-export function buildAvailableDateKeys(slots: GrowthBookingSlot[], timeZone: string): Set<string> {
-  return new Set(slots.map((slot) => formatSlotDateKey(slot.startAt, timeZone)))
+export function buildAvailableDateKeys(
+  slots: GrowthBookingSlot[],
+  timeZone: string,
+  timezoneMode: GrowthBookingTimezoneMode = "visitor_local",
+): Set<string> {
+  return new Set(slots.map((slot) => resolveBookingDisplayDateKey(slot.startAt, timeZone, timezoneMode)))
 }
 
 /** Calendar grid civil date — matches react-day-picker local cells for visitor modes. */
@@ -97,10 +120,7 @@ export function resolveBookingCalendarDateKey(
   displayTimezone: string,
   timezoneMode: GrowthBookingTimezoneMode = "visitor_local",
 ): string {
-  if (timezoneMode === "fixed_host") {
-    return calendarDateToSlotKey(date, displayTimezone)
-  }
-  return dateKeyFromLocalDate(date)
+  return resolveBookingDisplayDateKey(date, displayTimezone, timezoneMode)
 }
 
 export function resolveBookingTodayDateKey(
@@ -122,6 +142,28 @@ export function countAvailableDatesInMonth(availableDateKeys: Set<string>, month
     if (key.startsWith(prefix)) count += 1
   }
   return count
+}
+
+export function isPublicBookingCalendarDateSelectable(input: {
+  date: Date
+  displayTimezone: string
+  timezoneMode: GrowthBookingTimezoneMode
+  pageTimezone: string
+  todayKey: string
+  horizonEndKey: string | null
+  loadedMonths: string[]
+  loadingMonths: string[]
+  availableDateKeys: Set<string>
+}): boolean {
+  const key = resolveBookingCalendarDateKey(input.date, input.displayTimezone, input.timezoneMode)
+  if (key < input.todayKey) return false
+  if (input.horizonEndKey && key > input.horizonEndKey) return false
+  const monthKey = apiMonthKeyFromDate(input.date, input.pageTimezone)
+  if (!input.loadedMonths.includes(monthKey)) {
+    if (input.loadingMonths.includes(monthKey)) return false
+    return false
+  }
+  return input.availableDateKeys.has(key)
 }
 
 export function dateKeyFromLocalDate(date: Date): string {

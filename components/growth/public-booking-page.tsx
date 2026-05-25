@@ -22,7 +22,7 @@ import {
   resolveBookingCalendarDateKey,
   resolveBookingTodayDateKey,
 } from "@/lib/growth/booking/booking-availability-ui"
-import { GROWTH_BOOKING_AVAILABILITY_RENDER_FIX_QA_MARKER } from "@/lib/growth/booking/booking-page-defaults"
+import { GROWTH_BOOKING_AVAILABILITY_RENDER_FIX_QA_MARKER, GROWTH_BOOKING_CALENDAR_AVAILABILITY_QA_MARKER } from "@/lib/growth/booking/booking-page-defaults"
 import { GROWTH_BOOKING_PAGE_UI_QA_MARKER } from "@/lib/growth/booking/booking-page-ui-types"
 import type { GrowthBookingPublicThemeMode, GrowthBookingTimezoneMode } from "@/lib/growth/booking/booking-page-types"
 import { parsePublicThemePreviewParam } from "@/lib/growth/booking/public-booking-theme"
@@ -110,6 +110,7 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [slotsLoadError, setSlotsLoadError] = useState<string | null>(null)
   const [success, setSuccess] = useState<BookingSuccessState | null>(null)
   const [form, setForm] = useState({ name: "", email: "", company: "", phone: "", notes: "" })
   const [previewThemeMode, setPreviewThemeMode] = useState<GrowthBookingPublicThemeMode | null>(null)
@@ -125,13 +126,18 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
         slots?: GrowthBookingSlot[]
+        availableDateKeys?: string[]
         timezone?: string
         timezoneMode?: GrowthBookingTimezoneMode
         schedulingHorizonDays?: number
         horizonEndAt?: string
         message?: string
+        diagnostics?: Record<string, unknown>
       }
-      if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not load availability.")
+      if (!res.ok || !data.ok) {
+        throw new Error("Availability could not load. Please refresh or contact us.")
+      }
+      setSlotsLoadError(null)
       setSlots((current) => {
         const merged = new Map(current.map((slot) => [slot.startAt, slot]))
         for (const slot of data.slots ?? []) merged.set(slot.startAt, slot)
@@ -143,8 +149,8 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
       if (data.horizonEndAt) setHorizonEndAt(data.horizonEndAt)
       loadedMonthsRef.current.add(monthKey)
       setLoadedMonths(Array.from(loadedMonthsRef.current))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load availability.")
+    } catch {
+      setSlotsLoadError("Availability could not load. Please refresh or contact us.")
     } finally {
       pendingMonthsRef.current.delete(monthKey)
       setLoadingMonths(Array.from(pendingMonthsRef.current))
@@ -212,10 +218,13 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
     void loadSlotsForMonth(monthKey, pageTimezone)
   }, [loadSlotsForMonth, page, pageTimezone, visibleMonth])
 
-  const slotsByDate = useMemo(() => groupSlotsByDateKey(slots, displayTimezone), [slots, displayTimezone])
+  const slotsByDate = useMemo(
+    () => groupSlotsByDateKey(slots, displayTimezone, timezoneMode),
+    [slots, displayTimezone, timezoneMode],
+  )
   const availableDateKeys = useMemo(
-    () => buildAvailableDateKeys(slots, displayTimezone),
-    [slots, displayTimezone],
+    () => buildAvailableDateKeys(slots, displayTimezone, timezoneMode),
+    [slots, displayTimezone, timezoneMode],
   )
   const todayKey = useMemo(
     () => resolveBookingTodayDateKey(displayTimezone, timezoneMode),
@@ -246,7 +255,16 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
     [availableDateKeys, visibleMonthKey],
   )
   const showMonthEmptyState =
-    visibleMonthLoaded && !monthAvailabilityLoading && visibleMonthAvailableCount === 0
+    visibleMonthLoaded && !monthAvailabilityLoading && !slotsLoadError && visibleMonthAvailableCount === 0
+  const firstAvailableDateKey = useMemo(() => {
+    const prefix = `${visibleMonthKey}-`
+    const keys = [...availableDateKeys].filter((key) => key.startsWith(prefix)).sort()
+    return keys[0] ?? null
+  }, [availableDateKeys, visibleMonthKey])
+  const renderedDateKeyExample = useMemo(() => {
+    const sample = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 15, 12, 0, 0, 0)
+    return resolveBookingCalendarDateKey(sample, displayTimezone, timezoneMode)
+  }, [displayTimezone, timezoneMode, visibleMonth])
   function isCalendarDateDisabled(date: Date): boolean {
     const key = resolveBookingCalendarDateKey(date, displayTimezone, timezoneMode)
     if (key < todayKey) return true
@@ -275,7 +293,7 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
     if (timezoneMode === "visitor_override") {
       persistPublicBookingTimezone(slug, safe)
     }
-    if (selectedDateKey && !groupSlotsByDateKey(slots, safe).has(selectedDateKey)) {
+    if (selectedDateKey && !groupSlotsByDateKey(slots, safe, timezoneMode).has(selectedDateKey)) {
       setSelectedDateKey(null)
       setSelectedSlot(null)
       setStep("date")
@@ -375,7 +393,7 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
     <PublicBookingThemeShell mode={publicThemeMode}>
     <div
       className="min-h-screen bg-slate-100/80 px-3 py-6 dark:bg-slate-950 sm:px-6 sm:py-10"
-      data-qa-marker={`${GROWTH_BOOKING_PAGE_UI_QA_MARKER} ${GROWTH_BOOKING_AVAILABILITY_RENDER_FIX_QA_MARKER}`}
+      data-qa-marker={`${GROWTH_BOOKING_PAGE_UI_QA_MARKER} ${GROWTH_BOOKING_AVAILABILITY_RENDER_FIX_QA_MARKER} ${GROWTH_BOOKING_CALENDAR_AVAILABILITY_QA_MARKER}`}
     >
       <div className="mx-auto max-w-[1440px] overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-[0_24px_80px_rgb(0,0,0,0.08)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_24px_80px_rgb(0,0,0,0.45)]">
         <div className="grid lg:grid-cols-[38%_62%]">
@@ -410,6 +428,9 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
 
                 <div className="flex flex-1 flex-col gap-6 xl:flex-row xl:items-start">
                   <div className="w-full xl:max-w-[680px] xl:flex-1">
+                    {slotsLoadError ? (
+                      <p className="mb-3 text-sm text-destructive">{slotsLoadError}</p>
+                    ) : null}
                     {monthAvailabilityLoading ? (
                       <p className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
                         <Loader2 className="size-3.5 animate-spin" />
@@ -418,16 +439,18 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
                     ) : null}
                     {showMonthEmptyState ? (
                       <p className="mb-3 text-sm text-muted-foreground">
-                        No available times this month. Try the next month.
+                        No available times this month. Try another month.
                       </p>
                     ) : null}
                     {process.env.NODE_ENV !== "production" ? (
                       <p
                         className="mb-3 text-[10px] text-muted-foreground/80"
-                        data-qa-marker={GROWTH_BOOKING_AVAILABILITY_RENDER_FIX_QA_MARKER}
+                        data-qa-marker={GROWTH_BOOKING_CALENDAR_AVAILABILITY_QA_MARKER}
                       >
-                        visibleMonth={visibleMonthKey} loadedMonthKey={loadedMonths.join(",") || "none"}{" "}
-                        availableDateCount={visibleMonthAvailableCount} horizonEndAt={horizonEndKey ?? "none"}
+                        visibleMonthKey={visibleMonthKey} loadedMonthKeys={loadedMonths.join(",") || "none"}{" "}
+                        slotsCountForVisibleMonth={visibleMonthAvailableCount} availableDateKeyCount={availableDateKeys.size}{" "}
+                        firstAvailableDateKey={firstAvailableDateKey ?? "none"} selectedDisplayTimezone={displayTimezone}{" "}
+                        renderedDateKeyExample={renderedDateKeyExample} horizonEndAt={horizonEndKey ?? "none"}
                       </p>
                     ) : null}
                     <PublicBookingCalendar

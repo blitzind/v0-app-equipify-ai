@@ -3,6 +3,7 @@
 import type { GrowthBookingTimezoneMode, GrowthBookingPublicThemeMode } from "@/lib/growth/booking/booking-page-types"
 
 export const GROWTH_BOOKING_AVAILABILITY_RENDER_FIX_QA_MARKER = "booking-availability-render-fix-v1" as const
+export const GROWTH_BOOKING_CALENDAR_AVAILABILITY_QA_MARKER = "booking-calendar-availability-v2" as const
 export const GROWTH_BOOKING_PUBLIC_THEME_QA_MARKER = "booking-public-theme-mode-v1" as const
 export const GROWTH_BOOKING_SLOTS_API_QA_MARKER = "booking-slots-api-v1" as const
 
