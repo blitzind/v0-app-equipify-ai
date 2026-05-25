@@ -29,6 +29,7 @@ import {
 } from "@/components/growth/growth-ui-utils"
 import { GrowthWorkflowHealthBadge } from "@/components/growth/growth-workflow-health-badge"
 import { GrowthCallActionSheet } from "@/components/growth/growth-call-action-sheet"
+import { GrowthNativeDialerLaunchButton } from "@/components/growth/growth-native-dialer-launch-button"
 import {
   GROWTH_LEAD_CALL_DISPOSITIONS,
   type GrowthCallQueueRow,
@@ -265,6 +266,9 @@ export function GrowthCallQueueTable({
                       >
                         {saving ? <Loader2 className="size-4 animate-spin" /> : <Phone className="size-4" />}
                       </Button>
+                      {row.contactPhone ? (
+                        <GrowthNativeDialerLaunchButton leadId={row.leadId} phone={row.contactPhone} iconOnly variant="outline" />
+                      ) : null}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" size="sm" disabled={saving}>

@@ -15,6 +15,7 @@ import {
   Crown,
   Gauge,
   GitBranch,
+  Headphones,
   Inbox,
   LayoutDashboard,
   Mail,
@@ -242,6 +243,13 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
         icon: Sparkles,
         match: (path) => path.startsWith("/admin/growth/calls/live-coaching"),
         consoleKey: "calls_live_coaching",
+      },
+      {
+        href: "/admin/growth/calls/workspace",
+        label: "Call Workspace",
+        icon: Headphones,
+        match: (path) => path.startsWith("/admin/growth/calls/workspace"),
+        consoleKey: "calls_workspace",
       },
       {
         href: "/admin/growth/outreach",

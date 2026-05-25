@@ -1,0 +1,146 @@
+import "server-only"
+
+import type { SupabaseClient } from "@supabase/supabase-js"
+import { fetchNativeCallWorkspaceDashboard } from "@/lib/growth/native-dialer/native-dialer-dashboard-repository"
+import {
+  answerNativeCallSession,
+  declineNativeCallSession,
+  endNativeCallSession,
+  fetchActiveNativeCallSession,
+  listNativeDialerQueue,
+  saveNativeCallWrapup,
+  startNativeCallSession,
+} from "@/lib/growth/native-dialer/native-dialer-repository"
+import { emitNativeDialerNotifications } from "@/lib/growth/native-dialer/native-dialer-notifications"
+import type { NativeCallWrapupInput } from "@/lib/growth/native-dialer/native-dialer-wrapup-engine"
+import type {
+  NativeCallWorkspaceDashboard,
+  NativeCallWorkspaceSessionPublicView,
+  NativeCallWrapupPublicView,
+  NativeDialerLeadContext,
+  NativeDialerQueueItemPublicView,
+  NativeDialerQueueMode,
+} from "@/lib/growth/native-dialer/native-dialer-types"
+
+export async function fetchGrowthNativeCallWorkspaceDashboard(
+  admin: SupabaseClient,
+  ownerUserId?: string | null,
+): Promise<NativeCallWorkspaceDashboard> {
+  return fetchNativeCallWorkspaceDashboard(admin, ownerUserId)
+}
+
+export async function fetchGrowthNativeDialerQueue(
+  admin: SupabaseClient,
+  input?: { limit?: number; modes?: NativeDialerQueueMode[] },
+): Promise<NativeDialerQueueItemPublicView[]> {
+  return listNativeDialerQueue(admin, input)
+}
+
+export async function startGrowthNativeCall(
+  admin: SupabaseClient,
+  input: {
+    leadId?: string | null
+    ownerUserId?: string | null
+    phoneNumber: string
+    dialMode?: NativeDialerQueueMode | "inbound"
+    queueItemId?: string | null
+    contactName?: string | null
+    companyName?: string | null
+    direction?: "outbound" | "inbound"
+  },
+): Promise<NativeCallWorkspaceSessionPublicView> {
+  return startNativeCallSession(admin, input)
+}
+
+export async function answerGrowthNativeCall(
+  admin: SupabaseClient,
+  sessionId: string,
+): Promise<NativeCallWorkspaceSessionPublicView> {
+  return answerNativeCallSession(admin, sessionId)
+}
+
+export async function declineGrowthNativeCall(
+  admin: SupabaseClient,
+  sessionId: string,
+): Promise<NativeCallWorkspaceSessionPublicView> {
+  return declineNativeCallSession(admin, sessionId)
+}
+
+export async function endGrowthNativeCall(
+  admin: SupabaseClient,
+  sessionId: string,
+): Promise<NativeCallWorkspaceSessionPublicView> {
+  return endNativeCallSession(admin, sessionId)
+}
+
+export async function submitGrowthNativeCallWrapup(
+  admin: SupabaseClient,
+  input: { sessionId: string; ownerUserId?: string | null; wrapup: NativeCallWrapupInput; companyName?: string },
+): Promise<NativeCallWrapupPublicView> {
+  const wrapup = await saveNativeCallWrapup(admin, input)
+  await emitNativeDialerNotifications(admin, {
+    kind: "wrapup",
+    wrapup,
+    companyName: input.companyName ?? "Lead",
+  })
+  return wrapup
+}
+
+export async function fetchGrowthNativeDialerLeadContext(
+  admin: SupabaseClient,
+  leadId: string,
+): Promise<NativeDialerLeadContext | null> {
+  const [leadRes, dealRes, executionRes, outcomeRes, tasksRes] = await Promise.all([
+    admin.schema("growth").from("leads").select("company_name, contact_name, contact_phone, next_best_action, workflow_health").eq("id", leadId).maybeSingle(),
+    admin
+      .schema("growth")
+      .from("deal_intelligence_scores")
+      .select("close_probability")
+      .eq("lead_id", leadId)
+      .eq("score_status", "active")
+      .order("computed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    admin
+      .schema("growth")
+      .from("human_execution_plans")
+      .select("readiness_score")
+      .eq("lead_id", leadId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .catch(() => ({ data: null, error: null })),
+    admin
+      .schema("growth")
+      .from("meeting_outcome_intelligence_scores")
+      .select("meeting_outcome_score")
+      .eq("lead_id", leadId)
+      .order("computed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .catch(() => ({ data: null, error: null })),
+    admin
+      .schema("growth")
+      .from("cadence_tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("lead_id", leadId)
+      .eq("status", "pending"),
+  ])
+
+  if (!leadRes.data) return null
+  return {
+    leadId,
+    companyName: leadRes.data.company_name as string,
+    contactName: (leadRes.data.contact_name as string | null) ?? null,
+    contactPhone: (leadRes.data.contact_phone as string | null) ?? null,
+    researchSummary: null,
+    dealCloseProbability: (dealRes.data?.close_probability as number | null) ?? null,
+    executionReadinessScore: (executionRes.data?.readiness_score as number | null) ?? null,
+    meetingOutcomeScore: (outcomeRes.data?.meeting_outcome_score as number | null) ?? null,
+    recommendedNextAction: (leadRes.data.next_best_action as string | null) ?? null,
+    opportunityHealth: (leadRes.data.workflow_health as string | null) ?? null,
+    openTaskCount: tasksRes.count ?? 0,
+  }
+}
+
+export { fetchActiveNativeCallSession }

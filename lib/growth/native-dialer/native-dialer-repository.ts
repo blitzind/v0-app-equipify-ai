@@ -1,0 +1,437 @@
+import "server-only"
+
+import type { SupabaseClient } from "@supabase/supabase-js"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import { commandLeadFocusHref } from "@/lib/growth/command/command-action-catalog"
+import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { nativeCallWorkspaceHref } from "@/lib/growth/native-dialer/native-dialer-navigation"
+import {
+  buildSuggestedWrapupNextActions,
+  normalizeWrapupFlags,
+  type NativeCallWrapupInput,
+} from "@/lib/growth/native-dialer/native-dialer-wrapup-engine"
+import { routeNativeDialerProvider } from "@/lib/growth/native-dialer/native-dialer-provider-registry"
+import type {
+  NativeCallSessionStatus,
+  NativeCallWrapupPublicView,
+  NativeCallWorkspaceSessionPublicView,
+  NativeDialerProviderId,
+  NativeDialerQueueItemPublicView,
+  NativeDialerQueueMode,
+} from "@/lib/growth/native-dialer/native-dialer-types"
+
+const SESSION_SELECT =
+  "id, lead_id, owner_user_id, queue_item_id, provider, fallback_provider, dial_mode, direction, status, phone_number, contact_name, company_name, started_at, connected_at, ended_at, duration_seconds, recording_state, muted, on_hold, transfer_target, notes_draft, realtime_session_id, call_copilot_session_id, provider_call_ref, safe_summary"
+
+type SessionRow = Record<string, unknown>
+type QueueRow = Record<string, unknown>
+type WrapupRow = Record<string, unknown>
+
+function sessionsTable(admin: SupabaseClient) {
+  return admin.schema("growth").from("native_call_workspace_sessions")
+}
+
+function queueTable(admin: SupabaseClient) {
+  return admin.schema("growth").from("native_dialer_queue_items")
+}
+
+function wrapupsTable(admin: SupabaseClient) {
+  return admin.schema("growth").from("native_call_wrapups")
+}
+
+function settingsTable(admin: SupabaseClient) {
+  return admin.schema("growth").from("native_dialer_settings")
+}
+
+export function mapNativeCallSessionRow(row: SessionRow): NativeCallWorkspaceSessionPublicView {
+  return {
+    id: row.id as string,
+    leadId: (row.lead_id as string | null) ?? null,
+    ownerUserId: (row.owner_user_id as string | null) ?? null,
+    provider: row.provider as NativeDialerProviderId,
+    fallbackProvider: (row.fallback_provider as NativeDialerProviderId | null) ?? null,
+    dialMode: row.dial_mode as NativeCallWorkspaceSessionPublicView["dialMode"],
+    direction: row.direction as "outbound" | "inbound",
+    status: row.status as NativeCallSessionStatus,
+    phoneNumber: (row.phone_number as string | null) ?? null,
+    contactName: (row.contact_name as string | null) ?? null,
+    companyName: (row.company_name as string | null) ?? null,
+    startedAt: row.started_at as string,
+    connectedAt: (row.connected_at as string | null) ?? null,
+    endedAt: (row.ended_at as string | null) ?? null,
+    durationSeconds: row.duration_seconds as number,
+    recordingState: row.recording_state as NativeCallWorkspaceSessionPublicView["recordingState"],
+    muted: row.muted as boolean,
+    onHold: row.on_hold as boolean,
+    transferTarget: (row.transfer_target as string | null) ?? null,
+    notesDraft: row.notes_draft as string,
+    realtimeSessionId: (row.realtime_session_id as string | null) ?? null,
+    callCopilotSessionId: (row.call_copilot_session_id as string | null) ?? null,
+    providerCallRef: (row.provider_call_ref as string | null) ?? null,
+    safeSummary: row.safe_summary as string,
+  }
+}
+
+function mapQueueRow(row: QueueRow): NativeDialerQueueItemPublicView {
+  const leadId = row.lead_id as string
+  return {
+    id: row.id as string,
+    leadId,
+    ownerUserId: (row.owner_user_id as string | null) ?? null,
+    queueMode: row.queue_mode as NativeDialerQueueMode,
+    status: row.status as string,
+    priorityScore: row.priority_score as number,
+    callbackDueAt: (row.callback_due_at as string | null) ?? null,
+    phoneNumber: (row.phone_number as string | null) ?? null,
+    contactName: (row.contact_name as string | null) ?? null,
+    companyName: (row.company_name as string | null) ?? null,
+    reason: row.reason as string,
+    ctaHref: nativeCallWorkspaceHref({ leadId, phone: row.phone_number as string | null, queueItemId: row.id as string }),
+  }
+}
+
+function mapWrapupRow(row: WrapupRow): NativeCallWrapupPublicView {
+  return {
+    id: row.id as string,
+    sessionId: row.session_id as string,
+    leadId: (row.lead_id as string | null) ?? null,
+    outcome: row.outcome as NativeCallWrapupPublicView["outcome"],
+    leftVoicemail: row.left_voicemail as boolean,
+    noAnswer: row.no_answer as boolean,
+    connected: row.connected as boolean,
+    meetingBooked: row.meeting_booked as boolean,
+    followUpNeeded: row.follow_up_needed as boolean,
+    objectionCategory: (row.objection_category as string | null) ?? null,
+    buyingSignals: Array.isArray(row.buying_signals) ? (row.buying_signals as string[]) : [],
+    competitorMentioned: row.competitor_mentioned as boolean,
+    timelineDetected: row.timeline_detected as boolean,
+    budgetDetected: row.budget_detected as boolean,
+    championIdentified: row.champion_identified as boolean,
+    decisionMakerPresent: row.decision_maker_present as boolean,
+    suggestedNextActions: Array.isArray(row.suggested_next_actions)
+      ? (row.suggested_next_actions as string[])
+      : [],
+    notes: row.notes as string,
+    operatorConfirmedAt: (row.operator_confirmed_at as string | null) ?? null,
+  }
+}
+
+export async function resolveNativeDialerProviders(
+  admin: SupabaseClient,
+): Promise<{ primaryProvider: NativeDialerProviderId; fallbackProvider: NativeDialerProviderId }> {
+  const orgId = await getGrowthEngineAiOrgId(admin)
+  const { data } = await settingsTable(admin).select("primary_provider, fallback_provider").eq("organization_id", orgId).maybeSingle()
+  return {
+    primaryProvider: (data?.primary_provider as NativeDialerProviderId) ?? "stub",
+    fallbackProvider: (data?.fallback_provider as NativeDialerProviderId) ?? "stub",
+  }
+}
+
+export async function startNativeCallSession(
+  admin: SupabaseClient,
+  input: {
+    leadId?: string | null
+    ownerUserId?: string | null
+    phoneNumber: string
+    dialMode?: NativeDialerQueueMode | "inbound"
+    direction?: "outbound" | "inbound"
+    queueItemId?: string | null
+    contactName?: string | null
+    companyName?: string | null
+  },
+): Promise<NativeCallWorkspaceSessionPublicView> {
+  const orgId = await getGrowthEngineAiOrgId(admin)
+  const providers = await resolveNativeDialerProviders(admin)
+
+  let contactName = input.contactName ?? null
+  let companyName = input.companyName ?? null
+  if (input.leadId) {
+    const lead = await fetchGrowthLeadById(admin, input.leadId)
+    if (lead) {
+      contactName = contactName ?? lead.contactName
+      companyName = companyName ?? lead.companyName
+    }
+  }
+
+  const { data: inserted, error } = await sessionsTable(admin)
+    .insert({
+      organization_id: orgId,
+      lead_id: input.leadId ?? null,
+      owner_user_id: input.ownerUserId ?? null,
+      queue_item_id: input.queueItemId ?? null,
+      provider: providers.primaryProvider,
+      fallback_provider: providers.fallbackProvider,
+      dial_mode: input.dialMode ?? "manual",
+      direction: input.direction ?? "outbound",
+      status: "ringing",
+      phone_number: input.phoneNumber.trim(),
+      contact_name: contactName,
+      company_name: companyName,
+      recording_state: "pending",
+      safe_summary: "Operator-controlled call — awaiting connection.",
+    })
+    .select(SESSION_SELECT)
+    .single()
+  if (error) throw new Error(error.message)
+
+  if (input.direction === "inbound") {
+    return mapNativeCallSessionRow(inserted as SessionRow)
+  }
+
+  const routed = await routeNativeDialerProvider(providers)
+  const startResult = await routed.provider.startCall({
+    sessionId: inserted.id as string,
+    phoneNumber: input.phoneNumber,
+    leadId: input.leadId,
+    contactName,
+    companyName,
+  })
+
+  const now = new Date().toISOString()
+  const { data: active, error: activeError } = await sessionsTable(admin)
+    .update({
+      status: "active",
+      connected_at: now,
+      provider: routed.providerId,
+      fallback_provider: routed.failoverApplied ? providers.fallbackProvider : providers.primaryProvider,
+      provider_call_ref: startResult.providerCallRef,
+      recording_state: "active",
+      safe_summary: startResult.message,
+      updated_at: now,
+    })
+    .eq("id", inserted.id as string)
+    .select(SESSION_SELECT)
+    .single()
+  if (activeError) throw new Error(activeError.message)
+
+  if (input.queueItemId) {
+    await queueTable(admin)
+      .update({ status: "dialing", updated_at: now })
+      .eq("id", input.queueItemId)
+  }
+
+  return mapNativeCallSessionRow(active as SessionRow)
+}
+
+export async function answerNativeCallSession(
+  admin: SupabaseClient,
+  sessionId: string,
+): Promise<NativeCallWorkspaceSessionPublicView> {
+  const { data: existing, error: fetchError } = await sessionsTable(admin).select(SESSION_SELECT).eq("id", sessionId).maybeSingle()
+  if (fetchError) throw new Error(fetchError.message)
+  if (!existing) throw new Error("Call session not found.")
+  if (existing.status !== "ringing") throw new Error("Call is not ringing.")
+
+  const providers = await resolveNativeDialerProviders(admin)
+  const routed = await routeNativeDialerProvider(providers)
+  const startResult = await routed.provider.startCall({
+    sessionId,
+    phoneNumber: existing.phone_number as string,
+    leadId: (existing.lead_id as string | null) ?? null,
+    contactName: (existing.contact_name as string | null) ?? null,
+    companyName: (existing.company_name as string | null) ?? null,
+  })
+
+  const now = new Date().toISOString()
+  const { data: active, error: activeError } = await sessionsTable(admin)
+    .update({
+      status: "active",
+      connected_at: now,
+      provider: routed.providerId,
+      fallback_provider: routed.failoverApplied ? providers.fallbackProvider : providers.primaryProvider,
+      provider_call_ref: startResult.providerCallRef,
+      recording_state: "active",
+      safe_summary: startResult.message,
+      updated_at: now,
+    })
+    .eq("id", sessionId)
+    .select(SESSION_SELECT)
+    .single()
+  if (activeError) throw new Error(activeError.message)
+  return mapNativeCallSessionRow(active as SessionRow)
+}
+
+export async function declineNativeCallSession(
+  admin: SupabaseClient,
+  sessionId: string,
+): Promise<NativeCallWorkspaceSessionPublicView> {
+  const now = new Date().toISOString()
+  const { data: declined, error } = await sessionsTable(admin)
+    .update({
+      status: "missed",
+      ended_at: now,
+      recording_state: "stopped",
+      safe_summary: "Operator declined inbound call.",
+      updated_at: now,
+    })
+    .eq("id", sessionId)
+    .eq("status", "ringing")
+    .select(SESSION_SELECT)
+    .single()
+  if (error) throw new Error(error.message)
+  return mapNativeCallSessionRow(declined as SessionRow)
+}
+
+export async function endNativeCallSession(
+  admin: SupabaseClient,
+  sessionId: string,
+): Promise<NativeCallWorkspaceSessionPublicView> {
+  const { data: existing, error: fetchError } = await sessionsTable(admin).select(SESSION_SELECT).eq("id", sessionId).maybeSingle()
+  if (fetchError) throw new Error(fetchError.message)
+  if (!existing) throw new Error("Call session not found.")
+
+  const connectedAt = existing.connected_at as string | null
+  const startedAt = existing.started_at as string
+  const endedAt = new Date()
+  const durationSeconds = connectedAt
+    ? Math.max(0, Math.round((endedAt.getTime() - Date.parse(connectedAt)) / 1000))
+    : Math.max(0, Math.round((endedAt.getTime() - Date.parse(startedAt)) / 1000))
+
+  if (existing.provider_call_ref) {
+    const routed = await routeNativeDialerProvider({
+      primaryProvider: existing.provider as NativeDialerProviderId,
+      fallbackProvider: (existing.fallback_provider as NativeDialerProviderId) ?? "stub",
+    })
+    await routed.provider.endCall(existing.provider_call_ref as string).catch(() => undefined)
+  }
+
+  const { data, error } = await sessionsTable(admin)
+    .update({
+      status: "wrapping",
+      ended_at: endedAt.toISOString(),
+      duration_seconds: durationSeconds,
+      recording_state: "stopped",
+      on_hold: false,
+      muted: false,
+      updated_at: endedAt.toISOString(),
+    })
+    .eq("id", sessionId)
+    .select(SESSION_SELECT)
+    .single()
+  if (error) throw new Error(error.message)
+  return mapNativeCallSessionRow(data as SessionRow)
+}
+
+export async function saveNativeCallWrapup(
+  admin: SupabaseClient,
+  input: {
+    sessionId: string
+    ownerUserId?: string | null
+    wrapup: NativeCallWrapupInput
+  },
+): Promise<NativeCallWrapupPublicView> {
+  const orgId = await getGrowthEngineAiOrgId(admin)
+  const { data: session, error: sessionError } = await sessionsTable(admin).select("id, lead_id").eq("id", input.sessionId).maybeSingle()
+  if (sessionError) throw new Error(sessionError.message)
+  if (!session) throw new Error("Call session not found.")
+
+  const flags = normalizeWrapupFlags(input.wrapup)
+  const suggestedNextActions = buildSuggestedWrapupNextActions(input.wrapup)
+  const now = new Date().toISOString()
+
+  const { data, error } = await wrapupsTable(admin)
+    .upsert(
+      {
+        organization_id: orgId,
+        session_id: input.sessionId,
+        lead_id: session.lead_id as string | null,
+        owner_user_id: input.ownerUserId ?? null,
+        outcome: input.wrapup.outcome,
+        left_voicemail: flags.leftVoicemail,
+        no_answer: flags.noAnswer,
+        connected: flags.connected,
+        meeting_booked: flags.meetingBooked,
+        follow_up_needed: flags.followUpNeeded,
+        objection_category: input.wrapup.objectionCategory ?? null,
+        buying_signals: input.wrapup.buyingSignals ?? [],
+        competitor_mentioned: flags.competitorMentioned,
+        timeline_detected: flags.timelineDetected,
+        budget_detected: flags.budgetDetected,
+        champion_identified: flags.championIdentified,
+        decision_maker_present: flags.decisionMakerPresent,
+        suggested_next_actions: suggestedNextActions,
+        notes: input.wrapup.notes ?? "",
+        operator_confirmed_at: now,
+      },
+      { onConflict: "session_id" },
+    )
+    .select("*")
+    .single()
+  if (error) throw new Error(error.message)
+
+  await sessionsTable(admin)
+    .update({ status: "completed", updated_at: now })
+    .eq("id", input.sessionId)
+
+  return mapWrapupRow(data as WrapupRow)
+}
+
+export async function listNativeDialerQueue(
+  admin: SupabaseClient,
+  input?: { limit?: number; modes?: NativeDialerQueueMode[] },
+): Promise<NativeDialerQueueItemPublicView[]> {
+  let query = queueTable(admin)
+    .select("id, lead_id, owner_user_id, queue_mode, status, priority_score, callback_due_at, phone_number, contact_name, company_name, reason")
+    .in("status", ["pending", "previewing", "callback_due"])
+    .order("priority_score", { ascending: false })
+    .order("created_at", { ascending: true })
+    .limit(input?.limit ?? 50)
+  if (input?.modes?.length) query = query.in("queue_mode", input.modes)
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((row) => mapQueueRow(row as QueueRow))
+}
+
+export async function fetchActiveNativeCallSession(
+  admin: SupabaseClient,
+  ownerUserId?: string | null,
+): Promise<NativeCallWorkspaceSessionPublicView | null> {
+  let query = sessionsTable(admin)
+    .select(SESSION_SELECT)
+    .in("status", ["ringing", "active", "on_hold", "wrapping"])
+    .order("started_at", { ascending: false })
+    .limit(1)
+  if (ownerUserId) query = query.eq("owner_user_id", ownerUserId)
+  const { data, error } = await query.maybeSingle()
+  if (error) throw new Error(error.message)
+  return data ? mapNativeCallSessionRow(data as SessionRow) : null
+}
+
+export async function listRecentNativeCallSessions(
+  admin: SupabaseClient,
+  limit = 12,
+): Promise<NativeCallWorkspaceSessionPublicView[]> {
+  const { data, error } = await sessionsTable(admin)
+    .select(SESSION_SELECT)
+    .order("started_at", { ascending: false })
+    .limit(limit)
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((row) => mapNativeCallSessionRow(row as SessionRow))
+}
+
+export async function seedNativeDialerQueueFromCallQueue(
+  admin: SupabaseClient,
+  input: { leadId: string; phoneNumber: string; contactName?: string | null; companyName?: string | null; reason: string; queueMode?: NativeDialerQueueMode; priorityScore?: number },
+): Promise<NativeDialerQueueItemPublicView> {
+  const orgId = await getGrowthEngineAiOrgId(admin)
+  const { data, error } = await queueTable(admin)
+    .insert({
+      organization_id: orgId,
+      lead_id: input.leadId,
+      queue_mode: input.queueMode ?? "priority",
+      status: "pending",
+      priority_score: input.priorityScore ?? 50,
+      phone_number: input.phoneNumber,
+      contact_name: input.contactName ?? null,
+      company_name: input.companyName ?? null,
+      reason: input.reason,
+      source_system: "call_queue",
+      source_id: input.leadId,
+    })
+    .select("id, lead_id, owner_user_id, queue_mode, status, priority_score, callback_due_at, phone_number, contact_name, company_name, reason")
+    .single()
+  if (error) throw new Error(error.message)
+  return mapQueueRow(data as QueueRow)
+}
+
+export { commandLeadFocusHref }

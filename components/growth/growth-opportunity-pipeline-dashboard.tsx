@@ -5,8 +5,10 @@ import Link from "next/link"
 import { ChevronRight, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
-import { GrowthPredictiveDealIntelligenceCard } from "@/components/growth/growth-predictive-deal-intelligence-card"
 import { GrowthCallIntelligenceScorecardCard } from "@/components/growth/growth-call-intelligence-scorecard-card"
+import { GrowthNativeDialerLaunchButton } from "@/components/growth/growth-native-dialer-launch-button"
+import { GrowthPredictiveDealIntelligenceCard } from "@/components/growth/growth-predictive-deal-intelligence-card"
+import { nativeCallWorkspaceHref } from "@/lib/growth/native-dialer/native-dialer-navigation"
 import type {
   GrowthOpportunity,
   GrowthOpportunityDetail,
@@ -172,13 +174,19 @@ function OpportunityDetailPanel({
         </div>
       </div>
 
-      <Link
-        href={`/admin/growth/leads?leadId=${detail.leadId}`}
-        className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline"
-      >
-        Open linked lead
-        <ChevronRight className="size-4" />
-      </Link>
+      <div className="flex flex-wrap items-center gap-3">
+        <Link
+          href={`/admin/growth/leads?leadId=${detail.leadId}`}
+          className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline"
+        >
+          Open linked lead
+          <ChevronRight className="size-4" />
+        </Link>
+        <GrowthNativeDialerLaunchButton leadId={detail.leadId} label="Call workspace" size="sm" variant="outline" />
+        <Link href={nativeCallWorkspaceHref({ leadId: detail.leadId })} className="text-sm text-muted-foreground hover:underline">
+          Open in unified workspace
+        </Link>
+      </div>
     </div>
   )
 }

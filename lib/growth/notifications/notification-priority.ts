@@ -79,6 +79,10 @@ const TYPE_SEVERITY: Record<GrowthNotificationType, GrowthNotificationSeverity> 
   meeting_at_risk: "high",
   meeting_high_quality: "medium",
   meeting_stalled: "high",
+  callback_due: "high",
+  priority_call_ready: "critical",
+  missed_callback: "high",
+  meeting_booked_from_call: "medium",
 }
 
 const SEVERITY_BASE: Record<GrowthNotificationSeverity, number> = {

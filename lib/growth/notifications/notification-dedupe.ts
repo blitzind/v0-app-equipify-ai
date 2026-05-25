@@ -61,6 +61,10 @@ export const GROWTH_NOTIFICATION_COOLDOWN_MINUTES: Partial<Record<GrowthNotifica
   meeting_at_risk: 60,
   meeting_high_quality: 120,
   meeting_stalled: 60,
+  callback_due: 30,
+  priority_call_ready: 15,
+  missed_callback: 30,
+  meeting_booked_from_call: 60,
 }
 
 export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificationType, number>> = {
@@ -127,6 +131,10 @@ export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificati
   meeting_at_risk: 3 * 24 * 60,
   meeting_high_quality: 7 * 24 * 60,
   meeting_stalled: 3 * 24 * 60,
+  callback_due: 7 * 24 * 60,
+  priority_call_ready: 24 * 60,
+  missed_callback: 3 * 24 * 60,
+  meeting_booked_from_call: 7 * 24 * 60,
 }
 
 export function buildGrowthNotificationDeterministicHash(input: {

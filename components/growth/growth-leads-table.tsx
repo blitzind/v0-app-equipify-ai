@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { GrowthCallActionSheet } from "@/components/growth/growth-call-action-sheet"
+import { GrowthNativeDialerLaunchButton } from "@/components/growth/growth-native-dialer-launch-button"
 import { GROWTH_NEXT_BEST_ACTION_LABELS } from "@/lib/growth/nba-types"
 import type { GrowthLead } from "@/lib/growth/types"
 
@@ -199,10 +200,13 @@ export function GrowthLeadsTable({
                     <td className="px-4 py-3 align-top">
                       <div className="flex flex-wrap items-center gap-1">
                         {phone ? (
-                          <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => setCallTarget(lead)}>
-                            <Phone className="size-3.5" />
-                            <span className="sr-only">Call</span>
-                          </Button>
+                          <>
+                            <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => setCallTarget(lead)}>
+                              <Phone className="size-3.5" />
+                              <span className="sr-only">Call</span>
+                            </Button>
+                            <GrowthNativeDialerLaunchButton leadId={lead.id} phone={phone} iconOnly variant="outline" />
+                          </>
                         ) : (
                           <Tooltip>
                             <TooltipTrigger asChild>

@@ -103,6 +103,10 @@ export const GROWTH_NOTIFICATION_TYPES = [
   "meeting_at_risk",
   "meeting_high_quality",
   "meeting_stalled",
+  "callback_due",
+  "priority_call_ready",
+  "missed_callback",
+  "meeting_booked_from_call",
 ] as const
 export type GrowthNotificationType = (typeof GROWTH_NOTIFICATION_TYPES)[number]
 

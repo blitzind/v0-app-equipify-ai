@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Copy, ExternalLink, Loader2, Mic, Phone, Sparkles } from "lucide-react"
+import Link from "next/link"
+import { Copy, ExternalLink, Headphones, Loader2, Mic, Phone, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -15,6 +16,7 @@ import { buildGrowthCallDialOptions } from "@/lib/growth/communication/call-dial
 import type { ResolvedGrowthDialPreferences } from "@/lib/growth/communication/types"
 import { GROWTH_CALL_AUDIO_CAPTURE_ENABLED, GROWTH_CALL_DIALER_SAFETY_COPY } from "@/lib/growth/call-workflow-copy"
 import { formatGrowthCallDialerNextStep } from "@/lib/growth/call-workflow"
+import { nativeCallWorkspaceHref } from "@/lib/growth/native-dialer/native-dialer-navigation"
 import { resolveCallSheetMicCaptureHint } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-capability"
 import { GROWTH_BROWSER_AUDIO_CAPTURE_SAFETY_COPY } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-invariants"
 import { GROWTH_LEAD_CALL_DISPOSITIONS, type GrowthLeadCallDisposition } from "@/lib/growth/call-types"
@@ -329,6 +331,13 @@ export function GrowthCallActionSheet({
                       >
                         <Copy className="mr-2 size-4 shrink-0" />
                         {copied ? "Copied" : "Copy number"}
+                      </Button>
+
+                      <Button asChild className="min-h-11 w-full justify-start" variant="secondary">
+                        <Link href={nativeCallWorkspaceHref({ leadId, phone })}>
+                          <Headphones className="mr-2 size-4 shrink-0" />
+                          Open in Call Workspace
+                        </Link>
                       </Button>
                     </div>
                   )}

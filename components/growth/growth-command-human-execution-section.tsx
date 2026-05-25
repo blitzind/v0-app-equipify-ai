@@ -7,6 +7,7 @@ import type { GrowthHumanExecutionDashboard } from "@/lib/growth/human-execution
 import { GROWTH_HUMAN_APPROVED_EXECUTION_QA_MARKER } from "@/lib/growth/human-execution/human-execution-types"
 import { humanExecutionReadinessBandTone } from "@/lib/growth/human-execution/human-execution-readiness-score"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthNativeDialerLaunchButton } from "@/components/growth/growth-native-dialer-launch-button"
 
 export function GrowthCommandHumanExecutionSection({
   dashboard,
@@ -113,6 +114,7 @@ export function GrowthCommandHumanExecutionSection({
                     <Button asChild size="sm" variant="outline">
                       <Link href={item.ctaHref}>Open</Link>
                     </Button>
+                    <GrowthNativeDialerLaunchButton leadId={item.leadId} label="Call" size="sm" variant="secondary" />
                   </div>
                 </li>
               ))}

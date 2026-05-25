@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { GrowthNextBestActionBanner } from "@/components/growth/growth-next-best-action-banner"
 import { GrowthLeadAssignmentPanel } from "@/components/growth/growth-lead-assignment-panel"
 import { GrowthCallActionSheet } from "@/components/growth/growth-call-action-sheet"
+import { GrowthNativeDialerLaunchButton } from "@/components/growth/growth-native-dialer-launch-button"
 import {
   GrowthBadge,
   GrowthEngineCard,
@@ -297,10 +298,13 @@ export function GrowthLeadCommandCenter({
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
               {phone ? (
-                <Button size="lg" className="h-11 justify-start gap-2" onClick={() => setCallSheetOpen(true)}>
-                  <Phone className="size-4" />
-                  Call
-                </Button>
+                <>
+                  <Button size="lg" className="h-11 justify-start gap-2" onClick={() => setCallSheetOpen(true)}>
+                    <Phone className="size-4" />
+                    Call
+                  </Button>
+                  <GrowthNativeDialerLaunchButton leadId={lead.id} phone={phone} label="Workspace" size="lg" variant="secondary" />
+                </>
               ) : (
                 <Button size="lg" variant="outline" className="h-11 justify-start gap-2" disabled>
                   <Phone className="size-4" />

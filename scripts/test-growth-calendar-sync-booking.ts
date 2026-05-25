@@ -246,6 +246,8 @@ assert.match(syncRoute, /requireGrowthEnginePlatformAccess/)
 
 const bookRoute = fs.readFileSync(path.join(process.cwd(), "app/api/book/[slug]/book/route.ts"), "utf8")
 assert.match(bookRoute, /submitPublicBooking/)
+assert.match(bookRoute, /GROWTH_BOOKING_SUBMIT_API_QA_MARKER/)
+assert.match(bookRoute, /export const dynamic = "force-dynamic"/)
 
 const settingsPanel = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-google-calendar-settings-panel.tsx"),

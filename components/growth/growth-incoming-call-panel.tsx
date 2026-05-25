@@ -1,0 +1,53 @@
+"use client"
+
+import { Phone, PhoneOff } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import type { NativeCallWorkspaceSessionPublicView } from "@/lib/growth/native-dialer/native-dialer-types"
+import { NATIVE_DIALER_PROVIDER_LABELS } from "@/lib/growth/native-dialer/native-dialer-types"
+
+export function GrowthIncomingCallPanel({
+  session,
+  onAnswer,
+  onDecline,
+  answering,
+  declining,
+}: {
+  session: NativeCallWorkspaceSessionPublicView
+  onAnswer: () => void
+  onDecline: () => void
+  answering?: boolean
+  declining?: boolean
+}) {
+  return (
+    <GrowthEngineCard title="Incoming call" subtitle="Operator must answer — no autonomous pickup">
+      <div className="mb-4 flex flex-wrap gap-2">
+        <GrowthBadge label={session.direction === "inbound" ? "Inbound" : "Outbound ringing"} tone="attention" />
+        <GrowthBadge label={NATIVE_DIALER_PROVIDER_LABELS[session.provider]} tone="neutral" />
+      </div>
+
+      <div className="mb-6 space-y-1">
+        <p className="text-lg font-semibold">{session.companyName ?? "Unknown caller"}</p>
+        <p className="text-sm text-muted-foreground">{session.contactName ?? session.phoneNumber ?? "—"}</p>
+        <p className="text-sm font-medium tabular-nums">{session.phoneNumber ?? "—"}</p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" className="min-w-[120px]" disabled={answering || declining} onClick={onAnswer}>
+          <Phone className="mr-2 size-4" />
+          {answering ? "Connecting…" : "Answer"}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="min-w-[120px]"
+          disabled={answering || declining}
+          onClick={onDecline}
+        >
+          <PhoneOff className="mr-2 size-4" />
+          {declining ? "Declining…" : "Decline"}
+        </Button>
+      </div>
+    </GrowthEngineCard>
+  )
+}

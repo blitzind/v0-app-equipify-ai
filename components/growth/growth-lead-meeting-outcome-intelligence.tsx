@@ -5,6 +5,7 @@ import Link from "next/link"
 import { BrainCircuit, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthNativeDialerLaunchButton } from "@/components/growth/growth-native-dialer-launch-button"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { MeetingOutcomeLeadView } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-intelligence-types"
 import { GROWTH_MEETING_OUTCOME_INTELLIGENCE_QA_MARKER } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-intelligence-types"
@@ -149,6 +150,9 @@ export function GrowthLeadMeetingOutcomeIntelligence({ lead }: GrowthLeadMeeting
               {recomputing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
               Recompute
             </Button>
+            {lead.contactPhone ? (
+              <GrowthNativeDialerLaunchButton leadId={lead.id} phone={lead.contactPhone} label="Call workspace" />
+            ) : null}
             <Button asChild size="sm" variant="ghost">
               <Link href={`/admin/growth/leads?open=${lead.id}&focus=meetings`}>Open meetings</Link>
             </Button>

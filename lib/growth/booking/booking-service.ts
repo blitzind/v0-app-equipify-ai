@@ -42,11 +42,48 @@ export type PublicBookingSubmitResult =
       slotStartAt: string
       slotEndAt: string
       confirmationMessage: string | null
+      calendarInvitePending?: boolean
     }
   | { ok: false; code: string; message: string }
 
 import { publicBookingErrorMessage } from "@/lib/growth/booking/booking-public-errors"
 import { resolvePublicBookingLocationDisplay } from "@/lib/growth/booking/booking-public-display"
+
+function normalizeSlotIso(value: string): string {
+  return new Date(value).toISOString()
+}
+
+function sanitizeBusyIntervals(
+  intervals: Array<{ start: string; end: string }>,
+): Array<{ start: string; end: string }> {
+  return intervals.filter((interval) => {
+    const startMs = Date.parse(interval.start)
+    const endMs = Date.parse(interval.end)
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return false
+    if (endMs <= startMs) return false
+    if (endMs - startMs > 31 * 24 * 60 * 60 * 1000) return false
+    return true
+  })
+}
+
+async function loadOptionalGoogleBusyIntervals(
+  admin: SupabaseClient,
+  input: { ownerUserId: string; timeMin: string; timeMax: string; timezone: string },
+): Promise<Array<{ start: string; end: string }>> {
+  try {
+    const connection = await getGrowthCalendarConnectionWithFreshAccessToken(admin, input.ownerUserId)
+    if (!connection) return []
+    const rawBusy = await fetchGoogleCalendarBusyIntervals({
+      accessToken: connection.accessToken,
+      timeMin: input.timeMin,
+      timeMax: input.timeMax,
+      timezone: input.timezone,
+    })
+    return sanitizeBusyIntervals(rawBusy)
+  } catch {
+    return []
+  }
+}
 
 async function resolveLeadForBooking(
   admin: SupabaseClient,
@@ -126,28 +163,20 @@ export async function submitPublicBooking(
   if (!slotsResult.ok) return { ok: false, code: slotsResult.code, message: slotsResult.message }
 
   const slotAllowed = slotsResult.slots.some(
-    (entry) => entry.startAt === slot.startAt && entry.endAt === slot.endAt,
+    (entry) =>
+      normalizeSlotIso(entry.startAt) === normalizeSlotIso(slot.startAt) &&
+      normalizeSlotIso(entry.endAt) === normalizeSlotIso(slot.endAt),
   )
   if (!slotAllowed) {
     return { ok: false, code: "slot_unavailable", message: publicBookingErrorMessage("slot_unavailable") }
   }
 
-  const connection = await getGrowthCalendarConnectionWithFreshAccessToken(admin, page.ownerUserId)
-  if (!connection) {
-    return { ok: false, code: "calendar_unavailable", message: publicBookingErrorMessage("calendar_unavailable") }
-  }
-
-  let busyIntervals: Array<{ start: string; end: string }> = []
-  try {
-    busyIntervals = await fetchGoogleCalendarBusyIntervals({
-      accessToken: connection.accessToken,
-      timeMin: slot.startAt,
-      timeMax: slot.endAt,
-      timezone: page.timezone,
-    })
-  } catch {
-    return { ok: false, code: "calendar_unavailable", message: publicBookingErrorMessage("calendar_unavailable") }
-  }
+  const busyIntervals = await loadOptionalGoogleBusyIntervals(admin, {
+    ownerUserId: page.ownerUserId,
+    timeMin: slot.startAt,
+    timeMax: slot.endAt,
+    timezone: page.timezone,
+  })
 
   const existingBookings = await listConfirmedBookingsInRange(admin, page.id, slot.startAt, slot.endAt)
   if (
@@ -197,35 +226,47 @@ export async function submitPublicBooking(
       return { ok: false, code: "booking_failed", message: publicBookingErrorMessage("booking_failed") }
     }
 
-    const syncResult = await syncGrowthMeetingToGoogleCalendar(admin, {
-      meeting: meetingForSync,
-      actorUserId: page.ownerUserId,
-      action: "create",
-      confirm: true,
-      appOrigin: input.appOrigin,
+    const locationDisplay = resolvePublicBookingLocationDisplay({
+      locationType: page.locationType,
+      customLocation: page.customLocation,
+      manualMeetingUrl: resolvedLocation.meetingUrl ?? page.manualMeetingUrl,
     })
 
-    if (!syncResult.ok) {
-      await insertGrowthBookingPageBooking(admin, {
-        bookingPageId: page.id,
-        meetingId: meetingResult.meeting.id,
-        leadId,
-        guestName: name,
-        guestEmail: email,
-        guestCompany: input.company ?? null,
-        guestPhone: input.phone ?? null,
-        guestNotes: input.notes ?? null,
-        slotStartAt: slot.startAt,
-        slotEndAt: slot.endAt,
-        status: "failed",
-        errorMessage: syncResult.message,
+    let calendarInvitePending = false
+    let syncedMeeting = meetingForSync
+    let calendarEventId: string | null = null
+
+    try {
+      const syncResult = await syncGrowthMeetingToGoogleCalendar(admin, {
+        meeting: meetingForSync,
+        actorUserId: page.ownerUserId,
+        action: "create",
+        confirm: true,
+        appOrigin: input.appOrigin,
       })
-      return { ok: false, code: "calendar_unavailable", message: publicBookingErrorMessage("calendar_unavailable") }
+
+      if (syncResult.ok) {
+        syncedMeeting = syncResult.meeting
+        calendarEventId = syncResult.meeting.calendarEventId
+        await updateGrowthMeetingRow(admin, meetingResult.meeting.id, {
+          calendar_sync_status: "synced",
+        })
+      } else {
+        calendarInvitePending = true
+        await updateGrowthMeetingRow(admin, meetingResult.meeting.id, {
+          calendar_sync_status: "failed",
+        })
+      }
+    } catch {
+      calendarInvitePending = true
+      await updateGrowthMeetingRow(admin, meetingResult.meeting.id, {
+        calendar_sync_status: "failed",
+      })
     }
 
     const booking = await insertGrowthBookingPageBooking(admin, {
       bookingPageId: page.id,
-      meetingId: syncResult.meeting.id,
+      meetingId: syncedMeeting.id,
       leadId,
       guestName: name,
       guestEmail: email,
@@ -235,26 +276,28 @@ export async function submitPublicBooking(
       slotStartAt: slot.startAt,
       slotEndAt: slot.endAt,
       status: "confirmed",
-      calendarEventId: syncResult.meeting.calendarEventId,
-      meetingUrl: syncResult.meeting.meetingUrl,
+      calendarEventId,
+      meetingUrl: syncedMeeting.meetingUrl,
+      errorMessage: calendarInvitePending ? "calendar_invite_pending" : null,
     })
 
-    const locationDisplay = resolvePublicBookingLocationDisplay({
-      locationType: page.locationType,
-      customLocation: page.customLocation,
-      manualMeetingUrl: syncResult.meeting.meetingUrl ?? page.manualMeetingUrl,
-    })
+    const confirmationMessage = calendarInvitePending
+      ? page.confirmationMessage?.trim()
+        ? `${page.confirmationMessage.trim()} Calendar invite is pending.`
+        : "Your meeting is confirmed. Calendar invite is pending."
+      : page.confirmationMessage
 
     return {
       ok: true,
       bookingId: booking.id,
-      meetingId: syncResult.meeting.id,
-      meetingUrl: syncResult.meeting.meetingUrl,
+      meetingId: syncedMeeting.id,
+      meetingUrl: syncedMeeting.meetingUrl,
       locationLabel: locationDisplay.label,
-      locationUrl: syncResult.meeting.meetingUrl ?? locationDisplay.url,
+      locationUrl: syncedMeeting.meetingUrl ?? locationDisplay.url,
       slotStartAt: slot.startAt,
       slotEndAt: slot.endAt,
-      confirmationMessage: page.confirmationMessage,
+      confirmationMessage,
+      calendarInvitePending,
     }
   } catch {
     return { ok: false, code: "booking_failed", message: publicBookingErrorMessage("booking_failed") }
