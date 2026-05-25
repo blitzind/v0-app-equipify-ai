@@ -1,0 +1,74 @@
+/** Client-safe Growth booking page types (slice 6.27B). */
+
+export const GROWTH_BOOKING_PAGES_QA_MARKER = "booking-pages-v1" as const
+
+export const GROWTH_BOOKING_LOCATION_TYPES = ["google_meet", "phone_call", "custom_location"] as const
+export type GrowthBookingLocationType = (typeof GROWTH_BOOKING_LOCATION_TYPES)[number]
+
+export const GROWTH_BOOKING_PAGE_STATUSES = ["enabled", "disabled"] as const
+
+export type GrowthBookingAvailabilityWindow = {
+  dayOfWeek: number
+  startTime: string
+  endTime: string
+}
+
+export type GrowthBookingPage = {
+  id: string
+  ownerUserId: string
+  calendarConnectionId: string | null
+  name: string
+  slug: string
+  description: string | null
+  logoUrl: string | null
+  brandColor: string
+  meetingType: string | null
+  durationMinutes: number
+  bufferMinutes: number
+  availabilityWindows: GrowthBookingAvailabilityWindow[]
+  timezone: string
+  locationType: GrowthBookingLocationType
+  customLocation: string | null
+  confirmationMessage: string | null
+  reminderEmailSubject: string | null
+  reminderEmailBody: string | null
+  enabled: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type GrowthBookingPagePublicView = {
+  slug: string
+  name: string
+  description: string | null
+  logoUrl: string | null
+  brandColor: string
+  meetingType: string | null
+  durationMinutes: number
+  timezone: string
+  locationType: GrowthBookingLocationType
+  customLocation: string | null
+  confirmationMessage: string | null
+}
+
+export type GrowthBookingSlot = {
+  startAt: string
+  endAt: string
+}
+
+export type GrowthBookingPageBookingSummary = {
+  id: string
+  guestName: string
+  guestEmail: string
+  guestCompany: string | null
+  slotStartAt: string
+  slotEndAt: string
+  status: string
+  meetingId: string | null
+  createdAt: string
+}
+
+export type GrowthBookingPageListItem = GrowthBookingPage & {
+  bookingLink: string
+  recentBookingsCount: number
+}

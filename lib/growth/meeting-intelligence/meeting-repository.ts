@@ -10,7 +10,7 @@ import type {
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 
 const MEETING_SELECT =
-  "id, lead_id, owner_user_id, opportunity_id, outbound_reply_id, realtime_call_session_id, title, status, start_at, end_at, source, provider, calendar_event_id, calendar_sync_status, calendar_sync_error, calendar_synced_at, calendar_last_sync_at, meeting_url, notes, attendee_emails, timezone, outcome, next_action, follow_up_due_at, no_show_reason, scheduled_at, completed_at, canceled_at, no_show_at, outcome_recorded_at, created_by, created_at, updated_at"
+  "id, lead_id, owner_user_id, opportunity_id, outbound_reply_id, realtime_call_session_id, title, status, start_at, end_at, source, provider, calendar_event_id, calendar_sync_status, calendar_sync_error, calendar_synced_at, calendar_last_sync_at, meeting_url, notes, attendee_emails, timezone, outcome, next_action, follow_up_due_at, no_show_reason, scheduled_at, completed_at, canceled_at, no_show_at, outcome_recorded_at, booking_page_id, created_by, created_at, updated_at"
 
 type MeetingDbRow = {
   id: string
@@ -43,6 +43,7 @@ type MeetingDbRow = {
   canceled_at: string | null
   no_show_at: string | null
   outcome_recorded_at: string | null
+  booking_page_id: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -84,6 +85,7 @@ export function mapGrowthMeetingRow(row: MeetingDbRow): GrowthMeeting {
     canceledAt: row.canceled_at,
     noShowAt: row.no_show_at,
     outcomeRecordedAt: row.outcome_recorded_at,
+    bookingPageId: row.booking_page_id,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -222,4 +224,48 @@ export async function attachCompanyNamesToMeetings(
   if (error) throw new Error(error.message)
   const nameMap = new Map((data ?? []).map((row) => [row.id as string, row.company_name as string]))
   return meetings.map((meeting) => ({ ...meeting, companyName: nameMap.get(meeting.leadId) ?? null }))
+}
+
+export async function fetchGrowthMeetingByCalendarEventId(
+  admin: SupabaseClient,
+  calendarEventId: string,
+): Promise<GrowthMeeting | null> {
+  const { data, error } = await meetingsTable(admin)
+    .select(MEETING_SELECT)
+    .eq("calendar_event_id", calendarEventId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return data ? mapGrowthMeetingRow(data as MeetingDbRow) : null
+}
+
+export async function listGrowthMeetingsForOwnerInTimeRange(
+  admin: SupabaseClient,
+  ownerUserId: string,
+  timeMin: string,
+  timeMax: string,
+): Promise<GrowthMeeting[]> {
+  const { data, error } = await meetingsTable(admin)
+    .select(MEETING_SELECT)
+    .eq("owner_user_id", ownerUserId)
+    .gte("start_at", timeMin)
+    .lte("start_at", timeMax)
+    .order("start_at", { ascending: true })
+    .limit(500)
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((row) => mapGrowthMeetingRow(row as MeetingDbRow))
+}
+
+export async function listGrowthMeetingsWithCalendarConflict(
+  admin: SupabaseClient,
+  ownerUserId: string,
+  limit = 20,
+): Promise<GrowthMeeting[]> {
+  const { data, error } = await meetingsTable(admin)
+    .select(MEETING_SELECT)
+    .eq("owner_user_id", ownerUserId)
+    .eq("calendar_sync_status", "conflict")
+    .order("calendar_last_sync_at", { ascending: false, nullsFirst: false })
+    .limit(limit)
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((row) => mapGrowthMeetingRow(row as MeetingDbRow))
 }

@@ -8,9 +8,27 @@ type GoogleCalendarEvent = {
   etag?: string
   htmlLink?: string
   hangoutLink?: string
+  status?: string
+  summary?: string
+  description?: string
+  start?: { dateTime?: string; date?: string; timeZone?: string }
+  end?: { dateTime?: string; date?: string; timeZone?: string }
+  attendees?: Array<{ email?: string; organizer?: boolean; responseStatus?: string }>
   conferenceData?: {
     entryPoints?: Array<{ entryPointType?: string; uri?: string }>
   }
+}
+
+export type GoogleCalendarListedEvent = {
+  eventId: string
+  etag: string | null
+  status: string | null
+  title: string
+  startAt: string | null
+  endAt: string | null
+  attendeeEmails: string[]
+  meetingUrl: string | null
+  canceled: boolean
 }
 
 function extractMeetUrl(event: GoogleCalendarEvent): string | null {
@@ -183,4 +201,97 @@ export async function fetchGoogleCalendarEvent(input: {
     throw new Error(json.error?.message ?? `Google Calendar fetch failed (${res.status})`)
   }
   return (await res.json()) as GoogleCalendarEvent
+}
+
+function mapListedEvent(event: GoogleCalendarEvent): GoogleCalendarListedEvent | null {
+  if (!event.id) return null
+  const startAt = event.start?.dateTime ?? (event.start?.date ? `${event.start.date}T00:00:00.000Z` : null)
+  const endAt = event.end?.dateTime ?? (event.end?.date ? `${event.end.date}T00:00:00.000Z` : null)
+  const attendeeEmails = (event.attendees ?? [])
+    .map((entry) => entry.email?.trim().toLowerCase())
+    .filter(Boolean) as string[]
+  return {
+    eventId: event.id,
+    etag: event.etag ?? null,
+    status: event.status ?? null,
+    title: event.summary?.trim() || "Calendar event",
+    startAt,
+    endAt,
+    attendeeEmails,
+    meetingUrl: extractMeetUrl(event),
+    canceled: event.status === "cancelled",
+  }
+}
+
+export async function listGoogleCalendarEvents(input: {
+  accessToken: string
+  timeMin: string
+  timeMax: string
+  maxResults?: number
+}): Promise<GoogleCalendarListedEvent[]> {
+  const params = new URLSearchParams({
+    singleEvents: "true",
+    orderBy: "startTime",
+    timeMin: input.timeMin,
+    timeMax: input.timeMax,
+    maxResults: String(input.maxResults ?? 250),
+  })
+
+  const events: GoogleCalendarListedEvent[] = []
+  let pageToken: string | undefined
+
+  do {
+    if (pageToken) params.set("pageToken", pageToken)
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`,
+      { headers: { Authorization: `Bearer ${input.accessToken}` } },
+    )
+    const json = (await res.json()) as {
+      items?: GoogleCalendarEvent[]
+      nextPageToken?: string
+      error?: { message?: string }
+    }
+    if (!res.ok) {
+      throw new Error(json.error?.message ?? `Google Calendar list failed (${res.status})`)
+    }
+    for (const item of json.items ?? []) {
+      const mapped = mapListedEvent(item)
+      if (mapped) events.push(mapped)
+    }
+    pageToken = json.nextPageToken
+  } while (pageToken && events.length < (input.maxResults ?? 250))
+
+  return events
+}
+
+export async function fetchGoogleCalendarBusyIntervals(input: {
+  accessToken: string
+  timeMin: string
+  timeMax: string
+  timezone: string
+}): Promise<Array<{ start: string; end: string }>> {
+  const res = await fetch("https://www.googleapis.com/calendar/v3/freeBusy", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      timeMin: input.timeMin,
+      timeMax: input.timeMax,
+      timeZone: input.timezone,
+      items: [{ id: "primary" }],
+    }),
+  })
+  const json = (await res.json()) as {
+    calendars?: Record<string, { busy?: Array<{ start?: string; end?: string }> }>
+    error?: { message?: string }
+  }
+  if (!res.ok) {
+    throw new Error(json.error?.message ?? `Google Calendar freeBusy failed (${res.status})`)
+  }
+  const busy = json.calendars?.primary?.busy ?? []
+  return busy
+    .filter((entry) => entry.start && entry.end)
+    .map((entry) => ({ start: entry.start!, end: entry.end! }))
 }

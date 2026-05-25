@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 617,
-  sqlMigrations: 252,
+  apiRouteHandlers: 624,
+  sqlMigrations: 253,
   dashboardPages: 65,
-  componentsTsx: 426,
-  libTsFiles: 1390,
+  componentsTsx: 428,
+  libTsFiles: 1400,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **617** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **252** |
+| API route handlers (\`app/api/**/route.ts\`) | **624** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **253** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **426** |
-| \`lib/**/*.ts\` | **1390** |
+| \`components/**/*.tsx\` | **428** |
+| \`lib/**/*.ts\` | **1400** |
 
 ### Vercel crons
 
@@ -40,6 +40,9 @@ archived/restore/route.ts
 archived/route.ts
 billing/checkout/route.ts
 blitzpay/webhook/route.ts
+book/[slug]/book/route.ts
+book/[slug]/route.ts
+book/[slug]/slots/route.ts
 certificates/import-template/route.ts
 cron/ai-ops-digest/route.ts
 cron/blitzpay-memberships/route.ts
@@ -458,6 +461,8 @@ platform/growth/attention/[notificationId]/route.ts
 platform/growth/attention/bulk-acknowledge/route.ts
 platform/growth/attention/dashboard/route.ts
 platform/growth/attention/feed/route.ts
+platform/growth/booking-pages/[id]/route.ts
+platform/growth/booking-pages/route.ts
 platform/growth/cadence/command-summary/route.ts
 platform/growth/cadence/dashboard/route.ts
 platform/growth/cadence/tasks/[taskId]/route.ts
@@ -465,6 +470,7 @@ platform/growth/cadence/tasks/route.ts
 platform/growth/calendar/authorize/route.ts
 platform/growth/calendar/callback/route.ts
 platform/growth/calendar/connection/route.ts
+platform/growth/calendar/sync/route.ts
 platform/growth/call-queue/route.ts
 platform/growth/calls/dashboard/route.ts
 platform/growth/calls/live-coaching/dashboard/route.ts
@@ -551,6 +557,7 @@ platform/growth/leads/bulk-archive/route.ts
 platform/growth/leads/route.ts
 platform/growth/live-coaching/settings/route.ts
 platform/growth/meetings/[meetingId]/calendar/push/route.ts
+platform/growth/meetings/[meetingId]/calendar/resolve/route.ts
 platform/growth/meetings/[meetingId]/route.ts
 platform/growth/meetings/command-summary/route.ts
 platform/growth/meetings/dashboard/route.ts

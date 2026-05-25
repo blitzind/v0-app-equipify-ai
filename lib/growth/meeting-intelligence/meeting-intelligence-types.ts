@@ -97,6 +97,7 @@ export type GrowthMeeting = {
   createdBy: string | null
   createdAt: string
   updatedAt: string
+  bookingPageId?: string | null
   companyName?: string | null
 }
 
