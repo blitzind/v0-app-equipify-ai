@@ -10,6 +10,8 @@ export function publicBookingErrorMessage(code: string): string {
       return "Please check your booking details and try again."
     case "invalid_month":
       return "That calendar month is outside the booking window."
+    case "slots_fetch_failed":
+      return "Availability is temporarily unavailable. Please try again later."
     case "calendar_unavailable":
       return "Booking is temporarily unavailable. Please try again later."
     default:

@@ -24,6 +24,7 @@ import {
 import {
   GROWTH_BOOKING_AVAILABILITY_RENDER_FIX_QA_MARKER,
   GROWTH_BOOKING_PUBLIC_THEME_QA_MARKER,
+  GROWTH_BOOKING_SLOTS_API_QA_MARKER,
   normalizeMaxMeetingsPerDay,
   normalizePublicThemeMode,
   normalizeSchedulingHorizonDays,
@@ -153,14 +154,34 @@ const slotsRoute = fs.readFileSync(
   path.join(process.cwd(), "app/api/book/[slug]/slots/route.ts"),
   "utf8",
 )
+assert.match(slotsRoute, /export async function GET/)
+assert.match(slotsRoute, /force-dynamic/)
+assert.match(slotsRoute, /GROWTH_BOOKING_SLOTS_API_QA_MARKER/)
+assert.match(slotsRoute, /public-booking-slots-v1/)
+assert.match(slotsRoute, /public-booking-slots/)
 assert.match(slotsRoute, /month/)
 assert.match(slotsRoute, /horizonEndAt/)
+assert.match(slotsRoute, /application\/json/)
+
+const publicSlotsLib = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/booking/public-booking-slots.ts"),
+  "utf8",
+)
+assert.match(publicSlotsLib, /fetchPublicBookingSlots/)
+assert.match(publicSlotsLib, /loadConfirmedBookingsInRange/)
+
+const middlewareSource = fs.readFileSync(path.join(process.cwd(), "middleware.ts"), "utf8")
+assert.match(middlewareSource, /\/api\/book/)
+assert.match(middlewareSource, /\/book/)
+
+assert.equal(GROWTH_BOOKING_SLOTS_API_QA_MARKER, "booking-slots-api-v1")
 
 const publicBookingPage = fs.readFileSync(
   path.join(process.cwd(), "components/growth/public-booking-page.tsx"),
   "utf8",
 )
 assert.match(publicBookingPage, /loadSlotsForMonth/)
+assert.match(publicBookingPage, /\/api\/book\/\$\{encodeURIComponent\(slug\)\}\/slots\?month=/)
 assert.match(publicBookingPage, /horizonEndKey/)
 assert.match(publicBookingPage, /GROWTH_BOOKING_AVAILABILITY_RENDER_FIX_QA_MARKER/)
 assert.match(publicBookingPage, /No available times this month/)

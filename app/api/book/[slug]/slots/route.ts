@@ -1,36 +1,99 @@
 import { NextResponse } from "next/server"
-import { fetchPublicBookingSlots } from "@/lib/growth/booking/booking-service"
+import { GROWTH_BOOKING_SLOTS_API_QA_MARKER } from "@/lib/growth/booking/booking-page-defaults"
+import { fetchPublicBookingSlots } from "@/lib/growth/booking/public-booking-slots"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
 
 export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+
+const PUBLIC_BOOKING_SLOTS_ROUTE_META = "public-booking-slots-v1" as const
+
+function jsonResponse(body: Record<string, unknown>, status: number) {
+  return NextResponse.json(body, {
+    status,
+    headers: { "Content-Type": "application/json" },
+  })
+}
 
 export async function GET(request: Request, context: { params: Promise<{ slug: string }> }) {
   const { slug } = await context.params
   const normalized = String(slug ?? "").trim().toLowerCase()
   if (!normalized) {
-    return NextResponse.json({ error: "not_found", message: "Booking page not found." }, { status: 404 })
+    return jsonResponse(
+      {
+        ok: false,
+        qaMarker: GROWTH_BOOKING_SLOTS_API_QA_MARKER,
+        meta: { route: PUBLIC_BOOKING_SLOTS_ROUTE_META },
+        error: "not_found",
+        message: "Booking page not found.",
+      },
+      404,
+    )
   }
 
   const admin = createServiceRoleClient()
   if (!admin) {
-    return NextResponse.json({ error: "unavailable", message: "Booking is temporarily unavailable." }, { status: 503 })
+    return jsonResponse(
+      {
+        ok: false,
+        qaMarker: GROWTH_BOOKING_SLOTS_API_QA_MARKER,
+        meta: { route: PUBLIC_BOOKING_SLOTS_ROUTE_META },
+        error: "unavailable",
+        message: "Booking is temporarily unavailable.",
+      },
+      503,
+    )
   }
 
   const url = new URL(request.url)
   const month = url.searchParams.get("month")
 
-  const result = await fetchPublicBookingSlots(admin, normalized, { month })
-  if (!result.ok) {
-    return NextResponse.json({ error: result.code, message: result.message }, { status: result.code === "page_disabled" ? 404 : 503 })
-  }
+  try {
+    const result = await fetchPublicBookingSlots(admin, normalized, { month })
+    if (!result.ok) {
+      const status =
+        result.code === "page_disabled" || result.code === "not_found"
+          ? 404
+          : result.code === "invalid_month"
+            ? 400
+            : 503
+      return jsonResponse(
+        {
+          ok: false,
+          qaMarker: GROWTH_BOOKING_SLOTS_API_QA_MARKER,
+          meta: { route: PUBLIC_BOOKING_SLOTS_ROUTE_META },
+          error: result.code,
+          message: result.message,
+        },
+        status,
+      )
+    }
 
-  return NextResponse.json({
-    ok: true,
-    slots: result.slots,
-    timezone: result.timezone,
-    timezoneMode: result.timezoneMode,
-    schedulingHorizonDays: result.schedulingHorizonDays,
-    horizonEndAt: result.horizonEndAt,
-    monthKey: result.monthKey,
-  })
+    return jsonResponse(
+      {
+        ok: true,
+        qaMarker: GROWTH_BOOKING_SLOTS_API_QA_MARKER,
+        meta: { route: PUBLIC_BOOKING_SLOTS_ROUTE_META },
+        slots: result.slots,
+        timezone: result.timezone,
+        timezoneMode: result.timezoneMode,
+        schedulingHorizonDays: result.schedulingHorizonDays,
+        horizonEndAt: result.horizonEndAt,
+        monthKey: result.monthKey,
+      },
+      200,
+    )
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Could not load booking availability."
+    return jsonResponse(
+      {
+        ok: false,
+        qaMarker: GROWTH_BOOKING_SLOTS_API_QA_MARKER,
+        meta: { route: PUBLIC_BOOKING_SLOTS_ROUTE_META },
+        error: "slots_fetch_failed",
+        message,
+      },
+      503,
+    )
+  }
 }

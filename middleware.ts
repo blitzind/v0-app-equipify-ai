@@ -12,6 +12,8 @@ import { portalAuthGate } from "@/lib/portal/middleware-gate"
 
 const PUBLIC_ROUTES = new Set(["/login", "/onboarding"])
 
+/** Public booking pages + APIs — no auth required (`/book/*`, `/api/book/*`). */
+
 const DASHBOARD_PREFIXES = [
   "/customers",
   "/communications",
@@ -33,6 +35,8 @@ const DASHBOARD_PREFIXES = [
 
 function isProtectedRoute(pathname: string) {
   if (pathname.startsWith("/portal")) return false
+  if (pathname.startsWith("/book")) return false
+  if (pathname.startsWith("/api/book")) return false
   if (pathname === "/") return true
   if (pathname === "/test-maintenance-plan-create") return true
   if (pathname.startsWith("/admin")) return true
