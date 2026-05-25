@@ -11,10 +11,12 @@ import {
 } from "../lib/growth/native-dialer/native-dialer-wrapup-engine"
 import { nativeCallWorkspaceHref } from "../lib/growth/native-dialer/native-dialer-navigation"
 import { createNativeDialerProviderInstance } from "../lib/growth/native-dialer/native-dialer-provider-registry"
-import { GROWTH_NATIVE_DIALER_QA_MARKER, GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER } from "../lib/growth/native-dialer/native-dialer-types"
+import { GROWTH_NATIVE_DIALER_QA_MARKER, GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER, GROWTH_NATIVE_DIALER_CALL_START_FIX_QA_MARKER, GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER } from "../lib/growth/native-dialer/native-dialer-types"
 
 assert.equal(GROWTH_NATIVE_DIALER_QA_MARKER, "native-dialer-v1")
 assert.equal(GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER, "native-dialer-layout-v3")
+assert.equal(GROWTH_NATIVE_DIALER_CALL_START_FIX_QA_MARKER, "native-dialer-call-start-fix-v1")
+assert.equal(GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER, "native-dialer-live-coaching-center-v1")
 
 assert.match(
   nativeCallWorkspaceHref({ leadId: "00000000-0000-4000-8000-000000000001", phone: "+15551234567" }),
@@ -74,6 +76,11 @@ assert.match(workspaceComponent, /GrowthCallWorkspaceCenterPanel/)
 assert.match(workspaceComponent, /GrowthCallWorkspaceDialerCard/)
 assert.match(workspaceComponent, /GrowthCallWorkspaceIntelligenceRail/)
 assert.match(workspaceComponent, /GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER/)
+assert.match(workspaceComponent, /GROWTH_NATIVE_DIALER_CALL_START_FIX_QA_MARKER/)
+assert.match(workspaceComponent, /normalizeDialPhoneForApi/)
+assert.match(workspaceComponent, /onStartCall/)
+assert.match(workspaceComponent, /\/api\/platform\/growth\/calls\/start/)
+assert.match(workspaceComponent, /setActiveSession/)
 assert.match(workspaceComponent, /lg:grid-cols-\[320px_minmax\(0,1fr\)_320px\]/)
 
 const centerPanel = fs.readFileSync(
@@ -81,17 +88,35 @@ const centerPanel = fs.readFileSync(
   "utf8",
 )
 assert.match(centerPanel, /Ready to call/)
-assert.match(centerPanel, /No active call/)
+assert.match(centerPanel, /GrowthCallWorkspaceLiveCoachingPanel/)
 assert.match(centerPanel, /GROWTH_CALL_WORKSPACE_GLASS_DOCK/)
-assert.match(centerPanel, /Live Coaching/)
+
+const liveCoachingPanel = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace-live-coaching-panel.tsx"),
+  "utf8",
+)
+assert.match(liveCoachingPanel, /GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER/)
+assert.match(liveCoachingPanel, /Live Coaching Ready/)
+assert.match(liveCoachingPanel, /Start Coaching/)
+assert.match(liveCoachingPanel, /No guidance yet/)
 
 const dialerComponent = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-native-dialer.tsx"),
   "utf8",
 )
+assert.match(dialerComponent, /onStartCall/)
+assert.match(dialerComponent, /data-qa-action="native-dialer-start-call"/)
+assert.match(dialerComponent, /hasDialablePhone/)
+assert.match(dialerComponent, /disabled=\{disabled \|\| !canDial \|\| loading\}/)
 assert.match(dialerComponent, /h-14 w-full/)
 assert.match(dialerComponent, /font-mono text-3xl/)
 assert.match(dialerComponent, /bg-gradient-to-r from-emerald-600/)
+
+const dialerCard = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace-dialer-card.tsx"),
+  "utf8",
+)
+assert.match(dialerCard, /onStartCall/)
 
 const queueCard = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-workspace-queue-card.tsx"),

@@ -11,19 +11,23 @@ import {
   SquarePen,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { GrowthActiveCallPanel } from "@/components/growth/growth-active-call-panel"
+import { Textarea } from "@/components/ui/textarea"
 import { GrowthIncomingCallPanel } from "@/components/growth/growth-incoming-call-panel"
+import { GrowthCallWorkspaceLiveCoachingPanel } from "@/components/growth/growth-call-workspace-live-coaching-panel"
 import { GrowthPostCallWrapup } from "@/components/growth/growth-post-call-wrapup"
+import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import {
   GROWTH_CALL_WORKSPACE_GLASS_DOCK,
   GROWTH_CALL_WORKSPACE_PANEL,
   formatCallDuration,
+  formatDisplayPhone,
 } from "@/lib/growth/native-dialer/native-dialer-workspace-ui"
 import type {
   NativeCallWrapupOutcome,
   NativeCallWrapupPublicView,
   NativeCallWorkspaceSessionPublicView,
 } from "@/lib/growth/native-dialer/native-dialer-types"
+import { NATIVE_DIALER_PROVIDER_LABELS } from "@/lib/growth/native-dialer/native-dialer-types"
 import { cn } from "@/lib/utils"
 
 type WorkspacePhase = "idle" | "incoming" | "active" | "wrapup"
@@ -83,6 +87,32 @@ function ControlDockButton({
   )
 }
 
+function ActiveCallHeader({
+  session,
+  elapsed,
+}: {
+  session: NativeCallWorkspaceSessionPublicView
+  elapsed: number
+}) {
+  return (
+    <div className="mb-3 rounded-xl border border-border/60 bg-muted/20 px-4 py-3 dark:border-white/5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs text-muted-foreground">Active call</p>
+          <p className="font-semibold">{session.companyName ?? session.contactName ?? "Prospect"}</p>
+          <p className="text-sm text-muted-foreground">
+            {formatDisplayPhone(session.phoneNumber)} · {session.contactName ?? "Contact"}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <GrowthBadge label={NATIVE_DIALER_PROVIDER_LABELS[session.provider]} tone="neutral" />
+          <GrowthBadge label={formatCallDuration(elapsed)} tone="healthy" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function GrowthCallWorkspaceCenterPanel({
   phase,
   activeSession,
@@ -133,22 +163,24 @@ export function GrowthCallWorkspaceCenterPanel({
   }, [activeSession])
 
   const controlsEnabled = phase === "active"
-  const coachingLabel = phase === "active" ? "Enabled" : phase === "idle" ? "Ready" : "Standby"
-  const coachingTone = phase === "active" ? "healthy" : "neutral"
   const recordingLabel =
     phase === "active" && activeSession
-      ? activeSession.recordingState === "recording"
+      ? activeSession.recordingState === "active"
         ? "On"
         : "Off"
       : "Off"
   const recordingTone = recordingLabel === "On" ? "attention" : "neutral"
   const callTimeLabel =
     phase === "active" || phase === "wrapup" ? formatCallDuration(elapsed) : "00:00"
+  const providerLabel =
+    phase === "active" && activeSession
+      ? NATIVE_DIALER_PROVIDER_LABELS[activeSession.provider]
+      : "—"
 
   return (
     <section className={cn(GROWTH_CALL_WORKSPACE_PANEL, "flex min-h-[560px] flex-col p-4")}>
       {phase === "idle" ? (
-        <div className="mb-4">
+        <div className="mb-3">
           <h3 className="text-base font-semibold">Ready to call</h3>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
             Enter a number or pick a queue item. During calls, live coaching and realtime intelligence appear here.
@@ -157,42 +189,62 @@ export function GrowthCallWorkspaceCenterPanel({
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
         {phase === "idle" ? (
-          <div className="flex flex-1 flex-col items-center justify-center px-4 py-6 text-center">
-            <span className="mb-4 flex size-20 items-center justify-center rounded-full bg-muted/40 text-muted-foreground dark:bg-white/5">
-              <Headphones className="size-10" />
-            </span>
-            <p className="text-lg font-semibold">No active call</p>
-            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-              Select a lead or dial a number to get started.
-            </p>
-          </div>
+          <>
+            <GrowthCallWorkspaceLiveCoachingPanel phase="idle" leadId={null} nativeSessionId={null} />
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-border/60 px-4 py-3 text-center text-sm text-muted-foreground dark:border-white/10">
+              <Headphones className="size-4 shrink-0" />
+              <span>No active call — select a lead or dial a number to get started.</span>
+            </div>
+          </>
         ) : null}
 
         {phase === "incoming" && activeSession ? (
-          <GrowthIncomingCallPanel
-            session={activeSession}
-            onAnswer={onAnswer}
-            onDecline={onDecline}
-            answering={answering}
-            declining={declining}
-            embedded
-          />
+          <>
+            <GrowthIncomingCallPanel
+              session={activeSession}
+              onAnswer={onAnswer}
+              onDecline={onDecline}
+              answering={answering}
+              declining={declining}
+              embedded
+            />
+            <GrowthCallWorkspaceLiveCoachingPanel
+              phase="incoming"
+              leadId={activeSession.leadId}
+              nativeSessionId={activeSession.id}
+            />
+          </>
         ) : null}
 
         {phase === "active" && activeSession ? (
-          <GrowthActiveCallPanel
-            session={activeSession}
-            onEndCall={onEndCall}
-            onNotesChange={() => undefined}
-            ending={ending}
-            embedded
-          />
+          <>
+            <ActiveCallHeader session={activeSession} elapsed={elapsed} />
+            <GrowthCallWorkspaceLiveCoachingPanel
+              phase="active"
+              leadId={activeSession.leadId}
+              nativeSessionId={activeSession.id}
+            />
+            <Textarea
+              placeholder="Call notes (operator)"
+              value={activeSession.notesDraft}
+              readOnly
+              rows={2}
+              className="resize-none text-sm"
+            />
+          </>
         ) : null}
 
         {phase === "wrapup" && activeSession ? (
-          <GrowthPostCallWrapup session={activeSession} submitting={submittingWrapup} onSubmit={onSubmitWrapup} embedded />
+          <>
+            <GrowthCallWorkspaceLiveCoachingPanel
+              phase="wrapup"
+              leadId={activeSession.leadId}
+              nativeSessionId={activeSession.id}
+            />
+            <GrowthPostCallWrapup session={activeSession} submitting={submittingWrapup} onSubmit={onSubmitWrapup} embedded />
+          </>
         ) : null}
       </div>
 
@@ -214,9 +266,9 @@ export function GrowthCallWorkspaceCenterPanel({
         </div>
 
         <div className="grid grid-cols-3 gap-2">
-          <WorkspaceMetricCard label="Live Coaching" value={coachingLabel} tone={coachingTone} />
           <WorkspaceMetricCard label="Recording" value={recordingLabel} tone={recordingTone} />
           <WorkspaceMetricCard label="Call Time" value={callTimeLabel} />
+          <WorkspaceMetricCard label="Provider" value={providerLabel} />
         </div>
       </div>
     </section>

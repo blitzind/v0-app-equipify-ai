@@ -9,14 +9,14 @@ import { cn } from "@/lib/utils"
 export function GrowthCallWorkspaceDialerCard({
   phone,
   onPhoneChange,
-  onDial,
+  onStartCall,
   disabled,
   loading,
   recentSessions,
 }: {
   phone: string
   onPhoneChange: (value: string) => void
-  onDial: () => void
+  onStartCall: () => void
   disabled?: boolean
   loading?: boolean
   recentSessions: NativeCallWorkspaceSessionPublicView[]
@@ -29,11 +29,11 @@ export function GrowthCallWorkspaceDialerCard({
           <TabsTrigger value="recent">Recent Calls</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dialer" className="mt-0">
+        <TabsContent value="dialer" className="mt-0" forceMount>
           <GrowthNativeDialer
             phone={phone}
             onPhoneChange={onPhoneChange}
-            onDial={onDial}
+            onStartCall={onStartCall}
             disabled={disabled}
             loading={loading}
           />

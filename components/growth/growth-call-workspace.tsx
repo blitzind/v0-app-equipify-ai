@@ -17,9 +17,15 @@ import type {
   NativeDialerQueueItemPublicView,
 } from "@/lib/growth/native-dialer/native-dialer-types"
 import {
+  GROWTH_NATIVE_DIALER_CALL_START_FIX_QA_MARKER,
   GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER,
   GROWTH_NATIVE_DIALER_QA_MARKER,
 } from "@/lib/growth/native-dialer/native-dialer-types"
+import {
+  normalizeDialPhoneDigits,
+  normalizeDialPhoneForApi,
+  optionalUuid,
+} from "@/lib/growth/native-dialer/native-dialer-workspace-ui"
 
 export function GrowthCallWorkspace() {
   const searchParams = useSearchParams()
@@ -31,7 +37,7 @@ export function GrowthCallWorkspace() {
   const [queue, setQueue] = useState<NativeDialerQueueItemPublicView[]>([])
   const [activeSession, setActiveSession] = useState<NativeCallWorkspaceSessionPublicView | null>(null)
   const [leadContext, setLeadContext] = useState<NativeDialerLeadContext | null>(null)
-  const [phone, setPhone] = useState(initialPhone ?? "")
+  const [phone, setPhone] = useState(() => normalizeDialPhoneDigits(initialPhone ?? ""))
   const [loading, setLoading] = useState(true)
   const [setupMessage, setSetupMessage] = useState<string | null>(null)
   const [setupWarning, setSetupWarning] = useState<string | null>(null)
@@ -85,7 +91,9 @@ export function GrowthCallWorkspace() {
     const res = await fetch(`/api/platform/growth/calls/workspace/lead/${leadId}`, { cache: "no-store" })
     const data = (await res.json().catch(() => ({}))) as { leadContext?: NativeDialerLeadContext | null }
     setLeadContext(data.leadContext ?? null)
-    if (data.leadContext?.contactPhone && !phone) setPhone(data.leadContext.contactPhone)
+    if (data.leadContext?.contactPhone && !phone) {
+      setPhone(normalizeDialPhoneDigits(data.leadContext.contactPhone))
+    }
   }, [phone])
 
   useEffect(() => {
@@ -104,6 +112,12 @@ export function GrowthCallWorkspace() {
   }, [activeSession])
 
   async function startCall(input?: { phoneNumber?: string; leadId?: string | null; queueItemId?: string | null }) {
+    const phoneNumber = normalizeDialPhoneForApi(input?.phoneNumber ?? phone)
+    if (!phoneNumber) {
+      setError("Enter a valid phone number with at least 3 digits.")
+      return
+    }
+
     setStarting(true)
     setError(null)
     try {
@@ -111,9 +125,9 @@ export function GrowthCallWorkspace() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          phoneNumber: input?.phoneNumber ?? phone,
-          leadId: input?.leadId ?? initialLeadId,
-          queueItemId: input?.queueItemId ?? initialQueueItemId,
+          phoneNumber,
+          leadId: optionalUuid(input?.leadId ?? initialLeadId),
+          queueItemId: optionalUuid(input?.queueItemId ?? initialQueueItemId),
         }),
       })
       const data = (await res.json().catch(() => ({}))) as {
@@ -245,6 +259,7 @@ export function GrowthCallWorkspace() {
       className="w-full min-w-0 space-y-4"
       data-qa-marker={GROWTH_NATIVE_DIALER_QA_MARKER}
       data-layout-qa-marker={GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER}
+      data-call-start-fix-qa-marker={GROWTH_NATIVE_DIALER_CALL_START_FIX_QA_MARKER}
     >
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button type="button" size="sm" variant="outline" onClick={() => void load()}>
@@ -265,8 +280,13 @@ export function GrowthCallWorkspace() {
         <aside className="w-full min-w-0 space-y-4 lg:max-w-[320px]">
           <GrowthCallWorkspaceDialerCard
             phone={phone}
-            onPhoneChange={setPhone}
-            onDial={() => void startCall()}
+            onPhoneChange={(value) => setPhone(normalizeDialPhoneDigits(value))}
+            onStartCall={() =>
+              void startCall({
+                phoneNumber: normalizeDialPhoneForApi(phone),
+                leadId: optionalUuid(initialLeadId),
+              })
+            }
             disabled={workspacePhase !== "idle"}
             loading={starting}
             recentSessions={dashboard?.recentSessions ?? []}
@@ -276,10 +296,11 @@ export function GrowthCallWorkspace() {
             items={queue}
             dialingId={dialingQueueId}
             onDialItem={(item) => {
+              const phoneNumber = normalizeDialPhoneForApi(item.phoneNumber ?? phone)
               setDialingQueueId(item.id)
-              setPhone(item.phoneNumber ?? "")
+              setPhone(normalizeDialPhoneDigits(item.phoneNumber ?? phone))
               void startCall({
-                phoneNumber: item.phoneNumber ?? phone,
+                phoneNumber,
                 leadId: item.leadId,
                 queueItemId: item.id,
               })

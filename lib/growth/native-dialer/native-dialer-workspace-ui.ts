@@ -44,3 +44,40 @@ export function formatCallDuration(seconds: number): string {
   const s = seconds % 60
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
 }
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/** Strip formatting so keypad/backspace operate on stable digits. */
+export function normalizeDialPhoneDigits(value: string): string {
+  return value.replace(/\D/g, "")
+}
+
+export function appendDialPhoneKey(current: string, key: string): string {
+  const digits = normalizeDialPhoneDigits(current)
+  if (key === "*" || key === "#") return `${digits}${key}`
+  return `${digits}${key}`
+}
+
+export function backspaceDialPhone(current: string): string {
+  const raw = current.replace(/[^\d+*#]/g, "")
+  return raw.slice(0, -1)
+}
+
+/** Minimum digits for start API (matches zod min(3) on phoneNumber). */
+export function hasDialablePhone(value: string): boolean {
+  return normalizeDialPhoneDigits(value).length >= 3
+}
+
+export function normalizeDialPhoneForApi(value: string): string {
+  const digits = normalizeDialPhoneDigits(value)
+  if (digits.length < 3) return ""
+  if (digits.length === 10) return `+1${digits}`
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`
+  return digits
+}
+
+export function optionalUuid(value: string | null | undefined): string | null {
+  if (!value?.trim()) return null
+  return UUID_RE.test(value.trim()) ? value.trim() : null
+}

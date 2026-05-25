@@ -2,6 +2,8 @@
 
 export const GROWTH_NATIVE_DIALER_QA_MARKER = "native-dialer-v1" as const
 export const GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER = "native-dialer-layout-v3" as const
+export const GROWTH_NATIVE_DIALER_CALL_START_FIX_QA_MARKER = "native-dialer-call-start-fix-v1" as const
+export const GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER = "native-dialer-live-coaching-center-v1" as const
 
 export const NATIVE_DIALER_PROVIDER_IDS = [
   "stub",

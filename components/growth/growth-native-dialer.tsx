@@ -5,12 +5,18 @@ import { Delete, Phone, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { formatDisplayPhone } from "@/lib/growth/native-dialer/native-dialer-workspace-ui"
+import {
+  appendDialPhoneKey,
+  backspaceDialPhone,
+  formatDisplayPhone,
+  hasDialablePhone,
+  normalizeDialPhoneDigits,
+} from "@/lib/growth/native-dialer/native-dialer-workspace-ui"
 
 type GrowthNativeDialerProps = {
   phone: string
   onPhoneChange: (value: string) => void
-  onDial: () => void
+  onStartCall: () => void
   disabled?: boolean
   loading?: boolean
 }
@@ -33,7 +39,7 @@ const KEYPAD = [
 export function GrowthNativeDialer({
   phone,
   onPhoneChange,
-  onDial,
+  onStartCall,
   disabled,
   loading,
 }: GrowthNativeDialerProps) {
@@ -44,14 +50,16 @@ export function GrowthNativeDialer({
     return `Search: ${search.trim()} — select a lead from queue or paste a number`
   }, [search])
 
-  const displayPhone = phone ? formatDisplayPhone(phone) : ""
+  const dialDigits = normalizeDialPhoneDigits(phone)
+  const displayPhone = dialDigits ? formatDisplayPhone(dialDigits) : ""
+  const canDial = hasDialablePhone(phone)
 
   function appendKey(key: string) {
-    onPhoneChange(`${phone}${key}`)
+    onPhoneChange(appendDialPhoneKey(phone, key))
   }
 
   function backspace() {
-    onPhoneChange(phone.slice(0, -1))
+    onPhoneChange(backspaceDialPhone(phone))
   }
 
   function clearPhone() {
@@ -59,7 +67,7 @@ export function GrowthNativeDialer({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-qa-marker="growth-native-dialer-controls">
       <Input
         placeholder="Search lead, contact, or company..."
         value={search}
@@ -71,11 +79,12 @@ export function GrowthNativeDialer({
       <div className="relative">
         <Input
           value={displayPhone}
-          onChange={(e) => onPhoneChange(e.target.value.replace(/[^\d+*#]/g, ""))}
+          onChange={(e) => onPhoneChange(normalizeDialPhoneDigits(e.target.value))}
           placeholder="Enter phone number"
           className="h-14 border-0 bg-muted/30 pr-10 text-center font-mono text-3xl tracking-wide shadow-none focus-visible:ring-1 dark:bg-white/5"
+          inputMode="tel"
         />
-        {phone ? (
+        {dialDigits ? (
           <Button
             type="button"
             variant="ghost"
@@ -119,12 +128,13 @@ export function GrowthNativeDialer({
         </Button>
         <Button
           type="button"
+          data-qa-action="native-dialer-start-call"
           className={cn(
             "h-12 flex-[1.4] rounded-xl font-semibold text-white",
             "bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600",
           )}
-          disabled={disabled || !phone.trim() || loading}
-          onClick={onDial}
+          disabled={disabled || !canDial || loading}
+          onClick={onStartCall}
         >
           {loading ? "Starting…" : (
             <>
