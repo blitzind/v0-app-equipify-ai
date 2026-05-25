@@ -231,15 +231,12 @@ function resolveNavPermissions(args: {
     return getOrgPermissionsForRole("owner")
   }
 
-  // Phase 20 retry: navigation intentionally uses the stable DB role defaults,
-  // not commercial profile overlays. Future Phase 20B can add scoped nav
-  // filtering once loading and owner/admin/manager behavior are covered.
   if (args.status !== "ready") {
-    return getOrgPermissionsForRole("owner")
+    return getOrgPermissionsForRole(null)
   }
 
   if (!args.role) {
-    return getOrgPermissionsForRole("owner")
+    return getOrgPermissionsForRole(null)
   }
 
   return getOrgPermissionsForRole(args.role)
@@ -350,7 +347,7 @@ function SidebarBody({
       const navPermissions = resolveNavPermissions({
         role,
         status: permissionsStatus,
-        platformAdmin: isPlatformAdmin || sessionIdentityLoading,
+        platformAdmin: isPlatformAdmin,
         impersonating: impersonation.active || supportAccessActive,
       })
       debugNavResolution({

@@ -29,10 +29,20 @@ export async function GET() {
 
   const body: { authenticated: true } & SessionIdentity = {
     authenticated: true,
+    authUserId: user.id,
     email,
     displayName: displayNameFromProfile(row?.full_name, email),
     platformAdmin,
     platformRoleLabel: platformAdmin ? "Platform Admin" : null,
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    console.info("[equipify:session-context] account-summary", {
+      authUserId: user.id,
+      profileUserId: user.id,
+      profileEmail: email.trim().toLowerCase(),
+      platformAdmin,
+    })
   }
 
   return NextResponse.json(body)

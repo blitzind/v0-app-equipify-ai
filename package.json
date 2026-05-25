@@ -131,6 +131,8 @@
     "test:growth-revenue-execution": "tsx scripts/test-growth-revenue-execution.ts",
     "test:growth-human-approved-execution": "tsx scripts/test-growth-human-approved-execution.ts",
     "test:growth-meeting-outcome-intelligence": "tsx scripts/test-growth-meeting-outcome-intelligence.ts",
+    "test:onboarding-provision-finalization": "tsx scripts/test-onboarding-provision-finalization.ts",
+    "test:session-context-sync": "tsx scripts/test-session-context-sync.ts",
     "test:growth-native-dialer": "tsx scripts/test-growth-native-dialer.ts",
     "test:growth-native-dialer-schema-health": "tsx scripts/test-growth-native-dialer-schema-health.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",

@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { subscribeToAuthSessionChanges } from "@/lib/auth/auth-session-sync"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import {
   getEffectiveOrgPermissions,
@@ -123,6 +124,12 @@ export function OrgPermissionsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void load()
+  }, [load])
+
+  useEffect(() => {
+    return subscribeToAuthSessionChanges(() => {
+      void load()
+    })
   }, [load])
 
   const role = useMemo(() => normalizeOrgMemberRole(rawRole), [rawRole])

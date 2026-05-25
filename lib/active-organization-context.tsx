@@ -12,9 +12,15 @@ import {
 } from "react"
 import { useAdmin } from "@/lib/admin-store"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { subscribeToAuthSessionChanges } from "@/lib/auth/auth-session-sync"
+import {
+  ACTIVE_ORG_STORAGE_KEY,
+  clearUserScopedClientStorage,
+} from "@/lib/auth/session-context-storage"
+import { logSessionContextDiagnostics } from "@/lib/auth/session-context-diagnostics"
 import { EQUIPIFY_SUPPORT_SESSION_ORG_CACHE_KEY } from "@/lib/support-session-storage"
 
-const STORAGE_KEY = "equipify_active_organization_id"
+const STORAGE_KEY = ACTIVE_ORG_STORAGE_KEY
 
 export type ActiveOrgRow = {
   id: string
@@ -144,6 +150,14 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
     }
 
     if (lastResolvedUserIdRef.current !== user.id) {
+      if (lastResolvedUserIdRef.current) {
+        clearUserScopedClientStorage()
+        setOrganizations([])
+        setOrganizationId(null)
+        setOrganizationSlug(null)
+        setOrganizationName(null)
+        setSupportAccessActive(false)
+      }
       initialOrgResolutionCompleteRef.current = false
       lastResolvedUserIdRef.current = user.id
     }
@@ -346,11 +360,39 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
       organizationId: chosen,
       orgCount: resolvedOrgs.length,
     })
+
+    const memberRoleRow = chosen
+      ? await supabase
+          .from("organization_members")
+          .select("role")
+          .eq("organization_id", chosen)
+          .eq("user_id", user.id)
+          .eq("status", "active")
+          .maybeSingle()
+      : { data: null }
+
+    logSessionContextDiagnostics({
+      label: "active_org_resolved",
+      authUserId: user.id,
+      profileUserId: user.id,
+      activeOrganizationId: chosen,
+      orgMemberRole: (memberRoleRow.data as { role?: string } | null)?.role ?? null,
+    })
   }, [])
 
   useEffect(() => {
     void refresh()
   }, [refresh, impersonation.active, impersonation.accountId, impersonation.accountSlug, isPlatformAdmin])
+
+  useEffect(() => {
+    return subscribeToAuthSessionChanges((event) => {
+      if (event.type === "signed_out") {
+        void refresh()
+        return
+      }
+      void refresh()
+    })
+  }, [refresh])
 
   const switchOrganization = useCallback(
     async (orgId: string) => {

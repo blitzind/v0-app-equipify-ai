@@ -29,6 +29,7 @@ export async function loadPlatformAdminIdentity(): Promise<SessionIdentity | nul
   const row = profile as { full_name: string | null } | null
 
   return {
+    authUserId: user.id,
     email,
     displayName: displayNameFromProfile(row?.full_name, email),
     platformAdmin: true,

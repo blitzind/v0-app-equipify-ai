@@ -59,7 +59,7 @@ export function describeProvisioningPhaseFailure(code: ProvisioningErrorCode): s
     case "profile_failed":
       return "We couldn't finalize your profile. Please try again or sign in to retry."
     case "seed_failed":
-      return "We couldn't load your sample data. Please try again — your account is otherwise ready."
+      return "Sample data could not be loaded. Your workspace is ready — you can import examples under Settings → Sample data."
     case "service_unavailable":
       return "Workspace setup is temporarily unavailable. Please try again shortly."
     case "internal_error":

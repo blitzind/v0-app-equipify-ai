@@ -27,6 +27,8 @@ import { getOrgPermissionsForRole, type OrgMemberRole, type OrgPermissions } fro
 import { planBadgeFromWorkspace } from "@/lib/plan-display"
 import { useAdmin } from "@/lib/admin-store"
 import { useActiveOrganizationOptional } from "@/lib/active-organization-context"
+import { clearAuthSessionClientStorage } from "@/lib/auth/session-context-storage"
+import { logSessionContextDiagnostics } from "@/lib/auth/session-context-diagnostics"
 import { initialsFromDisplayLabel } from "@/lib/user-display"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import {
@@ -80,9 +82,8 @@ function resolveLauncherNavPermissions(args: {
   role: OrgMemberRole | null
   status: "loading" | "ready" | "no_org"
 }): OrgPermissions {
-  // Keep topbar/account navigation on stable DB role defaults for the Phase 20
-  // retry. Commercial profile overlays should not remove settings links.
-  if (args.status !== "ready" || !args.role) return getOrgPermissionsForRole("owner")
+  if (args.status === "loading") return getOrgPermissionsForRole(null)
+  if (args.status !== "ready" || !args.role) return getOrgPermissionsForRole(null)
   return getOrgPermissionsForRole(args.role)
 }
 
@@ -92,7 +93,7 @@ export function AppTopbar() {
   const pathname  = usePathname()
   const router    = useRouter()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
-  const { sessionIdentity, sessionIdentityLoading, isPlatformAdmin } = useAdmin()
+  const { sessionIdentity, sessionIdentityLoading, isPlatformAdmin, clearSessionIdentity } = useAdmin()
   const activeOrgOpt = useActiveOrganizationOptional()
   const [orgRoleLabel, setOrgRoleLabel] = useState<string | null>(null)
   const { workspace } = useTenant()
@@ -120,8 +121,10 @@ export function AppTopbar() {
 
   const hubRoleLabel =
     orgRoleLabel ??
-    (sessionIdentity?.platformAdmin ? (sessionIdentity.platformRoleLabel ?? "Platform Admin") : null) ??
-    "Member"
+    (!sessionIdentityLoading && sessionIdentity?.platformAdmin
+      ? (sessionIdentity.platformRoleLabel ?? "Platform Admin")
+      : null) ??
+    (sessionIdentityLoading ? "…" : "Member")
 
   const menuDisplayName =
     sessionIdentity?.displayName?.trim() ||
@@ -159,12 +162,21 @@ export function AppTopbar() {
       if (cancelled) return
       const role = (row as { role: string } | null)?.role
       setOrgRoleLabel(role ? formatOrganizationMemberRole(role) : null)
+      logSessionContextDiagnostics({
+        label: "topbar_org_role",
+        authUserId: user.id,
+        profileUserId: user.id,
+        profileEmail: sessionIdentity?.email ?? user.email ?? null,
+        activeOrganizationId: orgId,
+        orgMemberRole: role ?? null,
+        platformAdmin: sessionIdentity?.platformAdmin ?? false,
+      })
     })()
 
     return () => {
       cancelled = true
     }
-  }, [supabase, activeOrgOpt?.organizationId])
+  }, [supabase, activeOrgOpt?.organizationId, sessionIdentity?.email, sessionIdentity?.platformAdmin])
 
   useEffect(() => {
     const orgId = activeOrgOpt?.organizationId
@@ -237,9 +249,12 @@ export function AppTopbar() {
   }
 
   async function handleLogout() {
+    clearAuthSessionClientStorage()
+    clearSessionIdentity()
+    setOrgRoleLabel(null)
     await supabase.auth.signOut()
     setHubOpen(false)
-    router.push("/login")
+    window.location.assign("/login")
   }
 
   // Close account hub on outside click or ESC

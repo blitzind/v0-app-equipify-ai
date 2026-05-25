@@ -2,9 +2,10 @@
 
 import { Suspense, useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { Eye, EyeOff, ArrowRight } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { clearAuthSessionClientStorage } from "@/lib/auth/session-context-storage"
 import { BrandLogo } from "@/components/brand-logo"
 import { OAuthSignInButtonStack } from "@/components/auth/oauth-sign-in-button"
 import {
@@ -14,7 +15,6 @@ import {
 } from "@/lib/auth/supabase-oauth"
 
 function LoginPageInner() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [email, setEmail] = useState("")
@@ -53,8 +53,9 @@ function LoginPageInner() {
 
     setLoading(true)
     try {
+      clearAuthSessionClientStorage()
       await signInWithEmailPassword(email, password)
-      router.push("/")
+      window.location.assign("/")
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Unable to sign in."
       const message = raw.toLowerCase().includes("invalid login")

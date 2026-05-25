@@ -43,6 +43,13 @@ import {
   type HowHeardAboutEquipifyValue,
 } from "@/lib/onboarding/how-heard-about-equipify"
 import {
+  isBlockingProvisioningFailure,
+  ONBOARDING_SAMPLE_DATA_WARNING_STORAGE_KEY,
+  resolveOnboardingRedirectTarget,
+  sampleDataWarningMessage,
+  type OnboardingSampleDataStatus,
+} from "@/lib/onboarding/provision-finalization"
+import {
   buildOnboardingOAuthCallbackUrl,
   buildOnboardingOAuthReturnPath,
   detectOAuthProviderFromUser,
@@ -62,6 +69,7 @@ const TEAM_SIZE_OPTIONS = ONBOARDING_TEAM_SIZE_OPTIONS
 const CURRENT_SYSTEM_OPTIONS = ONBOARDING_CURRENT_SYSTEM_OPTIONS
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const ACTIVE_ORG_STORAGE_KEY = "equipify_active_organization_id"
 
 type InviteContext = {
   email: string
@@ -320,6 +328,8 @@ function OnboardingPageContent() {
   }
 
   async function finalizeOnboarding() {
+    if (isSubmitting) return
+
     const effectiveFirstName = form.firstName || firstNameParam || ""
     const effectiveLastName = form.lastName || lastNameParam || ""
     const effectiveEmail = form.email || emailParam || ""
@@ -337,6 +347,10 @@ function OnboardingPageContent() {
     let authUserId: string | null = null
     let completedOrganizationId: string | null = null
     let completionFlow: "invite" | "self_serve" = "self_serve"
+    let sampleDataStatus: OnboardingSampleDataStatus | null = null
+    let redirectTarget: string | null = null
+    let redirectScheduled = false
+
     try {
       const { data: existingSessionData } = await supabase.auth.getSession()
       authUserId = existingSessionData.session?.user?.id ?? null
@@ -419,13 +433,17 @@ function OnboardingPageContent() {
           ok?: boolean
           organizationId?: string
         }
-        if (!acceptRes.ok) {
+        if (!acceptRes.ok || !acceptData.organizationId) {
           setSubmitError(acceptData.message ?? "Could not accept invite. Request a new invite.")
           return
         }
-        completedOrganizationId =
-          acceptData.organizationId ?? inviteContext?.organizationId ?? null
+        completedOrganizationId = acceptData.organizationId
         completionFlow = "invite"
+        redirectTarget = resolveOnboardingRedirectTarget({
+          inviteFlow: true,
+          selectedPlanFromQuery: Boolean(parseOnboardingPlan(searchParams.get("plan"))),
+          selectedPlan,
+        })
       } else {
         const provisionRes = await fetch("/api/onboarding/provision", {
           method: "POST",
@@ -451,88 +469,147 @@ function OnboardingPageContent() {
           message?: string
           ok?: boolean
           organizationId?: string
+          sampleDataStatus?: OnboardingSampleDataStatus
+          redirectTarget?: string
+          onboardingCompleted?: boolean
         }
+
         if (!provisionRes.ok) {
+          if (provisionData.organizationId) {
+            completedOrganizationId = provisionData.organizationId
+            sampleDataStatus = "failed_non_blocking"
+            redirectTarget = resolveOnboardingRedirectTarget({
+              inviteFlow: false,
+              selectedPlanFromQuery: Boolean(parseOnboardingPlan(searchParams.get("plan"))),
+              selectedPlan,
+            })
+          } else {
+            setSubmitError(provisionData.message ?? "Could not finish workspace setup. Please try again.")
+            return
+          }
+        } else if (isBlockingProvisioningFailure(provisionData)) {
           setSubmitError(provisionData.message ?? "Could not finish workspace setup. Please try again.")
           return
+        } else {
+          completedOrganizationId = provisionData.organizationId ?? null
+          sampleDataStatus = provisionData.sampleDataStatus ?? null
+          redirectTarget =
+            provisionData.redirectTarget ??
+            resolveOnboardingRedirectTarget({
+              inviteFlow: false,
+              selectedPlanFromQuery: Boolean(parseOnboardingPlan(searchParams.get("plan"))),
+              selectedPlan,
+            })
         }
-        completedOrganizationId = provisionData.organizationId ?? null
         completionFlow = "self_serve"
       }
-    } finally {
-      setIsSubmitting(false)
-    }
 
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(ONBOARDING_INTENDED_PLAN_STORAGE_KEY, selectedPlan)
-      window.localStorage.setItem(
-        ONBOARDING_INTENT_STORAGE_KEY,
-        JSON.stringify({
-          selectedPlan,
-          trial: "scale",
-          firstName: form.firstName || firstNameParam || undefined,
-          lastName: form.lastName || lastNameParam || undefined,
-          email: form.email || emailParam || undefined,
-          phone: form.phone || undefined,
-          company: form.companyName || undefined,
-          industry: form.industry || undefined,
-          teamSize: form.teamSize || undefined,
-          currentSystem: form.currentSystem || undefined,
-          howHeardAboutEquipify: form.howHeardAboutEquipify || undefined,
-          howHeardAboutEquipifyOther:
-            form.howHeardAboutEquipify === HOW_HEARD_ABOUT_EQUIPIFY_OTHER_VALUE
-              ? form.howHeardAboutEquipifyOther.trim() || undefined
-              : undefined,
-          organizationId: organizationIdParam || undefined,
-          inviteTokenPresent: Boolean(inviteTokenParam),
-          inviteOrganizationId: inviteContext?.organizationId || undefined,
-          inviteRole: inviteContext?.role || undefined,
-        })
-      )
-    }
-
-    if (authUserId && completedOrganizationId) {
-      try {
-        if (completionFlow === "self_serve") {
-          trackFreeTrialSignup({
-            userId: authUserId,
-            organizationId: completedOrganizationId,
-            selectedPlan,
-            howHeardAboutEquipify: form.howHeardAboutEquipify || null,
-            howHeardAboutEquipifyOther:
-              form.howHeardAboutEquipify === HOW_HEARD_ABOUT_EQUIPIFY_OTHER_VALUE
-                ? form.howHeardAboutEquipifyOther.trim() || null
-                : null,
-          })
-        }
-        await new Promise<void>((resolve) => {
-          trackOnboardingCompleted({
-            userId: authUserId,
-            organizationId: completedOrganizationId,
-            flow: completionFlow,
-            howHeardAboutEquipify: form.howHeardAboutEquipify || null,
-            howHeardAboutEquipifyOther:
-              form.howHeardAboutEquipify === HOW_HEARD_ABOUT_EQUIPIFY_OTHER_VALUE
-                ? form.howHeardAboutEquipifyOther.trim() || null
-                : null,
-            onRedirectReady: resolve,
-          })
-        })
-      } catch (err) {
-        onboardingAnalyticsDevLog(
-          "post-provision analytics failed; continuing to redirect",
-          err,
-        )
+      if (!completedOrganizationId) {
+        setSubmitError("Workspace setup finished without an organization. Please try again or contact support.")
+        return
       }
-    }
 
-    const redirectHref = inviteTokenParam
-      ? "/"
-      : parseOnboardingPlan(searchParams.get("plan"))
-        ? `/settings/billing?plan=${selectedPlan}&source=onboarding`
-        : "/"
-    onboardingAnalyticsDevLog("router.push after analytics settle", { redirectHref })
-    router.push(redirectHref)
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, completedOrganizationId)
+        window.localStorage.setItem(ONBOARDING_INTENDED_PLAN_STORAGE_KEY, selectedPlan)
+        window.localStorage.setItem(
+          ONBOARDING_INTENT_STORAGE_KEY,
+          JSON.stringify({
+            selectedPlan,
+            trial: "scale",
+            firstName: form.firstName || firstNameParam || undefined,
+            lastName: form.lastName || lastNameParam || undefined,
+            email: form.email || emailParam || undefined,
+            phone: form.phone || undefined,
+            company: form.companyName || undefined,
+            industry: form.industry || undefined,
+            teamSize: form.teamSize || undefined,
+            currentSystem: form.currentSystem || undefined,
+            howHeardAboutEquipify: form.howHeardAboutEquipify || undefined,
+            howHeardAboutEquipifyOther:
+              form.howHeardAboutEquipify === HOW_HEARD_ABOUT_EQUIPIFY_OTHER_VALUE
+                ? form.howHeardAboutEquipifyOther.trim() || undefined
+                : undefined,
+            organizationId: completedOrganizationId,
+            inviteTokenPresent: Boolean(inviteTokenParam),
+            inviteOrganizationId: inviteContext?.organizationId || undefined,
+            inviteRole: inviteContext?.role || undefined,
+          }),
+        )
+
+        const warningMessage = sampleDataWarningMessage(sampleDataStatus)
+        if (warningMessage) {
+          try {
+            sessionStorage.setItem(ONBOARDING_SAMPLE_DATA_WARNING_STORAGE_KEY, warningMessage)
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
+      await supabase.auth.refreshSession()
+
+      if (authUserId) {
+        try {
+          if (completionFlow === "self_serve") {
+            trackFreeTrialSignup({
+              userId: authUserId,
+              organizationId: completedOrganizationId,
+              selectedPlan,
+              howHeardAboutEquipify: form.howHeardAboutEquipify || null,
+              howHeardAboutEquipifyOther:
+                form.howHeardAboutEquipify === HOW_HEARD_ABOUT_EQUIPIFY_OTHER_VALUE
+                  ? form.howHeardAboutEquipifyOther.trim() || null
+                  : null,
+            })
+          }
+          await new Promise<void>((resolve) => {
+            trackOnboardingCompleted({
+              userId: authUserId,
+              organizationId: completedOrganizationId,
+              flow: completionFlow,
+              howHeardAboutEquipify: form.howHeardAboutEquipify || null,
+              howHeardAboutEquipifyOther:
+                form.howHeardAboutEquipify === HOW_HEARD_ABOUT_EQUIPIFY_OTHER_VALUE
+                  ? form.howHeardAboutEquipifyOther.trim() || null
+                  : null,
+              onRedirectReady: resolve,
+            })
+          })
+        } catch (err) {
+          onboardingAnalyticsDevLog(
+            "post-provision analytics failed; continuing to redirect",
+            err,
+          )
+        }
+      }
+
+      const redirectHref =
+        redirectTarget ??
+        resolveOnboardingRedirectTarget({
+          inviteFlow: Boolean(inviteTokenParam),
+          selectedPlanFromQuery: Boolean(parseOnboardingPlan(searchParams.get("plan"))),
+          selectedPlan,
+        })
+
+      onboardingAnalyticsDevLog("onboarding redirect", {
+        redirectHref,
+        organizationId: completedOrganizationId,
+        sampleDataStatus,
+      })
+
+      if (typeof window !== "undefined") {
+        redirectScheduled = true
+        window.location.assign(redirectHref)
+        return
+      }
+      redirectScheduled = true
+      router.replace(redirectHref)
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Could not finish onboarding. Please try again.")
+    } finally {
+      if (!redirectScheduled) setIsSubmitting(false)
+    }
   }
 
   function next() {
@@ -909,11 +986,11 @@ function OnboardingPageContent() {
               </div>
 
               <div className="flex gap-3 max-w-md mx-auto">
-                <button onClick={back} className="portal-btn-secondary h-10 px-5">
+                <button onClick={back} disabled={isSubmitting} className="portal-btn-secondary h-10 px-5">
                   <ArrowLeft size={15} /> Back
                 </button>
                 <button onClick={next} disabled={isSubmitting} className="portal-btn-primary flex-1 justify-center h-10">
-                  {isSubmitting ? "Creating account..." : <>Start free trial <ArrowRight size={15} /></>}
+                  {isSubmitting ? "Finishing setup…" : <>Start free trial <ArrowRight size={15} /></>}
                 </button>
               </div>
               {submitError && (

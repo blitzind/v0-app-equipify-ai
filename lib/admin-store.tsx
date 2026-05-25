@@ -3,6 +3,12 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
 import type { PlatformAccount } from "./admin-data"
 import type { SessionIdentity } from "./session-identity"
+import { subscribeToAuthSessionChanges } from "@/lib/auth/auth-session-sync"
+import {
+  clearAuthSessionClientStorage,
+  clearUserScopedClientStorageIfAuthUserChanged,
+} from "@/lib/auth/session-context-storage"
+import { logSessionContextDiagnostics } from "@/lib/auth/session-context-diagnostics"
 import { EQUIPIFY_SUPPORT_SESSION_ORG_CACHE_KEY } from "@/lib/support-session-storage"
 
 interface ImpersonationState {
@@ -23,6 +29,10 @@ interface AdminContextValue {
   endImpersonation: () => Promise<void>
   /** Server gate for `/admin` — hydrates global session before client fetch. */
   seedPlatformSessionIdentity: (identity: SessionIdentity) => void
+  /** Refetch identity from `/api/session/account-summary` for the current auth user. */
+  refreshSessionIdentity: () => Promise<void>
+  /** Clear in-memory identity (logout / user switch). */
+  clearSessionIdentity: () => void
   /** Confirmed after bootstrap: session user email is in EQUIPIFY_PLATFORM_ADMIN_EMAILS (org role ignored). */
   isPlatformAdmin: boolean
   /** Show Platform Admin nav entry while loading or when confirmed platform admin (middleware still enforces /admin). */
@@ -53,50 +63,91 @@ type SupportSessionGetResponse =
       expiresAt: string
     }
 
+type AccountSummaryResponse =
+  | { authenticated: false }
+  | ({ authenticated: true } & SessionIdentity)
+
 export function AdminProvider({ children }: { children: React.ReactNode }) {
-  const sessionSeededRef = useRef(false)
+  const authUserIdRef = useRef<string | null>(null)
+  const refreshGenerationRef = useRef(0)
 
   const [sessionIdentity, setSessionIdentity] = useState<SessionIdentity | null>(null)
-
   const [sessionIdentityLoading, setSessionIdentityLoading] = useState(true)
 
-  useEffect(() => {
-    if (sessionSeededRef.current) {
-      return
-    }
+  const clearSessionIdentity = useCallback(() => {
+    authUserIdRef.current = null
+    setSessionIdentity(null)
+    setSessionIdentityLoading(false)
+  }, [])
 
-    let cancelled = false
-    ;(async () => {
-      try {
-        const res = await fetch("/api/session/account-summary")
-        const data = (await res.json()) as
-          | { authenticated: false }
-          | ({ authenticated: true } & SessionIdentity)
+  const refreshSessionIdentity = useCallback(async () => {
+    const generation = ++refreshGenerationRef.current
+    setSessionIdentityLoading(true)
 
-        if (cancelled) return
+    try {
+      const res = await fetch("/api/session/account-summary", { cache: "no-store" })
+      const data = (await res.json()) as AccountSummaryResponse
 
-        if ("authenticated" in data && data.authenticated === true) {
-          const { authenticated: _a, ...identity } = data
-          setSessionIdentity(identity)
-        } else {
-          setSessionIdentity(null)
-        }
-      } catch {
-        if (!cancelled) setSessionIdentity(null)
-      } finally {
-        if (!cancelled) setSessionIdentityLoading(false)
+      if (generation !== refreshGenerationRef.current) return
+
+      if ("authenticated" in data && data.authenticated === true) {
+        const { authenticated: _a, ...identity } = data
+        authUserIdRef.current = identity.authUserId
+        setSessionIdentity(identity)
+        logSessionContextDiagnostics({
+          label: "client_identity_loaded",
+          authUserId: identity.authUserId,
+          profileUserId: identity.authUserId,
+          profileEmail: identity.email,
+          platformAdmin: identity.platformAdmin,
+        })
+      } else {
+        authUserIdRef.current = null
+        setSessionIdentity(null)
       }
-    })()
-
-    return () => {
-      cancelled = true
+    } catch {
+      if (generation !== refreshGenerationRef.current) return
+      authUserIdRef.current = null
+      setSessionIdentity(null)
+    } finally {
+      if (generation === refreshGenerationRef.current) {
+        setSessionIdentityLoading(false)
+      }
     }
   }, [])
 
+  useEffect(() => {
+    return subscribeToAuthSessionChanges((event) => {
+      if (event.type === "signed_out") {
+        clearAuthSessionClientStorage()
+        clearSessionIdentity()
+        setImpersonation(impersonationIdle("Platform admin", "Platform Admin"))
+        return
+      }
+
+      const authUserChanged = clearUserScopedClientStorageIfAuthUserChanged(event.userId)
+      if (authUserChanged) {
+        authUserIdRef.current = null
+        setSessionIdentity(null)
+        setImpersonation(impersonationIdle("Platform admin", "Platform Admin"))
+      }
+
+      authUserIdRef.current = event.userId
+      void refreshSessionIdentity()
+    })
+  }, [clearSessionIdentity, refreshSessionIdentity])
+
   const seedPlatformSessionIdentity = useCallback((identity: SessionIdentity) => {
-    sessionSeededRef.current = true
+    authUserIdRef.current = identity.authUserId
     setSessionIdentity(identity)
     setSessionIdentityLoading(false)
+    logSessionContextDiagnostics({
+      label: "server_identity_seeded",
+      authUserId: identity.authUserId,
+      profileUserId: identity.authUserId,
+      profileEmail: identity.email,
+      platformAdmin: identity.platformAdmin,
+    })
   }, [])
 
   const adminLabel = sessionIdentity?.displayName ?? "Platform admin"
@@ -194,6 +245,8 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         startImpersonation,
         endImpersonation,
         seedPlatformSessionIdentity,
+        refreshSessionIdentity,
+        clearSessionIdentity,
         isPlatformAdmin,
         platformAdminNavVisible,
       }}

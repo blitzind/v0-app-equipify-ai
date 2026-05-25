@@ -17,6 +17,10 @@ import {
 } from "@/lib/onboarding/error-mapping"
 import { sendSignupProvisionEmailsIfNeeded } from "@/lib/email/signup-provision-emails"
 import { parseHowHeardAboutEquipifyInput } from "@/lib/onboarding/how-heard-about-equipify"
+import {
+  resolveOnboardingRedirectTarget,
+  type OnboardingSampleDataStatus,
+} from "@/lib/onboarding/provision-finalization"
 
 type Body = {
   organizationId?: string | null
@@ -165,6 +169,33 @@ async function persistHowHeardOnOrganization(
       error: error.message,
     })
   }
+}
+
+async function countSampleCustomers(admin: SupabaseClient, organizationId: string): Promise<number> {
+  const { count, error } = await admin
+    .from("customers")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("is_sample", true)
+  if (error) return 0
+  return count ?? 0
+}
+
+function resolveSampleDataStatus(input: {
+  seedDemo: boolean
+  seeded: boolean
+  seedSkipped: boolean
+  resumedFromPartial: boolean
+  seedFailed: boolean
+  sampleCustomerCount: number
+}): OnboardingSampleDataStatus {
+  if (!input.seedDemo) return "skipped"
+  if (input.seedFailed) {
+    return input.sampleCustomerCount > 0 ? "already_exists" : "failed_non_blocking"
+  }
+  if (input.seeded) return input.resumedFromPartial ? "warning" : "created"
+  if (input.seedSkipped || input.sampleCustomerCount > 0) return "already_exists"
+  return "skipped"
 }
 
 export async function POST(request: Request) {
@@ -378,6 +409,8 @@ export async function POST(request: Request) {
   let seededIndustry: string | null = null
   let seedCounts: Record<string, number> | null = null
   let resumedFromPartial = false
+  let seedFailed = false
+  let seedFailureMessage: string | null = null
 
   if (seedDemo) {
     try {
@@ -404,14 +437,39 @@ export async function POST(request: Request) {
         resumedFromPartial,
       })
     } catch (err) {
-      const message = err instanceof Error ? err.message : null
-      // Account is already provisioned. Surface a friendly message but keep
-      // the workspace usable — admins can re-run sample import from settings.
-      return failure("seed_failed", message, 400, { organizationId })
+      seedFailed = true
+      seedFailureMessage = err instanceof Error ? err.message : "Unknown seed error"
+      const sampleCustomerCount = await countSampleCustomers(svc, organizationId)
+      logProvisionError("demo_seed_failed_non_blocking", {
+        organizationId,
+        userId: user.id,
+        industry,
+        sampleCustomerCount,
+        error: seedFailureMessage,
+      })
+      if (sampleCustomerCount > 0) {
+        seeded = false
+        seedSkipped = true
+      }
     }
   } else {
     logProvision("demo_seed_skipped", { organizationId, seedDemo })
   }
+
+  const sampleCustomerCount = await countSampleCustomers(svc, organizationId)
+  const sampleDataStatus = resolveSampleDataStatus({
+    seedDemo,
+    seeded,
+    seedSkipped,
+    resumedFromPartial,
+    seedFailed,
+    sampleCustomerCount,
+  })
+  const redirectTarget = resolveOnboardingRedirectTarget({
+    inviteFlow: false,
+    selectedPlanFromQuery: Boolean(body.selectedPlan),
+    selectedPlan: String(body.selectedPlan ?? "growth"),
+  })
 
   // Welcome + internal notify (Phase 54.4): best-effort; never fails provisioning.
   // Idempotent per org via Auth user_metadata; only when this user created the org (not invite/join).
@@ -431,14 +489,30 @@ export async function POST(request: Request) {
     })
   }
 
+  logProvision("onboarding_completed", {
+    userId: user.id,
+    organizationIdPresent: Boolean(organizationId),
+    organizationId,
+    createdNewOrganization,
+    sampleDataStatus,
+    sampleCustomerCount,
+    redirectTarget,
+    seedFailed,
+    ...(seedFailureMessage ? { seedFailureMessage: seedFailureMessage.slice(0, 200) } : {}),
+  })
+
   return NextResponse.json({
     ok: true,
+    onboardingCompleted: true,
     organizationId,
+    sampleDataStatus,
+    redirectTarget,
     seeded,
     seedSkipped,
     seededIndustry,
     seedCounts,
     techniciansSeeded,
     resumedFromPartial,
+    seedFailed,
   })
 }
