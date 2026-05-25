@@ -34,7 +34,7 @@ export type PlatformAdminTabKey = PlatformAdminInlineTab | "growth_leads"
 
 export const PLATFORM_ADMIN_GROWTH_LEADS_TAB = {
   key: "growth_leads",
-  label: "Growth Leads",
+  label: "Growth Engine",
   icon: Target,
   href: "/admin/growth/command",
 } as const

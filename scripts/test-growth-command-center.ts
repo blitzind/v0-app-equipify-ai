@@ -27,6 +27,7 @@ import {
   GROWTH_COMMAND_SECTION_TABS,
   GROWTH_COMMAND_COMM_SECTION_LINKS,
 } from "../lib/growth/command/command-center-navigation"
+import { PLATFORM_ADMIN_GROWTH_LEADS_TAB } from "../components/admin/platform-admin-shell"
 import { buildBossBattles, buildCoachTips, buildHeatMap, detectComboChains } from "../lib/growth/command/command-dashboard-helpers"
 import { describeSequenceStartUnavailable } from "../lib/growth/sequence-enrollment/sequence-enrollment-ui"
 import type { GrowthLead } from "../lib/growth/types"
@@ -189,5 +190,9 @@ assert.ok(GROWTH_COMMAND_JUMP_DESTINATIONS.some((entry) => entry.label === "Dogf
 assert.equal(GROWTH_COMMAND_SECTION_TABS.length, 6)
 assert.equal(GROWTH_COMMAND_SECTION_TABS[0]?.anchor, "cc-today")
 assert.equal(GROWTH_COMMAND_COMM_SECTION_LINKS.length, 5)
+
+assert.equal(PLATFORM_ADMIN_GROWTH_LEADS_TAB.label, "Growth Engine")
+assert.equal(PLATFORM_ADMIN_GROWTH_LEADS_TAB.key, "growth_leads")
+assert.equal(PLATFORM_ADMIN_GROWTH_LEADS_TAB.href, "/admin/growth/command")
 
 console.log("growth-command-center: all checks passed")
