@@ -17,6 +17,7 @@ import {
   monthRangeInTimezone,
   resolveBookingTimezone,
 } from "@/lib/growth/booking/booking-timezone-utils"
+import { normalizeSchedulingHorizonDays } from "@/lib/growth/booking/booking-page-defaults"
 import { getGrowthCalendarConnectionWithFreshAccessToken } from "@/lib/growth/calendar/calendar-connection-service"
 import { fetchGoogleCalendarBusyIntervals } from "@/lib/growth/calendar/google-calendar-client"
 import { syncGrowthMeetingToGoogleCalendar } from "@/lib/growth/calendar/sync-meeting-calendar"
@@ -72,11 +73,12 @@ export async function fetchPublicBookingSlots(
 
   const now = new Date()
   const timeZone = resolveBookingTimezone(page.timezone)
+  const schedulingHorizonDays = normalizeSchedulingHorizonDays(page.schedulingHorizonDays)
   const monthKey = resolveMonthKey(options?.month, now, timeZone)
   const monthRange = monthRangeInTimezone(monthKey, timeZone)
   if (!monthRange) return { ok: false, code: "invalid_month", message: publicBookingErrorMessage("invalid_month") }
 
-  const horizonEnd = computeBookingHorizonEnd(now, page.schedulingHorizonDays)
+  const horizonEnd = computeBookingHorizonEnd(now, schedulingHorizonDays)
   const rangeStart = monthRange.rangeStart.getTime() < now.getTime() ? now : monthRange.rangeStart
   const rangeEnd =
     monthRange.rangeEnd.getTime() > horizonEnd.getTime() ? horizonEnd : monthRange.rangeEnd
@@ -87,7 +89,7 @@ export async function fetchPublicBookingSlots(
       slots: [],
       timezone: page.timezone,
       timezoneMode: page.timezoneMode,
-      schedulingHorizonDays: page.schedulingHorizonDays,
+      schedulingHorizonDays,
       horizonEndAt: horizonEnd.toISOString(),
       monthKey,
     }
@@ -120,7 +122,7 @@ export async function fetchPublicBookingSlots(
     bufferMinutes: page.bufferMinutes,
     minimumNoticeHours: page.minimumNoticeHours,
     maxMeetingsPerDay: page.maxMeetingsPerDay,
-    schedulingHorizonDays: page.schedulingHorizonDays,
+    schedulingHorizonDays,
     availabilityWindows: page.availabilityWindows,
     rangeStart,
     rangeEnd,
@@ -134,7 +136,7 @@ export async function fetchPublicBookingSlots(
     slots,
     timezone: page.timezone,
     timezoneMode: page.timezoneMode,
-    schedulingHorizonDays: page.schedulingHorizonDays,
+    schedulingHorizonDays,
     horizonEndAt: horizonEnd.toISOString(),
     monthKey,
   }

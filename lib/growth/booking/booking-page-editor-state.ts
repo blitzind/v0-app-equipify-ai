@@ -21,6 +21,7 @@ export function mapGrowthBookingPagePatch(parsed: Record<string, unknown>): Reco
   if (parsed.schedulingHorizonDays !== undefined) patch.scheduling_horizon_days = parsed.schedulingHorizonDays
   if (parsed.maxMeetingsPerDay !== undefined) patch.max_meetings_per_day = parsed.maxMeetingsPerDay
   if (parsed.timezoneMode !== undefined) patch.timezone_mode = parsed.timezoneMode
+  if (parsed.publicThemeMode !== undefined) patch.public_theme_mode = parsed.publicThemeMode
   if (parsed.availabilityWindows !== undefined) patch.availability_windows = parsed.availabilityWindows
   if (parsed.timezone !== undefined) patch.timezone = parsed.timezone
   if (parsed.locationType !== undefined) patch.location_type = parsed.locationType
@@ -67,6 +68,7 @@ export function growthBookingPageToEditorState(page: GrowthBookingPage) {
     maxMeetingsPerDay: page.maxMeetingsPerDay != null ? String(page.maxMeetingsPerDay) : "",
     timezone: page.timezone,
     timezoneMode: page.timezoneMode,
+    publicThemeMode: page.publicThemeMode,
     confirmationMessage: page.confirmationMessage ?? "",
     meetingProviderOverride: page.meetingProviderOverride,
     autoCreateMeetingLinkOverride: page.autoCreateMeetingLinkOverride,

@@ -12,6 +12,14 @@ import {
 } from "@/lib/growth/booking/booking-page-types"
 import { isValidBookingPageSlug, normalizeBookingPageSlug } from "@/lib/growth/booking/booking-page-slug"
 import {
+  normalizeMaxMeetingsPerDay,
+  normalizeMinimumNoticeHours,
+  normalizeSchedulingHorizonDays,
+  normalizeTimezoneMode,
+  normalizePublicThemeMode,
+  normalizeBufferMinutes,
+} from "@/lib/growth/booking/booking-page-defaults"
+import {
   resolveBookingPageAccentColor,
   resolveBookingPageDisplayTitle,
   resolvePublicBookingLocationFromPage,
@@ -20,7 +28,7 @@ import {
 export { isValidBookingPageSlug, normalizeBookingPageSlug }
 
 const PAGE_SELECT =
-  "id, owner_user_id, calendar_connection_id, name, slug, page_title, brand_name, description, logo_url, hero_image_url, brand_color, accent_color, footer_note, meeting_type, duration_minutes, buffer_minutes, buffer_before_minutes, buffer_after_minutes, minimum_notice_hours, scheduling_horizon_days, max_meetings_per_day, timezone_mode, availability_windows, timezone, location_type, custom_location, meeting_provider_override, auto_create_meeting_link_override, manual_meeting_url, confirmation_message, reminder_email_subject, reminder_email_body, enabled, created_at, updated_at"
+  "id, owner_user_id, calendar_connection_id, name, slug, page_title, brand_name, description, logo_url, hero_image_url, brand_color, accent_color, footer_note, meeting_type, duration_minutes, buffer_minutes, buffer_before_minutes, buffer_after_minutes, minimum_notice_hours, scheduling_horizon_days, max_meetings_per_day, timezone_mode, public_theme_mode, availability_windows, timezone, location_type, custom_location, meeting_provider_override, auto_create_meeting_link_override, manual_meeting_url, confirmation_message, reminder_email_subject, reminder_email_body, enabled, created_at, updated_at"
 
 type PageRow = {
   id: string
@@ -45,6 +53,7 @@ type PageRow = {
   scheduling_horizon_days: number | null
   max_meetings_per_day: number | null
   timezone_mode: string | null
+  public_theme_mode: string | null
   availability_windows: GrowthBookingAvailabilityWindow[] | null
   timezone: string
   location_type: string
@@ -86,12 +95,13 @@ function mapPage(row: PageRow): GrowthBookingPage {
     meetingType: row.meeting_type,
     durationMinutes: row.duration_minutes,
     bufferMinutes: row.buffer_minutes,
-    bufferBeforeMinutes: row.buffer_before_minutes ?? 0,
-    bufferAfterMinutes: row.buffer_after_minutes ?? row.buffer_minutes ?? 0,
-    minimumNoticeHours: row.minimum_notice_hours ?? 0,
-    schedulingHorizonDays: row.scheduling_horizon_days ?? 90,
-    maxMeetingsPerDay: row.max_meetings_per_day ?? null,
-    timezoneMode: (row.timezone_mode ?? "visitor_local") as GrowthBookingPage["timezoneMode"],
+    bufferBeforeMinutes: normalizeBufferMinutes(row.buffer_before_minutes, 0),
+    bufferAfterMinutes: normalizeBufferMinutes(row.buffer_after_minutes, row.buffer_minutes ?? 0),
+    minimumNoticeHours: normalizeMinimumNoticeHours(row.minimum_notice_hours),
+    schedulingHorizonDays: normalizeSchedulingHorizonDays(row.scheduling_horizon_days),
+    maxMeetingsPerDay: normalizeMaxMeetingsPerDay(row.max_meetings_per_day),
+    timezoneMode: normalizeTimezoneMode(row.timezone_mode),
+    publicThemeMode: normalizePublicThemeMode(row.public_theme_mode),
     availabilityWindows: row.availability_windows ?? [],
     timezone: row.timezone,
     locationType: row.location_type as GrowthBookingLocationType,
@@ -125,6 +135,7 @@ export function toPublicBookingPageView(page: GrowthBookingPage): GrowthBookingP
     durationMinutes: page.durationMinutes,
     timezone: page.timezone,
     timezoneMode: page.timezoneMode,
+    publicThemeMode: page.publicThemeMode,
     schedulingHorizonDays: page.schedulingHorizonDays,
     minimumNoticeHours: page.minimumNoticeHours,
     locationType: page.locationType,
@@ -203,6 +214,7 @@ export async function insertGrowthBookingPage(
     schedulingHorizonDays?: number
     maxMeetingsPerDay?: number | null
     timezoneMode?: GrowthBookingPage["timezoneMode"]
+    publicThemeMode?: GrowthBookingPage["publicThemeMode"]
     availabilityWindows?: GrowthBookingAvailabilityWindow[]
     timezone?: string
     locationType?: GrowthBookingLocationType
@@ -240,6 +252,7 @@ export async function insertGrowthBookingPage(
       scheduling_horizon_days: input.schedulingHorizonDays ?? 90,
       max_meetings_per_day: input.maxMeetingsPerDay ?? null,
       timezone_mode: input.timezoneMode ?? "visitor_local",
+      public_theme_mode: input.publicThemeMode ?? "system",
       availability_windows: input.availabilityWindows ?? [],
       timezone: input.timezone ?? "UTC",
       location_type: input.locationType ?? "google_meet",

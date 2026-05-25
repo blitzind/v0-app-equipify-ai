@@ -1,5 +1,10 @@
 import type { GrowthBookingAvailabilityWindow, GrowthBookingSlot } from "@/lib/growth/booking/booking-page-types"
 import {
+  normalizeMaxMeetingsPerDay,
+  normalizeMinimumNoticeHours,
+  normalizeSchedulingHorizonDays,
+} from "@/lib/growth/booking/booking-page-defaults"
+import {
   addDaysToDateKey,
   computeBookingHorizonEnd,
   formatDateKeyInTimezone,
@@ -85,10 +90,11 @@ export function buildBookingSlots(input: {
   const timezone = resolveBookingTimezone(input.timezone)
   const windows = resolveBookingAvailabilityWindows(input.availabilityWindows)
   const now = input.now ?? new Date()
-  const horizonDays = Math.max(1, Math.min(730, input.schedulingHorizonDays ?? 90))
+  const horizonDays = normalizeSchedulingHorizonDays(input.schedulingHorizonDays)
   const horizonEnd = computeBookingHorizonEnd(now, horizonDays)
   const { bufferBeforeMinutes, bufferAfterMinutes } = resolveBookingBufferMinutes(input)
-  const minimumNoticeMs = Math.max(0, input.minimumNoticeHours ?? 0) * 60 * 60 * 1000
+  const minimumNoticeMs = normalizeMinimumNoticeHours(input.minimumNoticeHours) * 60 * 60 * 1000
+  const maxMeetingsPerDay = normalizeMaxMeetingsPerDay(input.maxMeetingsPerDay)
   const earliestBookableMs = now.getTime() + minimumNoticeMs
   const durationMs = input.durationMinutes * 60 * 1000
   const bufferBeforeMs = bufferBeforeMinutes * 60 * 1000
@@ -118,7 +124,7 @@ export function buildBookingSlots(input: {
   const maxSlots = input.maxSlots ?? 500
 
   for (const dateKey of iterateDateKeys(fromKey, toKey, timezone)) {
-    if (input.maxMeetingsPerDay != null && (bookingsByDay.get(dateKey) ?? 0) >= input.maxMeetingsPerDay) {
+    if (maxMeetingsPerDay != null && (bookingsByDay.get(dateKey) ?? 0) >= maxMeetingsPerDay) {
       continue
     }
 

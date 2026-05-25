@@ -16,7 +16,12 @@ import {
   GrowthSettingsToggleRow,
 } from "@/components/growth/growth-settings-ui"
 import type { GrowthBookingPageListItem } from "@/lib/growth/booking/booking-page-types"
-import { GROWTH_BOOKING_PAGES_QA_MARKER, GROWTH_BOOKING_TIMEZONE_MODES } from "@/lib/growth/booking/booking-page-types"
+import {
+  GROWTH_BOOKING_PAGES_QA_MARKER,
+  GROWTH_BOOKING_PUBLIC_THEME_MODE_LABELS,
+  GROWTH_BOOKING_PUBLIC_THEME_MODES,
+  GROWTH_BOOKING_TIMEZONE_MODES,
+} from "@/lib/growth/booking/booking-page-types"
 import { GROWTH_BOOKING_PAGE_UI_QA_MARKER } from "@/lib/growth/booking/booking-page-ui-types"
 import { growthBookingPageToEditorState } from "@/lib/growth/booking/booking-page-editor-state"
 import {
@@ -69,6 +74,7 @@ const DEFAULT_FORM = {
   maxMeetingsPerDay: "",
   timezone: "America/New_York",
   timezoneMode: "visitor_local" as (typeof GROWTH_BOOKING_TIMEZONE_MODES)[number],
+  publicThemeMode: "system" as (typeof GROWTH_BOOKING_PUBLIC_THEME_MODES)[number],
   meetingType: "Intro call",
   confirmationMessage: "Thanks — your meeting is confirmed.",
   enabled: false,
@@ -155,6 +161,7 @@ export function GrowthBookingPagesPanel() {
           maxMeetingsPerDay: form.maxMeetingsPerDay ? Number(form.maxMeetingsPerDay) : null,
           timezone: form.timezone,
           timezoneMode: form.timezoneMode,
+          publicThemeMode: form.publicThemeMode,
           meetingType: form.meetingType,
           confirmationMessage: form.confirmationMessage,
           enabled: form.enabled,
@@ -206,6 +213,7 @@ export function GrowthBookingPagesPanel() {
           maxMeetingsPerDay: editor.maxMeetingsPerDay ? Number(editor.maxMeetingsPerDay) : null,
           timezone: editor.timezone,
           timezoneMode: editor.timezoneMode,
+          publicThemeMode: editor.publicThemeMode,
           confirmationMessage: editor.confirmationMessage || null,
           enabled: editor.enabled,
           meetingProviderOverride: editor.meetingProviderOverride,
@@ -224,6 +232,12 @@ export function GrowthBookingPagesPanel() {
     } finally {
       setSaving(false)
     }
+  }
+
+  function bookingPreviewHref(link: string, publicThemeMode: (typeof GROWTH_BOOKING_PUBLIC_THEME_MODES)[number]): string {
+    const url = new URL(link, typeof window !== "undefined" ? window.location.origin : "https://example.com")
+    url.searchParams.set("previewTheme", publicThemeMode)
+    return `${url.pathname}${url.search}`
   }
 
   async function copyLink(link: string) {
@@ -310,7 +324,11 @@ export function GrowthBookingPagesPanel() {
                     />
                     <GrowthSettingsBadge label={`${selected.recentBookingsCount} bookings`} tone="neutral" />
                     <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
-                      <a href={selected.bookingLink} target="_blank" rel="noreferrer">
+                      <a
+                        href={bookingPreviewHref(selected.bookingLink, editor.publicThemeMode)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
                         <ExternalLink className="mr-1 size-3" />
                         Preview
                       </a>
@@ -447,6 +465,28 @@ export function GrowthBookingPagesPanel() {
                           </option>
                         ))}
                       </select>
+                    </div>
+                    <div className={GROWTH_SETTINGS_FORM_GAP}>
+                      <Label className="text-xs">Public page theme</Label>
+                      <select
+                        className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
+                        value={editor.publicThemeMode}
+                        onChange={(event) =>
+                          setEditor({
+                            ...editor,
+                            publicThemeMode: event.target.value as EditorState["publicThemeMode"],
+                          })
+                        }
+                      >
+                        {GROWTH_BOOKING_PUBLIC_THEME_MODES.map((mode) => (
+                          <option key={mode} value={mode}>
+                            {GROWTH_BOOKING_PUBLIC_THEME_MODE_LABELS[mode]}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-muted-foreground">
+                        Controls light/dark on the public `/book/[slug]` page only. Preview uses the selected value before save.
+                      </p>
                     </div>
                     <div className={GROWTH_SETTINGS_FORM_GAP}>
                       <Label className="text-xs">Meeting type label</Label>

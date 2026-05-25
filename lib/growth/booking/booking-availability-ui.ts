@@ -1,5 +1,9 @@
-import type { GrowthBookingSlot } from "@/lib/growth/booking/booking-page-types"
-import type { GrowthBookingAvailabilityWindow } from "@/lib/growth/booking/booking-page-types"
+import type {
+  GrowthBookingAvailabilityWindow,
+  GrowthBookingSlot,
+  GrowthBookingTimezoneMode,
+} from "@/lib/growth/booking/booking-page-types"
+import { formatDateKeyInTimezone } from "@/lib/growth/booking/booking-timezone-utils"
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/
 
@@ -80,7 +84,44 @@ export function groupSlotsByDateKey(
 }
 
 export function datesWithAvailableSlots(slots: GrowthBookingSlot[], timeZone: string): Set<string> {
+  return buildAvailableDateKeys(slots, timeZone)
+}
+
+export function buildAvailableDateKeys(slots: GrowthBookingSlot[], timeZone: string): Set<string> {
   return new Set(slots.map((slot) => formatSlotDateKey(slot.startAt, timeZone)))
+}
+
+/** Calendar grid civil date — matches react-day-picker local cells for visitor modes. */
+export function resolveBookingCalendarDateKey(
+  date: Date,
+  displayTimezone: string,
+  timezoneMode: GrowthBookingTimezoneMode = "visitor_local",
+): string {
+  if (timezoneMode === "fixed_host") {
+    return calendarDateToSlotKey(date, displayTimezone)
+  }
+  return dateKeyFromLocalDate(date)
+}
+
+export function resolveBookingTodayDateKey(
+  displayTimezone: string,
+  timezoneMode: GrowthBookingTimezoneMode = "visitor_local",
+): string {
+  return resolveBookingCalendarDateKey(new Date(), displayTimezone, timezoneMode)
+}
+
+export function apiMonthKeyFromDate(date: Date, hostTimezone: string): string {
+  const anchor = new Date(date.getFullYear(), date.getMonth(), 1, 12, 0, 0, 0)
+  return formatDateKeyInTimezone(anchor, hostTimezone).slice(0, 7)
+}
+
+export function countAvailableDatesInMonth(availableDateKeys: Set<string>, monthKey: string): number {
+  const prefix = `${monthKey}-`
+  let count = 0
+  for (const key of availableDateKeys) {
+    if (key.startsWith(prefix)) count += 1
+  }
+  return count
 }
 
 export function dateKeyFromLocalDate(date: Date): string {
