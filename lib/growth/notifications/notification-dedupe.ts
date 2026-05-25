@@ -46,6 +46,11 @@ export const GROWTH_NOTIFICATION_COOLDOWN_MINUTES: Partial<Record<GrowthNotifica
   calendar_sync_failed: 30,
   meeting_synced: 15,
   meeting_conflict: 30,
+  deal_risk_increased: 120,
+  high_probability_deal: 180,
+  forecast_confidence_dropped: 120,
+  close_window_detected: 60,
+  deal_needs_action: 60,
 }
 
 export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificationType, number>> = {
@@ -97,6 +102,11 @@ export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificati
   calendar_sync_failed: 24 * 60,
   meeting_synced: 24 * 60,
   meeting_conflict: 3 * 24 * 60,
+  deal_risk_increased: 7 * 24 * 60,
+  high_probability_deal: 7 * 24 * 60,
+  forecast_confidence_dropped: 3 * 24 * 60,
+  close_window_detected: 7 * 24 * 60,
+  deal_needs_action: 3 * 24 * 60,
 }
 
 export function buildGrowthNotificationDeterministicHash(input: {

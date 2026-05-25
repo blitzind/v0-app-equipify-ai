@@ -82,6 +82,11 @@ export const GROWTH_NOTIFICATION_TYPES = [
   "calendar_sync_failed",
   "meeting_synced",
   "meeting_conflict",
+  "deal_risk_increased",
+  "high_probability_deal",
+  "forecast_confidence_dropped",
+  "close_window_detected",
+  "deal_needs_action",
 ] as const
 export type GrowthNotificationType = (typeof GROWTH_NOTIFICATION_TYPES)[number]
 

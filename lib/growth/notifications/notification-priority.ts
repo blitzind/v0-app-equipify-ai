@@ -64,6 +64,11 @@ const TYPE_SEVERITY: Record<GrowthNotificationType, GrowthNotificationSeverity> 
   calendar_sync_failed: "high",
   meeting_synced: "low",
   meeting_conflict: "high",
+  deal_risk_increased: "high",
+  high_probability_deal: "medium",
+  forecast_confidence_dropped: "high",
+  close_window_detected: "medium",
+  deal_needs_action: "high",
 }
 
 const SEVERITY_BASE: Record<GrowthNotificationSeverity, number> = {

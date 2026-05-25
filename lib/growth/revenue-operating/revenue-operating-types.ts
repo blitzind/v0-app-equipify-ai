@@ -1,5 +1,9 @@
 /** Client-safe Growth Engine revenue operating types (slice 6.20A). */
 
+import type { DealIntelligenceForecastAdjustment } from "@/lib/growth/deal-intelligence/deal-intelligence-types"
+
+export type { DealIntelligenceForecastAdjustment }
+
 export const GROWTH_REVENUE_OPERATING_QA_MARKER = "growth-revenue-operating-v1" as const
 
 export const GROWTH_REVENUE_FORECAST_PERIODS = [
@@ -121,6 +125,7 @@ export type GrowthRevenueOperatingDashboard = {
   staleHighValueDeals: GrowthRevenueAttentionDeal[]
   dealsNeedingAction: GrowthRevenueAttentionDeal[]
   attentionFeed: GrowthRevenueAttentionDeal[]
+  dealIntelligenceForecast: DealIntelligenceForecastAdjustment
 }
 
 export type GrowthRevenueExecutiveCommandSummary = {

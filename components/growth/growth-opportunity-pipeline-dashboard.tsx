@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ChevronRight, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthPredictiveDealIntelligenceCard } from "@/components/growth/growth-predictive-deal-intelligence-card"
 import type {
   GrowthOpportunity,
   GrowthOpportunityDetail,
@@ -127,6 +128,12 @@ function OpportunityDetailPanel({
           </ul>
         </div>
       ) : null}
+
+      <GrowthPredictiveDealIntelligenceCard
+        opportunityId={detail.id}
+        leadId={detail.leadId}
+        companyName={detail.companyName}
+      />
 
       <div>
         <p className="mb-2 text-sm font-medium">Move stage (human-controlled)</p>

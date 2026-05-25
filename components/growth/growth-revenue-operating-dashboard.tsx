@@ -150,6 +150,12 @@ export function GrowthRevenueOperatingDashboardView() {
           <StatTile label="Pipeline" value={formatCurrency(totals?.pipelineForecast ?? 0)} />
           <StatTile label="Coverage ratio" value={`${goal?.coverageRatio ?? 0}x`} />
           <StatTile label="Forecast confidence" value={`${goal?.forecastConfidence ?? 0}%`} />
+          {dashboard?.dealIntelligenceForecast ? (
+            <StatTile
+              label="AI-informed confidence"
+              value={`${dashboard.dealIntelligenceForecast.aiInformedForecastConfidence}%`}
+            />
+          ) : null}
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -158,6 +164,18 @@ export function GrowthRevenueOperatingDashboardView() {
           <StatTile label="At-risk pipeline" value={formatCurrency(totals?.atRiskPipelineAmount ?? 0)} />
           <StatTile label="Stale pipeline" value={formatCurrency(totals?.stalePipelineAmount ?? 0)} />
         </div>
+
+        {dashboard?.dealIntelligenceForecast ? (
+          <div className="mt-4 rounded-lg border border-indigo-200/70 bg-indigo-50/40 p-3 text-sm dark:border-indigo-900/50 dark:bg-indigo-950/20">
+            <div className="flex flex-wrap items-center gap-2">
+              <GrowthBadge label="AI-informed forecast" tone="healthy" />
+              <span className="text-muted-foreground">
+                {dashboard.dealIntelligenceForecast.scoredOpportunities} scored opportunities
+              </span>
+            </div>
+            <p className="mt-2 text-foreground">{dashboard.dealIntelligenceForecast.riskAdjustedForecastNote}</p>
+          </div>
+        ) : null}
       </GrowthEngineCard>
 
       <GrowthEngineCard title="Goal pacing">

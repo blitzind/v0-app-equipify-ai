@@ -31,6 +31,8 @@ import {
 } from "@/lib/growth/command/command-dashboard-helpers"
 import { isForecastRegression } from "@/lib/growth/revenue-forecast-trajectory"
 import { fetchProspectResearchCoverageSummary } from "@/lib/growth/research/research-repository"
+import { fetchDealIntelligenceDashboardSummary } from "@/lib/growth/deal-intelligence/deal-intelligence-repository"
+import { dealIntelligenceActionImpactBoost } from "@/lib/growth/deal-intelligence/nba-deal-intelligence-bridge"
 
 const LEAD_SCAN_SELECT =
   "id, company_name, status, follow_up_at, next_best_action, next_best_action_reason, executive_priority_tier, revenue_probability_score, revenue_probability_tier, revenue_trajectory, revenue_probability_previous_score, forecast_contribution_weight, forecast_attention_level, conversation_urgency_level, conversation_health_tier, relationship_trend, engagement_tier, opportunity_readiness_tier, decision_maker_status, last_researched_at, operational_capacity_tier, workflow_health, contact_temperature, assigned_to, call_priority_tier, score"
@@ -118,7 +120,7 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
   const todayIso = startOfTodayIso()
   const now = new Date().toISOString()
 
-  const [leadsRes, enrollmentsRes, stepsRes, outreachRes, copilotRes, timelineRes, researchCoverage] = await Promise.all([
+  const [leadsRes, enrollmentsRes, stepsRes, outreachRes, copilotRes, timelineRes, researchCoverage, dealIntelligence] = await Promise.all([
     admin.schema("growth").from("leads").select(LEAD_SCAN_SELECT).limit(300),
     admin
       .schema("growth")
@@ -152,6 +154,16 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
       .order("occurred_at", { ascending: false })
       .limit(200),
     fetchProspectResearchCoverageSummary(admin),
+    fetchDealIntelligenceDashboardSummary(admin).catch(() => ({
+      qaMarker: "predictive-deal-intelligence-v1" as const,
+      scoredOpportunities: 0,
+      highProbabilityDeals: 0,
+      criticalRiskDeals: 0,
+      averageForecastConfidence: 0,
+      dealsNeedingAction: 0,
+      topRecommendedActions: [],
+      averageCloseProbability: 0,
+    })),
   ])
 
   if (leadsRes.error) throw new Error(leadsRes.error.message)
@@ -162,16 +174,48 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
   const leadById = new Map(leads.map((lead) => [lead.id as string, lead]))
   const companyName = (leadId: string) => (leadById.get(leadId)?.company_name as string) ?? "Lead"
 
+  const dealScoreByLead = new Map<
+    string,
+    { closeProbability: number; riskLevel: string | null; recommendedOperatorAction: string | null }
+  >()
+  try {
+    const { data: dealScores } = await admin
+      .schema("growth")
+      .from("deal_intelligence_scores")
+      .select("lead_id, close_probability, risk_level, recommended_operator_action")
+      .eq("score_status", "active")
+      .limit(300)
+    for (const row of dealScores ?? []) {
+      dealScoreByLead.set(row.lead_id as string, {
+        closeProbability: Number(row.close_probability ?? 0),
+        riskLevel: row.risk_level as string | null,
+        recommendedOperatorAction: row.recommended_operator_action as string | null,
+      })
+    }
+  } catch {
+    // Schema may not be migrated yet — command center remains usable.
+  }
+
   const actions: GrowthCommandAction[] = []
 
   for (const lead of leads) {
     const leadId = lead.id as string
+    const dealScore = dealScoreByLead.get(leadId)
     const baseImpact = {
       executivePriorityTier: lead.executive_priority_tier as string | null,
       revenueTrajectory: lead.revenue_trajectory as string | null,
       revenueProbabilityScore: lead.revenue_probability_score as number | null,
       conversationUrgency: lead.conversation_urgency_level as string | null,
       overdueFollowUp: isOverdue(lead.follow_up_at as string | null),
+      dealIntelligenceBoost: dealScore
+        ? dealIntelligenceActionImpactBoost({
+            dealCloseProbability: dealScore.closeProbability,
+            dealRiskLevel: dealScore.riskLevel,
+            recommendedOperatorAction: dealScore.recommendedOperatorAction as Parameters<
+              typeof dealIntelligenceActionImpactBoost
+            >[0]["recommendedOperatorAction"],
+          })
+        : 0,
     }
     const revenueInput = {
       revenueProbabilityScore: lead.revenue_probability_score as number | null,
@@ -520,5 +564,6 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
     },
     todayStats,
     researchCoverage,
+    dealIntelligence,
   }
 }

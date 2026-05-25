@@ -35,6 +35,12 @@ import {
   emitGrowthPipelineCoverageLowNotification,
   emitGrowthStaleHighValueDealNotification,
 } from "@/lib/growth/revenue-operating/revenue-notification-integrations"
+import {
+  applyDealIntelligenceForecastAdjustment,
+} from "@/lib/growth/deal-intelligence/deal-intelligence-forecast"
+import {
+  fetchGrowthDealIntelligenceDashboard,
+} from "@/lib/growth/deal-intelligence/deal-intelligence-service"
 
 function opportunitiesTable(admin: SupabaseClient) {
   return admin.schema("growth").from("opportunities")
@@ -417,6 +423,24 @@ export async function recomputeGrowthRevenueOperatingDashboard(
     movementCount: movements.length,
   })
 
+  let dealIntelligenceForecast = applyDealIntelligenceForecastAdjustment({
+    baseForecastConfidence: goalPacing.forecastConfidence,
+    averageDealForecastConfidence: 0,
+    scoredOpportunities: 0,
+    criticalRiskDeals: 0,
+  })
+  try {
+    const dealSummary = await fetchGrowthDealIntelligenceDashboard(admin)
+    dealIntelligenceForecast = applyDealIntelligenceForecastAdjustment({
+      baseForecastConfidence: goalPacing.forecastConfidence,
+      averageDealForecastConfidence: dealSummary.averageForecastConfidence,
+      scoredOpportunities: dealSummary.scoredOpportunities,
+      criticalRiskDeals: dealSummary.criticalRiskDeals,
+    })
+  } catch {
+    // Deal intelligence schema optional until migration applied.
+  }
+
   return {
     qaMarker: GROWTH_REVENUE_OPERATING_QA_MARKER,
     period,
@@ -430,6 +454,7 @@ export async function recomputeGrowthRevenueOperatingDashboard(
     staleHighValueDeals,
     dealsNeedingAction,
     attentionFeed,
+    dealIntelligenceForecast,
   }
 }
 

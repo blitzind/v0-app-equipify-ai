@@ -146,6 +146,7 @@ export type GrowthCommandDebrief = {
 }
 
 import type { GrowthResearchCoverageSummary } from "@/lib/growth/research/research-types"
+import type { DealIntelligenceDashboardSummary } from "@/lib/growth/deal-intelligence/deal-intelligence-types"
 
 export type GrowthCommandDashboard = {
   generatedAt: string
@@ -172,4 +173,5 @@ export type GrowthCommandDashboard = {
     outreachExecuted: number
   }
   researchCoverage: GrowthResearchCoverageSummary
+  dealIntelligence: DealIntelligenceDashboardSummary
 }
