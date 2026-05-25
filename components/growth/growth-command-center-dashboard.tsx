@@ -24,6 +24,11 @@ import { GrowthCommandLifecycleCompactSection } from "@/components/growth/growth
 import { GrowthCommandResearchCoverageSection } from "@/components/growth/growth-command-research-coverage-section"
 import { GrowthCommandDealIntelligenceSection } from "@/components/growth/growth-command-deal-intelligence-section"
 import { GrowthCommandCallIntelligenceSection } from "@/components/growth/growth-command-call-intelligence-section"
+import {
+  GrowthCommandMorningFocusMetrics,
+  GrowthCommandPipelineMomentumBadge,
+  GrowthCommandRevenueExecutionSection,
+} from "@/components/growth/growth-command-revenue-execution-section"
 import { GrowthCommandPipelineRevenueSection } from "@/components/growth/growth-command-pipeline-revenue-section"
 import { GrowthCommandQuickActionsRail } from "@/components/growth/growth-command-quick-actions-rail"
 import { GrowthCommandSectionTabs } from "@/components/growth/growth-command-section-tabs"
@@ -42,6 +47,7 @@ import {
   GROWTH_COMMAND_CENTER_SPACING_QA_MARKER,
 } from "@/lib/growth/command/command-action-types"
 import type { GrowthCadenceCommandSummary } from "@/lib/growth/cadence/cadence-types"
+import type { GrowthExecutionDashboard } from "@/lib/growth/execution/execution-priority-types"
 import type { GrowthMeetingCommandSummary } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import { cn } from "@/lib/utils"
 
@@ -128,15 +134,18 @@ export function GrowthCommandCenterDashboard() {
   const [sprintSkipped, setSprintSkipped] = useState<Set<string>>(new Set())
   const [meetingsToday, setMeetingsToday] = useState(0)
   const [callsDue, setCallsDue] = useState(0)
+  const [executionDashboard, setExecutionDashboard] = useState<GrowthExecutionDashboard | null>(null)
+  const [startingSprint, setStartingSprint] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [dashboardRes, meetingsRes, cadenceRes] = await Promise.all([
+      const [dashboardRes, meetingsRes, cadenceRes, executionRes] = await Promise.all([
         fetch("/api/platform/growth/command/dashboard", { cache: "no-store" }),
         fetch("/api/platform/growth/meetings/command-summary", { cache: "no-store" }),
         fetch("/api/platform/growth/cadence/command-summary", { cache: "no-store" }),
+        fetch("/api/platform/growth/execution/dashboard", { cache: "no-store" }),
       ])
       const data = (await dashboardRes.json().catch(() => ({}))) as {
         ok?: boolean
@@ -149,10 +158,15 @@ export function GrowthCommandCenterDashboard() {
       const cadenceData = (await cadenceRes.json().catch(() => ({}))) as {
         summary?: GrowthCadenceCommandSummary | null
       }
+      const executionData = (await executionRes.json().catch(() => ({}))) as {
+        ok?: boolean
+        dashboard?: GrowthExecutionDashboard
+      }
       if (!dashboardRes.ok || !data.ok || !data.dashboard) {
         throw new Error(data.message ?? "Could not load command dashboard.")
       }
       setDashboard(data.dashboard)
+      setExecutionDashboard(executionData.ok && executionData.dashboard ? executionData.dashboard : null)
       setMeetingsToday(meetingsData.summary?.meetingsTodayCount ?? 0)
       setCallsDue(cadenceData.summary?.callTasksDueCount ?? 0)
     } catch (e) {
@@ -208,6 +222,27 @@ export function GrowthCommandCenterDashboard() {
     return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
   }
 
+  async function startExecutionSprint(sprintType: string, durationMinutes: number) {
+    setStartingSprint(true)
+    try {
+      const res = await fetch("/api/platform/growth/execution/sprints/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sprintType, durationMinutes }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message ?? "Could not start sprint.")
+      }
+      await load()
+      startSprint()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Sprint start failed.")
+    } finally {
+      setStartingSprint(false)
+    }
+  }
+
   if (loading && !dashboard) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -224,7 +259,12 @@ export function GrowthCommandCenterDashboard() {
   if (!dashboard) return null
 
   const mission = dashboard.missionControl
-  const topFocus = dashboard.topWinOpportunity ?? sprintActions[0] ?? filteredActions[0] ?? null
+  const topFocus =
+    executionDashboard?.morningFocus.topRevenuePriorities[0] ??
+    dashboard.topWinOpportunity ??
+    sprintActions[0] ??
+    filteredActions[0] ??
+    null
 
   const sprintPanel = sprintOpen ? (
     <div
@@ -341,7 +381,14 @@ export function GrowthCommandCenterDashboard() {
                       : "Review your ranked queue and start a focus sprint."}
                   </p>
                   <div className="flex flex-wrap gap-2 pt-1">
-                    <GrowthBadge label={mission.momentumLabel} tone={momentumTone(mission.momentumState)} />
+                    {executionDashboard ? (
+                      <GrowthCommandPipelineMomentumBadge
+                        momentum={executionDashboard.morningFocus.pipelineMomentum}
+                        label={executionDashboard.morningFocus.pipelineMomentumLabel}
+                      />
+                    ) : (
+                      <GrowthBadge label={mission.momentumLabel} tone={momentumTone(mission.momentumState)} />
+                    )}
                     <GrowthBadge label={`${dashboard.operatorRankLabel} · ${dashboard.operatorScore} pts`} tone="neutral" />
                   </div>
                 </div>
@@ -356,14 +403,19 @@ export function GrowthCommandCenterDashboard() {
                   </Button>
                 </div>
               </div>
-              <div className="mt-6 grid grid-cols-2 gap-4 border-t border-indigo-100/80 pt-6 dark:border-indigo-500/20 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-                <StatTile label="Critical actions" value={mission.criticalActions} className="bg-background/80 p-3.5" />
-                <StatTile label="Revenue at risk" value={mission.revenueAtRisk} className="bg-background/80 p-3.5" />
-                <StatTile label="Approvals waiting" value={mission.approvalsWaiting} className="bg-background/80 p-3.5" />
-                <StatTile label="Meetings today" value={meetingsToday} className="bg-background/80 p-3.5" />
-                <StatTile label="Calls due" value={callsDue} className="bg-background/80 p-3.5" />
-                <StatTile label="Stalled" value={mission.stalledOpportunities} className="bg-background/80 p-3.5" />
-                <StatTile label="Unassigned" value={mission.ownershipGaps} className="bg-background/80 p-3.5" />
+              <div className="mt-6 grid grid-cols-2 gap-4 border-t border-indigo-100/80 pt-6 dark:border-indigo-500/20 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-6">
+                {executionDashboard ? (
+                  <GrowthCommandMorningFocusMetrics dashboard={executionDashboard} />
+                ) : (
+                  <>
+                    <StatTile label="Critical actions" value={mission.criticalActions} className="bg-background/80 p-3.5" />
+                    <StatTile label="Revenue at risk" value={mission.revenueAtRisk} className="bg-background/80 p-3.5" />
+                    <StatTile label="Approvals waiting" value={mission.approvalsWaiting} className="bg-background/80 p-3.5" />
+                    <StatTile label="Meetings today" value={meetingsToday} className="bg-background/80 p-3.5" />
+                    <StatTile label="Calls due" value={callsDue} className="bg-background/80 p-3.5" />
+                    <StatTile label="Stalled" value={mission.stalledOpportunities} className="bg-background/80 p-3.5" />
+                  </>
+                )}
               </div>
             </div>
           </GrowthEngineCard>
@@ -432,6 +484,13 @@ export function GrowthCommandCenterDashboard() {
 
           {/* 4. Pipeline + Revenue */}
           <div id="cc-revenue" className={SECTION_SCROLL_CLASS}>
+          {executionDashboard ? (
+            <GrowthCommandRevenueExecutionSection
+              dashboard={executionDashboard}
+              onStartSprint={(sprintType, durationMinutes) => void startExecutionSprint(sprintType, durationMinutes)}
+              startingSprint={startingSprint}
+            />
+          ) : null}
           <GrowthCommandPipelineRevenueSection atRiskActions={dashboard.revenueRescueQueue} />
           </div>
 
