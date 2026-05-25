@@ -75,6 +75,12 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
         shortcutKey: "i",
       },
       {
+        href: "/admin/growth/replies",
+        label: "Reply Inbox",
+        icon: Mail,
+        match: (path) => path.startsWith("/admin/growth/replies"),
+      },
+      {
         href: "/admin/growth/leads/queue",
         label: "Call Queue",
         icon: Phone,

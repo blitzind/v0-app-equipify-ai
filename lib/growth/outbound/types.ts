@@ -164,6 +164,21 @@ export type GrowthOutboundReply = {
   confidence: number
   classificationLocked: boolean
   classificationLockedBy: string | null
+  intent: string | null
+  priority: string
+  nextAction: string | null
+  ownerUserId: string | null
+  threadReplyCount: number
+  firstReplyAt: string | null
+  lastReplyAt: string | null
+  responseLatencyMs: number | null
+  unanswered: boolean
+  ownerWaiting: boolean
+  replySlaDueAt: string | null
+  buyingSignals: string[]
+  objectionSignals: string[]
+  escalationSignals: string[]
+  intelligenceProcessedAt: string | null
   rawPayload: Record<string, unknown>
   createdAt: string
   updatedAt: string

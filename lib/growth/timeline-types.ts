@@ -112,6 +112,11 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "stale_detected",
   "opportunity_closed_won",
   "opportunity_closed_lost",
+  "reply_received",
+  "reply_classified",
+  "reply_assigned",
+  "reply_overdue",
+  "meeting_requested",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]

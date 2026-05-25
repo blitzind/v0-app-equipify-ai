@@ -31,6 +31,12 @@ const TYPE_SEVERITY: Record<GrowthNotificationType, GrowthNotificationSeverity> 
   owner_pipeline_underloaded: "low",
   capacity_warning: "medium",
   workload_imbalance: "low",
+  reply_waiting: "medium",
+  reply_overdue: "high",
+  meeting_request_received: "critical",
+  competitor_mentioned: "high",
+  high_priority_reply: "high",
+  owner_response_gap: "medium",
 }
 
 const SEVERITY_BASE: Record<GrowthNotificationSeverity, number> = {

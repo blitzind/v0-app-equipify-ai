@@ -48,6 +48,12 @@ export const GROWTH_NOTIFICATION_TYPES = [
   "owner_pipeline_underloaded",
   "capacity_warning",
   "workload_imbalance",
+  "reply_waiting",
+  "reply_overdue",
+  "meeting_request_received",
+  "competitor_mentioned",
+  "high_priority_reply",
+  "owner_response_gap",
 ] as const
 export type GrowthNotificationType = (typeof GROWTH_NOTIFICATION_TYPES)[number]
 

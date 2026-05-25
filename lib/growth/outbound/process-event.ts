@@ -18,8 +18,9 @@ import {
   upsertGrowthOutboundMessage,
 } from "@/lib/growth/outbound/message-repository"
 import type { NormalizedOutboundEvent, ProcessOutboundEventResult } from "@/lib/growth/outbound/types"
-import { classifyOutboundReply } from "@/lib/growth/outbound/reply-classifier"
+import { classifyReplyIntent } from "@/lib/growth/reply-intelligence/reply-intent-classifier"
 import { insertGrowthOutboundReply } from "@/lib/growth/outbound/reply-repository"
+import { processReplyIntelligence, leadHasCallablePhone } from "@/lib/growth/reply-intelligence/process-reply-intelligence"
 import { resolveOutboundLeadByEmail } from "@/lib/growth/outbound/resolve-lead-by-email"
 import { upsertGrowthSuppressionEntry } from "@/lib/growth/outbound/suppression-repository"
 import {
@@ -160,9 +161,10 @@ export async function processOutboundEvent(
   })
 
   let replyId: string | null = null
+  let insertedReply = null as Awaited<ReturnType<typeof insertGrowthOutboundReply>> | null
   if (event.eventType === "replied") {
-    const classified = classifyOutboundReply(event.bodyPreview)
-    const reply = await insertGrowthOutboundReply(admin, {
+    const classified = classifyReplyIntent(event.bodyPreview)
+    insertedReply = await insertGrowthOutboundReply(admin, {
       connectionId: connection.id,
       messageId,
       contactId: contact.id,
@@ -176,7 +178,7 @@ export async function processOutboundEvent(
       confidence: classified.confidence,
       rawPayload: event.raw,
     })
-    replyId = reply.id
+    replyId = insertedReply.id
   }
 
   if (event.eventType === "unsubscribed") {
@@ -243,7 +245,7 @@ export async function processOutboundEvent(
   if (event.eventType === "replied") {
     nextStatus = "replied"
     const dmPhone = await resolveDmPhone(admin, resolved.leadId, resolved.decisionMakerId)
-    const classified = classifyOutboundReply(event.bodyPreview)
+    const classified = classifyReplyIntent(event.bodyPreview)
     if (classified.classification === "interested" && hasCallablePhone(lead.contactPhone, dmPhone)) {
       nextStatus = "call_ready"
     }
@@ -265,8 +267,29 @@ export async function processOutboundEvent(
     outboundMessageId: messageId,
     outboundReplyId: replyId,
     campaignName: event.campaignName,
-    classification: event.eventType === "replied" ? classifyOutboundReply(event.bodyPreview).classification : undefined,
+    classification: event.eventType === "replied" ? classifyReplyIntent(event.bodyPreview).classification : undefined,
   })
+
+  if (event.eventType === "replied" && insertedReply) {
+    const dmPhone = await resolveDmPhone(admin, resolved.leadId, resolved.decisionMakerId)
+    let lastOutboundSentAt: string | null = null
+    if (messageId) {
+      const messageRow = await admin
+        .schema("growth")
+        .from("outbound_messages")
+        .select("sent_at")
+        .eq("id", messageId)
+        .maybeSingle()
+      lastOutboundSentAt = (messageRow.data as { sent_at?: string } | null)?.sent_at ?? null
+    }
+    await processReplyIntelligence(admin, {
+      reply: insertedReply,
+      lead,
+      bodyPreview: event.bodyPreview,
+      lastOutboundSentAt,
+      hasCallablePhone: leadHasCallablePhone(lead, dmPhone),
+    })
+  }
 
   if (campaignId) {
     await recomputeGrowthOutboundCampaignMetrics(admin, campaignId)

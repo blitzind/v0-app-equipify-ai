@@ -13,6 +13,12 @@ export const GROWTH_NOTIFICATION_COOLDOWN_MINUTES: Partial<Record<GrowthNotifica
   sequence_failed: 60,
   engagement_spike: 240,
   buying_signal_detected: 240,
+  reply_waiting: 30,
+  reply_overdue: 60,
+  meeting_request_received: 15,
+  competitor_mentioned: 60,
+  high_priority_reply: 30,
+  owner_response_gap: 120,
 }
 
 export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificationType, number>> = {
@@ -31,6 +37,12 @@ export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificati
   owner_pipeline_overloaded: 24 * 60,
   owner_pipeline_underloaded: 24 * 60,
   followup_needed: 14 * 24 * 60,
+  reply_waiting: 7 * 24 * 60,
+  reply_overdue: 3 * 24 * 60,
+  meeting_request_received: 7 * 24 * 60,
+  competitor_mentioned: 7 * 24 * 60,
+  high_priority_reply: 7 * 24 * 60,
+  owner_response_gap: 3 * 24 * 60,
 }
 
 export function buildGrowthNotificationDeterministicHash(input: {
