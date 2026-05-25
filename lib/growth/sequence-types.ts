@@ -6,7 +6,18 @@ export type GrowthSequenceFatigueRisk = (typeof GROWTH_SEQUENCE_FATIGUE_RISKS)[n
 export const GROWTH_SEQUENCE_PATTERN_KINDS = ["catalog", "detected"] as const
 export type GrowthSequencePatternKind = (typeof GROWTH_SEQUENCE_PATTERN_KINDS)[number]
 
-export const GROWTH_SEQUENCE_STEP_CHANNELS = ["email", "manual_call", "manual_follow_up"] as const
+export const GROWTH_SEQUENCE_STEP_CHANNELS = [
+  "email",
+  "manual_call",
+  "voicemail",
+  "linkedin_view_profile",
+  "linkedin_connect",
+  "linkedin_message",
+  "sms_task",
+  "meeting_followup",
+  "manual_task",
+  "manual_follow_up",
+] as const
 export type GrowthSequenceStepChannel = (typeof GROWTH_SEQUENCE_STEP_CHANNELS)[number]
 
 export const GROWTH_SEQUENCE_EXPECTED_SIGNALS = [

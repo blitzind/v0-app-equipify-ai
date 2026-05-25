@@ -11,6 +11,7 @@ import type {
   GrowthNotification,
 } from "@/lib/growth/notifications/notification-types"
 import { GROWTH_NOTIFICATIONS_QA_MARKER } from "@/lib/growth/notifications/notification-types"
+import type { GrowthCadenceCommandSummary } from "@/lib/growth/cadence/cadence-types"
 
 const VIEW_LABELS: Record<GrowthAttentionQueueView, string> = {
   my_work: "My Work",
@@ -33,6 +34,7 @@ function severityTone(severity: string): "critical" | "high" | "medium" | "low" 
 
 export function GrowthAttentionCenter() {
   const [dashboard, setDashboard] = useState<GrowthAttentionDashboard | null>(null)
+  const [cadenceSummary, setCadenceSummary] = useState<GrowthCadenceCommandSummary | null>(null)
   const [items, setItems] = useState<GrowthNotification[]>([])
   const [view, setView] = useState<GrowthAttentionQueueView>("needs_action")
   const [loading, setLoading] = useState(true)
@@ -45,16 +47,24 @@ export function GrowthAttentionCenter() {
     try {
       const params = new URLSearchParams({ view: activeView, ownerUserId: "me", limit: "25" })
       if (refresh) params.set("refresh", "true")
-      const res = await fetch(`/api/platform/growth/attention/feed?${params.toString()}`, { cache: "no-store" })
-      const data = (await res.json().catch(() => ({}))) as {
+      const [feedRes, cadenceRes] = await Promise.all([
+        fetch(`/api/platform/growth/attention/feed?${params.toString()}`, { cache: "no-store" }),
+        fetch("/api/platform/growth/cadence/command-summary", { cache: "no-store" }),
+      ])
+      const data = (await feedRes.json().catch(() => ({}))) as {
         ok?: boolean
         feed?: { items?: GrowthNotification[] }
         dashboard?: GrowthAttentionDashboard
         message?: string
       }
-      if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not load attention feed.")
+      const cadenceData = (await cadenceRes.json().catch(() => ({}))) as {
+        ok?: boolean
+        summary?: GrowthCadenceCommandSummary | null
+      }
+      if (!feedRes.ok || !data.ok) throw new Error(data.message ?? "Could not load attention feed.")
       setItems(data.feed?.items ?? [])
       setDashboard(data.dashboard ?? null)
+      setCadenceSummary(cadenceData.ok ? (cadenceData.summary ?? null) : null)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load attention feed.")
     } finally {
@@ -106,6 +116,16 @@ export function GrowthAttentionCenter() {
           <StatTile label="Provider issues" value={dashboard.providerIssueCount} />
           <StatTile label="Sequence failures" value={dashboard.sequenceFailureCount} />
           <StatTile label="Unassigned" value={dashboard.unassignedCount} />
+        </div>
+      ) : null}
+
+      {cadenceSummary ? (
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <StatTile label="Cadence due today" value={cadenceSummary.tasksDueTodayCount} />
+          <StatTile label="Overdue cadence" value={cadenceSummary.overdueCadenceTasksCount} />
+          <StatTile label="Call tasks due" value={cadenceSummary.callTasksDueCount} />
+          <StatTile label="LinkedIn tasks due" value={cadenceSummary.linkedinTasksDueCount} />
+          <StatTile label="Meeting follow-ups" value={cadenceSummary.meetingFollowupsDueCount} />
         </div>
       ) : null}
 

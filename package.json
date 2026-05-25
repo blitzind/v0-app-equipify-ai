@@ -115,6 +115,7 @@
     "test:growth-meeting-capture": "tsx scripts/test-growth-meeting-capture.ts",
     "test:growth-reply-intelligence": "tsx scripts/test-growth-reply-intelligence.ts",
     "test:growth-meeting-intelligence": "tsx scripts/test-growth-meeting-intelligence.ts",
+    "test:growth-multi-channel-cadence": "tsx scripts/test-growth-multi-channel-cadence.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
     "test:growth-assemblyai-browser-streaming": "tsx scripts/test-growth-assemblyai-browser-streaming.ts",
     "test:growth-openai-realtime-browser-streaming": "tsx scripts/test-growth-openai-realtime-browser-streaming.ts",

@@ -54,6 +54,20 @@ export function formatSequenceChannelLabel(channel: GrowthSequenceStepChannel): 
       return "Email"
     case "manual_call":
       return "Manual Call"
+    case "voicemail":
+      return "Voicemail"
+    case "linkedin_view_profile":
+      return "LinkedIn View"
+    case "linkedin_connect":
+      return "LinkedIn Connect"
+    case "linkedin_message":
+      return "LinkedIn Message"
+    case "sms_task":
+      return "SMS Task"
+    case "meeting_followup":
+      return "Meeting Follow-up"
+    case "manual_task":
+      return "Manual Task"
     case "manual_follow_up":
       return "Follow Up"
     default:
@@ -67,6 +81,20 @@ export function formatSequenceChannelShortLabel(channel: GrowthSequenceStepChann
       return "Email"
     case "manual_call":
       return "Call"
+    case "voicemail":
+      return "VM"
+    case "linkedin_view_profile":
+      return "LI View"
+    case "linkedin_connect":
+      return "LI Connect"
+    case "linkedin_message":
+      return "LI Msg"
+    case "sms_task":
+      return "SMS"
+    case "meeting_followup":
+      return "Meeting FU"
+    case "manual_task":
+      return "Task"
     case "manual_follow_up":
       return "Follow Up"
     default:

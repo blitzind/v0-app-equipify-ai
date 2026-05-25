@@ -185,7 +185,14 @@ export async function updateGrowthSequenceEnrollmentStep(
     scheduledFor: string | null
     stepExecutionConfidence: number
     outreachQueueId: string | null
+    cadenceTaskId: string | null
     generationId: string | null
+    instructions: string | null
+    stepOutcome: string | null
+    skipReason: string | null
+    opportunityId: string | null
+    meetingId: string | null
+    dueAt: string | null
     completedAt: string | null
     failureReason: string | null
   }>,
@@ -195,7 +202,14 @@ export async function updateGrowthSequenceEnrollmentStep(
   if (patch.scheduledFor !== undefined) row.scheduled_for = patch.scheduledFor
   if (patch.stepExecutionConfidence !== undefined) row.step_execution_confidence = patch.stepExecutionConfidence
   if (patch.outreachQueueId !== undefined) row.outreach_queue_id = patch.outreachQueueId
+  if (patch.cadenceTaskId !== undefined) row.cadence_task_id = patch.cadenceTaskId
   if (patch.generationId !== undefined) row.generation_id = patch.generationId
+  if (patch.instructions !== undefined) row.instructions = patch.instructions
+  if (patch.stepOutcome !== undefined) row.step_outcome = patch.stepOutcome
+  if (patch.skipReason !== undefined) row.skip_reason = patch.skipReason
+  if (patch.opportunityId !== undefined) row.opportunity_id = patch.opportunityId
+  if (patch.meetingId !== undefined) row.meeting_id = patch.meetingId
+  if (patch.dueAt !== undefined) row.due_at = patch.dueAt
   if (patch.completedAt !== undefined) row.completed_at = patch.completedAt
   if (patch.failureReason !== undefined) row.failure_reason = patch.failureReason
 

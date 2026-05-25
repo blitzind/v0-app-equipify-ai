@@ -60,6 +60,12 @@ export const GROWTH_NOTIFICATION_TYPES = [
   "meeting_no_show",
   "post_meeting_followup_due",
   "meeting_outcome_missing",
+  "cadence_task_due",
+  "cadence_task_overdue",
+  "cadence_task_completed",
+  "cadence_task_skipped",
+  "manual_call_due",
+  "linkedin_task_due",
 ] as const
 export type GrowthNotificationType = (typeof GROWTH_NOTIFICATION_TYPES)[number]
 

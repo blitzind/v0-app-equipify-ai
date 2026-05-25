@@ -46,6 +46,9 @@ import {
   emitGrowthLeadSequenceStepQueuedTimeline,
   emitGrowthLeadSequenceStepSkippedTimeline,
 } from "@/lib/growth/timeline-emitter"
+import { createCadenceTaskFromEnrollmentStep } from "@/lib/growth/cadence/materialize-cadence-step"
+import { isCadenceEmailChannel } from "@/lib/growth/cadence/cadence-channel-engine"
+import { fetchGrowthCadenceTaskByEnrollmentStepId } from "@/lib/growth/cadence/cadence-task-repository"
 import {
   emitGrowthApprovalRequiredNotification,
   emitGrowthSequenceFailedNotification,
@@ -135,7 +138,8 @@ async function queueSequenceStepOutreach(
 ): Promise<{ queued: boolean; reason?: string }> {
   const idempotencyKey = buildSequenceSchedulerIdempotencyKey(input.enrollmentId, input.step.id)
   const existingQueue = await fetchGrowthOutreachQueueByEnrollmentStepId(admin, input.step.id)
-  if (existingQueue || input.step.outreachQueueId) {
+  const existingTask = await fetchGrowthCadenceTaskByEnrollmentStepId(admin, input.step.id)
+  if (existingQueue || input.step.outreachQueueId || existingTask || input.step.cadenceTaskId) {
     return { queued: false, reason: "already_queued" }
   }
 
@@ -143,6 +147,17 @@ async function queueSequenceStepOutreach(
   if (!lead) return { queued: false, reason: "lead_not_found" }
 
   if (input.dryRun) return { queued: true }
+
+  if (!isCadenceEmailChannel(input.step.channel)) {
+    const result = await createCadenceTaskFromEnrollmentStep(admin, {
+      step: input.step,
+      enrollmentId: input.enrollmentId,
+      actingUserId: input.actingUserId,
+      idempotencyKey,
+    })
+    if (!result.task) return { queued: false, reason: result.reason ?? "cadence_task_failed" }
+    return { queued: true }
+  }
 
   let generationId = input.step.generationId
   let generation = generationId ? await fetchGrowthAiCopilotGenerationById(admin, generationId) : null

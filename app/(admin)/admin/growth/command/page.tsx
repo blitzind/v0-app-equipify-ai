@@ -5,6 +5,7 @@ import { useAdmin } from "@/lib/admin-store"
 import { GrowthCommandCenterDashboard } from "@/components/growth/growth-command-center-dashboard"
 import { GrowthAttentionCenter } from "@/components/growth/growth-attention-center"
 import { GrowthExecutiveRevenueSummary } from "@/components/growth/growth-executive-revenue-summary"
+import { GrowthCadenceCommandSummary } from "@/components/growth/growth-cadence-command-summary"
 import { GrowthMeetingCommandSummary } from "@/components/growth/growth-meeting-command-summary"
 import { GrowthPipelineCommandSummary } from "@/components/growth/growth-pipeline-command-summary"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
@@ -46,6 +47,7 @@ export default function AdminGrowthCommandPage() {
           <GrowthAttentionCenter />
           <GrowthExecutiveRevenueSummary />
           <GrowthMeetingCommandSummary />
+          <GrowthCadenceCommandSummary />
           <GrowthPipelineCommandSummary />
           <GrowthCommandCenterDashboard />
         </GrowthSectionLayout>

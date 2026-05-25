@@ -1,6 +1,17 @@
 /** Client-safe Growth Engine outreach queue types. */
 
-export const GROWTH_OUTREACH_QUEUE_CHANNELS = ["email", "manual_call", "manual_follow_up"] as const
+export const GROWTH_OUTREACH_QUEUE_CHANNELS = [
+  "email",
+  "manual_call",
+  "voicemail",
+  "linkedin_view_profile",
+  "linkedin_connect",
+  "linkedin_message",
+  "sms_task",
+  "meeting_followup",
+  "manual_task",
+  "manual_follow_up",
+] as const
 export type GrowthOutreachQueueChannel = (typeof GROWTH_OUTREACH_QUEUE_CHANNELS)[number]
 
 export const GROWTH_OUTREACH_QUEUE_STATUSES = [

@@ -1,5 +1,7 @@
 /** Client-safe Growth Engine sequence enrollment types. */
 
+import type { GrowthSequenceStepChannel } from "@/lib/growth/sequence-types"
+
 export const GROWTH_SEQUENCE_ENROLLMENT_STATUSES = [
   "draft",
   "active",
@@ -49,13 +51,20 @@ export type GrowthSequenceEnrollmentStep = {
   leadId: string
   sequencePatternStepId: string
   stepOrder: number
-  channel: "email" | "manual_call" | "manual_follow_up"
+  channel: GrowthSequenceStepChannel
   generationType: string | null
   scheduledFor: string | null
   status: GrowthSequenceEnrollmentStepStatus
   stepExecutionConfidence: number
   outreachQueueId: string | null
+  cadenceTaskId: string | null
   generationId: string | null
+  instructions: string | null
+  stepOutcome: string | null
+  skipReason: string | null
+  opportunityId: string | null
+  meetingId: string | null
+  dueAt: string | null
   completedAt: string | null
   failureReason: string | null
   createdAt: string

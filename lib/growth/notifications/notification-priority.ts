@@ -43,6 +43,12 @@ const TYPE_SEVERITY: Record<GrowthNotificationType, GrowthNotificationSeverity> 
   meeting_no_show: "high",
   post_meeting_followup_due: "medium",
   meeting_outcome_missing: "medium",
+  cadence_task_due: "medium",
+  cadence_task_overdue: "high",
+  cadence_task_completed: "low",
+  cadence_task_skipped: "medium",
+  manual_call_due: "high",
+  linkedin_task_due: "medium",
 }
 
 const SEVERITY_BASE: Record<GrowthNotificationSeverity, number> = {

@@ -14,6 +14,7 @@ import type {
   GrowthSequenceSchedulerStatus,
 } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
 import { GROWTH_SEQUENCE_SCHEDULER_QA_MARKER } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
+import { GrowthCadenceDashboard } from "@/components/growth/growth-cadence-dashboard"
 import { cn } from "@/lib/utils"
 
 type DashboardPayload = {
@@ -309,6 +310,8 @@ export function GrowthSequenceExecutionDashboard({
       </div>
 
       <EnrollmentList title="Completed recently" rows={dashboard.completedRecently} highlightEnrollmentId={highlightEnrollmentId} />
+
+      <GrowthCadenceDashboard />
     </div>
   )
 }

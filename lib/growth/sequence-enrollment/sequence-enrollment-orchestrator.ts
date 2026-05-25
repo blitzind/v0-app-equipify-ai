@@ -16,8 +16,10 @@ import {
 import { fetchGrowthOutreachSettings } from "@/lib/growth/outreach/outreach-settings-repository"
 import { resolveScheduledFor } from "@/lib/growth/outreach/outreach-scheduling"
 import { fetchGrowthPlatformCommunicationSettings } from "@/lib/growth/communication/settings-repository"
-import { runGrowthAiCopilotGeneration } from "@/lib/growth/run-ai-copilot-generation"
+import { createCadenceTaskFromEnrollmentStep } from "@/lib/growth/cadence/materialize-cadence-step"
+import { isCadenceEmailChannel } from "@/lib/growth/cadence/cadence-channel-engine"
 import { fetchGrowthAiCopilotGenerationById } from "@/lib/growth/ai-copilot-repository"
+import { runGrowthAiCopilotGeneration } from "@/lib/growth/run-ai-copilot-generation"
 import { listGrowthSequencePatterns } from "@/lib/growth/sequence-pattern-repository"
 import {
   computeEnrollmentHealthScore,
@@ -220,7 +222,7 @@ export async function materializeGrowthSequenceEnrollmentStep(
     return
   }
 
-  if (step.channel === "email") {
+  if (isCadenceEmailChannel(step.channel)) {
     const generationType = (step.generationType ?? "follow_up_email") as GrowthAiCopilotGenerationType
     const result = await runGrowthAiCopilotGeneration({
       admin,
@@ -247,59 +249,12 @@ export async function materializeGrowthSequenceEnrollmentStep(
     return
   }
 
-  const commSettings = await fetchGrowthPlatformCommunicationSettings(admin)
-  const preflight = await runGrowthOutreachPreflight(admin, {
-    lead,
-    channel: step.channel,
-    toEmail: lead.contactEmail,
-    generationType: null,
-    generationApproved: true,
-  })
-  if (!preflight.allowed) throw new Error(preflight.code ?? "preflight_blocked")
-
-  const queueItem = await insertGrowthOutreachQueueItem(admin, {
-    leadId: lead.id,
-    channel: step.channel,
-    status: "pending_approval",
-    priority: deriveOutreachQueuePriority({
-      callPriorityTier: lead.callPriorityTier,
-      executivePriorityTier: lead.executivePriorityTier,
-    }),
-    executionConfidence: computeOutreachExecutionConfidence({
-      leadScore: lead.score,
-      engagementScore: lead.engagementScore,
-      capacityTier: lead.operationalCapacityTier,
-      channel: step.channel,
-    }),
-    providerConnectionId: commSettings.activeEmailConnectionId,
-    payloadSnapshot: {
-      generationType: step.generationType,
-      sequenceStep: step.stepOrder,
-    },
-    createdBy: input.actingUserId,
-    sequencePatternId: enrollment.sequencePatternId,
-    sequenceEnrollmentStepId: step.id,
-  })
-
-  await updateGrowthSequenceEnrollmentStep(admin, step.id, {
-    status: "queued",
-    outreachQueueId: queueItem.id,
-    stepExecutionConfidence: computeStepExecutionConfidence({ lead, channel: step.channel }),
-  })
-
-  await insertGrowthOutreachQueueEvent(admin, {
-    queueId: queueItem.id,
-    eventType: "queued",
-    actorUserId: input.actingUserId,
-    metadata: { sequenceEnrollmentId: enrollment.id, sequenceStepId: step.id },
-  })
-
-  await emitGrowthLeadSequenceStepQueuedTimeline(admin, {
-    leadId: lead.id,
+  const result = await createCadenceTaskFromEnrollmentStep(admin, {
+    step,
     enrollmentId: enrollment.id,
-    stepId: step.id,
-    queueId: queueItem.id,
+    actingUserId: input.actingUserId,
   })
+  if (!result.task) throw new Error(result.reason ?? "cadence_task_failed")
 }
 
 export async function queueGrowthSequenceEnrollmentStep(
