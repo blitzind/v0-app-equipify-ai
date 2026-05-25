@@ -8,6 +8,7 @@ import { GrowthAiCopilotSettingsPanel } from "@/components/growth/growth-ai-copi
 import { GrowthLiveCoachingSettingsPanel } from "@/components/growth/growth-live-coaching-settings"
 import { GrowthGoogleCalendarSettingsPanel } from "@/components/growth/growth-google-calendar-settings-panel"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
+import { GROWTH_SETTINGS_UI_QA_MARKER, GrowthSettingsBadge } from "@/components/growth/growth-settings-ui"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -25,20 +26,24 @@ export default function AdminGrowthSettingsPage() {
 
   return (
     <PlatformAdminPageShell header={header}>
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-6">
         <PlatformAdminTabNav activeKey="growth_leads" />
 
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="flex size-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-              <Settings2 size={17} />
-            </span>
-            <div>
-              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Communication Settings</h1>
-              <p className="text-sm text-muted-foreground">
-                Provider selection, call dial preferences, and connection cost metadata — config only, no send or telephony APIs.
-              </p>
+        <section className="rounded-xl border border-border bg-card p-4 shadow-sm ring-1 ring-border/40 dark:ring-[#25324C]/80">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <Settings2 size={16} />
+              </span>
+              <div>
+                <h1 className={PAGE_STANDARD_PAGE_TITLE}>Communication Settings</h1>
+                <p className="text-xs text-muted-foreground">
+                  Provider selection, call dial preferences, and connection cost metadata — config only, no send or
+                  telephony APIs.
+                </p>
+              </div>
             </div>
+            <GrowthSettingsBadge label={GROWTH_SETTINGS_UI_QA_MARKER} tone="neutral" />
           </div>
         </section>
 

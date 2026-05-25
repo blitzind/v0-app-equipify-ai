@@ -1,13 +1,33 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Loader2, Save, Settings2 } from "lucide-react"
+import {
+  DollarSign,
+  Loader2,
+  Mail,
+  Phone,
+  Save,
+  Settings2,
+} from "lucide-react"
 import Link from "next/link"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import {
+  GROWTH_SETTINGS_FORM_GAP,
+  GROWTH_SETTINGS_INNER_GAP,
+  GROWTH_SETTINGS_SECTION_GAP,
+  GrowthEmailProviderComparisonList,
+  GrowthSettingsBadge,
+  GrowthSettingsCard,
+} from "@/components/growth/growth-settings-ui"
 import { resolveGrowthCallHref } from "@/lib/growth/communication/call-dial"
 import {
   GROWTH_CALL_DIAL_MODES,
@@ -21,19 +41,13 @@ import type {
   OutboundProviderCapabilityKey,
 } from "@/lib/growth/outbound/provider-capabilities"
 import type { GrowthEmailProviderConnection } from "@/lib/growth/outbound/types"
+import { cn } from "@/lib/utils"
 
 const DIAL_MODE_LABELS: Record<GrowthCallDialMode, string> = {
   tel: "Browser tel: link",
   facetime: "FaceTime audio",
   google_voice: "Google Voice (web)",
   custom_url_template: "Custom URL template",
-}
-
-const CAPABILITY_TONE: Record<string, string> = {
-  supported: "bg-emerald-100 text-emerald-800",
-  partial: "bg-amber-100 text-amber-800",
-  planned: "bg-slate-100 text-slate-700",
-  n_a: "bg-muted text-muted-foreground",
 }
 
 type ProvidersPayload = {
@@ -50,6 +64,14 @@ type PreferencesPayload = {
   resolved?: ResolvedGrowthDialPreferences
 }
 
+function costSummary(edit: { monthlyCostEstimate: string; seatCount: string; notes: string }): string {
+  const parts: string[] = []
+  if (edit.monthlyCostEstimate.trim()) parts.push(`$${edit.monthlyCostEstimate}/mo`)
+  if (edit.seatCount.trim()) parts.push(`${edit.seatCount} seats`)
+  if (edit.notes.trim()) parts.push("Notes")
+  return parts.length > 0 ? parts.join(" · ") : "No cost metadata"
+}
+
 export function GrowthCommunicationSettingsPanel() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -60,7 +82,6 @@ export function GrowthCommunicationSettingsPanel() {
   const [userPrefs, setUserPrefs] = useState<GrowthUserCommunicationPreferences | null>(null)
   const [resolved, setResolved] = useState<ResolvedGrowthDialPreferences | null>(null)
   const [providers, setProviders] = useState<OutboundProviderCapabilities[]>([])
-  const [capabilityLabels, setCapabilityLabels] = useState<Record<OutboundProviderCapabilityKey, string>>({} as Record<OutboundProviderCapabilityKey, string>)
   const [connections, setConnections] = useState<GrowthEmailProviderConnection[]>([])
 
   const [platformDialMode, setPlatformDialMode] = useState<GrowthCallDialMode>("tel")
@@ -118,7 +139,6 @@ export function GrowthCommunicationSettingsPanel() {
       setUserEmailConnectionId(prefs.user?.preferredEmailConnectionId ?? "")
 
       setProviders(providerData.providers ?? [])
-      setCapabilityLabels(providerData.capabilityLabels ?? ({} as Record<OutboundProviderCapabilityKey, string>))
       setConnections(providerData.connections ?? [])
 
       const edits: Record<string, { monthlyCostEstimate: string; seatCount: string; notes: string }> = {}
@@ -202,7 +222,7 @@ export function GrowthCommunicationSettingsPanel() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-10 text-sm text-muted-foreground">
+      <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />
         Loading communication settings…
       </div>
@@ -210,42 +230,42 @@ export function GrowthCommunicationSettingsPanel() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={GROWTH_SETTINGS_SECTION_GAP}>
       {error ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
           {error}
         </div>
       ) : null}
       {success ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200">
           {success}
         </div>
       ) : null}
 
-      <GrowthEngineCard>
-        <div className="space-y-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold">Call channel preferences</h2>
-              <p className="text-sm text-muted-foreground">
-                Fallback chain: your preferences → platform defaults → tel. Platform-admin internal only — future org add-ons will use org-scoped settings.
-              </p>
-            </div>
-            {resolved ? (
-              <span className="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
-                Active: {DIAL_MODE_LABELS[resolved.callDialMode]}
-              </span>
-            ) : null}
-          </div>
+      <GrowthSettingsCard
+        title="Call Channel Preferences"
+        icon={<Phone className="size-4" />}
+        headerAside={
+          resolved ? (
+            <GrowthSettingsBadge label={`Active: ${DIAL_MODE_LABELS[resolved.callDialMode]}`} tone="neutral" />
+          ) : null
+        }
+      >
+        <div className={GROWTH_SETTINGS_INNER_GAP}>
+          <p className="text-xs text-muted-foreground">
+            Fallback chain: your preferences → platform defaults → tel. Platform-admin internal only.
+          </p>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="space-y-3 rounded-xl border border-border p-4">
-              <h3 className="font-medium">Platform defaults</h3>
-              <div className="space-y-2">
-                <Label htmlFor="platform-dial-mode">Default dial mode</Label>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="space-y-2.5 rounded-lg border border-border/70 p-3 dark:border-[#25324C]">
+              <h4 className="text-sm font-medium">Platform Defaults</h4>
+              <div className={GROWTH_SETTINGS_FORM_GAP}>
+                <Label htmlFor="platform-dial-mode" className="text-xs">
+                  Default dial mode
+                </Label>
                 <select
                   id="platform-dial-mode"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
                   value={platformDialMode}
                   onChange={(event) => setPlatformDialMode(event.target.value as GrowthCallDialMode)}
                 >
@@ -256,16 +276,19 @@ export function GrowthCommunicationSettingsPanel() {
                   ))}
                 </select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="platform-template">Custom URL template</Label>
+              <div className={GROWTH_SETTINGS_FORM_GAP}>
+                <Label htmlFor="platform-template" className="text-xs">
+                  Custom URL template
+                </Label>
                 <Input
                   id="platform-template"
+                  className="h-9"
                   placeholder="zoomphone://call?number={{phone_e164}}"
                   value={platformTemplate}
                   onChange={(event) => setPlatformTemplate(event.target.value)}
                 />
               </div>
-              <label className="flex items-center gap-2 text-sm">
+              <label className="flex items-center gap-2 text-xs">
                 <input
                   type="checkbox"
                   checked={platformShowAlternates}
@@ -273,11 +296,13 @@ export function GrowthCommunicationSettingsPanel() {
                 />
                 Show alternate dialers in call sheet
               </label>
-              <div className="space-y-2">
-                <Label htmlFor="platform-email-connection">Active email connection</Label>
+              <div className={GROWTH_SETTINGS_FORM_GAP}>
+                <Label htmlFor="platform-email-connection" className="text-xs">
+                  Active email connection
+                </Label>
                 <select
                   id="platform-email-connection"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
                   value={platformEmailConnectionId}
                   onChange={(event) => setPlatformEmailConnectionId(event.target.value)}
                 >
@@ -291,13 +316,15 @@ export function GrowthCommunicationSettingsPanel() {
               </div>
             </div>
 
-            <div className="space-y-3 rounded-xl border border-border p-4">
-              <h3 className="font-medium">Your overrides</h3>
-              <div className="space-y-2">
-                <Label htmlFor="user-dial-mode">Dial mode override</Label>
+            <div className="space-y-2.5 rounded-lg border border-border/70 p-3 dark:border-[#25324C]">
+              <h4 className="text-sm font-medium">Your Overrides</h4>
+              <div className={GROWTH_SETTINGS_FORM_GAP}>
+                <Label htmlFor="user-dial-mode" className="text-xs">
+                  Dial mode override
+                </Label>
                 <select
                   id="user-dial-mode"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
                   value={userDialMode}
                   onChange={(event) => setUserDialMode(event.target.value)}
                 >
@@ -309,20 +336,25 @@ export function GrowthCommunicationSettingsPanel() {
                   ))}
                 </select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="user-template">Custom URL template override</Label>
+              <div className={GROWTH_SETTINGS_FORM_GAP}>
+                <Label htmlFor="user-template" className="text-xs">
+                  Custom URL template override
+                </Label>
                 <Input
                   id="user-template"
+                  className="h-9"
                   placeholder="Leave blank to inherit platform template"
                   value={userTemplate}
                   onChange={(event) => setUserTemplate(event.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="user-show-alternates">Alternate dialers override</Label>
+              <div className={GROWTH_SETTINGS_FORM_GAP}>
+                <Label htmlFor="user-show-alternates" className="text-xs">
+                  Alternate dialers override
+                </Label>
                 <select
                   id="user-show-alternates"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
                   value={userShowAlternates}
                   onChange={(event) => setUserShowAlternates(event.target.value)}
                 >
@@ -331,11 +363,13 @@ export function GrowthCommunicationSettingsPanel() {
                   <option value="false">Hide alternates</option>
                 </select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="user-email-connection">Preferred email connection</Label>
+              <div className={GROWTH_SETTINGS_FORM_GAP}>
+                <Label htmlFor="user-email-connection" className="text-xs">
+                  Preferred email connection
+                </Label>
                 <select
                   id="user-email-connection"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
                   value={userEmailConnectionId}
                   onChange={(event) => setUserEmailConnectionId(event.target.value)}
                 >
@@ -351,140 +385,114 @@ export function GrowthCommunicationSettingsPanel() {
           </div>
 
           {previewHref ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground">
               Preview (555-123-4567): <code className="rounded bg-muted px-1 py-0.5">{previewHref}</code>
             </p>
           ) : null}
 
-          <p className="text-xs text-muted-foreground">
-            Suppression is honored on email outreach. Calls are manual dial only — no auto-dial, recording, or copilot in this slice.
+          <p className="text-[11px] text-muted-foreground">
+            Suppression is honored on email outreach. Calls are manual dial only — no auto-dial, recording, or copilot
+            in this slice.
           </p>
         </div>
-      </GrowthEngineCard>
+      </GrowthSettingsCard>
 
-      <GrowthEngineCard>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold">Email provider comparison</h2>
-              <p className="text-sm text-muted-foreground">
-                Capability metadata only — fixture/stub mode until live adapters ship.
-              </p>
-            </div>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/admin/growth/outreach">
-                <Settings2 className="mr-2 size-4" />
-                Outreach center
-              </Link>
-            </Button>
-          </div>
-
-          <div className="overflow-x-auto rounded-xl border border-border">
-            <table className="min-w-full text-sm">
-              <thead className="bg-muted/40">
-                <tr>
-                  <th className="px-3 py-2 text-left font-medium">Provider</th>
-                  {(Object.keys(capabilityLabels) as OutboundProviderCapabilityKey[]).map((key) => (
-                    <th key={key} className="px-2 py-2 text-left font-medium whitespace-nowrap">
-                      {capabilityLabels[key] ?? key}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {providers.map((provider) => (
-                  <tr key={provider.providerFamily}>
-                    <td className="px-3 py-3 align-top">
-                      <div className="font-medium">{provider.displayName}</div>
-                      <div className="text-xs text-muted-foreground">{provider.summary}</div>
-                      {provider.fixtureOnly ? (
-                        <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-800">
-                          Fixture only
-                        </span>
-                      ) : null}
-                    </td>
-                    {(Object.keys(capabilityLabels) as OutboundProviderCapabilityKey[]).map((key) => {
-                      const status = provider.capabilities[key]
-                      return (
-                        <td key={key} className="px-2 py-3 align-top">
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] capitalize ${CAPABILITY_TONE[status] ?? ""}`}>
-                            {status.replace(/_/g, " ")}
-                          </span>
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <GrowthSettingsCard
+        title="Email Provider Comparison"
+        icon={<Mail className="size-4" />}
+        headerAside={
+          <Button asChild variant="outline" size="sm" className="h-7 px-2.5 text-xs">
+            <Link href="/admin/growth/outreach">
+              <Settings2 className="mr-1.5 size-3.5" />
+              Outreach Center
+            </Link>
+          </Button>
+        }
+      >
+        <div className={GROWTH_SETTINGS_INNER_GAP}>
+          <p className="text-xs text-muted-foreground">
+            Capability metadata only — fixture/stub mode until live adapters ship.
+          </p>
+          <GrowthEmailProviderComparisonList
+            providers={providers}
+            connections={connections}
+            activeConnectionId={platformEmailConnectionId}
+          />
         </div>
-      </GrowthEngineCard>
+      </GrowthSettingsCard>
 
-      <GrowthEngineCard>
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Connection cost notes</h2>
-          <div className="space-y-4">
+      <GrowthSettingsCard title="Connection Cost Notes" icon={<DollarSign className="size-4" />}>
+        {connections.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No provider connections yet.</p>
+        ) : (
+          <Accordion type="multiple" className="rounded-lg border border-border dark:border-[#25324C]">
             {connections.map((connection) => {
               const edit = connectionEdits[connection.id] ?? { monthlyCostEstimate: "", seatCount: "", notes: "" }
               return (
-                <div key={connection.id} className="rounded-xl border border-border p-4">
-                  <div className="mb-3 font-medium">
-                    {connection.label}{" "}
-                    <span className="text-sm font-normal text-muted-foreground">({connection.providerFamily})</span>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="space-y-1">
-                      <Label>Monthly cost estimate (USD)</Label>
-                      <Input
-                        inputMode="decimal"
-                        value={edit.monthlyCostEstimate}
-                        onChange={(event) =>
-                          setConnectionEdits((prev) => ({
-                            ...prev,
-                            [connection.id]: { ...edit, monthlyCostEstimate: event.target.value },
-                          }))
-                        }
-                      />
+                <AccordionItem key={connection.id} value={connection.id} className="border-border dark:border-[#25324C]">
+                  <AccordionTrigger className="px-3 py-2.5 hover:no-underline [&[data-state=open]>svg]:translate-y-0">
+                    <div className="flex flex-1 items-center justify-between gap-3 pr-2 text-left">
+                      <span className="text-sm font-medium">{connection.label}</span>
+                      <span className="text-xs font-normal text-muted-foreground">{costSummary(edit)}</span>
                     </div>
-                    <div className="space-y-1">
-                      <Label>Seat count</Label>
-                      <Input
-                        inputMode="numeric"
-                        value={edit.seatCount}
-                        onChange={(event) =>
-                          setConnectionEdits((prev) => ({
-                            ...prev,
-                            [connection.id]: { ...edit, seatCount: event.target.value },
-                          }))
-                        }
-                      />
+                  </AccordionTrigger>
+                  <AccordionContent className="px-3 pb-3">
+                    <div className="grid gap-2.5 sm:grid-cols-3">
+                      <div className={GROWTH_SETTINGS_FORM_GAP}>
+                        <Label className="text-xs">Monthly cost estimate (USD)</Label>
+                        <Input
+                          inputMode="decimal"
+                          className="h-9"
+                          value={edit.monthlyCostEstimate}
+                          onChange={(event) =>
+                            setConnectionEdits((prev) => ({
+                              ...prev,
+                              [connection.id]: { ...edit, monthlyCostEstimate: event.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className={GROWTH_SETTINGS_FORM_GAP}>
+                        <Label className="text-xs">Seat count</Label>
+                        <Input
+                          inputMode="numeric"
+                          className="h-9"
+                          value={edit.seatCount}
+                          onChange={(event) =>
+                            setConnectionEdits((prev) => ({
+                              ...prev,
+                              [connection.id]: { ...edit, seatCount: event.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className={cn(GROWTH_SETTINGS_FORM_GAP, "sm:col-span-3")}>
+                        <Label className="text-xs">Notes</Label>
+                        <Textarea
+                          rows={2}
+                          className="min-h-[4rem] text-sm"
+                          value={edit.notes}
+                          onChange={(event) =>
+                            setConnectionEdits((prev) => ({
+                              ...prev,
+                              [connection.id]: { ...edit, notes: event.target.value },
+                            }))
+                          }
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-1 sm:col-span-3">
-                      <Label>Notes</Label>
-                      <Textarea
-                        rows={2}
-                        value={edit.notes}
-                        onChange={(event) =>
-                          setConnectionEdits((prev) => ({
-                            ...prev,
-                            [connection.id]: { ...edit, notes: event.target.value },
-                          }))
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
+                  </AccordionContent>
+                </AccordionItem>
               )
             })}
-          </div>
-        </div>
-      </GrowthEngineCard>
+          </Accordion>
+        )}
+      </GrowthSettingsCard>
 
       <div className="flex justify-end">
-        <Button disabled={saving} onClick={() => void saveSettings()}>
+        <Button size="sm" disabled={saving} onClick={() => void saveSettings()}>
           {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}
-          Save settings
+          Save Settings
         </Button>
       </div>
     </div>

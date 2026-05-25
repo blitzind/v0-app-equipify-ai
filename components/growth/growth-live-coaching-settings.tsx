@@ -1,11 +1,17 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { Loader2, Radio } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { GrowthEngineCard, GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { GrowthLiveCoachingProviderComparisonTable } from "@/components/growth/growth-live-coaching-provider-selection"
+import {
+  GROWTH_SETTINGS_FORM_GAP,
+  GROWTH_SETTINGS_INNER_GAP,
+  GrowthSettingsBadge,
+  GrowthSettingsCard,
+  GrowthSettingsToggleRow,
+} from "@/components/growth/growth-settings-ui"
 import {
   buildLiveCoachingProviderComparisonRows,
   buildLiveCoachingProviderReadiness,
@@ -146,152 +152,168 @@ export function GrowthLiveCoachingSettingsPanel() {
   if (!settings) return null
 
   return (
-    <GrowthEngineCard title="Live Coaching">
-      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <GrowthBadge label={LIVE_COACHING_QA_PROOF_MARKER} tone="neutral" />
-        <span>Platform-admin live coaching configuration</span>
-      </div>
+    <GrowthSettingsCard
+      title="Live Coaching"
+      icon={<Radio className="size-4" />}
+      headerAside={
+        <div className="flex items-center gap-1.5">
+          <GrowthSettingsBadge label={LIVE_COACHING_QA_PROOF_MARKER} tone="neutral" />
+        </div>
+      }
+    >
+      {error ? <p className="mb-2 text-xs text-destructive">{error}</p> : null}
 
-      {error ? <p className="mb-3 text-sm text-destructive">{error}</p> : null}
-
-      <div className="space-y-4">
+      <div className={GROWTH_SETTINGS_INNER_GAP}>
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-sm font-medium">Provider comparison</span>
+            <span className="text-xs font-medium text-foreground">Provider Comparison</span>
             {recommendation.connectionId ? (
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
+                className="h-7 px-2.5 text-xs"
                 disabled={saving || settings.activeProviderConnectionId === recommendation.connectionId}
                 onClick={() => void save({ activeProviderConnectionId: recommendation.connectionId })}
               >
-                Use recommended provider
+                Use Recommended
               </Button>
             ) : null}
           </div>
           {recommendation.reason ? (
-            <p className="text-xs text-muted-foreground">{recommendation.reason}</p>
+            <p className="text-[11px] text-muted-foreground">{recommendation.reason}</p>
           ) : null}
-          <GrowthLiveCoachingProviderComparisonTable rows={comparisonRows} />
+          <GrowthLiveCoachingProviderComparisonTable rows={comparisonRows} compact />
         </div>
 
-        <label className="block space-y-1 text-sm">
-          <span className="font-medium">Active transcript provider</span>
-          <select
-            className="w-full rounded-md border border-border bg-background px-3 py-2"
-            value={settings.activeProviderConnectionId ?? ""}
-            onChange={(event) =>
-              void save({
-                activeProviderConnectionId: event.target.value ? event.target.value : null,
-              })
-            }
-            disabled={saving}
-          >
-            <option value="">Manual / stub fallback</option>
-            {connections.map((connection) => (
-              <option key={connection.id} value={connection.id}>
-                {connection.label} ({connection.provider.replace(/_/g, " ")})
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="grid gap-2.5 lg:grid-cols-2">
+          <label className={GROWTH_SETTINGS_FORM_GAP}>
+            <span className="text-xs font-medium">Active Transcript Provider</span>
+            <select
+              className="h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm"
+              value={settings.activeProviderConnectionId ?? ""}
+              onChange={(event) =>
+                void save({
+                  activeProviderConnectionId: event.target.value ? event.target.value : null,
+                })
+              }
+              disabled={saving}
+            >
+              <option value="">Manual / stub fallback</option>
+              {connections.map((connection) => (
+                <option key={connection.id} value={connection.id}>
+                  {connection.label} ({connection.provider.replace(/_/g, " ")})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className={GROWTH_SETTINGS_FORM_GAP}>
+            <span className="text-xs font-medium">Custom Keywords (comma-separated)</span>
+            <Input
+              className="h-9"
+              value={keywordsDraft}
+              onChange={(event) => setKeywordsDraft(event.target.value)}
+              onBlur={() =>
+                void save({
+                  customKeywords: keywordsDraft
+                    .split(",")
+                    .map((entry) => entry.trim())
+                    .filter(Boolean),
+                })
+              }
+              disabled={saving}
+            />
+          </label>
+        </div>
 
         {settings.activeProviderConnectionId ? (
-          <div className="space-y-2 rounded-lg border border-border bg-muted/20 px-3 py-3">
+          <div className="space-y-2 rounded-lg border border-border/70 px-2.5 py-2 dark:border-[#25324C]">
             {activeReadiness ? (
-              <div className="flex flex-wrap gap-2 text-xs">
-                <GrowthBadge label={activeReadiness.configured ? "Configured" : "Not configured"} tone="neutral" />
-                <GrowthBadge label={activeReadiness.validated ? "Validated" : "Not validated"} tone="neutral" />
-                <GrowthBadge
-                  label={activeReadiness.browserMicSupported ? "Browser mic supported" : "No browser mic"}
+              <div className="flex flex-wrap gap-1.5">
+                <GrowthSettingsBadge
+                  label={activeReadiness.configured ? "Configured" : "Not configured"}
+                  tone="neutral"
+                />
+                <GrowthSettingsBadge
+                  label={activeReadiness.validated ? "Validated" : "Not validated"}
+                  tone="neutral"
+                />
+                <GrowthSettingsBadge
+                  label={activeReadiness.browserMicSupported ? "Browser mic" : "No browser mic"}
                   tone="neutral"
                 />
                 {activeReadiness.circuitOpen ? (
-                  <GrowthBadge label="Circuit open" tone="attention" />
+                  <GrowthSettingsBadge label="Circuit open" tone="attention" />
                 ) : activeReadiness.degraded ? (
-                  <GrowthBadge label="Degraded" tone="attention" />
+                  <GrowthSettingsBadge label="Degraded" tone="attention" />
                 ) : (
-                  <GrowthBadge label={activeReadiness.readinessStatus.replace(/_/g, " ")} tone="healthy" />
+                  <GrowthSettingsBadge
+                    label={activeReadiness.readinessStatus.replace(/_/g, " ")}
+                    tone="healthy"
+                  />
                 )}
               </div>
             ) : null}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={testing || saving}
-              onClick={() => void testActiveProvider()}
-            >
-              {testing ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-              Test Connection
-            </Button>
-            {testMessage ? <p className="text-xs text-muted-foreground">{testMessage}</p> : null}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2.5 text-xs"
+                disabled={testing || saving}
+                onClick={() => void testActiveProvider()}
+              >
+                {testing ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : null}
+                Test Connection
+              </Button>
+              {testMessage ? <span className="text-[11px] text-muted-foreground">{testMessage}</span> : null}
+            </div>
             {!activeReadiness?.eligibleForRecommendation ? (
-              <p className="text-xs text-amber-950">{fallbackExplanation}</p>
+              <p className="text-[11px] text-amber-950 dark:text-amber-100">{fallbackExplanation}</p>
             ) : null}
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">
-            Manual transcript mode is active until a provider is selected. Deepgram, AssemblyAI, and OpenAI Realtime
-            support browser mic transcription when connected and ready. OpenAI is transcription-only — no voice
-            output.
+          <p className="text-[11px] text-muted-foreground">
+            Manual transcript mode until a provider is selected. Deepgram, AssemblyAI, and OpenAI Realtime support
+            browser mic when connected.
           </p>
         )}
 
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
+        <div className="grid gap-2 sm:grid-cols-2">
+          <GrowthSettingsToggleRow
+            label="Enable speaker separation"
             checked={settings.speakerSeparationEnabled}
-            onChange={(event) => void save({ speakerSeparationEnabled: event.target.checked })}
+            onCheckedChange={(checked) => void save({ speakerSeparationEnabled: checked })}
             disabled={saving}
           />
-          Enable speaker separation
-        </label>
-
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
+          <GrowthSettingsToggleRow
+            label="Enable keyword events"
             checked={settings.keywordEventsEnabled}
-            onChange={(event) => void save({ keywordEventsEnabled: event.target.checked })}
+            onCheckedChange={(checked) => void save({ keywordEventsEnabled: checked })}
             disabled={saving}
           />
-          Enable keyword events
-        </label>
+        </div>
 
-        <label className="block space-y-1 text-sm">
-          <span className="font-medium">Custom keywords (comma-separated)</span>
-          <Input
-            value={keywordsDraft}
-            onChange={(event) => setKeywordsDraft(event.target.value)}
-            onBlur={() =>
-              void save({
-                customKeywords: keywordsDraft
-                  .split(",")
-                  .map((entry) => entry.trim())
-                  .filter(Boolean),
-              })
-            }
-            disabled={saving}
-          />
-        </label>
-
-        <label className="block space-y-1 text-sm">
-          <span className="font-medium">Transcript confidence threshold ({settings.transcriptConfidenceThreshold})</span>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={settings.transcriptConfidenceThreshold}
-            onChange={(event) => void save({ transcriptConfidenceThreshold: Number(event.target.value) })}
-            disabled={saving}
-            className="w-full"
-          />
-        </label>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block space-y-1 text-sm">
-            <span className="font-medium">Critical guidance threshold ({settings.criticalGuidanceThreshold})</span>
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          <label className={GROWTH_SETTINGS_FORM_GAP}>
+            <span className="text-xs font-medium">
+              Transcript confidence ({settings.transcriptConfidenceThreshold})
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={settings.transcriptConfidenceThreshold}
+              onChange={(event) => void save({ transcriptConfidenceThreshold: Number(event.target.value) })}
+              disabled={saving}
+              className="w-full"
+            />
+          </label>
+          <label className={GROWTH_SETTINGS_FORM_GAP}>
+            <span className="text-xs font-medium">
+              Critical guidance ({settings.criticalGuidanceThreshold})
+            </span>
             <input
               type="range"
               min={0}
@@ -302,8 +324,10 @@ export function GrowthLiveCoachingSettingsPanel() {
               className="w-full"
             />
           </label>
-          <label className="block space-y-1 text-sm">
-            <span className="font-medium">Normal guidance threshold ({settings.normalGuidanceThreshold})</span>
+          <label className={GROWTH_SETTINGS_FORM_GAP}>
+            <span className="text-xs font-medium">
+              Normal guidance ({settings.normalGuidanceThreshold})
+            </span>
             <input
               type="range"
               min={0}
@@ -316,10 +340,17 @@ export function GrowthLiveCoachingSettingsPanel() {
           </label>
         </div>
 
-        <Button type="button" variant="outline" size="sm" disabled={saving} onClick={() => void load()}>
-          Refresh settings
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2.5 text-xs"
+          disabled={saving}
+          onClick={() => void load()}
+        >
+          Refresh Settings
         </Button>
       </div>
-    </GrowthEngineCard>
+    </GrowthSettingsCard>
   )
 }

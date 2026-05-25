@@ -1,11 +1,19 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Loader2, Save } from "lucide-react"
+import { BookOpen, ListChecks, Loader2, PhoneCall, Save, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { Switch } from "@/components/ui/switch"
+import {
+  GROWTH_SETTINGS_FORM_GAP,
+  GROWTH_SETTINGS_INNER_GAP,
+  GROWTH_SETTINGS_SECTION_GAP,
+  GrowthSettingsBadge,
+  GrowthSettingsCard,
+  GrowthSettingsToggleRow,
+} from "@/components/growth/growth-settings-ui"
 import type {
   GrowthAiCopilotRule,
   GrowthCopilotSettings,
@@ -115,151 +123,139 @@ export function GrowthAiCopilotSettingsPanel() {
   if (!settings) return null
 
   return (
-    <div className="space-y-6">
-      <GrowthEngineCard title="AI Copilot governance">
-        <div className="mb-4 flex flex-wrap gap-2">
-          <GrowthBadge
-            label={providerOk ? "AI provider healthy" : "AI provider unavailable"}
-            tone={providerOk ? "healthy" : "warning"}
+    <div className={GROWTH_SETTINGS_SECTION_GAP}>
+      <GrowthSettingsCard
+        title="AI Copilot Governance"
+        icon={<Shield className="size-4" />}
+        headerAside={
+          <GrowthSettingsBadge
+            label={providerOk ? "Provider healthy" : "Provider unavailable"}
+            tone={providerOk ? "healthy" : "attention"}
           />
-          <GrowthBadge label="Human approval required" tone="warning" />
-          <GrowthBadge label="No auto-send" tone="neutral" />
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+        }
+      >
+        <div className={GROWTH_SETTINGS_INNER_GAP}>
+          <div className="space-y-2">
+            <GrowthSettingsToggleRow
+              label="AI enabled"
               checked={settings.aiCopilotEnabled}
-              onChange={(event) => setSettings({ ...settings, aiCopilotEnabled: event.target.checked })}
+              onCheckedChange={(checked) => setSettings({ ...settings, aiCopilotEnabled: checked })}
             />
-            AI enabled
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+            <GrowthSettingsToggleRow
+              label="Store generations"
               checked={settings.aiCopilotStoreGenerations}
-              onChange={(event) => setSettings({ ...settings, aiCopilotStoreGenerations: event.target.checked })}
+              onCheckedChange={(checked) => setSettings({ ...settings, aiCopilotStoreGenerations: checked })}
             />
-            Store generations
-          </label>
-          <label className="flex items-center gap-2 text-sm opacity-70">
-            <input type="checkbox" checked disabled readOnly />
-            Human approval required (enforced)
-          </label>
-        </div>
-
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <Label>Generation retention days</Label>
-            <Input value={retentionDays} onChange={(event) => setRetentionDays(event.target.value)} />
+            <GrowthSettingsToggleRow
+              label="Human approval required"
+              description="Enforced for all outbound AI actions"
+              checked
+              disabled
+            />
           </div>
-          <div className="space-y-1">
-            <Label>Default prompt variant</Label>
-            <select
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={defaultVariant}
-              onChange={(event) => setDefaultVariant(event.target.value)}
-            >
-              {GROWTH_AI_COPILOT_PROMPT_VARIANTS.map((variant) => (
-                <option key={variant} value={variant}>
-                  {variant}
-                </option>
-              ))}
-            </select>
+
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <div className={GROWTH_SETTINGS_FORM_GAP}>
+              <Label className="text-xs">Generation retention days</Label>
+              <Input className="h-9" value={retentionDays} onChange={(event) => setRetentionDays(event.target.value)} />
+            </div>
+            <div className={GROWTH_SETTINGS_FORM_GAP}>
+              <Label className="text-xs">Default prompt variant</Label>
+              <select
+                className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
+                value={defaultVariant}
+                onChange={(event) => setDefaultVariant(event.target.value)}
+              >
+                {GROWTH_AI_COPILOT_PROMPT_VARIANTS.map((variant) => (
+                  <option key={variant} value={variant}>
+                    {variant}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
-      </GrowthEngineCard>
+      </GrowthSettingsCard>
 
-      <GrowthEngineCard title="Call Copilot">
-        <p className="mb-4 text-sm text-muted-foreground">
-          Call Copilot is separate from AI Communication Copilot. It powers pre-call briefings, in-call
-          objection help, and post-call summaries in the lead drawer and Calls dashboard.
-        </p>
-        {!settings.aiCopilotEnabled ? (
-          <p className="mb-4 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-sm text-amber-900">
-            Enable AI Copilot above before using Call Copilot — objection responses and post-call summaries
-            use the AI provider.
+      <GrowthSettingsCard title="Call Copilot" icon={<PhoneCall className="size-4" />}>
+        <div className={GROWTH_SETTINGS_INNER_GAP}>
+          <p className="text-xs text-muted-foreground">
+            Pre-call briefings, in-call objection help, and post-call summaries in the lead drawer and Calls dashboard.
           </p>
-        ) : null}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+          {!settings.aiCopilotEnabled ? (
+            <p className="rounded-md border border-amber-200 bg-amber-50/60 px-2.5 py-1.5 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+              Enable AI Copilot above before using Call Copilot.
+            </p>
+          ) : null}
+          <div className="space-y-2">
+            <GrowthSettingsToggleRow
+              label="Call Copilot enabled"
               checked={settings.callCopilotEnabled}
               disabled={!settings.aiCopilotEnabled}
-              onChange={(event) => setSettings({ ...settings, callCopilotEnabled: event.target.checked })}
+              onCheckedChange={(checked) => setSettings({ ...settings, callCopilotEnabled: checked })}
             />
-            Call Copilot enabled
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+            <GrowthSettingsToggleRow
+              label="Require summary approval before disposition"
               checked={settings.callCopilotRequireSummaryApproval}
               disabled={!settings.callCopilotEnabled}
-              onChange={(event) =>
-                setSettings({ ...settings, callCopilotRequireSummaryApproval: event.target.checked })
+              onCheckedChange={(checked) =>
+                setSettings({ ...settings, callCopilotRequireSummaryApproval: checked })
               }
             />
-            Require summary approval before disposition
-          </label>
-        </div>
-        {settings.aiCopilotEnabled && !settings.callCopilotEnabled ? (
-          <p className="mt-4 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-sm text-amber-900">
-            {GROWTH_CALL_COPILOT_DISABLED_DRAWER_MESSAGE}
-          </p>
-        ) : null}
-      </GrowthEngineCard>
-
-      <GrowthEngineCard title="Playbook training">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={settings.aiCopilotPlaybookEnabled}
-              onChange={(event) => setSettings({ ...settings, aiCopilotPlaybookEnabled: event.target.checked })}
-            />
-            Apply approved playbook rules during generation
-          </label>
-          <div className="space-y-1">
-            <Label>Max rules per generation</Label>
-            <Input value={playbookMaxRules} onChange={(event) => setPlaybookMaxRules(event.target.value)} />
           </div>
-          <div className="space-y-1">
-            <Label>Source retention days</Label>
-            <Input value={playbookRetentionDays} onChange={(event) => setPlaybookRetentionDays(event.target.value)} />
+          {settings.aiCopilotEnabled && !settings.callCopilotEnabled ? (
+            <p className="text-xs text-amber-900 dark:text-amber-100">{GROWTH_CALL_COPILOT_DISABLED_DRAWER_MESSAGE}</p>
+          ) : null}
+        </div>
+      </GrowthSettingsCard>
+
+      <GrowthSettingsCard title="Playbook Training" icon={<BookOpen className="size-4" />}>
+        <div className={GROWTH_SETTINGS_INNER_GAP}>
+          <GrowthSettingsToggleRow
+            label="Apply approved playbook rules during generation"
+            checked={settings.aiCopilotPlaybookEnabled}
+            onCheckedChange={(checked) => setSettings({ ...settings, aiCopilotPlaybookEnabled: checked })}
+          />
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <div className={GROWTH_SETTINGS_FORM_GAP}>
+              <Label className="text-xs">Max rules per generation</Label>
+              <Input className="h-9" value={playbookMaxRules} onChange={(event) => setPlaybookMaxRules(event.target.value)} />
+            </div>
+            <div className={GROWTH_SETTINGS_FORM_GAP}>
+              <Label className="text-xs">Source retention days</Label>
+              <Input
+                className="h-9"
+                value={playbookRetentionDays}
+                onChange={(event) => setPlaybookRetentionDays(event.target.value)}
+              />
+            </div>
           </div>
         </div>
-      </GrowthEngineCard>
+      </GrowthSettingsCard>
 
-      <GrowthEngineCard title="Copilot rules">
-        <ul className="space-y-2">
+      <GrowthSettingsCard title="Copilot Rules" icon={<ListChecks className="size-4" />}>
+        <ul className="divide-y divide-border rounded-lg border border-border dark:divide-[#25324C] dark:border-[#25324C]">
           {rules.map((rule) => (
-            <li key={rule.id} className="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-sm">
-              <div>
-                <p className="font-medium">{rule.label}</p>
-                {rule.description ? <p className="text-muted-foreground">{rule.description}</p> : null}
+            <li key={rule.id} className="flex items-center justify-between gap-3 px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-sm font-medium leading-tight">{rule.label}</p>
+                {rule.description ? (
+                  <p className="text-xs text-muted-foreground line-clamp-1">{rule.description}</p>
+                ) : null}
               </div>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={rule.enabled}
-                  onChange={(event) => void toggleRule(rule.ruleKey, event.target.checked)}
-                />
-                Enabled
-              </label>
+              <Switch checked={rule.enabled} onCheckedChange={(enabled) => void toggleRule(rule.ruleKey, enabled)} />
             </li>
           ))}
         </ul>
-      </GrowthEngineCard>
+      </GrowthSettingsCard>
 
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
-      {success ? <p className="text-sm text-emerald-700">{success}</p> : null}
+      {success ? <p className="text-sm text-emerald-700 dark:text-emerald-300">{success}</p> : null}
 
       <div className="flex justify-end">
-        <Button disabled={saving} onClick={() => void saveSettings()}>
+        <Button size="sm" disabled={saving} onClick={() => void saveSettings()}>
           {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}
-          Save copilot settings
+          Save Copilot Settings
         </Button>
       </div>
     </div>
