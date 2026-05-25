@@ -28,6 +28,12 @@ export type GrowthBrowserAudioCaptureState = {
   status: GrowthBrowserAudioCaptureStatus
   muted: boolean
   error: string | null
+  captureSourceMode: "microphone" | "browser_tab" | "mixed_audio" | "meeting_mode"
+  meetingProvider: "google_meet" | "zoom_web" | "microsoft_teams_web" | "generic_browser_audio" | null
+  mixedAudioEnabled: boolean
+  meetingAudioActive: boolean
+  microphoneActive: boolean
+  mixedAudioActive: boolean
   metrics: GrowthBrowserAudioCaptureMetrics
 }
 
@@ -43,5 +49,11 @@ export const initialBrowserAudioCaptureState = (): GrowthBrowserAudioCaptureStat
   status: "inactive",
   muted: false,
   error: null,
+  captureSourceMode: "microphone",
+  meetingProvider: null,
+  mixedAudioEnabled: false,
+  meetingAudioActive: false,
+  microphoneActive: false,
+  mixedAudioActive: false,
   metrics: emptyBrowserAudioCaptureMetrics(),
 })

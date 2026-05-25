@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { LiveCoachingSessionInsightsRollup } from "@/lib/growth/realtime/live-coaching/session-insights-types"
 
 const INSIGHTS_SELECT =
-  "session_id, lead_id, session_duration_ms, provider_id, transcript_finalized_count, guidance_generated_count, objection_count, buying_signal_count, discovery_gap_count, competitor_pressure_count, provider_interruptions, reconnect_attempts, retry_attempts, fallback_count, average_transcript_latency_ms, max_transcript_latency_ms, session_health_score, risk_level, computed_at"
+  "session_id, lead_id, session_duration_ms, provider_id, transcript_finalized_count, guidance_generated_count, objection_count, buying_signal_count, discovery_gap_count, competitor_pressure_count, provider_interruptions, reconnect_attempts, retry_attempts, fallback_count, average_transcript_latency_ms, max_transcript_latency_ms, session_health_score, risk_level, meeting_mode_used, meeting_provider, mixed_audio_used, meeting_capture_failures, computed_at"
 
 type InsightsDbRow = {
   session_id: string
@@ -25,6 +25,10 @@ type InsightsDbRow = {
   max_transcript_latency_ms: number
   session_health_score: number
   risk_level: string
+  meeting_mode_used: boolean
+  meeting_provider: string | null
+  mixed_audio_used: boolean
+  meeting_capture_failures: number
   computed_at: string
 }
 
@@ -52,6 +56,10 @@ function mapInsightsRow(row: InsightsDbRow): LiveCoachingSessionInsightsRollup {
     maxTranscriptLatencyMs: row.max_transcript_latency_ms,
     sessionHealthScore: row.session_health_score,
     riskLevel: row.risk_level as LiveCoachingSessionInsightsRollup["riskLevel"],
+    meetingModeUsed: row.meeting_mode_used ?? false,
+    meetingProvider: row.meeting_provider ?? null,
+    mixedAudioUsed: row.mixed_audio_used ?? false,
+    meetingCaptureFailures: row.meeting_capture_failures ?? 0,
     computedAt: row.computed_at,
   }
 }
@@ -77,6 +85,10 @@ function rollupToInsertRow(rollup: LiveCoachingSessionInsightsRollup) {
     max_transcript_latency_ms: rollup.maxTranscriptLatencyMs,
     session_health_score: rollup.sessionHealthScore,
     risk_level: rollup.riskLevel,
+    meeting_mode_used: rollup.meetingModeUsed,
+    meeting_provider: rollup.meetingProvider,
+    mixed_audio_used: rollup.mixedAudioUsed,
+    meeting_capture_failures: rollup.meetingCaptureFailures,
     computed_at: rollup.computedAt,
     updated_at: now,
   }

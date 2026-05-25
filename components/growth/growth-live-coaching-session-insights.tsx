@@ -177,6 +177,22 @@ export function GrowthLiveCoachingSessionInsights({
             <StatTile label="Avg transcript latency" value={`${rollup.averageTranscriptLatencyMs}ms`} />
             <StatTile label="Max transcript latency" value={`${rollup.maxTranscriptLatencyMs}ms`} />
           </div>
+
+          {rollup.meetingModeUsed ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <StatTile label="Meeting mode used" value="Yes" />
+              <StatTile
+                label="Meeting provider"
+                value={
+                  rollup.meetingProvider
+                    ? rollup.meetingProvider.replace(/_/g, " ")
+                    : "Generic browser audio"
+                }
+              />
+              <StatTile label="Mixed audio used" value={rollup.mixedAudioUsed ? "Yes" : "No"} />
+              <StatTile label="Meeting capture failures" value={rollup.meetingCaptureFailures} />
+            </div>
+          ) : null}
         </div>
       ) : null}
     </GrowthEngineCard>

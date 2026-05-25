@@ -25,6 +25,12 @@ export const LIVE_COACHING_SESSION_TIMELINE_EVENT_TYPES = [
   "session_stopped",
   "session_completed",
   "session_discarded",
+  "meeting_capture_started",
+  "meeting_capture_stopped",
+  "meeting_provider_detected",
+  "mixed_audio_enabled",
+  "meeting_audio_permission_denied",
+  "meeting_capture_failed",
 ] as const
 
 export type LiveCoachingSessionTimelineEventType =

@@ -55,7 +55,7 @@ export function evaluateBrowserAudioCaptureCapability(input: CapabilityInput): G
     }
   }
 
-  if (session.transcriptSource !== "provider" && session.transcriptSource !== "browser_mic") {
+  if (session.transcriptSource !== "provider" && session.transcriptSource !== "browser_mic" && session.transcriptSource !== "meeting_audio") {
     return {
       canStart: false,
       disabledReason: GROWTH_BROWSER_AUDIO_PROVIDER_UNAVAILABLE_MESSAGE,

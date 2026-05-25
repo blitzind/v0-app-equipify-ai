@@ -374,3 +374,98 @@ export async function emitLiveCoachingSnapshotDiffTimeline(
     })
   }
 }
+
+export async function emitLiveCoachingMeetingCaptureStartedTimeline(
+  admin: SupabaseClient,
+  session: GrowthRealtimeCallSession,
+  input: {
+    captureSourceMode: string
+    meetingProvider?: string | null
+    mixedAudioEnabled?: boolean
+  },
+): Promise<void> {
+  await emit(admin, {
+    leadId: session.leadId,
+    sessionId: session.id,
+    eventType: "meeting_capture_started",
+    providerId: session.providerId,
+    detail: {
+      captureSourceMode: input.captureSourceMode,
+      meetingProvider: input.meetingProvider ?? null,
+      mixedAudioEnabled: Boolean(input.mixedAudioEnabled),
+    },
+    dedupeKey: `meeting_capture_started:${session.id}:${input.captureSourceMode}`,
+  })
+}
+
+export async function emitLiveCoachingMeetingCaptureStoppedTimeline(
+  admin: SupabaseClient,
+  session: GrowthRealtimeCallSession,
+): Promise<void> {
+  await emit(admin, {
+    leadId: session.leadId,
+    sessionId: session.id,
+    eventType: "meeting_capture_stopped",
+    providerId: session.providerId,
+    detail: { captureStatus: session.browserAudioCaptureStatus },
+    dedupeKey: `meeting_capture_stopped:${session.id}`,
+  })
+}
+
+export async function emitLiveCoachingMeetingProviderDetectedTimeline(
+  admin: SupabaseClient,
+  session: GrowthRealtimeCallSession,
+  input: { meetingProvider: string },
+): Promise<void> {
+  await emit(admin, {
+    leadId: session.leadId,
+    sessionId: session.id,
+    eventType: "meeting_provider_detected",
+    providerId: session.providerId,
+    detail: { meetingProvider: input.meetingProvider },
+    dedupeKey: `meeting_provider_detected:${session.id}:${input.meetingProvider}`,
+  })
+}
+
+export async function emitLiveCoachingMixedAudioEnabledTimeline(
+  admin: SupabaseClient,
+  session: GrowthRealtimeCallSession,
+): Promise<void> {
+  await emit(admin, {
+    leadId: session.leadId,
+    sessionId: session.id,
+    eventType: "mixed_audio_enabled",
+    providerId: session.providerId,
+    dedupeKey: `mixed_audio_enabled:${session.id}`,
+  })
+}
+
+export async function emitLiveCoachingMeetingAudioPermissionTimeline(
+  admin: SupabaseClient,
+  session: GrowthRealtimeCallSession,
+  input: { errorCode?: string | null },
+): Promise<void> {
+  await emit(admin, {
+    leadId: session.leadId,
+    sessionId: session.id,
+    eventType: "meeting_audio_permission_denied",
+    severity: "warning",
+    providerId: session.providerId,
+    detail: { errorCode: input.errorCode ?? null },
+  })
+}
+
+export async function emitLiveCoachingMeetingCaptureFailedTimeline(
+  admin: SupabaseClient,
+  session: GrowthRealtimeCallSession,
+  input: { errorCode?: string | null },
+): Promise<void> {
+  await emit(admin, {
+    leadId: session.leadId,
+    sessionId: session.id,
+    eventType: "meeting_capture_failed",
+    severity: "warning",
+    providerId: session.providerId,
+    detail: { errorCode: input.errorCode ?? null },
+  })
+}

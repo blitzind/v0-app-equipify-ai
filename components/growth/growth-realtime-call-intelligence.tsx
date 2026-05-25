@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import { Check, Copy, Loader2, Mic, MicOff, Pause, Play, Square, StopCircle, X } from "lucide-react"
+import { Check, Copy, Loader2, Mic, MicOff, MonitorSpeaker, Pause, Play, Square, StopCircle, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useGrowthCallWorkflow } from "@/components/growth/growth-call-workflow-context"
@@ -13,8 +13,9 @@ import { GROWTH_CALL_AUDIO_CAPTURE_ENABLED, GROWTH_CALL_DIALER_SAFETY_COPY } fro
 import { formatGrowthCallDialerNextStep } from "@/lib/growth/call-workflow"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import { browserAudioCaptureStatusLabel } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-reducer"
-import { GROWTH_BROWSER_AUDIO_CAPTURE_SAFETY_COPY } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-invariants"
+import { GROWTH_BROWSER_AUDIO_CAPTURE_SAFETY_COPY, GROWTH_MEETING_CAPTURE_SAFETY_COPY } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-invariants"
 import type { GrowthBrowserAudioCaptureCapability } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-types"
+import { GROWTH_MEETING_PROVIDER_LABELS } from "@/lib/growth/realtime/browser-audio/meeting-capture-types"
 import { growthBrowserAudioStreamStatusLabel } from "@/lib/growth/realtime/browser-audio/browser-audio-stream-types"
 import { REALTIME_PROVIDER_LABELS } from "@/lib/growth/realtime/browser-audio/provider-labels"
 import type {
@@ -41,6 +42,9 @@ function formatTranscriptSourceLabel(session: GrowthRealtimeCallSession): string
     : null
   if (session.transcriptSource === "browser_mic" && providerLabel) {
     return `Browser Mic → ${providerLabel}`
+  }
+  if (session.transcriptSource === "meeting_audio" && providerLabel) {
+    return `Meeting Mode → ${providerLabel}`
   }
   return session.transcriptSource.replace(/_/g, " ")
 }
@@ -410,13 +414,13 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
         {activeSession && activeSession.status !== "completed" && GROWTH_CALL_AUDIO_CAPTURE_ENABLED ? (
           <div className="space-y-3 rounded-lg border border-border bg-card p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Browser mic capture</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Browser audio capture</p>
               <div className="flex flex-wrap items-center gap-2">
                 <GrowthBadge
                   label={browserAudioCaptureStatusLabel(
                     activeSession.browserAudioCaptureStatus ?? browserAudio.state.status,
                   )}
-                  tone={browserAudio.isMicActive ? "attention" : "neutral"}
+                  tone={browserAudio.isCaptureActive ? "attention" : "neutral"}
                 />
                 {captureQaProof ? (
                   <GrowthBadge
@@ -427,13 +431,68 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
                 {browserAudio.isMicActive ? (
                   <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700">
                     <span className="size-2 animate-pulse rounded-full bg-amber-500" />
-                    Mic live
+                    Microphone Active
+                  </span>
+                ) : null}
+                {browserAudio.isMeetingAudioActive ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-700">
+                    <span className="size-2 animate-pulse rounded-full bg-indigo-500" />
+                    Meeting Audio Active
+                  </span>
+                ) : null}
+                {browserAudio.isMixedAudioActive ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+                    <MonitorSpeaker className="size-3.5" />
+                    Mixed Audio Active
                   </span>
                 ) : null}
               </div>
             </div>
 
-            <p className="text-xs leading-relaxed text-muted-foreground">{GROWTH_BROWSER_AUDIO_CAPTURE_SAFETY_COPY}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant={browserAudio.captureUiMode === "microphone" ? "default" : "outline"}
+                onClick={() => browserAudio.setCaptureUiMode("microphone")}
+                disabled={browserAudio.isCaptureActive}
+              >
+                Microphone
+              </Button>
+              <Button
+                size="sm"
+                variant={browserAudio.captureUiMode === "meeting_mode" ? "default" : "outline"}
+                onClick={() => browserAudio.setCaptureUiMode("meeting_mode")}
+                disabled={browserAudio.isCaptureActive}
+              >
+                Meeting Mode
+              </Button>
+            </div>
+
+            {browserAudio.captureUiMode === "meeting_mode" ? (
+              <div className="space-y-2 rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                <p>{GROWTH_MEETING_CAPTURE_SAFETY_COPY}</p>
+                <p>Share Tab → choose Google Meet, Zoom, or Teams tab → optional microphone → connect provider → listening.</p>
+                <label className="flex items-center gap-2 text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={browserAudio.includeMicrophoneInMeeting}
+                    onChange={(event) => browserAudio.setIncludeMicrophoneInMeeting(event.target.checked)}
+                    disabled={browserAudio.isCaptureActive}
+                  />
+                  Include microphone in mixed meeting stream
+                </label>
+                {browserAudio.state.meetingProvider ? (
+                  <p>
+                    Meeting source detected:{" "}
+                    <span className="font-medium text-foreground">
+                      {GROWTH_MEETING_PROVIDER_LABELS[browserAudio.state.meetingProvider]}
+                    </span>
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-xs leading-relaxed text-muted-foreground">{GROWTH_BROWSER_AUDIO_CAPTURE_SAFETY_COPY}</p>
+            )}
 
             {!captureCapability?.canStart && captureCapability?.disabledReason ? (
               <p className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
@@ -463,11 +522,20 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
               <Button
                 size="sm"
                 className="min-h-11 w-full justify-center gap-2 px-5 font-medium whitespace-nowrap"
-                disabled={!captureCapability?.canStart || browserAudio.state.status === "active"}
+                disabled={!captureCapability?.canStart || browserAudio.isCaptureActive}
                 onClick={() => void browserAudio.startCapture()}
               >
-                <Mic className="mr-2 h-4 w-4 shrink-0" />
-                Start Mic Capture
+                {browserAudio.captureUiMode === "meeting_mode" ? (
+                  <>
+                    <MonitorSpeaker className="mr-2 h-4 w-4 shrink-0" />
+                    Share Tab & Start Meeting Capture
+                  </>
+                ) : (
+                  <>
+                    <Mic className="mr-2 h-4 w-4 shrink-0" />
+                    Start Mic Capture
+                  </>
+                )}
               </Button>
               <Button
                 size="sm"

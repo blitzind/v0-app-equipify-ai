@@ -149,7 +149,7 @@ export type GrowthRealtimeCallSession = {
   liveSnapshot: GrowthRealtimeLiveSnapshot
   realtimeProviderConnectionId: string | null
   providerId: string | null
-  transcriptSource: "manual" | "stub" | "provider" | "browser_mic"
+  transcriptSource: "manual" | "stub" | "provider" | "browser_mic" | "meeting_audio"
   transcriptQualityScore: number
   guidanceLatencyMs: number
   sessionProviderFailoverCount: number
@@ -158,6 +158,11 @@ export type GrowthRealtimeCallSession = {
   browserAudioStartedAt: string | null
   browserAudioEndedAt: string | null
   browserAudioError: string | null
+  meetingCaptureMode: "microphone" | "browser_tab" | "mixed_audio" | "meeting_mode" | null
+  meetingProvider: "google_meet" | "zoom_web" | "microsoft_teams_web" | "generic_browser_audio" | null
+  mixedAudioEnabled: boolean
+  meetingAudioActive: boolean
+  microphoneActive: boolean
   createdBy: string | null
   createdAt: string
   updatedAt: string

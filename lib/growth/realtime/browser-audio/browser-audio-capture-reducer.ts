@@ -13,6 +13,18 @@ export type BrowserAudioCaptureAction =
   | { type: "capture_failed"; error: string }
   | { type: "set_muted"; muted: boolean }
   | {
+      type: "set_capture_source"
+      captureSourceMode: GrowthBrowserAudioCaptureState["captureSourceMode"]
+      mixedAudioEnabled?: boolean
+    }
+  | {
+      type: "meeting_context"
+      meetingProvider: GrowthBrowserAudioCaptureState["meetingProvider"]
+      meetingAudioActive: boolean
+      microphoneActive: boolean
+      mixedAudioActive: boolean
+    }
+  | {
       type: "chunk_sent"
       latencyMs: number
       providerTranscriptLatencyMs?: number
@@ -40,6 +52,20 @@ export function browserAudioCaptureReducer(
       return { ...state, status: "failed", error: action.error }
     case "set_muted":
       return { ...state, muted: action.muted }
+    case "set_capture_source":
+      return {
+        ...state,
+        captureSourceMode: action.captureSourceMode,
+        mixedAudioEnabled: action.mixedAudioEnabled ?? state.mixedAudioEnabled,
+      }
+    case "meeting_context":
+      return {
+        ...state,
+        meetingProvider: action.meetingProvider,
+        meetingAudioActive: action.meetingAudioActive,
+        microphoneActive: action.microphoneActive,
+        mixedAudioActive: action.mixedAudioActive,
+      }
     case "chunk_sent": {
       const nextCount = state.metrics.chunkCount + 1
       const prevTotal = state.metrics.averageChunkSendLatencyMs * state.metrics.chunkCount

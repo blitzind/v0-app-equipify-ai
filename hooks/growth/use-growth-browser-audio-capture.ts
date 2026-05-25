@@ -2,16 +2,27 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react"
 import { GROWTH_CALL_AUDIO_CAPTURE_ENABLED } from "@/lib/growth/call-workflow-copy"
+import {
+  createBrowserAudioMixer,
+  extractAudioOnlyStream,
+  type BrowserAudioMixerHandle,
+} from "@/lib/growth/realtime/browser-audio/browser-audio-mixer"
 import { evaluateBrowserAudioCaptureEnvironment } from "@/lib/growth/realtime/browser-audio/browser-audio-browser-compat"
 import { browserAudioCaptureReducer } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-reducer"
-import {
-  canStartBrowserAudioCaptureGuard,
-} from "@/lib/growth/realtime/browser-audio/browser-audio-capture-guards"
+import { canStartBrowserAudioCaptureGuard } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-guards"
 import type { GrowthBrowserAudioCaptureCapability } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-types"
 import { initialBrowserAudioCaptureState } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-types"
 import type { GrowthBrowserAudioStreamState } from "@/lib/growth/realtime/browser-audio/browser-audio-stream-types"
 import {
+  detectMeetingProviderFromDisplayMedia,
+} from "@/lib/growth/realtime/browser-audio/meeting-provider-detection"
+import {
+  resolveMeetingCaptureSourceMode,
+  type GrowthMeetingProvider,
+} from "@/lib/growth/realtime/browser-audio/meeting-capture-types"
+import {
   BROWSER_AUDIO_TROUBLESHOOTING,
+  resolveMeetingCapturePermissionError,
   resolveMicrophonePermissionError,
 } from "@/lib/growth/realtime/browser-audio/browser-audio-troubleshooting"
 import type { GrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-types"
@@ -21,6 +32,18 @@ type UseGrowthBrowserAudioCaptureInput = {
   session: GrowthRealtimeCallSession | null
   capability: GrowthBrowserAudioCaptureCapability | null
   onSessionUpdated?: (session: GrowthRealtimeCallSession) => void
+}
+
+type CaptureUiMode = "microphone" | "meeting_mode"
+
+type SyncPayload = {
+  action: "request" | "start" | "pause" | "stop" | "fail" | "retry"
+  error?: string
+  captureSourceMode?: string
+  meetingProvider?: GrowthMeetingProvider | null
+  mixedAudioEnabled?: boolean
+  meetingAudioActive?: boolean
+  microphoneActive?: boolean
 }
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -59,7 +82,13 @@ export function useGrowthBrowserAudioCapture({
 }: UseGrowthBrowserAudioCaptureInput) {
   const [state, dispatch] = useReducer(browserAudioCaptureReducer, undefined, initialBrowserAudioCaptureState)
   const [streamState, setStreamState] = useState<GrowthBrowserAudioStreamState | null>(null)
+  const [captureUiMode, setCaptureUiMode] = useState<CaptureUiMode>("microphone")
+  const [includeMicrophoneInMeeting, setIncludeMicrophoneInMeeting] = useState(true)
+
   const streamRef = useRef<MediaStream | null>(null)
+  const displayStreamRef = useRef<MediaStream | null>(null)
+  const micStreamRef = useRef<MediaStream | null>(null)
+  const mixerRef = useRef<BrowserAudioMixerHandle | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const sequenceRef = useRef(0)
   const mutedRef = useRef(false)
@@ -69,8 +98,14 @@ export function useGrowthBrowserAudioCapture({
   const cleanupCapture = useCallback(() => {
     recorderRef.current?.stop()
     recorderRef.current = null
+    mixerRef.current?.destroy()
+    mixerRef.current = null
     stopMediaTracks(streamRef.current)
+    stopMediaTracks(displayStreamRef.current)
+    stopMediaTracks(micStreamRef.current)
     streamRef.current = null
+    displayStreamRef.current = null
+    micStreamRef.current = null
   }, [])
 
   useEffect(() => {
@@ -109,19 +144,19 @@ export function useGrowthBrowserAudioCapture({
       dispatch({ type: "capture_stopped" })
       setStreamState(null)
       if (session && (session.status === "completed" || session.status === "discarded")) {
-        void syncStatus("stop").catch(() => undefined)
+        void syncStatus({ action: "stop" }).catch(() => undefined)
       }
     }
   }, [session?.id, session?.status, cleanupCapture])
 
-  async function syncStatus(action: "request" | "start" | "pause" | "stop" | "fail" | "retry", error?: string) {
+  async function syncStatus(payload: SyncPayload) {
     if (!session) return null
     const res = await fetch(
       `/api/platform/growth/leads/${leadId}/realtime-call/sessions/${session.id}/browser-audio-capture`,
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, error: error ?? null }),
+        body: JSON.stringify(payload),
       },
     )
     const data = (await res.json().catch(() => ({}))) as {
@@ -132,7 +167,7 @@ export function useGrowthBrowserAudioCapture({
       error?: string
     }
     if (!res.ok || !data.ok || !data.session) {
-      throw new Error(data.message ?? data.error ?? "Could not update mic capture status.")
+      throw new Error(data.message ?? data.error ?? "Could not update capture status.")
     }
     if (data.stream) setStreamState(data.stream)
     onSessionUpdated?.(data.session)
@@ -169,10 +204,26 @@ export function useGrowthBrowserAudioCapture({
         type: "chunk_sent",
         latencyMs: Date.now() - started,
       })
-    } catch (e) {
+    } catch {
       dispatch({ type: "chunk_failed" })
-      throw e
     }
+  }
+
+  function startRecorder(stream: MediaStream, mimeType: string) {
+    const recorder = new MediaRecorder(stream, { mimeType })
+    recorderRef.current = recorder
+    sequenceRef.current = 0
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        void sendChunk(event.data, mimeType).catch(() => undefined)
+      }
+    }
+    recorder.onerror = () => {
+      dispatch({ type: "capture_failed", error: "Audio capture failed." })
+      void syncStatus({ action: "fail", error: "Audio capture failed." }).catch(() => undefined)
+      cleanupCapture()
+    }
+    recorder.start(250)
   }
 
   const startCapture = useCallback(async () => {
@@ -199,60 +250,158 @@ export function useGrowthBrowserAudioCapture({
       return
     }
 
+    const captureSourceMode = resolveMeetingCaptureSourceMode({
+      uiMode: captureUiMode,
+      includeMicrophone: includeMicrophoneInMeeting,
+    })
+    dispatch({
+      type: "set_capture_source",
+      captureSourceMode,
+      mixedAudioEnabled: captureSourceMode === "mixed_audio",
+    })
+
+    if (captureUiMode === "meeting_mode" && !environment.meetingCaptureSupported) {
+      dispatch({
+        type: "capture_failed",
+        error:
+          environment.meetingCaptureBlockedReason ??
+          BROWSER_AUDIO_TROUBLESHOOTING.meetingCaptureUnavailable,
+      })
+      return
+    }
+
     startingRef.current = true
     dispatch({ type: "request_permission" })
     try {
-      await syncStatus("request")
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
+      await syncStatus({
+        action: "request",
+        captureSourceMode,
+        mixedAudioEnabled: captureSourceMode === "mixed_audio",
+      })
+
       const mimeType = environment.preferredMimeType ?? "audio/webm"
-      const recorder = new MediaRecorder(stream, { mimeType })
-      recorderRef.current = recorder
-      sequenceRef.current = 0
       boundSessionIdRef.current = session.id
 
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          void sendChunk(event.data, mimeType).catch(() => undefined)
+      if (captureUiMode === "microphone") {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        streamRef.current = stream
+        startRecorder(stream, mimeType)
+        await syncStatus({
+          action: "start",
+          captureSourceMode,
+          microphoneActive: true,
+          meetingAudioActive: false,
+          mixedAudioEnabled: false,
+        })
+        dispatch({
+          type: "meeting_context",
+          meetingProvider: null,
+          meetingAudioActive: false,
+          microphoneActive: true,
+          mixedAudioActive: false,
+        })
+      } else {
+        const displayStream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: true,
+        })
+        displayStreamRef.current = displayStream
+
+        const meetingAudioStream = extractAudioOnlyStream(displayStream)
+        if (!meetingAudioStream) {
+          cleanupCapture()
+          throw new Error(BROWSER_AUDIO_TROUBLESHOOTING.meetingCaptureFailed)
         }
+
+        const audioTrack = meetingAudioStream.getAudioTracks()[0]
+        const meetingProvider = detectMeetingProviderFromDisplayMedia({
+          displaySurface: audioTrack?.getSettings().displaySurface ?? null,
+          label: audioTrack?.label ?? displayStream.getVideoTracks()[0]?.label ?? null,
+        })
+
+        let outputStream = meetingAudioStream
+        let microphoneActive = false
+        let mixedAudioActive = false
+
+        if (includeMicrophoneInMeeting) {
+          const micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+          micStreamRef.current = micStream
+          microphoneActive = true
+          const mixer = createBrowserAudioMixer()
+          mixerRef.current = mixer
+          mixer.addMeetingSource(meetingAudioStream)
+          mixer.addMicrophoneSource(micStream)
+          outputStream = mixer.getMixedStream()
+          mixedAudioActive = true
+        }
+
+        streamRef.current = outputStream
+        startRecorder(outputStream, mimeType)
+
+        await syncStatus({
+          action: "start",
+          captureSourceMode,
+          meetingProvider,
+          mixedAudioEnabled: mixedAudioActive,
+          meetingAudioActive: true,
+          microphoneActive,
+        })
+        dispatch({
+          type: "meeting_context",
+          meetingProvider,
+          meetingAudioActive: true,
+          microphoneActive,
+          mixedAudioActive,
+        })
       }
 
-      recorder.onerror = () => {
-        dispatch({ type: "capture_failed", error: "Microphone capture failed." })
-        void syncStatus("fail", "Microphone capture failed.").catch(() => undefined)
-        cleanupCapture()
-      }
-
-      recorder.start(250)
-      await syncStatus("start")
       dispatch({ type: "capture_active" })
     } catch (e) {
       cleanupCapture()
-      const message = resolveMicrophonePermissionError(
-        e instanceof Error ? e.message : BROWSER_AUDIO_TROUBLESHOOTING.microphonePermissionDenied,
-      )
+      const raw = e instanceof Error ? e.message : String(e)
+      const message =
+        captureUiMode === "meeting_mode"
+          ? resolveMeetingCapturePermissionError(raw)
+          : resolveMicrophonePermissionError(raw)
       dispatch({ type: "capture_failed", error: message })
-      await syncStatus("fail", message).catch(() => undefined)
+      await syncStatus({
+        action: "fail",
+        error: message,
+        captureSourceMode: resolveMeetingCaptureSourceMode({
+          uiMode: captureUiMode,
+          includeMicrophone: includeMicrophoneInMeeting,
+        }),
+      }).catch(() => undefined)
     } finally {
       startingRef.current = false
     }
-  }, [capability?.canStart, cleanupCapture, session, state.status, leadId])
+  }, [
+    capability?.canStart,
+    captureUiMode,
+    cleanupCapture,
+    includeMicrophoneInMeeting,
+    session,
+    state.status,
+    leadId,
+  ])
 
   const pauseCapture = useCallback(async () => {
     if (!session) return
     recorderRef.current?.pause()
-    stopMediaTracks(streamRef.current)
-    streamRef.current = null
-    await syncStatus("pause")
+    cleanupCapture()
+    await syncStatus({ action: "pause" })
     dispatch({ type: "capture_paused" })
-  }, [session, leadId])
+  }, [cleanupCapture, session, leadId])
 
   const stopCapture = useCallback(async () => {
     if (!session) return
     cleanupCapture()
-    await syncStatus("stop")
+    await syncStatus({
+      action: "stop",
+      captureSourceMode: state.captureSourceMode,
+    })
     dispatch({ type: "capture_stopped" })
-  }, [cleanupCapture, session, leadId])
+  }, [cleanupCapture, session, state.captureSourceMode, leadId])
 
   const toggleMute = useCallback(() => {
     dispatch({ type: "set_muted", muted: !state.muted })
@@ -261,7 +410,7 @@ export function useGrowthBrowserAudioCapture({
   const retryStream = useCallback(async () => {
     if (!session || !streamState?.metrics.canRetry) return
     try {
-      await syncStatus("retry")
+      await syncStatus({ action: "retry", captureSourceMode: state.captureSourceMode })
       dispatch({ type: "capture_active" })
     } catch (e) {
       dispatch({
@@ -269,16 +418,23 @@ export function useGrowthBrowserAudioCapture({
         error: e instanceof Error ? e.message : "Could not reconnect provider stream.",
       })
     }
-  }, [session, streamState?.metrics.canRetry, leadId])
+  }, [session, state.captureSourceMode, streamState?.metrics.canRetry, leadId])
 
   return {
     state,
     streamState,
+    captureUiMode,
+    includeMicrophoneInMeeting,
+    setCaptureUiMode,
+    setIncludeMicrophoneInMeeting,
     startCapture,
     pauseCapture,
     stopCapture,
     toggleMute,
     retryStream,
-    isMicActive: state.status === "active",
+    isMicActive: state.status === "active" && state.microphoneActive,
+    isMeetingAudioActive: state.status === "active" && state.meetingAudioActive,
+    isMixedAudioActive: state.status === "active" && state.mixedAudioActive,
+    isCaptureActive: state.status === "active",
   }
 }

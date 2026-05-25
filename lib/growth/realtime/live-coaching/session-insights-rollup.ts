@@ -82,6 +82,24 @@ export function buildLiveCoachingSessionInsightsRollup(input: {
   const providerDegradedCount = countEvents(events, "provider_degraded")
   const circuitBreakerTriggered = countEvents(events, "circuit_breaker_triggered") > 0
 
+  const meetingCaptureStarted = events.filter((event) => event.eventType === "meeting_capture_started")
+  const meetingModeUsed = meetingCaptureStarted.some(
+    (event) =>
+      event.detail.captureSourceMode !== "microphone" &&
+      event.detail.captureSourceMode != null,
+  )
+  const mixedAudioUsed = countEvents(events, "mixed_audio_enabled") > 0
+  const meetingCaptureFailures =
+    countEvents(events, "meeting_capture_failed") +
+    countEvents(events, "meeting_audio_permission_denied")
+  const detectedProviderEvent = [...events]
+    .reverse()
+    .find((event) => event.eventType === "meeting_provider_detected")
+  const meetingProvider =
+    typeof detectedProviderEvent?.detail.meetingProvider === "string"
+      ? detectedProviderEvent.detail.meetingProvider
+      : null
+
   const sessionHealthScore = computeSessionTimelineHealthScore({
     providerInterruptions,
     averageTranscriptLatencyMs,
@@ -120,6 +138,10 @@ export function buildLiveCoachingSessionInsightsRollup(input: {
     maxTranscriptLatencyMs,
     sessionHealthScore,
     riskLevel,
+    meetingModeUsed,
+    meetingProvider,
+    mixedAudioUsed,
+    meetingCaptureFailures,
     computedAt: input.computedAt ?? new Date().toISOString(),
   }
 }

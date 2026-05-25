@@ -23,6 +23,12 @@ export const BROWSER_AUDIO_TROUBLESHOOTING = {
     "Go live on the realtime session before starting mic capture.",
   fallbackManualMode:
     "Manual transcript mode is active while the selected provider is unavailable.",
+  meetingCaptureUnavailable:
+    "Meeting tab capture is unavailable in this browser. Use microphone capture or manual transcript mode.",
+  meetingAudioPermissionDenied:
+    "Browser tab or system audio sharing was denied. Choose a meeting tab and allow audio sharing, then retry.",
+  meetingCaptureFailed:
+    "Meeting capture could not start. Retry tab sharing or fall back to microphone capture.",
 } as const
 
 export type BrowserAudioTroubleshootingCode = keyof typeof BROWSER_AUDIO_TROUBLESHOOTING
@@ -42,4 +48,18 @@ export function resolveMicrophonePermissionError(raw: string): string {
     return BROWSER_AUDIO_TROUBLESHOOTING.microphonePermissionDenied
   }
   return raw.trim() || BROWSER_AUDIO_TROUBLESHOOTING.microphonePermissionDenied
+}
+
+export function resolveMeetingCapturePermissionError(raw: string): string {
+  const normalized = raw.toLowerCase()
+  if (
+    normalized.includes("permission") ||
+    normalized.includes("denied") ||
+    normalized.includes("notallowed") ||
+    normalized.includes("not allowed") ||
+    normalized.includes("abort")
+  ) {
+    return BROWSER_AUDIO_TROUBLESHOOTING.meetingAudioPermissionDenied
+  }
+  return raw.trim() || BROWSER_AUDIO_TROUBLESHOOTING.meetingCaptureFailed
 }

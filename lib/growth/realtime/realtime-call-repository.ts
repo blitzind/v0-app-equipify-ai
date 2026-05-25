@@ -35,6 +35,11 @@ type SessionRow = {
   browser_audio_started_at: string | null
   browser_audio_ended_at: string | null
   browser_audio_error: string | null
+  meeting_capture_mode: string | null
+  meeting_provider: string | null
+  mixed_audio_enabled: boolean
+  meeting_audio_active: boolean
+  microphone_active: boolean
   created_by: string | null
   created_at: string
   updated_at: string
@@ -51,7 +56,7 @@ type TranscriptRow = {
 }
 
 const SESSION_SELECT =
-  "id, lead_id, call_copilot_session_id, status, started_at, ended_at, live_guidance_mode, transcript_status, guidance_enabled, risk_monitoring_enabled, live_snapshot, realtime_provider_connection_id, provider_id, transcript_source, transcript_quality_score, guidance_latency_ms, session_provider_failover_count, browser_audio_capture_enabled, browser_audio_capture_status, browser_audio_started_at, browser_audio_ended_at, browser_audio_error, created_by, created_at, updated_at"
+  "id, lead_id, call_copilot_session_id, status, started_at, ended_at, live_guidance_mode, transcript_status, guidance_enabled, risk_monitoring_enabled, live_snapshot, realtime_provider_connection_id, provider_id, transcript_source, transcript_quality_score, guidance_latency_ms, session_provider_failover_count, browser_audio_capture_enabled, browser_audio_capture_status, browser_audio_started_at, browser_audio_ended_at, browser_audio_error, meeting_capture_mode, meeting_provider, mixed_audio_enabled, meeting_audio_active, microphone_active, created_by, created_at, updated_at"
 
 function sessionsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("realtime_call_sessions")
@@ -87,6 +92,12 @@ function mapSession(row: SessionRow): GrowthRealtimeCallSession {
     browserAudioStartedAt: row.browser_audio_started_at ?? null,
     browserAudioEndedAt: row.browser_audio_ended_at ?? null,
     browserAudioError: row.browser_audio_error ?? null,
+    meetingCaptureMode: (row.meeting_capture_mode ??
+      null) as GrowthRealtimeCallSession["meetingCaptureMode"],
+    meetingProvider: (row.meeting_provider ?? null) as GrowthRealtimeCallSession["meetingProvider"],
+    mixedAudioEnabled: row.mixed_audio_enabled ?? false,
+    meetingAudioActive: row.meeting_audio_active ?? false,
+    microphoneActive: row.microphone_active ?? false,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -170,6 +181,11 @@ export async function updateGrowthRealtimeCallSession(
     browserAudioStartedAt: string | null
     browserAudioEndedAt: string | null
     browserAudioError: string | null
+    meetingCaptureMode: GrowthRealtimeCallSession["meetingCaptureMode"]
+    meetingProvider: GrowthRealtimeCallSession["meetingProvider"]
+    mixedAudioEnabled: boolean
+    meetingAudioActive: boolean
+    microphoneActive: boolean
   }>,
 ): Promise<GrowthRealtimeCallSession> {
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() }
@@ -202,6 +218,21 @@ export async function updateGrowthRealtimeCallSession(
   }
   if (patch.browserAudioError !== undefined) {
     update.browser_audio_error = patch.browserAudioError
+  }
+  if (patch.meetingCaptureMode !== undefined) {
+    update.meeting_capture_mode = patch.meetingCaptureMode
+  }
+  if (patch.meetingProvider !== undefined) {
+    update.meeting_provider = patch.meetingProvider
+  }
+  if (patch.mixedAudioEnabled !== undefined) {
+    update.mixed_audio_enabled = patch.mixedAudioEnabled
+  }
+  if (patch.meetingAudioActive !== undefined) {
+    update.meeting_audio_active = patch.meetingAudioActive
+  }
+  if (patch.microphoneActive !== undefined) {
+    update.microphone_active = patch.microphoneActive
   }
 
   const { data, error } = await sessionsTable(admin)

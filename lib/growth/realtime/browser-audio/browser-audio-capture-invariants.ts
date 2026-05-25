@@ -4,7 +4,10 @@ export const GROWTH_BROWSER_AUDIO_STORAGE_ENABLED = false
 export const GROWTH_BROWSER_AUDIO_AUTONOMOUS_ACTIONS: string[] = []
 
 export const GROWTH_BROWSER_AUDIO_CAPTURE_SAFETY_COPY =
-  "Mic capture is used only to create live transcript text for coaching. Audio is not stored."
+  "Mic and meeting tab capture are used only to create live transcript text for coaching. Audio is not stored."
+
+export const GROWTH_MEETING_CAPTURE_SAFETY_COPY =
+  "Share a browser meeting tab to capture meeting audio for live coaching. Video is not stored — audio only."
 
 export const GROWTH_BROWSER_AUDIO_PROVIDER_UNAVAILABLE_MESSAGE =
   "Provider transcript streaming is not connected. Use manual transcript mode."

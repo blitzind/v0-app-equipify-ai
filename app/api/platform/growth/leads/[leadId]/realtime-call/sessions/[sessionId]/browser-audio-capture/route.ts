@@ -21,7 +21,14 @@ import { isRealtimeProviderCircuitOpen } from "@/lib/growth/realtime/providers/r
 import { listRealtimeProviderConnections } from "@/lib/growth/realtime/providers/realtime-provider-connection-repository"
 import { fetchGrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-repository"
 import { mapBrowserAudioChunkError } from "@/lib/growth/realtime/browser-audio/ingest-browser-audio-chunk"
+import { GROWTH_MEETING_CAPTURE_SOURCE_MODES, GROWTH_MEETING_PROVIDERS } from "@/lib/growth/realtime/browser-audio/meeting-capture-types"
 import {
+  emitLiveCoachingMeetingCaptureFailedTimeline,
+  emitLiveCoachingMeetingCaptureStartedTimeline,
+  emitLiveCoachingMeetingCaptureStoppedTimeline,
+  emitLiveCoachingMeetingAudioPermissionTimeline,
+  emitLiveCoachingMeetingProviderDetectedTimeline,
+  emitLiveCoachingMixedAudioEnabledTimeline,
   emitLiveCoachingMicPermissionTimeline,
   emitLiveCoachingSessionStoppedTimeline,
 } from "@/lib/growth/realtime/live-coaching/session-timeline-emitter"
@@ -34,6 +41,11 @@ const UUID_RE =
 const BodySchema = z.object({
   action: z.enum(["request", "start", "pause", "stop", "fail", "retry"]),
   error: z.string().trim().max(500).optional().nullable(),
+  captureSourceMode: z.enum(GROWTH_MEETING_CAPTURE_SOURCE_MODES).optional(),
+  meetingProvider: z.enum(GROWTH_MEETING_PROVIDERS).optional().nullable(),
+  mixedAudioEnabled: z.boolean().optional(),
+  meetingAudioActive: z.boolean().optional(),
+  microphoneActive: z.boolean().optional(),
 })
 
 async function resolveProviderConnectionForSession(
@@ -143,11 +155,22 @@ export async function PATCH(
     } as const
 
     const action = parsed.data.action
+    const captureSourceMode = parsed.data.captureSourceMode ?? existing.meetingCaptureMode ?? "microphone"
+    const meetingProvider = parsed.data.meetingProvider ?? existing.meetingProvider ?? null
+    const mixedAudioEnabled = parsed.data.mixedAudioEnabled ?? existing.mixedAudioEnabled ?? false
+    const meetingAudioActive = parsed.data.meetingAudioActive ?? false
+    const microphoneActive = parsed.data.microphoneActive ?? captureSourceMode === "microphone"
+
     const session = await updateBrowserAudioCaptureStatus(access.admin, {
       sessionId,
       status: statusMap[action],
       error: parsed.data.error,
       enabled: parsed.data.action === "start" || parsed.data.action === "pause",
+      meetingCaptureMode: captureSourceMode,
+      meetingProvider,
+      mixedAudioEnabled,
+      meetingAudioActive: parsed.data.action === "start" ? meetingAudioActive : false,
+      microphoneActive: parsed.data.action === "start" ? microphoneActive : false,
     })
 
     let stream = getBrowserAudioStreamState(sessionId)
@@ -162,16 +185,45 @@ export async function PATCH(
     }
 
     if (parsed.data.action === "start") {
-      await emitLiveCoachingMicPermissionTimeline(access.admin, session, { granted: true })
+      if (captureSourceMode === "microphone") {
+        await emitLiveCoachingMicPermissionTimeline(access.admin, session, { granted: true })
+      } else {
+        await emitLiveCoachingMeetingCaptureStartedTimeline(access.admin, session, {
+          captureSourceMode,
+          meetingProvider,
+          mixedAudioEnabled,
+        })
+        if (meetingProvider) {
+          await emitLiveCoachingMeetingProviderDetectedTimeline(access.admin, session, {
+            meetingProvider,
+          })
+        }
+        if (mixedAudioEnabled) {
+          await emitLiveCoachingMixedAudioEnabledTimeline(access.admin, session)
+        }
+      }
     }
     if (parsed.data.action === "fail") {
-      await emitLiveCoachingMicPermissionTimeline(access.admin, session, {
-        granted: false,
-        errorCode: parsed.data.error ?? "mic_permission_denied",
-      })
+      if (captureSourceMode === "microphone") {
+        await emitLiveCoachingMicPermissionTimeline(access.admin, session, {
+          granted: false,
+          errorCode: parsed.data.error ?? "mic_permission_denied",
+        })
+      } else if ((parsed.data.error ?? "").toLowerCase().includes("permission")) {
+        await emitLiveCoachingMeetingAudioPermissionTimeline(access.admin, session, {
+          errorCode: parsed.data.error ?? "meeting_audio_permission_denied",
+        })
+      } else {
+        await emitLiveCoachingMeetingCaptureFailedTimeline(access.admin, session, {
+          errorCode: parsed.data.error ?? "meeting_capture_failed",
+        })
+      }
     }
     if (parsed.data.action === "stop") {
       await emitLiveCoachingSessionStoppedTimeline(access.admin, session)
+      if (captureSourceMode !== "microphone") {
+        await emitLiveCoachingMeetingCaptureStoppedTimeline(access.admin, session)
+      }
     }
 
     const providerConnection = await resolveProviderConnectionForSession(access.admin, session)

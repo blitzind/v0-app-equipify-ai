@@ -29,6 +29,10 @@ export type LiveCoachingSessionInsightsRollup = {
   maxTranscriptLatencyMs: number
   sessionHealthScore: number
   riskLevel: LiveCoachingSessionInsightsRiskLevel
+  meetingModeUsed: boolean
+  meetingProvider: string | null
+  mixedAudioUsed: boolean
+  meetingCaptureFailures: number
   computedAt: string
 }
 

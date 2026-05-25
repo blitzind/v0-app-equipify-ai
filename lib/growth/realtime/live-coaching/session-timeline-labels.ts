@@ -31,6 +31,12 @@ export const SESSION_TIMELINE_EVENT_LABELS: Record<LiveCoachingSessionTimelineEv
   session_stopped: "Session stopped",
   session_completed: "Session completed",
   session_discarded: "Session discarded",
+  meeting_capture_started: "Meeting capture started",
+  meeting_capture_stopped: "Meeting capture stopped",
+  meeting_provider_detected: "Meeting provider detected",
+  mixed_audio_enabled: "Mixed audio enabled",
+  meeting_audio_permission_denied: "Meeting audio permission denied",
+  meeting_capture_failed: "Meeting capture failed",
 }
 
 export function sessionTimelineEventLabel(eventType: LiveCoachingSessionTimelineEventType): string {

@@ -66,6 +66,11 @@ export async function updateBrowserAudioCaptureStatus(
     error?: string | null
     enabled?: boolean
     transcriptSource?: GrowthRealtimeCallSession["transcriptSource"]
+    meetingCaptureMode?: GrowthRealtimeCallSession["meetingCaptureMode"]
+    meetingProvider?: GrowthRealtimeCallSession["meetingProvider"]
+    mixedAudioEnabled?: boolean
+    meetingAudioActive?: boolean
+    microphoneActive?: boolean
   },
 ): Promise<GrowthRealtimeCallSession> {
   const session = await fetchGrowthRealtimeCallSession(admin, input.sessionId)
@@ -79,17 +84,25 @@ export async function updateBrowserAudioCaptureStatus(
 
   if (input.enabled !== undefined) patch.browserAudioCaptureEnabled = input.enabled
   if (input.transcriptSource !== undefined) patch.transcriptSource = input.transcriptSource
+  if (input.meetingCaptureMode !== undefined) patch.meetingCaptureMode = input.meetingCaptureMode
+  if (input.meetingProvider !== undefined) patch.meetingProvider = input.meetingProvider
+  if (input.mixedAudioEnabled !== undefined) patch.mixedAudioEnabled = input.mixedAudioEnabled
+  if (input.meetingAudioActive !== undefined) patch.meetingAudioActive = input.meetingAudioActive
+  if (input.microphoneActive !== undefined) patch.microphoneActive = input.microphoneActive
 
   if (input.status === "active") {
     patch.browserAudioCaptureEnabled = true
     patch.browserAudioStartedAt = session.browserAudioStartedAt ?? now
     patch.browserAudioEndedAt = null
-    patch.transcriptSource = "browser_mic"
+    const mode = input.meetingCaptureMode ?? session.meetingCaptureMode
+    patch.transcriptSource = mode && mode !== "microphone" ? "meeting_audio" : "browser_mic"
   }
 
   if (input.status === "stopped" || input.status === "failed") {
     patch.browserAudioCaptureEnabled = false
     patch.browserAudioEndedAt = now
+    patch.meetingAudioActive = false
+    patch.microphoneActive = false
   }
 
   if (input.status === "inactive") {
