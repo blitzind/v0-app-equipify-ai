@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 608,
-  sqlMigrations: 250,
+  apiRouteHandlers: 613,
+  sqlMigrations: 251,
   dashboardPages: 65,
-  componentsTsx: 414,
-  libTsFiles: 1373,
+  componentsTsx: 416,
+  libTsFiles: 1378,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **608** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **250** |
+| API route handlers (\`app/api/**/route.ts\`) | **613** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **251** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **414** |
-| \`lib/**/*.ts\` | **1373** |
+| \`components/**/*.tsx\` | **416** |
+| \`lib/**/*.ts\` | **1378** |
 
 ### Vercel crons
 
@@ -488,6 +488,11 @@ platform/growth/customer-lifecycle/customers/[customerId]/route.ts
 platform/growth/customer-lifecycle/customers/route.ts
 platform/growth/customer-lifecycle/dashboard/route.ts
 platform/growth/customer-lifecycle/onboarding-tasks/[taskId]/route.ts
+platform/growth/dogfood/command-summary/route.ts
+platform/growth/dogfood/dashboard/route.ts
+platform/growth/dogfood/issues/[issueId]/route.ts
+platform/growth/dogfood/issues/route.ts
+platform/growth/dogfood/runs/route.ts
 platform/growth/engagement/dashboard/route.ts
 platform/growth/executive/dashboard/route.ts
 platform/growth/import-batches/[batchId]/commit/route.ts

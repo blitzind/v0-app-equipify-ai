@@ -40,6 +40,9 @@ export const GROWTH_NOTIFICATION_COOLDOWN_MINUTES: Partial<Record<GrowthNotifica
   expansion_candidate: 120,
   churn_risk: 60,
   followup_missing: 120,
+  dogfood_failure: 60,
+  dogfood_blocker: 30,
+  validation_complete: 120,
 }
 
 export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificationType, number>> = {
@@ -85,6 +88,9 @@ export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificati
   expansion_candidate: 14 * 24 * 60,
   churn_risk: 7 * 24 * 60,
   followup_missing: 7 * 24 * 60,
+  dogfood_failure: 7 * 24 * 60,
+  dogfood_blocker: 14 * 24 * 60,
+  validation_complete: 7 * 24 * 60,
 }
 
 export function buildGrowthNotificationDeterministicHash(input: {

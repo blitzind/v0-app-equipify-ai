@@ -76,6 +76,9 @@ export const GROWTH_NOTIFICATION_TYPES = [
   "expansion_candidate",
   "churn_risk",
   "followup_missing",
+  "dogfood_failure",
+  "dogfood_blocker",
+  "validation_complete",
 ] as const
 export type GrowthNotificationType = (typeof GROWTH_NOTIFICATION_TYPES)[number]
 

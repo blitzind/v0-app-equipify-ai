@@ -7,6 +7,7 @@ import { GrowthAttentionCenter } from "@/components/growth/growth-attention-cent
 import { GrowthExecutiveRevenueSummary } from "@/components/growth/growth-executive-revenue-summary"
 import { GrowthCadenceCommandSummary } from "@/components/growth/growth-cadence-command-summary"
 import { GrowthCustomerLifecycleCommandSummary } from "@/components/growth/growth-customer-lifecycle-command-summary"
+import { GrowthDogfoodCommandSummary } from "@/components/growth/growth-dogfood-command-summary"
 import { GrowthMeetingCommandSummary } from "@/components/growth/growth-meeting-command-summary"
 import { GrowthPipelineCommandSummary } from "@/components/growth/growth-pipeline-command-summary"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
@@ -50,6 +51,7 @@ export default function AdminGrowthCommandPage() {
           <GrowthMeetingCommandSummary />
           <GrowthCadenceCommandSummary />
           <GrowthCustomerLifecycleCommandSummary />
+          <GrowthDogfoodCommandSummary />
           <GrowthPipelineCommandSummary />
           <GrowthCommandCenterDashboard />
         </GrowthSectionLayout>

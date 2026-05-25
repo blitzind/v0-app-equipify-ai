@@ -58,6 +58,9 @@ const TYPE_SEVERITY: Record<GrowthNotificationType, GrowthNotificationSeverity> 
   expansion_candidate: "medium",
   churn_risk: "high",
   followup_missing: "medium",
+  dogfood_failure: "critical",
+  dogfood_blocker: "critical",
+  validation_complete: "low",
 }
 
 const SEVERITY_BASE: Record<GrowthNotificationSeverity, number> = {
