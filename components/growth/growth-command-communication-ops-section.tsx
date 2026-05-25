@@ -1,9 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import Link from "next/link"
 import { MessageSquare, Loader2 } from "lucide-react"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthCommandSectionLinks } from "@/components/growth/growth-command-section-links"
+import { GROWTH_COMMAND_COMM_SECTION_LINKS } from "@/lib/growth/command/command-center-navigation"
 import type { GrowthCadenceCommandSummary } from "@/lib/growth/cadence/cadence-types"
 import type { GrowthMeetingCommandSummary } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import type { GrowthAttentionDashboard } from "@/lib/growth/notifications/notification-types"
@@ -19,13 +20,7 @@ type CommunicationOpsData = {
   liveCoachingActive: boolean
 }
 
-const QUICK_LINKS = [
-  { href: "/admin/growth/replies", label: "Open Inbox" },
-  { href: "/admin/growth/calls", label: "Open Calls" },
-  { href: "/admin/growth/meetings", label: "Open Meetings" },
-  { href: "/admin/growth/sequences/execution", label: "Open Cadence" },
-  { href: "/admin/growth/calls/live-coaching", label: "Open Coaching" },
-] as const
+const QUICK_LINKS = GROWTH_COMMAND_COMM_SECTION_LINKS
 
 export function GrowthCommandCommunicationOpsSection() {
   const [data, setData] = useState<CommunicationOpsData | null>(null)
@@ -101,6 +96,7 @@ export function GrowthCommandCommunicationOpsSection() {
           <Loader2 className="size-4 animate-spin" />
           Loading communication metrics…
         </div>
+        <GrowthCommandSectionLinks links={QUICK_LINKS} className="mt-3" />
       </GrowthEngineCard>
     )
   }
@@ -109,13 +105,7 @@ export function GrowthCommandCommunicationOpsSection() {
     return (
       <GrowthEngineCard title="Communication Operations" icon={<MessageSquare className="size-4" />}>
         <p className="text-sm text-muted-foreground">Communication queues are clear — no urgent items right now.</p>
-        <div className="mt-3 flex flex-wrap gap-3">
-          {QUICK_LINKS.map((link) => (
-            <Link key={link.href} href={link.href} className="text-sm text-indigo-600 hover:underline">
-              {link.label}
-            </Link>
-          ))}
-        </div>
+        <GrowthCommandSectionLinks links={QUICK_LINKS} className="mt-3" />
       </GrowthEngineCard>
     )
   }
@@ -138,18 +128,12 @@ export function GrowthCommandCommunicationOpsSection() {
           value={data?.liveCoachingActive ? "Active" : data?.activeCallSessions ? `${data.activeCallSessions} open` : "Idle"}
         />
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <GrowthBadge label="No auto-send" tone="neutral" />
         {data?.liveCoachingActive ? <GrowthBadge label="Session in progress" tone="healthy" /> : null}
         {(data?.providerIssues ?? 0) > 0 ? <GrowthBadge label="Check providers" tone="attention" /> : null}
       </div>
-      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
-        {QUICK_LINKS.map((link) => (
-          <Link key={link.href} href={link.href} className="text-sm text-indigo-600 hover:underline">
-            {link.label}
-          </Link>
-        ))}
-      </div>
+      <GrowthCommandSectionLinks links={QUICK_LINKS} className="mt-4" />
     </GrowthEngineCard>
   )
 }

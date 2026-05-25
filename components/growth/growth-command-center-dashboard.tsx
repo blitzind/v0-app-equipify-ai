@@ -23,6 +23,7 @@ import { GrowthCommandDogfoodCompactSection } from "@/components/growth/growth-c
 import { GrowthCommandLifecycleCompactSection } from "@/components/growth/growth-command-lifecycle-compact-section"
 import { GrowthCommandPipelineRevenueSection } from "@/components/growth/growth-command-pipeline-revenue-section"
 import { GrowthCommandQuickActionsRail } from "@/components/growth/growth-command-quick-actions-rail"
+import { GrowthCommandSectionTabs } from "@/components/growth/growth-command-section-tabs"
 import { useAdmin } from "@/lib/admin-store"
 import { selectFocusSprintActions } from "@/lib/growth/command/command-action-engine"
 import type {
@@ -42,6 +43,7 @@ import { cn } from "@/lib/utils"
 
 const SPRINT_SECONDS = 30 * 60
 const DEFAULT_VISIBLE_ACTIONS = 5
+const SECTION_SCROLL_CLASS = "scroll-mt-24"
 
 function momentumTone(state: GrowthCommandMomentumState): "healthy" | "warning" | "attention" | "neutral" {
   if (state === "momentum_building") return "healthy"
@@ -309,9 +311,12 @@ export function GrowthCommandCenterDashboard() {
         <GrowthBadge label="Navigation only · no auto-send" tone="neutral" />
       </div>
 
+      <GrowthCommandSectionTabs />
+
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_220px]">
         <div className="space-y-5">
           {/* 1. Morning Focus */}
+          <div id="cc-today" className={SECTION_SCROLL_CLASS}>
           <GrowthEngineCard className="overflow-hidden border-indigo-100 bg-gradient-to-r from-indigo-50/80 via-background to-background p-0 dark:from-indigo-950/20">
             <div className="p-4 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
@@ -349,6 +354,8 @@ export function GrowthCommandCenterDashboard() {
               </div>
             </div>
           </GrowthEngineCard>
+
+          <GrowthCommandQuickActionsRail variant="chips" />
 
           {/* Today's Pipeline Operations */}
           <GrowthEngineCard title="Today's Pipeline Operations" icon={<LayoutDashboard className="size-4" />}>
@@ -397,22 +404,30 @@ export function GrowthCommandCenterDashboard() {
               </>
             )}
           </GrowthEngineCard>
+          </div>
 
           {/* 3. Communication Operations */}
+          <div id="cc-communication" className={SECTION_SCROLL_CLASS}>
           <GrowthCommandCommunicationOpsSection />
+          </div>
 
           {/* 4. Pipeline + Revenue */}
+          <div id="cc-revenue" className={SECTION_SCROLL_CLASS}>
           <GrowthCommandPipelineRevenueSection atRiskActions={dashboard.revenueRescueQueue} />
-
-          {/* 5. Meeting + Cadence — covered in Communication Ops; no duplicate full cards */}
+          </div>
 
           {/* 6. Customer Lifecycle */}
+          <div id="cc-lifecycle" className={SECTION_SCROLL_CLASS}>
           <GrowthCommandLifecycleCompactSection />
+          </div>
 
           {/* 7. Dogfood Readiness */}
+          <div id="cc-readiness" className={SECTION_SCROLL_CLASS}>
           <GrowthCommandDogfoodCompactSection />
+          </div>
 
           {/* 8. Performance */}
+          <div id="cc-performance" className={SECTION_SCROLL_CLASS}>
           <GrowthEngineCard title="Performance & End of Day" icon={<Trophy className="size-4" />}>
             <div className="space-y-4">
               <div>
@@ -511,17 +526,12 @@ export function GrowthCommandCenterDashboard() {
               ) : null}
             </div>
           </GrowthEngineCard>
+          </div>
         </div>
 
-        {/* Quick Actions rail — desktop sticky */}
         <div className="hidden xl:block">
-          <GrowthCommandQuickActionsRail />
+          <GrowthCommandQuickActionsRail variant="rail" />
         </div>
-      </div>
-
-      {/* Mobile quick actions */}
-      <div className="xl:hidden">
-        <GrowthCommandQuickActionsRail />
       </div>
     </div>
   )

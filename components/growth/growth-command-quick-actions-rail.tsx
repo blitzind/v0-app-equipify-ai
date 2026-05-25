@@ -11,6 +11,7 @@ import {
   Zap,
 } from "lucide-react"
 import { GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { cn } from "@/lib/utils"
 
 const QUICK_ACTIONS = [
   { href: "/admin/growth/imports", label: "Import Leads", icon: FileUp },
@@ -22,10 +23,36 @@ const QUICK_ACTIONS = [
   { href: "/admin/growth/outreach/approval", label: "Open Approval Queue", icon: CheckCircle2 },
 ] as const
 
-export function GrowthCommandQuickActionsRail() {
+type GrowthCommandQuickActionsRailProps = {
+  variant?: "rail" | "chips"
+}
+
+export function GrowthCommandQuickActionsRail({ variant = "rail" }: GrowthCommandQuickActionsRailProps) {
+  if (variant === "chips") {
+    return (
+      <div className="xl:hidden">
+        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Quick actions</p>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {QUICK_ACTIONS.map((action) => (
+            <Link
+              key={action.href}
+              href={action.href}
+              className={cn(
+                "shrink-0 rounded-full border border-border bg-background px-3 py-1.5 text-sm",
+                "hover:border-indigo-200 hover:bg-indigo-50/40",
+              )}
+            >
+              {action.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <GrowthEngineCard title="Quick Actions" icon={<Zap className="size-4" />} className="lg:sticky lg:top-4">
-      <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+    <GrowthEngineCard title="Quick Actions" icon={<Zap className="size-4" />} className="sticky top-4">
+      <ul className="grid gap-2">
         {QUICK_ACTIONS.map((action) => {
           const Icon = action.icon
           return (

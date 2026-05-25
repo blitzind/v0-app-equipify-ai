@@ -1,9 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import Link from "next/link"
 import { ClipboardCheck, Loader2 } from "lucide-react"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthCommandSectionLinks } from "@/components/growth/growth-command-section-links"
+import { GROWTH_COMMAND_DOGFOOD_SECTION_LINKS } from "@/lib/growth/command/command-center-navigation"
 import type { GrowthDogfoodCommandSummary } from "@/lib/growth/dogfood/dogfood-types"
 
 export function GrowthCommandDogfoodCompactSection() {
@@ -41,6 +42,7 @@ export function GrowthCommandDogfoodCompactSection() {
     return (
       <GrowthEngineCard title="Blitz Dogfood Readiness" icon={<ClipboardCheck className="size-4" />}>
         <p className="text-sm text-muted-foreground">Loading dogfood readiness…</p>
+        <GrowthCommandSectionLinks links={GROWTH_COMMAND_DOGFOOD_SECTION_LINKS} className="mt-3" />
       </GrowthEngineCard>
     )
   }
@@ -49,6 +51,7 @@ export function GrowthCommandDogfoodCompactSection() {
     return (
       <GrowthEngineCard title="Blitz Dogfood Readiness" icon={<ClipboardCheck className="size-4" />}>
         <p className="text-sm text-muted-foreground">{setupMessage}</p>
+        <GrowthCommandSectionLinks links={GROWTH_COMMAND_DOGFOOD_SECTION_LINKS} className="mt-3" />
       </GrowthEngineCard>
     )
   }
@@ -78,10 +81,8 @@ export function GrowthCommandDogfoodCompactSection() {
         ) : (
           <GrowthBadge label="Validation in progress" tone="neutral" />
         )}
-        <Link href="/admin/growth/dogfood" className="text-sm text-indigo-600 hover:underline">
-          Open validation center
-        </Link>
       </div>
+      <GrowthCommandSectionLinks links={GROWTH_COMMAND_DOGFOOD_SECTION_LINKS} className="mt-3" />
     </GrowthEngineCard>
   )
 }

@@ -22,6 +22,11 @@ import {
   displayCommandActionImpact,
   GROWTH_COMMAND_CENTER_QA_MARKER,
 } from "../lib/growth/command/command-action-types"
+import {
+  GROWTH_COMMAND_JUMP_DESTINATIONS,
+  GROWTH_COMMAND_SECTION_TABS,
+  GROWTH_COMMAND_COMM_SECTION_LINKS,
+} from "../lib/growth/command/command-center-navigation"
 import { buildBossBattles, buildCoachTips, buildHeatMap, detectComboChains } from "../lib/growth/command/command-dashboard-helpers"
 import { describeSequenceStartUnavailable } from "../lib/growth/sequence-enrollment/sequence-enrollment-ui"
 import type { GrowthLead } from "../lib/growth/types"
@@ -178,5 +183,11 @@ assert.equal(commandActionImpactTone(85), "critical")
 assert.equal(commandActionImpactTone(75), "high")
 assert.equal(commandActionImpactTone(60), "high")
 assert.equal(commandActionImpactTone(45), "neutral")
+
+assert.ok(GROWTH_COMMAND_JUMP_DESTINATIONS.some((entry) => entry.label === "Inbox" && entry.href === "/admin/growth/leads"))
+assert.ok(GROWTH_COMMAND_JUMP_DESTINATIONS.some((entry) => entry.label === "Dogfood Validation"))
+assert.equal(GROWTH_COMMAND_SECTION_TABS.length, 6)
+assert.equal(GROWTH_COMMAND_SECTION_TABS[0]?.anchor, "cc-today")
+assert.equal(GROWTH_COMMAND_COMM_SECTION_LINKS.length, 5)
 
 console.log("growth-command-center: all checks passed")

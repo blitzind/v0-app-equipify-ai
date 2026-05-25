@@ -1,9 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import Link from "next/link"
 import { HeartPulse, Loader2 } from "lucide-react"
 import { GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthCommandSectionLinks } from "@/components/growth/growth-command-section-links"
+import { GROWTH_COMMAND_LIFECYCLE_SECTION_LINKS } from "@/lib/growth/command/command-center-navigation"
 import type { GrowthCustomerLifecycleCommandSummary } from "@/lib/growth/customer-lifecycle/customer-lifecycle-types"
 
 export function GrowthCommandLifecycleCompactSection() {
@@ -49,6 +50,7 @@ export function GrowthCommandLifecycleCompactSection() {
     return (
       <GrowthEngineCard title="Customer Lifecycle" icon={<HeartPulse className="size-4" />}>
         <p className="text-sm text-muted-foreground">Loading lifecycle metrics…</p>
+        <GrowthCommandSectionLinks links={GROWTH_COMMAND_LIFECYCLE_SECTION_LINKS} className="mt-3" />
       </GrowthEngineCard>
     )
   }
@@ -57,6 +59,7 @@ export function GrowthCommandLifecycleCompactSection() {
     return (
       <GrowthEngineCard title="Customer Lifecycle" icon={<HeartPulse className="size-4" />}>
         <p className="text-sm text-muted-foreground">{setupMessage}</p>
+        <GrowthCommandSectionLinks links={GROWTH_COMMAND_LIFECYCLE_SECTION_LINKS} className="mt-3" />
       </GrowthEngineCard>
     )
   }
@@ -65,9 +68,7 @@ export function GrowthCommandLifecycleCompactSection() {
     return (
       <GrowthEngineCard title="Customer Lifecycle" icon={<HeartPulse className="size-4" />}>
         <p className="text-sm text-muted-foreground">No post-close lifecycle actions due.</p>
-        <Link href="/admin/growth/customer-lifecycle" className="mt-2 inline-block text-sm text-indigo-600 hover:underline">
-          Open lifecycle
-        </Link>
+        <GrowthCommandSectionLinks links={GROWTH_COMMAND_LIFECYCLE_SECTION_LINKS} className="mt-3" />
       </GrowthEngineCard>
     )
   }
@@ -82,9 +83,7 @@ export function GrowthCommandLifecycleCompactSection() {
         <StatTile label="Referral opportunities" value={summary?.referralOpportunitiesCount ?? 0} />
         <StatTile label="Onboarding overdue" value={summary?.onboardingOverdueCount ?? 0} />
       </div>
-      <Link href="/admin/growth/customer-lifecycle" className="mt-3 inline-block text-sm text-indigo-600 hover:underline">
-        Open lifecycle dashboard
-      </Link>
+      <GrowthCommandSectionLinks links={GROWTH_COMMAND_LIFECYCLE_SECTION_LINKS} className="mt-3" />
     </GrowthEngineCard>
   )
 }

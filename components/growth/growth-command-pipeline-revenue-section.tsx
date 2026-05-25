@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Loader2, TrendingUp } from "lucide-react"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthCommandSectionLinks } from "@/components/growth/growth-command-section-links"
+import { GROWTH_COMMAND_PIPELINE_SECTION_LINKS } from "@/lib/growth/command/command-center-navigation"
 import type { GrowthOpportunityPipelineDashboard } from "@/lib/growth/opportunity-pipeline/pipeline-types"
 import type { GrowthRevenueExecutiveCommandSummary } from "@/lib/growth/revenue-operating/revenue-operating-types"
 import type { GrowthCommandAction } from "@/lib/growth/command/command-action-types"
@@ -75,6 +77,7 @@ export function GrowthCommandPipelineRevenueSection({ atRiskActions = [] }: Grow
           <Loader2 className="size-4 animate-spin" />
           Loading pipeline and revenue…
         </div>
+        <GrowthCommandSectionLinks links={GROWTH_COMMAND_PIPELINE_SECTION_LINKS} className="mt-3" />
       </GrowthEngineCard>
     )
   }
@@ -83,6 +86,7 @@ export function GrowthCommandPipelineRevenueSection({ atRiskActions = [] }: Grow
     return (
       <GrowthEngineCard title="Pipeline + Revenue" icon={<TrendingUp className="size-4" />}>
         <p className="text-sm text-muted-foreground">No pipeline or revenue data available yet.</p>
+        <GrowthCommandSectionLinks links={GROWTH_COMMAND_PIPELINE_SECTION_LINKS} className="mt-3" />
       </GrowthEngineCard>
     )
   }
@@ -94,14 +98,6 @@ export function GrowthCommandPipelineRevenueSection({ atRiskActions = [] }: Grow
       ) : null}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">Combined forecast and pipeline health — deterministic only.</p>
-        <div className="flex flex-wrap gap-3">
-          <Link href="/admin/growth/revenue-operating" className="text-sm text-indigo-600 hover:underline">
-            Revenue operating
-          </Link>
-          <Link href="/admin/growth/opportunities/pipeline" className="text-sm text-indigo-600 hover:underline">
-            Open pipeline
-          </Link>
-        </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatTile label="Forecast to goal" value={`${revenue?.forecastToGoalRatio ?? 0}%`} />
@@ -141,6 +137,7 @@ export function GrowthCommandPipelineRevenueSection({ atRiskActions = [] }: Grow
           </ul>
         </div>
       ) : null}
+      <GrowthCommandSectionLinks links={GROWTH_COMMAND_PIPELINE_SECTION_LINKS} className="mt-4" />
     </GrowthEngineCard>
   )
 }
