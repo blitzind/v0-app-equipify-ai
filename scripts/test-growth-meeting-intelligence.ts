@@ -13,7 +13,6 @@ import {
   GROWTH_MEETING_STATUSES,
 } from "../lib/growth/meeting-intelligence/meeting-intelligence-types"
 import {
-  GROWTH_CALENDAR_SYNC_SETUP_MESSAGE,
   resolveGrowthCalendarSyncReadiness,
 } from "../lib/growth/meeting-intelligence/calendar-sync-readiness"
 import { GROWTH_NOTIFICATION_TYPES } from "../lib/growth/notifications/notification-types"
@@ -27,7 +26,7 @@ assert.ok(GROWTH_MEETING_INBOX_VIEWS.includes("meeting_requests"))
 
 const calendar = resolveGrowthCalendarSyncReadiness()
 assert.equal(calendar.ready, false)
-assert.equal(calendar.setupMessage, GROWTH_CALENDAR_SYNC_SETUP_MESSAGE)
+assert.match(calendar.setupMessage ?? "", /Connect Google Calendar/)
 
 for (const type of [
   "meeting_requested",

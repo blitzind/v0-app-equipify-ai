@@ -32,7 +32,10 @@ export async function GET(request: Request) {
         : undefined
 
   try {
-    const dashboard = await fetchGrowthMeetingIntelligenceDashboard(access.admin, { ownerUserId })
+    const dashboard = await fetchGrowthMeetingIntelligenceDashboard(access.admin, {
+      ownerUserId,
+      actorUserId: access.userId,
+    })
     return NextResponse.json({ ok: true, meta: { schemaReady: true }, dashboard })
   } catch {
     return NextResponse.json(

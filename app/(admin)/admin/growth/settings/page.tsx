@@ -1,10 +1,12 @@
 "use client"
 
+import { Suspense } from "react"
 import { Settings2 } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthCommunicationSettingsPanel } from "@/components/growth/growth-communication-settings"
 import { GrowthAiCopilotSettingsPanel } from "@/components/growth/growth-ai-copilot-settings"
 import { GrowthLiveCoachingSettingsPanel } from "@/components/growth/growth-live-coaching-settings"
+import { GrowthGoogleCalendarSettingsPanel } from "@/components/growth/growth-google-calendar-settings-panel"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -41,6 +43,9 @@ export default function AdminGrowthSettingsPage() {
         </section>
 
         <GrowthSectionLayout>
+          <Suspense fallback={null}>
+            <GrowthGoogleCalendarSettingsPanel />
+          </Suspense>
           <GrowthCommunicationSettingsPanel />
           <GrowthAiCopilotSettingsPanel />
           <GrowthLiveCoachingSettingsPanel />

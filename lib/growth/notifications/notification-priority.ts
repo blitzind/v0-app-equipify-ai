@@ -61,6 +61,9 @@ const TYPE_SEVERITY: Record<GrowthNotificationType, GrowthNotificationSeverity> 
   dogfood_failure: "critical",
   dogfood_blocker: "critical",
   validation_complete: "low",
+  calendar_sync_failed: "high",
+  meeting_synced: "low",
+  meeting_conflict: "high",
 }
 
 const SEVERITY_BASE: Record<GrowthNotificationSeverity, number> = {

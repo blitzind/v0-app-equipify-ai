@@ -1,7 +1,16 @@
 /** Client-safe calendar integration readiness for meeting intelligence. */
 
+import type { GrowthCalendarSyncStatus } from "@/lib/growth/calendar/google-calendar-types"
+
+export {
+  GROWTH_CALENDAR_NOT_CONNECTED_MESSAGE,
+  GROWTH_CALENDAR_SYNC_STATUS_LABELS,
+  GROWTH_CALENDAR_SYNC_STATUSES,
+  type GrowthCalendarSyncStatus,
+} from "@/lib/growth/calendar/google-calendar-types"
+
 export const GROWTH_CALENDAR_SYNC_SETUP_MESSAGE =
-  "Google Calendar sync is not connected yet. Track meetings manually — calendar-ready fields are preserved for future OAuth setup."
+  "Connect Google Calendar in Growth Settings to sync meetings after human confirmation."
 
 export type GrowthCalendarSyncReadiness = {
   ready: boolean
@@ -9,6 +18,7 @@ export type GrowthCalendarSyncReadiness = {
   setupMessage: string | null
 }
 
+/** Client-side fallback when connection status is unknown. */
 export function resolveGrowthCalendarSyncReadiness(): GrowthCalendarSyncReadiness {
   return {
     ready: false,

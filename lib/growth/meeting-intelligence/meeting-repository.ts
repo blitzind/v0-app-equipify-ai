@@ -10,7 +10,7 @@ import type {
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 
 const MEETING_SELECT =
-  "id, lead_id, owner_user_id, opportunity_id, outbound_reply_id, realtime_call_session_id, title, status, start_at, end_at, source, provider, calendar_event_id, outcome, next_action, follow_up_due_at, no_show_reason, scheduled_at, completed_at, canceled_at, no_show_at, outcome_recorded_at, created_by, created_at, updated_at"
+  "id, lead_id, owner_user_id, opportunity_id, outbound_reply_id, realtime_call_session_id, title, status, start_at, end_at, source, provider, calendar_event_id, calendar_sync_status, calendar_sync_error, calendar_synced_at, calendar_last_sync_at, meeting_url, notes, attendee_emails, timezone, outcome, next_action, follow_up_due_at, no_show_reason, scheduled_at, completed_at, canceled_at, no_show_at, outcome_recorded_at, created_by, created_at, updated_at"
 
 type MeetingDbRow = {
   id: string
@@ -26,6 +26,14 @@ type MeetingDbRow = {
   source: string
   provider: string | null
   calendar_event_id: string | null
+  calendar_sync_status: string | null
+  calendar_sync_error: string | null
+  calendar_synced_at: string | null
+  calendar_last_sync_at: string | null
+  meeting_url: string | null
+  notes: string | null
+  attendee_emails: string[] | null
+  timezone: string
   outcome: string | null
   next_action: string | null
   follow_up_due_at: string | null
@@ -59,6 +67,14 @@ export function mapGrowthMeetingRow(row: MeetingDbRow): GrowthMeeting {
     source: row.source as GrowthMeetingSource,
     provider: (row.provider as GrowthMeetingProvider | null) ?? null,
     calendarEventId: row.calendar_event_id,
+    calendarSyncStatus: (row.calendar_sync_status as GrowthMeeting["calendarSyncStatus"]) ?? null,
+    calendarSyncError: row.calendar_sync_error,
+    calendarSyncedAt: row.calendar_synced_at,
+    calendarLastSyncAt: row.calendar_last_sync_at,
+    meetingUrl: row.meeting_url,
+    notes: row.notes,
+    attendeeEmails: row.attendee_emails ?? [],
+    timezone: row.timezone ?? "UTC",
     outcome: row.outcome,
     nextAction: row.next_action,
     followUpDueAt: row.follow_up_due_at,

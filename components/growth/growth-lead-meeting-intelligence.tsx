@@ -9,6 +9,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import {
+  GROWTH_CALENDAR_SYNC_STATUS_LABELS,
+} from "@/lib/growth/calendar/google-calendar-types"
+import {
   GROWTH_MEETING_PROVIDER_LABELS,
   GROWTH_MEETING_PROVIDERS,
   GROWTH_MEETING_STATUS_LABELS,
@@ -105,6 +108,26 @@ export function GrowthLeadMeetingIntelligence({
       onTimelineRefresh?.()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Create failed.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function syncMeetingToCalendar(meetingId: string, action: "create" | "update" | "cancel") {
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/platform/growth/meetings/${meetingId}/calendar/push`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: true, action }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
+      if (!res.ok || !data.ok) throw new Error(data.message ?? "Calendar sync failed.")
+      await load()
+      onTimelineRefresh?.()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Calendar sync failed.")
     } finally {
       setSaving(false)
     }
@@ -217,6 +240,12 @@ export function GrowthLeadMeetingIntelligence({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{meeting.title}</span>
                     <GrowthBadge label={GROWTH_MEETING_STATUS_LABELS[meeting.status]} tone="neutral" />
+                    {meeting.calendarSyncStatus ? (
+                      <GrowthBadge
+                        label={GROWTH_CALENDAR_SYNC_STATUS_LABELS[meeting.calendarSyncStatus]}
+                        tone={meeting.calendarSyncStatus === "synced" ? "healthy" : "attention"}
+                      />
+                    ) : null}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     <CalendarClock className="mr-1 inline size-3" />
@@ -283,6 +312,30 @@ export function GrowthLeadMeetingIntelligence({
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
+                disabled={saving || !selected.startAt}
+                onClick={() => void syncMeetingToCalendar(selected.id, selected.calendarEventId ? "update" : "create")}
+              >
+                Confirm & sync to Google Calendar
+              </Button>
+              {selected.calendarEventId ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={saving}
+                  onClick={() => void syncMeetingToCalendar(selected.id, "cancel")}
+                >
+                  Sync cancel to calendar
+                </Button>
+              ) : null}
+              {selected.meetingUrl ? (
+                <a href={selected.meetingUrl} className="self-center text-sm text-indigo-600 hover:underline" target="_blank" rel="noreferrer">
+                  Open meeting link
+                </a>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
                 disabled={saving || !outcome.trim()}
                 onClick={() =>
                   void patchMeeting(selected.id, {
@@ -297,7 +350,7 @@ export function GrowthLeadMeetingIntelligence({
               {selected.opportunityId ? (
                 <Link
                   href={`/admin/growth/opportunities/pipeline?opportunityId=${selected.opportunityId}`}
-                  className="text-sm text-indigo-600 hover:underline self-center"
+                  className="self-center text-sm text-indigo-600 hover:underline"
                 >
                   Review opportunity stage
                 </Link>

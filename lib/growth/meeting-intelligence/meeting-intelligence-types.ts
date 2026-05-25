@@ -1,5 +1,7 @@
 /** Client-safe Growth Engine meeting intelligence types (slice 6.23A). */
 
+import type { GrowthCalendarSyncStatus } from "@/lib/growth/calendar/google-calendar-types"
+
 export const GROWTH_MEETING_INTELLIGENCE_QA_MARKER = "meeting-intelligence-v1" as const
 
 export const GROWTH_MEETING_STATUSES = [
@@ -75,6 +77,14 @@ export type GrowthMeeting = {
   source: GrowthMeetingSource
   provider: GrowthMeetingProvider | null
   calendarEventId: string | null
+  calendarSyncStatus: GrowthCalendarSyncStatus | null
+  calendarSyncError: string | null
+  calendarSyncedAt: string | null
+  calendarLastSyncAt: string | null
+  meetingUrl: string | null
+  notes: string | null
+  attendeeEmails: string[]
+  timezone: string
   outcome: string | null
   nextAction: string | null
   followUpDueAt: string | null
@@ -94,6 +104,9 @@ export type GrowthMeetingIntelligenceDashboard = {
   qaMarker: typeof GROWTH_MEETING_INTELLIGENCE_QA_MARKER
   calendarSyncReady: boolean
   calendarSetupMessage: string | null
+  calendarAccountEmail: string | null
+  calendarSyncHealth: string | null
+  calendarLastSyncAt: string | null
   upcomingCount: number
   meetingRequestCount: number
   outcomesMissingCount: number
@@ -120,6 +133,10 @@ export type CreateGrowthMeetingInput = {
   source?: GrowthMeetingSource
   provider?: GrowthMeetingProvider | null
   calendarEventId?: string | null
+  meetingUrl?: string | null
+  notes?: string | null
+  attendeeEmails?: string[]
+  timezone?: string | null
   ownerUserId?: string | null
   opportunityId?: string | null
   outboundReplyId?: string | null
@@ -136,6 +153,10 @@ export type UpdateGrowthMeetingInput = {
   endAt?: string | null
   provider?: GrowthMeetingProvider | null
   calendarEventId?: string | null
+  meetingUrl?: string | null
+  notes?: string | null
+  attendeeEmails?: string[]
+  timezone?: string | null
   ownerUserId?: string | null
   opportunityId?: string | null
   outcome?: string | null

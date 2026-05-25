@@ -162,8 +162,27 @@ export function GrowthMeetingIntelligenceDashboard() {
           </div>
           {!dashboard.calendarSyncReady && dashboard.calendarSetupMessage ? (
             <p className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-950">
-              {dashboard.calendarSetupMessage}
+              {dashboard.calendarSetupMessage}{" "}
+              <Link href="/admin/growth/settings" className="font-medium text-indigo-700 hover:underline">
+                Connect in Settings
+              </Link>
             </p>
+          ) : null}
+          {dashboard.calendarSyncReady ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+              <GrowthBadge label="Google Calendar connected" tone="healthy" />
+              {dashboard.calendarAccountEmail ? (
+                <span className="text-muted-foreground">{dashboard.calendarAccountEmail}</span>
+              ) : null}
+              {dashboard.calendarSyncHealth ? (
+                <GrowthBadge label={`Sync: ${dashboard.calendarSyncHealth}`} tone="neutral" />
+              ) : null}
+              {dashboard.calendarLastSyncAt ? (
+                <span className="text-xs text-muted-foreground">
+                  Last sync {new Date(dashboard.calendarLastSyncAt).toLocaleString()}
+                </span>
+              ) : null}
+            </div>
           ) : null}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatTile icon={<CalendarClock className="size-3.5" />} label="Upcoming" value={dashboard.upcomingCount} />

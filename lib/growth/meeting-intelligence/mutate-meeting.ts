@@ -79,6 +79,10 @@ export async function createGrowthMeeting(
     source: input.source ?? "manual",
     provider: input.provider ?? null,
     calendar_event_id: input.calendarEventId ?? null,
+    meeting_url: input.meetingUrl ?? null,
+    notes: input.notes ?? null,
+    attendee_emails: input.attendeeEmails ?? [],
+    timezone: input.timezone ?? "UTC",
     outcome: input.outcome ?? null,
     next_action: input.nextAction ?? null,
     follow_up_due_at: input.followUpDueAt ?? null,
@@ -126,6 +130,10 @@ export async function updateGrowthMeeting(
   if (input.endAt !== undefined) patch.end_at = input.endAt
   if (input.provider !== undefined) patch.provider = input.provider
   if (input.calendarEventId !== undefined) patch.calendar_event_id = input.calendarEventId
+  if (input.meetingUrl !== undefined) patch.meeting_url = input.meetingUrl
+  if (input.notes !== undefined) patch.notes = input.notes?.trim() || null
+  if (input.attendeeEmails !== undefined) patch.attendee_emails = input.attendeeEmails
+  if (input.timezone !== undefined) patch.timezone = input.timezone ?? "UTC"
   if (input.ownerUserId !== undefined) patch.owner_user_id = input.ownerUserId
   if (input.opportunityId !== undefined) patch.opportunity_id = input.opportunityId
   if (input.outcome !== undefined) patch.outcome = input.outcome?.trim() || null

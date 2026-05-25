@@ -43,6 +43,9 @@ export const GROWTH_NOTIFICATION_COOLDOWN_MINUTES: Partial<Record<GrowthNotifica
   dogfood_failure: 60,
   dogfood_blocker: 30,
   validation_complete: 120,
+  calendar_sync_failed: 30,
+  meeting_synced: 15,
+  meeting_conflict: 30,
 }
 
 export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificationType, number>> = {
@@ -91,6 +94,9 @@ export const GROWTH_NOTIFICATION_EXPIRY_MINUTES: Partial<Record<GrowthNotificati
   dogfood_failure: 7 * 24 * 60,
   dogfood_blocker: 14 * 24 * 60,
   validation_complete: 7 * 24 * 60,
+  calendar_sync_failed: 24 * 60,
+  meeting_synced: 24 * 60,
+  meeting_conflict: 3 * 24 * 60,
 }
 
 export function buildGrowthNotificationDeterministicHash(input: {

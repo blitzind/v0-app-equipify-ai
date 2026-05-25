@@ -32,7 +32,7 @@ export default function AdminGrowthMeetingsPage() {
             <div>
               <h1 className={PAGE_STANDARD_PAGE_TITLE}>Meeting Intelligence</h1>
               <p className="text-sm text-muted-foreground">
-                Track booked meetings, outcomes, no-shows, and follow-ups — manual calendar tracking until Google OAuth is ready.
+                Track booked meetings, outcomes, no-shows, and follow-ups — connect Google Calendar in Settings for human-confirmed sync.
               </p>
             </div>
           </div>

@@ -118,6 +118,7 @@
     "test:growth-multi-channel-cadence": "tsx scripts/test-growth-multi-channel-cadence.ts",
     "test:growth-post-close-revenue": "tsx scripts/test-growth-post-close-revenue.ts",
     "test:growth-dogfood-validation": "tsx scripts/test-growth-dogfood-validation.ts",
+    "test:growth-google-calendar": "tsx scripts/test-growth-google-calendar.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
     "test:growth-assemblyai-browser-streaming": "tsx scripts/test-growth-assemblyai-browser-streaming.ts",
     "test:growth-openai-realtime-browser-streaming": "tsx scripts/test-growth-openai-realtime-browser-streaming.ts",

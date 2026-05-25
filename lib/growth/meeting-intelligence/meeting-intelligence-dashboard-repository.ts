@@ -1,7 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { resolveGrowthCalendarSyncReadiness } from "@/lib/growth/meeting-intelligence/calendar-sync-readiness"
+import { fetchGrowthCalendarConnectionSummary } from "@/lib/growth/calendar/calendar-sync-readiness-server"
 import {
   GROWTH_MEETING_INTELLIGENCE_QA_MARKER,
   type GrowthMeetingCommandSummary,
@@ -56,17 +56,30 @@ function aggregateMeetings(
 
 export async function fetchGrowthMeetingIntelligenceDashboard(
   admin: SupabaseClient,
-  input?: { ownerUserId?: string | null },
+  input?: { ownerUserId?: string | null; actorUserId?: string | null },
 ): Promise<GrowthMeetingIntelligenceDashboard> {
   await evaluateGrowthMeetingIntelligenceNotifications(admin, input)
-  const calendar = resolveGrowthCalendarSyncReadiness()
+  const calendarUserId = input?.actorUserId ?? input?.ownerUserId ?? null
+  const calendar =
+    calendarUserId != null
+      ? await fetchGrowthCalendarConnectionSummary(admin, calendarUserId)
+      : {
+          connected: false,
+          setupMessage: "Connect Google Calendar in Growth Settings.",
+          accountEmail: null,
+          syncHealth: null,
+          lastSyncAt: null,
+        }
   const meetings = await listGrowthMeetingsForDashboardScan(admin, input)
   const stats = aggregateMeetings(meetings, Date.now())
 
   return {
     qaMarker: GROWTH_MEETING_INTELLIGENCE_QA_MARKER,
-    calendarSyncReady: calendar.ready,
+    calendarSyncReady: calendar.connected,
     calendarSetupMessage: calendar.setupMessage,
+    calendarAccountEmail: calendar.accountEmail,
+    calendarSyncHealth: calendar.syncHealth,
+    calendarLastSyncAt: calendar.lastSyncAt,
     ...stats,
   }
 }
