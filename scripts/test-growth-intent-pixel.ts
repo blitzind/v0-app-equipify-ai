@@ -280,6 +280,33 @@ assert.match(
 )
 assert.doesNotMatch(monitorUi, /submitted_identity/)
 
+const marketingSiteRoot = path.resolve(process.cwd(), "../equipify-site")
+if (fs.existsSync(marketingSiteRoot)) {
+  const marketingLayout = fs.readFileSync(path.join(marketingSiteRoot, "app/layout.tsx"), "utf8")
+  assert.match(marketingLayout, /EquipifyIntentPixelScript/)
+  assert.doesNotMatch(marketingLayout, /pixel\.js\?site_key=equipify-sandbox/)
+  const marketingScript = fs.readFileSync(
+    path.join(marketingSiteRoot, "components/analytics/equipify-intent-pixel-script.tsx"),
+    "utf8",
+  )
+  assert.match(marketingScript, /EQUIPIFY_INTENT_PIXEL_SCRIPT_URL/)
+  const marketingHelper = fs.readFileSync(
+    path.join(marketingSiteRoot, "lib/analytics/equipify-intent-pixel.ts"),
+    "utf8",
+  )
+  assert.match(marketingHelper, /growth-intent-pixel-installed-equipify-site-v1/)
+  assert.match(
+    marketingHelper,
+    /app\.equipify\.ai\/api\/growth\/intent-pixel\/pixel\.js\?site_key=equipify-sandbox/,
+  )
+  const adminUi = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/growth-intent-pixel-admin.tsx"),
+    "utf8",
+  )
+  assert.match(adminUi, /buildIntentPixelScriptSnippet/)
+  assert.match(adminUi, /script_snippet/)
+}
+
 console.log(
   "growth-intent-pixel-v1 + growth-intent-pixel-admin-v1 + growth-intent-pixel-live-v1 + growth-live-visitor-monitor-v1 checks passed",
 )
