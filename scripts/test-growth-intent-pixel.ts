@@ -10,6 +10,7 @@ import { normalizeCollectPayload } from "../lib/growth/intent-pixel/capture-inte
 import {
   GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER,
   GROWTH_INTENT_PIXEL_LIVE_QA_MARKER,
+  GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER,
 } from "../lib/growth/intent-pixel/intent-pixel-admin-types"
 import { GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION } from "../lib/growth/intent-pixel/intent-pixel-schema-health"
 import { isDomainAllowed } from "../lib/growth/intent-pixel/intent-pixel-repository"
@@ -27,6 +28,7 @@ import { hasUtmSignal, mergeUtmAttribution, parseUtmFromUrl } from "../lib/growt
 assert.equal(GROWTH_INTENT_PIXEL_QA_MARKER, "growth-intent-pixel-v1")
 assert.equal(GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER, "growth-intent-pixel-admin-v1")
 assert.equal(GROWTH_INTENT_PIXEL_LIVE_QA_MARKER, "growth-intent-pixel-live-v1")
+assert.equal(GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER, "growth-live-visitor-monitor-v1")
 assert.equal(
   GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION,
   "20270316120000_growth_engine_intent_pixel_foundation.sql",
@@ -88,6 +90,37 @@ assert.match(processRoute, /processRecentIntentToLeadInbox/)
 assert.match(processRoute, /requireGrowthEnginePlatformAccess/)
 assert.match(processRoute, /GROWTH_INTENT_PIXEL_LIVE_QA_MARKER/)
 
+const monitorRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/intent-pixel/monitor/route.ts"),
+  "utf8",
+)
+assert.match(monitorRoute, /fetchLiveVisitorMonitorSnapshot/)
+assert.match(monitorRoute, /GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER/)
+assert.match(monitorRoute, /requireGrowthEnginePlatformAccess/)
+
+const processSessionRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/intent-pixel/process-session/route.ts"),
+  "utf8",
+)
+assert.match(processSessionRoute, /processIntentSessionToLeadInbox/)
+assert.match(processSessionRoute, /requireGrowthEnginePlatformAccess/)
+
+const monitorLib = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/intent-pixel/live-visitor-monitor.ts"),
+  "utf8",
+)
+assert.match(monitorLib, /buildInstallVerification/)
+assert.match(monitorLib, /fetchLiveVisitorMonitorSnapshot/)
+assert.doesNotMatch(monitorLib, /runLeadEnginePipeline|sendEmail|executePipeline/)
+
+const sessionHandoff = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/intent-pixel/process-intent-session-handoff.ts"),
+  "utf8",
+)
+assert.match(sessionHandoff, /ingestIntentCandidateToLeadInbox/)
+assert.match(sessionHandoff, /GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER/)
+assert.doesNotMatch(sessionHandoff, /runLeadEnginePipeline|sendEmail/)
+
 const handoffSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/intent-pixel/process-recent-intent-handoff.ts"),
   "utf8",
@@ -108,6 +141,7 @@ const adminPage = fs.readFileSync(
 )
 assert.match(adminPage, /GrowthIntentPixelAdmin/)
 assert.match(adminPage, /GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER/)
+assert.match(adminPage, /GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER/)
 
 const adminUi = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-intent-pixel-admin.tsx"),
@@ -228,6 +262,24 @@ assert.match(script, /EquipifyIntentPixel/)
 assert.match(script, /trackConversion/)
 assert.doesNotMatch(script, /email.*inferred/i)
 
+const monitorUi = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/intent-pixel-monitor/growth-live-visitor-monitor.tsx"),
+  "utf8",
+)
+assert.match(monitorUi, /InstallVerificationCard/)
+assert.match(monitorUi, /LiveVisitorsPanel/)
+assert.match(monitorUi, /VisitorTimelinePanel/)
+assert.match(monitorUi, /HighIntentQueuePanel/)
+assert.match(monitorUi, /GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER/)
+assert.match(
+  fs.readFileSync(
+    path.join(process.cwd(), "components/growth/intent-pixel-monitor/install-verification-card.tsx"),
+    "utf8",
+  ),
+  /Install verification/,
+)
+assert.doesNotMatch(monitorUi, /submitted_identity/)
+
 console.log(
-  "growth-intent-pixel-v1 + growth-intent-pixel-admin-v1 + growth-intent-pixel-live-v1 checks passed",
+  "growth-intent-pixel-v1 + growth-intent-pixel-admin-v1 + growth-intent-pixel-live-v1 + growth-live-visitor-monitor-v1 checks passed",
 )

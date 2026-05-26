@@ -13,6 +13,7 @@ import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import {
   GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER,
   GROWTH_INTENT_PIXEL_LIVE_QA_MARKER,
+  GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER,
 } from "@/lib/growth/intent-pixel/intent-pixel-admin-types"
 
 export default function AdminGrowthIntentPixelPage() {
@@ -39,7 +40,8 @@ export default function AdminGrowthIntentPixelPage() {
                 Configure first-party website intent tracking, verify install health, and inspect anonymous activity — no third-party enrichment or outbound execution.
               </p>
               <p className="mt-1 font-mono text-xs text-muted-foreground">
-                {GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER} · {GROWTH_INTENT_PIXEL_LIVE_QA_MARKER}
+                {GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER} · {GROWTH_INTENT_PIXEL_LIVE_QA_MARKER} ·{" "}
+                {GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER}
               </p>
             </div>
           </div>

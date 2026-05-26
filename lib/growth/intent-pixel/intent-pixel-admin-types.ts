@@ -99,3 +99,15 @@ export type GrowthIntentPixelAdminRecentEvents = {
   site_key: string
   events: GrowthIntentPixelAdminStreamEvent[]
 }
+
+export {
+  GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER,
+  GROWTH_PIXEL_VERIFICATION_STATUSES,
+  type GrowthPixelVerificationStatus,
+  type GrowthPixelHealthTone,
+  type GrowthIntentPixelInstallVerification,
+  type GrowthLiveVisitorRow,
+  type GrowthVisitorTimelineEntry,
+  type GrowthHighIntentQueueItem,
+  type GrowthLiveVisitorMonitorSnapshot,
+} from "@/lib/growth/intent-pixel/live-visitor-monitor-types"

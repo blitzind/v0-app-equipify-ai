@@ -33,6 +33,7 @@ import {
   trackingModeLabel,
 } from "@/lib/growth/intent-pixel/intent-pixel-site-config"
 import { GROWTH_INTENT_PIXEL_PRIVACY_NOTE } from "@/lib/growth/intent-pixel/pii-policy"
+import { GrowthLiveVisitorMonitor } from "@/components/growth/intent-pixel-monitor/growth-live-visitor-monitor"
 import { cn } from "@/lib/utils"
 
 const INSTALL_STATUS_LABELS = {
@@ -278,6 +279,8 @@ export function GrowthIntentPixelAdmin() {
       {message ? (
         <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">{message}</p>
       ) : null}
+
+      <GrowthLiveVisitorMonitor siteKey={selectedKey} schemaReady={schemaReadyResolved} />
 
       {/* Site setup */}
       <section className="rounded-2xl border border-border bg-card shadow-sm">
