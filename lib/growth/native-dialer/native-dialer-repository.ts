@@ -11,6 +11,7 @@ import {
   type NativeCallWrapupInput,
 } from "@/lib/growth/native-dialer/native-dialer-wrapup-engine"
 import { routeNativeDialerProvider } from "@/lib/growth/native-dialer/native-dialer-provider-registry"
+import { resolveCallWorkspaceLeadByPhone } from "@/lib/growth/native-dialer/call-workspace-phone-lead-resolve"
 import type {
   NativeCallSessionStatus,
   NativeCallWrapupPublicView,
@@ -143,10 +144,16 @@ export async function startNativeCallSession(
   const orgId = await getGrowthEngineAiOrgId(admin)
   const providers = await resolveNativeDialerProviders(admin)
 
+  let leadId = input.leadId ?? null
+  if (!leadId) {
+    const phoneMatch = await resolveCallWorkspaceLeadByPhone(admin, input.phoneNumber)
+    if (phoneMatch?.leadId) leadId = phoneMatch.leadId
+  }
+
   let contactName = input.contactName ?? null
   let companyName = input.companyName ?? null
-  if (input.leadId) {
-    const lead = await fetchGrowthLeadById(admin, input.leadId)
+  if (leadId) {
+    const lead = await fetchGrowthLeadById(admin, leadId)
     if (lead) {
       contactName = contactName ?? lead.contactName
       companyName = companyName ?? lead.companyName
@@ -156,7 +163,7 @@ export async function startNativeCallSession(
   const { data: inserted, error } = await sessionsTable(admin)
     .insert({
       organization_id: orgId,
-      lead_id: input.leadId ?? null,
+      lead_id: leadId,
       owner_user_id: input.ownerUserId ?? null,
       queue_item_id: input.queueItemId ?? null,
       provider: providers.primaryProvider,
@@ -540,6 +547,49 @@ export async function seedNativeDialerQueueFromCallQueue(
     .single()
   if (error) throw new Error(error.message)
   return mapQueueRow(data as QueueRow)
+}
+
+export async function fetchNativeCallSessionById(
+  admin: SupabaseClient,
+  sessionId: string,
+): Promise<NativeCallWorkspaceSessionPublicView | null> {
+  const { data, error } = await sessionsTable(admin).select(SESSION_SELECT).eq("id", sessionId).maybeSingle()
+  if (error) throw new Error(error.message)
+  return data ? mapNativeCallSessionRow(data as SessionRow) : null
+}
+
+export async function linkNativeCallRealtimeSession(
+  admin: SupabaseClient,
+  input: { nativeSessionId: string; realtimeSessionId: string },
+): Promise<void> {
+  const { error } = await sessionsTable(admin)
+    .update({
+      realtime_session_id: input.realtimeSessionId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.nativeSessionId)
+  if (error) throw new Error(error.message)
+}
+
+export async function attachLeadToNativeCallSession(
+  admin: SupabaseClient,
+  input: { nativeSessionId: string; leadId: string },
+): Promise<NativeCallWorkspaceSessionPublicView> {
+  const lead = await fetchGrowthLeadById(admin, input.leadId)
+  if (!lead) throw new Error("Lead not found.")
+
+  const { data, error } = await sessionsTable(admin)
+    .update({
+      lead_id: input.leadId,
+      contact_name: lead.contactName,
+      company_name: lead.companyName,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.nativeSessionId)
+    .select(SESSION_SELECT)
+    .single()
+  if (error) throw new Error(error.message)
+  return mapNativeCallSessionRow(data as SessionRow)
 }
 
 export { commandLeadFocusHref }

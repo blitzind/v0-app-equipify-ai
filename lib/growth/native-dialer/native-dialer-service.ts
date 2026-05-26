@@ -165,4 +165,11 @@ export async function fetchGrowthNativeDialerLeadContext(
   }
 }
 
+export {
+  attachCallWorkspaceLead,
+  fetchCallWorkspaceLiveCoaching,
+  startCallWorkspaceLiveCoaching,
+} from "@/lib/growth/native-dialer/call-workspace-coaching-service"
+export { resolveCallWorkspaceLeadByPhone } from "@/lib/growth/native-dialer/call-workspace-phone-lead-resolve"
+
 export { fetchActiveNativeCallSession }

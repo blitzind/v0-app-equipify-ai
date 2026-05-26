@@ -23,6 +23,10 @@ import {
   GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER,
 } from "@/lib/growth/native-dialer/native-dialer-types"
 import {
+  GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER,
+  type CallWorkspaceCoachingMode,
+} from "@/lib/growth/native-dialer/call-workspace-coaching-types"
+import {
   beginGoogleVoiceBridgeDialFlow,
   GOOGLE_VOICE_BRIDGE_COPY_BLOCKED_TOAST,
   GOOGLE_VOICE_BRIDGE_COPY_SUCCESS_TOAST,
@@ -59,6 +63,8 @@ export function GrowthCallWorkspace() {
   const [declining, setDeclining] = useState(false)
   const [markingBridgeStarted, setMarkingBridgeStarted] = useState(false)
   const [coachingStartSignal, setCoachingStartSignal] = useState(0)
+  const [coachingMode, setCoachingMode] = useState<CallWorkspaceCoachingMode>("transcript_only")
+  const [leadLinked, setLeadLinked] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -154,7 +160,15 @@ export function GrowthCallWorkspace() {
           title: copied ? GOOGLE_VOICE_BRIDGE_COPY_SUCCESS_TOAST : GOOGLE_VOICE_BRIDGE_COPY_BLOCKED_TOAST,
         })
       }
-      if (data.session.leadId) void loadLeadContext(data.session.leadId)
+      if (data.session.leadId) {
+        setLeadLinked(true)
+        setCoachingMode("lead_linked")
+        void loadLeadContext(data.session.leadId)
+      } else {
+        setLeadLinked(false)
+        setCoachingMode("transcript_only")
+        setLeadContext(null)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Start failed.")
     } finally {
@@ -179,6 +193,11 @@ export function GrowthCallWorkspace() {
       }
       if (!res.ok || !data.session) throw new Error(data.message ?? "Could not mark call started.")
       setActiveSession(data.session)
+      if (data.session.leadId) {
+        setLeadLinked(true)
+        setCoachingMode("lead_linked")
+        void loadLeadContext(data.session.leadId)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Mark call started failed.")
     } finally {
@@ -302,6 +321,7 @@ export function GrowthCallWorkspace() {
       data-layout-qa-marker={GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER}
       data-call-start-fix-qa-marker={GROWTH_NATIVE_DIALER_CALL_START_FIX_QA_MARKER}
       data-google-voice-bridge-qa-marker={GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER}
+      data-google-voice-bridge-coaching-qa-marker={GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER}
     >
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button type="button" size="sm" variant="outline" onClick={() => void load()}>
@@ -359,6 +379,8 @@ export function GrowthCallWorkspace() {
           markingBridgeStarted={markingBridgeStarted}
           submittingWrapup={submittingWrapup}
           coachingStartSignal={coachingStartSignal}
+          coachingMode={coachingMode}
+          leadLinked={leadLinked}
           onAnswer={() => void answerCall()}
           onDecline={() => void declineCall()}
           onEndCall={() => void endCall()}
@@ -367,7 +389,18 @@ export function GrowthCallWorkspace() {
           onSubmitWrapup={submitWrapup}
         />
 
-        <GrowthCallWorkspaceIntelligenceRail leadContext={leadContext} />
+        <GrowthCallWorkspaceIntelligenceRail
+          leadContext={leadContext}
+          nativeSessionId={activeSession?.id ?? null}
+          sessionPhone={activeSession?.phoneNumber ?? phone}
+          onLeadAttached={(leadId, session) => {
+            void loadLeadContext(leadId)
+            setLeadLinked(true)
+            setCoachingMode("lead_linked")
+            if (session) setActiveSession(session)
+            else if (activeSession) setActiveSession({ ...activeSession, leadId })
+          }}
+        />
       </div>
     </div>
   )

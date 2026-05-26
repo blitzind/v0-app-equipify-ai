@@ -29,6 +29,7 @@ import type {
   NativeCallWrapupPublicView,
   NativeCallWorkspaceSessionPublicView,
 } from "@/lib/growth/native-dialer/native-dialer-types"
+import type { CallWorkspaceCoachingMode } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import { NATIVE_DIALER_PROVIDER_LABELS } from "@/lib/growth/native-dialer/native-dialer-types"
 import { cn } from "@/lib/utils"
 
@@ -129,6 +130,8 @@ export function GrowthCallWorkspaceCenterPanel({
   markingBridgeStarted,
   submittingWrapup,
   coachingStartSignal,
+  coachingMode,
+  leadLinked,
   onAnswer,
   onDecline,
   onEndCall,
@@ -144,6 +147,8 @@ export function GrowthCallWorkspaceCenterPanel({
   markingBridgeStarted?: boolean
   submittingWrapup?: boolean
   coachingStartSignal?: number
+  coachingMode: CallWorkspaceCoachingMode
+  leadLinked: boolean
   onAnswer: () => void
   onDecline: () => void
   onEndCall: () => void
@@ -213,7 +218,13 @@ export function GrowthCallWorkspaceCenterPanel({
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         {phase === "idle" ? (
           <>
-            <GrowthCallWorkspaceLiveCoachingPanel phase="idle" leadId={null} nativeSessionId={null} />
+            <GrowthCallWorkspaceLiveCoachingPanel
+              phase="idle"
+              nativeSessionId={null}
+              sessionLeadId={null}
+              coachingMode="transcript_only"
+              leadLinked={false}
+            />
             <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-border/60 px-4 py-3 text-center text-sm text-muted-foreground dark:border-white/10">
               <Headphones className="size-4 shrink-0" />
               <span>No active call — select a lead or dial a number to get started.</span>
@@ -233,8 +244,10 @@ export function GrowthCallWorkspaceCenterPanel({
             />
             <GrowthCallWorkspaceLiveCoachingPanel
               phase="incoming"
-              leadId={activeSession.leadId}
               nativeSessionId={activeSession.id}
+              sessionLeadId={activeSession.leadId}
+              coachingMode={coachingMode}
+              leadLinked={leadLinked}
             />
           </>
         ) : null}
@@ -251,8 +264,10 @@ export function GrowthCallWorkspaceCenterPanel({
             />
             <GrowthCallWorkspaceLiveCoachingPanel
               phase="bridge_pending"
-              leadId={activeSession.leadId}
               nativeSessionId={activeSession.id}
+              sessionLeadId={activeSession.leadId}
+              coachingMode={coachingMode}
+              leadLinked={leadLinked}
               startSignal={coachingStartSignal}
             />
           </>
@@ -263,8 +278,10 @@ export function GrowthCallWorkspaceCenterPanel({
             <ActiveCallHeader session={activeSession} elapsed={elapsed} externalBridge={externalBridge} />
             <GrowthCallWorkspaceLiveCoachingPanel
               phase="active"
-              leadId={activeSession.leadId}
               nativeSessionId={activeSession.id}
+              sessionLeadId={activeSession.leadId}
+              coachingMode={coachingMode}
+              leadLinked={leadLinked}
               startSignal={coachingStartSignal}
             />
             <Textarea
@@ -281,8 +298,10 @@ export function GrowthCallWorkspaceCenterPanel({
           <>
             <GrowthCallWorkspaceLiveCoachingPanel
               phase="wrapup"
-              leadId={activeSession.leadId}
               nativeSessionId={activeSession.id}
+              sessionLeadId={activeSession.leadId}
+              coachingMode={coachingMode}
+              leadLinked={leadLinked}
             />
             <GrowthPostCallWrapup session={activeSession} submitting={submittingWrapup} onSubmit={onSubmitWrapup} embedded />
           </>

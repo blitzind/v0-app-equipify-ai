@@ -6,6 +6,12 @@ import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { GROWTH_CALL_DIALER_SAFETY_COPY } from "@/lib/growth/call-workflow-copy"
 import type { GrowthLiveCoachingState, GrowthLiveGuidanceEvent } from "@/lib/growth/live-guidance/live-guidance-types"
+import {
+  CALL_WORKSPACE_COACHING_NO_LEAD_COPY,
+  CALL_WORKSPACE_TRANSCRIPT_ONLY_COACHING_COPY,
+  GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER,
+  type CallWorkspaceCoachingMode,
+} from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import { GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER } from "@/lib/growth/native-dialer/native-dialer-types"
 import type { GrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-types"
 
@@ -24,28 +30,38 @@ function GuidanceRow({ event }: { event: GrowthLiveGuidanceEvent }) {
   )
 }
 
+type WorkspaceCoachingPayload = {
+  coachingLeadId: string
+  sessionLeadId: string | null
+  coachingMode: CallWorkspaceCoachingMode
+  leadLinked: boolean
+  realtimeSession: GrowthRealtimeCallSession | null
+  coachingState: GrowthLiveCoachingState | null
+}
+
 export function GrowthCallWorkspaceLiveCoachingPanel({
   phase,
-  leadId,
   nativeSessionId,
+  sessionLeadId,
+  coachingMode,
+  leadLinked,
   startSignal,
 }: {
   phase: "idle" | "incoming" | "bridge_pending" | "active" | "wrapup"
-  leadId: string | null
   nativeSessionId: string | null
+  sessionLeadId: string | null
+  coachingMode: CallWorkspaceCoachingMode
+  leadLinked: boolean
   startSignal?: number
 }) {
-  const [sessions, setSessions] = useState<GrowthRealtimeCallSession[]>([])
-  const [coachingState, setCoachingState] = useState<GrowthLiveCoachingState | null>(null)
-  const [guidanceEvents, setGuidanceEvents] = useState<GrowthLiveGuidanceEvent[]>([])
+  const [coachingPayload, setCoachingPayload] = useState<WorkspaceCoachingPayload | null>(null)
   const [loading, setLoading] = useState(false)
   const [acting, setActing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const activeRealtimeSession = useMemo(
-    () => sessions.find((session) => ["preparing", "active", "paused"].includes(session.status)) ?? null,
-    [sessions],
-  )
+  const activeRealtimeSession = coachingPayload?.realtimeSession ?? null
+  const coachingState = coachingPayload?.coachingState ?? null
+  const guidanceEvents = coachingState?.activeGuidance ?? []
 
   const coachingActive = activeRealtimeSession?.status === "active"
   const coachingListening =
@@ -53,102 +69,57 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
     (activeRealtimeSession?.transcriptStatus === "live" ||
       activeRealtimeSession?.browserAudioCaptureStatus === "active")
 
+  const canStartCoaching = (phase === "bridge_pending" || phase === "active") && Boolean(nativeSessionId)
+
   const loadCoaching = useCallback(async () => {
-    if (!leadId || (phase !== "active" && phase !== "bridge_pending")) {
-      setSessions([])
-      setCoachingState(null)
-      setGuidanceEvents([])
+    if (!nativeSessionId || (phase !== "active" && phase !== "bridge_pending")) {
+      setCoachingPayload(null)
       return
     }
 
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/platform/growth/leads/${leadId}/realtime-call/sessions`, { cache: "no-store" })
+      const res = await fetch(`/api/platform/growth/calls/sessions/${nativeSessionId}/live-coaching`, {
+        cache: "no-store",
+      })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
-        sessions?: GrowthRealtimeCallSession[]
+        coaching?: WorkspaceCoachingPayload
         message?: string
       }
-      if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not load live coaching sessions.")
-
-      const nextSessions = data.sessions ?? []
-      setSessions(nextSessions)
-      const current = nextSessions.find((session) => ["preparing", "active", "paused"].includes(session.status))
-      if (!current) {
-        setCoachingState(null)
-        setGuidanceEvents([])
-        return
+      if (!res.ok || !data.ok || !data.coaching) {
+        throw new Error(data.message ?? "Could not load live coaching.")
       }
-
-      const detailRes = await fetch(
-        `/api/platform/growth/leads/${leadId}/realtime-call/sessions/${current.id}`,
-        { cache: "no-store" },
-      )
-      const detail = (await detailRes.json().catch(() => ({}))) as {
-        ok?: boolean
-        coachingState?: GrowthLiveCoachingState | null
-        message?: string
-      }
-      if (detailRes.ok && detail.ok) {
-        setCoachingState(detail.coachingState ?? null)
-        setGuidanceEvents(detail.coachingState?.activeGuidance ?? [])
-      }
+      setCoachingPayload(data.coaching)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Live coaching load failed.")
     } finally {
       setLoading(false)
     }
-  }, [leadId, phase])
+  }, [nativeSessionId, phase])
 
   useEffect(() => {
     void loadCoaching()
-  }, [loadCoaching, nativeSessionId])
-
-  useEffect(() => {
-    if (!startSignal || !leadId) return
-    if (phase !== "bridge_pending" && phase !== "active") return
-    void startCoaching()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- explicit operator trigger via startSignal
-  }, [startSignal])
+  }, [loadCoaching, sessionLeadId, coachingMode, leadLinked])
 
   async function startCoaching() {
-    if (!leadId) return
+    if (!nativeSessionId) return
     setActing(true)
     setError(null)
     try {
-      let session = sessions.find((item) => ["preparing", "active", "paused"].includes(item.status)) ?? null
-
-      if (!session) {
-        const createRes = await fetch(`/api/platform/growth/leads/${leadId}/realtime-call/sessions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        })
-        const createData = (await createRes.json().catch(() => ({}))) as { ok?: boolean; message?: string }
-        if (!createRes.ok || !createData.ok) throw new Error(createData.message ?? "Could not create coaching session.")
+      const res = await fetch(`/api/platform/growth/calls/sessions/${nativeSessionId}/live-coaching`, {
+        method: "POST",
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        coaching?: WorkspaceCoachingPayload
+        message?: string
       }
-
-      await loadCoaching()
-      const refreshed = await fetch(`/api/platform/growth/leads/${leadId}/realtime-call/sessions`, { cache: "no-store" })
-      const refreshedData = (await refreshed.json().catch(() => ({}))) as { sessions?: GrowthRealtimeCallSession[] }
-      session =
-        refreshedData.sessions?.find((item) => ["preparing", "active", "paused"].includes(item.status)) ?? null
-
-      if (session && (session.status === "preparing" || session.status === "paused")) {
-        const startRes = await fetch(
-          `/api/platform/growth/leads/${leadId}/realtime-call/sessions/${session.id}`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "start" }),
-          },
-        )
-        const startData = (await startRes.json().catch(() => ({}))) as { ok?: boolean; message?: string }
-        if (!startRes.ok || !startData.ok) throw new Error(startData.message ?? "Could not start live coaching.")
+      if (!res.ok || !data.ok || !data.coaching) {
+        throw new Error(data.message ?? "Could not start live coaching.")
       }
-
-      await loadCoaching()
+      setCoachingPayload(data.coaching)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start coaching.")
     } finally {
@@ -156,11 +127,24 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
     }
   }
 
+  useEffect(() => {
+    if (!startSignal || !nativeSessionId) return
+    if (phase !== "bridge_pending" && phase !== "active") return
+    void startCoaching()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- explicit operator trigger via startSignal
+  }, [startSignal])
+
+  const modeLabel = useMemo(() => {
+    if (leadLinked || coachingMode === "lead_linked") return "Lead-linked intelligence"
+    return "Transcript-only guidance"
+  }, [coachingMode, leadLinked])
+
   if (phase === "idle" || phase === "incoming") {
     return (
       <div
         className="flex flex-1 flex-col rounded-2xl border border-dashed border-emerald-500/30 bg-emerald-500/5 p-5 dark:border-emerald-400/20 dark:bg-emerald-400/5"
         data-qa-marker={GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER}
+        data-google-voice-bridge-coaching-qa-marker={GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER}
       >
         <div className="flex items-start gap-3">
           <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
@@ -176,8 +160,8 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
         </div>
         <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
           <li>• Operator-controlled only — no autonomous capture</li>
-          <li>• Live Coaching starts after capture begins</li>
-          <li>• Objections, responses, and buying signals surface in this panel</li>
+          <li>• Works with or without a linked lead (transcript-only mode)</li>
+          <li>• Objections, sentiment, talk ratio, and buying signals surface in this panel</li>
         </ul>
         <GrowthBadge label="Standby" tone="neutral" className="mt-4 w-fit" />
       </div>
@@ -189,43 +173,15 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
       <div
         className="rounded-2xl border border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground dark:border-white/5"
         data-qa-marker={GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER}
+        data-google-voice-bridge-coaching-qa-marker={GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER}
       >
         Live Coaching paused for operator wrap-up. Complete wrap-up to start the next call.
       </div>
     )
   }
 
-  if (phase === "bridge_pending") {
-    return (
-      <div
-        className="rounded-2xl border border-border/60 bg-muted/20 p-4 dark:border-white/5"
-        data-qa-marker={GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h4 className="font-semibold">Live Coaching</h4>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Available through browser capture once you start coaching from the bridge panel.
-            </p>
-          </div>
-          <GrowthBadge label={coachingActive ? "Active" : "Standby"} tone={coachingActive ? "healthy" : "neutral"} />
-        </div>
-        {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
-        {acting ? (
-          <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            Starting Live Coaching…
-          </p>
-        ) : null}
-      </div>
-    )
-  }
-
-  return (
-    <div
-      className="flex min-h-0 flex-1 flex-col rounded-2xl border border-border/70 bg-background/50 p-4 dark:border-white/10 dark:bg-white/[0.02]"
-      data-qa-marker={GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER}
-    >
+  const bridgeOrActivePanel = (
+    <>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Sparkles className="size-4 text-emerald-600 dark:text-emerald-400" />
@@ -238,12 +194,19 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <GrowthBadge label={modeLabel} tone={leadLinked ? "healthy" : "attention"} />
           <GrowthBadge
             label={coachingActive ? "Active" : "Standby"}
             tone={coachingActive ? "healthy" : "neutral"}
           />
           {!coachingActive ? (
-            <Button type="button" size="sm" disabled={!leadId || acting} onClick={() => void startCoaching()}>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!canStartCoaching || acting}
+              data-qa-action="call-workspace-start-coaching"
+              onClick={() => void startCoaching()}
+            >
               {acting ? (
                 <>
                   <Loader2 className="mr-2 size-4 animate-spin" />
@@ -260,16 +223,18 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
         </div>
       </div>
 
-      {!leadId ? (
-        <p className="text-sm text-muted-foreground">
-          Link a lead to this call to enable Live Coaching. Dial from the queue or open a lead in the workspace.
-        </p>
+      {!leadLinked && !sessionLeadId ? (
+        <p className="mb-2 text-sm text-muted-foreground">{CALL_WORKSPACE_COACHING_NO_LEAD_COPY}</p>
+      ) : null}
+
+      {!leadLinked && !sessionLeadId ? (
+        <p className="mb-2 text-xs text-muted-foreground">{CALL_WORKSPACE_TRANSCRIPT_ONLY_COACHING_COPY}</p>
       ) : null}
 
       {error ? <p className="mb-2 text-sm text-destructive">{error}</p> : null}
 
       {loading ? (
-        <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
+        <div className="flex flex-1 items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
           Loading coaching…
         </div>
@@ -304,8 +269,8 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
                 <p className="text-sm font-medium">No guidance yet</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {coachingActive
-                    ? "Guidance appears as transcript events are captured. Start browser mic capture from the lead drawer for audio."
-                    : "Live Coaching starts after capture begins. Click Start Coaching, then enable mic/meeting capture."}
+                    ? "Guidance appears as transcript events are captured. Enable browser mic capture when ready."
+                    : "Click Start Coaching, then enable mic/meeting capture for transcript guidance."}
                 </p>
               </div>
             ) : (
@@ -320,6 +285,28 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
           <p className="text-xs leading-relaxed text-muted-foreground">{GROWTH_CALL_DIALER_SAFETY_COPY}</p>
         </div>
       )}
+    </>
+  )
+
+  if (phase === "bridge_pending") {
+    return (
+      <div
+        className="rounded-2xl border border-border/60 bg-muted/20 p-4 dark:border-white/5"
+        data-qa-marker={GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER}
+        data-google-voice-bridge-coaching-qa-marker={GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER}
+      >
+        {bridgeOrActivePanel}
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="flex min-h-0 flex-1 flex-col rounded-2xl border border-border/70 bg-background/50 p-4 dark:border-white/10 dark:bg-white/[0.02]"
+      data-qa-marker={GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER}
+      data-google-voice-bridge-coaching-qa-marker={GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER}
+    >
+      {bridgeOrActivePanel}
     </div>
   )
 }
