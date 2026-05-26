@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Bookmark, Loader2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CompanyResultCard } from "@/components/growth/prospect-search/company-result-card"
+import { DiscoveryModeToggle } from "@/components/growth/prospect-search/discovery-mode-toggle"
 import { GuidedIcpBuilder } from "@/components/growth/prospect-search/guided-icp-builder"
 import { IcpTemplateRail } from "@/components/growth/prospect-search/icp-template-rail"
 import { PersonResultCard } from "@/components/growth/prospect-search/person-result-card"
@@ -20,6 +21,7 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-admin-types"
 import type {
   GrowthProspectSearchCompanyResult,
+  GrowthProspectSearchDiscoveryMode,
   GrowthProspectSearchFilters,
   GrowthProspectSearchListRow,
   GrowthProspectSearchPersonResult,
@@ -47,6 +49,8 @@ export function ProspectSearchShell() {
   const [heroFocused, setHeroFocused] = useState(false)
   const [placeholderIndex, setPlaceholderIndex] = useState(0)
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
+  const [discoveryMode, setDiscoveryMode] =
+    useState<GrowthProspectSearchDiscoveryMode>("internal")
 
   const heroPlaceholder = useMemo(
     () => rotateHeroPlaceholder(placeholderIndex),
@@ -70,6 +74,9 @@ export function ProspectSearchShell() {
       setActionMessage(null)
       try {
         const params = new URLSearchParams({ meta: "1", q })
+        if (discoveryMode === "discover_external") {
+          params.set("mode", "discover_external")
+        }
         if (Object.keys(filters).length > 0) {
           params.set("filters", JSON.stringify(filters))
         }
@@ -98,7 +105,7 @@ export function ProspectSearchShell() {
         setLoading(false)
       }
     },
-    [query, filters],
+    [query, filters, discoveryMode],
   )
 
   useEffect(() => {
@@ -170,8 +177,13 @@ export function ProspectSearchShell() {
       <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-violet-50/80 via-card to-cyan-50/50 p-6 shadow-sm dark:from-violet-950/30 dark:to-cyan-950/20">
         <h2 className="text-lg font-semibold tracking-tight sm:text-xl">Discover your ideal customer profile</h2>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Search observable Growth Engine + CRM records. No scraping, no outbound — infrastructure-backed discovery.
+          {discoveryMode === "internal"
+            ? "Search observable Growth Engine + CRM records. No scraping, no outbound."
+            : "Discover new companies via external provider slots (fixture/manual v1). Candidates are not automatic leads."}
         </p>
+        <div className="mt-4">
+          <DiscoveryModeToggle mode={discoveryMode} onChange={setDiscoveryMode} />
+        </div>
         <div className="relative mt-5">
           <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -247,10 +259,16 @@ export function ProspectSearchShell() {
                 Results
                 {result ? (
                   <span className="ml-2 font-normal text-muted-foreground">
-                    {companies.length} companies · {people.length} contacts
+                    {companies.length} companies
+                    {result.discovery_mode === "internal" ? ` · ${people.length} contacts` : " · external discovery"}
                   </span>
                 ) : null}
               </h2>
+              {result?.provider_messages && result.provider_messages.length > 0 ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {result.provider_messages.join(" · ")}
+                </p>
+              ) : null}
             </div>
             <div className="flex items-center gap-2">
               <SearchViewToggle view={view} onViewChange={setView} />

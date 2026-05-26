@@ -10,7 +10,16 @@ export const GROWTH_PROSPECT_SEARCH_SOURCE_TYPES = [
   "lead_inbox",
   "crm_prospect",
   "crm_customer",
+  "external_discovered",
 ] as const
+
+export const GROWTH_PROSPECT_SEARCH_DISCOVERY_MODES = [
+  "internal",
+  "discover_external",
+] as const
+
+export type GrowthProspectSearchDiscoveryMode =
+  (typeof GROWTH_PROSPECT_SEARCH_DISCOVERY_MODES)[number]
 
 export type GrowthProspectSearchSourceType = (typeof GROWTH_PROSPECT_SEARCH_SOURCE_TYPES)[number]
 
@@ -146,6 +155,7 @@ export type GrowthProspectSearchPersonResult = {
 
 export type GrowthProspectSearchResult = {
   qa_marker: typeof GROWTH_PROSPECT_SEARCH_QA_MARKER
+  discovery_mode: GrowthProspectSearchDiscoveryMode
   query: string
   parsed_query: GrowthProspectSearchParsedQuery
   filters: GrowthProspectSearchFilters
@@ -154,6 +164,8 @@ export type GrowthProspectSearchResult = {
   total_companies: number
   total_people: number
   source_counts: Record<GrowthProspectSearchSourceType, number>
+  external_discovery_run_id?: string | null
+  provider_messages?: string[]
 }
 
 export type GrowthProspectSearchSavedSearchRow = {

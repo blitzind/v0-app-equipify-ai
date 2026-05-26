@@ -90,9 +90,13 @@ export async function executeProspectSearchAction(
       "prospect_search",
       company.source_type,
       company.id,
+      company.website ?? "",
     ])
     const result = await createLeadCandidate(admin, {
-      site_key: "prospect_search",
+      site_key:
+        company.source_type === "external_discovered"
+          ? "prospect_search_external_discovery"
+          : "prospect_search",
       candidate_type: "identified",
       candidate_priority: "normal",
       intent_score: company.intent_score ?? 0,
@@ -103,7 +107,9 @@ export async function executeProspectSearchAction(
       domain: company.website,
       dedupe_hash,
       candidate_reasoning: [
-        "Manual push from Prospect Search — operator-initiated, not autonomous outreach.",
+        company.source_type === "external_discovered"
+          ? "Manual push from external company discovery — candidate is not an automatic lead."
+          : "Manual push from Prospect Search — operator-initiated, not autonomous outreach.",
         ...company.match_reasoning.slice(0, 3),
       ],
       candidate_evidence:

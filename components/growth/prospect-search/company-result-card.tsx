@@ -55,6 +55,11 @@ export function CompanyResultCard({
                 {row.industry}
               </Badge>
             ) : null}
+            {row.source_type === "external_discovered" ? (
+              <Badge variant="secondary" className="text-[10px]">
+                External
+              </Badge>
+            ) : null}
             {row.location ? (
               <Badge variant="outline" className="text-[10px]">
                 {row.location}

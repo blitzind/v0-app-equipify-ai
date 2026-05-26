@@ -21,12 +21,16 @@ import {
 } from "../lib/growth/prospect-search/prospect-search-provider"
 import { rankProspectSearchCompanies } from "../lib/growth/prospect-search/prospect-search-ranking"
 import {
+  GROWTH_PROSPECT_SEARCH_DISCOVERY_MODES,
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS,
+  GROWTH_PROSPECT_SEARCH_SOURCE_TYPES,
 } from "../lib/growth/prospect-search/prospect-search-types"
 
 async function main(): Promise<void> {
   assert.equal(GROWTH_PROSPECT_SEARCH_QA_MARKER, "growth-prospect-search-v1")
+  assert.ok(GROWTH_PROSPECT_SEARCH_SOURCE_TYPES.includes("external_discovered"))
+  assert.ok(GROWTH_PROSPECT_SEARCH_DISCOVERY_MODES.includes("discover_external"))
   assert.ok(GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS.includes("export_csv"))
   assert.ok(GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS.includes("push_to_lead_inbox"))
 
@@ -65,6 +69,7 @@ async function main(): Promise<void> {
   assert.match(pageSource, /GrowthProspectSearchAdmin/)
   assert.match(pageSource, /Prospect Search/)
   assert.match(pageSource, /GROWTH_PROSPECT_SEARCH_UX_QA_MARKER/)
+  assert.match(pageSource, /GROWTH_EXTERNAL_COMPANY_DISCOVERY_QA_MARKER/)
 
   const shellSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/prospect-search-shell.tsx"),
@@ -76,6 +81,8 @@ async function main(): Promise<void> {
   assert.match(shellSource, /CompanyResultCard/)
   assert.doesNotMatch(shellSource, /runLeadEnginePipeline/)
   assert.match(shellSource, /data-ux-marker/)
+  assert.match(shellSource, /DiscoveryModeToggle/)
+  assert.match(shellSource, /mode.*discover_external|discover_external/)
 
   const suggestionSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/search-suggestion-engine.ts"),

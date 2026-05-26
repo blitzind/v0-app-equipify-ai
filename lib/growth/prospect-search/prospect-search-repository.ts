@@ -16,9 +16,11 @@ import {
   rankProspectSearchCompanies,
   rankProspectSearchPeople,
 } from "@/lib/growth/prospect-search/prospect-search-ranking"
+import { runProspectSearchExternalDiscovery } from "@/lib/growth/prospect-search/prospect-search-external-discovery"
 import {
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_SOURCE_TYPES,
+  type GrowthProspectSearchDiscoveryMode,
   type GrowthProspectSearchFilters,
   type GrowthProspectSearchResult,
   type GrowthProspectSearchSourceType,
@@ -28,6 +30,8 @@ export type RunProspectSearchInput = {
   query: string
   filters?: Partial<GrowthProspectSearchFilters>
   limit?: number
+  discovery_mode?: GrowthProspectSearchDiscoveryMode
+  created_by?: string | null
 }
 
 export async function runProspectSearch(
@@ -38,6 +42,39 @@ export async function runProspectSearch(
   const mergedFilters = normalizeProspectSearchFilters(
     mergeParsedQueryIntoFilters(parsed, input.filters ?? {}) as GrowthProspectSearchFilters,
   )
+
+  const discovery_mode = input.discovery_mode ?? "internal"
+
+  if (discovery_mode === "discover_external") {
+    const external = await runProspectSearchExternalDiscovery(admin, {
+      query: input.query,
+      filters: mergedFilters,
+      created_by: input.created_by,
+      limit: input.limit ?? 50,
+    })
+
+    const source_counts = Object.fromEntries(
+      GROWTH_PROSPECT_SEARCH_SOURCE_TYPES.map((t) => [t, 0]),
+    ) as Record<GrowthProspectSearchSourceType, number>
+    for (const c of external.companies) {
+      source_counts[c.source_type] = (source_counts[c.source_type] ?? 0) + 1
+    }
+
+    return {
+      qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
+      discovery_mode,
+      query: input.query,
+      parsed_query: parsed,
+      filters: mergedFilters,
+      companies: external.companies,
+      people: [],
+      total_companies: external.companies.length,
+      total_people: 0,
+      source_counts,
+      external_discovery_run_id: external.discovery_run_id,
+      provider_messages: external.provider_messages,
+    }
+  }
 
   const provider = createInternalProspectSearchProvider()
   provider.describe()
@@ -72,6 +109,7 @@ export async function runProspectSearch(
 
   return {
     qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
+    discovery_mode: "internal",
     query: input.query,
     parsed_query: parsed,
     filters: mergedFilters,

@@ -11,6 +11,7 @@ const SIGNAL_STYLES: Record<string, string> = {
   "Vendor Evaluation": "bg-indigo-50 text-indigo-900 border-indigo-200",
   "Search Intent": "bg-cyan-50 text-cyan-900 border-cyan-200",
   "Purchase Ready": "bg-emerald-50 text-emerald-900 border-emerald-200",
+  "External discovery": "bg-orange-50 text-orange-900 border-orange-200",
 }
 
 function inferBadges(row: GrowthProspectSearchCompanyResult): string[] {
@@ -29,6 +30,7 @@ function inferBadges(row: GrowthProspectSearchCompanyResult): string[] {
   if (badges.length === 0 && row.intent_score != null && row.intent_score >= 12) {
     badges.push("Search Intent")
   }
+  if (row.source_type === "external_discovered") badges.unshift("External discovery")
 
   return [...new Set(badges)].slice(0, 4)
 }

@@ -11,6 +11,7 @@ import {
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import {
+  GROWTH_EXTERNAL_COMPANY_DISCOVERY_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_UX_QA_MARKER,
 } from "@/lib/growth/prospect-search/prospect-search-admin-types"
@@ -39,7 +40,8 @@ export default function AdminGrowthProspectSearchPage() {
                 Apollo-style discovery over your Growth Engine index — ICP filters, saved searches, lists, and operator actions. Infrastructure only; no scraping or outbound.
               </p>
               <p className="mt-1 font-mono text-xs text-muted-foreground">
-                {GROWTH_PROSPECT_SEARCH_QA_MARKER} · {GROWTH_PROSPECT_SEARCH_UX_QA_MARKER}
+                {GROWTH_PROSPECT_SEARCH_QA_MARKER} · {GROWTH_PROSPECT_SEARCH_UX_QA_MARKER} ·{" "}
+                {GROWTH_EXTERNAL_COMPANY_DISCOVERY_QA_MARKER}
               </p>
             </div>
           </div>

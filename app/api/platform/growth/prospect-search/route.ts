@@ -33,7 +33,15 @@ export async function GET(request: Request) {
   const filters = parseFiltersParam(url.searchParams.get("filters"))
   const includeMeta = url.searchParams.get("meta") === "1"
 
-  const result = await runProspectSearch(access.admin, { query, filters })
+  const discovery_mode =
+    url.searchParams.get("mode") === "discover_external" ? "discover_external" : "internal"
+
+  const result = await runProspectSearch(access.admin, {
+    query,
+    filters,
+    discovery_mode,
+    created_by: access.userId,
+  })
 
   if (!includeMeta) {
     return NextResponse.json({ ok: true, ...result })
