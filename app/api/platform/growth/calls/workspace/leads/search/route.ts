@@ -5,11 +5,33 @@ import { GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER } from "@/lib/growth/native-
 
 export const runtime = "nodejs"
 
+function readSearchQuery(request: Request): string {
+  const params = new URL(request.url).searchParams
+  return (params.get("q") ?? params.get("query") ?? "").trim()
+}
+
 export async function GET(request: Request) {
   const access = await requireGrowthEnginePlatformAccess()
-  if (!access.ok) return access.response
+  if (!access.ok) {
+    const body = await access.response.json().catch(() => ({}))
+    return NextResponse.json(
+      {
+        ok: false,
+        qaMarker: GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER,
+        error: (body as { error?: string }).error ?? "access_denied",
+        message: (body as { message?: string }).message ?? "Access denied.",
+        results: [],
+        leads: [],
+      },
+      { status: access.response.status },
+    )
+  }
 
-  const q = new URL(request.url).searchParams.get("q")?.trim() ?? ""
+  const q = readSearchQuery(request)
+  const debug =
+    new URL(request.url).searchParams.get("debug") === "1" &&
+    process.env.NODE_ENV !== "production"
+
   if (q.length < 2) {
     return NextResponse.json({
       ok: true,
@@ -35,7 +57,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { results, diagnostics } = await searchCallWorkspaceLeads(access.admin, q)
+    const { results, diagnostics } = await searchCallWorkspaceLeads(access.admin, q, { debug })
     return NextResponse.json({
       ok: true,
       qaMarker: GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER,
@@ -45,6 +67,16 @@ export async function GET(request: Request) {
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : "Search failed."
-    return NextResponse.json({ error: "search_failed", message }, { status: 500 })
+    return NextResponse.json(
+      {
+        ok: false,
+        qaMarker: GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER,
+        error: "search_failed",
+        message,
+        results: [],
+        leads: [],
+      },
+      { status: 500 },
+    )
   }
 }

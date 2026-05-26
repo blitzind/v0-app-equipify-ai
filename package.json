@@ -137,6 +137,8 @@
     "test:growth-native-dialer-lead-search": "tsx scripts/test-growth-native-dialer-lead-search.ts",
     "test:growth-lead-engine-icp-targeting": "tsx scripts/test-growth-lead-engine-icp-targeting.ts",
     "test:growth-lead-engine-company-discovery": "tsx scripts/test-growth-lead-engine-company-discovery.ts",
+    "test:growth-lead-engine-decision-maker-hypothesis": "tsx scripts/test-growth-lead-engine-decision-maker-hypothesis.ts",
+    "test:growth-lead-engine-contact-research": "tsx scripts/test-growth-lead-engine-contact-research.ts",
     "test:growth-native-dialer": "tsx scripts/test-growth-native-dialer.ts",
     "test:growth-native-dialer-schema-health": "tsx scripts/test-growth-native-dialer-schema-health.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",

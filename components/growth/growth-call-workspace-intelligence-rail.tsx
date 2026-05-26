@@ -108,9 +108,11 @@ export function GrowthCallWorkspaceIntelligenceRail({
   const [searchResults, setSearchResults] = useState<CallWorkspaceLeadSearchResult[]>([])
   const [searchDiagnostics, setSearchDiagnostics] = useState<CallWorkspaceLeadSearchDiagnostics | null>(null)
   const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const [attachingId, setAttachingId] = useState<string | null>(null)
   const [attachError, setAttachError] = useState<string | null>(null)
   const autoAttachRef = useRef<string | null>(null)
+  const searchRequestIdRef = useRef(0)
 
   const attachLead = useCallback(
     async (leadId: string) => {
@@ -142,41 +144,72 @@ export function GrowthCallWorkspaceIntelligenceRail({
     [nativeSessionId, onLeadAttached],
   )
 
-  const runSearch = useCallback(
-    async (query: string) => {
-      if (query.trim().length < 2) {
-        setSearchResults([])
-        setSearchDiagnostics(null)
-        return
+  const runSearch = useCallback(async (query: string) => {
+    const trimmed = query.trim()
+    if (trimmed.length < 2) {
+      setSearchResults([])
+      setSearchDiagnostics(null)
+      setSearchError(null)
+      return
+    }
+
+    const requestId = searchRequestIdRef.current + 1
+    searchRequestIdRef.current = requestId
+    const url = `/api/platform/growth/calls/workspace/leads/search?q=${encodeURIComponent(trimmed)}`
+
+    setSearching(true)
+    setSearchError(null)
+
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[native-dialer-lead-search] request", { query: trimmed, url })
+    }
+
+    try {
+      const res = await fetch(url, { cache: "no-store" })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        results?: CallWorkspaceLeadSearchResult[]
+        leads?: CallWorkspaceLeadSearchResult[]
+        diagnostics?: CallWorkspaceLeadSearchDiagnostics
+        message?: string
       }
-      setSearching(true)
-      setAttachError(null)
-      try {
-        const res = await fetch(
-          `/api/platform/growth/calls/workspace/leads/search?q=${encodeURIComponent(query.trim())}`,
-          { cache: "no-store" },
-        )
-        const data = (await res.json().catch(() => ({}))) as {
-          ok?: boolean
-          results?: CallWorkspaceLeadSearchResult[]
-          diagnostics?: CallWorkspaceLeadSearchDiagnostics
-          message?: string
-        }
-        if (!res.ok || !data.ok) throw new Error(data.message ?? "Search failed.")
-        setSearchResults(data.results ?? [])
-        setSearchDiagnostics(data.diagnostics ?? null)
-        if (data.diagnostics) {
-          console.info("[native-dialer-lead-search]", data.diagnostics)
-        }
-      } catch {
-        setSearchResults([])
-        setSearchDiagnostics(null)
-      } finally {
+
+      if (searchRequestIdRef.current !== requestId) return
+
+      const results = data.results ?? data.leads ?? []
+      const first = results[0]
+
+      if (process.env.NODE_ENV !== "production") {
+        console.info("[native-dialer-lead-search] response", {
+          query: trimmed,
+          status: res.status,
+          ok: data.ok,
+          resultCount: results.length,
+          firstCompany: first?.companyName ?? null,
+          firstContact: first?.contactName ?? null,
+        })
+      }
+
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.message ?? "Search failed.")
+      }
+
+      setSearchResults(results)
+      setSearchDiagnostics(data.diagnostics ?? null)
+      if (data.diagnostics) {
+        console.info("[native-dialer-lead-search]", data.diagnostics)
+      }
+    } catch (e) {
+      if (searchRequestIdRef.current !== requestId) return
+      setSearchResults([])
+      setSearchDiagnostics(null)
+      setSearchError(e instanceof Error ? e.message : "Search failed. Try again.")
+    } finally {
+      if (searchRequestIdRef.current === requestId) {
         setSearching(false)
       }
-    },
-    [],
-  )
+    }
+  }, [])
 
   useEffect(() => {
     const id = window.setTimeout(() => void runSearch(searchQuery), 300)
@@ -185,14 +218,30 @@ export function GrowthCallWorkspaceIntelligenceRail({
 
   useEffect(() => {
     const autoId = searchDiagnostics?.autoSelectedLeadId
-    if (!autoId || !nativeSessionId || leadContext) return
+    if (!autoId || !nativeSessionId || leadContext || searchResults.length === 0) return
     if (autoAttachRef.current === autoId) return
-    autoAttachRef.current = autoId
-    void attachLead(autoId)
-  }, [searchDiagnostics?.autoSelectedLeadId, nativeSessionId, leadContext, attachLead])
+
+    const timer = window.setTimeout(() => {
+      if (autoAttachRef.current === autoId) return
+      autoAttachRef.current = autoId
+      void attachLead(autoId)
+    }, 700)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    searchDiagnostics?.autoSelectedLeadId,
+    searchResults.length,
+    nativeSessionId,
+    leadContext,
+    attachLead,
+  ])
 
   const showEmpty =
-    searchQuery.trim().length >= 2 && !searching && searchResults.length === 0 && !attachError
+    searchQuery.trim().length >= 2 &&
+    !searching &&
+    !searchError &&
+    searchResults.length === 0 &&
+    !attachError
 
   const createProspectHref = `/admin/growth/leads?${new URLSearchParams({
     ...(searchQuery.trim() ? { companyName: searchQuery.trim() } : {}),
@@ -248,6 +297,11 @@ export function GrowthCallWorkspaceIntelligenceRail({
                     ))}
                   </ul>
                 </div>
+              ) : null}
+              {searchError ? (
+                <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                  {searchError === "Search failed." ? "Search failed. Try again." : searchError}
+                </p>
               ) : null}
               {showEmpty ? (
                 <div className="rounded-lg border border-dashed border-border/70 px-3 py-4 text-center dark:border-white/10">

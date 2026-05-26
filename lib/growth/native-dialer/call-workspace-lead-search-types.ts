@@ -35,6 +35,18 @@ export type CallWorkspaceLeadSearchSourceCounts = {
   relationship_memory: number
 }
 
+export type CallWorkspaceLeadSearchDebugSource = {
+  name: string
+  count: number
+  error: string | null
+}
+
+export type CallWorkspaceLeadSearchDebugDiagnostics = {
+  sources: CallWorkspaceLeadSearchDebugSource[]
+  mergedCount: number
+  autoSelectedLeadId: string | null
+}
+
 export type CallWorkspaceLeadSearchDiagnostics = {
   qaMarker: typeof GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER
   query: string
@@ -42,4 +54,5 @@ export type CallWorkspaceLeadSearchDiagnostics = {
   matchedEntityTypes: CallWorkspaceLeadSearchEntityType[]
   resultCount: number
   autoSelectedLeadId: string | null
+  debug?: CallWorkspaceLeadSearchDebugDiagnostics
 }

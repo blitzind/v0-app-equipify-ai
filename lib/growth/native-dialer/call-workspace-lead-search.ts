@@ -10,6 +10,7 @@ import {
 } from "@/lib/growth/import/normalize"
 import { probeGrowthLeadArchiveSchema } from "@/lib/growth/lead-archive-schema-health"
 import type {
+  CallWorkspaceLeadSearchDebugSource,
   CallWorkspaceLeadSearchDiagnostics,
   CallWorkspaceLeadSearchEntityType,
   CallWorkspaceLeadSearchResult,
@@ -22,6 +23,29 @@ export { GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER } from "@/lib/growth/native-
 
 const LEAD_SELECT =
   "id, company_name, contact_name, contact_email, contact_phone, website, source_kind, relationship_summary, promoted_prospect_id, archived_at, status"
+
+const GROWTH_LEAD_ILIKE_FIELDS = [
+  "company_name",
+  "contact_name",
+  "contact_email",
+  "contact_phone",
+  "website",
+  "city",
+  "state",
+  "relationship_summary",
+  "notes",
+  "external_ref",
+] as const
+
+const DECISION_MAKER_ILIKE_FIELDS = ["full_name", "email", "title", "phone"] as const
+
+const PROSPECT_ILIKE_FIELDS = [
+  "company_name",
+  "contact_name",
+  "contact_email",
+  "contact_phone",
+  "website",
+] as const
 
 type LeadRow = {
   id: string
@@ -37,12 +61,35 @@ type LeadRow = {
   status: string | null
 }
 
-function escapePostgrestIlikeValue(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_").replace(/,/g, "")
+export type CallWorkspaceLeadSearchOptions = {
+  debug?: boolean
 }
 
-function buildIlikePattern(query: string): string {
-  return `%${escapePostgrestIlikeValue(query.trim())}%`
+/** Strip ilike metacharacters; commas break PostgREST `or()` parsing. */
+export function sanitizeCallWorkspaceSearchQuery(raw: string): string {
+  return raw
+    .trim()
+    .slice(0, 80)
+    .replace(/%/g, "")
+    .replace(/\\/g, "")
+    .replace(/,/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+export function buildCallWorkspaceIlikePattern(query: string): string {
+  const sanitized = sanitizeCallWorkspaceSearchQuery(query)
+  return sanitized ? `%${sanitized}%` : "%"
+}
+
+function safeSourceErrorLabel(error: { code?: string; message?: string } | null | undefined): string {
+  if (!error) return "query_failed"
+  const code = error.code?.trim()
+  if (code) return code
+  const message = (error.message ?? "").toLowerCase()
+  if (message.includes("column")) return "column_error"
+  if (message.includes("syntax")) return "syntax_error"
+  return "query_failed"
 }
 
 function scoreTextMatch(input: {
@@ -51,7 +98,7 @@ function scoreTextMatch(input: {
   exactBoost?: number
   containsBoost?: number
 }): { confidence: number; matchedField: string } | null {
-  const needle = input.query.trim().toLowerCase()
+  const needle = sanitizeCallWorkspaceSearchQuery(input.query).toLowerCase()
   const hay = (input.value ?? "").trim().toLowerCase()
   if (!needle || !hay) return null
   if (hay === needle) {
@@ -107,61 +154,23 @@ function upsertResult(
   }
 }
 
-async function applyLeadArchiveFilter(
-  admin: SupabaseClient,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  query: any,
-) {
-  const probe = await probeGrowthLeadArchiveSchema(admin)
-  return probe.archiveColumns ? query.is("archived_at", null) : query.neq("status", "archived")
-}
-
-async function searchGrowthLeads(
-  admin: SupabaseClient,
+function ingestLeadRows(
+  map: Map<string, CallWorkspaceLeadSearchResult>,
+  rows: LeadRow[],
   query: string,
-  phoneDigits: string | null,
-): Promise<{ results: CallWorkspaceLeadSearchResult[]; counts: Partial<CallWorkspaceLeadSearchSourceCounts> }> {
-  const pattern = buildIlikePattern(query)
-  const orFilters = [
-    `company_name.ilike.${pattern}`,
-    `contact_name.ilike.${pattern}`,
-    `contact_email.ilike.${pattern}`,
-    `contact_phone.ilike.${pattern}`,
-    `website.ilike.${pattern}`,
-    `city.ilike.${pattern}`,
-    `state.ilike.${pattern}`,
-    `relationship_summary.ilike.${pattern}`,
-    `notes.ilike.${pattern}`,
-    `external_ref.ilike.${pattern}`,
-  ]
-  if (phoneDigits) {
-    orFilters.push(`contact_phone.ilike.%${phoneDigits}%`)
-  }
-
-  let leadQuery = admin
-    .schema("growth")
-    .from("leads")
-    .select(LEAD_SELECT)
-    .or(orFilters.join(","))
-    .order("updated_at", { ascending: false })
-    .limit(40)
-
-  leadQuery = await applyLeadArchiveFilter(admin, leadQuery)
-
-  const { data, error } = await leadQuery
-  if (error) throw new Error(error.message)
-
-  const map = new Map<string, CallWorkspaceLeadSearchResult>()
+  matchedFieldHint?: string,
+): { importCount: number; relationshipCount: number } {
   let importCount = 0
   let relationshipCount = 0
 
-  for (const row of (data ?? []) as LeadRow[]) {
+  for (const row of rows) {
     const companyMatch = scoreTextMatch({ query, value: row.company_name, exactBoost: 0.96, containsBoost: 0.88 })
     const contactMatch = scoreTextMatch({ query, value: row.contact_name, containsBoost: 0.8 })
     const emailMatch =
       normalizeEmail(query) && normalizeEmail(row.contact_email) === normalizeEmail(query)
         ? { confidence: 0.9, matchedField: "email_exact" }
         : scoreTextMatch({ query, value: row.contact_email, containsBoost: 0.78 })
+    const phoneDigits = normalizePhone(query)
     const phoneMatch =
       phoneDigits && normalizePhone(row.contact_phone) === phoneDigits
         ? { confidence: 0.9, matchedField: "phone_exact" }
@@ -183,7 +192,7 @@ async function searchGrowthLeads(
       phoneMatch ??
       websiteMatch ??
       relationshipMatch ??
-      ({ confidence: 0.7, matchedField: "db_ilike" } as const)
+      ({ confidence: 0.7, matchedField: matchedFieldHint ?? "db_ilike" } as const)
 
     const entityType: CallWorkspaceLeadSearchEntityType =
       row.source_kind === "import"
@@ -206,6 +215,82 @@ async function searchGrowthLeads(
     )
   }
 
+  return { importCount, relationshipCount }
+}
+
+async function applyLeadArchiveFilter(
+  admin: SupabaseClient,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  query: any,
+) {
+  const probe = await probeGrowthLeadArchiveSchema(admin)
+  return probe.archiveColumns ? query.is("archived_at", null) : query.neq("status", "archived")
+}
+
+async function searchGrowthLeads(
+  admin: SupabaseClient,
+  query: string,
+  phoneDigits: string | null,
+  debugSources: CallWorkspaceLeadSearchDebugSource[],
+): Promise<{ results: CallWorkspaceLeadSearchResult[]; counts: Partial<CallWorkspaceLeadSearchSourceCounts> }> {
+  const pattern = buildCallWorkspaceIlikePattern(query)
+  const map = new Map<string, CallWorkspaceLeadSearchResult>()
+  let importCount = 0
+  let relationshipCount = 0
+
+  for (const field of GROWTH_LEAD_ILIKE_FIELDS) {
+    const sourceName = `growth.leads.${field}`
+    try {
+      let leadQuery = admin
+        .schema("growth")
+        .from("leads")
+        .select(LEAD_SELECT)
+        .ilike(field, pattern)
+        .order("updated_at", { ascending: false })
+        .limit(40)
+
+      leadQuery = await applyLeadArchiveFilter(admin, leadQuery)
+      const { data, error } = await leadQuery
+      if (error) {
+        debugSources.push({ name: sourceName, count: 0, error: safeSourceErrorLabel(error) })
+        continue
+      }
+      const rows = (data ?? []) as LeadRow[]
+      debugSources.push({ name: sourceName, count: rows.length, error: null })
+      const tallies = ingestLeadRows(map, rows, query, `growth_${field}`)
+      importCount += tallies.importCount
+      relationshipCount += tallies.relationshipCount
+    } catch {
+      debugSources.push({ name: sourceName, count: 0, error: "exception" })
+    }
+  }
+
+  if (phoneDigits) {
+    const sourceName = "growth.leads.contact_phone_digits"
+    try {
+      let leadQuery = admin
+        .schema("growth")
+        .from("leads")
+        .select(LEAD_SELECT)
+        .ilike("contact_phone", `%${phoneDigits}%`)
+        .order("updated_at", { ascending: false })
+        .limit(40)
+      leadQuery = await applyLeadArchiveFilter(admin, leadQuery)
+      const { data, error } = await leadQuery
+      if (error) {
+        debugSources.push({ name: sourceName, count: 0, error: safeSourceErrorLabel(error) })
+      } else {
+        const rows = (data ?? []) as LeadRow[]
+        debugSources.push({ name: sourceName, count: rows.length, error: null })
+        const tallies = ingestLeadRows(map, rows, query, "phone_digits")
+        importCount += tallies.importCount
+        relationshipCount += tallies.relationshipCount
+      }
+    } catch {
+      debugSources.push({ name: sourceName, count: 0, error: "exception" })
+    }
+  }
+
   return {
     results: [...map.values()],
     counts: {
@@ -220,37 +305,77 @@ async function searchDecisionMakers(
   admin: SupabaseClient,
   query: string,
   phoneDigits: string | null,
+  debugSources: CallWorkspaceLeadSearchDebugSource[],
 ): Promise<{ results: CallWorkspaceLeadSearchResult[]; count: number }> {
-  const pattern = buildIlikePattern(query)
-  const orFilters = [
-    `full_name.ilike.${pattern}`,
-    `email.ilike.${pattern}`,
-    `title.ilike.${pattern}`,
-    `phone.ilike.${pattern}`,
-  ]
-  if (phoneDigits) orFilters.push(`phone.ilike.%${phoneDigits}%`)
+  const pattern = buildCallWorkspaceIlikePattern(query)
+  const dmById = new Map<string, Record<string, unknown>>()
 
-  const { data, error } = await admin
-    .schema("growth")
-    .from("lead_decision_makers")
-    .select("id, lead_id, full_name, email, phone, title")
-    .or(orFilters.join(","))
-    .not("lead_id", "is", null)
-    .limit(25)
-  if (error) return { results: [], count: 0 }
+  for (const field of DECISION_MAKER_ILIKE_FIELDS) {
+    const sourceName = `growth.lead_decision_makers.${field}`
+    try {
+      const { data, error } = await admin
+        .schema("growth")
+        .from("lead_decision_makers")
+        .select("id, lead_id, full_name, email, phone, title")
+        .ilike(field, pattern)
+        .not("lead_id", "is", null)
+        .limit(25)
+      if (error) {
+        debugSources.push({ name: sourceName, count: 0, error: safeSourceErrorLabel(error) })
+        continue
+      }
+      const rows = data ?? []
+      debugSources.push({ name: sourceName, count: rows.length, error: null })
+      for (const row of rows) {
+        dmById.set(row.id as string, row as Record<string, unknown>)
+      }
+    } catch {
+      debugSources.push({ name: sourceName, count: 0, error: "exception" })
+    }
+  }
 
-  const leadIds = [...new Set((data ?? []).map((row) => row.lead_id as string).filter(Boolean))]
+  if (phoneDigits) {
+    const sourceName = "growth.lead_decision_makers.phone_digits"
+    try {
+      const { data, error } = await admin
+        .schema("growth")
+        .from("lead_decision_makers")
+        .select("id, lead_id, full_name, email, phone, title")
+        .ilike("phone", `%${phoneDigits}%`)
+        .not("lead_id", "is", null)
+        .limit(25)
+      if (error) {
+        debugSources.push({ name: sourceName, count: 0, error: safeSourceErrorLabel(error) })
+      } else {
+        debugSources.push({ name: sourceName, count: (data ?? []).length, error: null })
+        for (const row of data ?? []) {
+          dmById.set(row.id as string, row as Record<string, unknown>)
+        }
+      }
+    } catch {
+      debugSources.push({ name: sourceName, count: 0, error: "exception" })
+    }
+  }
+
+  const leadIds = [...new Set([...dmById.values()].map((row) => row.lead_id as string).filter(Boolean))]
   if (leadIds.length === 0) return { results: [], count: 0 }
 
   let leadsQuery = admin.schema("growth").from("leads").select(LEAD_SELECT).in("id", leadIds)
   leadsQuery = await applyLeadArchiveFilter(admin, leadsQuery)
   const { data: leads, error: leadsError } = await leadsQuery
-  if (leadsError) return { results: [], count: 0 }
+  if (leadsError) {
+    debugSources.push({
+      name: "growth.leads.decision_maker_join",
+      count: 0,
+      error: safeSourceErrorLabel(leadsError),
+    })
+    return { results: [], count: 0 }
+  }
 
   const leadMap = new Map((leads ?? []).map((row) => [(row as LeadRow).id, row as LeadRow]))
   const results: CallWorkspaceLeadSearchResult[] = []
 
-  for (const dm of data ?? []) {
+  for (const dm of dmById.values()) {
     const lead = leadMap.get(dm.lead_id as string)
     if (!lead) continue
     const nameMatch = scoreTextMatch({ query, value: dm.full_name as string, containsBoost: 0.8 })
@@ -282,40 +407,58 @@ async function searchDecisionMakers(
 async function searchOutboundContacts(
   admin: SupabaseClient,
   query: string,
+  debugSources: CallWorkspaceLeadSearchDebugSource[],
 ): Promise<{ results: CallWorkspaceLeadSearchResult[]; count: number }> {
   const email = normalizeEmail(query)
   if (!email && query.trim().length < 3) return { results: [], count: 0 }
 
-  const pattern = buildIlikePattern(email ?? query)
-  const { data, error } = await admin
-    .schema("growth")
-    .from("outbound_contacts")
-    .select("lead_id, email")
-    .ilike("email", pattern)
-    .not("lead_id", "is", null)
-    .limit(20)
-  if (error) return { results: [], count: 0 }
+  const pattern = buildCallWorkspaceIlikePattern(email ?? query)
+  const sourceName = "growth.outbound_contacts.email"
+  try {
+    const { data, error } = await admin
+      .schema("growth")
+      .from("outbound_contacts")
+      .select("lead_id, email")
+      .ilike("email", pattern)
+      .not("lead_id", "is", null)
+      .limit(20)
+    if (error) {
+      debugSources.push({ name: sourceName, count: 0, error: safeSourceErrorLabel(error) })
+      return { results: [], count: 0 }
+    }
+    debugSources.push({ name: sourceName, count: (data ?? []).length, error: null })
 
-  const leadIds = [...new Set((data ?? []).map((row) => row.lead_id as string))]
-  if (leadIds.length === 0) return { results: [], count: 0 }
+    const leadIds = [...new Set((data ?? []).map((row) => row.lead_id as string))]
+    if (leadIds.length === 0) return { results: [], count: 0 }
 
-  let leadsQuery = admin.schema("growth").from("leads").select(LEAD_SELECT).in("id", leadIds)
-  leadsQuery = await applyLeadArchiveFilter(admin, leadsQuery)
-  const { data: leads, error: leadsError } = await leadsQuery
-  if (leadsError) return { results: [], count: 0 }
+    let leadsQuery = admin.schema("growth").from("leads").select(LEAD_SELECT).in("id", leadIds)
+    leadsQuery = await applyLeadArchiveFilter(admin, leadsQuery)
+    const { data: leads, error: leadsError } = await leadsQuery
+    if (leadsError) {
+      debugSources.push({
+        name: "growth.leads.outbound_join",
+        count: 0,
+        error: safeSourceErrorLabel(leadsError),
+      })
+      return { results: [], count: 0 }
+    }
 
-  const emailMap = new Map((data ?? []).map((row) => [row.lead_id as string, row.email as string]))
-  return {
-    results: (leads ?? []).map((row) =>
-      mapLeadRow(row as LeadRow, {
-        query,
-        entityType: "outbound_contact",
-        matchedField: "outbound_email",
-        confidence: 0.8,
-        contactEmailOverride: emailMap.get((row as LeadRow).id) ?? (row as LeadRow).contact_email,
-      }),
-    ),
-    count: (leads ?? []).length,
+    const emailMap = new Map((data ?? []).map((row) => [row.lead_id as string, row.email as string]))
+    return {
+      results: (leads ?? []).map((row) =>
+        mapLeadRow(row as LeadRow, {
+          query,
+          entityType: "outbound_contact",
+          matchedField: "outbound_email",
+          confidence: 0.8,
+          contactEmailOverride: emailMap.get((row as LeadRow).id) ?? (row as LeadRow).contact_email,
+        }),
+      ),
+      count: (leads ?? []).length,
+    }
+  } catch {
+    debugSources.push({ name: sourceName, count: 0, error: "exception" })
+    return { results: [], count: 0 }
   }
 }
 
@@ -323,29 +466,60 @@ async function searchProspects(
   admin: SupabaseClient,
   query: string,
   phoneDigits: string | null,
+  debugSources: CallWorkspaceLeadSearchDebugSource[],
 ): Promise<{ results: CallWorkspaceLeadSearchResult[]; count: number }> {
   const orgId = getGrowthEngineAiOrgId()
-  const pattern = buildIlikePattern(query)
-  const orFilters = [
-    `company_name.ilike.${pattern}`,
-    `contact_name.ilike.${pattern}`,
-    `contact_email.ilike.${pattern}`,
-    `contact_phone.ilike.${pattern}`,
-    `website.ilike.${pattern}`,
-  ]
-  if (phoneDigits) orFilters.push(`contact_phone.ilike.%${phoneDigits}%`)
+  const pattern = buildCallWorkspaceIlikePattern(query)
+  const prospectById = new Map<string, Record<string, unknown>>()
 
-  let prospectQuery = admin
-    .from("prospects")
-    .select("id, company_name, contact_name, contact_email, contact_phone, website, organization_id")
-    .or(orFilters.join(","))
-    .limit(25)
-  if (orgId) prospectQuery = prospectQuery.eq("organization_id", orgId)
+  for (const field of PROSPECT_ILIKE_FIELDS) {
+    const sourceName = `public.prospects.${field}`
+    try {
+      let prospectQuery = admin
+        .from("prospects")
+        .select("id, company_name, contact_name, contact_email, contact_phone, website, organization_id")
+        .ilike(field, pattern)
+        .limit(25)
+      if (orgId) prospectQuery = prospectQuery.eq("organization_id", orgId)
 
-  const { data: prospects, error } = await prospectQuery
-  if (error) return { results: [], count: 0 }
+      const { data, error } = await prospectQuery
+      if (error) {
+        debugSources.push({ name: sourceName, count: 0, error: safeSourceErrorLabel(error) })
+        continue
+      }
+      debugSources.push({ name: sourceName, count: (data ?? []).length, error: null })
+      for (const row of data ?? []) {
+        prospectById.set(row.id as string, row as Record<string, unknown>)
+      }
+    } catch {
+      debugSources.push({ name: sourceName, count: 0, error: "exception" })
+    }
+  }
 
-  const prospectIds = (prospects ?? []).map((row) => row.id as string)
+  if (phoneDigits) {
+    const sourceName = "public.prospects.contact_phone_digits"
+    try {
+      let prospectQuery = admin
+        .from("prospects")
+        .select("id, company_name, contact_name, contact_email, contact_phone, website, organization_id")
+        .ilike("contact_phone", `%${phoneDigits}%`)
+        .limit(25)
+      if (orgId) prospectQuery = prospectQuery.eq("organization_id", orgId)
+      const { data, error } = await prospectQuery
+      if (error) {
+        debugSources.push({ name: sourceName, count: 0, error: safeSourceErrorLabel(error) })
+      } else {
+        debugSources.push({ name: sourceName, count: (data ?? []).length, error: null })
+        for (const row of data ?? []) {
+          prospectById.set(row.id as string, row as Record<string, unknown>)
+        }
+      }
+    } catch {
+      debugSources.push({ name: sourceName, count: 0, error: "exception" })
+    }
+  }
+
+  const prospectIds = [...prospectById.keys()]
   if (prospectIds.length === 0) return { results: [], count: 0 }
 
   let leadsQuery = admin
@@ -355,7 +529,14 @@ async function searchProspects(
     .in("promoted_prospect_id", prospectIds)
   leadsQuery = await applyLeadArchiveFilter(admin, leadsQuery)
   const { data: leads, error: leadsError } = await leadsQuery
-  if (leadsError) return { results: [], count: 0 }
+  if (leadsError) {
+    debugSources.push({
+      name: "growth.leads.prospect_join",
+      count: 0,
+      error: safeSourceErrorLabel(leadsError),
+    })
+    return { results: [], count: 0 }
+  }
 
   const leadByProspect = new Map<string, LeadRow>()
   for (const row of leads ?? []) {
@@ -364,7 +545,7 @@ async function searchProspects(
   }
 
   const results: CallWorkspaceLeadSearchResult[] = []
-  for (const prospect of prospects ?? []) {
+  for (const prospect of prospectById.values()) {
     const lead = leadByProspect.get(prospect.id as string)
     if (!lead) continue
     const companyMatch = scoreTextMatch({
@@ -403,8 +584,11 @@ function pickAutoSelectLeadId(results: CallWorkspaceLeadSearchResult[]): string 
 export async function searchCallWorkspaceLeads(
   admin: SupabaseClient,
   query: string,
+  options: CallWorkspaceLeadSearchOptions = {},
 ): Promise<{ results: CallWorkspaceLeadSearchResult[]; diagnostics: CallWorkspaceLeadSearchDiagnostics }> {
-  const trimmed = query.trim()
+  const trimmed = sanitizeCallWorkspaceSearchQuery(query)
+  const debugSources: CallWorkspaceLeadSearchDebugSource[] = []
+
   if (trimmed.length < 2) {
     return {
       results: [],
@@ -429,17 +613,33 @@ export async function searchCallWorkspaceLeads(
   const phoneDigits = normalizePhone(trimmed)
   const merged = new Map<string, CallWorkspaceLeadSearchResult>()
 
-  const growth = await searchGrowthLeads(admin, trimmed, phoneDigits)
-  for (const row of growth.results) upsertResult(merged, row)
+  try {
+    const growth = await searchGrowthLeads(admin, trimmed, phoneDigits, debugSources)
+    for (const row of growth.results) upsertResult(merged, row)
+  } catch {
+    debugSources.push({ name: "growth.leads", count: 0, error: "exception" })
+  }
 
-  const decisionMakers = await searchDecisionMakers(admin, trimmed, phoneDigits)
-  for (const row of decisionMakers.results) upsertResult(merged, row)
+  try {
+    const decisionMakers = await searchDecisionMakers(admin, trimmed, phoneDigits, debugSources)
+    for (const row of decisionMakers.results) upsertResult(merged, row)
+  } catch {
+    debugSources.push({ name: "growth.lead_decision_makers", count: 0, error: "exception" })
+  }
 
-  const outbound = await searchOutboundContacts(admin, trimmed)
-  for (const row of outbound.results) upsertResult(merged, row)
+  try {
+    const outbound = await searchOutboundContacts(admin, trimmed, debugSources)
+    for (const row of outbound.results) upsertResult(merged, row)
+  } catch {
+    debugSources.push({ name: "growth.outbound_contacts", count: 0, error: "exception" })
+  }
 
-  const prospects = await searchProspects(admin, trimmed, phoneDigits)
-  for (const row of prospects.results) upsertResult(merged, row)
+  try {
+    const prospects = await searchProspects(admin, trimmed, phoneDigits, debugSources)
+    for (const row of prospects.results) upsertResult(merged, row)
+  } catch {
+    debugSources.push({ name: "public.prospects", count: 0, error: "exception" })
+  }
 
   const results = [...merged.values()]
     .sort((a, b) => b.confidence - a.confidence)
@@ -464,6 +664,15 @@ export async function searchCallWorkspaceLeads(
     matchedEntityTypes,
     resultCount: results.length,
     autoSelectedLeadId,
+    ...(options.debug
+      ? {
+          debug: {
+            sources: debugSources,
+            mergedCount: results.length,
+            autoSelectedLeadId,
+          },
+        }
+      : {}),
   }
 
   logGrowthEngine("native_dialer_lead_search", {
