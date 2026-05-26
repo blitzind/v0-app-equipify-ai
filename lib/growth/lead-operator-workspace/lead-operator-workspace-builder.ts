@@ -11,6 +11,7 @@ import {
   buildOperatorHandoffInputFromRow,
 } from "@/lib/growth/lead-operator-workspace/lead-inbox-card-view"
 import { extractLeadEngineOutputsFromRun } from "@/lib/growth/lead-operator-workspace/lead-engine-run-extract"
+import { loadCompanyIdentificationMatchesForLeadInbox } from "@/lib/growth/company-identification/company-identification-repository"
 import { loadSearchIntentSignalsForLeadInbox } from "@/lib/growth/search-intent/search-intent-repository"
 import {
   GROWTH_LEAD_ENGINE_RUN_METADATA_KEY,
@@ -19,6 +20,7 @@ import {
   type GrowthLeadOperatorAttributionCard,
   type GrowthLeadOperatorEvidenceCard,
   type GrowthLeadOperatorHistoryEntry,
+  type GrowthLeadOperatorCompanyMatchSummary,
   type GrowthLeadOperatorOverview,
   type GrowthLeadOperatorWorkspacePayload,
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
@@ -201,6 +203,48 @@ export async function buildLeadOperatorWorkspacePayload(
   ]
 
   const searchSignals = await loadSearchIntentSignalsForLeadInbox(admin, row.id, 12)
+  const companyMatches = await loadCompanyIdentificationMatchesForLeadInbox(admin, row.id, 5)
+  const topCompany = companyMatches[0] ?? null
+  const company_match: GrowthLeadOperatorCompanyMatchSummary | null = topCompany
+    ? {
+        id: topCompany.id,
+        company_name: topCompany.company_name,
+        company_domain: topCompany.company_domain,
+        matched_source: topCompany.matched_source,
+        match_type: topCompany.match_type,
+        match_confidence: topCompany.match_confidence,
+        match_score: topCompany.match_score,
+        evidence: topCompany.evidence,
+        is_candidate_match: true,
+      }
+    : (row.metadata?.company_identification_summary as { company_name?: string } | undefined)?.company_name
+      ? {
+          id: "metadata",
+          company_name: String(
+            (row.metadata.company_identification_summary as Record<string, unknown>).company_name,
+          ),
+          company_domain:
+            ((row.metadata.company_identification_summary as Record<string, unknown>)
+              .company_domain as string) ?? null,
+          matched_source: String(
+            (row.metadata.company_identification_summary as Record<string, unknown>).matched_source ??
+              "unknown",
+          ),
+          match_type: String(
+            (row.metadata.company_identification_summary as Record<string, unknown>).match_type ??
+              "inferred_company",
+          ),
+          match_confidence: Number(
+            (row.metadata.company_identification_summary as Record<string, unknown>)
+              .match_confidence ?? 0,
+          ),
+          match_score: Number(
+            (row.metadata.company_identification_summary as Record<string, unknown>).match_score ?? 0,
+          ),
+          evidence: "Company identification summary from inbox metadata — candidate match only.",
+          is_candidate_match: true,
+        }
+      : null
   const search_intent_signals: GrowthLeadOperatorSearchIntentSummary[] = searchSignals.map((s) => ({
     id: s.id,
     intent_topic: s.intent_topic,
@@ -227,6 +271,7 @@ export async function buildLeadOperatorWorkspacePayload(
     },
     history: buildHistory(row),
     search_intent_signals,
+    company_match,
   }
 }
 

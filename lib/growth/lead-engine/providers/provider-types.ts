@@ -18,6 +18,7 @@ export type GrowthLeadEngineProviderStatus =
 
 export const GROWTH_LEAD_ENGINE_PROVIDER_TYPES = [
   "company_research",
+  "company_identification",
   "decision_maker_research",
   "contact_research",
   "verification",
@@ -114,9 +115,15 @@ export interface GrowthLeadEngineIntentSignalProvider {
   collect(context: GrowthLeadEngineProviderContext): Promise<GrowthLeadEngineProviderResponse>
 }
 
+export interface GrowthLeadEngineCompanyIdentificationProvider {
+  readonly provider_type: "company_identification"
+  identify(context: GrowthLeadEngineProviderContext): Promise<GrowthLeadEngineProviderResponse>
+}
+
 export type GrowthLeadEngineProviderBundle = {
   mode: GrowthLeadEngineProviderMode
   company_research: GrowthLeadEngineCompanyResearchProvider
+  company_identification: GrowthLeadEngineCompanyIdentificationProvider
   decision_maker_research: GrowthLeadEngineDecisionMakerResearchProvider
   contact_research: GrowthLeadEngineContactResearchProvider
   verification: GrowthLeadEngineVerificationProvider

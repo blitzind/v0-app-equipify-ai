@@ -7,6 +7,10 @@ import {
 } from "@/lib/growth/lead-inbox/lead-inbox-dedupe"
 import { createLeadCandidate } from "@/lib/growth/lead-inbox/lead-inbox-repository"
 import {
+  linkCompanyMatchesToLeadInbox,
+  persistCompanyIdentificationMatches,
+} from "@/lib/growth/company-identification/company-identification-repository"
+import {
   linkSearchIntentSignalsToLeadInbox,
   persistSearchIntentSignals,
 } from "@/lib/growth/search-intent/search-intent-repository"
@@ -45,6 +49,7 @@ export function intentCandidateToInboxInput(
     pipeline_entry: candidate.recommended_pipeline_entry,
     company_name:
       options.company_name ||
+      candidate.company_identification_summary?.company_name ||
       identity.company_name ||
       (candidate.candidate_type === "anonymous"
         ? candidate.domain
@@ -54,7 +59,8 @@ export function intentCandidateToInboxInput(
           ? candidate.domain.split(".")[0]
           : "") ||
       "Unknown company",
-    domain: candidate.domain,
+    domain:
+      candidate.company_identification_summary?.company_domain ?? candidate.domain,
     contact_name: hasExplicitIdentity ? identity.full_name : null,
     email: hasExplicitIdentity ? identity.email : null,
     phone: hasExplicitIdentity ? identity.phone : null,
@@ -76,6 +82,7 @@ export function intentCandidateToInboxInput(
       threshold_passed: candidate.threshold_passed,
       lead_engine_eligible: candidate.lead_engine_eligible,
       search_intent_summary: candidate.search_intent_summary,
+      company_identification_summary: candidate.company_identification_summary,
     },
   }
 }
@@ -171,6 +178,27 @@ export async function ingestIntentCandidateToLeadInbox(
   }
 
   const result = await createLeadCandidate(admin, input)
+  if (result.ok && result.row && candidate.company_identification_matches.length > 0) {
+    const idInput = {
+      site_key: options.site_key,
+      visitor_key: candidate.visitor_key,
+      session_key: candidate.session_key,
+      intent_session_id: candidate.session_id,
+      lead_inbox_id: result.row!.id,
+    }
+    const persistedCompany = await persistCompanyIdentificationMatches(
+      admin,
+      candidate.company_identification_matches.map((m) => ({ ...m, lead_inbox_id: result.row!.id })),
+      idInput,
+    )
+    if (persistedCompany.ok && persistedCompany.rows.length > 0) {
+      await linkCompanyMatchesToLeadInbox(
+        admin,
+        result.row.id,
+        persistedCompany.rows.map((r) => r.id),
+      )
+    }
+  }
   if (result.ok && result.row && candidate.search_intent_signals.length > 0) {
     const persisted = await persistSearchIntentSignals(
       admin,

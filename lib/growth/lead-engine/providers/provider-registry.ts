@@ -21,8 +21,8 @@ import {
 import type { GrowthLeadEngineSandboxInput } from "@/lib/growth/lead-engine/workspace-types"
 
 const STAGE_PROVIDER_TYPES: Partial<Record<GrowthLeadEnginePipelineStageId, GrowthLeadEngineProviderType[]>> = {
-  icp_targeting: ["website_research"],
-  company_discovery: ["company_research", "website_research"],
+  icp_targeting: ["website_research", "company_identification"],
+  company_discovery: ["company_research", "company_identification", "website_research"],
   decision_maker_hypothesis: ["decision_maker_research"],
   contact_research: ["contact_research"],
   verification_triage: ["verification"],
@@ -58,6 +58,8 @@ async function invokeProvider(
   switch (providerType) {
     case "company_research":
       return bundle.company_research.research(context)
+    case "company_identification":
+      return bundle.company_identification.identify(context)
     case "decision_maker_research":
       return bundle.decision_maker_research.research(context)
     case "contact_research":

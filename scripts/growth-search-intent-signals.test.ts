@@ -34,6 +34,7 @@ import { computeIntentCandidateScore } from "../lib/growth/lead-engine/intent/in
 import { bridgeIntentSessionToLeadCandidate } from "../lib/growth/lead-engine/intent/intent-to-lead-bridge"
 import type { GrowthIntentPixelPageviewEvent, GrowthIntentPixelVisitorSession } from "../lib/growth/intent-pixel/intent-pixel-types"
 
+async function main(): Promise<void> {
 assert.equal(GROWTH_SEARCH_INTENT_QA_MARKER, "growth-search-intent-signals-v1")
 assert.equal(GROWTH_SEARCH_INTENT_CATEGORIES.length, 9)
 assert.equal(GROWTH_SEARCH_INTENT_STAGES.length, 5)
@@ -198,7 +199,7 @@ const baseScore = computeIntentCandidateScore(aggregated)
 const boosted = computeIntentCandidateScore(aggregated, { searchIntent: capture.contribution })
 assert.ok(boosted.intent_score >= baseScore.intent_score)
 
-const bridge = bridgeIntentSessionToLeadCandidate({
+const bridge = await bridgeIntentSessionToLeadCandidate({
   site_key: "demo-site",
   session: session(),
   visit_history: aggregated.visit_history,
@@ -208,7 +209,16 @@ assert.equal(bridge.ok, true)
 if (bridge.ok && bridge.lead_candidate) {
   assert.ok(bridge.lead_candidate.search_intent_signals.length >= 1)
   assert.ok(bridge.lead_candidate.search_intent_summary?.signal_count)
-  assert.ok(bridge.lead_candidate.scoring_breakdown.search_intent != null || boosted.intent_score > baseScore.intent_score)
+  assert.ok(
+    bridge.lead_candidate.scoring_breakdown.search_intent_top != null ||
+      boosted.intent_score > baseScore.intent_score,
+  )
 }
 
 console.log("growth-search-intent-signals: all checks passed")
+}
+
+void main().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})

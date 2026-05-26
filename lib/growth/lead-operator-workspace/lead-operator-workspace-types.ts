@@ -103,6 +103,18 @@ export type GrowthLeadOperatorHistoryEntry = {
   note: string
 }
 
+export type GrowthLeadOperatorCompanyMatchSummary = {
+  id: string
+  company_name: string
+  company_domain: string | null
+  matched_source: string
+  match_type: string
+  match_confidence: number
+  match_score: number
+  evidence: string
+  is_candidate_match: boolean
+}
+
 export type GrowthLeadOperatorSearchIntentSummary = {
   id: string
   intent_topic: string
@@ -140,6 +152,7 @@ export type GrowthLeadOperatorWorkspacePayload = {
   }
   history: GrowthLeadOperatorHistoryEntry[]
   search_intent_signals: GrowthLeadOperatorSearchIntentSummary[]
+  company_match: GrowthLeadOperatorCompanyMatchSummary | null
 }
 
 export const GROWTH_LEAD_ENGINE_RUN_METADATA_KEY = "lead_engine_run" as const

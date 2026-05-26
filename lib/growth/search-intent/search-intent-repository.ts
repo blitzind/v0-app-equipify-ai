@@ -107,6 +107,7 @@ export function buildSearchIntentCaptureInputsFromAggregate(
   options?: {
     lead_inbox_id?: string | null
     company_name?: string | null
+    company_domain?: string | null
   },
 ): GrowthSearchIntentCaptureInput[] {
   const session = aggregated.primary_session
@@ -117,7 +118,7 @@ export function buildSearchIntentCaptureInputsFromAggregate(
     visitor_key: session.visitor_key,
     session_key: session.session_key,
     lead_inbox_id: options?.lead_inbox_id ?? null,
-    company_domain: aggregated.domain,
+    company_domain: options?.company_domain ?? aggregated.domain,
     company_name: options?.company_name ?? null,
     landing_page: session.first_landing_url || session.last_page_url,
     referrer: session.last_referrer || session.first_referrer,
@@ -207,6 +208,7 @@ export function captureSearchIntentFromAggregatedSession(
   options?: {
     lead_inbox_id?: string | null
     company_name?: string | null
+    company_domain?: string | null
   },
 ): GrowthSearchIntentCaptureResult {
   const inputs = buildSearchIntentCaptureInputsFromAggregate(aggregated, options)

@@ -29,6 +29,7 @@ import type {
   GrowthIntentPixelVisitorSession,
 } from "../lib/growth/intent-pixel/intent-pixel-types"
 
+async function main(): Promise<void> {
 assert.equal(GROWTH_INTENT_LEAD_BRIDGE_QA_MARKER, "growth-intent-lead-bridge-v1")
 
 const bridgeSource = fs.readFileSync(
@@ -162,7 +163,7 @@ assert.equal(dedupe.dedupe_matched, true)
 assert.ok(dedupe.dedupe_reason?.includes("email") || dedupe.matched_on.includes("dedupe_hash"))
 
 // Threshold + full bridge — eligible
-const bridge = bridgeIntentSessionToLeadCandidate({
+const bridge = await bridgeIntentSessionToLeadCandidate({
   site_key: "equipify-sandbox",
   session,
   visit_history: visitHistory,
@@ -188,7 +189,7 @@ const lowSession = baseSession({
   last_page_url: "https://example.com/",
   first_landing_url: "https://example.com/",
 })
-const lowBridge = bridgeIntentSessionToLeadCandidate({
+const lowBridge = await bridgeIntentSessionToLeadCandidate({
   site_key: "equipify-sandbox",
   session: lowSession,
   visit_history: singleSessionVisitHistory(lowSession, [], []),
@@ -198,7 +199,7 @@ assert.ok(lowBridge.lead_candidate)
 assert.equal(lowBridge.lead_candidate?.lead_engine_eligible, false)
 
 // Consent denied — blocked
-const deniedBridge = bridgeIntentSessionToLeadCandidate({
+const deniedBridge = await bridgeIntentSessionToLeadCandidate({
   site_key: "equipify-sandbox",
   session: baseSession({ consent_status: "denied" }),
   visit_history: visitHistory,
@@ -207,7 +208,7 @@ const deniedBridge = bridgeIntentSessionToLeadCandidate({
 assert.equal(deniedBridge.lead_candidate?.lead_engine_eligible, false)
 
 // Dedupe blocks eligibility
-const dupBridge = bridgeIntentSessionToLeadCandidate({
+const dupBridge = await bridgeIntentSessionToLeadCandidate({
   site_key: "equipify-sandbox",
   session,
   visit_history: visitHistory,
@@ -239,7 +240,7 @@ const multiHistory = {
     { ...visitHistory.sessions[0]!, session_key: "s_old_2" },
   ],
 }
-const returningBridge = bridgeIntentSessionToLeadCandidate({
+const returningBridge = await bridgeIntentSessionToLeadCandidate({
   site_key: "equipify-sandbox",
   session,
   visit_history: multiHistory,
@@ -250,3 +251,9 @@ assert.ok(
 )
 
 console.log("growth-intent-lead-bridge-v1 checks passed")
+}
+
+void main().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})

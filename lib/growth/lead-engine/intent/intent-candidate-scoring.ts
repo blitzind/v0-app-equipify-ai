@@ -3,6 +3,7 @@ import type {
   GrowthIntentLeadCandidatePriority,
 } from "@/lib/growth/lead-engine/intent/intent-candidate-types"
 import type { GrowthIntentAggregatedSession } from "@/lib/growth/lead-engine/intent/intent-session-aggregator"
+import type { GrowthCompanyIdentificationScoreContribution } from "@/lib/growth/company-identification/company-identification-types"
 import type { GrowthSearchIntentScoreContribution } from "@/lib/growth/search-intent/search-intent-types"
 
 export const GROWTH_INTENT_HIGH_INTENT_PATHS = [
@@ -139,7 +140,10 @@ function scoreUtm(aggregated: GrowthIntentAggregatedSession): { points: number; 
 
 export function computeIntentCandidateScore(
   aggregated: GrowthIntentAggregatedSession,
-  options?: { searchIntent?: GrowthSearchIntentScoreContribution },
+  options?: {
+    searchIntent?: GrowthSearchIntentScoreContribution
+    companyIdentification?: GrowthCompanyIdentificationScoreContribution
+  },
 ): GrowthIntentScoreResult {
   const breakdown: GrowthIntentScoreBreakdown = {}
   const reasoning: string[] = []
@@ -187,9 +191,13 @@ export function computeIntentCandidateScore(
   }
 
   if (options?.searchIntent && options.searchIntent.points > 0) {
-    breakdown.search_intent = options.searchIntent.points
     Object.assign(breakdown, options.searchIntent.breakdown)
     reasoning.push(...options.searchIntent.reasons)
+  }
+
+  if (options?.companyIdentification && options.companyIdentification.points > 0) {
+    Object.assign(breakdown, options.companyIdentification.breakdown)
+    reasoning.push(...options.companyIdentification.reasons)
   }
 
   const intent_score = Object.values(breakdown).reduce((sum, v) => sum + v, 0)
@@ -224,8 +232,12 @@ export function computeIntentCandidateScore(
   }
 }
 
-export function normalizeCandidateConfidence(intentScore: number, hasEvidence: boolean): number {
+export function normalizeCandidateConfidence(
+  intentScore: number,
+  hasEvidence: boolean,
+  companyConfidenceBoost = 0,
+): number {
   const base = Math.min(1, intentScore / 25)
   const evidenceBoost = hasEvidence ? 0.1 : 0
-  return Number(Math.max(0, Math.min(1, base + evidenceBoost)).toFixed(3))
+  return Number(Math.max(0, Math.min(1, base + evidenceBoost + companyConfidenceBoost)).toFixed(3))
 }

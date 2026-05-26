@@ -13,6 +13,7 @@ import {
   computeIntentCandidateScore,
   normalizeCandidateConfidence,
 } from "@/lib/growth/lead-engine/intent/intent-candidate-scoring"
+import { identifyCompanyFromAggregatedSession } from "@/lib/growth/company-identification/company-identification-repository"
 import { captureSearchIntentFromAggregatedSession } from "@/lib/growth/search-intent/search-intent-repository"
 import {
   aggregateIntentSession,
@@ -151,9 +152,9 @@ function buildCandidateAttribution(
 }
 
 /** Core bridge: Intent Session → Intent Candidate → Threshold → Dedupe → Pipeline entry. */
-export function bridgeIntentSessionToLeadCandidate(
+export async function bridgeIntentSessionToLeadCandidate(
   input: GrowthIntentBridgeInput,
-): GrowthIntentLeadBridgeResult {
+): Promise<GrowthIntentLeadBridgeResult> {
   const warnings: string[] = []
   const errors: string[] = []
 
@@ -174,9 +175,14 @@ export function bridgeIntentSessionToLeadCandidate(
       warnings.push("Session marked identified but no explicit contact record — identity not inferred.")
     }
 
-    const searchCapture = captureSearchIntentFromAggregatedSession(aggregated)
+    const companyIdentification = await identifyCompanyFromAggregatedSession(aggregated, identity)
+    const searchCapture = captureSearchIntentFromAggregatedSession(aggregated, {
+      company_name: companyIdentification.top_match?.company_name ?? identity.company_name,
+      company_domain: companyIdentification.top_match?.company_domain ?? aggregated.domain,
+    })
     const score = computeIntentCandidateScore(aggregated, {
       searchIntent: searchCapture.contribution,
+      companyIdentification: companyIdentification.contribution,
     })
     const dedupeSources = buildDedupeSourcesFromAggregate(
       aggregated,
@@ -206,6 +212,13 @@ export function bridgeIntentSessionToLeadCandidate(
     )
     const pipelineEntry = resolvePipelineEntry(candidateType, identity)
     const evidence = buildCandidateEvidence(aggregated)
+    for (const match of companyIdentification.matches.slice(0, 3)) {
+      evidence.push({
+        claim: `Company candidate: ${match.company_name}`,
+        evidence: match.evidence,
+        source: "growth.company_identification_matches",
+      })
+    }
     for (const signal of searchCapture.signals.slice(0, 4)) {
       evidence.push({
         claim: `Search intent: ${signal.intent_topic}`,
@@ -214,6 +227,11 @@ export function bridgeIntentSessionToLeadCandidate(
       })
     }
     const attribution = buildCandidateAttribution(aggregated, score.scoring_breakdown)
+    for (const match of companyIdentification.matches.slice(0, 2)) {
+      for (const attr of match.source_attribution) {
+        attribution.push(attr)
+      }
+    }
     for (const signal of searchCapture.signals.slice(0, 3)) {
       for (const attr of signal.source_attribution) {
         attribution.push(attr)
@@ -239,7 +257,11 @@ export function bridgeIntentSessionToLeadCandidate(
       candidate_reasoning: [...score.reasoning, ...threshold.reasons, ...threshold.blockers],
       intent_score: score.intent_score,
       intent_grade: score.intent_grade,
-      candidate_confidence: normalizeCandidateConfidence(score.intent_score, evidence.length > 0),
+      candidate_confidence: normalizeCandidateConfidence(
+        score.intent_score,
+        evidence.length > 0,
+        companyIdentification.contribution.confidence_boost,
+      ),
       candidate_priority: score.candidate_priority,
       lead_engine_eligible: threshold.lead_engine_eligible,
       recommended_pipeline_entry: pipelineEntry,
@@ -269,6 +291,10 @@ export function bridgeIntentSessionToLeadCandidate(
             }
           : null,
       search_intent_signals: searchCapture.signals,
+      company_identification_summary: companyIdentification.summary
+        ? { ...companyIdentification.summary, is_candidate_match: true }
+        : null,
+      company_identification_matches: companyIdentification.matches,
     }
 
     const pipeline_entry: GrowthLeadEnginePipelineStageId | null = threshold.lead_engine_eligible
@@ -431,7 +457,7 @@ export async function bridgeIntentSessionFromStore(
     crmIndex = await fetchCrmDedupeIndexSafe(admin, session!, contacts)
   }
 
-  return bridgeIntentSessionToLeadCandidate({
+  return await bridgeIntentSessionToLeadCandidate({
     site_key: siteKey,
     session: session!,
     visit_history: visitHistory,

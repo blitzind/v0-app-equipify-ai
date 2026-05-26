@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { createFutureCompanyIdentificationProvider } from "@/lib/growth/company-identification/company-identification-provider"
 import {
   createProviderResponse,
   type GrowthLeadEngineCompanyResearchProvider,
@@ -415,6 +416,7 @@ export function createInternalGrowthLeadEngineProviderBundle(
   return {
     mode: "internal",
     company_research: company as GrowthLeadEngineCompanyResearchProvider,
+    company_identification: createFutureCompanyIdentificationProvider(),
     decision_maker_research: decisionMaker as GrowthLeadEngineDecisionMakerResearchProvider,
     contact_research: contact as GrowthLeadEngineContactResearchProvider,
     verification: verificationProvider as GrowthLeadEngineVerificationProvider,
@@ -442,6 +444,7 @@ export function createFutureExternalLeadEngineProviderBundle(): GrowthLeadEngine
   return {
     mode: "future_external",
     company_research: noopResearch("company_research") as GrowthLeadEngineCompanyResearchProvider,
+    company_identification: createFutureCompanyIdentificationProvider(),
     decision_maker_research: noopResearch("decision_maker_research") as GrowthLeadEngineDecisionMakerResearchProvider,
     contact_research: noopResearch("contact_research") as GrowthLeadEngineContactResearchProvider,
     verification: {

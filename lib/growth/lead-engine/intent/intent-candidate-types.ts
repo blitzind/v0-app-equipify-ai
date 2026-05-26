@@ -3,6 +3,9 @@
 import type { GrowthIntentPixelConsentStatus } from "@/lib/growth/intent-pixel/intent-pixel-types"
 import type { GrowthLeadEnginePipelineStageId } from "@/lib/growth/lead-engine/workspace-types"
 import type {
+  GrowthCompanyIdentificationMatchCandidate,
+} from "@/lib/growth/company-identification/company-identification-types"
+import type {
   GrowthSearchIntentCategory,
   GrowthSearchIntentClassifiedSignal,
 } from "@/lib/growth/search-intent/search-intent-types"
@@ -95,6 +98,16 @@ export type GrowthIntentLeadCandidate = {
     max_confidence: number
   } | null
   search_intent_signals: GrowthSearchIntentClassifiedSignal[]
+  company_identification_summary: {
+    company_name: string | null
+    company_domain: string | null
+    match_type: string | null
+    matched_source: string | null
+    match_confidence: number
+    match_score: number
+    is_candidate_match: boolean
+  } | null
+  company_identification_matches: GrowthCompanyIdentificationMatchCandidate[]
 }
 
 export type GrowthIntentLeadBridgeResult = {

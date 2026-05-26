@@ -25,6 +25,7 @@ import {
   type GrowthLeadEngineVerificationProvider,
   type GrowthLeadEngineWebsiteResearchProvider,
 } from "@/lib/growth/lead-engine/providers/provider-types"
+import { createFixtureCompanyIdentificationProvider } from "@/lib/growth/company-identification/company-identification-provider"
 import { providerSkippedResponse } from "@/lib/growth/lead-engine/providers/provider-errors"
 
 const FIXTURE_PROVIDER_NAME = "lead_engine_fixture_provider"
@@ -288,6 +289,14 @@ export function invokeFixtureProviderSync(
   switch (providerType) {
     case "company_research":
       return fixtureCompanyResearchSync(context)
+    case "company_identification":
+      return providerSkippedResponse(
+        FIXTURE_PROVIDER_NAME,
+        "company_identification",
+        context,
+        randomUUID(),
+        "Company identification uses in-process engine — fixture provider hook skipped.",
+      )
     case "decision_maker_research":
       return fixtureDecisionMakerResearchSync(context)
     case "contact_research":
@@ -310,10 +319,13 @@ export function buildFixtureIcpNormalizedPayload(
   return parseJsonSafe(buildSandboxIcpTargetingStub(input))
 }
 
+const companyIdentification = createFixtureCompanyIdentificationProvider()
+
 export function createFixtureLeadEngineProviderBundle(): GrowthLeadEngineProviderBundle {
   return {
     mode: "fixture",
     company_research: companyResearch,
+    company_identification: companyIdentification,
     decision_maker_research: decisionMakerResearch,
     contact_research: contactResearch,
     verification,

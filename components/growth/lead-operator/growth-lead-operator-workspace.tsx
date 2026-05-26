@@ -309,6 +309,24 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
         </TabsList>
 
         <TabsContent value="overview" className="mt-4 space-y-4">
+          {workspace.company_match ? (
+            <GrowthEngineCard title="Company match (candidate)">
+              <p className="text-sm font-medium">{workspace.company_match.company_name}</p>
+              {workspace.company_match.company_domain ? (
+                <p className="text-sm text-muted-foreground">{workspace.company_match.company_domain}</p>
+              ) : null}
+              <p className="mt-2 text-xs text-muted-foreground">
+                Source {workspace.company_match.matched_source.replace(/_/g, " ")} ·{" "}
+                {workspace.company_match.match_type.replace(/_/g, " ")} · confidence{" "}
+                {(workspace.company_match.match_confidence * 100).toFixed(0)}% · score{" "}
+                {workspace.company_match.match_score}
+              </p>
+              <p className="mt-2 text-xs text-amber-800">
+                Candidate match only — not guaranteed company identity. No IP-to-company claim.
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">{workspace.company_match.evidence}</p>
+            </GrowthEngineCard>
+          ) : null}
           <GrowthEngineCard title="Executive Summary">
             <p className="text-sm leading-relaxed text-muted-foreground">
               {workspace.overview.executive_summary}

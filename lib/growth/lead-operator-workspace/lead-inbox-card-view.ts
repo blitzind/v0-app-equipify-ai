@@ -84,6 +84,16 @@ export function buildLeadInboxCardView(row: GrowthLeadInboxRow): GrowthLeadInbox
     intentIndicators.push(`Keyword: ${searchSummary.top_keyword}`)
   }
 
+  const companySummary = row.metadata?.company_identification_summary as
+    | { company_name?: string; matched_source?: string; match_confidence?: number }
+    | undefined
+  if (companySummary?.company_name) {
+    intentIndicators.push(`Company: ${companySummary.company_name}`)
+  }
+  if (companySummary?.matched_source) {
+    intentIndicators.push(`Match: ${String(companySummary.matched_source).replace(/_/g, " ")}`)
+  }
+
   const lastActivityAt = row.updated_at || row.created_at
 
   return {
