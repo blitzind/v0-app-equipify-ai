@@ -146,6 +146,7 @@
     "test:growth-lead-engine-human-approval": "tsx scripts/human-approval.test.ts",
     "test:growth-lead-engine-revenue-execution": "tsx scripts/revenue-execution.test.ts",
     "test:growth-lead-engine-workspace": "tsx scripts/lead-engine-workspace.test.ts",
+    "test:growth-lead-engine-provider-adapter": "tsx scripts/test-growth-lead-engine-provider-adapter.ts",
     "test:growth-intent-pixel": "tsx scripts/test-growth-intent-pixel.ts",
     "test:growth-native-dialer": "tsx scripts/test-growth-native-dialer.ts",
     "test:growth-native-dialer-schema-health": "tsx scripts/test-growth-native-dialer-schema-health.ts",

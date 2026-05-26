@@ -41,7 +41,20 @@ import {
 } from "@/lib/growth/lead-engine/sandbox-stubs"
 import { parseGrowthLeadEngineVerificationTriageOutput } from "@/lib/growth/lead-engine/verification-triage-parser"
 import type { GrowthLeadEngineVerificationTriageOutput } from "@/lib/growth/lead-engine/verification-triage-types"
+import { fetchLeadEngineStageProviderResultsSync } from "@/lib/growth/lead-engine/providers/provider-registry"
+import {
+  GROWTH_LEAD_ENGINE_PROVIDER_ADAPTER_QA_MARKER,
+  toPublicProviderResponse,
+  type GrowthLeadEngineProviderMode,
+} from "@/lib/growth/lead-engine/providers/provider-types"
+import type { GrowthLeadEngineStageProviderPublicResult } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
 import type { GrowthLeadEnginePipelineStageId, GrowthLeadEngineSandboxInput } from "@/lib/growth/lead-engine/workspace-types"
+
+export type LeadEnginePipelineOptions = {
+  /** When set, providers run before each stage (failures isolated; parsers still use fixture stubs). */
+  providerMode?: GrowthLeadEngineProviderMode
+  admin?: import("@supabase/supabase-js").SupabaseClient | null
+}
 
 export type LeadEngineOrchestratorStageDefinition = {
   stageId: GrowthLeadEnginePipelineStageId
@@ -514,8 +527,43 @@ function buildExecutionSummary(
   return parts.join(" ")
 }
 
+function mapPublicProviderResults(
+  responses: ReturnType<typeof toPublicProviderResponse>[],
+): GrowthLeadEngineStageProviderPublicResult[] {
+  return responses.map((r) => ({
+    provider_name: r.provider_name,
+    provider_type: r.provider_type,
+    request_id: r.request_id,
+    status: r.status,
+    confidence: r.confidence,
+    source_attribution_count: r.source_attribution.length,
+    raw_payload_retained: r.raw_payload_retained,
+    warnings: r.warnings,
+    errors: r.errors,
+  }))
+}
+
+function upstreamBagToRecord(bag: UpstreamBag): Record<string, unknown> {
+  return {
+    icp: bag.icp,
+    company: bag.company,
+    decisionMaker: bag.decisionMaker,
+    contact: bag.contact,
+    verification: bag.verification,
+    brief: bag.brief,
+    personalization: bag.personalization,
+    leadScore: bag.leadScore,
+    approval: bag.approval,
+    execution: bag.execution,
+  }
+}
+
 /** Execute Lead Engine prompts 1–10 sequentially with parser enforcement (fixture mode). */
-export function runLeadEnginePipeline(input: GrowthLeadEngineSandboxInput): GrowthLeadEnginePipelineRun {
+export function runLeadEnginePipeline(
+  input: GrowthLeadEngineSandboxInput,
+  options?: LeadEnginePipelineOptions,
+): GrowthLeadEnginePipelineRun {
+  const providerMode = options?.providerMode ?? null
   const runId = randomUUID()
   const pipelineStart = performance.now()
   const upstream: UpstreamBag = {}
@@ -553,6 +601,30 @@ export function runLeadEnginePipeline(input: GrowthLeadEngineSandboxInput): Grow
     }
 
     const stageStart = performance.now()
+
+    let providerResultsSync: GrowthLeadEngineStageProviderPublicResult[] | undefined
+    if (providerMode) {
+      try {
+        const bundle = fetchLeadEngineStageProviderResultsSync(
+          providerMode,
+          input,
+          def.stageId,
+          upstreamBagToRecord(upstream),
+        )
+        providerResultsSync = mapPublicProviderResults(bundle.public_responses)
+        for (const response of bundle.responses) {
+          if (response.status === "failed") {
+            warningMessages.push(
+              `${def.stageId}: provider ${response.provider_type} failed (isolated): ${response.errors[0] ?? "unknown"}`,
+            )
+          }
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        warningMessages.push(`${def.stageId}: provider fetch error (isolated): ${message}`)
+      }
+    }
+
     const rawJson = buildRawJson(def.stageId, input, upstream)
     const parsedResult = parseStage(def.stageId, rawJson, upstream)
     const durationMs = Math.round(performance.now() - stageStart)
@@ -592,6 +664,7 @@ export function runLeadEnginePipeline(input: GrowthLeadEngineSandboxInput): Grow
       diagnostics: buildStageDiagnostics(def.stageId, durationMs, parsedResult.ok ? parsedResult.output : null, parsedResult.ok),
       fatal: fatalMessage != null,
       warnings,
+      provider_results: providerResultsSync,
     }
 
     stageResults.push(stageResult)
@@ -630,6 +703,8 @@ export function runLeadEnginePipeline(input: GrowthLeadEngineSandboxInput): Grow
     run_id: runId,
     qa_marker: GROWTH_LEAD_ENGINE_ORCHESTRATOR_QA_MARKER,
     mode: "fixture_dry_run",
+    provider_mode: providerMode,
+    provider_adapter_qa_marker: providerMode ? GROWTH_LEAD_ENGINE_PROVIDER_ADAPTER_QA_MARKER : null,
     pipeline_status: pipelineStatus,
     current_stage: currentStage,
     completed_stages: completedStages,

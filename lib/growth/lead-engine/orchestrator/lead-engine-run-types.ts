@@ -39,6 +39,19 @@ export type GrowthLeadEnginePipelineEvidenceEntry = {
   items: Array<{ claim: string; evidence: string; source: string }>
 }
 
+/** Provider adapter public view — raw_payload retained server-side only (Prompt 14). */
+export type GrowthLeadEngineStageProviderPublicResult = {
+  provider_name: string
+  provider_type: string
+  request_id: string
+  status: string
+  confidence: number
+  source_attribution_count: number
+  raw_payload_retained: true
+  warnings: string[]
+  errors: string[]
+}
+
 export type GrowthLeadEngineOrchestratorStageResult = {
   stage_id: GrowthLeadEnginePipelineStageId
   label: string
@@ -57,12 +70,17 @@ export type GrowthLeadEngineOrchestratorStageResult = {
   diagnostics: string[]
   fatal: boolean
   warnings: string[]
+  /** Present when pipeline runs with provider adapter enabled. */
+  provider_results?: GrowthLeadEngineStageProviderPublicResult[]
 }
 
 export type GrowthLeadEnginePipelineRun = {
   run_id: string
   qa_marker: typeof GROWTH_LEAD_ENGINE_ORCHESTRATOR_QA_MARKER
   mode: "fixture_dry_run"
+  /** null when provider adapter not invoked (default workspace dry-run). */
+  provider_mode: "fixture" | "internal" | "future_external" | null
+  provider_adapter_qa_marker: "lead-engine-provider-adapter-v1" | null
   pipeline_status: GrowthLeadEnginePipelineStatus
   current_stage: GrowthLeadEnginePipelineStageId | null
   completed_stages: GrowthLeadEnginePipelineStageId[]
