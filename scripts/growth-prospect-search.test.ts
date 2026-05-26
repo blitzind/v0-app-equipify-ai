@@ -64,6 +64,38 @@ async function main(): Promise<void> {
   )
   assert.match(pageSource, /GrowthProspectSearchAdmin/)
   assert.match(pageSource, /Prospect Search/)
+  assert.match(pageSource, /GROWTH_PROSPECT_SEARCH_UX_QA_MARKER/)
+
+  const shellSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-shell.tsx"),
+    "utf8",
+  )
+  assert.match(shellSource, /ProspectSearchShell/)
+  assert.match(shellSource, /GuidedIcpBuilder/)
+  assert.match(shellSource, /SearchRecommendations/)
+  assert.match(shellSource, /CompanyResultCard/)
+  assert.doesNotMatch(shellSource, /runLeadEnginePipeline/)
+  assert.match(shellSource, /data-ux-marker/)
+
+  const suggestionSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/search-suggestion-engine.ts"),
+    "utf8",
+  )
+  assert.match(suggestionSource, /buildSearchSuggestions/)
+
+  const recSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/search-recommendation-engine.ts"),
+    "utf8",
+  )
+  assert.match(recSource, /buildFilterRecommendations/)
+  assert.match(recSource, /Medical Equipment Service/)
+
+  const uxConstants = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-ux-constants.ts"),
+    "utf8",
+  )
+  assert.match(uxConstants, /growth-prospect-search-ux-v1/)
+  assert.match(uxConstants, /PROSPECT_SEARCH_ICP_TEMPLATES/)
 
   const navSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/growth-section-sidebar-nav.tsx"),
