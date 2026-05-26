@@ -144,6 +144,7 @@
     "test:growth-lead-engine-outreach-personalization": "tsx scripts/outreach-personalization.test.ts",
     "test:growth-lead-engine-lead-score": "tsx scripts/lead-score.test.ts",
     "test:growth-lead-engine-human-approval": "tsx scripts/human-approval.test.ts",
+    "test:growth-lead-engine-revenue-execution": "tsx scripts/revenue-execution.test.ts",
     "test:growth-native-dialer": "tsx scripts/test-growth-native-dialer.ts",
     "test:growth-native-dialer-schema-health": "tsx scripts/test-growth-native-dialer-schema-health.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
