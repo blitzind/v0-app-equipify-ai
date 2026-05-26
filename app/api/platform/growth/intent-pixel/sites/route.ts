@@ -6,6 +6,10 @@ import {
 } from "@/lib/growth/intent-pixel/intent-pixel-admin-repository"
 import { GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER } from "@/lib/growth/intent-pixel/intent-pixel-admin-types"
 import {
+  GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION,
+  isGrowthIntentPixelSchemaReady,
+} from "@/lib/growth/intent-pixel/intent-pixel-schema-health"
+import {
   isValidIntentPixelSiteKey,
   normalizeDomainAllowlist,
   parseTrackingModeInput,
@@ -18,8 +22,15 @@ export async function GET(request: Request) {
   if (!access.ok) return access.response
 
   const origin = new URL(request.url).origin
-  const sites = await listIntentPixelSites(access.admin, origin)
-  return NextResponse.json({ ok: true, qa_marker: GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER, sites })
+  const schema_ready = await isGrowthIntentPixelSchemaReady(access.admin)
+  const sites = schema_ready ? await listIntentPixelSites(access.admin, origin) : []
+  return NextResponse.json({
+    ok: true,
+    qa_marker: GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER,
+    schema_ready,
+    schema_migration: GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION,
+    sites,
+  })
 }
 
 export async function POST(request: Request) {
@@ -33,6 +44,18 @@ export async function POST(request: Request) {
   const domain_allowlist = Array.isArray(body.domain_allowlist)
     ? body.domain_allowlist.filter((e): e is string => typeof e === "string")
     : []
+
+  if (!(await isGrowthIntentPixelSchemaReady(access.admin))) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "schema_missing",
+        message: `Apply migration ${GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION} before creating sites.`,
+        schema_migration: GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION,
+      },
+      { status: 503 },
+    )
+  }
 
   if (!isValidIntentPixelSiteKey(site_key)) {
     return NextResponse.json(

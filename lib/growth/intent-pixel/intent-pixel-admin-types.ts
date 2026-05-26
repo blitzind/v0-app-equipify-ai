@@ -4,6 +4,11 @@ import type { GrowthIntentPixelConsentStatus } from "@/lib/growth/intent-pixel/i
 
 export const GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER = "growth-intent-pixel-admin-v1" as const
 
+/** Live activation — admin handoff + schema readiness (Prompt 23). */
+export const GROWTH_INTENT_PIXEL_LIVE_QA_MARKER = "growth-intent-pixel-live-v1" as const
+
+export { GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION } from "@/lib/growth/intent-pixel/intent-pixel-schema-health"
+
 export const GROWTH_INTENT_PIXEL_TRACKING_MODES = [
   "consent_gated",
   "always_on",
@@ -37,9 +42,23 @@ export type GrowthIntentPixelAdminSite = {
   updated_at: string
 }
 
+export type GrowthIntentPixelProcessRecentResult = {
+  qa_marker: typeof GROWTH_INTENT_PIXEL_LIVE_QA_MARKER
+  site_key: string
+  sessions_scanned: number
+  bridged_count: number
+  eligible_count: number
+  ingested_count: number
+  duplicate_count: number
+  skipped_count: number
+  inbox_ids: string[]
+  errors: string[]
+}
+
 export type GrowthIntentPixelAdminDiagnostics = {
   qa_marker: typeof GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER
   schema_ready: boolean
+  schema_migration: string
   site_key: string | null
   session_count_24h: number
   pageview_count_24h: number

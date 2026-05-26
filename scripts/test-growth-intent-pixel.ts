@@ -7,7 +7,11 @@ import fs from "node:fs"
 import path from "node:path"
 import { normalizeConsentStatus, resolveTrackingMode } from "../lib/growth/intent-pixel/consent-gate"
 import { normalizeCollectPayload } from "../lib/growth/intent-pixel/capture-intent-event"
-import { GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER } from "../lib/growth/intent-pixel/intent-pixel-admin-types"
+import {
+  GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER,
+  GROWTH_INTENT_PIXEL_LIVE_QA_MARKER,
+} from "../lib/growth/intent-pixel/intent-pixel-admin-types"
+import { GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION } from "../lib/growth/intent-pixel/intent-pixel-schema-health"
 import { isDomainAllowed } from "../lib/growth/intent-pixel/intent-pixel-repository"
 import {
   buildIntentPixelScriptSnippet,
@@ -22,6 +26,11 @@ import { hasUtmSignal, mergeUtmAttribution, parseUtmFromUrl } from "../lib/growt
 
 assert.equal(GROWTH_INTENT_PIXEL_QA_MARKER, "growth-intent-pixel-v1")
 assert.equal(GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER, "growth-intent-pixel-admin-v1")
+assert.equal(GROWTH_INTENT_PIXEL_LIVE_QA_MARKER, "growth-intent-pixel-live-v1")
+assert.equal(
+  GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION,
+  "20270316120000_growth_engine_intent_pixel_foundation.sql",
+)
 
 const migration = fs.readFileSync(
   path.join(process.cwd(), "supabase/migrations/20270316120000_growth_engine_intent_pixel_foundation.sql"),
@@ -68,6 +77,24 @@ const sitesRoute = fs.readFileSync(
 assert.match(sitesRoute, /listIntentPixelSites/)
 assert.match(sitesRoute, /createIntentPixelSite/)
 assert.match(sitesRoute, /requireGrowthEnginePlatformAccess/)
+assert.match(sitesRoute, /schema_ready/)
+assert.match(sitesRoute, /GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION/)
+
+const processRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/intent-pixel/process-recent/route.ts"),
+  "utf8",
+)
+assert.match(processRoute, /processRecentIntentToLeadInbox/)
+assert.match(processRoute, /requireGrowthEnginePlatformAccess/)
+assert.match(processRoute, /GROWTH_INTENT_PIXEL_LIVE_QA_MARKER/)
+
+const handoffSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/intent-pixel/process-recent-intent-handoff.ts"),
+  "utf8",
+)
+assert.match(handoffSource, /bridgeRecentIntentSessions/)
+assert.match(handoffSource, /ingestIntentCandidateToLeadInbox/)
+assert.doesNotMatch(handoffSource, /runLeadEnginePipeline|sendEmail|executePipeline/)
 
 const eventsRoute = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/intent-pixel/events/recent/route.ts"),
@@ -89,6 +116,11 @@ const adminUi = fs.readFileSync(
 assert.match(adminUi, /Privacy guardrails/)
 assert.match(adminUi, /Copy script/)
 assert.match(adminUi, /Event stream/)
+assert.match(adminUi, /GROWTH_INTENT_PIXEL_LIVE_QA_MARKER/)
+assert.match(adminUi, /Process recent intent/)
+assert.match(adminUi, /Schema:/)
+assert.match(adminUi, /"Ready"/)
+assert.match(adminUi, /GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION/)
 assert.doesNotMatch(adminUi, /submitted_identity/)
 assert.doesNotMatch(adminUi, /identified_contacts.*select.*email/i)
 
@@ -196,4 +228,6 @@ assert.match(script, /EquipifyIntentPixel/)
 assert.match(script, /trackConversion/)
 assert.doesNotMatch(script, /email.*inferred/i)
 
-console.log("growth-intent-pixel-v1 + growth-intent-pixel-admin-v1 checks passed")
+console.log(
+  "growth-intent-pixel-v1 + growth-intent-pixel-admin-v1 + growth-intent-pixel-live-v1 checks passed",
+)

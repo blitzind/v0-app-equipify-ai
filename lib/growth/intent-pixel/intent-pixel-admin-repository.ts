@@ -17,7 +17,10 @@ import {
   trackingModeFromSite,
 } from "@/lib/growth/intent-pixel/intent-pixel-site-config"
 import { fetchIntentPixelSite } from "@/lib/growth/intent-pixel/intent-pixel-repository"
-import { isGrowthIntentPixelSchemaReady } from "@/lib/growth/intent-pixel/intent-pixel-schema-health"
+import {
+  GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION,
+  isGrowthIntentPixelSchemaReady,
+} from "@/lib/growth/intent-pixel/intent-pixel-schema-health"
 import type {
   GrowthIntentPixelConsentStatus,
   GrowthIntentPixelSite,
@@ -179,6 +182,7 @@ export async function fetchIntentPixelAdminDiagnostics(
     return {
       qa_marker: GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER,
       schema_ready: false,
+      schema_migration: GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION,
       site_key: siteKey,
       session_count_24h: 0,
       pageview_count_24h: 0,
@@ -298,6 +302,7 @@ export async function fetchIntentPixelAdminDiagnostics(
   return {
     qa_marker: GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER,
     schema_ready: true,
+    schema_migration: GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION,
     site_key: siteKey,
     session_count_24h,
     pageview_count_24h,

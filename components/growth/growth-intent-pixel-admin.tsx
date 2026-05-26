@@ -11,6 +11,7 @@ import {
   Save,
   Shield,
   Plus,
+  Inbox,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,13 +19,19 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import {
   GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER,
+  GROWTH_INTENT_PIXEL_LIVE_QA_MARKER,
+  GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION,
   GROWTH_INTENT_PIXEL_TRACKING_MODES,
   type GrowthIntentPixelAdminDiagnostics,
   type GrowthIntentPixelAdminSite,
   type GrowthIntentPixelAdminStreamEvent,
+  type GrowthIntentPixelProcessRecentResult,
   type GrowthIntentPixelTrackingMode,
 } from "@/lib/growth/intent-pixel/intent-pixel-admin-types"
-import { trackingModeLabel } from "@/lib/growth/intent-pixel/intent-pixel-site-config"
+import {
+  buildIntentPixelScriptSnippet,
+  trackingModeLabel,
+} from "@/lib/growth/intent-pixel/intent-pixel-site-config"
 import { GROWTH_INTENT_PIXEL_PRIVACY_NOTE } from "@/lib/growth/intent-pixel/pii-policy"
 import { cn } from "@/lib/utils"
 
@@ -53,6 +60,9 @@ export function GrowthIntentPixelAdmin() {
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [schemaReady, setSchemaReady] = useState<boolean | null>(null)
+  const [processingIntent, setProcessingIntent] = useState(false)
+  const [lastHandoff, setLastHandoff] = useState<GrowthIntentPixelProcessRecentResult | null>(null)
 
   const [siteName, setSiteName] = useState("")
   const [domainsText, setDomainsText] = useState("")
@@ -63,6 +73,14 @@ export function GrowthIntentPixelAdmin() {
     () => sites.find((s) => s.site_key === selectedKey) ?? null,
     [sites, selectedKey],
   )
+
+  const scriptSnippet = useMemo(() => {
+    if (selected?.script_snippet) return selected.script_snippet
+    if (typeof window !== "undefined" && selectedKey) {
+      return buildIntentPixelScriptSnippet(window.location.origin, selectedKey).script_snippet
+    }
+    return ""
+  }, [selected, selectedKey])
 
   const loadAll = useCallback(async (siteKey: string) => {
     setLoading(true)
@@ -81,9 +99,11 @@ export function GrowthIntentPixelAdmin() {
 
       const sitesData = (await sitesRes.json().catch(() => ({}))) as {
         ok?: boolean
+        schema_ready?: boolean
         sites?: GrowthIntentPixelAdminSite[]
       }
       if (sitesRes.ok && sitesData.ok) {
+        if (typeof sitesData.schema_ready === "boolean") setSchemaReady(sitesData.schema_ready)
         setSites(sitesData.sites ?? [])
         if ((sitesData.sites ?? []).length > 0 && !sitesData.sites?.some((s) => s.site_key === siteKey)) {
           setSelectedKey(sitesData.sites![0]!.site_key)
@@ -109,6 +129,14 @@ export function GrowthIntentPixelAdmin() {
   useEffect(() => {
     void loadAll(selectedKey)
   }, [selectedKey, loadAll])
+
+  useEffect(() => {
+    if (!schemaReady) return
+    const timer = window.setInterval(() => {
+      void loadAll(selectedKey)
+    }, 30_000)
+    return () => window.clearInterval(timer)
+  }, [schemaReady, selectedKey, loadAll])
 
   useEffect(() => {
     if (!selected) return
@@ -180,19 +208,72 @@ export function GrowthIntentPixelAdmin() {
   }
 
   async function copySnippet() {
-    if (!selected?.script_snippet) return
-    await navigator.clipboard.writeText(selected.script_snippet)
+    if (!scriptSnippet) return
+    await navigator.clipboard.writeText(scriptSnippet)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
+  async function processRecentIntent() {
+    setProcessingIntent(true)
+    setMessage(null)
+    try {
+      const res = await fetch("/api/platform/growth/intent-pixel/process-recent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ site_key: selectedKey, limit: 25 }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        result?: GrowthIntentPixelProcessRecentResult
+        message?: string
+      }
+      if (!res.ok || !data.result) {
+        setMessage(data.message ?? "Could not process recent intent.")
+        return
+      }
+      setLastHandoff(data.result)
+      setMessage(
+        `Processed ${data.result.bridged_count} session(s): ${data.result.ingested_count} added to Lead Inbox, ${data.result.duplicate_count} duplicate(s), ${data.result.skipped_count} skipped.`,
+      )
+      await loadAll(selectedKey)
+    } finally {
+      setProcessingIntent(false)
+    }
+  }
+
+  const schemaReadyResolved = diagnostics?.schema_ready ?? schemaReady ?? false
   const installLabel = diagnostics
     ? INSTALL_STATUS_LABELS[diagnostics.install_status]
     : "—"
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="font-mono text-xs text-muted-foreground">{GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER}</p>
+      <p className="font-mono text-xs text-muted-foreground">
+        {GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER} · {GROWTH_INTENT_PIXEL_LIVE_QA_MARKER}
+      </p>
+
+      <section
+        className={cn(
+          "rounded-xl border px-4 py-3 text-sm",
+          schemaReadyResolved
+            ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+            : "border-amber-200 bg-amber-50 text-amber-900",
+        )}
+      >
+        <p className="font-semibold">
+          Schema: {schemaReadyResolved ? "Ready" : "Not applied"}
+        </p>
+        {!schemaReadyResolved ? (
+          <p className="mt-1 font-mono text-xs">
+            Apply migration {GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION} in Supabase before sites, events, or Lead Inbox handoff will work.
+          </p>
+        ) : (
+          <p className="mt-1 text-xs">
+            Intent Pixel tables are available. Install the snippet on an allowed domain and use consent modes as configured.
+          </p>
+        )}
+      </section>
 
       {message ? (
         <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">{message}</p>
@@ -211,11 +292,15 @@ export function GrowthIntentPixelAdmin() {
               value={selectedKey}
               onChange={(e) => setSelectedKey(e.target.value)}
             >
-              {sites.map((s) => (
-                <option key={s.site_key} value={s.site_key}>
-                  {s.site_key}
-                </option>
-              ))}
+              {sites.length === 0 ? (
+                <option value={selectedKey}>{selectedKey}</option>
+              ) : (
+                sites.map((s) => (
+                  <option key={s.site_key} value={s.site_key}>
+                    {s.site_key}
+                  </option>
+                ))
+              )}
             </select>
             <Button variant="outline" size="sm" onClick={() => void loadAll(selectedKey)} disabled={loading}>
               {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
@@ -296,9 +381,9 @@ export function GrowthIntentPixelAdmin() {
             <div>
               <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">Script install snippet</p>
               <pre className="max-h-28 overflow-auto rounded-lg border border-border bg-muted/50 p-3 font-mono text-xs">
-                {selected?.script_snippet ?? "Select a site to view snippet."}
+                {scriptSnippet || "Select or create a site to view the install snippet."}
               </pre>
-              <Button variant="outline" size="sm" className="mt-2" onClick={() => void copySnippet()} disabled={!selected}>
+              <Button variant="outline" size="sm" className="mt-2" onClick={() => void copySnippet()} disabled={!scriptSnippet}>
                 {copied ? <Check className="mr-1 size-4" /> : <Copy className="mr-1 size-4" />}
                 {copied ? "Copied" : "Copy script"}
               </Button>
@@ -330,11 +415,38 @@ export function GrowthIntentPixelAdmin() {
             }
           />
         </div>
-        {!diagnostics?.schema_ready ? (
+        {schemaReadyResolved ? (
+          <div className="flex flex-wrap items-center gap-2 border-t border-border px-5 py-3">
+            <Button
+              size="sm"
+              onClick={() => void processRecentIntent()}
+              disabled={processingIntent || !schemaReadyResolved}
+            >
+              {processingIntent ? (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              ) : (
+                <Inbox className="mr-2 size-4" />
+              )}
+              Process recent intent
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Runs Intent → Lead Bridge on recent sessions and creates Lead Inbox rows when eligible. Does not auto-run Lead Engine or send outreach.
+            </p>
+            {lastHandoff && lastHandoff.inbox_ids.length > 0 ? (
+              <p className="w-full text-xs text-muted-foreground">
+                Latest handoff: {lastHandoff.ingested_count} inbox row(s). Review at{" "}
+                <a href="/admin/growth/leads" className="font-medium text-violet-700 underline">
+                  Lead Inbox
+                </a>
+                .
+              </p>
+            ) : null}
+          </div>
+        ) : (
           <p className="border-t border-border px-5 py-3 text-sm text-amber-700">
-            Apply migration 20270316120000_growth_engine_intent_pixel_foundation.sql before events will persist.
+            Apply migration {GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION} before events will persist.
           </p>
-        ) : null}
+        )}
       </section>
 
       {/* Event stream */}
