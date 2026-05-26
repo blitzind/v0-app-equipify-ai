@@ -56,6 +56,18 @@ export type GrowthLeadInboxCardView = {
   intent_indicators: string[]
   has_operator_handoff: boolean
   has_lead_engine_run: boolean
+  buying_stage: string | null
+  buying_stage_confidence: number | null
+  company_match_confidence: number | null
+  search_intent_category: string | null
+  search_intent_keyword: string | null
+  evidence_strength: "strong" | "moderate" | "weak" | "minimal"
+  evidence_count: number
+  decision_maker_confidence: number | null
+  is_purchase_ready: boolean
+  is_high_intent_visitor: boolean
+  is_returning_account: boolean
+  needs_review: boolean
 }
 
 export type GrowthLeadInboxDashboardSectionPayload = {

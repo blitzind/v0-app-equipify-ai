@@ -14,9 +14,12 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { HighIntentActivityCard } from "@/components/growth/revenue-intelligence/high-intent-activity-card"
+import { RevenueIntelligenceWorkspaceLayout } from "@/components/growth/revenue-intelligence/workspace-layout"
 import { LEAD_ENGINE_STAGE_UI } from "@/lib/growth/lead-engine/lead-engine-stage-ui"
 import type { GrowthLeadEngineOrchestratorStageResult } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
 import type { GrowthLeadOperatorWorkspacePayload } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
+import { formatLabel } from "@/lib/growth/revenue-intelligence/revenue-intelligence-ux"
 import { useAdmin } from "@/lib/admin-store"
 
 function CollapsibleBlock({
@@ -60,7 +63,9 @@ function EvidenceList({
           <p className="mt-1 text-muted-foreground">{item.evidence}</p>
           <p className="mt-1 font-mono text-xs text-muted-foreground">
             {item.source}
-            {item.confidence != null ? ` · ${(item.confidence <= 1 ? item.confidence * 100 : item.confidence).toFixed(0)}%` : ""}
+            {item.confidence != null
+              ? ` · ${(item.confidence <= 1 ? item.confidence * 100 : item.confidence).toFixed(0)}%`
+              : ""}
           </p>
         </div>
       ))}
@@ -69,12 +74,23 @@ function EvidenceList({
 }
 
 function StageResultCard({ stage }: { stage: GrowthLeadEngineOrchestratorStageResult }) {
+  const parsed = stage.parsed as Record<string, unknown> | null
+  const highlights: string[] = []
+  if (typeof parsed?.lead_score === "number") highlights.push(`Lead score ${parsed.lead_score}`)
+  if (typeof parsed?.disposition === "string") highlights.push(`Verification: ${parsed.disposition}`)
+  if (typeof parsed?.approval_status === "string") highlights.push(`Approval: ${parsed.approval_status}`)
+  if (typeof parsed?.company_summary === "string") highlights.push(parsed.company_summary)
+  if (typeof parsed?.execution_summary === "string") highlights.push(parsed.execution_summary)
+  if (typeof parsed?.score_explanation === "string") highlights.push(parsed.score_explanation)
+
   return (
     <div className="rounded-xl border border-border bg-card">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
         <p className="font-medium">{stage.label}</p>
         <div className="flex gap-2">
-          <Badge variant={stage.status === "completed" ? "default" : "secondary"}>{stage.status}</Badge>
+          <Badge variant={stage.status === "completed" ? "default" : "secondary"}>
+            {formatLabel(stage.status)}
+          </Badge>
           {stage.human_review_required ? (
             <Badge variant="outline" className="border-amber-300 text-amber-900">
               review
@@ -83,47 +99,23 @@ function StageResultCard({ stage }: { stage: GrowthLeadEngineOrchestratorStageRe
         </div>
       </div>
       {stage.evidence?.summary ? (
-        <p className="border-b border-border px-4 py-2 text-sm text-muted-foreground">
-          {stage.evidence.summary}
-        </p>
+        <p className="border-b border-border px-4 py-2 text-sm text-muted-foreground">{stage.evidence.summary}</p>
       ) : null}
-      {stage.parsed ? (
-        <CollapsibleBlock title="Structured output" defaultOpen>
-          <EvidenceSummaryFromParsed stage={stage} />
-        </CollapsibleBlock>
-      ) : null}
-      <CollapsibleBlock title="Technical details (expand only if needed)">
+      {highlights.length > 0 ? (
+        <ul className="list-disc space-y-1 px-4 py-3 pl-8 text-sm text-muted-foreground">
+          {highlights.slice(0, 5).map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="px-4 py-3 text-sm text-muted-foreground">Stage output available — expand technical details if needed.</p>
+      )}
+      <CollapsibleBlock title="Technical details">
         <pre className="max-h-48 overflow-auto rounded bg-muted/40 p-2 font-mono text-xs">
           {stage.parsed ? JSON.stringify(stage.parsed, null, 2) : stage.raw_json || "(empty)"}
         </pre>
       </CollapsibleBlock>
     </div>
-  )
-}
-
-function EvidenceSummaryFromParsed({ stage }: { stage: GrowthLeadEngineOrchestratorStageResult }) {
-  const parsed = stage.parsed as Record<string, unknown> | null
-  if (!parsed) return <p className="text-sm text-muted-foreground">No parsed output.</p>
-
-  const highlights: string[] = []
-  if (typeof parsed.lead_score === "number") highlights.push(`Lead score: ${parsed.lead_score}`)
-  if (typeof parsed.disposition === "string") highlights.push(`Verification: ${parsed.disposition}`)
-  if (typeof parsed.approval_status === "string") highlights.push(`Approval: ${parsed.approval_status}`)
-  if (typeof parsed.company_summary === "string") highlights.push(parsed.company_summary)
-  if (typeof parsed.execution_summary === "string") highlights.push(parsed.execution_summary)
-  if (typeof parsed.score_explanation === "string") highlights.push(parsed.score_explanation)
-  if (typeof parsed.evidence_summary === "string") highlights.push(parsed.evidence_summary)
-
-  if (highlights.length === 0) {
-    return <p className="text-sm text-muted-foreground">Stage completed — expand technical details if needed.</p>
-  }
-
-  return (
-    <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-      {highlights.slice(0, 6).map((line) => (
-        <li key={line}>{line}</li>
-      ))}
-    </ul>
   )
 }
 
@@ -196,11 +188,29 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
     return map
   }, [run])
 
+  const searchEvidence = (workspace?.search_intent_signals ?? []).map((s) => ({
+    claim: s.intent_topic,
+    evidence: s.evidence,
+    source: `search_intent · ${s.source_type}`,
+    confidence: s.intent_score / 100,
+  }))
+
+  const companyEvidence = workspace?.company_match
+    ? [
+        {
+          claim: `Company: ${workspace.company_match.company_name}`,
+          evidence: workspace.company_match.evidence,
+          source: `company_identification · ${workspace.company_match.matched_source}`,
+          confidence: workspace.company_match.match_confidence,
+        },
+      ]
+    : []
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
         <Loader2 className="mr-2 size-4 animate-spin" />
-        Loading operator workspace…
+        Loading revenue intelligence workspace…
       </div>
     )
   }
@@ -213,170 +223,143 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
     )
   }
 
-  const card = workspace.card
+  const actionsBar = (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <Button asChild variant="outline" size="sm">
+        <Link href="/admin/growth/leads">← Revenue intelligence inbox</Link>
+      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" disabled={!!acting} onClick={() => void runAction("claim")}>
+          {acting === "claim" ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+          Claim
+        </Button>
+        <Button size="sm" variant="outline" disabled={!!acting} onClick={() => void runAction("assign_owner")}>
+          Assign owner
+        </Button>
+        <Button size="sm" variant="outline" disabled={!!acting} onClick={() => void runAction("approve")}>
+          Approve
+        </Button>
+        <Button size="sm" disabled={!!acting} onClick={() => void runAction("run_lead_engine")}>
+          {acting === "run_lead_engine" ? (
+            <Loader2 className="mr-2 size-4 animate-spin" />
+          ) : (
+            <Play className="mr-2 size-4" />
+          )}
+          Refresh intelligence
+        </Button>
+        <Button size="sm" variant="outline" disabled={!!acting} onClick={() => void runAction("archive")}>
+          Archive
+        </Button>
+        <Button size="sm" variant="outline" disabled={!!acting} onClick={() => void runAction("mark_duplicate")}>
+          Mark duplicate
+        </Button>
+        <Button size="sm" variant="ghost" disabled={!!acting} onClick={() => void load()}>
+          <RefreshCw className="size-4" />
+        </Button>
+      </div>
+    </div>
+  )
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <Button asChild variant="outline" size="sm">
-          <Link href="/admin/growth/leads">← Lead Inbox</Link>
-        </Button>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!!acting}
-            onClick={() => void runAction("claim")}
-          >
-            {acting === "claim" ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-            Claim
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!!acting}
-            onClick={() => void runAction("assign_owner")}
-          >
-            Assign owner
-          </Button>
-          <Button size="sm" variant="outline" disabled={!!acting} onClick={() => void runAction("approve")}>
-            Approve
-          </Button>
-          <Button
-            size="sm"
-            disabled={!!acting}
-            onClick={() => void runAction("run_lead_engine")}
-          >
-            {acting === "run_lead_engine" ? (
-              <Loader2 className="mr-2 size-4 animate-spin" />
-            ) : (
-              <Play className="mr-2 size-4" />
-            )}
-            Run Lead Engine
-          </Button>
-          <Button size="sm" variant="outline" disabled={!!acting} onClick={() => void runAction("archive")}>
-            Archive
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!!acting}
-            onClick={() => void runAction("mark_duplicate")}
-          >
-            Mark duplicate
-          </Button>
-          <Button size="sm" variant="ghost" disabled={!!acting} onClick={() => void load()}>
-            <RefreshCw className="size-4" />
-          </Button>
-        </div>
-      </div>
-
-      {error ? (
-        <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          <AlertTriangle className="size-4 shrink-0" />
-          {error}
-        </div>
-      ) : null}
-
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{card.company_name}</h1>
-            {card.domain ? <p className="text-sm text-muted-foreground">{card.domain}</p> : null}
+    <RevenueIntelligenceWorkspaceLayout workspace={workspace} actions={
+      <>
+        {actionsBar}
+        {error ? (
+          <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            <AlertTriangle className="size-4 shrink-0" />
+            {error}
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Badge>Score {card.lead_score ?? "—"}</Badge>
-            <Badge variant="secondary">Intent {card.intent_score} ({card.intent_grade})</Badge>
-            <Badge variant="outline">{card.verification_state}</Badge>
-            <Badge variant="outline">{card.recommended_motion.replace(/_/g, " ")}</Badge>
-            <Badge variant="outline">{card.recommended_owner.replace(/_/g, " ")}</Badge>
-            <Badge variant="outline">{card.recommended_urgency.replace(/_/g, " ")}</Badge>
-          </div>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Status {card.status} · Pipeline {card.pipeline_status} · {card.time_since_activity_label}
-        </p>
-      </section>
-
-      <Tabs defaultValue="overview" className="w-full">
+        ) : null}
+      </>
+    }>
+      <Tabs defaultValue="guidance" className="w-full">
         <TabsList className="flex h-auto flex-wrap justify-start gap-1 bg-muted/50 p-1">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="guidance">Operator guidance</TabsTrigger>
+          <TabsTrigger value="intent">Intent activity</TabsTrigger>
           <TabsTrigger value="evidence">Evidence</TabsTrigger>
-          <TabsTrigger value="intent">Intent Activity</TabsTrigger>
-          <TabsTrigger value="engine">Lead Engine</TabsTrigger>
-          <TabsTrigger value="guidance">Operator Guidance</TabsTrigger>
+          <TabsTrigger value="engine">Lead intelligence</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-4 space-y-4">
-          {workspace.buying_stage ? (
-            <GrowthEngineCard title="Buying stage (candidate)">
-              <p className="text-sm font-medium capitalize">
-                {workspace.buying_stage.detected_stage.replace(/_/g, " ")}
-              </p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Confidence {(workspace.buying_stage.stage_confidence * 100).toFixed(0)}% · score{" "}
-                {workspace.buying_stage.stage_score} · {workspace.buying_stage.signal_count} signal(s)
-              </p>
-              <p className="mt-2 text-xs text-amber-800">
-                Candidate assessment only — not guaranteed buying stage. No autonomous actions.
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">{workspace.buying_stage.evidence}</p>
-            </GrowthEngineCard>
-          ) : null}
-          {workspace.company_match ? (
-            <GrowthEngineCard title="Company match (candidate)">
-              <p className="text-sm font-medium">{workspace.company_match.company_name}</p>
-              {workspace.company_match.company_domain ? (
-                <p className="text-sm text-muted-foreground">{workspace.company_match.company_domain}</p>
-              ) : null}
-              <p className="mt-2 text-xs text-muted-foreground">
-                Source {workspace.company_match.matched_source.replace(/_/g, " ")} ·{" "}
-                {workspace.company_match.match_type.replace(/_/g, " ")} · confidence{" "}
-                {(workspace.company_match.match_confidence * 100).toFixed(0)}% · score{" "}
-                {workspace.company_match.match_score}
-              </p>
-              <p className="mt-2 text-xs text-amber-800">
-                Candidate match only — not guaranteed company identity. No IP-to-company claim.
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">{workspace.company_match.evidence}</p>
-            </GrowthEngineCard>
-          ) : null}
-          <GrowthEngineCard title="Executive Summary">
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {workspace.overview.executive_summary}
+        <TabsContent value="guidance" className="mt-4 space-y-4">
+          <GrowthEngineCard title="Next action">
+            <p className="text-sm font-medium text-foreground">
+              {handoff?.recommended_next_action ?? hints?.recommended_next_action}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Recommended timing: {handoff?.recommended_followup_window ?? hints?.recommended_followup_window}
             </p>
           </GrowthEngineCard>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <GrowthEngineCard title="Pain Points">
-              <EvidenceList items={workspace.overview.pain_points} />
+          <GrowthEngineCard title="Missing information">
+            <EvidenceList items={handoff?.missing_information ?? []} />
+          </GrowthEngineCard>
+          <GrowthEngineCard title="Objection preparation">
+            <EvidenceList items={handoff?.objection_preparation ?? []} />
+          </GrowthEngineCard>
+          <GrowthEngineCard title="Follow-up recommendation">
+            <p className="text-sm text-muted-foreground">
+              {handoff?.recommended_followup_window ?? hints?.recommended_followup_window} —{" "}
+              {formatLabel(handoff?.recommended_channel ?? hints?.recommended_channel ?? "none")} channel when approved for outreach.
+            </p>
+          </GrowthEngineCard>
+          {handoff?.talking_point_summary ? (
+            <GrowthEngineCard title="Talking points">
+              <p className="text-sm text-muted-foreground">{handoff.talking_point_summary}</p>
             </GrowthEngineCard>
-            <GrowthEngineCard title="Buying Signals">
-              <EvidenceList items={workspace.overview.buying_signals} />
-            </GrowthEngineCard>
-            <GrowthEngineCard title="Growth Signals">
-              <EvidenceList items={workspace.overview.growth_signals} />
-            </GrowthEngineCard>
-            <GrowthEngineCard title="Decision Maker Summary">
-              <p className="text-sm text-muted-foreground">{workspace.overview.decision_maker_summary}</p>
-            </GrowthEngineCard>
-            <GrowthEngineCard title="Contact Summary">
-              <p className="text-sm text-muted-foreground">{workspace.overview.contact_summary}</p>
-              {!workspace.row.contact_identified ? (
-                <p className="mt-2 text-xs text-amber-800">Contact PII hidden until identified via intent or research.</p>
-              ) : null}
-            </GrowthEngineCard>
-            <GrowthEngineCard title="Verification Summary">
-              <p className="text-sm text-muted-foreground">{workspace.overview.verification_summary}</p>
-            </GrowthEngineCard>
-          </div>
-          <GrowthEngineCard title="Lead Score Summary">
-            <p className="text-sm text-muted-foreground">{workspace.overview.lead_score_summary}</p>
+          ) : null}
+        </TabsContent>
+
+        <TabsContent value="intent" className="mt-4 space-y-4">
+          <GrowthEngineCard title="High-intent activity">
+            <HighIntentActivityCard
+              intentActivity={workspace.intent_activity}
+              searchSignals={workspace.search_intent_signals}
+            />
+          </GrowthEngineCard>
+          <GrowthEngineCard title="Session history">
+            {!workspace.intent_activity ? (
+              <p className="text-sm text-muted-foreground">No intent session history loaded.</p>
+            ) : (
+              <div className="space-y-4 text-sm">
+                <p className="text-muted-foreground">
+                  {workspace.intent_activity.session_count} sessions ·{" "}
+                  {workspace.intent_activity.total_pageviews} pageviews · visit frequency{" "}
+                  {workspace.row.session_count > 1 ? "returning" : "first visit"} · page depth{" "}
+                  {workspace.row.visit_count} views
+                </p>
+                {workspace.intent_activity.sessions.map((session) => (
+                  <div key={session.session_key} className="rounded-lg border border-border p-3">
+                    <p className="font-medium">
+                      Session · {session.pageview_count} views
+                      {session.is_identified ? " · identified" : " · anonymous"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {Math.round(session.total_time_on_site_ms / 1000)}s on site
+                    </p>
+                    {session.pageviews.length > 0 ? (
+                      <ul className="mt-2 list-disc pl-5 text-muted-foreground">
+                        {session.pageviews.slice(-8).map((pv) => (
+                          <li key={pv.id}>
+                            {pv.page_path || pv.page_url}
+                            {pv.duration_ms > 0 ? ` (${Math.round(pv.duration_ms / 1000)}s)` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {session.conversions.length > 0 ? (
+                      <p className="mt-2 text-xs font-medium text-emerald-800">
+                        Conversions: {session.conversions.map((c) => c.conversion_type.replace(/_/g, " ")).join(", ")}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
           </GrowthEngineCard>
         </TabsContent>
 
         <TabsContent value="evidence" className="mt-4 space-y-4">
-          <GrowthEngineCard title="Evidence">
+          <GrowthEngineCard title="Evidence cards">
             <EvidenceList items={workspace.evidence.items} />
           </GrowthEngineCard>
           <GrowthEngineCard title="Attribution">
@@ -399,87 +382,32 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
               )}
             </div>
           </GrowthEngineCard>
-        </TabsContent>
-
-        <TabsContent value="intent" className="mt-4 space-y-4">
-          {workspace.search_intent_signals.length > 0 ? (
-            <GrowthEngineCard title="Search intent signals">
-              <div className="space-y-2">
-                {workspace.search_intent_signals.map((signal) => (
-                  <div key={signal.id} className="rounded-lg border border-border p-3 text-sm">
-                    <p className="font-medium">{signal.intent_topic}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {signal.intent_category.replace(/_/g, " ")} · {signal.intent_stage.replace(/_/g, " ")} · score{" "}
-                      {signal.intent_score} · {signal.source_type.replace(/_/g, " ")}
-                    </p>
-                    {signal.keyword ? (
-                      <p className="mt-1 text-xs">Keyword: {signal.keyword}</p>
-                    ) : null}
-                    <p className="mt-1 text-muted-foreground">{signal.evidence}</p>
-                  </div>
-                ))}
-              </div>
+          {searchEvidence.length > 0 ? (
+            <GrowthEngineCard title="Search intent evidence">
+              <EvidenceList items={searchEvidence} />
             </GrowthEngineCard>
           ) : null}
-          <GrowthEngineCard title="Intent Activity">
-            {!workspace.intent_activity ? (
-              <p className="text-sm text-muted-foreground">No intent session history loaded.</p>
-            ) : (
-              <div className="space-y-4 text-sm">
-                <p className="text-muted-foreground">
-                  {workspace.intent_activity.session_count} sessions ·{" "}
-                  {workspace.intent_activity.total_pageviews} pageviews ·{" "}
-                  {Math.round(workspace.intent_activity.total_time_on_site_ms / 1000)}s on site
-                </p>
-                <p className="text-muted-foreground">
-                  UTM: {workspace.row.utm_source || "—"} / {workspace.row.utm_medium || "—"} /{" "}
-                  {workspace.row.utm_campaign || "—"}
-                </p>
-                {workspace.intent_activity.sessions.map((session) => (
-                  <div key={session.session_key} className="rounded-lg border border-border p-3">
-                    <p className="font-medium">
-                      Session {session.session_key.slice(0, 8)}… · {session.pageview_count} views
-                      {session.is_identified ? " · identified" : " · anonymous"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {session.started_at} — {Math.round(session.total_time_on_site_ms / 1000)}s
-                    </p>
-                    {session.pageviews.length > 0 ? (
-                      <ul className="mt-2 list-disc pl-5 text-muted-foreground">
-                        {session.pageviews.slice(-5).map((pv) => (
-                          <li key={pv.id}>
-                            {pv.page_path || pv.page_url}
-                            {pv.duration_ms > 0 ? ` (${Math.round(pv.duration_ms / 1000)}s)` : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                    {session.conversions.length > 0 ? (
-                      <p className="mt-2 text-xs font-medium text-emerald-800">
-                        Conversions: {session.conversions.map((c) => c.conversion_type).join(", ")}
-                      </p>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            )}
-          </GrowthEngineCard>
+          {companyEvidence.length > 0 ? (
+            <GrowthEngineCard title="Company identification evidence">
+              <EvidenceList items={companyEvidence} />
+            </GrowthEngineCard>
+          ) : null}
         </TabsContent>
 
         <TabsContent value="engine" className="mt-4 space-y-4">
           {!run ? (
-            <GrowthEngineCard title="Lead Engine">
+            <GrowthEngineCard title="Lead intelligence">
               <p className="text-sm text-muted-foreground">
-                Pipeline not run yet. Use Run Lead Engine to generate stage outputs (fixture mode, human review required).
+                Intelligence package not generated yet. Run refresh to produce scores, verification, and operator guidance.
               </p>
               <Button className="mt-3" size="sm" disabled={!!acting} onClick={() => void runAction("run_lead_engine")}>
                 <Play className="mr-2 size-4" />
-                Run Lead Engine
+                Refresh intelligence
               </Button>
             </GrowthEngineCard>
           ) : (
             <>
-              <GrowthEngineCard title="Pipeline status">
+              <GrowthEngineCard title="Pipeline intelligence">
                 <p className="text-sm text-muted-foreground">{run.execution_summary}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {LEAD_ENGINE_STAGE_UI.map((def) => {
@@ -502,48 +430,12 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
           )}
         </TabsContent>
 
-        <TabsContent value="guidance" className="mt-4 space-y-4">
-          <GrowthEngineCard title="Why this matters">
-            <p className="text-sm text-muted-foreground">
-              {handoff?.why_this_matters ?? hints?.recommended_next_action ?? "Run Lead Engine for guidance."}
-            </p>
-          </GrowthEngineCard>
-          <GrowthEngineCard title="Recommended next action">
-            <p className="text-sm font-medium">
-              {handoff?.recommended_next_action ?? hints?.recommended_next_action}
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Follow-up: {handoff?.recommended_followup_window ?? hints?.recommended_followup_window}
-            </p>
-          </GrowthEngineCard>
-          <GrowthEngineCard title="Missing information">
-            <EvidenceList items={handoff?.missing_information ?? []} />
-          </GrowthEngineCard>
-          <GrowthEngineCard title="Objection preparation">
-            <EvidenceList items={handoff?.objection_preparation ?? []} />
-          </GrowthEngineCard>
-          {handoff?.talking_point_summary ? (
-            <GrowthEngineCard title="Talking points">
-              <p className="text-sm text-muted-foreground">{handoff.talking_point_summary}</p>
-            </GrowthEngineCard>
-          ) : null}
-          {handoff?.human_notes?.length ? (
-            <GrowthEngineCard title="Operator notes">
-              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                {handoff.human_notes.map((note) => (
-                  <li key={note}>{note}</li>
-                ))}
-              </ul>
-            </GrowthEngineCard>
-          ) : null}
-        </TabsContent>
-
         <TabsContent value="history" className="mt-4">
-          <GrowthEngineCard title="History">
+          <GrowthEngineCard title="Activity history">
             <ul className="space-y-3 text-sm">
               {workspace.history.map((entry) => (
                 <li key={`${entry.at}-${entry.action}`} className="border-b border-border pb-2 last:border-0">
-                  <p className="font-medium">{entry.action.replace(/_/g, " ")}</p>
+                  <p className="font-medium capitalize">{formatLabel(entry.action)}</p>
                   <p className="text-xs text-muted-foreground">{entry.at}</p>
                   <p className="text-muted-foreground">{entry.note}</p>
                 </li>
@@ -552,8 +444,6 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
           </GrowthEngineCard>
         </TabsContent>
       </Tabs>
-
-      <p className="font-mono text-xs text-muted-foreground">{workspace.qa_marker}</p>
-    </div>
+    </RevenueIntelligenceWorkspaceLayout>
   )
 }

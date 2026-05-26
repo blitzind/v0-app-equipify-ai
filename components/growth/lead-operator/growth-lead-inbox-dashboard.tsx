@@ -1,16 +1,17 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Loader2, RefreshCw, Workflow } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthLeadInboxCard } from "@/components/growth/lead-operator/growth-lead-inbox-card"
+import { RevenueKpiStrip } from "@/components/growth/revenue-intelligence/revenue-kpi-strip"
 import {
   GROWTH_LEAD_INBOX_SORT_MODES,
-  GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER,
   type GrowthLeadInboxDashboardSectionPayload,
   type GrowthLeadInboxSortMode,
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
+import { GROWTH_REVENUE_INTELLIGENCE_UX_QA_MARKER } from "@/lib/growth/revenue-intelligence/revenue-intelligence-ux"
 import { cn } from "@/lib/utils"
 
 const SORT_LABELS: Record<GrowthLeadInboxSortMode, string> = {
@@ -26,6 +27,8 @@ export function GrowthLeadInboxDashboard() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const allCards = useMemo(() => sections.flatMap((s) => s.items), [sections])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -58,17 +61,12 @@ export function GrowthLeadInboxDashboard() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          {GROWTH_LEAD_INBOX_SORT_MODES.map((mode) => (
-            <Button
-              key={mode}
-              size="sm"
-              variant={sort === mode ? "default" : "outline"}
-              onClick={() => setSort(mode)}
-            >
-              {SORT_LABELS[mode]}
-            </Button>
-          ))}
+        <div>
+          <h2 className="text-lg font-semibold">Revenue intelligence</h2>
+          <p className="text-sm text-muted-foreground">
+            Prioritize accounts by intent, buying stage, and operator-ready signals.
+          </p>
+          <p className="mt-1 font-mono text-xs text-muted-foreground">{GROWTH_REVENUE_INTELLIGENCE_UX_QA_MARKER}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm">
@@ -91,7 +89,18 @@ export function GrowthLeadInboxDashboard() {
         </div>
       </div>
 
-      <p className="font-mono text-xs text-muted-foreground">{GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER}</p>
+      <div className="flex flex-wrap gap-2">
+        {GROWTH_LEAD_INBOX_SORT_MODES.map((mode) => (
+          <Button
+            key={mode}
+            size="sm"
+            variant={sort === mode ? "default" : "outline"}
+            onClick={() => setSort(mode)}
+          >
+            {SORT_LABELS[mode]}
+          </Button>
+        ))}
+      </div>
 
       {error ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
@@ -102,12 +111,13 @@ export function GrowthLeadInboxDashboard() {
       {loading ? (
         <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
           <Loader2 className="mr-2 size-4 animate-spin" />
-          Loading lead inbox…
+          Loading revenue intelligence queue…
         </div>
       ) : (
         <div className="space-y-8">
+          <RevenueKpiStrip cards={allCards} />
           <p className="text-sm text-muted-foreground">
-            {total} candidate{total === 1 ? "" : "s"} — operator workflow only, no autonomous outreach.
+            {total} account{total === 1 ? "" : "s"} in queue — human review required before any outreach.
           </p>
           {sections.map((section) => (
             <section key={section.id} className="space-y-3">
@@ -117,7 +127,7 @@ export function GrowthLeadInboxDashboard() {
               </div>
               {section.items.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
-                  No leads in this queue.
+                  No accounts in this queue.
                 </p>
               ) : (
                 <div

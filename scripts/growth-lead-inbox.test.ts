@@ -180,6 +180,18 @@ function makeCandidate(overrides: Partial<GrowthIntentLeadCandidate>): GrowthInt
     company_identification_matches: [],
     buying_stage_summary: null,
     buying_stage_assessment: null,
+    buying_stage: null,
+    buying_stage_confidence: null,
+    company_match_confidence: null,
+    search_intent_category: null,
+    search_intent_keyword: null,
+    evidence_strength: "minimal",
+    evidence_count: 1,
+    decision_maker_confidence: null,
+    is_purchase_ready: false,
+    is_high_intent_visitor: false,
+    is_returning_account: false,
+    needs_review: false,
     ...overrides,
   }
 }

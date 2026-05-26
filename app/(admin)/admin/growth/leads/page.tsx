@@ -10,7 +10,7 @@ import {
   usePlatformAdminHeaderIdentity,
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
-import { GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
+import { GROWTH_REVENUE_INTELLIGENCE_UX_QA_MARKER } from "@/lib/growth/revenue-intelligence/revenue-intelligence-ux"
 
 export default function AdminGrowthLeadInboxPage() {
   const { sessionIdentity } = useAdmin()
@@ -31,12 +31,12 @@ export default function AdminGrowthLeadInboxPage() {
               <Inbox size={17} />
             </span>
             <div>
-              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Lead Inbox</h1>
+              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Revenue intelligence</h1>
               <p className="text-sm text-muted-foreground">
-                Operational sales workspace — prioritize evidence, review intent, and route operators. No autonomous outreach.
+                Operator workspace — prioritize accounts by intent, buying stage, and evidence. Human review before any outreach.
               </p>
               <p className="mt-1 font-mono text-xs text-muted-foreground">
-                {GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER}
+                {GROWTH_REVENUE_INTELLIGENCE_UX_QA_MARKER}
               </p>
             </div>
           </div>

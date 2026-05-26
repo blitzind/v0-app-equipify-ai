@@ -8,6 +8,10 @@ import {
   type GrowthLeadInboxCardView,
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import { extractLeadEngineOutputsFromRun } from "@/lib/growth/lead-operator-workspace/lead-engine-run-extract"
+import {
+  deriveEvidenceStrength,
+  normalizeConfidence,
+} from "@/lib/growth/revenue-intelligence/revenue-intelligence-ux"
 
 function formatTimeSince(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime()
@@ -97,9 +101,40 @@ export function buildLeadInboxCardView(row: GrowthLeadInboxRow): GrowthLeadInbox
   const buyingStageSummary = row.metadata?.buying_stage_summary as
     | { detected_stage?: string; stage_confidence?: number }
     | undefined
-  if (buyingStageSummary?.detected_stage) {
-    intentIndicators.push(`Stage: ${String(buyingStageSummary.detected_stage).replace(/_/g, " ")}`)
+  const buyingStage = buyingStageSummary?.detected_stage ?? null
+  if (buyingStage) {
+    intentIndicators.push(`Stage: ${String(buyingStage).replace(/_/g, " ")}`)
   }
+
+  const decisionMaker =
+    outputs.decisionMakerHypothesis && typeof outputs.decisionMakerHypothesis === "object"
+      ? outputs.decisionMakerHypothesis
+      : null
+  const decisionMakerConfidence =
+    typeof decisionMaker?.confidence_assessment?.score === "number"
+      ? normalizeConfidence(decisionMaker.confidence_assessment.score)
+      : null
+
+  const evidenceCount = row.candidate_evidence.length
+  const evidenceStrength = deriveEvidenceStrength({
+    evidenceCount,
+    attributionCount: row.candidate_attribution.length,
+    candidateConfidence: row.candidate_confidence,
+  })
+
+  const isPurchaseReady =
+    buyingStage === "purchase_ready" || buyingStage === "active_opportunity"
+  const isHighIntentVisitor =
+    row.candidate_type === "high_intent" ||
+    row.intent_score >= 15 ||
+    searchSummary?.top_category === "demo_intent"
+  const isReturningAccount =
+    row.candidate_type === "returning" ||
+    row.candidate_type === "existing_account" ||
+    row.session_count > 1 ||
+    row.existing_account_match.matched
+  const needsReview =
+    row.human_review_required && (row.status === "new" || row.status === "reviewing")
 
   const lastActivityAt = row.updated_at || row.created_at
 
@@ -129,5 +164,17 @@ export function buildLeadInboxCardView(row: GrowthLeadInboxRow): GrowthLeadInbox
     intent_indicators: intentIndicators,
     has_operator_handoff: handoff != null,
     has_lead_engine_run: isPipelineRun(run),
+    buying_stage: buyingStage,
+    buying_stage_confidence: buyingStageSummary?.stage_confidence ?? null,
+    company_match_confidence: companySummary?.match_confidence ?? null,
+    search_intent_category: searchSummary?.top_category ?? null,
+    search_intent_keyword: searchSummary?.top_keyword ?? null,
+    evidence_strength: evidenceStrength,
+    evidence_count: evidenceCount,
+    decision_maker_confidence: decisionMakerConfidence,
+    is_purchase_ready: isPurchaseReady,
+    is_high_intent_visitor: isHighIntentVisitor,
+    is_returning_account: isReturningAccount,
+    needs_review: needsReview,
   }
 }
