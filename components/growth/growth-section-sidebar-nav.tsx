@@ -26,6 +26,7 @@ import {
   Plus,
   Radio,
   Radar,
+  Search,
   Send,
   Settings,
   Sparkles,
@@ -102,6 +103,12 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
         label: "Intent Pixel",
         icon: Radar,
         match: (path) => path.startsWith("/admin/growth/intent-pixel"),
+      },
+      {
+        href: "/admin/growth/search",
+        label: "Search",
+        icon: Search,
+        match: (path) => path.startsWith("/admin/growth/search"),
       },
       {
         href: "/admin/growth/replies",
