@@ -282,9 +282,9 @@ export function GrowthLeadEngineWorkspace() {
       </section>
 
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <h3 className="font-semibold">Sandbox input</h3>
+        <h3 className="font-semibold">Pipeline input</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Operator context drives fixture stubs. No provider integrations or outbound execution.
+          Development-only fixture run. For production workflow, use Lead Inbox → operator workspace.
         </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
@@ -332,7 +332,7 @@ export function GrowthLeadEngineWorkspace() {
         <div className="mt-4">
           <Button onClick={() => void runPipeline()} disabled={loading || !input.companyName.trim()}>
             {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Play className="mr-2 size-4" />}
-            Run Lead Engine
+            Run pipeline (dev)
           </Button>
         </div>
         {error ? (

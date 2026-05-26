@@ -81,7 +81,13 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
         href: "/admin/growth/leads",
         label: "Inbox",
         icon: Inbox,
-        match: (path) => path === "/admin/growth/leads",
+        match: (path) => {
+          if (!path.startsWith("/admin/growth/leads")) return false
+          if (path.startsWith("/admin/growth/leads/lead-engine")) return false
+          if (path.startsWith("/admin/growth/leads/crm")) return false
+          if (path.startsWith("/admin/growth/leads/queue")) return false
+          return path === "/admin/growth/leads" || /^\/admin\/growth\/leads\/[0-9a-f-]{36}$/i.test(path)
+        },
         consoleKey: "inbox",
         shortcutKey: "i",
       },

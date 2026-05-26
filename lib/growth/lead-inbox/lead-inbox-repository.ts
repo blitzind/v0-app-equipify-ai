@@ -397,6 +397,28 @@ export async function promoteToPipeline(
   })
 }
 
+export async function assignLeadOwner(
+  admin: SupabaseClient,
+  id: string,
+  ownerId: string,
+): Promise<GrowthLeadInboxRow | null> {
+  const row = await fetchLeadInboxById(admin, id)
+  if (!row) return null
+  return updateLeadInboxRow(admin, id, { owner_id: ownerId })
+}
+
+export async function saveLeadInboxMetadataPatch(
+  admin: SupabaseClient,
+  id: string,
+  metadataPatch: Record<string, unknown>,
+): Promise<GrowthLeadInboxRow | null> {
+  const row = await fetchLeadInboxById(admin, id)
+  if (!row) return null
+  return updateLeadInboxRow(admin, id, {
+    metadata: { ...row.metadata, ...metadataPatch },
+  })
+}
+
 export async function disqualifyLead(
   admin: SupabaseClient,
   id: string,

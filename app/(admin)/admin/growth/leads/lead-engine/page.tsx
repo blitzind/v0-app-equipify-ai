@@ -31,9 +31,9 @@ export default function AdminGrowthLeadEnginePage() {
               <Sparkles size={17} />
             </span>
             <div>
-              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Lead Engine Sandbox</h1>
+              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Lead Engine Tools</h1>
               <p className="text-sm text-muted-foreground">
-                Internal admin workspace to inspect the Lead Engine pipeline — parser validation via fixtures, no outbound execution.
+                Development pipeline inspector — parser validation via fixtures. Use the Lead Inbox for day-to-day operator workflow.
               </p>
               <p className="mt-1 font-mono text-xs text-muted-foreground">{GROWTH_LEAD_ENGINE_ORCHESTRATOR_QA_MARKER}</p>
             </div>
