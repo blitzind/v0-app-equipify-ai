@@ -8,6 +8,7 @@ import {
   ResultSignalBadges,
 } from "@/components/growth/prospect-search/result-signal-badges"
 import { BuyingCommitteePanel } from "@/components/growth/prospect-search/buying-committee-panel"
+import { RealWorldSourceBadge } from "@/components/growth/prospect-search/real-world-provider-status"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
 
@@ -57,9 +58,15 @@ export function CompanyResultCard({
               </Badge>
             ) : null}
             {row.source_type === "external_discovered" ? (
-              <Badge variant="secondary" className="text-[10px]">
-                External
-              </Badge>
+              <>
+                <Badge variant="secondary" className="text-[10px]">
+                  External
+                </Badge>
+                <RealWorldSourceBadge
+                  badge={row.discovery_source_badge}
+                  providerType={row.discovery_provider_type}
+                />
+              </>
             ) : null}
             {row.location ? (
               <Badge variant="outline" className="text-[10px]">

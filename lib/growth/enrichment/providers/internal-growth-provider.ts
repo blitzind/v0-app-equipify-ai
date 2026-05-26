@@ -83,58 +83,70 @@ export function createInternalGrowthEnrichmentProvider(
       }
 
       if (input.company_candidate_id) {
-        try {
-          const { data } = await admin
-            .schema("growth")
-            .from("external_company_candidates")
-            .select("id, company_name, domain, industry, category, city, state, metadata")
-            .eq("id", input.company_candidate_id)
-            .maybeSingle()
+        const companyTables = [
+          "real_world_company_candidates",
+          "external_company_candidates",
+        ] as const
+        for (const table of companyTables) {
+          try {
+            const { data } = await admin
+              .schema("growth")
+              .from(table)
+              .select(
+                "id, company_name, domain, industry, category, description, city, state, metadata",
+              )
+              .eq("id", input.company_candidate_id)
+              .maybeSingle()
 
-          if (data) {
-            const r = data as Record<string, unknown>
-            const meta =
-              r.metadata && typeof r.metadata === "object"
-                ? (r.metadata as Record<string, unknown>)
-                : {}
-            const location = [asString(r.city), asString(r.state)].filter(Boolean).join(", ")
-            company_enrichments.push({
-              company_candidate_id: input.company_candidate_id,
-              employee_estimate: null,
-              revenue_estimate: null,
-              industry: asString(r.industry) || null,
-              subindustry: asString(r.category) || null,
-              technology_signals: [],
-              crm_signals:
-                meta.matched_prospect_id || meta.matched_customer_id
-                  ? ["Existing CRM match (observed)"]
-                  : [],
-              service_signals: asString(r.category) ? [asString(r.category)] : [],
-              location_signals: location ? [location] : [],
-              confidence: 0.58,
-              evidence: [
-                {
-                  claim: "External company candidate",
-                  evidence: `company=${asString(r.company_name)} domain=${asString(r.domain)}`,
-                  source: "growth.external_company_candidates",
-                  tier: "observed",
-                },
-              ],
-              source_attribution: [
-                {
-                  source: "growth.external_company_candidates",
-                  provider_type: "internal_growth",
-                  provider_name: "internal_growth",
-                  tier: "observed",
-                  signal: "company_record",
-                  evidence: "Observed fields from company discovery store.",
-                  confidence: 0.58,
-                },
-              ],
-            })
+            if (data) {
+              const r = data as Record<string, unknown>
+              const meta =
+                r.metadata && typeof r.metadata === "object"
+                  ? (r.metadata as Record<string, unknown>)
+                  : {}
+              const location = [asString(r.city), asString(r.state)].filter(Boolean).join(", ")
+              company_enrichments.push({
+                company_candidate_id: input.company_candidate_id,
+                employee_estimate: null,
+                revenue_estimate: null,
+                industry: asString(r.industry) || null,
+                subindustry: asString(r.category) || null,
+                technology_signals: [],
+                crm_signals:
+                  meta.matched_prospect_id || meta.matched_customer_id
+                    ? ["Existing CRM match (observed)"]
+                    : [],
+                service_signals: [
+                  ...(asString(r.category) ? [asString(r.category)] : []),
+                  ...(asString(r.description) ? [asString(r.description).slice(0, 120)] : []),
+                ].filter(Boolean),
+                location_signals: location ? [location] : [],
+                confidence: 0.58,
+                evidence: [
+                  {
+                    claim: "Company discovery candidate",
+                    evidence: `company=${asString(r.company_name)} domain=${asString(r.domain)}`,
+                    source: `growth.${table}`,
+                    tier: "observed",
+                  },
+                ],
+                source_attribution: [
+                  {
+                    source: `growth.${table}`,
+                    provider_type: "internal_growth",
+                    provider_name: "internal_growth",
+                    tier: "observed",
+                    signal: "company_record",
+                    evidence: "Observed fields from company discovery store.",
+                    confidence: 0.58,
+                  },
+                ],
+              })
+              break
+            }
+          } catch {
+            /* optional */
           }
-        } catch {
-          /* optional */
         }
 
         if (input.growth_lead_id) {

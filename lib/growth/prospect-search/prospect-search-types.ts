@@ -115,6 +115,10 @@ export type GrowthProspectSearchParsedQuery = {
 export type GrowthProspectSearchCompanyResult = {
   id: string
   source_type: GrowthProspectSearchSourceType
+  /** Real-world / external discovery provider type when source_type is external_discovered. */
+  discovery_provider_type?: string | null
+  discovery_provider_name?: string | null
+  discovery_source_badge?: string | null
   company_name: string
   website: string | null
   industry: string | null
@@ -165,7 +169,11 @@ export type GrowthProspectSearchResult = {
   total_people: number
   source_counts: Record<GrowthProspectSearchSourceType, number>
   external_discovery_run_id?: string | null
+  real_world_discovery_run_id?: string | null
+  real_world_built_query?: string | null
   provider_messages?: string[]
+  provider_status_label?: string | null
+  provider_status_message?: string | null
 }
 
 export type GrowthProspectSearchSavedSearchRow = {

@@ -510,9 +510,11 @@ export function GrowthIntentPixelAdmin() {
                           "rounded px-1.5 py-0.5 text-xs",
                           ev.tracking_mode === "full"
                             ? "bg-emerald-100 text-emerald-800"
-                            : ev.tracking_mode === "essential_only"
-                              ? "bg-amber-100 text-amber-900"
-                              : "bg-slate-100 text-slate-700",
+                            : ev.tracking_mode === "anonymous"
+                              ? "bg-cyan-100 text-cyan-900"
+                              : ev.tracking_mode === "essential_only"
+                                ? "bg-amber-100 text-amber-900"
+                                : "bg-slate-100 text-slate-700",
                         )}
                       >
                         {ev.consent_status} · {ev.tracking_mode}

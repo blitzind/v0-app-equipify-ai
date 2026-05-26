@@ -58,6 +58,16 @@ const collectRoute = fs.readFileSync(
 )
 assert.match(collectRoute, /captureIntentPixelEvent/)
 assert.match(collectRoute, /Access-Control-Allow-Origin/)
+assert.match(collectRoute, /GROWTH_INTENT_PIXEL_422_DEBUG_QA_MARKER/)
+assert.match(collectRoute, /rejection_code/)
+assert.match(collectRoute, /logIntentPixelCollectRejection/)
+
+const collectDebug = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/intent-pixel/intent-pixel-collect-debug.ts"),
+  "utf8",
+)
+assert.match(collectDebug, /consent_unknown/)
+assert.match(collectDebug, /domain_not_allowed/)
 
 const pixelRoute = fs.readFileSync(
   path.join(process.cwd(), "app/api/growth/intent-pixel/pixel.js/route.ts"),
@@ -174,8 +184,24 @@ assert.match(adminRepo, /consent_denied_sessions_24h/)
 assert.doesNotMatch(adminRepo, /email.*full_name.*linkedin.*from.*identified/)
 
 // Site config
-assert.equal(trackingModeFromSite({ tracking_enabled: false, consent_required: true }), "disabled")
+assert.equal(
+  trackingModeFromSite({
+    tracking_enabled: false,
+    consent_required: true,
+    allow_anonymous_pageviews: false,
+  }),
+  "disabled",
+)
+assert.equal(
+  trackingModeFromSite({
+    tracking_enabled: true,
+    consent_required: true,
+    allow_anonymous_pageviews: true,
+  }),
+  "anonymous_pageviews",
+)
 assert.equal(siteFlagsFromTrackingMode("always_on").consent_required, false)
+assert.equal(siteFlagsFromTrackingMode("anonymous_pageviews").allow_anonymous_pageviews, true)
 assert.equal(isValidIntentPixelSiteKey("equipify-sandbox"), true)
 assert.match(
   buildIntentPixelScriptSnippet("https://app.test", "equipify-sandbox").script_snippet,
@@ -190,9 +216,19 @@ const site = {
   domain_allowlist: ["example.com"],
   tracking_enabled: true,
   consent_required: true,
+  allow_anonymous_pageviews: false,
 }
 
 let gate = resolveTrackingMode(site, "unknown", "pageview")
+assert.equal(gate.accepted, false)
+assert.equal(gate.mode, "rejected")
+
+const anonSite = { ...site, allow_anonymous_pageviews: true }
+gate = resolveTrackingMode(anonSite, "unknown", "pageview")
+assert.equal(gate.accepted, true)
+assert.equal(gate.mode, "anonymous")
+
+gate = resolveTrackingMode(anonSite, "unknown", "conversion")
 assert.equal(gate.accepted, false)
 assert.equal(gate.mode, "rejected")
 

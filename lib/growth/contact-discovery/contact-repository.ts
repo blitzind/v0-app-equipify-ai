@@ -63,17 +63,28 @@ export type ResolveCompanyContextResult = {
   industry: string | null
 }
 
+async function loadCompanyCandidateRow(
+  admin: SupabaseClient,
+  companyCandidateId: string,
+  table: "real_world_company_candidates" | "external_company_candidates",
+): Promise<Record<string, unknown> | null> {
+  const { data } = await admin
+    .schema("growth")
+    .from(table)
+    .select("id, company_name, domain, industry, metadata")
+    .eq("id", companyCandidateId)
+    .maybeSingle()
+  return data ? (data as Record<string, unknown>) : null
+}
+
 export async function resolveCompanyCandidateContext(
   admin: SupabaseClient,
   companyCandidateId: string,
 ): Promise<ResolveCompanyContextResult | null> {
   try {
-    const { data } = await admin
-      .schema("growth")
-      .from("external_company_candidates")
-      .select("id, company_name, domain, industry, metadata")
-      .eq("id", companyCandidateId)
-      .maybeSingle()
+    const data =
+      (await loadCompanyCandidateRow(admin, companyCandidateId, "real_world_company_candidates")) ??
+      (await loadCompanyCandidateRow(admin, companyCandidateId, "external_company_candidates"))
     if (!data) return null
     const r = data as Record<string, unknown>
     const meta =

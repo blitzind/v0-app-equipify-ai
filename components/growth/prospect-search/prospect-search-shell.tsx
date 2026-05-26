@@ -5,6 +5,7 @@ import { Bookmark, Loader2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CompanyResultCard } from "@/components/growth/prospect-search/company-result-card"
 import { DiscoveryModeToggle } from "@/components/growth/prospect-search/discovery-mode-toggle"
+import { RealWorldProviderStatus } from "@/components/growth/prospect-search/real-world-provider-status"
 import { GuidedIcpBuilder } from "@/components/growth/prospect-search/guided-icp-builder"
 import { IcpTemplateRail } from "@/components/growth/prospect-search/icp-template-rail"
 import { PersonResultCard } from "@/components/growth/prospect-search/person-result-card"
@@ -179,7 +180,7 @@ export function ProspectSearchShell() {
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
           {discoveryMode === "internal"
             ? "Search observable Growth Engine + CRM records. No scraping, no outbound."
-            : "Discover new companies via external provider slots (fixture/manual v1). Candidates are not automatic leads."}
+            : "Discover new companies from real-world public sources (Google Places, SERP, business directory). No Apollo, Seamless, Clay, or PDL. Candidates are not automatic leads."}
         </p>
         <div className="mt-4">
           <DiscoveryModeToggle mode={discoveryMode} onChange={setDiscoveryMode} />
@@ -264,6 +265,18 @@ export function ProspectSearchShell() {
                   </span>
                 ) : null}
               </h2>
+              {result?.discovery_mode === "discover_external" &&
+              (result.provider_status_label || result.provider_status_message) ? (
+                <RealWorldProviderStatus
+                  className="mt-2"
+                  label={result.provider_status_label}
+                  message={
+                    result.real_world_built_query
+                      ? `${result.provider_status_message ?? ""} Query: ${result.real_world_built_query}`
+                      : result.provider_status_message
+                  }
+                />
+              ) : null}
               {result?.provider_messages && result.provider_messages.length > 0 ? (
                 <p className="mt-1 text-xs text-muted-foreground">
                   {result.provider_messages.join(" · ")}

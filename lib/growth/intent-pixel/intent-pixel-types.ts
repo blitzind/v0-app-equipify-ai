@@ -106,6 +106,8 @@ export type GrowthIntentPixelSite = {
   domain_allowlist: string[]
   tracking_enabled: boolean
   consent_required: boolean
+  /** When true, anonymous pageviews persist while consent is unknown (no PII). */
+  allow_anonymous_pageviews: boolean
 }
 
 export type GrowthIntentPixelVisitorSession = {
@@ -195,7 +197,8 @@ export type GrowthIntentPixelCaptureResult = {
   session_key: string | null
   session_id: string | null
   consent_status: GrowthIntentPixelConsentStatus
-  tracking_mode: "full" | "essential_only" | "rejected"
+  tracking_mode: "full" | "essential_only" | "anonymous" | "rejected"
+  rejection_code?: string
 }
 
 export type GrowthIntentPixelDiagnostics = {

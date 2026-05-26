@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { normalizeConsentStatus, resolveTrackingMode } from "@/lib/growth/intent-pixel/consent-gate"
 import {
+  buildCollectRejectionDiagnostics,
+  type GrowthIntentPixelCollectRejectionDiagnostics,
+} from "@/lib/growth/intent-pixel/intent-pixel-collect-debug"
+import {
   attachIdentifiedContact,
   closeLastPageviewDuration,
   fetchIntentPixelSite,
@@ -10,12 +14,14 @@ import {
   recordPageview,
   upsertVisitorSession,
 } from "@/lib/growth/intent-pixel/intent-pixel-repository"
+import { trackingModeFromSite } from "@/lib/growth/intent-pixel/intent-pixel-site-config"
 import {
   GROWTH_INTENT_PIXEL_EVENT_TYPES,
   GROWTH_INTENT_PIXEL_QA_MARKER,
   type GrowthIntentPixelCaptureResult,
   type GrowthIntentPixelCollectPayload,
   type GrowthIntentPixelEventType,
+  type GrowthIntentPixelSite,
   type GrowthIntentPixelVisitHistory,
 } from "@/lib/growth/intent-pixel/intent-pixel-types"
 import { GROWTH_INTENT_PIXEL_PRIVACY_NOTE, resolvePiiCaptureSource, sanitizeSubmittedIdentity } from "@/lib/growth/intent-pixel/pii-policy"
@@ -91,6 +97,33 @@ export type GrowthIntentPixelCaptureResponse = GrowthIntentPixelCaptureResult & 
   visit_history?: GrowthIntentPixelVisitHistory
   pii_attached?: boolean
   pii_reason?: string
+  rejection?: GrowthIntentPixelCollectRejectionDiagnostics
+}
+
+function buildRejectedCapture(
+  base: GrowthIntentPixelCaptureResponse,
+  input: {
+    reason: string
+    payload: GrowthIntentPixelCollectPayload
+    site?: GrowthIntentPixelSite | null
+    domainAllowed?: boolean | null
+  },
+): GrowthIntentPixelCaptureResponse {
+  const rejection = buildCollectRejectionDiagnostics({
+    reason: input.reason,
+    payload: input.payload,
+    site: input.site ?? null,
+    domainAllowed: input.domainAllowed ?? null,
+    trackingModeResolved: input.site ? trackingModeFromSite(input.site) : null,
+  })
+  return {
+    ...base,
+    ok: false,
+    accepted: false,
+    reason: input.reason,
+    rejection_code: rejection.rejection_code,
+    rejection,
+  }
 }
 
 export async function captureIntentPixelEvent(
@@ -113,29 +146,41 @@ export async function captureIntentPixelEvent(
 
   const schemaReady = await isGrowthIntentPixelSchemaReady(admin)
   if (!schemaReady) {
-    return { ...base, reason: GROWTH_INTENT_PIXEL_SCHEMA_SETUP_MESSAGE }
+    return buildRejectedCapture(base, {
+      reason: GROWTH_INTENT_PIXEL_SCHEMA_SETUP_MESSAGE,
+      payload,
+    })
   }
 
   const site = await fetchIntentPixelSite(admin, payload.site_key)
   if (!site) {
-    return { ...base, reason: "Unknown intent pixel site_key." }
+    return buildRejectedCapture(base, {
+      reason: "Unknown intent pixel site_key.",
+      payload,
+    })
   }
 
   const pageUrl = asString(payload.page_url)
-  if (pageUrl && !isDomainAllowed(site, pageUrl)) {
-    return { ...base, reason: "Page URL hostname not on site domain allowlist." }
+  const domainAllowed = pageUrl ? isDomainAllowed(site, pageUrl) : null
+  if (pageUrl && domainAllowed === false) {
+    return buildRejectedCapture(base, {
+      reason: "Page URL hostname not on site domain allowlist.",
+      payload,
+      site,
+      domainAllowed: false,
+    })
   }
 
   const consentStatus = normalizeConsentStatus(payload.consent_status)
   const gate = resolveTrackingMode(site, consentStatus, payload.event_type)
 
   if (!gate.accepted) {
-    return {
-      ...base,
+    return buildRejectedCapture(base, {
       reason: gate.reason,
-      consent_status: consentStatus,
-      tracking_mode: gate.mode,
-    }
+      payload: { ...payload, consent_status: consentStatus },
+      site,
+      domainAllowed,
+    })
   }
 
   const session = await upsertVisitorSession(admin, site, payload, consentStatus)

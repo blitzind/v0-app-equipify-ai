@@ -7,7 +7,17 @@ import {
 
 const ESSENTIAL_EVENTS = new Set<GrowthIntentPixelEventType>(["consent_update"])
 
-export type GrowthIntentPixelTrackingMode = "full" | "essential_only" | "rejected"
+const ANONYMOUS_PAGE_EVENTS = new Set<GrowthIntentPixelEventType>([
+  "pageview",
+  "page_exit",
+  "heartbeat",
+])
+
+export type GrowthIntentPixelTrackingMode =
+  | "full"
+  | "essential_only"
+  | "anonymous"
+  | "rejected"
 
 export function normalizeConsentStatus(value: unknown): GrowthIntentPixelConsentStatus {
   const raw = typeof value === "string" ? value.trim().toLowerCase() : ""
@@ -27,6 +37,19 @@ export function resolveTrackingMode(
 
   if (!site.consent_required) {
     return { mode: "full", accepted: true, reason: "Consent not required for this site." }
+  }
+
+  if (
+    site.allow_anonymous_pageviews &&
+    consentStatus === "unknown" &&
+    ANONYMOUS_PAGE_EVENTS.has(eventType)
+  ) {
+    return {
+      mode: "anonymous",
+      accepted: true,
+      reason:
+        "Anonymous pageview permitted — site allows first-party pageviews without consent (no PII).",
+    }
   }
 
   if (consentStatus === "granted" || consentStatus === "not_required") {

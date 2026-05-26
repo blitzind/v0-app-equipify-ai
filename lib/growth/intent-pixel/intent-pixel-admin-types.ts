@@ -10,10 +10,13 @@ export const GROWTH_INTENT_PIXEL_LIVE_QA_MARKER = "growth-intent-pixel-live-v1" 
 export { GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION } from "@/lib/growth/intent-pixel/intent-pixel-schema-health"
 
 export const GROWTH_INTENT_PIXEL_TRACKING_MODES = [
+  "anonymous_pageviews",
   "consent_gated",
   "always_on",
   "disabled",
 ] as const
+
+export { GROWTH_INTENT_PIXEL_422_DEBUG_QA_MARKER } from "@/lib/growth/intent-pixel/intent-pixel-collect-debug"
 
 export type GrowthIntentPixelTrackingMode =
   (typeof GROWTH_INTENT_PIXEL_TRACKING_MODES)[number]
@@ -36,6 +39,7 @@ export type GrowthIntentPixelAdminSite = {
   tracking_mode: GrowthIntentPixelTrackingMode
   tracking_enabled: boolean
   consent_required: boolean
+  allow_anonymous_pageviews: boolean
   script_snippet: string
   pixel_script_url: string
   created_at: string
@@ -82,7 +86,7 @@ export type GrowthIntentPixelAdminStreamEvent = {
   session_key: string
   session_id: string
   consent_status: GrowthIntentPixelConsentStatus
-  tracking_mode: "full" | "essential_only" | "rejected"
+  tracking_mode: "full" | "essential_only" | "anonymous" | "rejected"
   visitor_type: "anonymous" | "identified"
   page_path: string
   page_url: string

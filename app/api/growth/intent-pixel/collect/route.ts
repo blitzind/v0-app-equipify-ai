@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server"
 import { captureIntentPixelEvent, normalizeCollectPayload } from "@/lib/growth/intent-pixel/capture-intent-event"
+import {
+  GROWTH_INTENT_PIXEL_422_DEBUG_QA_MARKER,
+  logIntentPixelCollectRejection,
+} from "@/lib/growth/intent-pixel/intent-pixel-collect-debug"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
 
 export const runtime = "nodejs"
@@ -21,7 +25,14 @@ export async function POST(request: Request) {
 
     if (!payload) {
       return NextResponse.json(
-        { ok: false, error: "validation_error", message: "site_key and event_type are required." },
+        {
+          ok: false,
+          error: "validation_error",
+          rejection_code: "validation_error",
+          reason: "site_key and event_type are required.",
+          message: "site_key and event_type are required.",
+          qa_marker: GROWTH_INTENT_PIXEL_422_DEBUG_QA_MARKER,
+        },
         { status: 400, headers: CORS_HEADERS },
       )
     }
@@ -38,6 +49,28 @@ export async function POST(request: Request) {
     const result = await captureIntentPixelEvent(admin, payload, {
       include_visit_history: includeHistory,
     })
+
+    if (!result.ok && result.rejection) {
+      logIntentPixelCollectRejection(result.rejection)
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "rejected",
+          rejection_code: result.rejection.rejection_code,
+          reason: result.reason,
+          message: result.reason,
+          qa_marker: GROWTH_INTENT_PIXEL_422_DEBUG_QA_MARKER,
+          capture: {
+            accepted: false,
+            consent_status: result.consent_status,
+            tracking_mode: result.tracking_mode,
+            rejection_code: result.rejection_code,
+          },
+          diagnostics: result.rejection,
+        },
+        { status: 422, headers: CORS_HEADERS },
+      )
+    }
 
     return NextResponse.json(
       { ok: result.ok, capture: result },

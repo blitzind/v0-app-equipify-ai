@@ -14,6 +14,7 @@ import {
   GROWTH_CONTACT_DISCOVERY_QA_MARKER,
   GROWTH_VERIFICATION_ENRICHMENT_QA_MARKER,
   GROWTH_EXTERNAL_COMPANY_DISCOVERY_QA_MARKER,
+  GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_UX_QA_MARKER,
 } from "@/lib/growth/prospect-search/prospect-search-admin-types"
@@ -43,7 +44,8 @@ export default function AdminGrowthProspectSearchPage() {
               </p>
               <p className="mt-1 font-mono text-xs text-muted-foreground">
                 {GROWTH_PROSPECT_SEARCH_QA_MARKER} · {GROWTH_PROSPECT_SEARCH_UX_QA_MARKER} ·{" "}
-                {GROWTH_EXTERNAL_COMPANY_DISCOVERY_QA_MARKER} · {GROWTH_CONTACT_DISCOVERY_QA_MARKER} ·{" "}
+                {GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER} · {GROWTH_EXTERNAL_COMPANY_DISCOVERY_QA_MARKER} ·{" "}
+                {GROWTH_CONTACT_DISCOVERY_QA_MARKER} ·{" "}
                 {GROWTH_VERIFICATION_ENRICHMENT_QA_MARKER}
               </p>
             </div>

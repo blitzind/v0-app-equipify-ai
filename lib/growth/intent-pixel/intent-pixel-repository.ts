@@ -29,6 +29,7 @@ function mapSite(row: Record<string, unknown>): GrowthIntentPixelSite {
       : [],
     tracking_enabled: row.tracking_enabled === true,
     consent_required: row.consent_required !== false,
+    allow_anonymous_pageviews: row.allow_anonymous_pageviews === true,
   }
 }
 
@@ -105,7 +106,9 @@ export async function fetchIntentPixelSite(
   const { data, error } = await admin
     .schema("growth")
     .from("intent_pixel_sites")
-    .select("id, site_key, site_name, domain_allowlist, tracking_enabled, consent_required")
+    .select(
+      "id, site_key, site_name, domain_allowlist, tracking_enabled, consent_required, allow_anonymous_pageviews",
+    )
     .eq("site_key", siteKey)
     .maybeSingle()
 

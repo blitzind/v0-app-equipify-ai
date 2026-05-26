@@ -61,7 +61,7 @@ const prospectRepo = fs.readFileSync(
   "utf8",
 )
 assert.match(prospectRepo, /discover_external/)
-assert.match(prospectRepo, /runProspectSearchExternalDiscovery/)
+assert.match(prospectRepo, /runProspectSearchRealWorldDiscovery/)
 
 const prospectRoute = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/prospect-search/route.ts"),

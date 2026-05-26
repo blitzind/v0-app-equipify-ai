@@ -16,7 +16,7 @@ import {
   rankProspectSearchCompanies,
   rankProspectSearchPeople,
 } from "@/lib/growth/prospect-search/prospect-search-ranking"
-import { runProspectSearchExternalDiscovery } from "@/lib/growth/prospect-search/prospect-search-external-discovery"
+import { runProspectSearchRealWorldDiscovery } from "@/lib/growth/prospect-search/prospect-search-real-world-discovery"
 import {
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_SOURCE_TYPES,
@@ -46,7 +46,7 @@ export async function runProspectSearch(
   const discovery_mode = input.discovery_mode ?? "internal"
 
   if (discovery_mode === "discover_external") {
-    const external = await runProspectSearchExternalDiscovery(admin, {
+    const realWorld = await runProspectSearchRealWorldDiscovery(admin, {
       query: input.query,
       filters: mergedFilters,
       created_by: input.created_by,
@@ -56,7 +56,7 @@ export async function runProspectSearch(
     const source_counts = Object.fromEntries(
       GROWTH_PROSPECT_SEARCH_SOURCE_TYPES.map((t) => [t, 0]),
     ) as Record<GrowthProspectSearchSourceType, number>
-    for (const c of external.companies) {
+    for (const c of realWorld.companies) {
       source_counts[c.source_type] = (source_counts[c.source_type] ?? 0) + 1
     }
 
@@ -66,13 +66,17 @@ export async function runProspectSearch(
       query: input.query,
       parsed_query: parsed,
       filters: mergedFilters,
-      companies: external.companies,
+      companies: realWorld.companies,
       people: [],
-      total_companies: external.companies.length,
+      total_companies: realWorld.companies.length,
       total_people: 0,
       source_counts,
-      external_discovery_run_id: external.discovery_run_id,
-      provider_messages: external.provider_messages,
+      external_discovery_run_id: realWorld.discovery_run_id,
+      real_world_discovery_run_id: realWorld.discovery_run_id,
+      real_world_built_query: realWorld.built_query,
+      provider_messages: realWorld.provider_messages,
+      provider_status_label: realWorld.provider_status?.label ?? null,
+      provider_status_message: realWorld.provider_status?.message ?? null,
     }
   }
 

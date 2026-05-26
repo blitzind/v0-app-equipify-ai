@@ -42,6 +42,7 @@ function mapSiteRecord(row: Record<string, unknown>): GrowthIntentPixelSite {
       : [],
     tracking_enabled: row.tracking_enabled === true,
     consent_required: row.consent_required !== false,
+    allow_anonymous_pageviews: row.allow_anonymous_pageviews === true,
   }
 }
 
@@ -77,6 +78,7 @@ export function toAdminSiteView(
     tracking_mode: trackingModeFromSite(site),
     tracking_enabled: site.tracking_enabled,
     consent_required: site.consent_required,
+    allow_anonymous_pageviews: site.allow_anonymous_pageviews,
     script_snippet,
     pixel_script_url,
     created_at: asString(row?.created_at) || new Date(0).toISOString(),
@@ -126,6 +128,7 @@ export async function createIntentPixelSite(
       domain_allowlist: normalizeDomainAllowlist(input.domain_allowlist),
       tracking_enabled: flags.tracking_enabled,
       consent_required: flags.consent_required,
+      allow_anonymous_pageviews: flags.allow_anonymous_pageviews,
       updated_at: new Date().toISOString(),
     })
     .select("*")
@@ -158,6 +161,7 @@ export async function updateIntentPixelSite(
     const flags = siteFlagsFromTrackingMode(patch.tracking_mode)
     update.tracking_enabled = flags.tracking_enabled
     update.consent_required = flags.consent_required
+    update.allow_anonymous_pageviews = flags.allow_anonymous_pageviews
   }
 
   const { data, error } = await admin
