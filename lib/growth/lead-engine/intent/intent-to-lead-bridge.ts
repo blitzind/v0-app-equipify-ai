@@ -13,6 +13,7 @@ import {
   computeIntentCandidateScore,
   normalizeCandidateConfidence,
 } from "@/lib/growth/lead-engine/intent/intent-candidate-scoring"
+import { assessBuyingStageFromAggregatedSession } from "@/lib/growth/buying-stage/buying-stage-repository"
 import { identifyCompanyFromAggregatedSession } from "@/lib/growth/company-identification/company-identification-repository"
 import { captureSearchIntentFromAggregatedSession } from "@/lib/growth/search-intent/search-intent-repository"
 import {
@@ -180,9 +181,21 @@ export async function bridgeIntentSessionToLeadCandidate(
       company_name: companyIdentification.top_match?.company_name ?? identity.company_name,
       company_domain: companyIdentification.top_match?.company_domain ?? aggregated.domain,
     })
+    const preliminaryScore = computeIntentCandidateScore(aggregated, {
+      searchIntent: searchCapture.contribution,
+      companyIdentification: companyIdentification.contribution,
+    })
+    const buyingStage = assessBuyingStageFromAggregatedSession(aggregated, {
+      intent_score: preliminaryScore.intent_score,
+      searchCapture,
+      companyIdentification,
+      existing_customer_ids: input.existing_customer_ids ?? [],
+      existing_lead_ids: input.existing_lead_ids ?? [],
+    })
     const score = computeIntentCandidateScore(aggregated, {
       searchIntent: searchCapture.contribution,
       companyIdentification: companyIdentification.contribution,
+      buyingStage: buyingStage.contribution,
     })
     const dedupeSources = buildDedupeSourcesFromAggregate(
       aggregated,
@@ -226,6 +239,13 @@ export async function bridgeIntentSessionToLeadCandidate(
         source: "growth.search_intent_signals",
       })
     }
+    if (buyingStage.assessment) {
+      evidence.push({
+        claim: `Buying stage candidate: ${buyingStage.assessment.detected_stage.replace(/_/g, " ")}`,
+        evidence: buyingStage.assessment.evidence,
+        source: "growth.buying_stage_assessments",
+      })
+    }
     const attribution = buildCandidateAttribution(aggregated, score.scoring_breakdown)
     for (const match of companyIdentification.matches.slice(0, 2)) {
       for (const attr of match.source_attribution) {
@@ -234,6 +254,11 @@ export async function bridgeIntentSessionToLeadCandidate(
     }
     for (const signal of searchCapture.signals.slice(0, 3)) {
       for (const attr of signal.source_attribution) {
+        attribution.push(attr)
+      }
+    }
+    if (buyingStage.assessment) {
+      for (const attr of buyingStage.assessment.source_attribution.slice(0, 4)) {
         attribution.push(attr)
       }
     }
@@ -260,7 +285,8 @@ export async function bridgeIntentSessionToLeadCandidate(
       candidate_confidence: normalizeCandidateConfidence(
         score.intent_score,
         evidence.length > 0,
-        companyIdentification.contribution.confidence_boost,
+        companyIdentification.contribution.confidence_boost +
+          buyingStage.contribution.confidence_boost,
       ),
       candidate_priority: score.candidate_priority,
       lead_engine_eligible: threshold.lead_engine_eligible,
@@ -295,6 +321,10 @@ export async function bridgeIntentSessionToLeadCandidate(
         ? { ...companyIdentification.summary, is_candidate_match: true }
         : null,
       company_identification_matches: companyIdentification.matches,
+      buying_stage_summary: buyingStage.summary
+        ? { ...buyingStage.summary, is_candidate_assessment: true }
+        : null,
+      buying_stage_assessment: buyingStage.assessment,
     }
 
     const pipeline_entry: GrowthLeadEnginePipelineStageId | null = threshold.lead_engine_eligible

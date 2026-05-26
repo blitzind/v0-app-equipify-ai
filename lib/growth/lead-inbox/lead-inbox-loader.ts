@@ -6,6 +6,7 @@ import {
   validateInboxPiiPolicy,
 } from "@/lib/growth/lead-inbox/lead-inbox-dedupe"
 import { createLeadCandidate } from "@/lib/growth/lead-inbox/lead-inbox-repository"
+import { persistBuyingStageAssessment } from "@/lib/growth/buying-stage/buying-stage-repository"
 import {
   linkCompanyMatchesToLeadInbox,
   persistCompanyIdentificationMatches,
@@ -83,6 +84,7 @@ export function intentCandidateToInboxInput(
       lead_engine_eligible: candidate.lead_engine_eligible,
       search_intent_summary: candidate.search_intent_summary,
       company_identification_summary: candidate.company_identification_summary,
+      buying_stage_summary: candidate.buying_stage_summary,
     },
   }
 }
@@ -178,6 +180,7 @@ export async function ingestIntentCandidateToLeadInbox(
   }
 
   const result = await createLeadCandidate(admin, input)
+  let topCompanyIdentificationId: string | null = null
   if (result.ok && result.row && candidate.company_identification_matches.length > 0) {
     const idInput = {
       site_key: options.site_key,
@@ -192,6 +195,7 @@ export async function ingestIntentCandidateToLeadInbox(
       idInput,
     )
     if (persistedCompany.ok && persistedCompany.rows.length > 0) {
+      topCompanyIdentificationId = persistedCompany.rows[0]?.id ?? null
       await linkCompanyMatchesToLeadInbox(
         admin,
         result.row.id,
@@ -214,6 +218,13 @@ export async function ingestIntentCandidateToLeadInbox(
         persisted.rows.map((r) => r.id),
       )
     }
+  }
+  if (result.ok && result.row && candidate.buying_stage_assessment) {
+    await persistBuyingStageAssessment(admin, candidate.buying_stage_assessment, {
+      lead_inbox_id: result.row.id,
+      intent_session_id: candidate.session_id,
+      company_identification_id: topCompanyIdentificationId,
+    })
   }
   return result
 }

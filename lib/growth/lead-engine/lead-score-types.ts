@@ -7,6 +7,7 @@ import type { GrowthLeadEngineDecisionMakerHypothesisOutput } from "@/lib/growth
 import type { GrowthLeadEngineIcpTargetingOutput } from "@/lib/growth/lead-engine/icp-targeting-types"
 import type { GrowthLeadEngineOutreachPersonalizationOutput } from "@/lib/growth/lead-engine/outreach-personalization-types"
 import type { GrowthLeadEngineVerificationTriageOutput } from "@/lib/growth/lead-engine/verification-triage-types"
+import type { GrowthBuyingStageResult } from "@/lib/growth/buying-stage/buying-stage-types"
 
 export const GROWTH_LEAD_ENGINE_LEAD_SCORE_QA_MARKER = "lead-engine-lead-score-v1" as const
 
@@ -54,6 +55,8 @@ export type GrowthLeadEngineLeadScoreInput = {
   verificationTriage: GrowthLeadEngineVerificationTriageOutput | string
   accountBrief: GrowthLeadEngineAccountBriefOutput | string
   outreachPersonalization: GrowthLeadEngineOutreachPersonalizationOutput | string
+  /** Observable buying stage assessment from intent/inbox — candidate only. */
+  buyingStage?: GrowthBuyingStageResult | string | null
 }
 
 export type GrowthLeadEngineLeadScoreSourceAttribution = {

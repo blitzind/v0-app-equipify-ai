@@ -94,6 +94,13 @@ export function buildLeadInboxCardView(row: GrowthLeadInboxRow): GrowthLeadInbox
     intentIndicators.push(`Match: ${String(companySummary.matched_source).replace(/_/g, " ")}`)
   }
 
+  const buyingStageSummary = row.metadata?.buying_stage_summary as
+    | { detected_stage?: string; stage_confidence?: number }
+    | undefined
+  if (buyingStageSummary?.detected_stage) {
+    intentIndicators.push(`Stage: ${String(buyingStageSummary.detected_stage).replace(/_/g, " ")}`)
+  }
+
   const lastActivityAt = row.updated_at || row.created_at
 
   return {

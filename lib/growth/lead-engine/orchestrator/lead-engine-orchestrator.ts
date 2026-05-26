@@ -1,3 +1,5 @@
+import "server-only"
+
 import { randomUUID } from "node:crypto"
 import { performance } from "node:perf_hooks"
 import { parseGrowthLeadEngineAccountBriefOutput } from "@/lib/growth/lead-engine/account-brief-parser"
@@ -48,6 +50,7 @@ import {
   type GrowthLeadEngineProviderMode,
 } from "@/lib/growth/lead-engine/providers/provider-types"
 import type { GrowthLeadEngineStageProviderPublicResult } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
+import { LEAD_ENGINE_STAGE_UI } from "@/lib/growth/lead-engine/lead-engine-stage-ui"
 import type { GrowthLeadEnginePipelineStageId, GrowthLeadEngineSandboxInput } from "@/lib/growth/lead-engine/workspace-types"
 
 export type LeadEnginePipelineOptions = {
@@ -63,53 +66,14 @@ export type LeadEngineOrchestratorStageDefinition = {
   qaMarker: string
 }
 
-export const LEAD_ENGINE_ORCHESTRATOR_STAGES: LeadEngineOrchestratorStageDefinition[] = [
-  { stageId: "icp_targeting", label: "ICP Targeting", shortLabel: "ICP", qaMarker: "lead-engine-icp-targeting-v1" },
-  {
-    stageId: "company_discovery",
-    label: "Company Discovery",
-    shortLabel: "Discovery",
-    qaMarker: "lead-engine-company-discovery-v1",
-  },
-  {
-    stageId: "decision_maker_hypothesis",
-    label: "Decision Maker Hypothesis",
-    shortLabel: "Decision Maker",
-    qaMarker: "lead-engine-decision-maker-hypothesis-v1",
-  },
-  {
-    stageId: "contact_research",
-    label: "Contact Research",
-    shortLabel: "Contacts",
-    qaMarker: "lead-engine-contact-research-v1",
-  },
-  {
-    stageId: "verification_triage",
-    label: "Verification Triage",
-    shortLabel: "Verification",
-    qaMarker: "lead-engine-verification-triage-v1",
-  },
-  { stageId: "account_brief", label: "Account Brief", shortLabel: "Brief", qaMarker: "lead-engine-account-brief-v1" },
-  {
-    stageId: "outreach_personalization",
-    label: "Outreach Personalization",
-    shortLabel: "Personalization",
-    qaMarker: "lead-engine-outreach-personalization-v1",
-  },
-  { stageId: "lead_score", label: "Lead Score", shortLabel: "Score", qaMarker: "lead-engine-lead-score-v1" },
-  {
-    stageId: "human_approval",
-    label: "Human Approval",
-    shortLabel: "Approval",
-    qaMarker: "lead-engine-human-approval-v1",
-  },
-  {
-    stageId: "revenue_execution",
-    label: "Revenue Execution",
-    shortLabel: "Execution",
-    qaMarker: "lead-engine-revenue-execution-v1",
-  },
-]
+/** Server-side stage order — sourced from client-safe UI metadata. */
+export const LEAD_ENGINE_ORCHESTRATOR_STAGES: LeadEngineOrchestratorStageDefinition[] =
+  LEAD_ENGINE_STAGE_UI.map((stage) => ({
+    stageId: stage.stageKey,
+    label: stage.label,
+    shortLabel: stage.shortLabel,
+    qaMarker: stage.qaMarker,
+  }))
 
 type UpstreamBag = {
   icp?: GrowthLeadEngineIcpTargetingOutput

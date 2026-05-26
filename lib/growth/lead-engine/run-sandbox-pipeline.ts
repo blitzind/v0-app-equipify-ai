@@ -1,7 +1,8 @@
 /**
  * @deprecated Use runLeadEnginePipeline from orchestrator — kept for backward compatibility.
  */
-import { LEAD_ENGINE_ORCHESTRATOR_STAGES, runLeadEnginePipeline } from "@/lib/growth/lead-engine/orchestrator/lead-engine-orchestrator"
+import { LEAD_ENGINE_STAGE_UI } from "@/lib/growth/lead-engine/lead-engine-stage-ui"
+import { runLeadEnginePipeline } from "@/lib/growth/lead-engine/orchestrator/lead-engine-orchestrator"
 import {
   GROWTH_LEAD_ENGINE_WORKSPACE_QA_MARKER,
   type GrowthLeadEnginePipelineStageResult,
@@ -9,8 +10,8 @@ import {
   type GrowthLeadEngineSandboxPipelineResult,
 } from "@/lib/growth/lead-engine/workspace-types"
 
-export const GROWTH_LEAD_ENGINE_PIPELINE_STAGES = LEAD_ENGINE_ORCHESTRATOR_STAGES.map((s) => ({
-  stageId: s.stageId,
+export const GROWTH_LEAD_ENGINE_PIPELINE_STAGES = LEAD_ENGINE_STAGE_UI.map((s) => ({
+  stageId: s.stageKey,
   label: s.label,
   qaMarker: s.qaMarker,
 }))

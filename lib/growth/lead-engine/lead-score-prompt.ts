@@ -112,6 +112,13 @@ export function buildGrowthLeadEngineLeadScoreUserPrompt(
     "Outreach Personalization Output:",
     formatUpstreamJsonBlock(input.outreachPersonalization),
     "",
+    ...(input.buyingStage
+      ? [
+          "Buying Stage Assessment (candidate — observable behavior only, not guaranteed):",
+          formatUpstreamJsonBlock(input.buyingStage),
+          "",
+        ]
+      : []),
     "Return JSON only.",
   ].join("\n")
 }

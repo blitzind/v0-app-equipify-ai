@@ -11,6 +11,7 @@ import {
   buildOperatorHandoffInputFromRow,
 } from "@/lib/growth/lead-operator-workspace/lead-inbox-card-view"
 import { extractLeadEngineOutputsFromRun } from "@/lib/growth/lead-operator-workspace/lead-engine-run-extract"
+import { loadBuyingStageAssessmentsForLeadInbox } from "@/lib/growth/buying-stage/buying-stage-repository"
 import { loadCompanyIdentificationMatchesForLeadInbox } from "@/lib/growth/company-identification/company-identification-repository"
 import { loadSearchIntentSignalsForLeadInbox } from "@/lib/growth/search-intent/search-intent-repository"
 import {
@@ -20,6 +21,7 @@ import {
   type GrowthLeadOperatorAttributionCard,
   type GrowthLeadOperatorEvidenceCard,
   type GrowthLeadOperatorHistoryEntry,
+  type GrowthLeadOperatorBuyingStageSummary,
   type GrowthLeadOperatorCompanyMatchSummary,
   type GrowthLeadOperatorOverview,
   type GrowthLeadOperatorWorkspacePayload,
@@ -203,6 +205,7 @@ export async function buildLeadOperatorWorkspacePayload(
   ]
 
   const searchSignals = await loadSearchIntentSignalsForLeadInbox(admin, row.id, 12)
+  const buyingStageRows = await loadBuyingStageAssessmentsForLeadInbox(admin, row.id, 3)
   const companyMatches = await loadCompanyIdentificationMatchesForLeadInbox(admin, row.id, 5)
   const topCompany = companyMatches[0] ?? null
   const company_match: GrowthLeadOperatorCompanyMatchSummary | null = topCompany
@@ -245,6 +248,37 @@ export async function buildLeadOperatorWorkspacePayload(
           is_candidate_match: true,
         }
       : null
+  const topBuyingStage = buyingStageRows[0] ?? null
+  const buying_stage: GrowthLeadOperatorBuyingStageSummary | null = topBuyingStage
+    ? {
+        id: topBuyingStage.id,
+        detected_stage: topBuyingStage.detected_stage,
+        stage_confidence: topBuyingStage.stage_confidence,
+        stage_score: topBuyingStage.stage_score,
+        evidence: topBuyingStage.evidence,
+        signal_count: topBuyingStage.signal_summary.length,
+        is_candidate_assessment: true,
+      }
+    : (row.metadata?.buying_stage_summary as { detected_stage?: string } | undefined)?.detected_stage
+      ? {
+          id: "metadata",
+          detected_stage: String(
+            (row.metadata.buying_stage_summary as Record<string, unknown>).detected_stage,
+          ),
+          stage_confidence: Number(
+            (row.metadata.buying_stage_summary as Record<string, unknown>).stage_confidence ?? 0,
+          ),
+          stage_score: Number(
+            (row.metadata.buying_stage_summary as Record<string, unknown>).stage_score ?? 0,
+          ),
+          evidence: "Buying stage summary from inbox metadata — candidate assessment only.",
+          signal_count: Number(
+            (row.metadata.buying_stage_summary as Record<string, unknown>).signal_count ?? 0,
+          ),
+          is_candidate_assessment: true,
+        }
+      : null
+
   const search_intent_signals: GrowthLeadOperatorSearchIntentSummary[] = searchSignals.map((s) => ({
     id: s.id,
     intent_topic: s.intent_topic,
@@ -272,6 +306,7 @@ export async function buildLeadOperatorWorkspacePayload(
     history: buildHistory(row),
     search_intent_signals,
     company_match,
+    buying_stage,
   }
 }
 

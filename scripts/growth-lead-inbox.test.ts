@@ -174,6 +174,12 @@ function makeCandidate(overrides: Partial<GrowthIntentLeadCandidate>): GrowthInt
     threshold_passed: true,
     threshold_reasons: ["Intent score meets threshold"],
     warnings: [],
+    search_intent_summary: null,
+    search_intent_signals: [],
+    company_identification_summary: null,
+    company_identification_matches: [],
+    buying_stage_summary: null,
+    buying_stage_assessment: null,
     ...overrides,
   }
 }

@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { LEAD_ENGINE_ORCHESTRATOR_STAGES } from "@/lib/growth/lead-engine/orchestrator/lead-engine-orchestrator"
+import { LEAD_ENGINE_STAGE_UI } from "@/lib/growth/lead-engine/lead-engine-stage-ui"
 import {
   GROWTH_LEAD_ENGINE_ORCHESTRATOR_QA_MARKER,
   type GrowthLeadEngineOrchestratorStageResult,
@@ -197,12 +197,12 @@ function PipelineVisualization({
 
   return (
     <div className="flex flex-wrap gap-2">
-      {LEAD_ENGINE_ORCHESTRATOR_STAGES.map((def, index) => {
-        const stage = stageById.get(def.stageId)
+      {LEAD_ENGINE_STAGE_UI.map((def, index) => {
+        const stage = stageById.get(def.stageKey)
         const completed = stage?.status === "completed"
         const failed = stage?.status === "failed"
         return (
-          <div key={def.stageId} className="flex items-center gap-1">
+          <div key={def.stageKey} className="flex items-center gap-1">
             <div
               className={cn(
                 "rounded-lg border px-3 py-2 text-center text-xs",
@@ -362,7 +362,7 @@ export function GrowthLeadEngineWorkspace() {
             <div className="rounded-lg border border-border bg-background p-3">
               <p className="text-xs text-muted-foreground">Stages</p>
               <p className="mt-1 font-semibold">
-                {run.completed_stages.length}/{LEAD_ENGINE_ORCHESTRATOR_STAGES.length}
+                {run.completed_stages.length}/{LEAD_ENGINE_STAGE_UI.length}
               </p>
             </div>
           </div>
@@ -428,11 +428,11 @@ export function GrowthLeadEngineWorkspace() {
 
       <section className="flex flex-col gap-4">
         <h3 className="font-semibold">Stage outputs</h3>
-        {LEAD_ENGINE_ORCHESTRATOR_STAGES.map((def) => {
+        {LEAD_ENGINE_STAGE_UI.map((def) => {
           const stage =
-            run?.stage_results.find((s) => s.stage_id === def.stageId) ??
+            run?.stage_results.find((s) => s.stage_id === def.stageKey) ??
             ({
-              stage_id: def.stageId,
+              stage_id: def.stageKey,
               label: def.label,
               short_label: def.shortLabel,
               qa_marker: def.qaMarker,
@@ -450,7 +450,7 @@ export function GrowthLeadEngineWorkspace() {
               fatal: false,
               warnings: [],
             } satisfies GrowthLeadEngineOrchestratorStageResult)
-          return <StagePanel key={def.stageId} stage={stage} />
+          return <StagePanel key={def.stageKey} stage={stage} />
         })}
       </section>
 

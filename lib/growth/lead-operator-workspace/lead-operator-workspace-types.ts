@@ -126,6 +126,16 @@ export type GrowthLeadOperatorSearchIntentSummary = {
   evidence: string
 }
 
+export type GrowthLeadOperatorBuyingStageSummary = {
+  id: string
+  detected_stage: string
+  stage_confidence: number
+  stage_score: number
+  evidence: string
+  signal_count: number
+  is_candidate_assessment: boolean
+}
+
 export type GrowthLeadInboxRowPublic = Omit<
   GrowthLeadInboxRow,
   "email" | "phone" | "contact_name" | "linkedin_url"
@@ -153,6 +163,7 @@ export type GrowthLeadOperatorWorkspacePayload = {
   history: GrowthLeadOperatorHistoryEntry[]
   search_intent_signals: GrowthLeadOperatorSearchIntentSummary[]
   company_match: GrowthLeadOperatorCompanyMatchSummary | null
+  buying_stage: GrowthLeadOperatorBuyingStageSummary | null
 }
 
 export const GROWTH_LEAD_ENGINE_RUN_METADATA_KEY = "lead_engine_run" as const

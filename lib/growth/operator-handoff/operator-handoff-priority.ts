@@ -44,6 +44,9 @@ export function computeOperatorHandoffPriorityHints(
   const verification = asObject<GrowthLeadEngineVerificationTriageOutput>(input.verificationTriage)
   const revenue = asObject<GrowthLeadEngineRevenueExecutionOutput>(input.revenueExecution)
   const inbox = input.leadInbox
+  const buyingStageSummary = inbox?.metadata?.buying_stage_summary as
+    | { detected_stage?: string; stage_confidence?: number }
+    | undefined
 
   const disposition = verification?.disposition ?? ""
   const approvalStatus = approval?.approval_status ?? ""
@@ -52,6 +55,15 @@ export function computeOperatorHandoffPriorityHints(
 
   let lead_priority = mapLeadScorePriority(leadScore?.priority_level)
   if (inbox?.candidate_priority === "urgent") lead_priority = "high"
+  if (
+    buyingStageSummary?.detected_stage === "purchase_ready" ||
+    buyingStageSummary?.detected_stage === "active_opportunity"
+  ) {
+    if (lead_priority === "low") lead_priority = "medium"
+    if ((buyingStageSummary.stage_confidence ?? 0) >= 0.65 && lead_priority !== "monitor") {
+      lead_priority = "high"
+    }
+  }
   if (approvalStatus === "blocked" || disposition === "reject") lead_priority = "monitor"
 
   let recommended_motion: GrowthOperatorHandoffMotion = "review"
@@ -91,6 +103,11 @@ export function computeOperatorHandoffPriorityHints(
   let recommended_urgency: GrowthOperatorHandoffUrgency = "this_week"
   if (inbox?.candidate_priority === "urgent" || approval?.approval_priority === "urgent") {
     recommended_urgency = "immediate"
+  } else if (
+    buyingStageSummary?.detected_stage === "purchase_ready" &&
+    (buyingStageSummary.stage_confidence ?? 0) >= 0.6
+  ) {
+    recommended_urgency = "today"
   } else if (lead_priority === "high" && disposition === "validated") {
     recommended_urgency = "today"
   } else if (lead_priority === "monitor" || disposition === "reject") {

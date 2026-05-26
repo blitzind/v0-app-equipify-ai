@@ -6,12 +6,18 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import {
+  LEAD_ENGINE_STAGE_UI,
+  GROWTH_LEAD_ENGINE_WORKSPACE_QA_MARKER,
+} from "../lib/growth/lead-engine/lead-engine-stage-ui"
+import {
   LEAD_ENGINE_ORCHESTRATOR_STAGES,
   runLeadEnginePipeline,
 } from "../lib/growth/lead-engine/orchestrator/lead-engine-orchestrator"
 import { GROWTH_LEAD_ENGINE_ORCHESTRATOR_QA_MARKER } from "../lib/growth/lead-engine/orchestrator/lead-engine-run-types"
 
 assert.equal(GROWTH_LEAD_ENGINE_ORCHESTRATOR_QA_MARKER, "lead-engine-workspace-v1")
+assert.equal(GROWTH_LEAD_ENGINE_WORKSPACE_QA_MARKER, "lead-engine-workspace-v1")
+assert.equal(LEAD_ENGINE_STAGE_UI.length, 10)
 assert.equal(LEAD_ENGINE_ORCHESTRATOR_STAGES.length, 10)
 
 const run = runLeadEnginePipeline({
@@ -53,5 +59,29 @@ const orchestratorPath = path.join(
   "lib/growth/lead-engine/orchestrator/lead-engine-orchestrator.ts",
 )
 assert.match(fs.readFileSync(orchestratorPath, "utf8"), /runLeadEnginePipeline/)
+assert.match(fs.readFileSync(orchestratorPath, "utf8"), /import "server-only"/)
+
+const workspaceComponentPath = path.join(
+  process.cwd(),
+  "components/growth/growth-lead-engine-workspace.tsx",
+)
+const workspaceSource = fs.readFileSync(workspaceComponentPath, "utf8")
+assert.doesNotMatch(workspaceSource, /lead-engine-orchestrator/)
+assert.match(workspaceSource, /lead-engine-stage-ui/)
+assert.match(workspaceSource, /\/api\/platform\/growth\/lead-engine\/sandbox/)
+
+const operatorWorkspacePath = path.join(
+  process.cwd(),
+  "components/growth/lead-operator/growth-lead-operator-workspace.tsx",
+)
+const operatorSource = fs.readFileSync(operatorWorkspacePath, "utf8")
+assert.doesNotMatch(operatorSource, /lead-engine-orchestrator/)
+assert.match(operatorSource, /lead-engine-stage-ui/)
+
+const sandboxRoutePath = path.join(
+  process.cwd(),
+  "app/api/platform/growth/lead-engine/sandbox/route.ts",
+)
+assert.match(fs.readFileSync(sandboxRoutePath, "utf8"), /runLeadEnginePipeline/)
 
 console.log("lead-engine-workspace.test.ts: all checks passed")

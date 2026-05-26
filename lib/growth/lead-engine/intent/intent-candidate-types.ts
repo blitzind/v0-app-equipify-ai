@@ -3,6 +3,10 @@
 import type { GrowthIntentPixelConsentStatus } from "@/lib/growth/intent-pixel/intent-pixel-types"
 import type { GrowthLeadEnginePipelineStageId } from "@/lib/growth/lead-engine/workspace-types"
 import type {
+  GrowthBuyingStage,
+  GrowthBuyingStageAssessmentCandidate,
+} from "@/lib/growth/buying-stage/buying-stage-types"
+import type {
   GrowthCompanyIdentificationMatchCandidate,
 } from "@/lib/growth/company-identification/company-identification-types"
 import type {
@@ -108,6 +112,14 @@ export type GrowthIntentLeadCandidate = {
     is_candidate_match: boolean
   } | null
   company_identification_matches: GrowthCompanyIdentificationMatchCandidate[]
+  buying_stage_summary: {
+    detected_stage: GrowthBuyingStage | null
+    stage_confidence: number
+    stage_score: number
+    signal_count: number
+    is_candidate_assessment: boolean
+  } | null
+  buying_stage_assessment: GrowthBuyingStageAssessmentCandidate | null
 }
 
 export type GrowthIntentLeadBridgeResult = {

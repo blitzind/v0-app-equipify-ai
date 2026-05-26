@@ -3,6 +3,7 @@ import type {
   GrowthIntentLeadCandidatePriority,
 } from "@/lib/growth/lead-engine/intent/intent-candidate-types"
 import type { GrowthIntentAggregatedSession } from "@/lib/growth/lead-engine/intent/intent-session-aggregator"
+import type { GrowthBuyingStageScoreContribution } from "@/lib/growth/buying-stage/buying-stage-types"
 import type { GrowthCompanyIdentificationScoreContribution } from "@/lib/growth/company-identification/company-identification-types"
 import type { GrowthSearchIntentScoreContribution } from "@/lib/growth/search-intent/search-intent-types"
 
@@ -143,6 +144,7 @@ export function computeIntentCandidateScore(
   options?: {
     searchIntent?: GrowthSearchIntentScoreContribution
     companyIdentification?: GrowthCompanyIdentificationScoreContribution
+    buyingStage?: GrowthBuyingStageScoreContribution
   },
 ): GrowthIntentScoreResult {
   const breakdown: GrowthIntentScoreBreakdown = {}
@@ -200,6 +202,11 @@ export function computeIntentCandidateScore(
     reasoning.push(...options.companyIdentification.reasons)
   }
 
+  if (options?.buyingStage && options.buyingStage.points > 0) {
+    Object.assign(breakdown, options.buyingStage.breakdown)
+    reasoning.push(...options.buyingStage.reasons)
+  }
+
   const intent_score = Object.values(breakdown).reduce((sum, v) => sum + v, 0)
 
   let intent_grade: GrowthIntentLeadCandidateGrade = "F"
@@ -214,7 +221,10 @@ export function computeIntentCandidateScore(
   } else if (
     intent_score >= 18 ||
     conversions.points >= 10 ||
-    (options?.searchIntent?.top_category === "demo_intent" && intent_score >= 14)
+    (options?.searchIntent?.top_category === "demo_intent" && intent_score >= 14) ||
+    (options?.buyingStage &&
+      options.buyingStage.points >= 8 &&
+      (breakdown.buying_stage_base ?? 0) >= 9)
   ) {
     candidate_priority = "urgent"
   } else if (intent_score >= 12) {
@@ -235,9 +245,9 @@ export function computeIntentCandidateScore(
 export function normalizeCandidateConfidence(
   intentScore: number,
   hasEvidence: boolean,
-  companyConfidenceBoost = 0,
+  confidenceBoost = 0,
 ): number {
   const base = Math.min(1, intentScore / 25)
   const evidenceBoost = hasEvidence ? 0.1 : 0
-  return Number(Math.max(0, Math.min(1, base + evidenceBoost + companyConfidenceBoost)).toFixed(3))
+  return Number(Math.max(0, Math.min(1, base + evidenceBoost + confidenceBoost)).toFixed(3))
 }

@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { GrowthEngineCard } from "@/components/growth/growth-ui-utils"
-import { LEAD_ENGINE_ORCHESTRATOR_STAGES } from "@/lib/growth/lead-engine/orchestrator/lead-engine-orchestrator"
+import { LEAD_ENGINE_STAGE_UI } from "@/lib/growth/lead-engine/lead-engine-stage-ui"
 import type { GrowthLeadEngineOrchestratorStageResult } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
 import type { GrowthLeadOperatorWorkspacePayload } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import { useAdmin } from "@/lib/admin-store"
@@ -309,6 +309,21 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
         </TabsList>
 
         <TabsContent value="overview" className="mt-4 space-y-4">
+          {workspace.buying_stage ? (
+            <GrowthEngineCard title="Buying stage (candidate)">
+              <p className="text-sm font-medium capitalize">
+                {workspace.buying_stage.detected_stage.replace(/_/g, " ")}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Confidence {(workspace.buying_stage.stage_confidence * 100).toFixed(0)}% · score{" "}
+                {workspace.buying_stage.stage_score} · {workspace.buying_stage.signal_count} signal(s)
+              </p>
+              <p className="mt-2 text-xs text-amber-800">
+                Candidate assessment only — not guaranteed buying stage. No autonomous actions.
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">{workspace.buying_stage.evidence}</p>
+            </GrowthEngineCard>
+          ) : null}
           {workspace.company_match ? (
             <GrowthEngineCard title="Company match (candidate)">
               <p className="text-sm font-medium">{workspace.company_match.company_name}</p>
@@ -467,11 +482,11 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
               <GrowthEngineCard title="Pipeline status">
                 <p className="text-sm text-muted-foreground">{run.execution_summary}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {LEAD_ENGINE_ORCHESTRATOR_STAGES.map((def) => {
-                    const stage = stageById.get(def.stageId)
+                  {LEAD_ENGINE_STAGE_UI.map((def) => {
+                    const stage = stageById.get(def.stageKey)
                     return (
                       <Badge
-                        key={def.stageId}
+                        key={def.stageKey}
                         variant={stage?.status === "completed" ? "default" : "secondary"}
                       >
                         {def.shortLabel}
