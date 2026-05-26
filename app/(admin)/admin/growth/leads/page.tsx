@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Loader2, Plus, RefreshCw, Target, Users } from "lucide-react"
+import { Loader2, Plus, RefreshCw, Sparkles, Target, Users } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useAdmin } from "@/lib/admin-store"
 import { Button } from "@/components/ui/button"
@@ -256,6 +256,12 @@ export default function AdminGrowthLeadsPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/admin/growth/leads/lead-engine">
+                  <Sparkles className="mr-2 size-4" />
+                  Lead Engine
+                </Link>
+              </Button>
               <Button asChild variant="outline" size="sm">
                 <Link href="/admin/growth/ownership">
                   <Users className="mr-2 size-4" />

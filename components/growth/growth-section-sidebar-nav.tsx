@@ -32,6 +32,7 @@ import {
   TrendingUp,
   Upload,
   Users,
+  Workflow,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -82,6 +83,12 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
         match: (path) => path === "/admin/growth/leads",
         consoleKey: "inbox",
         shortcutKey: "i",
+      },
+      {
+        href: "/admin/growth/leads/lead-engine",
+        label: "Lead Engine",
+        icon: Workflow,
+        match: (path) => path.startsWith("/admin/growth/leads/lead-engine"),
       },
       {
         href: "/admin/growth/replies",
