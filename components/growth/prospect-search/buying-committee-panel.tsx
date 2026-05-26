@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Loader2, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { VerificationEnrichmentCard } from "@/components/growth/lead-operator/verification-enrichment-card"
 import type { GrowthContactDiscoverySnapshot } from "@/lib/growth/contact-discovery/contact-discovery-types"
 
 export function BuyingCommitteePanel({
@@ -109,6 +110,12 @@ export function BuyingCommitteePanel({
           No contact candidates yet. Run discover contacts to build a buying committee.
         </p>
       )}
+      {committee?.contacts[0] ? (
+        <VerificationEnrichmentCard
+          contactCandidateId={committee.contacts[0].id}
+          companyCandidateId={companyCandidateId}
+        />
+      ) : null}
     </section>
   )
 }

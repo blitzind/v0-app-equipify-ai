@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { VerificationEnrichmentCard } from "@/components/growth/lead-operator/verification-enrichment-card"
 import { HighIntentActivityCard } from "@/components/growth/revenue-intelligence/high-intent-activity-card"
 import { RevenueIntelligenceWorkspaceLayout } from "@/components/growth/revenue-intelligence/workspace-layout"
 import { LEAD_ENGINE_STAGE_UI } from "@/lib/growth/lead-engine/lead-engine-stage-ui"
@@ -282,6 +283,18 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
         </TabsList>
 
         <TabsContent value="guidance" className="mt-4 space-y-4">
+          {typeof workspace.row.metadata?.prospect_search === "object" &&
+          workspace.row.metadata.prospect_search &&
+          typeof (workspace.row.metadata.prospect_search as Record<string, unknown>).source_id ===
+            "string" &&
+          (workspace.row.metadata.prospect_search as Record<string, unknown>).source_type ===
+            "external_discovered" ? (
+            <VerificationEnrichmentCard
+              companyCandidateId={
+                (workspace.row.metadata.prospect_search as Record<string, unknown>).source_id as string
+              }
+            />
+          ) : null}
           <GrowthEngineCard title="Next action">
             <p className="text-sm font-medium text-foreground">
               {handoff?.recommended_next_action ?? hints?.recommended_next_action}

@@ -71,6 +71,7 @@ async function main(): Promise<void> {
   assert.match(pageSource, /GROWTH_PROSPECT_SEARCH_UX_QA_MARKER/)
   assert.match(pageSource, /GROWTH_EXTERNAL_COMPANY_DISCOVERY_QA_MARKER/)
   assert.match(pageSource, /GROWTH_CONTACT_DISCOVERY_QA_MARKER/)
+  assert.match(pageSource, /GROWTH_VERIFICATION_ENRICHMENT_QA_MARKER/)
 
   const shellSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/prospect-search-shell.tsx"),

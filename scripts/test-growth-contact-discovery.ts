@@ -61,6 +61,18 @@ async function main(): Promise<void> {
   assert.match(routeSource, /runContactDiscoveryForCompany/)
   assert.match(routeSource, /GROWTH_CONTACT_DISCOVERY_QA_MARKER/)
 
+  const enrichmentRoute = fs.readFileSync(
+    path.join(process.cwd(), "app/api/platform/growth/enrichment/route.ts"),
+    "utf8",
+  )
+  assert.match(enrichmentRoute, /GROWTH_VERIFICATION_ENRICHMENT_QA_MARKER/)
+
+  const buyingPanel = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/buying-committee-panel.tsx"),
+    "utf8",
+  )
+  assert.match(buyingPanel, /VerificationEnrichmentCard/)
+
   const shellBridge = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/contact-discovery/integrations/prospect-search-bridge.ts"),
     "utf8",
