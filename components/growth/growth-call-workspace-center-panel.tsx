@@ -111,7 +111,9 @@ function ActiveCallHeader({
         <div className="flex flex-wrap items-center gap-2">
           <GrowthBadge label={NATIVE_DIALER_PROVIDER_LABELS[session.provider]} tone="neutral" />
           {externalBridge ? <GrowthBadge label="Bridge mode" tone="attention" /> : null}
-          <GrowthBadge label={formatCallDuration(elapsed)} tone="healthy" />
+          {externalBridge && !session.connectedAt ? null : (
+            <GrowthBadge label={formatCallDuration(elapsed)} tone="healthy" />
+          )}
         </div>
       </div>
     </div>
@@ -185,7 +187,12 @@ export function GrowthCallWorkspaceCenterPanel({
           : "Off"
         : "Off"
   const recordingTone = recordingLabel === "On" ? "attention" : "neutral"
-  const callTimeLabel = phase === "active" || phase === "wrapup" ? formatCallDuration(elapsed) : "00:00"
+  const callTimeLabel =
+    phase === "bridge_pending"
+      ? "00:00"
+      : phase === "active" || phase === "wrapup"
+        ? formatCallDuration(elapsed)
+        : "00:00"
   const providerLabel =
     activeSession && (phase === "active" || phase === "bridge_pending")
       ? NATIVE_DIALER_PROVIDER_LABELS[activeSession.provider]

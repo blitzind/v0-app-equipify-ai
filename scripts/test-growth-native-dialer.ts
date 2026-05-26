@@ -12,13 +12,24 @@ import {
 import { nativeCallWorkspaceHref } from "../lib/growth/native-dialer/native-dialer-navigation"
 import { createNativeDialerProviderInstance } from "../lib/growth/native-dialer/native-dialer-provider-registry"
 import { GROWTH_NATIVE_DIALER_QA_MARKER, GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER, GROWTH_NATIVE_DIALER_CALL_START_FIX_QA_MARKER, GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER, GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER, NATIVE_DIALER_PROVIDER_IDS } from "../lib/growth/native-dialer/native-dialer-types"
-import { GOOGLE_VOICE_BRIDGE_CALLS_URL, isGoogleVoiceBridgeProvider } from "../lib/growth/native-dialer/native-dialer-bridge"
+import {
+  beginGoogleVoiceBridgeDialFlow,
+  GOOGLE_VOICE_BRIDGE_CALLS_URL,
+  GOOGLE_VOICE_BRIDGE_COPY_BLOCKED_TOAST,
+  GOOGLE_VOICE_BRIDGE_COPY_SUCCESS_TOAST,
+  GOOGLE_VOICE_BRIDGE_MANUAL_FLOW_INSTRUCTION,
+  isGoogleVoiceBridgeProvider,
+} from "../lib/growth/native-dialer/native-dialer-bridge"
 
 assert.equal(GROWTH_NATIVE_DIALER_QA_MARKER, "native-dialer-v1")
 assert.equal(GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER, "native-dialer-layout-v3")
 assert.equal(GROWTH_NATIVE_DIALER_CALL_START_FIX_QA_MARKER, "native-dialer-call-start-fix-v1")
 assert.equal(GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER, "native-dialer-live-coaching-center-v1")
-assert.equal(GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER, "google-voice-bridge-v1")
+assert.equal(GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER, "google-voice-bridge-manual-flow-v2")
+assert.equal(GOOGLE_VOICE_BRIDGE_COPY_SUCCESS_TOAST, "Number copied. Paste it in Google Voice to place the call.")
+assert.equal(GOOGLE_VOICE_BRIDGE_COPY_BLOCKED_TOAST, "Copy blocked by browser. Use Copy Number.")
+assert.match(GOOGLE_VOICE_BRIDGE_MANUAL_FLOW_INSTRUCTION, /Paste or select the copied number/)
+assert.equal(typeof beginGoogleVoiceBridgeDialFlow, "function")
 assert.ok(NATIVE_DIALER_PROVIDER_IDS.includes("google_voice_bridge"))
 assert.equal(createNativeDialerProviderInstance("google_voice_bridge").providerId, "google_voice_bridge")
 assert.equal(isGoogleVoiceBridgeProvider("google_voice_bridge"), true)
@@ -190,27 +201,36 @@ const bridgePanel = fs.readFileSync(
   "utf8",
 )
 assert.match(bridgePanel, /External Bridge Mode/)
+assert.match(bridgePanel, /GOOGLE_VOICE_BRIDGE_MANUAL_FLOW_INSTRUCTION/)
 assert.match(bridgePanel, /Open Google Voice/)
-assert.match(bridgePanel, /Copy Phone Number/)
+assert.match(bridgePanel, /Copy Number/)
+assert.match(bridgePanel, /google-voice-bridge-copy-number/)
 assert.match(bridgePanel, /Mark Call Started/)
 assert.match(bridgePanel, /Start Live Coaching/)
 assert.match(bridgePanel, /End \/ Wrap Up/)
+assert.doesNotMatch(bridgePanel, /auto-dial|auto-started|automatically dial/i)
 
 assert.match(centerPanel, /bridge_pending/)
 assert.match(centerPanel, /GrowthCallWorkspaceGoogleVoiceBridgePanel/)
 assert.match(centerPanel, /externalBridge/)
 assert.match(centerPanel, /!externalBridge/)
+assert.match(centerPanel, /bridge_pending[\s\S]*00:00/)
 
 assert.match(workspaceComponent, /external_bridge_pending/)
 assert.match(workspaceComponent, /bridge-started/)
-assert.match(workspaceComponent, /openGoogleVoiceBridgeTab/)
+assert.match(workspaceComponent, /beginGoogleVoiceBridgeDialFlow/)
+assert.match(workspaceComponent, /GOOGLE_VOICE_BRIDGE_COPY_SUCCESS_TOAST/)
+assert.match(workspaceComponent, /GOOGLE_VOICE_BRIDGE_COPY_BLOCKED_TOAST/)
 assert.match(workspaceComponent, /GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER/)
+assert.doesNotMatch(workspaceComponent, /buildGoogleVoiceBridgeCopyHref|voice\.google\.com.*a=nc/)
 
 const nativeDialerSettings = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-native-dialer-settings-panel.tsx"),
   "utf8",
 )
 assert.match(nativeDialerSettings, /Google Voice Bridge/)
+assert.match(nativeDialerSettings, /cannot auto-dial/)
+assert.match(nativeDialerSettings, /manually place it/)
 
 const growthSettingsPage = fs.readFileSync(
   path.join(process.cwd(), "app/(admin)/admin/growth/settings/page.tsx"),

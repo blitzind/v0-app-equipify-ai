@@ -22,7 +22,12 @@ import {
   GROWTH_NATIVE_DIALER_QA_MARKER,
   GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER,
 } from "@/lib/growth/native-dialer/native-dialer-types"
-import { openGoogleVoiceBridgeTab } from "@/lib/growth/native-dialer/native-dialer-bridge"
+import {
+  beginGoogleVoiceBridgeDialFlow,
+  GOOGLE_VOICE_BRIDGE_COPY_BLOCKED_TOAST,
+  GOOGLE_VOICE_BRIDGE_COPY_SUCCESS_TOAST,
+} from "@/lib/growth/native-dialer/native-dialer-bridge"
+import { useToast } from "@/hooks/use-toast"
 import type { GrowthCallWorkspacePhase } from "@/components/growth/growth-call-workspace-center-panel"
 import {
   normalizeDialPhoneDigits,
@@ -31,6 +36,7 @@ import {
 } from "@/lib/growth/native-dialer/native-dialer-workspace-ui"
 
 export function GrowthCallWorkspace() {
+  const { toast } = useToast()
   const searchParams = useSearchParams()
   const initialLeadId = searchParams.get("leadId")
   const initialPhone = searchParams.get("phone")
@@ -143,7 +149,10 @@ export function GrowthCallWorkspace() {
       if (!res.ok || !data.session) throw new Error(data.message ?? "Could not start call.")
       setActiveSession(data.session)
       if (data.session.status === "external_bridge_pending") {
-        openGoogleVoiceBridgeTab()
+        const { copied } = await beginGoogleVoiceBridgeDialFlow(data.session.phoneNumber)
+        toast({
+          title: copied ? GOOGLE_VOICE_BRIDGE_COPY_SUCCESS_TOAST : GOOGLE_VOICE_BRIDGE_COPY_BLOCKED_TOAST,
+        })
       }
       if (data.session.leadId) void loadLeadContext(data.session.leadId)
     } catch (e) {

@@ -76,6 +76,9 @@ export function GrowthNativeDialerSettingsPanel() {
           Operator-controlled telephony adapters for the Call Workspace. Google Voice Bridge opens Google Voice
           externally — no stored credentials or autonomous dialing.
         </p>
+        <p className="text-sm text-muted-foreground">
+          Google Voice Bridge cannot auto-dial. It opens Google Voice and tracks the call after you manually place it.
+        </p>
         <GrowthSettingsBadge label={GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER} tone="neutral" />
 
         {loading ? (

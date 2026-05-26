@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import {
   copyPhoneNumberToClipboard,
+  GOOGLE_VOICE_BRIDGE_MANUAL_FLOW_INSTRUCTION,
   GOOGLE_VOICE_BRIDGE_QA_MARKER,
   openGoogleVoiceBridgeTab,
 } from "@/lib/growth/native-dialer/native-dialer-bridge"
@@ -32,6 +33,7 @@ export function GrowthCallWorkspaceGoogleVoiceBridgePanel({
   onEndCall: () => void
 }) {
   const [copied, setCopied] = useState(false)
+  const displayPhone = formatDisplayPhone(session.phoneNumber)
 
   async function handleCopyPhone() {
     const ok = await copyPhoneNumberToClipboard(session.phoneNumber)
@@ -41,32 +43,46 @@ export function GrowthCallWorkspaceGoogleVoiceBridgePanel({
 
   return (
     <div
-      className={cn(GROWTH_CALL_WORKSPACE_PANEL, "flex flex-col gap-4 border-amber-500/30 bg-amber-500/5 p-5 dark:border-amber-400/20")}
+      className={cn(
+        GROWTH_CALL_WORKSPACE_PANEL,
+        "flex flex-col gap-4 border-amber-500/30 bg-amber-500/5 p-5 dark:border-amber-400/20",
+      )}
       data-qa-marker={GOOGLE_VOICE_BRIDGE_QA_MARKER}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <GrowthBadge label="External Bridge Mode" tone="attention" />
-          <h3 className="mt-2 text-lg font-semibold">Google Voice Bridge</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Place the call in Google Voice, then click <span className="font-medium text-foreground">Mark Call Started</span>.
-          </p>
-        </div>
-        <GrowthBadge label="Manual provider telemetry unavailable" tone="neutral" />
-      </div>
-
-      <div className="rounded-xl border border-border/60 bg-background/70 px-4 py-3 dark:border-white/10">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Dial target</p>
-        <p className="mt-1 font-semibold">{session.companyName ?? session.contactName ?? "Prospect"}</p>
-        <p className="text-sm text-muted-foreground">
-          {formatDisplayPhone(session.phoneNumber)} · {session.contactName ?? "Contact"}
+      <div>
+        <GrowthBadge label="External Bridge Mode" tone="attention" />
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          {GOOGLE_VOICE_BRIDGE_MANUAL_FLOW_INSTRUCTION}
         </p>
       </div>
 
-      <p className="text-sm leading-relaxed text-muted-foreground">
-        Live Coaching is available through browser capture. Call intelligence is generated only when Live Coaching or
-        session capture is active.
-      </p>
+      <button
+        type="button"
+        data-qa-action="google-voice-bridge-copy-number"
+        onClick={() => void handleCopyPhone()}
+        className={cn(
+          "flex w-full items-center justify-between gap-3 rounded-full border border-border/70 bg-background px-5 py-4 text-left shadow-sm transition-colors",
+          "hover:border-amber-500/40 hover:bg-amber-500/5 dark:border-white/10 dark:bg-white/5",
+        )}
+      >
+        <span className="min-w-0">
+          <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">Number to dial</span>
+          <span className="mt-1 block truncate font-mono text-2xl font-semibold tabular-nums tracking-tight">
+            {displayPhone}
+          </span>
+        </span>
+        <span className="flex shrink-0 items-center gap-1.5 text-sm font-medium text-muted-foreground">
+          {copied ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
+          {copied ? "Copied" : "Tap to copy"}
+        </span>
+      </button>
+
+      {(session.companyName ?? session.contactName) ? (
+        <p className="text-sm text-muted-foreground">
+          {session.companyName ?? session.contactName}
+          {session.contactName && session.companyName ? ` · ${session.contactName}` : null}
+        </p>
+      ) : null}
 
       <div className="grid gap-2 sm:grid-cols-2">
         <Button type="button" variant="outline" onClick={() => openGoogleVoiceBridgeTab()}>
@@ -75,7 +91,7 @@ export function GrowthCallWorkspaceGoogleVoiceBridgePanel({
         </Button>
         <Button type="button" variant="outline" onClick={() => void handleCopyPhone()}>
           {copied ? <Check className="mr-2 size-4" /> : <Copy className="mr-2 size-4" />}
-          {copied ? "Copied" : "Copy Phone Number"}
+          {copied ? "Copied" : "Copy Number"}
         </Button>
         <Button type="button" onClick={onMarkCallStarted} disabled={markingStarted}>
           <Radio className="mr-2 size-4" />
