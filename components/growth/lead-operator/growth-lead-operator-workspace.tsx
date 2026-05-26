@@ -369,6 +369,25 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
         </TabsContent>
 
         <TabsContent value="intent" className="mt-4 space-y-4">
+          {workspace.search_intent_signals.length > 0 ? (
+            <GrowthEngineCard title="Search intent signals">
+              <div className="space-y-2">
+                {workspace.search_intent_signals.map((signal) => (
+                  <div key={signal.id} className="rounded-lg border border-border p-3 text-sm">
+                    <p className="font-medium">{signal.intent_topic}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {signal.intent_category.replace(/_/g, " ")} · {signal.intent_stage.replace(/_/g, " ")} · score{" "}
+                      {signal.intent_score} · {signal.source_type.replace(/_/g, " ")}
+                    </p>
+                    {signal.keyword ? (
+                      <p className="mt-1 text-xs">Keyword: {signal.keyword}</p>
+                    ) : null}
+                    <p className="mt-1 text-muted-foreground">{signal.evidence}</p>
+                  </div>
+                ))}
+              </div>
+            </GrowthEngineCard>
+          ) : null}
           <GrowthEngineCard title="Intent Activity">
             {!workspace.intent_activity ? (
               <p className="text-sm text-muted-foreground">No intent session history loaded.</p>

@@ -13,6 +13,7 @@ import {
   computeIntentCandidateScore,
   normalizeCandidateConfidence,
 } from "@/lib/growth/lead-engine/intent/intent-candidate-scoring"
+import { captureSearchIntentFromAggregatedSession } from "@/lib/growth/search-intent/search-intent-repository"
 import {
   aggregateIntentSession,
   extractIdentityFromContacts,
@@ -173,7 +174,10 @@ export function bridgeIntentSessionToLeadCandidate(
       warnings.push("Session marked identified but no explicit contact record — identity not inferred.")
     }
 
-    const score = computeIntentCandidateScore(aggregated)
+    const searchCapture = captureSearchIntentFromAggregatedSession(aggregated)
+    const score = computeIntentCandidateScore(aggregated, {
+      searchIntent: searchCapture.contribution,
+    })
     const dedupeSources = buildDedupeSourcesFromAggregate(
       aggregated,
       identity,
@@ -202,7 +206,19 @@ export function bridgeIntentSessionToLeadCandidate(
     )
     const pipelineEntry = resolvePipelineEntry(candidateType, identity)
     const evidence = buildCandidateEvidence(aggregated)
+    for (const signal of searchCapture.signals.slice(0, 4)) {
+      evidence.push({
+        claim: `Search intent: ${signal.intent_topic}`,
+        evidence: signal.evidence,
+        source: "growth.search_intent_signals",
+      })
+    }
     const attribution = buildCandidateAttribution(aggregated, score.scoring_breakdown)
+    for (const signal of searchCapture.signals.slice(0, 3)) {
+      for (const attr of signal.source_attribution) {
+        attribution.push(attr)
+      }
+    }
 
     if (evidence.length === 0) {
       warnings.push("No pageview or conversion evidence — low confidence.")
@@ -234,10 +250,25 @@ export function bridgeIntentSessionToLeadCandidate(
       identity,
       candidate_evidence: evidence,
       candidate_attribution: attribution,
-      scoring_breakdown: score.scoring_breakdown,
+      scoring_breakdown: {
+        ...score.scoring_breakdown,
+        ...(searchCapture.contribution.signal_count > 0
+          ? { search_intent_signals: searchCapture.contribution.signal_count }
+          : {}),
+      },
       threshold_passed: threshold.threshold_passed,
       threshold_reasons: [...threshold.reasons, ...threshold.blockers],
       warnings,
+      search_intent_summary:
+        searchCapture.contribution.signal_count > 0
+          ? {
+              top_keyword: searchCapture.contribution.top_keyword,
+              top_category: searchCapture.contribution.top_category,
+              signal_count: searchCapture.contribution.signal_count,
+              max_confidence: searchCapture.contribution.max_confidence,
+            }
+          : null,
+      search_intent_signals: searchCapture.signals,
     }
 
     const pipeline_entry: GrowthLeadEnginePipelineStageId | null = threshold.lead_engine_eligible

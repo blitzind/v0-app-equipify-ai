@@ -74,6 +74,16 @@ export function buildLeadInboxCardView(row: GrowthLeadInboxRow): GrowthLeadInbox
   if (row.existing_account_match.matched) intentIndicators.push("CRM account match")
   if (row.existing_lead_match.matched) intentIndicators.push("CRM lead match")
 
+  const searchSummary = row.metadata?.search_intent_summary as
+    | { top_keyword?: string; top_category?: string; signal_count?: number }
+    | undefined
+  if (searchSummary?.top_category) {
+    intentIndicators.push(`Search: ${String(searchSummary.top_category).replace(/_/g, " ")}`)
+  }
+  if (searchSummary?.top_keyword) {
+    intentIndicators.push(`Keyword: ${searchSummary.top_keyword}`)
+  }
+
   const lastActivityAt = row.updated_at || row.created_at
 
   return {

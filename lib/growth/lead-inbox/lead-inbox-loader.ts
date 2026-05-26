@@ -6,6 +6,10 @@ import {
   validateInboxPiiPolicy,
 } from "@/lib/growth/lead-inbox/lead-inbox-dedupe"
 import { createLeadCandidate } from "@/lib/growth/lead-inbox/lead-inbox-repository"
+import {
+  linkSearchIntentSignalsToLeadInbox,
+  persistSearchIntentSignals,
+} from "@/lib/growth/search-intent/search-intent-repository"
 import type {
   GrowthLeadInboxCreateInput,
   GrowthLeadInboxCreateResult,
@@ -71,6 +75,7 @@ export function intentCandidateToInboxInput(
       bridge_qa_marker: candidate.qa_marker,
       threshold_passed: candidate.threshold_passed,
       lead_engine_eligible: candidate.lead_engine_eligible,
+      search_intent_summary: candidate.search_intent_summary,
     },
   }
 }
@@ -165,5 +170,22 @@ export async function ingestIntentCandidateToLeadInbox(
     }
   }
 
-  return createLeadCandidate(admin, input)
+  const result = await createLeadCandidate(admin, input)
+  if (result.ok && result.row && candidate.search_intent_signals.length > 0) {
+    const persisted = await persistSearchIntentSignals(
+      admin,
+      candidate.search_intent_signals.map((signal) => ({
+        ...signal,
+        lead_inbox_id: result.row!.id,
+      })),
+    )
+    if (persisted.ok && persisted.rows.length > 0) {
+      await linkSearchIntentSignalsToLeadInbox(
+        admin,
+        result.row.id,
+        persisted.rows.map((r) => r.id),
+      )
+    }
+  }
+  return result
 }

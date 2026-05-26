@@ -11,6 +11,7 @@ import {
   buildOperatorHandoffInputFromRow,
 } from "@/lib/growth/lead-operator-workspace/lead-inbox-card-view"
 import { extractLeadEngineOutputsFromRun } from "@/lib/growth/lead-operator-workspace/lead-engine-run-extract"
+import { loadSearchIntentSignalsForLeadInbox } from "@/lib/growth/search-intent/search-intent-repository"
 import {
   GROWTH_LEAD_ENGINE_RUN_METADATA_KEY,
   GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER,
@@ -199,6 +200,18 @@ export async function buildLeadOperatorWorkspacePayload(
     ...(handoff?.operator_attribution ?? []),
   ]
 
+  const searchSignals = await loadSearchIntentSignalsForLeadInbox(admin, row.id, 12)
+  const search_intent_signals: GrowthLeadOperatorSearchIntentSummary[] = searchSignals.map((s) => ({
+    id: s.id,
+    intent_topic: s.intent_topic,
+    intent_category: s.intent_category,
+    intent_stage: s.intent_stage,
+    intent_score: s.intent_score,
+    keyword: s.normalized_keyword || s.keyword,
+    source_type: s.source_type,
+    evidence: s.evidence,
+  }))
+
   return {
     qa_marker: GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER,
     row: sanitizeLeadInboxRowForPublic(row, identified),
@@ -213,6 +226,7 @@ export async function buildLeadOperatorWorkspacePayload(
       attribution,
     },
     history: buildHistory(row),
+    search_intent_signals,
   }
 }
 

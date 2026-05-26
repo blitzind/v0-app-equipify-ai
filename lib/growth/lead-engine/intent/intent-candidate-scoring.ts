@@ -3,6 +3,7 @@ import type {
   GrowthIntentLeadCandidatePriority,
 } from "@/lib/growth/lead-engine/intent/intent-candidate-types"
 import type { GrowthIntentAggregatedSession } from "@/lib/growth/lead-engine/intent/intent-session-aggregator"
+import type { GrowthSearchIntentScoreContribution } from "@/lib/growth/search-intent/search-intent-types"
 
 export const GROWTH_INTENT_HIGH_INTENT_PATHS = [
   "/pricing",
@@ -138,6 +139,7 @@ function scoreUtm(aggregated: GrowthIntentAggregatedSession): { points: number; 
 
 export function computeIntentCandidateScore(
   aggregated: GrowthIntentAggregatedSession,
+  options?: { searchIntent?: GrowthSearchIntentScoreContribution },
 ): GrowthIntentScoreResult {
   const breakdown: GrowthIntentScoreBreakdown = {}
   const reasoning: string[] = []
@@ -184,6 +186,12 @@ export function computeIntentCandidateScore(
     if (utm.reason) reasoning.push(utm.reason)
   }
 
+  if (options?.searchIntent && options.searchIntent.points > 0) {
+    breakdown.search_intent = options.searchIntent.points
+    Object.assign(breakdown, options.searchIntent.breakdown)
+    reasoning.push(...options.searchIntent.reasons)
+  }
+
   const intent_score = Object.values(breakdown).reduce((sum, v) => sum + v, 0)
 
   let intent_grade: GrowthIntentLeadCandidateGrade = "F"
@@ -195,7 +203,11 @@ export function computeIntentCandidateScore(
   let candidate_priority: GrowthIntentLeadCandidatePriority = "low"
   if (aggregated.identified_contacts.length > 0 && intent_score >= 15) {
     candidate_priority = "urgent"
-  } else if (intent_score >= 18 || conversions.points >= 10) {
+  } else if (
+    intent_score >= 18 ||
+    conversions.points >= 10 ||
+    (options?.searchIntent?.top_category === "demo_intent" && intent_score >= 14)
+  ) {
     candidate_priority = "urgent"
   } else if (intent_score >= 12) {
     candidate_priority = "high"

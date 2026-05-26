@@ -103,6 +103,17 @@ export type GrowthLeadOperatorHistoryEntry = {
   note: string
 }
 
+export type GrowthLeadOperatorSearchIntentSummary = {
+  id: string
+  intent_topic: string
+  intent_category: string
+  intent_stage: string
+  intent_score: number
+  keyword: string
+  source_type: string
+  evidence: string
+}
+
 export type GrowthLeadInboxRowPublic = Omit<
   GrowthLeadInboxRow,
   "email" | "phone" | "contact_name" | "linkedin_url"
@@ -128,6 +139,7 @@ export type GrowthLeadOperatorWorkspacePayload = {
     attribution: GrowthLeadOperatorAttributionCard[]
   }
   history: GrowthLeadOperatorHistoryEntry[]
+  search_intent_signals: GrowthLeadOperatorSearchIntentSummary[]
 }
 
 export const GROWTH_LEAD_ENGINE_RUN_METADATA_KEY = "lead_engine_run" as const

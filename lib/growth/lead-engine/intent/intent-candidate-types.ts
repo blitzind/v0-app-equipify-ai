@@ -2,6 +2,10 @@
 
 import type { GrowthIntentPixelConsentStatus } from "@/lib/growth/intent-pixel/intent-pixel-types"
 import type { GrowthLeadEnginePipelineStageId } from "@/lib/growth/lead-engine/workspace-types"
+import type {
+  GrowthSearchIntentCategory,
+  GrowthSearchIntentClassifiedSignal,
+} from "@/lib/growth/search-intent/search-intent-types"
 
 export const GROWTH_INTENT_LEAD_BRIDGE_QA_MARKER = "growth-intent-lead-bridge-v1" as const
 
@@ -84,6 +88,13 @@ export type GrowthIntentLeadCandidate = {
   threshold_passed: boolean
   threshold_reasons: string[]
   warnings: string[]
+  search_intent_summary: {
+    top_keyword: string | null
+    top_category: GrowthSearchIntentCategory | null
+    signal_count: number
+    max_confidence: number
+  } | null
+  search_intent_signals: GrowthSearchIntentClassifiedSignal[]
 }
 
 export type GrowthIntentLeadBridgeResult = {
