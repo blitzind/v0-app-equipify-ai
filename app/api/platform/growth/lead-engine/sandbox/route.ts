@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
-import { runGrowthLeadEngineSandboxPipeline } from "@/lib/growth/lead-engine/run-sandbox-pipeline"
+import { runLeadEnginePipeline } from "@/lib/growth/lead-engine/orchestrator/lead-engine-orchestrator"
 import type { GrowthLeadEngineSandboxInput } from "@/lib/growth/lead-engine/workspace-types"
 
 export const runtime = "nodejs"
@@ -30,10 +30,10 @@ export async function POST(request: Request) {
       )
     }
 
-    const result = runGrowthLeadEngineSandboxPipeline(input)
-    return NextResponse.json({ ok: true, result })
+    const run = runLeadEnginePipeline(input)
+    return NextResponse.json({ ok: true, run })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: "sandbox_failed", message }, { status: 500 })
+    return NextResponse.json({ ok: false, error: "pipeline_failed", message }, { status: 500 })
   }
 }

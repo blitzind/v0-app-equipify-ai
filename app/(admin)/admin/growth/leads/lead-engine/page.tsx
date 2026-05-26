@@ -10,7 +10,7 @@ import {
   usePlatformAdminHeaderIdentity,
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
-import { GROWTH_LEAD_ENGINE_WORKSPACE_QA_MARKER } from "@/lib/growth/lead-engine/workspace-types"
+import { GROWTH_LEAD_ENGINE_ORCHESTRATOR_QA_MARKER } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
 
 export default function AdminGrowthLeadEnginePage() {
   const { sessionIdentity } = useAdmin()
@@ -35,7 +35,7 @@ export default function AdminGrowthLeadEnginePage() {
               <p className="text-sm text-muted-foreground">
                 Internal admin workspace to inspect the Lead Engine pipeline — parser validation via fixtures, no outbound execution.
               </p>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">{GROWTH_LEAD_ENGINE_WORKSPACE_QA_MARKER}</p>
+              <p className="mt-1 font-mono text-xs text-muted-foreground">{GROWTH_LEAD_ENGINE_ORCHESTRATOR_QA_MARKER}</p>
             </div>
           </div>
         </section>

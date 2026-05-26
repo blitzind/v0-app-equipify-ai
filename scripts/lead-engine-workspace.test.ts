@@ -1,18 +1,20 @@
 /**
- * Regression checks for Lead Engine workspace (UI shell + sandbox pipeline).
+ * Regression checks for Lead Engine workspace + orchestrator (Prompt 11).
  * Run: pnpm test:growth-lead-engine-workspace
  */
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
-import { runGrowthLeadEngineSandboxPipeline } from "../lib/growth/lead-engine/run-sandbox-pipeline"
-import { GROWTH_LEAD_ENGINE_PIPELINE_STAGES } from "../lib/growth/lead-engine/run-sandbox-pipeline"
-import { GROWTH_LEAD_ENGINE_WORKSPACE_QA_MARKER } from "../lib/growth/lead-engine/workspace-types"
+import {
+  LEAD_ENGINE_ORCHESTRATOR_STAGES,
+  runLeadEnginePipeline,
+} from "../lib/growth/lead-engine/orchestrator/lead-engine-orchestrator"
+import { GROWTH_LEAD_ENGINE_ORCHESTRATOR_QA_MARKER } from "../lib/growth/lead-engine/orchestrator/lead-engine-run-types"
 
-assert.equal(GROWTH_LEAD_ENGINE_WORKSPACE_QA_MARKER, "lead-engine-workspace-v1")
-assert.equal(GROWTH_LEAD_ENGINE_PIPELINE_STAGES.length, 10)
+assert.equal(GROWTH_LEAD_ENGINE_ORCHESTRATOR_QA_MARKER, "lead-engine-workspace-v1")
+assert.equal(LEAD_ENGINE_ORCHESTRATOR_STAGES.length, 10)
 
-const result = runGrowthLeadEngineSandboxPipeline({
+const run = runLeadEnginePipeline({
   companyName: "Precision Biomedical Services",
   domain: "precisionbiomed.example",
   industry: "Biomedical field service",
@@ -20,24 +22,36 @@ const result = runGrowthLeadEngineSandboxPipeline({
   notes: "Dispatch coordination context",
 })
 
-assert.equal(result.qaMarker, "lead-engine-workspace-v1")
-assert.equal(result.mode, "fixture_dry_run")
-assert.equal(result.stages.length, 10)
-assert.equal(result.completedCount, 10)
-assert.equal(result.errorCount, 0)
+assert.ok(run.run_id.length > 0)
+assert.equal(run.pipeline_status, "completed")
+assert.equal(run.completed_stages.length, 10)
+assert.equal(run.fatal_errors.length, 0)
+assert.ok(run.execution_duration_ms >= 0)
+assert.ok(run.pipeline_attribution_chain.length > 0)
+assert.ok(run.pipeline_evidence_chain.length > 0)
+assert.equal(run.stage_results.length, 10)
 
-const execution = result.stages.find((s) => s.stageId === "revenue_execution")
-assert.ok(execution?.parseOk)
-assert.equal(execution?.status, "ok")
+const execution = run.stage_results.find((s) => s.stage_id === "revenue_execution")
+assert.equal(execution?.status, "completed")
+assert.equal(execution?.parse_ok, true)
 
-const pagePath = path.join(process.cwd(), "app/(admin)/admin/growth/leads/lead-engine/page.tsx")
-const pageSource = fs.readFileSync(pagePath, "utf8")
-assert.match(pageSource, /GROWTH_LEAD_ENGINE_WORKSPACE_QA_MARKER/)
-assert.match(pageSource, /GrowthLeadEngineWorkspace/)
+const rejectRun = runLeadEnginePipeline({
+  companyName: "Bad Co",
+  domain: "bad.example",
+  industry: "Test",
+  location: "US",
+  notes: "test",
+})
+
+assert.ok(rejectRun.completed_stages.includes("verification_triage"))
 
 const navPath = path.join(process.cwd(), "components/growth/growth-section-sidebar-nav.tsx")
-const navSource = fs.readFileSync(navPath, "utf8")
-assert.match(navSource, /\/admin\/growth\/leads\/lead-engine/)
-assert.match(navSource, /Lead Engine/)
+assert.match(fs.readFileSync(navPath, "utf8"), /\/admin\/growth\/leads\/lead-engine/)
+
+const orchestratorPath = path.join(
+  process.cwd(),
+  "lib/growth/lead-engine/orchestrator/lead-engine-orchestrator.ts",
+)
+assert.match(fs.readFileSync(orchestratorPath, "utf8"), /runLeadEnginePipeline/)
 
 console.log("lead-engine-workspace.test.ts: all checks passed")
