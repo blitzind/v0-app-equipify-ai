@@ -140,6 +140,7 @@
     "test:growth-lead-engine-decision-maker-hypothesis": "tsx scripts/test-growth-lead-engine-decision-maker-hypothesis.ts",
     "test:growth-lead-engine-contact-research": "tsx scripts/test-growth-lead-engine-contact-research.ts",
     "test:growth-lead-engine-verification-triage": "tsx scripts/verification-triage.test.ts",
+    "test:growth-lead-engine-account-brief": "tsx scripts/account-brief.test.ts",
     "test:growth-native-dialer": "tsx scripts/test-growth-native-dialer.ts",
     "test:growth-native-dialer-schema-health": "tsx scripts/test-growth-native-dialer-schema-health.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
