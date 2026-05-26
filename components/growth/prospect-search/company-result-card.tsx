@@ -7,6 +7,7 @@ import {
   recommendedMotion,
   ResultSignalBadges,
 } from "@/components/growth/prospect-search/result-signal-badges"
+import { BuyingCommitteePanel } from "@/components/growth/prospect-search/buying-committee-panel"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
 
@@ -103,6 +104,10 @@ export function CompanyResultCard({
 
       {row.signals[0] ? (
         <p className="text-xs text-muted-foreground line-clamp-2">{row.signals[0]}</p>
+      ) : null}
+
+      {row.source_type === "external_discovered" && selected ? (
+        <BuyingCommitteePanel companyCandidateId={row.id} companyName={row.company_name} />
       ) : null}
 
       <div

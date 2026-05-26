@@ -156,6 +156,7 @@
     "test:growth-buying-stage-engine": "tsx scripts/growth-buying-stage-engine.test.ts",
     "test:growth-prospect-search": "tsx scripts/growth-prospect-search.test.ts",
     "test:growth-external-company-discovery": "tsx scripts/test-growth-external-company-discovery.ts",
+    "test:growth-contact-discovery": "tsx scripts/test-growth-contact-discovery.ts",
     "test:growth-native-dialer": "tsx scripts/test-growth-native-dialer.ts",
     "test:growth-native-dialer-schema-health": "tsx scripts/test-growth-native-dialer-schema-health.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",

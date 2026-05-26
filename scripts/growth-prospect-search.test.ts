@@ -70,6 +70,7 @@ async function main(): Promise<void> {
   assert.match(pageSource, /Prospect Search/)
   assert.match(pageSource, /GROWTH_PROSPECT_SEARCH_UX_QA_MARKER/)
   assert.match(pageSource, /GROWTH_EXTERNAL_COMPANY_DISCOVERY_QA_MARKER/)
+  assert.match(pageSource, /GROWTH_CONTACT_DISCOVERY_QA_MARKER/)
 
   const shellSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/prospect-search-shell.tsx"),
@@ -83,6 +84,11 @@ async function main(): Promise<void> {
   assert.match(shellSource, /data-ux-marker/)
   assert.match(shellSource, /DiscoveryModeToggle/)
   assert.match(shellSource, /mode.*discover_external|discover_external/)
+  const companyCardSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/company-result-card.tsx"),
+    "utf8",
+  )
+  assert.match(companyCardSource, /BuyingCommitteePanel/)
 
   const suggestionSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/search-suggestion-engine.ts"),

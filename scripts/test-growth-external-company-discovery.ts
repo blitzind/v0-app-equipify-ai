@@ -76,6 +76,12 @@ const shellSource = fs.readFileSync(
 assert.match(shellSource, /DiscoveryModeToggle/)
 assert.match(shellSource, /Discover new companies/)
 
+const contactRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/contact-discovery/route.ts"),
+  "utf8",
+)
+assert.match(contactRoute, /contact-discovery/)
+
 const actionsSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-actions.ts"),
   "utf8",

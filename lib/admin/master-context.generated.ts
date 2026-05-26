@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 671,
-  sqlMigrations: 274,
+  apiRouteHandlers: 672,
+  sqlMigrations: 275,
   dashboardPages: 65,
-  componentsTsx: 503,
-  libTsFiles: 1636,
+  componentsTsx: 504,
+  libTsFiles: 1652,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **671** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **274** |
+| API route handlers (\`app/api/**/route.ts\`) | **672** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **275** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **503** |
-| \`lib/**/*.ts\` | **1636** |
+| \`components/**/*.tsx\` | **504** |
+| \`lib/**/*.ts\` | **1652** |
 
 ### Vercel crons
 
@@ -497,6 +497,7 @@ platform/growth/capacity/dashboard/route.ts
 platform/growth/command/dashboard/route.ts
 platform/growth/communication-preferences/route.ts
 platform/growth/communication-settings/route.ts
+platform/growth/contact-discovery/route.ts
 platform/growth/conversations/dashboard/route.ts
 platform/growth/copilot/dashboard/route.ts
 platform/growth/copilot/generations/[generationId]/route.ts
