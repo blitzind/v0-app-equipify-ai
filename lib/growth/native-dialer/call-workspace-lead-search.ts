@@ -14,6 +14,7 @@ import type {
   CallWorkspaceLeadSearchDiagnostics,
   CallWorkspaceLeadSearchEntityType,
   CallWorkspaceLeadSearchResult,
+  CallWorkspaceLeadSearchSource,
   CallWorkspaceLeadSearchSourceCounts,
 } from "@/lib/growth/native-dialer/call-workspace-lead-search-types"
 import { GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER } from "@/lib/growth/native-dialer/call-workspace-lead-search-types"
@@ -45,7 +46,12 @@ const PROSPECT_ILIKE_FIELDS = [
   "contact_email",
   "contact_phone",
   "website",
+  "notes",
 ] as const
+
+const CUSTOMER_ILIKE_FIELDS = ["company_name", "notes"] as const
+
+const CUSTOMER_CONTACT_ILIKE_FIELDS = ["full_name", "email", "phone", "role"] as const
 
 type LeadRow = {
   id: string
@@ -118,6 +124,50 @@ function scoreTextMatch(input: {
   return null
 }
 
+function buildHit(input: {
+  id: string
+  displayName: string
+  companyName: string
+  email: string | null
+  phone: string | null
+  source: CallWorkspaceLeadSearchSource
+  confidence: number
+  matchedField: string
+  attachLeadId?: string | null
+  domain?: string | null
+  sourceKind?: string | null
+  contactName?: string | null
+}): CallWorkspaceLeadSearchResult {
+  const attachLeadId =
+    input.attachLeadId ??
+    (input.source === "growth_lead" ||
+    input.source === "import_lead" ||
+    input.source === "relationship_memory"
+      ? input.id
+      : null)
+  const contactName = input.contactName ?? null
+  const email = input.email
+  const phone = input.phone
+  return {
+    id: input.id,
+    displayName: input.displayName,
+    companyName: input.companyName,
+    email,
+    phone,
+    source: input.source,
+    confidence: input.confidence,
+    attachLeadId,
+    leadId: attachLeadId ?? input.id,
+    contactName,
+    contactEmail: email,
+    contactPhone: phone,
+    domain: input.domain ?? null,
+    entityType: input.source,
+    matchedField: input.matchedField,
+    sourceKind: input.sourceKind ?? null,
+  }
+}
+
 function mapLeadRow(
   row: LeadRow,
   input: {
@@ -130,28 +180,65 @@ function mapLeadRow(
     contactPhoneOverride?: string | null
   },
 ): CallWorkspaceLeadSearchResult {
-  return {
-    leadId: row.id,
+  const contactName = input.contactNameOverride ?? row.contact_name
+  const email = input.contactEmailOverride ?? row.contact_email
+  const phone = input.contactPhoneOverride ?? row.contact_phone
+  return buildHit({
+    id: row.id,
+    displayName: contactName?.trim() || row.company_name,
     companyName: row.company_name,
-    contactName: input.contactNameOverride ?? row.contact_name,
-    contactEmail: input.contactEmailOverride ?? row.contact_email,
-    contactPhone: input.contactPhoneOverride ?? row.contact_phone,
-    domain: normalizeWebsiteDomain(row.website),
-    entityType: input.entityType,
-    matchedField: input.matchedField,
+    email,
+    phone,
+    source: input.entityType,
     confidence: input.confidence,
+    matchedField: input.matchedField,
+    attachLeadId: row.id,
+    domain: normalizeWebsiteDomain(row.website),
     sourceKind: row.source_kind,
-  }
+    contactName,
+  })
+}
+
+function resultMergeKey(candidate: CallWorkspaceLeadSearchResult): string {
+  if (candidate.attachLeadId) return `lead:${candidate.attachLeadId}`
+  return `${candidate.source}:${candidate.id}`
 }
 
 function upsertResult(
   map: Map<string, CallWorkspaceLeadSearchResult>,
   candidate: CallWorkspaceLeadSearchResult,
 ): void {
-  const existing = map.get(candidate.leadId)
+  const key = resultMergeKey(candidate)
+  const existing = map.get(key)
   if (!existing || candidate.confidence > existing.confidence) {
-    map.set(candidate.leadId, candidate)
+    map.set(key, candidate)
   }
+}
+
+async function findGrowthLeadIdByCompanyName(
+  admin: SupabaseClient,
+  companyName: string,
+): Promise<string | null> {
+  const normalized = normalizeCompanyName(companyName)
+  if (!normalized) return null
+  try {
+    let leadQuery = admin
+      .schema("growth")
+      .from("leads")
+      .select("id, company_name")
+      .ilike("company_name", `%${sanitizeCallWorkspaceSearchQuery(companyName)}%`)
+      .limit(5)
+    leadQuery = await applyLeadArchiveFilter(admin, leadQuery)
+    const { data } = await leadQuery
+    for (const row of data ?? []) {
+      if (normalizeCompanyName((row as { company_name: string }).company_name) === normalized) {
+        return (row as { id: string }).id
+      }
+    }
+  } catch {
+    return null
+  }
+  return null
 }
 
 function ingestLeadRows(
@@ -478,6 +565,7 @@ async function searchProspects(
       let prospectQuery = admin
         .from("prospects")
         .select("id, company_name, contact_name, contact_email, contact_phone, website, organization_id")
+        .is("archived_at", null)
         .ilike(field, pattern)
         .limit(25)
       if (orgId) prospectQuery = prospectQuery.eq("organization_id", orgId)
@@ -502,6 +590,7 @@ async function searchProspects(
       let prospectQuery = admin
         .from("prospects")
         .select("id, company_name, contact_name, contact_email, contact_phone, website, organization_id")
+        .is("archived_at", null)
         .ilike("contact_phone", `%${phoneDigits}%`)
         .limit(25)
       if (orgId) prospectQuery = prospectQuery.eq("organization_id", orgId)
@@ -547,26 +636,205 @@ async function searchProspects(
   const results: CallWorkspaceLeadSearchResult[] = []
   for (const prospect of prospectById.values()) {
     const lead = leadByProspect.get(prospect.id as string)
-    if (!lead) continue
+    const companyName = (prospect.company_name as string) ?? ""
+    const contactName = (prospect.contact_name as string) ?? null
     const companyMatch = scoreTextMatch({
       query,
-      value: prospect.company_name as string,
+      value: companyName,
       exactBoost: 0.94,
       containsBoost: 0.86,
     })
     const best =
       companyMatch ??
-      scoreTextMatch({ query, value: prospect.contact_name as string, containsBoost: 0.78 }) ??
+      scoreTextMatch({ query, value: contactName, containsBoost: 0.78 }) ??
       ({ confidence: 0.72, matchedField: "prospect_ilike" } as const)
+
+    if (lead) {
+      results.push(
+        mapLeadRow(lead, {
+          query,
+          entityType: "prospect",
+          matchedField: best.matchedField,
+          confidence: best.confidence,
+          contactNameOverride: contactName ?? lead.contact_name,
+          contactEmailOverride: (prospect.contact_email as string) ?? lead.contact_email,
+          contactPhoneOverride: (prospect.contact_phone as string) ?? lead.contact_phone,
+        }),
+      )
+      continue
+    }
+
     results.push(
-      mapLeadRow(lead, {
-        query,
-        entityType: "prospect",
-        matchedField: best.matchedField,
+      buildHit({
+        id: prospect.id as string,
+        displayName: contactName?.trim() || companyName,
+        companyName,
+        email: (prospect.contact_email as string) ?? null,
+        phone: (prospect.contact_phone as string) ?? null,
+        source: "prospect",
         confidence: best.confidence,
-        contactNameOverride: (prospect.contact_name as string) ?? lead.contact_name,
-        contactEmailOverride: (prospect.contact_email as string) ?? lead.contact_email,
-        contactPhoneOverride: (prospect.contact_phone as string) ?? lead.contact_phone,
+        matchedField: best.matchedField,
+        attachLeadId: null,
+        domain: normalizeWebsiteDomain(prospect.website as string | null),
+        contactName,
+      }),
+    )
+  }
+
+  return { results, count: results.length }
+}
+
+async function searchAccounts(
+  admin: SupabaseClient,
+  query: string,
+  debugSources: CallWorkspaceLeadSearchDebugSource[],
+): Promise<{ results: CallWorkspaceLeadSearchResult[]; count: number }> {
+  const orgId = getGrowthEngineAiOrgId()
+  const pattern = buildCallWorkspaceIlikePattern(query)
+  const customerById = new Map<string, Record<string, unknown>>()
+
+  for (const field of CUSTOMER_ILIKE_FIELDS) {
+    const sourceName = `public.customers.${field}`
+    try {
+      let customerQuery = admin
+        .from("customers")
+        .select("id, company_name, notes")
+        .eq("is_archived", false)
+        .ilike(field, pattern)
+        .limit(25)
+      if (orgId) customerQuery = customerQuery.eq("organization_id", orgId)
+      const { data, error } = await customerQuery
+      if (error) {
+        debugSources.push({ name: sourceName, count: 0, error: safeSourceErrorLabel(error) })
+        continue
+      }
+      debugSources.push({ name: sourceName, count: (data ?? []).length, error: null })
+      for (const row of data ?? []) {
+        customerById.set(row.id as string, row as Record<string, unknown>)
+      }
+    } catch {
+      debugSources.push({ name: sourceName, count: 0, error: "exception" })
+    }
+  }
+
+  const results: CallWorkspaceLeadSearchResult[] = []
+  for (const customer of customerById.values()) {
+    const companyName = (customer.company_name as string) ?? ""
+    const best =
+      scoreTextMatch({ query, value: companyName, exactBoost: 0.9, containsBoost: 0.82 }) ??
+      ({ confidence: 0.7, matchedField: "account_ilike" } as const)
+    const attachLeadId = await findGrowthLeadIdByCompanyName(admin, companyName)
+    results.push(
+      buildHit({
+        id: customer.id as string,
+        displayName: companyName,
+        companyName,
+        email: null,
+        phone: null,
+        source: "account",
+        confidence: best.confidence,
+        matchedField: best.matchedField,
+        attachLeadId,
+        contactName: null,
+      }),
+    )
+  }
+
+  return { results, count: results.length }
+}
+
+async function searchCustomerContacts(
+  admin: SupabaseClient,
+  query: string,
+  phoneDigits: string | null,
+  debugSources: CallWorkspaceLeadSearchDebugSource[],
+): Promise<{ results: CallWorkspaceLeadSearchResult[]; count: number }> {
+  const orgId = getGrowthEngineAiOrgId()
+  const pattern = buildCallWorkspaceIlikePattern(query)
+  const contactById = new Map<string, Record<string, unknown>>()
+
+  for (const field of CUSTOMER_CONTACT_ILIKE_FIELDS) {
+    const sourceName = `public.customer_contacts.${field}`
+    try {
+      let contactQuery = admin
+        .from("customer_contacts")
+        .select("id, customer_id, full_name, email, phone, role")
+        .ilike(field, pattern)
+        .limit(25)
+      if (orgId) contactQuery = contactQuery.eq("organization_id", orgId)
+      const { data, error } = await contactQuery
+      if (error) {
+        debugSources.push({ name: sourceName, count: 0, error: safeSourceErrorLabel(error) })
+        continue
+      }
+      debugSources.push({ name: sourceName, count: (data ?? []).length, error: null })
+      for (const row of data ?? []) {
+        contactById.set(row.id as string, row as Record<string, unknown>)
+      }
+    } catch {
+      debugSources.push({ name: sourceName, count: 0, error: "exception" })
+    }
+  }
+
+  if (phoneDigits) {
+    const sourceName = "public.customer_contacts.phone_digits"
+    try {
+      let contactQuery = admin
+        .from("customer_contacts")
+        .select("id, customer_id, full_name, email, phone, role")
+        .ilike("phone", `%${phoneDigits}%`)
+        .limit(25)
+      if (orgId) contactQuery = contactQuery.eq("organization_id", orgId)
+      const { data, error } = await contactQuery
+      if (error) {
+        debugSources.push({ name: sourceName, count: 0, error: safeSourceErrorLabel(error) })
+      } else {
+        debugSources.push({ name: sourceName, count: (data ?? []).length, error: null })
+        for (const row of data ?? []) {
+          contactById.set(row.id as string, row as Record<string, unknown>)
+        }
+      }
+    } catch {
+      debugSources.push({ name: sourceName, count: 0, error: "exception" })
+    }
+  }
+
+  const customerIds = [...new Set([...contactById.values()].map((row) => row.customer_id as string))]
+  const companyByCustomer = new Map<string, string>()
+  if (customerIds.length > 0) {
+    try {
+      let customerQuery = admin.from("customers").select("id, company_name").in("id", customerIds)
+      if (orgId) customerQuery = customerQuery.eq("organization_id", orgId)
+      const { data } = await customerQuery
+      for (const row of data ?? []) {
+        companyByCustomer.set(row.id as string, row.company_name as string)
+      }
+    } catch {
+      debugSources.push({ name: "public.customers.contact_join", count: 0, error: "exception" })
+    }
+  }
+
+  const results: CallWorkspaceLeadSearchResult[] = []
+  for (const contact of contactById.values()) {
+    const fullName = (contact.full_name as string) ?? ""
+    const companyName = companyByCustomer.get(contact.customer_id as string) ?? fullName
+    const best =
+      scoreTextMatch({ query, value: fullName, containsBoost: 0.8 }) ??
+      scoreTextMatch({ query, value: contact.email as string, containsBoost: 0.76 }) ??
+      ({ confidence: 0.72, matchedField: "contact_ilike" } as const)
+    const attachLeadId = await findGrowthLeadIdByCompanyName(admin, companyName)
+    results.push(
+      buildHit({
+        id: contact.id as string,
+        displayName: fullName,
+        companyName,
+        email: (contact.email as string) ?? null,
+        phone: (contact.phone as string) ?? null,
+        source: "contact",
+        confidence: best.confidence,
+        matchedField: best.matchedField,
+        attachLeadId,
+        contactName: fullName,
       }),
     )
   }
@@ -575,9 +843,12 @@ async function searchProspects(
 }
 
 function pickAutoSelectLeadId(results: CallWorkspaceLeadSearchResult[]): string | null {
-  const high = results.filter((row) => row.confidence >= 0.9)
-  if (high.length === 1) return high[0]!.leadId
-  if (results.length === 1 && results[0]!.confidence >= 0.85) return results[0]!.leadId
+  const attachable = results.filter((row) => row.attachLeadId)
+  const high = attachable.filter((row) => row.confidence >= 0.9)
+  if (high.length === 1) return high[0]!.attachLeadId
+  if (attachable.length === 1 && attachable[0]!.confidence >= 0.85) {
+    return attachable[0]!.attachLeadId
+  }
   return null
 }
 
@@ -598,6 +869,8 @@ export async function searchCallWorkspaceLeads(
         sourceCounts: {
           growth_leads: 0,
           prospects: 0,
+          contacts: 0,
+          accounts: 0,
           decision_makers: 0,
           outbound_contacts: 0,
           import_leads: 0,
@@ -641,17 +914,33 @@ export async function searchCallWorkspaceLeads(
     debugSources.push({ name: "public.prospects", count: 0, error: "exception" })
   }
 
+  try {
+    const accounts = await searchAccounts(admin, trimmed, debugSources)
+    for (const row of accounts.results) upsertResult(merged, row)
+  } catch {
+    debugSources.push({ name: "public.customers", count: 0, error: "exception" })
+  }
+
+  try {
+    const contacts = await searchCustomerContacts(admin, trimmed, phoneDigits, debugSources)
+    for (const row of contacts.results) upsertResult(merged, row)
+  } catch {
+    debugSources.push({ name: "public.customer_contacts", count: 0, error: "exception" })
+  }
+
   const results = [...merged.values()]
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, 12)
 
   const sourceCounts: CallWorkspaceLeadSearchSourceCounts = {
-    growth_leads: results.filter((row) => row.entityType === "growth_lead").length,
-    prospects: results.filter((row) => row.entityType === "prospect").length,
-    decision_makers: results.filter((row) => row.entityType === "decision_maker").length,
-    outbound_contacts: results.filter((row) => row.entityType === "outbound_contact").length,
-    import_leads: results.filter((row) => row.entityType === "import_lead").length,
-    relationship_memory: results.filter((row) => row.entityType === "relationship_memory").length,
+    growth_leads: results.filter((row) => row.source === "growth_lead").length,
+    prospects: results.filter((row) => row.source === "prospect").length,
+    contacts: results.filter((row) => row.source === "contact").length,
+    accounts: results.filter((row) => row.source === "account").length,
+    decision_makers: results.filter((row) => row.source === "decision_maker").length,
+    outbound_contacts: results.filter((row) => row.source === "outbound_contact").length,
+    import_leads: results.filter((row) => row.source === "import_lead").length,
+    relationship_memory: results.filter((row) => row.source === "relationship_memory").length,
   }
 
   const autoSelectedLeadId = pickAutoSelectLeadId(results)
@@ -678,7 +967,13 @@ export async function searchCallWorkspaceLeads(
   logGrowthEngine("native_dialer_lead_search", {
     ...diagnostics,
     topMatch: results[0]
-      ? { leadId: results[0].leadId, entityType: results[0].entityType, confidence: results[0].confidence }
+      ? {
+          id: results[0].id,
+          attachLeadId: results[0].attachLeadId,
+          source: results[0].source,
+          displayName: results[0].displayName,
+          confidence: results[0].confidence,
+        }
       : null,
   })
 

@@ -352,6 +352,15 @@ export function GrowthCallWorkspace() {
             disabled={workspacePhase !== "idle"}
             loading={starting}
             recentSessions={dashboard?.recentSessions ?? []}
+            nativeSessionId={activeSession?.id ?? null}
+            leadContextAttached={Boolean(leadContext)}
+            onLeadAttached={(leadId, session) => {
+              void loadLeadContext(leadId)
+              setLeadLinked(true)
+              setCoachingMode("lead_linked")
+              if (session) setActiveSession(session)
+              else if (activeSession) setActiveSession({ ...activeSession, leadId })
+            }}
           />
 
           <GrowthCallWorkspaceQueueCard

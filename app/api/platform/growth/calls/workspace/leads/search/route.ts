@@ -44,6 +44,8 @@ export async function GET(request: Request) {
         sourceCounts: {
           growth_leads: 0,
           prospects: 0,
+          contacts: 0,
+          accounts: 0,
           decision_makers: 0,
           outbound_contacts: 0,
           import_leads: 0,
@@ -63,6 +65,7 @@ export async function GET(request: Request) {
       qaMarker: GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER,
       results,
       leads: results,
+      entities: results,
       diagnostics,
     })
   } catch (e) {

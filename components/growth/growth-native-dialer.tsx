@@ -1,9 +1,11 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { Delete, Phone, X } from "lucide-react"
+import { useState } from "react"
+import { Delete, Phone, Search, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { CallWorkspaceLeadSearchResultsPanel } from "@/components/growth/call-workspace-lead-search-results"
+import { useCallWorkspaceLeadSearch } from "@/components/growth/use-call-workspace-lead-search"
 import { cn } from "@/lib/utils"
 import {
   appendDialPhoneKey,
@@ -12,6 +14,8 @@ import {
   hasDialablePhone,
   normalizeDialPhoneDigits,
 } from "@/lib/growth/native-dialer/native-dialer-workspace-ui"
+import type { CallWorkspaceLeadSearchResult } from "@/lib/growth/native-dialer/call-workspace-lead-search-types"
+import type { NativeCallWorkspaceSessionPublicView } from "@/lib/growth/native-dialer/native-dialer-types"
 
 type GrowthNativeDialerProps = {
   phone: string
@@ -19,6 +23,9 @@ type GrowthNativeDialerProps = {
   onStartCall: () => void
   disabled?: boolean
   loading?: boolean
+  nativeSessionId?: string | null
+  leadContextAttached?: boolean
+  onLeadAttached?: (leadId: string, session?: NativeCallWorkspaceSessionPublicView) => void
 }
 
 const KEYPAD = [
@@ -42,13 +49,32 @@ export function GrowthNativeDialer({
   onStartCall,
   disabled,
   loading,
+  nativeSessionId,
+  leadContextAttached = false,
+  onLeadAttached,
 }: GrowthNativeDialerProps) {
-  const [search, setSearch] = useState("")
-
-  const filteredHint = useMemo(() => {
-    if (!search.trim()) return null
-    return `Search: ${search.trim()} — select a lead from queue or paste a number`
-  }, [search])
+  const {
+    searchQuery,
+    setSearchQuery,
+    searchResults,
+    searchDiagnostics,
+    searching,
+    searchError,
+    attachingId,
+    attachError,
+    showEmpty,
+    createProspectHref,
+    selectHit,
+    applyPhoneFromHit,
+  } = useCallWorkspaceLeadSearch({
+    nativeSessionId,
+    leadContextAttached,
+    onLeadAttached,
+    onEntitySelected: (hit) => {
+      const digits = applyPhoneFromHit(hit)
+      if (digits) onPhoneChange(digits)
+    },
+  })
 
   const dialDigits = normalizeDialPhoneDigits(phone)
   const displayPhone = dialDigits ? formatDisplayPhone(dialDigits) : ""
@@ -66,15 +92,36 @@ export function GrowthNativeDialer({
     onPhoneChange("")
   }
 
+  function handleSelect(hit: CallWorkspaceLeadSearchResult) {
+    const digits = applyPhoneFromHit(hit)
+    if (digits) onPhoneChange(digits)
+    void selectHit(hit)
+  }
+
   return (
     <div className="space-y-3" data-qa-marker="growth-native-dialer-controls">
-      <Input
-        placeholder="Search lead, contact, or company..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="h-9"
+      <div className="relative">
+        <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+        <Input
+          placeholder="Search lead, contact, company, or account..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="h-9 pl-9"
+          data-qa-action="native-dialer-lead-search-input"
+        />
+      </div>
+
+      <CallWorkspaceLeadSearchResultsPanel
+        searching={searching}
+        searchError={searchError}
+        searchResults={searchResults}
+        showEmpty={showEmpty}
+        attachingId={attachingId}
+        autoSelectedLeadId={searchDiagnostics?.autoSelectedLeadId ?? null}
+        attachError={attachError}
+        createProspectHref={createProspectHref}
+        onSelect={handleSelect}
       />
-      {filteredHint ? <p className="text-xs text-muted-foreground">{filteredHint}</p> : null}
 
       <div className="relative">
         <Input
@@ -110,7 +157,11 @@ export function GrowthNativeDialer({
             onClick={() => appendKey(key)}
           >
             <span className="text-xl font-semibold leading-none">{key}</span>
-            {sub ? <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground">{sub}</span> : null}
+            {sub ? (
+              <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground">
+                {sub}
+              </span>
+            ) : null}
           </Button>
         ))}
       </div>
@@ -136,7 +187,9 @@ export function GrowthNativeDialer({
           disabled={disabled || !canDial || loading}
           onClick={onStartCall}
         >
-          {loading ? "Starting…" : (
+          {loading ? (
+            "Starting…"
+          ) : (
             <>
               <Phone className="mr-2 size-4" />
               Call

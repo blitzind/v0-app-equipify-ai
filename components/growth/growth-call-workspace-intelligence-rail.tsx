@@ -1,6 +1,5 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import {
   BarChart3,
@@ -8,10 +7,7 @@ import {
   CalendarCheck,
   CheckSquare,
   ChevronRight,
-  Link2,
-  Loader2,
   MessageSquare,
-  Plus,
   Search,
   Sparkles,
   Target,
@@ -19,6 +15,8 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { CallWorkspaceLeadSearchResultsPanel } from "@/components/growth/call-workspace-lead-search-results"
+import { useCallWorkspaceLeadSearch } from "@/components/growth/use-call-workspace-lead-search"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import {
   GROWTH_CALL_WORKSPACE_PANEL,
@@ -27,10 +25,6 @@ import {
   leadInitials,
   meetingOutcomeLabel,
 } from "@/lib/growth/native-dialer/native-dialer-workspace-ui"
-import type {
-  CallWorkspaceLeadSearchDiagnostics,
-  CallWorkspaceLeadSearchResult,
-} from "@/lib/growth/native-dialer/call-workspace-lead-search-types"
 import { GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER } from "@/lib/growth/native-dialer/call-workspace-lead-search-types"
 import { GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import type {
@@ -61,38 +55,6 @@ function IntelligenceRow({
   )
 }
 
-function LeadSearchResultRow({
-  hit,
-  attaching,
-  onSelect,
-}: {
-  hit: CallWorkspaceLeadSearchResult
-  attaching: boolean
-  onSelect: () => void
-}) {
-  return (
-    <li>
-      <button
-        type="button"
-        data-qa-action="call-workspace-lead-search-result"
-        disabled={attaching}
-        onClick={onSelect}
-        className="w-full rounded-md px-2 py-2 text-left transition-colors hover:bg-muted/60 disabled:opacity-60"
-      >
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-0.5 text-xs">
-          <span className="col-span-2 truncate text-sm font-medium">{hit.companyName}</span>
-          <span className="truncate text-muted-foreground">{hit.contactName ?? "—"}</span>
-          <GrowthBadge label={hit.entityType.replace(/_/g, " ")} tone="neutral" />
-          <span className="truncate text-muted-foreground">{hit.contactEmail ?? "—"}</span>
-          <span className="col-span-2 truncate text-muted-foreground">
-            {hit.contactPhone ? formatDisplayPhone(hit.contactPhone) : "—"}
-          </span>
-        </div>
-      </button>
-    </li>
-  )
-}
-
 export function GrowthCallWorkspaceIntelligenceRail({
   leadContext,
   nativeSessionId,
@@ -104,148 +66,23 @@ export function GrowthCallWorkspaceIntelligenceRail({
   sessionPhone?: string | null
   onLeadAttached?: (leadId: string, session?: NativeCallWorkspaceSessionPublicView) => void
 }) {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [searchResults, setSearchResults] = useState<CallWorkspaceLeadSearchResult[]>([])
-  const [searchDiagnostics, setSearchDiagnostics] = useState<CallWorkspaceLeadSearchDiagnostics | null>(null)
-  const [searching, setSearching] = useState(false)
-  const [searchError, setSearchError] = useState<string | null>(null)
-  const [attachingId, setAttachingId] = useState<string | null>(null)
-  const [attachError, setAttachError] = useState<string | null>(null)
-  const autoAttachRef = useRef<string | null>(null)
-  const searchRequestIdRef = useRef(0)
-
-  const attachLead = useCallback(
-    async (leadId: string) => {
-      if (!nativeSessionId) return
-      setAttachingId(leadId)
-      setAttachError(null)
-      try {
-        const res = await fetch(`/api/platform/growth/calls/sessions/${nativeSessionId}/attach-lead`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ leadId }),
-        })
-        const data = (await res.json().catch(() => ({}))) as {
-          ok?: boolean
-          session?: NativeCallWorkspaceSessionPublicView
-          message?: string
-        }
-        if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not attach lead.")
-        onLeadAttached?.(leadId, data.session)
-        setSearchQuery("")
-        setSearchResults([])
-        setSearchDiagnostics(null)
-      } catch (e) {
-        setAttachError(e instanceof Error ? e.message : "Attach failed.")
-      } finally {
-        setAttachingId(null)
-      }
-    },
-    [nativeSessionId, onLeadAttached],
-  )
-
-  const runSearch = useCallback(async (query: string) => {
-    const trimmed = query.trim()
-    if (trimmed.length < 2) {
-      setSearchResults([])
-      setSearchDiagnostics(null)
-      setSearchError(null)
-      return
-    }
-
-    const requestId = searchRequestIdRef.current + 1
-    searchRequestIdRef.current = requestId
-    const url = `/api/platform/growth/calls/workspace/leads/search?q=${encodeURIComponent(trimmed)}`
-
-    setSearching(true)
-    setSearchError(null)
-
-    if (process.env.NODE_ENV !== "production") {
-      console.info("[native-dialer-lead-search] request", { query: trimmed, url })
-    }
-
-    try {
-      const res = await fetch(url, { cache: "no-store" })
-      const data = (await res.json().catch(() => ({}))) as {
-        ok?: boolean
-        results?: CallWorkspaceLeadSearchResult[]
-        leads?: CallWorkspaceLeadSearchResult[]
-        diagnostics?: CallWorkspaceLeadSearchDiagnostics
-        message?: string
-      }
-
-      if (searchRequestIdRef.current !== requestId) return
-
-      const results = data.results ?? data.leads ?? []
-      const first = results[0]
-
-      if (process.env.NODE_ENV !== "production") {
-        console.info("[native-dialer-lead-search] response", {
-          query: trimmed,
-          status: res.status,
-          ok: data.ok,
-          resultCount: results.length,
-          firstCompany: first?.companyName ?? null,
-          firstContact: first?.contactName ?? null,
-        })
-      }
-
-      if (!res.ok || data.ok === false) {
-        throw new Error(data.message ?? "Search failed.")
-      }
-
-      setSearchResults(results)
-      setSearchDiagnostics(data.diagnostics ?? null)
-      if (data.diagnostics) {
-        console.info("[native-dialer-lead-search]", data.diagnostics)
-      }
-    } catch (e) {
-      if (searchRequestIdRef.current !== requestId) return
-      setSearchResults([])
-      setSearchDiagnostics(null)
-      setSearchError(e instanceof Error ? e.message : "Search failed. Try again.")
-    } finally {
-      if (searchRequestIdRef.current === requestId) {
-        setSearching(false)
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    const id = window.setTimeout(() => void runSearch(searchQuery), 300)
-    return () => window.clearTimeout(id)
-  }, [searchQuery, runSearch])
-
-  useEffect(() => {
-    const autoId = searchDiagnostics?.autoSelectedLeadId
-    if (!autoId || !nativeSessionId || leadContext || searchResults.length === 0) return
-    if (autoAttachRef.current === autoId) return
-
-    const timer = window.setTimeout(() => {
-      if (autoAttachRef.current === autoId) return
-      autoAttachRef.current = autoId
-      void attachLead(autoId)
-    }, 700)
-
-    return () => window.clearTimeout(timer)
-  }, [
-    searchDiagnostics?.autoSelectedLeadId,
-    searchResults.length,
+  const {
+    searchQuery,
+    setSearchQuery,
+    searchResults,
+    searchDiagnostics,
+    searching,
+    searchError,
+    attachingId,
+    attachError,
+    showEmpty,
+    createProspectHref,
+    selectHit,
+  } = useCallWorkspaceLeadSearch({
     nativeSessionId,
-    leadContext,
-    attachLead,
-  ])
-
-  const showEmpty =
-    searchQuery.trim().length >= 2 &&
-    !searching &&
-    !searchError &&
-    searchResults.length === 0 &&
-    !attachError
-
-  const createProspectHref = `/admin/growth/leads?${new URLSearchParams({
-    ...(searchQuery.trim() ? { companyName: searchQuery.trim() } : {}),
-  }).toString()}`
+    leadContextAttached: Boolean(leadContext),
+    onLeadAttached,
+  })
 
   return (
     <section
@@ -259,8 +96,8 @@ export function GrowthCallWorkspaceIntelligenceRail({
         <div className="space-y-3" data-qa-action="call-workspace-attach-lead">
           <p className="text-sm leading-relaxed text-muted-foreground">
             No lead linked for this call
-            {sessionPhone ? ` (${formatDisplayPhone(sessionPhone)})` : ""}. Search the full Growth lead dataset to
-            attach a lead for intelligence and lead-linked coaching.
+            {sessionPhone ? ` (${formatDisplayPhone(sessionPhone)})` : ""}. Search Growth leads, prospects,
+            contacts, and accounts to attach intelligence and lead-linked coaching.
           </p>
           {nativeSessionId ? (
             <>
@@ -269,60 +106,22 @@ export function GrowthCallWorkspaceIntelligenceRail({
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search company, contact, email, phone, domain"
+                  placeholder="Search company, contact, email, phone, account"
                   className="pl-9"
                   data-qa-action="call-workspace-lead-search-input"
                 />
               </div>
-              {searching ? (
-                <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="size-3 animate-spin" />
-                  Searching Growth leads, prospects, contacts…
-                </p>
-              ) : null}
-              {searchResults.length > 0 ? (
-                <div className="rounded-lg border border-border/60 dark:border-white/10">
-                  <div className="grid grid-cols-2 gap-2 border-b border-border/60 px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground dark:border-white/10">
-                    <span>Company / Contact</span>
-                    <span className="text-right">Email / Phone</span>
-                  </div>
-                  <ul className="max-h-56 overflow-auto p-1">
-                    {searchResults.map((hit) => (
-                      <LeadSearchResultRow
-                        key={hit.leadId}
-                        hit={hit}
-                        attaching={attachingId === hit.leadId}
-                        onSelect={() => void attachLead(hit.leadId)}
-                      />
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {searchError ? (
-                <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                  {searchError === "Search failed." ? "Search failed. Try again." : searchError}
-                </p>
-              ) : null}
-              {showEmpty ? (
-                <div className="rounded-lg border border-dashed border-border/70 px-3 py-4 text-center dark:border-white/10">
-                  <p className="text-sm font-medium">No matching lead found</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Try a partial company name, email, or normalized phone.
-                  </p>
-                  <Button type="button" variant="outline" size="sm" className="mt-3" asChild>
-                    <Link href={createProspectHref}>
-                      <Plus className="mr-2 size-4" />
-                      Create Prospect
-                    </Link>
-                  </Button>
-                </div>
-              ) : null}
-              {searchDiagnostics?.autoSelectedLeadId ? (
-                <p className="text-xs text-muted-foreground">
-                  Auto-attaching high-confidence match…
-                </p>
-              ) : null}
-              {attachError ? <p className="text-xs text-destructive">{attachError}</p> : null}
+              <CallWorkspaceLeadSearchResultsPanel
+                searching={searching}
+                searchError={searchError}
+                searchResults={searchResults}
+                showEmpty={showEmpty}
+                attachingId={attachingId}
+                autoSelectedLeadId={searchDiagnostics?.autoSelectedLeadId ?? null}
+                attachError={attachError}
+                createProspectHref={createProspectHref}
+                onSelect={(hit) => void selectHit(hit)}
+              />
             </>
           ) : null}
         </div>

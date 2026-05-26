@@ -13,6 +13,9 @@ export function GrowthCallWorkspaceDialerCard({
   disabled,
   loading,
   recentSessions,
+  nativeSessionId,
+  leadContextAttached,
+  onLeadAttached,
 }: {
   phone: string
   onPhoneChange: (value: string) => void
@@ -20,6 +23,12 @@ export function GrowthCallWorkspaceDialerCard({
   disabled?: boolean
   loading?: boolean
   recentSessions: NativeCallWorkspaceSessionPublicView[]
+  nativeSessionId?: string | null
+  leadContextAttached?: boolean
+  onLeadAttached?: (
+    leadId: string,
+    session?: NativeCallWorkspaceSessionPublicView,
+  ) => void
 }) {
   return (
     <section className={cn(GROWTH_CALL_WORKSPACE_PANEL, "p-4")}>
@@ -36,6 +45,9 @@ export function GrowthCallWorkspaceDialerCard({
             onStartCall={onStartCall}
             disabled={disabled}
             loading={loading}
+            nativeSessionId={nativeSessionId}
+            leadContextAttached={leadContextAttached}
+            onLeadAttached={onLeadAttached}
           />
         </TabsContent>
 
