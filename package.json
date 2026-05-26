@@ -148,6 +148,7 @@
     "test:growth-lead-engine-workspace": "tsx scripts/lead-engine-workspace.test.ts",
     "test:growth-lead-engine-provider-adapter": "tsx scripts/test-growth-lead-engine-provider-adapter.ts",
     "test:growth-intent-pixel": "tsx scripts/test-growth-intent-pixel.ts",
+    "test:growth-intent-lead-bridge": "tsx scripts/growth-intent-lead-bridge.test.ts",
     "test:growth-native-dialer": "tsx scripts/test-growth-native-dialer.ts",
     "test:growth-native-dialer-schema-health": "tsx scripts/test-growth-native-dialer-schema-health.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
