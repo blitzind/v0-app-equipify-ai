@@ -45,7 +45,7 @@ const intelligenceRail = fs.readFileSync(
 )
 assert.match(intelligenceRail, /call-workspace-attach-lead/)
 assert.match(intelligenceRail, /attach-lead/)
-assert.match(intelligenceRail, /Search leads/)
+assert.match(intelligenceRail, /Search company, contact, email, phone, domain/)
 
 const repository = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/native-dialer/native-dialer-repository.ts"),

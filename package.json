@@ -134,6 +134,7 @@
     "test:onboarding-provision-finalization": "tsx scripts/test-onboarding-provision-finalization.ts",
     "test:session-context-sync": "tsx scripts/test-session-context-sync.ts",
     "test:growth-google-voice-bridge-coaching": "tsx scripts/test-growth-google-voice-bridge-coaching.ts",
+    "test:growth-native-dialer-lead-search": "tsx scripts/test-growth-native-dialer-lead-search.ts",
     "test:growth-lead-engine-icp-targeting": "tsx scripts/test-growth-lead-engine-icp-targeting.ts",
     "test:growth-lead-engine-company-discovery": "tsx scripts/test-growth-lead-engine-company-discovery.ts",
     "test:growth-native-dialer": "tsx scripts/test-growth-native-dialer.ts",
