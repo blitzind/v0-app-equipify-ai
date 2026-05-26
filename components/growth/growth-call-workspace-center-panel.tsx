@@ -13,9 +13,11 @@ import {
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { GrowthIncomingCallPanel } from "@/components/growth/growth-incoming-call-panel"
+import { GrowthCallWorkspaceGoogleVoiceBridgePanel } from "@/components/growth/growth-call-workspace-google-voice-bridge-panel"
 import { GrowthCallWorkspaceLiveCoachingPanel } from "@/components/growth/growth-call-workspace-live-coaching-panel"
 import { GrowthPostCallWrapup } from "@/components/growth/growth-post-call-wrapup"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import { isExternalBridgeSession } from "@/lib/growth/native-dialer/native-dialer-bridge"
 import {
   GROWTH_CALL_WORKSPACE_GLASS_DOCK,
   GROWTH_CALL_WORKSPACE_PANEL,
@@ -30,7 +32,7 @@ import type {
 import { NATIVE_DIALER_PROVIDER_LABELS } from "@/lib/growth/native-dialer/native-dialer-types"
 import { cn } from "@/lib/utils"
 
-type WorkspacePhase = "idle" | "incoming" | "active" | "wrapup"
+export type GrowthCallWorkspacePhase = "idle" | "incoming" | "bridge_pending" | "active" | "wrapup"
 
 function WorkspaceMetricCard({
   label,
@@ -90,15 +92,17 @@ function ControlDockButton({
 function ActiveCallHeader({
   session,
   elapsed,
+  externalBridge,
 }: {
   session: NativeCallWorkspaceSessionPublicView
   elapsed: number
+  externalBridge: boolean
 }) {
   return (
     <div className="mb-3 rounded-xl border border-border/60 bg-muted/20 px-4 py-3 dark:border-white/5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-xs text-muted-foreground">Active call</p>
+          <p className="text-xs text-muted-foreground">{externalBridge ? "External bridge call" : "Active call"}</p>
           <p className="font-semibold">{session.companyName ?? session.contactName ?? "Prospect"}</p>
           <p className="text-sm text-muted-foreground">
             {formatDisplayPhone(session.phoneNumber)} · {session.contactName ?? "Contact"}
@@ -106,6 +110,7 @@ function ActiveCallHeader({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <GrowthBadge label={NATIVE_DIALER_PROVIDER_LABELS[session.provider]} tone="neutral" />
+          {externalBridge ? <GrowthBadge label="Bridge mode" tone="attention" /> : null}
           <GrowthBadge label={formatCallDuration(elapsed)} tone="healthy" />
         </div>
       </div>
@@ -119,21 +124,29 @@ export function GrowthCallWorkspaceCenterPanel({
   answering,
   declining,
   ending,
+  markingBridgeStarted,
   submittingWrapup,
+  coachingStartSignal,
   onAnswer,
   onDecline,
   onEndCall,
+  onMarkBridgeStarted,
+  onStartLiveCoaching,
   onSubmitWrapup,
 }: {
-  phase: WorkspacePhase
+  phase: GrowthCallWorkspacePhase
   activeSession: NativeCallWorkspaceSessionPublicView | null
   answering?: boolean
   declining?: boolean
   ending?: boolean
+  markingBridgeStarted?: boolean
   submittingWrapup?: boolean
+  coachingStartSignal?: number
   onAnswer: () => void
   onDecline: () => void
   onEndCall: () => void
+  onMarkBridgeStarted: () => void
+  onStartLiveCoaching: () => void
   onSubmitWrapup: (input: {
     outcome: NativeCallWrapupOutcome
     objectionCategory?: string | null
@@ -147,33 +160,34 @@ export function GrowthCallWorkspaceCenterPanel({
   }) => Promise<NativeCallWrapupPublicView | null>
 }) {
   const [elapsed, setElapsed] = useState(activeSession?.durationSeconds ?? 0)
+  const externalBridge = isExternalBridgeSession(activeSession)
 
   useEffect(() => {
-    if (!activeSession || !["active", "on_hold"].includes(activeSession.status)) {
+    if (!activeSession || !["active", "on_hold"].includes(activeSession.status) || !activeSession.connectedAt) {
       setElapsed(activeSession?.durationSeconds ?? 0)
       return
     }
-    const anchor = activeSession.connectedAt
-      ? Date.parse(activeSession.connectedAt)
-      : Date.parse(activeSession.startedAt)
+    const anchor = Date.parse(activeSession.connectedAt)
     const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - anchor) / 1000)))
     tick()
     const id = window.setInterval(tick, 1000)
     return () => window.clearInterval(id)
   }, [activeSession])
 
-  const controlsEnabled = phase === "active"
+  const controlsEnabled = phase === "active" && !externalBridge
+  const bridgeControlsEnabled = phase === "bridge_pending" || (phase === "active" && externalBridge)
   const recordingLabel =
-    phase === "active" && activeSession
-      ? activeSession.recordingState === "active"
-        ? "On"
+    externalBridge
+      ? "N/A"
+      : phase === "active" && activeSession
+        ? activeSession.recordingState === "active"
+          ? "On"
+          : "Off"
         : "Off"
-      : "Off"
   const recordingTone = recordingLabel === "On" ? "attention" : "neutral"
-  const callTimeLabel =
-    phase === "active" || phase === "wrapup" ? formatCallDuration(elapsed) : "00:00"
+  const callTimeLabel = phase === "active" || phase === "wrapup" ? formatCallDuration(elapsed) : "00:00"
   const providerLabel =
-    phase === "active" && activeSession
+    activeSession && (phase === "active" || phase === "bridge_pending")
       ? NATIVE_DIALER_PROVIDER_LABELS[activeSession.provider]
       : "—"
 
@@ -218,13 +232,33 @@ export function GrowthCallWorkspaceCenterPanel({
           </>
         ) : null}
 
+        {phase === "bridge_pending" && activeSession ? (
+          <>
+            <GrowthCallWorkspaceGoogleVoiceBridgePanel
+              session={activeSession}
+              markingStarted={markingBridgeStarted}
+              ending={ending}
+              onMarkCallStarted={onMarkBridgeStarted}
+              onStartLiveCoaching={onStartLiveCoaching}
+              onEndCall={onEndCall}
+            />
+            <GrowthCallWorkspaceLiveCoachingPanel
+              phase="bridge_pending"
+              leadId={activeSession.leadId}
+              nativeSessionId={activeSession.id}
+              startSignal={coachingStartSignal}
+            />
+          </>
+        ) : null}
+
         {phase === "active" && activeSession ? (
           <>
-            <ActiveCallHeader session={activeSession} elapsed={elapsed} />
+            <ActiveCallHeader session={activeSession} elapsed={elapsed} externalBridge={externalBridge} />
             <GrowthCallWorkspaceLiveCoachingPanel
               phase="active"
               leadId={activeSession.leadId}
               nativeSessionId={activeSession.id}
+              startSignal={coachingStartSignal}
             />
             <Textarea
               placeholder="Call notes (operator)"
@@ -248,29 +282,39 @@ export function GrowthCallWorkspaceCenterPanel({
         ) : null}
       </div>
 
-      <div className="mt-auto space-y-3 pt-4">
-        <div className={GROWTH_CALL_WORKSPACE_GLASS_DOCK}>
-          <div className="flex gap-1">
-            <ControlDockButton label="Mute" icon={Mic} disabled={!controlsEnabled} />
-            <ControlDockButton label="Hold" icon={Pause} disabled={!controlsEnabled} />
-            <ControlDockButton label="Keypad" icon={Grid3X3} disabled={!controlsEnabled} />
-            <ControlDockButton label="Notes" icon={SquarePen} disabled={phase === "idle"} />
-            <ControlDockButton
-              label={ending ? "Ending…" : "End"}
-              icon={PhoneOff}
-              disabled={!controlsEnabled || ending}
-              destructive
-              onClick={onEndCall}
-            />
+      {phase !== "bridge_pending" ? (
+        <div className="mt-auto space-y-3 pt-4">
+          <div className={GROWTH_CALL_WORKSPACE_GLASS_DOCK}>
+            <div className="flex gap-1">
+              {!externalBridge ? (
+                <>
+                  <ControlDockButton label="Mute" icon={Mic} disabled={!controlsEnabled} />
+                  <ControlDockButton label="Hold" icon={Pause} disabled={!controlsEnabled} />
+                </>
+              ) : null}
+              <ControlDockButton label="Keypad" icon={Grid3X3} disabled={!controlsEnabled && !bridgeControlsEnabled} />
+              <ControlDockButton label="Notes" icon={SquarePen} disabled={phase === "idle"} />
+              <ControlDockButton
+                label={ending ? "Ending…" : "End"}
+                icon={PhoneOff}
+                disabled={(!controlsEnabled && !bridgeControlsEnabled) || ending}
+                destructive
+                onClick={onEndCall}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            {!externalBridge ? (
+              <WorkspaceMetricCard label="Recording" value={recordingLabel} tone={recordingTone} />
+            ) : (
+              <WorkspaceMetricCard label="Recording" value="N/A" tone="neutral" />
+            )}
+            <WorkspaceMetricCard label="Call Time" value={callTimeLabel} />
+            <WorkspaceMetricCard label="Provider" value={providerLabel} />
           </div>
         </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          <WorkspaceMetricCard label="Recording" value={recordingLabel} tone={recordingTone} />
-          <WorkspaceMetricCard label="Call Time" value={callTimeLabel} />
-          <WorkspaceMetricCard label="Provider" value={providerLabel} />
-        </div>
-      </div>
+      ) : null}
     </section>
   )
 }

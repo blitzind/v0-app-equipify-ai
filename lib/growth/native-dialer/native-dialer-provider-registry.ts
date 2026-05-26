@@ -37,6 +37,8 @@ export function createNativeDialerProviderInstance(providerId: NativeDialerProvi
       return new ElevenLabsNativeDialerProvider()
     case "sip":
       return new SipNativeDialerProvider()
+    case "google_voice_bridge":
+      return new GoogleVoiceBridgeNativeDialerProvider()
     default:
       return new StubNativeDialerProvider()
   }
@@ -118,6 +120,26 @@ class SipNativeDialerProvider implements NativeDialerTelephonyProvider {
   async endCall(): Promise<void> {}
   async health(): Promise<NativeDialerProviderHealth> {
     return { ok: true, providerId: "sip", message: "SIP adapter configured (operator controlled)." }
+  }
+}
+
+class GoogleVoiceBridgeNativeDialerProvider implements NativeDialerTelephonyProvider {
+  readonly providerId = "google_voice_bridge" as const
+  async startCall(input: NativeDialerStartInput): Promise<NativeDialerStartResult> {
+    return {
+      providerCallRef: `google_voice_bridge:${input.sessionId}`,
+      mode: "live",
+      message:
+        "External bridge mode — place the call manually in Google Voice, then mark call started. No provider telemetry.",
+    }
+  }
+  async endCall(): Promise<void> {}
+  async health(): Promise<NativeDialerProviderHealth> {
+    return {
+      ok: true,
+      providerId: "google_voice_bridge",
+      message: "Google Voice bridge ready — operator places calls externally.",
+    }
   }
 }
 

@@ -28,10 +28,12 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
   phase,
   leadId,
   nativeSessionId,
+  startSignal,
 }: {
-  phase: "idle" | "incoming" | "active" | "wrapup"
+  phase: "idle" | "incoming" | "bridge_pending" | "active" | "wrapup"
   leadId: string | null
   nativeSessionId: string | null
+  startSignal?: number
 }) {
   const [sessions, setSessions] = useState<GrowthRealtimeCallSession[]>([])
   const [coachingState, setCoachingState] = useState<GrowthLiveCoachingState | null>(null)
@@ -52,7 +54,7 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
       activeRealtimeSession?.browserAudioCaptureStatus === "active")
 
   const loadCoaching = useCallback(async () => {
-    if (!leadId || phase !== "active") {
+    if (!leadId || (phase !== "active" && phase !== "bridge_pending")) {
       setSessions([])
       setCoachingState(null)
       setGuidanceEvents([])
@@ -102,6 +104,13 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
   useEffect(() => {
     void loadCoaching()
   }, [loadCoaching, nativeSessionId])
+
+  useEffect(() => {
+    if (!startSignal || !leadId) return
+    if (phase !== "bridge_pending" && phase !== "active") return
+    void startCoaching()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- explicit operator trigger via startSignal
+  }, [startSignal])
 
   async function startCoaching() {
     if (!leadId) return
@@ -182,6 +191,32 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
         data-qa-marker={GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER}
       >
         Live Coaching paused for operator wrap-up. Complete wrap-up to start the next call.
+      </div>
+    )
+  }
+
+  if (phase === "bridge_pending") {
+    return (
+      <div
+        className="rounded-2xl border border-border/60 bg-muted/20 p-4 dark:border-white/5"
+        data-qa-marker={GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h4 className="font-semibold">Live Coaching</h4>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Available through browser capture once you start coaching from the bridge panel.
+            </p>
+          </div>
+          <GrowthBadge label={coachingActive ? "Active" : "Standby"} tone={coachingActive ? "healthy" : "neutral"} />
+        </div>
+        {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
+        {acting ? (
+          <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Starting Live Coaching…
+          </p>
+        ) : null}
       </div>
     )
   }

@@ -188,6 +188,33 @@ export async function startNativeCallSession(
   })
 
   const now = new Date().toISOString()
+  const isGoogleVoiceBridge = routed.providerId === "google_voice_bridge"
+
+  if (isGoogleVoiceBridge) {
+    const { data: pending, error: pendingError } = await sessionsTable(admin)
+      .update({
+        status: "external_bridge_pending",
+        provider: routed.providerId,
+        fallback_provider: routed.failoverApplied ? providers.fallbackProvider : providers.primaryProvider,
+        provider_call_ref: startResult.providerCallRef,
+        recording_state: "none",
+        safe_summary: startResult.message,
+        updated_at: now,
+      })
+      .eq("id", inserted.id as string)
+      .select(SESSION_SELECT)
+      .single()
+    if (pendingError) throw new Error(pendingError.message)
+
+    if (input.queueItemId) {
+      await queueTable(admin)
+        .update({ status: "dialing", updated_at: now })
+        .eq("id", input.queueItemId)
+    }
+
+    return mapNativeCallSessionRow(pending as SessionRow)
+  }
+
   const { data: active, error: activeError } = await sessionsTable(admin)
     .update({
       status: "active",
@@ -211,6 +238,87 @@ export async function startNativeCallSession(
   }
 
   return mapNativeCallSessionRow(active as SessionRow)
+}
+
+export async function markNativeCallBridgeStarted(
+  admin: SupabaseClient,
+  sessionId: string,
+): Promise<NativeCallWorkspaceSessionPublicView> {
+  const { data: existing, error: fetchError } = await sessionsTable(admin)
+    .select(SESSION_SELECT)
+    .eq("id", sessionId)
+    .maybeSingle()
+  if (fetchError) throw new Error(fetchError.message)
+  if (!existing) throw new Error("Call session not found.")
+  if (existing.status !== "external_bridge_pending") {
+    throw new Error("Call is not awaiting external bridge confirmation.")
+  }
+  if (existing.provider !== "google_voice_bridge") {
+    throw new Error("External bridge confirmation is only supported for Google Voice bridge.")
+  }
+
+  const now = new Date().toISOString()
+  const { data, error } = await sessionsTable(admin)
+    .update({
+      status: "active",
+      connected_at: now,
+      recording_state: "none",
+      safe_summary: "External bridge call active — manual provider telemetry unavailable.",
+      updated_at: now,
+    })
+    .eq("id", sessionId)
+    .select(SESSION_SELECT)
+    .single()
+  if (error) throw new Error(error.message)
+  return mapNativeCallSessionRow(data as SessionRow)
+}
+
+export async function fetchNativeDialerSettingsRow(
+  admin: SupabaseClient,
+): Promise<{
+  primaryProvider: NativeDialerProviderId
+  fallbackProvider: NativeDialerProviderId
+  defaultQueueMode: NativeDialerQueueMode
+  powerDialEnabled: boolean
+  previewDialEnabled: boolean
+}> {
+  const orgId = await getGrowthEngineAiOrgId(admin)
+  const { data, error } = await settingsTable(admin)
+    .select("primary_provider, fallback_provider, default_queue_mode, power_dial_enabled, preview_dial_enabled")
+    .eq("organization_id", orgId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return {
+    primaryProvider: (data?.primary_provider as NativeDialerProviderId) ?? "stub",
+    fallbackProvider: (data?.fallback_provider as NativeDialerProviderId) ?? "stub",
+    defaultQueueMode: (data?.default_queue_mode as NativeDialerQueueMode) ?? "manual",
+    powerDialEnabled: Boolean(data?.power_dial_enabled),
+    previewDialEnabled: data?.preview_dial_enabled !== false,
+  }
+}
+
+export async function updateNativeDialerSettingsRow(
+  admin: SupabaseClient,
+  input: {
+    primaryProvider?: NativeDialerProviderId
+    fallbackProvider?: NativeDialerProviderId
+  },
+): Promise<{ primaryProvider: NativeDialerProviderId; fallbackProvider: NativeDialerProviderId }> {
+  const orgId = await getGrowthEngineAiOrgId(admin)
+  const now = new Date().toISOString()
+  const patch: Record<string, unknown> = { updated_at: now }
+  if (input.primaryProvider) patch.primary_provider = input.primaryProvider
+  if (input.fallbackProvider) patch.fallback_provider = input.fallbackProvider
+
+  const { data, error } = await settingsTable(admin)
+    .upsert({ organization_id: orgId, ...patch }, { onConflict: "organization_id" })
+    .select("primary_provider, fallback_provider")
+    .single()
+  if (error) throw new Error(error.message)
+  return {
+    primaryProvider: data.primary_provider as NativeDialerProviderId,
+    fallbackProvider: data.fallback_provider as NativeDialerProviderId,
+  }
 }
 
 export async function answerNativeCallSession(
@@ -388,7 +496,7 @@ export async function fetchActiveNativeCallSession(
 ): Promise<NativeCallWorkspaceSessionPublicView | null> {
   let query = sessionsTable(admin)
     .select(SESSION_SELECT)
-    .in("status", ["ringing", "active", "on_hold", "wrapping"])
+    .in("status", ["ringing", "external_bridge_pending", "active", "on_hold", "wrapping"])
     .order("started_at", { ascending: false })
     .limit(1)
   if (ownerUserId) query = query.eq("owner_user_id", ownerUserId)

@@ -20,7 +20,10 @@ import {
   GROWTH_NATIVE_DIALER_CALL_START_FIX_QA_MARKER,
   GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER,
   GROWTH_NATIVE_DIALER_QA_MARKER,
+  GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER,
 } from "@/lib/growth/native-dialer/native-dialer-types"
+import { openGoogleVoiceBridgeTab } from "@/lib/growth/native-dialer/native-dialer-bridge"
+import type { GrowthCallWorkspacePhase } from "@/components/growth/growth-call-workspace-center-panel"
 import {
   normalizeDialPhoneDigits,
   normalizeDialPhoneForApi,
@@ -48,6 +51,8 @@ export function GrowthCallWorkspace() {
   const [dialingQueueId, setDialingQueueId] = useState<string | null>(null)
   const [answering, setAnswering] = useState(false)
   const [declining, setDeclining] = useState(false)
+  const [markingBridgeStarted, setMarkingBridgeStarted] = useState(false)
+  const [coachingStartSignal, setCoachingStartSignal] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -104,8 +109,9 @@ export function GrowthCallWorkspace() {
     if (initialLeadId) void loadLeadContext(initialLeadId)
   }, [initialLeadId, loadLeadContext])
 
-  const workspacePhase = useMemo(() => {
+  const workspacePhase = useMemo((): GrowthCallWorkspacePhase => {
     if (activeSession?.status === "wrapping") return "wrapup"
+    if (activeSession?.status === "external_bridge_pending") return "bridge_pending"
     if (activeSession?.status === "ringing") return "incoming"
     if (activeSession && ["active", "on_hold"].includes(activeSession.status)) return "active"
     return "idle"
@@ -136,12 +142,38 @@ export function GrowthCallWorkspace() {
       }
       if (!res.ok || !data.session) throw new Error(data.message ?? "Could not start call.")
       setActiveSession(data.session)
+      if (data.session.status === "external_bridge_pending") {
+        openGoogleVoiceBridgeTab()
+      }
       if (data.session.leadId) void loadLeadContext(data.session.leadId)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Start failed.")
     } finally {
       setStarting(false)
       setDialingQueueId(null)
+    }
+  }
+
+  async function markBridgeStarted() {
+    if (!activeSession) return
+    setMarkingBridgeStarted(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/platform/growth/calls/bridge-started", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: activeSession.id }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        session?: NativeCallWorkspaceSessionPublicView
+        message?: string
+      }
+      if (!res.ok || !data.session) throw new Error(data.message ?? "Could not mark call started.")
+      setActiveSession(data.session)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Mark call started failed.")
+    } finally {
+      setMarkingBridgeStarted(false)
     }
   }
 
@@ -260,6 +292,7 @@ export function GrowthCallWorkspace() {
       data-qa-marker={GROWTH_NATIVE_DIALER_QA_MARKER}
       data-layout-qa-marker={GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER}
       data-call-start-fix-qa-marker={GROWTH_NATIVE_DIALER_CALL_START_FIX_QA_MARKER}
+      data-google-voice-bridge-qa-marker={GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER}
     >
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button type="button" size="sm" variant="outline" onClick={() => void load()}>
@@ -314,10 +347,14 @@ export function GrowthCallWorkspace() {
           answering={answering}
           declining={declining}
           ending={ending}
+          markingBridgeStarted={markingBridgeStarted}
           submittingWrapup={submittingWrapup}
+          coachingStartSignal={coachingStartSignal}
           onAnswer={() => void answerCall()}
           onDecline={() => void declineCall()}
           onEndCall={() => void endCall()}
+          onMarkBridgeStarted={() => void markBridgeStarted()}
+          onStartLiveCoaching={() => setCoachingStartSignal((value) => value + 1)}
           onSubmitWrapup={submitWrapup}
         />
 

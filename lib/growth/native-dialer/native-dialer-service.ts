@@ -8,8 +8,11 @@ import {
   endNativeCallSession,
   fetchActiveNativeCallSession,
   listNativeDialerQueue,
+  markNativeCallBridgeStarted,
   saveNativeCallWrapup,
   startNativeCallSession,
+  fetchNativeDialerSettingsRow,
+  updateNativeDialerSettingsRow,
 } from "@/lib/growth/native-dialer/native-dialer-repository"
 import { emitNativeDialerNotifications } from "@/lib/growth/native-dialer/native-dialer-notifications"
 import type { NativeCallWrapupInput } from "@/lib/growth/native-dialer/native-dialer-wrapup-engine"
@@ -18,6 +21,7 @@ import type {
   NativeCallWorkspaceSessionPublicView,
   NativeCallWrapupPublicView,
   NativeDialerLeadContext,
+  NativeDialerProviderId,
   NativeDialerQueueItemPublicView,
   NativeDialerQueueMode,
 } from "@/lib/growth/native-dialer/native-dialer-types"
@@ -71,6 +75,24 @@ export async function endGrowthNativeCall(
   sessionId: string,
 ): Promise<NativeCallWorkspaceSessionPublicView> {
   return endNativeCallSession(admin, sessionId)
+}
+
+export async function markGrowthNativeCallBridgeStarted(
+  admin: SupabaseClient,
+  sessionId: string,
+): Promise<NativeCallWorkspaceSessionPublicView> {
+  return markNativeCallBridgeStarted(admin, sessionId)
+}
+
+export async function fetchGrowthNativeDialerSettings(admin: SupabaseClient) {
+  return fetchNativeDialerSettingsRow(admin)
+}
+
+export async function updateGrowthNativeDialerSettings(
+  admin: SupabaseClient,
+  input: { primaryProvider?: NativeDialerProviderId; fallbackProvider?: NativeDialerProviderId },
+) {
+  return updateNativeDialerSettingsRow(admin, input)
 }
 
 export async function submitGrowthNativeCallWrapup(

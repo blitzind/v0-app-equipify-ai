@@ -11,12 +11,18 @@ import {
 } from "../lib/growth/native-dialer/native-dialer-wrapup-engine"
 import { nativeCallWorkspaceHref } from "../lib/growth/native-dialer/native-dialer-navigation"
 import { createNativeDialerProviderInstance } from "../lib/growth/native-dialer/native-dialer-provider-registry"
-import { GROWTH_NATIVE_DIALER_QA_MARKER, GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER, GROWTH_NATIVE_DIALER_CALL_START_FIX_QA_MARKER, GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER } from "../lib/growth/native-dialer/native-dialer-types"
+import { GROWTH_NATIVE_DIALER_QA_MARKER, GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER, GROWTH_NATIVE_DIALER_CALL_START_FIX_QA_MARKER, GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER, GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER, NATIVE_DIALER_PROVIDER_IDS } from "../lib/growth/native-dialer/native-dialer-types"
+import { GOOGLE_VOICE_BRIDGE_CALLS_URL, isGoogleVoiceBridgeProvider } from "../lib/growth/native-dialer/native-dialer-bridge"
 
 assert.equal(GROWTH_NATIVE_DIALER_QA_MARKER, "native-dialer-v1")
 assert.equal(GROWTH_NATIVE_DIALER_LAYOUT_QA_MARKER, "native-dialer-layout-v3")
 assert.equal(GROWTH_NATIVE_DIALER_CALL_START_FIX_QA_MARKER, "native-dialer-call-start-fix-v1")
 assert.equal(GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER, "native-dialer-live-coaching-center-v1")
+assert.equal(GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER, "google-voice-bridge-v1")
+assert.ok(NATIVE_DIALER_PROVIDER_IDS.includes("google_voice_bridge"))
+assert.equal(createNativeDialerProviderInstance("google_voice_bridge").providerId, "google_voice_bridge")
+assert.equal(isGoogleVoiceBridgeProvider("google_voice_bridge"), true)
+assert.equal(GOOGLE_VOICE_BRIDGE_CALLS_URL, "https://voice.google.com/u/0/calls")
 
 assert.match(
   nativeCallWorkspaceHref({ leadId: "00000000-0000-4000-8000-000000000001", phone: "+15551234567" }),
@@ -157,5 +163,66 @@ assert.match(notificationTypes, /callback_due/)
 assert.match(notificationTypes, /priority_call_ready/)
 assert.match(notificationTypes, /missed_callback/)
 assert.match(notificationTypes, /meeting_booked_from_call/)
+
+const bridgeMigration = fs.readFileSync(
+  path.join(process.cwd(), "supabase/migrations/20270315130000_growth_engine_native_dialer_google_voice_bridge.sql"),
+  "utf8",
+)
+assert.match(bridgeMigration, /google_voice_bridge/)
+assert.match(bridgeMigration, /external_bridge_pending/)
+
+const bridgeStartedRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/calls/bridge-started/route.ts"),
+  "utf8",
+)
+assert.match(bridgeStartedRoute, /markGrowthNativeCallBridgeStarted/)
+assert.match(bridgeStartedRoute, /GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER/)
+
+const settingsRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/calls/settings/route.ts"),
+  "utf8",
+)
+assert.match(settingsRoute, /NATIVE_DIALER_PROVIDER_IDS/)
+assert.match(settingsRoute, /fetchGrowthNativeDialerSettings/)
+
+const bridgePanel = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace-google-voice-bridge-panel.tsx"),
+  "utf8",
+)
+assert.match(bridgePanel, /External Bridge Mode/)
+assert.match(bridgePanel, /Open Google Voice/)
+assert.match(bridgePanel, /Copy Phone Number/)
+assert.match(bridgePanel, /Mark Call Started/)
+assert.match(bridgePanel, /Start Live Coaching/)
+assert.match(bridgePanel, /End \/ Wrap Up/)
+
+assert.match(centerPanel, /bridge_pending/)
+assert.match(centerPanel, /GrowthCallWorkspaceGoogleVoiceBridgePanel/)
+assert.match(centerPanel, /externalBridge/)
+assert.match(centerPanel, /!externalBridge/)
+
+assert.match(workspaceComponent, /external_bridge_pending/)
+assert.match(workspaceComponent, /bridge-started/)
+assert.match(workspaceComponent, /openGoogleVoiceBridgeTab/)
+assert.match(workspaceComponent, /GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER/)
+
+const nativeDialerSettings = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-native-dialer-settings-panel.tsx"),
+  "utf8",
+)
+assert.match(nativeDialerSettings, /Google Voice Bridge/)
+
+const growthSettingsPage = fs.readFileSync(
+  path.join(process.cwd(), "app/(admin)/admin/growth/settings/page.tsx"),
+  "utf8",
+)
+assert.match(growthSettingsPage, /GrowthNativeDialerSettingsPanel/)
+
+const repository = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/native-dialer/native-dialer-repository.ts"),
+  "utf8",
+)
+assert.match(repository, /external_bridge_pending/)
+assert.match(repository, /markNativeCallBridgeStarted/)
 
 console.log("growth-native-dialer-v1 checks passed")
