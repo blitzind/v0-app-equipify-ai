@@ -1,5 +1,5 @@
 /**
- * Regression checks for Real-Time Intent Pixel foundation (Prompt 12).
+ * Regression checks for Real-Time Intent Pixel foundation (Prompts 12–13).
  * Run: pnpm test:growth-intent-pixel
  */
 import assert from "node:assert/strict"
@@ -7,13 +7,21 @@ import fs from "node:fs"
 import path from "node:path"
 import { normalizeConsentStatus, resolveTrackingMode } from "../lib/growth/intent-pixel/consent-gate"
 import { normalizeCollectPayload } from "../lib/growth/intent-pixel/capture-intent-event"
+import { GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER } from "../lib/growth/intent-pixel/intent-pixel-admin-types"
 import { isDomainAllowed } from "../lib/growth/intent-pixel/intent-pixel-repository"
+import {
+  buildIntentPixelScriptSnippet,
+  isValidIntentPixelSiteKey,
+  siteFlagsFromTrackingMode,
+  trackingModeFromSite,
+} from "../lib/growth/intent-pixel/intent-pixel-site-config"
 import { GROWTH_INTENT_PIXEL_QA_MARKER } from "../lib/growth/intent-pixel/intent-pixel-types"
 import { buildIntentPixelScript } from "../lib/growth/intent-pixel/pixel-script"
 import { GROWTH_INTENT_PIXEL_PRIVACY_NOTE, resolvePiiCaptureSource, sanitizeSubmittedIdentity } from "../lib/growth/intent-pixel/pii-policy"
 import { hasUtmSignal, mergeUtmAttribution, parseUtmFromUrl } from "../lib/growth/intent-pixel/utm-attribution"
 
 assert.equal(GROWTH_INTENT_PIXEL_QA_MARKER, "growth-intent-pixel-v1")
+assert.equal(GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER, "growth-intent-pixel-admin-v1")
 
 const migration = fs.readFileSync(
   path.join(process.cwd(), "supabase/migrations/20270316120000_growth_engine_intent_pixel_foundation.sql"),
@@ -51,8 +59,62 @@ const diagnosticsRoute = fs.readFileSync(
   "utf8",
 )
 assert.match(diagnosticsRoute, /requireGrowthEnginePlatformAccess/)
-assert.match(diagnosticsRoute, /GROWTH_INTENT_PIXEL_QA_MARKER/)
-assert.match(diagnosticsRoute, /fetchIntentPixelDiagnostics/)
+assert.match(diagnosticsRoute, /fetchIntentPixelAdminDiagnostics/)
+
+const sitesRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/intent-pixel/sites/route.ts"),
+  "utf8",
+)
+assert.match(sitesRoute, /listIntentPixelSites/)
+assert.match(sitesRoute, /createIntentPixelSite/)
+assert.match(sitesRoute, /requireGrowthEnginePlatformAccess/)
+
+const eventsRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/intent-pixel/events/recent/route.ts"),
+  "utf8",
+)
+assert.match(eventsRoute, /fetchIntentPixelRecentEvents/)
+
+const adminPage = fs.readFileSync(
+  path.join(process.cwd(), "app/(admin)/admin/growth/intent-pixel/page.tsx"),
+  "utf8",
+)
+assert.match(adminPage, /GrowthIntentPixelAdmin/)
+assert.match(adminPage, /GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER/)
+
+const adminUi = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-intent-pixel-admin.tsx"),
+  "utf8",
+)
+assert.match(adminUi, /Privacy guardrails/)
+assert.match(adminUi, /Copy script/)
+assert.match(adminUi, /Event stream/)
+assert.doesNotMatch(adminUi, /submitted_identity/)
+assert.doesNotMatch(adminUi, /identified_contacts.*select.*email/i)
+
+const sidebar = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-section-sidebar-nav.tsx"),
+  "utf8",
+)
+assert.match(sidebar, /\/admin\/growth\/intent-pixel/)
+assert.match(sidebar, /Intent Pixel/)
+
+const adminRepo = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/intent-pixel/intent-pixel-admin-repository.ts"),
+  "utf8",
+)
+assert.match(adminRepo, /PII_METADATA_KEY/)
+assert.match(adminRepo, /consent_denied_sessions_24h/)
+assert.doesNotMatch(adminRepo, /email.*full_name.*linkedin.*from.*identified/)
+
+// Site config
+assert.equal(trackingModeFromSite({ tracking_enabled: false, consent_required: true }), "disabled")
+assert.equal(siteFlagsFromTrackingMode("always_on").consent_required, false)
+assert.equal(isValidIntentPixelSiteKey("equipify-sandbox"), true)
+assert.match(
+  buildIntentPixelScriptSnippet("https://app.test", "equipify-sandbox").script_snippet,
+  /pixel\.js\?site_key=equipify-sandbox/,
+)
 
 // Consent gate
 const site = {
@@ -134,4 +196,4 @@ assert.match(script, /EquipifyIntentPixel/)
 assert.match(script, /trackConversion/)
 assert.doesNotMatch(script, /email.*inferred/i)
 
-console.log("growth-intent-pixel-v1 checks passed")
+console.log("growth-intent-pixel-v1 + growth-intent-pixel-admin-v1 checks passed")

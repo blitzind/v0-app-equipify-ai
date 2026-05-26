@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 661,
+  apiRouteHandlers: 664,
   sqlMigrations: 268,
   dashboardPages: 65,
-  componentsTsx: 467,
-  libTsFiles: 1554,
+  componentsTsx: 468,
+  libTsFiles: 1557,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **661** |
+| API route handlers (\`app/api/**/route.ts\`) | **664** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **268** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **467** |
-| \`lib/**/*.ts\` | **1554** |
+| \`components/**/*.tsx\` | **468** |
+| \`lib/**/*.ts\` | **1557** |
 
 ### Vercel crons
 
@@ -540,6 +540,9 @@ platform/growth/import-batches/route.ts
 platform/growth/import-mapping-profiles/route.ts
 platform/growth/import-vendors/route.ts
 platform/growth/intent-pixel/diagnostics/route.ts
+platform/growth/intent-pixel/events/recent/route.ts
+platform/growth/intent-pixel/sites/[siteKey]/route.ts
+platform/growth/intent-pixel/sites/route.ts
 platform/growth/lead-engine/sandbox/route.ts
 platform/growth/leads/[leadId]/activity-stream/route.ts
 platform/growth/leads/[leadId]/assign/route.ts

@@ -25,6 +25,7 @@ import {
   Plug,
   Plus,
   Radio,
+  Radar,
   Send,
   Settings,
   Sparkles,
@@ -89,6 +90,12 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
         label: "Lead Engine",
         icon: Workflow,
         match: (path) => path.startsWith("/admin/growth/leads/lead-engine"),
+      },
+      {
+        href: "/admin/growth/intent-pixel",
+        label: "Intent Pixel",
+        icon: Radar,
+        match: (path) => path.startsWith("/admin/growth/intent-pixel"),
       },
       {
         href: "/admin/growth/replies",
