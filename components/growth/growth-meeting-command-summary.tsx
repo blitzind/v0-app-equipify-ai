@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { CalendarClock, Loader2 } from "lucide-react"
-import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import type { GrowthMeetingCommandSummary } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 
 export function GrowthMeetingCommandSummary() {
@@ -71,11 +71,6 @@ export function GrowthMeetingCommandSummary() {
         <StatTile label="Outcomes missing" value={summary?.outcomesMissingCount ?? 0} />
         <StatTile label="Follow-ups due" value={summary?.followUpsDueCount ?? 0} />
       </div>
-      {summary ? (
-        <div className="mt-3">
-          <GrowthBadge label={summary.qaMarker} tone="healthy" />
-        </div>
-      ) : null}
     </GrowthEngineCard>
   )
 }

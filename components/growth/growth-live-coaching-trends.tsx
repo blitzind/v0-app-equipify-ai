@@ -59,18 +59,13 @@ export function GrowthLiveCoachingTrends() {
   }, [trends?.sessionsByProvider])
 
   return (
-    <GrowthEngineCard title="Coaching Trends">
+    <div data-qa-marker={trends?.qaProof?.marker}>
+      <GrowthEngineCard title="Coaching Trends">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          Deterministic trends from session insights rollups only. No transcript or audio data.
+          Session trends from coaching insights — no transcript or audio storage.
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          {trends?.qaProof ? (
-            <GrowthBadge
-              label={trends.qaProof.marker}
-              tone={trends.qaProof.verified ? "healthy" : "attention"}
-            />
-          ) : null}
           {trends?.meta.truncated ? (
             <GrowthBadge
               label={`Showing ${trends.meta.limit} of ${trends.meta.total}`}
@@ -205,6 +200,7 @@ export function GrowthLiveCoachingTrends() {
         </div>
       ) : null}
     </GrowthEngineCard>
+    </div>
   )
 }
 

@@ -6,10 +6,8 @@ import { InstallVerificationCard } from "@/components/growth/intent-pixel-monito
 import { LiveVisitorsPanel } from "@/components/growth/intent-pixel-monitor/live-visitors-panel"
 import { VisitorTimelinePanel } from "@/components/growth/intent-pixel-monitor/visitor-timeline-panel"
 import { HighIntentQueuePanel } from "@/components/growth/intent-pixel-monitor/high-intent-queue-panel"
-import {
-  GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER,
-  type GrowthLiveVisitorMonitorSnapshot,
-} from "@/lib/growth/intent-pixel/live-visitor-monitor-types"
+import { GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER } from "@/lib/growth/intent-pixel/live-visitor-monitor-types"
+import type { GrowthLiveVisitorMonitorSnapshot } from "@/lib/growth/intent-pixel/live-visitor-monitor-types"
 
 export function GrowthLiveVisitorMonitor({
   siteKey,
@@ -53,11 +51,12 @@ export function GrowthLiveVisitorMonitor({
   }, [schemaReady, loadMonitor])
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-2">
-        <p className="font-mono text-xs text-muted-foreground">{GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER}</p>
-        {loading ? <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Refreshing" /> : null}
-      </div>
+    <div className="flex flex-col gap-6" data-qa-marker={GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER}>
+      {loading ? (
+        <div className="flex justify-end">
+          <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Refreshing" />
+        </div>
+      ) : null}
 
       <div className="flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900">
         <Radio className="size-4 shrink-0" />

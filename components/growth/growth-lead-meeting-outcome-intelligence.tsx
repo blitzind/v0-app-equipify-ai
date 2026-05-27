@@ -8,7 +8,6 @@ import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/gr
 import { GrowthNativeDialerLaunchButton } from "@/components/growth/growth-native-dialer-launch-button"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { MeetingOutcomeLeadView } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-intelligence-types"
-import { GROWTH_MEETING_OUTCOME_INTELLIGENCE_QA_MARKER } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-intelligence-types"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthLeadMeetingOutcomeIntelligenceProps = {
@@ -85,10 +84,6 @@ export function GrowthLeadMeetingOutcomeIntelligence({ lead }: GrowthLeadMeeting
       title="Meeting Outcome Intelligence"
       subtitle="Deterministic outcome scoring — recommendations only, operator controlled"
       icon={<BrainCircuit className="size-4" />}
-      badges={[
-        { label: GROWTH_MEETING_OUTCOME_INTELLIGENCE_QA_MARKER, tone: "healthy" },
-        { label: "No auto-send · scheduling · CRM", tone: "neutral" },
-      ]}
     >
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

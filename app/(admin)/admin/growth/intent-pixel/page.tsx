@@ -10,11 +10,6 @@ import {
   usePlatformAdminHeaderIdentity,
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
-import {
-  GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER,
-  GROWTH_INTENT_PIXEL_LIVE_QA_MARKER,
-  GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER,
-} from "@/lib/growth/intent-pixel/intent-pixel-admin-types"
 
 export default function AdminGrowthIntentPixelPage() {
   const { sessionIdentity } = useAdmin()
@@ -38,10 +33,6 @@ export default function AdminGrowthIntentPixelPage() {
               <h1 className={PAGE_STANDARD_PAGE_TITLE}>Intent Pixel</h1>
               <p className="text-sm text-muted-foreground">
                 Configure first-party website intent tracking, verify install health, and inspect anonymous activity — no third-party enrichment or outbound execution.
-              </p>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">
-                {GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER} · {GROWTH_INTENT_PIXEL_LIVE_QA_MARKER} ·{" "}
-                {GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER}
               </p>
             </div>
           </div>

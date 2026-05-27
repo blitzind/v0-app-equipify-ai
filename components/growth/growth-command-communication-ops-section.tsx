@@ -113,7 +113,7 @@ export function GrowthCommandCommunicationOpsSection() {
   return (
     <GrowthEngineCard title="Communication Operations" icon={<MessageSquare className="size-4" />}>
       <p className="mb-3 text-sm text-muted-foreground">
-        Attention, replies, calls, meetings, cadence, and provider health — navigation only.
+        Attention, replies, calls, meetings, cadence, and provider health at a glance.
       </p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="Needs attention" value={needsAttention} />
@@ -129,7 +129,6 @@ export function GrowthCommandCommunicationOpsSection() {
         />
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <GrowthBadge label="No auto-send" tone="neutral" />
         {data?.liveCoachingActive ? <GrowthBadge label="Session in progress" tone="healthy" /> : null}
         {(data?.providerIssues ?? 0) > 0 ? <GrowthBadge label="Check providers" tone="attention" /> : null}
       </div>

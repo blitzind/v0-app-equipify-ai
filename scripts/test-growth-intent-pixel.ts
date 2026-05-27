@@ -150,8 +150,8 @@ const adminPage = fs.readFileSync(
   "utf8",
 )
 assert.match(adminPage, /GrowthIntentPixelAdmin/)
-assert.match(adminPage, /GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER/)
-assert.match(adminPage, /GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER/)
+assert.doesNotMatch(adminPage, /GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER/)
+assert.doesNotMatch(adminPage, /growth-intent-pixel-admin-v1/)
 
 const adminUi = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-intent-pixel-admin.tsx"),
@@ -160,7 +160,8 @@ const adminUi = fs.readFileSync(
 assert.match(adminUi, /Privacy guardrails/)
 assert.match(adminUi, /Copy script/)
 assert.match(adminUi, /Event stream/)
-assert.match(adminUi, /GROWTH_INTENT_PIXEL_LIVE_QA_MARKER/)
+assert.match(adminUi, /GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER/)
+assert.match(adminUi, /data-qa-marker=\{GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER\}/)
 assert.match(adminUi, /Process recent intent/)
 assert.match(adminUi, /Schema:/)
 assert.match(adminUi, /"Ready"/)
@@ -169,7 +170,7 @@ assert.doesNotMatch(adminUi, /submitted_identity/)
 assert.doesNotMatch(adminUi, /identified_contacts.*select.*email/i)
 
 const sidebar = fs.readFileSync(
-  path.join(process.cwd(), "components/growth/growth-section-sidebar-nav.tsx"),
+  path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts"),
   "utf8",
 )
 assert.match(sidebar, /\/admin\/growth\/intent-pixel/)
@@ -306,7 +307,7 @@ assert.match(monitorUi, /InstallVerificationCard/)
 assert.match(monitorUi, /LiveVisitorsPanel/)
 assert.match(monitorUi, /VisitorTimelinePanel/)
 assert.match(monitorUi, /HighIntentQueuePanel/)
-assert.match(monitorUi, /GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER/)
+assert.match(monitorUi, /data-qa-marker=\{GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER\}/)
 assert.match(
   fs.readFileSync(
     path.join(process.cwd(), "components/growth/intent-pixel-monitor/install-verification-card.tsx"),

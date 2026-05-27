@@ -14,7 +14,6 @@ import {
 import { GrowthBadge, GrowthEngineCard, formatRelativeTime } from "@/components/growth/growth-ui-utils"
 import {
   GROWTH_ASSIGNMENT_SOURCE_LABELS,
-  GROWTH_LEAD_ASSIGNMENT_QA_MARKER,
   type GrowthRepRosterEntry,
 } from "@/lib/growth/assignment/assignment-types"
 import type { GrowthLead } from "@/lib/growth/types"
@@ -98,7 +97,6 @@ export function GrowthLeadAssignmentPanel({
     <GrowthEngineCard title="Sales ownership">
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <GrowthBadge label={GROWTH_LEAD_ASSIGNMENT_QA_MARKER} tone="neutral" />
           {!compact ? (
             <span className="text-xs text-muted-foreground">
               Assign internal accountability without changing outreach approval gates.

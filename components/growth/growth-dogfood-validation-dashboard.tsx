@@ -207,7 +207,6 @@ export function GrowthDogfoodValidationDashboard() {
       {dashboard ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <GrowthBadge label={dashboard.qaMarker} tone="healthy" />
             <GrowthBadge label="Human validation only" tone="neutral" />
             {dashboard.readyForBlitzUsage ? (
               <GrowthBadge label="Ready for Blitz usage" tone="healthy" />

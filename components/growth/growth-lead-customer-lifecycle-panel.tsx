@@ -10,7 +10,6 @@ import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-
 import {
   GROWTH_CUSTOMER_LIFECYCLE_STAGE_LABELS,
   GROWTH_CUSTOMER_ONBOARDING_TASK_LABELS,
-  GROWTH_POST_CLOSE_REVENUE_QA_MARKER,
   type GrowthCustomerOnboardingTask,
   type GrowthCustomerProfile,
 } from "@/lib/growth/customer-lifecycle/customer-lifecycle-types"
@@ -139,11 +138,6 @@ export function GrowthLeadCustomerLifecyclePanel({ lead, onTimelineRefresh }: Gr
       }
     >
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <GrowthBadge label={GROWTH_POST_CLOSE_REVENUE_QA_MARKER} tone="neutral" />
-          <GrowthBadge label="No auto-send" tone="neutral" />
-        </div>
-
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />

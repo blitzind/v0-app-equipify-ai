@@ -102,17 +102,12 @@ export function GrowthLiveCoachingSessionTimeline({
   }
 
   return (
-    <GrowthEngineCard title="Session Timeline">
+    <div data-qa-marker={payload?.qaProof?.marker}>
+      <GrowthEngineCard title="Session Timeline">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          Metrics-only audit trail. No audio storage or transcript replay.
+          Metrics-only audit trail — no audio storage or transcript replay.
         </p>
-        {payload?.qaProof ? (
-          <GrowthBadge
-            label={payload.qaProof.marker}
-            tone={payload.qaProof.verified ? "healthy" : "attention"}
-          />
-        ) : null}
         {payload?.meta.truncated ? (
           <GrowthBadge
             label={`Showing ${payload.meta.limit} of ${payload.meta.total} events`}
@@ -200,6 +195,7 @@ export function GrowthLiveCoachingSessionTimeline({
         </div>
       ) : null}
     </GrowthEngineCard>
+    </div>
   )
 }
 

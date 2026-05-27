@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label"
 import {
   GROWTH_SETTINGS_FORM_GAP,
   GROWTH_SETTINGS_SECTION_GAP,
-  GrowthSettingsBadge,
   GrowthSettingsCard,
 } from "@/components/growth/growth-settings-ui"
 import {
@@ -79,8 +78,6 @@ export function GrowthNativeDialerSettingsPanel() {
         <p className="text-sm text-muted-foreground">
           Google Voice Bridge cannot auto-dial. It opens Google Voice and tracks the call after you manually place it.
         </p>
-        <GrowthSettingsBadge label={GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER} tone="neutral" />
-
         {loading ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />

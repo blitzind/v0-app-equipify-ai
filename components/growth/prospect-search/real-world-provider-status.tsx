@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge"
 import { GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER } from "@/lib/growth/real-world-discovery/providers/google-places-query-expansion"
 import { GROWTH_GOOGLE_PLACES_PROVIDER_QA_MARKER } from "@/lib/growth/real-world-discovery/providers/google-places-types"
+import { GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER } from "@/lib/growth/real-world-discovery/real-world-discovery-types"
 import { GROWTH_PROVIDER_CACHE_QA_MARKER } from "@/lib/growth/provider-cache/provider-cache-types"
 import type { GrowthProspectSearchProviderDiagnostic } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
@@ -15,7 +16,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   live_provider_active: "Live provider active",
-  fixture_fallback_active: "Fixture fallback active",
+  fixture_fallback_active: "Sample data mode",
   no_provider_configured: "No provider configured",
 }
 
@@ -35,7 +36,7 @@ export function RealWorldProviderStatus({
   return (
     <div
       className={cn("rounded-lg border px-3 py-2 text-sm", style, className)}
-      data-qa-marker="growth-real-world-company-discovery-v1"
+      data-qa-marker={GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER}
     >
       <p className="font-medium">{title}</p>
       {message ? <p className="mt-0.5 text-xs opacity-90">{message}</p> : null}

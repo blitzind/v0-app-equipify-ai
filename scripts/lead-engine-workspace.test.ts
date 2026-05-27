@@ -53,8 +53,9 @@ const rejectRun = runLeadEnginePipeline({
 
 assert.ok(rejectRun.completed_stages.includes("verification_triage"))
 
-const navPath = path.join(process.cwd(), "components/growth/growth-section-sidebar-nav.tsx")
-assert.match(fs.readFileSync(navPath, "utf8"), /\/admin\/growth\/leads\/lead-engine/)
+const navDefsPath = path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts")
+assert.match(fs.readFileSync(navDefsPath, "utf8"), /\/admin\/growth\/leads\/lead-engine/)
+assert.match(fs.readFileSync(navDefsPath, "utf8"), /Lead Intelligence Inspector/)
 
 const orchestratorPath = path.join(
   process.cwd(),
@@ -82,8 +83,8 @@ assert.doesNotMatch(workspaceSource, /North Star/)
 const pagePath = path.join(process.cwd(), "app/(admin)/admin/growth/leads/lead-engine/page.tsx")
 const pageSource = fs.readFileSync(pagePath, "utf8")
 assert.match(pageSource, /Lead Intelligence Inspector/)
-assert.match(pageSource, /GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER/)
-assert.doesNotMatch(pageSource, /Lead Engine Tools/)
+assert.match(pageSource, /data-qa-marker=\{GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER\}/)
+assert.doesNotMatch(pageSource, /lead-engine-workspace-v1/)
 
 assert.equal(GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER, "growth-lead-intelligence-inspector-v2")
 assert.equal(LEAD_INTELLIGENCE_INSPECTOR_FIXTURES.length, 4)

@@ -150,7 +150,7 @@ export function GrowthRealtimeProvidersDashboard() {
   const diagnosticsById = new Map(dashboard.diagnostics.map((entry) => [entry.connectionId, entry]))
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-qa-marker={dashboard.qaProof.marker}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile label="Connections" value={dashboard.stats.connectionCount} />
@@ -160,10 +160,9 @@ export function GrowthRealtimeProvidersDashboard() {
         </div>
         <div className="flex flex-col items-end gap-2">
           <GrowthBadge
-            label={dashboard.qaProof.label}
+            label={dashboard.qaProof.verified ? "Providers ready" : "Setup pending"}
             tone={dashboard.qaProof.verified ? "healthy" : "neutral"}
           />
-          <span className="text-xs text-muted-foreground">Diagnostic: {dashboard.qaProof.marker}</span>
           <Button type="button" variant="outline" size="sm" onClick={() => void runCleanup()} disabled={acting === "cleanup"}>
             {acting === "cleanup" ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
             Run cleanup

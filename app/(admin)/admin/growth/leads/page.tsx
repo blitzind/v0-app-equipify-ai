@@ -10,7 +10,6 @@ import {
   usePlatformAdminHeaderIdentity,
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
-import { GROWTH_REVENUE_INTELLIGENCE_UX_QA_MARKER } from "@/lib/growth/revenue-intelligence/revenue-intelligence-ux"
 
 export default function AdminGrowthLeadInboxPage() {
   const { sessionIdentity } = useAdmin()
@@ -34,9 +33,6 @@ export default function AdminGrowthLeadInboxPage() {
               <h1 className={PAGE_STANDARD_PAGE_TITLE}>Revenue intelligence</h1>
               <p className="text-sm text-muted-foreground">
                 Operator workspace — prioritize accounts by intent, buying stage, and evidence. Human review before any outreach.
-              </p>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">
-                {GROWTH_REVENUE_INTELLIGENCE_UX_QA_MARKER}
               </p>
             </div>
           </div>

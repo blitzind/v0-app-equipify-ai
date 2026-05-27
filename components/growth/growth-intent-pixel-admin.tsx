@@ -19,7 +19,6 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import {
   GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER,
-  GROWTH_INTENT_PIXEL_LIVE_QA_MARKER,
   GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION,
   GROWTH_INTENT_PIXEL_TRACKING_MODES,
   type GrowthIntentPixelAdminDiagnostics,
@@ -249,11 +248,7 @@ export function GrowthIntentPixelAdmin() {
     : "—"
 
   return (
-    <div className="flex flex-col gap-6">
-      <p className="font-mono text-xs text-muted-foreground">
-        {GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER} · {GROWTH_INTENT_PIXEL_LIVE_QA_MARKER}
-      </p>
-
+    <div className="flex flex-col gap-6" data-qa-marker={GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER}>
       <section
         className={cn(
           "rounded-xl border px-4 py-3 text-sm",

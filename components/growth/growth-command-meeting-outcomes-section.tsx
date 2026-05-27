@@ -4,7 +4,6 @@ import Link from "next/link"
 import { BrainCircuit } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { MeetingOutcomeDashboardSummary } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-intelligence-types"
-import { GROWTH_MEETING_OUTCOME_INTELLIGENCE_QA_MARKER } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-intelligence-types"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 
 function momentumTone(trend: string): "healthy" | "attention" | "medium" | "neutral" {
@@ -65,11 +64,6 @@ export function GrowthCommandMeetingOutcomesSection({
       subtitle="Deterministic follow-up recommendations — operator controlled only"
       icon={<BrainCircuit className="size-4" />}
     >
-      <div className="mb-4 flex flex-wrap gap-2">
-        <GrowthBadge label={GROWTH_MEETING_OUTCOME_INTELLIGENCE_QA_MARKER} tone="healthy" />
-        <GrowthBadge label="Recommendations only · no auto-send" tone="neutral" />
-      </div>
-
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile label="Scored meetings" value={String(dashboard.scoredMeetings)} />
         <StatTile label="Avg outcome score" value={`${dashboard.averageOutcomeScore}/100`} />

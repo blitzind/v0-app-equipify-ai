@@ -105,7 +105,7 @@ export function GrowthOutreachCenter({ onProcessFixture }: GrowthOutreachCenterP
           <div>
             <h2 className="text-lg font-semibold">Provider connection</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Fixture stub provider — no live EmailBison account connected yet.
+              Sample provider — no live EmailBison account connected yet.
             </p>
           </div>
         </div>
@@ -130,8 +130,8 @@ export function GrowthOutreachCenter({ onProcessFixture }: GrowthOutreachCenterP
       </section>
 
       <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-        <h3 className="font-semibold">Fixture processor</h3>
-        <p className="mt-1 text-sm text-muted-foreground">Process test events against leads with matching emails.</p>
+        <h3 className="font-semibold">Sample event processor</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Process sample outbound events against leads with matching emails.</p>
         <div className="mt-4 flex flex-wrap gap-2">
           {["sent-001", "replied-interested-001", "replied-ooo-001", "unsubscribed-001", "unmatched-email-001"].map(
             (fixtureId) => (

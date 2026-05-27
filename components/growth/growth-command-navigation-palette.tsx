@@ -88,7 +88,6 @@ export function GrowthCommandNavigationPalette() {
         ) : null}
       </CommandList>
       <div className="border-t px-3 py-2 text-[10px] text-muted-foreground">
-        <span className="mr-3">{GROWTH_NAVIGATION_IA_QA_MARKER}</span>
         <CommandShortcut>{shortcut}</CommandShortcut> open · ↑↓ navigate · Enter select · Esc close
       </div>
     </CommandDialog>

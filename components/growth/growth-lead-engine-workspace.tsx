@@ -19,7 +19,6 @@ import { LEAD_INTELLIGENCE_INSPECTOR_DEFAULT_INPUT } from "@/lib/growth/lead-eng
 import { GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER } from "@/lib/growth/lead-engine/lead-intelligence-inspector-types"
 import { LEAD_ENGINE_STAGE_UI } from "@/lib/growth/lead-engine/lead-engine-stage-ui"
 import {
-  GROWTH_LEAD_ENGINE_ORCHESTRATOR_QA_MARKER,
   type GrowthLeadEngineOrchestratorStageResult,
   type GrowthLeadEnginePipelineRun,
 } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
@@ -170,9 +169,6 @@ export function GrowthLeadEngineWorkspace() {
           </div>
         ) : null}
 
-        <p className="mt-3 font-mono text-[10px] text-muted-foreground">
-          {GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER} · {GROWTH_LEAD_ENGINE_ORCHESTRATOR_QA_MARKER}
-        </p>
       </section>
 
       {run ? (

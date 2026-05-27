@@ -152,15 +152,8 @@ export function GrowthLiveCoachingSettingsPanel() {
   if (!settings) return null
 
   return (
-    <GrowthSettingsCard
-      title="Live Coaching"
-      icon={<Radio className="size-4" />}
-      headerAside={
-        <div className="flex items-center gap-1.5">
-          <GrowthSettingsBadge label={LIVE_COACHING_QA_PROOF_MARKER} tone="neutral" />
-        </div>
-      }
-    >
+    <div data-qa-marker={LIVE_COACHING_QA_PROOF_MARKER}>
+      <GrowthSettingsCard title="Live Coaching" icon={<Radio className="size-4" />}>
       {error ? <p className="mb-2 text-xs text-destructive">{error}</p> : null}
 
       <div className={GROWTH_SETTINGS_INNER_GAP}>
@@ -352,5 +345,6 @@ export function GrowthLiveCoachingSettingsPanel() {
         </Button>
       </div>
     </GrowthSettingsCard>
+    </div>
   )
 }

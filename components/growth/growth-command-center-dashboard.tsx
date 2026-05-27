@@ -45,7 +45,6 @@ import type {
 import {
   commandActionImpactTone,
   displayCommandActionImpact,
-  GROWTH_COMMAND_CENTER_QA_MARKER,
   GROWTH_COMMAND_CENTER_SPACING_QA_MARKER,
 } from "@/lib/growth/command/command-action-types"
 import type { GrowthCadenceCommandSummary } from "@/lib/growth/cadence/cadence-types"
@@ -379,12 +378,6 @@ export function GrowthCommandCenterDashboard() {
   return (
     <div className="space-y-6" data-qa-marker={GROWTH_COMMAND_CENTER_SPACING_QA_MARKER}>
       {sprintPanel}
-
-      <div className="flex flex-wrap items-center gap-2">
-        <GrowthBadge label={GROWTH_COMMAND_CENTER_QA_MARKER} tone="healthy" />
-        <GrowthBadge label={GROWTH_COMMAND_CENTER_SPACING_QA_MARKER} tone="neutral" />
-        <GrowthBadge label="Navigation only · no auto-send" tone="neutral" />
-      </div>
 
       <GrowthCommandSectionTabs />
 

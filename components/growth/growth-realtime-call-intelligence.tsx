@@ -413,7 +413,7 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
         </div>
 
         {activeSession && activeSession.status !== "completed" && GROWTH_CALL_AUDIO_CAPTURE_ENABLED ? (
-          <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+          <div className="space-y-3 rounded-lg border border-border bg-card p-4" data-qa-marker={captureQaProof?.marker}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Browser audio capture</p>
               <div className="flex flex-wrap items-center gap-2">
@@ -423,12 +423,6 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
                   )}
                   tone={browserAudio.isCaptureActive ? "attention" : "neutral"}
                 />
-                {captureQaProof ? (
-                  <GrowthBadge
-                    label={captureQaProof.marker}
-                    tone={captureQaProof.verified ? "healthy" : "attention"}
-                  />
-                ) : null}
                 {browserAudio.isMicActive ? (
                   <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700">
                     <span className="size-2 animate-pulse rounded-full bg-amber-500" />

@@ -16,7 +16,6 @@ import {
   GROWTH_MEETING_LOCATION_HELPER_COPY,
   GROWTH_MEETING_LOCATION_PROVIDER_LABELS,
   GROWTH_MEETING_LOCATION_PROVIDERS,
-  GROWTH_MEETING_LOCATION_QA_MARKER,
   type GrowthMeetingLocationProvider,
   type GrowthMeetingLocationProviderReadiness,
   buildMeetingLocationProviderReadiness,
@@ -95,7 +94,6 @@ export function GrowthMeetingLocationSettingsPanel() {
     <GrowthSettingsCard
       title="Meeting Location Providers"
       icon={<MapPin className="size-4" />}
-      headerAside={<GrowthSettingsBadge label={GROWTH_MEETING_LOCATION_QA_MARKER} tone="neutral" />}
     >
       <div className={GROWTH_SETTINGS_INNER_GAP}>
         <p className="text-xs text-muted-foreground">{GROWTH_MEETING_LOCATION_HELPER_COPY}</p>

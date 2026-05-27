@@ -11,8 +11,6 @@ import {
 } from "@/components/growth/growth-settings-ui"
 import type { GrowthCalendarConflictMeeting, GrowthCalendarSyncStatusPanel } from "@/lib/growth/calendar/calendar-sync-types"
 import type { GrowthCalendarConnectionSummary } from "@/lib/growth/calendar/google-calendar-types"
-import { GROWTH_GOOGLE_CALENDAR_QA_MARKER } from "@/lib/growth/calendar/google-calendar-types"
-import { GROWTH_CALENDAR_SYNC_QA_MARKER } from "@/lib/growth/calendar/calendar-sync-types"
 
 function syncHealthTone(health: string | null): "healthy" | "attention" | "neutral" {
   if (health === "healthy") return "healthy"
@@ -285,8 +283,6 @@ export function GrowthGoogleCalendarSettingsPanel() {
             ) : null}
 
             <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2 dark:border-[#25324C]">
-              <GrowthSettingsBadge label={GROWTH_GOOGLE_CALENDAR_QA_MARKER} tone="neutral" />
-              <GrowthSettingsBadge label={GROWTH_CALENDAR_SYNC_QA_MARKER} tone="neutral" />
               <GrowthSettingsBadge label="Human-triggered sync" tone="neutral" />
               {summary?.connected ? (
                 <>

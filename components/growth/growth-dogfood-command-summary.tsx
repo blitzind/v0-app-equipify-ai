@@ -71,7 +71,6 @@ export function GrowthDogfoodCommandSummary() {
       </div>
       {summary ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          <GrowthBadge label={summary.qaMarker} tone="healthy" />
           {summary.readyForBlitzUsage ? (
             <GrowthBadge label="Ready for Blitz usage" tone="healthy" />
           ) : (

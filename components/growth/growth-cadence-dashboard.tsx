@@ -145,7 +145,6 @@ export function GrowthCadenceDashboard() {
       {dashboard ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <GrowthBadge label={dashboard.qaMarker} tone="healthy" />
             <GrowthBadge label="Human-owned tasks only" tone="neutral" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

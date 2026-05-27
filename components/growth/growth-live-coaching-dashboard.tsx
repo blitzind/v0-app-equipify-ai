@@ -108,13 +108,7 @@ export function GrowthLiveCoachingDashboard() {
   const talk = dashboard.talkRatioDistribution
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        {qaProof ? (
-          <GrowthBadge label={qaProof.marker} tone={qaProof.verified ? "healthy" : "attention"} />
-        ) : null}
-        <p className="text-xs text-muted-foreground">{qaProof?.label}</p>
-      </div>
+    <div className="space-y-6" data-qa-marker={qaProof?.marker}>
 
       <GrowthLiveCoachingTrends />
 

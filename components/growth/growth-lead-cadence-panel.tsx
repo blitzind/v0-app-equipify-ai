@@ -9,7 +9,6 @@ import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-
 import { cadenceCallQueueHref } from "@/lib/growth/cadence/cadence-channel-engine"
 import {
   GROWTH_CADENCE_CHANNEL_LABELS,
-  GROWTH_MULTI_CHANNEL_CADENCE_QA_MARKER,
   type GrowthCadenceTask,
   type GrowthCadenceTaskOutcome,
 } from "@/lib/growth/cadence/cadence-types"
@@ -121,7 +120,6 @@ export function GrowthLeadCadencePanel({ lead, onTimelineRefresh }: GrowthLeadCa
     >
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <GrowthBadge label={GROWTH_MULTI_CHANNEL_CADENCE_QA_MARKER} tone="neutral" />
           <GrowthBadge label="Human-owned only" tone="neutral" />
         </div>
 

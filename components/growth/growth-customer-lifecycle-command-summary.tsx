@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { HeartPulse, Loader2 } from "lucide-react"
-import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import type { GrowthCustomerLifecycleCommandSummary } from "@/lib/growth/customer-lifecycle/customer-lifecycle-types"
 
 export function GrowthCustomerLifecycleCommandSummary() {
@@ -69,11 +69,6 @@ export function GrowthCustomerLifecycleCommandSummary() {
         <StatTile label="Review opportunities" value={summary?.reviewOpportunitiesCount ?? 0} />
         <StatTile label="Referral opportunities" value={summary?.referralOpportunitiesCount ?? 0} />
       </div>
-      {summary ? (
-        <div className="mt-3">
-          <GrowthBadge label={summary.qaMarker} tone="healthy" />
-        </div>
-      ) : null}
     </GrowthEngineCard>
   )
 }

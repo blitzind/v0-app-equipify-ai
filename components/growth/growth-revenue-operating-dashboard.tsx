@@ -10,7 +10,6 @@ import type {
   GrowthRevenueForecastSettings,
   GrowthRevenueOperatingDashboard,
 } from "@/lib/growth/revenue-operating/revenue-operating-types"
-import { GROWTH_REVENUE_OPERATING_QA_MARKER } from "@/lib/growth/revenue-operating/revenue-operating-types"
 
 const PERIOD_LABELS: Record<GrowthRevenueForecastPeriod, string> = {
   this_month: "This month",
@@ -125,7 +124,6 @@ export function GrowthRevenueOperatingDashboardView() {
             <p className="text-sm text-muted-foreground">
               Deterministic forecast rollups from opportunity pipeline — no AI forecast decisions.
             </p>
-            <GrowthBadge label={GROWTH_REVENUE_OPERATING_QA_MARKER} tone="neutral" />
           </div>
           <Button size="sm" variant="outline" onClick={() => void load(period, true)} disabled={refreshing}>
             {refreshing ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}

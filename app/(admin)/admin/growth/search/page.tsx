@@ -10,15 +10,6 @@ import {
   usePlatformAdminHeaderIdentity,
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
-import {
-  GROWTH_CONTACT_DISCOVERY_QA_MARKER,
-  GROWTH_VERIFICATION_ENRICHMENT_QA_MARKER,
-  GROWTH_EXTERNAL_COMPANY_DISCOVERY_QA_MARKER,
-  GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER,
-  GROWTH_COMPANY_SIGNAL_INTELLIGENCE_QA_MARKER,
-  GROWTH_PROSPECT_SEARCH_QA_MARKER,
-  GROWTH_PROSPECT_SEARCH_UX_QA_MARKER,
-} from "@/lib/growth/prospect-search/prospect-search-admin-types"
 
 export default function AdminGrowthProspectSearchPage() {
   const { sessionIdentity } = useAdmin()
@@ -41,14 +32,7 @@ export default function AdminGrowthProspectSearchPage() {
             <div>
               <h1 className={PAGE_STANDARD_PAGE_TITLE}>Prospect Search</h1>
               <p className="text-sm text-muted-foreground">
-                Apollo-style discovery over your Growth Engine index — ICP filters, saved searches, lists, and operator actions. Infrastructure only; no scraping or outbound.
-              </p>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">
-                {GROWTH_PROSPECT_SEARCH_QA_MARKER} · {GROWTH_PROSPECT_SEARCH_UX_QA_MARKER} ·{" "}
-                {GROWTH_COMPANY_SIGNAL_INTELLIGENCE_QA_MARKER} · {GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER} ·{" "}
-                {GROWTH_EXTERNAL_COMPANY_DISCOVERY_QA_MARKER} ·{" "}
-                {GROWTH_CONTACT_DISCOVERY_QA_MARKER} ·{" "}
-                {GROWTH_VERIFICATION_ENRICHMENT_QA_MARKER}
+                Discover and qualify accounts with ICP filters, saved searches, and lists.
               </p>
             </div>
           </div>

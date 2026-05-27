@@ -10,7 +10,6 @@ import {
   GROWTH_CUSTOMER_LIFECYCLE_INBOX_VIEWS,
   GROWTH_CUSTOMER_LIFECYCLE_STAGE_LABELS,
   GROWTH_CUSTOMER_LIFECYCLE_STAGES,
-  GROWTH_POST_CLOSE_REVENUE_QA_MARKER,
   type GrowthCustomerLifecycleDashboard,
   type GrowthCustomerLifecycleInboxView,
   type GrowthCustomerLifecycleStage,
@@ -157,7 +156,6 @@ export function GrowthCustomerLifecycleDashboard() {
       {dashboard ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <GrowthBadge label={dashboard.qaMarker} tone="healthy" />
             <GrowthBadge label="Human-owned lifecycle" tone="neutral" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -261,7 +259,6 @@ export function GrowthCustomerLifecycleDashboard() {
 
       {dashboard ? (
         <GrowthEngineCard title="Lifecycle distribution">
-          <p className="mb-2 text-xs text-muted-foreground">QA marker: {GROWTH_POST_CLOSE_REVENUE_QA_MARKER}</p>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {dashboard.lifecycleStageDistribution.map((entry) => (
               <div key={entry.stage} className="rounded border border-border px-3 py-2 text-sm">

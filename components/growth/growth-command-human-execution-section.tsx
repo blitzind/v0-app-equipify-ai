@@ -4,7 +4,6 @@ import Link from "next/link"
 import { ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { GrowthHumanExecutionDashboard } from "@/lib/growth/human-execution/human-execution-types"
-import { GROWTH_HUMAN_APPROVED_EXECUTION_QA_MARKER } from "@/lib/growth/human-execution/human-execution-types"
 import { humanExecutionReadinessBandTone } from "@/lib/growth/human-execution/human-execution-readiness-score"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import { GrowthNativeDialerLaunchButton } from "@/components/growth/growth-native-dialer-launch-button"
@@ -23,7 +22,6 @@ export function GrowthCommandHumanExecutionSection({
       icon={<ShieldCheck className="size-4" />}
     >
       <div className="mb-4 flex flex-wrap gap-2">
-        <GrowthBadge label={GROWTH_HUMAN_APPROVED_EXECUTION_QA_MARKER} tone="healthy" />
         <GrowthBadge label="No autonomous sends · calls · CRM" tone="neutral" />
       </div>
 

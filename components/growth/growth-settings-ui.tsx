@@ -161,7 +161,7 @@ export function GrowthEmailProviderComparisonList({
               <div className="flex items-center gap-1.5">
                 <p className="text-sm font-medium text-foreground">{provider.displayName}</p>
                 {provider.fixtureOnly ? (
-                  <GrowthSettingsBadge label="Fixture" tone="attention" />
+                  <GrowthSettingsBadge label="Sample data" tone="attention" />
                 ) : null}
                 <Tooltip>
                   <TooltipTrigger asChild>

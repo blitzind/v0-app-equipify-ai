@@ -411,7 +411,7 @@ export function GrowthCommunicationSettingsPanel() {
       >
         <div className={GROWTH_SETTINGS_INNER_GAP}>
           <p className="text-xs text-muted-foreground">
-            Capability metadata only — fixture/stub mode until live adapters ship.
+            Capability metadata only — sample mode until live adapters are connected.
           </p>
           <GrowthEmailProviderComparisonList
             providers={providers}

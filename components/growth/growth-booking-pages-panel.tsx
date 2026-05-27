@@ -17,12 +17,10 @@ import {
 } from "@/components/growth/growth-settings-ui"
 import type { GrowthBookingPageListItem } from "@/lib/growth/booking/booking-page-types"
 import {
-  GROWTH_BOOKING_PAGES_QA_MARKER,
   GROWTH_BOOKING_PUBLIC_THEME_MODE_LABELS,
   GROWTH_BOOKING_PUBLIC_THEME_MODES,
   GROWTH_BOOKING_TIMEZONE_MODES,
 } from "@/lib/growth/booking/booking-page-types"
-import { GROWTH_BOOKING_PAGE_UI_QA_MARKER } from "@/lib/growth/booking/booking-page-ui-types"
 import { growthBookingPageToEditorState } from "@/lib/growth/booking/booking-page-editor-state"
 import {
   GROWTH_BOOKING_MEETING_PROVIDER_OVERRIDE_LABELS,
@@ -257,12 +255,6 @@ export function GrowthBookingPagesPanel() {
     <GrowthSettingsCard
       title="Booking Pages"
       icon={<Link2 className="size-4" />}
-      headerAside={
-        <div className="flex items-center gap-1.5">
-          <GrowthSettingsBadge label={GROWTH_BOOKING_PAGE_UI_QA_MARKER} tone="neutral" />
-          <GrowthSettingsBadge label={GROWTH_BOOKING_PAGES_QA_MARKER} tone="neutral" />
-        </div>
-      }
     >
       <div className={GROWTH_SETTINGS_INNER_GAP}>
         <p className="text-xs text-muted-foreground">

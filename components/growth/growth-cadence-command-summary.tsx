@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { GitBranch, Loader2 } from "lucide-react"
-import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import type { GrowthCadenceCommandSummary } from "@/lib/growth/cadence/cadence-types"
 
 export function GrowthCadenceCommandSummary() {
@@ -69,11 +69,6 @@ export function GrowthCadenceCommandSummary() {
         <StatTile label="LinkedIn tasks due" value={summary?.linkedinTasksDueCount ?? 0} />
         <StatTile label="Meeting follow-ups" value={summary?.meetingFollowupsDueCount ?? 0} />
       </div>
-      {summary ? (
-        <div className="mt-3">
-          <GrowthBadge label={summary.qaMarker} tone="healthy" />
-        </div>
-      ) : null}
     </GrowthEngineCard>
   )
 }

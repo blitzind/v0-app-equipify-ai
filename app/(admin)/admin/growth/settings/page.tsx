@@ -11,7 +11,6 @@ import { GrowthGoogleCalendarSettingsPanel } from "@/components/growth/growth-go
 import { GrowthBookingPagesPanel } from "@/components/growth/growth-booking-pages-panel"
 import { GrowthMeetingLocationSettingsPanel } from "@/components/growth/growth-meeting-location-settings-panel"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
-import { GROWTH_SETTINGS_UI_QA_MARKER, GrowthSettingsBadge } from "@/components/growth/growth-settings-ui"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -33,20 +32,16 @@ export default function AdminGrowthSettingsPage() {
         <PlatformAdminTabNav activeKey="growth_leads" />
 
         <section className="rounded-xl border border-border bg-card p-4 shadow-sm ring-1 ring-border/40 dark:ring-[#25324C]/80">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <span className="flex size-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300">
-                <Settings2 size={16} />
-              </span>
-              <div>
-                <h1 className={PAGE_STANDARD_PAGE_TITLE}>Communication Settings</h1>
-                <p className="text-xs text-muted-foreground">
-                  Provider selection, call dial preferences, and connection cost metadata — config only, no send or
-                  telephony APIs.
-                </p>
-              </div>
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300">
+              <Settings2 size={16} />
+            </span>
+            <div>
+              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Communication Settings</h1>
+              <p className="text-xs text-muted-foreground">
+                Provider selection, call dial preferences, and connection cost metadata.
+              </p>
             </div>
-            <GrowthSettingsBadge label={GROWTH_SETTINGS_UI_QA_MARKER} tone="neutral" />
           </div>
         </section>
 

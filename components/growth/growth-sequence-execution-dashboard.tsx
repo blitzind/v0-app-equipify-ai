@@ -13,7 +13,6 @@ import type {
   GrowthSequenceSchedulerRunResult,
   GrowthSequenceSchedulerStatus,
 } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
-import { GROWTH_SEQUENCE_SCHEDULER_QA_MARKER } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
 import { GrowthCadenceDashboard } from "@/components/growth/growth-cadence-dashboard"
 import { cn } from "@/lib/utils"
 
@@ -175,7 +174,6 @@ export function GrowthSequenceExecutionDashboard({
     <div className="space-y-6">
       <GrowthEngineCard title="Sequence Scheduler" icon={<GitBranch className="size-4" />}>
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <GrowthBadge label={GROWTH_SEQUENCE_SCHEDULER_QA_MARKER} tone="neutral" />
           {schedulerStatus?.providerConfigured ? (
             <GrowthBadge label="Provider configured" tone="healthy" />
           ) : (

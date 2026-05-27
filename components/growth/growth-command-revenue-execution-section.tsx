@@ -4,7 +4,6 @@ import Link from "next/link"
 import { Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { GrowthExecutionDashboard } from "@/lib/growth/execution/execution-priority-types"
-import { GROWTH_REVENUE_EXECUTION_QA_MARKER } from "@/lib/growth/execution/execution-priority-types"
 import { executionPriorityBandTone } from "@/lib/growth/execution/execution-priority-score"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 
@@ -40,11 +39,6 @@ export function GrowthCommandRevenueExecutionSection({
       subtitle="Deterministic priority queue — operator controlled, no autonomous sends"
       icon={<Target className="size-4" />}
     >
-      <div className="mb-4 flex flex-wrap gap-2">
-        <GrowthBadge label={GROWTH_REVENUE_EXECUTION_QA_MARKER} tone="healthy" />
-        <GrowthBadge label="Navigation only · no auto-send" tone="neutral" />
-      </div>
-
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <StatTile label="Critical execution items" value={String(summary.criticalExecutionItems)} />
         <StatTile label="Revenue protected" value={`$${summary.revenueProtected.toLocaleString()}`} />

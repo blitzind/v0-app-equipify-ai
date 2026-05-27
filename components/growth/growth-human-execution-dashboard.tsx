@@ -6,7 +6,6 @@ import { Loader2, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import type { GrowthHumanExecutionDashboard, HumanExecutionApprovalItem } from "@/lib/growth/human-execution/human-execution-types"
-import { GROWTH_HUMAN_APPROVED_EXECUTION_QA_MARKER } from "@/lib/growth/human-execution/human-execution-types"
 import { humanExecutionReadinessBandTone } from "@/lib/growth/human-execution/human-execution-readiness-score"
 
 export function GrowthHumanExecutionDashboardPanel() {
@@ -99,7 +98,6 @@ export function GrowthHumanExecutionDashboardPanel() {
         icon={<ShieldCheck className="size-4" />}
       >
         <div className="mb-4 flex flex-wrap gap-2">
-          <GrowthBadge label={GROWTH_HUMAN_APPROVED_EXECUTION_QA_MARKER} tone="healthy" />
           <GrowthBadge label="No autonomous CRM · sends · calls" tone="neutral" />
         </div>
 

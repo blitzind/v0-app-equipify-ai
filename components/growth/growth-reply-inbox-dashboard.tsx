@@ -109,7 +109,6 @@ export function GrowthReplyInboxDashboard() {
       {dashboard ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <GrowthBadge label={dashboard.qaMarker} tone="healthy" />
             <GrowthBadge label={`View: ${VIEW_LABELS[view]}`} tone="neutral" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

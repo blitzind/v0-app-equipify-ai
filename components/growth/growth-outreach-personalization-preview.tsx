@@ -34,7 +34,7 @@ export function GrowthOutreachPersonalizationPreview({ audit, generatedSubject, 
         {audit.refinedByAi ? (
           <GrowthBadge label="AI refined" tone="healthy" />
         ) : (
-          <GrowthBadge label="Deterministic draft" tone="neutral" />
+          <GrowthBadge label="Draft preview" tone="neutral" />
         )}
       </div>
 

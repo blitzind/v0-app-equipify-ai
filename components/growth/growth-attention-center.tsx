@@ -10,7 +10,6 @@ import type {
   GrowthAttentionQueueView,
   GrowthNotification,
 } from "@/lib/growth/notifications/notification-types"
-import { GROWTH_NOTIFICATIONS_QA_MARKER } from "@/lib/growth/notifications/notification-types"
 import type { GrowthCadenceCommandSummary } from "@/lib/growth/cadence/cadence-types"
 
 const VIEW_LABELS: Record<GrowthAttentionQueueView, string> = {
@@ -100,7 +99,6 @@ export function GrowthAttentionCenter() {
           <p className="text-sm text-muted-foreground">
             Deterministic operator notifications — who owns what and what needs action next.
           </p>
-          <GrowthBadge label={GROWTH_NOTIFICATIONS_QA_MARKER} tone="neutral" />
         </div>
         <Button size="sm" variant="outline" onClick={() => void load(view, true)} disabled={loading}>
           {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}

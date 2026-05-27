@@ -78,18 +78,24 @@ async function main(): Promise<void> {
   )
   assert.match(pageSource, /GrowthProspectSearchAdmin/)
   assert.match(pageSource, /Prospect Search/)
-  assert.match(pageSource, /GROWTH_PROSPECT_SEARCH_UX_QA_MARKER/)
-  assert.match(pageSource, /GROWTH_EXTERNAL_COMPANY_DISCOVERY_QA_MARKER/)
-  assert.match(pageSource, /GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER/)
-  assert.match(pageSource, /GROWTH_COMPANY_SIGNAL_INTELLIGENCE_QA_MARKER/)
-  assert.match(pageSource, /GROWTH_CONTACT_DISCOVERY_QA_MARKER/)
-  assert.match(pageSource, /GROWTH_VERIFICATION_ENRICHMENT_QA_MARKER/)
+  assert.doesNotMatch(pageSource, /GROWTH_PROSPECT_SEARCH_UX_QA_MARKER/)
+  assert.doesNotMatch(pageSource, /growth-prospect-search-ux-v1/)
 
   const shellSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/prospect-search-shell.tsx"),
     "utf8",
   )
   assert.match(shellSource, /ProspectSearchShell/)
+  assert.match(shellSource, /GROWTH_PROSPECT_SEARCH_QA_MARKER/)
+  assert.match(shellSource, /GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER/)
+  assert.match(shellSource, /RealWorldProviderStatus/)
+  const providerStatusSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/real-world-provider-status.tsx"),
+    "utf8",
+  )
+  assert.match(providerStatusSource, /data-qa-marker=\{GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER\}/)
+  assert.match(providerStatusSource, /GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER/)
+  assert.match(providerStatusSource, /GROWTH_PROVIDER_CACHE_QA_MARKER/)
   assert.match(shellSource, /GuidedIcpBuilder/)
   assert.match(shellSource, /SearchRecommendations/)
   assert.match(shellSource, /CompanyResultCard/)

@@ -11,7 +11,6 @@ import {
   type GrowthLeadInboxDashboardSectionPayload,
   type GrowthLeadInboxSortMode,
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
-import { GROWTH_REVENUE_INTELLIGENCE_UX_QA_MARKER } from "@/lib/growth/revenue-intelligence/revenue-intelligence-ux"
 import { cn } from "@/lib/utils"
 
 const SORT_LABELS: Record<GrowthLeadInboxSortMode, string> = {
@@ -66,7 +65,6 @@ export function GrowthLeadInboxDashboard() {
           <p className="text-sm text-muted-foreground">
             Prioritize accounts by intent, buying stage, and operator-ready signals.
           </p>
-          <p className="mt-1 font-mono text-xs text-muted-foreground">{GROWTH_REVENUE_INTELLIGENCE_UX_QA_MARKER}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm">

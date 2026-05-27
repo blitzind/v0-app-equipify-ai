@@ -38,9 +38,6 @@ export default function AdminGrowthLeadEnginePage() {
               <p className="text-sm text-muted-foreground">
                 Operator-facing intelligence review — inspect pipeline outputs, evidence, and guidance before outreach.
               </p>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">
-                {GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER}
-              </p>
             </div>
           </div>
         </section>

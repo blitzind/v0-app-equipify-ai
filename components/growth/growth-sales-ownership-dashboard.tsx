@@ -6,7 +6,6 @@ import { Loader2, Play, RefreshCw, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import {
-  GROWTH_LEAD_ASSIGNMENT_QA_MARKER,
   type GrowthAssignmentRunResult,
   type GrowthRepRosterEntry,
   type GrowthSalesOwnershipDashboard,
@@ -93,7 +92,6 @@ export function GrowthSalesOwnershipDashboard() {
             <p className="text-sm text-muted-foreground">
               Deterministic rep assignment, capacity limits, and accountability — no autonomous outreach.
             </p>
-            <GrowthBadge label={GROWTH_LEAD_ASSIGNMENT_QA_MARKER} tone="neutral" />
           </div>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={() => void load()} disabled={running}>

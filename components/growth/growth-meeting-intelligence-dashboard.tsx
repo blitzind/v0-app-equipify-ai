@@ -157,7 +157,6 @@ export function GrowthMeetingIntelligenceDashboard() {
       {dashboard ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <GrowthBadge label={dashboard.qaMarker} tone="healthy" />
             <GrowthBadge label={`View: ${VIEW_LABELS[view]}`} tone="neutral" />
           </div>
           {!dashboard.calendarSyncReady && dashboard.calendarSetupMessage ? (

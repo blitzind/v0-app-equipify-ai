@@ -15,7 +15,6 @@ import type {
   GrowthOpportunityPipelineDashboard,
   GrowthOpportunityPipelineView,
 } from "@/lib/growth/opportunity-pipeline/pipeline-types"
-import { GROWTH_OPPORTUNITY_PIPELINE_QA_MARKER } from "@/lib/growth/opportunity-pipeline/pipeline-types"
 import { cn } from "@/lib/utils"
 
 const VIEW_LABELS: Record<GrowthOpportunityPipelineView, string> = {
@@ -300,7 +299,6 @@ export function GrowthOpportunityPipelineDashboard() {
             <p className="text-sm text-muted-foreground">
               Deterministic pipeline, forecast, and deal execution — human-controlled stage movement only.
             </p>
-            <GrowthBadge label={GROWTH_OPPORTUNITY_PIPELINE_QA_MARKER} tone="neutral" />
           </div>
           <Button size="sm" variant="outline" onClick={() => void load(view, true)}>
             <RefreshCw className="mr-2 size-4" />

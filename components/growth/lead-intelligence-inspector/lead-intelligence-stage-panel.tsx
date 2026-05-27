@@ -185,7 +185,6 @@ export function LeadIntelligenceStagePanel({
             </ul>
           </div>
 
-          <p className="font-mono text-[10px] text-muted-foreground">{stage.qa_marker}</p>
         </div>
       </CollapsibleBlock>
     </div>

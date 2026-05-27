@@ -5,10 +5,7 @@ import { Activity, CircleDot } from "lucide-react"
 import { GROWTH_BUYING_STAGE_QA_MARKER } from "@/lib/growth/buying-stage/buying-stage-types"
 import { GROWTH_CONTACT_DISCOVERY_QA_MARKER } from "@/lib/growth/contact-discovery/contact-discovery-types"
 import { GROWTH_VERIFICATION_ENRICHMENT_QA_MARKER } from "@/lib/growth/enrichment/enrichment-types"
-import {
-  GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER,
-  GROWTH_INTENT_PIXEL_LIVE_QA_MARKER,
-} from "@/lib/growth/intent-pixel/intent-pixel-admin-types"
+import { GROWTH_INTENT_PIXEL_LIVE_QA_MARKER } from "@/lib/growth/intent-pixel/intent-pixel-admin-types"
 import {
   GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER,
   type LeadIntelligenceSystemStatusRow,
@@ -40,7 +37,7 @@ const BASE_SYSTEM_ROWS: LeadIntelligenceSystemStatusRow[] = [
     id: "company_discovery",
     label: "Company Discovery",
     status: "fixture",
-    detail: "Google Places + SERP providers (fixture fallback when unconfigured)",
+    detail: "Google Places + SERP providers (sample data when unconfigured)",
     href: "/admin/growth/search",
     qaMarker: GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER,
   },
@@ -74,6 +71,11 @@ const BASE_SYSTEM_ROWS: LeadIntelligenceSystemStatusRow[] = [
   },
 ]
 
+function statusLabel(status: LeadIntelligenceSystemStatusRow["status"]): string {
+  if (status === "fixture") return "sample"
+  return status
+}
+
 function statusTone(status: LeadIntelligenceSystemStatusRow["status"]): string {
   if (status === "ready") return "text-emerald-700 bg-emerald-50 border-emerald-200"
   if (status === "fixture") return "text-amber-800 bg-amber-50 border-amber-200"
@@ -87,7 +89,7 @@ function formatLastRun(run: GrowthLeadEnginePipelineRun | null): string {
 
 function formatProviderSpend(run: GrowthLeadEnginePipelineRun | null): string {
   if (!run) return "—"
-  if (run.mode === "fixture_dry_run") return "$0.00 (fixture dry-run)"
+  if (run.mode === "fixture_dry_run") return "$0.00 (sample pipeline)"
   return "—"
 }
 
@@ -108,7 +110,7 @@ export function LeadIntelligenceSystemStatusPanel({
         <h3 className="font-semibold">System status</h3>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Growth subsystems available to operators — fixture mode when live keys are not configured.
+        Growth subsystems available to operators — sample data mode when live keys are not configured.
       </p>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -123,13 +125,10 @@ export function LeadIntelligenceSystemStatusPanel({
                     statusTone(row.status),
                   )}
                 >
-                  {row.status}
+                  {statusLabel(row.status)}
                 </span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">{row.detail}</p>
-              {row.qaMarker ? (
-                <p className="mt-1 font-mono text-[10px] text-muted-foreground/80">{row.qaMarker}</p>
-              ) : null}
             </>
           )
 
@@ -156,9 +155,6 @@ export function LeadIntelligenceSystemStatusPanel({
             Provider spend
           </div>
           <p className="mt-1 text-sm">{formatProviderSpend(run)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Intent Pixel admin: {GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER}
-          </p>
         </div>
         <div className="rounded-lg border border-border bg-background p-3">
           <div className="flex items-center gap-2 text-sm font-medium">
@@ -166,9 +162,6 @@ export function LeadIntelligenceSystemStatusPanel({
             Last run
           </div>
           <p className="mt-1 text-sm">{formatLastRun(run)}</p>
-          {run ? (
-            <p className="mt-1 font-mono text-[10px] text-muted-foreground">run_id: {run.run_id}</p>
-          ) : null}
         </div>
       </div>
     </section>

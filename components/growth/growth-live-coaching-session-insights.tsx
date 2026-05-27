@@ -93,7 +93,7 @@ export function GrowthLiveCoachingSessionInsights({
     return (
       <GrowthEngineCard title="Session Insights">
         <p className="text-sm text-muted-foreground">
-          Start or select a live coaching session to view deterministic insights rollup.
+          Start or select a live coaching session to view coaching insights.
         </p>
       </GrowthEngineCard>
     )
@@ -102,18 +102,13 @@ export function GrowthLiveCoachingSessionInsights({
   const rollup = payload?.rollup
 
   return (
-    <GrowthEngineCard title="Session Insights">
+    <div data-qa-marker={payload?.qaProof?.marker}>
+      <GrowthEngineCard title="Session Insights">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          Deterministic rollup from timeline metrics only. No transcript or audio data.
+          Coaching insights from session metrics — no transcript or audio storage.
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          {payload?.qaProof ? (
-            <GrowthBadge
-              label={payload.qaProof.marker}
-              tone={payload.qaProof.verified ? "healthy" : "attention"}
-            />
-          ) : null}
           <Button
             type="button"
             size="sm"
@@ -196,6 +191,7 @@ export function GrowthLiveCoachingSessionInsights({
         </div>
       ) : null}
     </GrowthEngineCard>
+    </div>
   )
 }
 
