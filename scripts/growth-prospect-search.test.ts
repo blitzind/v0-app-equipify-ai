@@ -2447,6 +2447,8 @@ async function main(): Promise<void> {
 
   await testProspectOutboundLaunchMotion()
 
+  await testProspectTerritoryOpportunityHeatmap()
+
   console.log("growth-prospect-search: all checks passed")
 }
 
@@ -2888,6 +2890,171 @@ async function testProspectOutboundLaunchMotion(): Promise<void> {
   )
   assert.match(approvalPage, /filterLeadId/)
   assert.match(approvalPage, /OutboundLaunchContextBanner/)
+}
+
+async function testProspectTerritoryOpportunityHeatmap(): Promise<void> {
+  const {
+    aggregateTerritoryOpportunityHeatmap,
+    applyTerritoryHeatmapDrilldown,
+    averageBuyingStageMaturity,
+    computeTerritoryOpportunityHeatScore,
+    GROWTH_TERRITORY_OPPORTUNITY_HEATMAP_QA_MARKER,
+    isTerritoryHighIntentProspect,
+    isTerritoryQualifiedProspect,
+    resolveTerritoryDecisionMakerCoveragePct,
+    resolveTerritoryOpportunityBucketDimension,
+  } = await import("../lib/growth/prospect-search/territory-opportunity-heatmap")
+
+  assert.equal(GROWTH_TERRITORY_OPPORTUNITY_HEATMAP_QA_MARKER, "growth-territory-opportunity-heatmap-v1")
+
+  const nashville = {
+    id: "n1",
+    city: "nashville",
+    state: "TN",
+    lead_engine_score: 72,
+    buying_stage: "purchase_ready",
+    buying_stage_confidence: 0.8,
+    decision_maker_count: 2,
+    company_match_confidence: 70,
+    is_suppressed: false,
+    existing_customer: false,
+    existing_prospect: false,
+  }
+  const knoxville = {
+    id: "k1",
+    city: "knoxville",
+    state: "TN",
+    lead_engine_score: 58,
+    buying_stage: "vendor_evaluation",
+    decision_maker_count: 1,
+    is_suppressed: false,
+  }
+  const chattanooga = {
+    id: "c1",
+    city: "chattanooga",
+    state: "TN",
+    lead_engine_score: 44,
+    buying_stage: "solution_research",
+    is_suppressed: false,
+  }
+  const suppressed = {
+    id: "s1",
+    city: "greeneville",
+    state: "TN",
+    lead_engine_score: 80,
+    buying_stage: "purchase_ready",
+    decision_maker_count: 3,
+    is_suppressed: true,
+  }
+
+  assert.equal(isTerritoryQualifiedProspect(nashville), true)
+  assert.equal(isTerritoryQualifiedProspect({ ...chattanooga, lead_engine_score: 20 }), false)
+  assert.equal(isTerritoryHighIntentProspect(nashville), true)
+  assert.equal(resolveTerritoryDecisionMakerCoveragePct(nashville), 40)
+  assert.ok(averageBuyingStageMaturity([nashville, knoxville]) >= 50)
+
+  const suppressedScore = computeTerritoryOpportunityHeatScore({
+    companies: [nashville, suppressed],
+    existingAccountMode: "exclude",
+  })
+  assert.match(suppressedScore.explanation.join(" "), /Suppression penalty/)
+  assert.ok(
+    suppressedScore.score <
+      computeTerritoryOpportunityHeatScore({ companies: [nashville], existingAccountMode: "exclude" }).score,
+  )
+
+  const maturityScore = computeTerritoryOpportunityHeatScore({
+    companies: [nashville, chattanooga],
+    existingAccountMode: "exclude",
+  })
+  assert.match(maturityScore.explanation.join(" "), /Buying stage maturity/)
+
+  const dmScore = computeTerritoryOpportunityHeatScore({
+    companies: [nashville, { ...chattanooga, decision_maker_count: 0 }],
+    existingAccountMode: "exclude",
+  })
+  assert.match(dmScore.explanation.join(" "), /Decision maker coverage/)
+
+  assert.equal(
+    resolveTerritoryOpportunityBucketDimension({ territory_filter: { states: ["TN"] } }),
+    "city",
+  )
+  assert.equal(
+    resolveTerritoryOpportunityBucketDimension({ territory_filter: { metros: ["Nashville metro"] } }),
+    "metro",
+  )
+
+  const heatmap = aggregateTerritoryOpportunityHeatmap({
+    companies: [nashville, knoxville, chattanooga, suppressed],
+    filters: { territory_filter: { states: ["TN"] } },
+    bucket_dimension: "city",
+  })
+
+  assert.equal(heatmap.no_provider_calls, true)
+  assert.equal(heatmap.source, "materialized_index")
+  assert.equal(heatmap.territories[0]?.label, "Nashville, TN")
+  assert.ok(heatmap.territories[0]!.suppression_adjusted_opportunity_count >= 1)
+  assert.ok(heatmap.summary.qualified_prospects >= 3)
+
+  const drilldown = applyTerritoryHeatmapDrilldown(
+    { territory_filter: { states: ["TN"] } },
+    heatmap.territories[0]!,
+  )
+  assert.deepEqual(drilldown.territory_filter?.cities, ["nashville"])
+  assert.deepEqual(drilldown.territory_filter?.states, ["TN"])
+
+  const metadata = (
+    await import("../lib/growth/prospect-search/saved-search-workflows")
+  ).buildSavedSearchWorkflowMetadata({
+    resultCount: 120,
+    previousResultCount: 108,
+    territoryOpportunityCount: 84,
+    previousTerritoryOpportunityCount: 72,
+    bestTerritoryBucket: "Nashville, TN",
+    territoryOpportunityScore: 68,
+    previousTerritoryOpportunityScore: 61,
+  })
+  const workflow = (
+    await import("../lib/growth/prospect-search/saved-search-workflows")
+  ).parseSavedSearchWorkflowMetadata(metadata)
+  assert.equal(workflow.territoryOpportunityCount, 84)
+  assert.equal(workflow.territoryOpportunityDelta, 12)
+  assert.equal(workflow.bestTerritoryBucket, "Nashville, TN")
+
+  const heatmapRouteSource = fs.readFileSync(
+    path.join(process.cwd(), "app/api/platform/growth/prospect-search/territory-heatmap/route.ts"),
+    "utf8",
+  )
+  assert.match(heatmapRouteSource, /loadTerritoryOpportunityHeatmap/)
+  assert.doesNotMatch(heatmapRouteSource, /google|mapbox|geocode|provider/i)
+
+  const repositorySource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/territory-opportunity-heatmap-repository.ts"),
+    "utf8",
+  )
+  assert.match(repositorySource, /loadProspectSearchMaterializedCompanies/)
+  assert.doesNotMatch(repositorySource, /discover_external|google_places|serp/i)
+
+  const panelSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/territory-opportunity-heatmap-panel.tsx"),
+    "utf8",
+  )
+  assert.match(panelSource, /GROWTH_TERRITORY_OPPORTUNITY_HEATMAP_QA_MARKER/)
+  assert.match(panelSource, /data-mobile-source-wiring/)
+
+  const shellSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-shell.tsx"),
+    "utf8",
+  )
+  assert.match(shellSource, /TerritoryOpportunityHeatmapPanel/)
+  assert.match(shellSource, /useProspectSearchTerritoryHeatmap/)
+  assert.match(shellSource, /applyTerritoryHeatmapDrilldown/)
+
+  const savedSearchSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/saved-searches.ts"),
+    "utf8",
+  )
+  assert.match(savedSearchSource, /loadTerritoryOpportunitySnapshotForSavedSearch/)
 }
 
 void main()

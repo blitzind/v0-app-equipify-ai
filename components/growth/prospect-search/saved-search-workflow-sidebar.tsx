@@ -88,6 +88,29 @@ export function SavedSearchWorkflowSidebar({
                       ) : null}
                       <span>· {formatSavedSearchRefreshedAt(saved.workflow.lastRefreshedAt)}</span>
                       {saved.workflow.ownerLabel ? <span>· {saved.workflow.ownerLabel}</span> : null}
+                      {saved.workflow.territoryOpportunityCount != null ? (
+                        <span>
+                          · {saved.workflow.territoryOpportunityCount.toLocaleString()} territory opps
+                        </span>
+                      ) : null}
+                      {saved.workflow.bestTerritoryBucket ? (
+                        <span>· top {saved.workflow.bestTerritoryBucket}</span>
+                      ) : null}
+                      {saved.workflow.territoryOpportunityScore != null ? (
+                        <span>· heat {saved.workflow.territoryOpportunityScore}</span>
+                      ) : null}
+                      {formatSavedSearchCountDelta(saved.workflow.territoryOpportunityDelta) ? (
+                        <span
+                          className={cn(
+                            "font-medium tabular-nums",
+                            saved.workflow.territoryOpportunityDelta! > 0
+                              ? "text-emerald-700"
+                              : "text-rose-700",
+                          )}
+                        >
+                          opp {formatSavedSearchCountDelta(saved.workflow.territoryOpportunityDelta)}
+                        </span>
+                      ) : null}
                     </div>
                   </button>
                   <div className="flex shrink-0 items-center gap-0.5">

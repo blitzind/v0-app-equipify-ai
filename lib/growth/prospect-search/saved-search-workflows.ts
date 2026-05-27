@@ -17,6 +17,11 @@ export type GrowthSavedSearchWorkflowMetadata = {
   save_pagination?: boolean
   owner_label?: string | null
   discovery_mode?: GrowthProspectSearchDiscoveryMode
+  territory_opportunity_count?: number | null
+  previous_territory_opportunity_count?: number | null
+  best_territory_bucket?: string | null
+  territory_opportunity_score?: number | null
+  previous_territory_opportunity_score?: number | null
 }
 
 export type GrowthSavedSearchWorkflowView = {
@@ -29,6 +34,13 @@ export type GrowthSavedSearchWorkflowView = {
   savePagination: boolean
   ownerLabel: string | null
   discoveryMode: GrowthProspectSearchDiscoveryMode
+  territoryOpportunityCount: number | null
+  previousTerritoryOpportunityCount: number | null
+  territoryOpportunityDelta: number | null
+  bestTerritoryBucket: string | null
+  territoryOpportunityScore: number | null
+  previousTerritoryOpportunityScore: number | null
+  territoryOpportunityScoreDelta: number | null
 }
 
 export type GrowthProspectSearchSavedSearchWithWorkflow = GrowthProspectSearchSavedSearchRow & {
@@ -47,6 +59,32 @@ export function parseSavedSearchWorkflowMetadata(
       : null
   const countDelta =
     resultCount != null && previousResultCount != null ? resultCount - previousResultCount : null
+  const territoryOpportunityCount =
+    typeof raw.territory_opportunity_count === "number" && Number.isFinite(raw.territory_opportunity_count)
+      ? raw.territory_opportunity_count
+      : null
+  const previousTerritoryOpportunityCount =
+    typeof raw.previous_territory_opportunity_count === "number" &&
+    Number.isFinite(raw.previous_territory_opportunity_count)
+      ? raw.previous_territory_opportunity_count
+      : null
+  const territoryOpportunityDelta =
+    territoryOpportunityCount != null && previousTerritoryOpportunityCount != null
+      ? territoryOpportunityCount - previousTerritoryOpportunityCount
+      : null
+  const territoryOpportunityScore =
+    typeof raw.territory_opportunity_score === "number" && Number.isFinite(raw.territory_opportunity_score)
+      ? raw.territory_opportunity_score
+      : null
+  const previousTerritoryOpportunityScore =
+    typeof raw.previous_territory_opportunity_score === "number" &&
+    Number.isFinite(raw.previous_territory_opportunity_score)
+      ? raw.previous_territory_opportunity_score
+      : null
+  const territoryOpportunityScoreDelta =
+    territoryOpportunityScore != null && previousTerritoryOpportunityScore != null
+      ? territoryOpportunityScore - previousTerritoryOpportunityScore
+      : null
 
   return {
     resultCount,
@@ -58,6 +96,13 @@ export function parseSavedSearchWorkflowMetadata(
     savePagination: raw.save_pagination === true,
     ownerLabel: typeof raw.owner_label === "string" ? raw.owner_label : null,
     discoveryMode: raw.discovery_mode === "discover_external" ? "discover_external" : "internal",
+    territoryOpportunityCount,
+    previousTerritoryOpportunityCount,
+    territoryOpportunityDelta,
+    bestTerritoryBucket: typeof raw.best_territory_bucket === "string" ? raw.best_territory_bucket : null,
+    territoryOpportunityScore,
+    previousTerritoryOpportunityScore,
+    territoryOpportunityScoreDelta,
   }
 }
 
@@ -70,6 +115,11 @@ export function buildSavedSearchWorkflowMetadata(input: {
   savePagination?: boolean
   ownerLabel?: string | null
   discoveryMode?: GrowthProspectSearchDiscoveryMode
+  territoryOpportunityCount?: number | null
+  previousTerritoryOpportunityCount?: number | null
+  bestTerritoryBucket?: string | null
+  territoryOpportunityScore?: number | null
+  previousTerritoryOpportunityScore?: number | null
 }): GrowthSavedSearchWorkflowMetadata {
   return {
     qa_marker: GROWTH_SAVED_SEARCH_WORKFLOWS_QA_MARKER,
@@ -81,6 +131,11 @@ export function buildSavedSearchWorkflowMetadata(input: {
     save_pagination: input.savePagination === true,
     owner_label: input.ownerLabel ?? null,
     discovery_mode: input.discoveryMode ?? "internal",
+    territory_opportunity_count: input.territoryOpportunityCount ?? null,
+    previous_territory_opportunity_count: input.previousTerritoryOpportunityCount ?? null,
+    best_territory_bucket: input.bestTerritoryBucket ?? null,
+    territory_opportunity_score: input.territoryOpportunityScore ?? null,
+    previous_territory_opportunity_score: input.previousTerritoryOpportunityScore ?? null,
   }
 }
 

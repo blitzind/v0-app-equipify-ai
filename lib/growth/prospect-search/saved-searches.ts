@@ -10,6 +10,7 @@ import {
   buildSavedSearchWorkflowMetadata,
   parseSavedSearchWorkflowMetadata,
 } from "@/lib/growth/prospect-search/saved-search-workflows"
+import { loadTerritoryOpportunitySnapshotForSavedSearch } from "@/lib/growth/prospect-search/territory-opportunity-heatmap-repository"
 import type {
   GrowthProspectSearchDiscoveryMode,
   GrowthProspectSearchFilters,
@@ -150,6 +151,11 @@ export async function refreshProspectSearchSavedSearchCount(
     filters: row.filters,
   })
 
+  const territorySnapshot = await loadTerritoryOpportunitySnapshotForSavedSearch(admin, {
+    query: row.query_text,
+    filters: row.filters,
+  })
+
   const now = new Date().toISOString()
   const metadata = buildSavedSearchWorkflowMetadata({
     resultCount: count,
@@ -160,6 +166,11 @@ export async function refreshProspectSearchSavedSearchCount(
     savePagination: workflow.savePagination,
     ownerLabel: workflow.ownerLabel,
     discoveryMode: workflow.discoveryMode,
+    territoryOpportunityCount: territorySnapshot.territory_opportunity_count,
+    previousTerritoryOpportunityCount: workflow.territoryOpportunityCount,
+    bestTerritoryBucket: territorySnapshot.best_territory_bucket,
+    territoryOpportunityScore: territorySnapshot.territory_opportunity_score,
+    previousTerritoryOpportunityScore: workflow.territoryOpportunityScore,
   })
 
   return updateProspectSearchSavedSearch(admin, savedSearchId, { metadata })

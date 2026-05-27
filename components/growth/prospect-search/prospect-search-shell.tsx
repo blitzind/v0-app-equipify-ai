@@ -27,6 +27,7 @@ import {
   ProspectSearchRelaxFilters,
 } from "@/components/growth/prospect-search/prospect-search-active-filter-pills"
 import { TerritoryIntelligencePanel } from "@/components/growth/prospect-search/territory-intelligence-panel"
+import { TerritoryOpportunityHeatmapPanel } from "@/components/growth/prospect-search/territory-opportunity-heatmap-panel"
 import { PersonResultCard } from "@/components/growth/prospect-search/person-result-card"
 import { SearchEmptyState } from "@/components/growth/prospect-search/search-empty-state"
 import { SearchRecommendations } from "@/components/growth/prospect-search/search-recommendations"
@@ -78,6 +79,12 @@ import {
 import { ProspectSearchLiveEstimation } from "@/components/growth/prospect-search/prospect-search-live-estimation"
 import { ProspectSearchFilterHealthWarnings } from "@/components/growth/prospect-search/prospect-search-filter-health-warnings"
 import { useProspectSearchLiveEstimation } from "@/lib/growth/prospect-search/use-prospect-search-live-estimation"
+import { useProspectSearchTerritoryHeatmap } from "@/lib/growth/prospect-search/use-prospect-search-territory-heatmap"
+import {
+  applyTerritoryHeatmapDrilldown,
+  isTerritoryQualifiedProspect,
+  type GrowthTerritoryOpportunityRecommendedAction,
+} from "@/lib/growth/prospect-search/territory-opportunity-heatmap"
 import { cn } from "@/lib/utils"
 
 const EMPTY_FILTERS: GrowthProspectSearchFilters = {}
@@ -179,6 +186,15 @@ export function ProspectSearchShell() {
       query,
       filters,
       discoveryMode,
+      enabled: true,
+    })
+
+  const { heatmap, loading: heatmapLoading, panelVisible: territoryHeatmapVisible } =
+    useProspectSearchTerritoryHeatmap({
+      query,
+      filters,
+      discoveryMode,
+      savedSearchRestored: Boolean(activeSavedSearchId),
       enabled: true,
     })
 
@@ -680,6 +696,92 @@ export function ProspectSearchShell() {
     }
   }, [selectedCompanies, query, filters, discoveryMode])
 
+  const handleTerritoryHeatmapDrilldown = useCallback(
+    (territoryId: string) => {
+      const row = heatmap?.territories.find((entry) => entry.id === territoryId)
+      if (!row) return
+      const nextFilters = applyTerritoryHeatmapDrilldown(filtersRef.current, row)
+      replaceFilters(nextFilters)
+      setSelectedCompany(null)
+      setSelectedKeys(new Set())
+      void runSearch({
+        filters: nextFilters,
+        trigger: "explicit_operator_search",
+        resetSelection: true,
+      })
+    },
+    [heatmap?.territories, replaceFilters, runSearch],
+  )
+
+  const handleTerritoryHeatmapRecommendedAction = useCallback(
+    async (action: GrowthTerritoryOpportunityRecommendedAction) => {
+      if (action === "save_workflow") {
+        setSaveDialogOpen(true)
+        return
+      }
+      if (action === "bulk_push_qualified") {
+        const qualified = companies.filter((row) =>
+          isTerritoryQualifiedProspect({
+            id: row.id,
+            lead_score: row.lead_score,
+            lead_engine_score: row.lead_engine_score,
+            is_suppressed: row.is_suppressed,
+          }),
+        )
+        if (filters.territory_id || filters.territory_filter) {
+          await runAction("push_territory_top_prospects")
+          return
+        }
+        if (qualified.length === 0) return
+        setSelectedKeys(new Set(qualified.map((row) => prospectSearchSelectionKey(row))))
+        setBulkPushing(true)
+        setActionMessage(null)
+        setError(null)
+        try {
+          const res = await fetch("/api/platform/growth/prospect-search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "bulk_push_to_lead_inbox",
+              query,
+              filters,
+              discovery_mode: discoveryMode,
+              selected: qualified.map((row) => ({
+                source_type: row.source_type,
+                id: row.id,
+                company_name: row.company_name,
+              })),
+            }),
+          })
+          const json = (await res.json()) as {
+            ok?: boolean
+            message?: string
+            workspace_url?: string | null
+            failed?: number
+          }
+          setActionMessage({
+            message: json.message ?? (json.ok ? "Bulk push completed." : "Bulk push failed."),
+            tone: json.ok ? ((json.failed ?? 0) > 0 ? "warning" : "success") : "error",
+            workspaceUrl: json.workspace_url,
+          })
+          if (json.ok) setSelectedKeys(new Set())
+        } catch (e) {
+          setError(e instanceof Error ? e.message : String(e))
+        } finally {
+          setBulkPushing(false)
+        }
+        return
+      }
+      if (action === "launch_outbound_review") {
+        document.getElementById("growth-outbound-launch-review")?.scrollIntoView({ behavior: "smooth" })
+        return
+      }
+      void runSearch({ trigger: "explicit_operator_search" })
+      document.getElementById("growth-prospect-search-results")?.scrollIntoView({ behavior: "smooth" })
+    },
+    [companies, discoveryMode, filters, query, runAction, runSearch],
+  )
+
   return (
     <div
       className="flex flex-col gap-6"
@@ -827,11 +929,22 @@ export function ProspectSearchShell() {
           data-qa-marker={GROWTH_RESULTS_HEADER_LAYOUT_V1_QA_MARKER}
         >
           {!hasSearched ? (
-            <ProspectSearchCleanStartPanel
-              savedSearches={savedSearches}
-              onRunQuery={(q) => void runSearch({ queryText: q, trigger: "suggested_query_click" })}
-              onRestoreSavedSearch={(id) => void loadSavedById(id)}
-            />
+            <>
+              {territoryHeatmapVisible ? (
+                <TerritoryOpportunityHeatmapPanel
+                  heatmap={heatmap}
+                  loading={heatmapLoading}
+                  compact
+                  onDrilldown={handleTerritoryHeatmapDrilldown}
+                  onRecommendedAction={(action) => void handleTerritoryHeatmapRecommendedAction(action)}
+                />
+              ) : null}
+              <ProspectSearchCleanStartPanel
+                savedSearches={savedSearches}
+                onRunQuery={(q) => void runSearch({ queryText: q, trigger: "suggested_query_click" })}
+                onRestoreSavedSearch={(id) => void loadSavedById(id)}
+              />
+            </>
           ) : (
             <>
               <TerritoryIntelligencePanel
@@ -853,8 +966,18 @@ export function ProspectSearchShell() {
                 }}
               />
 
+              {territoryHeatmapVisible ? (
+                <TerritoryOpportunityHeatmapPanel
+                  heatmap={heatmap}
+                  loading={heatmapLoading}
+                  onDrilldown={handleTerritoryHeatmapDrilldown}
+                  onRecommendedAction={(action) => void handleTerritoryHeatmapRecommendedAction(action)}
+                />
+              ) : null}
+
               {companies.length > 0 ? (
-                <SavedSearchBatchLaunchPanel
+                <div id="growth-outbound-launch-review">
+                  <SavedSearchBatchLaunchPanel
                   savedSearchId={activeSavedSearchId}
                   companies={companies}
                   onOpenCompany={(companyId) => {
@@ -862,9 +985,10 @@ export function ProspectSearchShell() {
                     if (match) setSelectedCompany(match)
                   }}
                 />
+                </div>
               ) : null}
 
-              <div className="w-full min-w-0 space-y-3">
+              <div id="growth-prospect-search-results" className="w-full min-w-0 space-y-3">
                 <ProspectSearchActiveFilterPills filters={filters} onChange={replaceFilters} />
 
                 {loading ? (
