@@ -18,6 +18,7 @@ import type { GrowthReplyBuyingSignalEvidence } from "@/lib/growth/reply-intelli
 import type { ReplyIntentClassificationV2Result } from "@/lib/growth/reply-intelligence/reply-intent-classifier-v2"
 import type { GrowthReplyObjectionEvidence } from "@/lib/growth/reply-intelligence/reply-intent-types"
 import { appendGrowthLeadTimelineEvent } from "@/lib/growth/timeline-repository"
+import { processMultichannelRevenueIntelligence } from "@/lib/growth/revenue-intelligence/process-multichannel-revenue-intelligence"
 
 async function persistOpportunitySignals(
   admin: SupabaseClient,
@@ -299,9 +300,30 @@ export async function processRevenueIntelligence(
     await upsertSalesExecutionInsightSnapshot(admin, { scopeType: "global", insights }).catch(() => undefined)
   }
 
-  return {
-    signalCount: signals.length,
+  const multichannel = await processMultichannelRevenueIntelligence(admin, {
+    leadId: input.leadId,
+    companyName: input.companyName,
+    baseMomentumInput: {
+      threadReplyCount: input.threadReplyCount,
+      responseLatencyMs: input.responseLatencyMs,
+      buyingSignalCount: input.buyingSignals.length,
+      objectionCount: input.objections.length,
+      resolvedObjectionCount: 0,
+      outboundMessageCount: outboundCount ?? 0,
+      stakeholderCount: committeeMap.stakeholderCount,
+      priorMomentumScore: (priorMomentum as { momentum_score?: number } | null)?.momentum_score ?? null,
+    },
+    stakeholderCount: committeeMap.stakeholderCount,
+    outboundReplyId: input.replyId,
+  }).catch(() => ({
+    timelineSynced: 0,
     momentumScore: momentum.momentumScore,
     momentumTrend: momentum.momentumTrend,
+  }))
+
+  return {
+    signalCount: signals.length,
+    momentumScore: multichannel.momentumScore,
+    momentumTrend: multichannel.momentumTrend,
   }
 }

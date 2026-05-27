@@ -4,6 +4,7 @@ import { BarChart3 } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthRevenueIntelligenceDashboardView } from "@/components/growth/growth-revenue-intelligence-dashboard"
 import { GrowthExecutiveRevenueSection } from "@/components/growth/growth-executive-revenue-section"
+import { GrowthExecutiveRevenueOpsSection } from "@/components/growth/growth-executive-revenue-ops-section"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -40,6 +41,7 @@ export default function AdminGrowthRevenueIntelligencePage() {
         </section>
 
         <GrowthSectionLayout>
+          <GrowthExecutiveRevenueOpsSection />
           <GrowthExecutiveRevenueSection />
           <GrowthRevenueIntelligenceDashboardView />
         </GrowthSectionLayout>

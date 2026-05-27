@@ -4,6 +4,7 @@ import Link from "next/link"
 import { ArrowLeft, Target } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthOpportunityWorkspaceDashboard } from "@/components/growth/growth-opportunity-workspace-dashboard"
+import { GrowthOperatorExecutionWorkspaceV2Section } from "@/components/growth/growth-operator-execution-workspace-v2"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -49,6 +50,7 @@ export default function AdminGrowthOpportunityWorkspacePage() {
         </section>
 
         <GrowthSectionLayout>
+          <GrowthOperatorExecutionWorkspaceV2Section />
           <GrowthOpportunityWorkspaceDashboard />
         </GrowthSectionLayout>
       </div>
