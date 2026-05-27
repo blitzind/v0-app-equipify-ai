@@ -356,6 +356,16 @@ export async function addInboxMessage(
         metadata: { source: "inbox_meeting_intent", thread_id: input.thread_id },
       }).catch(() => undefined)
     }
+    const { ingestOpportunityIntelligenceFromInbox } = await import(
+      "@/lib/growth/opportunity-intelligence/crm-intelligence"
+    )
+    await ingestOpportunityIntelligenceFromInbox(admin, {
+      leadId: thread.lead_id,
+      inboxThreadId: input.thread_id,
+      subject,
+      body: bodyPreview,
+      classification: classificationResult.classification,
+    }).catch(() => undefined)
   }
 
   return { thread: updatedThread, message: mapMessage(data as Row) }

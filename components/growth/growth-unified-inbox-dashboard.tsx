@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import { GrowthReplyDraftingPanel } from "@/components/growth/growth-reply-drafting-panel"
+import { GrowthInboxOpportunityIntelligencePanel } from "@/components/growth/growth-inbox-opportunity-intelligence-panel"
 import { GrowthInboxTeamQueuePanel } from "@/components/growth/growth-inbox-team-queue-panel"
 import { classificationLabel } from "@/lib/growth/inbox/reply-classifier"
 import { priorityTierLabel } from "@/lib/growth/inbox/thread-priority"
@@ -583,6 +584,12 @@ export function GrowthUnifiedInboxDashboardPanel() {
           </div>
 
           <GrowthReplyDraftingPanel threadId={selectedThread.id} disabled={Boolean(actionLoading)} />
+
+          <GrowthInboxOpportunityIntelligencePanel
+            leadId={selectedThread.lead_id}
+            threadId={selectedThread.id}
+            disabled={Boolean(actionLoading)}
+          />
         </>
       ) : null}
     </div>

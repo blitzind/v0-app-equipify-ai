@@ -503,6 +503,19 @@ export async function sendApprovedReplyDraft(
       deliveryAttemptId: transport.attempt.id,
       sequenceEnrollmentId: draft.sequenceEnrollmentId ?? null,
     }).catch(() => undefined)
+
+    const { ingestOpportunityIntelligenceFromReplyDraft } = await import(
+      "@/lib/growth/opportunity-intelligence/crm-intelligence"
+    )
+    await ingestOpportunityIntelligenceFromReplyDraft(admin, {
+      leadId: draft.leadId,
+      inboxThreadId: draft.inboxThreadId,
+      draftId: draft.id,
+      classification: (draft.classification as import("@/lib/growth/inbox/inbox-types").GrowthInboxClassification | null) ?? null,
+      subject: draft.draftSubject ?? undefined,
+      body: draft.draftBody ?? undefined,
+      draftStatus: "sent",
+    }).catch(() => undefined)
   }
 
   return { draft, deliveryAttemptId: transport.attempt.id }

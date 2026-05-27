@@ -191,6 +191,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["revenue intelligence", "sequence performance", "attribution", "analytics", "funnel"],
   },
   {
+    id: "opportunity-intelligence",
+    label: "Opportunity Intelligence",
+    href: "/admin/growth/opportunity-intelligence",
+    keywords: ["opportunity intelligence", "crm intelligence", "buying signals", "committee", "sequence pause"],
+  },
+  {
     id: "settings",
     label: "Growth Settings",
     href: "/admin/growth/settings",
@@ -387,6 +393,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         href: "/admin/growth/revenue-intelligence",
         label: "Revenue Intelligence",
         match: prefixMatch("/admin/growth/revenue-intelligence"),
+      },
+      {
+        id: "opportunity-intelligence",
+        href: "/admin/growth/opportunity-intelligence",
+        label: "Opportunity Intelligence",
+        match: prefixMatch("/admin/growth/opportunity-intelligence"),
       },
       {
         id: "revenue-operating",
