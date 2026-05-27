@@ -3,6 +3,9 @@
 import type { GrowthCompanySignalUiSummary } from "@/lib/growth/company-signals/company-signal-types"
 import type { GrowthBuyingStage } from "@/lib/growth/buying-stage/buying-stage-types"
 import type { GrowthSearchIntentCategory } from "@/lib/growth/search-intent/search-intent-types"
+import { GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER } from "@/lib/growth/real-world-discovery/providers/serp-types"
+
+export { GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER }
 
 export const GROWTH_PROSPECT_SEARCH_QA_MARKER = "growth-prospect-search-v1" as const
 
@@ -160,6 +163,15 @@ export type GrowthProspectSearchPersonResult = {
   rank_score: number
 }
 
+export type GrowthProspectSearchProviderDiagnostic = {
+  provider_type: string
+  provider_name: string
+  provider_executed: boolean
+  provider_latency_ms: number
+  provider_result_count: number
+  provider_fallback_reason?: string | null
+}
+
 export type GrowthProspectSearchResult = {
   qa_marker: typeof GROWTH_PROSPECT_SEARCH_QA_MARKER
   discovery_mode: GrowthProspectSearchDiscoveryMode
@@ -177,6 +189,9 @@ export type GrowthProspectSearchResult = {
   provider_messages?: string[]
   provider_status_label?: string | null
   provider_status_message?: string | null
+  provider_diagnostics?: GrowthProspectSearchProviderDiagnostic[]
+  provider_fallback_reason?: string | null
+  provider_audit_qa_marker?: typeof GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER | null
 }
 
 export type GrowthProspectSearchSavedSearchRow = {

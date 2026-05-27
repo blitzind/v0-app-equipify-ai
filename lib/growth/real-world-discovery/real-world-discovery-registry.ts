@@ -2,15 +2,18 @@ import "server-only"
 
 import type {
   GrowthRealWorldDiscoveryProvider,
+  GrowthRealWorldDiscoveryProviderDiagnostics,
   GrowthRealWorldDiscoveryProviderResult,
   GrowthRealWorldDiscoveryProviderType,
   GrowthRealWorldDiscoveryQuery,
 } from "@/lib/growth/real-world-discovery/real-world-discovery-provider-types"
 import { GROWTH_REAL_WORLD_LIVE_PROVIDER_TYPES } from "@/lib/growth/real-world-discovery/real-world-discovery-provider-types"
 import type {
+  GrowthRealWorldProviderExecutionDiagnostic,
   GrowthRealWorldProviderStatusLabel,
   GrowthRealWorldProviderStatusSummary,
 } from "@/lib/growth/real-world-discovery/real-world-discovery-types"
+import { GROWTH_REAL_WORLD_SOURCE_BADGE_LABELS } from "@/lib/growth/real-world-discovery/real-world-discovery-types"
 import { createRealWorldBusinessDirectoryProvider } from "@/lib/growth/real-world-discovery/providers/business-directory-provider"
 import { createRealWorldFixtureProvider } from "@/lib/growth/real-world-discovery/providers/fixture-provider"
 import { createRealWorldGooglePlacesProvider } from "@/lib/growth/real-world-discovery/providers/google-places-provider"
@@ -39,8 +42,48 @@ function anyLiveProviderConfigured(): boolean {
     .some((p) => p.isConfigured())
 }
 
+function mergeProviderDiagnostics(
+  provider: GrowthRealWorldDiscoveryProvider,
+  result: GrowthRealWorldDiscoveryProviderResult,
+  latencyMs: number,
+  executed: boolean,
+): GrowthRealWorldDiscoveryProviderDiagnostics {
+  const fallbackReason =
+    result.diagnostics?.provider_fallback_reason ??
+    (provider.provider_type === "fixture"
+      ? "no_live_provider_configured"
+      : !executed
+        ? "not_configured"
+        : result.status === "failed"
+          ? result.error ?? result.message
+          : result.status === "skipped"
+            ? result.message
+            : null)
+
+  return {
+    provider_executed: result.diagnostics?.provider_executed ?? executed,
+    provider_latency_ms: result.diagnostics?.provider_latency_ms ?? latencyMs,
+    provider_result_count: result.candidates.length,
+    provider_fallback_reason: fallbackReason,
+  }
+}
+
+function toExecutionDiagnostic(
+  result: GrowthRealWorldDiscoveryProviderResult,
+): GrowthRealWorldProviderExecutionDiagnostic {
+  return {
+    provider_type: result.provider_type,
+    provider_name: result.provider_name,
+    provider_executed: result.diagnostics?.provider_executed ?? false,
+    provider_latency_ms: result.diagnostics?.provider_latency_ms ?? 0,
+    provider_result_count: result.diagnostics?.provider_result_count ?? result.candidates.length,
+    provider_fallback_reason: result.diagnostics?.provider_fallback_reason ?? null,
+  }
+}
+
 export function summarizeRealWorldProviderStatus(
   results: GrowthRealWorldDiscoveryProviderResult[],
+  options?: { use_fixture_fallback?: boolean },
 ): GrowthRealWorldProviderStatusSummary {
   const liveConfigured = anyLiveProviderConfigured()
   const liveActive = results.some(
@@ -58,7 +101,14 @@ export function summarizeRealWorldProviderStatus(
         GROWTH_REAL_WORLD_LIVE_PROVIDER_TYPES.includes(r.provider_type as never) &&
         r.status === "success",
     )
-    .map((r) => r.provider_name)
+    .map((r) => GROWTH_REAL_WORLD_SOURCE_BADGE_LABELS[r.provider_type] ?? r.provider_name)
+
+  const provider_diagnostics = results.map(toExecutionDiagnostic)
+  const provider_fallback_reason = fixtureActive
+    ? "no_live_provider_configured"
+    : options?.use_fixture_fallback
+      ? "no_live_provider_configured"
+      : null
 
   let label: GrowthRealWorldProviderStatusLabel = "no_provider_configured"
   let message = "No live provider configured — enable API keys or use fixture fallback."
@@ -79,6 +129,8 @@ export function summarizeRealWorldProviderStatus(
     message,
     live_providers,
     fixture_active: fixtureActive,
+    provider_diagnostics,
+    provider_fallback_reason,
   }
 }
 
@@ -104,23 +156,53 @@ export async function runRealWorldDiscoveryProviders(
         status: "skipped",
         message: `${provider.provider_name} not configured.`,
         candidates: [],
+        diagnostics: mergeProviderDiagnostics(
+          provider,
+          {
+            provider_name: provider.provider_name,
+            provider_type: provider.provider_type,
+            status: "skipped",
+            message: `${provider.provider_name} not configured.`,
+            candidates: [],
+          },
+          0,
+          false,
+        ),
       })
       continue
     }
 
+    const started = performance.now()
     try {
-      results.push(await provider.discover(input))
+      const result = await provider.discover(input)
+      const latencyMs = Math.round(performance.now() - started)
+      results.push({
+        ...result,
+        diagnostics: mergeProviderDiagnostics(provider, result, latencyMs, true),
+      })
     } catch (err) {
+      const latencyMs = Math.round(performance.now() - started)
+      const message = err instanceof Error ? err.message : "Provider failed."
       results.push({
         provider_name: provider.provider_name,
         provider_type: provider.provider_type,
         status: "failed",
-        message: err instanceof Error ? err.message : "Provider failed.",
+        message,
         candidates: [],
-        error: err instanceof Error ? err.message : String(err),
+        error: message,
+        diagnostics: {
+          provider_executed: true,
+          provider_latency_ms: latencyMs,
+          provider_result_count: 0,
+          provider_fallback_reason: message,
+        },
       })
     }
   }
 
   return results
+}
+
+export function anyRealWorldLiveProviderConfigured(): boolean {
+  return anyLiveProviderConfigured()
 }

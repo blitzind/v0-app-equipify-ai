@@ -29,6 +29,7 @@ import type {
   GrowthProspectSearchResult,
   GrowthProspectSearchSavedSearchRow,
 } from "@/lib/growth/prospect-search/prospect-search-types"
+import { GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
 
 const EMPTY_FILTERS: GrowthProspectSearchFilters = {}
@@ -281,6 +282,32 @@ export function ProspectSearchShell() {
                 <p className="mt-1 text-xs text-muted-foreground">
                   {result.provider_messages.join(" · ")}
                 </p>
+              ) : null}
+              {result?.discovery_mode === "discover_external" &&
+              result.provider_diagnostics &&
+              result.provider_diagnostics.length > 0 ? (
+                <div
+                  className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-700"
+                  data-qa-marker={result.provider_audit_qa_marker ?? GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER}
+                >
+                  <p className="font-medium">Provider diagnostics</p>
+                  <ul className="mt-1 space-y-1">
+                    {result.provider_diagnostics.map((row) => (
+                      <li key={`${row.provider_type}-${row.provider_name}`}>
+                        {row.provider_name}: executed={String(row.provider_executed)}, latency=
+                        {row.provider_latency_ms}ms, results={row.provider_result_count}
+                        {row.provider_fallback_reason
+                          ? `, fallback=${row.provider_fallback_reason}`
+                          : ""}
+                      </li>
+                    ))}
+                  </ul>
+                  {result.provider_fallback_reason ? (
+                    <p className="mt-1 opacity-90">
+                      Run fallback reason: {result.provider_fallback_reason}
+                    </p>
+                  ) : null}
+                </div>
               ) : null}
             </div>
             <div className="flex items-center gap-2">

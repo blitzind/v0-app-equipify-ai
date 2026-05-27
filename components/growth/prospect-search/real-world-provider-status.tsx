@@ -1,6 +1,7 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
+import { GROWTH_GOOGLE_PLACES_PROVIDER_QA_MARKER } from "@/lib/growth/real-world-discovery/providers/google-places-types"
 import { cn } from "@/lib/utils"
 
 const STATUS_STYLES: Record<string, string> = {
@@ -47,8 +48,13 @@ export function RealWorldSourceBadge({
   providerType?: string | null
 }) {
   if (!badge && !providerType) return null
+  const isGooglePlaces = providerType === "google_places" || badge === "Google Places"
   return (
-    <Badge variant="outline" className="text-[10px]">
+    <Badge
+      variant="outline"
+      className="text-[10px]"
+      data-qa-marker={isGooglePlaces ? GROWTH_GOOGLE_PLACES_PROVIDER_QA_MARKER : undefined}
+    >
       {badge ?? providerType}
     </Badge>
   )

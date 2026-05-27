@@ -20,6 +20,7 @@ import { runProspectSearchRealWorldDiscovery } from "@/lib/growth/prospect-searc
 import {
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_SOURCE_TYPES,
+  GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER,
   type GrowthProspectSearchDiscoveryMode,
   type GrowthProspectSearchFilters,
   type GrowthProspectSearchResult,
@@ -77,6 +78,9 @@ export async function runProspectSearch(
       provider_messages: realWorld.provider_messages,
       provider_status_label: realWorld.provider_status?.label ?? null,
       provider_status_message: realWorld.provider_status?.message ?? null,
+      provider_diagnostics: realWorld.provider_status?.provider_diagnostics ?? [],
+      provider_fallback_reason: realWorld.provider_status?.provider_fallback_reason ?? null,
+      provider_audit_qa_marker: GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER,
     }
   }
 

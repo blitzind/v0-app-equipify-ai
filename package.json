@@ -157,6 +157,7 @@
     "test:growth-prospect-search": "tsx scripts/growth-prospect-search.test.ts",
     "test:growth-external-company-discovery": "tsx scripts/test-growth-external-company-discovery.ts",
     "test:growth-real-world-company-discovery": "tsx scripts/test-growth-real-world-company-discovery.ts",
+    "test:growth-serp-provider-audit": "tsx scripts/test-growth-serp-provider-audit.ts",
     "test:growth-company-signals": "tsx scripts/test-growth-company-signals.ts",
     "test:schedule-work-order-flow": "tsx scripts/test-schedule-work-order-flow.ts",
     "test:growth-contact-discovery": "tsx scripts/test-growth-contact-discovery.ts",

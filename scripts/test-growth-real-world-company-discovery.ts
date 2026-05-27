@@ -22,6 +22,12 @@ import {
   GROWTH_REAL_WORLD_DISCOVERY_PRIVACY_NOTE,
 } from "../lib/growth/real-world-discovery/real-world-discovery-types"
 import { createRealWorldFixtureProvider } from "../lib/growth/real-world-discovery/providers/fixture-provider"
+import { buildGooglePlacesDiscoveryQuery } from "../lib/growth/real-world-discovery/providers/google-places-query-builder"
+import {
+  mapGooglePlaceToCandidate,
+  parseGooglePlaceId,
+} from "../lib/growth/real-world-discovery/providers/google-places-mapper"
+import { GROWTH_GOOGLE_PLACES_PROVIDER_QA_MARKER } from "../lib/growth/real-world-discovery/providers/google-places-types"
 
 async function main(): Promise<void> {
   assert.equal(GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER, "growth-real-world-company-discovery-v1")
@@ -75,6 +81,79 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(shellSource, /RealWorldProviderStatus/)
+
+  const googlePlacesSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/real-world-discovery/providers/google-places-provider.ts"),
+    "utf8",
+  )
+  assert.match(googlePlacesSource, /GOOGLE_PLACES_API_KEY/)
+  assert.match(googlePlacesSource, /searchGooglePlacesText/)
+  assert.match(googlePlacesSource, /buildGooglePlacesDiscoveryQuery/)
+  assert.doesNotMatch(googlePlacesSource, /scrape|puppeteer|cheerio/i)
+
+  assert.equal(GROWTH_GOOGLE_PLACES_PROVIDER_QA_MARKER, "growth-google-places-provider-v1")
+
+  const gp1 = buildGooglePlacesDiscoveryQuery({
+    industry: "medical equipment service",
+    location: "Boston MA",
+  })
+  assert.match(gp1, /medical equipment service/)
+  assert.match(gp1, /Boston MA/)
+
+  const gp2 = buildGooglePlacesDiscoveryQuery({
+    industry: "biomedical calibration",
+    location: "California",
+  })
+  assert.match(gp2, /biomedical calibration/)
+  assert.match(gp2, /California/)
+
+  const gp3 = buildGooglePlacesDiscoveryQuery({
+    industry: "commercial HVAC repair",
+    location: "Nashville TN",
+    employee_size_estimate: "20-100",
+    keywords: ["PM contracts"],
+  })
+  assert.match(gp3, /HVAC|hvac/i)
+  assert.match(gp3, /Nashville TN/)
+  assert.match(gp3, /20-100|PM contracts/)
+
+  const mapped = mapGooglePlaceToCandidate(
+    {
+      id: "places/ChIJTest123",
+      displayName: { text: "Precision Biomed Services" },
+      formattedAddress: "100 Main St, Boston, MA 02108, USA",
+      addressComponents: [
+        { longText: "Boston", shortText: "Boston", types: ["locality"] },
+        { longText: "Massachusetts", shortText: "MA", types: ["administrative_area_level_1"] },
+        { longText: "United States", shortText: "US", types: ["country"] },
+      ],
+      nationalPhoneNumber: "+1 617-555-0100",
+      websiteUri: "https://precisionbiomed.example",
+      rating: 4.6,
+      userRatingCount: 128,
+      types: ["point_of_interest", "establishment", "medical_equipment_supplier"],
+      googleMapsUri: "https://maps.google.com/?cid=123",
+    },
+    { query: gp1, source_rank: 1 },
+  )
+  assert.ok(mapped)
+  assert.equal(mapped!.company_name, "Precision Biomed Services")
+  assert.equal(parseGooglePlaceId("places/ChIJTest123"), "ChIJTest123")
+  assert.equal(mapped!.raw_payload_server_only?.source_provider, "google_places")
+  assert.equal(mapped!.raw_payload_server_only?.google_place_id, "ChIJTest123")
+  assert.ok(Array.isArray(mapped!.raw_payload_server_only?.categories))
+  assert.ok(mapped!.evidence.length > 0)
+  assert.ok(mapped!.source_attribution.length > 0)
+
+  assert.match(googlePlacesSource, /createRealWorldGooglePlacesProvider/)
+  assert.match(registrySource, /createRealWorldGooglePlacesProvider/)
+
+  const badgeSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/real-world-provider-status.tsx"),
+    "utf8",
+  )
+  assert.match(badgeSource, /GROWTH_GOOGLE_PLACES_PROVIDER_QA_MARKER/)
+  assert.match(badgeSource, /Google Places/)
 
   const q1 = buildRealWorldDiscoveryQuery({
     industry: "medical equipment service",

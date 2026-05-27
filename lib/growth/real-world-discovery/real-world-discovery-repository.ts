@@ -118,7 +118,10 @@ export async function runRealWorldCompanyDiscovery(
   }
 
   const providerResults = await runRealWorldDiscoveryProviders(providerQuery)
-  const provider_status = summarizeRealWorldProviderStatus(providerResults)
+  const useFixtureFallback = providerResults.some((r) => r.provider_type === "fixture")
+  const provider_status = summarizeRealWorldProviderStatus(providerResults, {
+    use_fixture_fallback: useFixtureFallback,
+  })
   const provider_messages = providerResults.map(
     (r) => `${r.provider_name}: ${r.status} — ${r.message}`,
   )
@@ -175,6 +178,8 @@ export async function runRealWorldCompanyDiscovery(
       metadata: {
         qa_marker: GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER,
         provider_status: provider_status.label,
+        provider_diagnostics: provider_status.provider_diagnostics ?? [],
+        provider_fallback_reason: provider_status.provider_fallback_reason ?? null,
       },
     })
     .select("*")
@@ -235,6 +240,18 @@ export async function runRealWorldCompanyDiscovery(
         existing_external_candidate_match: matches.existing_external_candidate_match,
         existing_real_world_candidate_match: matches.existing_real_world_candidate_match,
         search_inputs: input.search_inputs,
+        source_provider: prov?.provider_type ?? "fixture",
+        google_place_id:
+          typeof row.raw_payload_server_only?.google_place_id === "string"
+            ? row.raw_payload_server_only.google_place_id
+            : null,
+        serp_place_id:
+          typeof row.raw_payload_server_only?.serp_place_id === "string"
+            ? row.raw_payload_server_only.serp_place_id
+            : null,
+        categories: Array.isArray(row.raw_payload_server_only?.categories)
+          ? row.raw_payload_server_only.categories
+          : null,
       },
     })
   }

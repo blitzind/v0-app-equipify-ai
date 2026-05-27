@@ -60,6 +60,14 @@ export type GrowthRealWorldDiscoveryProviderResult = {
   message: string
   candidates: GrowthRealWorldDiscoveryProviderRawCandidate[]
   error?: string | null
+  diagnostics?: GrowthRealWorldDiscoveryProviderDiagnostics
+}
+
+export type GrowthRealWorldDiscoveryProviderDiagnostics = {
+  provider_executed: boolean
+  provider_latency_ms: number
+  provider_result_count: number
+  provider_fallback_reason?: string | null
 }
 
 export type GrowthRealWorldDiscoveryProvider = {

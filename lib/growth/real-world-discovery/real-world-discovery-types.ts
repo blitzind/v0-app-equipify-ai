@@ -101,6 +101,17 @@ export type GrowthRealWorldProviderStatusSummary = {
   message: string
   live_providers: string[]
   fixture_active: boolean
+  provider_diagnostics?: GrowthRealWorldProviderExecutionDiagnostic[]
+  provider_fallback_reason?: string | null
+}
+
+export type GrowthRealWorldProviderExecutionDiagnostic = {
+  provider_type: string
+  provider_name: string
+  provider_executed: boolean
+  provider_latency_ms: number
+  provider_result_count: number
+  provider_fallback_reason?: string | null
 }
 
 export const GROWTH_REAL_WORLD_DISCOVERY_PRIVACY_NOTE =
