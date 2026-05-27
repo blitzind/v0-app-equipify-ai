@@ -153,6 +153,9 @@ export type GrowthProspectSearchCompanyResult = {
   match_reasoning: string[]
   /** Evidence-backed company signal summary when intelligence run. */
   company_signal_summary?: GrowthCompanySignalUiSummary | null
+  /** Average detector confidence when internal signals are hydrated. */
+  signal_confidence?: number | null
+  signal_count?: number
 }
 
 export type GrowthProspectSearchPersonResult = {

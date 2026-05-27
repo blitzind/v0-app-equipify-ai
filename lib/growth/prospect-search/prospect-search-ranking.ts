@@ -51,6 +51,12 @@ export function rankProspectSearchCompanies(
       rank += 0.06
     }
 
+    const summary = row.company_signal_summary
+    if (summary?.technology_signals.length) rank += 0.02
+    if (summary?.growth_indicators.length) rank += 0.02
+    if (row.crm_detected?.trim()) rank += 0.02
+    if (summary?.operational_maturity === "Mature operations") rank += 0.02
+
     const reasoning: string[] = []
     if (rank > 0.5) reasoning.push("Strong text match to search query.")
     if (row.intent_score != null && row.intent_score >= 12) {
@@ -58,6 +64,18 @@ export function rankProspectSearchCompanies(
     }
     if (row.buying_stage) reasoning.push(`Buying stage candidate: ${row.buying_stage}.`)
     if (row.signals.length) reasoning.push(row.signals[0]!)
+    if (summary?.technology_signals[0]) {
+      reasoning.push(`Technology signal: ${summary.technology_signals[0]}.`)
+    }
+    if (summary?.growth_indicators[0]) {
+      reasoning.push(`Growth signal: ${summary.growth_indicators[0]}.`)
+    }
+
+    const baseConfidence = 0.35 + rank
+    const signalConfidence = row.signal_confidence ?? null
+    const confidence = Number(
+      Math.min(0.95, signalConfidence != null ? Math.max(baseConfidence, signalConfidence) : baseConfidence).toFixed(3),
+    )
 
     return {
       id: row.id,
@@ -72,7 +90,7 @@ export function rankProspectSearchCompanies(
       intent_score: row.intent_score,
       buying_stage: row.buying_stage,
       lead_score: row.lead_score,
-      confidence: Number(Math.min(0.95, 0.35 + rank).toFixed(3)),
+      confidence,
       company_match_confidence: row.company_match_confidence,
       decision_maker_coverage:
         row.decision_maker_count != null && row.decision_maker_count > 0
@@ -87,6 +105,9 @@ export function rankProspectSearchCompanies(
       customer_id: row.customer_id,
       rank_score: Number(rank.toFixed(4)),
       match_reasoning: reasoning,
+      company_signal_summary: row.company_signal_summary ?? null,
+      signal_confidence: row.signal_confidence ?? null,
+      signal_count: row.signal_count ?? 0,
     }
   })
 

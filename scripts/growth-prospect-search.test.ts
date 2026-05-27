@@ -22,6 +22,11 @@ import {
 } from "../lib/growth/prospect-search/prospect-search-provider"
 import { rankProspectSearchCompanies } from "../lib/growth/prospect-search/prospect-search-ranking"
 import {
+  GROWTH_PROSPECT_SEARCH_INTERNAL_SIGNAL_HYDRATION_QA_MARKER,
+  hydrateInternalCompanySignals,
+  hasDisplayableCompanySignalSummary,
+} from "../lib/growth/prospect-search/internal-company-signal-hydration"
+import {
   GROWTH_PROSPECT_SEARCH_DISCOVERY_MODES,
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS,
@@ -63,6 +68,8 @@ async function main(): Promise<void> {
   assert.match(indexSource, /growth\.lead_inbox/)
   assert.match(indexSource, /search_intent_signals/)
   assert.doesNotMatch(indexSource, /scrape|outbound|apollo\.io/)
+  assert.match(indexSource, /hydrateInternalCompanySignals/)
+  assert.match(indexSource, /applyInternalSignalHydration/)
 
   const actionsSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-actions.ts"),
@@ -113,6 +120,72 @@ async function main(): Promise<void> {
   assert.match(companyCardSource, /BuyingCommitteePanel/)
   assert.match(companyCardSource, /CompanyIntelligenceCard/)
   assert.match(companyCardSource, /company_signal_summary/)
+  assert.match(companyCardSource, /CompanySignalSummaryPanel/)
+
+  const hydrationSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/internal-company-signal-hydration.ts"),
+    "utf8",
+  )
+  assert.match(hydrationSource, /normalizeDetectedCompanySignals/)
+  assert.match(hydrationSource, /buildCompanySignalUiSummary/)
+  assert.equal(
+    GROWTH_PROSPECT_SEARCH_INTERNAL_SIGNAL_HYDRATION_QA_MARKER,
+    "growth-prospect-search-internal-signals-v1",
+  )
+
+  const leadHydration = hydrateInternalCompanySignals({
+    id: "lead-1",
+    source_type: "growth_lead",
+    company_name: "Acme Field Service",
+    website: "https://acme-hvac.com",
+    industry: "HVAC",
+    subindustry: null,
+    employees: "45",
+    revenue_range: "$5m",
+    location: "Nashville, TN",
+    city: "Nashville",
+    state: "TN",
+    service_area: "Middle Tennessee",
+    notes: "Uses FieldPulse and QuickBooks. Hiring field technicians.",
+    crm_detected: "HubSpot",
+    website_platform: null,
+    field_service_software: "FieldPulse",
+    keywords: [],
+    signals: [],
+  })
+  assert.ok(leadHydration)
+  assert.ok(leadHydration!.company_signal_summary.technology_signals.length > 0)
+  assert.ok(leadHydration!.signal_confidence > 0)
+  assert.ok(hasDisplayableCompanySignalSummary(leadHydration!.company_signal_summary, leadHydration!.signal_count))
+
+  const sparseHydration = hydrateInternalCompanySignals({
+    id: "cust-1",
+    source_type: "crm_customer",
+    company_name: "Plain Co",
+    website: null,
+    industry: null,
+    subindustry: null,
+    employees: null,
+    revenue_range: null,
+    location: null,
+    city: null,
+    state: null,
+    service_area: null,
+    notes: null,
+    crm_detected: null,
+    website_platform: null,
+    field_service_software: null,
+    keywords: [],
+    signals: [],
+  })
+  assert.equal(sparseHydration, null)
+
+  const badgeSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/result-signal-badges.tsx"),
+    "utf8",
+  )
+  assert.match(badgeSource, /companyIntelligenceBadges/)
+  assert.match(badgeSource, /inferProspectSearchResultBadges/)
 
   const suggestionSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/search-suggestion-engine.ts"),
@@ -202,6 +275,26 @@ async function main(): Promise<void> {
 
   const ranked = rankProspectSearchCompanies(filtered, "hvac Tennessee", parsed, 10)
   assert.ok(ranked[0]!.rank_score > 0)
+
+  const rankedWithSignals = rankProspectSearchCompanies(
+    [
+      {
+        ...filtered[0]!,
+        notes: "FieldPulse dispatch scheduling",
+        crm_detected: "HubSpot",
+        field_service_software: "FieldPulse",
+        company_signal_summary: leadHydration!.company_signal_summary,
+        signal_confidence: leadHydration!.signal_confidence,
+        signal_count: leadHydration!.signal_count,
+      },
+    ],
+    "hvac Tennessee",
+    parsed,
+    10,
+  )
+  assert.ok(rankedWithSignals[0]!.rank_score >= ranked[0]!.rank_score)
+  assert.ok(rankedWithSignals[0]!.company_signal_summary)
+  assert.ok((rankedWithSignals[0]!.signal_confidence ?? 0) > 0)
 
   const internal = createInternalProspectSearchProvider()
   assert.equal(internal.slot, "internal_observable_index")

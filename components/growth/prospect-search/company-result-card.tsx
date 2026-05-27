@@ -7,6 +7,7 @@ import {
   recommendedMotion,
   ResultSignalBadges,
 } from "@/components/growth/prospect-search/result-signal-badges"
+import { CompanySignalSummaryPanel } from "@/components/growth/prospect-search/company-signal-summary-panel"
 import { CompanyIntelligenceCard } from "@/components/growth/company-signals/company-intelligence-card"
 import { BuyingCommitteePanel } from "@/components/growth/prospect-search/buying-committee-panel"
 import { RealWorldSourceBadge } from "@/components/growth/prospect-search/real-world-provider-status"
@@ -83,26 +84,20 @@ export function CompanyResultCard({
         </div>
         <div className="text-right">
           <p className="text-[10px] uppercase text-muted-foreground">Confidence</p>
-          <p className="text-lg font-bold text-violet-700">{Math.round(row.confidence * 100)}%</p>
+          <p className="text-lg font-bold text-violet-700">
+            {Math.round((row.signal_confidence ?? row.confidence) * 100)}%
+          </p>
         </div>
       </div>
 
       <ResultSignalBadges row={row} />
 
       {row.company_signal_summary ? (
-        <div className="space-y-2 rounded-lg border border-violet-100 bg-violet-50/40 p-3">
-          {row.company_signal_summary.technology_signals.length > 0 ? (
-            <p className="text-xs">
-              <span className="font-semibold text-violet-900">Technology: </span>
-              {row.company_signal_summary.technology_signals.join(" · ")}
-            </p>
-          ) : null}
-          <p className="text-xs text-muted-foreground">
-            Ops {row.company_signal_summary.operational_maturity} · Digital{" "}
-            {row.company_signal_summary.digital_maturity} · Field service{" "}
-            {row.company_signal_summary.field_service_maturity}
-          </p>
-        </div>
+        <CompanySignalSummaryPanel
+          summary={row.company_signal_summary}
+          signalConfidence={row.signal_confidence ?? row.confidence}
+          signalCount={row.signal_count ?? 0}
+        />
       ) : null}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

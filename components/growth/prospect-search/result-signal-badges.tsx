@@ -12,9 +12,14 @@ const SIGNAL_STYLES: Record<string, string> = {
   "Search Intent": "bg-cyan-50 text-cyan-900 border-cyan-200",
   "Purchase Ready": "bg-emerald-50 text-emerald-900 border-emerald-200",
   "External discovery": "bg-orange-50 text-orange-900 border-orange-200",
+  "Hiring activity": "bg-lime-50 text-lime-900 border-lime-200",
+  "Growth indicators": "bg-green-50 text-green-900 border-green-200",
+  "Field service software detected": "bg-fuchsia-50 text-fuchsia-900 border-fuchsia-200",
+  "CRM indicators": "bg-slate-50 text-slate-900 border-slate-200",
+  "Multi-location indicators": "bg-teal-50 text-teal-900 border-teal-200",
 }
 
-function inferBadges(row: GrowthProspectSearchCompanyResult): string[] {
+function intentBadges(row: GrowthProspectSearchCompanyResult): string[] {
   const badges: string[] = []
   const signals = row.signals.join(" ").toLowerCase()
   const stage = (row.buying_stage ?? "").toLowerCase()
@@ -32,7 +37,29 @@ function inferBadges(row: GrowthProspectSearchCompanyResult): string[] {
   }
   if (row.source_type === "external_discovered") badges.unshift("External discovery")
 
-  return [...new Set(badges)].slice(0, 4)
+  return badges
+}
+
+function companyIntelligenceBadges(row: GrowthProspectSearchCompanyResult): string[] {
+  const summary = row.company_signal_summary
+  if (!summary) return []
+
+  const badges: string[] = []
+  for (const indicator of summary.growth_indicators.slice(0, 2)) {
+    badges.push(indicator)
+  }
+  for (const tech of summary.technology_signals.slice(0, 2)) {
+    badges.push(tech)
+  }
+  for (const fit of summary.fit_indicators.slice(0, 1)) {
+    if (!badges.includes(fit)) badges.push(fit)
+  }
+
+  return badges
+}
+
+export function inferProspectSearchResultBadges(row: GrowthProspectSearchCompanyResult): string[] {
+  return [...new Set([...intentBadges(row), ...companyIntelligenceBadges(row)])].slice(0, 5)
 }
 
 export function ResultSignalBadges({
@@ -42,7 +69,7 @@ export function ResultSignalBadges({
   row: GrowthProspectSearchCompanyResult
   className?: string
 }) {
-  const badges = inferBadges(row)
+  const badges = inferProspectSearchResultBadges(row)
   if (badges.length === 0) return null
 
   return (

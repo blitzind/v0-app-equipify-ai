@@ -4,6 +4,8 @@ import { createHash } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
 import { probeGrowthLeadArchiveSchema } from "@/lib/growth/lead-archive-schema-health"
+import { hydrateInternalCompanySignals } from "@/lib/growth/prospect-search/internal-company-signal-hydration"
+import type { GrowthCompanySignalUiSummary } from "@/lib/growth/company-signals/company-signal-types"
 import type { GrowthProspectSearchSourceType } from "@/lib/growth/prospect-search/prospect-search-types"
 
 function asString(value: unknown): string {
@@ -59,6 +61,10 @@ export type GrowthProspectSearchIndexCompany = {
   growth_lead_id: string | null
   prospect_id: string | null
   customer_id: string | null
+  /** Evidence-backed signal summary from internal hydration (in-memory). */
+  company_signal_summary?: GrowthCompanySignalUiSummary | null
+  signal_confidence?: number | null
+  signal_count?: number
 }
 
 export type GrowthProspectSearchIndexPerson = {
@@ -178,6 +184,20 @@ async function loadBuyingStageOverlays(admin: SupabaseClient): Promise<Map<strin
 
 function mergeKey(source: GrowthProspectSearchSourceType, id: string): string {
   return `${source}:${id}`
+}
+
+function applyInternalSignalHydration(
+  row: GrowthProspectSearchIndexCompany,
+): GrowthProspectSearchIndexCompany {
+  const hydration = hydrateInternalCompanySignals(row)
+  if (!hydration) return row
+  return {
+    ...row,
+    company_signal_summary: hydration.company_signal_summary,
+    signal_confidence: hydration.signal_confidence,
+    signal_count: hydration.signal_count,
+    signals: hydration.merged_signals,
+  }
 }
 
 export async function buildProspectSearchIndex(
@@ -487,7 +507,10 @@ export async function buildProspectSearchIndex(
     /* optional */
   }
 
-  return { companies: [...companyMap.values()], people }
+  return {
+    companies: [...companyMap.values()].map(applyInternalSignalHydration),
+    people,
+  }
 }
 
 export function prospectSearchDedupeHash(parts: string[]): string {
