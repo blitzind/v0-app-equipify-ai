@@ -4,7 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Bookmark, Loader2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { CompanyResultCard } from "@/components/growth/prospect-search/company-result-card"
+import {
+  ProspectSearchBulkActionBar,
+  ProspectSearchBulkPushSummary,
+} from "@/components/growth/prospect-search/prospect-search-bulk-action-bar"
 import { DiscoveryModeToggle } from "@/components/growth/prospect-search/discovery-mode-toggle"
 import {
   GooglePlacesQueryDiagnostics,
@@ -35,9 +40,16 @@ import type {
   GrowthProspectSearchSavedSearchRow,
 } from "@/lib/growth/prospect-search/prospect-search-types"
 import { GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-types"
+import { prospectSearchSelectionKey } from "@/lib/growth/prospect-search/prospect-search-selection"
 import { cn } from "@/lib/utils"
 
 const EMPTY_FILTERS: GrowthProspectSearchFilters = {}
+
+type ActionFeedback = {
+  message: string
+  tone: "success" | "warning" | "error"
+  workspaceUrl?: string | null
+}
 
 export function ProspectSearchShell() {
   const searchParams = useSearchParams()
@@ -51,9 +63,11 @@ export function ProspectSearchShell() {
   )
   const [loading, setLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
-  const [actionMessage, setActionMessage] = useState<string | null>(null)
+  const [actionMessage, setActionMessage] = useState<ActionFeedback | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<"card" | "table">("card")
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
+  const [bulkPushing, setBulkPushing] = useState(false)
   const [heroFocused, setHeroFocused] = useState(false)
   const [placeholderIndex, setPlaceholderIndex] = useState(0)
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
@@ -87,6 +101,7 @@ export function ProspectSearchShell() {
       setHasSearched(true)
       setError(null)
       setActionMessage(null)
+      setSelectedKeys(new Set())
       try {
         const params = new URLSearchParams({ meta: "1", q })
         if (discoveryMode === "discover_external") {
@@ -140,23 +155,60 @@ export function ProspectSearchShell() {
             action,
             query,
             filters,
+            discovery_mode: discoveryMode,
             company,
             ...extra,
           }),
         })
-        const json = (await res.json()) as { ok?: boolean; message?: string; workspace_url?: string }
-        setActionMessage(json.message ?? (json.ok ? "Done." : "Action failed."))
+        const json = (await res.json()) as {
+          ok?: boolean
+          message?: string
+          workspace_url?: string
+          push_outcome?: "pushed" | "already_exists" | "skipped_invalid" | "failed"
+          failed?: number
+        }
+
+        const tone: ActionFeedback["tone"] =
+          action === "bulk_push_to_lead_inbox"
+            ? json.ok
+              ? (json.failed ?? 0) > 0
+                ? "warning"
+                : "success"
+              : "error"
+            : json.push_outcome === "already_exists"
+              ? "warning"
+              : json.ok
+                ? "success"
+                : "error"
+
+        setActionMessage({
+          message: json.message ?? (json.ok ? "Done." : "Action failed."),
+          tone,
+          workspaceUrl: json.workspace_url,
+        })
+
         if (json.workspace_url && (action === "open_workspace" || action === "run_lead_engine")) {
           window.open(json.workspace_url, "_blank", "noopener,noreferrer")
         }
         if (action === "save_search" || action === "create_list") {
           await runSearch()
         }
+        if (action === "push_to_lead_inbox" && json.push_outcome === "pushed") {
+          setSelectedKeys((prev) => {
+            if (!company) return prev
+            const next = new Set(prev)
+            next.delete(prospectSearchSelectionKey(company))
+            return next
+          })
+        }
+        if (action === "bulk_push_to_lead_inbox" && json.ok) {
+          setSelectedKeys(new Set())
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
       }
     },
-    [query, filters, selectedCompany, runSearch],
+    [query, filters, discoveryMode, selectedCompany, runSearch],
   )
 
   const applyTemplate = useCallback((template: ProspectSearchIcpTemplate) => {
@@ -182,6 +234,69 @@ export function ProspectSearchShell() {
   const people = result?.people ?? []
   const showEmpty = hasSearched && !loading && companies.length === 0 && people.length === 0
 
+  const selectedCompanies = useMemo(
+    () => companies.filter((row) => selectedKeys.has(prospectSearchSelectionKey(row))),
+    [companies, selectedKeys],
+  )
+
+  const toggleCompanySelection = useCallback((row: GrowthProspectSearchCompanyResult, checked: boolean) => {
+    const key = prospectSearchSelectionKey(row)
+    setSelectedKeys((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(key)
+      else next.delete(key)
+      return next
+    })
+  }, [])
+
+  const selectAllVisible = useCallback(() => {
+    setSelectedKeys(new Set(companies.map((row) => prospectSearchSelectionKey(row))))
+  }, [companies])
+
+  const clearSelection = useCallback(() => {
+    setSelectedKeys(new Set())
+  }, [])
+
+  const runBulkPush = useCallback(async () => {
+    if (selectedCompanies.length === 0) return
+    setBulkPushing(true)
+    setActionMessage(null)
+    setError(null)
+    try {
+      const res = await fetch("/api/platform/growth/prospect-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "bulk_push_to_lead_inbox",
+          query,
+          filters,
+          discovery_mode: discoveryMode,
+          selected: selectedCompanies.map((row) => ({
+            source_type: row.source_type,
+            id: row.id,
+            company_name: row.company_name,
+          })),
+        }),
+      })
+      const json = (await res.json()) as {
+        ok?: boolean
+        message?: string
+        workspace_url?: string | null
+        failed?: number
+      }
+      setActionMessage({
+        message: json.message ?? (json.ok ? "Bulk push completed." : "Bulk push failed."),
+        tone: json.ok ? ((json.failed ?? 0) > 0 ? "warning" : "success") : "error",
+        workspaceUrl: json.workspace_url,
+      })
+      if (json.ok) setSelectedKeys(new Set())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBulkPushing(false)
+    }
+  }, [selectedCompanies, query, filters, discoveryMode])
+
   return (
     <div
       className="flex flex-col gap-6"
@@ -197,7 +312,13 @@ export function ProspectSearchShell() {
             : "Discover new companies from real-world public sources (Google Places, SERP, business directory). No Apollo, Seamless, Clay, or PDL. Candidates are not automatic leads."}
         </p>
         <div className="mt-4">
-          <DiscoveryModeToggle mode={discoveryMode} onChange={setDiscoveryMode} />
+          <DiscoveryModeToggle
+            mode={discoveryMode}
+            onChange={(mode) => {
+              setDiscoveryMode(mode)
+              setSelectedKeys(new Set())
+            }}
+          />
         </div>
         <div className="relative mt-5">
           <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
@@ -231,18 +352,18 @@ export function ProspectSearchShell() {
         </div>
       </section>
 
-      {(actionMessage || error) && (
-        <p
-          className={cn(
-            "rounded-lg border px-3 py-2 text-sm",
-            error
-              ? "border-red-200 bg-red-50 text-red-800"
-              : "border-emerald-200 bg-emerald-50 text-emerald-900",
-          )}
-        >
-          {error ?? actionMessage}
+      {error ? (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          {error}
         </p>
-      )}
+      ) : null}
+      {actionMessage ? (
+        <ProspectSearchBulkPushSummary
+          message={actionMessage.message}
+          workspaceUrl={actionMessage.workspaceUrl}
+          tone={actionMessage.tone}
+        />
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
         <IcpTemplateRail
@@ -349,7 +470,12 @@ export function ProspectSearchShell() {
                 </>
               ) : null}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {companies.length > 0 ? (
+                <Button size="sm" variant="ghost" onClick={selectAllVisible}>
+                  Select all visible
+                </Button>
+              ) : null}
               <SearchViewToggle view={view} onViewChange={setView} />
               <Button
                 variant="outline"
@@ -361,6 +487,14 @@ export function ProspectSearchShell() {
               </Button>
             </div>
           </div>
+
+          <ProspectSearchBulkActionBar
+            selectedCount={selectedKeys.size}
+            selectedCompanies={selectedCompanies}
+            pushing={bulkPushing}
+            onPush={() => void runBulkPush()}
+            onClear={clearSelection}
+          />
 
           {showEmpty ? (
             <SearchEmptyState
@@ -375,7 +509,9 @@ export function ProspectSearchShell() {
                   key={`${row.source_type}-${row.id}`}
                   row={row}
                   selected={selectedCompany?.id === row.id}
+                  checked={selectedKeys.has(prospectSearchSelectionKey(row))}
                   onSelect={() => setSelectedCompany(row)}
+                  onCheckedChange={(checked) => toggleCompanySelection(row, checked)}
                   onAction={(action, extra) => {
                     setSelectedCompany(row)
                     void runAction(action, { ...extra, company: row })
@@ -387,7 +523,11 @@ export function ProspectSearchShell() {
             <CompanyResultsTable
               rows={companies}
               selectedId={selectedCompany?.id ?? null}
+              selectedKeys={selectedKeys}
               onSelect={setSelectedCompany}
+              onToggleSelection={toggleCompanySelection}
+              onSelectAllVisible={selectAllVisible}
+              onClearSelection={clearSelection}
             />
           )}
 
@@ -410,17 +550,52 @@ export function ProspectSearchShell() {
 function CompanyResultsTable({
   rows,
   selectedId,
+  selectedKeys,
   onSelect,
+  onToggleSelection,
+  onSelectAllVisible,
+  onClearSelection,
 }: {
   rows: GrowthProspectSearchCompanyResult[]
   selectedId: string | null
+  selectedKeys: Set<string>
   onSelect: (row: GrowthProspectSearchCompanyResult) => void
+  onToggleSelection: (row: GrowthProspectSearchCompanyResult, checked: boolean) => void
+  onSelectAllVisible: () => void
+  onClearSelection: () => void
 }) {
+  const allVisibleSelected = rows.length > 0 && rows.every((row) => selectedKeys.has(prospectSearchSelectionKey(row)))
+
   return (
     <div className="overflow-x-auto rounded-xl border border-border bg-card">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
+        <p className="text-xs text-muted-foreground">
+          {selectedKeys.size > 0 ? `${selectedKeys.size} selected` : "Select companies for bulk push"}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={onSelectAllVisible}>
+            Select all visible
+          </Button>
+          {selectedKeys.size > 0 ? (
+            <Button size="sm" variant="ghost" onClick={onClearSelection}>
+              Clear
+            </Button>
+          ) : null}
+        </div>
+      </div>
       <table className="w-full min-w-[800px] text-left text-xs">
         <thead className="bg-muted/40 text-muted-foreground">
           <tr>
+            <th className="px-3 py-2">
+              <Checkbox
+                checked={allVisibleSelected}
+                onCheckedChange={(value) => {
+                  if (value === true) onSelectAllVisible()
+                  else onClearSelection()
+                }}
+                aria-label="Select all visible companies"
+              />
+            </th>
             <th className="px-3 py-2">Company</th>
             <th className="px-3 py-2">Lead</th>
             <th className="px-3 py-2">Intent</th>
@@ -440,6 +615,13 @@ function CompanyResultsTable({
               )}
               onClick={() => onSelect(row)}
             >
+              <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                <Checkbox
+                  checked={selectedKeys.has(prospectSearchSelectionKey(row))}
+                  onCheckedChange={(value) => onToggleSelection(row, value === true)}
+                  aria-label={`Select ${row.company_name}`}
+                />
+              </td>
               <td className="px-3 py-2 font-medium">{row.company_name}</td>
               <td className="px-3 py-2 tabular-nums">
                 {row.lead_engine_score ?? row.lead_score ?? ""}

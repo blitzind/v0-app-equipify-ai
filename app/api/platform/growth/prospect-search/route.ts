@@ -7,13 +7,54 @@ import { listProspectSearchSavedSearches } from "@/lib/growth/prospect-search/sa
 import {
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS,
+  GROWTH_PROSPECT_SEARCH_SOURCE_TYPES,
   type GrowthProspectSearchCompanyResult,
+  type GrowthProspectSearchDiscoveryMode,
   type GrowthProspectSearchFilters,
   type GrowthProspectSearchPersonResult,
   type GrowthProspectSearchResultAction,
+  type GrowthProspectSearchSourceType,
 } from "@/lib/growth/prospect-search/prospect-search-types"
 
 export const runtime = "nodejs"
+
+function parseSelectedRefs(raw: unknown): Array<{
+  source_type: GrowthProspectSearchSourceType
+  id: string
+  company_name?: string
+}> {
+  if (!Array.isArray(raw)) return []
+  const refs: Array<{
+    source_type: GrowthProspectSearchSourceType
+    id: string
+    company_name?: string
+  }> = []
+
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue
+    const row = item as Record<string, unknown>
+    const source_type =
+      typeof row.source_type === "string" ? row.source_type.trim() : ""
+    const id = typeof row.id === "string" ? row.id.trim() : ""
+    if (
+      !GROWTH_PROSPECT_SEARCH_SOURCE_TYPES.includes(source_type as GrowthProspectSearchSourceType) ||
+      !id
+    ) {
+      continue
+    }
+    refs.push({
+      source_type: source_type as GrowthProspectSearchSourceType,
+      id,
+      company_name: typeof row.company_name === "string" ? row.company_name : undefined,
+    })
+  }
+
+  return refs
+}
+
+function parseDiscoveryMode(raw: unknown): GrowthProspectSearchDiscoveryMode {
+  return raw === "discover_external" ? "discover_external" : "internal"
+}
 
 function parseFiltersParam(raw: string | null): Partial<GrowthProspectSearchFilters> {
   if (!raw) return {}
@@ -85,6 +126,8 @@ export async function POST(request: Request) {
     saved_search_name: typeof body.saved_search_name === "string" ? body.saved_search_name : undefined,
     list_name: typeof body.list_name === "string" ? body.list_name : undefined,
     list_id: typeof body.list_id === "string" ? body.list_id : undefined,
+    discovery_mode: parseDiscoveryMode(body.discovery_mode),
+    selected: parseSelectedRefs(body.selected),
     company:
       body.company && typeof body.company === "object"
         ? (body.company as GrowthProspectSearchCompanyResult)

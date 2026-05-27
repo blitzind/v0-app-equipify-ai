@@ -58,6 +58,12 @@ import {
 } from "../lib/growth/prospect-search/prospect-search-lead-engine-handoff"
 import { GROWTH_LEAD_ENGINE_RUN_METADATA_KEY } from "../lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import {
+  GROWTH_PROSPECT_SEARCH_BULK_PUSH_QA_MARKER,
+  buildProspectSearchPushMetadata,
+  formatBulkPushSummary,
+} from "../lib/growth/prospect-search/prospect-search-push-metadata"
+import { prospectSearchSelectionKey } from "../lib/growth/prospect-search/prospect-search-selection"
+import {
   parseTitleChips,
   serializeTitleChips,
   suggestTitles,
@@ -69,6 +75,7 @@ async function main(): Promise<void> {
   assert.ok(GROWTH_PROSPECT_SEARCH_DISCOVERY_MODES.includes("discover_external"))
   assert.ok(GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS.includes("export_csv"))
   assert.ok(GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS.includes("push_to_lead_inbox"))
+  assert.ok(GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS.includes("bulk_push_to_lead_inbox"))
 
   const migration = fs.readFileSync(
     path.join(
@@ -103,8 +110,9 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-actions.ts"),
     "utf8",
   )
-  assert.match(actionsSource, /createLeadCandidate/)
-  assert.match(actionsSource, /not autonomous/)
+  assert.match(actionsSource, /pushProspectSearchCompanyToLeadInbox/)
+  assert.match(actionsSource, /executeBulkPushToLeadInbox/)
+  assert.match(actionsSource, /bulk_push_to_lead_inbox/)
   assert.doesNotMatch(actionsSource, /sendEmail|executePipeline/)
 
   const pageSource = fs.readFileSync(
@@ -512,8 +520,6 @@ async function main(): Promise<void> {
   assert.match(indexSource, /applyProspectSearchQualificationToIndexRow/)
   assert.match(indexSource, /buyingStageOverlayFromAssessmentRow/)
   assert.match(actionsSource, /buildProspectSearchLeadEngineHandoffUrl/)
-  assert.match(actionsSource, /qualification_context/)
-  assert.match(actionsSource, /buying_stage_summary/)
   assert.match(companyCardSource, /CompanyQualificationMetrics/)
   assert.doesNotMatch(companyCardSource, /"—"/)
   assert.match(shellSource, /run_lead_engine/)
@@ -754,6 +760,114 @@ async function main(): Promise<void> {
   )[0]!.rank_score
   assert.ok(qualifiedRank > baseRank)
   assert.ok(qualifiedRank - baseRank <= 0.11)
+
+  assert.match(actionsSource, /pushProspectSearchCompanyToLeadInbox/)
+  assert.match(actionsSource, /executeBulkPushToLeadInbox/)
+
+  const pushSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-push-to-inbox.ts"),
+    "utf8",
+  )
+  assert.match(pushSource, /Already in Lead Inbox/)
+  assert.match(pushSource, /resolveProspectSearchCompaniesForPush/)
+  assert.match(pushSource, /createLeadCandidate/)
+  assert.match(pushSource, /not autonomous/)
+
+  const pushMetadataSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-push-metadata.ts"),
+    "utf8",
+  )
+  assert.match(pushMetadataSource, /qualification_context/)
+
+  const routeSource = fs.readFileSync(
+    path.join(process.cwd(), "app/api/platform/growth/prospect-search/route.ts"),
+    "utf8",
+  )
+  assert.match(routeSource, /parseSelectedRefs/)
+  assert.match(routeSource, /discovery_mode/)
+  assert.match(routeSource, /requireGrowthEnginePlatformAccess/)
+
+  assert.match(shellSource, /selectedKeys/)
+  assert.match(shellSource, /bulk_push_to_lead_inbox/)
+  assert.match(shellSource, /ProspectSearchBulkActionBar/)
+  assert.match(shellSource, /Select all visible/)
+  assert.match(shellSource, /setSelectedKeys\(new Set\(\)\)/)
+  assert.match(companyCardSource, /Checkbox/)
+  assert.match(companyCardSource, /onCheckedChange/)
+
+  const bulkBarSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-bulk-action-bar.tsx"),
+    "utf8",
+  )
+  assert.match(bulkBarSource, /growth-prospect-search-bulk-action-bar/)
+  assert.match(bulkBarSource, /Push selected to Lead Inbox/)
+  assert.match(bulkBarSource, /View Lead Inbox/)
+
+  assert.equal(GROWTH_PROSPECT_SEARCH_BULK_PUSH_QA_MARKER, "growth-prospect-search-bulk-push-v1")
+  assert.equal(
+    prospectSearchSelectionKey({ source_type: "growth_lead", id: "abc" }),
+    "growth_lead:abc",
+  )
+  assert.equal(
+    formatBulkPushSummary({
+      selected_total: 12,
+      pushed: 8,
+      already_exists: 3,
+      skipped_invalid: 1,
+      failed: 0,
+    }),
+    "12 selected · 8 added to Lead Inbox · 3 already existed · 1 skipped because source was incomplete",
+  )
+
+  const pushMetadata = buildProspectSearchPushMetadata(
+    {
+      id: "lead-1",
+      source_type: "growth_lead",
+      company_name: "Acme HVAC",
+      website: "acme.example",
+      industry: "HVAC",
+      subindustry: null,
+      employees: null,
+      revenue_range: null,
+      location: "TN",
+      intent_score: 12,
+      buying_stage: "consideration",
+      buying_stage_confidence: 0.7,
+      buying_stage_reason: "Pricing interest",
+      buying_stage_last_assessed_at: "2026-05-01T00:00:00.000Z",
+      lead_score: 55,
+      lead_engine_score: 72,
+      lead_engine_score_label: "Grade B",
+      lead_engine_score_explanation: "Strong fit",
+      lead_engine_last_run_at: null,
+      confidence: 0.8,
+      company_match_confidence: 0.75,
+      decision_maker_coverage: null,
+      verification_status: "unverified",
+      signals: ["CRM indicators"],
+      search_intent_category: "pricing",
+      lead_inbox_id: null,
+      growth_lead_id: "lead-1",
+      prospect_id: null,
+      customer_id: null,
+      rank_score: 0.5,
+      match_reasoning: [],
+      company_signal_summary: {
+        technology_signals: ["Field service software detected"],
+        growth_indicators: [],
+        fit_indicators: [],
+        operational_maturity: "Growing operations",
+      },
+      crm_detected: "HubSpot",
+      field_service_software: "FieldPulse",
+    },
+    "hvac tennessee",
+  )
+  const qualification = pushMetadata.qualification_context as Record<string, unknown>
+  assert.equal(qualification.lead_engine_score, 72)
+  assert.equal(qualification.buying_stage, "consideration")
+  assert.ok(pushMetadata.company_signal_summary)
+  assert.equal((pushMetadata.prospect_search as { query: string }).query, "hvac tennessee")
 
   console.log("growth-prospect-search: all checks passed")
 }

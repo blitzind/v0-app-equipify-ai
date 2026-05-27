@@ -1,19 +1,23 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { createLeadCandidate } from "@/lib/growth/lead-inbox/lead-inbox-repository"
 import {
   addProspectSearchListMembers,
   companyResultToListMember,
   createProspectSearchList,
   personResultToListMember,
 } from "@/lib/growth/prospect-search/list-management"
-import { prospectSearchDedupeHash } from "@/lib/growth/prospect-search/prospect-search-index"
 import { buildProspectSearchLeadEngineHandoffUrl } from "@/lib/growth/prospect-search/prospect-search-lead-engine-handoff"
+import {
+  executeBulkPushToLeadInbox,
+  pushProspectSearchCompanyToLeadInbox,
+  type ProspectSearchSelectionRef,
+} from "@/lib/growth/prospect-search/prospect-search-push-to-inbox"
 import { createProspectSearchSavedSearch } from "@/lib/growth/prospect-search/saved-searches"
 import type {
   GrowthProspectSearchActionResult,
   GrowthProspectSearchCompanyResult,
+  GrowthProspectSearchDiscoveryMode,
   GrowthProspectSearchFilters,
   GrowthProspectSearchPersonResult,
   GrowthProspectSearchResultAction,
@@ -26,11 +30,13 @@ export async function executeProspectSearchAction(
     userId?: string | null
     query?: string
     filters?: GrowthProspectSearchFilters
+    discovery_mode?: GrowthProspectSearchDiscoveryMode
     saved_search_name?: string
     list_name?: string
     list_id?: string
     company?: GrowthProspectSearchCompanyResult | null
     person?: GrowthProspectSearchPersonResult | null
+    selected?: ProspectSearchSelectionRef[]
   },
 ): Promise<GrowthProspectSearchActionResult> {
   const { action } = input
@@ -87,110 +93,65 @@ export async function executeProspectSearchAction(
     if (!company) {
       return { ok: false, action, message: "Select a company row to push to Lead Inbox." }
     }
-    const dedupe_hash = prospectSearchDedupeHash([
-      "prospect_search",
-      company.source_type,
-      company.id,
-      company.website ?? "",
-    ])
-    const result = await createLeadCandidate(admin, {
-      site_key:
-        company.source_type === "external_discovered"
-          ? "prospect_search_external_discovery"
-          : "prospect_search",
-      candidate_type: "identified",
-      candidate_priority: "normal",
-      intent_score: company.intent_score ?? 0,
-      intent_grade: "C",
-      candidate_confidence: company.confidence,
-      pipeline_entry: "icp_targeting",
-      company_name: company.company_name,
-      domain: company.website,
-      dedupe_hash,
-      candidate_reasoning: [
-        company.source_type === "external_discovered"
-          ? "Manual push from external company discovery — candidate is not an automatic lead."
-          : "Manual push from Prospect Search — operator-initiated, not autonomous outreach.",
-        ...company.match_reasoning.slice(0, 3),
-      ],
-      candidate_evidence:
-        company.signals.length > 0
-          ? company.signals.map((signal) => ({
-              claim: "Prospect search signal",
-              evidence: signal,
-              source: "growth.prospect_search",
-            }))
-          : [
-              {
-                claim: "Prospect search selection",
-                evidence: `Operator pushed ${company.source_type} record from ICP search.`,
-                source: "growth.prospect_search",
-              },
-            ],
-      candidate_attribution: [
-        {
-          source: "growth.prospect_search",
-          section: "result_action",
-          signal: "push_to_lead_inbox",
-          evidence: `Pushed from ${company.source_type} record ${company.id}.`,
-          confidence: company.confidence,
-        },
-      ],
-      session_count: 0,
-      visit_count: 0,
-      intent_session_id: `prospect-search-${company.id}`,
-      visitor_key: `prospect-search-${dedupe_hash}`,
-      metadata: {
-        prospect_search: {
-          source_type: company.source_type,
-          source_id: company.id,
-          query: input.query ?? "",
-        },
-        qualification_context: {
-          lead_engine_score: company.lead_engine_score ?? company.lead_score,
-          lead_engine_score_label: company.lead_engine_score_label,
-          lead_engine_score_explanation: company.lead_engine_score_explanation,
-          buying_stage: company.buying_stage,
-          buying_stage_confidence: company.buying_stage_confidence,
-          buying_stage_reason: company.buying_stage_reason,
-          company_match_confidence: company.company_match_confidence,
-          intent_score: company.intent_score,
-          search_intent_category: company.search_intent_category,
-          crm_detected: company.crm_detected,
-          field_service_software: company.field_service_software,
-          website_platform: company.website_platform,
-          service_area: company.service_area,
-        },
-        ...(company.buying_stage
-          ? {
-              buying_stage_summary: {
-                detected_stage: company.buying_stage,
-                stage_confidence: company.buying_stage_confidence,
-                stage_reasoning: company.buying_stage_reason ? [company.buying_stage_reason] : [],
-                assessed_at: company.buying_stage_last_assessed_at ?? new Date().toISOString(),
-                evidence: company.buying_stage_reason ?? "Carried from Prospect Search qualification overlay.",
-              },
-            }
-          : {}),
-        ...(company.company_signal_summary
-          ? { company_signal_summary: company.company_signal_summary }
-          : {}),
-      },
-    })
-    if (!result.ok || !result.row) {
+
+    const pushResult = await pushProspectSearchCompanyToLeadInbox(admin, company, input.query ?? "")
+
+    if (pushResult.outcome === "already_exists") {
       return {
-        ok: false,
+        ok: true,
         action,
-        message: result.reason ?? "Lead Inbox create failed.",
+        message: pushResult.message,
+        push_outcome: pushResult.outcome,
         lead_inbox_id: null,
       }
     }
+
+    if (pushResult.outcome !== "pushed") {
+      return {
+        ok: false,
+        action,
+        message: pushResult.message,
+        push_outcome: pushResult.outcome,
+        lead_inbox_id: null,
+      }
+    }
+
     return {
       ok: true,
       action,
-      message: "Added to Lead Inbox for human review.",
-      lead_inbox_id: result.row.id,
-      workspace_url: `/admin/growth/leads/${result.row.id}`,
+      message: pushResult.message,
+      push_outcome: pushResult.outcome,
+      lead_inbox_id: pushResult.lead_inbox_id ?? null,
+      workspace_url: pushResult.lead_inbox_id
+        ? `/admin/growth/leads/${pushResult.lead_inbox_id}`
+        : null,
+    }
+  }
+
+  if (action === "bulk_push_to_lead_inbox") {
+    const bulkResult = await executeBulkPushToLeadInbox(admin, {
+      query: input.query ?? "",
+      filters: input.filters,
+      discovery_mode: input.discovery_mode,
+      selected: input.selected ?? [],
+    })
+
+    return {
+      ok: bulkResult.ok,
+      action,
+      message: bulkResult.message,
+      workspace_url: bulkResult.workspace_url,
+      selected_total: bulkResult.selected_total,
+      pushed: bulkResult.pushed,
+      already_exists: bulkResult.already_exists,
+      skipped_invalid: bulkResult.skipped_invalid,
+      failed: bulkResult.failed,
+      bulk_items: bulkResult.items.map((item) => ({
+        outcome: item.outcome,
+        company_name: item.company_name,
+        source_type: item.source_type,
+        message: item.message,
+      })),
     }
   }
 

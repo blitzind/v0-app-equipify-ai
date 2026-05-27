@@ -73,6 +73,7 @@ export const GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS = [
   "save_search",
   "create_list",
   "push_to_lead_inbox",
+  "bulk_push_to_lead_inbox",
   "run_lead_engine",
   "open_workspace",
   "export_csv",
@@ -266,4 +267,16 @@ export type GrowthProspectSearchActionResult = {
   list_id?: string | null
   saved_search_id?: string | null
   workspace_url?: string | null
+  push_outcome?: "pushed" | "already_exists" | "skipped_invalid" | "failed"
+  selected_total?: number
+  pushed?: number
+  already_exists?: number
+  skipped_invalid?: number
+  failed?: number
+  bulk_items?: Array<{
+    outcome: "pushed" | "already_exists" | "skipped_invalid" | "failed"
+    company_name: string
+    source_type: GrowthProspectSearchSourceType
+    message: string
+  }>
 }

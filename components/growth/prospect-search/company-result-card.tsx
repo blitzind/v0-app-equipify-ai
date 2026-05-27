@@ -3,6 +3,7 @@
 import { ExternalLink, Inbox, ListPlus, Workflow } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   recommendedMotion,
   ResultSignalBadges,
@@ -19,12 +20,16 @@ import { CompanyQualificationExplanation, CompanyQualificationMetrics } from "@/
 export function CompanyResultCard({
   row,
   selected,
+  checked,
   onSelect,
+  onCheckedChange,
   onAction,
 }: {
   row: GrowthProspectSearchCompanyResult
   selected: boolean
+  checked: boolean
   onSelect: () => void
+  onCheckedChange: (checked: boolean) => void
   onAction: (action: string, extra?: Record<string, unknown>) => void
 }) {
   const motion = recommendedMotion(row)
@@ -41,7 +46,15 @@ export function CompanyResultCard({
       tabIndex={0}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <Checkbox
+            checked={checked}
+            onCheckedChange={(value) => onCheckedChange(value === true)}
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Select ${row.company_name}`}
+            className="mt-0.5"
+          />
+          <div className="min-w-0 flex-1">
           <h3 className="text-base font-semibold leading-tight">{row.company_name}</h3>
           {row.website ? (
             <p className="mt-0.5 truncate text-xs text-muted-foreground">{row.website}</p>
@@ -75,6 +88,7 @@ export function CompanyResultCard({
             ) : null}
           </div>
           <CompanyEnrichmentBadges row={row} />
+          </div>
         </div>
         <div className="text-right">
           <p className="text-[10px] uppercase text-muted-foreground">Confidence</p>
