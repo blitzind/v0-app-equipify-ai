@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react"
 
-const TERMINAL_LEAD_STATUSES = new Set(["converted", "disqualified", "archived"])
-
 export type GrowthSidebarPreviewLine = {
   label: string
   value: number | string
@@ -23,8 +21,10 @@ export type GrowthSidebarConsoleState = {
 export type GrowthSidebarConsoleKey =
   | "command"
   | "inbox"
+  | "inbox_high_priority"
   | "callQueue"
   | "imports"
+  | "intent_pixel"
   | "engagement"
   | "relationships"
   | "opportunities"
@@ -37,9 +37,13 @@ export type GrowthSidebarConsoleKey =
   | "calls_providers"
   | "calls_live"
   | "calls_live_coaching"
+  | "calls_workspace"
   | "outreach"
   | "outreach_approval"
   | "providers"
+  | "conversations"
+  | "sequences"
+  | "sequence_execution"
 
 const EMPTY_STATE: GrowthSidebarConsoleState = {
   loading: true,
@@ -82,9 +86,11 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
     setState((prev) => ({ ...prev, loading: true }))
     const [
       commandRes,
-      leadsRes,
+      leadInboxRes,
       callQueueRes,
       copilotRes,
+      outreachApprovalRes,
+      intentPixelRes,
       revenueRes,
       executiveRes,
       capacityRes,
@@ -99,13 +105,27 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
       fetchJson<{ ok?: boolean; dashboard?: { missionControl?: { criticalActions?: number } } }>(
         "/api/platform/growth/command/dashboard",
       ),
-      fetchJson<{ ok?: boolean; leads?: Array<{ status: string }> }>("/api/platform/growth/leads"),
+      fetchJson<{
+        ok?: boolean
+        total?: number
+        sections?: Array<{ id: string; items: unknown[] }>
+      }>("/api/platform/growth/lead-inbox"),
       fetchJson<{ ok?: boolean; rows?: unknown[] }>(
         "/api/platform/growth/call-queue?filter=call_ready&limit=100",
       ),
       fetchJson<{ ok?: boolean; dashboard?: { approvalQueue?: unknown[] } }>(
         "/api/platform/growth/copilot/dashboard",
       ),
+      fetchJson<{ ok?: boolean; sections?: { pendingApproval?: unknown[] } }>(
+        "/api/platform/growth/outreach/approval-dashboard",
+      ),
+      fetchJson<{
+        ok?: boolean
+        snapshot?: {
+          live_visitors?: unknown[]
+          high_intent_queue?: unknown[]
+        }
+      }>("/api/platform/growth/intent-pixel/monitor?site_key=equipify-sandbox"),
       fetchJson<{
         ok?: boolean
         dashboard?: {
@@ -168,10 +188,17 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
       }>("/api/platform/growth/opportunities/dashboard"),
     ])
 
-    const activeLeads = (leadsRes?.leads ?? []).filter((lead) => !TERMINAL_LEAD_STATUSES.has(lead.status))
+    const inboxTotal = leadInboxRes?.total ?? 0
+    const highPrioritySection = leadInboxRes?.sections?.find((s) => s.id === "high_priority")
+    const highPriorityCount = highPrioritySection?.items.length ?? 0
     const commandCritical = commandRes?.dashboard?.missionControl?.criticalActions ?? 0
     const callQueueCount = callQueueRes?.rows?.length ?? 0
     const approvalQueueCount = copilotRes?.dashboard?.approvalQueue?.length ?? 0
+    const outreachPendingCount = outreachApprovalRes?.sections?.pendingApproval?.length ?? 0
+    const intentHighIntentCount = intentPixelRes?.snapshot?.high_intent_queue?.length ?? 0
+    const intentLiveCount = intentPixelRes?.snapshot?.live_visitors?.length ?? 0
+    const intentPixelBadge =
+      intentHighIntentCount > 0 ? intentHighIntentCount : intentLiveCount > 0 ? intentLiveCount : undefined
     const revenue = revenueRes?.dashboard
     const executive = executiveRes?.dashboard
     const capacity = capacityRes?.dashboard
@@ -197,9 +224,12 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
       loading: false,
       badges: {
         command: commandCritical > 0 ? commandCritical : undefined,
-        inbox: activeLeads.length,
-        callQueue: callQueueCount,
-        copilot: approvalQueueCount,
+        inbox: inboxTotal > 0 ? inboxTotal : undefined,
+        inbox_high_priority: highPriorityCount > 0 ? highPriorityCount : undefined,
+        intent_pixel: intentPixelBadge,
+        callQueue: callQueueCount > 0 ? callQueueCount : undefined,
+        copilot: approvalQueueCount > 0 ? approvalQueueCount : undefined,
+        outreach_approval: outreachPendingCount > 0 ? outreachPendingCount : undefined,
         revenue: revenueAttention > 0 ? revenueAttention : undefined,
         executive: executiveTier.executive_now ?? undefined,
         playbooks: playbooksDraftCount > 0 ? playbooksDraftCount : undefined,
@@ -233,7 +263,15 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
         copilot: [{ label: "Approval queue", value: approvalQueueCount }],
         callQueue: [{ label: "Call ready", value: callQueueCount }],
         command: [{ label: "Critical actions", value: commandCritical }],
-        inbox: [{ label: "Active leads", value: activeLeads.length }],
+        inbox: [
+          { label: "Inbox total", value: inboxTotal },
+          { label: "High priority", value: highPriorityCount },
+        ],
+        intent_pixel: [
+          { label: "High intent queue", value: intentHighIntentCount },
+          { label: "Live visitors", value: intentLiveCount },
+        ],
+        outreach_approval: [{ label: "Pending approval", value: outreachPendingCount }],
         relationships: [
           { label: "Trusted", value: relationships?.trustedRelationships?.length ?? 0 },
           { label: "Strategic", value: relationships?.strategicRelationships?.length ?? 0 },

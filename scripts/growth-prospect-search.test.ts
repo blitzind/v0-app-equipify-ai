@@ -130,8 +130,13 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "components/growth/growth-section-sidebar-nav.tsx"),
     "utf8",
   )
-  assert.match(navSource, /\/admin\/growth\/search/)
-  assert.match(navSource, /label: "Search"/)
+  assert.match(navSource, /GROWTH_NAV_GROUP_DEFS/)
+  const navDefsSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts"),
+    "utf8",
+  )
+  assert.match(navDefsSource, /\/admin\/growth\/search/)
+  assert.match(navDefsSource, /Prospect Search/)
 
   const parsed = parseProspectSearchQuery("hvac companies 20-100 employees Tennessee")
   assert.ok(parsed.industry_hints.includes("hvac") || parsed.keywords.length > 0)

@@ -44,19 +44,23 @@ import {
   type GrowthSidebarConsoleKey,
   type GrowthSidebarPreviewLine,
 } from "@/hooks/use-growth-sidebar-console"
+import {
+  GROWTH_NAV_GROUP_DEFS,
+  GROWTH_NAV_QUICK_ACTIONS,
+  GROWTH_NAV_QUICK_ACTIONS_SECONDARY,
+  GROWTH_NAVIGATION_IA_QA_MARKER,
+  growthNavigationShortcutLabel,
+  type GrowthNavItemDef,
+} from "@/lib/growth/navigation/growth-navigation-destinations"
+import { isGrowthNavigationInputTarget } from "@/lib/growth/navigation/growth-navigation-input-guard"
 import { cn } from "@/lib/utils"
 
 export const GROWTH_SIDEBAR_NAV_QA_MARKER = "growth-sidebar-nav-v2" as const
 
 export const GROWTH_SIDEBAR_GROUPS_COLLAPSED_STORAGE_KEY = "equipify-growth-sidebar-groups-collapsed"
 
-type GrowthNavItem = {
-  href: string
-  label: string
+type GrowthNavItem = GrowthNavItemDef & {
   icon: LucideIcon
-  match: (path: string) => boolean
-  consoleKey?: GrowthSidebarConsoleKey
-  shortcutKey?: string
 }
 
 type GrowthNavGroup = {
@@ -65,270 +69,67 @@ type GrowthNavGroup = {
   items: GrowthNavItem[]
 }
 
-const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
-  {
-    id: "core",
-    label: "Core",
-    items: [
-      {
-        href: "/admin/growth/command",
-        label: "Command Center",
-        icon: LayoutDashboard,
-        match: (path) => path.startsWith("/admin/growth/command"),
-        consoleKey: "command",
-        shortcutKey: "m",
-      },
-      {
-        href: "/admin/growth/leads",
-        label: "Inbox",
-        icon: Inbox,
-        match: (path) => {
-          if (!path.startsWith("/admin/growth/leads")) return false
-          if (path.startsWith("/admin/growth/leads/lead-engine")) return false
-          if (path.startsWith("/admin/growth/leads/crm")) return false
-          if (path.startsWith("/admin/growth/leads/queue")) return false
-          return path === "/admin/growth/leads" || /^\/admin\/growth\/leads\/[0-9a-f-]{36}$/i.test(path)
-        },
-        consoleKey: "inbox",
-        shortcutKey: "i",
-      },
-      {
-        href: "/admin/growth/leads/lead-engine",
-        label: "Lead Intelligence Inspector",
-        icon: Workflow,
-        match: (path) => path.startsWith("/admin/growth/leads/lead-engine"),
-      },
-      {
-        href: "/admin/growth/intent-pixel",
-        label: "Intent Pixel",
-        icon: Radar,
-        match: (path) => path.startsWith("/admin/growth/intent-pixel"),
-      },
-      {
-        href: "/admin/growth/search",
-        label: "Search",
-        icon: Search,
-        match: (path) => path.startsWith("/admin/growth/search"),
-      },
-      {
-        href: "/admin/growth/replies",
-        label: "Reply Inbox",
-        icon: Mail,
-        match: (path) => path.startsWith("/admin/growth/replies"),
-      },
-      {
-        href: "/admin/growth/meetings",
-        label: "Meetings",
-        icon: CalendarClock,
-        match: (path) => path.startsWith("/admin/growth/meetings"),
-      },
-      {
-        href: "/admin/growth/leads/queue",
-        label: "Call Queue",
-        icon: Phone,
-        match: (path) => path.startsWith("/admin/growth/leads/queue"),
-        consoleKey: "callQueue",
-        shortcutKey: "c",
-      },
-      {
-        href: "/admin/growth/imports",
-        label: "Imports",
-        icon: Upload,
-        match: (path) => path.startsWith("/admin/growth/imports"),
-        consoleKey: "imports",
-      },
-    ],
-  },
-  {
-    id: "intelligence",
-    label: "Intelligence",
-    items: [
-      {
-        href: "/admin/growth/engagement",
-        label: "Engagement",
-        icon: Activity,
-        match: (path) => path.startsWith("/admin/growth/engagement"),
-        consoleKey: "engagement",
-      },
-      {
-        href: "/admin/growth/conversations",
-        label: "Conversations",
-        icon: MessageSquare,
-        match: (path) => path.startsWith("/admin/growth/conversations"),
-        consoleKey: "conversations",
-      },
-      {
-        href: "/admin/growth/sequences",
-        label: "Sequences",
-        icon: GitBranch,
-        match: (path) => path === "/admin/growth/sequences",
-        consoleKey: "sequences",
-      },
-      {
-        href: "/admin/growth/sequences/execution",
-        label: "Sequence Execution",
-        icon: PlayCircle,
-        match: (path) => path.startsWith("/admin/growth/sequences/execution"),
-        consoleKey: "sequence_execution",
-      },
-      {
-        href: "/admin/growth/relationships",
-        label: "Relationships",
-        icon: Users,
-        match: (path) => path.startsWith("/admin/growth/relationships"),
-        consoleKey: "relationships",
-      },
-      {
-        href: "/admin/growth/opportunities/pipeline",
-        label: "Pipeline",
-        icon: GitBranch,
-        match: (path) => path.startsWith("/admin/growth/opportunities/pipeline"),
-        consoleKey: "opportunities",
-      },
-      {
-        href: "/admin/growth/opportunities",
-        label: "Opportunities",
-        icon: Target,
-        match: (path) => path === "/admin/growth/opportunities",
-        consoleKey: "opportunities",
-      },
-      {
-        href: "/admin/growth/revenue-operating",
-        label: "Revenue Operating",
-        icon: Crown,
-        match: (path) => path.startsWith("/admin/growth/revenue-operating"),
-        consoleKey: "revenue",
-      },
-      {
-        href: "/admin/growth/revenue",
-        label: "Revenue",
-        icon: TrendingUp,
-        match: (path) => path === "/admin/growth/revenue",
-        consoleKey: "revenue",
-        shortcutKey: "r",
-      },
-      {
-        href: "/admin/growth/executive",
-        label: "Executive",
-        icon: Crown,
-        match: (path) => path.startsWith("/admin/growth/executive"),
-        consoleKey: "executive",
-        shortcutKey: "e",
-      },
-      {
-        href: "/admin/growth/capacity",
-        label: "Capacity",
-        icon: Gauge,
-        match: (path) => path.startsWith("/admin/growth/capacity"),
-        consoleKey: "capacity",
-      },
-    ],
-  },
-  {
-    id: "ai-channels",
-    label: "AI & Channels",
-    items: [
-      {
-        href: "/admin/growth/copilot",
-        label: "Copilot",
-        icon: Bot,
-        match: (path) => path === "/admin/growth/copilot",
-        consoleKey: "copilot",
-      },
-      {
-        href: "/admin/growth/copilot/playbooks",
-        label: "Playbook Training",
-        icon: BookOpen,
-        match: (path) => path.startsWith("/admin/growth/copilot/playbooks"),
-        consoleKey: "playbooks",
-      },
-      {
-        href: "/admin/growth/calls",
-        label: "Calls",
-        icon: Phone,
-        match: (path) => path === "/admin/growth/calls",
-        consoleKey: "calls",
-      },
-      {
-        href: "/admin/growth/calls/providers",
-        label: "Call Providers",
-        icon: Plug,
-        match: (path) => path.startsWith("/admin/growth/calls/providers"),
-        consoleKey: "calls_providers",
-      },
-      {
-        href: "/admin/growth/calls/live",
-        label: "Live Calls",
-        icon: Radio,
-        match: (path) =>
-          path.startsWith("/admin/growth/calls/live") && !path.startsWith("/admin/growth/calls/live-coaching"),
-        consoleKey: "calls_live",
-      },
-      {
-        href: "/admin/growth/calls/live-coaching",
-        label: "Live Coaching",
-        icon: Sparkles,
-        match: (path) => path.startsWith("/admin/growth/calls/live-coaching"),
-        consoleKey: "calls_live_coaching",
-      },
-      {
-        href: "/admin/growth/calls/workspace",
-        label: "Call Workspace",
-        icon: Headphones,
-        match: (path) => path.startsWith("/admin/growth/calls/workspace"),
-        consoleKey: "calls_workspace",
-      },
-      {
-        href: "/admin/growth/outreach",
-        label: "Outreach",
-        icon: Mail,
-        match: (path) => path === "/admin/growth/outreach",
-        consoleKey: "outreach",
-      },
-      {
-        href: "/admin/growth/outreach/approval",
-        label: "Outreach Approval",
-        icon: Send,
-        match: (path) => path.startsWith("/admin/growth/outreach/approval"),
-        consoleKey: "outreach_approval",
-      },
-      {
-        href: "/admin/growth/providers",
-        label: "Providers",
-        icon: Plug,
-        match: (path) => path.startsWith("/admin/growth/providers"),
-        consoleKey: "providers",
-      },
-    ],
-  },
-  {
-    id: "settings",
-    label: "Settings",
-    items: [
-      {
-        href: "/admin/growth/settings",
-        label: "Settings",
-        icon: Settings,
-        match: (path) => path.startsWith("/admin/growth/settings"),
-      },
-    ],
-  },
-]
+const GROWTH_NAV_ICONS: Record<string, LucideIcon> = {
+  command: LayoutDashboard,
+  "revenue-inbox": Inbox,
+  "prospect-search": Search,
+  "intent-pixel": Radar,
+  imports: Upload,
+  outreach: Send,
+  "outreach-approval": Send,
+  sequences: GitBranch,
+  "reply-inbox": Mail,
+  meetings: CalendarClock,
+  "call-queue": Phone,
+  "call-workspace": Headphones,
+  "sequence-execution": PlayCircle,
+  engagement: Activity,
+  conversations: MessageSquare,
+  pipeline: GitBranch,
+  opportunities: Target,
+  "revenue-operating": Crown,
+  revenue: TrendingUp,
+  executive: Crown,
+  capacity: Gauge,
+  calls: Phone,
+  "calls-live": Radio,
+  "live-coaching": Sparkles,
+  "call-providers": Plug,
+  "lead-intelligence": Workflow,
+  "crm-leads": Users,
+  providers: Plug,
+  copilot: Bot,
+  playbooks: BookOpen,
+  relationships: Users,
+  "growth-settings": Settings,
+  "communication-settings": Settings,
+  "provider-settings": Plug,
+}
 
-const QUICK_ACTIONS = [
-  { href: "/admin/growth/imports", label: "Import Leads" },
-  { href: "/admin/growth/leads", label: "Run Research" },
-  { href: "/admin/growth/copilot", label: "Generate Copilot Draft" },
-] as const
+function toNavItems(defs: GrowthNavItemDef[]): GrowthNavItem[] {
+  return defs.map((item) => ({
+    ...item,
+    icon: GROWTH_NAV_ICONS[item.id] ?? LayoutDashboard,
+  }))
+}
+
+const GROWTH_NAV_GROUPS: GrowthNavGroup[] = GROWTH_NAV_GROUP_DEFS.map((group) => ({
+  id: group.id,
+  label: group.label,
+  items: toNavItems(group.items),
+}))
+
+const QUICK_ACTIONS = [...GROWTH_NAV_QUICK_ACTIONS, ...GROWTH_NAV_QUICK_ACTIONS_SECONDARY]
 
 const QUICK_ACTIONS_GROUP: GrowthNavGroup = {
   id: "quick-actions",
   label: "Quick Actions",
-  items: QUICK_ACTIONS.map((action) => ({
+  items: GROWTH_NAV_QUICK_ACTIONS.map((action) => ({
+    id: action.id,
     href: action.href,
     label: action.label,
     icon: Plus,
-    match: (path: string) => path === action.href || path.startsWith(`${action.href}/`),
+    match: (path: string) => path === action.href.split("?")[0] || path.startsWith(`${action.href.split("?")[0]}/`),
   })),
 }
 
@@ -601,7 +402,7 @@ function GrowthNavGroups({
             >
               {group.items.map((item) => (
                 <GrowthNavLink
-                  key={item.href}
+                  key={item.id}
                   item={item}
                   pathname={pathname}
                   collapsed={collapsed}
@@ -695,16 +496,7 @@ function useGrowthSidebarKeyboardShortcuts() {
     }
 
     function onKeyDown(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.tagName === "SELECT" ||
-          target.isContentEditable)
-      ) {
-        return
-      }
+      if (isGrowthNavigationInputTarget(event.target)) return
 
       if (event.metaKey || event.ctrlKey || event.altKey) return
 
@@ -766,6 +558,7 @@ export function GrowthSectionSidebarNav() {
       <nav
         aria-label="Growth Engine"
         data-qa-marker={GROWTH_SIDEBAR_NAV_QA_MARKER}
+        data-navigation-ia-marker={GROWTH_NAVIGATION_IA_QA_MARKER}
         className={cn("hidden shrink-0 lg:block", collapsed ? "w-[4.5rem]" : "w-60")}
       >
         <div className="sticky top-6 flex flex-col rounded-2xl border border-border bg-card p-3 shadow-sm dark:border-border/80 dark:bg-card/95">
@@ -791,7 +584,7 @@ export function GrowthSectionSidebarNav() {
                 <div key={group.id} className={cn("space-y-0.5", groupIndex > 0 ? "mt-3 border-t border-border/50 pt-3 dark:border-border/40" : "")}>
                   {group.items.map((item) => (
                     <GrowthNavLink
-                      key={item.href}
+                      key={item.id}
                       item={item}
                       pathname={pathname}
                       collapsed
@@ -817,12 +610,19 @@ export function GrowthSectionSidebarNav() {
           <GrowthSidebarHealthStrip collapsed={collapsed} health={consoleState.health} loading={consoleState.loading} />
 
           {!collapsed ? (
-            <p className="mt-3 px-2 text-[10px] text-muted-foreground">Shortcuts: g then i/c/r/e</p>
+            <p className="mt-3 px-2 text-[10px] text-muted-foreground">
+              {growthNavigationShortcutLabel()} navigation · g then i/c/r/e/m
+            </p>
           ) : null}
         </div>
       </nav>
 
-      <nav aria-label="Growth Engine" data-qa-marker={GROWTH_SIDEBAR_NAV_QA_MARKER} className="lg:hidden">
+      <nav
+        aria-label="Growth Engine"
+        data-qa-marker={GROWTH_SIDEBAR_NAV_QA_MARKER}
+        data-navigation-ia-marker={GROWTH_NAVIGATION_IA_QA_MARKER}
+        className="lg:hidden"
+      >
         <div className="min-w-0 rounded-xl border border-border bg-card p-2 shadow-sm dark:border-border/80 dark:bg-card/95">
           <GrowthNavGroups
             pathname={pathname}

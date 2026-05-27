@@ -124,6 +124,7 @@
     "test:growth-booking-calendar-availability": "tsx scripts/test-growth-booking-calendar-availability.ts",
     "test:growth-meeting-location-providers": "tsx scripts/test-growth-meeting-location-providers.ts",
     "test:growth-sidebar-nav": "tsx scripts/test-growth-sidebar-nav.ts",
+    "test:growth-command-navigation": "tsx scripts/test-growth-command-navigation.ts",
     "test:growth-booking-page-ui": "tsx scripts/test-growth-booking-page-ui.ts",
     "test:growth-ai-research-agent": "tsx scripts/test-growth-ai-research-agent.ts",
     "test:growth-predictive-deal-intelligence": "tsx scripts/test-growth-predictive-deal-intelligence.ts",
