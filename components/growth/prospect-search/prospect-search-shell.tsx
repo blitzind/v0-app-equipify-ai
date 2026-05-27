@@ -41,6 +41,7 @@ import type {
 } from "@/lib/growth/prospect-search/prospect-search-types"
 import { GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-types"
 import { prospectSearchSelectionKey } from "@/lib/growth/prospect-search/prospect-search-selection"
+import { CompanyStatusBadges } from "@/components/growth/prospect-search/company-status-badges"
 import { cn } from "@/lib/utils"
 
 const EMPTY_FILTERS: GrowthProspectSearchFilters = {}
@@ -175,7 +176,7 @@ export function ProspectSearchShell() {
                 ? "warning"
                 : "success"
               : "error"
-            : json.push_outcome === "already_exists"
+            : json.push_outcome === "already_exists" || json.push_outcome === "suppressed"
               ? "warning"
               : json.ok
                 ? "success"
@@ -237,6 +238,11 @@ export function ProspectSearchShell() {
   const selectedCompanies = useMemo(
     () => companies.filter((row) => selectedKeys.has(prospectSearchSelectionKey(row))),
     [companies, selectedKeys],
+  )
+
+  const pushableSelectedCount = useMemo(
+    () => selectedCompanies.filter((row) => !row.is_suppressed).length,
+    [selectedCompanies],
   )
 
   const toggleCompanySelection = useCallback((row: GrowthProspectSearchCompanyResult, checked: boolean) => {
@@ -490,6 +496,7 @@ export function ProspectSearchShell() {
 
           <ProspectSearchBulkActionBar
             selectedCount={selectedKeys.size}
+            pushableCount={pushableSelectedCount}
             selectedCompanies={selectedCompanies}
             pushing={bulkPushing}
             onPush={() => void runBulkPush()}
@@ -596,6 +603,7 @@ function CompanyResultsTable({
                 aria-label="Select all visible companies"
               />
             </th>
+            <th className="px-3 py-2">Status</th>
             <th className="px-3 py-2">Company</th>
             <th className="px-3 py-2">Lead</th>
             <th className="px-3 py-2">Intent</th>
@@ -615,12 +623,15 @@ function CompanyResultsTable({
               )}
               onClick={() => onSelect(row)}
             >
-              <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+              <td className="px-3 py-2 align-top" onClick={(e) => e.stopPropagation()}>
                 <Checkbox
                   checked={selectedKeys.has(prospectSearchSelectionKey(row))}
                   onCheckedChange={(value) => onToggleSelection(row, value === true)}
                   aria-label={`Select ${row.company_name}`}
                 />
+              </td>
+              <td className="px-3 py-2 align-top">
+                <CompanyStatusBadges row={row} />
               </td>
               <td className="px-3 py-2 font-medium">{row.company_name}</td>
               <td className="px-3 py-2 tabular-nums">

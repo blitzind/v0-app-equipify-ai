@@ -62,12 +62,24 @@ export type GrowthProspectSearchRevenueBand = (typeof GROWTH_PROSPECT_SEARCH_REV
 
 export const GROWTH_PROSPECT_SEARCH_EXISTING_ACCOUNT_MODES = [
   "any",
+  "exclude_customers",
+  "exclude_crm",
   "include_only",
   "exclude",
 ] as const
 
 export type GrowthProspectSearchExistingAccountMode =
   (typeof GROWTH_PROSPECT_SEARCH_EXISTING_ACCOUNT_MODES)[number]
+
+export const GROWTH_PROSPECT_SEARCH_SUPPRESSION_MODES = [
+  "any",
+  "exclude",
+  "include_only",
+  "suppressed_only",
+] as const
+
+export type GrowthProspectSearchSuppressionMode =
+  (typeof GROWTH_PROSPECT_SEARCH_SUPPRESSION_MODES)[number]
 
 export const GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS = [
   "save_search",
@@ -105,6 +117,7 @@ export type GrowthProspectSearchFilters = {
   company_identification_confidence_min?: number | null
   returning_visitor_only?: boolean
   existing_account_mode?: GrowthProspectSearchExistingAccountMode
+  suppression_mode?: GrowthProspectSearchSuppressionMode
   lead_score_min?: number | null
   decision_maker_role?: string | null
   title_contains?: string | null
@@ -169,6 +182,17 @@ export type GrowthProspectSearchCompanyResult = {
   website_platform?: string | null
   field_service_software?: string | null
   existing_account?: boolean
+  in_lead_inbox?: boolean
+  existing_customer?: boolean
+  existing_prospect?: boolean
+  already_pushed?: boolean
+  is_suppressed?: boolean
+  suppression_reason?: string | null
+  suppression_scope?: string | null
+  suppressed_at?: string | null
+  score_explanation_items?: string[]
+  confidence_explanation_items?: string[]
+  recommended_next_step_reason?: string | null
 }
 
 export type GrowthProspectSearchPersonResult = {
@@ -267,14 +291,15 @@ export type GrowthProspectSearchActionResult = {
   list_id?: string | null
   saved_search_id?: string | null
   workspace_url?: string | null
-  push_outcome?: "pushed" | "already_exists" | "skipped_invalid" | "failed"
+  push_outcome?: "pushed" | "already_exists" | "skipped_invalid" | "suppressed" | "failed"
   selected_total?: number
   pushed?: number
   already_exists?: number
   skipped_invalid?: number
+  suppressed?: number
   failed?: number
   bulk_items?: Array<{
-    outcome: "pushed" | "already_exists" | "skipped_invalid" | "failed"
+    outcome: "pushed" | "already_exists" | "skipped_invalid" | "suppressed" | "failed"
     company_name: string
     source_type: GrowthProspectSearchSourceType
     message: string

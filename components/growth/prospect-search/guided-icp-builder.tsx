@@ -185,6 +185,64 @@ export function GuidedIcpBuilder({
         <FilterGroupCard title="Title targeting" description="Decision maker roles & titles">
           <TitleTargetingCard filters={filters} onChange={onChange} />
         </FilterGroupCard>
+
+        <FilterGroupCard title="Account safety" description="Existing accounts and outreach suppression">
+          <div className="space-y-3">
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">Existing accounts</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    ["any", "Show all"],
+                    ["exclude_customers", "Exclude customers"],
+                    ["exclude_crm", "Exclude customers + prospects"],
+                    ["include_only", "Only existing accounts"],
+                  ] as const
+                ).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => onChange({ ...filters, existing_account_mode: mode })}
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 text-xs font-medium",
+                      (filters.existing_account_mode ?? "any") === mode
+                        ? "border-emerald-400 bg-emerald-50 text-emerald-900"
+                        : "border-border hover:bg-muted",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">Suppressed contacts</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    ["exclude", "Hide suppressed"],
+                    ["any", "Include suppressed"],
+                    ["suppressed_only", "Suppressed only"],
+                  ] as const
+                ).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => onChange({ ...filters, suppression_mode: mode })}
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 text-xs font-medium",
+                      (filters.suppression_mode ?? "exclude") === mode
+                        ? "border-red-300 bg-red-50 text-red-900"
+                        : "border-border hover:bg-muted",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </FilterGroupCard>
       </div>
     </div>
   )

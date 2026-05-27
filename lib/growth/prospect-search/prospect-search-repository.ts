@@ -16,6 +16,7 @@ import {
   rankProspectSearchCompanies,
   rankProspectSearchPeople,
 } from "@/lib/growth/prospect-search/prospect-search-ranking"
+import { enrichProspectSearchExternalCompanies } from "@/lib/growth/prospect-search/prospect-search-external-enrichment"
 import { runProspectSearchRealWorldDiscovery } from "@/lib/growth/prospect-search/prospect-search-real-world-discovery"
 import {
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
@@ -56,10 +57,20 @@ export async function runProspectSearch(
       limit: input.limit ?? 50,
     })
 
+    const enrichedCompanies = await enrichProspectSearchExternalCompanies(
+      admin,
+      realWorld.companies,
+      {
+        query: input.query,
+        filters: mergedFilters,
+        parsed,
+      },
+    )
+
     const source_counts = Object.fromEntries(
       GROWTH_PROSPECT_SEARCH_SOURCE_TYPES.map((t) => [t, 0]),
     ) as Record<GrowthProspectSearchSourceType, number>
-    for (const c of realWorld.companies) {
+    for (const c of enrichedCompanies) {
       source_counts[c.source_type] = (source_counts[c.source_type] ?? 0) + 1
     }
 
@@ -69,9 +80,9 @@ export async function runProspectSearch(
       query: input.query,
       parsed_query: parsed,
       filters: mergedFilters,
-      companies: realWorld.companies,
+      companies: enrichedCompanies,
       people: [],
-      total_companies: realWorld.companies.length,
+      total_companies: enrichedCompanies.length,
       total_people: 0,
       source_counts,
       external_discovery_run_id: realWorld.discovery_run_id,

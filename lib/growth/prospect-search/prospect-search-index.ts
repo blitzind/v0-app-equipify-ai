@@ -19,7 +19,12 @@ import {
   applyProspectSearchQualificationToIndexRow,
   buyingStageOverlayFromAssessmentRow,
 } from "@/lib/growth/prospect-search/prospect-search-qualification-overlays"
-import type { ProspectSearchBuyingStageOverlay } from "@/lib/growth/prospect-search/prospect-search-qualification-overlays"
+import type { GrowthProspectSearchSourceType } from "@/lib/growth/prospect-search/prospect-search-types"
+import { deriveProspectSearchCompanyStatus } from "@/lib/growth/prospect-search/prospect-search-status"
+import {
+  applyProspectSearchSuppressionOverlay,
+  loadProspectSearchSuppressionLookup,
+} from "@/lib/growth/prospect-search/prospect-search-suppression-overlays"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -77,6 +82,14 @@ export type GrowthProspectSearchIndexCompany = {
   search_intent_category: string | null
   returning_visitor: boolean
   existing_account: boolean
+  in_lead_inbox: boolean
+  existing_customer: boolean
+  existing_prospect: boolean
+  already_pushed: boolean
+  is_suppressed: boolean
+  suppression_reason: string | null
+  suppression_scope: string | null
+  suppressed_at: string | null
   lead_inbox_id: string | null
   growth_lead_id: string | null
   prospect_id: string | null
@@ -275,6 +288,24 @@ function mergeKey(source: GrowthProspectSearchSourceType, id: string): string {
   return `${source}:${id}`
 }
 
+function applyProspectSearchSafetyOverlays(
+  row: GrowthProspectSearchIndexCompany,
+  suppressionLookup: Awaited<ReturnType<typeof loadProspectSearchSuppressionLookup>>,
+): GrowthProspectSearchIndexCompany {
+  const status = deriveProspectSearchCompanyStatus(row)
+  return applyProspectSearchSuppressionOverlay(
+    {
+      ...row,
+      ...status,
+      is_suppressed: row.is_suppressed ?? false,
+      suppression_reason: row.suppression_reason ?? null,
+      suppression_scope: row.suppression_scope ?? null,
+      suppressed_at: row.suppressed_at ?? null,
+    },
+    suppressionLookup,
+  )
+}
+
 function applyInternalSignalHydration(
   row: GrowthProspectSearchIndexCompany,
 ): GrowthProspectSearchIndexCompany {
@@ -289,6 +320,27 @@ function applyInternalSignalHydration(
   }
 }
 
+const INDEX_SAFETY_DEFAULTS = {
+  in_lead_inbox: false,
+  existing_customer: false,
+  existing_prospect: false,
+  already_pushed: false,
+  is_suppressed: false,
+  suppression_reason: null,
+  suppression_scope: null,
+  suppressed_at: null,
+} satisfies Pick<
+  GrowthProspectSearchIndexCompany,
+  | "in_lead_inbox"
+  | "existing_customer"
+  | "existing_prospect"
+  | "already_pushed"
+  | "is_suppressed"
+  | "suppression_reason"
+  | "suppression_scope"
+  | "suppressed_at"
+>
+
 export async function buildProspectSearchIndex(
   admin: SupabaseClient,
   query: string,
@@ -298,17 +350,19 @@ export async function buildProspectSearchIndex(
   const companyMap = new Map<string, GrowthProspectSearchIndexCompany>()
   const people: GrowthProspectSearchIndexPerson[] = []
 
-  const [intentOverlays, matchOverlays, buyingOverlays] = await Promise.all([
+  const [intentOverlays, matchOverlays, buyingOverlays, suppressionLookup] = await Promise.all([
     loadIntentOverlays(admin),
     loadCompanyMatchOverlays(admin),
     loadBuyingStageOverlays(admin),
+    loadProspectSearchSuppressionLookup(admin),
   ])
 
   const upsertCompany = (row: GrowthProspectSearchIndexCompany) => {
-    const key = mergeKey(row.source_type, row.id)
+    const normalized = { ...INDEX_SAFETY_DEFAULTS, ...row }
+    const key = mergeKey(normalized.source_type, normalized.id)
     const existing = companyMap.get(key)
-    if (!existing || (row.intent_score ?? 0) > (existing.intent_score ?? 0)) {
-      companyMap.set(key, row)
+    if (!existing || (normalized.intent_score ?? 0) > (existing.intent_score ?? 0)) {
+      companyMap.set(key, normalized)
     }
   }
 
@@ -642,7 +696,9 @@ export async function buildProspectSearchIndex(
   }
 
   return {
-    companies: [...companyMap.values()].map(applyInternalSignalHydration),
+    companies: [...companyMap.values()]
+      .map(applyInternalSignalHydration)
+      .map((row) => applyProspectSearchSafetyOverlays(row, suppressionLookup)),
     people,
   }
 }

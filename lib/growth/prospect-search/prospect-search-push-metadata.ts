@@ -10,6 +10,7 @@ export const GROWTH_PROSPECT_SEARCH_PUSH_OUTCOMES = [
   "pushed",
   "already_exists",
   "skipped_invalid",
+  "suppressed",
   "failed",
 ] as const
 
@@ -38,6 +39,7 @@ export type GrowthProspectSearchBulkPushResult = {
   pushed: number
   already_exists: number
   skipped_invalid: number
+  suppressed: number
   failed: number
   items: GrowthProspectSearchPushItemResult[]
   workspace_url?: string | null
@@ -91,11 +93,17 @@ export function formatBulkPushSummary(input: {
   pushed: number
   already_exists: number
   skipped_invalid: number
+  suppressed?: number
   failed: number
 }): string {
   const parts = [`${input.selected_total} selected`]
   if (input.pushed > 0) parts.push(`${input.pushed} added to Lead Inbox`)
   if (input.already_exists > 0) parts.push(`${input.already_exists} already existed`)
+  if ((input.suppressed ?? 0) > 0) {
+    parts.push(
+      `${input.suppressed} suppressed ${input.suppressed === 1 ? "row was" : "rows were"} skipped`,
+    )
+  }
   if (input.skipped_invalid > 0) {
     parts.push(
       `${input.skipped_invalid} skipped because ${input.skipped_invalid === 1 ? "source was incomplete" : "sources were incomplete"}`,

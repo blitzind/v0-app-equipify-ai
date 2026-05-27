@@ -106,6 +106,16 @@ export async function executeProspectSearchAction(
       }
     }
 
+    if (pushResult.outcome === "suppressed") {
+      return {
+        ok: true,
+        action,
+        message: pushResult.message,
+        push_outcome: pushResult.outcome,
+        lead_inbox_id: null,
+      }
+    }
+
     if (pushResult.outcome !== "pushed") {
       return {
         ok: false,
@@ -145,6 +155,7 @@ export async function executeProspectSearchAction(
       pushed: bulkResult.pushed,
       already_exists: bulkResult.already_exists,
       skipped_invalid: bulkResult.skipped_invalid,
+      suppressed: bulkResult.suppressed,
       failed: bulkResult.failed,
       bulk_items: bulkResult.items.map((item) => ({
         outcome: item.outcome,

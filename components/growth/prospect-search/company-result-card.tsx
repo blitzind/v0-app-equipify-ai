@@ -15,7 +15,9 @@ import { BuyingCommitteePanel } from "@/components/growth/prospect-search/buying
 import { RealWorldSourceBadge } from "@/components/growth/prospect-search/real-world-provider-status"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
-import { CompanyQualificationExplanation, CompanyQualificationMetrics } from "@/components/growth/prospect-search/company-qualification-metrics"
+import { CompanyQualificationMetrics } from "@/components/growth/prospect-search/company-qualification-metrics"
+import { CompanyResultExplanations } from "@/components/growth/prospect-search/company-result-explanations"
+import { CompanyStatusBadges } from "@/components/growth/prospect-search/company-status-badges"
 
 export function CompanyResultCard({
   row,
@@ -98,6 +100,7 @@ export function CompanyResultCard({
         </div>
       </div>
 
+      <CompanyStatusBadges row={row} />
       <ResultSignalBadges row={row} />
 
       {row.company_signal_summary ? (
@@ -109,11 +112,13 @@ export function CompanyResultCard({
       ) : null}
 
       <CompanyQualificationMetrics row={row} />
-      <CompanyQualificationExplanation row={row} />
+      <CompanyResultExplanations row={row} />
 
-      <p className="rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2 text-xs text-violet-900">
-        <span className="font-semibold">Recommended motion:</span> {motion}
-      </p>
+      {!row.recommended_next_step_reason ? (
+        <p className="rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2 text-xs text-violet-900">
+          <span className="font-semibold">Recommended motion:</span> {motion}
+        </p>
+      ) : null}
 
       {row.signals[0] ? (
         <p className="text-xs text-muted-foreground line-clamp-2">{row.signals[0]}</p>
@@ -150,9 +155,9 @@ export function CompanyResultCard({
           <ListPlus className="mr-1 size-3.5" />
           Add To List
         </Button>
-        <Button size="sm" onClick={() => onAction("push_to_lead_inbox")}>
+        <Button size="sm" onClick={() => onAction("push_to_lead_inbox")} disabled={row.is_suppressed}>
           <Inbox className="mr-1 size-3.5" />
-          Push To Lead Inbox
+          {row.is_suppressed ? "Suppressed" : "Push To Lead Inbox"}
         </Button>
       </div>
     </article>

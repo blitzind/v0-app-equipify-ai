@@ -2,10 +2,13 @@ import type { GrowthBuyingStage } from "@/lib/growth/buying-stage/buying-stage-t
 import {
   GROWTH_PROSPECT_SEARCH_EMPLOYEE_SIZE_BANDS,
   GROWTH_PROSPECT_SEARCH_REVENUE_BANDS,
+  GROWTH_PROSPECT_SEARCH_SUPPRESSION_MODES,
   type GrowthProspectSearchEmployeeSizeBand,
   type GrowthProspectSearchFilters,
   type GrowthProspectSearchRevenueBand,
+  type GrowthProspectSearchSuppressionMode,
 } from "@/lib/growth/prospect-search/prospect-search-types"
+import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthProspectSearchIndexCompany } from "@/lib/growth/prospect-search/prospect-search-index"
 
 function asString(value: unknown): string {
@@ -100,6 +103,13 @@ export function normalizeProspectSearchFilters(
         : null,
     returning_visitor_only: raw.returning_visitor_only === true,
     existing_account_mode: raw.existing_account_mode ?? "any",
+    suppression_mode:
+      raw.suppression_mode &&
+      GROWTH_PROSPECT_SEARCH_SUPPRESSION_MODES.includes(
+        raw.suppression_mode as GrowthProspectSearchSuppressionMode,
+      )
+        ? (raw.suppression_mode as GrowthProspectSearchSuppressionMode)
+        : "exclude",
     lead_score_min: typeof raw.lead_score_min === "number" ? raw.lead_score_min : null,
     decision_maker_role: asString(raw.decision_maker_role) || null,
     title_contains: asString(raw.title_contains) || null,
@@ -109,10 +119,9 @@ export function normalizeProspectSearchFilters(
   }
 }
 
-export function applyProspectSearchFilters(
-  companies: GrowthProspectSearchIndexCompany[],
-  filters: GrowthProspectSearchFilters,
-): GrowthProspectSearchIndexCompany[] {
+export function applyProspectSearchFilters<
+  T extends GrowthProspectSearchIndexCompany | GrowthProspectSearchCompanyResult,
+>(companies: T[], filters: GrowthProspectSearchFilters): T[] {
   return companies.filter((row) => {
     if (filters.source_types?.length && !filters.source_types.includes(row.source_type)) {
       return false
@@ -192,8 +201,22 @@ export function applyProspectSearchFilters(
       return false
     }
     if (filters.returning_visitor_only && !row.returning_visitor) return false
-    if (filters.existing_account_mode === "include_only" && !row.existing_account) return false
-    if (filters.existing_account_mode === "exclude" && row.existing_account) return false
+
+    const status = row.existing_customer || row.existing_prospect || row.existing_account
+    if (filters.existing_account_mode === "include_only" && !status) return false
+    if (filters.existing_account_mode === "exclude" && status) return false
+    if (filters.existing_account_mode === "exclude_customers" && row.existing_customer) return false
+    if (
+      filters.existing_account_mode === "exclude_crm" &&
+      (row.existing_customer || row.existing_prospect)
+    ) {
+      return false
+    }
+
+    if (filters.suppression_mode === "exclude" && row.is_suppressed) return false
+    if (filters.suppression_mode === "include_only" && !row.is_suppressed) return false
+    if (filters.suppression_mode === "suppressed_only" && !row.is_suppressed) return false
+
     if (filters.verification_status && row.verification_status !== filters.verification_status) {
       return false
     }

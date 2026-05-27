@@ -6,7 +6,7 @@ import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-se
 export function CompanyEnrichmentBadges({ row }: { row: GrowthProspectSearchCompanyResult }) {
   const badges: Array<{ key: string; label: string }> = []
 
-  if (row.existing_account) {
+  if (row.existing_account && !row.existing_customer && !row.existing_prospect) {
     badges.push({ key: "existing-account", label: "Existing account" })
   }
   if (row.crm_detected) {

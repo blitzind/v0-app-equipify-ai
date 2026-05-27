@@ -464,6 +464,8 @@ async function main(): Promise<void> {
   )
   assert.match(icpSource, /TitleTargetingCard/)
   assert.match(icpSource, /GROWTH_TITLE_TARGETING_SMART_QA_MARKER|title-targeting-card/)
+  assert.match(icpSource, /Account safety/)
+  assert.match(icpSource, /Hide suppressed/)
 
   const titleCardSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/title-targeting-card.tsx"),
@@ -868,6 +870,312 @@ async function main(): Promise<void> {
   assert.equal(qualification.buying_stage, "consideration")
   assert.ok(pushMetadata.company_signal_summary)
   assert.equal((pushMetadata.prospect_search as { query: string }).query, "hvac tennessee")
+
+  const {
+    GROWTH_PROSPECT_SEARCH_EXPLANATIONS_QA_MARKER,
+    buildProspectSearchExplanations,
+    hasProspectSearchExplanations,
+  } = await import("../lib/growth/prospect-search/prospect-search-explanations")
+  const {
+    deriveProspectSearchCompanyStatus,
+    GROWTH_PROSPECT_SEARCH_STATUS_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-status")
+  const { finalizeProspectSearchCompanyResult } = await import(
+    "../lib/growth/prospect-search/prospect-search-result-finalize"
+  )
+
+  assert.equal(GROWTH_PROSPECT_SEARCH_EXPLANATIONS_QA_MARKER, "growth-prospect-search-explanations-v1")
+  assert.equal(GROWTH_PROSPECT_SEARCH_STATUS_QA_MARKER, "growth-prospect-search-status-v1")
+
+  const explained = buildProspectSearchExplanations({
+    row: {
+      company_name: "Acme HVAC",
+      website: "https://acme-hvac.com",
+      industry: "HVAC",
+      location: "Tennessee",
+      signals: ["CRM indicators"],
+      match_reasoning: ["Strong text match to search query."],
+      rank_score: 0.7,
+      confidence: 0.8,
+      signal_confidence: 0.82,
+      lead_engine_score: 72,
+      lead_engine_score_explanation: "Strong ICP fit.",
+      lead_score: null,
+      buying_stage: "consideration",
+      buying_stage_reason: "Pricing interest observed.",
+      intent_score: 14,
+      search_intent_category: "pricing",
+      company_match_confidence: 0.75,
+      crm_detected: "HubSpot",
+      field_service_software: "FieldPulse",
+      website_platform: null,
+      company_signal_summary: {
+        technology_signals: ["Field service software detected"],
+        growth_indicators: ["Hiring activity"],
+        fit_indicators: [],
+        operational_maturity: "Growing operations",
+      },
+      existing_customer: false,
+      existing_prospect: false,
+      in_lead_inbox: false,
+      is_suppressed: false,
+      suppression_reason: null,
+      source_type: "growth_lead",
+    },
+    query: "hvac",
+    filters: { industry: "HVAC" },
+    parsed: parseProspectSearchQuery("hvac Tennessee"),
+  })
+  assert.ok(explained.score_explanation_items.length > 0)
+  assert.ok(explained.confidence_explanation_items.length > 0)
+  assert.ok(explained.recommended_next_step_reason)
+  assert.ok(hasProspectSearchExplanations(explained))
+
+  const sparseExplained = buildProspectSearchExplanations({
+    row: {
+      company_name: "Unknown Co",
+      website: null,
+      industry: null,
+      location: null,
+      signals: [],
+      match_reasoning: [],
+      rank_score: 0.1,
+      confidence: 0.4,
+      signal_confidence: null,
+      lead_engine_score: null,
+      lead_engine_score_explanation: null,
+      lead_score: null,
+      buying_stage: null,
+      buying_stage_reason: null,
+      intent_score: null,
+      search_intent_category: null,
+      company_match_confidence: null,
+      crm_detected: null,
+      field_service_software: null,
+      website_platform: null,
+      company_signal_summary: null,
+      existing_customer: false,
+      existing_prospect: false,
+      in_lead_inbox: false,
+      is_suppressed: false,
+      suppression_reason: null,
+      source_type: "crm_prospect",
+    },
+  })
+  assert.ok(sparseExplained.confidence_explanation_items.some((item) => /limited/i.test(item)))
+
+  const status = deriveProspectSearchCompanyStatus({
+    source_type: "lead_inbox",
+    lead_inbox_id: "inbox-1",
+    customer_id: null,
+    prospect_id: null,
+    existing_account: false,
+    signals: [],
+  })
+  assert.equal(status.in_lead_inbox, true)
+  assert.equal(status.already_pushed, true)
+
+  const finalized = finalizeProspectSearchCompanyResult({
+    id: "1",
+    source_type: "crm_customer",
+    company_name: "Customer Co",
+    website: "customer.example",
+    industry: "HVAC",
+    subindustry: null,
+    employees: null,
+    revenue_range: null,
+    location: "TN",
+    intent_score: null,
+    buying_stage: null,
+    buying_stage_confidence: null,
+    buying_stage_reason: null,
+    buying_stage_last_assessed_at: null,
+    lead_score: null,
+    lead_engine_score: null,
+    lead_engine_score_label: null,
+    lead_engine_score_explanation: null,
+    lead_engine_last_run_at: null,
+    confidence: 0.6,
+    company_match_confidence: null,
+    decision_maker_coverage: null,
+    verification_status: "existing_account",
+    signals: [],
+    search_intent_category: null,
+    lead_inbox_id: null,
+    growth_lead_id: null,
+    prospect_id: null,
+    customer_id: "cust-1",
+    rank_score: 0.4,
+    match_reasoning: [],
+    existing_account: true,
+    is_suppressed: true,
+    suppression_reason: "unsubscribe",
+    suppression_scope: "domain",
+    suppressed_at: null,
+    in_lead_inbox: false,
+    existing_customer: true,
+    existing_prospect: false,
+    already_pushed: false,
+  })
+  assert.ok(finalized.confidence_explanation_items.length > 0)
+  assert.match(finalized.recommended_next_step_reason ?? "", /suppressed/i)
+  assert.ok(finalized.existing_customer)
+
+  const suppressionFiltered = applyProspectSearchFilters(
+    [
+      {
+        id: "1",
+        source_type: "growth_lead",
+        company_name: "Allowed",
+        website: null,
+        industry: "HVAC",
+        subindustry: null,
+        employees: null,
+        revenue_range: null,
+        location: null,
+        city: null,
+        state: null,
+        service_area: null,
+        notes: null,
+        keywords: [],
+        crm_detected: null,
+        website_platform: null,
+        field_service_software: null,
+        intent_score: null,
+        buying_stage: null,
+        buying_stage_confidence: null,
+        buying_stage_reason: null,
+        buying_stage_last_assessed_at: null,
+        lead_score: null,
+        lead_engine_score: null,
+        lead_engine_score_label: null,
+        lead_engine_score_explanation: null,
+        lead_engine_last_run_at: null,
+        company_match_confidence: null,
+        decision_maker_count: 0,
+        verification_status: "unverified",
+        priority: null,
+        signals: [],
+        search_intent_category: null,
+        returning_visitor: false,
+        existing_account: false,
+        in_lead_inbox: false,
+        existing_customer: false,
+        existing_prospect: false,
+        already_pushed: false,
+        is_suppressed: false,
+        suppression_reason: null,
+        suppression_scope: null,
+        suppressed_at: null,
+        lead_inbox_id: null,
+        growth_lead_id: "1",
+        prospect_id: null,
+        customer_id: null,
+      },
+      {
+        id: "2",
+        source_type: "growth_lead",
+        company_name: "Blocked",
+        website: null,
+        industry: "HVAC",
+        subindustry: null,
+        employees: null,
+        revenue_range: null,
+        location: null,
+        city: null,
+        state: null,
+        service_area: null,
+        notes: null,
+        keywords: [],
+        crm_detected: null,
+        website_platform: null,
+        field_service_software: null,
+        intent_score: null,
+        buying_stage: null,
+        buying_stage_confidence: null,
+        buying_stage_reason: null,
+        buying_stage_last_assessed_at: null,
+        lead_score: null,
+        lead_engine_score: null,
+        lead_engine_score_label: null,
+        lead_engine_score_explanation: null,
+        lead_engine_last_run_at: null,
+        company_match_confidence: null,
+        decision_maker_count: 0,
+        verification_status: "unverified",
+        priority: null,
+        signals: [],
+        search_intent_category: null,
+        returning_visitor: false,
+        existing_account: false,
+        in_lead_inbox: false,
+        existing_customer: false,
+        existing_prospect: false,
+        already_pushed: false,
+        is_suppressed: true,
+        suppression_reason: "unsubscribe",
+        suppression_scope: "email",
+        suppressed_at: "2026-05-01T00:00:00.000Z",
+        lead_inbox_id: null,
+        growth_lead_id: "2",
+        prospect_id: null,
+        customer_id: null,
+      },
+    ],
+    normalizeProspectSearchFilters({ suppression_mode: "exclude" }),
+  )
+  assert.equal(suppressionFiltered.length, 1)
+  assert.equal(suppressionFiltered[0]!.company_name, "Allowed")
+
+  const crmExcluded = applyProspectSearchFilters(
+    [
+      {
+        ...suppressionFiltered[0]!,
+        id: "3",
+        company_name: "Prospect Co",
+        existing_prospect: true,
+        prospect_id: "p-1",
+        growth_lead_id: null,
+      },
+      {
+        ...suppressionFiltered[0]!,
+        id: "4",
+        company_name: "Fresh Co",
+        existing_prospect: false,
+        growth_lead_id: "4",
+      },
+    ],
+    normalizeProspectSearchFilters({ existing_account_mode: "exclude_crm" }),
+  )
+  assert.equal(crmExcluded.length, 1)
+  assert.equal(crmExcluded[0]!.company_name, "Fresh Co")
+
+  assert.match(
+    formatBulkPushSummary({
+      selected_total: 4,
+      pushed: 2,
+      already_exists: 1,
+      skipped_invalid: 0,
+      suppressed: 1,
+      failed: 0,
+    }),
+    /1 suppressed row was skipped/,
+  )
+
+  const explanationsSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-explanations.ts"),
+    "utf8",
+  )
+  assert.match(explanationsSource, /buildProspectSearchExplanations/)
+  assert.match(companyCardSource, /CompanyResultExplanations/)
+  assert.match(companyCardSource, /CompanyStatusBadges/)
+  const filtersSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-filters.ts"),
+    "utf8",
+  )
+  assert.match(filtersSource, /suppression_mode/)
+  assert.equal(normalizeProspectSearchFilters({}).suppression_mode, "exclude")
+  assert.match(pushSource, /Suppressed from outreach/)
 
   console.log("growth-prospect-search: all checks passed")
 }

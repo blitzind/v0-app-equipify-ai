@@ -45,6 +45,13 @@ export async function pushProspectSearchCompanyToLeadInbox(
     }
   }
 
+  if (company.is_suppressed) {
+    return {
+      outcome: "suppressed",
+      message: "Suppressed from outreach — not pushed to Lead Inbox.",
+    }
+  }
+
   const dedupe_hash = prospectSearchDedupeHash([
     "prospect_search",
     company.source_type,
@@ -168,6 +175,7 @@ export async function executeBulkPushToLeadInbox(
       pushed: 0,
       already_exists: 0,
       skipped_invalid: 0,
+      suppressed: 0,
       failed: 0,
       items: [],
     }
@@ -184,6 +192,7 @@ export async function executeBulkPushToLeadInbox(
   let pushed = 0
   let already_exists = 0
   let skipped_invalid = 0
+  let suppressed = 0
   let failed = 0
 
   for (const ref of selected) {
@@ -215,6 +224,9 @@ export async function executeBulkPushToLeadInbox(
       case "already_exists":
         already_exists += 1
         break
+      case "suppressed":
+        suppressed += 1
+        break
       case "skipped_invalid":
         skipped_invalid += 1
         break
@@ -230,6 +242,7 @@ export async function executeBulkPushToLeadInbox(
     pushed,
     already_exists,
     skipped_invalid,
+    suppressed,
     failed,
   })
 
@@ -241,6 +254,7 @@ export async function executeBulkPushToLeadInbox(
     pushed,
     already_exists,
     skipped_invalid,
+    suppressed,
     failed,
     items,
     workspace_url: pushed > 0 ? "/admin/growth/leads" : null,

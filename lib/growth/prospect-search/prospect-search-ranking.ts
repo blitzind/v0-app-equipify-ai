@@ -7,6 +7,7 @@ import type {
 import type { GrowthProspectSearchIndexCompany } from "@/lib/growth/prospect-search/prospect-search-index"
 import type { GrowthProspectSearchIndexPerson } from "@/lib/growth/prospect-search/prospect-search-index"
 import { inferEmployeeSizeBand, inferRevenueBand } from "@/lib/growth/prospect-search/prospect-search-filters"
+import { finalizeProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-result-finalize"
 
 function includesFold(hay: string | null | undefined, needle: string): boolean {
   if (!hay || !needle) return false
@@ -176,7 +177,8 @@ export function rankProspectSearchCompanies(
       Math.min(0.95, signalConfidence != null ? Math.max(baseConfidence, signalConfidence) : baseConfidence).toFixed(3),
     )
 
-    return {
+    return finalizeProspectSearchCompanyResult(
+      {
       id: row.id,
       source_type: row.source_type,
       company_name: row.company_name,
@@ -219,7 +221,17 @@ export function rankProspectSearchCompanies(
       website_platform: row.website_platform,
       field_service_software: row.field_service_software,
       existing_account: row.existing_account,
-    }
+      in_lead_inbox: row.in_lead_inbox,
+      existing_customer: row.existing_customer,
+      existing_prospect: row.existing_prospect,
+      already_pushed: row.already_pushed,
+      is_suppressed: row.is_suppressed,
+      suppression_reason: row.suppression_reason,
+      suppression_scope: row.suppression_scope,
+      suppressed_at: row.suppressed_at,
+    },
+      { query, filters, parsed },
+    )
   })
 
   return scored

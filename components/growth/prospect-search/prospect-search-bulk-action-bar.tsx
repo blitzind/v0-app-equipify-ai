@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 
 export function ProspectSearchBulkActionBar({
   selectedCount,
+  pushableCount,
   selectedCompanies,
   pushing,
   onPush,
@@ -15,6 +16,7 @@ export function ProspectSearchBulkActionBar({
   className,
 }: {
   selectedCount: number
+  pushableCount: number
   selectedCompanies: GrowthProspectSearchCompanyResult[]
   pushing: boolean
   onPush: () => void
@@ -42,6 +44,12 @@ export function ProspectSearchBulkActionBar({
         </p>
         {sourceSummary ? (
           <p className="text-xs text-violet-900/80">{sourceSummary}</p>
+        ) : null}
+        {pushableCount < selectedCount ? (
+          <p className="text-xs text-red-800">
+            {selectedCount - pushableCount} suppressed{" "}
+            {selectedCount - pushableCount === 1 ? "row will" : "rows will"} be skipped on push.
+          </p>
         ) : null}
         {externalCount > 0 ? (
           <p className="text-xs text-amber-900">
