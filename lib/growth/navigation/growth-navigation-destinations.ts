@@ -203,6 +203,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["booking intelligence", "meeting intent", "calendar routing", "meeting conversion"],
   },
   {
+    id: "multichannel",
+    label: "Multi-Channel",
+    href: "/admin/growth/multichannel",
+    keywords: ["multichannel", "channel tasks", "manual call", "linkedin manual", "sequence orchestration"],
+  },
+  {
     id: "settings",
     label: "Growth Settings",
     href: "/admin/growth/settings",
@@ -510,6 +516,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         href: "/admin/growth/booking-intelligence",
         label: "Booking Intelligence",
         match: prefixMatch("/admin/growth/booking-intelligence"),
+      },
+      {
+        id: "multichannel",
+        href: "/admin/growth/multichannel",
+        label: "Multi-Channel",
+        match: prefixMatch("/admin/growth/multichannel"),
       },
       {
         id: "live-coaching",

@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 786,
-  sqlMigrations: 306,
+  apiRouteHandlers: 792,
+  sqlMigrations: 307,
   dashboardPages: 65,
-  componentsTsx: 562,
-  libTsFiles: 2010,
+  componentsTsx: 564,
+  libTsFiles: 2019,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **786** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **306** |
+| API route handlers (\`app/api/**/route.ts\`) | **792** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **307** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **562** |
-| \`lib/**/*.ts\` | **2010** |
+| \`components/**/*.tsx\` | **564** |
+| \`lib/**/*.ts\` | **2019** |
 
 ### Vercel crons
 
@@ -674,6 +674,12 @@ platform/growth/meetings/command-summary/route.ts
 platform/growth/meetings/dashboard/route.ts
 platform/growth/meetings/inbox/route.ts
 platform/growth/meetings/route.ts
+platform/growth/multichannel/dashboard/route.ts
+platform/growth/multichannel/plan/route.ts
+platform/growth/multichannel/tasks/[id]/approve/route.ts
+platform/growth/multichannel/tasks/[id]/complete/route.ts
+platform/growth/multichannel/tasks/[id]/skip/route.ts
+platform/growth/multichannel/tasks/route.ts
 platform/growth/opportunities/[opportunityId]/deal-intelligence/recompute/route.ts
 platform/growth/opportunities/[opportunityId]/deal-intelligence/route.ts
 platform/growth/opportunities/dashboard/route.ts

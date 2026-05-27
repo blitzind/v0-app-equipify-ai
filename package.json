@@ -179,6 +179,7 @@
     "test:growth-revenue-intelligence": "tsx scripts/test-growth-revenue-intelligence.ts",
     "test:growth-opportunity-intelligence": "tsx scripts/test-growth-opportunity-intelligence.ts",
     "test:growth-booking-intelligence": "tsx scripts/test-growth-booking-intelligence.ts",
+    "test:growth-multichannel-sequences": "tsx scripts/test-growth-multichannel-sequences.ts",
     "test:growth-provider-delivery": "tsx scripts/test-growth-provider-delivery.ts",
     "test:growth-provider-transport": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-provider-transport.ts",
     "test:growth-engagement-attribution": "tsx scripts/test-growth-engagement-attribution.ts",

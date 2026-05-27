@@ -12,6 +12,7 @@ import {
   type GrowthSequenceSafeExecutionDashboard,
   sequenceExecutionStatusLabel,
 } from "@/lib/growth/sequences/execution/sequence-execution-types"
+import { channelTypeLabel, taskStatusLabel, type GrowthSequenceChannelTask } from "@/lib/growth/multichannel/multichannel-types"
 import { cn } from "@/lib/utils"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked" | "medium"> = {
@@ -37,6 +38,7 @@ export function GrowthSequenceSafeExecutionDashboard() {
   const [dashboard, setDashboard] = useState<GrowthSequenceSafeExecutionDashboard | null>(null)
   const [meetingIntentReviews, setMeetingIntentReviews] = useState(0)
   const [sequenceStopCandidates, setSequenceStopCandidates] = useState(0)
+  const [channelTasks, setChannelTasks] = useState<GrowthSequenceChannelTask[]>([])
   const [loading, setLoading] = useState(true)
   const [actionJobId, setActionJobId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -62,6 +64,12 @@ export function GrowthSequenceSafeExecutionDashboard() {
         setMeetingIntentReviews(bookingData.dashboard.pendingBookingReviews?.length ?? 0)
         setSequenceStopCandidates(bookingData.dashboard.sequenceStopCandidates?.length ?? 0)
       }
+
+      const multichannelRes = await fetch("/api/platform/growth/multichannel/tasks", { cache: "no-store" })
+      const multichannelData = (await multichannelRes.json().catch(() => ({}))) as {
+        tasks?: GrowthSequenceChannelTask[]
+      }
+      if (multichannelRes.ok) setChannelTasks(multichannelData.tasks ?? [])
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
     } finally {
@@ -210,6 +218,40 @@ export function GrowthSequenceSafeExecutionDashboard() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </GrowthEngineCard>
+
+      <GrowthEngineCard title="Multi-Channel Task Timeline">
+        {channelTasks.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No multi-channel tasks planned yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {channelTasks.slice(0, 10).map((task) => (
+              <div key={task.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <GrowthBadge label={channelTypeLabel(task.channel)} tone="attention" />
+                  <GrowthBadge label={taskStatusLabel(task.status)} tone="medium" />
+                  <span>{task.leadLabel}</span>
+                  <span className="text-muted-foreground">{task.title}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {task.callWorkspaceHref ? (
+                    <Button type="button" size="sm" variant="outline" asChild>
+                      <Link href={task.callWorkspaceHref}>Call Workspace</Link>
+                    </Button>
+                  ) : null}
+                  {task.bookingIntelligenceHref ? (
+                    <Button type="button" size="sm" variant="outline" asChild>
+                      <Link href={task.bookingIntelligenceHref}>Booking Intelligence</Link>
+                    </Button>
+                  ) : null}
+                  <Button type="button" size="sm" variant="ghost" asChild>
+                    <Link href="/admin/growth/multichannel">Multi-Channel</Link>
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </GrowthEngineCard>
