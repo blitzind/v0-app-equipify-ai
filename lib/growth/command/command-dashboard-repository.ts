@@ -35,6 +35,8 @@ import { fetchDealIntelligenceDashboardSummary } from "@/lib/growth/deal-intelli
 import { dealIntelligenceActionImpactBoost } from "@/lib/growth/deal-intelligence/nba-deal-intelligence-bridge"
 import { fetchCallIntelligenceDashboardSummary } from "@/lib/growth/call-intelligence/call-intelligence-repository"
 import { callIntelligenceActionImpactBoost } from "@/lib/growth/call-intelligence/call-intelligence-nba-bridge"
+import { growthSignalActionImpactBoost } from "@/lib/growth/company-growth-signals/integrations/command-center-bridge"
+import type { GrowthSignalTier } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
 
 const LEAD_SCAN_SELECT =
   "id, company_name, status, follow_up_at, next_best_action, next_best_action_reason, executive_priority_tier, revenue_probability_score, revenue_probability_tier, revenue_trajectory, revenue_probability_previous_score, forecast_contribution_weight, forecast_attention_level, conversation_urgency_level, conversation_health_tier, relationship_trend, engagement_tier, opportunity_readiness_tier, decision_maker_status, last_researched_at, operational_capacity_tier, workflow_health, contact_temperature, assigned_to, call_priority_tier, score"
@@ -243,12 +245,33 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
     // Schema may not be migrated yet — command center remains usable.
   }
 
+  const growthSignalByLead = new Map<string, { score: number; tier: GrowthSignalTier | null }>()
+  try {
+    const leadIds = leads.map((lead) => lead.id as string).filter(Boolean)
+    if (leadIds.length > 0) {
+      const { data } = await admin
+        .schema("growth")
+        .from("company_growth_signal_scores")
+        .select("company_id, growth_signal_score, signal_tier")
+        .in("company_id", leadIds)
+      for (const row of data ?? []) {
+        growthSignalByLead.set(row.company_id as string, {
+          score: Number(row.growth_signal_score ?? 0),
+          tier: (row.signal_tier as GrowthSignalTier | null) ?? null,
+        })
+      }
+    }
+  } catch {
+    // Growth signal schema may not be migrated yet.
+  }
+
   const actions: GrowthCommandAction[] = []
 
   for (const lead of leads) {
     const leadId = lead.id as string
     const dealScore = dealScoreByLead.get(leadId)
     const callScore = callScoreByLead.get(leadId)
+    const growthSignal = growthSignalByLead.get(leadId)
     const baseImpact = {
       executivePriorityTier: lead.executive_priority_tier as string | null,
       revenueTrajectory: lead.revenue_trajectory as string | null,
@@ -270,6 +293,12 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
             riskLevel: callScore.riskLevel,
             nextStepScore: callScore.nextStepScore,
             objectionCount: callScore.objectionCount,
+          })
+        : 0,
+      growthSignalBoost: growthSignal
+        ? growthSignalActionImpactBoost({
+            growthSignalScore: growthSignal.score,
+            signalTier: growthSignal.tier,
           })
         : 0,
     }

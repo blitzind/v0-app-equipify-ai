@@ -14,6 +14,7 @@ import { CompanyIntelligenceCard } from "@/components/growth/company-signals/com
 import { BuyingCommitteePanel } from "@/components/growth/prospect-search/buying-committee-panel"
 import { CompanyContactIntelligencePanel } from "@/components/growth/prospect-search/company-contact-intelligence-panel"
 import { CompanyContactsPanel } from "@/components/growth/prospect-search/company-contacts-panel"
+import { CompanyGrowthSignalsPanel } from "@/components/growth/prospect-search/company-growth-signals-panel"
 import { RealWorldSourceBadge } from "@/components/growth/prospect-search/real-world-provider-status"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
@@ -115,6 +116,14 @@ export function CompanyResultCard({
       <CompanyStatusBadges row={row} />
       <ResultSignalBadges row={row} />
 
+      {row.growth_signal_score != null ? (
+        <p className="rounded-lg border border-sky-100 bg-sky-50/50 px-3 py-2 text-xs text-sky-950">
+          <span className="font-semibold">Growth signals:</span> {row.growth_signal_score}/100
+          {row.growth_signal_tier ? ` · ${row.growth_signal_tier}` : ""}
+          {row.growth_signal_recommended_action ? ` — ${row.growth_signal_recommended_action}` : ""}
+        </p>
+      ) : null}
+
       {row.company_signal_summary ? (
         <CompanySignalSummaryPanel
           summary={row.company_signal_summary}
@@ -165,6 +174,13 @@ export function CompanyResultCard({
             companyName={row.company_name}
             website={row.website}
             growthLeadId={row.growth_lead_id}
+          />
+          <CompanyGrowthSignalsPanel
+            companyId={row.id}
+            companyName={row.company_name}
+            website={row.website}
+            contactCoverageLabel={row.contact_intelligence?.contact_coverage_label}
+            lastVerifiedAt={row.growth_signal_last_computed_at}
           />
           <BuyingCommitteePanel companyCandidateId={row.id} companyName={row.company_name} />
         </>

@@ -8,6 +8,8 @@ import { listGrowthOutboundMessagesForLead } from "@/lib/growth/outbound/message
 import { listGrowthOutboundRepliesForLead } from "@/lib/growth/outbound/reply-repository"
 import { fetchLatestUsableGrowthLeadResearchRun } from "@/lib/growth/research-repository"
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
+import { loadCompanyGrowthSignalsSnapshot } from "@/lib/growth/company-growth-signals/growth-signal-repository"
+import { GROWTH_SIGNAL_TYPE_LABELS } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
 import type { GrowthLead } from "@/lib/growth/types"
 
 function truncate(value: string | null | undefined, max = 240): string {
@@ -21,7 +23,7 @@ export async function buildGrowthAiCopilotInput(
   lead: GrowthLead,
   options?: { sourceReplyId?: string | null },
 ): Promise<GrowthAiCopilotInputSnapshot> {
-  const [decisionMakers, messages, replies, researchRun, prospectRun] = await Promise.all([
+  const [decisionMakers, messages, replies, researchRun, prospectRun, growthSignals] = await Promise.all([
     listGrowthLeadDecisionMakers(admin, lead.id),
     listGrowthOutboundMessagesForLead(admin, lead.id),
     listGrowthOutboundRepliesForLead(admin, lead.id),
@@ -31,6 +33,7 @@ export async function buildGrowthAiCopilotInput(
     lead.latestProspectResearchRunId
       ? fetchLatestCompletedProspectResearchRun(admin, lead.id)
       : Promise.resolve(null),
+    loadCompanyGrowthSignalsSnapshot(admin, lead.id).catch(() => null),
   ])
 
   const sourceReply = options?.sourceReplyId
@@ -85,6 +88,14 @@ export async function buildGrowthAiCopilotInput(
     nextBestActionReason: truncate(lead.nextBestActionReason, 160),
     recentOutbound,
     replyPreview: truncate(sourceReply?.bodyPreview, 1200) || null,
+    growthSignalScore: growthSignals?.score?.growth_signal_score ?? null,
+    growthSignalTier: growthSignals?.score?.signal_tier ?? null,
+    growthSignalRecommendedAction: truncate(growthSignals?.score?.recommended_next_action, 160) || null,
+    topGrowthSignals: (growthSignals?.score?.top_signals ?? []).slice(0, 3).map((signal) => ({
+      signalType: GROWTH_SIGNAL_TYPE_LABELS[signal.signal_type] ?? signal.signal_type,
+      confidence: signal.confidence_score,
+      evidence: truncate(signal.evidence_excerpt, 160),
+    })),
     frameworks: resolveGrowthAiCopilotFrameworkKeys(lead),
   }
 }

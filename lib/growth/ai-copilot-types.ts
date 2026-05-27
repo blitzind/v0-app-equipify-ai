@@ -163,6 +163,10 @@ export type GrowthAiCopilotInputSnapshot = {
     occurredAt: string | null
   }>
   replyPreview?: string | null
+  growthSignalScore?: number | null
+  growthSignalTier?: string | null
+  growthSignalRecommendedAction?: string | null
+  topGrowthSignals?: Array<{ signalType: string; confidence: number; evidence: string }>
   frameworks: {
     objections: string[]
     buyingSignals: string[]

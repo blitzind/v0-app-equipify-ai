@@ -3,6 +3,13 @@ import type {
   GrowthLeadInboxStatus,
 } from "@/lib/growth/lead-inbox/lead-inbox-types"
 
+function growthSignalScoreFromMetadata(metadata: Record<string, unknown>): number {
+  const growthSignals = metadata.growth_signals
+  if (!growthSignals || typeof growthSignals !== "object") return 0
+  const score = (growthSignals as Record<string, unknown>).growth_signal_score
+  return typeof score === "number" ? score : 0
+}
+
 const PRIORITY_RANK: Record<GrowthLeadInboxRow["candidate_priority"], number> = {
   urgent: 0,
   high: 1,
@@ -24,6 +31,10 @@ export function compareLeadInboxPriority(a: GrowthLeadInboxRow, b: GrowthLeadInb
 
   const scoreDelta = b.intent_score - a.intent_score
   if (scoreDelta !== 0) return scoreDelta
+
+  const growthDelta =
+    growthSignalScoreFromMetadata(b.metadata) - growthSignalScoreFromMetadata(a.metadata)
+  if (growthDelta !== 0) return growthDelta
 
   const confidenceDelta = b.candidate_confidence - a.candidate_confidence
   if (confidenceDelta !== 0) return confidenceDelta

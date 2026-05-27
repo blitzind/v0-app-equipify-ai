@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 680,
-  sqlMigrations: 284,
+  apiRouteHandlers: 682,
+  sqlMigrations: 285,
   dashboardPages: 65,
-  componentsTsx: 533,
-  libTsFiles: 1775,
+  componentsTsx: 534,
+  libTsFiles: 1787,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **680** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **284** |
+| API route handlers (\`app/api/**/route.ts\`) | **682** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **285** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **533** |
-| \`lib/**/*.ts\` | **1775** |
+| \`components/**/*.tsx\` | **534** |
+| \`lib/**/*.ts\` | **1787** |
 
 ### Vercel crons
 
@@ -48,6 +48,7 @@ cron/ai-ops-digest/route.ts
 cron/blitzpay-memberships/route.ts
 cron/blitzpay-reminders/route.ts
 cron/blitzpay-scheduled-payments/route.ts
+cron/growth-company-signal-refresh/route.ts
 cron/growth-contact-refresh/route.ts
 cron/growth-outreach-execute/route.ts
 cron/growth-sequence-scheduler/route.ts
@@ -500,6 +501,7 @@ platform/growth/communication-preferences/route.ts
 platform/growth/communication-settings/route.ts
 platform/growth/company-contacts/[contactId]/route.ts
 platform/growth/company-contacts/route.ts
+platform/growth/company-growth-signals/route.ts
 platform/growth/company-signals/route.ts
 platform/growth/contact-discovery/route.ts
 platform/growth/conversations/dashboard/route.ts

@@ -2,6 +2,10 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createLeadCandidate } from "@/lib/growth/lead-inbox/lead-inbox-repository"
+import {
+  growthSignalInboxIntentBoost,
+  growthSignalInboxPriority,
+} from "@/lib/growth/company-growth-signals/integrations/command-center-bridge"
 import { prospectSearchDedupeHash } from "@/lib/growth/prospect-search/prospect-search-index"
 import {
   buildProspectSearchPushMetadata,
@@ -59,14 +63,19 @@ export async function pushProspectSearchCompanyToLeadInbox(
     company.website ?? "",
   ])
 
+  const growthIntentBoost = growthSignalInboxIntentBoost(company.growth_signal_score)
+  const inboxPriority = company.growth_signal_tier
+    ? growthSignalInboxPriority(company.growth_signal_tier)
+    : "normal"
+
   const result = await createLeadCandidate(admin, {
     site_key:
       company.source_type === "external_discovered"
         ? "prospect_search_external_discovery"
         : "prospect_search",
     candidate_type: "identified",
-    candidate_priority: "normal",
-    intent_score: company.intent_score ?? 0,
+    candidate_priority: inboxPriority,
+    intent_score: (company.intent_score ?? 0) + growthIntentBoost,
     intent_grade: "C",
     candidate_confidence: company.confidence,
     pipeline_entry: "icp_targeting",
@@ -77,6 +86,9 @@ export async function pushProspectSearchCompanyToLeadInbox(
       company.source_type === "external_discovered"
         ? "Manual push from external company discovery — candidate is not an automatic lead."
         : "Manual push from Prospect Search — operator-initiated, not autonomous outreach.",
+      ...(company.growth_signal_score != null
+        ? [`Growth signal score ${company.growth_signal_score}${company.growth_signal_tier ? ` (${company.growth_signal_tier})` : ""}.`]
+        : []),
       ...company.match_reasoning.slice(0, 3),
     ],
     candidate_evidence:

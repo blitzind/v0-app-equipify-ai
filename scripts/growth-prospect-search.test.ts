@@ -1887,6 +1887,88 @@ async function main(): Promise<void> {
   assert.ok(contactExplained.confidence_explanation_items.some((item) => /Contact confidence/i.test(item)))
   assert.ok(contactExplained.recommended_next_step_reason?.includes("Recommended first contact"))
 
+  const {
+    applyGrowthSignalsToCompanyResult,
+  } = await import("../lib/growth/company-growth-signals/integrations/prospect-search-growth-signals-overlay")
+  const { growthSignalRankBoost } = await import("../lib/growth/company-growth-signals/growth-signal-scoring")
+
+  assert.match(repositorySource, /applyProspectSearchGrowthSignalsOverlay/)
+  assert.match(rankingSource, /growthSignalRankBoost/)
+  assert.match(companyCardSource, /CompanyGrowthSignalsPanel/)
+  assert.match(companyCardSource, /growth_signal_score/)
+
+  const growthBridged = applyGrowthSignalsToCompanyResult(
+    {
+      id: "co-growth-1",
+      source_type: "external_discovered",
+      company_name: "Signal HVAC",
+      website: "https://signal.example",
+      industry: "HVAC",
+      location: "Denver, CO",
+      city: "Denver",
+      state: "CO",
+      postal_code: null,
+      country: "US",
+      metro: null,
+      lat: null,
+      lng: null,
+      service_area: null,
+      signals: [],
+      match_reasoning: [],
+      rank_score: 0.55,
+      confidence: 0.72,
+      signal_confidence: 0.45,
+      lead_engine_score: 74,
+      lead_engine_score_explanation: "Strong ICP fit",
+      lead_score: 74,
+      buying_stage: "consideration",
+      buying_stage_reason: null,
+      intent_score: null,
+      search_intent_category: null,
+      company_match_confidence: null,
+      crm_detected: null,
+      field_service_software: null,
+      website_platform: null,
+      company_signal_summary: null,
+      existing_customer: false,
+      existing_prospect: false,
+      in_lead_inbox: false,
+      is_suppressed: false,
+      suppression_reason: null,
+    },
+    {
+      qa_marker: "growth-company-growth-signals-v1",
+      schema_ready: true,
+      company_id: "co-growth-1",
+      evidence_sources: [],
+      signals: [],
+      score: {
+        company_id: "co-growth-1",
+        growth_signal_score: 72,
+        signal_tier: "high",
+        top_signals: [
+          {
+            signal_type: "hiring_technicians",
+            confidence_score: 80,
+            evidence_excerpt: "HVAC technician role listed on careers page",
+          },
+        ],
+        recommended_next_action: "Research hiring contacts and validate operational pain",
+        last_computed_at: new Date().toISOString(),
+      },
+      privacy_note: "Evidence required",
+    },
+  )
+  assert.equal(growthBridged.growth_signal_score, 72)
+  assert.equal(growthBridged.growth_signal_tier, "high")
+  assert.ok(growthSignalRankBoost(72) > 0)
+
+  const growthPushSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-push-to-inbox.ts"),
+    "utf8",
+  )
+  assert.match(growthPushSource, /growthSignalInboxIntentBoost/)
+
   console.log("growth-prospect-search: all checks passed")
 }
 

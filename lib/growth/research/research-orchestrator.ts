@@ -19,6 +19,8 @@ import {
 import { scrapeProspectWebsite } from "@/lib/growth/research/website-scraper"
 import { runWebsiteContactDiscoveryForCompany } from "@/lib/growth/contact-discovery/company-contact-repository"
 import { isGrowthCompanyContactsSchemaReady } from "@/lib/growth/contact-discovery/company-contact-schema-health"
+import { runCompanyGrowthSignalDiscovery } from "@/lib/growth/company-growth-signals/growth-signal-repository"
+import { isGrowthCompanyGrowthSignalsSchemaReady } from "@/lib/growth/company-growth-signals/company-growth-signal-schema-health"
 import {
   fetchActiveProspectResearchRun,
   fetchCachedProspectResearchRun,
@@ -115,6 +117,22 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
     const industry = classifyProspectIndustry(lead.companyName, scrape)
     const tech = detectWebsiteTechnologies(scrape.html, scrape.plainText)
     const maturity = scoreWebsiteMaturity(scrape.html, scrape.plainText, scrape)
+
+    if (await isGrowthCompanyGrowthSignalsSchemaReady(input.admin)) {
+      try {
+        await runCompanyGrowthSignalDiscovery(input.admin, {
+          company_id: lead.id,
+          website: lead.website,
+          company_name: lead.companyName,
+          description: scrape.plainText.slice(0, 500) || null,
+          website_maturity_score: maturity.score,
+          icp_fit_score: lead.score,
+        })
+      } catch {
+        // Growth signal discovery is additive — research run continues on failure.
+      }
+    }
+
     const pain = detectProspectPainSignals(scrape.html, scrape.plainText, scrape, maturity.score)
     const companySignals = buildCompanySignals(scrape.html, scrape.plainText, scrape, tech.technologies)
     const flags = detectWebsiteFeatureFlags(scrape.html, scrape.plainText, scrape)

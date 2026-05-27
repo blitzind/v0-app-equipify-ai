@@ -98,6 +98,12 @@ export function buildGrowthAiCopilotUserPrompt(
       },
       recentOutbound: snapshot.recentOutbound,
       replyPreview: snapshot.replyPreview,
+      growthSignals: {
+        score: snapshot.growthSignalScore,
+        tier: snapshot.growthSignalTier,
+        recommendedAction: snapshot.growthSignalRecommendedAction,
+        topSignals: snapshot.topGrowthSignals,
+      },
       frameworks: {
         objections: objectionNotes,
         buyingSignals: buyingNotes,

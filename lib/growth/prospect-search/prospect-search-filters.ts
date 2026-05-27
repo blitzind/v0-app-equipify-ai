@@ -1,4 +1,5 @@
-import type { GrowthBuyingStage } from "@/lib/growth/buying-stage/buying-stage-types"
+import type { GrowthSignalTier } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
+import { GROWTH_SIGNAL_TIERS } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
 import {
   GROWTH_PROSPECT_SEARCH_EMPLOYEE_SIZE_BANDS,
   GROWTH_PROSPECT_SEARCH_REVENUE_BANDS,
@@ -125,6 +126,13 @@ export function normalizeProspectSearchFilters(
     verification_status: asString(raw.verification_status) || null,
     priority: asString(raw.priority) || null,
     source_types: Array.isArray(raw.source_types) ? raw.source_types : undefined,
+    growth_signal_score_min:
+      typeof raw.growth_signal_score_min === "number" ? raw.growth_signal_score_min : null,
+    growth_signal_tiers: Array.isArray(raw.growth_signal_tiers)
+      ? raw.growth_signal_tiers.filter((tier): tier is GrowthSignalTier =>
+          GROWTH_SIGNAL_TIERS.includes(tier as GrowthSignalTier),
+        )
+      : undefined,
   }
 }
 
@@ -208,6 +216,17 @@ export function applyProspectSearchFilters<
     }
     if (filters.lead_score_min != null && (row.lead_score ?? 0) < filters.lead_score_min) {
       return false
+    }
+    if (
+      filters.growth_signal_score_min != null &&
+      (row.growth_signal_score ?? 0) < filters.growth_signal_score_min
+    ) {
+      return false
+    }
+    if (filters.growth_signal_tiers?.length) {
+      if (!row.growth_signal_tier || !filters.growth_signal_tiers.includes(row.growth_signal_tier)) {
+        return false
+      }
     }
     if (filters.buying_stages?.length) {
       if (!row.buying_stage || !filters.buying_stages.includes(row.buying_stage as GrowthBuyingStage)) {

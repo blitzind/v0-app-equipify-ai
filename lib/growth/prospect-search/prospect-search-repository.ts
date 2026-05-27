@@ -26,6 +26,7 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-ranking"
 import { enrichProspectSearchExternalCompanies } from "@/lib/growth/prospect-search/prospect-search-external-enrichment"
 import { applyProspectSearchContactIntelligenceOverlay } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-loader"
+import { applyProspectSearchGrowthSignalsOverlay } from "@/lib/growth/company-growth-signals/integrations/prospect-search-bridge"
 import { runProspectSearchRealWorldDiscovery } from "@/lib/growth/prospect-search/prospect-search-real-world-discovery"
 import {
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
@@ -103,8 +104,9 @@ export async function runProspectSearch(
       enrichedCompanies,
       { query: input.query, filters: mergedFilters, parsed },
     )
+    const companiesWithSignals = await applyProspectSearchGrowthSignalsOverlay(admin, companiesWithContacts)
 
-    const source_counts = buildSourceCounts(companiesWithContacts)
+    const source_counts = buildSourceCounts(companiesWithSignals)
 
     return {
       qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
@@ -112,9 +114,9 @@ export async function runProspectSearch(
       query: input.query,
       parsed_query: parsed,
       filters: mergedFilters,
-      companies: companiesWithContacts,
+      companies: companiesWithSignals,
       people: [],
-      total_companies: companiesWithContacts.length,
+      total_companies: companiesWithSignals.length,
       total_people: 0,
       page: 1,
       page_size: companiesWithContacts.length,
@@ -201,6 +203,7 @@ export async function runProspectSearch(
     companyPage.companies,
     { query: input.query, filters: mergedFilters, parsed },
   )
+  const companiesWithSignals = await applyProspectSearchGrowthSignalsOverlay(admin, companiesWithContacts)
 
   return {
     qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
@@ -208,7 +211,7 @@ export async function runProspectSearch(
     query: input.query,
     parsed_query: parsed,
     filters: mergedFilters,
-    companies: companiesWithContacts,
+    companies: companiesWithSignals,
     people: peoplePage.people,
     total_companies: companyPage.total_count,
     total_people: peoplePage.total_count,

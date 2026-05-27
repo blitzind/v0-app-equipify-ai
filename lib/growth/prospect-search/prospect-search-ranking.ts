@@ -9,6 +9,7 @@ import type {
 import { inferEmployeeSizeBand, inferRevenueBand } from "@/lib/growth/prospect-search/prospect-search-filters"
 import { finalizeProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-result-finalize"
 import { computeContactCoverageRankBoost } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence"
+import { growthSignalRankBoost } from "@/lib/growth/company-growth-signals/growth-signal-scoring"
 
 function includesFold(hay: string | null | undefined, needle: string): boolean {
   if (!hay || !needle) return false
@@ -151,6 +152,7 @@ export function rankProspectSearchCompanies(
     }
     rank += computeQualificationRankBoost(row)
     rank += computeContactRankBoost(row)
+    rank += growthSignalRankBoost(row.growth_signal_score)
 
     const summary = row.company_signal_summary
     if (summary?.technology_signals.length) rank += 0.02

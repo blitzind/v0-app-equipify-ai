@@ -85,6 +85,16 @@ export function buildProspectSearchPushMetadata(
     ...(company.company_signal_summary
       ? { company_signal_summary: company.company_signal_summary }
       : {}),
+    ...(company.growth_signal_score != null
+      ? {
+          growth_signals: {
+            growth_signal_score: company.growth_signal_score,
+            growth_signal_tier: company.growth_signal_tier,
+            recommended_next_action: company.growth_signal_recommended_action,
+            last_computed_at: company.growth_signal_last_computed_at,
+          },
+        }
+      : {}),
   }
 }
 

@@ -11,6 +11,7 @@ export function computeCommandActionImpact(input: {
   overdueFollowUp?: boolean
   dealIntelligenceBoost?: number
   callIntelligenceBoost?: number
+  growthSignalBoost?: number
 }): number {
   let score = COMMAND_ACTION_BASE_IMPACT[input.kind]
 
@@ -29,6 +30,7 @@ export function computeCommandActionImpact(input: {
   if (input.overdueFollowUp) score += 5
   if (input.dealIntelligenceBoost) score += input.dealIntelligenceBoost
   if (input.callIntelligenceBoost) score += input.callIntelligenceBoost
+  if (input.growthSignalBoost) score += input.growthSignalBoost
 
   score -= Math.round(COMMAND_ACTION_EFFORT_MINUTES[input.kind] / 5)
 

@@ -1,6 +1,7 @@
 /** Growth Engine — Prospect Search + ICP Builder types (Prompt 23). Client-safe. */
 
 import type { GrowthCompanySignalUiSummary } from "@/lib/growth/company-signals/company-signal-types"
+import type { GrowthSignalTier } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
 import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
 import type { GrowthBuyingStage } from "@/lib/growth/buying-stage/buying-stage-types"
 import type { GrowthSearchIntentCategory } from "@/lib/growth/search-intent/search-intent-types"
@@ -142,6 +143,8 @@ export type GrowthProspectSearchFilters = {
   verification_status?: string | null
   priority?: string | null
   source_types?: GrowthProspectSearchSourceType[]
+  growth_signal_score_min?: number | null
+  growth_signal_tiers?: GrowthSignalTier[]
 }
 
 export type GrowthProspectSearchParsedQuery = {
@@ -293,6 +296,11 @@ export type GrowthProspectSearchCompanyResult = {
   territory_match_reasons?: string[]
   /** Evidence-backed decision maker / committee overlay (Sprint 4C). */
   contact_intelligence?: GrowthProspectSearchContactIntelligence | null
+  /** Multi-source growth signal score overlay. */
+  growth_signal_score?: number | null
+  growth_signal_tier?: GrowthSignalTier | null
+  growth_signal_recommended_action?: string | null
+  growth_signal_last_computed_at?: string | null
 }
 
 export type GrowthProspectSearchPersonResult = {
