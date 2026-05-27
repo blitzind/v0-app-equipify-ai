@@ -4,6 +4,7 @@ import { Mail } from "lucide-react"
 import Link from "next/link"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
+import { GrowthInfrastructureReadinessStrip } from "@/components/growth/growth-infrastructure-readiness-strip"
 import { GrowthMailboxConnectionsDashboard } from "@/components/growth/growth-mailbox-connections-dashboard"
 import {
   PlatformAdminPageShell,
@@ -44,6 +45,12 @@ export default function AdminGrowthMailboxConnectionsPage() {
             </Button>
           </div>
         </section>
+
+        <GrowthInfrastructureReadinessStrip
+          surfaceId="mailbox_provider"
+          title="Google mailbox path"
+          matchTitle="Google mailbox (primary)"
+        />
 
         <GrowthSectionLayout>
           <GrowthMailboxConnectionsDashboard />

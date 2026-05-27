@@ -4,6 +4,7 @@ import { Settings2 } from "lucide-react"
 import Link from "next/link"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthProviderSetupDashboard } from "@/components/growth/growth-provider-setup-dashboard"
+import { GrowthInfrastructureReadinessStrip } from "@/components/growth/growth-infrastructure-readiness-strip"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -45,6 +46,12 @@ export default function AdminGrowthProviderSetupPage() {
             </Button>
           </div>
         </section>
+
+        <GrowthInfrastructureReadinessStrip
+          surfaceId="mailbox_provider"
+          title="Google mailbox provider"
+          matchTitle="Google mailbox (primary)"
+        />
 
         <GrowthSectionLayout>
           <GrowthProviderSetupDashboard />

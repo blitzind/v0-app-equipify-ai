@@ -1,9 +1,20 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto"
 
-const PEPPER =
-  process.env.GROWTH_PROVIDER_SECRET_PEPPER?.trim() ||
-  process.env.GROWTH_PROVIDER_CREDENTIALS_PEPPER?.trim() ||
-  "growth_provider_credentials_pepper_dev_only"
+export const DEV_FALLBACK_CREDENTIAL_PEPPER = "growth_provider_credentials_pepper_dev_only" as const
+
+function resolveCredentialPepper(): string {
+  return (
+    process.env.GROWTH_PROVIDER_SECRET_PEPPER?.trim() ||
+    process.env.GROWTH_PROVIDER_CREDENTIALS_PEPPER?.trim() ||
+    DEV_FALLBACK_CREDENTIAL_PEPPER
+  )
+}
+
+export function isUsingDevFallbackCredentialPepper(): boolean {
+  return resolveCredentialPepper() === DEV_FALLBACK_CREDENTIAL_PEPPER
+}
+
+const PEPPER = resolveCredentialPepper()
 
 const ALGORITHM = "aes-256-gcm"
 const IV_BYTES = 12

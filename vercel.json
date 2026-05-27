@@ -19,6 +19,46 @@
     {
       "path": "/api/cron/process-technician-push-queue",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/growth-outreach-execute",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/growth-sequence-scheduler",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/growth-sequence-safe-execute",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/growth-inbox-sync",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/growth-signal-ingest",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/growth-discovery-worker",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/growth-company-signal-refresh",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/growth-contact-refresh",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/growth-territory-refresh",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/growth-market-health-refresh",
+      "schedule": "0 1 * * *"
     }
   ]
 }

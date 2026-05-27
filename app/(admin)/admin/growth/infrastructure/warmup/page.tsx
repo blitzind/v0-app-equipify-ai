@@ -4,6 +4,7 @@ import { Flame } from "lucide-react"
 import Link from "next/link"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
+import { GrowthInfrastructureReadinessStrip } from "@/components/growth/growth-infrastructure-readiness-strip"
 import { GrowthWarmupDashboardPanel } from "@/components/growth/growth-warmup-dashboard"
 import {
   PlatformAdminPageShell,
@@ -44,6 +45,8 @@ export default function AdminGrowthWarmupPage() {
             </Button>
           </div>
         </section>
+
+        <GrowthInfrastructureReadinessStrip surfaceId="warmup" title="Mailbox warmup" />
 
         <GrowthSectionLayout>
           <GrowthWarmupDashboardPanel />

@@ -271,7 +271,7 @@ export async function evaluatePreSendSuppression(
   return { allowed: true, reason: null, blockCode: null }
 }
 
-/** Pre-send gate — must pass before any transport execution. No bypass. */
+/** Pre-send gate — delegates to unified assertPreSendAllowed. No bypass. */
 export async function assertPreSendSuppressionAllowed(
   admin: SupabaseClient,
   input: {
@@ -280,5 +280,11 @@ export async function assertPreSendSuppressionAllowed(
     senderAccountId: string
   },
 ): Promise<GrowthPreSendSuppressionResult> {
-  return evaluatePreSendSuppression(admin, input)
+  const { assertPreSendAllowed } = await import("@/lib/growth/compliance/pre-send-assertion")
+  const result = await assertPreSendAllowed(admin, input)
+  return {
+    allowed: result.allowed,
+    reason: result.reason,
+    blockCode: result.blockCode,
+  }
 }

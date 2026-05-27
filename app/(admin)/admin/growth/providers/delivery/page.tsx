@@ -4,6 +4,7 @@ import { Truck } from "lucide-react"
 import Link from "next/link"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
+import { GrowthInfrastructureReadinessStrip } from "@/components/growth/growth-infrastructure-readiness-strip"
 import { GrowthProviderDeliveryDashboardPanel } from "@/components/growth/growth-provider-delivery-dashboard"
 import {
   PlatformAdminPageShell,
@@ -35,7 +36,7 @@ export default function AdminGrowthProviderDeliveryPage() {
               <div>
                 <h1 className={PAGE_STANDARD_PAGE_TITLE}>Delivery</h1>
                 <p className="text-sm text-muted-foreground">
-                  Provider transport abstraction and route simulation — orchestration only, no live outbound execution.
+                  Transport routing, delivery attempts, and provider health — live when simulation flags are off.
                 </p>
               </div>
             </div>
@@ -44,6 +45,8 @@ export default function AdminGrowthProviderDeliveryPage() {
             </Button>
           </div>
         </section>
+
+        <GrowthInfrastructureReadinessStrip surfaceId="transport_send" title="Transport send plane" />
 
         <GrowthSectionLayout>
           <GrowthProviderDeliveryDashboardPanel />

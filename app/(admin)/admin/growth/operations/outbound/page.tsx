@@ -1,18 +1,18 @@
 "use client"
 
-import { Webhook } from "lucide-react"
+import { Radar } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
-import { GrowthProviderWebhooksDashboardPanel } from "@/components/growth/growth-provider-webhooks-dashboard"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
-import { GrowthInfrastructureReadinessStrip } from "@/components/growth/growth-infrastructure-readiness-strip"
+import { GrowthOutboundOperationsDashboard } from "@/components/growth/growth-outbound-operations-dashboard"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
   usePlatformAdminHeaderIdentity,
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
+import { GROWTH_CRON_TELEMETRY_QA_MARKER } from "@/lib/growth/runtime/cron-telemetry-types"
 
-export default function AdminGrowthProviderWebhooksPage() {
+export default function AdminGrowthOutboundOperationsPage() {
   const { sessionIdentity } = useAdmin()
   const header = usePlatformAdminHeaderIdentity({
     displayName: sessionIdentity?.displayName,
@@ -22,27 +22,25 @@ export default function AdminGrowthProviderWebhooksPage() {
 
   return (
     <PlatformAdminPageShell header={header}>
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8" data-qa-marker={GROWTH_CRON_TELEMETRY_QA_MARKER}>
         <PlatformAdminTabNav activeKey="growth_leads" />
 
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center gap-2">
-            <span className="flex size-9 items-center justify-center rounded-full bg-violet-50 text-violet-700">
-              <Webhook size={17} />
+            <span className="flex size-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+              <Radar size={17} />
             </span>
             <div>
-              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Webhooks</h1>
+              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Outbound Operations</h1>
               <p className="text-sm text-muted-foreground">
-                Ingest provider delivery events — Growth Engine owns state, compliance, and attribution.
+                Cron telemetry, queue health, provider status, and honest infrastructure readiness — platform admin only.
               </p>
             </div>
           </div>
         </section>
 
-        <GrowthInfrastructureReadinessStrip surfaceId="webhook_ingestion" title="Webhook ingestion" />
-
         <GrowthSectionLayout>
-          <GrowthProviderWebhooksDashboardPanel />
+          <GrowthOutboundOperationsDashboard />
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>

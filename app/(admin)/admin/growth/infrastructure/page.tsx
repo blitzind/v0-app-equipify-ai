@@ -5,6 +5,8 @@ import Link from "next/link"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import { GrowthSenderInfrastructureDashboard } from "@/components/growth/growth-sender-infrastructure-dashboard"
+import { GrowthInfrastructureReadinessStrip } from "@/components/growth/growth-infrastructure-readiness-strip"
+import { GROWTH_INFRASTRUCTURE_READINESS_QA_MARKER } from "@/lib/growth/infrastructure/infrastructure-readiness-types"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -23,7 +25,7 @@ export default function AdminGrowthInfrastructurePage() {
 
   return (
     <PlatformAdminPageShell header={header}>
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8" data-qa-marker={GROWTH_INFRASTRUCTURE_READINESS_QA_MARKER}>
         <PlatformAdminTabNav activeKey="growth_leads" />
 
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -49,6 +51,8 @@ export default function AdminGrowthInfrastructurePage() {
             </div>
           </div>
         </section>
+
+        <GrowthInfrastructureReadinessStrip surfaceId="transport_send" title="Outbound transport" />
 
         <GrowthSectionLayout>
           <GrowthSenderInfrastructureDashboard />

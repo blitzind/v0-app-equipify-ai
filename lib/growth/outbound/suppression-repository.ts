@@ -101,8 +101,20 @@ export async function listGrowthSuppressionEntries(
 export async function assertEmailSendAllowed(
   admin: SupabaseClient,
   email: string,
-): Promise<{ allowed: boolean; reason?: string }> {
-  const suppressed = await isEmailSuppressed(admin, email)
-  if (suppressed) return { allowed: false, reason: "suppressed" }
+  input?: { leadId?: string | null; senderAccountId?: string },
+): Promise<{ allowed: boolean; reason?: string; blockLayer?: string | null }> {
+  const { evaluatePreSendAllowed } = await import("@/lib/growth/compliance/pre-send-assertion")
+  const result = await evaluatePreSendAllowed(admin, {
+    email,
+    leadId: input?.leadId,
+    senderAccountId: input?.senderAccountId,
+  })
+  if (!result.allowed) {
+    return {
+      allowed: false,
+      reason: result.reason ?? result.blockCode ?? "suppressed",
+      blockLayer: result.blockLayer,
+    }
+  }
   return { allowed: true }
 }

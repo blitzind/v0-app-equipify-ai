@@ -11,7 +11,8 @@ import { getTransportAdapter } from "@/lib/growth/providers/adapters/adapter-reg
 import { selectDeliveryRoute } from "@/lib/growth/providers/provider-router"
 import { getSenderAccount } from "@/lib/growth/sender/sender-repository"
 import { applyOutboundEmailTracking } from "@/lib/growth/tracking/tracking-links"
-import { assertPreSendSuppressionAllowed } from "@/lib/growth/compliance/suppression-engine"
+import { assertPreSendAllowed } from "@/lib/growth/compliance/pre-send-assertion"
+import { assertGrowthProductionRuntimeSafe } from "@/lib/growth/runtime/runtime-guards"
 import { enforceGovernanceIfReady } from "@/lib/growth/governance/governance-enforcement"
 import { checkTransportRateLimit } from "@/lib/growth/providers/transport/transport-rate-limit"
 import { resolveTransportFallbackRoute, simulateTransportDelivery } from "@/lib/growth/providers/transport/transport-fallback"
@@ -121,7 +122,7 @@ async function executeAttemptOnRoute(
     extra_metadata?: Record<string, unknown>
   },
 ): Promise<TransportSendResult> {
-  const suppression = await assertPreSendSuppressionAllowed(admin, {
+  const suppression = await assertPreSendAllowed(admin, {
     email: input.message.to,
     leadId: input.lead_id,
     senderAccountId: input.sender_account_id,
@@ -341,6 +342,7 @@ export async function executeTransportSend(
   input: TransportSendInput,
 ): Promise<TransportSendResult> {
   assertHumanApproval(input)
+  assertGrowthProductionRuntimeSafe("transport.send")
 
   await enforceGovernanceIfReady(admin, {
     action: input.is_test ? "provider_test_send" : "provider_send",

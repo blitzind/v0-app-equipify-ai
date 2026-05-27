@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 860,
-  sqlMigrations: 318,
+  apiRouteHandlers: 862,
+  sqlMigrations: 319,
   dashboardPages: 65,
-  componentsTsx: 603,
-  libTsFiles: 2149,
+  componentsTsx: 606,
+  libTsFiles: 2159,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **860** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **318** |
+| API route handlers (\`app/api/**/route.ts\`) | **862** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **319** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **603** |
-| \`lib/**/*.ts\` | **2149** |
+| \`components/**/*.tsx\` | **606** |
+| \`lib/**/*.ts\` | **2159** |
 
 ### Vercel crons
 
@@ -30,6 +30,16 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 - \`/api/cron/process-import-runs\` — cron: \`*/5 * * * *\`
 - \`/api/cron/ai-ops-digest\` — cron: \`0 * * * *\`
 - \`/api/cron/process-technician-push-queue\` — cron: \`*/5 * * * *\`
+- \`/api/cron/growth-outreach-execute\` — cron: \`*/5 * * * *\`
+- \`/api/cron/growth-sequence-scheduler\` — cron: \`*/10 * * * *\`
+- \`/api/cron/growth-sequence-safe-execute\` — cron: \`*/5 * * * *\`
+- \`/api/cron/growth-inbox-sync\` — cron: \`*/15 * * * *\`
+- \`/api/cron/growth-signal-ingest\` — cron: \`0 * * * *\`
+- \`/api/cron/growth-discovery-worker\` — cron: \`0 3 * * *\`
+- \`/api/cron/growth-company-signal-refresh\` — cron: \`0 4 * * *\`
+- \`/api/cron/growth-contact-refresh\` — cron: \`30 4 * * *\`
+- \`/api/cron/growth-territory-refresh\` — cron: \`0 2 * * *\`
+- \`/api/cron/growth-market-health-refresh\` — cron: \`0 1 * * *\`
 
 ### API routes (relative to \`app/api\`)
 
@@ -622,6 +632,7 @@ platform/growth/inbox/thread/[id]/resolve/route.ts
 platform/growth/inbox/thread/[id]/route.ts
 platform/growth/inbox/thread/[id]/unassign/route.ts
 platform/growth/inbox/thread/route.ts
+platform/growth/infrastructure/readiness/route.ts
 platform/growth/intelligence/dashboard/route.ts
 platform/growth/intelligence/providers/route.ts
 platform/growth/intelligence/revenue/route.ts
@@ -712,6 +723,7 @@ platform/growth/multichannel/tasks/[id]/approve/route.ts
 platform/growth/multichannel/tasks/[id]/complete/route.ts
 platform/growth/multichannel/tasks/[id]/skip/route.ts
 platform/growth/multichannel/tasks/route.ts
+platform/growth/operations/outbound/route.ts
 platform/growth/opportunities/[opportunityId]/deal-intelligence/recompute/route.ts
 platform/growth/opportunities/[opportunityId]/deal-intelligence/route.ts
 platform/growth/opportunities/dashboard/route.ts

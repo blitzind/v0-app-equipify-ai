@@ -18,6 +18,8 @@ import {
 } from "@/lib/growth/mailboxes/mailbox-token-manager"
 import { getMailboxProviderCapabilities } from "@/lib/growth/mailboxes/mailbox-provider-registry"
 import { validateMailboxConnectionStub } from "@/lib/growth/mailboxes/mailbox-validation"
+import { googleProviderOAuthConfigured } from "@/lib/growth/provider-setup/google-oauth"
+import { validateGoogleMailboxConnectionLive, refreshGoogleMailboxTokensLive } from "@/lib/growth/mailboxes/google-mailbox-live-validation"
 import type {
   GrowthMailboxConnectionSummary,
   GrowthMailboxHealthDashboard,
@@ -320,19 +322,52 @@ export async function validateMailboxConnection(
   if (!data) throw new Error("mailbox_not_found")
 
   const row = data as MailboxRow
-  const validation = validateMailboxConnectionStub({
-    provider_family: asString(row.provider_family) as GrowthSenderProviderFamily,
+  const providerFamily = asString(row.provider_family) as GrowthSenderProviderFamily
+  const validationInput = {
+    provider_family: providerFamily,
     email_address: asString(row.email_address),
     status: asString(row.status) as GrowthMailboxConnectionSummary["status"],
     token_configured: Boolean(row.encrypted_access_token || row.encrypted_refresh_token),
     token_expires_at: asString(row.token_expires_at) || null,
     validation_failure_count: asNumber(row.validation_failure_count, 0),
-  })
+  }
 
-  const refreshResult = refreshProviderToken({
-    provider_family: asString(row.provider_family) as GrowthSenderProviderFamily,
+  let validation =
+    providerFamily === "google" && googleProviderOAuthConfigured()
+      ? await validateGoogleMailboxConnectionLive({
+          email_address: validationInput.email_address,
+          encrypted_refresh_token: asString(row.encrypted_refresh_token) || null,
+          encrypted_access_token: asString(row.encrypted_access_token) || null,
+          token_expires_at: validationInput.token_expires_at,
+          status: validationInput.status,
+          validation_failure_count: validationInput.validation_failure_count,
+        })
+      : validateMailboxConnectionStub(validationInput)
+
+  let refreshResult = refreshProviderToken({
+    provider_family: providerFamily,
     encrypted_refresh_token: asString(row.encrypted_refresh_token) || null,
   })
+
+  let tokenExpiresAt = asString(row.token_expires_at) || null
+  let encryptedAccessToken = asString(row.encrypted_access_token) || null
+
+  if (providerFamily === "google" && googleProviderOAuthConfigured() && validation.valid) {
+    const liveRefresh = await refreshGoogleMailboxTokensLive(asString(row.encrypted_refresh_token) || null)
+    if (liveRefresh.ok) {
+      refreshResult = "supported"
+      encryptedAccessToken = encryptMailboxToken(liveRefresh.accessToken)
+      tokenExpiresAt = liveRefresh.expiresAt
+    } else {
+      refreshResult = "failed"
+      validation = {
+        valid: false,
+        status: "error",
+        message: liveRefresh.message,
+        checked_at: new Date().toISOString(),
+      }
+    }
+  }
 
   const now = new Date().toISOString()
   const failureCount = validation.valid
@@ -344,6 +379,8 @@ export async function validateMailboxConnection(
       status: validation.status,
       last_validation_at: validation.checked_at,
       validation_failure_count: failureCount,
+      encrypted_access_token: encryptedAccessToken,
+      token_expires_at: tokenExpiresAt,
       last_refresh_attempt: refreshResult !== "unsupported" ? now : asString(row.last_refresh_attempt) || null,
       last_successful_refresh: refreshResult === "supported" ? now : asString(row.last_successful_refresh) || null,
       updated_at: now,
