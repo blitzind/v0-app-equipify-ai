@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import {
+  GROWTH_INTENT_CONSENT_MANAGER_QA_MARKER,
   GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER,
   GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION,
   GROWTH_INTENT_PIXEL_TRACKING_MODES,
@@ -47,6 +48,50 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
     <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+    </div>
+  )
+}
+
+function ConsentBreakdownChart({
+  breakdown,
+}: {
+  breakdown: GrowthIntentPixelAdminDiagnostics["consent_breakdown"]
+}) {
+  const total = breakdown.granted + breakdown.denied + breakdown.unknown
+  if (total === 0) {
+    return <p className="text-sm text-muted-foreground">No consent-resolved sessions in the last 24 hours.</p>
+  }
+
+  const segments = [
+    { key: "Granted", value: breakdown.granted, className: "bg-emerald-500" },
+    { key: "Denied", value: breakdown.denied, className: "bg-rose-500" },
+    { key: "Unknown", value: breakdown.unknown, className: "bg-amber-400" },
+  ]
+
+  return (
+    <div className="space-y-3">
+      <div className="flex h-3 overflow-hidden rounded-full bg-muted">
+        {segments.map((segment) =>
+          segment.value > 0 ? (
+            <div
+              key={segment.key}
+              className={cn(segment.className, "h-full")}
+              style={{ width: `${(segment.value / total) * 100}%` }}
+              title={`${segment.key}: ${segment.value}`}
+            />
+          ) : null,
+        )}
+      </div>
+      <div className="flex flex-wrap gap-4 text-sm">
+        {segments.map((segment) => (
+          <div key={segment.key} className="flex items-center gap-2">
+            <span className={cn("size-2.5 rounded-full", segment.className)} />
+            <span>
+              {segment.key}: <span className="font-medium tabular-nums">{segment.value}</span>
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -412,6 +457,54 @@ export function GrowthIntentPixelAdmin() {
                 : "None"
             }
           />
+        </div>
+
+        <div
+          className="space-y-4 border-t border-border px-5 py-5"
+          data-qa-marker={GROWTH_INTENT_CONSENT_MANAGER_QA_MARKER}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-base font-semibold">Consent &amp; tracking visibility</h3>
+              <p className="text-sm text-muted-foreground">
+                First-party consent manager metrics — anonymous behavioral tracking blocked when denied or unknown.
+              </p>
+            </div>
+            {diagnostics?.tracking_visibility_impacted ? (
+              <Badge variant="destructive" className="shrink-0">
+                Tracking visibility impacted
+              </Badge>
+            ) : null}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label="Consent acceptance %"
+              value={
+                diagnostics?.consent_acceptance_pct != null
+                  ? `${diagnostics.consent_acceptance_pct}%`
+                  : "—"
+              }
+            />
+            <StatCard
+              label="Tracking coverage %"
+              value={
+                diagnostics?.tracking_coverage_pct != null
+                  ? `${diagnostics.tracking_coverage_pct}%`
+                  : "—"
+              }
+            />
+            <StatCard
+              label="Anonymous sessions blocked"
+              value={diagnostics?.anonymous_sessions_blocked_24h ?? "—"}
+            />
+            <StatCard
+              label="High intent blocked by consent"
+              value={diagnostics?.high_intent_sessions_blocked_by_consent_24h ?? "—"}
+            />
+          </div>
+          {diagnostics?.consent_breakdown ? (
+            <ConsentBreakdownChart breakdown={diagnostics.consent_breakdown} />
+          ) : null}
         </div>
         {schemaReadyResolved ? (
           <div className="flex flex-wrap items-center gap-2 border-t border-border px-5 py-3">

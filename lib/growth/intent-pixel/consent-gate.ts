@@ -1,4 +1,7 @@
 import {
+  EXPLICIT_CAPTURE_CONVERSION_TYPES,
+} from "@/lib/growth/intent-pixel/intent-consent-manager-types"
+import {
   GROWTH_INTENT_PIXEL_CONSENT_STATUSES,
   type GrowthIntentPixelConsentStatus,
   type GrowthIntentPixelEventType,
@@ -26,10 +29,42 @@ export function normalizeConsentStatus(value: unknown): GrowthIntentPixelConsent
     : "unknown"
 }
 
+export function isExplicitCaptureConversion(conversionType?: string | null): boolean {
+  const raw = typeof conversionType === "string" ? conversionType.trim().toLowerCase() : ""
+  return EXPLICIT_CAPTURE_CONVERSION_TYPES.includes(raw as (typeof EXPLICIT_CAPTURE_CONVERSION_TYPES)[number])
+}
+
+export function allowsBehavioralTracking(
+  consentStatus: GrowthIntentPixelConsentStatus,
+  trackingMode: GrowthIntentPixelTrackingMode,
+): boolean {
+  return (
+    trackingMode === "full" &&
+    (consentStatus === "granted" || consentStatus === "not_required")
+  )
+}
+
+export function allowsIntentScoring(consentStatus: GrowthIntentPixelConsentStatus): boolean {
+  return consentStatus === "granted" || consentStatus === "not_required"
+}
+
+export function allowsSearchIntentSignals(consentStatus: GrowthIntentPixelConsentStatus): boolean {
+  return allowsIntentScoring(consentStatus)
+}
+
+export function allowsBuyingStageInference(consentStatus: GrowthIntentPixelConsentStatus): boolean {
+  return allowsIntentScoring(consentStatus)
+}
+
+export function allowsSessionScoring(consentStatus: GrowthIntentPixelConsentStatus): boolean {
+  return allowsIntentScoring(consentStatus)
+}
+
 export function resolveTrackingMode(
   site: GrowthIntentPixelSite,
   consentStatus: GrowthIntentPixelConsentStatus,
   eventType: GrowthIntentPixelEventType,
+  conversionType?: string | null,
 ): { mode: GrowthIntentPixelTrackingMode; accepted: boolean; reason: string } {
   if (!site.tracking_enabled) {
     return { mode: "rejected", accepted: false, reason: "Site tracking is disabled." }
@@ -37,19 +72,6 @@ export function resolveTrackingMode(
 
   if (!site.consent_required) {
     return { mode: "full", accepted: true, reason: "Consent not required for this site." }
-  }
-
-  if (
-    site.allow_anonymous_pageviews &&
-    consentStatus === "unknown" &&
-    ANONYMOUS_PAGE_EVENTS.has(eventType)
-  ) {
-    return {
-      mode: "anonymous",
-      accepted: true,
-      reason:
-        "Anonymous pageview permitted — site allows first-party pageviews without consent (no PII).",
-    }
   }
 
   if (consentStatus === "granted" || consentStatus === "not_required") {
@@ -64,10 +86,30 @@ export function resolveTrackingMode(
         reason: "Consent denied — only consent preference stored.",
       }
     }
+    if (eventType === "conversion" && isExplicitCaptureConversion(conversionType)) {
+      return {
+        mode: "essential_only",
+        accepted: true,
+        reason: "Explicit capture event permitted while analytics consent denied.",
+      }
+    }
     return {
       mode: "rejected",
       accepted: false,
-      reason: "Consent denied — analytics tracking blocked.",
+      reason: "Consent denied — anonymous session and behavioral tracking blocked.",
+    }
+  }
+
+  if (
+    site.allow_anonymous_pageviews &&
+    consentStatus === "unknown" &&
+    ANONYMOUS_PAGE_EVENTS.has(eventType)
+  ) {
+    return {
+      mode: "essential_only",
+      accepted: true,
+      reason:
+        "Operational pageview only — no behavioral profiling or intent scoring until consent is granted.",
     }
   }
 

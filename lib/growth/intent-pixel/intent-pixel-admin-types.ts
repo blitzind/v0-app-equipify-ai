@@ -4,6 +4,8 @@ import type { GrowthIntentPixelConsentStatus } from "@/lib/growth/intent-pixel/i
 
 export const GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER = "growth-intent-pixel-admin-v1" as const
 
+export { GROWTH_INTENT_CONSENT_MANAGER_QA_MARKER } from "@/lib/growth/intent-pixel/intent-consent-manager-types"
+
 /** Live activation — admin handoff + schema readiness (Prompt 23). */
 export const GROWTH_INTENT_PIXEL_LIVE_QA_MARKER = "growth-intent-pixel-live-v1" as const
 
@@ -71,6 +73,16 @@ export type GrowthIntentPixelAdminDiagnostics = {
   consent_denied_sessions_24h: number
   consent_unknown_sessions_24h: number
   consent_granted_sessions_24h: number
+  consent_acceptance_pct: number | null
+  tracking_coverage_pct: number | null
+  anonymous_sessions_blocked_24h: number
+  high_intent_sessions_blocked_by_consent_24h: number
+  consent_breakdown: {
+    granted: number
+    denied: number
+    unknown: number
+  }
+  tracking_visibility_impacted: boolean
   install_status: GrowthIntentPixelInstallStatus
   last_event_at: string | null
   privacy_note: string

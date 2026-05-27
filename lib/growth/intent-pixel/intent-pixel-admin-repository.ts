@@ -27,6 +27,7 @@ import type {
 } from "@/lib/growth/intent-pixel/intent-pixel-types"
 import { GROWTH_INTENT_PIXEL_PRIVACY_NOTE } from "@/lib/growth/intent-pixel/pii-policy"
 import { mergeUtmAttribution } from "@/lib/growth/intent-pixel/utm-attribution"
+import { TRACKING_VISIBILITY_IMPACTED_THRESHOLD } from "@/lib/growth/intent-pixel/intent-consent-manager-types"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -54,6 +55,60 @@ function sessionStreamTrackingMode(
 }
 
 const PII_METADATA_KEY = /email|phone|full_name|linkedin|company_name/i
+
+function buildConsentDiagnostics(input: {
+  session_count_24h: number
+  consent_denied_sessions_24h: number
+  consent_unknown_sessions_24h: number
+  consent_granted_sessions_24h: number
+  high_intent_sessions_blocked_by_consent_24h: number
+  consent_required: boolean
+}): Pick<
+  GrowthIntentPixelAdminDiagnostics,
+  | "consent_acceptance_pct"
+  | "tracking_coverage_pct"
+  | "anonymous_sessions_blocked_24h"
+  | "high_intent_sessions_blocked_by_consent_24h"
+  | "consent_breakdown"
+  | "tracking_visibility_impacted"
+> {
+  const {
+    session_count_24h,
+    consent_denied_sessions_24h,
+    consent_unknown_sessions_24h,
+    consent_granted_sessions_24h,
+    high_intent_sessions_blocked_by_consent_24h,
+    consent_required,
+  } = input
+
+  const consentTotal =
+    consent_granted_sessions_24h + consent_denied_sessions_24h + consent_unknown_sessions_24h
+
+  const consent_acceptance_pct =
+    consentTotal > 0 ? Math.round((consent_granted_sessions_24h / consentTotal) * 100) : null
+
+  const tracking_coverage_pct =
+    session_count_24h > 0 ? Math.round((consent_granted_sessions_24h / session_count_24h) * 100) : null
+
+  const blockedRatio =
+    consentTotal > 0
+      ? (consent_denied_sessions_24h + consent_unknown_sessions_24h) / consentTotal
+      : 0
+
+  return {
+    consent_acceptance_pct,
+    tracking_coverage_pct,
+    anonymous_sessions_blocked_24h: consent_denied_sessions_24h + consent_unknown_sessions_24h,
+    high_intent_sessions_blocked_by_consent_24h,
+    consent_breakdown: {
+      granted: consent_granted_sessions_24h,
+      denied: consent_denied_sessions_24h,
+      unknown: consent_unknown_sessions_24h,
+    },
+    tracking_visibility_impacted:
+      consent_required && consentTotal >= 3 && blockedRatio > TRACKING_VISIBILITY_IMPACTED_THRESHOLD,
+  }
+}
 
 function sanitizeEventMetadata(meta: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {}
@@ -183,6 +238,14 @@ export async function fetchIntentPixelAdminDiagnostics(
 ): Promise<GrowthIntentPixelAdminDiagnostics> {
   const schema_ready = await isGrowthIntentPixelSchemaReady(admin)
   if (!schema_ready) {
+    const emptyConsent = buildConsentDiagnostics({
+      session_count_24h: 0,
+      consent_denied_sessions_24h: 0,
+      consent_unknown_sessions_24h: 0,
+      consent_granted_sessions_24h: 0,
+      high_intent_sessions_blocked_by_consent_24h: 0,
+      consent_required: true,
+    })
     return {
       qa_marker: GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER,
       schema_ready: false,
@@ -195,6 +258,7 @@ export async function fetchIntentPixelAdminDiagnostics(
       consent_denied_sessions_24h: 0,
       consent_unknown_sessions_24h: 0,
       consent_granted_sessions_24h: 0,
+      ...emptyConsent,
       install_status: "schema_missing",
       last_event_at: null,
       privacy_note: GROWTH_INTENT_PIXEL_PRIVACY_NOTE,
@@ -212,9 +276,10 @@ export async function fetchIntentPixelAdminDiagnostics(
   let consent_denied_sessions_24h = 0
   let consent_unknown_sessions_24h = 0
   let consent_granted_sessions_24h = 0
+  let high_intent_sessions_blocked_by_consent_24h = 0
 
   if (siteId) {
-    const [sessions, pageviews, conversions, identified, denied, unknown, granted] =
+    const [sessions, pageviews, conversions, identified, denied, unknown, granted, highIntentBlocked] =
       await Promise.all([
         admin
           .schema("growth")
@@ -261,6 +326,14 @@ export async function fetchIntentPixelAdminDiagnostics(
           .eq("site_id", siteId)
           .gte("started_at", since)
           .in("consent_status", ["granted", "not_required"]),
+        admin
+          .schema("growth")
+          .from("intent_visitor_sessions")
+          .select("id", { count: "exact", head: true })
+          .eq("site_id", siteId)
+          .gte("started_at", since)
+          .in("consent_status", ["denied", "unknown"])
+          .gte("pageview_count", 3),
       ])
 
     session_count_24h = sessions.count ?? 0
@@ -270,6 +343,7 @@ export async function fetchIntentPixelAdminDiagnostics(
     consent_denied_sessions_24h = denied.count ?? 0
     consent_unknown_sessions_24h = unknown.count ?? 0
     consent_granted_sessions_24h = granted.count ?? 0
+    high_intent_sessions_blocked_by_consent_24h = highIntentBlocked.count ?? 0
   }
 
   let last_event_at: string | null = null
@@ -303,6 +377,15 @@ export async function fetchIntentPixelAdminDiagnostics(
   else if (pageview_count_24h + conversion_count_24h > 0) install_status = "receiving"
   else if (!site) install_status = "idle"
 
+  const consentMetrics = buildConsentDiagnostics({
+    session_count_24h,
+    consent_denied_sessions_24h,
+    consent_unknown_sessions_24h,
+    consent_granted_sessions_24h,
+    high_intent_sessions_blocked_by_consent_24h,
+    consent_required: site?.consent_required !== false,
+  })
+
   return {
     qa_marker: GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER,
     schema_ready: true,
@@ -315,6 +398,7 @@ export async function fetchIntentPixelAdminDiagnostics(
     consent_denied_sessions_24h,
     consent_unknown_sessions_24h,
     consent_granted_sessions_24h,
+    ...consentMetrics,
     install_status,
     last_event_at,
     privacy_note: GROWTH_INTENT_PIXEL_PRIVACY_NOTE,

@@ -150,6 +150,7 @@
     "test:growth-lead-engine-workspace": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/lead-engine-workspace.test.ts",
     "test:growth-lead-engine-provider-adapter": "tsx scripts/test-growth-lead-engine-provider-adapter.ts",
     "test:growth-intent-pixel": "tsx scripts/test-growth-intent-pixel.ts",
+    "test:growth-intent-consent": "tsx scripts/test-growth-intent-consent.ts",
     "test:growth-intent-lead-bridge": "tsx scripts/growth-intent-lead-bridge.test.ts",
     "test:growth-lead-inbox": "tsx scripts/growth-lead-inbox.test.ts",
     "test:growth-operator-handoff": "tsx scripts/growth-operator-handoff.test.ts",

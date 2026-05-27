@@ -172,7 +172,12 @@ export async function captureIntentPixelEvent(
   }
 
   const consentStatus = normalizeConsentStatus(payload.consent_status)
-  const gate = resolveTrackingMode(site, consentStatus, payload.event_type)
+  const gate = resolveTrackingMode(
+    site,
+    consentStatus,
+    payload.event_type,
+    payload.conversion_type,
+  )
 
   if (!gate.accepted) {
     return buildRejectedCapture(base, {

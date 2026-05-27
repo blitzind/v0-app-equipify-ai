@@ -227,7 +227,7 @@ assert.equal(gate.mode, "rejected")
 const anonSite = { ...site, allow_anonymous_pageviews: true }
 gate = resolveTrackingMode(anonSite, "unknown", "pageview")
 assert.equal(gate.accepted, true)
-assert.equal(gate.mode, "anonymous")
+assert.equal(gate.mode, "essential_only")
 
 gate = resolveTrackingMode(anonSite, "unknown", "conversion")
 assert.equal(gate.accepted, false)
@@ -240,6 +240,13 @@ assert.equal(gate.mode, "full")
 gate = resolveTrackingMode(site, "denied", "consent_update")
 assert.equal(gate.accepted, true)
 assert.equal(gate.mode, "essential_only")
+
+gate = resolveTrackingMode(site, "denied", "conversion", "form_submit")
+assert.equal(gate.accepted, true)
+assert.equal(gate.mode, "essential_only")
+
+gate = resolveTrackingMode(site, "denied", "pageview")
+assert.equal(gate.accepted, false)
 
 assert.equal(normalizeConsentStatus("GRANTED"), "granted")
 
@@ -297,6 +304,8 @@ const script = buildIntentPixelScript({
 assert.match(script, /growth-intent-pixel-v1/)
 assert.match(script, /EquipifyIntentPixel/)
 assert.match(script, /trackConversion/)
+assert.match(script, /equipify_intent_consent_ts/)
+assert.match(script, /allowsBehavioral/)
 assert.doesNotMatch(script, /email.*inferred/i)
 
 const monitorUi = fs.readFileSync(
@@ -321,6 +330,7 @@ const marketingSiteRoot = path.resolve(process.cwd(), "../equipify-site")
 if (fs.existsSync(marketingSiteRoot)) {
   const marketingLayout = fs.readFileSync(path.join(marketingSiteRoot, "app/layout.tsx"), "utf8")
   assert.match(marketingLayout, /EquipifyIntentPixelScript/)
+  assert.match(marketingLayout, /IntentConsentProvider/)
   assert.doesNotMatch(marketingLayout, /pixel\.js\?site_key=equipify-sandbox/)
   const marketingScript = fs.readFileSync(
     path.join(marketingSiteRoot, "components/analytics/equipify-intent-pixel-script.tsx"),
