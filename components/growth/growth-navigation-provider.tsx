@@ -3,6 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { usePathname } from "next/navigation"
 import { isGrowthNavigationInputTarget } from "@/lib/growth/navigation/growth-navigation-input-guard"
+import { resolveGrowthNavigationEntryFromPathname } from "@/lib/growth/navigation/growth-navigation-destinations"
+import { recordGrowthNavigationUsage } from "@/lib/growth/navigation/growth-navigation-usage-memory"
 
 type GrowthNavigationContextValue = {
   open: boolean
@@ -37,6 +39,13 @@ export function GrowthNavigationProvider({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     setOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
+    if (!pathname.startsWith("/admin/growth")) return
+    const entry = resolveGrowthNavigationEntryFromPathname(pathname)
+    if (!entry) return
+    recordGrowthNavigationUsage(entry)
   }, [pathname])
 
   const value = useMemo(

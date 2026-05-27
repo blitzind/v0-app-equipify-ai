@@ -1,6 +1,7 @@
-/** Growth Engine navigation IA — shared destinations for sidebar + command palette (Prompt 33). */
+/** Growth Engine navigation IA — shared destinations for sidebar + command palette (Prompt 33 + 35). */
 
 import type { GrowthSidebarConsoleKey } from "@/hooks/use-growth-sidebar-console"
+import type { GrowthCommandPaletteEntry } from "@/lib/growth/navigation/growth-navigation-ranking"
 
 export const GROWTH_NAVIGATION_IA_QA_MARKER = "growth-navigation-ia-v2" as const
 
@@ -17,6 +18,8 @@ export type GrowthNavigationQuickAction = {
   label: string
   href: string
   keywords?: string[]
+  aliases?: string[]
+  coreWorkflow?: boolean
 }
 
 export type GrowthNavItemDef = {
@@ -46,41 +49,76 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     id: "command",
     label: "Command Center",
     href: "/admin/growth/command",
-    keywords: ["mission", "dashboard", "daily"],
+    keywords: ["mission", "dashboard", "daily", "command"],
     consoleKey: "command",
   },
   {
     id: "inbox",
-    label: "Lead Inbox / Revenue Intelligence",
+    label: "Revenue Inbox",
     href: "/admin/growth/leads",
-    keywords: ["revenue", "inbox", "leads"],
+    keywords: ["revenue", "inbox", "leads", "pipeline", "prospects"],
     consoleKey: "inbox",
   },
   {
     id: "search",
     label: "Prospect Search",
     href: "/admin/growth/search",
-    keywords: ["discover", "prospect", "icp"],
+    keywords: ["discover", "prospect", "icp", "search", "companies", "apollo", "seamless"],
   },
   {
     id: "intent-pixel",
     label: "Intent Pixel",
     href: "/admin/growth/intent-pixel",
-    keywords: ["intent", "visitor", "pixel"],
+    keywords: ["intent", "visitor", "pixel", "tracking", "visitor tracking"],
     consoleKey: "intent_pixel",
   },
   {
     id: "lead-intelligence",
     label: "Lead Intelligence Inspector",
     href: "/admin/growth/leads/lead-engine",
-    keywords: ["lead engine", "inspector", "pipeline"],
+    keywords: ["lead engine", "inspector", "pipeline", "lead intelligence", "pipeline inspector"],
   },
   {
-    id: "outreach",
-    label: "Outreach",
-    href: "/admin/growth/outreach",
-    keywords: ["email", "sequence"],
-    consoleKey: "outreach",
+    id: "call-workspace",
+    label: "Call Workspace",
+    href: "/admin/growth/calls/workspace",
+    keywords: ["dial", "call", "live", "dialer", "phone", "live calls"],
+    consoleKey: "calls_workspace",
+  },
+  {
+    id: "calls-live",
+    label: "Live Calls",
+    href: "/admin/growth/calls/live",
+    keywords: ["live calls", "active calls", "phone"],
+    consoleKey: "calls_live",
+  },
+  {
+    id: "call-queue",
+    label: "Call Queue",
+    href: "/admin/growth/leads/queue",
+    keywords: ["queue", "calls due", "cadence"],
+    consoleKey: "callQueue",
+  },
+  {
+    id: "live-coaching",
+    label: "Live Coaching",
+    href: "/admin/growth/calls/live-coaching",
+    keywords: ["coaching", "guidance", "objection", "transcript"],
+    consoleKey: "calls_live_coaching",
+  },
+  {
+    id: "call-providers",
+    label: "Call Providers",
+    href: "/admin/growth/calls/providers",
+    keywords: ["call provider", "transcript provider", "retell", "elevenlabs"],
+    consoleKey: "calls_providers",
+  },
+  {
+    id: "providers",
+    label: "Provider Diagnostics",
+    href: "/admin/growth/providers",
+    keywords: ["provider", "diagnostics", "api"],
+    consoleKey: "providers",
   },
   {
     id: "outreach-approval",
@@ -88,27 +126,6 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     href: "/admin/growth/outreach/approval",
     keywords: ["approval", "queue"],
     consoleKey: "outreach_approval",
-  },
-  {
-    id: "call-workspace",
-    label: "Call Workspace",
-    href: "/admin/growth/calls/workspace",
-    keywords: ["dial", "call", "live"],
-    consoleKey: "calls_workspace",
-  },
-  {
-    id: "live-coaching",
-    label: "Live Coaching",
-    href: "/admin/growth/calls/live-coaching",
-    keywords: ["coaching", "guidance"],
-    consoleKey: "calls_live_coaching",
-  },
-  {
-    id: "providers",
-    label: "Providers",
-    href: "/admin/growth/providers",
-    keywords: ["provider", "diagnostics"],
-    consoleKey: "providers",
   },
   {
     id: "settings",
@@ -120,34 +137,42 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
 
 export const GROWTH_NAV_QUICK_ACTIONS: GrowthNavigationQuickAction[] = [
   {
-    id: "discover",
+    id: "discover-companies",
     label: "Discover Companies",
     href: "/admin/growth/search?mode=discover",
-    keywords: ["prospect", "search"],
+    keywords: ["prospect", "search", "discover"],
+    aliases: ["discover", "companies"],
+    coreWorkflow: true,
   },
   {
     id: "process-intent",
     label: "Process Intent",
     href: "/admin/growth/intent-pixel",
-    keywords: ["pixel", "visitor"],
+    keywords: ["pixel", "visitor", "intent"],
+    coreWorkflow: true,
   },
   {
     id: "open-inbox",
     label: "Open Lead Inbox",
     href: "/admin/growth/leads",
-    keywords: ["revenue", "inbox"],
+    keywords: ["revenue", "inbox", "lead inbox"],
+    aliases: ["revenue", "pipeline", "prospects"],
+    coreWorkflow: true,
   },
   {
     id: "run-lead-intelligence",
     label: "Run Lead Intelligence",
     href: "/admin/growth/leads/lead-engine",
-    keywords: ["inspector", "pipeline"],
+    keywords: ["inspector", "pipeline", "lead engine", "lead intelligence"],
+    aliases: ["pipeline inspector"],
   },
   {
     id: "start-live-call",
     label: "Start Live Call",
     href: "/admin/growth/calls/workspace",
-    keywords: ["call", "dial"],
+    keywords: ["call", "dial", "phone"],
+    aliases: ["dialer", "live calls"],
+    coreWorkflow: true,
   },
   {
     id: "review-outreach-approval",
@@ -162,8 +187,37 @@ export const GROWTH_NAV_QUICK_ACTIONS_SECONDARY: GrowthNavigationQuickAction[] =
     id: "import-leads",
     label: "Import Leads",
     href: "/admin/growth/imports",
-    keywords: ["csv", "upload"],
+    keywords: ["csv", "upload", "imports"],
   },
+]
+
+export const GROWTH_COMMAND_PALETTE_ENTRIES: GrowthCommandPaletteEntry[] = [
+  ...GROWTH_NAV_QUICK_ACTIONS.map((action) => ({
+    id: action.id,
+    label: action.label,
+    href: action.href,
+    keywords: action.keywords,
+    aliases: action.aliases,
+    coreWorkflow: action.coreWorkflow,
+    group: "quick" as const,
+  })),
+  ...GROWTH_COMMAND_PALETTE_DESTINATIONS.map((dest) => ({
+    id: dest.id,
+    label: dest.label,
+    href: dest.href,
+    keywords: dest.keywords,
+    aliases: dest.keywords,
+    coreWorkflow: ["command", "inbox", "search", "intent-pixel", "call-workspace"].includes(dest.id),
+    group: "navigate" as const,
+  })),
+  ...GROWTH_NAV_QUICK_ACTIONS_SECONDARY.map((action) => ({
+    id: action.id,
+    label: action.label,
+    href: action.href,
+    keywords: action.keywords,
+    aliases: action.aliases,
+    group: "more" as const,
+  })),
 ]
 
 export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
@@ -206,13 +260,6 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         consoleKey: "intent_pixel",
         match: prefixMatch("/admin/growth/intent-pixel"),
       },
-      {
-        id: "imports",
-        href: "/admin/growth/imports",
-        label: "Imports",
-        consoleKey: "imports",
-        match: prefixMatch("/admin/growth/imports"),
-      },
     ],
   },
   {
@@ -239,27 +286,6 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         label: "Sequences",
         consoleKey: "sequences",
         match: (path) => path === "/admin/growth/sequences",
-      },
-      {
-        id: "reply-inbox",
-        href: "/admin/growth/replies",
-        label: "Reply Inbox",
-        consoleKey: "conversations",
-        match: prefixMatch("/admin/growth/replies"),
-      },
-      {
-        id: "meetings",
-        href: "/admin/growth/meetings",
-        label: "Meetings",
-        match: prefixMatch("/admin/growth/meetings"),
-      },
-      {
-        id: "call-queue",
-        href: "/admin/growth/leads/queue",
-        label: "Call Queue",
-        consoleKey: "callQueue",
-        shortcutKey: "c",
-        match: prefixMatch("/admin/growth/leads/queue"),
       },
       {
         id: "call-workspace",
@@ -342,8 +368,8 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
     ],
   },
   {
-    id: "calls-coaching",
-    label: "Calls & Coaching",
+    id: "communication",
+    label: "Communication",
     items: [
       {
         id: "calls",
@@ -361,6 +387,33 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
           path.startsWith("/admin/growth/calls/live") &&
           !path.startsWith("/admin/growth/calls/live-coaching"),
       },
+      {
+        id: "call-queue",
+        href: "/admin/growth/leads/queue",
+        label: "Call Queue",
+        consoleKey: "callQueue",
+        shortcutKey: "c",
+        match: prefixMatch("/admin/growth/leads/queue"),
+      },
+      {
+        id: "meetings",
+        href: "/admin/growth/meetings",
+        label: "Meetings",
+        match: prefixMatch("/admin/growth/meetings"),
+      },
+      {
+        id: "reply-inbox",
+        href: "/admin/growth/replies",
+        label: "Reply Inbox",
+        consoleKey: "conversations",
+        match: prefixMatch("/admin/growth/replies"),
+      },
+    ],
+  },
+  {
+    id: "coaching",
+    label: "Coaching",
+    items: [
       {
         id: "live-coaching",
         href: "/admin/growth/calls/live-coaching",
@@ -394,6 +447,13 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: prefixMatch("/admin/growth/leads/crm"),
       },
       {
+        id: "imports",
+        href: "/admin/growth/imports",
+        label: "Imports",
+        consoleKey: "imports",
+        match: prefixMatch("/admin/growth/imports"),
+      },
+      {
         id: "providers",
         href: "/admin/growth/providers",
         label: "Provider Diagnostics",
@@ -410,7 +470,7 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
       {
         id: "playbooks",
         href: "/admin/growth/copilot/playbooks",
-        label: "Playbook Training",
+        label: "Playbooks",
         consoleKey: "playbooks",
         match: prefixMatch("/admin/growth/copilot/playbooks"),
       },
@@ -454,4 +514,30 @@ export function growthNavigationShortcutLabel(): string {
     return "⌘K"
   }
   return "Ctrl+K"
+}
+
+export function resolveGrowthNavigationEntryFromPathname(
+  pathname: string,
+): Pick<GrowthCommandPaletteEntry, "id" | "label" | "href"> | null {
+  for (const group of GROWTH_NAV_GROUP_DEFS) {
+    for (const item of group.items) {
+      if (item.match(pathname)) {
+        return { id: item.id, label: item.label, href: pathname.startsWith(item.href) ? pathname : item.href }
+      }
+    }
+  }
+  return null
+}
+
+export function listGrowthNavigationPaletteHrefs(): string[] {
+  const hrefs = new Set<string>()
+  for (const entry of GROWTH_COMMAND_PALETTE_ENTRIES) {
+    hrefs.add(entry.href.split("?")[0] ?? entry.href)
+  }
+  for (const group of GROWTH_NAV_GROUP_DEFS) {
+    for (const item of group.items) {
+      hrefs.add(item.href.split("?")[0] ?? item.href)
+    }
+  }
+  return [...hrefs]
 }

@@ -52,6 +52,7 @@ import {
   growthNavigationShortcutLabel,
   type GrowthNavItemDef,
 } from "@/lib/growth/navigation/growth-navigation-destinations"
+import { GROWTH_NAVIGATION_POLISH_QA_MARKER } from "@/lib/growth/navigation/growth-navigation-ranking"
 import { isGrowthNavigationInputTarget } from "@/lib/growth/navigation/growth-navigation-input-guard"
 import { cn } from "@/lib/utils"
 
@@ -291,6 +292,19 @@ function GrowthNavLink({
         />
       ) : null}
       <Icon className={cn("size-4 shrink-0", active ? GROWTH_NAV_ICON_ACTIVE : GROWTH_NAV_ICON_INACTIVE)} aria-hidden />
+      {collapsed && !compact && badge ? (
+        <span
+          className={cn(
+            "absolute -right-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full px-1 py-0.5 text-[9px] font-semibold tabular-nums",
+            active
+              ? "bg-blue-100 text-blue-800 dark:bg-cyan-500/20 dark:text-cyan-100"
+              : "bg-emerald-100 text-emerald-800 dark:bg-slate-700 dark:text-slate-200",
+          )}
+          aria-label={`${badge} notifications`}
+        >
+          {badge > 9 ? "9+" : badge}
+        </span>
+      ) : null}
       {!collapsed || compact ? (
         <span className="min-w-0 flex-1 truncate">{item.label}</span>
       ) : null}
@@ -306,7 +320,14 @@ function GrowthNavLink({
       <Tooltip>
         <TooltipTrigger asChild>{link}</TooltipTrigger>
         <TooltipContent side="right" sideOffset={8} className="max-w-48 bg-card text-foreground border shadow-md">
-          <PreviewTooltipContent label={item.label} lines={previewLines} />
+          <PreviewTooltipContent
+            label={item.label}
+            lines={
+              badge
+                ? [{ label: "Count", value: badge > 99 ? "99+" : String(badge) }, ...(previewLines ?? [])]
+                : previewLines
+            }
+          />
         </TooltipContent>
       </Tooltip>
     )
@@ -559,6 +580,7 @@ export function GrowthSectionSidebarNav() {
         aria-label="Growth Engine"
         data-qa-marker={GROWTH_SIDEBAR_NAV_QA_MARKER}
         data-navigation-ia-marker={GROWTH_NAVIGATION_IA_QA_MARKER}
+        data-navigation-polish-marker={GROWTH_NAVIGATION_POLISH_QA_MARKER}
         className={cn("hidden shrink-0 lg:block", collapsed ? "w-[4.5rem]" : "w-60")}
       >
         <div className="sticky top-6 flex flex-col rounded-2xl border border-border bg-card p-3 shadow-sm dark:border-border/80 dark:bg-card/95">
@@ -621,9 +643,10 @@ export function GrowthSectionSidebarNav() {
         aria-label="Growth Engine"
         data-qa-marker={GROWTH_SIDEBAR_NAV_QA_MARKER}
         data-navigation-ia-marker={GROWTH_NAVIGATION_IA_QA_MARKER}
+        data-navigation-polish-marker={GROWTH_NAVIGATION_POLISH_QA_MARKER}
         className="lg:hidden"
       >
-        <div className="min-w-0 rounded-xl border border-border bg-card p-2 shadow-sm dark:border-border/80 dark:bg-card/95">
+        <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card p-2 shadow-sm dark:border-border/80 dark:bg-card/95">
           <GrowthNavGroups
             pathname={pathname}
             badges={consoleState.badges}
