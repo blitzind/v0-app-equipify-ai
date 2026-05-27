@@ -51,8 +51,8 @@ export function ProspectSearchLiveEstimation({
   return (
     <div
       className={cn(
-        "rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs",
-        compact && "px-2 py-1.5",
+        "w-full min-w-0 rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs",
+        compact && "px-2 py-1.5 text-[11px] leading-snug",
         className,
       )}
       data-qa-marker={GROWTH_LIVE_ESTIMATED_RESULTS_QA_MARKER}
@@ -70,7 +70,7 @@ export function ProspectSearchLiveEstimation({
         ) : null}
       </div>
       {estimate ? (
-        <p className="mt-1 text-muted-foreground">
+        <p className={cn("mt-1 text-muted-foreground break-words", compact && "mt-0.5 line-clamp-2")}>
           {estimate.provider_readiness.label}
           {displayState === "using_cached_estimate" ? " · Using cached estimate" : null}
           {stateText && displayState !== "ready" && displayState !== "using_cached_estimate"

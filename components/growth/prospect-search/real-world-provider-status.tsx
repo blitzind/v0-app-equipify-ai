@@ -45,11 +45,11 @@ export function RealWorldProviderStatus({
 
   return (
     <div
-      className={cn("rounded-lg border px-3 py-2 text-sm", style, className)}
+      className={cn("w-full min-w-0 rounded-lg border px-3 py-2 text-sm break-words", style, className)}
       data-qa-marker={GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER}
     >
       <p className="font-medium">{title}</p>
-      {message ? <p className="mt-0.5 text-xs opacity-90">{message}</p> : null}
+      {message ? <p className="mt-0.5 text-xs opacity-90 break-words">{message}</p> : null}
     </div>
   )
 }
@@ -92,7 +92,7 @@ export function GooglePlacesQueryDiagnostics({
   return (
     <div
       className={cn(
-        "mt-2 rounded-md border border-violet-200 bg-violet-50/70 px-2.5 py-2 text-[11px] text-violet-950",
+        "mt-2 w-full min-w-0 rounded-md border border-violet-200 bg-violet-50/70 px-2.5 py-2 text-[11px] text-violet-950 break-words",
         className,
       )}
       data-qa-marker={qaMarker ?? GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER}
@@ -149,7 +149,7 @@ export function ProviderCacheCostDiagnostics({
   return (
     <div
       className={cn(
-        "mt-2 space-y-2 rounded-md border border-emerald-200 bg-emerald-50/60 px-2.5 py-2 text-[11px] text-emerald-950",
+        "mt-2 w-full min-w-0 space-y-2 rounded-md border border-emerald-200 bg-emerald-50/60 px-2.5 py-2 text-[11px] text-emerald-950 break-words",
         className,
       )}
       data-qa-marker={qaMarker ?? GROWTH_PROVIDER_CACHE_QA_MARKER}
@@ -202,7 +202,7 @@ export function ProviderRuntimeDiagnosticsPanel({
   return (
     <div
       className={cn(
-        "mt-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-800",
+        "mt-2 w-full min-w-0 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-800 break-words",
         className,
       )}
       data-qa-marker={GROWTH_PROVIDER_RUNTIME_DIAGNOSTICS_QA_MARKER}

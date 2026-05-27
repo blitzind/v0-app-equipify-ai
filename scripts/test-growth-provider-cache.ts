@@ -22,7 +22,11 @@ import {
   GROWTH_PROVIDER_CACHE_QA_MARKER,
   PROVIDER_CACHE_TTL_DAYS,
 } from "../lib/growth/provider-cache/provider-cache-types"
-import { GROWTH_PROVIDER_CACHE_SCHEMA_MIGRATION } from "../lib/growth/provider-cache/provider-cache-schema-health"
+import {
+  assertGrowthProviderCacheSchemaMigrationContent,
+  GROWTH_PROVIDER_CACHE_SCHEMA_MIGRATION,
+  resolveGrowthProviderCacheSchemaMigration,
+} from "../lib/growth/provider-cache/provider-cache-schema-health"
 
 function read(rel: string): string {
   return fs.readFileSync(path.join(process.cwd(), rel), "utf8")
@@ -31,8 +35,16 @@ function read(rel: string): string {
 async function main(): Promise<void> {
   assert.equal(GROWTH_PROVIDER_CACHE_QA_MARKER, "growth-provider-cache-v1")
 
-  const migration = read(`supabase/migrations/${GROWTH_PROVIDER_CACHE_SCHEMA_MIGRATION}`)
-  assert.match(migration, /provider_query_cache/)
+  const migrationFile = resolveGrowthProviderCacheSchemaMigration()
+  assert.equal(
+    migrationFile,
+    GROWTH_PROVIDER_CACHE_SCHEMA_MIGRATION,
+    "resolved migration filename should match exported constant",
+  )
+  assert.equal(migrationFile, "20270407120000_growth_engine_provider_query_cache.sql")
+
+  const migration = read(`supabase/migrations/${migrationFile}`)
+  assertGrowthProviderCacheSchemaMigrationContent(migration)
   assert.match(migration, /provider_name, query_hash/)
   assert.match(migration, /expires_at/)
   assert.match(migration, /service_role/)

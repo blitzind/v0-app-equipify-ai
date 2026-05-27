@@ -41,6 +41,8 @@ import { rotateHeroPlaceholder } from "@/components/growth/prospect-search/searc
 import {
   GROWTH_PROSPECT_SEARCH_UX_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_LAYOUT_V2_QA_MARKER,
+  GROWTH_RESULTS_HEADER_LAYOUT_V1_QA_MARKER,
+  GROWTH_PROVIDER_STATUS_LAYOUT_V1_QA_MARKER,
   type ProspectSearchIcpTemplate,
 } from "@/components/growth/prospect-search/prospect-search-ux-constants"
 import {
@@ -720,152 +722,179 @@ export function ProspectSearchShell() {
             }}
           />
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0 flex-1 space-y-2">
-              <ProspectSearchActiveFilterPills filters={filters} onChange={replaceFilters} />
-              <div>
-              <h2 className="text-sm font-semibold">
-                Results
-                {result ? (
-                  <span className="ml-2 font-normal text-muted-foreground">
-                    {result.total_companies.toLocaleString()} companies
-                    {result.discovery_mode === "internal" ? ` · ${result.total_people.toLocaleString()} contacts` : " · external discovery"}
+          <div className="w-full min-w-0 space-y-3">
+            <ProspectSearchActiveFilterPills filters={filters} onChange={replaceFilters} />
+
+            <div className="flex w-full min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div
+                className="min-w-0 flex-1"
+                data-qa-marker={GROWTH_RESULTS_HEADER_LAYOUT_V1_QA_MARKER}
+              >
+                <h2 className="text-sm font-semibold leading-snug text-foreground">
+                  <span className="inline-flex max-w-full flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                    <span className="whitespace-nowrap">Results</span>
+                    {result ? (
+                      <>
+                        <span className="whitespace-nowrap font-normal text-muted-foreground">
+                          {result.total_companies.toLocaleString()} companies
+                        </span>
+                        <span className="font-normal text-muted-foreground" aria-hidden="true">
+                          ·
+                        </span>
+                        <span className="font-normal text-muted-foreground">
+                          {result.discovery_mode === "internal"
+                            ? `${result.total_people.toLocaleString()} contacts`
+                            : "external discovery"}
+                        </span>
+                      </>
+                    ) : null}
                   </span>
+                </h2>
+                {result?.discovery_mode === "internal" ? (
+                  <ProspectSearchIndexDiagnostics diagnostics={result.index_diagnostics} />
                 ) : null}
-              </h2>
-              {result?.discovery_mode === "internal" ? (
-                <ProspectSearchIndexDiagnostics diagnostics={result.index_diagnostics} />
-              ) : null}
-              {result?.discovery_mode === "discover_external" &&
-              (result.provider_status_label || result.provider_status_message) ? (
-                <RealWorldProviderStatus
-                  className="mt-2"
-                  label={result.provider_status_label}
-                  message={
-                    result.real_world_built_query
-                      ? `${result.provider_status_message ?? ""} Query: ${result.real_world_built_query}`
-                      : result.provider_status_message
-                  }
-                />
-              ) : null}
-              {result?.used_relaxed_external_filters ? (
-                <p className="mt-2 text-xs text-violet-900">
-                  Showing provider matches with incomplete firmographic data.
-                </p>
-              ) : null}
-              {process.env.NODE_ENV === "development" &&
-              result?.provider_runtime_diagnostics ? (
-                <ProviderRuntimeDiagnosticsPanel
-                  className="mt-2"
-                  diagnostics={result.provider_runtime_diagnostics}
-                />
-              ) : null}
-              {result?.provider_messages && result.provider_messages.length > 0 ? (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {result.provider_messages.join(" · ")}
-                </p>
-              ) : null}
-              {result?.discovery_mode === "discover_external" &&
-              result.provider_diagnostics &&
-              result.provider_diagnostics.length > 0 ? (
-                <>
-                  {result.provider_diagnostics
-                    .filter((row) => row.provider_type === "google_places")
-                    .map((row) => (
-                      <GooglePlacesQueryDiagnostics
-                        key={`${row.provider_type}-${row.provider_name}`}
-                        diagnostic={row}
-                        qaMarker={result.google_places_query_expansion_qa_marker}
-                      />
-                    ))}
-                  <ProviderCacheCostDiagnostics
-                    diagnostics={result.provider_diagnostics}
-                    qaMarker={result.provider_cache_qa_marker}
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                {companies.length > 0 ? (
+                  <Button size="sm" variant="ghost" onClick={selectAllVisible}>
+                    Select all visible
+                  </Button>
+                ) : null}
+                <Select
+                  value={sortBy}
+                  onValueChange={(value: GrowthProspectSearchSortBy) => {
+                    setSortBy(value)
+                    void fetchResults({ sortByOverride: value, nextPage: 1, resetSelection: true })
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[170px] text-xs">
+                    <SelectValue placeholder="Sort results" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="rank">Default rank</SelectItem>
+                    <SelectItem value="signal_momentum">Signal momentum</SelectItem>
+                  </SelectContent>
+                </Select>
+                <SearchViewToggle view={view} onViewChange={setView} />
+                <Button variant="outline" size="sm" onClick={() => setSaveDialogOpen(true)}>
+                  <Bookmark className="mr-1 size-3.5" />
+                  Save workflow
+                </Button>
+              </div>
+            </div>
+
+            {result?.discovery_mode === "discover_external" &&
+            (result.provider_status_label ||
+              result.provider_status_message ||
+              result.used_relaxed_external_filters ||
+              (result.provider_messages && result.provider_messages.length > 0) ||
+              (result.provider_diagnostics && result.provider_diagnostics.length > 0) ||
+              (process.env.NODE_ENV === "development" &&
+                (result.provider_runtime_diagnostics || result.external_filter_diagnostics))) ? (
+              <div
+                className="flex w-full min-w-0 flex-col gap-2"
+                data-qa-marker={GROWTH_PROVIDER_STATUS_LAYOUT_V1_QA_MARKER}
+              >
+                {result.provider_status_label || result.provider_status_message ? (
+                  <RealWorldProviderStatus
+                    className="w-full min-w-0"
+                    label={result.provider_status_label}
+                    message={
+                      result.real_world_built_query
+                        ? `${result.provider_status_message ?? ""} Query: ${result.real_world_built_query}`
+                        : result.provider_status_message
+                    }
                   />
-                  <div
-                    className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-700"
-                    data-qa-marker={result.provider_audit_qa_marker ?? GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER}
-                  >
-                    <p className="font-medium">Provider diagnostics</p>
-                    <ul className="mt-1 space-y-1">
-                      {result.provider_diagnostics
-                        .filter((row) => row.provider_type !== "google_places")
-                        .map((row) => (
-                          <li key={`${row.provider_type}-${row.provider_name}`}>
-                            {row.provider_name}: executed={String(row.provider_executed)}, latency=
-                            {row.provider_latency_ms}ms, results={row.provider_result_count}
-                            {row.provider_fallback_reason
-                              ? `, fallback=${row.provider_fallback_reason}`
-                              : ""}
-                          </li>
-                        ))}
-                      {result.provider_diagnostics
-                        .filter((row) => row.provider_type === "google_places")
-                        .map((row) => (
-                          <li key={`${row.provider_type}-${row.provider_name}-summary`}>
-                            {row.provider_name}: executed={String(row.provider_executed)}, latency=
-                            {row.provider_latency_ms}ms, merged={row.provider_merged_result_count ?? row.provider_result_count}
-                            , queries={row.provider_query_generated?.length ?? 0}
-                          </li>
-                        ))}
-                    </ul>
-                    {result.provider_fallback_reason ? (
+                ) : null}
+                {result.used_relaxed_external_filters ? (
+                  <p className="text-xs text-violet-900">
+                    Showing provider matches with incomplete firmographic data.
+                  </p>
+                ) : null}
+                {process.env.NODE_ENV === "development" && result.provider_runtime_diagnostics ? (
+                  <ProviderRuntimeDiagnosticsPanel
+                    className="w-full min-w-0"
+                    diagnostics={result.provider_runtime_diagnostics}
+                  />
+                ) : null}
+                {result.provider_messages && result.provider_messages.length > 0 ? (
+                  <p className="text-xs text-muted-foreground break-words">
+                    {result.provider_messages.join(" · ")}
+                  </p>
+                ) : null}
+                {result.provider_diagnostics && result.provider_diagnostics.length > 0 ? (
+                  <>
+                    {result.provider_diagnostics
+                      .filter((row) => row.provider_type === "google_places")
+                      .map((row) => (
+                        <GooglePlacesQueryDiagnostics
+                          key={`${row.provider_type}-${row.provider_name}`}
+                          className="w-full min-w-0"
+                          diagnostic={row}
+                          qaMarker={result.google_places_query_expansion_qa_marker}
+                        />
+                      ))}
+                    <ProviderCacheCostDiagnostics
+                      className="w-full min-w-0"
+                      diagnostics={result.provider_diagnostics}
+                      qaMarker={result.provider_cache_qa_marker}
+                    />
+                    <div
+                      className="w-full min-w-0 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-700 break-words"
+                      data-qa-marker={result.provider_audit_qa_marker ?? GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER}
+                    >
+                      <p className="font-medium">Provider diagnostics</p>
+                      <ul className="mt-1 space-y-1">
+                        {result.provider_diagnostics
+                          .filter((row) => row.provider_type !== "google_places")
+                          .map((row) => (
+                            <li key={`${row.provider_type}-${row.provider_name}`}>
+                              {row.provider_name}: executed={String(row.provider_executed)}, latency=
+                              {row.provider_latency_ms}ms, results={row.provider_result_count}
+                              {row.provider_fallback_reason
+                                ? `, fallback=${row.provider_fallback_reason}`
+                                : ""}
+                            </li>
+                          ))}
+                        {result.provider_diagnostics
+                          .filter((row) => row.provider_type === "google_places")
+                          .map((row) => (
+                            <li key={`${row.provider_type}-${row.provider_name}-summary`}>
+                              {row.provider_name}: executed={String(row.provider_executed)}, latency=
+                              {row.provider_latency_ms}ms, merged=
+                              {row.provider_merged_result_count ?? row.provider_result_count}, queries=
+                              {row.provider_query_generated?.length ?? 0}
+                            </li>
+                          ))}
+                      </ul>
+                      {result.provider_fallback_reason ? (
+                        <p className="mt-1 opacity-90">
+                          Run fallback reason: {result.provider_fallback_reason}
+                        </p>
+                      ) : null}
+                    </div>
+                  </>
+                ) : null}
+                {process.env.NODE_ENV === "development" && result.external_filter_diagnostics ? (
+                  <div className="w-full min-w-0 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-950 break-words">
+                    <p className="font-medium">External filter diagnostics (dev only)</p>
+                    <p>
+                      raw={result.external_filter_diagnostics.raw_provider_count} · normalized=
+                      {result.external_filter_diagnostics.normalized_result_count} · dropped=
+                      {result.external_filter_diagnostics.dropped_result_count}
+                    </p>
+                    {Object.keys(result.external_filter_diagnostics.dropped_reasons).length > 0 ? (
                       <p className="mt-1 opacity-90">
-                        Run fallback reason: {result.provider_fallback_reason}
+                        dropped reasons:{" "}
+                        {Object.entries(result.external_filter_diagnostics.dropped_reasons)
+                          .map(([reason, count]) => `${reason}=${count}`)
+                          .join(", ")}
                       </p>
                     ) : null}
                   </div>
-                </>
-              ) : null}
-              {process.env.NODE_ENV === "development" &&
-              result?.discovery_mode === "discover_external" &&
-              result.external_filter_diagnostics ? (
-                <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-950">
-                  <p className="font-medium">External filter diagnostics (dev only)</p>
-                  <p>
-                    raw={result.external_filter_diagnostics.raw_provider_count} · normalized=
-                    {result.external_filter_diagnostics.normalized_result_count} · dropped=
-                    {result.external_filter_diagnostics.dropped_result_count}
-                  </p>
-                  {Object.keys(result.external_filter_diagnostics.dropped_reasons).length > 0 ? (
-                    <p className="mt-1 opacity-90">
-                      dropped reasons:{" "}
-                      {Object.entries(result.external_filter_diagnostics.dropped_reasons)
-                        .map(([reason, count]) => `${reason}=${count}`)
-                        .join(", ")}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
+                ) : null}
               </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {companies.length > 0 ? (
-                <Button size="sm" variant="ghost" onClick={selectAllVisible}>
-                  Select all visible
-                </Button>
-              ) : null}
-              <Select
-                value={sortBy}
-                onValueChange={(value: GrowthProspectSearchSortBy) => {
-                  setSortBy(value)
-                  void fetchResults({ sortByOverride: value, nextPage: 1, resetSelection: true })
-                }}
-              >
-                <SelectTrigger className="h-8 w-[170px] text-xs">
-                  <SelectValue placeholder="Sort results" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="rank">Default rank</SelectItem>
-                  <SelectItem value="signal_momentum">Signal momentum</SelectItem>
-                </SelectContent>
-              </Select>
-              <SearchViewToggle view={view} onViewChange={setView} />
-              <Button variant="outline" size="sm" onClick={() => setSaveDialogOpen(true)}>
-                <Bookmark className="mr-1 size-3.5" />
-                Save workflow
-              </Button>
-            </div>
+            ) : null}
           </div>
 
           <ProspectSearchBulkActionBar

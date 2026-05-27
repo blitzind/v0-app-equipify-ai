@@ -73,7 +73,7 @@ export function buildProspectSearchButtonLabel(input: {
       }
       return { label: `Search estimated ${ranged.label.replace("~", "")} companies`, disabled: false }
     }
-    return { label: "Search external providers", disabled: false }
+    return { label: "Search providers", disabled: false }
   }
 
   const count = input.exact_count ?? 0

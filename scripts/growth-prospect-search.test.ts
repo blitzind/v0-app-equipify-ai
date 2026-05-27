@@ -2328,6 +2328,28 @@ async function main(): Promise<void> {
   assert.match(shellSource, /useProspectSearchLiveEstimation/)
   assert.match(filterRailSource, /estimationSlot/)
   assert.match(shellSource, /ProspectSearchRelaxFilters/)
+  assert.match(shellSource, /GROWTH_RESULTS_HEADER_LAYOUT_V1_QA_MARKER/)
+  assert.match(shellSource, /GROWTH_PROVIDER_STATUS_LAYOUT_V1_QA_MARKER/)
+  assert.match(shellSource, /inline-flex max-w-full flex-wrap items-baseline/)
+  assert.match(savedWorkflowIcpSource, /GROWTH_SEARCH_FILTERS_COLLAPSED_DEFAULT_QA_MARKER/)
+  assert.match(savedWorkflowIcpSource, /writeProspectSearchFilterAccordionExpanded/)
+  assert.doesNotMatch(savedWorkflowIcpSource, /defaultValue=\{accordionDefaults\}/)
+  assert.doesNotMatch(savedWorkflowIcpSource, /accordionDefaults = \["industry"/)
+
+  const filterAccordionStateSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-filter-accordion-state.ts"),
+    "utf8",
+  )
+  assert.match(filterAccordionStateSource, /growth-search-filters-collapsed-default-v1/)
+  assert.match(filterAccordionStateSource, /migrateProspectSearchFilterAccordionStorage/)
+  assert.match(filterAccordionStateSource, /filter-sections-v2/)
+
+  const providerStatusLayoutSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/real-world-provider-status.tsx"),
+    "utf8",
+  )
+  assert.match(providerStatusLayoutSource, /w-full min-w-0/)
+  assert.match(providerStatusLayoutSource, /break-words/)
 
   const estimateRouteSource = fs.readFileSync(
     path.join(process.cwd(), "app/api/platform/growth/prospect-search/estimate/route.ts"),

@@ -1,10 +1,15 @@
 "use client"
 
-import type { Dispatch, ReactNode, SetStateAction } from "react"
+import { useEffect, useState, type Dispatch, ReactNode, SetStateAction } from "react"
 import { RecommendedFilters } from "@/components/growth/prospect-search/recommended-filters"
 import { SmartFilterInput } from "@/components/growth/prospect-search/smart-filter-input"
 import { TitleTargetingCard } from "@/components/growth/prospect-search/title-targeting-card"
 import { TerritoryFilterCard } from "@/components/growth/prospect-search/territory-filter-card"
+import {
+  GROWTH_SEARCH_FILTERS_COLLAPSED_DEFAULT_QA_MARKER,
+  readProspectSearchFilterAccordionExpanded,
+  writeProspectSearchFilterAccordionExpanded,
+} from "@/components/growth/prospect-search/prospect-search-filter-accordion-state"
 import {
   PROSPECT_SEARCH_BUYING_STAGE_UI,
   PROSPECT_SEARCH_CONFIDENCE_PRESETS,
@@ -49,12 +54,12 @@ function FilterActions({
 }) {
   return (
     <div className={cn("space-y-2", className)}>
-      {estimationSlot}
+      {estimationSlot ? <div className="min-w-0">{estimationSlot}</div> : null}
       <div className="flex gap-2">
         <button
           type="button"
           onClick={onClear}
-          className="flex-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+          className="min-w-0 flex-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
         >
           Clear all
         </button>
@@ -62,7 +67,7 @@ function FilterActions({
           type="button"
           onClick={onApply}
           disabled={applyDisabled}
-          className="flex-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+          className="min-w-0 flex-1 whitespace-normal rounded-md bg-primary px-3 py-1.5 text-center text-xs font-medium leading-tight text-primary-foreground shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
         >
           {applyLabel}
         </button>
@@ -131,7 +136,11 @@ export function GuidedIcpBuilder({
     onChange((prev) => ({ ...prev, ...intentPresetToFilters(id) }))
   }
 
-  const accordionDefaults = ["industry", "company-size", "location", "territory"]
+  const [expandedSections, setExpandedSections] = useState<string[]>([])
+
+  useEffect(() => {
+    setExpandedSections(readProspectSearchFilterAccordionExpanded())
+  }, [])
 
   return (
     <div className={cn("space-y-3", isRail ? "" : "space-y-4")}>
@@ -163,8 +172,13 @@ export function GuidedIcpBuilder({
 
       <Accordion
         type="multiple"
-        defaultValue={accordionDefaults}
+        value={expandedSections}
+        onValueChange={(value) => {
+          setExpandedSections(value)
+          writeProspectSearchFilterAccordionExpanded(value)
+        }}
         className={cn(isRail && "rounded-lg border border-border/60 bg-muted/10 px-1")}
+        data-qa-marker={GROWTH_SEARCH_FILTERS_COLLAPSED_DEFAULT_QA_MARKER}
       >
         <AccordionItem value="industry" className="border-border/60 px-2">
           <AccordionTrigger className="py-3 text-sm hover:no-underline">Industry</AccordionTrigger>
