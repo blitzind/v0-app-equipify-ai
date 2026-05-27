@@ -88,3 +88,22 @@ export function formatCommandCenterHiringCompanyLabel(signal: GrowthSignalRow): 
   const departments = formatDepartmentDistribution(metrics.department_distribution, 2)
   return `${company} · ${metrics.open_role_count} roles · ${departments}`
 }
+
+export type CommandCenterWatchlistMetrics = {
+  active_watchlists: number
+  matches_last_24h: number
+  top_watchlists: Array<{ id: string; name: string; match_count: number }>
+  high_urgency_unmatched: number
+}
+
+/** Read-only Command Center watchlist metrics (Milestone D). */
+export function buildCommandCenterWatchlistMetrics(
+  snapshot: CommandCenterWatchlistMetrics,
+): CommandCenterWatchlistMetrics {
+  return {
+    active_watchlists: snapshot.active_watchlists,
+    matches_last_24h: snapshot.matches_last_24h,
+    top_watchlists: snapshot.top_watchlists.slice(0, 5),
+    high_urgency_unmatched: snapshot.high_urgency_unmatched,
+  }
+}

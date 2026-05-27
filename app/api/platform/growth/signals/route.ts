@@ -9,6 +9,7 @@ import {
   type GrowthSignalType,
   type GrowthSignalUrgency,
   type GrowthSignalWorkflowState,
+  type GrowthSignalSuppressionState,
 } from "@/lib/growth/signals/signal-types"
 
 export const runtime = "nodejs"
@@ -35,6 +36,15 @@ export async function GET(request: Request) {
   const occurred_to = url.searchParams.get("occurred_to")?.trim() || undefined
   const category = url.searchParams.get("category")?.trim() || undefined
   const publisher = url.searchParams.get("publisher")?.trim() || url.searchParams.get("source")?.trim() || undefined
+  const watchlist_id = url.searchParams.get("watchlist_id")?.trim() || undefined
+  const suppression_state = parseEnumParam(
+    url.searchParams.get("suppression_state"),
+    ["active", "suppressed", "dismissed"] as const,
+  ) as GrowthSignalSuppressionState | undefined
+  const minimum_signal_score = Number(url.searchParams.get("minimum_signal_score") ?? "")
+  const department = url.searchParams.get("department")?.trim() || undefined
+  const hiring_intensity = url.searchParams.get("hiring_intensity")?.trim() || undefined
+  const geography = url.searchParams.get("geography")?.trim() || undefined
   const limit = Number(url.searchParams.get("limit") ?? "50")
   const offset = Number(url.searchParams.get("offset") ?? "0")
 
@@ -51,6 +61,12 @@ export async function GET(request: Request) {
     occurred_to,
     category,
     publisher,
+    watchlist_id,
+    suppression_state,
+    minimum_signal_score: Number.isFinite(minimum_signal_score) ? minimum_signal_score : undefined,
+    department,
+    hiring_intensity,
+    geography,
     limit: Number.isFinite(limit) ? limit : 50,
     offset: Number.isFinite(offset) ? offset : 0,
   })
@@ -68,6 +84,12 @@ export async function GET(request: Request) {
       occurred_to: occurred_to ?? null,
       category: category ?? null,
       publisher: publisher ?? null,
+      watchlist_id: watchlist_id ?? null,
+      suppression_state: suppression_state ?? null,
+      minimum_signal_score: Number.isFinite(minimum_signal_score) ? minimum_signal_score : null,
+      department: department ?? null,
+      hiring_intensity: hiring_intensity ?? null,
+      geography: geography ?? null,
     },
     items: result.items,
     total: result.total,

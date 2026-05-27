@@ -13,12 +13,14 @@ import {
 } from "@/components/ui/sheet"
 import { IntentSignalsFilterBar } from "@/components/growth/intent-signals/intent-signals-filter-bar"
 import { IntentSignalsMetricsRow } from "@/components/growth/intent-signals/intent-signals-metrics-row"
+import { IntentSignalsSignalActions } from "@/components/growth/intent-signals/intent-signals-signal-actions"
 import {
   GROWTH_INTENT_SIGNALS_NEWS_TAB_QA_MARKER,
   getIntentSignalTabMeta,
 } from "@/components/growth/intent-signals/intent-signals-ux-constants"
 import { formatNewsCategoryLabel } from "@/lib/growth/signals/news-signal-categories"
 import type { GrowthSignalDetailRow, GrowthSignalRow } from "@/lib/growth/signals/signal-types"
+import type { GrowthSignalWatchlistRow } from "@/lib/growth/signals/signal-watchlist-types"
 
 function formatRelativeDate(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
@@ -48,12 +50,19 @@ function countWithinMs(signals: GrowthSignalRow[], ms: number): number {
   }).length
 }
 
-export function NewsTab({ onOpenSetupDrawer }: { onOpenSetupDrawer?: () => void }) {
+export function NewsTab({
+  onOpenSetupDrawer,
+  watchlistId,
+}: {
+  onOpenSetupDrawer?: () => void
+  watchlistId?: string | null
+}) {
   const tabMeta = getIntentSignalTabMeta("news")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [signals, setSignals] = useState<GrowthSignalRow[]>([])
   const [total, setTotal] = useState(0)
+  const [watchlists, setWatchlists] = useState<GrowthSignalWatchlistRow[]>([])
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detail, setDetail] = useState<GrowthSignalDetailRow | null>(null)
@@ -62,7 +71,9 @@ export function NewsTab({ onOpenSetupDrawer }: { onOpenSetupDrawer?: () => void 
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/platform/growth/signals?signal_type=news_event&limit=100", {
+      const params = new URLSearchParams({ signal_type: "news_event", limit: "100" })
+      if (watchlistId) params.set("watchlist_id", watchlistId)
+      const res = await fetch(`/api/platform/growth/signals?${params.toString()}`, {
         cache: "no-store",
       })
       const data = (await res.json().catch(() => ({}))) as {
@@ -83,11 +94,25 @@ export function NewsTab({ onOpenSetupDrawer }: { onOpenSetupDrawer?: () => void 
     } finally {
       setLoading(false)
     }
+  }, [watchlistId])
+
+  const loadWatchlists = useCallback(async () => {
+    try {
+      const res = await fetch("/api/platform/growth/signals/watchlists", { cache: "no-store" })
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; items?: GrowthSignalWatchlistRow[] }
+      if (res.ok && data.ok) setWatchlists(data.items ?? [])
+    } catch {
+      setWatchlists([])
+    }
   }, [])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    void loadWatchlists()
+  }, [loadWatchlists])
 
   const metrics = useMemo(
     () => ({
@@ -278,9 +303,15 @@ export function NewsTab({ onOpenSetupDrawer }: { onOpenSetupDrawer?: () => void 
                   </a>
                 </Button>
               ) : null}
-              <p className="text-xs text-muted-foreground">
-                Push to Lead Inbox is not enabled in this milestone — manual review only.
-              </p>
+              <IntentSignalsSignalActions
+                signal={detail}
+                watchlists={watchlists}
+                selectedWatchlistId={watchlistId}
+                onUpdated={(updated) => {
+                  setDetail((prev) => (prev ? { ...prev, ...updated } : prev))
+                  void load()
+                }}
+              />
             </div>
           ) : null}
         </SheetContent>

@@ -8,6 +8,8 @@ export const GROWTH_INTENT_SIGNALS_JOBS_TAB_QA_MARKER = "growth-intent-signals-j
 
 export const GROWTH_INTENT_SIGNALS_HIRES_TAB_QA_MARKER = "growth-intent-signals-hires-v1" as const
 
+export const GROWTH_INTENT_SIGNALS_WATCHLISTS_QA_MARKER = "growth-signal-watchlists-v1" as const
+
 export const GROWTH_INTENT_SIGNALS_SETUP_DRAWER_QA_MARKER =
   "growth-intent-signals-setup-drawer-v1" as const
 

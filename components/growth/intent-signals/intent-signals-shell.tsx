@@ -23,6 +23,11 @@ import {
 import { NewsTab } from "@/components/growth/intent-signals/tabs/news-tab"
 import { JobsTab } from "@/components/growth/intent-signals/tabs/jobs-tab"
 import { HiresTab } from "@/components/growth/intent-signals/tabs/hires-tab"
+import {
+  IntentSignalsWatchlistBar,
+  type IntentSignalsWatchlistSelection,
+} from "@/components/growth/intent-signals/intent-signals-watchlist-bar"
+import { IntentSignalsWatchlistDrawer } from "@/components/growth/intent-signals/intent-signals-watchlist-drawer"
 import type { IntentSignalsViewMode } from "@/components/growth/intent-signals/intent-signals-view-toggle"
 import type {
   GrowthIntentPixelAdminDiagnostics,
@@ -70,6 +75,14 @@ export function IntentSignalsShell({
   onMonitorRefresh?: () => void
 }) {
   const [viewMode, setViewMode] = useState<IntentSignalsViewMode>("people")
+  const [watchlistSelection, setWatchlistSelection] = useState<IntentSignalsWatchlistSelection>({
+    watchlistId: null,
+    watchlist: null,
+  })
+  const [watchlistDrawerOpen, setWatchlistDrawerOpen] = useState(false)
+  const [watchlistRefreshToken, setWatchlistRefreshToken] = useState(0)
+
+  const showWatchlists = activeTab === "news" || activeTab === "jobs" || activeTab === "hires"
 
   return (
     <div
@@ -106,6 +119,15 @@ export function IntentSignalsShell({
         </div>
       </div>
 
+      {showWatchlists ? (
+        <IntentSignalsWatchlistBar
+          selection={watchlistSelection}
+          onSelectionChange={setWatchlistSelection}
+          onCreateClick={() => setWatchlistDrawerOpen(true)}
+          refreshToken={watchlistRefreshToken}
+        />
+      ) : null}
+
       {activeTab === "website-visitors" ? (
         <WebsiteVisitorsTab
           siteKey={siteKey}
@@ -122,14 +144,32 @@ export function IntentSignalsShell({
           onMonitorRefresh={onMonitorRefresh}
         />
       ) : activeTab === "news" ? (
-        <NewsTab onOpenSetupDrawer={onOpenSetupDrawer} />
+        <NewsTab
+          onOpenSetupDrawer={onOpenSetupDrawer}
+          watchlistId={watchlistSelection.watchlistId}
+        />
       ) : activeTab === "jobs" ? (
-        <JobsTab onOpenSetupDrawer={onOpenSetupDrawer} />
+        <JobsTab
+          onOpenSetupDrawer={onOpenSetupDrawer}
+          watchlistId={watchlistSelection.watchlistId}
+        />
       ) : activeTab === "hires" ? (
-        <HiresTab onOpenSetupDrawer={onOpenSetupDrawer} />
+        <HiresTab
+          onOpenSetupDrawer={onOpenSetupDrawer}
+          watchlistId={watchlistSelection.watchlistId}
+        />
       ) : (
         <IntentSignalsPreviewTab tabId={activeTab} />
       )}
+
+      <IntentSignalsWatchlistDrawer
+        open={watchlistDrawerOpen}
+        onOpenChange={setWatchlistDrawerOpen}
+        onCreated={(watchlist) => {
+          setWatchlistSelection({ watchlistId: watchlist.id, watchlist })
+          setWatchlistRefreshToken((value) => value + 1)
+        }}
+      />
     </div>
   )
 }

@@ -36,7 +36,7 @@ import {
 import { PLATFORM_ADMIN_GROWTH_LEADS_TAB } from "../components/admin/platform-admin-shell"
 import { buildBossBattles, buildCoachTips, buildHeatMap, detectComboChains } from "../lib/growth/command/command-dashboard-helpers"
 import { describeSequenceStartUnavailable } from "../lib/growth/sequence-enrollment/sequence-enrollment-ui"
-import { buildCommandCenterHiringMetrics } from "../lib/growth/signals/integrations/command-center-bridge"
+import { buildCommandCenterHiringMetrics, buildCommandCenterWatchlistMetrics } from "../lib/growth/signals/integrations/command-center-bridge"
 import type { GrowthLead } from "../lib/growth/types"
 import type { GrowthSignalRow } from "../lib/growth/signals/signal-types"
 
@@ -282,5 +282,19 @@ const hiringMetrics = buildCommandCenterHiringMetrics({
 assert.ok(hiringMetrics.recent_hiring_signals_count >= 1)
 assert.equal(hiringMetrics.top_hiring_companies[0]?.company_name, "Acme Health Systems")
 assert.equal(hiringMetrics.hiring_spikes.length, 1)
+
+const watchlistMetrics = buildCommandCenterWatchlistMetrics({
+  active_watchlists: 3,
+  matches_last_24h: 12,
+  top_watchlists: [
+    { id: "w1", name: "Medical hiring", match_count: 8 },
+    { id: "w2", name: "News alerts", match_count: 4 },
+  ],
+  high_urgency_unmatched: 5,
+})
+assert.equal(watchlistMetrics.active_watchlists, 3)
+assert.equal(watchlistMetrics.matches_last_24h, 12)
+assert.equal(watchlistMetrics.top_watchlists[0]?.name, "Medical hiring")
+assert.equal(watchlistMetrics.high_urgency_unmatched, 5)
 
 console.log("growth-command-center: all checks passed")

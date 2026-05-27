@@ -198,14 +198,20 @@ export type GrowthSignalDetailRow = GrowthSignalRow & {
 export type GrowthSignalListFilters = {
   signal_type?: GrowthSignalType
   workflow_state?: GrowthSignalWorkflowState
+  suppression_state?: GrowthSignalSuppressionState
   urgency?: GrowthSignalUrgency
   company?: string
   domain?: string
   category?: string
+  department?: string
+  hiring_intensity?: string
+  minimum_signal_score?: number
+  geography?: string
   publisher?: string
   occurred_from?: string
   occurred_to?: string
   organization_id?: string | null
+  watchlist_id?: string
   limit?: number
   offset?: number
 }

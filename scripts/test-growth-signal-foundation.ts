@@ -51,6 +51,21 @@ import {
   buildDerivedHireSignalDraft,
 } from "../lib/growth/signals/hiring-velocity"
 import { stripInternalSignalFields } from "../lib/growth/signals/signal-api-sanitize"
+import {
+  GROWTH_SIGNAL_WATCHLISTS_QA_MARKER,
+  GROWTH_SIGNAL_WATCHLIST_EXAMPLE_PAYLOAD,
+  GROWTH_SIGNAL_SAFE_ACTIONS,
+  GROWTH_SIGNAL_BLOCKED_ACTIONS,
+} from "../lib/growth/signals/signal-watchlist-types"
+import {
+  GROWTH_SIGNAL_TRIGGER_RULE_EXAMPLE_PAYLOAD,
+  GROWTH_SIGNAL_TRIGGER_SAFETY_MODES,
+} from "../lib/growth/signals/signal-trigger-rule-types"
+import {
+  evaluateSignalWatchlist,
+  evaluateSignalTriggerRule,
+  signalMatchesWatchlistFilters,
+} from "../lib/growth/signals/signal-trigger-evaluator"
 
 function main(): void {
   assert.equal(GROWTH_SIGNAL_FOUNDATION_QA_MARKER, "growth-signal-foundation-v1")
@@ -232,7 +247,8 @@ function main(): void {
     "utf8",
   )
   assert.match(newsTab, /GROWTH_INTENT_SIGNALS_NEWS_TAB_QA_MARKER/)
-  assert.match(newsTab, /signal_type=news_event/)
+  assert.match(newsTab, /signal_type: "news_event"/)
+  assert.match(newsTab, /watchlist_id/)
   assert.match(newsTab, /tabMeta\.emptyState\.title/)
   assert.match(uxConstants, /No news signals yet/)
   assert.match(uxConstants, /id: "news"[\s\S]*implemented: true/)
@@ -357,9 +373,9 @@ function main(): void {
     "utf8",
   )
   assert.match(jobsTab, /GROWTH_INTENT_SIGNALS_JOBS_TAB_QA_MARKER/)
-  assert.match(jobsTab, /signal_type=job_posting/)
+  assert.match(jobsTab, /signal_type: "job_posting"/)
   assert.match(hiresTab, /GROWTH_INTENT_SIGNALS_HIRES_TAB_QA_MARKER/)
-  assert.match(hiresTab, /signal_type=hire/)
+  assert.match(hiresTab, /signal_type: "hire"/)
   assert.match(uxConstants, /No hiring signals yet/)
   assert.match(uxConstants, /id: "jobs"[\s\S]*implemented: true/)
   assert.match(uxConstants, /id: "hires"[\s\S]*implemented: true/)
@@ -374,6 +390,147 @@ function main(): void {
     "utf8",
   )
   assert.match(ccBridge, /buildCommandCenterHiringMetrics/)
+  assert.match(ccBridge, /buildCommandCenterWatchlistMetrics/)
+
+  const watchlistMigrationPath = path.join(
+    process.cwd(),
+    "supabase/migrations/20270528120000_growth_engine_signal_watchlists.sql",
+  )
+  assert.ok(fs.existsSync(watchlistMigrationPath), "watchlist migration must exist")
+  const watchlistMigration = fs.readFileSync(watchlistMigrationPath, "utf8")
+  assert.match(watchlistMigration, /growth\.signal_watchlists/)
+  assert.match(watchlistMigration, /growth\.signal_trigger_rules/)
+  assert.match(watchlistMigration, /growth\.signal_watchlist_matches/)
+
+  const {
+    GROWTH_SIGNAL_WATCHLISTS_QA_MARKER: watchlistMarker,
+    GROWTH_SIGNAL_WATCHLIST_EXAMPLE_PAYLOAD: watchlistExample,
+    GROWTH_SIGNAL_SAFE_ACTIONS: safeActions,
+    GROWTH_SIGNAL_BLOCKED_ACTIONS: blockedActions,
+  } = {
+    GROWTH_SIGNAL_WATCHLISTS_QA_MARKER,
+    GROWTH_SIGNAL_WATCHLIST_EXAMPLE_PAYLOAD,
+    GROWTH_SIGNAL_SAFE_ACTIONS,
+    GROWTH_SIGNAL_BLOCKED_ACTIONS,
+  }
+  assert.equal(watchlistMarker, "growth-signal-watchlists-v1")
+  assert.ok(watchlistExample.name)
+  assert.ok(safeActions.includes("add_to_watchlist"))
+  assert.ok(blockedActions.includes("auto_sequence"))
+
+  assert.equal(GROWTH_SIGNAL_TRIGGER_RULE_EXAMPLE_PAYLOAD.enabled, false)
+  assert.ok(GROWTH_SIGNAL_TRIGGER_SAFETY_MODES.includes("manual_review"))
+
+  const watchlistNewsOnly = {
+    id: "w1",
+    signal_types: ["news_event"] as GrowthSignalRow["signal_type"][],
+    filters: { minimum_signal_score: 40 },
+  }
+  const newsSignal: GrowthSignalRow = {
+    ...sampleJobs[0]!,
+    id: "n1",
+    signal_type: "news_event",
+    signal_score: 45,
+    category: "Field Service",
+  }
+  const jobSignal = sampleJobs[0]!
+  const watchlistMatches = evaluateSignalWatchlist(watchlistNewsOnly, [newsSignal, jobSignal])
+  assert.equal(watchlistMatches.length, 1)
+  assert.equal(watchlistMatches[0]?.signal.id, "n1")
+
+  const scoreWatchlist = {
+    id: "w2",
+    signal_types: [] as GrowthSignalRow["signal_type"][],
+    filters: { minimum_signal_score: 50 },
+  }
+  const lowScore = { ...newsSignal, id: "n2", signal_score: 30 }
+  assert.equal(signalMatchesWatchlistFilters(lowScore, scoreWatchlist).matched, false)
+  assert.equal(signalMatchesWatchlistFilters(newsSignal, scoreWatchlist).matched, false)
+  assert.equal(signalMatchesWatchlistFilters({ ...newsSignal, signal_score: 55 }, scoreWatchlist).matched, true)
+
+  const deptWatchlist = {
+    id: "w3",
+    signal_types: ["job_posting"] as GrowthSignalRow["signal_type"][],
+    filters: { department: "Biomedical" },
+  }
+  assert.equal(signalMatchesWatchlistFilters(jobSignal, deptWatchlist).matched, true)
+  assert.equal(signalMatchesWatchlistFilters(sampleJobs[1]!, deptWatchlist).matched, false)
+
+  const intensitySignal: GrowthSignalRow = {
+    ...sampleJobs[0]!,
+    id: "h1",
+    signal_type: "hire",
+    metadata: {
+      hiring_velocity: { hiring_intensity: "high", open_role_count: 6 },
+    },
+  }
+  const intensityWatchlist = {
+    id: "w4",
+    signal_types: ["hire"] as GrowthSignalRow["signal_type"][],
+    filters: { hiring_intensity: "high" },
+  }
+  assert.equal(signalMatchesWatchlistFilters(intensitySignal, intensityWatchlist).matched, true)
+
+  const triggerSuggestions = evaluateSignalTriggerRule(
+    {
+      id: "r1",
+      name: "High hire review",
+      enabled: false,
+      safety_mode: "manual_review",
+      conditions: { signal_types: ["hire"], hiring_intensity: "high" },
+      actions: { suggest_review: true },
+    },
+    [intensitySignal],
+  )
+  assert.equal(triggerSuggestions.length, 0)
+
+  const enabledSuggestions = evaluateSignalTriggerRule(
+    {
+      id: "r2",
+      name: "High hire review",
+      enabled: true,
+      safety_mode: "suggest_only",
+      conditions: { signal_types: ["hire"], hiring_intensity: "high" },
+      actions: { suggest_review: true, suggest_watchlist: true },
+    },
+    [intensitySignal],
+  )
+  assert.equal(enabledSuggestions.length, 1)
+  assert.ok(enabledSuggestions[0]?.suggested_actions.includes("suggest_review"))
+  assert.doesNotMatch(JSON.stringify(enabledSuggestions), /auto_send|auto_sequence|auto_enroll/)
+
+  const actionsSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/signals/signal-actions.ts"),
+    "utf8",
+  )
+  assert.match(actionsSource, /isGrowthSignalBlockedAction/)
+  assert.match(actionsSource, /GROWTH_SIGNAL_BLOCKED_ACTIONS/)
+  assert.match(actionsSource, /blocked_action/)
+  assert.doesNotMatch(actionsSource, /sendEmail|slack/i)
+
+  const refreshSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/signals/signal-watchlist-repository.ts"),
+    "utf8",
+  )
+  assert.match(refreshSource, /refreshSignalWatchlistMatches/)
+  assert.match(refreshSource, /upsert/)
+  assert.doesNotMatch(refreshSource, /pushToLeadInbox|sendEmail|auto_sequence|slack/i)
+
+  const actionsRoute = fs.readFileSync(
+    path.join(process.cwd(), "app/api/platform/growth/signals/[id]/actions/route.ts"),
+    "utf8",
+  )
+  assert.match(actionsRoute, /applyGrowthSignalAction/)
+  assert.doesNotMatch(actionsRoute, /raw_payload|stack/i)
+
+  const watchlistsRoute = fs.readFileSync(
+    path.join(process.cwd(), "app/api/platform/growth/signals/watchlists/route.ts"),
+    "utf8",
+  )
+  assert.match(watchlistsRoute, /GROWTH_SIGNAL_WATCHLISTS_QA_MARKER/)
+
+  assert.match(uxConstants, /growth-signal-watchlists-v1/)
+  assert.match(signalsShell, /IntentSignalsWatchlistBar/)
 
   const prospectOverlay = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/signals/integrations/prospect-search-signal-overlay.ts"),

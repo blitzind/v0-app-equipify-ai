@@ -16,6 +16,8 @@ import {
   isGrowthSignalFoundationSchemaReady,
 } from "@/lib/growth/signals/signal-schema-health"
 import { stripInternalSignalFields } from "@/lib/growth/signals/signal-api-sanitize"
+import { signalMatchesWatchlistFilters } from "@/lib/growth/signals/signal-trigger-evaluator"
+import { getGrowthSignalWatchlist } from "@/lib/growth/signals/signal-watchlist-repository"
 import {
   GROWTH_SIGNAL_FOUNDATION_QA_MARKER,
   type GrowthNormalizedSignalDraft,
@@ -117,6 +119,77 @@ function mapEventRow(row: Record<string, unknown>): GrowthSignalEventRow {
   }
 }
 
+function readHiringIntensity(metadata: Record<string, unknown> | undefined): string | null {
+  const velocity = metadata?.hiring_velocity
+  if (!velocity || typeof velocity !== "object") return null
+  const intensity = (velocity as Record<string, unknown>).hiring_intensity
+  return typeof intensity === "string" && intensity.trim() ? intensity.trim() : null
+}
+
+function applyClientSideSignalFilters(
+  items: GrowthSignalRow[],
+  filters: GrowthSignalListFilters,
+): GrowthSignalRow[] {
+  return items.filter((signal) => {
+    if (filters.minimum_signal_score != null && signal.signal_score < filters.minimum_signal_score) {
+      return false
+    }
+    if (filters.suppression_state && signal.suppression_state !== filters.suppression_state) {
+      return false
+    }
+    if (filters.department) {
+      const dept = signal.category?.trim() || ""
+      if (!dept.toLowerCase().includes(filters.department.toLowerCase())) return false
+    }
+    if (filters.hiring_intensity) {
+      const intensity = readHiringIntensity(signal.metadata)
+      if (!intensity || intensity.toLowerCase() !== filters.hiring_intensity.toLowerCase()) return false
+    }
+    if (filters.geography) {
+      const geo = signal.geography?.trim() || ""
+      if (!geo.toLowerCase().includes(filters.geography.toLowerCase())) return false
+    }
+    return true
+  })
+}
+
+async function mergeWatchlistFilters(
+  admin: SupabaseClient,
+  filters: GrowthSignalListFilters,
+): Promise<GrowthSignalListFilters | null> {
+  const watchlistId = filters.watchlist_id?.trim()
+  if (!watchlistId) return filters
+
+  const watchlist = await getGrowthSignalWatchlist(admin, watchlistId)
+  if (!watchlist || watchlist.archived_at) return null
+
+  const wf = watchlist.filters
+  const allowedTypes =
+    watchlist.signal_types.length > 0 ? watchlist.signal_types : wf.signal_types ?? []
+
+  if (filters.signal_type && allowedTypes.length > 0 && !allowedTypes.includes(filters.signal_type)) {
+    return { ...filters, watchlist_id: watchlistId, signal_type: filters.signal_type }
+  }
+
+  return {
+    ...filters,
+    watchlist_id: watchlistId,
+    signal_type: filters.signal_type,
+    workflow_state: filters.workflow_state ?? wf.workflow_state ?? undefined,
+    suppression_state: filters.suppression_state ?? wf.suppression_state ?? undefined,
+    urgency: filters.urgency ?? (wf.urgency as GrowthSignalUrgency | null) ?? undefined,
+    company: filters.company ?? wf.company ?? undefined,
+    domain: filters.domain ?? wf.domain ?? undefined,
+    category: filters.category ?? wf.category ?? undefined,
+    department: filters.department ?? wf.department ?? undefined,
+    hiring_intensity: filters.hiring_intensity ?? wf.hiring_intensity ?? undefined,
+    minimum_signal_score: filters.minimum_signal_score ?? wf.minimum_signal_score ?? undefined,
+    geography: filters.geography ?? wf.geography ?? undefined,
+    occurred_from: filters.occurred_from ?? wf.occurred_from ?? undefined,
+    occurred_to: filters.occurred_to ?? wf.occurred_to ?? undefined,
+  }
+}
+
 export async function loadGrowthSignals(
   admin: SupabaseClient,
   filters: GrowthSignalListFilters = {},
@@ -129,8 +202,42 @@ export async function loadGrowthSignals(
     }
   }
 
-  const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200)
-  const offset = Math.max(filters.offset ?? 0, 0)
+  const merged = await mergeWatchlistFilters(admin, filters)
+  if (merged === null) {
+    return {
+      qa_marker: GROWTH_SIGNAL_FOUNDATION_QA_MARKER,
+      items: [],
+      total: 0,
+    }
+  }
+
+  if (merged.watchlist_id) {
+    const watchlist = await getGrowthSignalWatchlist(admin, merged.watchlist_id)
+    if (watchlist) {
+      const allowedTypes =
+        watchlist.signal_types.length > 0
+          ? watchlist.signal_types
+          : watchlist.filters.signal_types ?? []
+      if (merged.signal_type && allowedTypes.length > 0 && !allowedTypes.includes(merged.signal_type)) {
+        return {
+          qa_marker: GROWTH_SIGNAL_FOUNDATION_QA_MARKER,
+          items: [],
+          total: 0,
+        }
+      }
+    }
+  }
+
+  const effectiveFilters = merged
+  const limit = Math.min(Math.max(effectiveFilters.limit ?? 50, 1), 200)
+  const offset = Math.max(effectiveFilters.offset ?? 0, 0)
+  const needsClientFilter =
+    effectiveFilters.minimum_signal_score != null ||
+    effectiveFilters.suppression_state != null ||
+    effectiveFilters.department != null ||
+    effectiveFilters.hiring_intensity != null ||
+    effectiveFilters.geography != null ||
+    Boolean(effectiveFilters.watchlist_id)
 
   let query = admin
     .schema("growth")
@@ -140,24 +247,29 @@ export async function loadGrowthSignals(
       { count: "exact" },
     )
     .order("occurred_at", { ascending: false })
-    .range(offset, offset + limit - 1)
 
-  if (filters.signal_type) query = query.eq("signal_type", filters.signal_type)
-  if (filters.workflow_state) query = query.eq("workflow_state", filters.workflow_state)
-  if (filters.urgency) query = query.eq("urgency", filters.urgency)
-  if (filters.organization_id) query = query.eq("organization_id", filters.organization_id)
-  if (filters.company) query = query.ilike("company_name", `%${filters.company}%`)
-  if (filters.domain) query = query.ilike("domain", `%${filters.domain}%`)
-  if (filters.occurred_from) query = query.gte("occurred_at", filters.occurred_from)
-  if (filters.occurred_to) query = query.lte("occurred_at", filters.occurred_to)
-  if (filters.category) query = query.eq("category", filters.category)
+  if (!needsClientFilter) {
+    query = query.range(offset, offset + limit - 1)
+  } else {
+    query = query.limit(2000)
+  }
 
-  if (filters.publisher) {
+  if (effectiveFilters.signal_type) query = query.eq("signal_type", effectiveFilters.signal_type)
+  if (effectiveFilters.workflow_state) query = query.eq("workflow_state", effectiveFilters.workflow_state)
+  if (effectiveFilters.urgency) query = query.eq("urgency", effectiveFilters.urgency)
+  if (effectiveFilters.organization_id) query = query.eq("organization_id", effectiveFilters.organization_id)
+  if (effectiveFilters.company) query = query.ilike("company_name", `%${effectiveFilters.company}%`)
+  if (effectiveFilters.domain) query = query.ilike("domain", `%${effectiveFilters.domain}%`)
+  if (effectiveFilters.occurred_from) query = query.gte("occurred_at", effectiveFilters.occurred_from)
+  if (effectiveFilters.occurred_to) query = query.lte("occurred_at", effectiveFilters.occurred_to)
+  if (effectiveFilters.category) query = query.eq("category", effectiveFilters.category)
+
+  if (effectiveFilters.publisher) {
     const { data: sourceMatches, error: sourceError } = await admin
       .schema("growth")
       .from("signal_sources")
       .select("signal_id")
-      .or(`publisher.ilike.%${filters.publisher}%,source_label.ilike.%${filters.publisher}%`)
+      .or(`publisher.ilike.%${effectiveFilters.publisher}%,source_label.ilike.%${effectiveFilters.publisher}%`)
     if (sourceError) throw new Error(sourceError.message)
     const signalIds = [...new Set((sourceMatches ?? []).map((row) => asString(row.signal_id)).filter(Boolean))]
     if (signalIds.length === 0) {
@@ -175,9 +287,28 @@ export async function loadGrowthSignals(
     throw new Error(error.message)
   }
 
+  let items = (data ?? []).map((row) => mapSignalRow(row as Record<string, unknown>))
+
+  if (needsClientFilter) {
+    items = applyClientSideSignalFilters(items, effectiveFilters)
+    if (effectiveFilters.watchlist_id) {
+      const watchlist = await getGrowthSignalWatchlist(admin, effectiveFilters.watchlist_id)
+      if (watchlist) {
+        items = items.filter((signal) => signalMatchesWatchlistFilters(signal, watchlist).matched)
+      }
+    }
+    const total = items.length
+    items = items.slice(offset, offset + limit)
+    return {
+      qa_marker: GROWTH_SIGNAL_FOUNDATION_QA_MARKER,
+      items,
+      total,
+    }
+  }
+
   return {
     qa_marker: GROWTH_SIGNAL_FOUNDATION_QA_MARKER,
-    items: (data ?? []).map((row) => mapSignalRow(row as Record<string, unknown>)),
+    items,
     total: count ?? 0,
   }
 }
