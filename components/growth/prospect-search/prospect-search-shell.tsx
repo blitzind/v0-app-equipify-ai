@@ -146,7 +146,7 @@ export function ProspectSearchShell() {
         })
         const json = (await res.json()) as { ok?: boolean; message?: string; workspace_url?: string }
         setActionMessage(json.message ?? (json.ok ? "Done." : "Action failed."))
-        if (json.workspace_url && action === "open_workspace") {
+        if (json.workspace_url && (action === "open_workspace" || action === "run_lead_engine")) {
           window.open(json.workspace_url, "_blank", "noopener,noreferrer")
         }
         if (action === "save_search" || action === "create_list") {
@@ -441,15 +441,19 @@ function CompanyResultsTable({
               onClick={() => onSelect(row)}
             >
               <td className="px-3 py-2 font-medium">{row.company_name}</td>
-              <td className="px-3 py-2 tabular-nums">{row.lead_score ?? "—"}</td>
-              <td className="px-3 py-2 tabular-nums">{row.intent_score ?? "—"}</td>
-              <td className="px-3 py-2">{row.buying_stage ?? "—"}</td>
+              <td className="px-3 py-2 tabular-nums">
+                {row.lead_engine_score ?? row.lead_score ?? ""}
+              </td>
+              <td className="px-3 py-2 tabular-nums">{row.intent_score ?? ""}</td>
+              <td className="px-3 py-2">
+                {row.buying_stage ? row.buying_stage.replace(/_/g, " ") : ""}
+              </td>
               <td className="px-3 py-2">
                 {row.company_match_confidence != null
                   ? `${Math.round(row.company_match_confidence * 100)}%`
-                  : "—"}
+                  : ""}
               </td>
-              <td className="px-3 py-2">{row.location ?? "—"}</td>
+              <td className="px-3 py-2">{row.location ?? ""}</td>
               <td className="px-3 py-2">{Math.round(row.confidence * 100)}%</td>
             </tr>
           ))}

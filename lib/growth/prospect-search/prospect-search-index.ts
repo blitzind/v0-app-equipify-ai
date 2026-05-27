@@ -15,7 +15,11 @@ import {
   type ProspectSearchResearchOverlay,
 } from "@/lib/growth/prospect-search/prospect-search-index-enrichment"
 import type { GrowthCompanySignalUiSummary } from "@/lib/growth/company-signals/company-signal-types"
-import type { GrowthProspectSearchSourceType } from "@/lib/growth/prospect-search/prospect-search-types"
+import {
+  applyProspectSearchQualificationToIndexRow,
+  buyingStageOverlayFromAssessmentRow,
+} from "@/lib/growth/prospect-search/prospect-search-qualification-overlays"
+import type { ProspectSearchBuyingStageOverlay } from "@/lib/growth/prospect-search/prospect-search-qualification-overlays"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -57,7 +61,14 @@ export type GrowthProspectSearchIndexCompany = {
   field_service_software: string | null
   intent_score: number | null
   buying_stage: string | null
+  buying_stage_confidence: number | null
+  buying_stage_reason: string | null
+  buying_stage_last_assessed_at: string | null
   lead_score: number | null
+  lead_engine_score: number | null
+  lead_engine_score_label: string | null
+  lead_engine_score_explanation: string | null
+  lead_engine_last_run_at: string | null
   company_match_confidence: number | null
   decision_maker_count: number
   verification_status: string
@@ -99,9 +110,7 @@ type MatchOverlay = {
   company_match_confidence?: number
 }
 
-type BuyingOverlay = {
-  buying_stage?: string | null
-}
+type BuyingOverlay = ProspectSearchBuyingStageOverlay
 
 async function applyLeadArchiveFilter(
   admin: SupabaseClient,
@@ -173,7 +182,7 @@ async function loadBuyingStageOverlays(admin: SupabaseClient): Promise<Map<strin
     const { data } = await admin
       .schema("growth")
       .from("buying_stage_assessments")
-      .select("lead_inbox_id, detected_stage")
+      .select("lead_inbox_id, detected_stage, stage_confidence, stage_reasoning, evidence, updated_at, created_at")
       .not("lead_inbox_id", "is", null)
       .order("created_at", { ascending: false })
       .limit(200)
@@ -183,7 +192,7 @@ async function loadBuyingStageOverlays(admin: SupabaseClient): Promise<Map<strin
       const inboxId = asString(r.lead_inbox_id)
       if (!inboxId || seen.has(inboxId)) continue
       seen.add(inboxId)
-      map.set(inboxId, { buying_stage: asString(r.detected_stage) || null })
+      map.set(inboxId, buyingStageOverlayFromAssessmentRow(r))
     }
   } catch {
     /* optional */
@@ -341,27 +350,44 @@ export async function buildProspectSearchIndex(
         service_area: enrichment.service_area,
       })
 
-      upsertCompany({
-        id,
-        source_type: "growth_lead",
-        company_name: asString(r.company_name) || "Unknown",
-        ...enrichment,
-        intent_score: null,
-        buying_stage: null,
-        lead_score: typeof r.score === "number" ? r.score : null,
-        company_match_confidence: null,
-        decision_maker_count: asString(r.decision_maker_status) === "identified" ? 1 : 0,
-        verification_status: "unverified",
-        priority: null,
-        signals,
-        search_intent_category: null,
-        returning_visitor: false,
-        existing_account: false,
-        lead_inbox_id: null,
-        growth_lead_id: id,
-        prospect_id: null,
-        customer_id: null,
-      })
+      upsertCompany(
+        applyProspectSearchQualificationToIndexRow(
+          {
+            id,
+            source_type: "growth_lead",
+            company_name: asString(r.company_name) || "Unknown",
+            ...enrichment,
+            intent_score: null,
+            buying_stage: null,
+            buying_stage_confidence: null,
+            buying_stage_reason: null,
+            buying_stage_last_assessed_at: null,
+            lead_score: typeof r.score === "number" ? r.score : null,
+            lead_engine_score: null,
+            lead_engine_score_label: null,
+            lead_engine_score_explanation: null,
+            lead_engine_last_run_at: null,
+            company_match_confidence: null,
+            decision_maker_count: asString(r.decision_maker_status) === "identified" ? 1 : 0,
+            verification_status: "unverified",
+            priority: null,
+            signals,
+            search_intent_category: null,
+            returning_visitor: false,
+            existing_account: false,
+            lead_inbox_id: null,
+            growth_lead_id: id,
+            prospect_id: null,
+            customer_id: null,
+          },
+          {
+            metadata:
+              r.metadata && typeof r.metadata === "object"
+                ? (r.metadata as Record<string, unknown>)
+                : {},
+          },
+        ),
+      )
     }
   } catch {
     /* growth.leads optional */
@@ -409,33 +435,48 @@ export async function buildProspectSearchIndex(
         signals.unshift(`Search intent: ${intentOverlay.search_intent_category}`)
       }
 
-      upsertCompany({
-        id,
-        source_type: "lead_inbox",
-        company_name: asString(r.company_name) || "Unknown",
-        ...enrichment,
-        intent_score:
-          typeof r.intent_score === "number"
-            ? r.intent_score
-            : (intentOverlay?.intent_score ?? null),
-        buying_stage:
-          (typeof buying?.detected_stage === "string" ? buying.detected_stage : null) ??
-          buyingOverlay?.buying_stage ??
-          null,
-        lead_score: typeof r.intent_score === "number" ? r.intent_score : null,
-        company_match_confidence: matchOverlay?.company_match_confidence ?? null,
-        decision_maker_count: 0,
-        verification_status: "candidate",
-        priority: asString(r.candidate_priority) || null,
-        signals: [...new Set(signals)].slice(0, 6),
-        search_intent_category: intentOverlay?.search_intent_category ?? null,
-        returning_visitor: intentOverlay?.returning_visitor ?? false,
-        existing_account,
-        lead_inbox_id: id,
-        growth_lead_id: null,
-        prospect_id: null,
-        customer_id: null,
-      })
+      upsertCompany(
+        applyProspectSearchQualificationToIndexRow(
+          {
+            id,
+            source_type: "lead_inbox",
+            company_name: asString(r.company_name) || "Unknown",
+            ...enrichment,
+            intent_score:
+              typeof r.intent_score === "number"
+                ? r.intent_score
+                : (intentOverlay?.intent_score ?? null),
+            buying_stage:
+              (typeof buying?.detected_stage === "string" ? buying.detected_stage : null) ??
+              buyingOverlay?.buying_stage ??
+              null,
+            buying_stage_confidence: buyingOverlay?.buying_stage_confidence ?? null,
+            buying_stage_reason: buyingOverlay?.buying_stage_reason ?? null,
+            buying_stage_last_assessed_at: buyingOverlay?.buying_stage_last_assessed_at ?? null,
+            lead_score: typeof r.intent_score === "number" ? r.intent_score : null,
+            lead_engine_score: null,
+            lead_engine_score_label: null,
+            lead_engine_score_explanation: null,
+            lead_engine_last_run_at: null,
+            company_match_confidence: matchOverlay?.company_match_confidence ?? null,
+            decision_maker_count: 0,
+            verification_status: "candidate",
+            priority: asString(r.candidate_priority) || null,
+            signals: [...new Set(signals)].slice(0, 6),
+            search_intent_category: intentOverlay?.search_intent_category ?? null,
+            returning_visitor: intentOverlay?.returning_visitor ?? false,
+            existing_account,
+            lead_inbox_id: id,
+            growth_lead_id: null,
+            prospect_id: null,
+            customer_id: null,
+          },
+          {
+            metadata: meta,
+            buyingOverlay: buyingOverlay ?? null,
+          },
+        ),
+      )
     }
   } catch {
     /* optional */
@@ -466,7 +507,14 @@ export async function buildProspectSearchIndex(
           ...enrichment,
           intent_score: null,
           buying_stage: null,
+          buying_stage_confidence: null,
+          buying_stage_reason: null,
+          buying_stage_last_assessed_at: null,
           lead_score: null,
+          lead_engine_score: null,
+          lead_engine_score_label: null,
+          lead_engine_score_explanation: null,
+          lead_engine_last_run_at: null,
           company_match_confidence: null,
           decision_maker_count: 0,
           verification_status: "crm_prospect",
@@ -518,7 +566,14 @@ export async function buildProspectSearchIndex(
           ...enrichment,
           intent_score: null,
           buying_stage: null,
+          buying_stage_confidence: null,
+          buying_stage_reason: null,
+          buying_stage_last_assessed_at: null,
           lead_score: null,
+          lead_engine_score: null,
+          lead_engine_score_label: null,
+          lead_engine_score_explanation: null,
+          lead_engine_last_run_at: null,
           company_match_confidence: null,
           decision_maker_count: 0,
           verification_status: "existing_account",

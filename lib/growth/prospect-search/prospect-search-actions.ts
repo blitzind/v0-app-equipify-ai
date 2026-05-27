@@ -9,6 +9,7 @@ import {
   personResultToListMember,
 } from "@/lib/growth/prospect-search/list-management"
 import { prospectSearchDedupeHash } from "@/lib/growth/prospect-search/prospect-search-index"
+import { buildProspectSearchLeadEngineHandoffUrl } from "@/lib/growth/prospect-search/prospect-search-lead-engine-handoff"
 import { createProspectSearchSavedSearch } from "@/lib/growth/prospect-search/saved-searches"
 import type {
   GrowthProspectSearchActionResult,
@@ -145,6 +146,35 @@ export async function executeProspectSearchAction(
           source_id: company.id,
           query: input.query ?? "",
         },
+        qualification_context: {
+          lead_engine_score: company.lead_engine_score ?? company.lead_score,
+          lead_engine_score_label: company.lead_engine_score_label,
+          lead_engine_score_explanation: company.lead_engine_score_explanation,
+          buying_stage: company.buying_stage,
+          buying_stage_confidence: company.buying_stage_confidence,
+          buying_stage_reason: company.buying_stage_reason,
+          company_match_confidence: company.company_match_confidence,
+          intent_score: company.intent_score,
+          search_intent_category: company.search_intent_category,
+          crm_detected: company.crm_detected,
+          field_service_software: company.field_service_software,
+          website_platform: company.website_platform,
+          service_area: company.service_area,
+        },
+        ...(company.buying_stage
+          ? {
+              buying_stage_summary: {
+                detected_stage: company.buying_stage,
+                stage_confidence: company.buying_stage_confidence,
+                stage_reasoning: company.buying_stage_reason ? [company.buying_stage_reason] : [],
+                assessed_at: company.buying_stage_last_assessed_at ?? new Date().toISOString(),
+                evidence: company.buying_stage_reason ?? "Carried from Prospect Search qualification overlay.",
+              },
+            }
+          : {}),
+        ...(company.company_signal_summary
+          ? { company_signal_summary: company.company_signal_summary }
+          : {}),
       },
     })
     if (!result.ok || !result.row) {
@@ -172,8 +202,8 @@ export async function executeProspectSearchAction(
     return {
       ok: true,
       action,
-      message: "Open Lead Engine workspace with company context (sandbox POST).",
-      workspace_url: "/admin/growth/leads/lead-engine",
+      message: "Open Lead Engine workspace with company context prefilled.",
+      workspace_url: buildProspectSearchLeadEngineHandoffUrl(company, input.query),
       growth_lead_id: company.growth_lead_id,
     }
   }

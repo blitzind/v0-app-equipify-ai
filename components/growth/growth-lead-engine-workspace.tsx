@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { AlertTriangle, Loader2, Play, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,13 +24,25 @@ import {
   type GrowthLeadEnginePipelineRun,
 } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
 import type { GrowthLeadEngineSandboxInput } from "@/lib/growth/lead-engine/workspace-types"
+import { parseProspectSearchLeadEngineHandoffParams } from "@/lib/growth/prospect-search/prospect-search-lead-engine-handoff"
 
 export function GrowthLeadEngineWorkspace() {
+  const searchParams = useSearchParams()
   const [input, setInput] = useState<GrowthLeadEngineSandboxInput>(LEAD_INTELLIGENCE_INSPECTOR_DEFAULT_INPUT)
   const [activePresetId, setActivePresetId] = useState<string | null>("medical-equipment")
   const [run, setRun] = useState<GrowthLeadEnginePipelineRun | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [handoffApplied, setHandoffApplied] = useState(false)
+
+  useEffect(() => {
+    if (handoffApplied || !searchParams) return
+    const handoff = parseProspectSearchLeadEngineHandoffParams(searchParams)
+    if (!handoff) return
+    setInput(handoff)
+    setActivePresetId(null)
+    setHandoffApplied(true)
+  }, [handoffApplied, searchParams])
 
   async function runPipeline() {
     setLoading(true)

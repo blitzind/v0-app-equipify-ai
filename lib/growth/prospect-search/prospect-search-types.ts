@@ -138,7 +138,14 @@ export type GrowthProspectSearchCompanyResult = {
   location: string | null
   intent_score: number | null
   buying_stage: string | null
+  buying_stage_confidence: number | null
+  buying_stage_reason: string | null
+  buying_stage_last_assessed_at: string | null
   lead_score: number | null
+  lead_engine_score: number | null
+  lead_engine_score_label: string | null
+  lead_engine_score_explanation: string | null
+  lead_engine_last_run_at: string | null
   confidence: number
   company_match_confidence: number | null
   decision_maker_coverage: number | null

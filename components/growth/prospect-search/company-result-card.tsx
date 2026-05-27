@@ -14,15 +14,7 @@ import { BuyingCommitteePanel } from "@/components/growth/prospect-search/buying
 import { RealWorldSourceBadge } from "@/components/growth/prospect-search/real-world-provider-status"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
-
-function MetricPill({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-lg bg-muted/50 px-2.5 py-1.5">
-      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="text-sm font-semibold tabular-nums">{value}</p>
-    </div>
-  )
-}
+import { CompanyQualificationExplanation, CompanyQualificationMetrics } from "@/components/growth/prospect-search/company-qualification-metrics"
 
 export function CompanyResultCard({
   row,
@@ -102,22 +94,8 @@ export function CompanyResultCard({
         />
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <MetricPill label="Lead score" value={row.lead_score ?? "—"} />
-        <MetricPill label="Intent" value={row.intent_score ?? "—"} />
-        <MetricPill
-          label="Buying stage"
-          value={row.buying_stage?.replace(/_/g, " ") ?? "—"}
-        />
-        <MetricPill
-          label="Company match"
-          value={
-            row.company_match_confidence != null
-              ? `${Math.round(row.company_match_confidence * 100)}%`
-              : "—"
-          }
-        />
-      </div>
+      <CompanyQualificationMetrics row={row} />
+      <CompanyQualificationExplanation row={row} />
 
       <p className="rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2 text-xs text-violet-900">
         <span className="font-semibold">Recommended motion:</span> {motion}

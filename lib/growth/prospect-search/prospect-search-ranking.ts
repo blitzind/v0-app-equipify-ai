@@ -1,10 +1,10 @@
 import type {
   GrowthProspectSearchCompanyResult,
   GrowthProspectSearchFilters,
-  GrowthProspectSearchIndexCompany,
   GrowthProspectSearchParsedQuery,
   GrowthProspectSearchPersonResult,
 } from "@/lib/growth/prospect-search/prospect-search-types"
+import type { GrowthProspectSearchIndexCompany } from "@/lib/growth/prospect-search/prospect-search-index"
 import type { GrowthProspectSearchIndexPerson } from "@/lib/growth/prospect-search/prospect-search-index"
 import { inferEmployeeSizeBand, inferRevenueBand } from "@/lib/growth/prospect-search/prospect-search-filters"
 
@@ -14,6 +14,27 @@ function includesFold(hay: string | null | undefined, needle: string): boolean {
 }
 
 const MAX_ENRICHMENT_RANK_BOOST = 0.1
+const MAX_QUALIFICATION_RANK_BOOST = 0.1
+
+function computeQualificationRankBoost(row: GrowthProspectSearchIndexCompany): number {
+  let boost = 0
+
+  const engineScore = row.lead_engine_score ?? row.lead_score
+  if (engineScore != null && engineScore >= 70) boost += 0.03
+  else if (engineScore != null && engineScore >= 50) boost += 0.015
+
+  const stage = (row.buying_stage ?? "").toLowerCase()
+  if (stage.includes("purchase") || stage.includes("active_opportunity")) boost += 0.025
+  else if (row.buying_stage) boost += 0.01
+
+  if (row.company_match_confidence != null && row.company_match_confidence >= 0.7) boost += 0.02
+  else if (row.company_match_confidence != null && row.company_match_confidence >= 0.5) boost += 0.01
+
+  if (row.intent_score != null && row.intent_score >= 15) boost += 0.02
+  else if (row.intent_score != null && row.intent_score >= 12) boost += 0.01
+
+  return Math.min(MAX_QUALIFICATION_RANK_BOOST, boost)
+}
 
 function computeEnrichmentRankBoost(
   row: GrowthProspectSearchIndexCompany,
@@ -121,12 +142,7 @@ export function rankProspectSearchCompanies(
     if (parsed.keywords.length) {
       rank = Math.max(rank, textMatchScore(parsed.keywords.join(" "), blob))
     }
-    if (row.intent_score != null) rank += Math.min(0.15, row.intent_score / 200)
-    if (row.lead_score != null) rank += Math.min(0.12, row.lead_score / 120)
-    if (row.company_match_confidence != null) rank += row.company_match_confidence * 0.08
-    if (row.buying_stage === "purchase_ready" || row.buying_stage === "active_opportunity") {
-      rank += 0.06
-    }
+    rank += computeQualificationRankBoost(row)
 
     const summary = row.company_signal_summary
     if (summary?.technology_signals.length) rank += 0.02
@@ -140,7 +156,12 @@ export function rankProspectSearchCompanies(
     if (row.intent_score != null && row.intent_score >= 12) {
       reasoning.push(`Intent score ${row.intent_score} from observable traffic.`)
     }
-    if (row.buying_stage) reasoning.push(`Buying stage candidate: ${row.buying_stage}.`)
+    if (row.lead_engine_score != null) {
+      reasoning.push(`Lead Engine score ${row.lead_engine_score}.`)
+    } else if (row.lead_score != null && row.lead_score >= 50) {
+      reasoning.push(`Lead score ${row.lead_score}.`)
+    }
+    if (row.buying_stage) reasoning.push(`Buying stage: ${row.buying_stage.replace(/_/g, " ")}.`)
     if (row.signals.length) reasoning.push(row.signals[0]!)
     if (summary?.technology_signals[0]) {
       reasoning.push(`Technology signal: ${summary.technology_signals[0]}.`)
@@ -167,7 +188,14 @@ export function rankProspectSearchCompanies(
       location: row.location,
       intent_score: row.intent_score,
       buying_stage: row.buying_stage,
+      buying_stage_confidence: row.buying_stage_confidence,
+      buying_stage_reason: row.buying_stage_reason,
+      buying_stage_last_assessed_at: row.buying_stage_last_assessed_at,
       lead_score: row.lead_score,
+      lead_engine_score: row.lead_engine_score,
+      lead_engine_score_label: row.lead_engine_score_label,
+      lead_engine_score_explanation: row.lead_engine_score_explanation,
+      lead_engine_last_run_at: row.lead_engine_last_run_at,
       confidence,
       company_match_confidence: row.company_match_confidence,
       decision_maker_coverage:

@@ -45,6 +45,19 @@ import {
   getIndustryTitleRecommendations,
 } from "../lib/growth/prospect-search/title-industry-mapping"
 import {
+  GROWTH_PROSPECT_SEARCH_QUALIFICATION_QA_MARKER,
+  applyProspectSearchQualificationToIndexRow,
+  extractBuyingStageFromMetadata,
+  extractLeadEngineScoreOverlay,
+  resolveProspectSearchQualificationFields,
+} from "../lib/growth/prospect-search/prospect-search-qualification-overlays"
+import {
+  GROWTH_PROSPECT_SEARCH_LEAD_ENGINE_HANDOFF_QA_MARKER,
+  buildProspectSearchLeadEngineHandoffUrl,
+  parseProspectSearchLeadEngineHandoffParams,
+} from "../lib/growth/prospect-search/prospect-search-lead-engine-handoff"
+import { GROWTH_LEAD_ENGINE_RUN_METADATA_KEY } from "../lib/growth/lead-operator-workspace/lead-operator-workspace-types"
+import {
   parseTitleChips,
   serializeTitleChips,
   suggestTitles,
@@ -487,6 +500,260 @@ async function main(): Promise<void> {
   assert.equal(titleFiltered.length, 2)
   assert.ok(titleFiltered.some((p) => p.title === "CEO"))
   assert.ok(titleFiltered.some((p) => p.title === "Director of Operations"))
+
+  assert.equal(
+    GROWTH_PROSPECT_SEARCH_QUALIFICATION_QA_MARKER,
+    "growth-prospect-search-qualification-v1",
+  )
+  assert.equal(
+    GROWTH_PROSPECT_SEARCH_LEAD_ENGINE_HANDOFF_QA_MARKER,
+    "growth-prospect-search-lead-engine-handoff-v1",
+  )
+  assert.match(indexSource, /applyProspectSearchQualificationToIndexRow/)
+  assert.match(indexSource, /buyingStageOverlayFromAssessmentRow/)
+  assert.match(actionsSource, /buildProspectSearchLeadEngineHandoffUrl/)
+  assert.match(actionsSource, /qualification_context/)
+  assert.match(actionsSource, /buying_stage_summary/)
+  assert.match(companyCardSource, /CompanyQualificationMetrics/)
+  assert.doesNotMatch(companyCardSource, /"—"/)
+  assert.match(shellSource, /run_lead_engine/)
+  const leadEngineWorkspaceSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/growth-lead-engine-workspace.tsx"),
+    "utf8",
+  )
+  assert.match(leadEngineWorkspaceSource, /parseProspectSearchLeadEngineHandoffParams/)
+
+  const leadEngineRunFixture = {
+    run_id: "run-test-1",
+    qa_marker: "lead-engine-orchestrator-v1",
+    mode: "fixture_dry_run",
+    provider_mode: null,
+    provider_adapter_qa_marker: null,
+    pipeline_status: "completed",
+    current_stage: null,
+    completed_stages: ["lead_score"],
+    failed_stage: null,
+    execution_duration_ms: 120,
+    pipeline_confidence: 0.82,
+    human_review_required: false,
+    stage_results: [
+      {
+        stage_id: "lead_score",
+        parse_ok: true,
+        parsed: {
+          lead_score: 78,
+          lead_grade: "B",
+          priority_level: "high_priority",
+          score_explanation: "Strong ICP fit with field service signals.",
+        },
+      },
+    ],
+    pipeline_diagnostics: [],
+    pipeline_evidence_chain: [],
+    pipeline_attribution_chain: [],
+    fatal_errors: [],
+    warning_messages: [],
+    execution_summary: "Fixture run",
+    input: {
+      companyName: "Acme HVAC",
+      domain: "acme.example",
+      industry: "HVAC",
+      location: "Tennessee",
+      notes: "",
+    },
+  }
+
+  const engineOverlay = extractLeadEngineScoreOverlay({
+    [GROWTH_LEAD_ENGINE_RUN_METADATA_KEY]: leadEngineRunFixture,
+    lead_engine_completed_at: "2026-05-01T12:00:00.000Z",
+  })
+  assert.ok(engineOverlay)
+  assert.equal(engineOverlay!.lead_engine_score, 78)
+  assert.equal(engineOverlay!.lead_engine_score_label, "Grade B")
+  assert.match(engineOverlay!.lead_engine_score_explanation ?? "", /ICP fit/)
+
+  const qualified = resolveProspectSearchQualificationFields(
+    { lead_score: 40, buying_stage: null },
+    { metadata: { [GROWTH_LEAD_ENGINE_RUN_METADATA_KEY]: leadEngineRunFixture } },
+  )
+  assert.equal(qualified.lead_score, 78)
+  assert.equal(qualified.lead_engine_score, 78)
+
+  const fallback = resolveProspectSearchQualificationFields(
+    { lead_score: 40, buying_stage: "consideration" },
+    { metadata: {} },
+  )
+  assert.equal(fallback.lead_score, 40)
+  assert.equal(fallback.lead_engine_score, null)
+
+  const buyingMeta = extractBuyingStageFromMetadata({
+    buying_stage_summary: {
+      detected_stage: "purchase_ready",
+      stage_confidence: 0.86,
+      stage_reasoning: ["Repeated pricing page visits."],
+      assessed_at: "2026-05-02T10:00:00.000Z",
+    },
+  })
+  assert.ok(buyingMeta)
+  assert.equal(buyingMeta!.buying_stage, "purchase_ready")
+  assert.equal(buyingMeta!.buying_stage_confidence, 0.86)
+
+  const inboxQualified = applyProspectSearchQualificationToIndexRow(
+    {
+      id: "inbox-1",
+      source_type: "lead_inbox",
+      company_name: "Acme",
+      website: "acme.example",
+      industry: "HVAC",
+      subindustry: null,
+      employees: null,
+      revenue_range: null,
+      location: "TN",
+      city: null,
+      state: "TN",
+      service_area: null,
+      notes: null,
+      keywords: [],
+      crm_detected: null,
+      website_platform: null,
+      field_service_software: null,
+      intent_score: 18,
+      buying_stage: null,
+      buying_stage_confidence: null,
+      buying_stage_reason: null,
+      buying_stage_last_assessed_at: null,
+      lead_score: 18,
+      lead_engine_score: null,
+      lead_engine_score_label: null,
+      lead_engine_score_explanation: null,
+      lead_engine_last_run_at: null,
+      company_match_confidence: 0.82,
+      decision_maker_count: 0,
+      verification_status: "candidate",
+      priority: null,
+      signals: [],
+      search_intent_category: "pricing",
+      returning_visitor: true,
+      existing_account: false,
+      lead_inbox_id: "inbox-1",
+      growth_lead_id: null,
+      prospect_id: null,
+      customer_id: null,
+    },
+    {
+      metadata: { [GROWTH_LEAD_ENGINE_RUN_METADATA_KEY]: leadEngineRunFixture },
+      buyingOverlay: buyingMeta,
+    },
+  )
+  assert.equal(inboxQualified.lead_engine_score, 78)
+  assert.equal(inboxQualified.buying_stage, "purchase_ready")
+
+  const handoffUrl = buildProspectSearchLeadEngineHandoffUrl(
+    {
+      id: "crm-1",
+      source_type: "crm_prospect",
+      company_name: "Summit Garage",
+      website: "summitgarage.example",
+      industry: "Garage Door",
+      location: "Phoenix, AZ",
+      subindustry: null,
+      employees: null,
+      revenue_range: null,
+      intent_score: null,
+      buying_stage: null,
+      buying_stage_confidence: null,
+      buying_stage_reason: null,
+      buying_stage_last_assessed_at: null,
+      lead_score: null,
+      lead_engine_score: null,
+      lead_engine_score_label: null,
+      lead_engine_score_explanation: null,
+      lead_engine_last_run_at: null,
+      confidence: 0.5,
+      company_match_confidence: null,
+      decision_maker_coverage: null,
+      verification_status: "crm_prospect",
+      signals: [],
+      search_intent_category: null,
+      lead_inbox_id: null,
+      growth_lead_id: null,
+      prospect_id: "crm-1",
+      customer_id: null,
+      rank_score: 0.4,
+      match_reasoning: [],
+    },
+    "garage door phoenix",
+  )
+  assert.match(handoffUrl, /\/admin\/growth\/leads\/lead-engine\?/)
+  assert.match(handoffUrl, /companyName=Summit\+Garage/)
+  assert.match(handoffUrl, /sourceType=crm_prospect/)
+  assert.match(handoffUrl, /prospectId=crm-1/)
+
+  const parsedHandoff = parseProspectSearchLeadEngineHandoffParams(
+    new URLSearchParams(handoffUrl.split("?")[1]!),
+  )
+  assert.ok(parsedHandoff)
+  assert.equal(parsedHandoff!.companyName, "Summit Garage")
+  assert.equal(parsedHandoff!.domain, "summitgarage.example")
+
+  const baseRankRow = {
+    id: "1",
+    source_type: "growth_lead" as const,
+    company_name: "Acme HVAC",
+    website: null,
+    industry: "HVAC",
+    subindustry: null,
+    employees: "50",
+    revenue_range: null,
+    location: "Tennessee",
+    city: null,
+    state: "TN",
+    service_area: null,
+    notes: null,
+    keywords: [],
+    crm_detected: null,
+    website_platform: null,
+    field_service_software: null,
+    intent_score: null,
+    buying_stage: null,
+    buying_stage_confidence: null,
+    buying_stage_reason: null,
+    buying_stage_last_assessed_at: null,
+    lead_score: null,
+    lead_engine_score: null,
+    lead_engine_score_label: null,
+    lead_engine_score_explanation: null,
+    lead_engine_last_run_at: null,
+    company_match_confidence: null,
+    decision_maker_count: 0,
+    verification_status: "unverified",
+    priority: null,
+    signals: [],
+    search_intent_category: null,
+    returning_visitor: false,
+    existing_account: false,
+    lead_inbox_id: null,
+    growth_lead_id: "1",
+    prospect_id: null,
+    customer_id: null,
+  }
+  const baseRank = rankProspectSearchCompanies([baseRankRow], "Acme HVAC", parsed, 10)[0]!.rank_score
+  const qualifiedRank = rankProspectSearchCompanies(
+    [
+      {
+        ...baseRankRow,
+        lead_engine_score: 85,
+        buying_stage: "purchase_ready",
+        company_match_confidence: 0.9,
+        intent_score: 20,
+      },
+    ],
+    "Acme HVAC",
+    parsed,
+    10,
+  )[0]!.rank_score
+  assert.ok(qualifiedRank > baseRank)
+  assert.ok(qualifiedRank - baseRank <= 0.11)
 
   console.log("growth-prospect-search: all checks passed")
 }

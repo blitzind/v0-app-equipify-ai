@@ -92,6 +92,7 @@ export function recommendedMotion(row: GrowthProspectSearchCompanyResult): strin
   if (stage.includes("purchase")) return "Prioritize outreach — purchase-ready signals"
   if (stage.includes("vendor") || stage.includes("comparison")) return "Send comparison-focused follow-up"
   if (row.intent_score != null && row.intent_score >= 15) return "Review in Lead Inbox — high intent"
+  if (row.lead_engine_score != null && row.lead_engine_score >= 50) return "Run Lead Engine enrichment"
   if (row.lead_score != null && row.lead_score >= 50) return "Run Lead Engine enrichment"
   return "Add to list or push to inbox for review"
 }
