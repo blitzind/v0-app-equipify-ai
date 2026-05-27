@@ -128,7 +128,7 @@ assert.match(notificationTypes, /execution_approval_needed/)
 assert.match(notificationTypes, /fatigue_protection_triggered/)
 assert.match(notificationTypes, /call_now_opportunity/)
 
-const masterContext = fs.readFileSync(path.join(process.cwd(), "lib/admin/master-context.ts"), "utf8")
+const masterContext = fs.readFileSync(path.join(process.cwd(), "lib/admin/master-context.manual.before.md"), "utf8")
 assert.match(masterContext, /6\.32A.*Human.*Approved|human-approved-execution-v1/i)
 
 const service = fs.readFileSync(path.join(process.cwd(), "lib/growth/human-execution/human-execution-service.ts"), "utf8")

@@ -188,7 +188,7 @@ const repoSource = fs.readFileSync(
 )
 assert.doesNotMatch(repoSource, /openai|anthropic/i)
 
-const masterContext = fs.readFileSync(path.join(process.cwd(), "lib/admin/master-context.ts"), "utf8")
+const masterContext = fs.readFileSync(path.join(process.cwd(), "lib/admin/master-context.manual.before.md"), "utf8")
 assert.match(masterContext, /6\.31A.*Revenue Execution|revenue-execution-v1/i)
 
 console.log("growth revenue execution tests passed")

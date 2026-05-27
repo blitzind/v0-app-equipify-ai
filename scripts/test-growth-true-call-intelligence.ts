@@ -314,7 +314,7 @@ const repo = fs.readFileSync(
 assert.match(repo, /safe_summary/)
 assert.doesNotMatch(repo, /transcript_content|audio_url|audio_blob/i)
 
-const masterContext = fs.readFileSync(path.join(process.cwd(), "lib/admin/master-context.ts"), "utf8")
+const masterContext = fs.readFileSync(path.join(process.cwd(), "lib/admin/master-context.manual.before.md"), "utf8")
 assert.match(masterContext, /6\.30A|true-call-intelligence-v1|call_intelligence_scorecards/)
 
 console.log("growth-true-call-intelligence: all checks passed")

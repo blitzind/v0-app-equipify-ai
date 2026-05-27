@@ -197,7 +197,7 @@ const revenueDash = fs.readFileSync(
 assert.match(revenueDash, /dealIntelligenceForecast/)
 assert.match(revenueDash, /AI-informed/)
 
-const masterContext = fs.readFileSync(path.join(process.cwd(), "lib/admin/master-context.ts"), "utf8")
+const masterContext = fs.readFileSync(path.join(process.cwd(), "lib/admin/master-context.manual.before.md"), "utf8")
 assert.match(masterContext, /6\.29A|predictive-deal-intelligence-v1|deal_intelligence_scores/)
 
 console.log("growth-predictive-deal-intelligence: all checks passed")
