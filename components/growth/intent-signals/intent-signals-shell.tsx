@@ -20,6 +20,7 @@ import {
   IntentSignalsPreviewTab,
   WebsiteVisitorsTab,
 } from "@/components/growth/intent-signals/tabs/website-visitors-tab"
+import { NewsTab } from "@/components/growth/intent-signals/tabs/news-tab"
 import type { IntentSignalsViewMode } from "@/components/growth/intent-signals/intent-signals-view-toggle"
 import type {
   GrowthIntentPixelAdminDiagnostics,
@@ -118,6 +119,8 @@ export function IntentSignalsShell({
           lastHandoff={lastHandoff}
           onMonitorRefresh={onMonitorRefresh}
         />
+      ) : activeTab === "news" ? (
+        <NewsTab onOpenSetupDrawer={onOpenSetupDrawer} />
       ) : (
         <IntentSignalsPreviewTab tabId={activeTab} />
       )}

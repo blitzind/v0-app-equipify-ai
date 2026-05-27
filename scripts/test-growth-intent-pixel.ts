@@ -173,12 +173,16 @@ const signalsShell = fs.readFileSync(
 )
 assert.match(signalsShell, /GROWTH_INTENT_SIGNALS_LAYOUT_V2_QA_MARKER/)
 assert.match(signalsShell, /data-qa-marker=\{GROWTH_INTENT_SIGNALS_LAYOUT_V2_QA_MARKER\}/)
+assert.match(signalsShell, /NewsTab/)
+assert.match(signalsShell, /activeTab === "news"/)
 
 const signalsUxConstants = fs.readFileSync(
   path.join(process.cwd(), "components/growth/intent-signals/intent-signals-ux-constants.ts"),
   "utf8",
 )
 assert.match(signalsUxConstants, /growth-intent-signals-layout-v2/)
+assert.match(signalsUxConstants, /growth-intent-signals-news-v1/)
+assert.match(signalsUxConstants, /id: "news"[\s\S]*implemented: true/)
 
 const setupDrawer = fs.readFileSync(
   path.join(process.cwd(), "components/growth/intent-signals/intent-signals-setup-drawer.tsx"),

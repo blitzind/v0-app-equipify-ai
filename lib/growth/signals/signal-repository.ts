@@ -146,6 +146,25 @@ export async function loadGrowthSignals(
   if (filters.domain) query = query.ilike("domain", `%${filters.domain}%`)
   if (filters.occurred_from) query = query.gte("occurred_at", filters.occurred_from)
   if (filters.occurred_to) query = query.lte("occurred_at", filters.occurred_to)
+  if (filters.category) query = query.eq("category", filters.category)
+
+  if (filters.publisher) {
+    const { data: sourceMatches, error: sourceError } = await admin
+      .schema("growth")
+      .from("signal_sources")
+      .select("signal_id")
+      .or(`publisher.ilike.%${filters.publisher}%,source_label.ilike.%${filters.publisher}%`)
+    if (sourceError) throw new Error(sourceError.message)
+    const signalIds = [...new Set((sourceMatches ?? []).map((row) => asString(row.signal_id)).filter(Boolean))]
+    if (signalIds.length === 0) {
+      return {
+        qa_marker: GROWTH_SIGNAL_FOUNDATION_QA_MARKER,
+        items: [],
+        total: 0,
+      }
+    }
+    query = query.in("id", signalIds)
+  }
 
   const { data, error, count } = await query
   if (error) {

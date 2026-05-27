@@ -201,6 +201,8 @@ export type GrowthSignalListFilters = {
   urgency?: GrowthSignalUrgency
   company?: string
   domain?: string
+  category?: string
+  publisher?: string
   occurred_from?: string
   occurred_to?: string
   organization_id?: string | null

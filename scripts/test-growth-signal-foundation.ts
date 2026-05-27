@@ -27,6 +27,14 @@ import {
   summarizeSignalProviderRegistry,
 } from "../lib/growth/signals/providers/signal-provider-registry"
 import { createManualImportSignalAdapter } from "../lib/growth/signals/providers/adapters/manual-import-adapter"
+import {
+  createNewsManualSignalAdapter,
+  normalizeNewsManualItem,
+} from "../lib/growth/signals/providers/adapters/news-signal-adapter"
+import {
+  classifyNewsSignalCategory,
+  GROWTH_NEWS_MANUAL_QUEUE_SAMPLE_INPUT,
+} from "../lib/growth/signals/news-signal-categories"
 import { stripInternalSignalFields } from "../lib/growth/signals/signal-api-sanitize"
 
 function main(): void {
@@ -112,6 +120,28 @@ function main(): void {
   assert.ok(getSignalProvider("manual_import"))
   const registry = summarizeSignalProviderRegistry()
   assert.ok(registry.some((entry) => entry.provider_key === "manual_import"))
+  assert.ok(getSignalProvider("news_manual"))
+  assert.ok(registry.some((entry) => entry.provider_key === "news_manual"))
+
+  const newsAdapter = createNewsManualSignalAdapter()
+  const newsDrafts = newsAdapter.normalize(GROWTH_NEWS_MANUAL_QUEUE_SAMPLE_INPUT)
+  assert.equal(newsDrafts.length, 1)
+  assert.equal(newsDrafts[0]?.signal_type, "news_event")
+  assert.equal(newsDrafts[0]?.provider_key, "news_manual")
+  assert.ok(newsDrafts[0]?.evidence[0]?.source_url)
+
+  assert.equal(normalizeNewsManualItem({ headline: "No URL story" }), null)
+  assert.equal(
+    classifyNewsSignalCategory({
+      headline: "Acme raises Series B funding round",
+      excerpt: "Venture capital investment announced.",
+    }),
+    "funding",
+  )
+  assert.equal(
+    classifyNewsSignalCategory({ headline: "Routine quarterly update", excerpt: "Business as usual." }),
+    "general",
+  )
 
   const manual = createManualImportSignalAdapter()
   const normalized = manual.normalize([
@@ -151,6 +181,8 @@ function main(): void {
   )
 
   assert.match(listRoute, /loadGrowthSignals/)
+  assert.match(listRoute, /category/)
+  assert.match(listRoute, /publisher/)
   assert.match(listRoute, /GROWTH_SIGNAL_FOUNDATION_QA_MARKER/)
   assert.match(detailRoute, /loadGrowthSignalById/)
   assert.doesNotMatch(listRoute, /signal_raw_payloads/)
@@ -171,6 +203,33 @@ function main(): void {
     "utf8",
   )
   assert.match(inboxBridge, /not enabled in Milestone A/)
+
+  const newsTab = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/intent-signals/tabs/news-tab.tsx"),
+    "utf8",
+  )
+  const uxConstants = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/intent-signals/intent-signals-ux-constants.ts"),
+    "utf8",
+  )
+  const signalsShell = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/intent-signals/intent-signals-shell.tsx"),
+    "utf8",
+  )
+  assert.match(newsTab, /GROWTH_INTENT_SIGNALS_NEWS_TAB_QA_MARKER/)
+  assert.match(newsTab, /signal_type=news_event/)
+  assert.match(newsTab, /tabMeta\.emptyState\.title/)
+  assert.match(uxConstants, /No news signals yet/)
+  assert.match(uxConstants, /id: "news"[\s\S]*implemented: true/)
+  assert.match(signalsShell, /NewsTab/)
+  assert.match(signalsShell, /activeTab === "news"/)
+
+  const workerSourceNews = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/signals/signal-ingestion-worker.ts"),
+    "utf8",
+  )
+  assert.match(workerSourceNews, /queueNewsManualIngestion/)
+  assert.match(workerSourceNews, /news_manual/)
 
   console.log("growth-signal-foundation: ok")
 }

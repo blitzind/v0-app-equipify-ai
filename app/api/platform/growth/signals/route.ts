@@ -33,6 +33,8 @@ export async function GET(request: Request) {
   const domain = url.searchParams.get("domain")?.trim() || undefined
   const occurred_from = url.searchParams.get("occurred_from")?.trim() || undefined
   const occurred_to = url.searchParams.get("occurred_to")?.trim() || undefined
+  const category = url.searchParams.get("category")?.trim() || undefined
+  const publisher = url.searchParams.get("publisher")?.trim() || url.searchParams.get("source")?.trim() || undefined
   const limit = Number(url.searchParams.get("limit") ?? "50")
   const offset = Number(url.searchParams.get("offset") ?? "0")
 
@@ -47,6 +49,8 @@ export async function GET(request: Request) {
     domain,
     occurred_from,
     occurred_to,
+    category,
+    publisher,
     limit: Number.isFinite(limit) ? limit : 50,
     offset: Number.isFinite(offset) ? offset : 0,
   })
@@ -62,6 +66,8 @@ export async function GET(request: Request) {
       domain: domain ?? null,
       occurred_from: occurred_from ?? null,
       occurred_to: occurred_to ?? null,
+      category: category ?? null,
+      publisher: publisher ?? null,
     },
     items: result.items,
     total: result.total,

@@ -2,6 +2,8 @@
 
 export const GROWTH_INTENT_SIGNALS_LAYOUT_V2_QA_MARKER = "growth-intent-signals-layout-v2" as const
 
+export const GROWTH_INTENT_SIGNALS_NEWS_TAB_QA_MARKER = "growth-intent-signals-news-v1" as const
+
 export const GROWTH_INTENT_SIGNALS_SETUP_DRAWER_QA_MARKER =
   "growth-intent-signals-setup-drawer-v1" as const
 
@@ -228,32 +230,25 @@ export const INTENT_SIGNAL_TABS: readonly IntentSignalTabMeta[] = [
   {
     id: "news",
     label: "News",
-    implemented: false,
+    implemented: true,
     filters: ["Company", "Industry", "News Category", "Company size", "More filters"],
     columns: [
       { key: "company", label: "Company" },
       { key: "headline", label: "Headline" },
       { key: "source", label: "Source" },
-      { key: "country", label: "Country" },
+      { key: "geography", label: "Country/Region" },
       { key: "category", label: "Category" },
+      { key: "score", label: "Signal score" },
       { key: "date", label: "Date" },
+      { key: "actions", label: "Actions" },
     ],
     emptyState: {
-      title: "Monitor company news mentions",
-      description: "Stay ahead of funding, expansion, leadership changes, and other trigger events.",
-      ctaLabel: "Track news",
+      title: "No news signals yet",
+      description: "News signals will appear here after public company news is ingested.",
+      ctaLabel: "Add news signal",
     },
-    sampleMetrics: { total: 678, h24: 31, d7: 245, d30: 1890 },
-    sampleRows: [
-      {
-        company: "Demo Corp",
-        headline: "Sample expansion announcement",
-        source: "Industry Weekly",
-        country: "US",
-        category: "Expansion",
-        date: "8 hr ago",
-      },
-    ],
+    sampleMetrics: { total: 0, h24: 0, d7: 0, d30: 0 },
+    sampleRows: [],
   },
   {
     id: "tech",
