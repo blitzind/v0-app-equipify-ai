@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, type Dispatch, type SetStateAction } from "react"
 import { TitleAutocomplete } from "@/components/growth/prospect-search/title-autocomplete"
 import { TitlePillGroup } from "@/components/growth/prospect-search/title-pill-group"
 import { TitleRecommendations } from "@/components/growth/prospect-search/title-recommendations"
@@ -16,7 +16,7 @@ export function TitleTargetingCard({
   onChange,
 }: {
   filters: GrowthProspectSearchFilters
-  onChange: (filters: GrowthProspectSearchFilters) => void
+  onChange: Dispatch<SetStateAction<GrowthProspectSearchFilters>>
 }) {
   const [draft, setDraft] = useState("")
 
@@ -31,10 +31,10 @@ export function TitleTargetingCard({
       (title, index, arr) =>
         arr.findIndex((t) => t.toLowerCase() === title.toLowerCase()) === index,
     )
-    onChange({
-      ...filters,
+    onChange((prev) => ({
+      ...prev,
       ...serializeTitleChips(unique),
-    })
+    }))
   }
 
   function addTitle(title: string) {

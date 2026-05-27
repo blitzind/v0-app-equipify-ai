@@ -1,5 +1,6 @@
 "use client"
 
+import type { Dispatch, SetStateAction } from "react"
 import { RecommendedFilters } from "@/components/growth/prospect-search/recommended-filters"
 import { SmartFilterInput } from "@/components/growth/prospect-search/smart-filter-input"
 import { TitleTargetingCard } from "@/components/growth/prospect-search/title-targeting-card"
@@ -68,7 +69,7 @@ export function GuidedIcpBuilder({
   variant = "default",
 }: {
   filters: GrowthProspectSearchFilters
-  onChange: (filters: GrowthProspectSearchFilters) => void
+  onChange: Dispatch<SetStateAction<GrowthProspectSearchFilters>>
   onApply: () => void
   onClear: () => void
   variant?: "default" | "rail"
@@ -77,32 +78,41 @@ export function GuidedIcpBuilder({
   const activeIntent = detectActiveIntentPreset(filters)
   const isRail = variant === "rail"
 
+  function applyFilters() {
+    onApply()
+  }
+
   function toggleBand(band: ProspectSearchEmployeeBandUi) {
-    const next = selectedBands.includes(band)
-      ? selectedBands.filter((b) => b !== band)
-      : [...selectedBands, band]
-    const backend = next.flatMap((b) => employeeBandUiToBackend(b))
-    onChange({
-      ...filters,
-      employee_size_bands: backend.length ? (backend as GrowthProspectSearchFilters["employee_size_bands"]) : undefined,
+    onChange((prev) => {
+      const bands = employeeBandsBackendToUi(prev.employee_size_bands)
+      const next = bands.includes(band) ? bands.filter((b) => b !== band) : [...bands, band]
+      const backend = next.flatMap((b) => employeeBandUiToBackend(b))
+      return {
+        ...prev,
+        employee_size_bands: backend.length
+          ? (backend as GrowthProspectSearchFilters["employee_size_bands"])
+          : undefined,
+      }
     })
   }
 
   function toggleTechnology(tech: string) {
-    const list = filters.technologies ?? []
-    const next = list.includes(tech) ? list.filter((t) => t !== tech) : [...list, tech]
-    onChange({
-      ...filters,
-      technologies: next.length ? next : undefined,
-      crm_detected: tech.match(/salesforce|hubspot|zoho/i) ? tech : filters.crm_detected,
-      field_service_software: tech.match(/servicetitan|housecall|fieldpulse/i)
-        ? tech
-        : filters.field_service_software,
+    onChange((prev) => {
+      const list = prev.technologies ?? []
+      const next = list.includes(tech) ? list.filter((t) => t !== tech) : [...list, tech]
+      return {
+        ...prev,
+        technologies: next.length ? next : undefined,
+        crm_detected: tech.match(/salesforce|hubspot|zoho/i) ? tech : prev.crm_detected,
+        field_service_software: tech.match(/servicetitan|housecall|fieldpulse/i)
+          ? tech
+          : prev.field_service_software,
+      }
     })
   }
 
   function applyIntentPreset(id: ProspectSearchIntentPresetId) {
-    onChange({ ...filters, ...intentPresetToFilters(id) })
+    onChange((prev) => ({ ...prev, ...intentPresetToFilters(id) }))
   }
 
   const accordionDefaults = ["industry", "company-size", "location", "territory"]
@@ -117,10 +127,10 @@ export function GuidedIcpBuilder({
               Structured filters — dropdowns, chips, and smart suggestions (no spreadsheet).
             </p>
           </div>
-          <FilterActions onClear={onClear} onApply={onApply} />
+          <FilterActions onClear={onClear} onApply={applyFilters} />
         </div>
       ) : (
-        <FilterActions onClear={onClear} onApply={onApply} />
+        <FilterActions onClear={onClear} onApply={applyFilters} />
       )}
 
       <Accordion
@@ -135,13 +145,13 @@ export function GuidedIcpBuilder({
               label="Primary industry"
               field="industry"
               value={filters.industry ?? ""}
-              onChange={(v) => onChange({ ...filters, industry: v || null })}
+              onChange={(v) => onChange((prev) => ({ ...prev, industry: v || null }))}
               placeholder="e.g. HVAC, Biomedical"
             />
             <RecommendedFilters
               field="industry"
               query={filters.industry ?? ""}
-              onPick={(v) => onChange({ ...filters, industry: v })}
+              onPick={(v) => onChange((prev) => ({ ...prev, industry: v }))}
             />
           </AccordionContent>
         </AccordionItem>
@@ -176,13 +186,13 @@ export function GuidedIcpBuilder({
               label="Location"
               field="location"
               value={filters.location ?? ""}
-              onChange={(v) => onChange({ ...filters, location: v || null })}
+              onChange={(v) => onChange((prev) => ({ ...prev, location: v || null }))}
               placeholder="e.g. California, Tennessee"
             />
             <RecommendedFilters
               field="location"
               query={filters.location ?? ""}
-              onPick={(v) => onChange({ ...filters, location: v })}
+              onPick={(v) => onChange((prev) => ({ ...prev, location: v }))}
             />
           </AccordionContent>
         </AccordionItem>
@@ -228,13 +238,15 @@ export function GuidedIcpBuilder({
                       key={stage.id}
                       type="button"
                       onClick={() => {
-                        const current = filters.buying_stages ?? []
-                        const next = active
-                          ? current.filter((value) => value !== stage.id)
-                          : [...current, stage.id as GrowthBuyingStage]
-                        onChange({
-                          ...filters,
-                          buying_stages: next.length ? next : undefined,
+                        onChange((prev) => {
+                          const current = prev.buying_stages ?? []
+                          const next = active
+                            ? current.filter((value) => value !== stage.id)
+                            : [...current, stage.id as GrowthBuyingStage]
+                          return {
+                            ...prev,
+                            buying_stages: next.length ? next : undefined,
+                          }
                         })
                       }}
                       className={cn(
@@ -296,13 +308,15 @@ export function GuidedIcpBuilder({
                     key={band.id}
                     type="button"
                     onClick={() => {
-                      const current = filters.revenue_bands ?? []
-                      const next = active
-                        ? current.filter((value) => value !== band.id)
-                        : [...current, band.id as GrowthProspectSearchRevenueBand]
-                      onChange({
-                        ...filters,
-                        revenue_bands: next.length ? next : undefined,
+                      onChange((prev) => {
+                        const current = prev.revenue_bands ?? []
+                        const next = active
+                          ? current.filter((value) => value !== band.id)
+                          : [...current, band.id as GrowthProspectSearchRevenueBand]
+                        return {
+                          ...prev,
+                          revenue_bands: next.length ? next : undefined,
+                        }
                       })
                     }}
                     className={cn(
@@ -329,10 +343,10 @@ export function GuidedIcpBuilder({
                     key={preset.label}
                     type="button"
                     onClick={() =>
-                      onChange({
-                        ...filters,
+                      onChange((prev) => ({
+                        ...prev,
                         lead_score_min: preset.value,
-                      })
+                      }))
                     }
                     className={cn(
                       "rounded-full border px-2.5 py-1 text-xs font-medium",
@@ -354,10 +368,10 @@ export function GuidedIcpBuilder({
                     key={preset.label}
                     type="button"
                     onClick={() =>
-                      onChange({
-                        ...filters,
+                      onChange((prev) => ({
+                        ...prev,
                         company_identification_confidence_min: preset.value,
-                      })
+                      }))
                     }
                     className={cn(
                       "rounded-full border px-2.5 py-1 text-xs font-medium",
@@ -375,7 +389,7 @@ export function GuidedIcpBuilder({
               label="Service area"
               field="location"
               value={filters.service_area ?? ""}
-              onChange={(v) => onChange({ ...filters, service_area: v || null })}
+              onChange={(v) => onChange((prev) => ({ ...prev, service_area: v || null }))}
               placeholder="e.g. Southeast, Dallas metro"
             />
           </AccordionContent>
@@ -398,7 +412,7 @@ export function GuidedIcpBuilder({
                   <button
                     key={mode}
                     type="button"
-                    onClick={() => onChange({ ...filters, existing_account_mode: mode })}
+                    onClick={() => onChange((prev) => ({ ...prev, existing_account_mode: mode }))}
                     className={cn(
                       "rounded-full border px-2.5 py-1 text-xs font-medium",
                       (filters.existing_account_mode ?? "any") === mode
@@ -424,7 +438,7 @@ export function GuidedIcpBuilder({
                   <button
                     key={mode}
                     type="button"
-                    onClick={() => onChange({ ...filters, suppression_mode: mode })}
+                    onClick={() => onChange((prev) => ({ ...prev, suppression_mode: mode }))}
                     className={cn(
                       "rounded-full border px-2.5 py-1 text-xs font-medium",
                       (filters.suppression_mode ?? "exclude") === mode
@@ -441,7 +455,7 @@ export function GuidedIcpBuilder({
         </AccordionItem>
       </Accordion>
 
-      {isRail ? <FilterActions onClear={onClear} onApply={onApply} className="pt-1" /> : null}
+      {isRail ? <FilterActions onClear={onClear} onApply={applyFilters} className="pt-1" /> : null}
     </div>
   )
 }

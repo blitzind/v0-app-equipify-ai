@@ -1,5 +1,6 @@
 "use client"
 
+import type { Dispatch, SetStateAction } from "react"
 import { SmartFilterInput } from "@/components/growth/prospect-search/smart-filter-input"
 import type {
   GrowthProspectSearchFilters,
@@ -21,7 +22,7 @@ export function TerritoryFilterCard({
   onChange,
 }: {
   filters: GrowthProspectSearchFilters
-  onChange: (filters: GrowthProspectSearchFilters) => void
+  onChange: Dispatch<SetStateAction<GrowthProspectSearchFilters>>
 }) {
   const territory = filters.territory_filter ?? {}
   const selectedStates = territory.states ?? []
@@ -35,10 +36,10 @@ export function TerritoryFilterCard({
       next.metros?.length ||
       next.postal_codes?.length ||
       next.radius
-    onChange({
-      ...filters,
+    onChange((prev) => ({
+      ...prev,
       territory_filter: hasValues ? next : undefined,
-    })
+    }))
   }
 
   function toggleState(state: string) {

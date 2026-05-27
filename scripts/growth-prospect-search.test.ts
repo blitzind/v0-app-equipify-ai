@@ -62,6 +62,10 @@ import {
   buildProspectSearchPushMetadata,
   formatBulkPushSummary,
 } from "../lib/growth/prospect-search/prospect-search-push-metadata"
+import {
+  buildProspectSearchGetRequestParams,
+  compactProspectSearchFiltersForTransport,
+} from "../lib/growth/prospect-search/prospect-search-client-request"
 import { prospectSearchSelectionKey } from "../lib/growth/prospect-search/prospect-search-selection"
 import {
   parseTitleChips,
@@ -2124,6 +2128,33 @@ async function main(): Promise<void> {
   assert.match(savedWorkflowIcpSource, /buying_stages/)
   assert.match(savedWorkflowIcpSource, /company_identification_confidence_min/)
   assert.match(savedWorkflowIcpSource, /service_area/)
+
+  const clientRequestParams = buildProspectSearchGetRequestParams({
+    query: "hvac companies",
+    filters: {
+      industry: "HVAC",
+      employee_size_bands: ["21-50"],
+      location: "Tennessee",
+    },
+    discoveryMode: "discover_external",
+    page: 1,
+    pageSize: 50,
+  })
+  assert.equal(clientRequestParams.get("mode"), "discover_external")
+  assert.match(clientRequestParams.get("filters") ?? "", /HVAC/)
+  assert.match(clientRequestParams.get("filters") ?? "", /21-50/)
+  assert.equal(compactProspectSearchFiltersForTransport({ existing_account_mode: "any" }), null)
+
+  assert.match(shellSource, /buildProspectSearchGetRequestParams/)
+  assert.match(shellSource, /filtersOverride/)
+  assert.match(shellSource, /filtersRef\.current/)
+  assert.match(shellSource, /updateFilters/)
+  assert.match(shellSource, /filters: filtersRef\.current/)
+  assert.match(filterRailSource, /Apply & search|onApply/)
+  assert.match(savedWorkflowIcpSource, /applyFilters/)
+  assert.match(savedWorkflowIcpSource, /onChange\(\(prev\)/)
+  assert.match(shellSource, /replaceFilters\(row\.filters\)/)
+  assert.match(shellSource, /filters: nextFilters/)
 
   console.log("growth-prospect-search: all checks passed")
 }

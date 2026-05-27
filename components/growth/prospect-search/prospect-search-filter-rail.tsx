@@ -1,5 +1,6 @@
 "use client"
 
+import type { Dispatch, SetStateAction } from "react"
 import { Filter } from "lucide-react"
 import { GuidedIcpBuilder } from "@/components/growth/prospect-search/guided-icp-builder"
 import { SavedSearchWorkflowSidebar } from "@/components/growth/prospect-search/saved-search-workflow-sidebar"
@@ -21,7 +22,7 @@ export function ProspectSearchFilterRail({
   onDeleteSavedSearch,
 }: {
   filters: GrowthProspectSearchFilters
-  onChange: (filters: GrowthProspectSearchFilters) => void
+  onChange: Dispatch<SetStateAction<GrowthProspectSearchFilters>>
   onApply: () => void
   onClear: () => void
   savedSearches: GrowthProspectSearchSavedSearchWithWorkflow[]

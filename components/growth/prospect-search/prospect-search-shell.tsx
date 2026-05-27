@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react"
 import { useSearchParams } from "next/navigation"
 import { Bookmark, LayoutTemplate, Loader2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -52,9 +52,16 @@ import {
   GROWTH_SAVED_SEARCH_WORKFLOWS_QA_MARKER,
   type GrowthProspectSearchSavedSearchWithWorkflow,
 } from "@/lib/growth/prospect-search/saved-search-workflows"
+import { buildProspectSearchGetRequestParams } from "@/lib/growth/prospect-search/prospect-search-client-request"
 import { cn } from "@/lib/utils"
 
 const EMPTY_FILTERS: GrowthProspectSearchFilters = {}
+
+type ProspectSearchRunInput = {
+  queryText?: string
+  filters?: GrowthProspectSearchFilters
+  discoveryMode?: GrowthProspectSearchDiscoveryMode
+}
 
 function resolveDiscoveryModeFromParams(
   searchParams: ReturnType<typeof useSearchParams>,
@@ -102,6 +109,31 @@ export function ProspectSearchShell() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
 
+  const queryRef = useRef(query)
+  const filtersRef = useRef(filters)
+  const discoveryModeRef = useRef(discoveryMode)
+  const pageRef = useRef(page)
+  const pageSizeRef = useRef(pageSize)
+
+  queryRef.current = query
+  filtersRef.current = filters
+  discoveryModeRef.current = discoveryMode
+  pageRef.current = page
+  pageSizeRef.current = pageSize
+
+  const updateFilters = useCallback((updater: SetStateAction<GrowthProspectSearchFilters>) => {
+    setFilters((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater
+      filtersRef.current = next
+      return next
+    })
+  }, [])
+
+  const replaceFilters = useCallback((next: GrowthProspectSearchFilters) => {
+    filtersRef.current = next
+    setFilters(next)
+  }, [])
+
   const heroPlaceholder = useMemo(
     () => rotateHeroPlaceholder(placeholderIndex),
     [placeholderIndex],
@@ -126,14 +158,23 @@ export function ProspectSearchShell() {
   const fetchResults = useCallback(
     async (input: {
       queryText?: string
+      filtersOverride?: GrowthProspectSearchFilters
+      discoveryModeOverride?: GrowthProspectSearchDiscoveryMode
       nextPage?: number
       nextPageSize?: number
       resetSelection?: boolean
     } = {}) => {
-      const q = input.queryText ?? query
-      const activePage = input.nextPage ?? page
-      const activePageSize = input.nextPageSize ?? pageSize
+      const q = input.queryText ?? queryRef.current
+      const activeFilters = input.filtersOverride ?? filtersRef.current
+      const activeDiscoveryMode = input.discoveryModeOverride ?? discoveryModeRef.current
+      const activePage = input.nextPage ?? pageRef.current
+      const activePageSize = input.nextPageSize ?? pageSizeRef.current
       if (input.queryText != null) setQuery(input.queryText)
+      if (input.filtersOverride != null) {
+        filtersRef.current = input.filtersOverride
+        setFilters(input.filtersOverride)
+      }
+      if (input.discoveryModeOverride != null) setDiscoveryMode(input.discoveryModeOverride)
       if (input.nextPage != null) setPage(input.nextPage)
       if (input.nextPageSize != null) setPageSize(input.nextPageSize)
       setLoading(true)
@@ -142,18 +183,13 @@ export function ProspectSearchShell() {
       setActionMessage(null)
       if (input.resetSelection !== false) setSelectedKeys(new Set())
       try {
-        const params = new URLSearchParams({
-          meta: "1",
-          q,
-          page: String(activePage),
-          page_size: String(activePageSize),
+        const params = buildProspectSearchGetRequestParams({
+          query: q,
+          filters: activeFilters,
+          discoveryMode: activeDiscoveryMode,
+          page: activePage,
+          pageSize: activePageSize,
         })
-        if (discoveryMode === "discover_external") {
-          params.set("mode", "discover_external")
-        }
-        if (Object.keys(filters).length > 0) {
-          params.set("filters", JSON.stringify(filters))
-        }
         const res = await fetch(`/api/platform/growth/prospect-search?${params}`, {
           cache: "no-store",
         })
@@ -179,15 +215,23 @@ export function ProspectSearchShell() {
         setLoading(false)
       }
     },
-    [query, filters, discoveryMode, page, pageSize],
+    [],
   )
 
   const runSearch = useCallback(
-    async (queryOverride?: string) => {
+    async (input?: string | ProspectSearchRunInput) => {
+      const normalized =
+        typeof input === "string" ? { queryText: input } : (input ?? {})
       setPage(1)
-      await fetchResults({ queryText: queryOverride ?? query, nextPage: 1, resetSelection: true })
+      await fetchResults({
+        queryText: normalized.queryText ?? queryRef.current,
+        filtersOverride: normalized.filters,
+        discoveryModeOverride: normalized.discoveryMode,
+        nextPage: 1,
+        resetSelection: true,
+      })
     },
-    [fetchResults, query],
+    [fetchResults],
   )
 
   const goToPage = useCallback(
@@ -286,12 +330,13 @@ export function ProspectSearchShell() {
   )
 
   const applyTemplate = useCallback((template: ProspectSearchIcpTemplate) => {
+    const nextFilters = { ...EMPTY_FILTERS, ...template.filters }
     setActiveTemplateId(template.id)
     setActiveSavedSearchId(null)
     setQuery(template.query)
-    setFilters({ ...EMPTY_FILTERS, ...template.filters })
-    void runSearch(template.query)
-  }, [runSearch])
+    replaceFilters(nextFilters)
+    void runSearch({ queryText: template.query, filters: nextFilters })
+  }, [runSearch, replaceFilters])
 
   const suggestedSaveName = useMemo(() => {
     const parts = [filters.industry, filters.territory_filter?.states?.[0], filters.location]
@@ -395,28 +440,28 @@ export function ProspectSearchShell() {
       if (!row) return
       setActiveSavedSearchId(id)
       setActiveTemplateId(null)
-      setQuery(row.query_text)
-      setFilters(row.filters)
+      const restoreDiscoveryMode =
+        row.workflow.discoveryMode === "discover_external" ? "discover_external" : "internal"
       const restorePage = row.workflow.savePagination && row.workflow.page ? row.workflow.page : 1
       const restorePageSize =
         row.workflow.savePagination && row.workflow.pageSize ? row.workflow.pageSize : pageSize
-      if (row.workflow.discoveryMode === "discover_external") {
-        setDiscoveryMode("discover_external")
-      } else {
-        setDiscoveryMode("internal")
-      }
+      setQuery(row.query_text)
+      replaceFilters(row.filters)
+      setDiscoveryMode(restoreDiscoveryMode)
       setPage(restorePage)
       if (row.workflow.savePagination && row.workflow.pageSize) {
         setPageSize(restorePageSize)
       }
       await fetchResults({
         queryText: row.query_text,
+        filtersOverride: row.filters,
+        discoveryModeOverride: restoreDiscoveryMode,
         nextPage: restorePage,
         nextPageSize: restorePageSize,
         resetSelection: true,
       })
     },
-    [savedSearches, pageSize, fetchResults],
+    [savedSearches, pageSize, fetchResults, replaceFilters],
   )
 
   const companies = result?.companies ?? []
@@ -568,9 +613,15 @@ export function ProspectSearchShell() {
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <ProspectSearchFilterRail
           filters={filters}
-          onChange={setFilters}
-          onApply={() => void runSearch()}
-          onClear={() => setFilters(EMPTY_FILTERS)}
+          onChange={updateFilters}
+          onApply={() =>
+            void runSearch({
+              queryText: queryRef.current,
+              filters: filtersRef.current,
+              discoveryMode: discoveryModeRef.current,
+            })
+          }
+          onClear={() => replaceFilters(EMPTY_FILTERS)}
           savedSearches={savedSearches}
           lists={lists}
           onLoadSavedSearch={(id) => void loadSavedById(id)}
@@ -775,7 +826,7 @@ export function ProspectSearchShell() {
         onCreateCustom={() => {
           setActiveTemplateId(null)
           setActiveSavedSearchId(null)
-          setFilters(EMPTY_FILTERS)
+          replaceFilters(EMPTY_FILTERS)
           setQuery("")
         }}
       />
