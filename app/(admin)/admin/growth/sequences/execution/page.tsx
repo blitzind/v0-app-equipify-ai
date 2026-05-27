@@ -3,7 +3,7 @@
 import { useSearchParams } from "next/navigation"
 import { PlayCircle } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
-import { GrowthSequenceExecutionDashboard } from "@/components/growth/growth-sequence-execution-dashboard"
+import { GrowthSequenceExecutionFoundationDashboard } from "@/components/growth/growth-sequence-execution-foundation-dashboard"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -42,7 +42,7 @@ export default function AdminGrowthSequenceExecutionPage() {
         </section>
 
         <GrowthSectionLayout>
-          <GrowthSequenceExecutionDashboard highlightEnrollmentId={highlightEnrollmentId} />
+          <GrowthSequenceExecutionFoundationDashboard highlightEnrollmentId={highlightEnrollmentId} />
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>

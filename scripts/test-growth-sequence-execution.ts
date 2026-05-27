@@ -1,205 +1,214 @@
 /**
- * Regression checks for Growth Engine guided sequence execution (slice 6.7A).
+ * Regression checks for Sequence Execution Foundation (Phase 2A).
  * Run: pnpm test:growth-sequence-execution
  */
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
+import { buildSequenceExecutionDashboard } from "../lib/growth/sequences/sequence-dashboard"
+import { computeEnrollmentNextDueAt } from "../lib/growth/sequences/sequence-enrollment"
+import { evaluateSequenceExitRules } from "../lib/growth/sequences/sequence-exit-rules"
+import { buildSequenceStatusChangeEvents } from "../lib/growth/sequences/sequence-event-builder"
 import {
-  computeEnrollmentHealthScore,
-  computeStepExecutionConfidence,
-  detectSequenceDrift,
-} from "../lib/growth/sequence-enrollment/sequence-enrollment-health"
-import type {
-  GrowthSequenceEnrollment,
-  GrowthSequenceEnrollmentStep,
-  GrowthSequenceEnrollmentWithSteps,
-} from "../lib/growth/sequence-enrollment-types"
+  computeSequenceHealthScore,
+  evaluateSequenceHealth,
+  isSequenceStepOverdue,
+  sequenceHealthScoreToTier,
+} from "../lib/growth/sequences/sequence-health"
 import {
-  describeSequenceStartUnavailable,
-  formatEnrollmentCurrentStepLabel,
-  formatEnrollmentStatusLabel,
-  formatSequenceUserMessage,
-  formatStepStatusMeta,
-  formatStepStatusLabel,
-  growthSequenceEnrollmentActionRequired,
-  mapPreflightCodeToMessage,
-} from "../lib/growth/sequence-enrollment/sequence-enrollment-ui"
-import type { GrowthLead } from "../lib/growth/types"
+  assertSequenceEnrollmentTransition,
+  canTransitionSequenceEnrollment,
+} from "../lib/growth/sequences/sequence-state-machine"
+import {
+  GROWTH_SEQUENCE_EXECUTION_FOUNDATION_QA_MARKER,
+  GROWTH_SEQUENCE_EXECUTION_PRIVACY_NOTE,
+  GROWTH_SEQUENCE_TIMELINE_EVENT_TYPES,
+} from "../lib/growth/sequences/sequence-types"
+import { GROWTH_SEQUENCE_EXECUTION_SCHEMA_MIGRATION } from "../lib/growth/sequences/sequence-schema-health"
 
-const NOW = Date.now()
-const daysAgo = (days: number) => new Date(NOW - days * 24 * 60 * 60 * 1000).toISOString()
+async function main(): Promise<void> {
+  assert.equal(GROWTH_SEQUENCE_EXECUTION_FOUNDATION_QA_MARKER, "growth-sequence-execution-foundation-v1")
+  assert.match(GROWTH_SEQUENCE_EXECUTION_PRIVACY_NOTE, /human approval|no sending/i)
+  assert.equal(GROWTH_SEQUENCE_TIMELINE_EVENT_TYPES.length, 6)
 
-const baseLead = (partial: Partial<GrowthLead> = {}): GrowthLead =>
-  ({
-    id: "lead-1",
-    companyName: "Acme",
-    status: "qualified",
-    contactEmail: "ops@acme.test",
-    contactPhone: "555-0100",
-    engagementScore: 72,
-    recommendedSequenceConfidence: 68,
-    operationalCapacityTier: "healthy",
-    sequenceFatigueRisk: "low",
-    ...partial,
-  }) as GrowthLead
+  const migration = fs.readFileSync(
+    path.join(process.cwd(), `supabase/migrations/${GROWTH_SEQUENCE_EXECUTION_SCHEMA_MIGRATION}`),
+    "utf8",
+  )
+  assert.match(migration, /growth\.sequence_templates/)
+  assert.match(migration, /growth\.sequence_template_steps/)
+  assert.match(migration, /growth\.sequence_template_enrollments/)
+  assert.match(migration, /growth\.sequence_execution_events/)
+  assert.match(migration, /sequence_started/)
+  assert.match(migration, /sequence_health_declined/)
+  assert.match(migration, /deleted_at/)
+  assert.match(migration, /service role only/)
 
-const baseEnrollment = (partial: Partial<GrowthSequenceEnrollment> = {}): GrowthSequenceEnrollment => ({
-  id: "enrollment-1",
-  leadId: "lead-1",
-  sequencePatternId: "pattern-1",
-  sequenceVersion: 1,
-  status: "active",
-  currentStepOrder: 1,
-  enrollmentHealthScore: 70,
-  enrollmentStalled: false,
-  ownerUserId: "user-1",
-  pauseReason: null,
-  startedAt: daysAgo(10),
-  completedAt: null,
-  cancelledAt: null,
-  cancelledReason: null,
-  metadata: {},
-  createdBy: "user-1",
-  createdAt: daysAgo(10),
-  updatedAt: daysAgo(1),
-  ...partial,
-})
+  assert.equal(canTransitionSequenceEnrollment("draft", "active"), true)
+  assert.equal(canTransitionSequenceEnrollment("active", "paused"), true)
+  assert.equal(canTransitionSequenceEnrollment("paused", "active"), true)
+  assert.equal(canTransitionSequenceEnrollment("draft", "completed"), false)
+  assert.throws(() => assertSequenceEnrollmentTransition("completed", "active"))
 
-const baseStep = (partial: Partial<GrowthSequenceEnrollmentStep> = {}): GrowthSequenceEnrollmentStep => ({
-  id: "step-1",
-  enrollmentId: "enrollment-1",
-  leadId: "lead-1",
-  sequencePatternStepId: "pattern-step-1",
-  stepOrder: 2,
-  channel: "email",
-  generationType: "follow_up_email",
-  scheduledFor: daysAgo(8),
-  status: "pending",
-  stepExecutionConfidence: 62,
-  outreachQueueId: null,
-  generationId: null,
-  completedAt: null,
-  failureReason: null,
-  createdAt: daysAgo(10),
-  updatedAt: daysAgo(1),
-  ...partial,
-})
+  assert.equal(computeSequenceHealthScore({ status: "active" }), 100)
+  assert.equal(sequenceHealthScoreToTier(100), "healthy")
+  assert.equal(sequenceHealthScoreToTier(75), "warning")
+  assert.equal(sequenceHealthScoreToTier(55), "degraded")
+  assert.equal(sequenceHealthScoreToTier(20), "critical")
+  assert.equal(
+    computeSequenceHealthScore({
+      status: "paused",
+      overdue_step: true,
+      has_failed_event: true,
+      has_critical_event: true,
+    }),
+    25,
+  )
 
-const confidence = computeStepExecutionConfidence({ lead: baseLead(), channel: "email" })
-assert.ok(confidence >= 0 && confidence <= 100)
+  const overdue = isSequenceStepOverdue(new Date(Date.now() - 60_000).toISOString(), "active")
+  assert.equal(overdue, true)
 
-const lowConfidence = computeStepExecutionConfidence({
-  lead: baseLead({ contactEmail: null, operationalCapacityTier: "critical", sequenceFatigueRisk: "high" }),
-  channel: "email",
-})
-assert.ok(lowConfidence < confidence)
+  const health = evaluateSequenceHealth({ status: "active", overdue_step: true })
+  assert.equal(health.health_tier, "warning")
 
-const healthy = computeEnrollmentHealthScore({
-  enrollment: baseEnrollment(),
-  steps: [
-    baseStep({ stepOrder: 1, status: "executed" }),
-    baseStep({ id: "step-2", stepOrder: 2, status: "pending", scheduledFor: daysAgo(1) }),
-  ],
-  totalSteps: 2,
-})
-assert.ok(healthy.healthScore >= 0 && healthy.healthScore <= 100)
-assert.equal(healthy.stalled, false)
+  const exit = evaluateSequenceExitRules({ reply_detected: true, exit_on_reply: true })
+  assert.equal(exit.should_exit, true)
+  assert.equal(exit.signal, "reply_detected")
 
-const stalled = computeEnrollmentHealthScore({
-  enrollment: baseEnrollment({ currentStepOrder: 1 }),
-  steps: [
-    baseStep({ stepOrder: 1, status: "executed" }),
-    baseStep({ id: "step-2", stepOrder: 2, status: "queued", scheduledFor: daysAgo(10) }),
-  ],
-  totalSteps: 2,
-})
-assert.equal(stalled.stalled, true)
-assert.ok(stalled.healthScore < healthy.healthScore)
+  const blocked = evaluateSequenceExitRules({ suppressed_lead: true })
+  assert.equal(blocked.should_exit, true)
 
-const drift = detectSequenceDrift({
-  enrollmentId: "enrollment-1",
-  leadId: "lead-1",
-  companyName: "Acme",
-  patternKey: "email_then_call",
-  steps: [
-    baseStep({ stepOrder: 1, channel: "manual_call", status: "failed", failureReason: "queue rejected" }),
-    baseStep({ id: "step-2", stepOrder: 2, status: "skipped" }),
-  ],
-  patternSteps: [
-    { id: "ps-1", patternId: "pattern-1", stepOrder: 1, channel: "email", delayDaysMin: 0, delayDaysMax: 0, generationType: "cold_email", playbookCategory: null, requiredHumanApproval: true, expectedSignal: "reply" },
-    { id: "ps-2", patternId: "pattern-1", stepOrder: 2, channel: "manual_call", delayDaysMin: 3, delayDaysMax: 7, generationType: null, playbookCategory: null, requiredHumanApproval: true, expectedSignal: "call_interested" },
-  ],
-})
-assert.ok(drift.some((signal) => signal.driftKind === "channel_mismatch"))
-assert.ok(drift.some((signal) => signal.driftKind === "queue_failed"))
-assert.ok(drift.some((signal) => signal.driftKind === "skipped_gap"))
+  const dueAt = computeEnrollmentNextDueAt(
+    [
+      {
+        id: "s1",
+        sequence_template_id: "t1",
+        step_number: 1,
+        channel: "email",
+        delay_days: 2,
+        generation_type: "intro",
+        approval_required: true,
+        condition_rules: {},
+        exit_rules: {},
+        metadata: {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ],
+    1,
+    new Date().toISOString(),
+  )
+  assert.ok(dueAt)
 
-const leadWithRec = {
-  recommendedSequencePatternId: "pattern-1",
-  recommendedSequenceConfidence: 72,
-  sequenceFatigueRisk: "low",
-} as GrowthLead
+  const events = buildSequenceStatusChangeEvents({
+    leadLabel: "Acme",
+    sequenceName: "Intro",
+    previousStatus: "draft",
+    nextStatus: "active",
+    previousScore: 100,
+    nextScore: 80,
+  })
+  assert.ok(events.some((event) => event.timeline_type === "sequence_started"))
+  assert.ok(events.some((event) => event.timeline_type === "sequence_health_declined"))
 
-assert.equal(
-  describeSequenceStartUnavailable(leadWithRec, { hasEnrollment: false }).canStart,
-  true,
-)
-assert.equal(
-  describeSequenceStartUnavailable({ ...leadWithRec, recommendedSequencePatternId: null } as GrowthLead, {
-    hasEnrollment: false,
-  }).message,
-  "No recommended sequence yet",
-)
-assert.equal(
-  describeSequenceStartUnavailable({ ...leadWithRec, sequenceFatigueRisk: "high" } as GrowthLead, {
-    hasEnrollment: false,
-  }).message,
-  "High fatigue risk",
-)
-assert.equal(mapPreflightCodeToMessage("low_confidence"), "Need more outreach activity")
+  const dashboard = buildSequenceExecutionDashboard({
+    templates: [
+      {
+        id: "t1",
+        name: "Intro",
+        description: null,
+        category: "outbound",
+        status: "draft",
+        approval_required: true,
+        exit_on_reply: true,
+        exit_on_meeting: true,
+        exit_on_positive_intent: true,
+        created_by: null,
+        step_count: 3,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        deleted_at: null,
+      },
+    ],
+    enrollments: [
+      {
+        id: "e1",
+        lead_id: "l1",
+        lead_label: "Acme",
+        sequence_template_id: "t1",
+        sequence_name: "Intro",
+        status: "active",
+        current_step: 1,
+        next_step_due_at: new Date().toISOString(),
+        completion_reason: null,
+        health_score: 90,
+        health_tier: "healthy",
+        enrolled_by: null,
+        started_at: new Date().toISOString(),
+        completed_at: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: "e2",
+        lead_id: "l2",
+        lead_label: "Beta",
+        sequence_template_id: "t1",
+        sequence_name: "Intro",
+        status: "paused",
+        current_step: 2,
+        next_step_due_at: null,
+        completion_reason: null,
+        health_score: 70,
+        health_tier: "warning",
+        enrolled_by: null,
+        started_at: new Date().toISOString(),
+        completed_at: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ],
+  })
+  assert.equal(dashboard.qa_marker, GROWTH_SEQUENCE_EXECUTION_FOUNDATION_QA_MARKER)
+  assert.equal(dashboard.draft_count, 1)
+  assert.equal(dashboard.active_count, 1)
+  assert.equal(dashboard.paused_count, 1)
 
-const draftEnrollment = {
-  status: "draft",
-  currentStepOrder: 0,
-  steps: [{ stepOrder: 1, channel: "email", status: "pending", stepExecutionConfidence: 20 }],
-} as unknown as GrowthSequenceEnrollmentWithSteps
+  const repoSource = fs.readFileSync(path.join(process.cwd(), "lib/growth/sequences/sequence-repository.ts"), "utf8")
+  assert.match(repoSource, /softDeleteSequenceTemplate/)
+  assert.match(repoSource, /enrollLeadInSequence/)
+  assert.match(repoSource, /sequence_template_enrollments/)
+  assert.doesNotMatch(repoSource, /executeStep|sendMail|outreach_queue\.insert/i)
 
-assert.equal(formatEnrollmentCurrentStepLabel(draftEnrollment), "Awaiting Confirmation")
-assert.equal(formatEnrollmentStatusLabel("active"), "Active Sequence")
-assert.equal(formatStepStatusLabel("draft_created"), "Pending Approval")
-assert.equal(formatStepStatusMeta({ status: "skipped", stepExecutionConfidence: 20 } as GrowthSequenceEnrollmentStep), "Skipped")
-assert.equal(
-  formatStepStatusMeta({ status: "queued", stepExecutionConfidence: 20 } as GrowthSequenceEnrollmentStep),
-  "Pending Queue • Confidence 20%",
-)
-assert.equal(growthSequenceEnrollmentActionRequired(draftEnrollment), false)
-assert.equal(
-  growthSequenceEnrollmentActionRequired({
-    ...draftEnrollment,
-    status: "active",
-    currentStepOrder: 0,
-    steps: [{ stepOrder: 1, channel: "email", status: "draft_created", stepExecutionConfidence: 20 }],
-  } as unknown as GrowthSequenceEnrollmentWithSteps),
-  true,
-)
-assert.equal(formatSequenceUserMessage({ code: "active_enrollment", message: "active_enrollment" }), "Existing sequence in progress.")
-assert.equal(formatSequenceUserMessage({ code: "draft_enrollment", message: "draft_enrollment" }), "Draft sequence ready for confirmation.")
+  for (const route of [
+    "app/api/platform/growth/sequences/route.ts",
+    "app/api/platform/growth/sequences/dashboard/route.ts",
+    "app/api/platform/growth/sequences/enroll/route.ts",
+    "app/api/platform/growth/sequences/[id]/route.ts",
+    "app/api/platform/growth/sequences/[id]/pause/route.ts",
+    "app/api/platform/growth/sequences/[id]/resume/route.ts",
+    "app/api/platform/growth/sequences/[id]/cancel/route.ts",
+  ]) {
+    const apiSource = fs.readFileSync(path.join(process.cwd(), route), "utf8")
+    assert.match(apiSource, /requireGrowthEnginePlatformAccess/)
+  }
 
-const executionRepoSource = fs.readFileSync(
-  path.join(process.cwd(), "lib/growth/sequence-enrollment/sequence-execution-dashboard-repository.ts"),
-  "utf8",
-)
-assert.doesNotMatch(executionRepoSource, /leads!inner/)
-assert.doesNotMatch(executionRepoSource, /\.select\([^)]*leads\(/)
-assert.match(executionRepoSource, /fetchLeadCompanyNamesByIds/)
-assert.match(executionRepoSource, /\.from\("leads"\)/)
+  const uiSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/growth-sequence-execution-foundation-dashboard.tsx"),
+    "utf8",
+  )
+  assert.match(uiSource, /Sequence Health/)
+  assert.match(uiSource, /Step Viewer/)
+  assert.match(uiSource, /Coming Soon/)
+  assert.match(uiSource, /GROWTH_SEQUENCE_EXECUTION_FOUNDATION_QA_MARKER/)
 
-const executionRouteSource = fs.readFileSync(
-  path.join(process.cwd(), "app/api/platform/growth/sequences/execution/dashboard/route.ts"),
-  "utf8",
-)
-assert.match(executionRouteSource, /requireGrowthEnginePlatformAccess/)
-assert.doesNotMatch(executionRouteSource, /e\.message/)
+  const navSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts"),
+    "utf8",
+  )
+  assert.match(navSource, /\/admin\/growth\/sequences\/execution/)
 
-console.log("growth-sequence-execution: all assertions passed")
+  console.log("growth-sequence-execution: all checks passed")
+}
+
+void main()

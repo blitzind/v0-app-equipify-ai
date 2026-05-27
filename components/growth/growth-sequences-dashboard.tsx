@@ -66,7 +66,7 @@ export function GrowthSequencesDashboard() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/platform/growth/sequences/dashboard", { cache: "no-store" })
+      const res = await fetch("/api/platform/growth/sequences/intelligence/dashboard", { cache: "no-store" })
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; dashboard?: DashboardPayload; message?: string }
       if (!res.ok || !data.ok || !data.dashboard) {
         throw new Error(data.message ?? "Could not load sequences dashboard.")
