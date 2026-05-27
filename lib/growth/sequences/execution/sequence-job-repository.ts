@@ -8,6 +8,7 @@ import type {
   GrowthSequenceExecutionJobView,
 } from "@/lib/growth/sequences/execution/sequence-execution-types"
 import { maskSequenceExecutionLeadLabel } from "@/lib/growth/sequences/execution/sequence-execution-types"
+import { resolveExperimentAssignmentPreviewsForJobs } from "@/lib/growth/experiments/experiment-repository"
 
 type JobRow = {
   id: string
@@ -297,14 +298,24 @@ export async function enrichSequenceExecutionJobViews(
     (providersRes.data ?? []).map((row) => [row.id as string, row.provider_name as string]),
   )
 
-  return jobs.map((job) => {
+  const experimentPreviews = await resolveExperimentAssignmentPreviewsForJobs(
+    admin,
+    jobs.map((job) => ({ leadId: job.leadId, sequenceStepId: job.sequenceStepId })),
+  )
+
+  return jobs.map((job, index) => {
     const step = job.sequenceStepId ? stepMap.get(job.sequenceStepId) : null
+    const experimentPreview = experimentPreviews[index]
     return {
       ...job,
       leadLabel: maskSequenceExecutionLeadLabel(job.leadId, leadMap.get(job.leadId)),
       sequenceLabel: enrollmentMap.get(job.sequenceEnrollmentId)?.slice(0, 8) ?? "Sequence",
       stepLabel: step ? `Step ${step.stepOrder} · ${step.channel}` : "—",
       providerLabel: job.providerId ? providerMap.get(job.providerId) ?? null : null,
+      experimentId: experimentPreview?.experimentId ?? null,
+      experimentName: experimentPreview?.experimentName ?? null,
+      experimentVariantId: experimentPreview?.variantId ?? null,
+      experimentVariantLabel: experimentPreview?.variantLabel ?? null,
     }
   })
 }

@@ -9,6 +9,7 @@ import {
 import { applyDeliverySuppression } from "@/lib/growth/compliance/suppression-engine"
 import { buildSenderReputationSnapshot } from "@/lib/growth/compliance/sender-reputation"
 import { getDeliveryAttempt } from "@/lib/growth/providers/transport/transport-repository"
+import { recordExperimentMetricFromDeliveryAttempt } from "@/lib/growth/experiments/experiment-metrics"
 
 function complaintsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("email_complaints")
@@ -68,6 +69,11 @@ export async function recordEmailComplaint(
     senderAccountId: attempt.sender_account_id,
     leadId: attempt.lead_id,
   })
+
+  await recordExperimentMetricFromDeliveryAttempt(admin, {
+    deliveryAttemptId: attempt.id,
+    metric: "complaints",
+  }).catch(() => undefined)
 
   return { recorded: true }
 }

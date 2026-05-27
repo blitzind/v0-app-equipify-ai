@@ -76,6 +76,10 @@ export type GrowthSequenceExecutionJobView = GrowthSequenceExecutionJob & {
   sequenceLabel: string
   stepLabel: string
   providerLabel: string | null
+  experimentId?: string | null
+  experimentName?: string | null
+  experimentVariantId?: string | null
+  experimentVariantLabel?: string | null
 }
 
 export type GrowthSequenceSafeExecutionDashboard = {
@@ -124,6 +128,9 @@ export type GrowthSequenceSendPayload = {
   text: string
   senderAccountId: string
   providerId: string | null
+  experimentId?: string | null
+  experimentVariantId?: string | null
+  experimentVariantLabel?: string | null
 }
 
 export function maskSequenceExecutionLeadLabel(leadId: string, companyName?: string | null): string {

@@ -9,6 +9,7 @@ import {
 } from "@/lib/growth/inbox/reply-event-builder"
 import { listReplyIntelligenceEvents, persistReplyEventDrafts } from "@/lib/growth/inbox/reply-events"
 import { evaluateThreadHealth } from "@/lib/growth/inbox/thread-health"
+import { recordExperimentEngagementForLead } from "@/lib/growth/experiments/experiment-metrics"
 import { computeThreadPriorityScore, priorityScoreToTier } from "@/lib/growth/inbox/thread-priority"
 import type {
   GrowthInboxDashboard,
@@ -329,6 +330,19 @@ export async function addInboxMessage(
     isInbound: input.direction === "inbound",
     actor: { actorUserId: input.actorUserId, actorEmail: input.actorEmail },
   })
+
+  if (input.direction === "inbound" && thread.lead_id) {
+    await recordExperimentEngagementForLead(admin, { leadId: thread.lead_id, metric: "replies" }).catch(() => undefined)
+    if (classificationResult.classification === "positive_interest") {
+      await recordExperimentEngagementForLead(admin, {
+        leadId: thread.lead_id,
+        metric: "positive_replies",
+      }).catch(() => undefined)
+    }
+    if (classificationResult.classification === "meeting_intent") {
+      await recordExperimentEngagementForLead(admin, { leadId: thread.lead_id, metric: "meetings" }).catch(() => undefined)
+    }
+  }
 
   return { thread: updatedThread, message: mapMessage(data as Row) }
 }

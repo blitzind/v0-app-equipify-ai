@@ -46,6 +46,7 @@ export type TransportSendInput = {
   actorUserId: string
   actorEmail: string
   is_test?: boolean
+  metadata?: Record<string, unknown>
 }
 
 export type TransportSendResult = {
@@ -105,6 +106,7 @@ async function executeAttemptOnRoute(
     actorEmail: string
     is_test?: boolean
     retry_count?: number
+    extra_metadata?: Record<string, unknown>
   },
 ): Promise<TransportSendResult> {
   const suppression = await assertPreSendSuppressionAllowed(admin, {
@@ -169,6 +171,7 @@ async function executeAttemptOnRoute(
       subject: input.message.subject,
       html: input.message.html ?? null,
       text: input.message.text ?? null,
+      ...(input.extra_metadata ?? {}),
     },
   })
 
@@ -346,6 +349,7 @@ export async function executeTransportSend(
     actorUserId: input.actorUserId,
     actorEmail: input.actorEmail,
     is_test: input.is_test,
+    extra_metadata: input.metadata,
   })
 
   if (primaryResult.ok) return primaryResult
@@ -373,6 +377,7 @@ export async function executeTransportSend(
     actorEmail: input.actorEmail,
     is_test: input.is_test,
     retry_count: 0,
+    extra_metadata: input.metadata,
   })
 
   await recordTransportAuditEvent(admin, {

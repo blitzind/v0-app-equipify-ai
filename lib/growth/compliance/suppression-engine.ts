@@ -8,6 +8,7 @@ import {
   recordSuppressionAppliedTimelineEvent,
   recordUnsubscribeDetectedTimelineEvent,
 } from "@/lib/growth/compliance/compliance-events"
+import { recordExperimentMetricFromDeliveryAttempt } from "@/lib/growth/experiments/experiment-metrics"
 
 function suppressionsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("delivery_suppressions")
@@ -50,6 +51,7 @@ export async function registerUnsubscribe(
     reason?: string | null
     source?: string
     leadId?: string | null
+    deliveryAttemptId?: string | null
     occurredAt?: string
   },
 ): Promise<{ ok: boolean; emailHash: string }> {
@@ -83,6 +85,13 @@ export async function registerUnsubscribe(
     source: input.source ?? "manual",
     occurredAt,
   })
+
+  if (input.deliveryAttemptId) {
+    await recordExperimentMetricFromDeliveryAttempt(admin, {
+      deliveryAttemptId: input.deliveryAttemptId,
+      metric: "unsubscribes",
+    }).catch(() => undefined)
+  }
 
   return { ok: true, emailHash }
 }

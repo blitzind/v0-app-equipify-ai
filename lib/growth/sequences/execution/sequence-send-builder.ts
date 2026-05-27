@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { fetchGrowthAiCopilotGenerationById } from "@/lib/growth/ai-copilot-repository"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { applyOutboundEmailTracking } from "@/lib/growth/tracking/tracking-links"
+import { applyExperimentVariantToSendPayload } from "@/lib/growth/experiments/experiment-repository"
 import { fetchGrowthSequenceEnrollmentStepById } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
 import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 import { listSenderAccounts } from "@/lib/growth/sender/sender-repository"
@@ -31,7 +32,12 @@ export async function resolveSequenceExecutionSender(
 
 export async function buildSequenceExecutionSendPayload(
   admin: SupabaseClient,
-  input: { sequenceStepId: string; leadId: string; deliveryAttemptId?: string | null },
+  input: {
+    sequenceStepId: string
+    leadId: string
+    deliveryAttemptId?: string | null
+    sequenceEnrollmentId?: string | null
+  },
 ): Promise<GrowthSequenceSendPayload | { error: string }> {
   const [step, lead] = await Promise.all([
     fetchGrowthSequenceEnrollmentStepById(admin, input.sequenceStepId),
@@ -55,6 +61,21 @@ export async function buildSequenceExecutionSendPayload(
     body = generation.generatedContent?.trim() || body
   }
 
+  const experimentOverlay = await applyExperimentVariantToSendPayload(admin, {
+    leadId: input.leadId,
+    sequenceEnrollmentId: input.sequenceEnrollmentId,
+    sequenceStepId: input.sequenceStepId,
+    subject,
+    body,
+    senderAccountId: sender.senderAccountId,
+    providerId: sender.providerId,
+  })
+
+  subject = experimentOverlay.subject
+  body = experimentOverlay.body
+  sender.senderAccountId = experimentOverlay.senderAccountId
+  sender.providerId = experimentOverlay.providerId
+
   let html = sanitizeHtml(`<div>${body.replace(/\n/g, "<br/>")}</div>${UNSUBSCRIBE_FOOTER}`)
   if (input.deliveryAttemptId && process.env.GROWTH_TRACKING_DISABLED?.trim() !== "true") {
     html = applyOutboundEmailTracking({
@@ -72,5 +93,8 @@ export async function buildSequenceExecutionSendPayload(
     text: text.slice(0, 10000),
     senderAccountId: sender.senderAccountId,
     providerId: sender.providerId,
+    experimentId: experimentOverlay.experimentId,
+    experimentVariantId: experimentOverlay.variantId,
+    experimentVariantLabel: experimentOverlay.variantLabel,
   }
 }

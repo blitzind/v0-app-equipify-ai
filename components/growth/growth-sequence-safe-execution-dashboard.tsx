@@ -167,6 +167,7 @@ export function GrowthSequenceSafeExecutionDashboard() {
                   <th className="px-2 py-2 font-medium">Due</th>
                   <th className="px-2 py-2 font-medium">Approval</th>
                   <th className="px-2 py-2 font-medium">Provider</th>
+                  <th className="px-2 py-2 font-medium">Experiment</th>
                   <th className="px-2 py-2 font-medium">Last Error</th>
                   <th className="px-2 py-2 font-medium">Actions</th>
                 </tr>
@@ -228,6 +229,18 @@ function JobRow({
         )}
       </td>
       <td className="px-2 py-3 text-muted-foreground">{job.providerLabel ?? "—"}</td>
+      <td className="px-2 py-3 text-muted-foreground">
+        {job.experimentVariantLabel ? (
+          <span title={job.experimentName ?? undefined}>
+            {job.experimentVariantLabel}
+            {job.experimentName ? (
+              <span className="block text-xs text-muted-foreground/80">{job.experimentName}</span>
+            ) : null}
+          </span>
+        ) : (
+          "—"
+        )}
+      </td>
       <td className="max-w-[180px] truncate px-2 py-3 text-destructive" title={job.lastError ?? undefined}>
         {job.lastError ?? "—"}
       </td>

@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { classifyBounce, hashComplianceEmail, isHardBounceType } from "@/lib/growth/compliance/bounce-classifier"
+import { recordExperimentMetricFromDeliveryAttempt } from "@/lib/growth/experiments/experiment-metrics"
 import {
   recordBounceDetectedTimelineEvent,
   recordSenderReputationDeclinedTimelineEvent,
@@ -215,6 +216,11 @@ export async function recordEmailBounce(
       })
     }
   }
+
+  await recordExperimentMetricFromDeliveryAttempt(admin, {
+    deliveryAttemptId: attempt.id,
+    metric: "bounces",
+  }).catch(() => undefined)
 
   return { recorded: true, classification }
 }

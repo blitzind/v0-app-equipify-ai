@@ -179,6 +179,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     consoleKey: "outreach_approval",
   },
   {
+    id: "experiments",
+    label: "Experiments",
+    href: "/admin/growth/experiments",
+    keywords: ["experiment", "ab test", "variant", "sequence test", "winner", "intelligence"],
+  },
+  {
     id: "settings",
     label: "Growth Settings",
     href: "/admin/growth/settings",
@@ -363,6 +369,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         label: "Engagement",
         consoleKey: "engagement",
         match: prefixMatch("/admin/growth/engagement"),
+      },
+      {
+        id: "experiments",
+        href: "/admin/growth/experiments",
+        label: "Experiments",
+        match: prefixMatch("/admin/growth/experiments"),
       },
       {
         id: "revenue-operating",

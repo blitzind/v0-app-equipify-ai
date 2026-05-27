@@ -14,6 +14,7 @@ const bodySchema = z.object({
   reason: z.string().max(500).optional().nullable(),
   source: z.string().max(120).optional(),
   leadId: z.string().uuid().optional().nullable(),
+  deliveryAttemptId: z.string().uuid().optional().nullable(),
 })
 
 export async function POST(request: Request) {

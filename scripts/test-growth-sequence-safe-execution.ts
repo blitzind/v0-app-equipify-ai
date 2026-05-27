@@ -90,6 +90,8 @@ async function main(): Promise<void> {
   assert.match(runnerSource, /assertPreSendSuppressionAllowed/)
   assert.match(runnerSource, /executeTransportSend/)
   assert.match(runnerSource, /advanceGrowthSequenceEnrollmentAfterStep/)
+  assert.match(runnerSource, /incrementExperimentMetric/)
+  assert.match(runnerSource, /experiment_variant_id/)
   assert.match(runnerSource, /job_not_approved/)
   assert.match(runnerSource, /human_approved: true/)
   assert.match(runnerSource, /human_approval_confirmed: true/)
@@ -101,6 +103,7 @@ async function main(): Promise<void> {
 
   const sendBuilderSource = readSource("lib/growth/sequences/execution/sequence-send-builder.ts")
   assert.match(sendBuilderSource, /applyOutboundEmailTracking/)
+  assert.match(sendBuilderSource, /applyExperimentVariantToSendPayload/)
   assert.match(sendBuilderSource, new RegExp(UNSUBSCRIBE_PLACEHOLDER.replace(/[{}]/g, "\\$&")))
   assert.match(sendBuilderSource, /generation\.status !== "approved"/)
 
@@ -109,6 +112,7 @@ async function main(): Promise<void> {
   assert.match(repositorySource, /tryLockSequenceExecutionJob/)
   assert.match(repositorySource, /listApprovedDueSequenceExecutionJobs/)
   assert.match(repositorySource, /maskSequenceExecutionLeadLabel/)
+  assert.match(repositorySource, /resolveExperimentAssignmentPreviewsForJobs/)
 
   const cronSource = readSource("app/api/cron/growth-sequence-safe-execute/route.ts")
   assert.match(cronSource, /CRON_SECRET/)
@@ -132,6 +136,7 @@ async function main(): Promise<void> {
   assert.match(uiSource, /Due Jobs/)
   assert.match(uiSource, /Pending Approval/)
   assert.match(uiSource, /Sent 24h/)
+  assert.match(uiSource, /Experiment/)
   assert.doesNotMatch(uiSource, /api_key|secret|password/i)
 
   console.log("growth sequence safe execution tests passed")

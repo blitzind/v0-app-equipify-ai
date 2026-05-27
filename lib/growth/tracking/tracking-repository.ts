@@ -8,6 +8,7 @@ import {
   tierFromAttributionScore,
 } from "@/lib/growth/tracking/engagement-score"
 import { recordAttributionTimelineEvents, recordEmailClickedTimelineEvent, recordEmailOpenedTimelineEvent } from "@/lib/growth/tracking/engagement-events"
+import { recordExperimentMetricFromDeliveryAttempt } from "@/lib/growth/experiments/experiment-metrics"
 import type {
   GrowthAttributionRates,
   GrowthEmailClickRecord,
@@ -172,6 +173,11 @@ export async function recordEmailOpen(
     await refreshLeadEngagementScore(admin, attempt.lead_id, { incrementOpens: 1, activityAt: openedAt })
   }
 
+  await recordExperimentMetricFromDeliveryAttempt(admin, {
+    deliveryAttemptId: attempt.id,
+    metric: "opens",
+  }).catch(() => undefined)
+
   return { recorded: true, open: mapOpen(data as OpenRow) }
 }
 
@@ -240,6 +246,11 @@ export async function recordEmailClick(
     })
     await refreshLeadEngagementScore(admin, attempt.lead_id, { incrementClicks: 1, activityAt: clickedAt })
   }
+
+  await recordExperimentMetricFromDeliveryAttempt(admin, {
+    deliveryAttemptId: attempt.id,
+    metric: "clicks",
+  }).catch(() => undefined)
 
   return { recorded: true, click: mapClick(data as ClickRow), redirectUrl: input.destinationUrl }
 }

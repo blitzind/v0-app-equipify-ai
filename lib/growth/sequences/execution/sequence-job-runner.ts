@@ -183,6 +183,7 @@ export async function runSequenceExecutionJob(
   const payload = await buildSequenceExecutionSendPayload(admin, {
     sequenceStepId: locked.sequenceStepId,
     leadId: locked.leadId,
+    sequenceEnrollmentId: locked.sequenceEnrollmentId,
   })
 
   if ("error" in payload) {
@@ -218,6 +219,14 @@ export async function runSequenceExecutionJob(
     human_approval_confirmed: true,
     actorUserId: input.actingUserId,
     actorEmail: input.actingUserEmail,
+    metadata:
+      payload.experimentId && payload.experimentVariantId
+        ? {
+            experiment_id: payload.experimentId,
+            experiment_variant_id: payload.experimentVariantId,
+            experiment_variant_label: payload.experimentVariantLabel ?? null,
+          }
+        : undefined,
   })
 
   if (!transport.ok || !transport.attempt) {
@@ -283,8 +292,27 @@ export async function runSequenceExecutionJob(
       delivery_attempt_id: transport.attempt.id,
       provider_message_id: transport.provider_message_id ?? null,
       cron_mode: input.cronMode ?? false,
+      experiment_id: payload.experimentId ?? null,
+      experiment_variant_id: payload.experimentVariantId ?? null,
+      experiment_variant_label: payload.experimentVariantLabel ?? null,
     },
   })
+
+  if (payload.experimentId && payload.experimentVariantId) {
+    const { incrementExperimentMetric, linkExperimentAssignmentDeliveryAttempt } = await import(
+      "@/lib/growth/experiments/experiment-metrics"
+    )
+    await incrementExperimentMetric(admin, {
+      experimentId: payload.experimentId,
+      variantId: payload.experimentVariantId,
+      metric: "sent",
+    })
+    await linkExperimentAssignmentDeliveryAttempt(admin, {
+      experimentId: payload.experimentId,
+      leadId: locked.leadId,
+      deliveryAttemptId: transport.attempt.id,
+    })
+  }
 
   await recordSequenceExecutionTimelineEvent(admin, {
     leadId: locked.leadId,

@@ -172,6 +172,12 @@ async function main(): Promise<void> {
   )
   assert.match(orchestrator, /applyOutboundEmailTracking/)
 
+  const trackingRepo = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/tracking/tracking-repository.ts"),
+    "utf8",
+  )
+  assert.match(trackingRepo, /recordExperimentMetricFromDeliveryAttempt/)
+
   const families = listTransportAdapterFamilies()
   assert.deepEqual(families.sort(), ["google", "microsoft", "resend", "ses", "smtp"].sort())
 
