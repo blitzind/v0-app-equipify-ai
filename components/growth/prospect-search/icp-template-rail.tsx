@@ -3,6 +3,8 @@
 import { Plus, Sparkles } from "lucide-react"
 import { PROSPECT_SEARCH_ICP_TEMPLATES } from "@/components/growth/prospect-search/prospect-search-ux-constants"
 import type { ProspectSearchIcpTemplate } from "@/components/growth/prospect-search/prospect-search-ux-constants"
+import { SavedSearchWorkflowSidebar } from "@/components/growth/prospect-search/saved-search-workflow-sidebar"
+import type { GrowthProspectSearchSavedSearchWithWorkflow } from "@/lib/growth/prospect-search/saved-search-workflows"
 import { cn } from "@/lib/utils"
 
 export function IcpTemplateRail({
@@ -12,13 +14,21 @@ export function IcpTemplateRail({
   savedSearches,
   lists,
   onLoadSavedSearch,
+  activeSavedSearchId,
+  refreshingSavedCounts,
+  onRefreshSavedCounts,
+  onDeleteSavedSearch,
 }: {
   activeTemplateId: string | null
   onSelectTemplate: (template: ProspectSearchIcpTemplate) => void
   onCreateCustom: () => void
-  savedSearches: Array<{ id: string; name: string }>
+  savedSearches: GrowthProspectSearchSavedSearchWithWorkflow[]
   lists: Array<{ id: string; name: string; member_count: number }>
   onLoadSavedSearch: (id: string) => void
+  activeSavedSearchId?: string | null
+  refreshingSavedCounts?: boolean
+  onRefreshSavedCounts?: (id?: string) => void
+  onDeleteSavedSearch?: (id: string) => void
 }) {
   return (
     <aside className="flex flex-col gap-4 rounded-2xl border border-border bg-card/80 p-4 shadow-sm lg:sticky lg:top-4 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto">
@@ -62,24 +72,14 @@ export function IcpTemplateRail({
       </button>
 
       {savedSearches.length > 0 ? (
-        <div>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Saved searches
-          </h3>
-          <ul className="mt-2 space-y-1">
-            {savedSearches.map((s) => (
-              <li key={s.id}>
-                <button
-                  type="button"
-                  className="w-full rounded px-2 py-1 text-left text-sm hover:bg-muted"
-                  onClick={() => onLoadSavedSearch(s.id)}
-                >
-                  {s.name}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <SavedSearchWorkflowSidebar
+          savedSearches={savedSearches}
+          activeSavedSearchId={activeSavedSearchId ?? null}
+          refreshing={refreshingSavedCounts}
+          onRestore={onLoadSavedSearch}
+          onRefreshCounts={(id) => onRefreshSavedCounts?.(id)}
+          onDelete={(id) => onDeleteSavedSearch?.(id)}
+        />
       ) : null}
 
       {lists.length > 0 ? (

@@ -3,7 +3,7 @@ import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { executeProspectSearchAction } from "@/lib/growth/prospect-search/prospect-search-actions"
 import { listProspectSearchLists } from "@/lib/growth/prospect-search/list-management"
 import { runProspectSearch } from "@/lib/growth/prospect-search/prospect-search-repository"
-import { listProspectSearchSavedSearches } from "@/lib/growth/prospect-search/saved-searches"
+import { listProspectSearchSavedSearchesWithWorkflow, refreshAllProspectSearchSavedSearchCounts } from "@/lib/growth/prospect-search/saved-searches"
 import {
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS,
@@ -93,8 +93,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: true, ...result })
   }
 
+  const refreshSavedCounts = url.searchParams.get("refresh_saved_counts") === "1"
+
   const [saved_searches, lists] = await Promise.all([
-    listProspectSearchSavedSearches(access.admin),
+    refreshSavedCounts
+      ? refreshAllProspectSearchSavedSearchCounts(access.admin)
+      : listProspectSearchSavedSearchesWithWorkflow(access.admin),
     listProspectSearchLists(access.admin),
   ])
 
@@ -144,6 +148,11 @@ export async function POST(request: Request) {
     territory_name: typeof body.territory_name === "string" ? body.territory_name : undefined,
     territory_id: typeof body.territory_id === "string" ? body.territory_id : undefined,
     saved_search_id: typeof body.saved_search_id === "string" ? body.saved_search_id : undefined,
+    page: typeof body.page === "number" ? body.page : Number(body.page) || undefined,
+    page_size: typeof body.page_size === "number" ? body.page_size : Number(body.page_size) || undefined,
+    save_pagination: body.save_pagination === true,
+    result_count: typeof body.result_count === "number" ? body.result_count : Number(body.result_count) || undefined,
+    owner_label: typeof body.owner_label === "string" ? body.owner_label : undefined,
   })
 
   return NextResponse.json({ ok: actionResult.ok, ...actionResult })

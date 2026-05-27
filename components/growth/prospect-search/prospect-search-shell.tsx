@@ -45,6 +45,12 @@ import { prospectSearchSelectionKey } from "@/lib/growth/prospect-search/prospec
 import { CompanyStatusBadges } from "@/components/growth/prospect-search/company-status-badges"
 import { ProspectSearchIndexDiagnostics } from "@/components/growth/prospect-search/prospect-search-index-diagnostics"
 import { ProspectSearchPagination } from "@/components/growth/prospect-search/prospect-search-pagination"
+import { SaveSearchWorkflowDialog } from "@/components/growth/prospect-search/save-search-workflow-dialog"
+import {
+  attachSavedSearchWorkflow,
+  GROWTH_SAVED_SEARCH_WORKFLOWS_QA_MARKER,
+  type GrowthProspectSearchSavedSearchWithWorkflow,
+} from "@/lib/growth/prospect-search/saved-search-workflows"
 import { cn } from "@/lib/utils"
 
 const EMPTY_FILTERS: GrowthProspectSearchFilters = {}
@@ -60,7 +66,11 @@ export function ProspectSearchShell() {
   const [query, setQuery] = useState("")
   const [filters, setFilters] = useState<GrowthProspectSearchFilters>(EMPTY_FILTERS)
   const [result, setResult] = useState<GrowthProspectSearchResult | null>(null)
-  const [savedSearches, setSavedSearches] = useState<GrowthProspectSearchSavedSearchRow[]>([])
+  const [savedSearches, setSavedSearches] = useState<GrowthProspectSearchSavedSearchWithWorkflow[]>([])
+  const [activeSavedSearchId, setActiveSavedSearchId] = useState<string | null>(null)
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
+  const [savingSearch, setSavingSearch] = useState(false)
+  const [refreshingSavedCounts, setRefreshingSavedCounts] = useState(false)
   const [lists, setLists] = useState<GrowthProspectSearchListRow[]>([])
   const [selectedCompany, setSelectedCompany] = useState<GrowthProspectSearchCompanyResult | null>(
     null,
@@ -145,7 +155,7 @@ export function ProspectSearchShell() {
           return
         }
         setResult(json.result)
-        setSavedSearches(json.saved_searches ?? [])
+        setSavedSearches((json.saved_searches ?? []).map((row) => attachSavedSearchWorkflow(row)))
         setLists(json.lists ?? [])
         const first = json.result.companies[0] ?? null
         setSelectedCompany(first)
@@ -263,21 +273,136 @@ export function ProspectSearchShell() {
 
   const applyTemplate = useCallback((template: ProspectSearchIcpTemplate) => {
     setActiveTemplateId(template.id)
+    setActiveSavedSearchId(null)
     setQuery(template.query)
     setFilters({ ...EMPTY_FILTERS, ...template.filters })
     void runSearch(template.query)
   }, [runSearch])
 
+  const suggestedSaveName = useMemo(() => {
+    const parts = [filters.industry, filters.territory_filter?.states?.[0], filters.location]
+      .filter(Boolean)
+      .map((part) => String(part).trim())
+    if (parts.length > 0) return parts.slice(0, 2).join(" ")
+    if (query.trim()) return query.trim().slice(0, 60)
+    return "Saved search"
+  }, [filters.industry, filters.location, filters.territory_filter?.states, query])
+
+  const refreshSavedCounts = useCallback(
+    async (savedSearchId?: string) => {
+      setRefreshingSavedCounts(true)
+      setError(null)
+      try {
+        const res = await fetch("/api/platform/growth/prospect-search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "refresh_saved_search_counts",
+            saved_search_id: savedSearchId,
+          }),
+        })
+        const json = (await res.json()) as { ok?: boolean; message?: string }
+        if (!res.ok || !json.ok) throw new Error(json.message ?? "Could not refresh saved search counts.")
+
+        const metaRes = await fetch("/api/platform/growth/prospect-search?meta=1&q=&page=1&page_size=1", {
+          cache: "no-store",
+        })
+        const metaJson = (await metaRes.json()) as {
+          saved_searches?: GrowthProspectSearchSavedSearchRow[]
+        }
+        setSavedSearches((metaJson.saved_searches ?? []).map((row) => attachSavedSearchWorkflow(row)))
+        setActionMessage({ message: json.message ?? "Counts refreshed.", tone: "success" })
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setRefreshingSavedCounts(false)
+      }
+    },
+    [],
+  )
+
+  const deleteSavedSearch = useCallback(async (savedSearchId: string) => {
+    if (!window.confirm("Delete this saved search workflow?")) return
+    setError(null)
+    try {
+      const res = await fetch("/api/platform/growth/prospect-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete_saved_search", saved_search_id: savedSearchId }),
+      })
+      const json = (await res.json()) as { ok?: boolean; message?: string }
+      if (!res.ok || !json.ok) throw new Error(json.message ?? "Could not delete saved search.")
+      setSavedSearches((prev) => prev.filter((row) => row.id !== savedSearchId))
+      if (activeSavedSearchId === savedSearchId) setActiveSavedSearchId(null)
+      setActionMessage({ message: json.message ?? "Saved search deleted.", tone: "success" })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }, [activeSavedSearchId])
+
+  const saveSearchWorkflow = useCallback(
+    async (input: { name: string; savePagination: boolean }) => {
+      setSavingSearch(true)
+      setError(null)
+      try {
+        const res = await fetch("/api/platform/growth/prospect-search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "save_search",
+            query,
+            filters,
+            discovery_mode: discoveryMode,
+            saved_search_name: input.name,
+            save_pagination: input.savePagination,
+            page: input.savePagination ? page : undefined,
+            page_size: input.savePagination ? pageSize : undefined,
+            result_count: result?.total_companies ?? null,
+          }),
+        })
+        const json = (await res.json()) as { ok?: boolean; message?: string; saved_search_id?: string }
+        if (!res.ok || !json.ok) throw new Error(json.message ?? "Could not save search.")
+        setSaveDialogOpen(false)
+        setActiveSavedSearchId(json.saved_search_id ?? null)
+        setActionMessage({ message: json.message ?? "Saved.", tone: "success" })
+        await refreshSavedCounts()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setSavingSearch(false)
+      }
+    },
+    [query, filters, discoveryMode, page, pageSize, result?.total_companies, refreshSavedCounts],
+  )
+
   const loadSavedById = useCallback(
-    (id: string) => {
+    async (id: string) => {
       const row = savedSearches.find((s) => s.id === id)
       if (!row) return
+      setActiveSavedSearchId(id)
+      setActiveTemplateId(null)
       setQuery(row.query_text)
       setFilters(row.filters)
-      setActiveTemplateId(null)
-      void runSearch(row.query_text)
+      const restorePage = row.workflow.savePagination && row.workflow.page ? row.workflow.page : 1
+      const restorePageSize =
+        row.workflow.savePagination && row.workflow.pageSize ? row.workflow.pageSize : pageSize
+      if (row.workflow.discoveryMode === "discover_external") {
+        setDiscoveryMode("discover_external")
+      } else {
+        setDiscoveryMode("internal")
+      }
+      setPage(restorePage)
+      if (row.workflow.savePagination && row.workflow.pageSize) {
+        setPageSize(restorePageSize)
+      }
+      await fetchResults({
+        queryText: row.query_text,
+        nextPage: restorePage,
+        nextPageSize: restorePageSize,
+        resetSelection: true,
+      })
     },
-    [savedSearches, runSearch],
+    [savedSearches, pageSize, fetchResults],
   )
 
   const companies = result?.companies ?? []
@@ -357,6 +482,7 @@ export function ProspectSearchShell() {
       className="flex flex-col gap-6"
       data-qa-marker={GROWTH_PROSPECT_SEARCH_QA_MARKER}
       data-ux-marker={GROWTH_PROSPECT_SEARCH_UX_QA_MARKER}
+      data-saved-search-workflows-marker={GROWTH_SAVED_SEARCH_WORKFLOWS_QA_MARKER}
     >
       {/* Search hero */}
       <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-violet-50/80 via-card to-cyan-50/50 p-6 shadow-sm dark:from-violet-950/30 dark:to-cyan-950/20">
@@ -426,12 +552,17 @@ export function ProspectSearchShell() {
           onSelectTemplate={applyTemplate}
           onCreateCustom={() => {
             setActiveTemplateId(null)
+            setActiveSavedSearchId(null)
             setFilters(EMPTY_FILTERS)
             setQuery("")
           }}
           savedSearches={savedSearches}
           lists={lists}
-          onLoadSavedSearch={loadSavedById}
+          onLoadSavedSearch={(id) => void loadSavedById(id)}
+          activeSavedSearchId={activeSavedSearchId}
+          refreshingSavedCounts={refreshingSavedCounts}
+          onRefreshSavedCounts={(id) => void refreshSavedCounts(id)}
+          onDeleteSavedSearch={(id) => void deleteSavedSearch(id)}
         />
 
         <div className="flex min-w-0 flex-col gap-6">
@@ -554,13 +685,9 @@ export function ProspectSearchShell() {
                 </Button>
               ) : null}
               <SearchViewToggle view={view} onViewChange={setView} />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => runAction("save_search", { saved_search_name: "ICP discovery" })}
-              >
+              <Button variant="outline" size="sm" onClick={() => setSaveDialogOpen(true)}>
                 <Bookmark className="mr-1 size-3.5" />
-                Save search
+                Save workflow
               </Button>
             </div>
           </div>
@@ -633,6 +760,14 @@ export function ProspectSearchShell() {
           ) : null}
         </div>
       </div>
+
+      <SaveSearchWorkflowDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        defaultName={suggestedSaveName}
+        onSave={(input) => void saveSearchWorkflow(input)}
+        saving={savingSearch}
+      />
     </div>
   )
 }

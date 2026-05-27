@@ -2046,6 +2046,80 @@ async function main(): Promise<void> {
   assert.ok(marketBridged.related_companies?.length)
   assert.ok(marketBridged.committee_completion)
 
+  const {
+    GROWTH_SAVED_SEARCH_WORKFLOWS_QA_MARKER,
+    buildSavedSearchWorkflowMetadata,
+    formatSavedSearchCountDelta,
+    parseSavedSearchWorkflowMetadata,
+  } = await import("../lib/growth/prospect-search/saved-search-workflows")
+  assert.equal(GROWTH_SAVED_SEARCH_WORKFLOWS_QA_MARKER, "growth-saved-search-workflows-v1")
+
+  const metadata = buildSavedSearchWorkflowMetadata({
+    resultCount: 120,
+    previousResultCount: 108,
+    lastRefreshedAt: "2026-05-26T12:00:00.000Z",
+    page: 2,
+    pageSize: 50,
+    savePagination: true,
+    discoveryMode: "internal",
+  })
+  const workflow = parseSavedSearchWorkflowMetadata(metadata)
+  assert.equal(workflow.resultCount, 120)
+  assert.equal(workflow.countDelta, 12)
+  assert.equal(formatSavedSearchCountDelta(12), "+12")
+  assert.equal(formatSavedSearchCountDelta(-5), "-5")
+
+  assert.ok(GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS.includes("refresh_saved_search_counts"))
+  assert.ok(GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS.includes("delete_saved_search"))
+
+  const savedSearchWorkflowSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/saved-search-workflows.ts"),
+    "utf8",
+  )
+  assert.match(savedSearchWorkflowSource, /growth-saved-search-workflows-v1/)
+
+  const countSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-count.ts"),
+    "utf8",
+  )
+  assert.match(countSource, /countProspectSearchMatchesInternal/)
+  assert.match(countSource, /loadProspectSearchMaterializedCompanies/)
+  assert.doesNotMatch(countSource, /discover_external/)
+
+  const savedWorkflowShellSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-shell.tsx"),
+    "utf8",
+  )
+  assert.match(savedWorkflowShellSource, /SaveSearchWorkflowDialog/)
+  assert.match(savedWorkflowShellSource, /loadSavedById/)
+  assert.match(savedWorkflowShellSource, /refresh_saved_search_counts/)
+  assert.match(savedWorkflowShellSource, /save_pagination/)
+  assert.match(savedWorkflowShellSource, /GROWTH_SAVED_SEARCH_WORKFLOWS_QA_MARKER/)
+
+  const icpRailSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/icp-template-rail.tsx"),
+    "utf8",
+  )
+  assert.match(icpRailSource, /SavedSearchWorkflowSidebar/)
+
+  const sidebarSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/saved-search-workflow-sidebar.tsx"),
+    "utf8",
+  )
+  assert.match(sidebarSource, /Saved workflows/)
+  assert.match(sidebarSource, /Inbox/)
+  assert.match(sidebarSource, /Research/)
+
+  const savedWorkflowIcpSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/guided-icp-builder.tsx"),
+    "utf8",
+  )
+  assert.match(savedWorkflowIcpSource, /lead_score_min/)
+  assert.match(savedWorkflowIcpSource, /revenue_bands/)
+  assert.match(savedWorkflowIcpSource, /buying_stages/)
+  assert.match(savedWorkflowIcpSource, /company_identification_confidence_min/)
+  assert.match(savedWorkflowIcpSource, /service_area/)
+
   console.log("growth-prospect-search: all checks passed")
 }
 

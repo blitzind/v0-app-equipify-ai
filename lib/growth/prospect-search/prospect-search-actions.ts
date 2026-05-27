@@ -13,7 +13,14 @@ import {
   pushProspectSearchCompanyToLeadInbox,
   type ProspectSearchSelectionRef,
 } from "@/lib/growth/prospect-search/prospect-search-push-to-inbox"
-import { createProspectSearchSavedSearch } from "@/lib/growth/prospect-search/saved-searches"
+import {
+  buildSavedSearchMetadataOnSave,
+  createProspectSearchSavedSearch,
+  deleteProspectSearchSavedSearch,
+  refreshAllProspectSearchSavedSearchCounts,
+  refreshProspectSearchSavedSearchCount,
+} from "@/lib/growth/prospect-search/saved-searches"
+import { countProspectSearchMatchesInternal } from "@/lib/growth/prospect-search/prospect-search-count"
 import {
   createTerritory,
   createTerritoryFromSavedSearch,
@@ -46,6 +53,11 @@ export async function executeProspectSearchAction(
     territory_name?: string
     territory_id?: string
     saved_search_id?: string
+    page?: number
+    page_size?: number
+    save_pagination?: boolean
+    result_count?: number | null
+    owner_label?: string | null
   },
 ): Promise<GrowthProspectSearchActionResult> {
   const { action } = input
@@ -154,11 +166,29 @@ export async function executeProspectSearchAction(
   }
 
   if (action === "save_search") {
+    let resultCount = input.result_count ?? null
+    if (resultCount == null && (input.discovery_mode ?? "internal") === "internal") {
+      resultCount = await countProspectSearchMatchesInternal(admin, {
+        query: input.query ?? "",
+        filters: input.filters ?? {},
+      })
+    }
+
+    const metadata = await buildSavedSearchMetadataOnSave({
+      resultCount,
+      page: input.page,
+      pageSize: input.page_size,
+      savePagination: input.save_pagination,
+      ownerLabel: input.owner_label ?? null,
+      discoveryMode: input.discovery_mode ?? "internal",
+    })
+
     const row = await createProspectSearchSavedSearch(admin, {
       created_by: input.userId ?? null,
       name: input.saved_search_name?.trim() || "Saved search",
       query_text: input.query ?? "",
       filters: input.filters ?? {},
+      metadata,
     })
     if (!row) {
       return { ok: false, action, message: "Could not save search — schema may not be applied." }
@@ -169,6 +199,44 @@ export async function executeProspectSearchAction(
       message: `Saved search "${row.name}".`,
       saved_search_id: row.id,
     }
+  }
+
+  if (action === "refresh_saved_search_counts") {
+    const refreshed = input.saved_search_id
+      ? await refreshProspectSearchSavedSearchCount(admin, input.saved_search_id)
+      : null
+    const rows = refreshed
+      ? [refreshed]
+      : (await refreshAllProspectSearchSavedSearchCounts(admin)).map((row) => ({
+          id: row.id,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          created_by: row.created_by,
+          name: row.name,
+          query_text: row.query_text,
+          filters: row.filters,
+          metadata: row.metadata,
+        }))
+
+    return {
+      ok: true,
+      action,
+      message: input.saved_search_id
+        ? "Saved search count refreshed."
+        : `Refreshed counts for ${rows.length} saved search(es).`,
+      saved_search_id: input.saved_search_id ?? null,
+    }
+  }
+
+  if (action === "delete_saved_search") {
+    if (!input.saved_search_id) {
+      return { ok: false, action, message: "Saved search id is required." }
+    }
+    const deleted = await deleteProspectSearchSavedSearch(admin, input.saved_search_id)
+    if (!deleted) {
+      return { ok: false, action, message: "Could not delete saved search." }
+    }
+    return { ok: true, action, message: "Saved search deleted." }
   }
 
   if (action === "create_list") {

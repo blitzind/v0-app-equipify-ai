@@ -89,6 +89,8 @@ export type GrowthProspectSearchSuppressionMode =
 
 export const GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS = [
   "save_search",
+  "refresh_saved_search_counts",
+  "delete_saved_search",
   "save_territory",
   "refresh_territory",
   "push_territory_top_prospects",

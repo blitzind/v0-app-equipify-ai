@@ -6,8 +6,12 @@ import { SmartFilterInput } from "@/components/growth/prospect-search/smart-filt
 import { TitleTargetingCard } from "@/components/growth/prospect-search/title-targeting-card"
 import { TerritoryFilterCard } from "@/components/growth/prospect-search/territory-filter-card"
 import {
+  PROSPECT_SEARCH_BUYING_STAGE_UI,
+  PROSPECT_SEARCH_CONFIDENCE_PRESETS,
   PROSPECT_SEARCH_EMPLOYEE_BANDS_UI,
   PROSPECT_SEARCH_INTENT_PRESETS,
+  PROSPECT_SEARCH_LEAD_SCORE_PRESETS,
+  PROSPECT_SEARCH_REVENUE_BANDS_UI,
   PROSPECT_SEARCH_TECHNOLOGIES,
   employeeBandUiToBackend,
   employeeBandsBackendToUi,
@@ -15,7 +19,11 @@ import {
   type ProspectSearchEmployeeBandUi,
   type ProspectSearchIntentPresetId,
 } from "@/components/growth/prospect-search/prospect-search-ux-constants"
-import type { GrowthProspectSearchFilters } from "@/lib/growth/prospect-search/prospect-search-types"
+import type { GrowthBuyingStage } from "@/lib/growth/buying-stage/buying-stage-types"
+import type {
+  GrowthProspectSearchFilters,
+  GrowthProspectSearchRevenueBand,
+} from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
 
 export function GuidedIcpBuilder({
@@ -189,6 +197,128 @@ export function GuidedIcpBuilder({
 
         <FilterGroupCard title="Title targeting" description="Decision maker roles & titles">
           <TitleTargetingCard filters={filters} onChange={onChange} />
+        </FilterGroupCard>
+
+        <FilterGroupCard title="Qualification" description="Lead score, revenue, buying stage, and match confidence">
+          <div className="space-y-3">
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">Lead score minimum</p>
+              <div className="flex flex-wrap gap-1.5">
+                {PROSPECT_SEARCH_LEAD_SCORE_PRESETS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() =>
+                      onChange({
+                        ...filters,
+                        lead_score_min: preset.value,
+                      })
+                    }
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 text-xs font-medium",
+                      (filters.lead_score_min ?? null) === preset.value
+                        ? "border-violet-400 bg-violet-50 text-violet-900"
+                        : "border-border hover:bg-muted",
+                    )}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">Revenue bands</p>
+              <div className="flex flex-wrap gap-1.5">
+                {PROSPECT_SEARCH_REVENUE_BANDS_UI.map((band) => {
+                  const active = (filters.revenue_bands ?? []).includes(band.id as GrowthProspectSearchRevenueBand)
+                  return (
+                    <button
+                      key={band.id}
+                      type="button"
+                      onClick={() => {
+                        const current = filters.revenue_bands ?? []
+                        const next = active
+                          ? current.filter((value) => value !== band.id)
+                          : [...current, band.id as GrowthProspectSearchRevenueBand]
+                        onChange({
+                          ...filters,
+                          revenue_bands: next.length ? next : undefined,
+                        })
+                      }}
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-xs font-medium",
+                        active ? "border-amber-400 bg-amber-50 text-amber-900" : "border-border hover:bg-muted",
+                      )}
+                    >
+                      {band.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">Buying stage</p>
+              <div className="flex flex-wrap gap-1.5">
+                {PROSPECT_SEARCH_BUYING_STAGE_UI.map((stage) => {
+                  const active = (filters.buying_stages ?? []).includes(stage.id as GrowthBuyingStage)
+                  return (
+                    <button
+                      key={stage.id}
+                      type="button"
+                      onClick={() => {
+                        const current = filters.buying_stages ?? []
+                        const next = active
+                          ? current.filter((value) => value !== stage.id)
+                          : [...current, stage.id as GrowthBuyingStage]
+                        onChange({
+                          ...filters,
+                          buying_stages: next.length ? next : undefined,
+                        })
+                      }}
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-xs font-medium",
+                        active ? "border-indigo-400 bg-indigo-50 text-indigo-900" : "border-border hover:bg-muted",
+                      )}
+                    >
+                      {stage.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">Decision maker confidence</p>
+              <div className="flex flex-wrap gap-1.5">
+                {PROSPECT_SEARCH_CONFIDENCE_PRESETS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() =>
+                      onChange({
+                        ...filters,
+                        company_identification_confidence_min: preset.value,
+                      })
+                    }
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 text-xs font-medium",
+                      (filters.company_identification_confidence_min ?? null) === preset.value
+                        ? "border-teal-400 bg-teal-50 text-teal-900"
+                        : "border-border hover:bg-muted",
+                    )}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <SmartFilterInput
+              label="Service area"
+              field="location"
+              value={filters.service_area ?? ""}
+              onChange={(v) => onChange({ ...filters, service_area: v || null })}
+              placeholder="e.g. Southeast, Dallas metro"
+            />
+          </div>
         </FilterGroupCard>
 
         <FilterGroupCard title="Account safety" description="Existing accounts and outreach suppression">

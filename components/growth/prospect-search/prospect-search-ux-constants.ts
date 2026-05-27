@@ -83,6 +83,39 @@ export const PROSPECT_SEARCH_TECHNOLOGIES = [
   "Microsoft Dynamics",
 ] as const
 
+export const PROSPECT_SEARCH_REVENUE_BANDS_UI = [
+  { id: "under_1m", label: "Under $1M" },
+  { id: "1m_5m", label: "$1M–$5M" },
+  { id: "5m_10m", label: "$5M–$10M" },
+  { id: "10m_50m", label: "$10M–$50M" },
+  { id: "50m_100m", label: "$50M–$100M" },
+  { id: "100m+", label: "$100M+" },
+] as const
+
+export const PROSPECT_SEARCH_LEAD_SCORE_PRESETS = [
+  { label: "Any", value: null },
+  { label: "50+", value: 50 },
+  { label: "75+", value: 75 },
+  { label: "80+", value: 80 },
+] as const
+
+export const PROSPECT_SEARCH_CONFIDENCE_PRESETS = [
+  { label: "Any", value: null },
+  { label: "60%+", value: 60 },
+  { label: "70%+", value: 70 },
+  { label: "80%+", value: 80 },
+] as const
+
+export const PROSPECT_SEARCH_BUYING_STAGE_UI = [
+  { id: "awareness", label: "Awareness" },
+  { id: "problem_identified", label: "Problem ID" },
+  { id: "solution_research", label: "Research" },
+  { id: "vendor_evaluation", label: "Evaluating" },
+  { id: "comparison", label: "Comparison" },
+  { id: "purchase_ready", label: "Purchase ready" },
+  { id: "active_opportunity", label: "Active opp" },
+] as const
+
 export const PROSPECT_SEARCH_DECISION_ROLES = [
   "Owner",
   "Founder",
