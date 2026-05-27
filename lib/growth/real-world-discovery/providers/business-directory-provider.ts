@@ -1,10 +1,13 @@
 import type { GrowthRealWorldDiscoveryProvider } from "@/lib/growth/real-world-discovery/real-world-discovery-provider-types"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 /**
  * Public business directory / search API abstraction.
  * Wire a compliant provider via BUSINESS_DIRECTORY_API_URL + BUSINESS_DIRECTORY_API_KEY.
  */
-export function createRealWorldBusinessDirectoryProvider(): GrowthRealWorldDiscoveryProvider {
+export function createRealWorldBusinessDirectoryProvider(_options?: {
+  admin?: SupabaseClient | null
+}): GrowthRealWorldDiscoveryProvider {
   return {
     provider_name: "business_directory",
     provider_type: "business_directory",

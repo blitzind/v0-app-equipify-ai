@@ -7,6 +7,7 @@ import { CompanyResultCard } from "@/components/growth/prospect-search/company-r
 import { DiscoveryModeToggle } from "@/components/growth/prospect-search/discovery-mode-toggle"
 import {
   GooglePlacesQueryDiagnostics,
+  ProviderCacheCostDiagnostics,
   RealWorldProviderStatus,
 } from "@/components/growth/prospect-search/real-world-provider-status"
 import { GuidedIcpBuilder } from "@/components/growth/prospect-search/guided-icp-builder"
@@ -299,6 +300,10 @@ export function ProspectSearchShell() {
                         qaMarker={result.google_places_query_expansion_qa_marker}
                       />
                     ))}
+                  <ProviderCacheCostDiagnostics
+                    diagnostics={result.provider_diagnostics}
+                    qaMarker={result.provider_cache_qa_marker}
+                  />
                   <div
                     className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-700"
                     data-qa-marker={result.provider_audit_qa_marker ?? GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER}

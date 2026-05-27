@@ -35,6 +35,7 @@ async function main(): Promise<void> {
 
   // 2. Provider registry execution path
   assert.match(registrySource, /createRealWorldSerpProvider/)
+  assert.match(registrySource, /admin\?: SupabaseClient/)
   assert.match(registrySource, /runRealWorldDiscoveryProviders/)
   assert.match(registrySource, /useFixtureFallback/)
   assert.match(registrySource, /provider_executed/)
@@ -46,6 +47,7 @@ async function main(): Promise<void> {
   assert.match(serpClientSource, /fetch\(/)
   assert.match(serpClientSource, /serpapi\.com\/search\.json/)
   assert.match(serpClientSource, /engine: "google_maps"/)
+  assert.match(serpProviderSource, /executeCachedRealWorldProviderQuery/)
   assert.match(serpProviderSource, /searchSerpGoogleMaps/)
   assert.doesNotMatch(serpProviderSource, /status: "skipped"/)
   assert.doesNotMatch(serpProviderSource, /scrape|puppeteer|cheerio/i)

@@ -22,6 +22,7 @@ import {
   GROWTH_PROSPECT_SEARCH_SOURCE_TYPES,
   GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER,
   GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER,
+  GROWTH_PROVIDER_CACHE_QA_MARKER,
   type GrowthProspectSearchDiscoveryMode,
   type GrowthProspectSearchFilters,
   type GrowthProspectSearchResult,
@@ -83,6 +84,7 @@ export async function runProspectSearch(
       provider_fallback_reason: realWorld.provider_status?.provider_fallback_reason ?? null,
       provider_audit_qa_marker: GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER,
       google_places_query_expansion_qa_marker: GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER,
+      provider_cache_qa_marker: GROWTH_PROVIDER_CACHE_QA_MARKER,
     }
   }
 

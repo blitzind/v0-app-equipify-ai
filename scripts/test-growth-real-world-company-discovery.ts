@@ -93,8 +93,7 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "lib/growth/real-world-discovery/providers/google-places-provider.ts"),
     "utf8",
   )
-  assert.match(googlePlacesSource, /GOOGLE_PLACES_API_KEY/)
-  assert.match(googlePlacesSource, /searchGooglePlacesText/)
+  assert.match(googlePlacesSource, /executeCachedRealWorldProviderQuery/)
   assert.match(googlePlacesSource, /buildGooglePlacesDiscoveryQueries/)
   assert.match(googlePlacesSource, /mergeGooglePlacesCandidates/)
   assert.doesNotMatch(googlePlacesSource, /scrape|puppeteer|cheerio/i)

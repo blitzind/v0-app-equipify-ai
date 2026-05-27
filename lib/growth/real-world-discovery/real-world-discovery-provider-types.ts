@@ -71,6 +71,11 @@ export type GrowthRealWorldDiscoveryProviderDiagnostics = {
   provider_query_generated?: string[]
   provider_query_result_count?: number[]
   provider_merged_result_count?: number
+  provider_cache_hit?: boolean
+  provider_cache_age_ms?: number | null
+  provider_cost_estimate?: number
+  provider_live_request_count?: number
+  provider_cache_hit_count?: number
 }
 
 export type GrowthRealWorldDiscoveryProvider = {

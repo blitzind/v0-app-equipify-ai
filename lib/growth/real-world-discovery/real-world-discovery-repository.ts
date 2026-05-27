@@ -117,7 +117,7 @@ export async function runRealWorldCompanyDiscovery(
     limit,
   }
 
-  const providerResults = await runRealWorldDiscoveryProviders(providerQuery)
+  const providerResults = await runRealWorldDiscoveryProviders(providerQuery, { admin })
   const useFixtureFallback = providerResults.some((r) => r.provider_type === "fixture")
   const provider_status = summarizeRealWorldProviderStatus(providerResults, {
     use_fixture_fallback: useFixtureFallback,

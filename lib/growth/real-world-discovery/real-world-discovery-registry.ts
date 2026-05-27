@@ -1,5 +1,6 @@
 import "server-only"
 
+import type { SupabaseClient } from "@supabase/supabase-js"
 import type {
   GrowthRealWorldDiscoveryProvider,
   GrowthRealWorldDiscoveryProviderDiagnostics,
@@ -20,11 +21,14 @@ import { createRealWorldGooglePlacesProvider } from "@/lib/growth/real-world-dis
 import { createRealWorldManualImportProvider } from "@/lib/growth/real-world-discovery/providers/manual-import-provider"
 import { createRealWorldSerpProvider } from "@/lib/growth/real-world-discovery/providers/serp-provider"
 
-export function listRealWorldDiscoveryProviders(): GrowthRealWorldDiscoveryProvider[] {
+export function listRealWorldDiscoveryProviders(options?: {
+  admin?: SupabaseClient | null
+}): GrowthRealWorldDiscoveryProvider[] {
+  const admin = options?.admin ?? null
   return [
-    createRealWorldGooglePlacesProvider(),
-    createRealWorldSerpProvider(),
-    createRealWorldBusinessDirectoryProvider(),
+    createRealWorldGooglePlacesProvider({ admin }),
+    createRealWorldSerpProvider({ admin }),
+    createRealWorldBusinessDirectoryProvider({ admin }),
     createRealWorldManualImportProvider(),
     createRealWorldFixtureProvider(),
   ]
@@ -68,6 +72,11 @@ function mergeProviderDiagnostics(
     provider_query_generated: result.diagnostics?.provider_query_generated,
     provider_query_result_count: result.diagnostics?.provider_query_result_count,
     provider_merged_result_count: result.diagnostics?.provider_merged_result_count,
+    provider_cache_hit: result.diagnostics?.provider_cache_hit,
+    provider_cache_age_ms: result.diagnostics?.provider_cache_age_ms,
+    provider_cost_estimate: result.diagnostics?.provider_cost_estimate,
+    provider_live_request_count: result.diagnostics?.provider_live_request_count,
+    provider_cache_hit_count: result.diagnostics?.provider_cache_hit_count,
   }
 }
 
@@ -84,6 +93,11 @@ function toExecutionDiagnostic(
     provider_query_generated: result.diagnostics?.provider_query_generated,
     provider_query_result_count: result.diagnostics?.provider_query_result_count,
     provider_merged_result_count: result.diagnostics?.provider_merged_result_count,
+    provider_cache_hit: result.diagnostics?.provider_cache_hit,
+    provider_cache_age_ms: result.diagnostics?.provider_cache_age_ms,
+    provider_cost_estimate: result.diagnostics?.provider_cost_estimate,
+    provider_live_request_count: result.diagnostics?.provider_live_request_count,
+    provider_cache_hit_count: result.diagnostics?.provider_cache_hit_count,
   }
 }
 
@@ -143,8 +157,9 @@ export function summarizeRealWorldProviderStatus(
 /** Run providers; failures isolated. Fixture only when no live provider is configured. */
 export async function runRealWorldDiscoveryProviders(
   input: GrowthRealWorldDiscoveryQuery,
+  options?: { admin?: SupabaseClient | null },
 ): Promise<GrowthRealWorldDiscoveryProviderResult[]> {
-  const all = listRealWorldDiscoveryProviders()
+  const all = listRealWorldDiscoveryProviders({ admin: options?.admin ?? null })
   const useFixtureFallback = !anyLiveProviderConfigured()
 
   const toRun = all.filter((p) => {
