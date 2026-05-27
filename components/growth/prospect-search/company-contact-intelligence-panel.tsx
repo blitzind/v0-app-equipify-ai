@@ -3,6 +3,7 @@
 import { Target, UserRound, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
+import { ProspectSearchSchemaHealthNotice } from "@/components/growth/prospect-search/prospect-search-schema-health-notice"
 
 export function CompanyContactIntelligencePanel({
   companyName,
@@ -28,11 +29,7 @@ export function CompanyContactIntelligencePanel({
         ) : null}
       </div>
 
-      {!intelligence.schema_ready && !intelligence.source_labels.includes("growth.company_contacts") ? (
-        <p className="mt-2 text-xs text-amber-800">
-          Contact discovery schema not applied — run migrations 20270323120000 and 20270403120000.
-        </p>
-      ) : null}
+      <ProspectSearchSchemaHealthNotice health={intelligence.schema_health} />
 
       {firstContact ? (
         <div className="mt-3 rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs">

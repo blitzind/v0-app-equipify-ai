@@ -54,12 +54,6 @@ export function BuyingCommitteePanel({
         </Button>
       </div>
 
-      {!snapshot?.schema_ready ? (
-        <p className="mt-2 text-xs text-amber-800">
-          Contact discovery schema not applied — run migration 20270323120000_growth_engine_contact_discovery.sql.
-        </p>
-      ) : null}
-
       {committee ? (
         <div className="mt-3 space-y-3 text-xs">
           <div className="flex flex-wrap gap-1">

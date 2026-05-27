@@ -68,6 +68,12 @@ import {
   type GrowthProspectSearchSavedSearchWithWorkflow,
 } from "@/lib/growth/prospect-search/saved-search-workflows"
 import { buildProspectSearchGetRequestParams } from "@/lib/growth/prospect-search/prospect-search-client-request"
+import {
+  GROWTH_PROSPECT_SEARCH_PROVIDER_INTENT_QA_MARKER,
+  resolveProspectSearchExternalPendingMessage,
+  shouldFetchProspectSearchResults,
+  type ProspectSearchFetchTrigger,
+} from "@/lib/growth/prospect-search/prospect-search-provider-search-intent"
 import { useProspectSearchLiveEstimation } from "@/lib/growth/prospect-search/use-prospect-search-live-estimation"
 import { cn } from "@/lib/utils"
 
@@ -77,6 +83,7 @@ type ProspectSearchRunInput = {
   queryText?: string
   filters?: GrowthProspectSearchFilters
   discoveryMode?: GrowthProspectSearchDiscoveryMode
+  trigger?: ProspectSearchFetchTrigger
 }
 
 function resolveDiscoveryModeFromParams(
@@ -126,6 +133,7 @@ export function ProspectSearchShell() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
   const [sortBy, setSortBy] = useState<GrowthProspectSearchSortBy>("rank")
+  const [pendingProviderSearchHint, setPendingProviderSearchHint] = useState<string | null>(null)
 
   const queryRef = useRef(query)
   const filtersRef = useRef(filters)
@@ -261,17 +269,38 @@ export function ProspectSearchShell() {
   const runSearch = useCallback(
     async (input?: string | ProspectSearchRunInput) => {
       const normalized =
-        typeof input === "string" ? { queryText: input } : (input ?? {})
+        typeof input === "string"
+          ? { queryText: input, trigger: "explicit_operator_search" as const }
+          : (input ?? { trigger: "explicit_operator_search" as const })
+      const activeDiscoveryMode = normalized.discoveryMode ?? discoveryModeRef.current
+      const trigger = normalized.trigger ?? "explicit_operator_search"
+
+      if (normalized.queryText != null) setQuery(normalized.queryText)
+      if (normalized.filters != null) replaceFilters(normalized.filters)
+
+      if (
+        !shouldFetchProspectSearchResults({
+          discoveryMode: activeDiscoveryMode,
+          trigger,
+        })
+      ) {
+        if (trigger !== "post_action_refresh" && trigger !== "pagination" && trigger !== "sort_change") {
+          setPendingProviderSearchHint(resolveProspectSearchExternalPendingMessage(trigger))
+        }
+        return
+      }
+
+      setPendingProviderSearchHint(null)
       setPage(1)
       await fetchResults({
         queryText: normalized.queryText ?? queryRef.current,
-        filtersOverride: normalized.filters,
-        discoveryModeOverride: normalized.discoveryMode,
+        filtersOverride: normalized.filters ?? filtersRef.current,
+        discoveryModeOverride: activeDiscoveryMode,
         nextPage: 1,
         resetSelection: true,
       })
     },
-    [fetchResults],
+    [fetchResults, replaceFilters],
   )
 
   const goToPage = useCallback(
@@ -364,10 +393,10 @@ export function ProspectSearchShell() {
           if (action === "save_territory" && json.territory_id) {
             setFilters((prev) => ({ ...prev, territory_id: json.territory_id ?? null }))
           }
-          await runSearch()
+          await runSearch({ trigger: "post_action_refresh" })
         }
         if (action === "refresh_territory") {
-          await runSearch()
+          await runSearch({ trigger: "post_action_refresh" })
         }
         if (action === "push_to_lead_inbox" && json.push_outcome === "pushed") {
           setSelectedKeys((prev) => {
@@ -430,7 +459,11 @@ export function ProspectSearchShell() {
     setActiveSavedSearchId(null)
     setQuery(template.query)
     replaceFilters(nextFilters)
-    void runSearch({ queryText: template.query, filters: nextFilters })
+    void runSearch({
+      queryText: template.query,
+      filters: nextFilters,
+      trigger: "icp_template_selection",
+    })
   }, [runSearch, replaceFilters])
 
   const suggestedSaveName = useMemo(() => {
@@ -547,6 +580,19 @@ export function ProspectSearchShell() {
       if (row.workflow.savePagination && row.workflow.pageSize) {
         setPageSize(restorePageSize)
       }
+
+      if (
+        !shouldFetchProspectSearchResults({
+          discoveryMode: restoreDiscoveryMode,
+          trigger: "saved_workflow_restore",
+        })
+      ) {
+        setPendingProviderSearchHint(
+          resolveProspectSearchExternalPendingMessage("saved_workflow_restore"),
+        )
+        return
+      }
+
       await fetchResults({
         queryText: row.query_text,
         filtersOverride: row.filters,
@@ -635,6 +681,7 @@ export function ProspectSearchShell() {
       data-layout-marker={GROWTH_PROSPECT_SEARCH_LAYOUT_V2_QA_MARKER}
       data-saved-search-workflows-marker={GROWTH_SAVED_SEARCH_WORKFLOWS_QA_MARKER}
       data-pipeline-automation-marker={GROWTH_PROSPECT_PIPELINE_AUTOMATION_QA_MARKER}
+      data-provider-search-intent-marker={GROWTH_PROSPECT_SEARCH_PROVIDER_INTENT_QA_MARKER}
       data-live-provider-query-expansion-marker={GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER}
       data-clean-start-marker={GROWTH_SEARCH_CLEAN_START_QA_MARKER}
       data-has-searched-marker={GROWTH_SEARCH_HAS_SEARCHED_STATE_QA_MARKER}
@@ -671,14 +718,14 @@ export function ProspectSearchShell() {
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setHeroFocused(true)}
             onBlur={() => setTimeout(() => setHeroFocused(false), 180)}
-            onKeyDown={(e) => e.key === "Enter" && !searchButtonDisabled && void runSearch()}
+            onKeyDown={(e) => e.key === "Enter" && !searchButtonDisabled && void runSearch({ trigger: "explicit_operator_search" })}
             placeholder={heroPlaceholder}
             className="h-14 w-full rounded-xl border border-border bg-background/90 pl-4 pr-4 text-base shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 sm:pl-12 sm:pr-36"
           />
           <Button
             className="w-full sm:absolute sm:right-2 sm:top-1/2 sm:w-auto sm:-translate-y-1/2"
             size="lg"
-            onClick={() => void runSearch()}
+            onClick={() => void runSearch({ trigger: "explicit_operator_search" })}
             disabled={searchButtonDisabled}
           >
             {loading ? (
@@ -696,13 +743,21 @@ export function ProspectSearchShell() {
             visible={heroFocused}
             onSelect={(v) => {
               setQuery(v)
-              void runSearch(v)
+              void runSearch({ queryText: v, trigger: "search_recommendation_select" })
             }}
           />
           </div>
         </div>
       </section>
 
+      {pendingProviderSearchHint ? (
+        <p
+          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+          data-provider-search-pending-hint="v1"
+        >
+          {pendingProviderSearchHint}
+        </p>
+      ) : null}
       {error ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
@@ -725,6 +780,7 @@ export function ProspectSearchShell() {
               queryText: queryRef.current,
               filters: filtersRef.current,
               discoveryMode: discoveryModeRef.current,
+              trigger: "explicit_operator_search",
             })
           }
           onClear={() => replaceFilters(EMPTY_FILTERS)}
@@ -746,7 +802,7 @@ export function ProspectSearchShell() {
           {!hasSearched ? (
             <ProspectSearchCleanStartPanel
               savedSearches={savedSearches}
-              onRunQuery={(q) => void runSearch(q)}
+              onRunQuery={(q) => void runSearch({ queryText: q, trigger: "suggested_query_click" })}
               onRestoreSavedSearch={(id) => void loadSavedById(id)}
             />
           ) : (
@@ -873,7 +929,7 @@ export function ProspectSearchShell() {
 
               {showEmpty ? (
                 <SearchEmptyState
-                  onRunQuery={(q) => void runSearch(q)}
+                  onRunQuery={(q) => void runSearch({ queryText: q, trigger: "suggested_query_click" })}
                   onSelectTemplate={applyTemplate}
                   recentSaved={savedSearches}
                   title={result?.expanded_search_exhausted ? "No companies found" : "No companies found"}

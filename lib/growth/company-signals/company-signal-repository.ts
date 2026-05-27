@@ -6,7 +6,7 @@ import {
   normalizeDetectedCompanySignals,
 } from "@/lib/growth/company-signals/company-signal-engine"
 import type { GrowthCompanySignalContext } from "@/lib/growth/company-signals/company-signal-context"
-import { isGrowthCompanySignalSchemaReady } from "@/lib/growth/company-signals/company-signal-schema-health"
+import { probeGrowthCompanySignalSchema } from "@/lib/growth/company-signals/company-signal-schema-health"
 import {
   GROWTH_COMPANY_SIGNAL_INTELLIGENCE_QA_MARKER,
   GROWTH_COMPANY_SIGNAL_PRIVACY_NOTE,
@@ -154,8 +154,9 @@ export async function runCompanySignalIntelligence(
     privacy_note: GROWTH_COMPANY_SIGNAL_PRIVACY_NOTE,
   }
 
-  const schema_ready = await isGrowthCompanySignalSchemaReady(admin)
-  if (!schema_ready) return { ...base, schema_ready: false }
+  const schema_health = await probeGrowthCompanySignalSchema(admin)
+  const schema_ready = schema_health.ready
+  if (!schema_ready) return { ...base, schema_ready: false, schema_health }
 
   const ctx = await resolveCompanySignalContext(admin, input.company_candidate_id)
   if (!ctx) return { ...base, schema_ready: true }
@@ -237,6 +238,7 @@ export async function runCompanySignalIntelligence(
   return {
     qa_marker: GROWTH_COMPANY_SIGNAL_INTELLIGENCE_QA_MARKER,
     schema_ready: true,
+    schema_health,
     company_candidate_id: input.company_candidate_id,
     run,
     signals: stored,
@@ -259,8 +261,9 @@ export async function loadCompanySignalSnapshot(
     privacy_note: GROWTH_COMPANY_SIGNAL_PRIVACY_NOTE,
   }
 
-  const schema_ready = await isGrowthCompanySignalSchemaReady(admin)
-  if (!schema_ready) return { ...base, schema_ready: false }
+  const schema_health = await probeGrowthCompanySignalSchema(admin)
+  const schema_ready = schema_health.ready
+  if (!schema_ready) return { ...base, schema_ready: false, schema_health }
 
   const { data: runRow } = await admin
     .schema("growth")
@@ -272,7 +275,7 @@ export async function loadCompanySignalSnapshot(
     .maybeSingle()
 
   if (!runRow) {
-    return { ...base, schema_ready: true }
+    return { ...base, schema_ready: true, schema_health }
   }
 
   const r = runRow as Record<string, unknown>
@@ -302,6 +305,7 @@ export async function loadCompanySignalSnapshot(
   return {
     qa_marker: GROWTH_COMPANY_SIGNAL_INTELLIGENCE_QA_MARKER,
     schema_ready: true,
+    schema_health,
     company_candidate_id: companyCandidateId,
     run,
     signals,

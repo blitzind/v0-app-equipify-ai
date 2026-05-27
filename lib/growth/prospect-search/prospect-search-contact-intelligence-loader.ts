@@ -6,7 +6,7 @@ import { listCompanyContacts } from "@/lib/growth/contact-discovery/company-cont
 import { computeCompanyContactCoverage } from "@/lib/growth/contact-discovery/company-contact-coverage"
 import { isGrowthCompanyContactsSchemaReady } from "@/lib/growth/contact-discovery/company-contact-schema-health"
 import { companyContactToContactInput } from "@/lib/growth/contact-discovery/integrations/company-contacts-bridge"
-import { isGrowthContactDiscoverySchemaReady } from "@/lib/growth/contact-discovery/contact-schema-health"
+import { probeProspectSearchContactIntelligenceSchema } from "@/lib/growth/prospect-search/prospect-search-intelligence-schema-health"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import type { GrowthLeadEngineDecisionMakerHypothesisOutput } from "@/lib/growth/lead-engine/decision-maker-hypothesis-types"
 import type { GrowthLeadEnginePipelineRun } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
@@ -69,6 +69,7 @@ async function buildContactIntelligenceForCompany(
   },
   context: {
     schema_ready: boolean
+    schema_health: import("@/lib/growth/schema-health/growth-schema-health-types").GrowthSchemaHealthSummary
     decisionMakersByLead: Map<string, Awaited<ReturnType<typeof listGrowthLeadDecisionMakers>>>
     leadMetadataById: Map<string, Record<string, unknown>>
   },
@@ -158,7 +159,7 @@ async function buildContactIntelligenceForCompany(
       input.growth_lead_id
         ? "No evidence-backed contacts on this Growth lead yet."
         : "No evidence-backed contacts available for this company.",
-      { schema_ready: context.schema_ready, source_labels },
+      { schema_ready: context.schema_ready, source_labels, schema_health: context.schema_health },
     )
   }
 
@@ -167,6 +168,7 @@ async function buildContactIntelligenceForCompany(
     decision_maker_hypothesis,
     committee_completeness,
     schema_ready: context.schema_ready,
+    schema_health: context.schema_health,
     source_labels,
     contact_coverage_score,
     contact_coverage_label,
@@ -188,7 +190,8 @@ export async function loadProspectSearchContactIntelligenceBatch(
   const map = new Map<string, GrowthProspectSearchContactIntelligence>()
   if (companies.length === 0) return map
 
-  const schema_ready = await isGrowthContactDiscoverySchemaReady(admin)
+  const schema_health = await probeProspectSearchContactIntelligenceSchema(admin)
+  const schema_ready = schema_health.ready
   const leadIds = [...new Set(companies.map((c) => c.growth_lead_id).filter(Boolean))] as string[]
   const leadMetadataById = await loadLeadMetadataByIds(admin, leadIds)
 
@@ -206,6 +209,7 @@ export async function loadProspectSearchContactIntelligenceBatch(
     companies.map(async (company) => {
       const intelligence = await buildContactIntelligenceForCompany(admin, company, {
         schema_ready,
+        schema_health,
         decisionMakersByLead,
         leadMetadataById,
       })

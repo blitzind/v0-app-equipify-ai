@@ -10,7 +10,7 @@ import {
   type GrowthCompanyContactsSnapshot,
   type GrowthCompanyContactStatus,
 } from "@/lib/growth/contact-discovery/company-contact-types"
-import { isGrowthCompanyContactsSchemaReady } from "@/lib/growth/contact-discovery/company-contact-schema-health"
+import { isGrowthCompanyContactsSchemaReady, probeGrowthCompanyContactsSchema } from "@/lib/growth/contact-discovery/company-contact-schema-health"
 import { scoreDecisionMakerTitle } from "@/lib/growth/contact-discovery/decision-maker-score"
 import type { ExtractedWebsiteContact } from "@/lib/growth/contact-discovery/extract/extract-shared"
 import {
@@ -128,11 +128,13 @@ export async function loadCompanyContactsSnapshot(
   admin: SupabaseClient,
   companyId: string,
 ): Promise<GrowthCompanyContactsSnapshot> {
-  const schema_ready = await isGrowthCompanyContactsSchemaReady(admin)
+  const schema_health = await probeGrowthCompanyContactsSchema(admin)
+  const schema_ready = schema_health.ready
   if (!schema_ready) {
     return {
       qa_marker: GROWTH_COMPANY_CONTACTS_QA_MARKER,
       schema_ready: false,
+      schema_health,
       company_id: companyId,
       contacts: [],
       coverage: computeCompanyContactCoverage([]),
@@ -144,6 +146,7 @@ export async function loadCompanyContactsSnapshot(
   return {
     qa_marker: GROWTH_COMPANY_CONTACTS_QA_MARKER,
     schema_ready: true,
+    schema_health,
     company_id: companyId,
     contacts,
     coverage: computeCompanyContactCoverage(contacts),

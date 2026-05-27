@@ -5,6 +5,7 @@ import { Loader2, Radar } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { GrowthCompanySignalSnapshot } from "@/lib/growth/company-signals/company-signal-types"
+import { ProspectSearchSchemaHealthNotice } from "@/components/growth/prospect-search/prospect-search-schema-health-notice"
 
 function MaturityRow({ label, value }: { label: string; value: string }) {
   return (
@@ -19,10 +20,12 @@ export function CompanyIntelligenceCard({
   companyCandidateId,
   companyName,
   compact = false,
+  suppressSchemaNotice = false,
 }: {
   companyCandidateId: string | null
   companyName?: string
   compact?: boolean
+  suppressSchemaNotice?: boolean
 }) {
   const [snapshot, setSnapshot] = useState<GrowthCompanySignalSnapshot | null>(null)
   const [loading, setLoading] = useState(false)
@@ -75,11 +78,9 @@ export function CompanyIntelligenceCard({
         </Button>
       </div>
 
-      {!snapshot?.schema_ready ? (
-        <p className="mt-2 text-xs text-amber-800">
-          Apply migration 20270327120000_growth_engine_company_signal_intelligence.sql.
-        </p>
-      ) : ui ? (
+      {!suppressSchemaNotice ? <ProspectSearchSchemaHealthNotice health={snapshot?.schema_health} /> : null}
+
+      {snapshot?.schema_ready && ui ? (
         <div className="mt-4 space-y-4">
           <dl className={compact ? "grid gap-3 text-sm sm:grid-cols-2" : "grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3"}>
             <MaturityRow label="Operational maturity" value={ui.operational_maturity} />

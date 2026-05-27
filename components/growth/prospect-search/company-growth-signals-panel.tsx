@@ -5,6 +5,7 @@ import { Loader2, RefreshCw, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import type { GrowthCompanyGrowthSignalsSnapshot } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
+import { ProspectSearchSchemaHealthNotice } from "@/components/growth/prospect-search/prospect-search-schema-health-notice"
 import { GROWTH_SIGNAL_TYPE_LABELS } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
 
 function tierTone(tier: string): "attention" | "healthy" | "medium" | "neutral" {
@@ -26,12 +27,14 @@ export function CompanyGrowthSignalsPanel({
   website,
   contactCoverageLabel,
   lastVerifiedAt,
+  suppressSchemaNotice = false,
 }: {
   companyId: string
   companyName: string
   website?: string | null
   contactCoverageLabel?: string | null
   lastVerifiedAt?: string | null
+  suppressSchemaNotice?: boolean
 }) {
   const [snapshot, setSnapshot] = useState<GrowthCompanyGrowthSignalsSnapshot | null>(null)
   const [loading, setLoading] = useState(false)
@@ -78,11 +81,7 @@ export function CompanyGrowthSignalsPanel({
         </Button>
       </div>
 
-      {!snapshot?.schema_ready ? (
-        <p className="mt-2 text-xs text-amber-800">
-          Growth signal schema not applied — run migration 20270404120000_growth_engine_multi_source_growth_signals.sql.
-        </p>
-      ) : null}
+      {!suppressSchemaNotice ? <ProspectSearchSchemaHealthNotice health={snapshot?.schema_health} /> : null}
 
       <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
         {contactCoverageLabel ? <span>Contact coverage {contactCoverageLabel}</span> : null}

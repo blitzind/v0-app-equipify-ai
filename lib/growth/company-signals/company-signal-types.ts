@@ -1,5 +1,7 @@
 /** Growth Engine — Company Signal Intelligence (Prompt 30). Client-safe. */
 
+import type { GrowthSchemaHealthSummary } from "@/lib/growth/schema-health/growth-schema-health-types"
+
 export const GROWTH_COMPANY_SIGNAL_INTELLIGENCE_QA_MARKER =
   "growth-company-signal-intelligence-v1" as const
 
@@ -83,9 +85,12 @@ export type GrowthCompanySignalUiSummary = {
   fit_indicators: string[]
 }
 
+import type { GrowthSchemaHealthSummary } from "@/lib/growth/schema-health/growth-schema-health-types"
+
 export type GrowthCompanySignalSnapshot = {
   qa_marker: typeof GROWTH_COMPANY_SIGNAL_INTELLIGENCE_QA_MARKER
   schema_ready: boolean
+  schema_health?: GrowthSchemaHealthSummary | null
   company_candidate_id: string
   run: GrowthCompanySignalRun | null
   signals: GrowthCompanySignal[]

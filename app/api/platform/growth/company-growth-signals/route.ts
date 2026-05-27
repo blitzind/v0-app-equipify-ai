@@ -4,8 +4,9 @@ import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import {
   GROWTH_COMPANY_GROWTH_SIGNALS_SCHEMA_SETUP_MESSAGE,
   isGrowthCompanyGrowthSignalsSchemaReady,
+  probeGrowthCompanyGrowthSignalsSchema,
 } from "@/lib/growth/company-growth-signals/company-growth-signal-schema-health"
-import { GROWTH_COMPANY_GROWTH_SIGNALS_QA_MARKER } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
+import { GROWTH_COMPANY_GROWTH_SIGNALS_PRIVACY_NOTE, GROWTH_COMPANY_GROWTH_SIGNALS_QA_MARKER } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
 import {
   loadCompanyGrowthSignalsSnapshot,
   runCompanyGrowthSignalDiscovery,
@@ -17,17 +18,28 @@ export async function GET(request: Request) {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 
+  const url = new URL(request.url)
+  const companyId = url.searchParams.get("company_id")
+
   const schemaReady = await isGrowthCompanyGrowthSignalsSchemaReady(access.admin)
+  const schema_health = schemaReady ? null : await probeGrowthCompanyGrowthSignalsSchema(access.admin)
   if (!schemaReady) {
     return NextResponse.json({
       ok: true,
-      meta: { schemaReady: false, setupMessage: GROWTH_COMPANY_GROWTH_SIGNALS_SCHEMA_SETUP_MESSAGE },
-      snapshot: null,
+      meta: { schemaReady: false, setupMessage: schema_health?.warning_message ?? GROWTH_COMPANY_GROWTH_SIGNALS_SCHEMA_SETUP_MESSAGE },
+      snapshot: {
+        qa_marker: GROWTH_COMPANY_GROWTH_SIGNALS_QA_MARKER,
+        schema_ready: false,
+        schema_health,
+        company_id: companyId ?? "",
+        evidence_sources: [],
+        signals: [],
+        score: null,
+        privacy_note: GROWTH_COMPANY_GROWTH_SIGNALS_PRIVACY_NOTE,
+      },
     })
   }
 
-  const url = new URL(request.url)
-  const companyId = url.searchParams.get("company_id")
   const run = url.searchParams.get("run") === "1"
   const website = url.searchParams.get("website")
   const companyName = url.searchParams.get("company_name") ?? "Company"

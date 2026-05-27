@@ -16,7 +16,7 @@ import {
   dedupeNormalizedContacts,
   normalizeContactCandidate,
 } from "@/lib/growth/contact-discovery/contact-normalizer"
-import { isGrowthContactDiscoverySchemaReady } from "@/lib/growth/contact-discovery/contact-schema-health"
+import { probeGrowthContactDiscoverySchema } from "@/lib/growth/contact-discovery/contact-schema-health"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -169,8 +169,9 @@ export async function runContactDiscoveryForCompany(
     privacy_note: GROWTH_CONTACT_DISCOVERY_PRIVACY_NOTE,
   }
 
-  const schema_ready = await isGrowthContactDiscoverySchemaReady(admin)
-  if (!schema_ready) return { ...base, schema_ready: false }
+  const schema_health = await probeGrowthContactDiscoverySchema(admin)
+  const schema_ready = schema_health.ready
+  if (!schema_ready) return { ...base, schema_ready: false, schema_health }
 
   const ctx = await resolveCompanyCandidateContext(admin, input.company_candidate_id)
   if (!ctx) {
@@ -361,11 +362,13 @@ export async function loadContactDiscoverySnapshot(
   admin: SupabaseClient,
   companyCandidateId: string,
 ): Promise<GrowthContactDiscoverySnapshot> {
-  const schema_ready = await isGrowthContactDiscoverySchemaReady(admin)
+  const schema_health = await probeGrowthContactDiscoverySchema(admin)
+  const schema_ready = schema_health.ready
   if (!schema_ready) {
     return {
       qa_marker: GROWTH_CONTACT_DISCOVERY_QA_MARKER,
       schema_ready: false,
+      schema_health,
       company_candidate_id: companyCandidateId,
       run: null,
       contacts: [],
@@ -397,6 +400,7 @@ export async function loadContactDiscoverySnapshot(
   return {
     qa_marker: GROWTH_CONTACT_DISCOVERY_QA_MARKER,
     schema_ready: true,
+    schema_health,
     company_candidate_id: companyCandidateId,
     run: null,
     contacts: mapped,

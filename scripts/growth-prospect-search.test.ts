@@ -2419,7 +2419,172 @@ async function main(): Promise<void> {
 
   await testProspectPipelineAutomation()
 
+  await testProspectSearchProviderIntent()
+
+  await testProspectSearchIntelligenceSchemaHealth()
+
   console.log("growth-prospect-search: all checks passed")
+}
+
+async function testProspectSearchIntelligenceSchemaHealth(): Promise<void> {
+  const {
+    GROWTH_PROSPECT_SEARCH_INTELLIGENCE_SCHEMA_QA_MARKER,
+    formatGrowthSchemaHealthNotice,
+    mergeGrowthSchemaHealthSummaries,
+    shouldShowGrowthSchemaHealthWarning,
+    summarizeGrowthSchemaProbeResults,
+  } = await import("../lib/growth/schema-health/growth-schema-health-types")
+
+  assert.equal(GROWTH_PROSPECT_SEARCH_INTELLIGENCE_SCHEMA_QA_MARKER, "growth-prospect-search-intelligence-schema-v1")
+
+  const ready = summarizeGrowthSchemaProbeResults({
+    featureLabel: "Contact discovery",
+    objects: [{ table: "contact_candidates", columns: ["id"], label: "growth.contact_candidates" }],
+    outcomes: ["detected"],
+  })
+  assert.equal(ready.ready, true)
+  assert.equal(shouldShowGrowthSchemaHealthWarning(ready), false)
+
+  const uncertain = summarizeGrowthSchemaProbeResults({
+    featureLabel: "Contact discovery",
+    objects: [{ table: "contact_candidates", columns: ["id"], label: "growth.contact_candidates" }],
+    outcomes: ["uncertain"],
+  })
+  assert.equal(uncertain.ready, true)
+  assert.equal(shouldShowGrowthSchemaHealthWarning(uncertain), false)
+
+  const partial = summarizeGrowthSchemaProbeResults({
+    featureLabel: "Contact discovery",
+    objects: [
+      { table: "contact_candidates", columns: ["id"], label: "growth.contact_candidates" },
+      { table: "buying_committees", columns: ["id"], label: "growth.buying_committees" },
+    ],
+    outcomes: ["detected", "missing"],
+  })
+  assert.equal(partial.ready, false)
+  assert.match(formatGrowthSchemaHealthNotice(partial) ?? "", /missing growth\.buying_committees/)
+  assert.doesNotMatch(formatGrowthSchemaHealthNotice(partial) ?? "", /20270323120000/)
+
+  const merged = mergeGrowthSchemaHealthSummaries([
+    { ready: false, verified: false, uncertain: false, missing_objects: ["growth.contact_candidates"], warning_message: "Contact discovery schema is incomplete — missing growth.contact_candidates.", env_hint: null },
+    { ready: true, verified: true, uncertain: false, missing_objects: [], warning_message: null, env_hint: null },
+  ])
+  assert.equal(merged.ready, false)
+
+  const contactPanelSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/company-contact-intelligence-panel.tsx"),
+    "utf8",
+  )
+  assert.match(contactPanelSource, /ProspectSearchSchemaHealthNotice/)
+  assert.doesNotMatch(contactPanelSource, /20270323120000/)
+
+  const buyingCommitteeSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/buying-committee-panel.tsx"),
+    "utf8",
+  )
+  assert.doesNotMatch(buyingCommitteeSource, /schema not applied/)
+
+  const probeSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/schema-health/growth-postgrest-table-probe.ts"),
+    "utf8",
+  )
+  assert.match(probeSource, /GROWTH_SCHEMA_HEALTH_PROBE_CACHE_MS = 15_000/)
+  assert.match(probeSource, /growth\.contact_discovery_runs/)
+
+  const typesSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/schema-health/growth-schema-health-types.ts"),
+    "utf8",
+  )
+  assert.match(typesSource, /Connected to Supabase project/)
+}
+
+async function testProspectSearchProviderIntent(): Promise<void> {
+  const {
+    GROWTH_PROSPECT_SEARCH_PROVIDER_INTENT_QA_MARKER,
+    PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES,
+    shouldFetchProspectSearchResults,
+    resolveProspectSearchExternalPendingMessage,
+  } = await import("../lib/growth/prospect-search/prospect-search-provider-search-intent")
+
+  assert.equal(GROWTH_PROSPECT_SEARCH_PROVIDER_INTENT_QA_MARKER, "growth-prospect-search-provider-intent-v1")
+
+  assert.equal(
+    shouldFetchProspectSearchResults({
+      discoveryMode: "discover_external",
+      trigger: "explicit_operator_search",
+    }),
+    true,
+  )
+  assert.equal(
+    shouldFetchProspectSearchResults({
+      discoveryMode: "discover_external",
+      trigger: "icp_template_selection",
+    }),
+    false,
+  )
+  assert.equal(
+    shouldFetchProspectSearchResults({
+      discoveryMode: "discover_external",
+      trigger: "saved_workflow_restore",
+    }),
+    false,
+  )
+  assert.equal(
+    shouldFetchProspectSearchResults({
+      discoveryMode: "discover_external",
+      trigger: "suggested_query_click",
+    }),
+    false,
+  )
+  assert.equal(
+    shouldFetchProspectSearchResults({
+      discoveryMode: "internal",
+      trigger: "icp_template_selection",
+    }),
+    true,
+  )
+  assert.equal(
+    shouldFetchProspectSearchResults({
+      discoveryMode: "internal",
+      trigger: "saved_workflow_restore",
+    }),
+    true,
+  )
+
+  assert.equal(
+    resolveProspectSearchExternalPendingMessage("icp_template_selection"),
+    PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.templateApplied,
+  )
+  assert.match(
+    resolveProspectSearchExternalPendingMessage("saved_workflow_restore"),
+    /Workflow restored/i,
+  )
+  assert.match(
+    resolveProspectSearchExternalPendingMessage("search_recommendation_select"),
+    /Query updated/i,
+  )
+
+  const shellSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-shell.tsx"),
+    "utf8",
+  )
+  assert.match(shellSource, /shouldFetchProspectSearchResults/)
+  assert.match(shellSource, /trigger: "icp_template_selection"/)
+  assert.match(shellSource, /trigger: "saved_workflow_restore"/)
+  assert.match(shellSource, /trigger: "explicit_operator_search"/)
+  assert.match(shellSource, /data-provider-search-intent-marker/)
+  assert.match(shellSource, /data-provider-search-pending-hint/)
+  assert.match(shellSource, /pendingProviderSearchHint/)
+  assert.match(shellSource, /resolveProspectSearchExternalPendingMessage/)
+  assert.doesNotMatch(shellSource, /void runSearch\(\{ queryText: template\.query, filters: nextFilters \}\)/)
+  assert.match(shellSource, /trigger: "suggested_query_click"/)
+
+  const intentSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-provider-search-intent.ts"),
+    "utf8",
+  )
+  assert.match(intentSource, /Template applied\. Review filters, then click Search providers\./)
+  assert.match(intentSource, /Workflow restored — click Search providers\./)
 }
 
 async function testProspectPipelineAutomation(): Promise<void> {

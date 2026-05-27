@@ -1,5 +1,7 @@
 /** Growth Engine — Contact Discovery + Buying Committee types (Prompt 27). Client-safe. */
 
+import type { GrowthSchemaHealthSummary } from "@/lib/growth/schema-health/growth-schema-health-types"
+
 export const GROWTH_CONTACT_DISCOVERY_QA_MARKER = "growth-contact-discovery-v1" as const
 
 export const GROWTH_CONTACT_DISCOVERY_RUN_STATUSES = [
@@ -126,6 +128,7 @@ export type GrowthBuyingCommitteeAssessment = {
 export type GrowthContactDiscoverySnapshot = {
   qa_marker: typeof GROWTH_CONTACT_DISCOVERY_QA_MARKER
   schema_ready: boolean
+  schema_health?: GrowthSchemaHealthSummary | null
   company_candidate_id: string
   run: GrowthContactDiscoveryRun | null
   contacts: GrowthContactCandidate[]

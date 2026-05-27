@@ -195,6 +195,7 @@ export function CompanyResultCard({
             companyCandidateId={row.id}
             companyName={row.company_name}
             compact
+            suppressSchemaNotice={Boolean(row.contact_intelligence?.schema_health?.warning_message)}
           />
           <CompanyContactsPanel
             companyId={row.id}
@@ -208,6 +209,7 @@ export function CompanyResultCard({
             website={row.website}
             contactCoverageLabel={row.contact_intelligence?.contact_coverage_label}
             lastVerifiedAt={row.growth_signal_last_computed_at}
+            suppressSchemaNotice={Boolean(row.contact_intelligence?.schema_health?.warning_message)}
           />
           <BuyingCommitteePanel companyCandidateId={row.id} companyName={row.company_name} />
           {row.related_companies?.length ? (

@@ -1,5 +1,7 @@
 /** Growth Engine — Company Contacts types (Apollo replacement layer). Client-safe. */
 
+import type { GrowthSchemaHealthSummary } from "@/lib/growth/schema-health/growth-schema-health-types"
+
 export const GROWTH_COMPANY_CONTACTS_QA_MARKER = "growth-company-contacts-v1" as const
 
 export const GROWTH_COMPANY_CONTACT_EMAIL_STATUSES = [
@@ -89,6 +91,7 @@ export type GrowthCompanyContactCoverage = {
 export type GrowthCompanyContactsSnapshot = {
   qa_marker: typeof GROWTH_COMPANY_CONTACTS_QA_MARKER
   schema_ready: boolean
+  schema_health?: GrowthSchemaHealthSummary | null
   company_id: string
   contacts: GrowthCompanyContact[]
   coverage: GrowthCompanyContactCoverage

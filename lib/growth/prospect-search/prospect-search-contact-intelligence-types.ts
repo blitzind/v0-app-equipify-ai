@@ -1,5 +1,7 @@
 /** Prospect Search contact intelligence bridge types (Sprint 4C). Client-safe. */
 
+import type { GrowthSchemaHealthSummary } from "@/lib/growth/schema-health/growth-schema-health-types"
+
 export const GROWTH_PROSPECT_SEARCH_CONTACT_INTELLIGENCE_QA_MARKER =
   "growth-prospect-search-contact-intelligence-v1" as const
 
@@ -62,6 +64,7 @@ export type GrowthProspectSearchContactIntelligence = {
   contact_confidence_score?: number | null
   primary_contact_id?: string | null
   recommended_contact_id?: string | null
+  schema_health?: GrowthSchemaHealthSummary | null
 }
 
 export type ProspectSearchLeadEngineContactHandoffContext = {

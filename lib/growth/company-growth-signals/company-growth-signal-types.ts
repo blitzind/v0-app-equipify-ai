@@ -1,5 +1,7 @@
 /** Multi-source growth signal types. Client-safe. */
 
+import type { GrowthSchemaHealthSummary } from "@/lib/growth/schema-health/growth-schema-health-types"
+
 export const GROWTH_COMPANY_GROWTH_SIGNALS_QA_MARKER = "growth-company-growth-signals-v1" as const
 
 export const GROWTH_EVIDENCE_SOURCE_TYPES = [
@@ -74,9 +76,12 @@ export type GrowthCompanyGrowthSignalScore = {
   last_computed_at: string
 }
 
+import type { GrowthSchemaHealthSummary } from "@/lib/growth/schema-health/growth-schema-health-types"
+
 export type GrowthCompanyGrowthSignalsSnapshot = {
   qa_marker: typeof GROWTH_COMPANY_GROWTH_SIGNALS_QA_MARKER
   schema_ready: boolean
+  schema_health?: GrowthSchemaHealthSummary | null
   company_id: string
   evidence_sources: GrowthCompanyEvidenceSource[]
   signals: GrowthCompanyGrowthSignal[]

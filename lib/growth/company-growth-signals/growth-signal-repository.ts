@@ -13,7 +13,10 @@ import {
   type RawEvidenceSourceCandidate,
   type RawGrowthSignalCandidate,
 } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
-import { isGrowthCompanyGrowthSignalsSchemaReady } from "@/lib/growth/company-growth-signals/company-growth-signal-schema-health"
+import {
+  isGrowthCompanyGrowthSignalsSchemaReady,
+  probeGrowthCompanyGrowthSignalsSchema,
+} from "@/lib/growth/company-growth-signals/company-growth-signal-schema-health"
 import { computeGrowthSignalScore } from "@/lib/growth/company-growth-signals/growth-signal-scoring"
 import {
   discoverMultiSourceEvidence,
@@ -199,10 +202,12 @@ export async function loadCompanyGrowthSignalsSnapshot(
   admin: SupabaseClient,
   companyId: string,
 ): Promise<GrowthCompanyGrowthSignalsSnapshot> {
-  if (!(await isGrowthCompanyGrowthSignalsSchemaReady(admin))) {
+  const schema_health = await probeGrowthCompanyGrowthSignalsSchema(admin)
+  if (!schema_health.ready) {
     return {
       qa_marker: GROWTH_COMPANY_GROWTH_SIGNALS_QA_MARKER,
       schema_ready: false,
+      schema_health,
       company_id: companyId,
       evidence_sources: [],
       signals: [],
@@ -220,6 +225,7 @@ export async function loadCompanyGrowthSignalsSnapshot(
   return {
     qa_marker: GROWTH_COMPANY_GROWTH_SIGNALS_QA_MARKER,
     schema_ready: true,
+    schema_health,
     company_id: companyId,
     evidence_sources,
     signals,

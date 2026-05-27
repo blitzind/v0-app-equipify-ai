@@ -93,12 +93,6 @@ export function CompanyContactsPanel({
         </Button>
       </div>
 
-      {!snapshot?.schema_ready ? (
-        <p className="mt-2 text-xs text-amber-800">
-          Contact discovery schema not applied — run migration 20270403120000_growth_engine_company_contacts.sql.
-        </p>
-      ) : null}
-
       {snapshot?.schema_ready ? (
         <p className="mt-2 text-xs text-muted-foreground">
           Confidence {snapshot.coverage.contact_confidence_score}% · {snapshot.privacy_note}

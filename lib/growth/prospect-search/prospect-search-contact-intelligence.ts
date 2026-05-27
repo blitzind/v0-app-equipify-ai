@@ -336,6 +336,7 @@ export function buildProspectSearchContactIntelligence(input: {
   contact_confidence_score?: number | null
   primary_contact_id?: string | null
   recommended_contact_id?: string | null
+  schema_health?: import("@/lib/growth/schema-health/growth-schema-health-types").GrowthSchemaHealthSummary | null
 }): GrowthProspectSearchContactIntelligence {
   const schema_ready = input.schema_ready ?? true
   const evidenceBacked = dedupeContacts(input.contacts.filter(hasEvidence))
@@ -398,18 +399,24 @@ export function buildProspectSearchContactIntelligence(input: {
     contact_confidence_score: input.contact_confidence_score ?? null,
     primary_contact_id: input.primary_contact_id ?? null,
     recommended_contact_id: input.recommended_contact_id ?? null,
+    schema_health: input.schema_health ?? null,
   }
 }
 
 export function emptyProspectSearchContactIntelligence(
   reason: string,
-  options?: { schema_ready?: boolean; source_labels?: string[] },
+  options?: {
+    schema_ready?: boolean
+    source_labels?: string[]
+    schema_health?: import("@/lib/growth/schema-health/growth-schema-health-types").GrowthSchemaHealthSummary | null
+  },
 ): GrowthProspectSearchContactIntelligence {
   return buildProspectSearchContactIntelligence({
     contacts: [],
     schema_ready: options?.schema_ready ?? true,
     source_labels: options?.source_labels ?? [],
     empty_reason: reason,
+    schema_health: options?.schema_health ?? null,
   })
 }
 
