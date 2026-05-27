@@ -31,7 +31,7 @@ function domainsTable(admin: SupabaseClient) {
 }
 
 function activeAccountsQuery(admin: SupabaseClient) {
-  return accountsTable(admin).is("deleted_at", null)
+  return accountsTable(admin).select("*").is("deleted_at", null)
 }
 
 function mapAccount(row: Record<string, unknown>): GrowthSenderAccount {
@@ -133,8 +133,8 @@ async function recomputeSenderHealth(
       last_health_check: now,
       updated_at: now,
     })
-    .eq("id", account.id)
     .is("deleted_at", null)
+    .eq("id", account.id)
     .select("*")
     .single()
 
@@ -283,8 +283,8 @@ export async function updateSenderAccount(
 
   const { data, error } = await accountsTable(admin)
     .update(patch)
-    .eq("id", senderId)
     .is("deleted_at", null)
+    .eq("id", senderId)
     .select("*")
     .single()
 
@@ -324,8 +324,8 @@ export async function softDeleteSenderAccount(
   const deletedAt = new Date().toISOString()
   const { data, error } = await accountsTable(admin)
     .update({ deleted_at: deletedAt, status: "disabled", updated_at: deletedAt })
-    .eq("id", input.senderId)
     .is("deleted_at", null)
+    .eq("id", input.senderId)
     .select("id, deleted_at")
     .single()
 

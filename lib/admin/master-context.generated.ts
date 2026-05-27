@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 721,
-  sqlMigrations: 293,
+  apiRouteHandlers: 726,
+  sqlMigrations: 294,
   dashboardPages: 65,
-  componentsTsx: 544,
-  libTsFiles: 1866,
+  componentsTsx: 545,
+  libTsFiles: 1877,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **721** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **293** |
+| API route handlers (\`app/api/**/route.ts\`) | **726** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **294** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **544** |
-| \`lib/**/*.ts\` | **1866** |
+| \`components/**/*.tsx\` | **545** |
+| \`lib/**/*.ts\` | **1877** |
 
 ### Vercel crons
 
@@ -658,6 +658,7 @@ platform/growth/outreach/queue/[queueId]/route.ts
 platform/growth/outreach/queue/route.ts
 platform/growth/prospect-search/index/rebuild/route.ts
 platform/growth/prospect-search/route.ts
+platform/growth/providers/[id]/route.ts
 platform/growth/providers/connections/[connectionId]/campaigns/route.ts
 platform/growth/providers/connections/[connectionId]/credentials/route.ts
 platform/growth/providers/connections/[connectionId]/disable/route.ts
@@ -666,6 +667,10 @@ platform/growth/providers/connections/[connectionId]/route.ts
 platform/growth/providers/connections/[connectionId]/timeline/route.ts
 platform/growth/providers/connections/[connectionId]/validate/route.ts
 platform/growth/providers/connections/route.ts
+platform/growth/providers/dashboard/route.ts
+platform/growth/providers/route-test/route.ts
+platform/growth/providers/route.ts
+platform/growth/providers/validate/route.ts
 platform/growth/realtime/providers/connections/[connectionId]/credentials/route.ts
 platform/growth/realtime/providers/connections/[connectionId]/diagnostics/route.ts
 platform/growth/realtime/providers/connections/[connectionId]/route.ts

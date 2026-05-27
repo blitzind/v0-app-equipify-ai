@@ -47,7 +47,7 @@ function scheduleTable(admin: SupabaseClient) {
 }
 
 function activeProfilesQuery(admin: SupabaseClient) {
-  return profilesTable(admin).is("deleted_at", null)
+  return profilesTable(admin).select("*").is("deleted_at", null)
 }
 
 async function loadSenderSummary(
@@ -174,8 +174,8 @@ async function recomputeWarmupProfile(
       completed_at: nextStatus === "completed" ? previous.completed_at ?? now : previous.completed_at,
       updated_at: now,
     })
-    .eq("id", profileId)
     .is("deleted_at", null)
+    .eq("id", profileId)
     .select("*")
     .single()
 
@@ -300,7 +300,7 @@ export async function updateWarmupProfile(
     updates.daily_increment = computeDailyIncrement(scheduleDraft)
   }
 
-  const { error } = await profilesTable(admin).update(updates).eq("id", profileId).is("deleted_at", null)
+  const { error } = await profilesTable(admin).update(updates).is("deleted_at", null).eq("id", profileId)
   if (error) throw new Error(error.message)
 
   return recomputeWarmupProfile(admin, profileId, {
@@ -320,8 +320,8 @@ export async function softDeleteWarmupProfile(
   const deletedAt = new Date().toISOString()
   const { data, error } = await profilesTable(admin)
     .update({ deleted_at: deletedAt, status: "disabled", updated_at: deletedAt })
-    .eq("id", profileId)
     .is("deleted_at", null)
+    .eq("id", profileId)
     .select("id")
     .single()
 
@@ -362,8 +362,8 @@ export async function generateWarmupSchedule(
       last_progress_at: now,
       updated_at: now,
     })
-    .eq("id", profileId)
     .is("deleted_at", null)
+    .eq("id", profileId)
 
   if (error) throw new Error(error.message)
 
@@ -382,8 +382,8 @@ export async function pauseWarmupProfile(
   const now = new Date().toISOString()
   const { error } = await profilesTable(admin)
     .update({ status: "paused", updated_at: now })
-    .eq("id", profileId)
     .is("deleted_at", null)
+    .eq("id", profileId)
 
   if (error) throw new Error(error.message)
   return recomputeWarmupProfile(admin, profileId, { ...input, forceStatus: "paused" })
@@ -406,8 +406,8 @@ export async function resumeWarmupProfile(
   const now = new Date().toISOString()
   const { error } = await profilesTable(admin)
     .update({ status: "warming", last_progress_at: now, updated_at: now })
-    .eq("id", profileId)
     .is("deleted_at", null)
+    .eq("id", profileId)
 
   if (error) throw new Error(error.message)
   return recomputeWarmupProfile(admin, profileId, { ...input, forceStatus: "warming" })

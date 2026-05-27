@@ -108,9 +108,16 @@ create unique index if not exists company_evidence_sources_dedupe_idx
 create index if not exists company_growth_signals_company_idx
   on growth.company_growth_signals (company_id, detected_at desc);
 
-create index if not exists company_growth_signals_active_idx
-  on growth.company_growth_signals (company_id, confidence_score desc)
-  where expires_at is null or expires_at > now();
+create index if not exists company_growth_signals_company_confidence_idx
+  on growth.company_growth_signals (
+    company_id,
+    confidence_score desc
+  );
+
+create index if not exists company_growth_signals_expires_at_idx
+  on growth.company_growth_signals (
+    expires_at
+  );
 
 create index if not exists company_growth_signals_type_idx
   on growth.company_growth_signals (company_id, signal_type);

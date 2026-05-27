@@ -79,6 +79,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["inbox", "reply", "thread", "unified inbox", "reply intelligence"],
   },
   {
+    id: "provider-delivery",
+    label: "Delivery",
+    href: "/admin/growth/providers/delivery",
+    keywords: ["delivery", "provider", "route", "transport", "send routing"],
+  },
+  {
     id: "lead-intelligence",
     label: "Lead Intelligence Inspector",
     href: "/admin/growth/leads/lead-engine",
@@ -467,6 +473,26 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
     ],
   },
   {
+    id: "providers-nav",
+    label: "Providers",
+    items: [
+      {
+        id: "providers",
+        href: "/admin/growth/providers",
+        label: "Provider Diagnostics",
+        consoleKey: "providers",
+        match: (path) =>
+          path.startsWith("/admin/growth/providers") && !path.startsWith("/admin/growth/providers/delivery"),
+      },
+      {
+        id: "provider-delivery",
+        href: "/admin/growth/providers/delivery",
+        label: "Delivery",
+        match: prefixMatch("/admin/growth/providers/delivery"),
+      },
+    ],
+  },
+  {
     id: "tools",
     label: "Tools",
     items: [
@@ -488,13 +514,6 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         label: "Imports",
         consoleKey: "imports",
         match: prefixMatch("/admin/growth/imports"),
-      },
-      {
-        id: "providers",
-        href: "/admin/growth/providers",
-        label: "Provider Diagnostics",
-        consoleKey: "providers",
-        match: prefixMatch("/admin/growth/providers"),
       },
       {
         id: "infrastructure",

@@ -42,7 +42,7 @@ function connectionsTable(admin: SupabaseClient) {
 }
 
 function activeConnectionsQuery(admin: SupabaseClient) {
-  return connectionsTable(admin).is("deleted_at", null)
+  return connectionsTable(admin).select("*").is("deleted_at", null)
 }
 
 function mapSummary(row: MailboxRow): GrowthMailboxConnectionSummary {
@@ -108,8 +108,8 @@ async function recomputeMailboxHealth(
       health_reason,
       updated_at: now,
     })
-    .eq("id", asString(row.id))
     .is("deleted_at", null)
+    .eq("id", asString(row.id))
     .select("*")
     .single()
 
@@ -259,8 +259,8 @@ export async function updateMailboxConnection(
 
   const { data, error } = await connectionsTable(admin)
     .update(patch)
-    .eq("id", mailboxId)
     .is("deleted_at", null)
+    .eq("id", mailboxId)
     .select("*")
     .single()
 
@@ -290,8 +290,8 @@ export async function softDeleteMailboxConnection(
   const deletedAt = new Date().toISOString()
   const { data, error } = await connectionsTable(admin)
     .update({ deleted_at: deletedAt, status: "disabled", updated_at: deletedAt })
-    .eq("id", input.mailboxId)
     .is("deleted_at", null)
+    .eq("id", input.mailboxId)
     .select("id, deleted_at")
     .single()
 
@@ -348,8 +348,8 @@ export async function validateMailboxConnection(
       last_successful_refresh: refreshResult === "supported" ? now : asString(row.last_successful_refresh) || null,
       updated_at: now,
     })
-    .eq("id", mailboxId)
     .is("deleted_at", null)
+    .eq("id", mailboxId)
     .select("*")
     .single()
 

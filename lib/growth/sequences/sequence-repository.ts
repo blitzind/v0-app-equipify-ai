@@ -59,7 +59,7 @@ function enrollmentsTable(admin: SupabaseClient) {
 }
 
 function activeTemplatesQuery(admin: SupabaseClient) {
-  return templatesTable(admin).is("deleted_at", null)
+  return templatesTable(admin).select("*").is("deleted_at", null)
 }
 
 function mapStep(row: Row): GrowthSequenceTemplateStep {
@@ -383,7 +383,7 @@ export async function updateSequenceTemplate(
   if (input.exit_on_meeting !== undefined) updates.exit_on_meeting = input.exit_on_meeting
   if (input.exit_on_positive_intent !== undefined) updates.exit_on_positive_intent = input.exit_on_positive_intent
 
-  const { error } = await templatesTable(admin).update(updates).eq("id", templateId).is("deleted_at", null)
+  const { error } = await templatesTable(admin).update(updates).is("deleted_at", null).eq("id", templateId)
   if (error) throw new Error(error.message)
 
   return getSequenceTemplate(admin, templateId) as Promise<GrowthSequenceTemplate>
@@ -399,8 +399,8 @@ export async function softDeleteSequenceTemplate(
   const deletedAt = new Date().toISOString()
   const { data, error } = await templatesTable(admin)
     .update({ deleted_at: deletedAt, status: "archived", updated_at: deletedAt })
-    .eq("id", templateId)
     .is("deleted_at", null)
+    .eq("id", templateId)
     .select("id")
     .single()
 
