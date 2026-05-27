@@ -5,6 +5,9 @@ import { archiveInboxThread, getInboxThread, updateInboxThread } from "@/lib/gro
 import { isGrowthUnifiedInboxSchemaReady } from "@/lib/growth/inbox/inbox-schema-health"
 import { fetchInboxThreadSyncDetail } from "@/lib/growth/inbox-sync/inbox-sync-repository"
 import { isGrowthInboxSyncSchemaReady } from "@/lib/growth/inbox-sync/inbox-sync-schema-health"
+import { listInboxThreadOwnerHistory } from "@/lib/growth/inbox-team-ownership/inbox-owner-history-repository"
+import { suggestInboxThreadOwner } from "@/lib/growth/inbox-team-ownership/inbox-owner-suggestion"
+import { isGrowthInboxTeamOwnershipSchemaReady } from "@/lib/growth/inbox-team-ownership/inbox-team-ownership-schema-health"
 import { GROWTH_INBOX_THREAD_STATUSES } from "@/lib/growth/inbox/inbox-types"
 
 export const runtime = "nodejs"
@@ -34,7 +37,14 @@ export async function GET(_request: Request, context: RouteContext) {
     }
     const syncDetail =
       (await isGrowthInboxSyncSchemaReady(access.admin)) ? await fetchInboxThreadSyncDetail(access.admin, id) : null
-    return NextResponse.json({ ok: true, thread, syncDetail })
+    const teamOwnershipReady = await isGrowthInboxTeamOwnershipSchemaReady(access.admin)
+    const [ownerHistory, ownerSuggestion] = teamOwnershipReady
+      ? await Promise.all([
+          listInboxThreadOwnerHistory(access.admin, id),
+          suggestInboxThreadOwner(access.admin, id),
+        ])
+      : [[], null]
+    return NextResponse.json({ ok: true, thread, syncDetail, ownerHistory, ownerSuggestion })
   } catch (error) {
     return NextResponse.json(
       {

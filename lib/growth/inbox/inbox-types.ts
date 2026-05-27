@@ -36,6 +36,11 @@ export const GROWTH_INBOX_TIMELINE_EVENT_TYPES = [
   "meeting_interest_detected",
   "unsubscribe_detected",
   "thread_owner_assigned",
+  "thread_claimed",
+  "thread_handoff",
+  "thread_unassigned",
+  "thread_sla_overdue",
+  "inbox_assignment_rule_applied",
 ] as const
 export type GrowthInboxTimelineEventType = (typeof GROWTH_INBOX_TIMELINE_EVENT_TYPES)[number]
 
@@ -68,6 +73,11 @@ export type GrowthInboxThread = {
   last_message_at: string | null
   owner_user_id: string | null
   owner_label: string | null
+  assigned_at?: string | null
+  assigned_by?: string | null
+  assignment_source?: string | null
+  sla_due_at?: string | null
+  handoff_note?: string | null
   priority_score: number
   priority_tier: GrowthInboxPriorityTier
   classification: GrowthInboxClassification

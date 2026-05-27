@@ -55,7 +55,7 @@ function sampleThread(overrides: Partial<{
 async function main(): Promise<void> {
   assert.equal(GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER, "growth-unified-inbox-foundation-v1")
   assert.match(GROWTH_UNIFIED_INBOX_PRIVACY_NOTE, /no mailbox sync|manual/i)
-  assert.equal(GROWTH_INBOX_TIMELINE_EVENT_TYPES.length, 7)
+  assert.equal(GROWTH_INBOX_TIMELINE_EVENT_TYPES.length, 12)
 
   const migration = fs.readFileSync(
     path.join(process.cwd(), `supabase/migrations/${GROWTH_UNIFIED_INBOX_SCHEMA_MIGRATION}`),
@@ -175,6 +175,7 @@ async function main(): Promise<void> {
   assert.match(uiSource, /Sync Health/)
   assert.match(uiSource, /GROWTH_INBOX_SYNC_THREAD_CONTINUITY_QA_MARKER/)
   assert.match(uiSource, /GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER/)
+  assert.match(uiSource, /GrowthInboxTeamQueuePanel/)
 
   const navSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts"),

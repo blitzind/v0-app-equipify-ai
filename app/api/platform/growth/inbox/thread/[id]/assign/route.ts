@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
-import { assignThreadOwner } from "@/lib/growth/inbox/thread-repository"
+import { assignInboxThreadToUser } from "@/lib/growth/inbox-team-ownership/inbox-thread-ownership-repository"
+import { isGrowthInboxTeamOwnershipSchemaReady } from "@/lib/growth/inbox-team-ownership/inbox-team-ownership-schema-health"
 import { isGrowthUnifiedInboxSchemaReady } from "@/lib/growth/inbox/inbox-schema-health"
 
 export const runtime = "nodejs"
@@ -26,9 +27,22 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params
+  const ownerUserId = parsed.data.ownerUserId ?? access.userId
+
   try {
+    if (await isGrowthInboxTeamOwnershipSchemaReady(access.admin)) {
+      const thread = await assignInboxThreadToUser(access.admin, id, {
+        ownerUserId,
+        assignmentSource: "manual",
+        actorUserId: access.userId,
+        actorEmail: access.userEmail,
+      })
+      return NextResponse.json({ ok: true, thread })
+    }
+
+    const { assignThreadOwner } = await import("@/lib/growth/inbox/thread-repository")
     const thread = await assignThreadOwner(access.admin, id, {
-      owner_user_id: parsed.data.ownerUserId ?? access.userId,
+      owner_user_id: ownerUserId,
       actorUserId: access.userId,
       actorEmail: access.userEmail,
     })

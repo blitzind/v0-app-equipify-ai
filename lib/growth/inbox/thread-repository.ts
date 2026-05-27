@@ -19,7 +19,7 @@ import type {
   GrowthReplyIntelligenceEvent,
   GrowthReplyIntelligenceSummary,
 } from "@/lib/growth/inbox/inbox-types"
-import { formatLeadLabel } from "@/lib/growth/sequences/sequence-enrollment"
+import { computeInboxThreadSlaDueAt } from "@/lib/growth/inbox-team-ownership/inbox-sla-tracker"
 
 type Row = Record<string, unknown>
 
@@ -115,6 +115,11 @@ async function mapThread(admin: SupabaseClient, row: Row, ownerLabels?: Map<stri
     last_message_at: asString(row.last_message_at) || null,
     owner_user_id: ownerUserId,
     owner_label: ownerLabel,
+    assigned_at: asString(row.assigned_at) || null,
+    assigned_by: asString(row.assigned_by) || null,
+    assignment_source: asString(row.assignment_source) || null,
+    sla_due_at: asString(row.sla_due_at) || null,
+    handoff_note: asString(row.handoff_note) || null,
     priority_score: asNumber(row.priority_score, 0),
     priority_tier: asString(row.priority_tier) as GrowthInboxThread["priority_tier"],
     classification: asString(row.classification) as GrowthInboxThread["classification"],
@@ -165,6 +170,7 @@ async function recomputeThreadIntelligence(
 
   const now = new Date().toISOString()
   const replyIncrement = input.isInbound ? 1 : 0
+  const slaDueAt = input.isInbound ? computeInboxThreadSlaDueAt(now, priorityTier) : previous.sla_due_at ?? null
 
   const { data, error } = await threadsTable(admin)
     .update({
@@ -176,6 +182,7 @@ async function recomputeThreadIntelligence(
       requires_human_review: health.requires_human_review,
       reply_count: previous.reply_count + replyIncrement,
       last_message_at: now,
+      sla_due_at: slaDueAt,
       updated_at: now,
     })
     .eq("id", threadId)
