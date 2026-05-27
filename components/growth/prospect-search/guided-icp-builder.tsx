@@ -3,6 +3,7 @@
 import { FilterGroupCard } from "@/components/growth/prospect-search/filter-group-card"
 import { RecommendedFilters } from "@/components/growth/prospect-search/recommended-filters"
 import { SmartFilterInput } from "@/components/growth/prospect-search/smart-filter-input"
+import { TitleTargetingCard } from "@/components/growth/prospect-search/title-targeting-card"
 import {
   PROSPECT_SEARCH_EMPLOYEE_BANDS_UI,
   PROSPECT_SEARCH_INTENT_PRESETS,
@@ -181,27 +182,8 @@ export function GuidedIcpBuilder({
           </div>
         </FilterGroupCard>
 
-        <FilterGroupCard title="Title targeting" description="Decision maker roles">
-          <SmartFilterInput
-            label="Title contains"
-            field="role"
-            value={filters.title_contains ?? filters.decision_maker_role ?? ""}
-            onChange={(v) =>
-              onChange({
-                ...filters,
-                title_contains: v || null,
-                decision_maker_role: v || null,
-              })
-            }
-            placeholder="e.g. Owner, Service Director"
-          />
-          <RecommendedFilters
-            field="role"
-            query={filters.title_contains ?? ""}
-            onPick={(v) =>
-              onChange({ ...filters, title_contains: v, decision_maker_role: v })
-            }
-          />
+        <FilterGroupCard title="Title targeting" description="Decision maker roles & titles">
+          <TitleTargetingCard filters={filters} onChange={onChange} />
         </FilterGroupCard>
       </div>
     </div>

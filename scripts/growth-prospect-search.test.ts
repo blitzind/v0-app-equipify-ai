@@ -7,6 +7,7 @@ import fs from "node:fs"
 import path from "node:path"
 import {
   applyProspectSearchFilters,
+  filterProspectPeopleByTitle,
   inferEmployeeSizeBand,
   normalizeProspectSearchFilters,
 } from "../lib/growth/prospect-search/prospect-search-filters"
@@ -26,6 +27,15 @@ import {
   GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS,
   GROWTH_PROSPECT_SEARCH_SOURCE_TYPES,
 } from "../lib/growth/prospect-search/prospect-search-types"
+import {
+  GROWTH_TITLE_TARGETING_SMART_QA_MARKER,
+  getIndustryTitleRecommendations,
+} from "../lib/growth/prospect-search/title-industry-mapping"
+import {
+  parseTitleChips,
+  serializeTitleChips,
+  suggestTitles,
+} from "../lib/growth/prospect-search/title-suggestion-engine"
 
 async function main(): Promise<void> {
   assert.equal(GROWTH_PROSPECT_SEARCH_QA_MARKER, "growth-prospect-search-v1")
@@ -187,6 +197,59 @@ async function main(): Promise<void> {
   const apollo = createFutureApolloProspectSearchProvider()
   assert.equal(apollo.query({ query: "x", filters: {} }).status, "skipped")
   assert.equal(GROWTH_PROSPECT_SEARCH_PROVIDER_QA_MARKER, "growth-prospect-search-provider-v1")
+
+  assert.equal(GROWTH_TITLE_TARGETING_SMART_QA_MARKER, "growth-title-targeting-smart-v1")
+
+  const icpSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/guided-icp-builder.tsx"),
+    "utf8",
+  )
+  assert.match(icpSource, /TitleTargetingCard/)
+  assert.match(icpSource, /GROWTH_TITLE_TARGETING_SMART_QA_MARKER|title-targeting-card/)
+
+  const titleCardSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/title-targeting-card.tsx"),
+    "utf8",
+  )
+  assert.match(titleCardSource, /GROWTH_TITLE_TARGETING_SMART_QA_MARKER/)
+  assert.match(titleCardSource, /data-qa-marker/)
+
+  const medRecs = getIndustryTitleRecommendations("Medical Equipment Service", 10)
+  assert.ok(medRecs.includes("Biomedical Manager"))
+  assert.ok(medRecs.includes("HTM Director"))
+  assert.ok(medRecs.includes("Field Service Manager"))
+
+  const operSuggest = suggestTitles({ query: "oper", limit: 10 }).map((r) => r.title)
+  assert.ok(operSuggest.includes("Operations Manager"))
+  assert.ok(operSuggest.includes("Director of Operations"))
+  assert.ok(operSuggest.includes("Operations Director"))
+
+  const bioSuggest = suggestTitles({ query: "bio", limit: 10 }).map((r) => r.title)
+  assert.ok(bioSuggest.includes("Biomedical Manager"))
+  assert.ok(bioSuggest.includes("Biomedical Engineer"))
+
+  assert.deepEqual(parseTitleChips("Owner|CEO|Director of Operations"), [
+    "Owner",
+    "CEO",
+    "Director of Operations",
+  ])
+  assert.equal(
+    serializeTitleChips(["Owner", "CEO"]).title_contains,
+    "Owner|CEO",
+  )
+
+  const titleFiltered = filterProspectPeopleByTitle(
+    [
+      { title: "CEO", role: "Executive" },
+      { title: "Engineer", role: "Staff" },
+      { title: "Director of Operations", role: "Operations" },
+    ],
+    "Owner|CEO|Director of Operations",
+    "Owner|CEO|Director of Operations",
+  )
+  assert.equal(titleFiltered.length, 2)
+  assert.ok(titleFiltered.some((p) => p.title === "CEO"))
+  assert.ok(titleFiltered.some((p) => p.title === "Director of Operations"))
 
   console.log("growth-prospect-search: all checks passed")
 }

@@ -192,17 +192,33 @@ export function applyProspectSearchFilters(
   })
 }
 
+function matchTitleToken(blob: string, token: string): boolean {
+  if (!token.trim()) return true
+  return includesFold(blob, token.trim())
+}
+
+function matchTitleFilter(blob: string, raw: string | null | undefined): boolean {
+  const value = asString(raw)
+  if (!value) return true
+  if (value.includes("|")) {
+    return value
+      .split("|")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .some((token) => matchTitleToken(blob, token))
+  }
+  return matchTitleToken(blob, value)
+}
+
 export function filterProspectPeopleByTitle<T extends { title: string | null; role: string | null }>(
   people: T[],
   titleContains: string | null | undefined,
   role: string | null | undefined,
 ): T[] {
   return people.filter((p) => {
-    if (titleContains) {
-      const blob = `${p.title ?? ""} ${p.role ?? ""}`
-      if (!includesFold(blob, titleContains)) return false
-    }
-    if (role && !includesFold(p.role ?? p.title, role)) return false
+    const blob = `${p.title ?? ""} ${p.role ?? ""}`.trim()
+    if (!matchTitleFilter(blob, titleContains)) return false
+    if (role && role !== titleContains && !matchTitleFilter(blob, role)) return false
     return true
   })
 }
