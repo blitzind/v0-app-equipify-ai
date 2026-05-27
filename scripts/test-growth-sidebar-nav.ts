@@ -46,6 +46,10 @@ assert.match(source, /data-qa-marker=\{GROWTH_SIDEBAR_NAV_QA_MARKER\}/)
 assert.match(source, /aria-expanded=\{!groupCollapsed\}/)
 assert.match(source, /TooltipContent side="right"/)
 assert.match(source, /resolveNavBadge/)
+assert.match(source, /safeMatchGrowthNavItem/)
+assert.match(source, /normalizeGrowthPathname/)
+assert.match(source, /GrowthSidebarNavErrorBoundary/)
+assert.match(source, /futurePlaceholder/)
 
 const coreGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "core")
 assert.ok(coreGroup?.items.some((i) => i.label === "Revenue Inbox"))
@@ -108,6 +112,8 @@ assert.match(consoleSource, /pendingApproval/)
 assert.match(consoleSource, /activeSequences/)
 assert.match(consoleSource, /criticalSignals/)
 assert.match(consoleSource, /systemHealthLabel/)
+assert.match(consoleSource, /degraded/)
+assert.match(consoleSource, /GrowthSidebarConsole failed/)
 
 const layoutSource = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-section-layout.tsx"),

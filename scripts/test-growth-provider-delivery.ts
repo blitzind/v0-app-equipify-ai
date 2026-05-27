@@ -221,10 +221,10 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(uiSource, /Provider Health/)
-  assert.match(uiSource, /Route Simulator/)
-  assert.match(uiSource, /Coming Soon/)
+  assert.match(uiSource, /Transport Health/)
+  assert.match(uiSource, /Transport Simulator/)
   assert.match(uiSource, /GROWTH_PROVIDER_DELIVERY_FOUNDATION_QA_MARKER/)
-  assert.doesNotMatch(uiSource, /provider_id|sender_account_id/)
+  assert.doesNotMatch(uiSource, /encrypted_access_token|smtp_password|apiKey/)
 
   const navSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts"),

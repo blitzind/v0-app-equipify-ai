@@ -7,17 +7,20 @@ export type GrowthSidebarPreviewLine = {
   value: number | string
 }
 
+export type GrowthSidebarConsoleHealth = {
+  openInbox: number
+  pendingApproval: number
+  activeSequences: number
+  criticalSignals: number
+  systemHealthLabel: string
+}
+
 export type GrowthSidebarConsoleState = {
   loading: boolean
+  degraded: boolean
   badges: Partial<Record<GrowthSidebarConsoleKey, number>>
   previews: Partial<Record<GrowthSidebarConsoleKey, GrowthSidebarPreviewLine[]>>
-  health: {
-    openInbox: number
-    pendingApproval: number
-    activeSequences: number
-    criticalSignals: number
-    systemHealthLabel: string
-  }
+  health: GrowthSidebarConsoleHealth
 }
 
 export type GrowthSidebarConsoleKey =
@@ -47,17 +50,26 @@ export type GrowthSidebarConsoleKey =
   | "sequences"
   | "sequence_execution"
 
+const DEFAULT_HEALTH: GrowthSidebarConsoleHealth = {
+  openInbox: 0,
+  pendingApproval: 0,
+  activeSequences: 0,
+  criticalSignals: 0,
+  systemHealthLabel: "Healthy",
+}
+
 const EMPTY_STATE: GrowthSidebarConsoleState = {
   loading: true,
+  degraded: false,
   badges: {},
   previews: {},
-  health: {
-    openInbox: 0,
-    pendingApproval: 0,
-    activeSequences: 0,
-    criticalSignals: 0,
-    systemHealthLabel: "Healthy",
-  },
+  health: DEFAULT_HEALTH,
+}
+
+function logGrowthSidebarDev(event: string): void {
+  if (process.env.NODE_ENV === "development") {
+    console.warn(`[GrowthSidebar] ${event}`)
+  }
 }
 
 function capacityHealthLabel(tierCounts: {
@@ -95,244 +107,261 @@ async function fetchJson<T>(url: string): Promise<T | null> {
   }
 }
 
+function safeLength(value: unknown): number {
+  return Array.isArray(value) ? value.length : 0
+}
+
 export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
   const [state, setState] = useState<GrowthSidebarConsoleState>(EMPTY_STATE)
 
   const load = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true }))
-    const [
-      commandRes,
-      leadInboxRes,
-      callQueueRes,
-      copilotRes,
-      outreachApprovalRes,
-      intentPixelRes,
-      revenueRes,
-      executiveRes,
-      capacityRes,
-      playbooksRes,
-      callsRes,
-      callsLiveRes,
-      liveCoachingRes,
-      engagementRes,
-      relationshipsRes,
-      opportunitiesRes,
-      unifiedInboxRes,
-      sequencesRes,
-    ] = await Promise.all([
-      fetchJson<{ ok?: boolean; dashboard?: { missionControl?: { criticalActions?: number } } }>(
-        "/api/platform/growth/command/dashboard",
-      ),
-      fetchJson<{
-        ok?: boolean
-        total?: number
-        sections?: Array<{ id: string; items: unknown[] }>
-      }>("/api/platform/growth/lead-inbox"),
-      fetchJson<{ ok?: boolean; rows?: unknown[] }>(
-        "/api/platform/growth/call-queue?filter=call_ready&limit=100",
-      ),
-      fetchJson<{ ok?: boolean; dashboard?: { approvalQueue?: unknown[] } }>(
-        "/api/platform/growth/copilot/dashboard",
-      ),
-      fetchJson<{ ok?: boolean; sections?: { pendingApproval?: unknown[] } }>(
-        "/api/platform/growth/outreach/approval-dashboard",
-      ),
-      fetchJson<{
-        ok?: boolean
-        snapshot?: {
-          live_visitors?: unknown[]
-          high_intent_queue?: unknown[]
-        }
-      }>("/api/platform/growth/intent-pixel/monitor?site_key=equipify-sandbox"),
-      fetchJson<{
-        ok?: boolean
-        dashboard?: {
-          tierCounts?: Record<string, number>
-          trajectoryCounts?: Record<string, number>
-          revenueRegressionWatch?: unknown[]
-          highAttention?: unknown[]
-        }
-      }>("/api/platform/growth/revenue/dashboard"),
-      fetchJson<{
-        ok?: boolean
-        dashboard?: {
-          tierCounts?: Record<string, number>
-          executiveNow?: unknown[]
-          revenueRisk?: unknown[]
-          leadershipBottlenecks?: unknown[]
-        }
-      }>("/api/platform/growth/executive/dashboard"),
-      fetchJson<{
-        ok?: boolean
-        dashboard?: {
-          tierCounts?: Record<string, number>
-          operationalRisk?: unknown[]
-          capacityAtRisk?: unknown[]
-        }
-      }>("/api/platform/growth/capacity/dashboard"),
-      fetchJson<{ ok?: boolean; draftRules?: unknown[] }>("/api/platform/growth/copilot/playbooks"),
-      fetchJson<{ ok?: boolean; dashboard?: { stats?: { activeCount?: number; highRiskActive?: number } } }>(
-        "/api/platform/growth/calls/dashboard",
-      ),
-      fetchJson<{ ok?: boolean; dashboard?: { stats?: { liveCount?: number } } }>(
-        "/api/platform/growth/calls/live/dashboard",
-      ),
-      fetchJson<{ ok?: boolean; dashboard?: { stats?: { activeGuidanceEvents?: number } } }>(
-        "/api/platform/growth/calls/live-coaching/dashboard",
-      ),
-      fetchJson<{
-        ok?: boolean
-        dashboard?: {
-          hotLeads?: unknown[]
-          engagedLeads?: unknown[]
-          needsAttention?: unknown[]
-        }
-      }>("/api/platform/growth/engagement/dashboard"),
-      fetchJson<{
-        ok?: boolean
-        dashboard?: {
-          trustedRelationships?: unknown[]
-          strategicRelationships?: unknown[]
-          relationshipCooling?: unknown[]
-        }
-      }>("/api/platform/growth/relationships/dashboard"),
-      fetchJson<{
-        ok?: boolean
-        dashboard?: {
-          priorityOpportunities?: unknown[]
-          salesReady?: unknown[]
-          blockedOpportunities?: unknown[]
-        }
-      }>("/api/platform/growth/opportunities/dashboard"),
-      fetchJson<{
-        ok?: boolean
-        dashboard?: { open_count?: number; critical_priority_count?: number; needs_review_count?: number }
-      }>("/api/platform/growth/inbox/dashboard"),
-      fetchJson<{
-        ok?: boolean
-        dashboard?: { active_count?: number }
-      }>("/api/platform/growth/sequences/dashboard"),
-    ])
+    setState((prev) => ({ ...prev, loading: true, degraded: false }))
 
-    const inboxTotal = leadInboxRes?.total ?? 0
-    const highPrioritySection = leadInboxRes?.sections?.find((s) => s.id === "high_priority")
-    const highPriorityCount = highPrioritySection?.items.length ?? 0
-    const commandCritical = commandRes?.dashboard?.missionControl?.criticalActions ?? 0
-    const callQueueCount = callQueueRes?.rows?.length ?? 0
-    const approvalQueueCount = copilotRes?.dashboard?.approvalQueue?.length ?? 0
-    const outreachPendingCount = outreachApprovalRes?.sections?.pendingApproval?.length ?? 0
-    const intentHighIntentCount = intentPixelRes?.snapshot?.high_intent_queue?.length ?? 0
-    const intentLiveCount = intentPixelRes?.snapshot?.live_visitors?.length ?? 0
-    const intentPixelBadge =
-      intentHighIntentCount > 0 ? intentHighIntentCount : intentLiveCount > 0 ? intentLiveCount : undefined
-    const revenue = revenueRes?.dashboard
-    const executive = executiveRes?.dashboard
-    const capacity = capacityRes?.dashboard
-    const playbooksDraftCount = playbooksRes?.draftRules?.length ?? 0
-    const calls = callsRes?.dashboard
-    const callsLiveCount = callsLiveRes?.dashboard?.stats?.liveCount ?? 0
-    const liveCoachingActive = liveCoachingRes?.dashboard?.stats?.activeGuidanceEvents ?? 0
-    const engagement = engagementRes?.dashboard
-    const relationships = relationshipsRes?.dashboard
-    const opportunities = opportunitiesRes?.dashboard
+    try {
+      const [
+        commandRes,
+        leadInboxRes,
+        callQueueRes,
+        copilotRes,
+        outreachApprovalRes,
+        intentPixelRes,
+        revenueRes,
+        executiveRes,
+        capacityRes,
+        playbooksRes,
+        callsRes,
+        callsLiveRes,
+        liveCoachingRes,
+        engagementRes,
+        relationshipsRes,
+        opportunitiesRes,
+        unifiedInboxRes,
+        sequencesRes,
+      ] = await Promise.all([
+        fetchJson<{ ok?: boolean; dashboard?: { missionControl?: { criticalActions?: number } } }>(
+          "/api/platform/growth/command/dashboard",
+        ),
+        fetchJson<{
+          ok?: boolean
+          total?: number
+          sections?: Array<{ id: string; items?: unknown[] }>
+        }>("/api/platform/growth/lead-inbox"),
+        fetchJson<{ ok?: boolean; rows?: unknown[] }>(
+          "/api/platform/growth/call-queue?filter=call_ready&limit=100",
+        ),
+        fetchJson<{ ok?: boolean; dashboard?: { approvalQueue?: unknown[] } }>(
+          "/api/platform/growth/copilot/dashboard",
+        ),
+        fetchJson<{ ok?: boolean; sections?: { pendingApproval?: unknown[] } }>(
+          "/api/platform/growth/outreach/approval-dashboard",
+        ),
+        fetchJson<{
+          ok?: boolean
+          snapshot?: {
+            live_visitors?: unknown[]
+            high_intent_queue?: unknown[]
+          }
+        }>("/api/platform/growth/intent-pixel/monitor?site_key=equipify-sandbox"),
+        fetchJson<{
+          ok?: boolean
+          dashboard?: {
+            tierCounts?: Record<string, number>
+            trajectoryCounts?: Record<string, number>
+            revenueRegressionWatch?: unknown[]
+            highAttention?: unknown[]
+          }
+        }>("/api/platform/growth/revenue/dashboard"),
+        fetchJson<{
+          ok?: boolean
+          dashboard?: {
+            tierCounts?: Record<string, number>
+            executiveNow?: unknown[]
+            revenueRisk?: unknown[]
+            leadershipBottlenecks?: unknown[]
+          }
+        }>("/api/platform/growth/executive/dashboard"),
+        fetchJson<{
+          ok?: boolean
+          dashboard?: {
+            tierCounts?: Record<string, number>
+            operationalRisk?: unknown[]
+            capacityAtRisk?: unknown[]
+          }
+        }>("/api/platform/growth/capacity/dashboard"),
+        fetchJson<{ ok?: boolean; draftRules?: unknown[] }>("/api/platform/growth/copilot/playbooks"),
+        fetchJson<{ ok?: boolean; dashboard?: { stats?: { activeCount?: number; highRiskActive?: number } } }>(
+          "/api/platform/growth/calls/dashboard",
+        ),
+        fetchJson<{ ok?: boolean; dashboard?: { stats?: { liveCount?: number } } }>(
+          "/api/platform/growth/calls/live/dashboard",
+        ),
+        fetchJson<{ ok?: boolean; dashboard?: { stats?: { activeGuidanceEvents?: number } } }>(
+          "/api/platform/growth/calls/live-coaching/dashboard",
+        ),
+        fetchJson<{
+          ok?: boolean
+          dashboard?: {
+            hotLeads?: unknown[]
+            engagedLeads?: unknown[]
+            needsAttention?: unknown[]
+          }
+        }>("/api/platform/growth/engagement/dashboard"),
+        fetchJson<{
+          ok?: boolean
+          dashboard?: {
+            trustedRelationships?: unknown[]
+            strategicRelationships?: unknown[]
+            relationshipCooling?: unknown[]
+          }
+        }>("/api/platform/growth/relationships/dashboard"),
+        fetchJson<{
+          ok?: boolean
+          dashboard?: {
+            priorityOpportunities?: unknown[]
+            salesReady?: unknown[]
+            blockedOpportunities?: unknown[]
+          }
+        }>("/api/platform/growth/opportunities/dashboard"),
+        fetchJson<{
+          ok?: boolean
+          dashboard?: { open_count?: number; critical_priority_count?: number; needs_review_count?: number }
+        }>("/api/platform/growth/inbox/dashboard"),
+        fetchJson<{
+          ok?: boolean
+          dashboard?: { active_count?: number }
+        }>("/api/platform/growth/sequences/dashboard"),
+      ])
 
-    const revenueTier = revenue?.tierCounts ?? {}
-    const revenueTrajectory = revenue?.trajectoryCounts ?? {}
-    const executiveTier = executive?.tierCounts ?? {}
-    const capacityTier = capacity?.tierCounts ?? {}
+      const inboxTotal = leadInboxRes?.total ?? 0
+      const highPrioritySection = leadInboxRes?.sections?.find((s) => s.id === "high_priority")
+      const highPriorityCount = safeLength(highPrioritySection?.items)
+      const commandCritical = commandRes?.dashboard?.missionControl?.criticalActions ?? 0
+      const callQueueCount = safeLength(callQueueRes?.rows)
+      const approvalQueueCount = safeLength(copilotRes?.dashboard?.approvalQueue)
+      const outreachPendingCount = safeLength(outreachApprovalRes?.sections?.pendingApproval)
+      const intentHighIntentCount = safeLength(intentPixelRes?.snapshot?.high_intent_queue)
+      const intentLiveCount = safeLength(intentPixelRes?.snapshot?.live_visitors)
+      const intentPixelBadge =
+        intentHighIntentCount > 0 ? intentHighIntentCount : intentLiveCount > 0 ? intentLiveCount : undefined
+      const revenue = revenueRes?.dashboard
+      const executive = executiveRes?.dashboard
+      const capacity = capacityRes?.dashboard
+      const playbooksDraftCount = safeLength(playbooksRes?.draftRules)
+      const calls = callsRes?.dashboard
+      const callsLiveCount = callsLiveRes?.dashboard?.stats?.liveCount ?? 0
+      const liveCoachingActive = liveCoachingRes?.dashboard?.stats?.activeGuidanceEvents ?? 0
+      const engagement = engagementRes?.dashboard
+      const relationships = relationshipsRes?.dashboard
+      const opportunities = opportunitiesRes?.dashboard
 
-    const revenueAttention =
-      (revenueTier.forecasted ?? 0) + (revenueTier.commit_candidate ?? 0)
-    const regressionCount =
-      (revenueTrajectory.at_risk ?? 0) + (revenueTrajectory.slowing ?? 0)
+      const revenueTier = revenue?.tierCounts ?? {}
+      const revenueTrajectory = revenue?.trajectoryCounts ?? {}
+      const executiveTier = executive?.tierCounts ?? {}
+      const capacityTier = capacity?.tierCounts ?? {}
 
-    const unifiedInbox = unifiedInboxRes?.dashboard
-    const openInboxCount = unifiedInbox?.open_count ?? 0
-    const inboxCriticalCount = unifiedInbox?.critical_priority_count ?? 0
-    const activeSequencesCount = sequencesRes?.dashboard?.active_count ?? 0
-    const criticalSignalsCount = commandCritical + intentHighIntentCount + inboxCriticalCount
+      const revenueAttention =
+        (revenueTier.forecasted ?? 0) + (revenueTier.commit_candidate ?? 0)
+      const regressionCount =
+        (revenueTrajectory.at_risk ?? 0) + (revenueTrajectory.slowing ?? 0)
 
-    setState({
-      loading: false,
-      badges: {
-        command: commandCritical > 0 ? commandCritical : undefined,
-        inbox: inboxTotal > 0 ? inboxTotal : undefined,
-        inbox_high_priority: highPriorityCount > 0 ? highPriorityCount : undefined,
-        intent_pixel: intentPixelBadge,
-        callQueue: callQueueCount > 0 ? callQueueCount : undefined,
-        copilot: approvalQueueCount > 0 ? approvalQueueCount : undefined,
-        outreach_approval: outreachPendingCount > 0 ? outreachPendingCount : undefined,
-        revenue: revenueAttention > 0 ? revenueAttention : undefined,
-        executive: executiveTier.executive_now ?? undefined,
-        playbooks: playbooksDraftCount > 0 ? playbooksDraftCount : undefined,
-        calls: calls?.stats?.activeCount ? calls.stats.activeCount : undefined,
-        calls_live: callsLiveCount > 0 ? callsLiveCount : undefined,
-        calls_live_coaching: liveCoachingActive > 0 ? liveCoachingActive : undefined,
-        engagement: engagement?.hotLeads?.length ?? undefined,
-        opportunities: opportunities?.priorityOpportunities?.length ?? undefined,
-        sequences: activeSequencesCount > 0 ? activeSequencesCount : undefined,
-      },
-      previews: {
-        revenue: [
-          { label: "Forecasted", value: revenueTier.forecasted ?? 0 },
-          { label: "Commit", value: revenueTier.commit_candidate ?? 0 },
-          { label: "Regression", value: regressionCount },
-        ],
-        executive: [
-          { label: "Executive now", value: executiveTier.executive_now ?? 0 },
-          { label: "Priority", value: executiveTier.priority ?? 0 },
-          { label: "Revenue risk", value: executive?.revenueRisk?.length ?? 0 },
-        ],
-        engagement: [
-          { label: "Hot", value: engagement?.hotLeads?.length ?? 0 },
-          { label: "Engaged", value: engagement?.engagedLeads?.length ?? 0 },
-          { label: "Needs attention", value: engagement?.needsAttention?.length ?? 0 },
-        ],
-        capacity: [
-          { label: "Healthy", value: capacityTier.healthy ?? 0 },
-          { label: "Strained", value: capacityTier.strained ?? 0 },
-          { label: "At risk", value: capacity?.capacityAtRisk?.length ?? 0 },
-        ],
-        copilot: [{ label: "Approval queue", value: approvalQueueCount }],
-        callQueue: [{ label: "Call ready", value: callQueueCount }],
-        command: [{ label: "Critical actions", value: commandCritical }],
-        inbox: [
-          { label: "Inbox total", value: inboxTotal },
-          { label: "High priority", value: highPriorityCount },
-        ],
-        intent_pixel: [
-          { label: "High intent queue", value: intentHighIntentCount },
-          { label: "Live visitors", value: intentLiveCount },
-        ],
-        outreach_approval: [{ label: "Pending approval", value: outreachPendingCount }],
-        relationships: [
-          { label: "Trusted", value: relationships?.trustedRelationships?.length ?? 0 },
-          { label: "Strategic", value: relationships?.strategicRelationships?.length ?? 0 },
-          { label: "Cooling", value: relationships?.relationshipCooling?.length ?? 0 },
-        ],
-        opportunities: [
-          { label: "Priority", value: opportunities?.priorityOpportunities?.length ?? 0 },
-          { label: "Sales ready", value: opportunities?.salesReady?.length ?? 0 },
-          { label: "Blocked", value: opportunities?.blockedOpportunities?.length ?? 0 },
-        ],
-        playbooks: [{ label: "Draft rules", value: playbooksDraftCount }],
-        calls: [
-          { label: "Active", value: calls?.stats?.activeCount ?? 0 },
-          { label: "High risk", value: calls?.stats?.highRiskActive ?? 0 },
-        ],
-      },
-      health: {
-        openInbox: openInboxCount,
-        pendingApproval: outreachPendingCount,
-        activeSequences: activeSequencesCount,
-        criticalSignals: criticalSignalsCount,
-        systemHealthLabel: systemHealthLabel({
-          capacityTier,
-          commandCritical,
-          outreachPending: outreachPendingCount,
-        }),
-      },
-    })
+      const unifiedInbox = unifiedInboxRes?.dashboard
+      const openInboxCount = unifiedInbox?.open_count ?? 0
+      const inboxCriticalCount = unifiedInbox?.critical_priority_count ?? 0
+      const activeSequencesCount = sequencesRes?.dashboard?.active_count ?? 0
+      const criticalSignalsCount = commandCritical + intentHighIntentCount + inboxCriticalCount
+
+      setState({
+        loading: false,
+        degraded: false,
+        badges: {
+          command: commandCritical > 0 ? commandCritical : undefined,
+          inbox: inboxTotal > 0 ? inboxTotal : undefined,
+          inbox_high_priority: highPriorityCount > 0 ? highPriorityCount : undefined,
+          intent_pixel: intentPixelBadge,
+          callQueue: callQueueCount > 0 ? callQueueCount : undefined,
+          copilot: approvalQueueCount > 0 ? approvalQueueCount : undefined,
+          outreach_approval: outreachPendingCount > 0 ? outreachPendingCount : undefined,
+          revenue: revenueAttention > 0 ? revenueAttention : undefined,
+          executive: executiveTier.executive_now ?? undefined,
+          playbooks: playbooksDraftCount > 0 ? playbooksDraftCount : undefined,
+          calls: calls?.stats?.activeCount ? calls.stats.activeCount : undefined,
+          calls_live: callsLiveCount > 0 ? callsLiveCount : undefined,
+          calls_live_coaching: liveCoachingActive > 0 ? liveCoachingActive : undefined,
+          engagement: safeLength(engagement?.hotLeads) || undefined,
+          opportunities: safeLength(opportunities?.priorityOpportunities) || undefined,
+          sequences: activeSequencesCount > 0 ? activeSequencesCount : undefined,
+        },
+        previews: {
+          revenue: [
+            { label: "Forecasted", value: revenueTier.forecasted ?? 0 },
+            { label: "Commit", value: revenueTier.commit_candidate ?? 0 },
+            { label: "Regression", value: regressionCount },
+          ],
+          executive: [
+            { label: "Executive now", value: executiveTier.executive_now ?? 0 },
+            { label: "Priority", value: executiveTier.priority ?? 0 },
+            { label: "Revenue risk", value: safeLength(executive?.revenueRisk) },
+          ],
+          engagement: [
+            { label: "Hot", value: safeLength(engagement?.hotLeads) },
+            { label: "Engaged", value: safeLength(engagement?.engagedLeads) },
+            { label: "Needs attention", value: safeLength(engagement?.needsAttention) },
+          ],
+          capacity: [
+            { label: "Healthy", value: capacityTier.healthy ?? 0 },
+            { label: "Strained", value: capacityTier.strained ?? 0 },
+            { label: "At risk", value: safeLength(capacity?.capacityAtRisk) },
+          ],
+          copilot: [{ label: "Approval queue", value: approvalQueueCount }],
+          callQueue: [{ label: "Call ready", value: callQueueCount }],
+          command: [{ label: "Critical actions", value: commandCritical }],
+          inbox: [
+            { label: "Inbox total", value: inboxTotal },
+            { label: "High priority", value: highPriorityCount },
+          ],
+          intent_pixel: [
+            { label: "High intent queue", value: intentHighIntentCount },
+            { label: "Live visitors", value: intentLiveCount },
+          ],
+          outreach_approval: [{ label: "Pending approval", value: outreachPendingCount }],
+          relationships: [
+            { label: "Trusted", value: safeLength(relationships?.trustedRelationships) },
+            { label: "Strategic", value: safeLength(relationships?.strategicRelationships) },
+            { label: "Cooling", value: safeLength(relationships?.relationshipCooling) },
+          ],
+          opportunities: [
+            { label: "Priority", value: safeLength(opportunities?.priorityOpportunities) },
+            { label: "Sales ready", value: safeLength(opportunities?.salesReady) },
+            { label: "Blocked", value: safeLength(opportunities?.blockedOpportunities) },
+          ],
+          playbooks: [{ label: "Draft rules", value: playbooksDraftCount }],
+          calls: [
+            { label: "Active", value: calls?.stats?.activeCount ?? 0 },
+            { label: "High risk", value: calls?.stats?.highRiskActive ?? 0 },
+          ],
+        },
+        health: {
+          openInbox: openInboxCount,
+          pendingApproval: outreachPendingCount,
+          activeSequences: activeSequencesCount,
+          criticalSignals: criticalSignalsCount,
+          systemHealthLabel: systemHealthLabel({
+            capacityTier,
+            commandCritical,
+            outreachPending: outreachPendingCount,
+          }),
+        },
+      })
+    } catch {
+      logGrowthSidebarDev("GrowthSidebarConsole failed")
+      setState({
+        loading: false,
+        degraded: true,
+        badges: {},
+        previews: {},
+        health: DEFAULT_HEALTH,
+      })
+    }
   }, [])
 
   useEffect(() => {

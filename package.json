@@ -172,6 +172,7 @@
     "test:growth-warmup": "tsx scripts/test-growth-warmup.ts",
     "test:growth-unified-inbox": "tsx scripts/test-growth-unified-inbox.ts",
     "test:growth-provider-delivery": "tsx scripts/test-growth-provider-delivery.ts",
+    "test:growth-provider-transport": "tsx scripts/test-growth-provider-transport.ts",
     "test:schedule-work-order-flow": "tsx scripts/test-schedule-work-order-flow.ts",
     "test:growth-contact-discovery": "tsx scripts/test-growth-contact-discovery.ts",
     "test:growth-verification-enrichment": "tsx scripts/test-growth-verification-enrichment.ts",

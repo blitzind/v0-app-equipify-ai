@@ -638,14 +638,46 @@ export function growthNavigationShortcutLabel(): string {
   return "Ctrl+K"
 }
 
+/** Coerce pathname for nav matching — usePathname() may be null during hydration. */
+export function normalizeGrowthPathname(pathname: string | null | undefined): string {
+  return typeof pathname === "string" ? pathname : ""
+}
+
+export function safeMatchGrowthNavItem(item: GrowthNavItemDef, pathname: string | null | undefined): boolean {
+  const normalized = normalizeGrowthPathname(pathname)
+  if (!normalized) return false
+  try {
+    return item.match(normalized)
+  } catch {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[GrowthNavigation] GrowthNavigationResolution failed", { id: item.id })
+    }
+    return false
+  }
+}
+
 export function resolveGrowthNavigationEntryFromPathname(
-  pathname: string,
+  pathname: string | null | undefined,
 ): Pick<GrowthCommandPaletteEntry, "id" | "label" | "href"> | null {
-  for (const group of GROWTH_NAV_GROUP_DEFS) {
-    for (const item of group.items) {
-      if (item.match(pathname)) {
-        return { id: item.id, label: item.label, href: pathname.startsWith(item.href) ? pathname : item.href }
+  const normalized = normalizeGrowthPathname(pathname)
+  if (!normalized) return null
+
+  try {
+    for (const group of GROWTH_NAV_GROUP_DEFS) {
+      for (const item of group.items) {
+        if (safeMatchGrowthNavItem(item, normalized)) {
+          const baseHref = item.href.split("?")[0] ?? item.href
+          return {
+            id: item.id,
+            label: item.label,
+            href: normalized.startsWith(baseHref) ? normalized : item.href,
+          }
+        }
       }
+    }
+  } catch {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[GrowthNavigation] GrowthNavigationResolution failed")
     }
   }
   return null

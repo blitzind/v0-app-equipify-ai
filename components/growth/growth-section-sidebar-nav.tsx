@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { Component, useCallback, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from "react"
 import type { LucideIcon } from "lucide-react"
 import {
   Activity,
@@ -20,7 +20,7 @@ import {
   Inbox,
   LayoutDashboard,
   Mail,
-  Map,
+  Map as MapIcon,
   MessageSquare,
   Network,
   Phone,
@@ -54,6 +54,8 @@ import {
   GROWTH_NAV_GROUP_DEFS,
   GROWTH_NAVIGATION_IA_QA_MARKER,
   growthNavigationShortcutLabel,
+  normalizeGrowthPathname,
+  safeMatchGrowthNavItem,
   type GrowthNavItemDef,
 } from "@/lib/growth/navigation/growth-navigation-destinations"
 import { GROWTH_NAVIGATION_POLISH_QA_MARKER } from "@/lib/growth/navigation/growth-navigation-ranking"
@@ -117,13 +119,13 @@ const GROWTH_NAV_ICONS: Record<string, LucideIcon> = {
   "ai-generations": Bot,
   relationships: Users,
   "market-graph": Network,
-  "territory-intelligence": Map,
+  "territory-intelligence": MapIcon,
   "company-signals": Zap,
   "growth-signals": TrendingUp,
   "committee-intelligence": Users,
   "committee-mapping": Users,
   "market-discovery": Search,
-  territories: Map,
+  territories: MapIcon,
   "human-execution": Headphones,
   "growth-settings": Settings,
   "communication-settings": Settings,
@@ -145,15 +147,28 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = GROWTH_NAV_GROUP_DEFS.map((group) =>
 
 function resolveNavBadge(
   item: GrowthNavItem,
-  badges: Partial<Record<GrowthSidebarConsoleKey, number>>,
+  badges: Partial<Record<GrowthSidebarConsoleKey, number>> | null | undefined,
 ): number | undefined {
-  if (item.id === "calls") {
-    const total = (badges.calls ?? 0) + (badges.callQueue ?? 0)
-    return total > 0 ? total : undefined
+  try {
+    if (item.futurePlaceholder) return undefined
+    const safeBadges = badges ?? {}
+    if (item.id === "calls") {
+      const total = (safeBadges.calls ?? 0) + (safeBadges.callQueue ?? 0)
+      return total > 0 ? total : undefined
+    }
+    if (!item.consoleKey) return undefined
+    const count = safeBadges[item.consoleKey]
+    return count && count > 0 ? count : undefined
+  } catch {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[GrowthSidebar] GrowthBadgeResolution failed", { id: item.id })
+    }
+    return undefined
   }
-  if (!item.consoleKey) return undefined
-  const count = badges[item.consoleKey]
-  return count && count > 0 ? count : undefined
+}
+
+function groupHasActiveRoute(group: GrowthNavGroup, pathname: string): boolean {
+  return group.items.some((item) => safeMatchGrowthNavItem(item, pathname))
 }
 
 function readCollapsedGrowthGroups(): Set<string> {
@@ -178,8 +193,12 @@ function writeCollapsedGrowthGroups(set: Set<string>) {
   }
 }
 
-function groupHasActiveRoute(group: GrowthNavGroup, pathname: string): boolean {
-  return group.items.some((item) => item.match(pathname))
+function resolvePreviewLines(
+  item: GrowthNavItem,
+  previews: Partial<Record<GrowthSidebarConsoleKey, GrowthSidebarPreviewLine[]>> | null | undefined,
+): GrowthSidebarPreviewLine[] | undefined {
+  if (item.futurePlaceholder || !item.consoleKey) return undefined
+  return previews?.[item.consoleKey]
 }
 
 function useGrowthSidebarGroupCollapse(pathname: string, groups: GrowthNavGroup[]) {
@@ -285,22 +304,21 @@ function GrowthNavLink({
   badge?: number
   previewLines?: GrowthSidebarPreviewLine[]
 }) {
-  const active = item.match(pathname)
+  const active = safeMatchGrowthNavItem(item, pathname)
   const Icon = item.icon
   const placeholder = item.futurePlaceholder
 
-  const link = (
-    <Link
-      href={item.href}
-      className={cn(
-        "group relative flex min-w-0 items-center gap-2",
-        GROWTH_NAV_ROW_MOTION,
-        compact ? "shrink-0 px-3 py-2" : "px-3 py-2",
-        collapsed && !compact ? "justify-center px-2" : "",
-        placeholder ? "opacity-60" : "",
-        active ? GROWTH_NAV_ROW_ACTIVE : GROWTH_NAV_ROW_INACTIVE,
-      )}
-    >
+  const rowClassName = cn(
+    "group relative flex min-w-0 items-center gap-2",
+    GROWTH_NAV_ROW_MOTION,
+    compact ? "shrink-0 px-3 py-2" : "px-3 py-2",
+    collapsed && !compact ? "justify-center px-2" : "",
+    placeholder ? "cursor-not-allowed opacity-60" : "",
+    active ? GROWTH_NAV_ROW_ACTIVE : GROWTH_NAV_ROW_INACTIVE,
+  )
+
+  const rowContent = (
+    <>
       {active && !collapsed && !compact ? (
         <span
           className={cn("absolute left-0 top-1/2 z-[1] h-5 w-0.5 -translate-y-1/2 rounded-r-full", GROWTH_NAV_ACTIVE_RAIL)}
@@ -334,6 +352,20 @@ function GrowthNavLink({
       {compact && badge ? (
         <NavBadge count={badge} active={active} />
       ) : null}
+    </>
+  )
+
+  if (placeholder) {
+    return (
+      <span className={rowClassName} aria-disabled="true" title="Coming soon">
+        {rowContent}
+      </span>
+    )
+  }
+
+  const link = (
+    <Link href={item.href} className={rowClassName}>
+      {rowContent}
     </Link>
   )
 
@@ -447,7 +479,7 @@ function GrowthNavGroups({
                   collapsed={collapsed}
                   compact={compact}
                   badge={resolveNavBadge(item, badges)}
-                  previewLines={item.consoleKey ? previews[item.consoleKey] : undefined}
+                  previewLines={resolvePreviewLines(item, previews)}
                 />
               ))}
             </div>
@@ -462,21 +494,30 @@ function GrowthSidebarHealthStrip({
   collapsed,
   health,
   loading,
+  degraded,
 }: {
   collapsed: boolean
   health: {
-    openInbox: number
-    pendingApproval: number
-    activeSequences: number
-    criticalSignals: number
-    systemHealthLabel: string
-  }
+    openInbox?: number
+    pendingApproval?: number
+    activeSequences?: number
+    criticalSignals?: number
+    systemHealthLabel?: string
+  } | null
   loading: boolean
+  degraded?: boolean
 }) {
+  const safeHealth = {
+    openInbox: health?.openInbox ?? 0,
+    pendingApproval: health?.pendingApproval ?? 0,
+    activeSequences: health?.activeSequences ?? 0,
+    criticalSignals: health?.criticalSignals ?? 0,
+    systemHealthLabel: health?.systemHealthLabel ?? "Healthy",
+  }
   const systemTone =
-    health.systemHealthLabel === "Healthy"
+    safeHealth.systemHealthLabel === "Healthy"
       ? "text-emerald-700"
-      : health.systemHealthLabel === "Monitor"
+      : safeHealth.systemHealthLabel === "Monitor"
         ? "text-amber-700"
         : "text-rose-700"
 
@@ -490,11 +531,13 @@ function GrowthSidebarHealthStrip({
         </TooltipTrigger>
         <TooltipContent side="right" className="max-w-44 bg-card text-foreground border shadow-md">
           <p className="mb-1 font-medium">Growth Health</p>
-          <p className="text-[11px]">Open inbox: {loading ? "…" : health.openInbox}</p>
-          <p className="text-[11px]">Pending approval: {loading ? "…" : health.pendingApproval}</p>
-          <p className="text-[11px]">Active sequences: {loading ? "…" : health.activeSequences}</p>
-          <p className="text-[11px]">Critical signals: {loading ? "…" : health.criticalSignals}</p>
-          <p className={cn("text-[11px] font-medium", systemTone)}>System: {loading ? "…" : health.systemHealthLabel}</p>
+          <p className="text-[11px]">Open inbox: {loading ? "…" : safeHealth.openInbox}</p>
+          <p className="text-[11px]">Pending approval: {loading ? "…" : safeHealth.pendingApproval}</p>
+          <p className="text-[11px]">Active sequences: {loading ? "…" : safeHealth.activeSequences}</p>
+          <p className="text-[11px]">Critical signals: {loading ? "…" : safeHealth.criticalSignals}</p>
+          <p className={cn("text-[11px] font-medium", systemTone)}>
+            System: {loading ? "…" : degraded ? "Degraded" : safeHealth.systemHealthLabel}
+          </p>
         </TooltipContent>
       </Tooltip>
     )
@@ -506,23 +549,23 @@ function GrowthSidebarHealthStrip({
       <dl className="mt-2 space-y-1.5 text-xs">
         <div className="flex items-center justify-between gap-2">
           <dt className="text-muted-foreground">Open Inbox</dt>
-          <dd className="font-semibold tabular-nums">{loading ? "…" : health.openInbox}</dd>
+          <dd className="font-semibold tabular-nums">{loading ? "…" : safeHealth.openInbox}</dd>
         </div>
         <div className="flex items-center justify-between gap-2">
           <dt className="text-muted-foreground">Pending Approval</dt>
-          <dd className="font-semibold tabular-nums">{loading ? "…" : health.pendingApproval}</dd>
+          <dd className="font-semibold tabular-nums">{loading ? "…" : safeHealth.pendingApproval}</dd>
         </div>
         <div className="flex items-center justify-between gap-2">
           <dt className="text-muted-foreground">Active Sequences</dt>
-          <dd className="font-semibold tabular-nums">{loading ? "…" : health.activeSequences}</dd>
+          <dd className="font-semibold tabular-nums">{loading ? "…" : safeHealth.activeSequences}</dd>
         </div>
         <div className="flex items-center justify-between gap-2">
           <dt className="text-muted-foreground">Critical Signals</dt>
-          <dd className="font-semibold tabular-nums">{loading ? "…" : health.criticalSignals}</dd>
+          <dd className="font-semibold tabular-nums">{loading ? "…" : safeHealth.criticalSignals}</dd>
         </div>
         <div className="flex items-center justify-between gap-2">
           <dt className="text-muted-foreground">System Health</dt>
-          <dd className={cn("font-semibold", systemTone)}>{loading ? "…" : health.systemHealthLabel}</dd>
+          <dd className={cn("font-semibold", systemTone)}>{loading ? "…" : degraded ? "Degraded" : safeHealth.systemHealthLabel}</dd>
         </div>
       </dl>
     </div>
@@ -580,7 +623,42 @@ function useGrowthSidebarKeyboardShortcuts() {
 }
 
 export function GrowthSectionSidebarNav() {
-  const pathname = usePathname()
+  return (
+    <GrowthSidebarNavErrorBoundary>
+      <GrowthSectionSidebarNavInner />
+    </GrowthSidebarNavErrorBoundary>
+  )
+}
+
+class GrowthSidebarNavErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false }
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true }
+  }
+
+  componentDidCatch(_error: Error, _info: ErrorInfo) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[GrowthSidebar] GrowthSidebarNav render failed")
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <nav aria-label="Growth Engine" className="hidden w-60 shrink-0 lg:block">
+          <div className="sticky top-6 rounded-2xl border border-border bg-card p-3 text-xs text-muted-foreground shadow-sm">
+            Growth navigation unavailable. Refresh to retry.
+          </div>
+        </nav>
+      )
+    }
+    return this.props.children
+  }
+}
+
+function GrowthSectionSidebarNavInner() {
+  const pathname = normalizeGrowthPathname(usePathname())
   const consoleState = useGrowthSidebarConsole()
   const [collapsed, setCollapsed] = useState(false)
   const { collapsedGroups, toggleGroup } = useGrowthSidebarGroupCollapse(pathname, GROWTH_NAV_GROUPS)
@@ -645,7 +723,7 @@ export function GrowthSectionSidebarNav() {
                       pathname={pathname}
                       collapsed
                       badge={resolveNavBadge(item, consoleState.badges)}
-                      previewLines={item.consoleKey ? consoleState.previews[item.consoleKey] : undefined}
+                      previewLines={resolvePreviewLines(item, consoleState.previews)}
                     />
                   ))}
                 </div>
@@ -662,7 +740,12 @@ export function GrowthSectionSidebarNav() {
             />
           )}
 
-          <GrowthSidebarHealthStrip collapsed={collapsed} health={consoleState.health} loading={consoleState.loading} />
+          <GrowthSidebarHealthStrip
+            collapsed={collapsed}
+            health={consoleState.health}
+            loading={consoleState.loading}
+            degraded={consoleState.degraded}
+          />
 
           {!collapsed ? (
             <p className="mt-3 px-2 text-[10px] text-muted-foreground">

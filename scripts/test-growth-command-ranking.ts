@@ -42,7 +42,8 @@ const providerSource = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-navigation-provider.tsx"),
   "utf8",
 )
-assert.match(providerSource, /resolveGrowthNavigationEntryFromPathname/)
+assert.match(providerSource, /normalizeGrowthPathname/)
+assert.match(providerSource, /GrowthNavigationResolution failed/)
 assert.match(providerSource, /recordGrowthNavigationUsage/)
 
 const sidebarSource = fs.readFileSync(

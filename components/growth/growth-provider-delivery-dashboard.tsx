@@ -33,6 +33,18 @@ import type {
   GrowthDeliveryRouteSelection,
 } from "@/lib/growth/providers/provider-types"
 import { GROWTH_PROVIDER_DELIVERY_FOUNDATION_QA_MARKER } from "@/lib/growth/providers/provider-types"
+import type {
+  GrowthDeliveryAttempt,
+  GrowthProviderRateLimitRow,
+  GrowthTransportHealthSnapshot,
+  GrowthTransportSimulationResult,
+} from "@/lib/growth/providers/adapters/provider-adapter-types"
+import {
+  GROWTH_LIVE_PROVIDER_TRANSPORT_QA_MARKER,
+  GROWTH_LIVE_PROVIDER_TRANSPORT_PRIVACY_NOTE,
+} from "@/lib/growth/providers/adapters/provider-adapter-types"
+import { transportHealthLabel } from "@/lib/growth/providers/transport/transport-health"
+import { supportsLiveTransport } from "@/lib/growth/providers/adapters/adapter-registry"
 import type { GrowthSenderAccount } from "@/lib/growth/sender/sender-types"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
@@ -100,6 +112,14 @@ export function GrowthProviderDeliveryDashboardPanel() {
   const [simVolume, setSimVolume] = useState("1")
   const [simProviderState, setSimProviderState] = useState("connected")
   const [simulation, setSimulation] = useState<GrowthDeliveryRouteSelection | null>(null)
+  const [transportSimulation, setTransportSimulation] = useState<GrowthTransportSimulationResult | null>(null)
+  const [attempts, setAttempts] = useState<GrowthDeliveryAttempt[]>([])
+  const [rateLimits, setRateLimits] = useState<Array<GrowthProviderRateLimitRow & { status?: { allowed: boolean; reason: string } }>>([])
+  const [transportHealth, setTransportHealth] = useState<GrowthTransportHealthSnapshot | null>(null)
+  const [testSendOpen, setTestSendOpen] = useState(false)
+  const [testSendTo, setTestSendTo] = useState("")
+  const [testSendConfirmed, setTestSendConfirmed] = useState(false)
+  const [simProviderId, setSimProviderId] = useState("")
   const [deleteTarget, setDeleteTarget] = useState<GrowthDeliveryProvider | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
@@ -112,12 +132,18 @@ export function GrowthProviderDeliveryDashboardPanel() {
     setLoading(true)
     setError(null)
     try {
-      const [listResponse, dashboardResponse] = await Promise.all([
+      const [listResponse, dashboardResponse, attemptsResponse, rateLimitsResponse] = await Promise.all([
         fetch("/api/platform/growth/providers"),
         fetch("/api/platform/growth/providers/dashboard"),
+        fetch("/api/platform/growth/providers/delivery-attempts?limit=20"),
+        fetch("/api/platform/growth/providers/rate-limits"),
       ])
       const listPayload = (await listResponse.json()) as ListPayload
       const dashboardPayload = (await dashboardResponse.json()) as DashboardPayload
+      const attemptsPayload = (await attemptsResponse.json()) as { attempts?: GrowthDeliveryAttempt[] }
+      const rateLimitsPayload = (await rateLimitsResponse.json()) as {
+        rate_limits?: Array<GrowthProviderRateLimitRow & { status?: { allowed: boolean; reason: string } }>
+      }
       if (!listResponse.ok) throw new Error(listPayload.message ?? "Could not load delivery providers.")
       if (!dashboardResponse.ok) throw new Error(dashboardPayload.message ?? "Could not load delivery dashboard.")
 
@@ -127,6 +153,19 @@ export function GrowthProviderDeliveryDashboardPanel() {
       setSenders(dashboardPayload.senders ?? listPayload.senders ?? [])
       setDashboard(dashboardPayload.dashboard ?? null)
       setEvents(dashboardPayload.events ?? [])
+      setAttempts(attemptsPayload.attempts ?? [])
+      setRateLimits(rateLimitsPayload.rate_limits ?? [])
+
+      const connectedCount = mergedProviders.filter((provider) => provider.status === "connected").length
+      setTransportHealth({
+        qa_marker: GROWTH_LIVE_PROVIDER_TRANSPORT_QA_MARKER,
+        queued_count: (attemptsPayload.attempts ?? []).filter((attempt) => attempt.status === "queued").length,
+        sent_count_24h: (attemptsPayload.attempts ?? []).filter((attempt) => attempt.status === "sent").length,
+        failed_count_24h: (attemptsPayload.attempts ?? []).filter((attempt) => attempt.status === "failed").length,
+        retry_scheduled_count: (attemptsPayload.attempts ?? []).filter((attempt) => attempt.status === "retry_scheduled").length,
+        rate_limited_providers: (rateLimitsPayload.rate_limits ?? []).filter((row) => row.status && !row.status.allowed).length,
+        healthy_providers: Math.max(0, connectedCount - (rateLimitsPayload.rate_limits ?? []).filter((row) => row.status && !row.status.allowed).length),
+      })
 
       if (!selectedProviderId && mergedProviders.length > 0) {
         setSelectedProviderId(mergedProviders[0].id)
@@ -219,6 +258,54 @@ export function GrowthProviderDeliveryDashboardPanel() {
     const payload = (await response.json()) as { message?: string; selection?: GrowthDeliveryRouteSelection }
     if (!response.ok) throw new Error(payload.message ?? "Route test failed.")
     setSimulation(payload.selection ?? null)
+
+    const matchedRoute = routes.find(
+      (route) =>
+        route.sender_account_id === simSenderId &&
+        (simProviderId ? route.provider_id === simProviderId : true),
+    )
+    const matchedRateLimit = rateLimits.find((row) => row.provider_id === (matchedRoute?.provider_id ?? ""))
+    const fallbackRoute = routes.find((route) => route.id === payload.selection?.fallback_route_id)
+
+    setTransportSimulation({
+      route: {
+        selected_route_id: payload.selection?.selected_route_id ?? null,
+        selected_provider_name: payload.selection?.selected_provider_name ?? null,
+        fallback_route_id: payload.selection?.fallback_route_id ?? null,
+        fallback_provider_name: payload.selection?.fallback_provider_name ?? null,
+        reason: payload.selection?.reason ?? "",
+      },
+      rate_limit: {
+        allowed: matchedRateLimit?.status?.allowed ?? true,
+        reason: matchedRateLimit?.status?.reason ?? "No rate limit row configured.",
+        minute_remaining: matchedRateLimit ? Math.max(0, matchedRateLimit.minute_cap - matchedRateLimit.current_minute) : 0,
+        hour_remaining: matchedRateLimit ? Math.max(0, matchedRateLimit.hour_cap - matchedRateLimit.current_hour) : 0,
+        day_remaining: matchedRateLimit ? Math.max(0, matchedRateLimit.day_cap - matchedRateLimit.current_day) : 0,
+      },
+      fallback_route: {
+        route_id: fallbackRoute?.id ?? payload.selection?.fallback_route_id ?? null,
+        provider_name: fallbackRoute?.provider_name ?? payload.selection?.fallback_provider_name ?? null,
+      },
+    })
+  }
+
+  async function runLiveSendTest() {
+    if (!testSendConfirmed) throw new Error("Confirm human approval before sending.")
+    if (!simSenderId) throw new Error("Select a sender for the live send test.")
+    const response = await fetch("/api/platform/growth/providers/test-send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        senderAccountId: simSenderId,
+        to: testSendTo.trim(),
+        humanApproved: true,
+        humanApprovalConfirmed: true,
+      }),
+    })
+    const payload = (await response.json()) as { message?: string; ok?: boolean; error?: string }
+    if (!response.ok) throw new Error(payload.message ?? payload.error ?? "Live send test failed.")
+    setTestSendOpen(false)
+    setTestSendConfirmed(false)
   }
 
   if (loading) {
@@ -234,7 +321,8 @@ export function GrowthProviderDeliveryDashboardPanel() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
-          {GROWTH_PROVIDER_DELIVERY_FOUNDATION_QA_MARKER} · Transport abstraction and route simulation only — no live sending or workers.
+          {GROWTH_PROVIDER_DELIVERY_FOUNDATION_QA_MARKER} · {GROWTH_LIVE_PROVIDER_TRANSPORT_QA_MARKER} ·{" "}
+          {GROWTH_LIVE_PROVIDER_TRANSPORT_PRIVACY_NOTE}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
@@ -260,15 +348,82 @@ export function GrowthProviderDeliveryDashboardPanel() {
         </div>
       </GrowthEngineCard>
 
-      <GrowthEngineCard title="Live Delivery Engine">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-border px-4 py-3">
-          <p className="text-sm text-muted-foreground">
-            Outbound delivery workers and provider dispatch are not enabled in this foundation phase.
-          </p>
-          <Button type="button" variant="outline" size="sm" disabled>
-            Live Delivery Engine
-            <GrowthBadge label="Coming Soon" tone="neutral" className="ml-2" />
-          </Button>
+      <GrowthEngineCard title="Transport Health">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <StatTile label="Queued" value={String(transportHealth?.queued_count ?? 0)} />
+          <StatTile label="Sent (recent)" value={String(transportHealth?.sent_count_24h ?? 0)} />
+          <StatTile label="Failed (recent)" value={String(transportHealth?.failed_count_24h ?? 0)} />
+          <StatTile label="Retry scheduled" value={String(transportHealth?.retry_scheduled_count ?? 0)} />
+          <StatTile label="System" value={transportHealth ? transportHealthLabel(transportHealth) : "—"} />
+        </div>
+      </GrowthEngineCard>
+
+      <GrowthEngineCard title="Rate Limits">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-muted-foreground">
+                <th className="px-2 py-2 font-medium">Provider</th>
+                <th className="px-2 py-2 font-medium">Minute</th>
+                <th className="px-2 py-2 font-medium">Hour</th>
+                <th className="px-2 py-2 font-medium">Day</th>
+                <th className="px-2 py-2 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rateLimits.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-2 py-6 text-center text-muted-foreground">
+                    Rate limits initialize on first human-approved send.
+                  </td>
+                </tr>
+              ) : (
+                rateLimits.map((row) => {
+                  const providerName = providers.find((provider) => provider.id === row.provider_id)?.provider_name ?? "Provider"
+                  return (
+                    <tr key={row.id} className="border-b">
+                      <td className="px-2 py-2">{providerName}</td>
+                      <td className="px-2 py-2">
+                        {row.current_minute}/{row.minute_cap}
+                      </td>
+                      <td className="px-2 py-2">
+                        {row.current_hour}/{row.hour_cap}
+                      </td>
+                      <td className="px-2 py-2">
+                        {row.current_day}/{row.day_cap}
+                      </td>
+                      <td className="px-2 py-2">
+                        <GrowthBadge
+                          label={row.status?.allowed ? "Available" : "Limited"}
+                          tone={row.status?.allowed ? "healthy" : "attention"}
+                        />
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </GrowthEngineCard>
+
+      <GrowthEngineCard title="Attempt Queue">
+        <div className="space-y-2">
+          {attempts.slice(0, 8).map((attempt) => (
+            <div key={attempt.id} className="rounded-lg border border-border px-3 py-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <GrowthBadge label={attempt.status} tone={STATUS_TONE[attempt.status === "sent" ? "healthy" : attempt.status === "failed" ? "critical" : "attention"] ?? "neutral"} />
+                <span className="font-medium">{attempt.metadata.subject ? String(attempt.metadata.subject) : "Delivery attempt"}</span>
+                <span className="text-xs text-muted-foreground">{formatDate(attempt.queued_at)}</span>
+              </div>
+              {attempt.failure_reason ? (
+                <p className="mt-1 text-xs text-muted-foreground">{attempt.failure_reason}</p>
+              ) : null}
+            </div>
+          ))}
+          {attempts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No delivery attempts yet. Use Live Send Test with human approval.</p>
+          ) : null}
         </div>
       </GrowthEngineCard>
 
@@ -333,7 +488,9 @@ export function GrowthProviderDeliveryDashboardPanel() {
                 <th className="px-2 py-2 font-medium">Family</th>
                 <th className="px-2 py-2 font-medium">Capabilities</th>
                 <th className="px-2 py-2 font-medium">Health</th>
-                <th className="px-2 py-2 font-medium">Validation</th>
+                <th className="px-2 py-2 font-medium">Connected</th>
+                <th className="px-2 py-2 font-medium">Validated</th>
+                <th className="px-2 py-2 font-medium">Transport</th>
                 <th className="px-2 py-2 font-medium">Daily Capacity</th>
                 <th className="px-2 py-2 font-medium">Status</th>
                 <th className="px-2 py-2 font-medium">Actions</th>
@@ -342,7 +499,7 @@ export function GrowthProviderDeliveryDashboardPanel() {
             <tbody>
               {providers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-2 py-6 text-center text-muted-foreground">
+                  <td colSpan={10} className="px-2 py-6 text-center text-muted-foreground">
                     No delivery providers registered yet.
                   </td>
                 </tr>
@@ -362,7 +519,19 @@ export function GrowthProviderDeliveryDashboardPanel() {
                         tone={STATUS_TONE[providerHealthTier(provider.health_score)] ?? "neutral"}
                       />
                     </td>
+                    <td className="px-2 py-2">
+                      <GrowthBadge
+                        label={provider.status === "connected" || provider.status === "warning" ? "Yes" : "No"}
+                        tone={provider.status === "connected" ? "healthy" : "neutral"}
+                      />
+                    </td>
                     <td className="px-2 py-2">{formatDate(provider.last_validation_at)}</td>
+                    <td className="px-2 py-2">
+                      <GrowthBadge
+                        label={supportsLiveTransport(provider.provider_family) ? providerHealthTier(provider.health_score) : "N/A"}
+                        tone={supportsLiveTransport(provider.provider_family) ? STATUS_TONE[providerHealthTier(provider.health_score)] ?? "neutral" : "neutral"}
+                      />
+                    </td>
                     <td className="px-2 py-2">{provider.max_daily_volume}</td>
                     <td className="px-2 py-2">
                       <GrowthBadge label={providerStatusLabel(provider.status)} tone={STATUS_TONE[provider.status] ?? "neutral"} />
@@ -429,7 +598,7 @@ export function GrowthProviderDeliveryDashboardPanel() {
       </GrowthEngineCard>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <GrowthEngineCard title="Route Simulator">
+        <GrowthEngineCard title="Transport Simulator">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="sim-sender">Sender</Label>
@@ -450,6 +619,22 @@ export function GrowthProviderDeliveryDashboardPanel() {
               <Label htmlFor="sim-volume">Volume</Label>
               <Input id="sim-volume" value={simVolume} onChange={(e) => setSimVolume(e.target.value)} />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="sim-provider">Provider</Label>
+              <Select value={simProviderId || "__auto__"} onValueChange={(value) => setSimProviderId(value === "__auto__" ? "" : value)}>
+                <SelectTrigger id="sim-provider">
+                  <SelectValue placeholder="Auto route" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__auto__">Auto route</SelectItem>
+                  {providers.map((provider) => (
+                    <SelectItem key={provider.id} value={provider.id}>
+                      {provider.provider_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="sim-state">Provider State</Label>
               <Select value={simProviderState} onValueChange={setSimProviderState}>
@@ -465,10 +650,29 @@ export function GrowthProviderDeliveryDashboardPanel() {
               </Select>
             </div>
           </div>
-          <Button type="button" className="mt-4" disabled={!simSenderId || Boolean(actionLoading)} onClick={() => void runAction("route-test", runRouteTest)}>
-            Route Test
-          </Button>
-          {simulation ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button type="button" disabled={!simSenderId || Boolean(actionLoading)} onClick={() => void runAction("route-test", runRouteTest)}>
+              Simulate Transport
+            </Button>
+            <Button type="button" variant="outline" disabled={!simSenderId || Boolean(actionLoading)} onClick={() => setTestSendOpen(true)}>
+              Live Send Test
+            </Button>
+          </div>
+          {transportSimulation ? (
+            <div className="mt-4 space-y-2 rounded-xl border border-border px-4 py-3 text-sm">
+              <p>
+                <span className="font-medium">Route:</span> {transportSimulation.route.selected_provider_name ?? "None"}
+              </p>
+              <p>
+                <span className="font-medium">Rate limit:</span>{" "}
+                {transportSimulation.rate_limit.allowed ? "Available" : "Limited"} — {transportSimulation.rate_limit.reason}
+              </p>
+              <p>
+                <span className="font-medium">Fallback route:</span> {transportSimulation.fallback_route.provider_name ?? "None"}
+              </p>
+              <p className="text-muted-foreground">{transportSimulation.route.reason}</p>
+            </div>
+          ) : simulation ? (
             <div className="mt-4 space-y-2 rounded-xl border border-border px-4 py-3 text-sm">
               <p>
                 <span className="font-medium">Selected route:</span> {simulation.selected_provider_name ?? "None"}
@@ -481,7 +685,7 @@ export function GrowthProviderDeliveryDashboardPanel() {
           ) : null}
         </GrowthEngineCard>
 
-        <GrowthEngineCard title="Delivery Events">
+        <GrowthEngineCard title="Provider Delivery Feed">
           <div className="space-y-2">
             {events.slice(0, 10).map((event) => (
               <div key={event.id} className="rounded-lg border border-border px-3 py-2">
@@ -496,6 +700,43 @@ export function GrowthProviderDeliveryDashboardPanel() {
           </div>
         </GrowthEngineCard>
       </div>
+
+      <AlertDialog open={testSendOpen} onOpenChange={(open) => !open && (setTestSendOpen(false), setTestSendConfirmed(false))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Live Send Test — human approval required</AlertDialogTitle>
+            <AlertDialogDescription>
+              This sends a real message through the selected provider route. Autonomous sending is disabled — you must confirm
+              manually. No secrets are shown in this dialog.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="test-send-to">Recipient email</Label>
+              <Input id="test-send-to" type="email" value={testSendTo} onChange={(e) => setTestSendTo(e.target.value)} placeholder="you@company.com" />
+            </div>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={testSendConfirmed}
+                onChange={(e) => setTestSendConfirmed(e.target.checked)}
+                className="mt-1"
+              />
+              <span>I confirm this human-approved live send test. I understand this is not autonomous outreach.</span>
+            </label>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              disabled={!testSendTo.trim() || !testSendConfirmed || Boolean(actionLoading)}
+              onClick={() => void runAction("test-send", runLiveSendTest)}
+            >
+              Send test message
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>

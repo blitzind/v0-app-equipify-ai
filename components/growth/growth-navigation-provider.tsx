@@ -3,7 +3,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { usePathname } from "next/navigation"
 import { isGrowthNavigationInputTarget } from "@/lib/growth/navigation/growth-navigation-input-guard"
-import { resolveGrowthNavigationEntryFromPathname } from "@/lib/growth/navigation/growth-navigation-destinations"
+import {
+  resolveGrowthNavigationEntryFromPathname,
+  normalizeGrowthPathname,
+} from "@/lib/growth/navigation/growth-navigation-destinations"
 import { recordGrowthNavigationUsage } from "@/lib/growth/navigation/growth-navigation-usage-memory"
 
 type GrowthNavigationContextValue = {
@@ -15,7 +18,7 @@ type GrowthNavigationContextValue = {
 const GrowthNavigationContext = createContext<GrowthNavigationContextValue | null>(null)
 
 export function GrowthNavigationProvider({ children }: { children: ReactNode }) {
-  const pathname = usePathname()
+  const pathname = normalizeGrowthPathname(usePathname())
   const [open, setOpen] = useState(false)
 
   const isGrowthRoute = pathname.startsWith("/admin/growth")
@@ -43,9 +46,15 @@ export function GrowthNavigationProvider({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     if (!pathname.startsWith("/admin/growth")) return
-    const entry = resolveGrowthNavigationEntryFromPathname(pathname)
-    if (!entry) return
-    recordGrowthNavigationUsage(entry)
+    try {
+      const entry = resolveGrowthNavigationEntryFromPathname(pathname)
+      if (!entry) return
+      recordGrowthNavigationUsage(entry)
+    } catch {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[GrowthNavigation] GrowthNavigationResolution failed")
+      }
+    }
   }, [pathname])
 
   const value = useMemo(
