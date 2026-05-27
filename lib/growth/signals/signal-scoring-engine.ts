@@ -30,6 +30,28 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
+function scorePeopleSignalRelevance(draft: GrowthNormalizedSignalDraft): number {
+  if (draft.signal_type !== "job_change" && draft.signal_type !== "promotion") return 0
+
+  let score = 0
+  const metadata = readMetadataRecord(draft)
+  const identityConfidence =
+    typeof metadata.identity_confidence === "number" ? metadata.identity_confidence : 0
+  const department = asLower(draft.category)
+  const seniority = asLower(draft.seniority)
+  const ageDays = Math.max(0, (Date.now() - parseOccurredAtMs(draft.occurred_at)) / (1000 * 60 * 60 * 24))
+
+  if (["director", "vp", "c_suite"].includes(seniority)) score += 6
+  if (ICP_JOB_DEPARTMENTS.has(department)) score += 4
+  if (draft.domain?.trim()) score += 3
+  if (ageDays <= 30) score += 4
+  if (identityConfidence >= 0.9) score += 4
+  else if (identityConfidence >= 0.75) score += 2
+  if (draft.signal_type === "promotion" && seniority === "director") score += 3
+
+  return clamp(score, 0, 15)
+}
+
 function parseOccurredAtMs(occurredAt: string): number {
   const ms = Date.parse(occurredAt)
   return Number.isFinite(ms) ? ms : Date.now()
@@ -151,6 +173,7 @@ export function scoreSignalV1(draft: GrowthNormalizedSignalDraft): GrowthSignalS
   const roleSeniority = scoreRoleSeniority(draft)
   const buyingRelevance = scoreBuyingRelevance(draft)
   const jobHiringRelevance = scoreJobHiringRelevance(draft)
+  const peopleSignalRelevance = scorePeopleSignalRelevance(draft)
   const territoryRelevance = draft.geography?.trim() ? 3 : 0
 
   const signal_score = clamp(
@@ -161,16 +184,20 @@ export function scoreSignalV1(draft: GrowthNormalizedSignalDraft): GrowthSignalS
       roleSeniority +
       buyingRelevance +
       jobHiringRelevance +
+      peopleSignalRelevance +
       territoryRelevance,
     0,
     100,
   )
 
+  const metadata = readMetadataRecord(draft)
+  const identityConfidence =
+    typeof metadata.identity_confidence === "number" ? metadata.identity_confidence : null
+
   const confidence = clamp(
-    0.35 +
-      (evidence / 20) * 0.25 +
-      (companyFit / 10) * 0.2 +
-      (recency / 20) * 0.2,
+    identityConfidence != null
+      ? identityConfidence * 0.85 + (evidence / 20) * 0.15
+      : 0.35 + (evidence / 20) * 0.25 + (companyFit / 10) * 0.2 + (recency / 20) * 0.2,
     0,
     1,
   )
@@ -193,6 +220,7 @@ export function scoreSignalV1(draft: GrowthNormalizedSignalDraft): GrowthSignalS
         role_seniority: roleSeniority,
         buying_relevance: buyingRelevance,
         job_hiring_relevance: jobHiringRelevance,
+        people_signal_relevance: peopleSignalRelevance,
         territory_relevance: territoryRelevance,
       },
     },

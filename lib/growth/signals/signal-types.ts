@@ -213,6 +213,10 @@ export type GrowthSignalListFilters = {
   occurred_to?: string
   organization_id?: string | null
   watchlist_id?: string
+  seniority?: string
+  transition_type?: string
+  identity_confidence_min?: number
+  previous_company_domain?: string
   limit?: number
   offset?: number
 }

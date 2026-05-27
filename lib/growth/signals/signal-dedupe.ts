@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto"
+import { buildPersonSignalDedupeKey } from "@/lib/growth/signals/job-change-signal-normalizer"
 import type {
   GrowthNormalizedSignalDraft,
   GrowthSignalEvidenceDraft,
@@ -84,6 +85,28 @@ export function attachSignalDedupeHash(draft: GrowthNormalizedSignalDraft): stri
       domain: draft.domain,
       company_name: draft.company_name,
     })
+  }
+
+  if (draft.signal_type === "job_change" || draft.signal_type === "promotion") {
+    const meta = draft.metadata ?? {}
+    const personName =
+      typeof meta.person_name === "string"
+        ? meta.person_name
+        : draft.contact_display_label ?? ""
+    const personExternalId =
+      typeof meta.person_external_id === "string" ? meta.person_external_id : null
+    const sourceUrl = draft.evidence[0]?.source_url ?? null
+    const key = buildPersonSignalDedupeKey({
+      person_external_id: personExternalId,
+      person_name: personName,
+      source_url: sourceUrl,
+      new_company_domain: draft.domain,
+      new_company_name: draft.company_name,
+      new_title: draft.title,
+      occurred_at: draft.occurred_at,
+      signal_type: draft.signal_type,
+    })
+    return createHash("sha256").update(key).digest("hex").slice(0, 40)
   }
 
   return buildSignalDedupeHash({

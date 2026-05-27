@@ -1,4 +1,5 @@
 import { createManualImportSignalAdapter } from "@/lib/growth/signals/providers/adapters/manual-import-adapter"
+import { createJobChangeManualSignalAdapter } from "@/lib/growth/signals/providers/adapters/job-change-manual-adapter"
 import { createJobPostingManualSignalAdapter } from "@/lib/growth/signals/providers/adapters/job-posting-adapter"
 import { createNewsManualSignalAdapter } from "@/lib/growth/signals/providers/adapters/news-signal-adapter"
 import type {
@@ -21,6 +22,7 @@ export function listSignalProviders(): GrowthSignalProvider[] {
     createManualImportSignalAdapter(),
     createNewsManualSignalAdapter(),
     createJobPostingManualSignalAdapter(),
+    createJobChangeManualSignalAdapter(),
   ]
 }
 

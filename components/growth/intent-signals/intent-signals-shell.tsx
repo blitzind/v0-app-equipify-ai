@@ -24,6 +24,10 @@ import { NewsTab } from "@/components/growth/intent-signals/tabs/news-tab"
 import { JobsTab } from "@/components/growth/intent-signals/tabs/jobs-tab"
 import { HiresTab } from "@/components/growth/intent-signals/tabs/hires-tab"
 import {
+  JobChangesTab,
+  PromotionsTab,
+} from "@/components/growth/intent-signals/tabs/person-signals-tab"
+import {
   IntentSignalsWatchlistBar,
   type IntentSignalsWatchlistSelection,
 } from "@/components/growth/intent-signals/intent-signals-watchlist-bar"
@@ -82,7 +86,12 @@ export function IntentSignalsShell({
   const [watchlistDrawerOpen, setWatchlistDrawerOpen] = useState(false)
   const [watchlistRefreshToken, setWatchlistRefreshToken] = useState(0)
 
-  const showWatchlists = activeTab === "news" || activeTab === "jobs" || activeTab === "hires"
+  const showWatchlists =
+    activeTab === "news" ||
+    activeTab === "jobs" ||
+    activeTab === "hires" ||
+    activeTab === "job-changes" ||
+    activeTab === "promotions"
 
   return (
     <div
@@ -158,6 +167,10 @@ export function IntentSignalsShell({
           onOpenSetupDrawer={onOpenSetupDrawer}
           watchlistId={watchlistSelection.watchlistId}
         />
+      ) : activeTab === "job-changes" ? (
+        <JobChangesTab watchlistId={watchlistSelection.watchlistId} />
+      ) : activeTab === "promotions" ? (
+        <PromotionsTab watchlistId={watchlistSelection.watchlistId} />
       ) : (
         <IntentSignalsPreviewTab tabId={activeTab} />
       )}

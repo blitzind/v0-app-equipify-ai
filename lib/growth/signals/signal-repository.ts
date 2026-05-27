@@ -16,6 +16,7 @@ import {
   isGrowthSignalFoundationSchemaReady,
 } from "@/lib/growth/signals/signal-schema-health"
 import { stripInternalSignalFields } from "@/lib/growth/signals/signal-api-sanitize"
+import { stripInternalPersonMetadata, readPersonSignalMetadata } from "@/lib/growth/signals/person-signal-metadata"
 import { signalMatchesWatchlistFilters } from "@/lib/growth/signals/signal-trigger-evaluator"
 import { getGrowthSignalWatchlist } from "@/lib/growth/signals/signal-watchlist-repository"
 import {
@@ -53,7 +54,7 @@ function parseMetadata(value: unknown): Record<string, unknown> {
 }
 
 function mapSignalRow(row: Record<string, unknown>): GrowthSignalRow {
-  return stripInternalSignalFields({
+  const mapped = stripInternalSignalFields({
     id: asString(row.id),
     organization_id: asNullableString(row.organization_id),
     signal_type: asString(row.signal_type) as GrowthSignalType,
@@ -87,6 +88,8 @@ function mapSignalRow(row: Record<string, unknown>): GrowthSignalRow {
     updated_at: asString(row.updated_at),
     metadata: parseMetadata(row.metadata),
   })
+  mapped.metadata = stripInternalPersonMetadata(mapped.metadata)
+  return mapped
 }
 
 function mapSourceRow(row: Record<string, unknown>): GrowthSignalSourceRow {
@@ -149,6 +152,27 @@ function applyClientSideSignalFilters(
       const geo = signal.geography?.trim() || ""
       if (!geo.toLowerCase().includes(filters.geography.toLowerCase())) return false
     }
+    if (filters.seniority && signal.seniority?.toLowerCase() !== filters.seniority.toLowerCase()) {
+      return false
+    }
+    const personMeta = readPersonSignalMetadata(signal)
+    if (filters.transition_type && personMeta.transition_type !== filters.transition_type) {
+      return false
+    }
+    if (
+      filters.identity_confidence_min != null &&
+      (personMeta.identity_confidence ?? 0) < filters.identity_confidence_min
+    ) {
+      return false
+    }
+    if (
+      filters.previous_company_domain &&
+      !(personMeta.previous_company_domain ?? "")
+        .toLowerCase()
+        .includes(filters.previous_company_domain.toLowerCase())
+    ) {
+      return false
+    }
     return true
   })
 }
@@ -185,6 +209,12 @@ async function mergeWatchlistFilters(
     hiring_intensity: filters.hiring_intensity ?? wf.hiring_intensity ?? undefined,
     minimum_signal_score: filters.minimum_signal_score ?? wf.minimum_signal_score ?? undefined,
     geography: filters.geography ?? wf.geography ?? undefined,
+    seniority: filters.seniority ?? wf.seniority ?? undefined,
+    transition_type: filters.transition_type ?? wf.transition_type ?? undefined,
+    identity_confidence_min:
+      filters.identity_confidence_min ?? wf.identity_confidence_min ?? undefined,
+    previous_company_domain:
+      filters.previous_company_domain ?? wf.previous_company_domain ?? undefined,
     occurred_from: filters.occurred_from ?? wf.occurred_from ?? undefined,
     occurred_to: filters.occurred_to ?? wf.occurred_to ?? undefined,
   }
@@ -237,6 +267,10 @@ export async function loadGrowthSignals(
     effectiveFilters.department != null ||
     effectiveFilters.hiring_intensity != null ||
     effectiveFilters.geography != null ||
+    effectiveFilters.seniority != null ||
+    effectiveFilters.transition_type != null ||
+    effectiveFilters.identity_confidence_min != null ||
+    effectiveFilters.previous_company_domain != null ||
     Boolean(effectiveFilters.watchlist_id)
 
   let query = admin
@@ -264,6 +298,7 @@ export async function loadGrowthSignals(
   if (effectiveFilters.occurred_from) query = query.gte("occurred_at", effectiveFilters.occurred_from)
   if (effectiveFilters.occurred_to) query = query.lte("occurred_at", effectiveFilters.occurred_to)
   if (effectiveFilters.category) query = query.eq("category", effectiveFilters.category)
+  if (effectiveFilters.seniority) query = query.eq("seniority", effectiveFilters.seniority)
 
   if (effectiveFilters.publisher) {
     const { data: sourceMatches, error: sourceError } = await admin

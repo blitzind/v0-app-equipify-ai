@@ -22,6 +22,8 @@ const SIGNAL_STYLES: Record<string, string> = {
   News: "bg-blue-50 text-blue-900 border-blue-200",
   Hiring: "bg-lime-50 text-lime-900 border-lime-200",
   Jobs: "bg-orange-50 text-orange-900 border-orange-200",
+  "Job Change": "bg-purple-50 text-purple-900 border-purple-200",
+  Promotion: "bg-pink-50 text-pink-900 border-pink-200",
 }
 
 function intentSignalsBadges(row: GrowthProspectSearchCompanyResult): string[] {
@@ -34,6 +36,8 @@ function intentSignalsBadges(row: GrowthProspectSearchCompanyResult): string[] {
     badges.push("Hiring")
   }
   if ((row.top_signal_types ?? []).includes("job_posting")) badges.push("Jobs")
+  if ((row.top_signal_types ?? []).includes("job_change")) badges.push("Job Change")
+  if ((row.top_signal_types ?? []).includes("promotion")) badges.push("Promotion")
   if ((row.watchlist_matches?.length ?? 0) > 0) badges.push("Watchlist match")
   return badges
 }

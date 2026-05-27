@@ -8,6 +8,14 @@ export const GROWTH_INTENT_SIGNALS_JOBS_TAB_QA_MARKER = "growth-intent-signals-j
 
 export const GROWTH_INTENT_SIGNALS_HIRES_TAB_QA_MARKER = "growth-intent-signals-hires-v1" as const
 
+export const GROWTH_INTENT_SIGNALS_JOB_CHANGES_TAB_QA_MARKER =
+  "growth-intent-signals-job-changes-v1" as const
+
+export const GROWTH_INTENT_SIGNALS_PROMOTIONS_TAB_QA_MARKER =
+  "growth-intent-signals-promotions-v1" as const
+
+export const GROWTH_PEOPLE_SIGNALS_QA_MARKER = "growth-people-signals-v1" as const
+
 export const GROWTH_INTENT_SIGNALS_WATCHLISTS_QA_MARKER = "growth-signal-watchlists-v1" as const
 
 export const GROWTH_INTENT_SIGNALS_SETUP_DRAWER_QA_MARKER =
@@ -107,20 +115,23 @@ export const INTENT_SIGNAL_TABS: readonly IntentSignalTabMeta[] = [
   {
     id: "job-changes",
     label: "Job Changes",
-    implemented: false,
-    filters: ["Job Title", "Seniority", "Company", "Industry", "More filters"],
+    implemented: true,
+    filters: ["Job Title", "Seniority", "Company", "Transition type", "More filters"],
     columns: [
       { key: "person", label: "Person" },
       { key: "newRole", label: "New role" },
       { key: "newCompany", label: "New company" },
-      { key: "country", label: "Country" },
       { key: "previousRole", label: "Previous role" },
+      { key: "previousCompany", label: "Previous company" },
+      { key: "confidence", label: "Confidence" },
+      { key: "score", label: "Signal score" },
       { key: "date", label: "Date" },
+      { key: "actions", label: "Actions" },
     ],
     emptyState: {
-      title: "Catch job changes as they happen",
+      title: "No job change signals yet",
       description:
-        "Get notified when decision-makers move roles so you can reach out at the right moment.",
+        "Job change signals will appear here after verified person-level employment changes are ingested.",
       ctaLabel: "Track job changes",
     },
     sampleMetrics: { total: 892, h24: 38, d7: 412, d30: 2890 },
@@ -146,19 +157,23 @@ export const INTENT_SIGNAL_TABS: readonly IntentSignalTabMeta[] = [
   {
     id: "promotions",
     label: "Promotions",
-    implemented: false,
-    filters: ["Job Title", "Seniority", "Company", "Industry", "More filters"],
+    implemented: true,
+    filters: ["Job Title", "Seniority", "Company", "Transition type", "More filters"],
     columns: [
       { key: "person", label: "Person" },
       { key: "newTitle", label: "New title" },
       { key: "company", label: "Company" },
-      { key: "country", label: "Country" },
       { key: "previousTitle", label: "Previous title" },
+      { key: "seniorityChange", label: "Seniority change" },
+      { key: "confidence", label: "Confidence" },
+      { key: "score", label: "Signal score" },
       { key: "date", label: "Date" },
+      { key: "actions", label: "Actions" },
     ],
     emptyState: {
-      title: "Know when contacts get promoted",
-      description: "Spot internal promotions at target accounts and adjust your outreach timing.",
+      title: "No promotion signals yet",
+      description:
+        "Promotion signals will appear here after verified same-company title changes are ingested.",
       ctaLabel: "Track promotions",
     },
     sampleMetrics: { total: 534, h24: 22, d7: 198, d30: 1420 },

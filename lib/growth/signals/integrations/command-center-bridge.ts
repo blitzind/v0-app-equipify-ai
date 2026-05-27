@@ -130,6 +130,8 @@ export type CommandCenterSignalMomentumSummary = {
   high_urgency_signals_count: number
   news_events_count: number
   hiring_spikes_count: number
+  job_changes_count: number
+  promotions_count: number
   watchlist_matches_last_24h: number
   watchlist_matches_last_7d: number
   top_companies_by_momentum: CommandCenterSignalMomentumCompany[]
@@ -209,6 +211,8 @@ export function buildCommandCenterSignalMomentumSummary(input: {
       ? (velocity as Record<string, unknown>).hiring_spike === true
       : false
   }).length
+  const jobChanges = activeSignals.filter((signal) => signal.signal_type === "job_change").length
+  const promotions = activeSignals.filter((signal) => signal.signal_type === "promotion").length
 
   return {
     qa_marker: GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
@@ -217,6 +221,8 @@ export function buildCommandCenterSignalMomentumSummary(input: {
     high_urgency_signals_count: highUrgency,
     news_events_count: newsEvents,
     hiring_spikes_count: hiringSpikes,
+    job_changes_count: jobChanges,
+    promotions_count: promotions,
     watchlist_matches_last_24h:
       input.watchlist_metrics?.matches_last_24h ??
       countWatchlistMatchesSince(input.watchlist_matches, 24, nowMs),

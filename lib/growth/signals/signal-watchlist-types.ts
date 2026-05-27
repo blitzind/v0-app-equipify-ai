@@ -18,6 +18,11 @@ export type GrowthSignalWatchlistFilters = {
   occurred_to?: string | null
   workflow_state?: GrowthSignalWorkflowState | null
   suppression_state?: GrowthSignalSuppressionState | null
+  seniority?: string | null
+  transition_type?: string | null
+  identity_confidence_min?: number | null
+  previous_company_domain?: string | null
+  new_company_domain?: string | null
 }
 
 export type GrowthSignalWatchlistMatchReason = {
@@ -29,6 +34,9 @@ export type GrowthSignalWatchlistMatchReason = {
   matched_hiring_intensity?: string | null
   matched_geography?: string | null
   matched_domain?: string | null
+  matched_transition_type?: string | null
+  matched_identity_confidence_min?: number | null
+  matched_seniority?: string | null
 }
 
 export type GrowthSignalWatchlistRow = {
@@ -109,6 +117,21 @@ export function normalizeSignalWatchlistFilters(
       raw.suppression_state &&
       GROWTH_SIGNAL_SUPPRESSION_STATES.includes(raw.suppression_state as GrowthSignalSuppressionState)
         ? (raw.suppression_state as GrowthSignalSuppressionState)
+        : null,
+    seniority: typeof raw.seniority === "string" && raw.seniority.trim() ? raw.seniority.trim() : null,
+    transition_type:
+      typeof raw.transition_type === "string" && raw.transition_type.trim() ? raw.transition_type.trim() : null,
+    identity_confidence_min:
+      typeof raw.identity_confidence_min === "number" && Number.isFinite(raw.identity_confidence_min)
+        ? raw.identity_confidence_min
+        : null,
+    previous_company_domain:
+      typeof raw.previous_company_domain === "string" && raw.previous_company_domain.trim()
+        ? raw.previous_company_domain.trim()
+        : null,
+    new_company_domain:
+      typeof raw.new_company_domain === "string" && raw.new_company_domain.trim()
+        ? raw.new_company_domain.trim()
         : null,
   }
 }

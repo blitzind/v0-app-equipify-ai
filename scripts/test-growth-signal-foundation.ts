@@ -79,6 +79,23 @@ import {
 } from "../lib/growth/signals/integrations/prospect-search-signal-overlay"
 import { buildTerritorySignalIntelligenceSummary } from "../lib/growth/signals/integrations/territory-signal-intelligence"
 import { buildCommandCenterSignalMomentumSummary } from "../lib/growth/signals/integrations/command-center-bridge"
+import {
+  evaluatePersonIdentityConfidence,
+  meetsPromotionIdentityThreshold,
+  PERSON_IDENTITY_REJECT_THRESHOLD,
+} from "../lib/growth/signals/person-identity-confidence"
+import {
+  detectTransitionType,
+  computeSeniorityDelta,
+  buildPersonSignalDedupeKey,
+  GROWTH_PEOPLE_SIGNALS_QA_MARKER,
+  GROWTH_JOB_CHANGE_MANUAL_QUEUE_SAMPLE_INPUT,
+} from "../lib/growth/signals/job-change-signal-normalizer"
+import {
+  normalizeJobChangeManualItems,
+  GROWTH_JOB_CHANGE_MANUAL_PROVIDER_KEY,
+} from "../lib/growth/signals/providers/adapters/job-change-manual-adapter"
+import { sanitizePersonSignalMetadata } from "../lib/growth/signals/person-signal-metadata"
 
 function main(): void {
   assert.equal(GROWTH_SIGNAL_FOUNDATION_QA_MARKER, "growth-signal-foundation-v1")
@@ -677,6 +694,8 @@ function main(): void {
   const ccSummary = buildCommandCenterSignalMomentumSummary({ signals })
   assert.equal(ccSummary.qa_marker, "growth-signal-momentum-v1")
   assert.ok(ccSummary.top_companies_by_momentum.length >= 1)
+  assert.equal(typeof ccSummary.job_changes_count, "number")
+  assert.equal(typeof ccSummary.promotions_count, "number")
 
   const rollupRoute = fs.readFileSync(
     path.join(process.cwd(), "app/api/platform/growth/signals/company-rollup/route.ts"),
@@ -684,6 +703,158 @@ function main(): void {
   )
   assert.match(rollupRoute, /sanitizeRollup/)
   assert.doesNotMatch(rollupRoute, /raw_payload:/)
+
+  assert.equal(PERSON_IDENTITY_REJECT_THRESHOLD, 0.5)
+  assert.equal(evaluatePersonIdentityConfidence({ person_name: "" }).accept, false)
+  assert.equal(
+    evaluatePersonIdentityConfidence({
+      person_name: "Jane Smith",
+      person_external_id: "manual-123",
+      source_url: "https://example.com/profile/jane-smith",
+    }).identity_confidence,
+    1,
+  )
+  assert.equal(meetsPromotionIdentityThreshold(0.74), false)
+  assert.equal(meetsPromotionIdentityThreshold(0.75), true)
+
+  assert.equal(GROWTH_PEOPLE_SIGNALS_QA_MARKER, "growth-people-signals-v1")
+  assert.equal(
+    detectTransitionType({
+      previous_company_domain: "oldco.com",
+      new_company_domain: "newco.com",
+      previous_title: "Manager",
+      new_title: "Director",
+    }),
+    "company_move",
+  )
+  assert.equal(
+    detectTransitionType({
+      previous_company_domain: "acme.com",
+      new_company_domain: "acme.com",
+      previous_title: "Manager",
+      new_title: "Director",
+    }),
+    "internal_promotion",
+  )
+  assert.equal(computeSeniorityDelta("Manager", "Director"), 1)
+  assert.notEqual(
+    buildPersonSignalDedupeKey({
+      person_name: "Jane Smith",
+      new_company_domain: "a.com",
+      new_title: "Director",
+      occurred_at: "2026-05-01T00:00:00Z",
+      signal_type: "job_change",
+    }),
+    buildPersonSignalDedupeKey({
+      person_name: "Jane Smith",
+      new_company_domain: "b.com",
+      new_title: "Director",
+      occurred_at: "2026-05-01T00:00:00Z",
+      signal_type: "job_change",
+    }),
+  )
+
+  assert.equal(GROWTH_JOB_CHANGE_MANUAL_PROVIDER_KEY, "job_change_manual")
+  assert.equal(normalizeJobChangeManualItems([{ person_name: "Jane" }]).length, 0)
+  assert.equal(
+    normalizeJobChangeManualItems([
+      {
+        person_name: "Jane",
+        excerpt: "maybe changed jobs",
+        new_company_name: "Acme",
+        new_title: "Director",
+        source_url: "https://example.com/jane",
+      },
+    ]).length,
+    0,
+  )
+  const companyMoveDrafts = normalizeJobChangeManualItems(GROWTH_JOB_CHANGE_MANUAL_QUEUE_SAMPLE_INPUT)
+  assert.ok(companyMoveDrafts.some((draft) => draft.signal_type === "job_change"))
+  const promotionDrafts = normalizeJobChangeManualItems([
+    {
+      person_name: "Alex Rivera",
+      person_external_id: "promo-1",
+      source_url: "https://example.com/alex",
+      excerpt: "Alex Rivera promoted to Director of Field Service at Summit Biomed.",
+      occurred_at: "2026-05-18T09:00:00Z",
+      new_company_name: "Summit Biomed",
+      new_company_domain: "summitbiomed.com",
+      previous_company_name: "Summit Biomed",
+      previous_company_domain: "summitbiomed.com",
+      previous_title: "Field Service Manager",
+      new_title: "Director of Field Service",
+      explicit_promotion: true,
+    },
+  ])
+  assert.ok(promotionDrafts.some((draft) => draft.signal_type === "promotion"))
+  assert.equal(
+    normalizeJobChangeManualItems([
+      {
+        person_name: "Alex Rivera",
+        source_url: "https://example.com/alex-2",
+        excerpt: "Alex Rivera promoted.",
+        new_company_name: "Summit Biomed",
+        new_company_domain: "summitbiomed.com",
+        new_title: "Director of Field Service",
+      },
+    ]).length,
+    0,
+  )
+
+  const sanitized = sanitizePersonSignalMetadata({
+    person_name: "Jane",
+    person_external_id: "secret-id",
+    identity_confidence: 0.9,
+    people_provider: "debug",
+  })
+  assert.equal(sanitized.person_name, "Jane")
+  assert.equal((sanitized as Record<string, unknown>).person_external_id, undefined)
+
+  const personSignal = {
+    ...signals[0]!,
+    signal_type: "job_change" as const,
+    seniority: "director",
+    metadata: {
+      person_signal: true,
+      transition_type: "company_move",
+      identity_confidence: 0.9,
+      previous_company_domain: "oldco.com",
+    },
+  }
+  assert.equal(
+    signalMatchesWatchlistFilters(personSignal, {
+      signal_types: ["job_change"],
+      filters: { transition_type: "company_move", identity_confidence_min: 0.75 },
+    }).matched,
+    true,
+  )
+
+  const personTabSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/intent-signals/tabs/person-signals-tab.tsx"),
+    "utf8",
+  )
+  assert.match(personTabSource, /GROWTH_INTENT_SIGNALS_JOB_CHANGES_TAB_QA_MARKER/)
+  assert.match(personTabSource, /GROWTH_INTENT_SIGNALS_PROMOTIONS_TAB_QA_MARKER/)
+  assert.match(personTabSource, /IntentSignalsPersonSignalDetail/)
+
+  const shellSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/intent-signals/intent-signals-shell.tsx"),
+    "utf8",
+  )
+  assert.match(shellSource, /JobChangesTab/)
+  assert.match(shellSource, /PromotionsTab/)
+
+  const registrySource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/signals/providers/signal-provider-registry.ts"),
+    "utf8",
+  )
+  assert.match(registrySource, /createJobChangeManualSignalAdapter/)
+
+  const uiActionsSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/intent-signals/intent-signals-signal-actions.tsx"),
+    "utf8",
+  )
+  assert.doesNotMatch(uiActionsSource, /auto_sequence|auto_outreach|auto_enroll/)
 
   console.log("growth-signal-foundation: ok")
 }

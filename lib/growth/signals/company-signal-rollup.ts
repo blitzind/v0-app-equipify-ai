@@ -2,6 +2,7 @@
 
 import { normalizeDomain } from "@/lib/growth/company-identification/company-identification-normalize"
 import { readHiringVelocityFromMetadata } from "@/lib/growth/signals/hiring-velocity-ui-helpers"
+import { readPersonSignalMetadata } from "@/lib/growth/signals/person-signal-metadata"
 import type { GrowthSignalRow, GrowthSignalType } from "@/lib/growth/signals/signal-types"
 
 export const GROWTH_SIGNAL_MOMENTUM_QA_MARKER = "growth-signal-momentum-v1" as const
@@ -39,6 +40,9 @@ export type GrowthCompanySignalRollup = {
   news_count: number
   job_posting_count: number
   hiring_signal_count: number
+  job_change_count: number
+  promotion_count: number
+  people_signal_count: number
   watchlist_match_count: number
   average_signal_score: number
   max_signal_score: number
@@ -86,6 +90,10 @@ export function formatSignalTypeLabel(type: GrowthSignalType): string {
       return "Jobs"
     case "hire":
       return "Hiring"
+    case "job_change":
+      return "Job Change"
+    case "promotion":
+      return "Promotion"
     default:
       return type.replace(/_/g, " ")
   }
@@ -159,9 +167,15 @@ function computeCategoryBoost(signals: GrowthSignalRow[]): number {
   let boost = 0
   const hasNews = signals.some((s) => s.signal_type === "news_event")
   const hasHiring = signals.some((s) => s.signal_type === "hire" || s.signal_type === "job_posting")
+  const hasPeople = signals.some(
+    (s) =>
+      (s.signal_type === "job_change" || s.signal_type === "promotion") &&
+      (readPersonSignalMetadata(s).identity_confidence ?? 0) >= 0.75,
+  )
   if (hasNews) boost += 2
   if (hasHiring) boost += 3
-  return Math.min(5, boost)
+  if (hasPeople) boost += 4
+  return Math.min(8, boost)
 }
 
 export function deriveMomentumLabel(score: number): GrowthSignalMomentumLabel {
@@ -190,6 +204,9 @@ export function buildCompanySignalRollup(input: GrowthCompanySignalRollupInput):
       news_count: 0,
       job_posting_count: 0,
       hiring_signal_count: 0,
+      job_change_count: 0,
+      promotion_count: 0,
+      people_signal_count: 0,
       watchlist_match_count: 0,
       average_signal_score: 0,
       max_signal_score: 0,
@@ -223,6 +240,8 @@ export function buildCompanySignalRollup(input: GrowthCompanySignalRollupInput):
   let newsCount = 0
   let jobPostingCount = 0
   let hiringCount = 0
+  let jobChangeCount = 0
+  let promotionCount = 0
   let scoreSum = 0
   let maxScore = 0
   let evidenceCount = 0
@@ -235,6 +254,8 @@ export function buildCompanySignalRollup(input: GrowthCompanySignalRollupInput):
     if (signal.signal_type === "news_event") newsCount += 1
     if (signal.signal_type === "job_posting") jobPostingCount += 1
     if (signal.signal_type === "hire") hiringCount += 1
+    if (signal.signal_type === "job_change") jobChangeCount += 1
+    if (signal.signal_type === "promotion") promotionCount += 1
     scoreSum += signal.signal_score
     maxScore = Math.max(maxScore, signal.signal_score)
     if (signal.evidence_summary?.trim()) evidenceCount += 1
@@ -298,6 +319,9 @@ export function buildCompanySignalRollup(input: GrowthCompanySignalRollupInput):
     news_count: newsCount,
     job_posting_count: jobPostingCount,
     hiring_signal_count: hiringCount,
+    job_change_count: jobChangeCount,
+    promotion_count: promotionCount,
+    people_signal_count: jobChangeCount + promotionCount,
     watchlist_match_count: watchlistMatches.length,
     average_signal_score: Number((scoreSum / activeSignals.length).toFixed(2)),
     max_signal_score: maxScore,

@@ -20,6 +20,8 @@ export function GrowthCommandSignalIntelligenceSection({
         <StatTile label="High urgency signals" value={String(summary.high_urgency_signals_count)} />
         <StatTile label="News events" value={String(summary.news_events_count)} />
         <StatTile label="Hiring spikes" value={String(summary.hiring_spikes_count)} />
+        <StatTile label="Job changes" value={String(summary.job_changes_count ?? 0)} />
+        <StatTile label="Promotions" value={String(summary.promotions_count ?? 0)} />
         <StatTile label="Watchlist matches 24h" value={String(summary.watchlist_matches_last_24h)} />
         <StatTile label="Watchlist matches 7d" value={String(summary.watchlist_matches_last_7d)} />
         <StatTile label="Recent hiring signals" value={String(summary.hiring.recent_hiring_signals_count)} />

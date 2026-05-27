@@ -46,6 +46,10 @@ export async function GET(request: Request) {
   const department = url.searchParams.get("department")?.trim() || undefined
   const hiring_intensity = url.searchParams.get("hiring_intensity")?.trim() || undefined
   const geography = url.searchParams.get("geography")?.trim() || undefined
+  const seniority = url.searchParams.get("seniority")?.trim() || undefined
+  const transition_type = url.searchParams.get("transition_type")?.trim() || undefined
+  const previous_company_domain = url.searchParams.get("previous_company_domain")?.trim() || undefined
+  const identity_confidence_min = Number(url.searchParams.get("identity_confidence_min") ?? "")
   const limit = Number(url.searchParams.get("limit") ?? "50")
   const offset = Number(url.searchParams.get("offset") ?? "0")
 
@@ -69,6 +73,12 @@ export async function GET(request: Request) {
     department,
     hiring_intensity,
     geography,
+    seniority,
+    transition_type,
+    previous_company_domain,
+    identity_confidence_min: Number.isFinite(identity_confidence_min)
+      ? identity_confidence_min
+      : undefined,
     limit: Number.isFinite(limit) ? limit : 50,
     offset: Number.isFinite(offset) ? offset : 0,
   })
@@ -93,6 +103,12 @@ export async function GET(request: Request) {
       department: department ?? null,
       hiring_intensity: hiring_intensity ?? null,
       geography: geography ?? null,
+      seniority: seniority ?? null,
+      transition_type: transition_type ?? null,
+      previous_company_domain: previous_company_domain ?? null,
+      identity_confidence_min: Number.isFinite(identity_confidence_min)
+        ? identity_confidence_min
+        : null,
     },
     items: result.items,
     total: result.total,

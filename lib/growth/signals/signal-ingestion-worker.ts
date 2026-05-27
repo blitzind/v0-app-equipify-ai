@@ -176,3 +176,17 @@ export async function queueJobPostingManualIngestion(
     cursor: { sample_input: input.sample_input },
   })
 }
+
+export async function queueJobChangeManualIngestion(
+  admin: SupabaseClient,
+  input: {
+    sample_input: unknown
+    organization_id?: string | null
+  },
+): Promise<{ ok: boolean; queue_id?: string; reason?: string }> {
+  return enqueueSignalIngestionJob(admin, {
+    provider_key: "job_change_manual",
+    organization_id: input.organization_id ?? null,
+    cursor: { sample_input: input.sample_input },
+  })
+}

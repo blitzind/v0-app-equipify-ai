@@ -1,4 +1,5 @@
 import type { GrowthSignalRow } from "@/lib/growth/signals/signal-types"
+import { readPersonSignalMetadata } from "@/lib/growth/signals/person-signal-metadata"
 import {
   normalizeSignalWatchlistFilters,
   type GrowthSignalWatchlistFilters,
@@ -57,6 +58,19 @@ export function buildSignalWatchlistMatchReason(
   if (filters.geography && includesFold(signal.geography, filters.geography)) {
     reason.matched_geography = filters.geography
   }
+  const personMeta = readPersonSignalMetadata(signal)
+  if (filters.transition_type && personMeta.transition_type === filters.transition_type) {
+    reason.matched_transition_type = filters.transition_type
+  }
+  if (
+    filters.identity_confidence_min != null &&
+    (personMeta.identity_confidence ?? 0) >= filters.identity_confidence_min
+  ) {
+    reason.matched_identity_confidence_min = filters.identity_confidence_min
+  }
+  if (filters.seniority && signal.seniority?.toLowerCase() === filters.seniority.toLowerCase()) {
+    reason.matched_seniority = filters.seniority
+  }
   return reason
 }
 
@@ -109,6 +123,28 @@ export function signalMatchesWatchlistFilters(
     }
   }
   if (filters.geography && !includesFold(signal.geography, filters.geography)) {
+    return { matched: false, reason: {} }
+  }
+  const personMeta = readPersonSignalMetadata(signal)
+  if (filters.seniority && signal.seniority?.toLowerCase() !== filters.seniority.toLowerCase()) {
+    return { matched: false, reason: {} }
+  }
+  if (filters.transition_type && personMeta.transition_type !== filters.transition_type) {
+    return { matched: false, reason: {} }
+  }
+  if (
+    filters.identity_confidence_min != null &&
+    (personMeta.identity_confidence ?? 0) < filters.identity_confidence_min
+  ) {
+    return { matched: false, reason: {} }
+  }
+  if (
+    filters.previous_company_domain &&
+    !includesFold(personMeta.previous_company_domain, filters.previous_company_domain)
+  ) {
+    return { matched: false, reason: {} }
+  }
+  if (filters.new_company_domain && !includesFold(signal.domain, filters.new_company_domain)) {
     return { matched: false, reason: {} }
   }
   if (filters.occurred_from) {
