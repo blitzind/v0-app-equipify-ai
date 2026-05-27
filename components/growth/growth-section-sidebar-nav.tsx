@@ -78,6 +78,7 @@ const GROWTH_NAV_ICONS: Record<string, LucideIcon> = {
   "revenue-inbox": Inbox,
   "prospect-search": Search,
   "intent-pixel": Radar,
+  "unified-inbox": Mail,
   imports: Upload,
   outreach: Send,
   "outreach-approval": Send,

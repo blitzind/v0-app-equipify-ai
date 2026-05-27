@@ -73,6 +73,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     consoleKey: "intent_pixel",
   },
   {
+    id: "unified-inbox",
+    label: "Inbox",
+    href: "/admin/growth/inbox",
+    keywords: ["inbox", "reply", "thread", "unified inbox", "reply intelligence"],
+  },
+  {
     id: "lead-intelligence",
     label: "Lead Intelligence Inspector",
     href: "/admin/growth/leads/lead-engine",
@@ -283,6 +289,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         label: "Intent Pixel",
         consoleKey: "intent_pixel",
         match: prefixMatch("/admin/growth/intent-pixel"),
+      },
+      {
+        id: "unified-inbox",
+        href: "/admin/growth/inbox",
+        label: "Inbox",
+        match: prefixMatch("/admin/growth/inbox"),
       },
     ],
   },
