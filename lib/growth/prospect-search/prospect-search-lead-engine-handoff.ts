@@ -2,9 +2,23 @@
 
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthLeadEngineSandboxInput } from "@/lib/growth/lead-engine/workspace-types"
+import {
+  buildLeadEngineContactHandoffContext,
+  type ProspectSearchLeadEngineContactHandoffContext,
+} from "@/lib/growth/prospect-search/prospect-search-contact-intelligence"
 
 export const GROWTH_PROSPECT_SEARCH_LEAD_ENGINE_HANDOFF_QA_MARKER =
   "growth-prospect-search-lead-engine-handoff-v1" as const
+
+export type GrowthLeadEngineSandboxHandoffInput = GrowthLeadEngineSandboxInput & {
+  sourceType?: string | null
+  sourceId?: string | null
+  growthLeadId?: string | null
+  leadInboxId?: string | null
+  prospectId?: string | null
+  customerId?: string | null
+  contactHandoff?: ProspectSearchLeadEngineContactHandoffContext | null
+}
 
 const MAX_NOTES_LENGTH = 500
 
@@ -30,14 +44,20 @@ export function buildProspectSearchLeadEngineHandoffInput(
     | "buying_stage"
     | "lead_engine_score"
     | "lead_engine_score_explanation"
+    | "contact_intelligence"
   >,
   query?: string,
-): GrowthLeadEngineSandboxInput {
+): GrowthLeadEngineSandboxHandoffInput {
+  const intelligence = company.contact_intelligence
   const noteParts = [
     query ? `Prospect search query: ${query}` : null,
     company.buying_stage ? `Buying stage: ${company.buying_stage.replace(/_/g, " ")}` : null,
     company.lead_engine_score != null ? `Lead Engine score: ${company.lead_engine_score}` : null,
     company.lead_engine_score_explanation,
+    intelligence?.outreach_recommendation ?? null,
+    intelligence?.first_contact
+      ? `First contact: ${intelligence.first_contact.role}${intelligence.first_contact.name ? ` (${intelligence.first_contact.name})` : ""} · ${Math.round(intelligence.first_contact.confidence * 100)}%`
+      : null,
     company.crm_detected ? `CRM: ${company.crm_detected}` : null,
     company.field_service_software ? `Field service: ${company.field_service_software}` : null,
     company.service_area ? `Service area: ${company.service_area}` : null,
@@ -50,6 +70,9 @@ export function buildProspectSearchLeadEngineHandoffInput(
     industry: trimParam(company.industry, 120) ?? "",
     location: trimParam(company.location, 120) ?? "",
     notes: noteParts.join(" · ").slice(0, MAX_NOTES_LENGTH),
+    sourceType: company.source_type,
+    sourceId: company.id,
+    contactHandoff: buildLeadEngineContactHandoffContext(intelligence),
   }
 }
 
@@ -72,13 +95,50 @@ export function buildProspectSearchLeadEngineHandoffUrl(
   if (company.lead_inbox_id) params.set("leadInboxId", company.lead_inbox_id)
   if (company.prospect_id) params.set("prospectId", company.prospect_id)
   if (company.customer_id) params.set("customerId", company.customer_id)
+  if (input.contactHandoff) {
+    params.set("contactHandoff", encodeContactHandoffContext(input.contactHandoff))
+  }
 
   return `/admin/growth/leads/lead-engine?${params.toString()}`
 }
 
+function encodeContactHandoffContext(context: ProspectSearchLeadEngineContactHandoffContext): string {
+  const json = JSON.stringify(context)
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(json, "utf8").toString("base64url")
+  }
+  const bytes = new TextEncoder().encode(json)
+  let binary = ""
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+}
+
+function decodeContactHandoffContext(
+  encoded: string | null | undefined,
+): ProspectSearchLeadEngineContactHandoffContext | null {
+  const value = encoded?.trim()
+  if (!value) return null
+  try {
+    let json = ""
+    if (typeof Buffer !== "undefined") {
+      json = Buffer.from(value, "base64url").toString("utf8")
+    } else {
+      const normalized = value.replace(/-/g, "+").replace(/_/g, "/")
+      json = decodeURIComponent(
+        Array.from(atob(normalized), (char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`).join(""),
+      )
+    }
+    const parsed = JSON.parse(json) as ProspectSearchLeadEngineContactHandoffContext
+    if (typeof parsed.contact_count !== "number") return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
 export function parseProspectSearchLeadEngineHandoffParams(
   searchParams: URLSearchParams,
-): GrowthLeadEngineSandboxInput | null {
+): GrowthLeadEngineSandboxHandoffInput | null {
   const companyName = trimParam(searchParams.get("companyName"))
   if (!companyName) return null
 
@@ -88,5 +148,12 @@ export function parseProspectSearchLeadEngineHandoffParams(
     industry: trimParam(searchParams.get("industry"), 120) ?? "",
     location: trimParam(searchParams.get("location"), 120) ?? "",
     notes: trimParam(searchParams.get("notes"), MAX_NOTES_LENGTH) ?? "",
+    sourceType: trimParam(searchParams.get("sourceType")),
+    sourceId: trimParam(searchParams.get("sourceId")),
+    growthLeadId: trimParam(searchParams.get("growthLeadId")),
+    leadInboxId: trimParam(searchParams.get("leadInboxId")),
+    prospectId: trimParam(searchParams.get("prospectId")),
+    customerId: trimParam(searchParams.get("customerId")),
+    contactHandoff: decodeContactHandoffContext(searchParams.get("contactHandoff")),
   }
 }

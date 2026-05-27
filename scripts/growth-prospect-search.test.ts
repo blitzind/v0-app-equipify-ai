@@ -1611,6 +1611,282 @@ async function main(): Promise<void> {
   assert.match(pushSource, /resolveProspectSearchCompanyResultsForPush/)
   assert.match(repositorySource, /territory_radius_note/)
 
+  const {
+    GROWTH_PROSPECT_SEARCH_CONTACT_INTELLIGENCE_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-contact-intelligence-types")
+  const {
+    buildProspectSearchContactIntelligence,
+    computeContactConfidenceRankBoost,
+    computeContactCoverageRankBoost,
+    decisionMakerToContactInput,
+    leadEngineContactResearchToInputs,
+    MAX_CONTACT_CONFIDENCE_RANK_BOOST,
+  } = await import("../lib/growth/prospect-search/prospect-search-contact-intelligence")
+  const {
+    buildProspectSearchLeadEngineHandoffInput,
+  } = await import("../lib/growth/prospect-search/prospect-search-lead-engine-handoff")
+
+  assert.equal(
+    GROWTH_PROSPECT_SEARCH_CONTACT_INTELLIGENCE_QA_MARKER,
+    "growth-prospect-search-contact-intelligence-v1",
+  )
+  assert.equal(MAX_CONTACT_CONFIDENCE_RANK_BOOST, 0.05)
+  assert.equal(computeContactCoverageRankBoost(3), 0.05)
+  assert.equal(computeContactCoverageRankBoost(0), 0)
+
+  const dmWithEvidence = decisionMakerToContactInput({
+    id: "dm-1",
+    leadId: "lead-1",
+    fullName: "Maria Chen",
+    title: "Director Clinical Engineering",
+    email: "maria@example.com",
+    phone: null,
+    linkedinUrl: null,
+    source: "website",
+    sourceDetail: "Leadership page listing",
+    confidence: 0.92,
+    evidenceExcerpt: "Listed on company team page as Director Clinical Engineering.",
+    status: "confirmed",
+    isPrimary: true,
+    createdBy: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  })
+  assert.ok(dmWithEvidence)
+  assert.equal(dmWithEvidence!.full_name, "Maria Chen")
+
+  const dmWithoutEvidence = decisionMakerToContactInput({
+    id: "dm-2",
+    leadId: "lead-1",
+    fullName: "Hallucinated Person",
+    title: "CEO",
+    email: null,
+    phone: null,
+    linkedinUrl: null,
+    source: "manual",
+    sourceDetail: null,
+    confidence: 0.99,
+    evidenceExcerpt: null,
+    status: "suspected",
+    isPrimary: false,
+    createdBy: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  })
+  assert.equal(dmWithoutEvidence, null)
+
+  const contactResearchInputs = leadEngineContactResearchToInputs({
+    contact_candidates: [
+      {
+        full_name: "Maria Chen",
+        job_title: "Director Clinical Engineering",
+        department: "Clinical Engineering",
+        role_match_type: "decision_maker",
+        email: "maria@example.com",
+        email_confidence: 1,
+        phone: "",
+        phone_confidence: 0,
+        linkedin_url: "",
+        confidence: 0.92,
+        source_evidence: [
+          {
+            claim: "Leadership listing",
+            evidence: "Company team page lists Maria Chen as Director Clinical Engineering.",
+            source: "website",
+          },
+        ],
+      },
+      {
+        full_name: "Invented Contact",
+        job_title: "CEO",
+        department: "",
+        role_match_type: "owner",
+        email: "fake@example.com",
+        email_confidence: 1,
+        phone: "",
+        phone_confidence: 0,
+        linkedin_url: "",
+        confidence: 0.99,
+        source_evidence: [],
+      },
+    ],
+    coverage: {
+      primary_roles_found: ["decision_maker"],
+      missing_roles: ["economic buyer"],
+      committee_completion: 0.5,
+    },
+    research_quality: { score: 0.8, reasoning: ["Evidence-backed only"] },
+  })
+  assert.equal(contactResearchInputs.length, 1)
+
+  const intelligence = buildProspectSearchContactIntelligence({
+    contacts: [dmWithEvidence!, ...contactResearchInputs],
+    decision_maker_hypothesis: {
+      recommended_targeting_strategy: { primary_motion: "Clinical ops", reason: "ICP fit" },
+      buying_committee: {
+        primary_targets: [
+          { role: "Director Clinical Engineering", confidence: 0.9, reason: "Primary buyer" },
+          { role: "Biomedical Manager", confidence: 0.75, reason: "Influencer" },
+        ],
+        secondary_targets: [],
+        avoid_roles: [],
+      },
+      role_patterns: {
+        owner_patterns: [],
+        operations_patterns: ["Director Clinical Engineering"],
+        service_patterns: [],
+        executive_patterns: [],
+        procurement_patterns: [],
+        technical_patterns: ["Biomedical Manager"],
+      },
+      committee_completeness: {
+        recommended_contacts: 4,
+        minimum_contacts: 2,
+        critical_missing_roles: ["Procurement"],
+      },
+      escalation_path: ["Director Clinical Engineering"],
+      engagement_priority: ["Director Clinical Engineering", "Biomedical Manager"],
+      confidence_assessment: { score: 88, reasoning: ["Strong title alignment"] },
+    },
+    committee_completeness: 0.75,
+    source_labels: ["growth.lead_decision_makers", "lead_engine.contact_research"],
+  })
+
+  assert.equal(intelligence.qa_marker, GROWTH_PROSPECT_SEARCH_CONTACT_INTELLIGENCE_QA_MARKER)
+  assert.equal(intelligence.contacts.length, 1)
+  assert.ok(intelligence.committee_roles.length >= 2)
+  assert.ok(intelligence.first_contact)
+  assert.equal(intelligence.first_contact!.role, "Director Clinical Engineering")
+  assert.ok(intelligence.first_contact!.reasons.includes("Highest evidence"))
+  assert.ok(intelligence.confidence_explanation)
+  assert.ok(intelligence.confidence_explanation!.evidence.length > 0)
+  assert.equal(computeContactConfidenceRankBoost(intelligence), 0.05)
+
+  const sparse = buildProspectSearchContactIntelligence({ contacts: [] })
+  assert.equal(sparse.has_contacts, false)
+  assert.ok(sparse.empty_reason)
+
+  const duplicateMerged = buildProspectSearchContactIntelligence({
+    contacts: [
+      dmWithEvidence!,
+      {
+        ...dmWithEvidence!,
+        id: "dm-dup",
+        confidence: 0.5,
+      },
+    ],
+  })
+  assert.equal(duplicateMerged.contacts.length, 1)
+
+  const handoffInput = buildProspectSearchLeadEngineHandoffInput({
+    company_name: "Acme Biomed",
+    website: "acme.example",
+    industry: "Biomedical",
+    location: "Chicago, IL",
+    source_type: "growth_lead",
+    id: "lead-row-1",
+    signals: [],
+    crm_detected: null,
+    field_service_software: null,
+    service_area: null,
+    buying_stage: "consideration",
+    lead_engine_score: 78,
+    lead_engine_score_explanation: "Strong ICP fit",
+    contact_intelligence: intelligence,
+  })
+  assert.match(handoffInput.notes, /First contact/)
+  assert.ok(handoffInput.contactHandoff)
+  assert.equal(handoffInput.contactHandoff!.first_contact_name, "Maria Chen")
+
+  const contactBridgeHandoffUrl = buildProspectSearchLeadEngineHandoffUrl(
+    {
+      id: "lead-row-1",
+      source_type: "growth_lead",
+      company_name: "Acme Biomed",
+      website: "acme.example",
+      industry: "Biomedical",
+      location: "Chicago, IL",
+      signals: [],
+      buying_stage: "consideration",
+      lead_engine_score: 78,
+      lead_engine_score_explanation: "Strong ICP fit",
+      contact_intelligence: intelligence,
+    } as import("../lib/growth/prospect-search/prospect-search-types").GrowthProspectSearchCompanyResult,
+    "biomedical chicago",
+  )
+  assert.match(contactBridgeHandoffUrl, /contactHandoff=/)
+  const parsedHandoffUrl = parseProspectSearchLeadEngineHandoffParams(
+    new URLSearchParams(contactBridgeHandoffUrl.split("?")[1]!),
+  )
+  assert.ok(parsedHandoffUrl?.contactHandoff)
+  assert.equal(parsedHandoffUrl!.contactHandoff!.first_contact_role, "Director Clinical Engineering")
+
+  const contactIntelSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-contact-intelligence.ts"),
+    "utf8",
+  )
+  const contactIntelLoaderSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-contact-intelligence-loader.ts"),
+    "utf8",
+  )
+  assert.match(contactIntelSource, /recommendFirstContact/)
+  assert.match(contactIntelSource, /hasEvidence/)
+  assert.match(contactIntelLoaderSource, /applyProspectSearchContactIntelligenceOverlay/)
+  assert.match(contactIntelLoaderSource, /listGrowthLeadDecisionMakers/)
+  assert.match(repositorySource, /applyProspectSearchContactIntelligenceOverlay/)
+  assert.match(companyCardSource, /CompanyContactIntelligencePanel/)
+  assert.match(leadEngineWorkspaceSource, /contactHandoff/)
+  const rankingSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-ranking.ts"),
+    "utf8",
+  )
+  assert.match(rankingSource, /computeContactCoverageRankBoost/)
+  assert.match(companyCardSource, /external_discovered.*BuyingCommitteePanel/s)
+
+  const contactExplained = buildProspectSearchExplanations({
+    row: {
+      company_name: "Acme Biomed",
+      website: "acme.example",
+      industry: "Biomedical",
+      location: "Chicago, IL",
+      city: "Chicago",
+      state: "IL",
+      postal_code: null,
+      country: "US",
+      metro: null,
+      lat: null,
+      lng: null,
+      service_area: null,
+      signals: [],
+      match_reasoning: [],
+      rank_score: 0.7,
+      confidence: 0.8,
+      signal_confidence: null,
+      lead_engine_score: 78,
+      lead_engine_score_explanation: "Strong ICP fit",
+      lead_score: 78,
+      buying_stage: "consideration",
+      buying_stage_reason: null,
+      intent_score: null,
+      search_intent_category: null,
+      company_match_confidence: null,
+      crm_detected: null,
+      field_service_software: null,
+      website_platform: null,
+      company_signal_summary: null,
+      existing_customer: false,
+      existing_prospect: false,
+      in_lead_inbox: false,
+      is_suppressed: false,
+      suppression_reason: null,
+      source_type: "growth_lead",
+      contact_intelligence: intelligence,
+      decision_maker_coverage: 0.75,
+    },
+  })
+  assert.ok(contactExplained.confidence_explanation_items.some((item) => /Contact confidence/i.test(item)))
+  assert.ok(contactExplained.recommended_next_step_reason?.includes("Recommended first contact"))
+
   console.log("growth-prospect-search: all checks passed")
 }
 

@@ -8,6 +8,7 @@ import type {
 } from "@/lib/growth/prospect-search/prospect-search-types"
 import { inferEmployeeSizeBand, inferRevenueBand } from "@/lib/growth/prospect-search/prospect-search-filters"
 import { finalizeProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-result-finalize"
+import { computeContactCoverageRankBoost } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence"
 
 function includesFold(hay: string | null | undefined, needle: string): boolean {
   if (!hay || !needle) return false
@@ -16,6 +17,7 @@ function includesFold(hay: string | null | undefined, needle: string): boolean {
 
 const MAX_ENRICHMENT_RANK_BOOST = 0.1
 const MAX_QUALIFICATION_RANK_BOOST = 0.1
+const MAX_CONTACT_RANK_BOOST = 0.05
 
 function computeQualificationRankBoost(row: GrowthProspectSearchIndexCompany): number {
   let boost = 0
@@ -35,6 +37,10 @@ function computeQualificationRankBoost(row: GrowthProspectSearchIndexCompany): n
   else if (row.intent_score != null && row.intent_score >= 12) boost += 0.01
 
   return Math.min(MAX_QUALIFICATION_RANK_BOOST, boost)
+}
+
+function computeContactRankBoost(row: GrowthProspectSearchIndexCompany): number {
+  return Math.min(MAX_CONTACT_RANK_BOOST, computeContactCoverageRankBoost(row.decision_maker_count))
 }
 
 function computeEnrichmentRankBoost(
@@ -144,6 +150,7 @@ export function rankProspectSearchCompanies(
       rank = Math.max(rank, textMatchScore(parsed.keywords.join(" "), blob))
     }
     rank += computeQualificationRankBoost(row)
+    rank += computeContactRankBoost(row)
 
     const summary = row.company_signal_summary
     if (summary?.technology_signals.length) rank += 0.02
@@ -163,6 +170,9 @@ export function rankProspectSearchCompanies(
       reasoning.push(`Lead score ${row.lead_score}.`)
     }
     if (row.buying_stage) reasoning.push(`Buying stage: ${row.buying_stage.replace(/_/g, " ")}.`)
+    if (row.decision_maker_count > 0) {
+      reasoning.push(`${row.decision_maker_count} evidence-backed decision maker(s) indexed.`)
+    }
     if (row.signals.length) reasoning.push(row.signals[0]!)
     if (summary?.technology_signals[0]) {
       reasoning.push(`Technology signal: ${summary.technology_signals[0]}.`)

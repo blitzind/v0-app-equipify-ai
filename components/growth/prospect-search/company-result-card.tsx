@@ -12,6 +12,7 @@ import { CompanySignalSummaryPanel } from "@/components/growth/prospect-search/c
 import { CompanyEnrichmentBadges } from "@/components/growth/prospect-search/company-enrichment-badges"
 import { CompanyIntelligenceCard } from "@/components/growth/company-signals/company-intelligence-card"
 import { BuyingCommitteePanel } from "@/components/growth/prospect-search/buying-committee-panel"
+import { CompanyContactIntelligencePanel } from "@/components/growth/prospect-search/company-contact-intelligence-panel"
 import { RealWorldSourceBadge } from "@/components/growth/prospect-search/real-world-provider-status"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
@@ -132,6 +133,13 @@ export function CompanyResultCard({
 
       {row.signals[0] ? (
         <p className="text-xs text-muted-foreground line-clamp-2">{row.signals[0]}</p>
+      ) : null}
+
+      {selected ? (
+        <CompanyContactIntelligencePanel
+          companyName={row.company_name}
+          intelligence={row.contact_intelligence}
+        />
       ) : null}
 
       {row.source_type === "external_discovered" && selected ? (

@@ -25,6 +25,7 @@ import {
   rankProspectSearchPeople,
 } from "@/lib/growth/prospect-search/prospect-search-ranking"
 import { enrichProspectSearchExternalCompanies } from "@/lib/growth/prospect-search/prospect-search-external-enrichment"
+import { applyProspectSearchContactIntelligenceOverlay } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-loader"
 import { runProspectSearchRealWorldDiscovery } from "@/lib/growth/prospect-search/prospect-search-real-world-discovery"
 import {
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
@@ -97,7 +98,13 @@ export async function runProspectSearch(
       },
     )
 
-    const source_counts = buildSourceCounts(enrichedCompanies)
+    const companiesWithContacts = await applyProspectSearchContactIntelligenceOverlay(
+      admin,
+      enrichedCompanies,
+      { query: input.query, filters: mergedFilters, parsed },
+    )
+
+    const source_counts = buildSourceCounts(companiesWithContacts)
 
     return {
       qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
@@ -105,12 +112,12 @@ export async function runProspectSearch(
       query: input.query,
       parsed_query: parsed,
       filters: mergedFilters,
-      companies: enrichedCompanies,
+      companies: companiesWithContacts,
       people: [],
-      total_companies: enrichedCompanies.length,
+      total_companies: companiesWithContacts.length,
       total_people: 0,
       page: 1,
-      page_size: enrichedCompanies.length,
+      page_size: companiesWithContacts.length,
       has_next_page: false,
       source_counts,
       external_discovery_run_id: realWorld.discovery_run_id,
@@ -189,13 +196,19 @@ export async function runProspectSearch(
 
   const source_counts = buildSourceCounts(companyPage.companies)
 
+  const companiesWithContacts = await applyProspectSearchContactIntelligenceOverlay(
+    admin,
+    companyPage.companies,
+    { query: input.query, filters: mergedFilters, parsed },
+  )
+
   return {
     qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
     discovery_mode: "internal",
     query: input.query,
     parsed_query: parsed,
     filters: mergedFilters,
-    companies: companyPage.companies,
+    companies: companiesWithContacts,
     people: peoplePage.people,
     total_companies: companyPage.total_count,
     total_people: peoplePage.total_count,

@@ -74,6 +74,8 @@ export function buildProspectSearchExplanations(input: {
     | "is_suppressed"
     | "suppression_reason"
     | "source_type"
+    | "contact_intelligence"
+    | "decision_maker_coverage"
   >
   query?: string
   filters?: GrowthProspectSearchFilters
@@ -208,9 +210,32 @@ export function buildProspectSearchExplanations(input: {
     confidenceItems.push("Website present but limited stack or signal enrichment.")
   }
 
+  const contactIntel = row.contact_intelligence
+  if (contactIntel?.has_contacts && contactIntel.first_contact) {
+    scoreItems.push(
+      `Evidence-backed first contact: ${contactIntel.first_contact.role}${contactIntel.first_contact.name ? ` (${contactIntel.first_contact.name})` : ""}.`,
+    )
+    confidenceItems.push(
+      `Contact confidence ${Math.round(contactIntel.first_contact.confidence * 100)}% from ${contactIntel.first_contact.reasons.join(", ").toLowerCase()}.`,
+    )
+    for (const evidence of contactIntel.confidence_explanation?.evidence.slice(0, 2) ?? []) {
+      confidenceItems.push(evidence)
+    }
+  } else if (contactIntel?.committee_roles.length) {
+    scoreItems.push(
+      `Buying committee role hypotheses available (${contactIntel.committee_roles.length} roles).`,
+    )
+  } else if (row.decision_maker_coverage != null && row.decision_maker_coverage > 0) {
+    confidenceItems.push(
+      `Decision maker coverage ${Math.round(row.decision_maker_coverage * 100)}% from indexed records.`,
+    )
+  }
+
   let recommended: string | null = null
   if (row.is_suppressed) {
     recommended = "Do not push — company or contact is suppressed from outreach."
+  } else if (contactIntel?.outreach_recommendation) {
+    recommended = contactIntel.outreach_recommendation
   } else if (row.in_lead_inbox) {
     recommended = "Open Lead Inbox workspace to review before additional action."
   } else if (row.existing_customer) {

@@ -34,12 +34,16 @@ export function GrowthLeadEngineWorkspace() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [handoffApplied, setHandoffApplied] = useState(false)
+  const [contactHandoff, setContactHandoff] = useState<
+    import("@/lib/growth/prospect-search/prospect-search-contact-intelligence-types").ProspectSearchLeadEngineContactHandoffContext | null
+  >(null)
 
   useEffect(() => {
     if (handoffApplied || !searchParams) return
     const handoff = parseProspectSearchLeadEngineHandoffParams(searchParams)
     if (!handoff) return
     setInput(handoff)
+    setContactHandoff(handoff.contactHandoff ?? null)
     setActivePresetId(null)
     setHandoffApplied(true)
   }, [handoffApplied, searchParams])
@@ -179,6 +183,26 @@ export function GrowthLeadEngineWorkspace() {
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
             {error}
+          </div>
+        ) : null}
+
+        {contactHandoff ? (
+          <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50/60 px-3 py-2 text-sm text-violet-950">
+            <p className="font-semibold">Prospect Search contact context preloaded</p>
+            {contactHandoff.summary ? (
+              <p className="mt-1 text-xs">{contactHandoff.summary}</p>
+            ) : (
+              <p className="mt-1 text-xs">
+                {contactHandoff.contact_count} evidence-backed contact
+                {contactHandoff.contact_count === 1 ? "" : "s"}
+                {contactHandoff.first_contact_role
+                  ? ` · first contact: ${contactHandoff.first_contact_role}`
+                  : ""}
+                {contactHandoff.first_contact_confidence != null
+                  ? ` (${Math.round(contactHandoff.first_contact_confidence * 100)}%)`
+                  : ""}
+              </p>
+            )}
           </div>
         ) : null}
 
