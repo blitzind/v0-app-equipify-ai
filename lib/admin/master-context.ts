@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-27T21:03:34.710Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-27T21:09:45.437Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -400,7 +400,7 @@ ${MCG_SCAN_SECTION}
 - **Accessibility:** Semantic headings, focus rings (\`--ring\`), sufficient contrast; prefer Radix primitives from \`components/ui\`.
 
 ## Known Limitations / Technical Debt
-- Growth outbound operational send plane v1 (`growth-operational-send-plane-v1`): live Google mailbox + transport orchestrator path; Microsoft preview-only; warmup execution disabled; unified pre-send read layer only (legacy suppression tables retained). See \`docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md\`.
+- Growth outbound operational send plane v1 + internal outbound ops Phase 1 (`growth-internal-outbound-ops-v1`): live Google mailbox + transport orchestrator; internal ops center at \`/admin/growth/infrastructure/outbound-operations\`; Microsoft preview-only; warmup execution disabled; unified pre-send gate with infrastructure guards; DNS manual verification only. See \`docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md\`.
 - Demo/mock layers (\`tenant-store\`, some portal pages) can drift from production RBAC.
 - Settings surfaces: **personal** notification channel preferences and static reminder cadence cards are **not** persisted until dedicated APIs exist — workspace alert/digest/quiet prefs use \`notification-preferences\` — see \`docs/SETTINGS_WIRING_AUDIT.md\`.
 - Capability enforcement: some routes (e.g. parts of Communications / AI-Ops) still use raw \`organization_members.role\` branching; Settings nav intentionally uses role-default permissions — see \`docs/PERMISSIONS_ENFORCEMENT_AUDIT.md\`.

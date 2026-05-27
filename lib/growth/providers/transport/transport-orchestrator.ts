@@ -115,6 +115,7 @@ async function executeAttemptOnRoute(
     message: { to: string; subject: string; html?: string; text?: string }
     lead_id?: string | null
     sequence_enrollment_id?: string | null
+    sender_pool_id?: string | null
     actorUserId: string
     actorEmail: string
     is_test?: boolean
@@ -126,6 +127,7 @@ async function executeAttemptOnRoute(
     email: input.message.to,
     leadId: input.lead_id,
     senderAccountId: input.sender_account_id,
+    senderPoolId: input.sender_pool_id,
   })
 
   if (!suppression.allowed) {
@@ -401,6 +403,7 @@ export async function executeTransportSend(
     message: { to: input.to, subject: input.subject, html: input.html, text: input.text },
     lead_id: input.lead_id,
     sequence_enrollment_id: input.sequence_enrollment_id,
+    sender_pool_id: input.sender_pool_id,
     actorUserId: input.actorUserId,
     actorEmail: input.actorEmail,
     is_test: input.is_test,
@@ -430,6 +433,7 @@ export async function executeTransportSend(
     message: { to: input.to, subject: input.subject, html: input.html, text: input.text },
     lead_id: input.lead_id,
     sequence_enrollment_id: input.sequence_enrollment_id,
+    sender_pool_id: input.sender_pool_id,
     actorUserId: input.actorUserId,
     actorEmail: input.actorEmail,
     is_test: input.is_test,

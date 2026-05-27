@@ -6,7 +6,7 @@ import { useAdmin } from "@/lib/admin-store"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import { GrowthSenderInfrastructureDashboard } from "@/components/growth/growth-sender-infrastructure-dashboard"
 import { GrowthInfrastructureReadinessStrip } from "@/components/growth/growth-infrastructure-readiness-strip"
-import { GROWTH_INFRASTRUCTURE_READINESS_QA_MARKER } from "@/lib/growth/infrastructure/infrastructure-readiness-types"
+import { GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER } from "@/lib/growth/operations/internal-outbound-ops-types"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -25,7 +25,7 @@ export default function AdminGrowthInfrastructurePage() {
 
   return (
     <PlatformAdminPageShell header={header}>
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8" data-qa-marker={GROWTH_INFRASTRUCTURE_READINESS_QA_MARKER}>
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8" data-qa-marker={GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER}>
         <PlatformAdminTabNav activeKey="growth_leads" />
 
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -42,6 +42,9 @@ export default function AdminGrowthInfrastructurePage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" asChild>
+                <Link href="/admin/growth/infrastructure/outbound-operations">Outbound Operations</Link>
+              </Button>
               <Button type="button" variant="outline" size="sm" asChild>
                 <Link href="/admin/growth/infrastructure/mailboxes">Mailbox Connections</Link>
               </Button>

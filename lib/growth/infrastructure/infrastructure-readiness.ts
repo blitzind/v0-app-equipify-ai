@@ -58,7 +58,10 @@ export function resolveMailboxProviderReadiness(
 }
 
 export function resolveDnsValidationReadiness(): GrowthInfrastructureReadinessDescriptor {
-  return descriptor("stub", "DNS validation records are advisory — no live DNS probe execution.")
+  return descriptor(
+    "stub",
+    "MANUAL VERIFICATION REQUIRED — no live DNS probe; operator must verify SPF/DKIM/DMARC/MX externally.",
+  )
 }
 
 export function resolveWarmupReadiness(): GrowthInfrastructureReadinessDescriptor {

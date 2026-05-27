@@ -1,6 +1,6 @@
 /** Client-safe infrastructure readiness labels (operational send plane v1). */
 
-export const GROWTH_INFRASTRUCTURE_READINESS_QA_MARKER = "growth-operational-send-plane-v1" as const
+export const GROWTH_INFRASTRUCTURE_READINESS_QA_MARKER = "growth-internal-outbound-ops-v1" as const
 
 export const GROWTH_INFRASTRUCTURE_READINESS_STATUSES = [
   "live",
@@ -9,6 +9,8 @@ export const GROWTH_INFRASTRUCTURE_READINESS_STATUSES = [
   "preview_only",
   "disabled",
   "internal",
+  "error",
+  "degraded",
 ] as const
 
 export type GrowthInfrastructureReadinessStatus = (typeof GROWTH_INFRASTRUCTURE_READINESS_STATUSES)[number]
@@ -26,6 +28,8 @@ export const GROWTH_INFRASTRUCTURE_READINESS_LABELS: Record<GrowthInfrastructure
   preview_only: "Preview only",
   disabled: "Disabled",
   internal: "Internal",
+  error: "Error",
+  degraded: "Degraded",
 }
 
 export function growthInfrastructureReadinessLabel(

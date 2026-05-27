@@ -155,6 +155,21 @@ export async function listMailboxConnections(admin: SupabaseClient): Promise<Gro
   return (data ?? []).map((row) => mapSummary(row as MailboxRow))
 }
 
+export async function getMailboxConnectionBySender(
+  admin: SupabaseClient,
+  senderAccountId: string,
+): Promise<GrowthMailboxConnectionSummary | null> {
+  const { data, error } = await activeConnectionsQuery(admin)
+    .select("*")
+    .eq("sender_account_id", senderAccountId)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  if (!data) return null
+  return recomputeMailboxHealth(admin, data as MailboxRow)
+}
+
 export async function getMailboxConnection(
   admin: SupabaseClient,
   mailboxId: string,

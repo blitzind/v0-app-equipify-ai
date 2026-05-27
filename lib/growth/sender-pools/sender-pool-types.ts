@@ -82,6 +82,8 @@ export type GrowthSenderPoolMember = {
   manualPriority: number
   lastSelectedAt: string | null
   cooldownUntil: string | null
+  operationalPauseReason: string | null
+  operationalPausedAt: string | null
   notes: string
   createdAt: string
   updatedAt: string

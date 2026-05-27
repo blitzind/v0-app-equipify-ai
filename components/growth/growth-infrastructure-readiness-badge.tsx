@@ -11,6 +11,8 @@ const STATUS_STYLES: Record<GrowthInfrastructureReadinessDescriptor["status"], s
   preview_only: "border-violet-300 bg-violet-100 text-violet-950 ring-1 ring-violet-400/40",
   disabled: "border-rose-200 bg-rose-50 text-rose-900 ring-1 ring-rose-300/40",
   internal: "border-sky-300 bg-sky-100 text-sky-950 ring-1 ring-sky-400/30",
+  error: "border-rose-400 bg-rose-100 text-rose-950 ring-2 ring-rose-500/50",
+  degraded: "border-amber-400 bg-amber-100 text-amber-950 ring-1 ring-amber-500/40",
 }
 
 export function GrowthInfrastructureReadinessBadge({

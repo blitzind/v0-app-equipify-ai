@@ -3,21 +3,27 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GrowthPreSendSuppressionResult } from "@/lib/growth/compliance/compliance-types"
 import { evaluatePreSendSuppression } from "@/lib/growth/compliance/suppression-engine"
+import { evaluatePreSendInfrastructureAllowed } from "@/lib/growth/compliance/pre-send-infrastructure-guards"
 import { isEmailSuppressed } from "@/lib/growth/outbound/suppression-repository"
+import { recordInternalOutboundAuditEvent } from "@/lib/growth/operations/internal-outbound-audit"
+import { GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER } from "@/lib/growth/operations/internal-outbound-ops-types"
 
-export const GROWTH_PRE_SEND_ASSERTION_QA_MARKER = "growth-operational-send-plane-v1" as const
+export const GROWTH_PRE_SEND_ASSERTION_QA_MARKER = GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER
 
 export type GrowthPreSendAssertionInput = {
   email: string
   leadId?: string | null
   senderAccountId?: string
+  senderPoolId?: string | null
+  skipInfrastructureChecks?: boolean
 }
 
 export type GrowthPreSendAssertionResult = GrowthPreSendSuppressionResult & {
-  blockLayer: "compliance" | "outbound_suppression" | null
+  blockLayer: "compliance" | "outbound_suppression" | "infrastructure" | null
+  infrastructureBlockCode?: string | null
 }
 
-/** Unified read/evaluation layer across compliance + outbound suppression tables. */
+/** Unified read/evaluation layer: compliance → outbound suppression → infrastructure guards. */
 export async function evaluatePreSendAllowed(
   admin: SupabaseClient,
   input: GrowthPreSendAssertionInput,
@@ -38,6 +44,33 @@ export async function evaluatePreSendAllowed(
       reason: "Recipient is on the outbound suppression list.",
       blockCode: "suppression",
       blockLayer: "outbound_suppression",
+    }
+  }
+
+  if (input.senderAccountId && !input.skipInfrastructureChecks) {
+    const infrastructure = await evaluatePreSendInfrastructureAllowed(admin, {
+      senderAccountId: input.senderAccountId,
+      senderPoolId: input.senderPoolId,
+      recipientEmail: input.email,
+    })
+
+    if (!infrastructure.allowed) {
+      await recordInternalOutboundAuditEvent(admin, {
+        eventType: "pre_send_blocked",
+        severity: "high",
+        title: "Pre-send blocked by infrastructure guard",
+        summary: infrastructure.reason,
+        senderAccountId: input.senderAccountId,
+        metadata: { block_code: infrastructure.blockCode, recipient: input.email },
+      }).catch(() => undefined)
+
+      return {
+        allowed: false,
+        reason: infrastructure.reason,
+        blockCode: "suppression",
+        blockLayer: "infrastructure",
+        infrastructureBlockCode: infrastructure.blockCode,
+      }
     }
   }
 

@@ -85,6 +85,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["inbox", "reply", "thread", "unified inbox", "reply intelligence"],
   },
   {
+    id: "internal-outbound-operations",
+    label: "Internal Outbound Operations",
+    href: "/admin/growth/infrastructure/outbound-operations",
+    keywords: ["internal", "outbound", "operations", "mailboxes", "sender pools", "deliverability"],
+  },
+  {
     id: "outbound-operations",
     label: "Outbound Operations",
     href: "/admin/growth/operations/outbound",
@@ -686,9 +692,15 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
     label: "Providers",
     items: [
       {
+        id: "internal-outbound-operations",
+        href: "/admin/growth/infrastructure/outbound-operations",
+        label: "Internal Outbound Ops",
+        match: prefixMatch("/admin/growth/infrastructure/outbound-operations"),
+      },
+      {
         id: "outbound-operations",
         href: "/admin/growth/operations/outbound",
-        label: "Outbound Operations",
+        label: "Cron Telemetry",
         match: prefixMatch("/admin/growth/operations/outbound"),
       },
       {

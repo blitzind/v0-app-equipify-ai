@@ -108,4 +108,18 @@ Production build guard:
 tsx scripts/verify-growth-production-runtime.ts
 ```
 
-(runs automatically before `pnpm build`)
+## Internal Outbound Operations (Phase 1)
+
+QA marker: `growth-internal-outbound-ops-v1`
+
+**Primary ops center:** `/admin/growth/infrastructure/outbound-operations`
+
+Consolidates mailboxes, domains (manual DNS verification), sender pools, queue/cron health, deliverability metrics, Google provider status, and operational audit events.
+
+**Migration:** `20270528120000_growth_engine_internal_outbound_ops.sql` — `internal_outbound_audit_events`, sender pool operational pause columns.
+
+**Extended pre-send gate:** `assertPreSendAllowed()` now evaluates compliance → outbound suppression → infrastructure guards (sender health, mailbox, domain protection, pool pause).
+
+**Sender operational pause:** Critical fatigue auto-pauses pool members with audit trail — no automatic re-enable.
+
+**DNS:** MANUAL VERIFICATION REQUIRED — stub flags only; readiness states include `error` and `degraded`.

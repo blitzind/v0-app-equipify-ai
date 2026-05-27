@@ -154,6 +154,17 @@ export async function resolveSenderRotationForPool(
             signals: { member_status: ctx.memberStatus },
           }).catch(() => undefined)
         }
+        if (signal.severity === "critical") {
+          const { applyOperationalPauseForFatigue } = await import(
+            "@/lib/growth/sender-pools/sender-operational-pause"
+          )
+          await applyOperationalPauseForFatigue(admin, {
+            memberId: member.id,
+            senderAccountId: ctx.senderAccountId,
+            senderPoolId: pool.id,
+            signal,
+          }).catch(() => undefined)
+        }
       }
       contexts.push(ctx)
     }

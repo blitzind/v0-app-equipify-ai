@@ -75,6 +75,8 @@ function mapMember(row: Record<string, unknown>, senderLabel = "Sender"): Growth
     manualPriority: asNumber(row.manual_priority, 100),
     lastSelectedAt: asString(row.last_selected_at) || null,
     cooldownUntil: asString(row.cooldown_until) || null,
+    operationalPauseReason: asString(row.operational_pause_reason) || null,
+    operationalPausedAt: asString(row.operational_paused_at) || null,
     notes: asString(row.notes),
     createdAt: asString(row.created_at),
     updatedAt: asString(row.updated_at),

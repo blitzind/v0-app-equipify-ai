@@ -20,7 +20,7 @@ import { DEV_FALLBACK_CREDENTIAL_PEPPER, isUsingDevFallbackCredentialPepper } fr
 
 async function main(): Promise<void> {
   assert.equal(GROWTH_CRON_TELEMETRY_QA_MARKER, "growth-operational-send-plane-v1")
-  assert.equal(GROWTH_INFRASTRUCTURE_READINESS_QA_MARKER, "growth-operational-send-plane-v1")
+  assert.equal(GROWTH_INFRASTRUCTURE_READINESS_QA_MARKER, "growth-internal-outbound-ops-v1")
   assert.equal(GROWTH_CRON_ROUTE_IDS.length, 10)
 
   const migration = fs.readFileSync(
@@ -59,7 +59,7 @@ async function main(): Promise<void> {
   assert.match(transport, /assertGrowthProductionRuntimeSafe/)
 
   const preSend = fs.readFileSync(path.join(process.cwd(), "lib/growth/compliance/pre-send-assertion.ts"), "utf8")
-  assert.match(preSend, /growth-operational-send-plane-v1/)
+  assert.match(preSend, /growth-internal-outbound-ops-v1|GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER/)
   assert.match(preSend, /evaluatePreSendSuppression/)
   assert.match(preSend, /isEmailSuppressed/)
 

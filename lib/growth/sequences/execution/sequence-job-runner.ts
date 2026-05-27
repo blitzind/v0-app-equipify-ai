@@ -1,7 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { assertPreSendSuppressionAllowed } from "@/lib/growth/compliance/suppression-engine"
+import { assertPreSendAllowed } from "@/lib/growth/compliance/pre-send-assertion"
 import { enforceGovernanceIfReady } from "@/lib/growth/governance/governance-enforcement"
 import { advanceGrowthSequenceEnrollmentAfterStep } from "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
 import { skipGrowthSequenceEnrollmentStep } from "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
@@ -225,10 +225,11 @@ export async function runSequenceExecutionJob(
     return { ok: false, jobId: locked.id, status: "blocked", message: code, blocked: true }
   }
 
-  const suppression = await assertPreSendSuppressionAllowed(admin, {
+  const suppression = await assertPreSendAllowed(admin, {
     email: payload.to,
     leadId: locked.leadId,
     senderAccountId: payload.senderAccountId,
+    senderPoolId: payload.senderPoolId ?? locked.senderPoolId,
   })
   if (!suppression.allowed) {
     await finalizeBlockedJob(admin, locked, suppression.reason ?? "suppression_blocked")

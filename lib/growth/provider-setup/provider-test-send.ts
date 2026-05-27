@@ -98,6 +98,19 @@ export async function runProviderTestSend(
         .from("provider_connection_settings")
         .update({ last_test_send_at: new Date().toISOString(), status: "connected" })
         .eq("provider_family", input.providerFamily)
+
+      const { recordInternalOutboundAuditEvent } = await import("@/lib/growth/operations/internal-outbound-audit")
+      await recordInternalOutboundAuditEvent(admin, {
+        eventType: "send_verification_recorded",
+        severity: "low",
+        title: "Provider test send verified",
+        summary: `Test send via ${input.providerFamily} transport orchestrator succeeded.`,
+        senderAccountId: input.senderAccountId,
+        deliveryAttemptId: result.attempt?.id ?? null,
+        actorUserId: input.actorUserId,
+        actorEmail: input.actorEmail,
+        metadata: { provider_family: input.providerFamily, is_test: true },
+      }).catch(() => undefined)
     }
 
     await recordProviderConnectionCheck(admin, {
