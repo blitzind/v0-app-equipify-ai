@@ -140,6 +140,9 @@ export async function runProspectSearch(
     index_mode: useMaterialized ? "materialized" : "fallback",
     index_row_count: materializedAvailable ? materializedStats.row_count : null,
     last_indexed_at: materializedAvailable ? materializedStats.last_indexed_at : null,
+    territory_radius_note: mergedFilters.territory_filter?.radius
+      ? "Radius filter uses indexed coordinates only — companies without lat/lng are excluded."
+      : null,
   }
   logProspectSearchIndexMode(index_diagnostics)
 
@@ -149,6 +152,7 @@ export async function runProspectSearch(
   if (useMaterialized) {
     indexCompanies = await loadProspectSearchMaterializedCompanies(admin, {
       query: input.query,
+      territory_filter: mergedFilters.territory_filter,
     })
     const leadNames = new Map<string, string>()
     for (const company of indexCompanies) {

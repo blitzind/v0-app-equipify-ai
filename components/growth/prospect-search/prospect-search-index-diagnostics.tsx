@@ -15,13 +15,16 @@ export function ProspectSearchIndexDiagnostics({
     : null
 
   return (
-    <p
-      className="mt-1 text-[11px] text-muted-foreground"
+    <div
+      className="mt-1 space-y-0.5 text-[11px] text-muted-foreground"
       data-qa-marker="growth-prospect-search-index-diagnostics-v1"
     >
-      Index: {modeLabel}
-      {diagnostics.index_row_count != null ? ` · ${diagnostics.index_row_count.toLocaleString()} rows` : ""}
-      {indexedAt ? ` · Last indexed ${indexedAt}` : ""}
-    </p>
+      <p>
+        Index: {modeLabel}
+        {diagnostics.index_row_count != null ? ` · ${diagnostics.index_row_count.toLocaleString()} rows` : ""}
+        {indexedAt ? ` · Last indexed ${indexedAt}` : ""}
+      </p>
+      {diagnostics.territory_radius_note ? <p>{diagnostics.territory_radius_note}</p> : null}
+    </div>
   )
 }

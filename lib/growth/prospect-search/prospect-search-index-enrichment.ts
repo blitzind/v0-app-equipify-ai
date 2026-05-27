@@ -1,7 +1,8 @@
 /** Map existing enrichment/research fields onto Prospect Search index rows (Sprint 2). */
 
-import type { GrowthProspectSearchIndexCompany } from "@/lib/growth/prospect-search/prospect-search-index"
+import type { GrowthProspectSearchIndexCompany } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthProspectSearchSourceType } from "@/lib/growth/prospect-search/prospect-search-types"
+import { buildProspectSearchRowGeoFields } from "@/lib/growth/prospect-search/prospect-search-geo"
 
 export const GROWTH_PROSPECT_SEARCH_INDEX_ENRICHMENT_QA_MARKER =
   "growth-prospect-search-index-enrichment-v1" as const
@@ -125,6 +126,22 @@ export function formatEstimatedValueCents(value: unknown): string | null {
   return `$${Math.round(value / 100).toLocaleString("en-US")}`
 }
 
+type ProspectSearchGeoFields = Pick<
+  GrowthProspectSearchIndexCompany,
+  "postal_code" | "country" | "metro" | "lat" | "lng"
+>
+
+function mapGeoFields(input: {
+  city?: string | null
+  state?: string | null
+  postal_code?: string | null
+  country?: string | null
+  service_area?: string | null
+  metadata?: Record<string, unknown>
+}): ProspectSearchGeoFields {
+  return buildProspectSearchRowGeoFields(input)
+}
+
 export function mapGrowthLeadIndexEnrichment(input: {
   raw: Record<string, unknown>
   research?: ProspectSearchResearchOverlay | null
@@ -144,6 +161,11 @@ export function mapGrowthLeadIndexEnrichment(input: {
   | "website_platform"
   | "field_service_software"
   | "keywords"
+  | "postal_code"
+  | "country"
+  | "metro"
+  | "lat"
+  | "lng"
 > {
   const meta = metaRecord(input.raw.metadata)
   const research = input.research
@@ -189,6 +211,14 @@ export function mapGrowthLeadIndexEnrichment(input: {
       pickFieldServiceSoftwareFromTechnologies(technologies),
     ),
     keywords: [],
+    ...mapGeoFields({
+      city: asString(input.raw.city),
+      state: asString(input.raw.state),
+      postal_code: asString(input.raw.postal_code),
+      country: asString(input.raw.country),
+      service_area: metaString(meta, "service_area", "service_area_clues"),
+      metadata: meta,
+    }),
   }
 }
 
@@ -210,6 +240,11 @@ export function mapLeadInboxIndexEnrichment(input: {
   | "website_platform"
   | "field_service_software"
   | "keywords"
+  | "postal_code"
+  | "country"
+  | "metro"
+  | "lat"
+  | "lng"
 > {
   const meta = metaRecord(input.raw.metadata)
 
@@ -238,6 +273,14 @@ export function mapLeadInboxIndexEnrichment(input: {
     website_platform: metaString(meta, "website_platform"),
     field_service_software: metaString(meta, "field_service_software", "field_service_stack_detected"),
     keywords: [],
+    ...mapGeoFields({
+      city: metaString(meta, "city"),
+      state: metaString(meta, "state"),
+      postal_code: metaString(meta, "postal_code", "zip"),
+      country: metaString(meta, "country"),
+      service_area: metaString(meta, "service_area"),
+      metadata: meta,
+    }),
   }
 }
 
@@ -259,6 +302,11 @@ export function mapCrmProspectIndexEnrichment(input: {
   | "website_platform"
   | "field_service_software"
   | "keywords"
+  | "postal_code"
+  | "country"
+  | "metro"
+  | "lat"
+  | "lng"
 > {
   const notes = asString(input.raw.notes)
 
@@ -282,6 +330,12 @@ export function mapCrmProspectIndexEnrichment(input: {
     website_platform: null,
     field_service_software: null,
     keywords: [],
+    ...mapGeoFields({
+      city: asString(input.raw.city),
+      state: asString(input.raw.state),
+      postal_code: asString(input.raw.postal_code),
+      service_area: null,
+    }),
   }
 }
 
@@ -304,6 +358,11 @@ export function mapCrmCustomerIndexEnrichment(input: {
   | "website_platform"
   | "field_service_software"
   | "keywords"
+  | "postal_code"
+  | "country"
+  | "metro"
+  | "lat"
+  | "lng"
 > {
   const notes = asString(input.raw.notes)
   const locationOverlay = input.location
@@ -328,6 +387,12 @@ export function mapCrmCustomerIndexEnrichment(input: {
     website_platform: null,
     field_service_software: null,
     keywords: [],
+    ...mapGeoFields({
+      city: locationOverlay?.city,
+      state: locationOverlay?.state,
+      postal_code: locationOverlay?.postal_code,
+      service_area: null,
+    }),
   }
 }
 

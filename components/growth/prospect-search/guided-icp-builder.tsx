@@ -4,6 +4,7 @@ import { FilterGroupCard } from "@/components/growth/prospect-search/filter-grou
 import { RecommendedFilters } from "@/components/growth/prospect-search/recommended-filters"
 import { SmartFilterInput } from "@/components/growth/prospect-search/smart-filter-input"
 import { TitleTargetingCard } from "@/components/growth/prospect-search/title-targeting-card"
+import { TerritoryFilterCard } from "@/components/growth/prospect-search/territory-filter-card"
 import {
   PROSPECT_SEARCH_EMPLOYEE_BANDS_UI,
   PROSPECT_SEARCH_INTENT_PRESETS,
@@ -122,7 +123,7 @@ export function GuidedIcpBuilder({
           </div>
         </FilterGroupCard>
 
-        <FilterGroupCard title="Location" description="State or region">
+        <FilterGroupCard title="Location" description="Free-text region (backward compatible)">
           <SmartFilterInput
             label="Location"
             field="location"
@@ -135,6 +136,10 @@ export function GuidedIcpBuilder({
             query={filters.location ?? ""}
             onPick={(v) => onChange({ ...filters, location: v })}
           />
+        </FilterGroupCard>
+
+        <FilterGroupCard title="Territory" description="Structured state, city, ZIP, and radius filters">
+          <TerritoryFilterCard filters={filters} onChange={onChange} />
         </FilterGroupCard>
 
         <FilterGroupCard title="Intent" description="Observable buying & traffic signals">

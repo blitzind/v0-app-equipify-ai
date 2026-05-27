@@ -1337,6 +1337,280 @@ async function main(): Promise<void> {
   assert.match(shellSource, /ProspectSearchIndexDiagnostics/)
   assert.match(shellSource, /page_size/)
 
+  const territoryMigration = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "supabase/migrations/20270402120000_growth_engine_prospect_search_territory_geo.sql",
+    ),
+    "utf8",
+  )
+  assert.match(territoryMigration, /lat numeric/)
+  assert.match(territoryMigration, /normalized_geo_key/)
+
+  const {
+    GROWTH_PROSPECT_SEARCH_GEO_QA_MARKER,
+    buildNormalizedGeoKey,
+    evaluateTerritoryMatch,
+    haversineDistanceMiles,
+    normalizeCity,
+    normalizePostalCode,
+    normalizeState,
+    normalizeTerritoryFilter,
+    parseTerritoryInput,
+    rowMatchesTerritoryFilter,
+  } = await import("../lib/growth/prospect-search/prospect-search-geo")
+
+  assert.equal(GROWTH_PROSPECT_SEARCH_GEO_QA_MARKER, "growth-prospect-search-geo-v1")
+  assert.equal(normalizeState("Tennessee"), "TN")
+  assert.equal(normalizeState("tn"), "TN")
+  assert.equal(normalizeCity("Nashville metro"), "nashville")
+  assert.equal(normalizePostalCode("37745-1234"), "37745")
+  assert.equal(buildNormalizedGeoKey({ city: "Nashville", state: "TN", postal_code: "37201" }), "tn|nashville|37201")
+
+  const parsedTn = parseTerritoryInput("TN")
+  assert.deepEqual(parsedTn.states, ["TN"])
+  const parsedCityState = parseTerritoryInput("Greeneville, TN")
+  assert.deepEqual(parsedCityState.states, ["TN"])
+  assert.equal(parsedCityState.cities?.[0], "greeneville")
+  const parsedZip = parseTerritoryInput("37745")
+  assert.deepEqual(parsedZip.postal_codes, ["37745"])
+  const parsedMetro = parseTerritoryInput("Nashville metro")
+  assert.deepEqual(parsedMetro.metros, ["nashville"])
+
+  const row = {
+    city: "Greeneville",
+    state: "TN",
+    postal_code: "37745",
+    country: "US",
+    location: "Greeneville, TN",
+    service_area: "East Tennessee",
+    metro: "greeneville",
+    lat: 36.1631,
+    lng: -82.8307,
+  }
+
+  assert.ok(
+    rowMatchesTerritoryFilter(row, normalizeTerritoryFilter({ states: ["Tennessee"] })!),
+  )
+  assert.ok(
+    rowMatchesTerritoryFilter(row, normalizeTerritoryFilter({ cities: ["Greeneville"], states: ["TN"] })!),
+  )
+  assert.ok(
+    rowMatchesTerritoryFilter(row, normalizeTerritoryFilter({ postal_codes: ["37745"] })!),
+  )
+
+  const radiusMatch = evaluateTerritoryMatch(row, {
+    radius: { center_lat: 36.16, center_lng: -82.83, miles: 25, label: "Greeneville" },
+  })
+  assert.ok(radiusMatch.matches)
+  assert.ok(radiusMatch.reasons.some((reason) => /Within 25 miles/i.test(reason)))
+
+  const missingCoords = evaluateTerritoryMatch(
+    { ...row, lat: null, lng: null },
+    { radius: { center_lat: 36.16, center_lng: -82.83, miles: 25 } },
+  )
+  assert.equal(missingCoords.matches, false)
+
+  assert.ok(haversineDistanceMiles(36.16, -82.83, 36.1631, -82.8307) < 5)
+
+  const territoryFiltered = applyProspectSearchFilters(
+    [
+      {
+        id: "1",
+        source_type: "growth_lead",
+        company_name: "TN Co",
+        website: null,
+        industry: "HVAC",
+        subindustry: null,
+        employees: null,
+        revenue_range: null,
+        location: "Nashville, TN",
+        city: "Nashville",
+        state: "TN",
+        postal_code: "37201",
+        country: "US",
+        metro: "nashville",
+        lat: 36.1627,
+        lng: -86.7816,
+        service_area: null,
+        notes: null,
+        keywords: [],
+        crm_detected: null,
+        website_platform: null,
+        field_service_software: null,
+        intent_score: null,
+        buying_stage: null,
+        buying_stage_confidence: null,
+        buying_stage_reason: null,
+        buying_stage_last_assessed_at: null,
+        lead_score: null,
+        lead_engine_score: null,
+        lead_engine_score_label: null,
+        lead_engine_score_explanation: null,
+        lead_engine_last_run_at: null,
+        company_match_confidence: null,
+        decision_maker_count: 0,
+        verification_status: "unverified",
+        priority: null,
+        signals: [],
+        search_intent_category: null,
+        returning_visitor: false,
+        existing_account: false,
+        in_lead_inbox: false,
+        existing_customer: false,
+        existing_prospect: false,
+        already_pushed: false,
+        is_suppressed: false,
+        suppression_reason: null,
+        suppression_scope: null,
+        suppressed_at: null,
+        lead_inbox_id: null,
+        growth_lead_id: "1",
+        prospect_id: null,
+        customer_id: null,
+      },
+      {
+        id: "2",
+        source_type: "growth_lead",
+        company_name: "TX Co",
+        website: null,
+        industry: "HVAC",
+        subindustry: null,
+        employees: null,
+        revenue_range: null,
+        location: "Austin, TX",
+        city: "Austin",
+        state: "TX",
+        postal_code: "78701",
+        country: "US",
+        metro: "austin",
+        lat: 30.2672,
+        lng: -97.7431,
+        service_area: null,
+        notes: null,
+        keywords: [],
+        crm_detected: null,
+        website_platform: null,
+        field_service_software: null,
+        intent_score: null,
+        buying_stage: null,
+        buying_stage_confidence: null,
+        buying_stage_reason: null,
+        buying_stage_last_assessed_at: null,
+        lead_score: null,
+        lead_engine_score: null,
+        lead_engine_score_label: null,
+        lead_engine_score_explanation: null,
+        lead_engine_last_run_at: null,
+        company_match_confidence: null,
+        decision_maker_count: 0,
+        verification_status: "unverified",
+        priority: null,
+        signals: [],
+        search_intent_category: null,
+        returning_visitor: false,
+        existing_account: false,
+        in_lead_inbox: false,
+        existing_customer: false,
+        existing_prospect: false,
+        already_pushed: false,
+        is_suppressed: false,
+        suppression_reason: null,
+        suppression_scope: null,
+        suppressed_at: null,
+        lead_inbox_id: null,
+        growth_lead_id: "2",
+        prospect_id: null,
+        customer_id: null,
+      },
+    ],
+    normalizeProspectSearchFilters({
+      territory_filter: { states: ["TN"] },
+    }),
+  )
+  assert.equal(territoryFiltered.length, 1)
+  assert.equal(territoryFiltered[0]!.company_name, "TN Co")
+
+  const locationCompat = applyProspectSearchFilters(
+    territoryFiltered,
+    normalizeProspectSearchFilters({ location: "Nashville" }),
+  )
+  assert.equal(locationCompat.length, 1)
+
+  const savedRoundTrip = normalizeProspectSearchFilters({
+    territory_filter: {
+      states: ["TN"],
+      cities: ["Nashville"],
+      postal_codes: ["37201"],
+      radius: { center_lat: 36.16, center_lng: -86.78, miles: 30, label: "Nashville" },
+    },
+  })
+  assert.ok(savedRoundTrip.territory_filter?.states?.includes("TN"))
+  assert.ok(savedRoundTrip.territory_filter?.radius?.miles === 30)
+
+  const territoryExplained = buildProspectSearchExplanations({
+    row: {
+      company_name: "TN Co",
+      website: null,
+      industry: "HVAC",
+      location: "Nashville, TN",
+      city: "Nashville",
+      state: "TN",
+      postal_code: "37201",
+      country: "US",
+      metro: "nashville",
+      lat: 36.1627,
+      lng: -86.7816,
+      service_area: "Middle Tennessee",
+      signals: [],
+      match_reasoning: [],
+      rank_score: 0.6,
+      confidence: 0.7,
+      signal_confidence: null,
+      lead_engine_score: null,
+      lead_engine_score_explanation: null,
+      lead_score: null,
+      buying_stage: null,
+      buying_stage_reason: null,
+      intent_score: null,
+      search_intent_category: null,
+      company_match_confidence: null,
+      crm_detected: null,
+      field_service_software: null,
+      website_platform: null,
+      company_signal_summary: null,
+      existing_customer: false,
+      existing_prospect: false,
+      in_lead_inbox: false,
+      is_suppressed: false,
+      suppression_reason: null,
+      source_type: "growth_lead",
+    },
+    filters: savedRoundTrip,
+  })
+  assert.ok(territoryExplained.score_explanation_items.some((item) => /state/i.test(item)))
+
+  const pagedTerritory = paginateRankedProspectSearchCompanies(
+    territoryFiltered,
+    "",
+    parseProspectSearchQuery(""),
+    1,
+    10,
+    savedRoundTrip,
+  )
+  assert.equal(pagedTerritory.total_count, 1)
+
+  const geoSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-geo.ts"),
+    "utf8",
+  )
+  assert.match(geoSource, /parseTerritoryInput/)
+  assert.match(filtersSource, /territory_filter/)
+  assert.match(icpSource, /Territory/)
+  assert.match(companyCardSource, /matched_territory_label/)
+  assert.match(pushSource, /resolveProspectSearchCompanyResultsForPush/)
+  assert.match(repositorySource, /territory_radius_note/)
+
   console.log("growth-prospect-search: all checks passed")
 }
 

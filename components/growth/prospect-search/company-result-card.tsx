@@ -61,6 +61,16 @@ export function CompanyResultCard({
           {row.website ? (
             <p className="mt-0.5 truncate text-xs text-muted-foreground">{row.website}</p>
           ) : null}
+          {row.location ? (
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{row.location}</p>
+          ) : row.city || row.state || row.postal_code ? (
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {[row.city, row.state, row.postal_code].filter(Boolean).join(", ")}
+            </p>
+          ) : null}
+          {row.matched_territory_label ? (
+            <p className="mt-1 text-[11px] text-sky-800">{row.matched_territory_label}</p>
+          ) : null}
           <div className="mt-2 flex flex-wrap gap-1">
             {row.industry ? (
               <Badge variant="secondary" className="text-[10px]">

@@ -16,7 +16,8 @@ import {
   loadProspectSearchSuppressionLookup,
 } from "@/lib/growth/prospect-search/prospect-search-suppression-overlays"
 import { deriveProspectSearchCompanyStatus } from "@/lib/growth/prospect-search/prospect-search-status"
-import type { GrowthProspectSearchSourceType } from "@/lib/growth/prospect-search/prospect-search-types"
+import type { GrowthProspectSearchSourceType, GrowthProspectSearchTerritoryFilter } from "@/lib/growth/prospect-search/prospect-search-types"
+import { normalizeState } from "@/lib/growth/prospect-search/prospect-search-geo"
 
 export const GROWTH_PROSPECT_SEARCH_MATERIALIZED_INDEX_QA_MARKER =
   "growth-prospect-search-materialized-index-v1" as const
@@ -81,6 +82,7 @@ export async function loadProspectSearchMaterializedCompanies(
     query?: string
     source_type?: GrowthProspectSearchSourceType
     source_ids?: string[]
+    territory_filter?: GrowthProspectSearchTerritoryFilter
   },
 ): Promise<GrowthProspectSearchIndexCompany[]> {
   let query = admin
@@ -94,6 +96,20 @@ export async function loadProspectSearchMaterializedCompanies(
   }
   if (input.source_ids?.length) {
     query = query.in("source_id", input.source_ids.slice(0, 200))
+  }
+
+  const territory = input.territory_filter
+  if (territory?.country) query = query.eq("country", territory.country)
+  if (territory?.states?.length) {
+    query = query.in(
+      "state",
+      territory.states.map((state) => normalizeState(state)).filter(Boolean) as string[],
+    )
+  }
+  if (territory?.postal_codes?.length) query = query.in("postal_code", territory.postal_codes)
+  if (territory?.metros?.length) query = query.in("metro", territory.metros)
+  if (territory?.cities?.length && territory.cities.length === 1) {
+    query = query.ilike("city", `%${territory.cities[0]}%`)
   }
 
   const sanitized = sanitizeProspectSearchQuery(input.query ?? "")

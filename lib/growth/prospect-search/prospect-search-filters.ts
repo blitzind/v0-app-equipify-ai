@@ -10,6 +10,11 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthProspectSearchIndexCompany } from "@/lib/growth/prospect-search/prospect-search-index"
+import {
+  mergeLocationTextIntoTerritoryFilter,
+  normalizeTerritoryFilter,
+  rowMatchesTerritoryFilter,
+} from "@/lib/growth/prospect-search/prospect-search-geo"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -70,6 +75,10 @@ export function normalizeProspectSearchFilters(
         )
       : undefined,
     location: asString(raw.location) || null,
+    territory_filter: mergeLocationTextIntoTerritoryFilter({
+      location: asString(raw.location) || null,
+      territory_filter: normalizeTerritoryFilter(raw.territory_filter),
+    }),
     service_area: asString(raw.service_area) || null,
     company_age_years_min:
       typeof raw.company_age_years_min === "number" ? raw.company_age_years_min : null,
@@ -138,6 +147,25 @@ export function applyProspectSearchFilters<
       if (!includesFold(loc, filters.location)) return false
     }
     if (filters.service_area && !includesFold(row.service_area, filters.service_area)) {
+      return false
+    }
+    if (
+      filters.territory_filter &&
+      !rowMatchesTerritoryFilter(
+        {
+          city: row.city,
+          state: row.state,
+          postal_code: row.postal_code,
+          country: row.country,
+          location: row.location,
+          service_area: row.service_area,
+          metro: row.metro,
+          lat: row.lat,
+          lng: row.lng,
+        },
+        filters.territory_filter,
+      )
+    ) {
       return false
     }
     if (filters.employee_size_bands?.length) {

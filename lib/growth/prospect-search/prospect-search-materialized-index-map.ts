@@ -1,6 +1,15 @@
 import type { GrowthCompanySignalUiSummary } from "@/lib/growth/company-signals/company-signal-types"
 import type { GrowthProspectSearchIndexCompany } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthProspectSearchSourceType } from "@/lib/growth/prospect-search/prospect-search-types"
+import {
+  buildNormalizedGeoKey,
+  buildProspectSearchRowGeoFields,
+  inferMetroFromText,
+  normalizeCity,
+  normalizeCountry,
+  normalizePostalCode,
+  normalizeState,
+} from "@/lib/growth/prospect-search/prospect-search-geo"
 
 export type ProspectSearchMaterializedIndexRow = {
   id?: string
@@ -46,6 +55,10 @@ export type ProspectSearchMaterializedIndexRow = {
   suppression_scope_safe: string | null
   source_updated_at: string | null
   indexed_at?: string
+  lat?: number | null
+  lng?: number | null
+  metro?: string | null
+  normalized_geo_key?: string | null
   metadata: Record<string, unknown>
   is_active?: boolean
 }
@@ -88,6 +101,14 @@ export function indexCompanyToMaterializedRow(
   sourceUpdatedAt?: string | null,
 ): ProspectSearchMaterializedIndexRow {
   const domain = normalizeDomain(row.website)
+  const geo = buildProspectSearchRowGeoFields({
+    city: row.city,
+    state: row.state,
+    postal_code: row.postal_code,
+    country: row.country,
+    service_area: row.service_area,
+    metro: row.metro,
+  })
   const technologies = [
     row.crm_detected,
     row.field_service_software,
@@ -104,14 +125,22 @@ export function indexCompanyToMaterializedRow(
     website: row.website,
     email_domain: domain,
     phone: null,
-    city: row.city,
-    state: row.state,
-    postal_code: null,
-    country: null,
+    city: normalizeCity(row.city),
+    state: normalizeState(row.state),
+    postal_code: geo.postal_code,
+    country: geo.country,
     location_label: row.location,
     industry: row.industry,
     vertical: row.subindustry,
     service_area: row.service_area,
+    metro: geo.metro,
+    lat: geo.lat,
+    lng: geo.lng,
+    normalized_geo_key: buildNormalizedGeoKey({
+      city: row.city,
+      state: row.state,
+      postal_code: geo.postal_code,
+    }),
     employee_count: parseEmployeeCount(row.employees),
     employee_range: row.employees,
     estimated_annual_revenue: null,
@@ -187,6 +216,11 @@ export function materializedRowToIndexCompany(
     location: row.location_label,
     city: row.city,
     state: row.state,
+    postal_code: row.postal_code,
+    country: row.country,
+    metro: row.metro,
+    lat: typeof row.lat === "number" ? row.lat : null,
+    lng: typeof row.lng === "number" ? row.lng : null,
     service_area: row.service_area,
     notes: asString(meta.notes) || null,
     keywords,

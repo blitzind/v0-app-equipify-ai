@@ -23,3 +23,12 @@ export async function isGrowthProspectSearchIndexSchemaReady(admin: SupabaseClie
     .limit(1)
   return !error
 }
+
+export async function isGrowthProspectSearchTerritoryGeoReady(admin: SupabaseClient): Promise<boolean> {
+  const { error } = await admin
+    .schema("growth")
+    .from("prospect_search_index")
+    .select("lat, lng, metro, normalized_geo_key")
+    .limit(1)
+  return !error
+}

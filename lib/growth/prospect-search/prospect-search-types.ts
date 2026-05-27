@@ -94,6 +94,22 @@ export const GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS = [
 export type GrowthProspectSearchResultAction =
   (typeof GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS)[number]
 
+export type GrowthProspectSearchTerritoryRadiusFilter = {
+  center_lat: number
+  center_lng: number
+  miles: number
+  label?: string
+}
+
+export type GrowthProspectSearchTerritoryFilter = {
+  country?: string
+  states?: string[]
+  cities?: string[]
+  metros?: string[]
+  postal_codes?: string[]
+  radius?: GrowthProspectSearchTerritoryRadiusFilter
+}
+
 /** ICP Builder filter set — all optional facets. */
 export type GrowthProspectSearchFilters = {
   industry?: string | null
@@ -101,6 +117,7 @@ export type GrowthProspectSearchFilters = {
   employee_size_bands?: GrowthProspectSearchEmployeeSizeBand[]
   revenue_bands?: GrowthProspectSearchRevenueBand[]
   location?: string | null
+  territory_filter?: GrowthProspectSearchTerritoryFilter
   service_area?: string | null
   company_age_years_min?: number | null
   company_age_years_max?: number | null
@@ -148,6 +165,11 @@ export type GrowthProspectSearchIndexCompany = {
   location: string | null
   city: string | null
   state: string | null
+  postal_code?: string | null
+  country?: string | null
+  metro?: string | null
+  lat?: number | null
+  lng?: number | null
   service_area: string | null
   notes: string | null
   keywords: string[]
@@ -216,6 +238,13 @@ export type GrowthProspectSearchCompanyResult = {
   employees: string | null
   revenue_range: string | null
   location: string | null
+  city?: string | null
+  state?: string | null
+  postal_code?: string | null
+  country?: string | null
+  metro?: string | null
+  lat?: number | null
+  lng?: number | null
   intent_score: number | null
   buying_stage: string | null
   buying_stage_confidence: number | null
@@ -259,6 +288,8 @@ export type GrowthProspectSearchCompanyResult = {
   score_explanation_items?: string[]
   confidence_explanation_items?: string[]
   recommended_next_step_reason?: string | null
+  matched_territory_label?: string | null
+  territory_match_reasons?: string[]
 }
 
 export type GrowthProspectSearchPersonResult = {
@@ -296,6 +327,7 @@ export type GrowthProspectSearchIndexDiagnostics = {
   index_mode: "materialized" | "fallback"
   index_row_count: number | null
   last_indexed_at: string | null
+  territory_radius_note?: string | null
 }
 
 export type GrowthProspectSearchResult = {

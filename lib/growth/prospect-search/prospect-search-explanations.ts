@@ -5,6 +5,7 @@ import type {
   GrowthProspectSearchCompanyResult,
   GrowthProspectSearchFilters,
 } from "@/lib/growth/prospect-search/prospect-search-types"
+import { evaluateTerritoryMatch } from "@/lib/growth/prospect-search/prospect-search-geo"
 
 export const GROWTH_PROSPECT_SEARCH_EXPLANATIONS_QA_MARKER =
   "growth-prospect-search-explanations-v1" as const
@@ -42,6 +43,14 @@ export function buildProspectSearchExplanations(input: {
     | "website"
     | "industry"
     | "location"
+    | "city"
+    | "state"
+    | "postal_code"
+    | "country"
+    | "metro"
+    | "lat"
+    | "lng"
+    | "service_area"
     | "signals"
     | "match_reasoning"
     | "rank_score"
@@ -96,6 +105,34 @@ export function buildProspectSearchExplanations(input: {
   } else if (parsed?.industry_hints.length && row.industry) {
     const hit = parsed.industry_hints.find((hint) => includesFold(row.industry, hint))
     if (hit) scoreItems.push(`Industry aligns with search (${hit}).`)
+  }
+
+  if (filters?.location && includesFold([row.location, row.city, row.state].filter(Boolean).join(" "), filters.location)) {
+    scoreItems.push(`Matches location filter (${filters.location}).`)
+  }
+
+  if (filters?.territory_filter) {
+    const territoryMatch = evaluateTerritoryMatch(
+      {
+        city: row.city,
+        state: row.state,
+        postal_code: row.postal_code,
+        country: row.country,
+        location: row.location,
+        service_area: row.service_area,
+        metro: row.metro,
+        lat: row.lat,
+        lng: row.lng,
+      },
+      filters.territory_filter,
+    )
+    for (const reason of territoryMatch.reasons.slice(0, 3)) {
+      if (!scoreItems.includes(reason)) scoreItems.push(reason)
+    }
+  } else if (parsed?.location_hints.length) {
+    const locBlob = [row.location, row.city, row.state, row.service_area].filter(Boolean).join(" ")
+    const hit = parsed.location_hints.find((hint) => includesFold(locBlob, hint))
+    if (hit) scoreItems.push(`Location aligns with search (${hit}).`)
   }
 
   if (row.crm_detected) scoreItems.push(`CRM software detected (${row.crm_detected}).`)
