@@ -103,6 +103,8 @@ async function main(): Promise<void> {
   assert.match(shellSource, /data-ux-marker/)
   assert.match(shellSource, /DiscoveryModeToggle/)
   assert.match(shellSource, /mode.*discover_external|discover_external/)
+  assert.match(shellSource, /useSearchParams/)
+  assert.match(shellSource, /mode === "discover"/)
   assert.match(shellSource, /RealWorldProviderStatus/)
   const companyCardSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/company-result-card.tsx"),

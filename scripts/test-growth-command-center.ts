@@ -3,6 +3,8 @@
  * Run: pnpm test:growth-command-center
  */
 import assert from "node:assert/strict"
+import fs from "node:fs"
+import path from "node:path"
 import {
   COMMAND_AUTONOMOUS_KINDS,
   OPERATOR_RANK_THRESHOLDS,
@@ -27,6 +29,10 @@ import {
   GROWTH_COMMAND_SECTION_TABS,
   GROWTH_COMMAND_COMM_SECTION_LINKS,
 } from "../lib/growth/command/command-center-navigation"
+import {
+  GROWTH_COMMAND_CENTER_ACTIONS_QA_MARKER,
+  GROWTH_COMMAND_CENTER_QUICK_ACTIONS,
+} from "../lib/growth/command/command-center-quick-actions"
 import { PLATFORM_ADMIN_GROWTH_LEADS_TAB } from "../components/admin/platform-admin-shell"
 import { buildBossBattles, buildCoachTips, buildHeatMap, detectComboChains } from "../lib/growth/command/command-dashboard-helpers"
 import { describeSequenceStartUnavailable } from "../lib/growth/sequence-enrollment/sequence-enrollment-ui"
@@ -190,6 +196,35 @@ assert.ok(GROWTH_COMMAND_JUMP_DESTINATIONS.some((entry) => entry.label === "Dogf
 assert.equal(GROWTH_COMMAND_SECTION_TABS.length, 6)
 assert.equal(GROWTH_COMMAND_SECTION_TABS[0]?.anchor, "cc-today")
 assert.equal(GROWTH_COMMAND_COMM_SECTION_LINKS.length, 5)
+
+assert.equal(GROWTH_COMMAND_CENTER_ACTIONS_QA_MARKER, "growth-command-center-actions-v3")
+assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS.length, 9)
+assert.deepEqual(
+  GROWTH_COMMAND_CENTER_QUICK_ACTIONS.map((action) => action.label),
+  [
+    "Search Companies",
+    "Discover Companies",
+    "View Intent Activity",
+    "Run Research",
+    "Generate Copilot Draft",
+    "Start Live Call",
+    "Join Meeting",
+    "Launch Sequence",
+    "Open Approval Queue",
+  ],
+)
+assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS[0]?.href, "/admin/growth/search")
+assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS[1]?.href, "/admin/growth/search?mode=discover")
+assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS[2]?.href, "/admin/growth/intent-pixel")
+assert.ok(!GROWTH_COMMAND_CENTER_QUICK_ACTIONS.some((action) => action.label === "Import Leads"))
+assert.ok(!GROWTH_COMMAND_CENTER_QUICK_ACTIONS.some((action) => action.label === "Open Sequences"))
+
+const quickActionsRail = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-command-quick-actions-rail.tsx"),
+  "utf8",
+)
+assert.match(quickActionsRail, /GROWTH_COMMAND_CENTER_ACTIONS_QA_MARKER/)
+assert.match(quickActionsRail, /data-qa-marker=\{GROWTH_COMMAND_CENTER_ACTIONS_QA_MARKER\}/)
 
 assert.equal(PLATFORM_ADMIN_GROWTH_LEADS_TAB.label, "Growth Engine")
 assert.equal(PLATFORM_ADMIN_GROWTH_LEADS_TAB.key, "growth_leads")

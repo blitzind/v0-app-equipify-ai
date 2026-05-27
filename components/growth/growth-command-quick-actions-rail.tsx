@@ -1,27 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import {
-  CheckCircle2,
-  FileUp,
-  GitBranch,
-  Headphones,
-  Sparkles,
-  Video,
-  Zap,
-} from "lucide-react"
+import { Zap } from "lucide-react"
 import { GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import {
+  GROWTH_COMMAND_CENTER_ACTIONS_QA_MARKER,
+  GROWTH_COMMAND_CENTER_QUICK_ACTIONS,
+} from "@/lib/growth/command/command-center-quick-actions"
 import { cn } from "@/lib/utils"
-
-const QUICK_ACTIONS = [
-  { href: "/admin/growth/imports", label: "Import Leads", icon: FileUp },
-  { href: "/admin/growth/leads?focus=research", label: "Run Research", icon: Sparkles },
-  { href: "/admin/growth/leads?focus=ai-copilot", label: "Generate Copilot Draft", icon: Sparkles },
-  { href: "/admin/growth/calls/live-coaching", label: "Start Live Call", icon: Headphones },
-  { href: "/admin/growth/meetings", label: "Join Meeting", icon: Video },
-  { href: "/admin/growth/sequences", label: "Open Sequences", icon: GitBranch },
-  { href: "/admin/growth/outreach/approval", label: "Open Approval Queue", icon: CheckCircle2 },
-] as const
 
 type GrowthCommandQuickActionsRailProps = {
   variant?: "rail" | "chips"
@@ -30,10 +16,10 @@ type GrowthCommandQuickActionsRailProps = {
 export function GrowthCommandQuickActionsRail({ variant = "rail" }: GrowthCommandQuickActionsRailProps) {
   if (variant === "chips") {
     return (
-      <div className="xl:hidden">
+      <div className="xl:hidden" data-qa-marker={GROWTH_COMMAND_CENTER_ACTIONS_QA_MARKER}>
         <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Quick actions</p>
         <div className="flex gap-3 overflow-x-auto pb-1">
-          {QUICK_ACTIONS.map((action) => (
+          {GROWTH_COMMAND_CENTER_QUICK_ACTIONS.map((action) => (
             <Link
               key={action.href}
               href={action.href}
@@ -51,23 +37,29 @@ export function GrowthCommandQuickActionsRail({ variant = "rail" }: GrowthComman
   }
 
   return (
-    <GrowthEngineCard title="Quick Actions" icon={<Zap className="size-4" />} className="sticky top-4 p-5 shadow-sm sm:p-6 [&>div:first-child]:mb-5">
-      <ul className="grid gap-3">
-        {QUICK_ACTIONS.map((action) => {
-          const Icon = action.icon
-          return (
-            <li key={action.href}>
-              <Link
-                href={action.href}
-                className="flex min-h-11 items-center gap-3 rounded-xl border border-border/80 px-4 py-3 text-sm transition-colors hover:border-indigo-200 hover:bg-indigo-50/40 dark:hover:border-indigo-500/30 dark:hover:bg-indigo-950/30"
-              >
-                <Icon className="size-4 shrink-0 text-muted-foreground" />
-                {action.label}
-              </Link>
-            </li>
-          )
-        })}
-      </ul>
-    </GrowthEngineCard>
+    <div data-qa-marker={GROWTH_COMMAND_CENTER_ACTIONS_QA_MARKER}>
+      <GrowthEngineCard
+        title="Quick Actions"
+        icon={<Zap className="size-4" />}
+        className="sticky top-4 p-5 shadow-sm sm:p-6 [&>div:first-child]:mb-5"
+      >
+        <ul className="grid gap-3">
+          {GROWTH_COMMAND_CENTER_QUICK_ACTIONS.map((action) => {
+            const Icon = action.icon
+            return (
+              <li key={action.href}>
+                <Link
+                  href={action.href}
+                  className="flex min-h-11 items-center gap-3 rounded-xl border border-border/80 px-4 py-3 text-sm transition-colors hover:border-indigo-200 hover:bg-indigo-50/40 dark:hover:border-indigo-500/30 dark:hover:bg-indigo-950/30"
+                >
+                  <Icon className="size-4 shrink-0 text-muted-foreground" />
+                  {action.label}
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      </GrowthEngineCard>
+    </div>
   )
 }

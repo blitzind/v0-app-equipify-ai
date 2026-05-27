@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Bookmark, Loader2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CompanyResultCard } from "@/components/growth/prospect-search/company-result-card"
@@ -39,6 +40,7 @@ import { cn } from "@/lib/utils"
 const EMPTY_FILTERS: GrowthProspectSearchFilters = {}
 
 export function ProspectSearchShell() {
+  const searchParams = useSearchParams()
   const [query, setQuery] = useState("")
   const [filters, setFilters] = useState<GrowthProspectSearchFilters>(EMPTY_FILTERS)
   const [result, setResult] = useState<GrowthProspectSearchResult | null>(null)
@@ -69,6 +71,13 @@ export function ProspectSearchShell() {
     }, 4500)
     return () => window.clearInterval(t)
   }, [])
+
+  useEffect(() => {
+    const mode = searchParams.get("mode")
+    if (mode === "discover" || mode === "discover_external") {
+      setDiscoveryMode("discover_external")
+    }
+  }, [searchParams])
 
   const runSearch = useCallback(
     async (queryOverride?: string) => {

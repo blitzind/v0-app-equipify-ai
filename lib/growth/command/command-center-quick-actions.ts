@@ -1,0 +1,34 @@
+/** Growth Command Center quick action rail (strategy-aligned v3). */
+
+import type { LucideIcon } from "lucide-react"
+import {
+  CheckCircle2,
+  Compass,
+  GitBranch,
+  Headphones,
+  Radar,
+  Search,
+  Sparkles,
+  Video,
+} from "lucide-react"
+
+export const GROWTH_COMMAND_CENTER_ACTIONS_QA_MARKER =
+  "growth-command-center-actions-v3" as const
+
+export type GrowthCommandCenterQuickAction = {
+  href: string
+  label: string
+  icon: LucideIcon
+}
+
+export const GROWTH_COMMAND_CENTER_QUICK_ACTIONS: readonly GrowthCommandCenterQuickAction[] = [
+  { href: "/admin/growth/search", label: "Search Companies", icon: Search },
+  { href: "/admin/growth/search?mode=discover", label: "Discover Companies", icon: Compass },
+  { href: "/admin/growth/intent-pixel", label: "View Intent Activity", icon: Radar },
+  { href: "/admin/growth/leads?focus=research", label: "Run Research", icon: Sparkles },
+  { href: "/admin/growth/leads?focus=ai-copilot", label: "Generate Copilot Draft", icon: Sparkles },
+  { href: "/admin/growth/calls/live-coaching", label: "Start Live Call", icon: Headphones },
+  { href: "/admin/growth/meetings", label: "Join Meeting", icon: Video },
+  { href: "/admin/growth/sequences", label: "Launch Sequence", icon: GitBranch },
+  { href: "/admin/growth/outreach/approval", label: "Open Approval Queue", icon: CheckCircle2 },
+] as const
