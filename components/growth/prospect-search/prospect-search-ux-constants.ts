@@ -10,6 +10,15 @@ export const GROWTH_RESULTS_HEADER_LAYOUT_V1_QA_MARKER = "growth-results-header-
 
 export const GROWTH_PROVIDER_STATUS_LAYOUT_V1_QA_MARKER = "growth-provider-status-layout-v1" as const
 
+export const GROWTH_SEARCH_CLEAN_START_QA_MARKER = "growth-search-clean-start-v1" as const
+
+export const GROWTH_SEARCH_HAS_SEARCHED_STATE_QA_MARKER = "growth-search-has-searched-state-v1" as const
+
+export const GROWTH_SEARCH_DIAGNOSTICS_HIDDEN_QA_MARKER = "growth-search-diagnostics-hidden-v1" as const
+
+export const GROWTH_SEARCH_FILTERS_COLLAPSED_DEFAULT_QA_MARKER =
+  "growth-search-filters-collapsed-default-v1" as const
+
 export const PROSPECT_SEARCH_HERO_PLACEHOLDERS = [
   "medical equipment service companies California",
   "hvac companies 20-100 employees",

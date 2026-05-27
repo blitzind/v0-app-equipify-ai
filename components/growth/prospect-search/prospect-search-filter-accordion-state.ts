@@ -1,7 +1,6 @@
 /** Persisted filter accordion expansion — collapsed by default on first load. */
 
-export const GROWTH_SEARCH_FILTERS_COLLAPSED_DEFAULT_QA_MARKER =
-  "growth-search-filters-collapsed-default-v1" as const
+export { GROWTH_SEARCH_FILTERS_COLLAPSED_DEFAULT_QA_MARKER } from "@/components/growth/prospect-search/prospect-search-ux-constants"
 
 export const PROSPECT_SEARCH_FILTER_ACCORDION_STORAGE_KEY =
   "growth-prospect-search-filter-sections-v2" as const

@@ -142,8 +142,16 @@ async function main(): Promise<void> {
   )
   assert.match(shellSource, /ProspectSearchShell/)
   assert.match(shellSource, /GROWTH_PROSPECT_SEARCH_QA_MARKER/)
-  assert.match(shellSource, /GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER/)
-  assert.match(shellSource, /RealWorldProviderStatus/)
+  assert.match(shellSource, /ProspectSearchDiagnosticsDisclosure/)
+  assert.match(shellSource, /ProspectSearchCleanStartPanel/)
+  assert.match(shellSource, /loadInitialMeta/)
+  assert.doesNotMatch(shellSource, /void runSearch\(\)\s*\n\s*\}, \[\]\)/)
+  assert.match(shellSource, /data-has-searched-marker/)
+  assert.match(shellSource, /GROWTH_SEARCH_HAS_SEARCHED_STATE_QA_MARKER/)
+  assert.match(shellSource, /GROWTH_SEARCH_CLEAN_START_QA_MARKER/)
+  assert.match(shellSource, /GROWTH_SEARCH_DIAGNOSTICS_HIDDEN_QA_MARKER/)
+  assert.doesNotMatch(shellSource, /<ProspectSearchLiveEstimation/)
+  assert.match(shellSource, /enabled: hasSearched && showEmpty/)
   const providerStatusSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/real-world-provider-status.tsx"),
     "utf8",
@@ -164,7 +172,7 @@ async function main(): Promise<void> {
   assert.match(shellSource, /mode.*discover_external|discover_external/)
   assert.match(shellSource, /useSearchParams/)
   assert.match(shellSource, /mode === "discover"/)
-  assert.match(shellSource, /RealWorldProviderStatus/)
+  assert.match(shellSource, /ProspectSearchDiagnosticsDisclosure/)
   const companyCardSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/company-result-card.tsx"),
     "utf8",
@@ -1350,7 +1358,7 @@ async function main(): Promise<void> {
   assert.match(rebuildRouteSource, /rows_indexed/)
 
   assert.match(shellSource, /ProspectSearchPagination/)
-  assert.match(shellSource, /ProspectSearchIndexDiagnostics/)
+  assert.doesNotMatch(shellSource, /<ProspectSearchIndexDiagnostics/)
   assert.match(shellSource, /page_size/)
 
   const territoryMigration = fs.readFileSync(
@@ -2279,7 +2287,7 @@ async function main(): Promise<void> {
     "provider_key_missing",
   )
 
-  assert.match(savedWorkflowShellSource, /ProviderRuntimeDiagnosticsPanel/)
+  assert.match(savedWorkflowShellSource, /ProspectSearchDiagnosticsDisclosure/)
   assert.match(savedWorkflowShellSource, /used_relaxed_external_filters/)
   assert.match(savedWorkflowShellSource, /Showing provider matches with incomplete firmographic data/)
 
@@ -2347,13 +2355,12 @@ async function main(): Promise<void> {
     /Search 248 companies/,
   )
 
-  assert.match(shellSource, /ProspectSearchLiveEstimation/)
-  assert.match(shellSource, /GROWTH_LIVE_RESULT_ESTIMATION_QA_MARKER/)
   assert.match(shellSource, /useProspectSearchLiveEstimation/)
-  assert.match(filterRailSource, /estimationSlot/)
+  assert.doesNotMatch(shellSource, /<ProspectSearchLiveEstimation/)
+  assert.doesNotMatch(shellSource, /estimationSlot/)
   assert.match(shellSource, /ProspectSearchRelaxFilters/)
   assert.match(shellSource, /GROWTH_RESULTS_HEADER_LAYOUT_V1_QA_MARKER/)
-  assert.match(shellSource, /GROWTH_PROVIDER_STATUS_LAYOUT_V1_QA_MARKER/)
+  assert.doesNotMatch(shellSource, /GROWTH_PROVIDER_STATUS_LAYOUT_V1_QA_MARKER/)
   assert.match(shellSource, /inline-flex max-w-full flex-wrap items-baseline/)
   assert.match(savedWorkflowIcpSource, /GROWTH_SEARCH_FILTERS_COLLAPSED_DEFAULT_QA_MARKER/)
   assert.match(savedWorkflowIcpSource, /writeProspectSearchFilterAccordionExpanded/)
@@ -2364,9 +2371,25 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "components/growth/prospect-search/prospect-search-filter-accordion-state.ts"),
     "utf8",
   )
-  assert.match(filterAccordionStateSource, /growth-search-filters-collapsed-default-v1/)
+  assert.match(filterAccordionStateSource, /GROWTH_SEARCH_FILTERS_COLLAPSED_DEFAULT_QA_MARKER/)
   assert.match(filterAccordionStateSource, /migrateProspectSearchFilterAccordionStorage/)
   assert.match(filterAccordionStateSource, /filter-sections-v2/)
+
+  const uxConstantsSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-ux-constants.ts"),
+    "utf8",
+  )
+  assert.match(uxConstantsSource, /growth-search-clean-start-v1/)
+  assert.match(uxConstantsSource, /growth-search-has-searched-state-v1/)
+  assert.match(uxConstantsSource, /growth-search-diagnostics-hidden-v1/)
+  assert.match(uxConstantsSource, /growth-search-filters-collapsed-default-v1/)
+
+  const cleanStartSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-clean-start-panel.tsx"),
+    "utf8",
+  )
+  assert.match(cleanStartSource, /Find your next prospects/)
+  assert.match(cleanStartSource, /Search by company type, industry, location, technology, or plain English/)
 
   const providerStatusLayoutSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/real-world-provider-status.tsx"),

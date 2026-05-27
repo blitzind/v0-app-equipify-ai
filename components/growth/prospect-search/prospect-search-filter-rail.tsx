@@ -52,7 +52,7 @@ export function ProspectSearchFilterRail({
         <Filter className="size-4 text-violet-600" />
         <div>
           <h2 className="text-sm font-semibold">Filters</h2>
-          <p className="text-xs text-muted-foreground">Refine ICP before searching</p>
+          <p className="text-xs text-muted-foreground">Refine before you search</p>
         </div>
       </div>
 

@@ -18,20 +18,14 @@ import {
   ProspectSearchBulkPushSummary,
 } from "@/components/growth/prospect-search/prospect-search-bulk-action-bar"
 import { DiscoveryModeToggle } from "@/components/growth/prospect-search/discovery-mode-toggle"
-import {
-  GooglePlacesQueryDiagnostics,
-  ProviderCacheCostDiagnostics,
-  ProviderRuntimeDiagnosticsPanel,
-  RealWorldProviderStatus,
-} from "@/components/growth/prospect-search/real-world-provider-status"
 import { IcpTemplatesDrawer } from "@/components/growth/prospect-search/icp-templates-drawer"
 import { ProspectSearchFilterRail } from "@/components/growth/prospect-search/prospect-search-filter-rail"
-import { ProspectSearchLiveEstimation } from "@/components/growth/prospect-search/prospect-search-live-estimation"
+import { ProspectSearchCleanStartPanel } from "@/components/growth/prospect-search/prospect-search-clean-start-panel"
+import { ProspectSearchDiagnosticsDisclosure } from "@/components/growth/prospect-search/prospect-search-diagnostics-disclosure"
 import {
   ProspectSearchActiveFilterPills,
   ProspectSearchRelaxFilters,
 } from "@/components/growth/prospect-search/prospect-search-active-filter-pills"
-import { ProspectSearchFilterHealthWarnings } from "@/components/growth/prospect-search/prospect-search-filter-health-warnings"
 import { TerritoryIntelligencePanel } from "@/components/growth/prospect-search/territory-intelligence-panel"
 import { PersonResultCard } from "@/components/growth/prospect-search/person-result-card"
 import { SearchEmptyState } from "@/components/growth/prospect-search/search-empty-state"
@@ -42,7 +36,9 @@ import {
   GROWTH_PROSPECT_SEARCH_UX_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_LAYOUT_V2_QA_MARKER,
   GROWTH_RESULTS_HEADER_LAYOUT_V1_QA_MARKER,
-  GROWTH_PROVIDER_STATUS_LAYOUT_V1_QA_MARKER,
+  GROWTH_SEARCH_CLEAN_START_QA_MARKER,
+  GROWTH_SEARCH_DIAGNOSTICS_HIDDEN_QA_MARKER,
+  GROWTH_SEARCH_HAS_SEARCHED_STATE_QA_MARKER,
   type ProspectSearchIcpTemplate,
 } from "@/components/growth/prospect-search/prospect-search-ux-constants"
 import {
@@ -58,10 +54,9 @@ import type {
   GrowthProspectSearchSavedSearchRow,
   GrowthProspectSearchSortBy,
 } from "@/lib/growth/prospect-search/prospect-search-types"
-import { GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER, GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-types"
+import { GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-types"
 import { prospectSearchSelectionKey } from "@/lib/growth/prospect-search/prospect-search-selection"
 import { CompanyStatusBadges } from "@/components/growth/prospect-search/company-status-badges"
-import { ProspectSearchIndexDiagnostics } from "@/components/growth/prospect-search/prospect-search-index-diagnostics"
 import { ProspectSearchPagination } from "@/components/growth/prospect-search/prospect-search-pagination"
 import { SaveSearchWorkflowDialog } from "@/components/growth/prospect-search/save-search-workflow-dialog"
 import {
@@ -70,10 +65,6 @@ import {
   type GrowthProspectSearchSavedSearchWithWorkflow,
 } from "@/lib/growth/prospect-search/saved-search-workflows"
 import { buildProspectSearchGetRequestParams } from "@/lib/growth/prospect-search/prospect-search-client-request"
-import {
-  GROWTH_LIVE_ESTIMATED_RESULTS_QA_MARKER,
-  GROWTH_LIVE_RESULT_ESTIMATION_QA_MARKER,
-} from "@/lib/growth/prospect-search/prospect-search-estimation-types"
 import { useProspectSearchLiveEstimation } from "@/lib/growth/prospect-search/use-prospect-search-live-estimation"
 import { cn } from "@/lib/utils"
 
@@ -164,16 +155,21 @@ export function ProspectSearchShell() {
     [placeholderIndex],
   )
 
-  const { estimate, loading: estimating, displayState } = useProspectSearchLiveEstimation({
+  const companies = result?.companies ?? []
+  const people = result?.people ?? []
+  const showEmpty = hasSearched && !loading && companies.length === 0 && people.length === 0
+
+  const { estimate } = useProspectSearchLiveEstimation({
     query,
     filters,
     discoveryMode,
+    enabled: hasSearched && showEmpty,
   })
 
-  const searchButtonLabel = estimate?.search_button_label ?? "Search"
-  const searchButtonDisabled = loading || (estimate?.search_button_disabled ?? false)
-  const applyButtonLabel = estimate?.search_button_label ?? "Apply & search"
-  const applyButtonDisabled = estimate?.search_button_disabled ?? false
+  const searchButtonLabel = discoveryMode === "discover_external" ? "Search providers" : "Search"
+  const applyButtonLabel = searchButtonLabel
+  const searchButtonDisabled = loading
+  const applyButtonDisabled = loading
 
   useEffect(() => {
     const t = window.setInterval(() => {
@@ -289,9 +285,27 @@ export function ProspectSearchShell() {
     [fetchResults],
   )
 
-  useEffect(() => {
-    void runSearch()
+  const loadInitialMeta = useCallback(async () => {
+    try {
+      const metaRes = await fetch("/api/platform/growth/prospect-search?meta=1&q=&page=1&page_size=1", {
+        cache: "no-store",
+      })
+      const metaJson = (await metaRes.json()) as {
+        ok?: boolean
+        saved_searches?: GrowthProspectSearchSavedSearchRow[]
+        lists?: GrowthProspectSearchListRow[]
+      }
+      if (!metaRes.ok || metaJson.ok === false) return
+      setSavedSearches((metaJson.saved_searches ?? []).map((row) => attachSavedSearchWorkflow(row)))
+      setLists(metaJson.lists ?? [])
+    } catch {
+      // Clean start should still render when meta load fails.
+    }
   }, [])
+
+  useEffect(() => {
+    void loadInitialMeta()
+  }, [loadInitialMeta])
 
   const runAction = useCallback(
     async (action: string, extra?: Record<string, unknown>) => {
@@ -504,10 +518,6 @@ export function ProspectSearchShell() {
     [savedSearches, pageSize, fetchResults, replaceFilters],
   )
 
-  const companies = result?.companies ?? []
-  const people = result?.people ?? []
-  const showEmpty = hasSearched && !loading && companies.length === 0 && people.length === 0
-
   const selectedCompanies = useMemo(
     () => companies.filter((row) => selectedKeys.has(prospectSearchSelectionKey(row))),
     [companies, selectedKeys],
@@ -584,8 +594,10 @@ export function ProspectSearchShell() {
       data-layout-marker={GROWTH_PROSPECT_SEARCH_LAYOUT_V2_QA_MARKER}
       data-saved-search-workflows-marker={GROWTH_SAVED_SEARCH_WORKFLOWS_QA_MARKER}
       data-live-provider-query-expansion-marker={GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER}
-      data-live-estimation-marker={GROWTH_LIVE_RESULT_ESTIMATION_QA_MARKER}
-      data-live-estimated-results-marker={GROWTH_LIVE_ESTIMATED_RESULTS_QA_MARKER}
+      data-clean-start-marker={GROWTH_SEARCH_CLEAN_START_QA_MARKER}
+      data-has-searched-marker={GROWTH_SEARCH_HAS_SEARCHED_STATE_QA_MARKER}
+      data-has-searched={hasSearched ? "true" : "false"}
+      data-diagnostics-hidden-marker={GROWTH_SEARCH_DIAGNOSTICS_HIDDEN_QA_MARKER}
     >
       {/* Search hero */}
       <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-violet-50/80 via-card to-cyan-50/50 p-6 shadow-sm dark:from-violet-950/30 dark:to-cyan-950/20">
@@ -608,12 +620,7 @@ export function ProspectSearchShell() {
             ICP Templates
           </Button>
         </div>
-        <div className="mt-5 space-y-3">
-          <ProspectSearchLiveEstimation
-            estimate={estimate}
-            loading={estimating}
-            displayState={displayState}
-          />
+        <div className="mt-5">
           <div className="relative flex flex-col gap-2 sm:block">
           <Search className="pointer-events-none absolute left-4 top-1/2 hidden size-5 -translate-y-1/2 text-muted-foreground sm:block" />
           <input
@@ -632,7 +639,14 @@ export function ProspectSearchShell() {
             onClick={() => void runSearch()}
             disabled={searchButtonDisabled}
           >
-            {loading ? <Loader2 className="size-4 animate-spin" /> : searchButtonLabel}
+            {loading ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                {discoveryMode === "discover_external" ? "Searching providers…" : "Searching…"}
+              </>
+            ) : (
+              searchButtonLabel
+            )}
           </Button>
           <SearchRecommendations
             query={query}
@@ -674,25 +688,6 @@ export function ProspectSearchShell() {
           onClear={() => replaceFilters(EMPTY_FILTERS)}
           applyLabel={applyButtonLabel}
           applyDisabled={applyButtonDisabled}
-          estimationSlot={
-            <ProspectSearchLiveEstimation
-              estimate={estimate}
-              loading={estimating}
-              displayState={displayState}
-              compact
-            />
-          }
-          filterHealthSlot={
-            <ProspectSearchFilterHealthWarnings estimate={estimate} className="mb-3" />
-          }
-          relaxFiltersSlot={
-            <ProspectSearchRelaxFilters
-              estimate={estimate}
-              filters={filters}
-              onChange={replaceFilters}
-              className="mb-3"
-            />
-          }
           savedSearches={savedSearches}
           lists={lists}
           onLoadSavedSearch={(id) => void loadSavedById(id)}
@@ -702,275 +697,193 @@ export function ProspectSearchShell() {
           onDeleteSavedSearch={(id) => void deleteSavedSearch(id)}
         />
 
-        <div className="flex min-w-0 flex-1 flex-col gap-6">
-          <TerritoryIntelligencePanel
-            summary={result?.territory_intelligence}
-            filters={filters}
-            query={query}
-            loading={loading}
-            onSaveTerritory={async (name) => {
-              await runAction("save_territory", { territory_name: name })
-            }}
-            onRefreshTerritory={async () => {
-              await runAction("refresh_territory", {
-                territory_id: filters.territory_id ?? result?.territory_intelligence?.territory_id,
-              })
-              await runSearch()
-            }}
-            onPushTopProspects={async () => {
-              await runAction("push_territory_top_prospects")
-            }}
-          />
-
-          <div className="w-full min-w-0 space-y-3">
-            <ProspectSearchActiveFilterPills filters={filters} onChange={replaceFilters} />
-
-            <div className="flex w-full min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div
-                className="min-w-0 flex-1"
-                data-qa-marker={GROWTH_RESULTS_HEADER_LAYOUT_V1_QA_MARKER}
-              >
-                <h2 className="text-sm font-semibold leading-snug text-foreground">
-                  <span className="inline-flex max-w-full flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-                    <span className="whitespace-nowrap">Results</span>
-                    {result ? (
-                      <>
-                        <span className="whitespace-nowrap font-normal text-muted-foreground">
-                          {result.total_companies.toLocaleString()} companies
-                        </span>
-                        <span className="font-normal text-muted-foreground" aria-hidden="true">
-                          ·
-                        </span>
-                        <span className="font-normal text-muted-foreground">
-                          {result.discovery_mode === "internal"
-                            ? `${result.total_people.toLocaleString()} contacts`
-                            : "external discovery"}
-                        </span>
-                      </>
-                    ) : null}
-                  </span>
-                </h2>
-                {result?.discovery_mode === "internal" ? (
-                  <ProspectSearchIndexDiagnostics diagnostics={result.index_diagnostics} />
-                ) : null}
-              </div>
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                {companies.length > 0 ? (
-                  <Button size="sm" variant="ghost" onClick={selectAllVisible}>
-                    Select all visible
-                  </Button>
-                ) : null}
-                <Select
-                  value={sortBy}
-                  onValueChange={(value: GrowthProspectSearchSortBy) => {
-                    setSortBy(value)
-                    void fetchResults({ sortByOverride: value, nextPage: 1, resetSelection: true })
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-[170px] text-xs">
-                    <SelectValue placeholder="Sort results" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="rank">Default rank</SelectItem>
-                    <SelectItem value="signal_momentum">Signal momentum</SelectItem>
-                  </SelectContent>
-                </Select>
-                <SearchViewToggle view={view} onViewChange={setView} />
-                <Button variant="outline" size="sm" onClick={() => setSaveDialogOpen(true)}>
-                  <Bookmark className="mr-1 size-3.5" />
-                  Save workflow
-                </Button>
-              </div>
-            </div>
-
-            {result?.discovery_mode === "discover_external" &&
-            (result.provider_status_label ||
-              result.provider_status_message ||
-              result.used_relaxed_external_filters ||
-              (result.provider_messages && result.provider_messages.length > 0) ||
-              (result.provider_diagnostics && result.provider_diagnostics.length > 0) ||
-              (process.env.NODE_ENV === "development" &&
-                (result.provider_runtime_diagnostics || result.external_filter_diagnostics))) ? (
-              <div
-                className="flex w-full min-w-0 flex-col gap-2"
-                data-qa-marker={GROWTH_PROVIDER_STATUS_LAYOUT_V1_QA_MARKER}
-              >
-                {result.provider_status_label || result.provider_status_message ? (
-                  <RealWorldProviderStatus
-                    className="w-full min-w-0"
-                    label={result.provider_status_label}
-                    message={
-                      result.real_world_built_query
-                        ? `${result.provider_status_message ?? ""} Query: ${result.real_world_built_query}`
-                        : result.provider_status_message
-                    }
-                  />
-                ) : null}
-                {result.used_relaxed_external_filters ? (
-                  <p className="text-xs text-violet-900">
-                    Showing provider matches with incomplete firmographic data.
-                  </p>
-                ) : null}
-                {process.env.NODE_ENV === "development" && result.provider_runtime_diagnostics ? (
-                  <ProviderRuntimeDiagnosticsPanel
-                    className="w-full min-w-0"
-                    diagnostics={result.provider_runtime_diagnostics}
-                  />
-                ) : null}
-                {result.provider_messages && result.provider_messages.length > 0 ? (
-                  <p className="text-xs text-muted-foreground break-words">
-                    {result.provider_messages.join(" · ")}
-                  </p>
-                ) : null}
-                {result.provider_diagnostics && result.provider_diagnostics.length > 0 ? (
-                  <>
-                    {result.provider_diagnostics
-                      .filter((row) => row.provider_type === "google_places")
-                      .map((row) => (
-                        <GooglePlacesQueryDiagnostics
-                          key={`${row.provider_type}-${row.provider_name}`}
-                          className="w-full min-w-0"
-                          diagnostic={row}
-                          qaMarker={result.google_places_query_expansion_qa_marker}
-                        />
-                      ))}
-                    <ProviderCacheCostDiagnostics
-                      className="w-full min-w-0"
-                      diagnostics={result.provider_diagnostics}
-                      qaMarker={result.provider_cache_qa_marker}
-                    />
-                    <div
-                      className="w-full min-w-0 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-700 break-words"
-                      data-qa-marker={result.provider_audit_qa_marker ?? GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER}
-                    >
-                      <p className="font-medium">Provider diagnostics</p>
-                      <ul className="mt-1 space-y-1">
-                        {result.provider_diagnostics
-                          .filter((row) => row.provider_type !== "google_places")
-                          .map((row) => (
-                            <li key={`${row.provider_type}-${row.provider_name}`}>
-                              {row.provider_name}: executed={String(row.provider_executed)}, latency=
-                              {row.provider_latency_ms}ms, results={row.provider_result_count}
-                              {row.provider_fallback_reason
-                                ? `, fallback=${row.provider_fallback_reason}`
-                                : ""}
-                            </li>
-                          ))}
-                        {result.provider_diagnostics
-                          .filter((row) => row.provider_type === "google_places")
-                          .map((row) => (
-                            <li key={`${row.provider_type}-${row.provider_name}-summary`}>
-                              {row.provider_name}: executed={String(row.provider_executed)}, latency=
-                              {row.provider_latency_ms}ms, merged=
-                              {row.provider_merged_result_count ?? row.provider_result_count}, queries=
-                              {row.provider_query_generated?.length ?? 0}
-                            </li>
-                          ))}
-                      </ul>
-                      {result.provider_fallback_reason ? (
-                        <p className="mt-1 opacity-90">
-                          Run fallback reason: {result.provider_fallback_reason}
-                        </p>
-                      ) : null}
-                    </div>
-                  </>
-                ) : null}
-                {process.env.NODE_ENV === "development" && result.external_filter_diagnostics ? (
-                  <div className="w-full min-w-0 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-950 break-words">
-                    <p className="font-medium">External filter diagnostics (dev only)</p>
-                    <p>
-                      raw={result.external_filter_diagnostics.raw_provider_count} · normalized=
-                      {result.external_filter_diagnostics.normalized_result_count} · dropped=
-                      {result.external_filter_diagnostics.dropped_result_count}
-                    </p>
-                    {Object.keys(result.external_filter_diagnostics.dropped_reasons).length > 0 ? (
-                      <p className="mt-1 opacity-90">
-                        dropped reasons:{" "}
-                        {Object.entries(result.external_filter_diagnostics.dropped_reasons)
-                          .map(([reason, count]) => `${reason}=${count}`)
-                          .join(", ")}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-
-          <ProspectSearchBulkActionBar
-            selectedCount={selectedKeys.size}
-            pushableCount={pushableSelectedCount}
-            selectedCompanies={selectedCompanies}
-            pushing={bulkPushing}
-            onPush={() => void runBulkPush()}
-            onClear={clearSelection}
-          />
-
-          {result && result.discovery_mode === "internal" && result.total_companies > 0 ? (
-            <ProspectSearchPagination
-              page={result.page ?? page}
-              pageSize={result.page_size ?? pageSize}
-              totalCount={result.total_companies}
-              hasNextPage={result.has_next_page ?? false}
-              loading={loading}
-              onPageChange={(nextPage) => void goToPage(nextPage)}
-              onPageSizeChange={(nextPageSize) => void changePageSize(nextPageSize)}
-            />
-          ) : null}
-
-          {showEmpty ? (
-            <SearchEmptyState
+        <div
+          className="flex min-w-0 flex-1 flex-col gap-6"
+          data-qa-marker={GROWTH_RESULTS_HEADER_LAYOUT_V1_QA_MARKER}
+        >
+          {!hasSearched ? (
+            <ProspectSearchCleanStartPanel
+              savedSearches={savedSearches}
               onRunQuery={(q) => void runSearch(q)}
-              onSelectTemplate={applyTemplate}
-              recentSaved={savedSearches}
-              title={result?.expanded_search_exhausted ? "No companies found" : undefined}
-              emptyMessage={
-                result?.expanded_search_exhausted
-                  ? "No companies found after expanded provider search. Try adding a location or broadening filters."
-                  : result?.discovery_mode === "discover_external" && hasSearched
-                    ? "No companies matched this search yet. Try a starter ICP template or broaden industry filters."
-                    : undefined
-              }
+              onRestoreSavedSearch={(id) => void loadSavedById(id)}
             />
-          ) : view === "card" ? (
-            <div className="flex flex-col gap-4">
-              {companies.map((row) => (
-                <CompanyResultCard
-                  key={`${row.source_type}-${row.id}`}
-                  row={row}
-                  selected={selectedCompany?.id === row.id}
-                  checked={selectedKeys.has(prospectSearchSelectionKey(row))}
-                  onSelect={() => setSelectedCompany(row)}
-                  onCheckedChange={(checked) => toggleCompanySelection(row, checked)}
-                  onAction={(action, extra) => {
-                    setSelectedCompany(row)
-                    void runAction(action, { ...extra, company: row })
-                  }}
-                />
-              ))}
-            </div>
           ) : (
-            <CompanyResultsTable
-              rows={companies}
-              selectedId={selectedCompany?.id ?? null}
-              selectedKeys={selectedKeys}
-              onSelect={setSelectedCompany}
-              onToggleSelection={toggleCompanySelection}
-              onSelectAllVisible={selectAllVisible}
-              onClearSelection={clearSelection}
-            />
-          )}
+            <>
+              <TerritoryIntelligencePanel
+                summary={result?.territory_intelligence}
+                filters={filters}
+                query={query}
+                loading={loading}
+                onSaveTerritory={async (name) => {
+                  await runAction("save_territory", { territory_name: name })
+                }}
+                onRefreshTerritory={async () => {
+                  await runAction("refresh_territory", {
+                    territory_id: filters.territory_id ?? result?.territory_intelligence?.territory_id,
+                  })
+                  await runSearch()
+                }}
+                onPushTopProspects={async () => {
+                  await runAction("push_territory_top_prospects")
+                }}
+              />
 
-          {people.length > 0 ? (
-            <div>
-              <h3 className="mb-3 text-sm font-semibold">Contacts ({people.length})</h3>
-              <div className="flex flex-col gap-3">
-                {people.map((row) => (
-                  <PersonResultCard key={row.id} row={row} />
-                ))}
+              <div className="w-full min-w-0 space-y-3">
+                <ProspectSearchActiveFilterPills filters={filters} onChange={replaceFilters} />
+
+                {loading ? (
+                  <p className="text-sm text-muted-foreground">
+                    {discoveryMode === "discover_external" ? "Searching providers…" : "Searching…"}
+                  </p>
+                ) : null}
+
+                <div className="flex w-full min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-sm font-semibold leading-snug text-foreground">
+                      <span className="inline-flex max-w-full flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                        <span className="whitespace-nowrap">Results</span>
+                        {result && !loading ? (
+                          <>
+                            <span className="whitespace-nowrap font-normal text-muted-foreground">
+                              {result.total_companies.toLocaleString()} companies found
+                            </span>
+                            {result.discovery_mode === "internal" ? (
+                              <>
+                                <span className="font-normal text-muted-foreground" aria-hidden="true">
+                                  ·
+                                </span>
+                                <span className="font-normal text-muted-foreground">
+                                  {result.total_people.toLocaleString()} contacts
+                                </span>
+                              </>
+                            ) : null}
+                          </>
+                        ) : null}
+                      </span>
+                    </h2>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    {companies.length > 0 ? (
+                      <Button size="sm" variant="ghost" onClick={selectAllVisible}>
+                        Select all visible
+                      </Button>
+                    ) : null}
+                    <Select
+                      value={sortBy}
+                      onValueChange={(value: GrowthProspectSearchSortBy) => {
+                        setSortBy(value)
+                        void fetchResults({ sortByOverride: value, nextPage: 1, resetSelection: true })
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-[170px] text-xs">
+                        <SelectValue placeholder="Sort results" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="rank">Default rank</SelectItem>
+                        <SelectItem value="signal_momentum">Signal momentum</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <SearchViewToggle view={view} onViewChange={setView} />
+                    <Button variant="outline" size="sm" onClick={() => setSaveDialogOpen(true)}>
+                      <Bookmark className="mr-1 size-3.5" />
+                      Save workflow
+                    </Button>
+                  </div>
+                </div>
+
+                {result?.used_relaxed_external_filters ? (
+                  <p className="text-xs text-muted-foreground">
+                    Showing provider matches with incomplete firmographic data. Try broadening filters if needed.
+                  </p>
+                ) : null}
+
+                {result ? <ProspectSearchDiagnosticsDisclosure result={result} /> : null}
+
+                {showEmpty ? (
+                  <ProspectSearchRelaxFilters
+                    estimate={estimate}
+                    filters={filters}
+                    onChange={replaceFilters}
+                  />
+                ) : null}
               </div>
-            </div>
-          ) : null}
+
+              <ProspectSearchBulkActionBar
+                selectedCount={selectedKeys.size}
+                pushableCount={pushableSelectedCount}
+                selectedCompanies={selectedCompanies}
+                pushing={bulkPushing}
+                onPush={() => void runBulkPush()}
+                onClear={clearSelection}
+              />
+
+              {result && result.discovery_mode === "internal" && result.total_companies > 0 ? (
+                <ProspectSearchPagination
+                  page={result.page ?? page}
+                  pageSize={result.page_size ?? pageSize}
+                  totalCount={result.total_companies}
+                  hasNextPage={result.has_next_page ?? false}
+                  loading={loading}
+                  onPageChange={(nextPage) => void goToPage(nextPage)}
+                  onPageSizeChange={(nextPageSize) => void changePageSize(nextPageSize)}
+                />
+              ) : null}
+
+              {showEmpty ? (
+                <SearchEmptyState
+                  onRunQuery={(q) => void runSearch(q)}
+                  onSelectTemplate={applyTemplate}
+                  recentSaved={savedSearches}
+                  title={result?.expanded_search_exhausted ? "No companies found" : "No companies found"}
+                  emptyMessage={
+                    result?.expanded_search_exhausted
+                      ? "No companies found after expanded provider search. Try adding a location or broadening filters."
+                      : result?.discovery_mode === "discover_external"
+                        ? "No companies matched this search yet. Try broadening industry or location filters."
+                        : "No companies matched this search yet. Try broadening filters or adjusting your query."
+                  }
+                />
+              ) : view === "card" ? (
+                <div className="flex flex-col gap-4">
+                  {companies.map((row) => (
+                    <CompanyResultCard
+                      key={`${row.source_type}-${row.id}`}
+                      row={row}
+                      selected={selectedCompany?.id === row.id}
+                      checked={selectedKeys.has(prospectSearchSelectionKey(row))}
+                      onSelect={() => setSelectedCompany(row)}
+                      onCheckedChange={(checked) => toggleCompanySelection(row, checked)}
+                      onAction={(action, extra) => {
+                        setSelectedCompany(row)
+                        void runAction(action, { ...extra, company: row })
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <CompanyResultsTable
+                  rows={companies}
+                  selectedId={selectedCompany?.id ?? null}
+                  selectedKeys={selectedKeys}
+                  onSelect={setSelectedCompany}
+                  onToggleSelection={toggleCompanySelection}
+                  onSelectAllVisible={selectAllVisible}
+                  onClearSelection={clearSelection}
+                />
+              )}
+
+              {people.length > 0 ? (
+                <div>
+                  <h3 className="mb-3 text-sm font-semibold">Contacts ({people.length})</h3>
+                  <div className="flex flex-col gap-3">
+                    {people.map((row) => (
+                      <PersonResultCard key={row.id} row={row} />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
       </div>
 

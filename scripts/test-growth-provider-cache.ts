@@ -139,13 +139,17 @@ async function main(): Promise<void> {
   const registrySource = read("lib/growth/real-world-discovery/real-world-discovery-registry.ts")
   const repoSource = read("lib/growth/real-world-discovery/real-world-discovery-repository.ts")
   const shellSource = read("components/growth/prospect-search/prospect-search-shell.tsx")
+  const diagnosticsSource = read(
+    "components/growth/prospect-search/prospect-search-diagnostics-disclosure.tsx",
+  )
 
   assert.match(googlePlacesSource, /executeCachedRealWorldProviderQuery/)
   assert.match(serpSource, /executeCachedRealWorldProviderQuery/)
   assert.match(registrySource, /admin\?: SupabaseClient/)
   assert.match(repoSource, /runRealWorldDiscoveryProviders\(providerQuery, \{ admin \}\)/)
-  assert.match(shellSource, /ProviderCacheCostDiagnostics/)
-  assert.match(shellSource, /provider_cache_qa_marker/)
+  assert.match(shellSource, /ProspectSearchDiagnosticsDisclosure/)
+  assert.match(diagnosticsSource, /ProviderCacheCostDiagnostics/)
+  assert.match(diagnosticsSource, /provider_cache_qa_marker/)
   assert.match(read("components/growth/prospect-search/real-world-provider-status.tsx"), /GROWTH_PROVIDER_CACHE_QA_MARKER/)
 
   console.log(`${GROWTH_PROVIDER_CACHE_QA_MARKER} checks passed`)

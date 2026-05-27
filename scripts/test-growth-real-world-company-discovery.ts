@@ -110,8 +110,13 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "components/growth/prospect-search/prospect-search-shell.tsx"),
     "utf8",
   )
-  assert.match(shellSource, /RealWorldProviderStatus/)
-  assert.match(shellSource, /ProviderRuntimeDiagnosticsPanel/)
+  assert.match(shellSource, /ProspectSearchDiagnosticsDisclosure/)
+  const diagnosticsSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-diagnostics-disclosure.tsx"),
+    "utf8",
+  )
+  assert.match(diagnosticsSource, /RealWorldProviderStatus/)
+  assert.match(diagnosticsSource, /ProviderRuntimeDiagnosticsPanel/)
 
   const googlePlacesSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/real-world-discovery/providers/google-places-provider.ts"),

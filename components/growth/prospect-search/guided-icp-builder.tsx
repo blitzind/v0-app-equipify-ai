@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils"
 function FilterActions({
   onClear,
   onApply,
-  applyLabel = "Apply & search",
+  applyLabel = "Search",
   applyDisabled = false,
   estimationSlot,
   className,
