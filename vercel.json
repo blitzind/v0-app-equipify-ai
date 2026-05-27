@@ -67,6 +67,10 @@
     {
       "path": "/api/cron/growth-sequence-recovery",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/growth-lifecycle-maintenance",
+      "schedule": "0 */4 * * *"
     }
   ]
 }

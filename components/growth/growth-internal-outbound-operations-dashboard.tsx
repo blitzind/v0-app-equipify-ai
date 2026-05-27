@@ -13,6 +13,7 @@ import type { GrowthInternalOutboundOperationsDashboard } from "@/lib/growth/ope
 import { GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER } from "@/lib/growth/operations/internal-outbound-ops-types"
 import { GROWTH_DELIVERABILITY_INTELLIGENCE_QA_MARKER } from "@/lib/growth/deliverability/deliverability-intelligence-types"
 import { GROWTH_REPUTATION_SAFE_SCALING_QA_MARKER } from "@/lib/growth/outbound/reputation-safe-scaling-types"
+import { GROWTH_OUTBOUND_LIFECYCLE_OPS_QA_MARKER } from "@/lib/growth/outbound/lifecycle-ops-types"
 
 function formatDate(value: string | null): string {
   if (!value) return "—"
@@ -490,6 +491,104 @@ export function GrowthInternalOutboundOperationsDashboardView() {
             ))}
           </div>
         </GrowthEngineCard>
+      </div>
+
+      <div
+        className="flex flex-col gap-5"
+        data-qa-marker={GROWTH_OUTBOUND_LIFECYCLE_OPS_QA_MARKER}
+      >
+        <GrowthEngineCard title="Lifecycle management" icon={<Users size={16} />}>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatTile label="Active inboxes" value={String(dashboard.lifecycle_ops.inventory_summary.activeSenders)} />
+            <StatTile label="Paused" value={String(dashboard.lifecycle_ops.inventory_summary.pausedSenders)} />
+            <StatTile label="Retirement candidates" value={String(dashboard.lifecycle_ops.sustainability_metrics.retirementCandidateCount)} />
+            <StatTile label="Inactive (21d+)" value={String(dashboard.lifecycle_ops.sustainability_metrics.inactiveInfrastructureCount)} />
+          </div>
+          <div className="mt-4 space-y-2 text-xs">
+            {dashboard.lifecycle_ops.lifecycle_rows.slice(0, 12).map((row) => (
+              <div key={row.senderAccountId} className="rounded-lg border p-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{row.emailAddress}</span>
+                  <GrowthBadge label={row.lifecycleStage} tone={row.lifecycleStage === "elevated_risk" ? "critical" : "neutral"} />
+                </div>
+                <p className="text-muted-foreground">
+                  Trust {row.trustScore} · Fatigue {row.fatigueScore}
+                  {row.inactivityDays != null ? ` · Inactive ${row.inactivityDays}d` : ""}
+                  {row.lifecycleStageOverride ? " · MANUAL OVERRIDE" : ""}
+                </p>
+                {row.recommendations[0] ? <p className="text-[11px] text-amber-900">{row.recommendations[0]}</p> : null}
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">{dashboard.lifecycle_ops.partial_telemetry_note}</p>
+        </GrowthEngineCard>
+
+        <div data-qa-marker={`${GROWTH_OUTBOUND_LIFECYCLE_OPS_QA_MARKER}-maintenance`}>
+          <GrowthEngineCard title="Maintenance queue" icon={<Server size={16} />}>
+            <ul className="space-y-2 text-xs">
+              {dashboard.lifecycle_ops.maintenance_tasks.length === 0 ? (
+                <li className="text-muted-foreground">No open maintenance tasks.</li>
+              ) : (
+                dashboard.lifecycle_ops.maintenance_tasks.slice(0, 15).map((task) => (
+                  <li key={task.id} className="rounded-lg border p-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium">{task.title}</span>
+                      <GrowthBadge label={task.severity} tone={task.severity === "critical" ? "critical" : "attention"} />
+                    </div>
+                    <p className="text-muted-foreground">{task.summary ?? task.taskType}</p>
+                    <p className="text-[10px] text-muted-foreground">Recommendation only — operator action required.</p>
+                  </li>
+                ))
+              )}
+            </ul>
+            {dashboard.lifecycle_ops.operational_alerts.length > 0 ? (
+              <div className="mt-4 border-t pt-3">
+                <p className="mb-2 text-xs font-medium">Operational alerts</p>
+                <ul className="space-y-2 text-xs">
+                  {dashboard.lifecycle_ops.operational_alerts.slice(0, 8).map((alert) => (
+                    <li key={alert.id} className="rounded border p-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span>{alert.title}</span>
+                        <GrowthBadge label={alert.category} tone="neutral" />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </GrowthEngineCard>
+        </div>
+
+        <div data-qa-marker={`${GROWTH_OUTBOUND_LIFECYCLE_OPS_QA_MARKER}-sustainability`}>
+          <GrowthEngineCard title="Infrastructure sustainability" icon={<Shield size={16} />}>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <StatTile label="Avg inbox age (days)" value={String(dashboard.lifecycle_ops.sustainability_metrics.avgInboxAgeDays)} />
+              <StatTile label="Aging senders (90d+)" value={String(dashboard.lifecycle_ops.sustainability_metrics.agingSenderCount)} />
+              <StatTile label="Risk accumulation" value={String(dashboard.lifecycle_ops.sustainability_metrics.riskAccumulationScore)} />
+              <StatTile
+                label="Interventions (30d)"
+                value={String(dashboard.lifecycle_ops.sustainability_metrics.operationalInterventions30d)}
+              />
+              <StatTile
+                label="Available capacity"
+                value={String(dashboard.lifecycle_ops.inventory_summary.availableDailyCapacity)}
+              />
+              <StatTile label="Used capacity" value={String(dashboard.lifecycle_ops.inventory_summary.usedDailyCapacity)} />
+              <StatTile label="Domains" value={String(dashboard.lifecycle_ops.inventory_summary.totalDomains)} />
+              <StatTile label="Mailboxes" value={String(dashboard.lifecycle_ops.inventory_summary.totalMailboxes)} />
+            </div>
+            {dashboard.lifecycle_ops.domain_rotation_recommendations.length > 0 ? (
+              <ul className="mt-4 space-y-2 text-xs">
+                {dashboard.lifecycle_ops.domain_rotation_recommendations.slice(0, 5).map((rec) => (
+                  <li key={rec.domainId} className="rounded border p-2">
+                    <span className="font-medium">{rec.title}</span>
+                    <p className="text-muted-foreground">{rec.detail}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </GrowthEngineCard>
+        </div>
       </div>
 
       <GrowthEngineCard title="Deliverability (deterministic)" icon={<Shield size={16} />}>

@@ -28,6 +28,8 @@ import { fetchDeliverabilityIntelligenceDashboard } from "@/lib/growth/deliverab
 import type { GrowthDeliverabilityIntelligenceDashboard } from "@/lib/growth/deliverability/deliverability-intelligence-dashboard"
 import { fetchExecutionCommandCenterDashboard } from "@/lib/growth/outbound/execution-command-center-dashboard"
 import type { GrowthExecutionCommandCenterDashboard } from "@/lib/growth/outbound/execution-command-center-dashboard"
+import { fetchLifecycleOpsDashboard } from "@/lib/growth/outbound/lifecycle-ops-dashboard"
+import type { GrowthLifecycleOpsDashboard } from "@/lib/growth/outbound/lifecycle-ops-dashboard"
 import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 
 export type GrowthInternalOutboundOperationsDashboard = {
@@ -57,6 +59,7 @@ export type GrowthInternalOutboundOperationsDashboard = {
   readiness_catalog: ReturnType<typeof buildGrowthInfrastructureReadinessCatalog>
   deliverability_intelligence: GrowthDeliverabilityIntelligenceDashboard
   execution_command_center: GrowthExecutionCommandCenterDashboard
+  lifecycle_ops: GrowthLifecycleOpsDashboard
 }
 
 function since24hIso(): string {
@@ -88,6 +91,7 @@ export async function fetchGrowthInternalOutboundOperationsDashboard(
     complaints24h,
     deliverabilityIntelligence,
     executionCommandCenter,
+    lifecycleOps,
   ] = await Promise.all([
     fetchGrowthOutboundOperationsDashboard(admin),
     listMailboxConnections(admin),
@@ -122,6 +126,7 @@ export async function fetchGrowthInternalOutboundOperationsDashboard(
       .gte("occurred_at", since24h),
     fetchDeliverabilityIntelligenceDashboard(admin),
     fetchExecutionCommandCenterDashboard(admin),
+    fetchLifecycleOpsDashboard(admin),
   ])
 
   const senderById = new Map(senders.map((s) => [s.id, s]))
@@ -290,5 +295,6 @@ export async function fetchGrowthInternalOutboundOperationsDashboard(
     readiness_catalog: buildGrowthInfrastructureReadinessCatalog(),
     deliverability_intelligence: deliverabilityIntelligence,
     execution_command_center: executionCommandCenter,
+    lifecycle_ops: lifecycleOps,
   }
 }
