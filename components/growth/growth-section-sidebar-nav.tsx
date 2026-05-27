@@ -20,11 +20,12 @@ import {
   Inbox,
   LayoutDashboard,
   Mail,
+  Map,
   MessageSquare,
+  Network,
   Phone,
   PlayCircle,
   Plug,
-  Plus,
   Radio,
   Radar,
   Search,
@@ -39,6 +40,7 @@ import {
   Upload,
   Users,
   Workflow,
+  Zap,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -50,8 +52,6 @@ import {
 } from "@/hooks/use-growth-sidebar-console"
 import {
   GROWTH_NAV_GROUP_DEFS,
-  GROWTH_NAV_QUICK_ACTIONS,
-  GROWTH_NAV_QUICK_ACTIONS_SECONDARY,
   GROWTH_NAVIGATION_IA_QA_MARKER,
   growthNavigationShortcutLabel,
   type GrowthNavItemDef,
@@ -102,7 +102,9 @@ const GROWTH_NAV_ICONS: Record<string, LucideIcon> = {
   "live-coaching": Sparkles,
   "call-providers": Plug,
   "lead-intelligence": Workflow,
+  "lead-engine-inspector": Workflow,
   "crm-leads": Users,
+  "discover-companies": Search,
   providers: Plug,
   "provider-delivery": Truck,
   infrastructure: Server,
@@ -111,7 +113,18 @@ const GROWTH_NAV_ICONS: Record<string, LucideIcon> = {
   warmup: Flame,
   copilot: Bot,
   playbooks: BookOpen,
+  "ai-research": Sparkles,
+  "ai-generations": Bot,
   relationships: Users,
+  "market-graph": Network,
+  "territory-intelligence": Map,
+  "company-signals": Zap,
+  "growth-signals": TrendingUp,
+  "committee-intelligence": Users,
+  "committee-mapping": Users,
+  "market-discovery": Search,
+  territories: Map,
+  "human-execution": Headphones,
   "growth-settings": Settings,
   "communication-settings": Settings,
   "provider-settings": Plug,
@@ -130,21 +143,18 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = GROWTH_NAV_GROUP_DEFS.map((group) =>
   items: toNavItems(group.items),
 }))
 
-const QUICK_ACTIONS = [...GROWTH_NAV_QUICK_ACTIONS, ...GROWTH_NAV_QUICK_ACTIONS_SECONDARY]
-
-const QUICK_ACTIONS_GROUP: GrowthNavGroup = {
-  id: "quick-actions",
-  label: "Quick Actions",
-  items: GROWTH_NAV_QUICK_ACTIONS.map((action) => ({
-    id: action.id,
-    href: action.href,
-    label: action.label,
-    icon: Plus,
-    match: (path: string) => path === action.href.split("?")[0] || path.startsWith(`${action.href.split("?")[0]}/`),
-  })),
+function resolveNavBadge(
+  item: GrowthNavItem,
+  badges: Partial<Record<GrowthSidebarConsoleKey, number>>,
+): number | undefined {
+  if (item.id === "calls") {
+    const total = (badges.calls ?? 0) + (badges.callQueue ?? 0)
+    return total > 0 ? total : undefined
+  }
+  if (!item.consoleKey) return undefined
+  const count = badges[item.consoleKey]
+  return count && count > 0 ? count : undefined
 }
-
-const GROWTH_SIDEBAR_ALL_GROUPS: GrowthNavGroup[] = [...GROWTH_NAV_GROUPS, QUICK_ACTIONS_GROUP]
 
 function readCollapsedGrowthGroups(): Set<string> {
   if (typeof window === "undefined") return new Set()
@@ -277,6 +287,7 @@ function GrowthNavLink({
 }) {
   const active = item.match(pathname)
   const Icon = item.icon
+  const placeholder = item.futurePlaceholder
 
   const link = (
     <Link
@@ -286,6 +297,7 @@ function GrowthNavLink({
         GROWTH_NAV_ROW_MOTION,
         compact ? "shrink-0 px-3 py-2" : "px-3 py-2",
         collapsed && !compact ? "justify-center px-2" : "",
+        placeholder ? "opacity-60" : "",
         active ? GROWTH_NAV_ROW_ACTIVE : GROWTH_NAV_ROW_INACTIVE,
       )}
     >
@@ -366,7 +378,6 @@ function GrowthNavGroups({
   collapsedGroups,
   toggleGroup,
   groups = GROWTH_NAV_GROUPS,
-  showQuickActions = false,
 }: {
   pathname: string
   collapsed?: boolean
@@ -376,13 +387,10 @@ function GrowthNavGroups({
   collapsedGroups?: Set<string>
   toggleGroup?: (groupId: string) => void
   groups?: GrowthNavGroup[]
-  showQuickActions?: boolean
 }) {
-  const navGroups = showQuickActions ? GROWTH_SIDEBAR_ALL_GROUPS : groups
-
   return (
     <>
-      {navGroups.map((group, groupIndex) => {
+      {groups.map((group, groupIndex) => {
         const groupCollapsed = collapsedGroups?.has(group.id) ?? false
         const groupActive = groupHasActiveRoute(group, pathname)
         const showHeader = !compact && !collapsed && toggleGroup
@@ -438,7 +446,7 @@ function GrowthNavGroups({
                   pathname={pathname}
                   collapsed={collapsed}
                   compact={compact}
-                  badge={item.consoleKey ? badges[item.consoleKey] : undefined}
+                  badge={resolveNavBadge(item, badges)}
                   previewLines={item.consoleKey ? previews[item.consoleKey] : undefined}
                 />
               ))}
@@ -456,13 +464,19 @@ function GrowthSidebarHealthStrip({
   loading,
 }: {
   collapsed: boolean
-  health: { revenueRisk: number; executiveNow: number; capacityLabel: string }
+  health: {
+    openInbox: number
+    pendingApproval: number
+    activeSequences: number
+    criticalSignals: number
+    systemHealthLabel: string
+  }
   loading: boolean
 }) {
-  const capacityTone =
-    health.capacityLabel === "Healthy"
+  const systemTone =
+    health.systemHealthLabel === "Healthy"
       ? "text-emerald-700"
-      : health.capacityLabel === "Strained"
+      : health.systemHealthLabel === "Monitor"
         ? "text-amber-700"
         : "text-rose-700"
 
@@ -476,9 +490,11 @@ function GrowthSidebarHealthStrip({
         </TooltipTrigger>
         <TooltipContent side="right" className="max-w-44 bg-card text-foreground border shadow-md">
           <p className="mb-1 font-medium">Growth Health</p>
-          <p className="text-[11px]">Revenue risk: {loading ? "…" : health.revenueRisk}</p>
-          <p className="text-[11px]">Executive now: {loading ? "…" : health.executiveNow}</p>
-          <p className={cn("text-[11px] font-medium", capacityTone)}>Capacity: {loading ? "…" : health.capacityLabel}</p>
+          <p className="text-[11px]">Open inbox: {loading ? "…" : health.openInbox}</p>
+          <p className="text-[11px]">Pending approval: {loading ? "…" : health.pendingApproval}</p>
+          <p className="text-[11px]">Active sequences: {loading ? "…" : health.activeSequences}</p>
+          <p className="text-[11px]">Critical signals: {loading ? "…" : health.criticalSignals}</p>
+          <p className={cn("text-[11px] font-medium", systemTone)}>System: {loading ? "…" : health.systemHealthLabel}</p>
         </TooltipContent>
       </Tooltip>
     )
@@ -489,16 +505,24 @@ function GrowthSidebarHealthStrip({
       <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Growth Health</p>
       <dl className="mt-2 space-y-1.5 text-xs">
         <div className="flex items-center justify-between gap-2">
-          <dt className="text-muted-foreground">Revenue risk</dt>
-          <dd className="font-semibold tabular-nums">{loading ? "…" : health.revenueRisk}</dd>
+          <dt className="text-muted-foreground">Open Inbox</dt>
+          <dd className="font-semibold tabular-nums">{loading ? "…" : health.openInbox}</dd>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <dt className="text-muted-foreground">Executive now</dt>
-          <dd className="font-semibold tabular-nums">{loading ? "…" : health.executiveNow}</dd>
+          <dt className="text-muted-foreground">Pending Approval</dt>
+          <dd className="font-semibold tabular-nums">{loading ? "…" : health.pendingApproval}</dd>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <dt className="text-muted-foreground">Capacity</dt>
-          <dd className={cn("font-semibold", capacityTone)}>{loading ? "…" : health.capacityLabel}</dd>
+          <dt className="text-muted-foreground">Active Sequences</dt>
+          <dd className="font-semibold tabular-nums">{loading ? "…" : health.activeSequences}</dd>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <dt className="text-muted-foreground">Critical Signals</dt>
+          <dd className="font-semibold tabular-nums">{loading ? "…" : health.criticalSignals}</dd>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <dt className="text-muted-foreground">System Health</dt>
+          <dd className={cn("font-semibold", systemTone)}>{loading ? "…" : health.systemHealthLabel}</dd>
         </div>
       </dl>
     </div>
@@ -559,7 +583,7 @@ export function GrowthSectionSidebarNav() {
   const pathname = usePathname()
   const consoleState = useGrowthSidebarConsole()
   const [collapsed, setCollapsed] = useState(false)
-  const { collapsedGroups, toggleGroup } = useGrowthSidebarGroupCollapse(pathname, GROWTH_SIDEBAR_ALL_GROUPS)
+  const { collapsedGroups, toggleGroup } = useGrowthSidebarGroupCollapse(pathname, GROWTH_NAV_GROUPS)
 
   useGrowthSidebarKeyboardShortcuts()
 
@@ -612,7 +636,7 @@ export function GrowthSectionSidebarNav() {
 
           {collapsed ? (
             <>
-              {GROWTH_SIDEBAR_ALL_GROUPS.map((group, groupIndex) => (
+              {GROWTH_NAV_GROUPS.map((group, groupIndex) => (
                 <div key={group.id} className={cn("space-y-0.5", groupIndex > 0 ? "mt-3 border-t border-border/50 pt-3 dark:border-border/40" : "")}>
                   {group.items.map((item) => (
                     <GrowthNavLink
@@ -620,7 +644,7 @@ export function GrowthSectionSidebarNav() {
                       item={item}
                       pathname={pathname}
                       collapsed
-                      badge={item.consoleKey ? consoleState.badges[item.consoleKey] : undefined}
+                      badge={resolveNavBadge(item, consoleState.badges)}
                       previewLines={item.consoleKey ? consoleState.previews[item.consoleKey] : undefined}
                     />
                   ))}
@@ -635,7 +659,6 @@ export function GrowthSectionSidebarNav() {
               previews={consoleState.previews}
               collapsedGroups={collapsedGroups}
               toggleGroup={toggleGroup}
-              showQuickActions
             />
           )}
 
@@ -663,7 +686,6 @@ export function GrowthSectionSidebarNav() {
             previews={consoleState.previews}
             collapsedGroups={collapsedGroups}
             toggleGroup={toggleGroup}
-            showQuickActions
           />
         </div>
       </nav>

@@ -8,19 +8,24 @@ import path from "node:path"
 import {
   GROWTH_COMMAND_PALETTE_DESTINATIONS,
   GROWTH_COMMAND_PALETTE_ENTRIES,
-  GROWTH_NAV_QUICK_ACTIONS,
   GROWTH_NAVIGATION_IA_QA_MARKER,
 } from "../lib/growth/navigation/growth-navigation-destinations"
+import {
+  GROWTH_COMMAND_REGISTRY,
+  GROWTH_COMMAND_REGISTRY_QA_MARKER,
+} from "../lib/growth/navigation/growth-command-registry"
 import { GROWTH_NAVIGATION_POLISH_QA_MARKER } from "../lib/growth/navigation/growth-navigation-ranking"
 
 assert.equal(GROWTH_NAVIGATION_IA_QA_MARKER, "growth-navigation-ia-v2")
 assert.equal(GROWTH_NAVIGATION_POLISH_QA_MARKER, "growth-navigation-polish-v1")
+assert.equal(GROWTH_COMMAND_REGISTRY_QA_MARKER, "growth-command-registry-v1")
 
 const palettePath = path.join(process.cwd(), "components/growth/growth-command-navigation-palette.tsx")
 const paletteSource = fs.readFileSync(palettePath, "utf8")
 assert.match(paletteSource, /CommandDialog/)
 assert.match(paletteSource, /GROWTH_NAVIGATION_IA_QA_MARKER/)
 assert.match(paletteSource, /GROWTH_NAVIGATION_POLISH_QA_MARKER/)
+assert.match(paletteSource, /GROWTH_COMMAND_REGISTRY/)
 assert.match(paletteSource, /Growth navigation/)
 assert.match(paletteSource, /rankGrowthCommandPaletteEntries/)
 assert.match(paletteSource, /readGrowthNavigationUsage/)
@@ -67,10 +72,13 @@ for (const id of requiredIds) {
 }
 
 assert.ok(GROWTH_COMMAND_PALETTE_DESTINATIONS.some((d) => d.label === "Revenue Inbox"))
+assert.ok(GROWTH_COMMAND_PALETTE_DESTINATIONS.some((d) => d.label === "Intent Signals"))
 assert.ok(GROWTH_COMMAND_PALETTE_ENTRIES.length > GROWTH_COMMAND_PALETTE_DESTINATIONS.length)
 
-assert.ok(GROWTH_NAV_QUICK_ACTIONS.some((a) => a.href.includes("mode=discover")))
-assert.ok(GROWTH_NAV_QUICK_ACTIONS.some((a) => a.label === "Run Lead Intelligence"))
+assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.href.includes("mode=discover")))
+assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.label === "Run Lead Research"))
+assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.label === "Open Inbox"))
+assert.equal(GROWTH_COMMAND_REGISTRY.length, 7)
 
 const guardSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/navigation/growth-navigation-input-guard.ts"),

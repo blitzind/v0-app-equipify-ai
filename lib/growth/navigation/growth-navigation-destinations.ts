@@ -1,6 +1,7 @@
-/** Growth Engine navigation IA — shared destinations for sidebar + command palette (Prompt 33 + 35). */
+/** Growth Engine navigation IA — shared destinations for sidebar + command palette (IA v2). */
 
 import type { GrowthSidebarConsoleKey } from "@/hooks/use-growth-sidebar-console"
+import { GROWTH_COMMAND_REGISTRY } from "@/lib/growth/navigation/growth-command-registry"
 import type { GrowthCommandPaletteEntry } from "@/lib/growth/navigation/growth-navigation-ranking"
 
 export const GROWTH_NAVIGATION_IA_QA_MARKER = "growth-navigation-ia-v2" as const
@@ -28,6 +29,8 @@ export type GrowthNavItemDef = {
   label: string
   consoleKey?: GrowthSidebarConsoleKey
   shortcutKey?: string
+  /** Reserved entries for upcoming surfaces — same routes, muted in sidebar. */
+  futurePlaceholder?: boolean
   match: (path: string) => boolean
 }
 
@@ -67,9 +70,9 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
   },
   {
     id: "intent-pixel",
-    label: "Intent Pixel",
+    label: "Intent Signals",
     href: "/admin/growth/intent-pixel",
-    keywords: ["intent", "visitor", "pixel", "tracking", "visitor tracking"],
+    keywords: ["intent", "visitor", "pixel", "tracking", "visitor tracking", "intent signals"],
     consoleKey: "intent_pixel",
   },
   {
@@ -171,52 +174,15 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
   },
 ]
 
-export const GROWTH_NAV_QUICK_ACTIONS: GrowthNavigationQuickAction[] = [
-  {
-    id: "discover-companies",
-    label: "Discover Companies",
-    href: "/admin/growth/search?mode=discover",
-    keywords: ["prospect", "search", "discover"],
-    aliases: ["discover", "companies"],
-    coreWorkflow: true,
-  },
-  {
-    id: "process-intent",
-    label: "Process Intent",
-    href: "/admin/growth/intent-pixel",
-    keywords: ["pixel", "visitor", "intent"],
-    coreWorkflow: true,
-  },
-  {
-    id: "open-inbox",
-    label: "Open Lead Inbox",
-    href: "/admin/growth/leads",
-    keywords: ["revenue", "inbox", "lead inbox"],
-    aliases: ["revenue", "pipeline", "prospects"],
-    coreWorkflow: true,
-  },
-  {
-    id: "run-lead-intelligence",
-    label: "Run Lead Intelligence",
-    href: "/admin/growth/leads/lead-engine",
-    keywords: ["inspector", "pipeline", "lead engine", "lead intelligence"],
-    aliases: ["pipeline inspector"],
-  },
-  {
-    id: "start-live-call",
-    label: "Start Live Call",
-    href: "/admin/growth/calls/workspace",
-    keywords: ["call", "dial", "phone"],
-    aliases: ["dialer", "live calls"],
-    coreWorkflow: true,
-  },
-  {
-    id: "review-outreach-approval",
-    label: "Review Outreach Approval",
-    href: "/admin/growth/outreach/approval",
-    keywords: ["approval", "outreach"],
-  },
-]
+/** @deprecated Sidebar quick actions removed — use GROWTH_COMMAND_REGISTRY for palette foundation. */
+export const GROWTH_NAV_QUICK_ACTIONS: GrowthNavigationQuickAction[] = GROWTH_COMMAND_REGISTRY.map((entry) => ({
+  id: entry.id,
+  label: entry.label,
+  href: entry.href,
+  keywords: entry.keywords,
+  aliases: entry.aliases,
+  coreWorkflow: entry.coreWorkflow,
+}))
 
 export const GROWTH_NAV_QUICK_ACTIONS_SECONDARY: GrowthNavigationQuickAction[] = [
   {
@@ -228,14 +194,14 @@ export const GROWTH_NAV_QUICK_ACTIONS_SECONDARY: GrowthNavigationQuickAction[] =
 ]
 
 export const GROWTH_COMMAND_PALETTE_ENTRIES: GrowthCommandPaletteEntry[] = [
-  ...GROWTH_NAV_QUICK_ACTIONS.map((action) => ({
-    id: action.id,
-    label: action.label,
-    href: action.href,
-    keywords: action.keywords,
-    aliases: action.aliases,
-    coreWorkflow: action.coreWorkflow,
-    group: "quick" as const,
+  ...GROWTH_COMMAND_REGISTRY.map((entry) => ({
+    id: entry.id,
+    label: entry.label,
+    href: entry.href,
+    keywords: entry.keywords,
+    aliases: entry.aliases,
+    coreWorkflow: entry.coreWorkflow,
+    group: "command" as const,
   })),
   ...GROWTH_COMMAND_PALETTE_DESTINATIONS.map((dest) => ({
     id: dest.id,
@@ -243,7 +209,7 @@ export const GROWTH_COMMAND_PALETTE_ENTRIES: GrowthCommandPaletteEntry[] = [
     href: dest.href,
     keywords: dest.keywords,
     aliases: dest.keywords,
-    coreWorkflow: ["command", "inbox", "search", "intent-pixel", "call-workspace"].includes(dest.id),
+    coreWorkflow: ["command", "inbox", "search", "intent-pixel", "call-workspace", "unified-inbox"].includes(dest.id),
     group: "navigate" as const,
   })),
   ...GROWTH_NAV_QUICK_ACTIONS_SECONDARY.map((action) => ({
@@ -270,6 +236,18 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: prefixMatch("/admin/growth/command"),
       },
       {
+        id: "prospect-search",
+        href: "/admin/growth/search",
+        label: "Prospect Search",
+        match: prefixMatch("/admin/growth/search"),
+      },
+      {
+        id: "unified-inbox",
+        href: "/admin/growth/inbox",
+        label: "Inbox",
+        match: prefixMatch("/admin/growth/inbox"),
+      },
+      {
         id: "revenue-inbox",
         href: "/admin/growth/leads",
         label: "Revenue Inbox",
@@ -284,30 +262,27 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         },
       },
       {
-        id: "prospect-search",
-        href: "/admin/growth/search",
-        label: "Prospect Search",
-        match: prefixMatch("/admin/growth/search"),
+        id: "calls",
+        href: "/admin/growth/calls",
+        label: "Calls",
+        consoleKey: "calls",
+        shortcutKey: "c",
+        match: (path) => {
+          if (path.startsWith("/admin/growth/calls/workspace")) return false
+          if (path.startsWith("/admin/growth/calls/providers")) return false
+          if (path.startsWith("/admin/growth/calls/live-coaching")) return false
+          if (path.startsWith("/admin/growth/leads/queue")) return true
+          if (path === "/admin/growth/calls") return true
+          if (path.startsWith("/admin/growth/calls/live")) return true
+          return false
+        },
       },
       {
-        id: "intent-pixel",
-        href: "/admin/growth/intent-pixel",
-        label: "Intent Pixel",
-        consoleKey: "intent_pixel",
-        match: prefixMatch("/admin/growth/intent-pixel"),
+        id: "meetings",
+        href: "/admin/growth/meetings",
+        label: "Meetings",
+        match: prefixMatch("/admin/growth/meetings"),
       },
-      {
-        id: "unified-inbox",
-        href: "/admin/growth/inbox",
-        label: "Inbox",
-        match: prefixMatch("/admin/growth/inbox"),
-      },
-    ],
-  },
-  {
-    id: "workflow",
-    label: "Workflow",
-    items: [
       {
         id: "outreach",
         href: "/admin/growth/outreach",
@@ -316,32 +291,19 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: (path) => path === "/admin/growth/outreach",
       },
       {
-        id: "outreach-approval",
-        href: "/admin/growth/outreach/approval",
-        label: "Outreach Approval",
-        consoleKey: "outreach_approval",
-        match: prefixMatch("/admin/growth/outreach/approval"),
-      },
-      {
         id: "sequences",
         href: "/admin/growth/sequences",
         label: "Sequences",
         consoleKey: "sequences",
-        match: (path) => path === "/admin/growth/sequences",
+        match: (path) =>
+          path.startsWith("/admin/growth/sequences") && !path.startsWith("/admin/growth/sequences/execution"),
       },
       {
-        id: "call-workspace",
-        href: "/admin/growth/calls/workspace",
-        label: "Call Workspace",
-        consoleKey: "calls_workspace",
-        match: prefixMatch("/admin/growth/calls/workspace"),
-      },
-      {
-        id: "sequence-execution",
-        href: "/admin/growth/sequences/execution",
-        label: "Sequence Execution",
-        consoleKey: "sequence_execution",
-        match: prefixMatch("/admin/growth/sequences/execution"),
+        id: "pipeline",
+        href: "/admin/growth/opportunities/pipeline",
+        label: "Pipeline",
+        consoleKey: "opportunities",
+        match: prefixMatch("/admin/growth/opportunities/pipeline"),
       },
     ],
   },
@@ -350,11 +312,17 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
     label: "Intelligence",
     items: [
       {
-        id: "engagement",
-        href: "/admin/growth/engagement",
-        label: "Engagement",
-        consoleKey: "engagement",
-        match: prefixMatch("/admin/growth/engagement"),
+        id: "intent-pixel",
+        href: "/admin/growth/intent-pixel",
+        label: "Intent Signals",
+        consoleKey: "intent_pixel",
+        match: prefixMatch("/admin/growth/intent-pixel"),
+      },
+      {
+        id: "lead-intelligence",
+        href: "/admin/growth/leads/lead-engine",
+        label: "Lead Intelligence",
+        match: prefixMatch("/admin/growth/leads/lead-engine"),
       },
       {
         id: "conversations",
@@ -364,33 +332,32 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: prefixMatch("/admin/growth/conversations"),
       },
       {
-        id: "pipeline",
-        href: "/admin/growth/opportunities/pipeline",
-        label: "Pipeline",
-        consoleKey: "opportunities",
-        match: prefixMatch("/admin/growth/opportunities/pipeline"),
+        id: "reply-inbox",
+        href: "/admin/growth/replies",
+        label: "Reply Inbox",
+        consoleKey: "conversations",
+        match: prefixMatch("/admin/growth/replies"),
       },
       {
-        id: "opportunities",
-        href: "/admin/growth/opportunities",
-        label: "Opportunities",
-        consoleKey: "opportunities",
-        match: (path) => path === "/admin/growth/opportunities",
+        id: "relationships",
+        href: "/admin/growth/relationships",
+        label: "Relationships",
+        consoleKey: "relationships",
+        match: prefixMatch("/admin/growth/relationships"),
+      },
+      {
+        id: "engagement",
+        href: "/admin/growth/engagement",
+        label: "Engagement",
+        consoleKey: "engagement",
+        match: prefixMatch("/admin/growth/engagement"),
       },
       {
         id: "revenue-operating",
         href: "/admin/growth/revenue-operating",
-        label: "Revenue Operating",
+        label: "Revenue Intelligence",
         consoleKey: "revenue",
         match: prefixMatch("/admin/growth/revenue-operating"),
-      },
-      {
-        id: "revenue",
-        href: "/admin/growth/revenue",
-        label: "Revenue",
-        consoleKey: "revenue",
-        shortcutKey: "r",
-        match: (path) => path === "/admin/growth/revenue",
       },
       {
         id: "executive",
@@ -407,55 +374,83 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         consoleKey: "capacity",
         match: prefixMatch("/admin/growth/capacity"),
       },
+      {
+        id: "market-graph",
+        href: "/admin/growth/search",
+        label: "Market Graph",
+        futurePlaceholder: true,
+        match: (path) => path === "/admin/growth/search" && path.includes("market-graph"),
+      },
+      {
+        id: "territory-intelligence",
+        href: "/admin/growth/search",
+        label: "Territory Intelligence",
+        futurePlaceholder: true,
+        match: (path) => path === "/admin/growth/search" && path.includes("territory"),
+      },
+      {
+        id: "company-signals",
+        href: "/admin/growth/search",
+        label: "Company Signals",
+        futurePlaceholder: true,
+        match: (path) => path === "/admin/growth/search" && path.includes("company-signals"),
+      },
+      {
+        id: "growth-signals",
+        href: "/admin/growth/search",
+        label: "Growth Signals",
+        futurePlaceholder: true,
+        match: (path) => path === "/admin/growth/search" && path.includes("growth-signals"),
+      },
+      {
+        id: "committee-intelligence",
+        href: "/admin/growth/search",
+        label: "Committee Intelligence",
+        futurePlaceholder: true,
+        match: (path) => path === "/admin/growth/search" && path.includes("committee"),
+      },
+      {
+        id: "opportunities",
+        href: "/admin/growth/opportunities",
+        label: "Opportunities",
+        consoleKey: "opportunities",
+        match: (path) => path === "/admin/growth/opportunities",
+      },
+      {
+        id: "revenue",
+        href: "/admin/growth/revenue",
+        label: "Revenue Forecast",
+        consoleKey: "revenue",
+        shortcutKey: "r",
+        match: (path) => path === "/admin/growth/revenue",
+      },
     ],
   },
   {
-    id: "communication",
-    label: "Communication",
+    id: "execution",
+    label: "Execution",
     items: [
       {
-        id: "calls",
-        href: "/admin/growth/calls",
-        label: "Calls",
-        consoleKey: "calls",
-        match: (path) => path === "/admin/growth/calls",
+        id: "call-workspace",
+        href: "/admin/growth/calls/workspace",
+        label: "Call Workspace",
+        consoleKey: "calls_workspace",
+        match: prefixMatch("/admin/growth/calls/workspace"),
       },
       {
-        id: "calls-live",
-        href: "/admin/growth/calls/live",
-        label: "Live Calls",
-        consoleKey: "calls_live",
-        match: (path) =>
-          path.startsWith("/admin/growth/calls/live") &&
-          !path.startsWith("/admin/growth/calls/live-coaching"),
+        id: "outreach-approval",
+        href: "/admin/growth/outreach/approval",
+        label: "Outreach Approval",
+        consoleKey: "outreach_approval",
+        match: prefixMatch("/admin/growth/outreach/approval"),
       },
       {
-        id: "call-queue",
-        href: "/admin/growth/leads/queue",
-        label: "Call Queue",
-        consoleKey: "callQueue",
-        shortcutKey: "c",
-        match: prefixMatch("/admin/growth/leads/queue"),
+        id: "sequence-execution",
+        href: "/admin/growth/sequences/execution",
+        label: "Sequence Execution",
+        consoleKey: "sequence_execution",
+        match: prefixMatch("/admin/growth/sequences/execution"),
       },
-      {
-        id: "meetings",
-        href: "/admin/growth/meetings",
-        label: "Meetings",
-        match: prefixMatch("/admin/growth/meetings"),
-      },
-      {
-        id: "reply-inbox",
-        href: "/admin/growth/replies",
-        label: "Reply Inbox",
-        consoleKey: "conversations",
-        match: prefixMatch("/admin/growth/replies"),
-      },
-    ],
-  },
-  {
-    id: "coaching",
-    label: "Coaching",
-    items: [
       {
         id: "live-coaching",
         href: "/admin/growth/calls/live-coaching",
@@ -470,43 +465,35 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         consoleKey: "calls_providers",
         match: prefixMatch("/admin/growth/calls/providers"),
       },
-    ],
-  },
-  {
-    id: "providers-nav",
-    label: "Providers",
-    items: [
       {
-        id: "providers",
-        href: "/admin/growth/providers",
-        label: "Provider Diagnostics",
-        consoleKey: "providers",
-        match: (path) =>
-          path.startsWith("/admin/growth/providers") && !path.startsWith("/admin/growth/providers/delivery"),
-      },
-      {
-        id: "provider-delivery",
-        href: "/admin/growth/providers/delivery",
-        label: "Delivery",
-        match: prefixMatch("/admin/growth/providers/delivery"),
+        id: "human-execution",
+        href: "/admin/growth/execution",
+        label: "Human Execution",
+        match: prefixMatch("/admin/growth/execution"),
       },
     ],
   },
   {
-    id: "tools",
-    label: "Tools",
+    id: "lead-engine",
+    label: "Lead Engine",
     items: [
       {
-        id: "lead-intelligence",
-        href: "/admin/growth/leads/lead-engine",
-        label: "Lead Intelligence Inspector",
-        match: prefixMatch("/admin/growth/leads/lead-engine"),
+        id: "discover-companies",
+        href: "/admin/growth/search?mode=discover",
+        label: "Discover Companies",
+        match: (path) => path.startsWith("/admin/growth/search"),
       },
       {
         id: "crm-leads",
         href: "/admin/growth/leads/crm",
         label: "CRM Leads",
         match: prefixMatch("/admin/growth/leads/crm"),
+      },
+      {
+        id: "lead-engine-inspector",
+        href: "/admin/growth/leads/lead-engine",
+        label: "Lead Intelligence Inspector",
+        match: prefixMatch("/admin/growth/leads/lead-engine"),
       },
       {
         id: "imports",
@@ -516,20 +503,53 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: prefixMatch("/admin/growth/imports"),
       },
       {
-        id: "infrastructure",
-        href: "/admin/growth/infrastructure",
-        label: "Infrastructure",
-        match: (path) =>
-          path.startsWith("/admin/growth/infrastructure") &&
-          !path.startsWith("/admin/growth/infrastructure/mailboxes") &&
-          !path.startsWith("/admin/growth/infrastructure/deliverability") &&
-          !path.startsWith("/admin/growth/infrastructure/warmup"),
+        id: "committee-mapping",
+        href: "/admin/growth/search",
+        label: "Committee Mapping",
+        futurePlaceholder: true,
+        match: (path) => path === "/admin/growth/search" && path.includes("committee-mapping"),
+      },
+      {
+        id: "market-discovery",
+        href: "/admin/growth/search?mode=discover",
+        label: "Market Discovery",
+        futurePlaceholder: true,
+        match: (path) => path.startsWith("/admin/growth/search") && path.includes("market-discovery"),
+      },
+      {
+        id: "territories",
+        href: "/admin/growth/search",
+        label: "Territories",
+        futurePlaceholder: true,
+        match: (path) => path === "/admin/growth/search" && path.includes("territories"),
+      },
+    ],
+  },
+  {
+    id: "providers-nav",
+    label: "Providers",
+    items: [
+      {
+        id: "provider-delivery",
+        href: "/admin/growth/providers/delivery",
+        label: "Delivery",
+        match: prefixMatch("/admin/growth/providers/delivery"),
       },
       {
         id: "mailbox-connections",
         href: "/admin/growth/infrastructure/mailboxes",
         label: "Mailbox Connections",
         match: prefixMatch("/admin/growth/infrastructure/mailboxes"),
+      },
+      {
+        id: "infrastructure",
+        href: "/admin/growth/infrastructure",
+        label: "Sender Infrastructure",
+        match: (path) =>
+          path.startsWith("/admin/growth/infrastructure") &&
+          !path.startsWith("/admin/growth/infrastructure/mailboxes") &&
+          !path.startsWith("/admin/growth/infrastructure/deliverability") &&
+          !path.startsWith("/admin/growth/infrastructure/warmup"),
       },
       {
         id: "deliverability",
@@ -543,6 +563,20 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         label: "Warmup",
         match: prefixMatch("/admin/growth/infrastructure/warmup"),
       },
+      {
+        id: "providers",
+        href: "/admin/growth/providers",
+        label: "Provider Diagnostics",
+        consoleKey: "providers",
+        match: (path) =>
+          path.startsWith("/admin/growth/providers") && !path.startsWith("/admin/growth/providers/delivery"),
+      },
+    ],
+  },
+  {
+    id: "ai",
+    label: "AI",
+    items: [
       {
         id: "copilot",
         href: "/admin/growth/copilot",
@@ -558,11 +592,16 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: prefixMatch("/admin/growth/copilot/playbooks"),
       },
       {
-        id: "relationships",
-        href: "/admin/growth/relationships",
-        label: "Relationships",
-        consoleKey: "relationships",
-        match: prefixMatch("/admin/growth/relationships"),
+        id: "ai-research",
+        href: "/admin/growth/leads/lead-engine",
+        label: "AI Research",
+        match: prefixMatch("/admin/growth/leads/lead-engine"),
+      },
+      {
+        id: "ai-generations",
+        href: "/admin/growth/copilot",
+        label: "AI Generations",
+        match: (path) => path === "/admin/growth/copilot",
       },
     ],
   },

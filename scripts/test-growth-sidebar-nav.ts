@@ -11,9 +11,9 @@ import {
 } from "../components/growth/growth-section-sidebar-nav"
 import {
   GROWTH_NAV_GROUP_DEFS,
-  GROWTH_NAV_QUICK_ACTIONS,
   GROWTH_NAVIGATION_IA_QA_MARKER,
 } from "../lib/growth/navigation/growth-navigation-destinations"
+import { GROWTH_COMMAND_REGISTRY } from "../lib/growth/navigation/growth-command-registry"
 import { GROWTH_NAVIGATION_POLISH_QA_MARKER } from "../lib/growth/navigation/growth-navigation-ranking"
 
 assert.equal(GROWTH_SIDEBAR_NAV_QA_MARKER, "growth-sidebar-nav-v2")
@@ -31,49 +31,83 @@ assert.match(source, /useGrowthSidebarGroupCollapse/)
 assert.match(source, /GROWTH_NAV_GROUP_DEFS/)
 assert.match(source, /GROWTH_NAVIGATION_IA_QA_MARKER/)
 assert.match(source, /GROWTH_NAVIGATION_POLISH_QA_MARKER/)
-assert.match(source, /GROWTH_NAV_QUICK_ACTIONS/)
 assert.match(source, /growthNavigationShortcutLabel/)
+assert.match(source, /Open Inbox/)
+assert.match(source, /Pending Approval/)
+assert.match(source, /Active Sequences/)
+assert.match(source, /Critical Signals/)
+assert.match(source, /System Health/)
+assert.doesNotMatch(source, /Quick Actions/)
+assert.doesNotMatch(source, /GROWTH_NAV_QUICK_ACTIONS/)
 assert.doesNotMatch(source, /Run Research/)
 assert.doesNotMatch(source, /Generate Copilot Draft/)
 assert.match(source, /dark:bg-slate-800/)
 assert.match(source, /data-qa-marker=\{GROWTH_SIDEBAR_NAV_QA_MARKER\}/)
 assert.match(source, /aria-expanded=\{!groupCollapsed\}/)
 assert.match(source, /TooltipContent side="right"/)
+assert.match(source, /resolveNavBadge/)
 
 const coreGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "core")
 assert.ok(coreGroup?.items.some((i) => i.label === "Revenue Inbox"))
+assert.ok(coreGroup?.items.some((i) => i.label === "Inbox"))
+assert.ok(coreGroup?.items.some((i) => i.label === "Prospect Search"))
+assert.ok(!coreGroup?.items.some((i) => i.label === "Intent Signals"))
+assert.ok(!coreGroup?.items.some((i) => i.label === "Sequence Execution"))
+assert.ok(!coreGroup?.items.some((i) => i.label === "Outreach Approval"))
 assert.ok(!coreGroup?.items.some((i) => i.label === "Lead Intelligence Inspector"))
 assert.ok(!coreGroup?.items.some((i) => i.label === "Imports"))
 
-const workflowGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "workflow")
-assert.ok(workflowGroup?.items.some((i) => i.label === "Outreach Approval"))
-assert.ok(!workflowGroup?.items.some((i) => i.label === "Reply Inbox"))
+const intelligenceGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "intelligence")
+assert.equal(intelligenceGroup?.label, "Intelligence")
+assert.ok(intelligenceGroup?.items.some((i) => i.label === "Intent Signals"))
+assert.ok(intelligenceGroup?.items.some((i) => i.label === "Lead Intelligence"))
+assert.ok(intelligenceGroup?.items.some((i) => i.label === "Revenue Intelligence"))
 
-const communicationGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "communication")
-assert.equal(communicationGroup?.label, "Communication")
-assert.ok(communicationGroup?.items.some((i) => i.label === "Call Queue"))
+const executionGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "execution")
+assert.equal(executionGroup?.label, "Execution")
+assert.ok(executionGroup?.items.some((i) => i.label === "Call Workspace"))
+assert.ok(executionGroup?.items.some((i) => i.label === "Outreach Approval"))
+assert.ok(executionGroup?.items.some((i) => i.label === "Sequence Execution"))
+assert.ok(executionGroup?.items.some((i) => i.label === "Live Coaching"))
+assert.ok(executionGroup?.items.some((i) => i.label === "Call Providers"))
 
-const coachingGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "coaching")
-assert.equal(coachingGroup?.label, "Coaching")
+const leadEngineGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "lead-engine")
+assert.equal(leadEngineGroup?.label, "Lead Engine")
+assert.ok(leadEngineGroup?.items.some((i) => i.label === "Discover Companies"))
+assert.ok(leadEngineGroup?.items.some((i) => i.label === "CRM Leads"))
+assert.ok(leadEngineGroup?.items.some((i) => i.label === "Lead Intelligence Inspector"))
+assert.ok(leadEngineGroup?.items.some((i) => i.label === "Imports"))
 
-const toolsGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "tools")
-assert.ok(toolsGroup?.items.some((i) => i.label === "Lead Intelligence Inspector"))
-assert.ok(toolsGroup?.items.some((i) => i.label === "CRM Leads"))
-assert.ok(toolsGroup?.items.some((i) => i.label === "Provider Diagnostics"))
-assert.ok(toolsGroup?.items.some((i) => i.label === "Imports"))
-assert.ok(toolsGroup?.items.some((i) => i.label === "Playbooks"))
+const providersGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "providers-nav")
+assert.equal(providersGroup?.label, "Providers")
+assert.ok(providersGroup?.items.some((i) => i.label === "Delivery"))
+assert.ok(providersGroup?.items.some((i) => i.label === "Provider Diagnostics"))
+assert.ok(providersGroup?.items.some((i) => i.label === "Mailbox Connections"))
 
-assert.ok(GROWTH_NAV_QUICK_ACTIONS.some((a) => a.label === "Discover Companies"))
+const aiGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "ai")
+assert.equal(aiGroup?.label, "AI")
+assert.ok(aiGroup?.items.some((i) => i.label === "Copilot"))
+assert.ok(aiGroup?.items.some((i) => i.label === "Playbooks"))
+
+assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.label === "Discover Companies"))
+
+const navIds = GROWTH_NAV_GROUP_DEFS.flatMap((group) => group.items.map((item) => item.id))
+assert.equal(navIds.length, new Set(navIds).size, "duplicate sidebar nav ids")
 
 const consoleSource = fs.readFileSync(
   path.join(process.cwd(), "hooks/use-growth-sidebar-console.ts"),
   "utf8",
 )
 assert.match(consoleSource, /lead-inbox/)
+assert.match(consoleSource, /inbox\/dashboard/)
+assert.match(consoleSource, /sequences\/dashboard/)
 assert.match(consoleSource, /outreach\/approval-dashboard/)
 assert.match(consoleSource, /intent-pixel\/monitor/)
-assert.match(consoleSource, /intent_pixel/)
-assert.match(consoleSource, /outreach_approval/)
+assert.match(consoleSource, /openInbox/)
+assert.match(consoleSource, /pendingApproval/)
+assert.match(consoleSource, /activeSequences/)
+assert.match(consoleSource, /criticalSignals/)
+assert.match(consoleSource, /systemHealthLabel/)
 
 const layoutSource = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-section-layout.tsx"),

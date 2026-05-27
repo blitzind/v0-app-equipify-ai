@@ -12,9 +12,11 @@ export type GrowthSidebarConsoleState = {
   badges: Partial<Record<GrowthSidebarConsoleKey, number>>
   previews: Partial<Record<GrowthSidebarConsoleKey, GrowthSidebarPreviewLine[]>>
   health: {
-    revenueRisk: number
-    executiveNow: number
-    capacityLabel: string
+    openInbox: number
+    pendingApproval: number
+    activeSequences: number
+    criticalSignals: number
+    systemHealthLabel: string
   }
 }
 
@@ -50,9 +52,11 @@ const EMPTY_STATE: GrowthSidebarConsoleState = {
   badges: {},
   previews: {},
   health: {
-    revenueRisk: 0,
-    executiveNow: 0,
-    capacityLabel: "Healthy",
+    openInbox: 0,
+    pendingApproval: 0,
+    activeSequences: 0,
+    criticalSignals: 0,
+    systemHealthLabel: "Healthy",
   },
 }
 
@@ -65,6 +69,18 @@ function capacityHealthLabel(tierCounts: {
   if ((tierCounts.critical ?? 0) > 0) return "Critical"
   if ((tierCounts.constrained ?? 0) > 0) return "Constrained"
   if ((tierCounts.strained ?? 0) > 0) return "Strained"
+  return "Healthy"
+}
+
+function systemHealthLabel(input: {
+  capacityTier: Parameters<typeof capacityHealthLabel>[0]
+  commandCritical: number
+  outreachPending: number
+}): string {
+  const capacityLabel = capacityHealthLabel(input.capacityTier)
+  if (capacityLabel === "Critical" || input.commandCritical >= 5) return "Critical"
+  if (capacityLabel === "Constrained" || capacityLabel === "Strained" || input.outreachPending >= 10) return "Attention"
+  if (input.commandCritical > 0 || input.outreachPending > 0) return "Monitor"
   return "Healthy"
 }
 
@@ -101,6 +117,8 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
       engagementRes,
       relationshipsRes,
       opportunitiesRes,
+      unifiedInboxRes,
+      sequencesRes,
     ] = await Promise.all([
       fetchJson<{ ok?: boolean; dashboard?: { missionControl?: { criticalActions?: number } } }>(
         "/api/platform/growth/command/dashboard",
@@ -186,6 +204,14 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
           blockedOpportunities?: unknown[]
         }
       }>("/api/platform/growth/opportunities/dashboard"),
+      fetchJson<{
+        ok?: boolean
+        dashboard?: { open_count?: number; critical_priority_count?: number; needs_review_count?: number }
+      }>("/api/platform/growth/inbox/dashboard"),
+      fetchJson<{
+        ok?: boolean
+        dashboard?: { active_count?: number }
+      }>("/api/platform/growth/sequences/dashboard"),
     ])
 
     const inboxTotal = leadInboxRes?.total ?? 0
@@ -220,6 +246,12 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
     const regressionCount =
       (revenueTrajectory.at_risk ?? 0) + (revenueTrajectory.slowing ?? 0)
 
+    const unifiedInbox = unifiedInboxRes?.dashboard
+    const openInboxCount = unifiedInbox?.open_count ?? 0
+    const inboxCriticalCount = unifiedInbox?.critical_priority_count ?? 0
+    const activeSequencesCount = sequencesRes?.dashboard?.active_count ?? 0
+    const criticalSignalsCount = commandCritical + intentHighIntentCount + inboxCriticalCount
+
     setState({
       loading: false,
       badges: {
@@ -238,6 +270,7 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
         calls_live_coaching: liveCoachingActive > 0 ? liveCoachingActive : undefined,
         engagement: engagement?.hotLeads?.length ?? undefined,
         opportunities: opportunities?.priorityOpportunities?.length ?? undefined,
+        sequences: activeSequencesCount > 0 ? activeSequencesCount : undefined,
       },
       previews: {
         revenue: [
@@ -289,9 +322,15 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
         ],
       },
       health: {
-        revenueRisk: regressionCount,
-        executiveNow: executiveTier.executive_now ?? 0,
-        capacityLabel: capacityHealthLabel(capacityTier),
+        openInbox: openInboxCount,
+        pendingApproval: outreachPendingCount,
+        activeSequences: activeSequencesCount,
+        criticalSignals: criticalSignalsCount,
+        systemHealthLabel: systemHealthLabel({
+          capacityTier,
+          commandCritical,
+          outreachPending: outreachPendingCount,
+        }),
       },
     })
   }, [])

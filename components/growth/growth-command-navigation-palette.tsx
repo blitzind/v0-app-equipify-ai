@@ -17,9 +17,9 @@ import { useGrowthNavigation } from "@/components/growth/growth-navigation-provi
 import {
   GROWTH_COMMAND_PALETTE_ENTRIES,
   GROWTH_NAVIGATION_IA_QA_MARKER,
-  GROWTH_NAV_QUICK_ACTIONS,
   growthNavigationShortcutLabel,
 } from "@/lib/growth/navigation/growth-navigation-destinations"
+import { GROWTH_COMMAND_REGISTRY } from "@/lib/growth/navigation/growth-command-registry"
 import {
   GROWTH_NAVIGATION_POLISH_QA_MARKER,
   rankGrowthCommandPaletteEntries,
@@ -88,7 +88,7 @@ function GrowthCommandPaletteEmptyState({
           Core workflow shortcuts
         </p>
         <div className="space-y-1">
-          {GROWTH_NAV_QUICK_ACTIONS.slice(0, 4).map((action) => (
+          {GROWTH_COMMAND_REGISTRY.slice(0, 4).map((action) => (
             <button
               key={`shortcut-${action.id}`}
               type="button"
@@ -133,7 +133,7 @@ export function GrowthCommandNavigationPalette() {
     [search, usage],
   )
 
-  const quickEntries = rankedEntries.filter((entry) => entry.group === "quick")
+  const commandEntries = rankedEntries.filter((entry) => entry.group === "command" || entry.group === "quick")
   const navigateEntries = rankedEntries.filter((entry) => entry.group === "navigate")
   const moreEntries = rankedEntries.filter((entry) => entry.group === "more")
   const recentEntries = useMemo(() => {
@@ -187,9 +187,9 @@ export function GrowthCommandNavigationPalette() {
                 </CommandGroup>
               ) : null}
 
-              {quickEntries.length ? (
-                <CommandGroup heading="Quick actions">
-                  {quickEntries.map((entry) => (
+              {commandEntries.length ? (
+                <CommandGroup heading="Commands">
+                  {commandEntries.map((entry) => (
                     <CommandItem key={entry.id} value={entry.id} onSelect={() => navigate(entry.href, entry)}>
                       {entry.label}
                     </CommandItem>
@@ -197,7 +197,7 @@ export function GrowthCommandNavigationPalette() {
                 </CommandGroup>
               ) : null}
 
-              {quickEntries.length && navigateEntries.length ? <CommandSeparator /> : null}
+              {commandEntries.length && navigateEntries.length ? <CommandSeparator /> : null}
 
               {navigateEntries.length ? (
                 <CommandGroup heading="Navigate">

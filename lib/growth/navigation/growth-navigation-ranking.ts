@@ -12,7 +12,7 @@ export type GrowthCommandPaletteEntry = {
   keywords?: string[]
   aliases?: string[]
   coreWorkflow?: boolean
-  group?: "quick" | "navigate" | "more"
+  group?: "command" | "quick" | "navigate" | "more"
 }
 
 /** Query-specific priority boosts when the operator types these terms. */
@@ -64,8 +64,8 @@ const CORE_WORKFLOW_IDS = new Set([
   "intent-pixel",
   "call-workspace",
   "discover-companies",
-  "process-intent",
   "open-inbox",
+  "unified-inbox",
 ])
 
 function searchableTerms(entry: GrowthCommandPaletteEntry): string[] {
