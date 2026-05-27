@@ -121,6 +121,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     consoleKey: "providers",
   },
   {
+    id: "infrastructure",
+    label: "Infrastructure",
+    href: "/admin/growth/infrastructure",
+    keywords: ["sender", "infrastructure", "domain", "deliverability", "warmup"],
+  },
+  {
     id: "outreach-approval",
     label: "Outreach Approval",
     href: "/admin/growth/outreach/approval",
@@ -459,6 +465,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         label: "Provider Diagnostics",
         consoleKey: "providers",
         match: prefixMatch("/admin/growth/providers"),
+      },
+      {
+        id: "infrastructure",
+        href: "/admin/growth/infrastructure",
+        label: "Infrastructure",
+        match: prefixMatch("/admin/growth/infrastructure"),
       },
       {
         id: "copilot",
