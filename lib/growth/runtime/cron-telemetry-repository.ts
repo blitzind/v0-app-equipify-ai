@@ -13,7 +13,7 @@ import {
 } from "@/lib/growth/runtime/cron-telemetry-types"
 
 export const GROWTH_CRON_EXECUTION_TELEMETRY_MIGRATION =
-  "20270527120000_growth_engine_cron_execution_telemetry.sql" as const
+  "20270527123000_growth_engine_cron_execution_telemetry.sql" as const
 
 type RunRow = {
   id: string

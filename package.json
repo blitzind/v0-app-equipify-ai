@@ -172,6 +172,7 @@
     "test:growth-sender-infrastructure": "tsx scripts/test-growth-sender-infrastructure.ts",
     "test:growth-mailbox-connections": "tsx scripts/test-growth-mailbox-connections.ts",
     "test:growth-deliverability": "tsx scripts/test-growth-deliverability.ts",
+    "check:migration-drift": "tsx scripts/check-migration-drift.ts",
     "test:growth-operational-send-plane": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-operational-send-plane.ts",
     "test:growth-internal-outbound-ops": "tsx scripts/test-growth-internal-outbound-ops.ts",
     "test:growth-deliverability-intelligence": "tsx scripts/test-growth-deliverability-intelligence.ts",

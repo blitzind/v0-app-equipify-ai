@@ -67,7 +67,7 @@ All Growth crons are registered in `vercel.json` and wrapped with `runGrowthCron
 | `/api/cron/growth-territory-refresh` | `0 2 * * *` | intelligence |
 | `/api/cron/growth-market-health-refresh` | `0 1 * * *` | intelligence |
 
-Telemetry persists to `growth.cron_execution_runs` (migration `20270527120000_growth_engine_cron_execution_telemetry.sql`).
+Telemetry persists to `growth.cron_execution_runs` (migration `20270527123000_growth_engine_cron_execution_telemetry.sql`).
 
 ## Operational visibility
 

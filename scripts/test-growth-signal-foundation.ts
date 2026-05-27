@@ -444,7 +444,7 @@ function main(): void {
 
   const watchlistMigrationPath = path.join(
     process.cwd(),
-    "supabase/migrations/20270528120000_growth_engine_signal_watchlists.sql",
+    "supabase/migrations/20270528123000_growth_engine_signal_watchlists.sql",
   )
   assert.ok(fs.existsSync(watchlistMigrationPath), "watchlist migration must exist")
   const watchlistMigration = fs.readFileSync(watchlistMigrationPath, "utf8")
