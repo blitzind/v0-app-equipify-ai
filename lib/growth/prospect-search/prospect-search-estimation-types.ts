@@ -1,5 +1,11 @@
 /** Client-safe Prospect Search live estimation types + QA markers. */
 
+import {
+  GROWTH_MARKET_ESTIMATION_TIER_QA_MARKER,
+  GROWTH_NO_FALSE_NEGATIVE_ESTIMATES_QA_MARKER,
+  GROWTH_PRESEARCH_ESTIMATION_VS_RESULTS_QA_MARKER,
+  type GrowthMarketEstimationTier,
+} from "@/lib/growth/prospect-search/prospect-search-presearch-market-estimation"
 import type { GrowthProspectSearchDiscoveryMode } from "@/lib/growth/prospect-search/prospect-search-types"
 
 export const GROWTH_LIVE_ESTIMATED_RESULTS_QA_MARKER =
@@ -17,7 +23,7 @@ export const GROWTH_SEARCH_RESULT_PREVIEW_QA_MARKER =
 export const GROWTH_PROVIDER_HEALTH_DASHBOARD_QA_MARKER =
   "growth-provider-health-dashboard-v1" as const
 
-export type GrowthProspectSearchEstimateConfidence = "high" | "medium" | "low"
+export type GrowthProspectSearchEstimateConfidence = "high" | "medium" | "low" | "broad" | "heuristic"
 
 export type GrowthProspectSearchEstimateState =
   | "estimating"
@@ -26,6 +32,7 @@ export type GrowthProspectSearchEstimateState =
   | "filters_too_restrictive"
   | "provider_unavailable"
   | "using_cached_estimate"
+  | "presearch_broad_market"
 
 export type GrowthProspectSearchEstimateSource =
   | "materialized_index"
@@ -33,6 +40,10 @@ export type GrowthProspectSearchEstimateSource =
   | "provider_cache"
   | "saved_search_stats"
   | "provider_readiness_heuristic"
+  | "industry_breadth"
+  | "query_category"
+  | "market_heuristic"
+  | "indexed_hint"
 
 export type GrowthProspectSearchProviderReadiness = {
   google_places: "available" | "unavailable" | "disabled"
@@ -46,11 +57,20 @@ export type GrowthProspectSearchLiveEstimate = {
   qa_marker: typeof GROWTH_LIVE_ESTIMATED_RESULTS_QA_MARKER
   estimation_state_marker: typeof GROWTH_FILTER_ESTIMATION_STATE_QA_MARKER
   preview_marker: typeof GROWTH_SEARCH_RESULT_PREVIEW_QA_MARKER
+  presearch_market_qa_marker: typeof GROWTH_MARKET_ESTIMATION_TIER_QA_MARKER
+  presearch_vs_results_qa_marker: typeof GROWTH_PRESEARCH_ESTIMATION_VS_RESULTS_QA_MARKER
+  no_false_negative_qa_marker: typeof GROWTH_NO_FALSE_NEGATIVE_ESTIMATES_QA_MARKER
+  phase: "presearch"
   state: GrowthProspectSearchEstimateState
   confidence: GrowthProspectSearchEstimateConfidence
+  confidence_label: string
   discovery_mode: GrowthProspectSearchDiscoveryMode
   exact_count: number | null
+  indexed_count_hint: number | null
+  market_tier: GrowthMarketEstimationTier | null
+  broad_market_category: boolean
   display_label: string
+  market_helper: string
   range_floor: number | null
   provider_readiness: GrowthProspectSearchProviderReadiness
   sources: GrowthProspectSearchEstimateSource[]

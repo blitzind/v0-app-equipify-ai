@@ -1,6 +1,9 @@
 /** Client-safe formatting for live Prospect Search estimates — never fake precision. */
 
 import type {
+  GrowthMarketEstimationTier,
+} from "@/lib/growth/prospect-search/prospect-search-presearch-market-estimation"
+import type {
   GrowthProspectSearchDiscoveryMode,
   GrowthProspectSearchFilters,
 } from "@/lib/growth/prospect-search/prospect-search-types"
@@ -32,122 +35,40 @@ export function floorEstimateToRange(count: number): { floor: number; label: str
   return { floor: 10, label: "~10+" }
 }
 
-export function formatExactOrRangeLabel(input: {
-  exact_count: number | null
-  confidence: GrowthProspectSearchEstimateConfidence
-  discovery_mode: GrowthProspectSearchDiscoveryMode
-}): { display_label: string; range_floor: number | null } {
-  if (input.exact_count == null) {
-    return { display_label: PROSPECT_SEARCH_ESTIMATE_UNAVAILABLE_LABEL, range_floor: null }
-  }
-
-  const count = input.exact_count
-
-  if (input.confidence === "high") {
-    if (count <= 0) {
-      return { display_label: "No likely matches", range_floor: 0 }
-    }
-    return {
-      display_label: `${formatProspectSearchMatchingCount(count)} matching companies`,
-      range_floor: count,
-    }
-  }
-
-  if (count <= 0) {
-    return { display_label: "No likely matches", range_floor: 0 }
-  }
-
-  const ranged = floorEstimateToRange(count)
-  return {
-    display_label: `${ranged.label} matching companies`,
-    range_floor: ranged.floor,
-  }
-}
-
-export function formatProspectSearchMarketSizeHeadline(input: {
-  exact_count: number | null
-  confidence: GrowthProspectSearchEstimateConfidence
-  discovery_mode: GrowthProspectSearchDiscoveryMode
-}): { headline: string; helper: string } {
-  if (input.exact_count == null) {
-    return {
-      headline: PROSPECT_SEARCH_ESTIMATE_UNAVAILABLE_LABEL,
-      helper:
-        input.discovery_mode === "discover_external"
-          ? "Based on your current filters. External discovery runs only when you click Search."
-          : "Counts reflect indexed CRM and Growth Engine records — no external discovery.",
-    }
-  }
-
-  const count = input.exact_count
-
-  if (count <= 0) {
-    return {
-      headline: "No likely matches",
-      helper:
-        input.discovery_mode === "discover_external"
-          ? "Based on your current filters. External discovery runs only when you click Search."
-          : "Refine filters to find indexed companies — no search required.",
-    }
-  }
-
-  const headline =
-    input.confidence === "high"
-      ? `${formatProspectSearchMatchingCount(count)} matching companies`
-      : formatExactOrRangeLabel(input).display_label
-
-  if (input.discovery_mode === "discover_external") {
-    return {
-      headline,
-      helper: "Based on your current filters. External discovery runs only when you click Search.",
-    }
-  }
-
-  return {
-    headline,
-    helper: "Based on your current filters. Counts reflect indexed CRM and Growth Engine records.",
-  }
-}
-
 export function buildProspectSearchButtonLabel(input: {
   state: GrowthProspectSearchEstimateState
   discovery_mode: GrowthProspectSearchDiscoveryMode
   exact_count: number | null
   confidence: GrowthProspectSearchEstimateConfidence
   provider_readiness: GrowthProspectSearchProviderReadiness
+  broad_market_category?: boolean
+  market_tier?: GrowthMarketEstimationTier | null
 }): { label: string; disabled: boolean } {
-  if (input.state === "provider_unavailable" && input.discovery_mode === "discover_external") {
+  if (
+    input.discovery_mode === "discover_external" &&
+    !input.provider_readiness.external_discovery_available
+  ) {
     return { label: "Provider unavailable", disabled: true }
   }
 
   if (input.discovery_mode === "discover_external") {
-    if (!input.provider_readiness.external_discovery_available) {
-      return { label: "Provider unavailable", disabled: true }
-    }
-    if (input.state === "no_likely_matches" && (input.exact_count ?? 0) <= 0) {
-      return { label: "No likely matches", disabled: true }
-    }
+    return { label: "Search market", disabled: false }
+  }
+
+  if (input.broad_market_category || input.market_tier === "large" || input.market_tier === "massive") {
     return { label: "Search", disabled: false }
   }
 
-  if (input.state === "no_likely_matches") {
-    return { label: "No likely matches", disabled: true }
+  if (input.state === "no_likely_matches" && !input.broad_market_category) {
+    return { label: "Search", disabled: false }
   }
+
   const count = input.exact_count ?? 0
-  if (count <= 0 && input.state === "filters_too_restrictive") {
-    return { label: "No likely matches", disabled: true }
+  if (count > 0 && input.confidence === "high") {
+    return { label: `Search ${formatProspectSearchMatchingCount(count)} companies`, disabled: false }
   }
-  if (count <= 0) {
-    return { label: "No likely matches", disabled: true }
-  }
-  if (input.confidence === "high" && input.exact_count != null) {
-    return { label: `Search ${formatProspectSearchMatchingCount(input.exact_count)} companies`, disabled: false }
-  }
-  const ranged = floorEstimateToRange(count)
-  if (ranged.floor >= 1000) {
-    return { label: "Search estimated 1k+ companies", disabled: false }
-  }
-  return { label: `Search estimated ${ranged.label.replace("~", "")} companies`, disabled: false }
+
+  return { label: "Search", disabled: false }
 }
 
 export function countActiveProspectSearchFilters(filters: GrowthProspectSearchFilters): number {
