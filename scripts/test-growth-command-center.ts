@@ -36,7 +36,7 @@ import {
 import { PLATFORM_ADMIN_GROWTH_LEADS_TAB } from "../components/admin/platform-admin-shell"
 import { buildBossBattles, buildCoachTips, buildHeatMap, detectComboChains } from "../lib/growth/command/command-dashboard-helpers"
 import { describeSequenceStartUnavailable } from "../lib/growth/sequence-enrollment/sequence-enrollment-ui"
-import { buildCommandCenterHiringMetrics, buildCommandCenterWatchlistMetrics } from "../lib/growth/signals/integrations/command-center-bridge"
+import { buildCommandCenterHiringMetrics, buildCommandCenterSignalMomentumSummary, buildCommandCenterWatchlistMetrics } from "../lib/growth/signals/integrations/command-center-bridge"
 import type { GrowthLead } from "../lib/growth/types"
 import type { GrowthSignalRow } from "../lib/growth/signals/signal-types"
 
@@ -296,5 +296,54 @@ assert.equal(watchlistMetrics.active_watchlists, 3)
 assert.equal(watchlistMetrics.matches_last_24h, 12)
 assert.equal(watchlistMetrics.top_watchlists[0]?.name, "Medical hiring")
 assert.equal(watchlistMetrics.high_urgency_unmatched, 5)
+
+const momentumSummary = buildCommandCenterSignalMomentumSummary({
+  signals: [
+    {
+      id: "sig-1",
+      organization_id: null,
+      signal_type: "news_event",
+      provider_key: "manual",
+      provider_event_id: null,
+      dedupe_hash: "d1",
+      confidence: 0.8,
+      signal_score: 72,
+      urgency: "high",
+      routing_priority: 1,
+      occurred_at: new Date().toISOString(),
+      detected_at: new Date().toISOString(),
+      expires_at: null,
+      company_id: null,
+      company_name: "Acme Health Systems",
+      domain: "acmehealth.com",
+      contact_id: null,
+      contact_display_label: null,
+      title: "Expansion",
+      previous_title: null,
+      seniority: null,
+      geography: "Nashville, TN",
+      industry: null,
+      category: "Field Service",
+      evidence_summary: "Regional expansion",
+      workflow_state: "new",
+      suppression_state: "active",
+      processed_to_lead_inbox: false,
+      lead_inbox_id: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      metadata: {},
+    } satisfies GrowthSignalRow,
+  ],
+  watchlist_metrics: watchlistMetrics,
+})
+assert.equal(momentumSummary.qa_marker, "growth-signal-momentum-v1")
+assert.ok(momentumSummary.top_companies_by_momentum.length >= 1)
+assert.ok(momentumSummary.high_urgency_signals_count >= 1)
+
+const ccSection = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-command-signal-intelligence-section.tsx"),
+  "utf8",
+)
+assert.match(ccSection, /GROWTH_SIGNAL_MOMENTUM_QA_MARKER/)
 
 console.log("growth-command-center: all checks passed")

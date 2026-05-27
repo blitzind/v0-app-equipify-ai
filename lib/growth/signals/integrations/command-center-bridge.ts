@@ -1,5 +1,11 @@
 import type { GrowthSignalRow } from "@/lib/growth/signals/signal-types"
 import {
+  buildCompanySignalRollup,
+  deriveMomentumLabel,
+  GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
+  type GrowthSignalMomentumLabel,
+} from "@/lib/growth/signals/company-signal-rollup"
+import {
   formatDepartmentDistribution,
   readHiringVelocityFromMetadata,
 } from "@/lib/growth/signals/hiring-velocity-ui-helpers"
@@ -105,5 +111,118 @@ export function buildCommandCenterWatchlistMetrics(
     matches_last_24h: snapshot.matches_last_24h,
     top_watchlists: snapshot.top_watchlists.slice(0, 5),
     high_urgency_unmatched: snapshot.high_urgency_unmatched,
+  }
+}
+
+export type CommandCenterSignalMomentumCompany = {
+  company_name: string
+  domain: string | null
+  momentum_score: number
+  momentum_label: GrowthSignalMomentumLabel
+  latest_signal_summary: string | null
+  watchlist_match: boolean
+}
+
+export type CommandCenterSignalMomentumSummary = {
+  qa_marker: typeof GROWTH_SIGNAL_MOMENTUM_QA_MARKER
+  momentum_label: GrowthSignalMomentumLabel
+  average_momentum_score: number
+  high_urgency_signals_count: number
+  news_events_count: number
+  hiring_spikes_count: number
+  watchlist_matches_last_24h: number
+  watchlist_matches_last_7d: number
+  top_companies_by_momentum: CommandCenterSignalMomentumCompany[]
+}
+
+function companyKey(signal: GrowthSignalRow): string {
+  const domain = signal.domain?.trim().toLowerCase()
+  if (domain) return `domain:${domain}`
+  const name = signal.company_name?.trim().toLowerCase()
+  if (name) return `company:${name}`
+  return `signal:${signal.id}`
+}
+
+function countWatchlistMatchesSince(
+  matches: Array<{ matched_at: string }> | undefined,
+  hours: number,
+  nowMs: number,
+): number {
+  const cutoff = nowMs - hours * 60 * 60 * 1000
+  return (matches ?? []).filter((row) => Date.parse(row.matched_at) >= cutoff && Date.parse(row.matched_at) <= nowMs)
+    .length
+}
+
+/** Milestone E — Intent Signals momentum summary for Command Center. */
+export function buildCommandCenterSignalMomentumSummary(input: {
+  signals: GrowthSignalRow[]
+  watchlist_metrics?: CommandCenterWatchlistMetrics
+  watchlist_matches?: Array<{ matched_at: string }>
+  watchlist_match_signal_ids?: Set<string>
+  now?: Date
+}): CommandCenterSignalMomentumSummary {
+  const nowMs = (input.now ?? new Date()).getTime()
+  const activeSignals = input.signals.filter((signal) => signal.suppression_state === "active")
+  const matchIds = input.watchlist_match_signal_ids ?? new Set<string>()
+
+  const groups = new Map<string, GrowthSignalRow[]>()
+  for (const signal of activeSignals) {
+    const key = companyKey(signal)
+    const bucket = groups.get(key) ?? []
+    bucket.push(signal)
+    groups.set(key, bucket)
+  }
+
+  const rollups: CommandCenterSignalMomentumCompany[] = []
+  for (const bucket of groups.values()) {
+    const primary = bucket[0]!
+    const rollup = buildCompanySignalRollup({
+      domain: primary.domain,
+      company_id: primary.company_id,
+      company_name: primary.company_name,
+      signals: bucket,
+    })
+    if (rollup.total_signal_count === 0) continue
+    rollups.push({
+      company_name: primary.company_name?.trim() || primary.domain?.trim() || "—",
+      domain: primary.domain,
+      momentum_score: rollup.momentum_score,
+      momentum_label: rollup.momentum_label,
+      latest_signal_summary: rollup.latest_signal_summary,
+      watchlist_match: bucket.some((signal) => matchIds.has(signal.id)),
+    })
+  }
+
+  const avgMomentum =
+    rollups.length > 0
+      ? Math.round(rollups.reduce((sum, row) => sum + row.momentum_score, 0) / rollups.length)
+      : 0
+
+  const highUrgency = activeSignals.filter(
+    (signal) => signal.urgency === "high" || signal.urgency === "urgent",
+  ).length
+  const newsEvents = activeSignals.filter((signal) => signal.signal_type === "news_event").length
+  const hiringSpikes = activeSignals.filter((signal) => {
+    if (signal.signal_type !== "hire") return false
+    const velocity = signal.metadata?.hiring_velocity
+    return velocity && typeof velocity === "object"
+      ? (velocity as Record<string, unknown>).hiring_spike === true
+      : false
+  }).length
+
+  return {
+    qa_marker: GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
+    momentum_label: deriveMomentumLabel(avgMomentum),
+    average_momentum_score: avgMomentum,
+    high_urgency_signals_count: highUrgency,
+    news_events_count: newsEvents,
+    hiring_spikes_count: hiringSpikes,
+    watchlist_matches_last_24h:
+      input.watchlist_metrics?.matches_last_24h ??
+      countWatchlistMatchesSince(input.watchlist_matches, 24, nowMs),
+    watchlist_matches_last_7d: countWatchlistMatchesSince(input.watchlist_matches, 24 * 7, nowMs),
+    top_companies_by_momentum: rollups
+      .sort((a, b) => b.momentum_score - a.momentum_score)
+      .slice(0, 5),
   }
 }

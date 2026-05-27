@@ -37,6 +37,15 @@ import { fetchCallIntelligenceDashboardSummary } from "@/lib/growth/call-intelli
 import { callIntelligenceActionImpactBoost } from "@/lib/growth/call-intelligence/call-intelligence-nba-bridge"
 import { growthSignalActionImpactBoost } from "@/lib/growth/company-growth-signals/integrations/command-center-bridge"
 import { fetchCommandMarketHealth } from "@/lib/growth/market-intelligence/market-repository"
+import {
+  buildCommandCenterHiringMetrics,
+  buildCommandCenterSignalMomentumSummary,
+  buildCommandCenterWatchlistMetrics,
+} from "@/lib/growth/signals/integrations/command-center-bridge"
+import { loadGrowthSignals } from "@/lib/growth/signals/signal-repository"
+import { isGrowthSignalFoundationSchemaReady } from "@/lib/growth/signals/signal-schema-health"
+import { loadWatchlistMetricsSnapshot } from "@/lib/growth/signals/signal-watchlist-repository"
+import type { GrowthCommandSignalIntelligenceSummary } from "@/lib/growth/command/command-action-types"
 import type { GrowthSignalTier } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
 
 const LEAD_SCAN_SELECT =
@@ -87,6 +96,57 @@ function startOfTodayIso(): string {
   return d.toISOString()
 }
 
+async function loadCommandCenterSignalIntelligence(
+  admin: SupabaseClient,
+): Promise<GrowthCommandSignalIntelligenceSummary> {
+  const emptyWatchlist = buildCommandCenterWatchlistMetrics({
+    active_watchlists: 0,
+    matches_last_24h: 0,
+    top_watchlists: [],
+    high_urgency_unmatched: 0,
+  })
+  const emptyHiring = buildCommandCenterHiringMetrics({})
+  const emptyMomentum = buildCommandCenterSignalMomentumSummary({
+    signals: [],
+    watchlist_metrics: emptyWatchlist,
+  })
+
+  if (!(await isGrowthSignalFoundationSchemaReady(admin))) {
+    return {
+      ...emptyMomentum,
+      hiring: emptyHiring,
+      watchlist: emptyWatchlist,
+    }
+  }
+
+  const occurredFrom = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+  const [loaded, watchlistSnapshot] = await Promise.all([
+    loadGrowthSignals(admin, {
+      occurred_from: occurredFrom,
+      suppression_state: "active",
+      limit: 500,
+      offset: 0,
+    }),
+    loadWatchlistMetricsSnapshot(admin),
+  ])
+
+  const watchlist = buildCommandCenterWatchlistMetrics(watchlistSnapshot)
+  const hiring = buildCommandCenterHiringMetrics({
+    job_postings: loaded.items.filter((signal) => signal.signal_type === "job_posting"),
+    hire_signals: loaded.items.filter((signal) => signal.signal_type === "hire"),
+  })
+  const momentum = buildCommandCenterSignalMomentumSummary({
+    signals: loaded.items,
+    watchlist_metrics: watchlist,
+  })
+
+  return {
+    ...momentum,
+    hiring,
+    watchlist,
+  }
+}
+
 function isOverdue(iso: string | null | undefined): boolean {
   if (!iso) return false
   return Date.parse(iso) <= Date.now()
@@ -125,7 +185,7 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
   const todayIso = startOfTodayIso()
   const now = new Date().toISOString()
 
-  const [leadsRes, enrollmentsRes, stepsRes, outreachRes, copilotRes, timelineRes, researchCoverage, dealIntelligence, callIntelligence, marketHealth] = await Promise.all([
+  const [leadsRes, enrollmentsRes, stepsRes, outreachRes, copilotRes, timelineRes, researchCoverage, dealIntelligence, callIntelligence, marketHealth, signalIntelligence] = await Promise.all([
     admin.schema("growth").from("leads").select(LEAD_SCAN_SELECT).limit(300),
     admin
       .schema("growth")
@@ -181,6 +241,7 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
       scoredCalls: 0,
     })),
     fetchCommandMarketHealth(admin),
+    loadCommandCenterSignalIntelligence(admin),
   ])
 
   if (leadsRes.error) throw new Error(leadsRes.error.message)
@@ -699,5 +760,6 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
     dealIntelligence,
     callIntelligence,
     marketHealth,
+    signalIntelligence,
   }
 }

@@ -38,8 +38,13 @@ import {
   GROWTH_PROVIDER_RUNTIME_DIAGNOSTICS_QA_MARKER,
 } from "@/lib/growth/prospect-search/prospect-search-provider-runtime-diagnostics"
 import {
+  applyProspectSearchSignalIntelligenceOverlay,
+  type GrowthProspectSearchSortBy,
+} from "@/lib/growth/signals/integrations/prospect-search-signal-intelligence-loader"
+import {
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_SOURCE_TYPES,
+  GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
   GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER,
   GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER,
   GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER,
@@ -59,6 +64,7 @@ export type RunProspectSearchInput = {
   page?: number
   page_size?: number
   discovery_mode?: GrowthProspectSearchDiscoveryMode
+  sort_by?: GrowthProspectSearchSortBy
   created_by?: string | null
 }
 
@@ -91,6 +97,7 @@ export async function runProspectSearch(
   )
 
   const discovery_mode = input.discovery_mode ?? "internal"
+  const sort_by: GrowthProspectSearchSortBy = input.sort_by ?? "rank"
   const page = Math.max(1, input.page ?? 1)
   const page_size = Math.min(200, Math.max(1, input.page_size ?? input.limit ?? 50))
 
@@ -173,22 +180,30 @@ export async function runProspectSearch(
       },
     )
 
-    const source_counts = buildSourceCounts(companiesWithMarket)
+    const companiesWithSignals = await applyProspectSearchSignalIntelligenceOverlay(
+      admin,
+      companiesWithMarket,
+      { sort_by },
+    )
+
+    const source_counts = buildSourceCounts(companiesWithSignals)
 
     return attachTerritoryIntelligenceToSearchResult(
       admin,
       {
       qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
       discovery_mode,
+      sort_by,
+      signal_momentum_qa_marker: GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
       query: input.query,
       parsed_query: parsed,
       filters: mergedFilters,
-      companies: companiesWithMarket,
+      companies: companiesWithSignals,
       people: [],
-      total_companies: companiesWithMarket.length,
+      total_companies: companiesWithSignals.length,
       total_people: 0,
       page: 1,
-      page_size: companiesWithMarket.length,
+      page_size: companiesWithSignals.length,
       has_next_page: false,
       source_counts,
       external_discovery_run_id: realWorld.discovery_run_id,
@@ -214,7 +229,7 @@ export async function runProspectSearch(
         enrichedCompanies.length === 0 &&
         provider_status_label === "provider_returned_raw_0",
       },
-      companiesWithMarket,
+      companiesWithSignals,
     )
   }
 
@@ -263,14 +278,51 @@ export async function runProspectSearch(
     mergedFilters.decision_maker_role,
   )
 
-  const companyPage = paginateRankedProspectSearchCompanies(
-    filteredCompanies,
-    input.query,
-    parsed,
-    page,
-    page_size,
-    mergedFilters,
-  )
+  let companyPageCompanies: GrowthProspectSearchCompanyResult[]
+  let companyPageMeta: {
+    total_count: number
+    page: number
+    page_size: number
+    has_next_page: boolean
+  }
+
+  if (sort_by === "signal_momentum") {
+    const rankedAll = rankProspectSearchCompanies(
+      filteredCompanies,
+      input.query,
+      parsed,
+      filteredCompanies.length || 1,
+      mergedFilters,
+    )
+    const withSignals = await applyProspectSearchSignalIntelligenceOverlay(admin, rankedAll, {
+      sort_by: "signal_momentum",
+    })
+    const offset = (page - 1) * page_size
+    companyPageCompanies = withSignals.slice(offset, offset + page_size)
+    companyPageMeta = {
+      total_count: withSignals.length,
+      page,
+      page_size,
+      has_next_page: offset + page_size < withSignals.length,
+    }
+  } else {
+    const companyPage = paginateRankedProspectSearchCompanies(
+      filteredCompanies,
+      input.query,
+      parsed,
+      page,
+      page_size,
+      mergedFilters,
+    )
+    companyPageCompanies = companyPage.companies
+    companyPageMeta = {
+      total_count: companyPage.total_count,
+      page: companyPage.page,
+      page_size: companyPage.page_size,
+      has_next_page: companyPage.has_next_page,
+    }
+  }
+
   const peoplePage = paginateRankedProspectSearchPeople(
     filteredPeople,
     input.query,
@@ -278,11 +330,11 @@ export async function runProspectSearch(
     page_size,
   )
 
-  const source_counts = buildSourceCounts(companyPage.companies)
+  const source_counts = buildSourceCounts(companyPageCompanies)
 
   const companiesWithContacts = await applyProspectSearchContactIntelligenceOverlay(
     admin,
-    companyPage.companies,
+    companyPageCompanies,
     { query: input.query, filters: mergedFilters, parsed },
   )
   const companiesWithMarket = await applyProspectSearchIntelligenceOverlays(
@@ -296,26 +348,32 @@ export async function runProspectSearch(
         : null,
     },
   )
+  const companiesWithSignals =
+    sort_by === "signal_momentum"
+      ? companiesWithMarket
+      : await applyProspectSearchSignalIntelligenceOverlay(admin, companiesWithMarket, { sort_by })
 
   return attachTerritoryIntelligenceToSearchResult(
     admin,
     {
     qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
     discovery_mode: "internal",
+    sort_by,
+    signal_momentum_qa_marker: GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
     query: input.query,
     parsed_query: parsed,
     filters: mergedFilters,
-    companies: companiesWithMarket,
+    companies: companiesWithSignals,
     people: peoplePage.people,
-    total_companies: companyPage.total_count,
+    total_companies: companyPageMeta.total_count,
     total_people: peoplePage.total_count,
-    page: companyPage.page,
-    page_size: companyPage.page_size,
-    has_next_page: companyPage.has_next_page,
+    page: companyPageMeta.page,
+    page_size: companyPageMeta.page_size,
+    has_next_page: companyPageMeta.has_next_page,
     index_diagnostics,
     source_counts,
     },
-    companiesWithMarket,
+    companiesWithSignals,
   )
 }
 

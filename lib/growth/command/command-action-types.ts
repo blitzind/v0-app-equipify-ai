@@ -149,6 +149,16 @@ import type { GrowthResearchCoverageSummary } from "@/lib/growth/research/resear
 import type { DealIntelligenceDashboardSummary } from "@/lib/growth/deal-intelligence/deal-intelligence-types"
 import type { CallIntelligenceDashboardSummary } from "@/lib/growth/call-intelligence/call-intelligence-types"
 import type { GrowthCommandMarketHealth } from "@/lib/growth/market-intelligence/market-intelligence-types"
+import type { CommandCenterSignalMomentumSummary } from "@/lib/growth/signals/integrations/command-center-bridge"
+import type {
+  CommandCenterHiringMetrics,
+  CommandCenterWatchlistMetrics,
+} from "@/lib/growth/signals/integrations/command-center-bridge"
+
+export type GrowthCommandSignalIntelligenceSummary = CommandCenterSignalMomentumSummary & {
+  hiring: CommandCenterHiringMetrics
+  watchlist: CommandCenterWatchlistMetrics
+}
 
 export type GrowthCommandDashboard = {
   generatedAt: string
@@ -178,4 +188,5 @@ export type GrowthCommandDashboard = {
   dealIntelligence: DealIntelligenceDashboardSummary
   callIntelligence: CallIntelligenceDashboardSummary
   marketHealth: GrowthCommandMarketHealth
+  signalIntelligence: GrowthCommandSignalIntelligenceSummary
 }

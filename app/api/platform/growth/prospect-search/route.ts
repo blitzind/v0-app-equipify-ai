@@ -79,11 +79,13 @@ export async function GET(request: Request) {
 
   const page = Number.parseInt(url.searchParams.get("page") ?? "1", 10)
   const page_size = Number.parseInt(url.searchParams.get("page_size") ?? "50", 10)
+  const sort_by = url.searchParams.get("sort_by") === "signal_momentum" ? "signal_momentum" : "rank"
 
   const result = await runProspectSearch(access.admin, {
     query,
     filters,
     discovery_mode,
+    sort_by,
     created_by: access.userId,
     page: Number.isFinite(page) ? page : 1,
     page_size: Number.isFinite(page_size) ? page_size : 50,

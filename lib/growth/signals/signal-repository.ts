@@ -259,6 +259,7 @@ export async function loadGrowthSignals(
   if (effectiveFilters.urgency) query = query.eq("urgency", effectiveFilters.urgency)
   if (effectiveFilters.organization_id) query = query.eq("organization_id", effectiveFilters.organization_id)
   if (effectiveFilters.company) query = query.ilike("company_name", `%${effectiveFilters.company}%`)
+  if (effectiveFilters.company_id) query = query.eq("company_id", effectiveFilters.company_id)
   if (effectiveFilters.domain) query = query.ilike("domain", `%${effectiveFilters.domain}%`)
   if (effectiveFilters.occurred_from) query = query.gte("occurred_at", effectiveFilters.occurred_from)
   if (effectiveFilters.occurred_to) query = query.lte("occurred_at", effectiveFilters.occurred_to)

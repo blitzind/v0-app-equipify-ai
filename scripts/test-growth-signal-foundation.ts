@@ -66,6 +66,19 @@ import {
   evaluateSignalTriggerRule,
   signalMatchesWatchlistFilters,
 } from "../lib/growth/signals/signal-trigger-evaluator"
+import {
+  GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
+  buildCompanySignalRollup,
+  deriveMomentumLabel,
+  signalMatchesCompanyRollupTarget,
+} from "../lib/growth/signals/company-signal-rollup"
+import {
+  buildProspectSearchSignalIntelligenceOverlay,
+  resolveProspectSearchCompanyMatchKeys,
+  sortProspectSearchCompaniesBySignalMomentum,
+} from "../lib/growth/signals/integrations/prospect-search-signal-overlay"
+import { buildTerritorySignalIntelligenceSummary } from "../lib/growth/signals/integrations/territory-signal-intelligence"
+import { buildCommandCenterSignalMomentumSummary } from "../lib/growth/signals/integrations/command-center-bridge"
 
 function main(): void {
   assert.equal(GROWTH_SIGNAL_FOUNDATION_QA_MARKER, "growth-signal-foundation-v1")
@@ -537,6 +550,140 @@ function main(): void {
     "utf8",
   )
   assert.match(prospectOverlay, /buildProspectSearchHiringOverlay/)
+  assert.match(prospectOverlay, /buildProspectSearchSignalIntelligenceOverlay/)
+  assert.match(prospectOverlay, /signalMatchesCompanyRollupTarget|resolveProspectSearchCompanyMatchKeys/)
+
+  assert.equal(GROWTH_SIGNAL_MOMENTUM_QA_MARKER, "growth-signal-momentum-v1")
+
+  const baseSignal = (partial: Partial<GrowthSignalRow>): GrowthSignalRow => ({
+    id: partial.id ?? "s1",
+    organization_id: null,
+    signal_type: partial.signal_type ?? "news_event",
+    provider_key: "manual",
+    provider_event_id: null,
+    dedupe_hash: "d1",
+    confidence: 0.8,
+    signal_score: partial.signal_score ?? 55,
+    urgency: partial.urgency ?? "normal",
+    routing_priority: 1,
+    occurred_at: partial.occurred_at ?? new Date().toISOString(),
+    detected_at: partial.occurred_at ?? new Date().toISOString(),
+    expires_at: null,
+    company_id: partial.company_id ?? null,
+    company_name: partial.company_name ?? "Acme Health Systems",
+    domain: partial.domain ?? "acmehealth.com",
+    contact_id: null,
+    contact_display_label: null,
+    title: partial.title ?? "News",
+    previous_title: null,
+    seniority: null,
+    geography: partial.geography ?? null,
+    industry: null,
+    category: partial.category ?? "Field Service",
+    evidence_summary: partial.evidence_summary ?? "Expansion announced",
+    workflow_state: "new",
+    suppression_state: "active",
+    processed_to_lead_inbox: false,
+    lead_inbox_id: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    metadata: partial.metadata ?? {},
+  })
+
+  const signals = [
+    baseSignal({ id: "n1", signal_type: "news_event", signal_score: 60 }),
+    baseSignal({
+      id: "j1",
+      signal_type: "job_posting",
+      signal_score: 50,
+      evidence_summary: "Biomedical technician",
+      category: "Biomedical",
+    }),
+    baseSignal({
+      id: "h1",
+      signal_type: "hire",
+      signal_score: 70,
+      urgency: "high",
+      metadata: {
+        hiring_velocity: { hiring_intensity: "high", hiring_spike: true, open_role_count: 4 },
+      },
+    }),
+  ]
+
+  const rollup = buildCompanySignalRollup({
+    domain: "acmehealth.com",
+    signals,
+    watchlist_matches: [{ signal_id: "n1", watchlist_id: "w1", watchlist_name: "Medical hiring" }],
+  })
+  assert.equal(rollup.total_signal_count, 3)
+  assert.equal(rollup.news_count, 1)
+  assert.equal(rollup.job_posting_count, 1)
+  assert.equal(rollup.hiring_signal_count, 1)
+  assert.equal(rollup.watchlist_match_count, 1)
+  assert.ok(rollup.momentum_score > rollup.momentum_base_score)
+  assert.equal(deriveMomentumLabel(0), "Quiet")
+  assert.equal(deriveMomentumLabel(80), "Priority")
+
+  assert.equal(
+    signalMatchesCompanyRollupTarget(signals[0]!, { domain: "acmehealth.com", company_name: "Other Co" }),
+    true,
+  )
+  assert.equal(
+    signalMatchesCompanyRollupTarget(signals[0]!, { domain: null, company_name: "Acme Health Systems" }),
+    false,
+  )
+  assert.equal(
+    signalMatchesCompanyRollupTarget(
+      { ...signals[0]!, company_name: "Similar Name Co", domain: null },
+      { domain: null, company_name: "Acme Health Systems" },
+    ),
+    false,
+  )
+
+  const overlay = buildProspectSearchSignalIntelligenceOverlay({
+    company: {
+      website: "https://acmehealth.com",
+      company_name: "Acme Health Systems",
+      growth_lead_id: null,
+      prospect_id: null,
+      customer_id: null,
+    },
+    signals,
+  })
+  assert.equal(overlay.qa_marker, "growth-signal-momentum-v1")
+  assert.ok(overlay.signal_momentum_score > 0)
+
+  const keys = resolveProspectSearchCompanyMatchKeys({
+    website: "https://acmehealth.com",
+    company_name: "Acme",
+    growth_lead_id: null,
+    prospect_id: null,
+    customer_id: null,
+  })
+  assert.equal(keys.domain, "acmehealth.com")
+
+  const sorted = sortProspectSearchCompaniesBySignalMomentum([
+    { id: "a", signal_momentum_score: 10, recent_signal_count: 1 } as never,
+    { id: "b", signal_momentum_score: 40, recent_signal_count: 3 } as never,
+  ])
+  assert.equal(sorted[0]?.id, "b")
+
+  const territoryEmpty = buildTerritorySignalIntelligenceSummary({
+    companies: [{ company_id: "c1", company_name: "Acme", state: "TN", city: "Nashville" }],
+    signals,
+  })
+  assert.equal(territoryEmpty.total_signals_30d, 0)
+
+  const ccSummary = buildCommandCenterSignalMomentumSummary({ signals })
+  assert.equal(ccSummary.qa_marker, "growth-signal-momentum-v1")
+  assert.ok(ccSummary.top_companies_by_momentum.length >= 1)
+
+  const rollupRoute = fs.readFileSync(
+    path.join(process.cwd(), "app/api/platform/growth/signals/company-rollup/route.ts"),
+    "utf8",
+  )
+  assert.match(rollupRoute, /sanitizeRollup/)
+  assert.doesNotMatch(rollupRoute, /raw_payload:/)
 
   console.log("growth-signal-foundation: ok")
 }

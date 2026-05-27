@@ -2235,6 +2235,7 @@ async function main(): Promise<void> {
     GROWTH_SAVED_SEARCH_SCHEMA_READY_QA_MARKER,
     GROWTH_PROSPECT_SEARCH_GRANTS_MIGRATION,
   } = await import("../lib/growth/prospect-search/prospect-search-schema-health")
+  const { GROWTH_SIGNAL_MOMENTUM_QA_MARKER } = await import("../lib/growth/signals/company-signal-rollup")
   assert.equal(GROWTH_SAVED_SEARCH_SCHEMA_READY_QA_MARKER, "growth-saved-search-schema-ready-v1")
   const grantsMigration = fs.readFileSync(
     path.join(process.cwd(), `supabase/migrations/${GROWTH_PROSPECT_SEARCH_GRANTS_MIGRATION}`),
@@ -2278,6 +2279,14 @@ async function main(): Promise<void> {
   assert.match(savedWorkflowShellSource, /ProviderRuntimeDiagnosticsPanel/)
   assert.match(savedWorkflowShellSource, /used_relaxed_external_filters/)
   assert.match(savedWorkflowShellSource, /Showing provider matches with incomplete firmographic data/)
+
+  assert.match(savedWorkflowShellSource, /signal_momentum/)
+  const companyCardMomentumSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/company-result-card.tsx"),
+    "utf8",
+  )
+  assert.match(companyCardMomentumSource, /CompanySignalMomentumPanel/)
+  assert.equal(GROWTH_SIGNAL_MOMENTUM_QA_MARKER, "growth-signal-momentum-v1")
 
   console.log("growth-prospect-search: all checks passed")
 }

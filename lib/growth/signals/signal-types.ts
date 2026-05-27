@@ -201,6 +201,7 @@ export type GrowthSignalListFilters = {
   suppression_state?: GrowthSignalSuppressionState
   urgency?: GrowthSignalUrgency
   company?: string
+  company_id?: string
   domain?: string
   category?: string
   department?: string

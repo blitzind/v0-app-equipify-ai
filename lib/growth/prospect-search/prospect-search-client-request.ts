@@ -4,6 +4,7 @@ import { normalizeProspectSearchFilters } from "@/lib/growth/prospect-search/pro
 import type {
   GrowthProspectSearchDiscoveryMode,
   GrowthProspectSearchFilters,
+  GrowthProspectSearchSortBy,
 } from "@/lib/growth/prospect-search/prospect-search-types"
 
 export function compactProspectSearchFiltersForTransport(
@@ -26,6 +27,7 @@ export function buildProspectSearchGetRequestParams(input: {
   discoveryMode: GrowthProspectSearchDiscoveryMode
   page: number
   pageSize: number
+  sortBy?: GrowthProspectSearchSortBy
   includeMeta?: boolean
 }): URLSearchParams {
   const params = new URLSearchParams({
@@ -37,6 +39,10 @@ export function buildProspectSearchGetRequestParams(input: {
 
   if (input.discoveryMode === "discover_external") {
     params.set("mode", "discover_external")
+  }
+
+  if (input.sortBy === "signal_momentum") {
+    params.set("sort_by", "signal_momentum")
   }
 
   const normalized = normalizeProspectSearchFilters(input.filters)

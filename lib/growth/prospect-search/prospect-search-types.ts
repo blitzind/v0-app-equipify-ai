@@ -9,6 +9,7 @@ import type { GrowthProspectSearchCommitteeCompletion } from "@/lib/growth/marke
 import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
 import type { GrowthBuyingStage } from "@/lib/growth/buying-stage/buying-stage-types"
 import type { GrowthSearchIntentCategory } from "@/lib/growth/search-intent/search-intent-types"
+import type { GrowthSignalType } from "@/lib/growth/signals/signal-types"
 import { GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER } from "@/lib/growth/real-world-discovery/providers/serp-types"
 import { GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER } from "@/lib/growth/real-world-discovery/providers/google-places-query-expansion"
 import { GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER } from "@/lib/growth/real-world-discovery/live-provider-query-expansion"
@@ -19,13 +20,20 @@ import {
   GROWTH_PROVIDER_RELAXED_FILTER_RETRY_QA_MARKER,
   GROWTH_PROVIDER_RUNTIME_DIAGNOSTICS_QA_MARKER,
 } from "@/lib/growth/prospect-search/prospect-search-provider-runtime-diagnostics"
+import {
+  GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
+  type GrowthSignalMomentumLabel,
+} from "@/lib/growth/signals/company-signal-rollup"
 
 export {
   GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER,
   GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER,
   GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER,
   GROWTH_PROVIDER_CACHE_QA_MARKER,
+  GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
 }
+
+export type { GrowthSignalMomentumLabel }
 
 export const GROWTH_PROSPECT_SEARCH_QA_MARKER = "growth-prospect-search-v1" as const
 
@@ -41,6 +49,10 @@ export const GROWTH_PROSPECT_SEARCH_DISCOVERY_MODES = [
   "internal",
   "discover_external",
 ] as const
+
+export const GROWTH_PROSPECT_SEARCH_SORT_OPTIONS = ["rank", "signal_momentum"] as const
+
+export type GrowthProspectSearchSortBy = (typeof GROWTH_PROSPECT_SEARCH_SORT_OPTIONS)[number]
 
 export type GrowthProspectSearchDiscoveryMode =
   (typeof GROWTH_PROSPECT_SEARCH_DISCOVERY_MODES)[number]
@@ -328,6 +340,16 @@ export type GrowthProspectSearchCompanyResult = {
   /** Keyword hints for external discovery industry matching. */
   keywords?: string[]
   notes?: string | null
+  /** Intent Signals momentum overlay (Milestone E). */
+  signal_momentum_score?: number | null
+  signal_momentum_label?: GrowthSignalMomentumLabel | null
+  recent_signal_count?: number | null
+  latest_signal_summary?: string | null
+  top_signal_types?: GrowthSignalType[]
+  hiring_intensity?: string | null
+  watchlist_matches?: Array<{ watchlist_id: string; watchlist_name: string }>
+  signal_evidence_count?: number | null
+  signal_intelligence_qa_marker?: typeof GROWTH_SIGNAL_MOMENTUM_QA_MARKER | null
 }
 
 export type GrowthProspectSearchPersonResult = {
@@ -400,6 +422,8 @@ export type GrowthProspectSearchResult = {
   used_relaxed_external_filters?: boolean
   provider_runtime_diagnostics_qa_marker?: typeof GROWTH_PROVIDER_RUNTIME_DIAGNOSTICS_QA_MARKER | null
   provider_relaxed_filter_retry_qa_marker?: typeof GROWTH_PROVIDER_RELAXED_FILTER_RETRY_QA_MARKER | null
+  sort_by?: GrowthProspectSearchSortBy
+  signal_momentum_qa_marker?: typeof GROWTH_SIGNAL_MOMENTUM_QA_MARKER | null
   expanded_search_exhausted?: boolean
   territory_intelligence?: GrowthTerritoryIntelligenceSummary | null
 }

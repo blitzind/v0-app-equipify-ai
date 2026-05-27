@@ -17,6 +17,25 @@ const SIGNAL_STYLES: Record<string, string> = {
   "Field service software detected": "bg-fuchsia-50 text-fuchsia-900 border-fuchsia-200",
   "CRM indicators": "bg-slate-50 text-slate-900 border-slate-200",
   "Multi-location indicators": "bg-teal-50 text-teal-900 border-teal-200",
+  "Recent signals": "bg-indigo-50 text-indigo-900 border-indigo-200",
+  "Watchlist match": "bg-fuchsia-50 text-fuchsia-900 border-fuchsia-200",
+  News: "bg-blue-50 text-blue-900 border-blue-200",
+  Hiring: "bg-lime-50 text-lime-900 border-lime-200",
+  Jobs: "bg-orange-50 text-orange-900 border-orange-200",
+}
+
+function intentSignalsBadges(row: GrowthProspectSearchCompanyResult): string[] {
+  const badges: string[] = []
+  const label = row.signal_momentum_label
+  if (label && label !== "Quiet") badges.push(`${label} momentum`)
+  if ((row.recent_signal_count ?? 0) > 0) badges.push("Recent signals")
+  if ((row.top_signal_types ?? []).includes("news_event")) badges.push("News")
+  if ((row.top_signal_types ?? []).includes("hire") || (row.top_signal_types ?? []).includes("job_posting")) {
+    badges.push("Hiring")
+  }
+  if ((row.top_signal_types ?? []).includes("job_posting")) badges.push("Jobs")
+  if ((row.watchlist_matches?.length ?? 0) > 0) badges.push("Watchlist match")
+  return badges
 }
 
 function intentBadges(row: GrowthProspectSearchCompanyResult): string[] {
@@ -59,7 +78,7 @@ function companyIntelligenceBadges(row: GrowthProspectSearchCompanyResult): stri
 }
 
 export function inferProspectSearchResultBadges(row: GrowthProspectSearchCompanyResult): string[] {
-  return [...new Set([...intentBadges(row), ...companyIntelligenceBadges(row)])].slice(0, 5)
+  return [...new Set([...intentSignalsBadges(row), ...intentBadges(row), ...companyIntelligenceBadges(row)])].slice(0, 6)
 }
 
 export function ResultSignalBadges({

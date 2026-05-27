@@ -5,6 +5,13 @@ import { useSearchParams } from "next/navigation"
 import { Bookmark, LayoutTemplate, Loader2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { CompanyResultCard } from "@/components/growth/prospect-search/company-result-card"
 import {
   ProspectSearchBulkActionBar,
@@ -41,6 +48,7 @@ import type {
   GrowthProspectSearchPersonResult,
   GrowthProspectSearchResult,
   GrowthProspectSearchSavedSearchRow,
+  GrowthProspectSearchSortBy,
 } from "@/lib/growth/prospect-search/prospect-search-types"
 import { GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER, GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-types"
 import { prospectSearchSelectionKey } from "@/lib/growth/prospect-search/prospect-search-selection"
@@ -109,18 +117,21 @@ export function ProspectSearchShell() {
   )
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
+  const [sortBy, setSortBy] = useState<GrowthProspectSearchSortBy>("rank")
 
   const queryRef = useRef(query)
   const filtersRef = useRef(filters)
   const discoveryModeRef = useRef(discoveryMode)
   const pageRef = useRef(page)
   const pageSizeRef = useRef(pageSize)
+  const sortByRef = useRef(sortBy)
 
   queryRef.current = query
   filtersRef.current = filters
   discoveryModeRef.current = discoveryMode
   pageRef.current = page
   pageSizeRef.current = pageSize
+  sortByRef.current = sortBy
 
   const updateFilters = useCallback((updater: SetStateAction<GrowthProspectSearchFilters>) => {
     setFilters((prev) => {
@@ -163,11 +174,13 @@ export function ProspectSearchShell() {
       discoveryModeOverride?: GrowthProspectSearchDiscoveryMode
       nextPage?: number
       nextPageSize?: number
+      sortByOverride?: GrowthProspectSearchSortBy
       resetSelection?: boolean
     } = {}) => {
       const q = input.queryText ?? queryRef.current
       const activeFilters = input.filtersOverride ?? filtersRef.current
       const activeDiscoveryMode = input.discoveryModeOverride ?? discoveryModeRef.current
+      const activeSortBy = input.sortByOverride ?? sortByRef.current
       const activePage = input.nextPage ?? pageRef.current
       const activePageSize = input.nextPageSize ?? pageSizeRef.current
       if (input.queryText != null) setQuery(input.queryText)
@@ -178,6 +191,7 @@ export function ProspectSearchShell() {
       if (input.discoveryModeOverride != null) setDiscoveryMode(input.discoveryModeOverride)
       if (input.nextPage != null) setPage(input.nextPage)
       if (input.nextPageSize != null) setPageSize(input.nextPageSize)
+      if (input.sortByOverride != null) setSortBy(input.sortByOverride)
       setLoading(true)
       setHasSearched(true)
       setError(null)
@@ -190,6 +204,7 @@ export function ProspectSearchShell() {
           discoveryMode: activeDiscoveryMode,
           page: activePage,
           pageSize: activePageSize,
+          sortBy: activeSortBy,
         })
         const res = await fetch(`/api/platform/growth/prospect-search?${params}`, {
           cache: "no-store",
@@ -775,6 +790,21 @@ export function ProspectSearchShell() {
                   Select all visible
                 </Button>
               ) : null}
+              <Select
+                value={sortBy}
+                onValueChange={(value: GrowthProspectSearchSortBy) => {
+                  setSortBy(value)
+                  void fetchResults({ sortByOverride: value, nextPage: 1, resetSelection: true })
+                }}
+              >
+                <SelectTrigger className="h-8 w-[170px] text-xs">
+                  <SelectValue placeholder="Sort results" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="rank">Default rank</SelectItem>
+                  <SelectItem value="signal_momentum">Signal momentum</SelectItem>
+                </SelectContent>
+              </Select>
               <SearchViewToggle view={view} onViewChange={setView} />
               <Button variant="outline" size="sm" onClick={() => setSaveDialogOpen(true)}>
                 <Bookmark className="mr-1 size-3.5" />

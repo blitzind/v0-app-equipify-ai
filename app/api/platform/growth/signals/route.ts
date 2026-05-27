@@ -31,6 +31,7 @@ export async function GET(request: Request) {
   )
   const urgency = parseEnumParam(url.searchParams.get("urgency"), GROWTH_SIGNAL_URGENCY_LEVELS)
   const company = url.searchParams.get("company")?.trim() || undefined
+  const company_id = url.searchParams.get("company_id")?.trim() || undefined
   const domain = url.searchParams.get("domain")?.trim() || undefined
   const occurred_from = url.searchParams.get("occurred_from")?.trim() || undefined
   const occurred_to = url.searchParams.get("occurred_to")?.trim() || undefined
@@ -56,6 +57,7 @@ export async function GET(request: Request) {
     workflow_state: workflow_state as GrowthSignalWorkflowState | undefined,
     urgency: urgency as GrowthSignalUrgency | undefined,
     company,
+    company_id,
     domain,
     occurred_from,
     occurred_to,
@@ -79,6 +81,7 @@ export async function GET(request: Request) {
       workflow_state: workflow_state ?? null,
       urgency: urgency ?? null,
       company: company ?? null,
+      company_id: company_id ?? null,
       domain: domain ?? null,
       occurred_from: occurred_from ?? null,
       occurred_to: occurred_to ?? null,
