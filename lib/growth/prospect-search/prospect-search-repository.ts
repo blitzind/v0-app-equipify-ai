@@ -27,6 +27,10 @@ import {
 import { enrichProspectSearchExternalCompanies } from "@/lib/growth/prospect-search/prospect-search-external-enrichment"
 import { applyProspectSearchContactIntelligenceOverlay } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-loader"
 import { applyProspectSearchGrowthSignalsOverlay } from "@/lib/growth/company-growth-signals/integrations/prospect-search-bridge"
+import {
+  applyTerritoryFiltersToSearchInput,
+  attachTerritoryIntelligenceToSearchResult,
+} from "@/lib/growth/territory-intelligence/integrations/prospect-search-bridge"
 import { runProspectSearchRealWorldDiscovery } from "@/lib/growth/prospect-search/prospect-search-real-world-discovery"
 import {
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
@@ -73,8 +77,9 @@ export async function runProspectSearch(
   input: RunProspectSearchInput,
 ): Promise<GrowthProspectSearchResult> {
   const parsed = parseProspectSearchQuery(input.query)
+  const baseFilters = mergeParsedQueryIntoFilters(parsed, input.filters ?? {}) as GrowthProspectSearchFilters
   const mergedFilters = normalizeProspectSearchFilters(
-    mergeParsedQueryIntoFilters(parsed, input.filters ?? {}) as GrowthProspectSearchFilters,
+    await applyTerritoryFiltersToSearchInput(admin, baseFilters),
   )
 
   const discovery_mode = input.discovery_mode ?? "internal"
@@ -108,7 +113,9 @@ export async function runProspectSearch(
 
     const source_counts = buildSourceCounts(companiesWithSignals)
 
-    return {
+    return attachTerritoryIntelligenceToSearchResult(
+      admin,
+      {
       qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
       discovery_mode,
       query: input.query,
@@ -119,7 +126,7 @@ export async function runProspectSearch(
       total_companies: companiesWithSignals.length,
       total_people: 0,
       page: 1,
-      page_size: companiesWithContacts.length,
+      page_size: companiesWithSignals.length,
       has_next_page: false,
       source_counts,
       external_discovery_run_id: realWorld.discovery_run_id,
@@ -133,7 +140,9 @@ export async function runProspectSearch(
       provider_audit_qa_marker: GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER,
       google_places_query_expansion_qa_marker: GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER,
       provider_cache_qa_marker: GROWTH_PROVIDER_CACHE_QA_MARKER,
-    }
+      },
+      companiesWithSignals,
+    )
   }
 
   const provider = createInternalProspectSearchProvider()
@@ -205,7 +214,9 @@ export async function runProspectSearch(
   )
   const companiesWithSignals = await applyProspectSearchGrowthSignalsOverlay(admin, companiesWithContacts)
 
-  return {
+  return attachTerritoryIntelligenceToSearchResult(
+    admin,
+    {
     qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
     discovery_mode: "internal",
     query: input.query,
@@ -220,7 +231,9 @@ export async function runProspectSearch(
     has_next_page: companyPage.has_next_page,
     index_diagnostics,
     source_counts,
-  }
+    },
+    companiesWithSignals,
+  )
 }
 
 export async function resolveProspectSearchCompanyResultsForPush(

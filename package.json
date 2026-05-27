@@ -163,6 +163,7 @@
     "test:growth-serp-provider-audit": "tsx scripts/test-growth-serp-provider-audit.ts",
     "test:growth-provider-cache": "tsx scripts/test-growth-provider-cache.ts",
     "test:growth-company-signals": "tsx scripts/test-growth-company-signals.ts",
+    "test:growth-territory-intelligence": "tsx scripts/test-growth-territory-intelligence.ts",
     "test:schedule-work-order-flow": "tsx scripts/test-schedule-work-order-flow.ts",
     "test:growth-contact-discovery": "tsx scripts/test-growth-contact-discovery.ts",
     "test:growth-verification-enrichment": "tsx scripts/test-growth-verification-enrichment.ts",

@@ -17,6 +17,7 @@ import {
   RealWorldProviderStatus,
 } from "@/components/growth/prospect-search/real-world-provider-status"
 import { GuidedIcpBuilder } from "@/components/growth/prospect-search/guided-icp-builder"
+import { TerritoryIntelligencePanel } from "@/components/growth/prospect-search/territory-intelligence-panel"
 import { IcpTemplateRail } from "@/components/growth/prospect-search/icp-template-rail"
 import { PersonResultCard } from "@/components/growth/prospect-search/person-result-card"
 import { SearchEmptyState } from "@/components/growth/prospect-search/search-empty-state"
@@ -206,6 +207,7 @@ export function ProspectSearchShell() {
           ok?: boolean
           message?: string
           workspace_url?: string
+          territory_id?: string
           push_outcome?: "pushed" | "already_exists" | "skipped_invalid" | "failed"
           failed?: number
         }
@@ -232,7 +234,13 @@ export function ProspectSearchShell() {
         if (json.workspace_url && (action === "open_workspace" || action === "run_lead_engine")) {
           window.open(json.workspace_url, "_blank", "noopener,noreferrer")
         }
-        if (action === "save_search" || action === "create_list") {
+        if (action === "save_search" || action === "create_list" || action === "save_territory") {
+          if (action === "save_territory" && json.territory_id) {
+            setFilters((prev) => ({ ...prev, territory_id: json.territory_id ?? null }))
+          }
+          await runSearch()
+        }
+        if (action === "refresh_territory") {
           await runSearch()
         }
         if (action === "push_to_lead_inbox" && json.push_outcome === "pushed") {
@@ -435,6 +443,25 @@ export function ProspectSearchShell() {
               onClear={() => setFilters(EMPTY_FILTERS)}
             />
           </section>
+
+          <TerritoryIntelligencePanel
+            summary={result?.territory_intelligence}
+            filters={filters}
+            query={query}
+            loading={loading}
+            onSaveTerritory={async (name) => {
+              await runAction("save_territory", { territory_name: name })
+            }}
+            onRefreshTerritory={async () => {
+              await runAction("refresh_territory", {
+                territory_id: filters.territory_id ?? result?.territory_intelligence?.territory_id,
+              })
+              await runSearch()
+            }}
+            onPushTopProspects={async () => {
+              await runAction("push_territory_top_prospects")
+            }}
+          />
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>

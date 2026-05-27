@@ -2,6 +2,7 @@
 
 import type { GrowthCompanySignalUiSummary } from "@/lib/growth/company-signals/company-signal-types"
 import type { GrowthSignalTier } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
+import type { GrowthTerritoryIntelligenceSummary } from "@/lib/growth/territory-intelligence/territory-intelligence-types"
 import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
 import type { GrowthBuyingStage } from "@/lib/growth/buying-stage/buying-stage-types"
 import type { GrowthSearchIntentCategory } from "@/lib/growth/search-intent/search-intent-types"
@@ -85,6 +86,9 @@ export type GrowthProspectSearchSuppressionMode =
 
 export const GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS = [
   "save_search",
+  "save_territory",
+  "refresh_territory",
+  "push_territory_top_prospects",
   "create_list",
   "push_to_lead_inbox",
   "bulk_push_to_lead_inbox",
@@ -145,6 +149,7 @@ export type GrowthProspectSearchFilters = {
   source_types?: GrowthProspectSearchSourceType[]
   growth_signal_score_min?: number | null
   growth_signal_tiers?: GrowthSignalTier[]
+  territory_id?: string | null
 }
 
 export type GrowthProspectSearchParsedQuery = {
@@ -367,6 +372,7 @@ export type GrowthProspectSearchResult = {
   provider_audit_qa_marker?: typeof GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER | null
   google_places_query_expansion_qa_marker?: typeof GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER | null
   provider_cache_qa_marker?: typeof GROWTH_PROVIDER_CACHE_QA_MARKER | null
+  territory_intelligence?: GrowthTerritoryIntelligenceSummary | null
 }
 
 export type GrowthProspectSearchSavedSearchRow = {
@@ -409,6 +415,7 @@ export type GrowthProspectSearchActionResult = {
   growth_lead_id?: string | null
   list_id?: string | null
   saved_search_id?: string | null
+  territory_id?: string | null
   workspace_url?: string | null
   push_outcome?: "pushed" | "already_exists" | "skipped_invalid" | "suppressed" | "failed"
   selected_total?: number

@@ -133,6 +133,7 @@ export function normalizeProspectSearchFilters(
           GROWTH_SIGNAL_TIERS.includes(tier as GrowthSignalTier),
         )
       : undefined,
+    territory_id: asString(raw.territory_id) || null,
   }
 }
 

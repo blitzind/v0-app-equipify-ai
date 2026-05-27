@@ -141,6 +141,9 @@ export async function POST(request: Request) {
       body.person && typeof body.person === "object"
         ? (body.person as GrowthProspectSearchPersonResult)
         : null,
+    territory_name: typeof body.territory_name === "string" ? body.territory_name : undefined,
+    territory_id: typeof body.territory_id === "string" ? body.territory_id : undefined,
+    saved_search_id: typeof body.saved_search_id === "string" ? body.saved_search_id : undefined,
   })
 
   return NextResponse.json({ ok: actionResult.ok, ...actionResult })

@@ -1969,6 +1969,14 @@ async function main(): Promise<void> {
   )
   assert.match(growthPushSource, /growthSignalInboxIntentBoost/)
 
+  const territoryPanelSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/territory-intelligence-panel.tsx"),
+    "utf8",
+  )
+  assert.match(repositorySource, /attachTerritoryIntelligenceToSearchResult/)
+  assert.match(territoryPanelSource, /growth-territory-intelligence-v1/)
+  assert.match(filtersSource, /territory_id/)
+
   console.log("growth-prospect-search: all checks passed")
 }
 

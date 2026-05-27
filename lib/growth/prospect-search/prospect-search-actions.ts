@@ -14,6 +14,12 @@ import {
   type ProspectSearchSelectionRef,
 } from "@/lib/growth/prospect-search/prospect-search-push-to-inbox"
 import { createProspectSearchSavedSearch } from "@/lib/growth/prospect-search/saved-searches"
+import {
+  createTerritory,
+  createTerritoryFromSavedSearch,
+  refreshTerritoryIntelligence,
+} from "@/lib/growth/territory-intelligence/territory-repository"
+import { runProspectSearch } from "@/lib/growth/prospect-search/prospect-search-repository"
 import type {
   GrowthProspectSearchActionResult,
   GrowthProspectSearchCompanyResult,
@@ -37,6 +43,9 @@ export async function executeProspectSearchAction(
     company?: GrowthProspectSearchCompanyResult | null
     person?: GrowthProspectSearchPersonResult | null
     selected?: ProspectSearchSelectionRef[]
+    territory_name?: string
+    territory_id?: string
+    saved_search_id?: string
   },
 ): Promise<GrowthProspectSearchActionResult> {
   const { action } = input
@@ -46,6 +55,101 @@ export async function executeProspectSearchAction(
       ok: false,
       action,
       message: "CSV export is reserved for a future release — not executed in v1.",
+    }
+  }
+
+  if (action === "save_territory") {
+    const filters = input.filters ?? {}
+    const territory =
+      input.saved_search_id
+        ? await createTerritoryFromSavedSearch(admin, {
+            saved_search_id: input.saved_search_id,
+            name: input.territory_name,
+            created_by: input.userId ?? null,
+          })
+        : await createTerritory(admin, {
+            name: input.territory_name,
+            territory_filter: filters.territory_filter ?? {},
+            industry: filters.industry,
+            icp_label: input.territory_name ?? filters.industry ?? null,
+            query_text: input.query ?? "",
+            filters,
+            created_by: input.userId ?? null,
+          })
+
+    if (!territory) {
+      return { ok: false, action, message: "Could not save territory — schema may not be applied." }
+    }
+
+    return {
+      ok: true,
+      action,
+      message: `Saved territory "${territory.name}".`,
+      territory_id: territory.id,
+    }
+  }
+
+  if (action === "refresh_territory") {
+    const territoryId = input.territory_id ?? input.filters?.territory_id
+    if (!territoryId) {
+      return { ok: false, action, message: "Select a saved territory to refresh." }
+    }
+    const snapshot = await refreshTerritoryIntelligence(admin, territoryId)
+    if (!snapshot?.score) {
+      return { ok: false, action, message: "Territory refresh failed." }
+    }
+    return {
+      ok: true,
+      action,
+      message: `Territory refreshed — opportunity score ${snapshot.score.territory_opportunity_score}/100.`,
+      territory_id: territoryId,
+    }
+  }
+
+  if (action === "push_territory_top_prospects") {
+    const search = await runProspectSearch(admin, {
+      query: input.query ?? "",
+      filters: input.filters,
+      discovery_mode: input.discovery_mode,
+      page: 1,
+      page_size: 200,
+    })
+
+    const topCompanies = search.companies
+      .filter((company) => !company.is_suppressed)
+      .sort((a, b) => {
+        const scoreA = (a.growth_signal_score ?? 0) * 0.5 + (a.lead_engine_score ?? a.lead_score ?? 0) * 0.5
+        const scoreB = (b.growth_signal_score ?? 0) * 0.5 + (b.lead_engine_score ?? b.lead_score ?? 0) * 0.5
+        return scoreB - scoreA
+      })
+      .slice(0, 10)
+
+    if (topCompanies.length === 0) {
+      return { ok: false, action, message: "No eligible territory prospects to push." }
+    }
+
+    const bulkResult = await executeBulkPushToLeadInbox(admin, {
+      query: input.query ?? "",
+      filters: input.filters,
+      discovery_mode: input.discovery_mode,
+      selected: topCompanies.map((company) => ({
+        source_type: company.source_type,
+        id: company.id,
+        company_name: company.company_name,
+      })),
+    })
+
+    return {
+      ok: bulkResult.ok,
+      action,
+      message: bulkResult.message,
+      workspace_url: bulkResult.workspace_url,
+      selected_total: bulkResult.selected_total,
+      pushed: bulkResult.pushed,
+      already_exists: bulkResult.already_exists,
+      skipped_invalid: bulkResult.skipped_invalid,
+      suppressed: bulkResult.suppressed,
+      failed: bulkResult.failed,
     }
   }
 

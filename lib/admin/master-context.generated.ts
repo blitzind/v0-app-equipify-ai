@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 682,
-  sqlMigrations: 285,
+  apiRouteHandlers: 684,
+  sqlMigrations: 286,
   dashboardPages: 65,
-  componentsTsx: 534,
-  libTsFiles: 1787,
+  componentsTsx: 535,
+  libTsFiles: 1794,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **682** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **285** |
+| API route handlers (\`app/api/**/route.ts\`) | **684** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **286** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **534** |
-| \`lib/**/*.ts\` | **1787** |
+| \`components/**/*.tsx\` | **535** |
+| \`lib/**/*.ts\` | **1794** |
 
 ### Vercel crons
 
@@ -52,6 +52,7 @@ cron/growth-company-signal-refresh/route.ts
 cron/growth-contact-refresh/route.ts
 cron/growth-outreach-execute/route.ts
 cron/growth-sequence-scheduler/route.ts
+cron/growth-territory-refresh/route.ts
 cron/maintenance-due/route.ts
 cron/process-ai-jobs/route.ts
 cron/process-import-runs/route.ts
@@ -665,6 +666,7 @@ platform/growth/sequences/execution/dashboard/route.ts
 platform/growth/sequences/patterns/route.ts
 platform/growth/sequences/scheduler/run/route.ts
 platform/growth/suppression/route.ts
+platform/growth/territory-intelligence/route.ts
 platform/growth/webhooks/outbound/[provider]/route.ts
 platform/import-operations/bulk-recover/route.ts
 platform/import-operations/bulk-retry/route.ts
