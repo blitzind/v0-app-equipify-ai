@@ -29,6 +29,9 @@ import {
   shouldCreateNewInboxThread,
 } from "@/lib/growth/inbox-sync/thread-matcher"
 import type { GrowthInboxSyncRunSummary } from "@/lib/growth/inbox-sync/inbox-sync-types"
+import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { ingestGrowthReplyFromInboxSync } from "@/lib/growth/replies/reply-ingestion-pipeline"
+import { processReplyIntelligence, leadHasCallablePhone } from "@/lib/growth/reply-intelligence/process-reply-intelligence"
 
 function isSimulateEnabled(): boolean {
   return process.env.GROWTH_INBOX_SYNC_SIMULATE?.trim() === "true"
@@ -205,6 +208,40 @@ export async function runInboxSyncForMailbox(
           summary: "Provider reply synced into unified inbox.",
           payload: { thread_id: threadId, matched_by: match.matchedBy },
         })
+
+        const ingestion = await ingestGrowthReplyFromInboxSync(admin, {
+          leadId,
+          mailboxConnectionId: mailbox.id,
+          inboxMessageId: imported.message.id,
+          senderEmail: message.fromEmail,
+          recipientEmail: message.toEmail,
+          subject: message.subject,
+          bodyExcerpt: message.bodyPreview,
+          receivedAt: message.messageTimestamp,
+          providerFamily: mailbox.provider_family,
+          providerMessageId: message.providerMessageId,
+          sequenceEnrollmentId: match.sequenceEnrollmentId,
+          deliveryAttemptId: match.deliveryAttemptId,
+          rawPayloadRef: {
+            provider_thread_id: message.providerThreadId,
+            matched_by: match.matchedBy,
+          },
+        })
+
+        if (ingestion.outboundReply && !ingestion.deduped) {
+          const lead = await fetchGrowthLeadById(admin, leadId)
+          if (lead) {
+            await processReplyIntelligence(admin, {
+              reply: ingestion.outboundReply,
+              lead,
+              bodyPreview: message.bodyPreview,
+              hasCallablePhone: leadHasCallablePhone(lead, null),
+              senderEmail: message.fromEmail,
+              sequenceEnrollmentId: match.sequenceEnrollmentId,
+              ingestionEventId: ingestion.ingestionEventId,
+            })
+          }
+        }
       }
 
       if (match.sequenceEnrollmentId && leadId) {

@@ -6,6 +6,7 @@ import {
   GROWTH_REPLY_INBOX_VIEWS,
   GROWTH_REPLY_INTENTS,
   GROWTH_REPLY_PRIORITIES,
+  GROWTH_REPLY_SALES_EXECUTION_VIEWS,
 } from "@/lib/growth/reply-intelligence/reply-intent-types"
 
 export const runtime = "nodejs"
@@ -46,9 +47,19 @@ export async function GET(request: Request) {
   const limit = z.coerce.number().int().min(1).max(100).catch(25).parse(url.searchParams.get("limit") ?? "25")
   const offset = z.coerce.number().int().min(0).catch(0).parse(url.searchParams.get("offset") ?? "0")
 
+  const salesExecutionViewParam = url.searchParams.get("salesExecutionView")
+  const salesExecutionView =
+    salesExecutionViewParam &&
+    GROWTH_REPLY_SALES_EXECUTION_VIEWS.includes(
+      salesExecutionViewParam as (typeof GROWTH_REPLY_SALES_EXECUTION_VIEWS)[number],
+    )
+      ? (salesExecutionViewParam as (typeof GROWTH_REPLY_SALES_EXECUTION_VIEWS)[number])
+      : undefined
+
   try {
     const feed = await listGrowthReplyInbox(access.admin, {
       view,
+      salesExecutionView,
       ownerUserId,
       intent,
       priority,

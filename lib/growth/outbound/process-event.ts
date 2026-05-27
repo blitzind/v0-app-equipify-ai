@@ -19,6 +19,7 @@ import {
 } from "@/lib/growth/outbound/message-repository"
 import type { NormalizedOutboundEvent, ProcessOutboundEventResult } from "@/lib/growth/outbound/types"
 import { classifyReplyIntent } from "@/lib/growth/reply-intelligence/reply-intent-classifier"
+import { ingestGrowthReplyFromWebhook } from "@/lib/growth/replies/reply-ingestion-pipeline"
 import { insertGrowthOutboundReply } from "@/lib/growth/outbound/reply-repository"
 import { processReplyIntelligence, leadHasCallablePhone } from "@/lib/growth/reply-intelligence/process-reply-intelligence"
 import { resolveOutboundLeadByEmail } from "@/lib/growth/outbound/resolve-lead-by-email"
@@ -282,12 +283,31 @@ export async function processOutboundEvent(
         .maybeSingle()
       lastOutboundSentAt = (messageRow.data as { sent_at?: string } | null)?.sent_at ?? null
     }
+    const ingestion = await ingestGrowthReplyFromWebhook(admin, {
+      existingOutboundReplyId: insertedReply.id,
+      existingMessageEventId: messageEvent.id,
+      connectionId: connection.id,
+      leadId: resolved.leadId,
+      contactId: contact.id,
+      messageId,
+      receivedAt: event.occurredAt,
+      bodyExcerpt: event.bodyPreview,
+      subject: event.subject,
+      senderEmail: event.email,
+      providerReplyId: event.providerReplyId,
+      providerFamily: event.provider,
+      campaignId: campaignId ?? null,
+      rawPayloadRef: event.raw,
+    })
     await processReplyIntelligence(admin, {
       reply: insertedReply,
       lead,
       bodyPreview: event.bodyPreview,
       lastOutboundSentAt,
       hasCallablePhone: leadHasCallablePhone(lead, dmPhone),
+      senderEmail: event.email,
+      campaignId: campaignId ?? null,
+      ingestionEventId: ingestion.ingestionEventId,
     })
   }
 

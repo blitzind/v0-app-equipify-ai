@@ -32,7 +32,7 @@ export default function AdminGrowthRepliesPage() {
             <div>
               <h1 className={PAGE_STANDARD_PAGE_TITLE}>Inbox Intelligence</h1>
               <p className="text-sm text-muted-foreground">
-                Deterministic reply intent, priority, ownership routing, and next actions — human executes, no autonomous sends.
+                Reply intelligence v2 — evidence-backed classification, operator workflows, conversation timeline, and AI-assisted copilot. Human executes; no autonomous sends.
               </p>
             </div>
           </div>

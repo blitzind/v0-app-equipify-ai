@@ -12,6 +12,7 @@ import type {
   GrowthReplyIntent,
   GrowthReplyNextAction,
   GrowthReplyPriority,
+  GrowthReplySalesExecutionView,
 } from "@/lib/growth/reply-intelligence/reply-intent-types"
 
 type ReplyDbRow = {
@@ -153,6 +154,13 @@ export async function updateGrowthOutboundReplyIntelligence(
     buyingSignals: string[]
     objectionSignals: string[]
     escalationSignals: string[]
+    classificationV2?: Record<string, unknown> | null
+    confidenceTier?: string | null
+    uncertaintyState?: string | null
+    matchedPhrases?: unknown[] | null
+    recommendedOperatorAction?: string | null
+    ingestionSource?: string | null
+    ingestionEventId?: string | null
   },
 ): Promise<GrowthOutboundReply> {
   const now = new Date().toISOString()
@@ -175,6 +183,13 @@ export async function updateGrowthOutboundReplyIntelligence(
       buying_signals: input.buyingSignals,
       objection_signals: input.objectionSignals,
       escalation_signals: input.escalationSignals,
+      classification_v2: input.classificationV2 ?? null,
+      confidence_tier: input.confidenceTier ?? null,
+      uncertainty_state: input.uncertaintyState ?? null,
+      matched_phrases: input.matchedPhrases ?? [],
+      recommended_operator_action: input.recommendedOperatorAction ?? null,
+      ingestion_source: input.ingestionSource ?? null,
+      ingestion_event_id: input.ingestionEventId ?? null,
       intelligence_processed_at: now,
       updated_at: now,
     })
@@ -202,6 +217,7 @@ export async function listGrowthOutboundRepliesForLead(
 
 export type GrowthReplyInboxQuery = {
   view?: GrowthReplyInboxView
+  salesExecutionView?: GrowthReplySalesExecutionView
   ownerUserId?: string | null
   intent?: GrowthReplyIntent
   priority?: GrowthReplyPriority
@@ -252,6 +268,31 @@ export async function listGrowthReplyInbox(
   }
   if (query.view === "waiting_on_prospect") {
     request = request.eq("owner_waiting", true)
+  }
+
+  if (query.salesExecutionView === "needs_review") {
+    request = request.or("confidence_tier.in.(low,uncertain),uncertainty_state.eq.ambiguous,unanswered.eq.true")
+  }
+  if (query.salesExecutionView === "interested") {
+    request = request.in("intent", ["positive_interest", "meeting_request", "demo_request"])
+  }
+  if (query.salesExecutionView === "demo_requests") {
+    request = request.in("intent", ["demo_request", "meeting_request"])
+  }
+  if (query.salesExecutionView === "pricing_questions") {
+    request = request.eq("intent", "pricing_question")
+  }
+  if (query.salesExecutionView === "objection_heavy") {
+    request = request.in("intent", ["objection", "timing_delay", "competitor_mention", "angry_complaint"])
+  }
+  if (query.salesExecutionView === "stop_unsubscribe") {
+    request = request.in("intent", ["unsubscribe", "not_interested", "wrong_contact"])
+  }
+  if (query.salesExecutionView === "angry_complaint") {
+    request = request.eq("intent", "angry_complaint")
+  }
+  if (query.salesExecutionView === "low_confidence") {
+    request = request.in("confidence_tier", ["low", "uncertain"])
   }
 
   if (query.ownerUserId && query.view !== "my_inbox") {
