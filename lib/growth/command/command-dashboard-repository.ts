@@ -36,6 +36,7 @@ import { dealIntelligenceActionImpactBoost } from "@/lib/growth/deal-intelligenc
 import { fetchCallIntelligenceDashboardSummary } from "@/lib/growth/call-intelligence/call-intelligence-repository"
 import { callIntelligenceActionImpactBoost } from "@/lib/growth/call-intelligence/call-intelligence-nba-bridge"
 import { growthSignalActionImpactBoost } from "@/lib/growth/company-growth-signals/integrations/command-center-bridge"
+import { fetchCommandMarketHealth } from "@/lib/growth/market-intelligence/market-repository"
 import type { GrowthSignalTier } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
 
 const LEAD_SCAN_SELECT =
@@ -124,7 +125,7 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
   const todayIso = startOfTodayIso()
   const now = new Date().toISOString()
 
-  const [leadsRes, enrollmentsRes, stepsRes, outreachRes, copilotRes, timelineRes, researchCoverage, dealIntelligence, callIntelligence] = await Promise.all([
+  const [leadsRes, enrollmentsRes, stepsRes, outreachRes, copilotRes, timelineRes, researchCoverage, dealIntelligence, callIntelligence, marketHealth] = await Promise.all([
     admin.schema("growth").from("leads").select(LEAD_SCAN_SELECT).limit(300),
     admin
       .schema("growth")
@@ -179,6 +180,7 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
       topCoachingOpportunities: [],
       scoredCalls: 0,
     })),
+    fetchCommandMarketHealth(admin),
   ])
 
   if (leadsRes.error) throw new Error(leadsRes.error.message)
@@ -696,5 +698,6 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
     researchCoverage,
     dealIntelligence,
     callIntelligence,
+    marketHealth,
   }
 }

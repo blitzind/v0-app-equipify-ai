@@ -1892,7 +1892,7 @@ async function main(): Promise<void> {
   } = await import("../lib/growth/company-growth-signals/integrations/prospect-search-growth-signals-overlay")
   const { growthSignalRankBoost } = await import("../lib/growth/company-growth-signals/growth-signal-scoring")
 
-  assert.match(repositorySource, /applyProspectSearchGrowthSignalsOverlay/)
+  assert.match(repositorySource, /applyProspectSearchIntelligenceOverlays/)
   assert.match(rankingSource, /growthSignalRankBoost/)
   assert.match(companyCardSource, /CompanyGrowthSignalsPanel/)
   assert.match(companyCardSource, /growth_signal_score/)
@@ -1976,6 +1976,75 @@ async function main(): Promise<void> {
   assert.match(repositorySource, /attachTerritoryIntelligenceToSearchResult/)
   assert.match(territoryPanelSource, /growth-territory-intelligence-v1/)
   assert.match(filtersSource, /territory_id/)
+
+  const marketPanelSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/related-companies-panel.tsx"),
+    "utf8",
+  )
+  assert.match(repositorySource, /applyProspectSearchIntelligenceOverlays/)
+  assert.match(marketPanelSource, /Related Companies/)
+  assert.match(marketPanelSource, /GROWTH_MARKET_INTELLIGENCE_QA_MARKER/)
+  assert.match(companyCardSource, /company_confidence/)
+  assert.match(companyCardSource, /committee_completion/)
+  assert.match(companyCardSource, /related_companies/)
+
+  const anchor = {
+    id: "co-market-1",
+    source_type: "growth_lead" as const,
+    company_name: "Anchor HVAC",
+    website: "https://anchor.example",
+    industry: "HVAC",
+    subindustry: null,
+    employees: "51-100",
+    revenue_range: null,
+    location: "Nashville, TN",
+    city: "Nashville",
+    state: "TN",
+    intent_score: null,
+    buying_stage: null,
+    buying_stage_confidence: null,
+    buying_stage_reason: null,
+    buying_stage_last_assessed_at: null,
+    lead_score: 78,
+    lead_engine_score: 78,
+    lead_engine_score_label: null,
+    lead_engine_score_explanation: null,
+    lead_engine_last_run_at: null,
+    confidence: 0.8,
+    company_match_confidence: null,
+    decision_maker_coverage: null,
+    verification_status: "unverified",
+    signals: [],
+    search_intent_category: null,
+    lead_inbox_id: null,
+    growth_lead_id: null,
+    prospect_id: null,
+    customer_id: null,
+    rank_score: 1,
+    match_reasoning: [],
+    field_service_software: "ServiceTitan",
+    crm_detected: null,
+    growth_signal_score: 70,
+    growth_signal_tier: "high" as const,
+    company_signal_summary: { growth_indicators: ["hiring"], technology_signals: [], fit_indicators: [], operational_maturity: "Unknown", digital_maturity: "Unknown", field_service_maturity: "Unknown" },
+  }
+  const peer = { ...anchor, id: "co-market-2", company_name: "Peer HVAC", lead_engine_score: 74, lead_score: 74 }
+  const { buildCompanyRelationships } = await import(
+    "../lib/growth/market-intelligence/integrations/prospect-search-market-bridge"
+  )
+  const { applyMarketIntelligenceToCompanyResult, computeProspectSearchCommitteeCompletion, computeProspectSearchCompanyConfidence } =
+    await import("../lib/growth/market-intelligence/integrations/prospect-search-market-overlay")
+  const related = buildCompanyRelationships(anchor, [anchor, peer], 5)
+  assert.ok(related.length > 0)
+  const committee = computeProspectSearchCommitteeCompletion(anchor)
+  const confidence = computeProspectSearchCompanyConfidence(anchor, committee)
+  const marketBridged = applyMarketIntelligenceToCompanyResult(anchor, {
+    related_companies: related,
+    company_confidence: confidence,
+    committee_completion: committee,
+  })
+  assert.ok(marketBridged.related_companies?.length)
+  assert.ok(marketBridged.committee_completion)
 
   console.log("growth-prospect-search: all checks passed")
 }

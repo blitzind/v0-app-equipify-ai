@@ -3,6 +3,9 @@
 import type { GrowthCompanySignalUiSummary } from "@/lib/growth/company-signals/company-signal-types"
 import type { GrowthSignalTier } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
 import type { GrowthTerritoryIntelligenceSummary } from "@/lib/growth/territory-intelligence/territory-intelligence-types"
+import type { GrowthCompanyConfidenceScore } from "@/lib/growth/confidence-intelligence/confidence-intelligence-types"
+import type { GrowthCompanyRelationship } from "@/lib/growth/market-intelligence/market-intelligence-types"
+import type { GrowthProspectSearchCommitteeCompletion } from "@/lib/growth/market-intelligence/integrations/prospect-search-market-overlay"
 import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
 import type { GrowthBuyingStage } from "@/lib/growth/buying-stage/buying-stage-types"
 import type { GrowthSearchIntentCategory } from "@/lib/growth/search-intent/search-intent-types"
@@ -306,6 +309,12 @@ export type GrowthProspectSearchCompanyResult = {
   growth_signal_tier?: GrowthSignalTier | null
   growth_signal_recommended_action?: string | null
   growth_signal_last_computed_at?: string | null
+  /** Top related companies from market graph intelligence. */
+  related_companies?: GrowthCompanyRelationship[]
+  /** Evidence-backed confidence dimensions. */
+  company_confidence?: GrowthCompanyConfidenceScore | null
+  /** Expanded committee completion scoring. */
+  committee_completion?: GrowthProspectSearchCommitteeCompletion | null
 }
 
 export type GrowthProspectSearchPersonResult = {

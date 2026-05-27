@@ -32,6 +32,7 @@ export const GROWTH_COMMAND_SECTION_TABS: readonly GrowthCommandSectionTab[] = [
   { label: "Today", anchor: "cc-today" },
   { label: "Communication", anchor: "cc-communication" },
   { label: "Revenue", anchor: "cc-revenue" },
+  { label: "Market", anchor: "cc-research" },
   { label: "Lifecycle", anchor: "cc-lifecycle" },
   { label: "Readiness", anchor: "cc-readiness" },
   { label: "Performance", anchor: "cc-performance" },

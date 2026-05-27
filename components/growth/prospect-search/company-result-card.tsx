@@ -15,6 +15,8 @@ import { BuyingCommitteePanel } from "@/components/growth/prospect-search/buying
 import { CompanyContactIntelligencePanel } from "@/components/growth/prospect-search/company-contact-intelligence-panel"
 import { CompanyContactsPanel } from "@/components/growth/prospect-search/company-contacts-panel"
 import { CompanyGrowthSignalsPanel } from "@/components/growth/prospect-search/company-growth-signals-panel"
+import { RelatedCompaniesPanel } from "@/components/growth/prospect-search/related-companies-panel"
+import { CompanyConfidenceSummary } from "@/components/growth/prospect-search/company-confidence-summary"
 import { RealWorldSourceBadge } from "@/components/growth/prospect-search/real-world-provider-status"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
@@ -124,6 +126,13 @@ export function CompanyResultCard({
         </p>
       ) : null}
 
+      {row.company_confidence || row.committee_completion ? (
+        <CompanyConfidenceSummary
+          confidence={row.company_confidence}
+          committee={row.committee_completion}
+        />
+      ) : null}
+
       {row.company_signal_summary ? (
         <CompanySignalSummaryPanel
           summary={row.company_signal_summary}
@@ -183,7 +192,15 @@ export function CompanyResultCard({
             lastVerifiedAt={row.growth_signal_last_computed_at}
           />
           <BuyingCommitteePanel companyCandidateId={row.id} companyName={row.company_name} />
+          {row.related_companies?.length ? (
+            <RelatedCompaniesPanel
+              relatedCompanies={row.related_companies}
+              companyName={row.company_name}
+            />
+          ) : null}
         </>
+      ) : selected && row.related_companies?.length ? (
+        <RelatedCompaniesPanel relatedCompanies={row.related_companies} companyName={row.company_name} />
       ) : null}
 
       <div

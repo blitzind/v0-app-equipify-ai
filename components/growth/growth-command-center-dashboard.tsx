@@ -22,6 +22,7 @@ import { GrowthCommandCommunicationOpsSection } from "@/components/growth/growth
 import { GrowthCommandDogfoodCompactSection } from "@/components/growth/growth-command-dogfood-compact-section"
 import { GrowthCommandLifecycleCompactSection } from "@/components/growth/growth-command-lifecycle-compact-section"
 import { GrowthCommandResearchCoverageSection } from "@/components/growth/growth-command-research-coverage-section"
+import { GrowthCommandMarketOperatingSection } from "@/components/growth/growth-command-market-operating-section"
 import { GrowthCommandDealIntelligenceSection } from "@/components/growth/growth-command-deal-intelligence-section"
 import { GrowthCommandCallIntelligenceSection } from "@/components/growth/growth-command-call-intelligence-section"
 import { GrowthCommandHumanExecutionSection } from "@/components/growth/growth-command-human-execution-section"
@@ -522,6 +523,7 @@ export function GrowthCommandCenterDashboard() {
 
           {/* 5. Research Coverage */}
           <div id="cc-research" className={SECTION_SCROLL_CLASS}>
+          <GrowthCommandMarketOperatingSection marketHealth={dashboard.marketHealth} />
           <GrowthCommandResearchCoverageSection coverage={dashboard.researchCoverage} />
           <GrowthCommandDealIntelligenceSection summary={dashboard.dealIntelligence} />
           <GrowthCommandCallIntelligenceSection summary={dashboard.callIntelligence} />

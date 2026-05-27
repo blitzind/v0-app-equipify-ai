@@ -26,7 +26,7 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-ranking"
 import { enrichProspectSearchExternalCompanies } from "@/lib/growth/prospect-search/prospect-search-external-enrichment"
 import { applyProspectSearchContactIntelligenceOverlay } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-loader"
-import { applyProspectSearchGrowthSignalsOverlay } from "@/lib/growth/company-growth-signals/integrations/prospect-search-bridge"
+import { applyProspectSearchIntelligenceOverlays } from "@/lib/growth/market-intelligence/integrations/prospect-search-bridge"
 import {
   applyTerritoryFiltersToSearchInput,
   attachTerritoryIntelligenceToSearchResult,
@@ -38,6 +38,7 @@ import {
   GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER,
   GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER,
   GROWTH_PROVIDER_CACHE_QA_MARKER,
+  type GrowthProspectSearchCompanyResult,
   type GrowthProspectSearchDiscoveryMode,
   type GrowthProspectSearchFilters,
   type GrowthProspectSearchIndexDiagnostics,
@@ -54,6 +55,7 @@ export type RunProspectSearchInput = {
   discovery_mode?: GrowthProspectSearchDiscoveryMode
   created_by?: string | null
 }
+
 
 function buildSourceCounts(
   companies: Array<{ source_type: GrowthProspectSearchSourceType }>,
@@ -109,9 +111,19 @@ export async function runProspectSearch(
       enrichedCompanies,
       { query: input.query, filters: mergedFilters, parsed },
     )
-    const companiesWithSignals = await applyProspectSearchGrowthSignalsOverlay(admin, companiesWithContacts)
+    const companiesWithMarket = await applyProspectSearchIntelligenceOverlays(
+      admin,
+      companiesWithContacts,
+      {
+        territory_id: mergedFilters.territory_id ?? null,
+        industry: mergedFilters.industry ?? parsed.industry ?? null,
+        territory_label: mergedFilters.territory_filter?.states?.[0]
+          ? `${mergedFilters.territory_filter.states[0]} ${mergedFilters.industry ?? parsed.industry ?? ""}`.trim()
+          : null,
+      },
+    )
 
-    const source_counts = buildSourceCounts(companiesWithSignals)
+    const source_counts = buildSourceCounts(companiesWithMarket)
 
     return attachTerritoryIntelligenceToSearchResult(
       admin,
@@ -121,12 +133,12 @@ export async function runProspectSearch(
       query: input.query,
       parsed_query: parsed,
       filters: mergedFilters,
-      companies: companiesWithSignals,
+      companies: companiesWithMarket,
       people: [],
-      total_companies: companiesWithSignals.length,
+      total_companies: companiesWithMarket.length,
       total_people: 0,
       page: 1,
-      page_size: companiesWithSignals.length,
+      page_size: companiesWithMarket.length,
       has_next_page: false,
       source_counts,
       external_discovery_run_id: realWorld.discovery_run_id,
@@ -141,7 +153,7 @@ export async function runProspectSearch(
       google_places_query_expansion_qa_marker: GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER,
       provider_cache_qa_marker: GROWTH_PROVIDER_CACHE_QA_MARKER,
       },
-      companiesWithSignals,
+      companiesWithMarket,
     )
   }
 
@@ -212,7 +224,17 @@ export async function runProspectSearch(
     companyPage.companies,
     { query: input.query, filters: mergedFilters, parsed },
   )
-  const companiesWithSignals = await applyProspectSearchGrowthSignalsOverlay(admin, companiesWithContacts)
+  const companiesWithMarket = await applyProspectSearchIntelligenceOverlays(
+    admin,
+    companiesWithContacts,
+    {
+      territory_id: mergedFilters.territory_id ?? null,
+      industry: mergedFilters.industry ?? parsed.industry ?? null,
+      territory_label: mergedFilters.territory_filter?.states?.[0]
+        ? `${mergedFilters.territory_filter.states[0]} ${mergedFilters.industry ?? parsed.industry ?? ""}`.trim()
+        : null,
+    },
+  )
 
   return attachTerritoryIntelligenceToSearchResult(
     admin,
@@ -222,7 +244,7 @@ export async function runProspectSearch(
     query: input.query,
     parsed_query: parsed,
     filters: mergedFilters,
-    companies: companiesWithSignals,
+    companies: companiesWithMarket,
     people: peoplePage.people,
     total_companies: companyPage.total_count,
     total_people: peoplePage.total_count,
@@ -232,7 +254,7 @@ export async function runProspectSearch(
     index_diagnostics,
     source_counts,
     },
-    companiesWithSignals,
+    companiesWithMarket,
   )
 }
 

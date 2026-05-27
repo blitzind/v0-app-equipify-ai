@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 684,
-  sqlMigrations: 286,
+  apiRouteHandlers: 688,
+  sqlMigrations: 287,
   dashboardPages: 65,
-  componentsTsx: 535,
-  libTsFiles: 1794,
+  componentsTsx: 538,
+  libTsFiles: 1810,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **684** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **286** |
+| API route handlers (\`app/api/**/route.ts\`) | **688** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **287** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **535** |
-| \`lib/**/*.ts\` | **1794** |
+| \`components/**/*.tsx\` | **538** |
+| \`lib/**/*.ts\` | **1810** |
 
 ### Vercel crons
 
@@ -50,6 +50,8 @@ cron/blitzpay-reminders/route.ts
 cron/blitzpay-scheduled-payments/route.ts
 cron/growth-company-signal-refresh/route.ts
 cron/growth-contact-refresh/route.ts
+cron/growth-discovery-worker/route.ts
+cron/growth-market-health-refresh/route.ts
 cron/growth-outreach-execute/route.ts
 cron/growth-sequence-scheduler/route.ts
 cron/growth-territory-refresh/route.ts
@@ -522,6 +524,7 @@ platform/growth/customer-lifecycle/customers/route.ts
 platform/growth/customer-lifecycle/dashboard/route.ts
 platform/growth/customer-lifecycle/onboarding-tasks/[taskId]/route.ts
 platform/growth/deal-intelligence/dashboard/route.ts
+platform/growth/discovery-engine/route.ts
 platform/growth/dogfood/command-summary/route.ts
 platform/growth/dogfood/dashboard/route.ts
 platform/growth/dogfood/issues/[issueId]/route.ts
@@ -608,6 +611,7 @@ platform/growth/leads/[leadId]/timeline/route.ts
 platform/growth/leads/bulk-archive/route.ts
 platform/growth/leads/route.ts
 platform/growth/live-coaching/settings/route.ts
+platform/growth/market-intelligence/route.ts
 platform/growth/meeting-outcomes/dashboard/route.ts
 platform/growth/meetings/[meetingId]/calendar/push/route.ts
 platform/growth/meetings/[meetingId]/calendar/resolve/route.ts
