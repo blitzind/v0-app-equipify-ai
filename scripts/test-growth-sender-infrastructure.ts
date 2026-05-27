@@ -86,6 +86,7 @@ async function main(): Promise<void> {
   const capabilities = listSenderProviderCapabilities()
   assert.equal(capabilities.length, 4)
   assert.equal(GROWTH_SENDER_PROVIDER_CAPABILITIES.google.supportsOauth, true)
+  assert.equal(GROWTH_SENDER_PROVIDER_CAPABILITIES.google.supportsMailboxConnection, true)
   assert.equal(GROWTH_SENDER_PROVIDER_CAPABILITIES.smtp.supportsOauth, false)
   assert.equal(GROWTH_SENDER_PROVIDER_CAPABILITIES.custom.supportsRotation, false)
 

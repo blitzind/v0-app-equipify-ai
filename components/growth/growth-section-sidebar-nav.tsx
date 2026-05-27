@@ -101,6 +101,7 @@ const GROWTH_NAV_ICONS: Record<string, LucideIcon> = {
   "crm-leads": Users,
   providers: Plug,
   infrastructure: Server,
+  "mailbox-connections": Mail,
   copilot: Bot,
   playbooks: BookOpen,
   relationships: Users,
