@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import { Loader2, Plus, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -178,10 +179,15 @@ export function GrowthContentLibraryDashboardView() {
         <p className="text-xs text-muted-foreground">
           {GROWTH_TEMPLATE_SNIPPET_SYSTEM_QA_MARKER} · {GROWTH_CONTENT_PRIVACY_NOTE}
         </p>
-        <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
-          {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-          Refresh
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/copilot/personalization">AI Personalization</Link>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {error ? (

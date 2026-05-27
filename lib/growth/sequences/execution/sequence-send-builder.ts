@@ -10,6 +10,7 @@ import { resolveSenderRotationForPool } from "@/lib/growth/sender-pools/sender-p
 import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 import { listSenderAccounts } from "@/lib/growth/sender/sender-repository"
 import { resolveApprovedTemplateContent } from "@/lib/growth/content/dashboard"
+import { getApprovedPersonalizationForJob } from "@/lib/growth/personalization/dashboard"
 import type { GrowthSequenceSendPayload } from "@/lib/growth/sequences/execution/sequence-execution-types"
 
 const UNSUBSCRIBE_FOOTER =
@@ -136,6 +137,14 @@ export async function buildSequenceExecutionSendPayload(
     body = generation.generatedContent?.trim() || body
   }
 
+  const personalizationGenerationId = input.personalizationGenerationId ?? null
+  if (personalizationGenerationId) {
+    const personalization = await getApprovedPersonalizationForJob(admin, personalizationGenerationId)
+    if (!personalization) return { error: "personalization_not_approved" }
+    subject = personalization.subject || subject
+    body = personalization.body || body
+  }
+
   const experimentOverlay = await applyExperimentVariantToSendPayload(admin, {
     leadId: input.leadId,
     sequenceEnrollmentId: input.sequenceEnrollmentId,
@@ -178,5 +187,6 @@ export async function buildSequenceExecutionSendPayload(
     experimentVariantLabel: experimentOverlay.variantLabel,
     contentTemplateVersionId,
     contentTemplateId,
+    personalizationGenerationId,
   }
 }

@@ -86,6 +86,9 @@ export function GrowthReplyDraftsDashboard() {
             <Link href="/admin/growth/copilot/content-library">Content Library</Link>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/copilot/personalization">AI Personalization</Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
             <Link href="/admin/growth/inbox">Unified Inbox</Link>
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => void load()}>

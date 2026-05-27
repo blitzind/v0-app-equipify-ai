@@ -152,7 +152,15 @@ function evaluateRuleForAction(
             severity: "critical",
           }
     case "role_can_approve":
-      if (!["sequence_job_approve", "content_template_approve", "content_snippet_approve"].includes(input.action)) return null
+      if (
+        ![
+          "sequence_job_approve",
+          "content_template_approve",
+          "content_snippet_approve",
+          "personalization_approve",
+        ].includes(input.action)
+      )
+        return null
       return evaluateRoleCanApprove(input.actorEmail, config)
         ? null
         : {
@@ -174,7 +182,16 @@ function evaluateRuleForAction(
             severity: "critical",
           }
     case "ai_requires_review":
-      if (!["content_template_approve", "content_snippet_approve", "reply_draft_send"].includes(input.action)) return null
+      if (
+        ![
+          "content_template_approve",
+          "content_snippet_approve",
+          "reply_draft_send",
+          "personalization_generate",
+          "personalization_approve",
+        ].includes(input.action)
+      )
+        return null
       return evaluateAiRequiresReview(input.requiresAiReview, input.humanApprovalConfirmed)
     default:
       return null

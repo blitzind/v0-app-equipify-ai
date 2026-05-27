@@ -67,6 +67,14 @@ export const GROWTH_COMMAND_REGISTRY: GrowthCommandRegistryEntry[] = [
     paletteEnabled: true,
   },
   {
+    id: "ai-personalization",
+    label: "AI Personalization",
+    href: "/admin/growth/copilot/personalization",
+    keywords: ["personalization", "ai copy", "evidence", "approval queue", "prospect messaging"],
+    aliases: ["personalization", "ai personalization"],
+    paletteEnabled: true,
+  },
+  {
     id: "open-provider-delivery",
     label: "Open Provider Delivery",
     href: "/admin/growth/providers/delivery",

@@ -180,6 +180,7 @@
     "test:growth-opportunity-intelligence": "tsx scripts/test-growth-opportunity-intelligence.ts",
     "test:growth-booking-intelligence": "tsx scripts/test-growth-booking-intelligence.ts",
     "test:growth-lead-memory": "tsx scripts/test-growth-lead-memory.ts",
+    "test:growth-ai-personalization": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-ai-personalization.ts",
     "test:growth-enterprise-governance": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-enterprise-governance.ts",
     "test:growth-multichannel-sequences": "tsx scripts/test-growth-multichannel-sequences.ts",
     "test:growth-sender-pools": "tsx scripts/test-growth-sender-pools.ts",

@@ -213,6 +213,19 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["content library", "template", "snippet", "merge field", "copy", "message block"],
   },
   {
+    id: "ai-personalization",
+    label: "AI Personalization",
+    href: "/admin/growth/copilot/personalization",
+    keywords: [
+      "ai personalization",
+      "personalization",
+      "evidence",
+      "outbound copy",
+      "prospect personalization",
+      "approval queue",
+    ],
+  },
+  {
     id: "revenue-intelligence",
     label: "Revenue Intelligence",
     href: "/admin/growth/revenue-intelligence",
@@ -765,6 +778,13 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         label: "Reply Drafts",
         consoleKey: "reply-drafts",
         match: prefixMatch("/admin/growth/copilot/reply-drafts"),
+      },
+      {
+        id: "ai-personalization",
+        href: "/admin/growth/copilot/personalization",
+        label: "Personalization",
+        consoleKey: "ai-personalization",
+        match: prefixMatch("/admin/growth/copilot/personalization"),
       },
       {
         id: "ai-research",

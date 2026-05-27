@@ -145,6 +145,7 @@ export type GrowthSequenceSendPayload = {
   experimentVariantLabel?: string | null
   contentTemplateVersionId?: string | null
   contentTemplateId?: string | null
+  personalizationGenerationId?: string | null
 }
 
 export function maskSequenceExecutionLeadLabel(leadId: string, companyName?: string | null): string {

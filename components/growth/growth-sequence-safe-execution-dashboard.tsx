@@ -169,6 +169,9 @@ export function GrowthSequenceSafeExecutionDashboard() {
             <Link href="/admin/growth/copilot/content-library">Content Library</Link>
           </Button>
           <Button variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/copilot/personalization">AI Personalization</Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
             <Link href="/admin/growth/intelligence/relationship-memory">Relationship Memory</Link>
           </Button>
           <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>

@@ -271,6 +271,9 @@ export async function runSequenceExecutionJob(
             content_template_id: payload.contentTemplateId ?? null,
           }
         : {}),
+      ...(payload.personalizationGenerationId
+        ? { personalization_generation_id: payload.personalizationGenerationId }
+        : {}),
       governance_audit_recorded: true,
     },
   })

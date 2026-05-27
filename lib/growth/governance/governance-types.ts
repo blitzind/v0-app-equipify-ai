@@ -46,6 +46,8 @@ export const GROWTH_GOVERNANCE_ACTIONS = [
   "provider_test_send",
   "content_template_approve",
   "content_snippet_approve",
+  "personalization_generate",
+  "personalization_approve",
   "export_generate",
 ] as const
 export type GrowthGovernanceAction = (typeof GROWTH_GOVERNANCE_ACTIONS)[number]
