@@ -1,7 +1,11 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { attachSignalDedupeHash, buildSignalEvidenceDedupeHash } from "@/lib/growth/signals/signal-dedupe"
+import { attachSignalDedupeHash, buildDerivedHireDedupeHash, buildSignalEvidenceDedupeHash, GROWTH_HIRING_VELOCITY_DERIVED_PROVIDER_KEY } from "@/lib/growth/signals/signal-dedupe"
+import {
+  aggregateJobPostingsToHiringVelocity,
+  buildDerivedHireSignalDraft,
+} from "@/lib/growth/signals/hiring-velocity"
 import {
   buildSignalEvidenceSummary,
   validateSignalEvidenceRequired,
@@ -457,4 +461,154 @@ export async function enqueueSignalIngestionJob(
 
   if (error) return { ok: false, reason: error.message }
   return { ok: true, queue_id: asString(data?.id) }
+}
+
+export type SyncDerivedHiringSignalsResult = {
+  upserted: number
+  skipped: number
+  errors: string[]
+}
+
+async function upsertDerivedHireSignalDraft(
+  admin: SupabaseClient,
+  draft: GrowthNormalizedSignalDraft,
+): Promise<PersistGrowthSignalResult> {
+  const evidenceError = validateSignalEvidenceRequired(draft)
+  if (evidenceError) {
+    return { ok: false, reason: evidenceError }
+  }
+
+  const dedupe_hash = buildDerivedHireDedupeHash({
+    organization_id: draft.organization_id,
+    domain: draft.domain,
+    company_name: draft.company_name,
+  })
+
+  let existingQuery = admin
+    .schema("growth")
+    .from("signals")
+    .select("id")
+    .eq("signal_type", "hire")
+    .eq("provider_key", GROWTH_HIRING_VELOCITY_DERIVED_PROVIDER_KEY)
+    .eq("dedupe_hash", dedupe_hash)
+
+  existingQuery =
+    draft.organization_id != null
+      ? existingQuery.eq("organization_id", draft.organization_id)
+      : existingQuery.is("organization_id", null)
+
+  const existing = await existingQuery.maybeSingle()
+  const scoring = scoreSignalV1(draft)
+  const evidence_summary = buildSignalEvidenceSummary(draft)
+
+  if (existing.data?.id) {
+    const signalId = asString(existing.data.id)
+    const { error: updateError } = await admin
+      .schema("growth")
+      .from("signals")
+      .update({
+        occurred_at: draft.occurred_at,
+        company_name: draft.company_name ?? "",
+        domain: draft.domain ?? null,
+        geography: draft.geography ?? null,
+        category: draft.category ?? null,
+        title: draft.title ?? null,
+        evidence_summary,
+        confidence: scoring.confidence,
+        signal_score: scoring.signal_score,
+        urgency: scoring.urgency,
+        routing_priority: scoring.routing_priority,
+        scoring_metadata: scoring.scoring_metadata,
+        metadata: draft.metadata ?? {},
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", signalId)
+
+    if (updateError) return { ok: false, reason: updateError.message }
+
+    await admin.schema("growth").from("signal_sources").delete().eq("signal_id", signalId)
+    const sourceRows = draft.evidence.map((entry) => ({
+      signal_id: signalId,
+      organization_id: draft.organization_id ?? null,
+      source_type: entry.source_type,
+      source_label: entry.source_label ?? draft.provider_key,
+      source_url: entry.source_url ?? null,
+      publisher: entry.publisher ?? null,
+      excerpt: entry.excerpt,
+      observed_at: entry.observed_at ?? draft.occurred_at,
+      confidence_score: entry.confidence_score ?? scoring.confidence,
+      dedupe_hash: buildSignalEvidenceDedupeHash(signalId, entry),
+      metadata: entry.metadata ?? {},
+    }))
+    const { error: sourceError } = await admin.schema("growth").from("signal_sources").insert(sourceRows)
+    if (sourceError) return { ok: false, reason: sourceError.message }
+
+    await recordSignalEvent(admin, {
+      signal_id: signalId,
+      event_type: "scored",
+      organization_id: draft.organization_id ?? null,
+      payload: { ...scoring.scoring_metadata, derived_sync: true },
+    })
+
+    return { ok: true, signal_id: signalId }
+  }
+
+  const draftWithDedupe: GrowthNormalizedSignalDraft = {
+    ...draft,
+    provider_event_id: draft.provider_event_id ?? dedupe_hash.slice(0, 20),
+  }
+  return persistGrowthSignalDraft(admin, {
+    ...draftWithDedupe,
+    provider_key: GROWTH_HIRING_VELOCITY_DERIVED_PROVIDER_KEY,
+  })
+}
+
+export async function syncDerivedHiringSignals(
+  admin: SupabaseClient,
+  organization_id?: string | null,
+): Promise<SyncDerivedHiringSignalsResult> {
+  const result: SyncDerivedHiringSignalsResult = { upserted: 0, skipped: 0, errors: [] }
+
+  if (!(await isGrowthSignalFoundationSchemaReady(admin))) {
+    result.errors.push(GROWTH_SIGNAL_FOUNDATION_SCHEMA_SETUP_MESSAGE)
+    return result
+  }
+
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  let query = admin
+    .schema("growth")
+    .from("signals")
+    .select(
+      "id, organization_id, signal_type, provider_key, provider_event_id, dedupe_hash, confidence, signal_score, urgency, routing_priority, occurred_at, detected_at, expires_at, company_id, company_name, domain, contact_id, contact_display_label, title, previous_title, seniority, geography, industry, category, evidence_summary, workflow_state, suppression_state, processed_to_lead_inbox, lead_inbox_id, created_at, updated_at, metadata",
+    )
+    .eq("signal_type", "job_posting")
+    .gte("occurred_at", cutoff)
+    .order("occurred_at", { ascending: false })
+    .limit(500)
+
+  if (organization_id) {
+    query = query.eq("organization_id", organization_id)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    result.errors.push(error.message)
+    return result
+  }
+
+  const jobPostings = (data ?? []).map((row) => mapSignalRow(row as Record<string, unknown>))
+  const aggregates = aggregateJobPostingsToHiringVelocity(jobPostings)
+
+  for (const aggregate of aggregates) {
+    const draft = buildDerivedHireSignalDraft(aggregate)
+    const persisted = await upsertDerivedHireSignalDraft(admin, draft)
+    if (persisted.ok) {
+      result.upserted += 1
+    } else {
+      result.skipped += 1
+      if (persisted.reason) result.errors.push(persisted.reason)
+    }
+  }
+
+  return result
 }

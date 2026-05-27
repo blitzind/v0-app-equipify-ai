@@ -36,7 +36,9 @@ import {
 import { PLATFORM_ADMIN_GROWTH_LEADS_TAB } from "../components/admin/platform-admin-shell"
 import { buildBossBattles, buildCoachTips, buildHeatMap, detectComboChains } from "../lib/growth/command/command-dashboard-helpers"
 import { describeSequenceStartUnavailable } from "../lib/growth/sequence-enrollment/sequence-enrollment-ui"
+import { buildCommandCenterHiringMetrics } from "../lib/growth/signals/integrations/command-center-bridge"
 import type { GrowthLead } from "../lib/growth/types"
+import type { GrowthSignalRow } from "../lib/growth/signals/signal-types"
 
 function action(partial: Partial<GrowthCommandAction> & Pick<GrowthCommandAction, "id" | "kind" | "leadId">): GrowthCommandAction {
   return {
@@ -227,5 +229,58 @@ assert.match(quickActionsRail, /data-qa-marker=\{GROWTH_COMMAND_CENTER_ACTIONS_Q
 assert.equal(PLATFORM_ADMIN_GROWTH_LEADS_TAB.label, "Growth Engine")
 assert.equal(PLATFORM_ADMIN_GROWTH_LEADS_TAB.key, "growth_leads")
 assert.equal(PLATFORM_ADMIN_GROWTH_LEADS_TAB.href, "/admin/growth/command")
+
+const hiringMetrics = buildCommandCenterHiringMetrics({
+  hire_signals: [
+    {
+      id: "h1",
+      organization_id: null,
+      signal_type: "hire",
+      provider_key: "hiring_velocity_derived",
+      provider_event_id: "domain:acmehealth.com",
+      dedupe_hash: "x",
+      confidence: 0.8,
+      signal_score: 60,
+      urgency: "normal",
+      routing_priority: 6,
+      occurred_at: new Date().toISOString(),
+      detected_at: new Date().toISOString(),
+      expires_at: null,
+      company_id: null,
+      company_name: "Acme Health Systems",
+      domain: "acmehealth.com",
+      contact_id: null,
+      contact_display_label: null,
+      title: "Active hiring: 4 open roles",
+      previous_title: null,
+      seniority: null,
+      geography: "Nashville, TN",
+      industry: null,
+      category: "Field Service",
+      evidence_summary: "hire aggregate",
+      workflow_state: "new",
+      suppression_state: "active",
+      processed_to_lead_inbox: false,
+      lead_inbox_id: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      metadata: {
+        no_employee_records: true,
+        hiring_velocity: {
+          open_role_count: 4,
+          hiring_velocity_7d: 2,
+          hiring_velocity_30d: 4,
+          hiring_spike: true,
+          hiring_intensity: "medium",
+          department_distribution: { "Field Service": 2 },
+          geographies: ["Nashville, TN"],
+        },
+      },
+    } satisfies GrowthSignalRow,
+  ],
+})
+assert.ok(hiringMetrics.recent_hiring_signals_count >= 1)
+assert.equal(hiringMetrics.top_hiring_companies[0]?.company_name, "Acme Health Systems")
+assert.equal(hiringMetrics.hiring_spikes.length, 1)
 
 console.log("growth-command-center: all checks passed")

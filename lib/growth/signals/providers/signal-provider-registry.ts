@@ -1,4 +1,5 @@
 import { createManualImportSignalAdapter } from "@/lib/growth/signals/providers/adapters/manual-import-adapter"
+import { createJobPostingManualSignalAdapter } from "@/lib/growth/signals/providers/adapters/job-posting-adapter"
 import { createNewsManualSignalAdapter } from "@/lib/growth/signals/providers/adapters/news-signal-adapter"
 import type {
   GrowthSignalPollContext,
@@ -16,7 +17,11 @@ export type GrowthSignalProviderRegistryEntry = {
 }
 
 export function listSignalProviders(): GrowthSignalProvider[] {
-  return [createManualImportSignalAdapter(), createNewsManualSignalAdapter()]
+  return [
+    createManualImportSignalAdapter(),
+    createNewsManualSignalAdapter(),
+    createJobPostingManualSignalAdapter(),
+  ]
 }
 
 export function getSignalProvider(providerKey: string): GrowthSignalProvider | null {

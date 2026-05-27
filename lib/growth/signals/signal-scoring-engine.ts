@@ -78,6 +78,63 @@ function scoreBuyingRelevance(draft: GrowthNormalizedSignalDraft): number {
   return clamp(hits * 3, 0, 15)
 }
 
+const ICP_JOB_DEPARTMENTS = new Set([
+  "field service",
+  "operations",
+  "dispatch",
+  "biomedical",
+  "facilities",
+  "warehouse",
+])
+
+function readMetadataRecord(draft: GrowthNormalizedSignalDraft): Record<string, unknown> {
+  return draft.metadata && typeof draft.metadata === "object" ? draft.metadata : {}
+}
+
+function scoreJobHiringRelevance(draft: GrowthNormalizedSignalDraft): number {
+  if (draft.signal_type !== "job_posting" && draft.signal_type !== "hire") return 0
+
+  let score = 0
+  const metadata = readMetadataRecord(draft)
+  const department = asLower(draft.category)
+  const roleFamily = asLower(metadata.role_family)
+  const operationalRelevance = asLower(metadata.operational_relevance)
+  const hiringVelocity =
+    metadata.hiring_velocity && typeof metadata.hiring_velocity === "object"
+      ? (metadata.hiring_velocity as Record<string, unknown>)
+      : null
+
+  if (ICP_JOB_DEPARTMENTS.has(department)) score += 4
+  if (roleFamily === "technician") score += 4
+  if (department === "dispatch" || roleFamily === "dispatcher") score += 3
+  if (operationalRelevance === "high") score += 3
+
+  const indicators = Array.isArray(metadata.hiring_intent_indicators)
+    ? metadata.hiring_intent_indicators.filter((entry): entry is string => typeof entry === "string")
+    : []
+  if (indicators.includes("field_ops_expansion")) score += 2
+  if (indicators.includes("multi_location_hiring")) score += 2
+
+  if (hiringVelocity) {
+    const intensity = asLower(hiringVelocity.hiring_intensity)
+    const velocity7d = typeof hiringVelocity.hiring_velocity_7d === "number" ? hiringVelocity.hiring_velocity_7d : 0
+    const spike = hiringVelocity.hiring_spike === true
+    if (intensity === "high") score += 4
+    else if (intensity === "medium") score += 2
+    if (velocity7d >= 3) score += 2
+    if (spike) score += 3
+  }
+
+  const titleHaystack = asLower(draft.title)
+  if (titleHaystack.includes("technician") || titleHaystack.includes("dispatch")) score += 2
+
+  return clamp(score, 0, 15)
+}
+
+function asLower(value: unknown): string {
+  return typeof value === "string" ? value.trim().toLowerCase() : ""
+}
+
 function urgencyFromScore(signalType: GrowthSignalType, signalScore: number): GrowthSignalUrgency {
   if (signalScore >= 80) return "urgent"
   if (signalScore >= 65) return "high"
@@ -93,10 +150,18 @@ export function scoreSignalV1(draft: GrowthNormalizedSignalDraft): GrowthSignalS
   const companyFit = scoreCompanyFit(draft)
   const roleSeniority = scoreRoleSeniority(draft)
   const buyingRelevance = scoreBuyingRelevance(draft)
+  const jobHiringRelevance = scoreJobHiringRelevance(draft)
   const territoryRelevance = draft.geography?.trim() ? 3 : 0
 
   const signal_score = clamp(
-    typeBase + recency + evidence + companyFit + roleSeniority + buyingRelevance + territoryRelevance,
+    typeBase +
+      recency +
+      evidence +
+      companyFit +
+      roleSeniority +
+      buyingRelevance +
+      jobHiringRelevance +
+      territoryRelevance,
     0,
     100,
   )
@@ -127,6 +192,7 @@ export function scoreSignalV1(draft: GrowthNormalizedSignalDraft): GrowthSignalS
         company_fit: companyFit,
         role_seniority: roleSeniority,
         buying_relevance: buyingRelevance,
+        job_hiring_relevance: jobHiringRelevance,
         territory_relevance: territoryRelevance,
       },
     },

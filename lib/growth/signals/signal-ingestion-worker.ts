@@ -5,6 +5,7 @@ import { pollSignalProvider } from "@/lib/growth/signals/providers/signal-provid
 import {
   enqueueSignalIngestionJob,
   persistGrowthSignalDraft,
+  syncDerivedHiringSignals,
 } from "@/lib/growth/signals/signal-repository"
 import { validateSignalEvidenceRequired } from "@/lib/growth/signals/signal-evidence"
 import { GROWTH_SIGNAL_FOUNDATION_QA_MARKER } from "@/lib/growth/signals/signal-types"
@@ -16,6 +17,7 @@ export type ProcessSignalIngestionQueueResult = {
   duplicates: number
   rejected: number
   failed: number
+  derived_hires_upserted: number
   errors: string[]
 }
 
@@ -34,6 +36,7 @@ export async function processSignalIngestionQueue(
     duplicates: 0,
     rejected: 0,
     failed: 0,
+    derived_hires_upserted: 0,
     errors: [],
   }
 
@@ -106,6 +109,12 @@ export async function processSignalIngestionQueue(
         }
       }
 
+      if (providerKey === "job_posting_manual") {
+        const derived = await syncDerivedHiringSignals(admin, job.organization_id ?? null)
+        result.derived_hires_upserted += derived.upserted
+        result.errors.push(...derived.errors)
+      }
+
       await admin
         .schema("growth")
         .from("signal_ingestion_queue")
@@ -149,6 +158,20 @@ export async function queueNewsManualIngestion(
 ): Promise<{ ok: boolean; queue_id?: string; reason?: string }> {
   return enqueueSignalIngestionJob(admin, {
     provider_key: "news_manual",
+    organization_id: input.organization_id ?? null,
+    cursor: { sample_input: input.sample_input },
+  })
+}
+
+export async function queueJobPostingManualIngestion(
+  admin: SupabaseClient,
+  input: {
+    sample_input: unknown
+    organization_id?: string | null
+  },
+): Promise<{ ok: boolean; queue_id?: string; reason?: string }> {
+  return enqueueSignalIngestionJob(admin, {
+    provider_key: "job_posting_manual",
     organization_id: input.organization_id ?? null,
     cursor: { sample_input: input.sample_input },
   })

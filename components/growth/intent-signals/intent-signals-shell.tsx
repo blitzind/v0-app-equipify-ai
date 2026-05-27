@@ -21,6 +21,8 @@ import {
   WebsiteVisitorsTab,
 } from "@/components/growth/intent-signals/tabs/website-visitors-tab"
 import { NewsTab } from "@/components/growth/intent-signals/tabs/news-tab"
+import { JobsTab } from "@/components/growth/intent-signals/tabs/jobs-tab"
+import { HiresTab } from "@/components/growth/intent-signals/tabs/hires-tab"
 import type { IntentSignalsViewMode } from "@/components/growth/intent-signals/intent-signals-view-toggle"
 import type {
   GrowthIntentPixelAdminDiagnostics,
@@ -121,6 +123,10 @@ export function IntentSignalsShell({
         />
       ) : activeTab === "news" ? (
         <NewsTab onOpenSetupDrawer={onOpenSetupDrawer} />
+      ) : activeTab === "jobs" ? (
+        <JobsTab onOpenSetupDrawer={onOpenSetupDrawer} />
+      ) : activeTab === "hires" ? (
+        <HiresTab onOpenSetupDrawer={onOpenSetupDrawer} />
       ) : (
         <IntentSignalsPreviewTab tabId={activeTab} />
       )}

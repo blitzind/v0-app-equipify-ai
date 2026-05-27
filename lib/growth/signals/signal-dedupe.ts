@@ -47,7 +47,45 @@ export function buildSignalDedupeHash(input: {
   return createHash("sha256").update(key).digest("hex").slice(0, 40)
 }
 
+export const GROWTH_HIRING_VELOCITY_DERIVED_PROVIDER_KEY = "hiring_velocity_derived" as const
+
+function normalizeCompanyKey(domain: string | null | undefined, companyName: string | null | undefined): string {
+  const domainKey = normalizeKeyPart(domain)
+  if (domainKey) return `domain:${domainKey}`
+  const nameKey = normalizeKeyPart(companyName)
+  if (nameKey) return `company:${nameKey}`
+  return "unknown"
+}
+
+export function buildDerivedHireDedupeHash(input: {
+  organization_id?: string | null
+  domain?: string | null
+  company_name?: string | null
+}): string {
+  const companyKey = normalizeCompanyKey(input.domain, input.company_name)
+  return buildSignalDedupeHash({
+    organization_id: input.organization_id,
+    signal_type: "hire",
+    provider_key: GROWTH_HIRING_VELOCITY_DERIVED_PROVIDER_KEY,
+    provider_event_id: companyKey,
+    occurred_at: "derived",
+    domain: input.domain,
+    company_name: input.company_name,
+  })
+}
+
 export function attachSignalDedupeHash(draft: GrowthNormalizedSignalDraft): string {
+  if (
+    draft.signal_type === "hire" &&
+    draft.provider_key === GROWTH_HIRING_VELOCITY_DERIVED_PROVIDER_KEY
+  ) {
+    return buildDerivedHireDedupeHash({
+      organization_id: draft.organization_id,
+      domain: draft.domain,
+      company_name: draft.company_name,
+    })
+  }
+
   return buildSignalDedupeHash({
     organization_id: draft.organization_id,
     signal_type: draft.signal_type,

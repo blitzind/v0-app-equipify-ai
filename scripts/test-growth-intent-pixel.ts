@@ -175,6 +175,10 @@ assert.match(signalsShell, /GROWTH_INTENT_SIGNALS_LAYOUT_V2_QA_MARKER/)
 assert.match(signalsShell, /data-qa-marker=\{GROWTH_INTENT_SIGNALS_LAYOUT_V2_QA_MARKER\}/)
 assert.match(signalsShell, /NewsTab/)
 assert.match(signalsShell, /activeTab === "news"/)
+assert.match(signalsShell, /JobsTab/)
+assert.match(signalsShell, /HiresTab/)
+assert.match(signalsShell, /activeTab === "jobs"/)
+assert.match(signalsShell, /activeTab === "hires"/)
 
 const signalsUxConstants = fs.readFileSync(
   path.join(process.cwd(), "components/growth/intent-signals/intent-signals-ux-constants.ts"),
@@ -182,7 +186,12 @@ const signalsUxConstants = fs.readFileSync(
 )
 assert.match(signalsUxConstants, /growth-intent-signals-layout-v2/)
 assert.match(signalsUxConstants, /growth-intent-signals-news-v1/)
+assert.match(signalsUxConstants, /growth-intent-signals-jobs-v1/)
+assert.match(signalsUxConstants, /growth-intent-signals-hires-v1/)
 assert.match(signalsUxConstants, /id: "news"[\s\S]*implemented: true/)
+assert.match(signalsUxConstants, /id: "jobs"[\s\S]*implemented: true/)
+assert.match(signalsUxConstants, /id: "hires"[\s\S]*implemented: true/)
+assert.match(signalsUxConstants, /id: "job-changes"[\s\S]*implemented: false/)
 
 const setupDrawer = fs.readFileSync(
   path.join(process.cwd(), "components/growth/intent-signals/intent-signals-setup-drawer.tsx"),

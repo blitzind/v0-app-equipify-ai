@@ -4,6 +4,10 @@ export const GROWTH_INTENT_SIGNALS_LAYOUT_V2_QA_MARKER = "growth-intent-signals-
 
 export const GROWTH_INTENT_SIGNALS_NEWS_TAB_QA_MARKER = "growth-intent-signals-news-v1" as const
 
+export const GROWTH_INTENT_SIGNALS_JOBS_TAB_QA_MARKER = "growth-intent-signals-jobs-v1" as const
+
+export const GROWTH_INTENT_SIGNALS_HIRES_TAB_QA_MARKER = "growth-intent-signals-hires-v1" as const
+
 export const GROWTH_INTENT_SIGNALS_SETUP_DRAWER_QA_MARKER =
   "growth-intent-signals-setup-drawer-v1" as const
 
@@ -170,62 +174,51 @@ export const INTENT_SIGNAL_TABS: readonly IntentSignalTabMeta[] = [
   {
     id: "hires",
     label: "Hires",
-    implemented: false,
-    filters: ["Job Title", "Seniority", "Company", "Company size", "More filters"],
+    implemented: true,
+    filters: ["Company", "Department", "Hiring intensity", "Geography", "More filters"],
     columns: [
-      { key: "person", label: "Person" },
-      { key: "role", label: "Role" },
       { key: "company", label: "Company" },
-      { key: "country", label: "Country" },
-      { key: "startDate", label: "Start date" },
+      { key: "activeHiring", label: "Active Hiring" },
+      { key: "departments", label: "Departments" },
+      { key: "velocity", label: "Velocity" },
+      { key: "spike", label: "Hiring Spike" },
+      { key: "geography", label: "Geography" },
+      { key: "score", label: "Signal Score" },
       { key: "date", label: "Date" },
+      { key: "actions", label: "Actions" },
     ],
     emptyState: {
-      title: "Spot new hires at target accounts",
-      description: "Identify fresh hires in buying roles and warm up accounts with timely outreach.",
-      ctaLabel: "Track new hires",
+      title: "No aggregate hiring signals yet",
+      description:
+        "Hiring activity signals are derived from ingested job postings and will appear here after job data is processed.",
+      ctaLabel: "Add hiring signal",
     },
-    sampleMetrics: { total: 1103, h24: 56, d7: 489, d30: 3210 },
-    sampleRows: [
-      {
-        person: "Sample Contact D",
-        role: "Field Service Manager",
-        company: "Example Inc",
-        country: "US",
-        startDate: "May 12",
-        date: "4 hr ago",
-      },
-    ],
+    sampleMetrics: { total: 0, h24: 0, d7: 0, d30: 0 },
+    sampleRows: [],
   },
   {
     id: "jobs",
     label: "Jobs",
-    implemented: false,
-    filters: ["Company", "Industry", "Company size", "Department", "More filters"],
+    implemented: true,
+    filters: ["Company", "Department", "Location", "Employment type", "More filters"],
     columns: [
       { key: "company", label: "Company" },
-      { key: "rolePosted", label: "Role posted" },
+      { key: "role", label: "Role" },
       { key: "department", label: "Department" },
-      { key: "country", label: "Country" },
       { key: "location", label: "Location" },
+      { key: "employmentType", label: "Employment Type" },
+      { key: "intensity", label: "Hiring Intensity" },
+      { key: "score", label: "Signal Score" },
       { key: "date", label: "Date" },
+      { key: "actions", label: "Actions" },
     ],
     emptyState: {
-      title: "Track companies that are hiring",
-      description: "Monitor job postings that signal expansion, new locations, or budget availability.",
-      ctaLabel: "Track job postings",
+      title: "No hiring signals yet",
+      description: "Job posting signals will appear here after hiring activity is ingested.",
+      ctaLabel: "Add hiring signal",
     },
-    sampleMetrics: { total: 2341, h24: 89, d7: 756, d30: 5120 },
-    sampleRows: [
-      {
-        company: "Sample Industries",
-        rolePosted: "Service Director",
-        department: "Operations",
-        country: "US",
-        location: "Austin, TX",
-        date: "6 hr ago",
-      },
-    ],
+    sampleMetrics: { total: 0, h24: 0, d7: 0, d30: 0 },
+    sampleRows: [],
   },
   {
     id: "news",
