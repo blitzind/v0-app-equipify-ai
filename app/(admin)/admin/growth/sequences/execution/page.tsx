@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation"
 import { PlayCircle } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthSequenceExecutionFoundationDashboard } from "@/components/growth/growth-sequence-execution-foundation-dashboard"
+import { GrowthSequenceSafeExecutionDashboard } from "@/components/growth/growth-sequence-safe-execution-dashboard"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -42,7 +43,10 @@ export default function AdminGrowthSequenceExecutionPage() {
         </section>
 
         <GrowthSectionLayout>
-          <GrowthSequenceExecutionFoundationDashboard highlightEnrollmentId={highlightEnrollmentId} />
+          <GrowthSequenceSafeExecutionDashboard />
+          <div className="mt-8">
+            <GrowthSequenceExecutionFoundationDashboard highlightEnrollmentId={highlightEnrollmentId} />
+          </div>
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>

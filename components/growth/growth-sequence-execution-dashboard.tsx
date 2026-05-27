@@ -98,7 +98,7 @@ export function GrowthSequenceExecutionDashboard({
     setError(null)
     try {
       const [dashboardRes] = await Promise.all([
-        fetch("/api/platform/growth/sequences/execution/dashboard", { cache: "no-store" }),
+        fetch("/api/platform/growth/sequences/execution/dashboard?view=enrollments", { cache: "no-store" }),
         loadSchedulerStatus(),
       ])
       const data = (await dashboardRes.json().catch(() => ({}))) as { ok?: boolean; dashboard?: DashboardPayload; message?: string }
