@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GrowthLead } from "@/lib/growth/types"
 import { extractBuyingSignals } from "@/lib/growth/reply-intelligence/buying-signal-extractor"
 import { recordCampaignReplyLearning } from "@/lib/growth/reply-intelligence/campaign-reply-learning"
+import { processRevenueIntelligence } from "@/lib/growth/revenue-intelligence/process-revenue-intelligence"
 import { applyReplyComplianceHardening } from "@/lib/growth/reply-intelligence/reply-compliance-hardening"
 import { buildReplyCopilotAssist } from "@/lib/growth/reply-intelligence/reply-copilot-service"
 import { classifyReplyIntentV2 } from "@/lib/growth/reply-intelligence/reply-intent-classifier-v2"
@@ -209,6 +210,22 @@ export async function processReplyIntelligence(
     campaignId: input.campaignId,
     sequenceEnrollmentId: input.sequenceEnrollmentId,
     classification: classified,
+  }).catch(() => undefined)
+
+  await processRevenueIntelligence(admin, {
+    leadId: input.lead.id,
+    replyId: input.reply.id,
+    companyName: input.lead.companyName,
+    bodyPreview: input.bodyPreview,
+    classification: classified,
+    buyingSignals: buyingSignalsDetailed,
+    objections: objectionsDetailed,
+    threadReplyCount: thread.threadReplyCount,
+    responseLatencyMs: thread.responseLatencyMs,
+    recommendedOperatorAction: classified.recommendedOperatorAction,
+    campaignId: input.campaignId,
+    sequenceEnrollmentId: input.sequenceEnrollmentId,
+    receivedAt: input.reply.receivedAt,
   }).catch(() => undefined)
 
   await emitReplyReceivedTimeline(admin, {

@@ -1,9 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { Target } from "lucide-react"
+import { ArrowLeft, Target } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
-import { GrowthOpportunityDashboard } from "@/components/growth/growth-opportunity-dashboard"
+import { GrowthOpportunityWorkspaceDashboard } from "@/components/growth/growth-opportunity-workspace-dashboard"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -13,7 +13,7 @@ import {
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import { Button } from "@/components/ui/button"
 
-export default function AdminGrowthOpportunitiesPage() {
+export default function AdminGrowthOpportunityWorkspacePage() {
   const { sessionIdentity } = useAdmin()
   const header = usePlatformAdminHeaderIdentity({
     displayName: sessionIdentity?.displayName,
@@ -33,20 +33,23 @@ export default function AdminGrowthOpportunitiesPage() {
                 <Target size={17} />
               </span>
               <div>
-                <h1 className={PAGE_STANDARD_PAGE_TITLE}>Opportunity Readiness</h1>
+                <h1 className={PAGE_STANDARD_PAGE_TITLE}>Opportunity Workspace</h1>
                 <p className="text-sm text-muted-foreground">
-                  Sales-motion readiness scoring with blockers, accelerators, and executive close candidates — read-only intelligence, no send.
+                  Evidence-backed opportunity signals, buying momentum, committee intelligence, and operator recommendations — no autonomous deal progression.
                 </p>
               </div>
             </div>
-            <Button asChild size="sm">
-              <Link href="/admin/growth/opportunities/workspace">Opportunity workspace</Link>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/admin/growth/opportunities">
+                <ArrowLeft className="mr-2 size-4" />
+                Readiness view
+              </Link>
             </Button>
           </div>
         </section>
 
         <GrowthSectionLayout>
-          <GrowthOpportunityDashboard />
+          <GrowthOpportunityWorkspaceDashboard />
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>

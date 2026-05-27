@@ -68,6 +68,10 @@ export const GROWTH_REVENUE_ATTRIBUTION_EVENT_TYPES = [
   "opportunity_created",
   "opportunity_won",
   "pipeline_value",
+  "demo_request_detected",
+  "pricing_question_detected",
+  "positive_reply_detected",
+  "momentum_accelerated",
 ] as const
 export type GrowthRevenueAttributionEventType = (typeof GROWTH_REVENUE_ATTRIBUTION_EVENT_TYPES)[number]
 
