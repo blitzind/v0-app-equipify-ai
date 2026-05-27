@@ -15,6 +15,10 @@ import type {
   GrowthRealWorldProviderStatusSummary,
 } from "@/lib/growth/real-world-discovery/real-world-discovery-types"
 import { GROWTH_REAL_WORLD_SOURCE_BADGE_LABELS } from "@/lib/growth/real-world-discovery/real-world-discovery-types"
+import {
+  isGooglePlacesApiKeyConfigured,
+  isSerpApiKeyConfigured,
+} from "@/lib/growth/prospect-search/prospect-search-provider-runtime-diagnostics"
 import { createRealWorldBusinessDirectoryProvider } from "@/lib/growth/real-world-discovery/providers/business-directory-provider"
 import { createRealWorldFixtureProvider } from "@/lib/growth/real-world-discovery/providers/fixture-provider"
 import { createRealWorldGooglePlacesProvider } from "@/lib/growth/real-world-discovery/providers/google-places-provider"
@@ -105,7 +109,13 @@ export function summarizeRealWorldProviderStatus(
   results: GrowthRealWorldDiscoveryProviderResult[],
   options?: { use_fixture_fallback?: boolean },
 ): GrowthRealWorldProviderStatusSummary {
-  const liveConfigured = anyLiveProviderConfigured()
+  const googleKey = isGooglePlacesApiKeyConfigured()
+  const serpKey = isSerpApiKeyConfigured()
+  const anyLiveKey = googleKey || serpKey
+  const rawCount = results.reduce(
+    (sum, r) => sum + (r.diagnostics?.provider_merged_result_count ?? r.diagnostics?.provider_result_count ?? r.candidates.length),
+    0,
+  )
   const liveActive = results.some(
     (r) =>
       GROWTH_REAL_WORLD_LIVE_PROVIDER_TYPES.includes(r.provider_type as never) &&
@@ -124,6 +134,10 @@ export function summarizeRealWorldProviderStatus(
     .map((r) => GROWTH_REAL_WORLD_SOURCE_BADGE_LABELS[r.provider_type] ?? r.provider_name)
 
   const provider_diagnostics = results.map(toExecutionDiagnostic)
+  const anyExecuted = provider_diagnostics.some((row) => row.provider_executed)
+  const anyQuota = provider_diagnostics.some((row) =>
+    /quota|rate.?limit|429|resource_exhausted/i.test(row.provider_fallback_reason ?? ""),
+  )
   const provider_fallback_reason = fixtureActive
     ? "no_live_provider_configured"
     : options?.use_fixture_fallback
@@ -133,15 +147,25 @@ export function summarizeRealWorldProviderStatus(
   let label: GrowthRealWorldProviderStatusLabel = "no_provider_configured"
   let message = "No live provider configured — enable API keys or use fixture fallback."
 
-  if (liveActive) {
-    label = "live_provider_active"
-    message = `Live provider active: ${live_providers.join(", ") || "configured"}.`
-  } else if (fixtureActive) {
+  if (fixtureActive && !anyLiveKey) {
     label = "fixture_fallback_active"
     message = "Fixture fallback active — no live public-source API configured."
-  } else if (liveConfigured) {
+  } else if (anyQuota) {
+    label = "provider_quota_rate_limited"
+    message = "Provider quota or rate limit reached — try again later or narrow the query."
+  } else if (rawCount === 0 && anyExecuted) {
+    label = "provider_returned_raw_0"
+    message = "Live providers executed but returned zero raw matches for the expanded queries."
+  } else if (!anyLiveKey) {
+    label = "provider_key_missing"
+    message =
+      "Provider key missing — set GOOGLE_PLACES_API_KEY and/or SERPAPI_API_KEY (or SERP_API_KEY)."
+  } else if (liveActive) {
     label = "live_provider_active"
-    message = "No companies found after expanded provider search. Try adding a location or broadening filters."
+    message = `Live provider active: ${live_providers.join(", ") || "configured"}.`
+  } else if (anyLiveKey && !anyExecuted) {
+    label = "provider_key_missing"
+    message = "Provider keys are set but no live provider executed in this run."
   }
 
   return {

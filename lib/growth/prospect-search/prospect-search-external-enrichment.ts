@@ -4,7 +4,6 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { filterProspectPeopleByTitle } from "@/lib/growth/prospect-search/prospect-search-filters"
 import {
   applyProspectSearchExternalCompanyFilters,
-  relaxProspectSearchExternalCompanyFilters,
   type GrowthProspectSearchExternalFilterDiagnostics,
 } from "@/lib/growth/prospect-search/prospect-search-external-filters"
 import { finalizeProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-result-finalize"
@@ -69,12 +68,20 @@ export async function enrichProspectSearchExternalCompanies(
     }
   }
 
-  const relaxed = relaxProspectSearchExternalCompanyFilters(enriched, context.filters)
-  const relaxedFiltered = applyProspectSearchExternalCompanyFilters(relaxed, {
+  const relaxedFilters: GrowthProspectSearchFilters = {
     ...context.filters,
     employee_size_bands: undefined,
     revenue_bands: undefined,
-  })
+    technologies: undefined,
+    buying_stages: undefined,
+    intent_score_min: undefined,
+    lead_score_min: undefined,
+    growth_signal_score_min: undefined,
+    growth_signal_tiers: undefined,
+    search_intent_categories: undefined,
+  }
+
+  const relaxedFiltered = applyProspectSearchExternalCompanyFilters(enriched, relaxedFilters)
 
   return {
     companies: relaxedFiltered.companies,

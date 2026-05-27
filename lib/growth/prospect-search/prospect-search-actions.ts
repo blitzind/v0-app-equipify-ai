@@ -27,6 +27,7 @@ import {
   refreshTerritoryIntelligence,
 } from "@/lib/growth/territory-intelligence/territory-repository"
 import { runProspectSearch } from "@/lib/growth/prospect-search/prospect-search-repository"
+import { GROWTH_PROSPECT_SEARCH_SCHEMA_SETUP_MESSAGE } from "@/lib/growth/prospect-search/prospect-search-schema-health"
 import type {
   GrowthProspectSearchActionResult,
   GrowthProspectSearchCompanyResult,
@@ -191,7 +192,11 @@ export async function executeProspectSearchAction(
       metadata,
     })
     if (!row) {
-      return { ok: false, action, message: "Could not save search — schema may not be applied." }
+      return {
+        ok: false,
+        action,
+        message: GROWTH_PROSPECT_SEARCH_SCHEMA_SETUP_MESSAGE,
+      }
     }
     return {
       ok: true,

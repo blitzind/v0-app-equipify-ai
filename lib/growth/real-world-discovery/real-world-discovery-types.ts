@@ -16,6 +16,10 @@ export type GrowthRealWorldDiscoveryRunStatus =
 
 export const GROWTH_REAL_WORLD_PROVIDER_STATUS_LABELS = [
   "live_provider_active",
+  "provider_key_missing",
+  "provider_quota_rate_limited",
+  "provider_returned_raw_0",
+  "results_dropped_by_filters",
   "fixture_fallback_active",
   "no_provider_configured",
 ] as const

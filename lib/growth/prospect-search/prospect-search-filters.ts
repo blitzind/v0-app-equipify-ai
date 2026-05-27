@@ -1,3 +1,4 @@
+import type { GrowthBuyingStage } from "@/lib/growth/buying-stage/buying-stage-types"
 import type { GrowthSignalTier } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
 import { GROWTH_SIGNAL_TIERS } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
 import {
@@ -31,13 +32,18 @@ const INDUSTRY_FILTER_ALIAS_TOKENS: Record<string, readonly string[]> = {
     "medical equipment",
     "biomedical",
     "biomed",
+    "biomedical equipment",
     "clinical engineering",
     "healthcare equipment",
     "hospital equipment",
     "medical device",
+    "medical device repair",
     "equipment repair",
     "equipment service",
     "equipment maintenance",
+    "healthcare equipment service",
+    "hospital equipment service",
+    "medical equipment repair",
     "field service",
     "calibration",
   ],
@@ -127,9 +133,15 @@ export function explainProspectSearchFilterDrop<
   }
   if (filters.keywords?.length) {
     const blob = [row.company_name, row.website, row.industry, row.notes, ...row.keywords].join(" ")
-    if (!filters.keywords.every((kw) => includesFold(blob, kw))) return "keywords"
+    const keywordMatch = options?.external_discovery
+      ? filters.keywords.some((kw) => includesFold(blob, kw))
+      : filters.keywords.every((kw) => includesFold(blob, kw))
+    if (!keywordMatch) return "keywords"
   }
   if (filters.technologies?.length) {
+    if (options?.external_discovery) {
+      // External listings rarely expose stack data — do not drop on technology filters.
+    } else {
     const blob = [
       row.crm_detected,
       row.field_service_software,
@@ -141,6 +153,7 @@ export function explainProspectSearchFilterDrop<
       .filter(Boolean)
       .join(" ")
     if (!filters.technologies.every((tech) => includesFold(blob, tech))) return "technologies"
+    }
   }
   if (filters.crm_detected && !includesFold(row.crm_detected, filters.crm_detected)) return "crm_detected"
   if (filters.website_platform && !includesFold(row.website_platform, filters.website_platform)) {
@@ -152,34 +165,36 @@ export function explainProspectSearchFilterDrop<
   ) {
     return "field_service_software"
   }
-  if (filters.intent_score_min != null && (row.intent_score ?? 0) < filters.intent_score_min) {
-    return "intent_score_min"
-  }
-  if (filters.lead_score_min != null && (row.lead_score ?? 0) < filters.lead_score_min) {
-    return "lead_score_min"
-  }
-  if (
-    filters.growth_signal_score_min != null &&
-    (row.growth_signal_score ?? 0) < filters.growth_signal_score_min
-  ) {
-    return "growth_signal_score_min"
-  }
-  if (filters.growth_signal_tiers?.length) {
-    if (!row.growth_signal_tier || !filters.growth_signal_tiers.includes(row.growth_signal_tier)) {
-      return "growth_signal_tier"
+  if (!options?.external_discovery) {
+    if (filters.intent_score_min != null && (row.intent_score ?? 0) < filters.intent_score_min) {
+      return "intent_score_min"
     }
-  }
-  if (filters.buying_stages?.length) {
-    if (!row.buying_stage || !filters.buying_stages.includes(row.buying_stage as GrowthBuyingStage)) {
-      return "buying_stage"
+    if (filters.lead_score_min != null && (row.lead_score ?? 0) < filters.lead_score_min) {
+      return "lead_score_min"
     }
-  }
-  if (filters.search_intent_categories?.length) {
     if (
-      !row.search_intent_category ||
-      !filters.search_intent_categories.includes(row.search_intent_category)
+      filters.growth_signal_score_min != null &&
+      (row.growth_signal_score ?? 0) < filters.growth_signal_score_min
     ) {
-      return "search_intent_category"
+      return "growth_signal_score_min"
+    }
+    if (filters.growth_signal_tiers?.length) {
+      if (!row.growth_signal_tier || !filters.growth_signal_tiers.includes(row.growth_signal_tier)) {
+        return "growth_signal_tier"
+      }
+    }
+    if (filters.buying_stages?.length) {
+      if (!row.buying_stage || !filters.buying_stages.includes(row.buying_stage as GrowthBuyingStage)) {
+        return "buying_stage"
+      }
+    }
+    if (filters.search_intent_categories?.length) {
+      if (
+        !row.search_intent_category ||
+        !filters.search_intent_categories.includes(row.search_intent_category)
+      ) {
+        return "search_intent_category"
+      }
     }
   }
   if (

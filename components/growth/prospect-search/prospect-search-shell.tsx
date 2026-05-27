@@ -14,6 +14,7 @@ import { DiscoveryModeToggle } from "@/components/growth/prospect-search/discove
 import {
   GooglePlacesQueryDiagnostics,
   ProviderCacheCostDiagnostics,
+  ProviderRuntimeDiagnosticsPanel,
   RealWorldProviderStatus,
 } from "@/components/growth/prospect-search/real-world-provider-status"
 import { IcpTemplatesDrawer } from "@/components/growth/prospect-search/icp-templates-drawer"
@@ -676,6 +677,18 @@ export function ProspectSearchShell() {
                       ? `${result.provider_status_message ?? ""} Query: ${result.real_world_built_query}`
                       : result.provider_status_message
                   }
+                />
+              ) : null}
+              {result?.used_relaxed_external_filters ? (
+                <p className="mt-2 text-xs text-violet-900">
+                  Showing provider matches with incomplete firmographic data.
+                </p>
+              ) : null}
+              {process.env.NODE_ENV === "development" &&
+              result?.provider_runtime_diagnostics ? (
+                <ProviderRuntimeDiagnosticsPanel
+                  className="mt-2"
+                  diagnostics={result.provider_runtime_diagnostics}
                 />
               ) : null}
               {result?.provider_messages && result.provider_messages.length > 0 ? (

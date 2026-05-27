@@ -2231,6 +2231,54 @@ async function main(): Promise<void> {
     "industry",
   )
 
+  const {
+    GROWTH_SAVED_SEARCH_SCHEMA_READY_QA_MARKER,
+    GROWTH_PROSPECT_SEARCH_GRANTS_MIGRATION,
+  } = await import("../lib/growth/prospect-search/prospect-search-schema-health")
+  assert.equal(GROWTH_SAVED_SEARCH_SCHEMA_READY_QA_MARKER, "growth-saved-search-schema-ready-v1")
+  const grantsMigration = fs.readFileSync(
+    path.join(process.cwd(), `supabase/migrations/${GROWTH_PROSPECT_SEARCH_GRANTS_MIGRATION}`),
+    "utf8",
+  )
+  assert.match(grantsMigration, /grant select, insert, update, delete on table growth.prospect_search_saved_searches to service_role/)
+  assert.match(grantsMigration, /growth-saved-search-schema-ready-v1/)
+
+  const {
+    GROWTH_PROVIDER_RUNTIME_DIAGNOSTICS_QA_MARKER,
+    GROWTH_PROVIDER_RELAXED_FILTER_RETRY_QA_MARKER,
+    deriveProspectSearchProviderStatus,
+  } = await import("../lib/growth/prospect-search/prospect-search-provider-runtime-diagnostics")
+  assert.equal(GROWTH_PROVIDER_RUNTIME_DIAGNOSTICS_QA_MARKER, "growth-provider-runtime-diagnostics-v1")
+  assert.equal(GROWTH_PROVIDER_RELAXED_FILTER_RETRY_QA_MARKER, "growth-provider-relaxed-filter-retry-v1")
+  assert.equal(
+    deriveProspectSearchProviderStatus({
+      google_places_key_present: true,
+      serp_key_present: false,
+      raw_result_count: 0,
+      filtered_result_count: 0,
+      fixture_active: false,
+      provider_diagnostics: [{ provider_executed: true } as never],
+      used_relaxed_filters: false,
+    }).label,
+    "provider_returned_raw_0",
+  )
+  assert.equal(
+    deriveProspectSearchProviderStatus({
+      google_places_key_present: false,
+      serp_key_present: false,
+      raw_result_count: 0,
+      filtered_result_count: 0,
+      fixture_active: false,
+      provider_diagnostics: [],
+      used_relaxed_filters: false,
+    }).label,
+    "provider_key_missing",
+  )
+
+  assert.match(savedWorkflowShellSource, /ProviderRuntimeDiagnosticsPanel/)
+  assert.match(savedWorkflowShellSource, /used_relaxed_external_filters/)
+  assert.match(savedWorkflowShellSource, /Showing provider matches with incomplete firmographic data/)
+
   console.log("growth-prospect-search: all checks passed")
 }
 

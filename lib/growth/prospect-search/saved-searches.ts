@@ -3,7 +3,8 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { countProspectSearchMatchesInternal } from "@/lib/growth/prospect-search/prospect-search-count"
 import { normalizeProspectSearchFilters } from "@/lib/growth/prospect-search/prospect-search-filters"
-import { isGrowthProspectSearchSchemaReady } from "@/lib/growth/prospect-search/prospect-search-schema-health"
+import { isGrowthProspectSearchSchemaReady, GROWTH_PROSPECT_SEARCH_SCHEMA_SETUP_MESSAGE } from "@/lib/growth/prospect-search/prospect-search-schema-health"
+import { logGrowthEngine } from "@/lib/growth/access"
 import {
   attachSavedSearchWorkflow,
   buildSavedSearchWorkflowMetadata,
@@ -83,7 +84,14 @@ export async function createProspectSearchSavedSearch(
     metadata?: Record<string, unknown>
   },
 ): Promise<GrowthProspectSearchSavedSearchRow | null> {
-  if (!(await isGrowthProspectSearchSchemaReady(admin))) return null
+  const schemaReady = await isGrowthProspectSearchSchemaReady(admin)
+  if (!schemaReady) {
+    logGrowthEngine("prospect_search_saved_search_schema_not_ready", {
+      action: "create",
+      message: GROWTH_PROSPECT_SEARCH_SCHEMA_SETUP_MESSAGE,
+    })
+    return null
+  }
   const now = new Date().toISOString()
   const { data, error } = await savedSearchesTable(admin)
     .insert({
@@ -96,7 +104,14 @@ export async function createProspectSearchSavedSearch(
     })
     .select("*")
     .single()
-  if (error || !data) return null
+  if (error || !data) {
+    logGrowthEngine("prospect_search_saved_search_insert_failed", {
+      action: "create",
+      code: error?.code ?? null,
+      message: error?.message ?? "insert_failed",
+    })
+    return null
+  }
   return mapSavedSearchRow(data as Record<string, unknown>)
 }
 

@@ -18,9 +18,21 @@ import type {
   GrowthProspectSearchFilters,
 } from "@/lib/growth/prospect-search/prospect-search-types"
 
+function buildExternalDiscoveryKeywords(row: GrowthRealWorldCompanyCandidate): string[] {
+  const keywords: string[] = []
+  if (row.category) keywords.push(row.category)
+  if (row.description) keywords.push(row.description)
+  if (row.industry) keywords.push(row.industry)
+  for (const ev of row.evidence.slice(0, 3)) {
+    if (ev.evidence) keywords.push(ev.evidence)
+  }
+  return keywords
+}
+
 function realWorldCandidateToCompanyResult(
   row: GrowthRealWorldCompanyCandidate & { rank_score?: number },
   rank_score: number,
+  filterIndustry?: string | null,
 ): GrowthProspectSearchCompanyResult {
   const signals: string[] = []
   if (row.existing_customer_match) signals.push("Existing CRM customer match")
@@ -41,16 +53,27 @@ function realWorldCandidateToCompanyResult(
     ...row.source_attribution.slice(0, 2).map((a) => a.evidence),
   ]
 
+  const locationParts = [row.city, row.state, row.country].filter(Boolean)
+  const locationLabel =
+    row.location ??
+    (locationParts.length ? locationParts.join(", ") : null)
+
+  const keywords = buildExternalDiscoveryKeywords(row)
+  const industry = row.industry ?? filterIndustry ?? null
+
   return {
     id: row.id,
     source_type: "external_discovered",
     company_name: row.company_name,
     website: row.website,
-    industry: row.industry,
+    industry,
     subindustry: row.category,
+    city: row.city,
+    state: row.state,
+    country: row.country,
     employees: null,
     revenue_range: null,
-    location: row.location,
+    location: locationLabel,
     intent_score: null,
     buying_stage: null,
     lead_score: null,
@@ -81,6 +104,8 @@ function realWorldCandidateToCompanyResult(
     discovery_provider_type: row.provider_type,
     discovery_provider_name: row.provider_name,
     discovery_source_badge: badge,
+    keywords,
+    notes: row.description,
   }
 }
 
@@ -99,6 +124,7 @@ export async function runProspectSearchRealWorldDiscovery(
   provider_status: GrowthRealWorldProviderStatusSummary | null
   schema_ready: boolean
   built_query: string
+  persist_warning?: string | null
 }> {
   const search_inputs = prospectSearchFiltersToRealWorldInputs(input.filters, input.query)
   const built_query = buildRealWorldDiscoveryQuery(search_inputs)
@@ -116,7 +142,7 @@ export async function runProspectSearchRealWorldDiscovery(
       typeof ranked.rank_score === "number"
         ? ranked.rank_score
         : Math.max(0.1, discovery.candidates.length - i) * 0.01
-    return realWorldCandidateToCompanyResult(row, rank_score)
+    return realWorldCandidateToCompanyResult(row, rank_score, input.filters.industry ?? null)
   })
 
   if (discovery.schema_ready && companies.length > 0) {
@@ -144,5 +170,6 @@ export async function runProspectSearchRealWorldDiscovery(
     provider_status: discovery.provider_status,
     schema_ready: discovery.schema_ready,
     built_query,
+    persist_warning: discovery.persist_warning ?? null,
   }
 }

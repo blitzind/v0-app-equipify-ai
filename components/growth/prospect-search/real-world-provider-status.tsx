@@ -5,18 +5,28 @@ import { GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER } from "@/lib/growth/rea
 import { GROWTH_GOOGLE_PLACES_PROVIDER_QA_MARKER } from "@/lib/growth/real-world-discovery/providers/google-places-types"
 import { GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER } from "@/lib/growth/real-world-discovery/real-world-discovery-types"
 import { GROWTH_PROVIDER_CACHE_QA_MARKER } from "@/lib/growth/provider-cache/provider-cache-types"
+import type { GrowthProspectSearchProviderRuntimeDiagnostics } from "@/lib/growth/prospect-search/prospect-search-provider-runtime-diagnostics"
+import { GROWTH_PROVIDER_RUNTIME_DIAGNOSTICS_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-provider-runtime-diagnostics"
 import type { GrowthProspectSearchProviderDiagnostic } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
 
 const STATUS_STYLES: Record<string, string> = {
   live_provider_active: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  provider_key_missing: "border-rose-200 bg-rose-50 text-rose-900",
+  provider_quota_rate_limited: "border-orange-200 bg-orange-50 text-orange-900",
+  provider_returned_raw_0: "border-amber-200 bg-amber-50 text-amber-900",
+  results_dropped_by_filters: "border-violet-200 bg-violet-50 text-violet-900",
   fixture_fallback_active: "border-amber-200 bg-amber-50 text-amber-900",
   no_provider_configured: "border-slate-200 bg-slate-50 text-slate-700",
 }
 
 const STATUS_LABELS: Record<string, string> = {
   live_provider_active: "Live provider active",
-  fixture_fallback_active: "Sample data mode",
+  provider_key_missing: "Provider key missing",
+  provider_quota_rate_limited: "Provider quota / rate limited",
+  provider_returned_raw_0: "Provider returned raw 0",
+  results_dropped_by_filters: "Results dropped by filters",
+  fixture_fallback_active: "Fixture fallback active",
   no_provider_configured: "No provider configured",
 }
 
@@ -178,6 +188,61 @@ export function ProviderCacheCostDiagnostics({
           </div>
         )
       })}
+    </div>
+  )
+}
+
+export function ProviderRuntimeDiagnosticsPanel({
+  diagnostics,
+  className,
+}: {
+  diagnostics: GrowthProspectSearchProviderRuntimeDiagnostics
+  className?: string
+}) {
+  return (
+    <div
+      className={cn(
+        "mt-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-800",
+        className,
+      )}
+      data-qa-marker={GROWTH_PROVIDER_RUNTIME_DIAGNOSTICS_QA_MARKER}
+    >
+      <p className="font-semibold">Provider runtime diagnostics</p>
+      <p className="mt-1">
+        Google Places key present: {String(diagnostics.google_places_key_present)} · Serp key present:{" "}
+        {String(diagnostics.serp_key_present)}
+      </p>
+      <p>
+        Provider selected: {diagnostics.providers_selected.join(", ") || "none"} · Status:{" "}
+        {STATUS_LABELS[diagnostics.provider_status_label] ?? diagnostics.provider_status_label}
+      </p>
+      <p>
+        raw={diagnostics.raw_result_count} · normalized={diagnostics.normalized_result_count} · filtered=
+        {diagnostics.filtered_result_count}
+      </p>
+      {diagnostics.query_expansion.length > 0 ? (
+        <>
+          <p className="mt-1 font-medium">Query expansion</p>
+          <ul className="mt-0.5 space-y-0.5">
+            {diagnostics.query_expansion.slice(0, 8).map((query, index) => (
+              <li key={`${query}-${index}`}>{query}</li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {Object.keys(diagnostics.dropped_reason_counts).length > 0 ? (
+        <p className="mt-1 opacity-90">
+          Dropped reasons:{" "}
+          {Object.entries(diagnostics.dropped_reason_counts)
+            .map(([reason, count]) => `${reason}=${count}`)
+            .join(", ")}
+        </p>
+      ) : null}
+      {diagnostics.used_relaxed_filters ? (
+        <p className="mt-1 font-medium text-violet-900">
+          Showing provider matches with incomplete firmographic data.
+        </p>
+      ) : null}
     </div>
   )
 }

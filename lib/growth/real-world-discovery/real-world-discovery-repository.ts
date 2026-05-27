@@ -1,9 +1,11 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { logGrowthEngine } from "@/lib/growth/access"
 import {
   dedupeNormalizedRealWorldCandidates,
   normalizeRealWorldCompanyCandidate,
+  type NormalizedRealWorldCompanyCandidate,
 } from "@/lib/growth/real-world-discovery/real-world-company-normalizer"
 import { resolveRealWorldCompanyInternalMatches } from "@/lib/growth/real-world-discovery/real-world-company-dedupe"
 import { rankRealWorldCompanyCandidates } from "@/lib/growth/real-world-discovery/real-world-company-ranking"
@@ -84,6 +86,67 @@ export type RunRealWorldCompanyDiscoveryResult = {
   privacy_note: string
   provider_messages: string[]
   provider_status: GrowthRealWorldProviderStatusSummary
+  persist_warning?: string | null
+}
+
+async function buildInMemoryCandidates(
+  admin: SupabaseClient,
+  deduped: NormalizedRealWorldCompanyCandidate[],
+  providerByHash: Map<string, { provider_name: string; provider_type: string }>,
+  input: RunRealWorldCompanyDiscoveryInput,
+  query: string,
+  industry: string | null,
+  location: string | null,
+): Promise<GrowthRealWorldCompanyCandidate[]> {
+  const now = new Date().toISOString()
+  const out: GrowthRealWorldCompanyCandidate[] = []
+
+  for (const row of deduped) {
+    const matches = await resolveRealWorldCompanyInternalMatches(admin, row)
+    const prov = providerByHash.get(row.dedupe_hash)
+    out.push({
+      id: `memory-${row.dedupe_hash}`,
+      created_at: now,
+      updated_at: now,
+      run_id: "memory",
+      query,
+      industry: row.industry ?? industry,
+      location: row.location ?? location,
+      provider_name: prov?.provider_name ?? "real_world_fixture",
+      provider_type: prov?.provider_type ?? "fixture",
+      company_name: row.company_name,
+      website: row.website,
+      domain: row.domain,
+      phone: row.phone,
+      address: row.address,
+      city: row.city,
+      state: row.state,
+      country: row.country,
+      category: row.category,
+      description: row.description,
+      rating: row.rating,
+      review_count: row.review_count,
+      source_url: row.source_url,
+      source_rank: row.source_rank,
+      confidence: row.confidence,
+      dedupe_hash: row.dedupe_hash,
+      existing_customer_match: matches.existing_customer_match,
+      existing_prospect_match: matches.existing_prospect_match,
+      existing_growth_lead_match: matches.existing_growth_lead_match,
+      evidence: row.evidence,
+      source_attribution: row.source_attribution,
+      metadata: {
+        in_memory_only: true,
+        matched_customer_id: matches.matched_customer_id,
+        matched_prospect_id: matches.matched_prospect_id,
+        matched_growth_lead_id: matches.matched_growth_lead_id,
+        search_inputs: input.search_inputs,
+        source_provider: prov?.provider_type ?? "fixture",
+      },
+    })
+  }
+
+  return out
 }
 
 export async function runRealWorldCompanyDiscovery(
@@ -99,6 +162,7 @@ export async function runRealWorldCompanyDiscovery(
     privacy_note: GROWTH_REAL_WORLD_DISCOVERY_PRIVACY_NOTE,
     provider_messages: [] as string[],
     provider_status: emptyStatus,
+    persist_warning: null as string | null,
   }
 
   const schema_ready = await isGrowthRealWorldDiscoverySchemaReady(admin)
@@ -159,6 +223,15 @@ export async function runRealWorldCompanyDiscovery(
     normalized.map((n) => [n.dedupe_hash, { provider_name: n.provider_name, provider_type: n.provider_type }]),
   )
 
+  if (deduped.length === 0) {
+    return {
+      ...base,
+      schema_ready: true,
+      provider_messages,
+      provider_status,
+    }
+  }
+
   const { data: runRow, error: runError } = await admin
     .schema("growth")
     .from("real_world_discovery_runs")
@@ -168,13 +241,9 @@ export async function runRealWorldCompanyDiscovery(
       industry,
       location,
       provider_names: providerResults.map((r) => r.provider_name),
-      status: providerResults.some((r) => r.status === "failed")
-        ? deduped.length
-          ? "partial"
-          : "failed"
-        : "completed",
+      status: providerResults.some((r) => r.status === "failed") ? "partial" : "completed",
       candidate_count: 0,
-      error_message: runError ? runError.message : null,
+      error_message: null,
       metadata: {
         qa_marker: GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER,
         provider_status: provider_status.label,
@@ -186,11 +255,31 @@ export async function runRealWorldCompanyDiscovery(
     .single()
 
   if (runError || !runRow) {
+    const detail = runError ? `${runError.code ?? "error"}: ${runError.message}` : "run_insert_missing_row"
+    logGrowthEngine("real_world_discovery_run_insert_failed", { detail, candidate_count: deduped.length })
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[real-world-discovery:run-insert]", detail)
+    }
+
+    const inMemory = await buildInMemoryCandidates(
+      admin,
+      deduped,
+      providerByHash,
+      input,
+      query,
+      industry,
+      location,
+    )
+    const ranked = rankRealWorldCompanyCandidates(inMemory, query, input.search_inputs, limit)
+
     return {
       ...base,
       schema_ready: true,
+      candidates: ranked,
       provider_messages,
       provider_status,
+      persist_warning:
+        "Provider results returned in memory only — discovery run persistence is blocked (apply service_role grants migration).",
     }
   }
 
@@ -268,6 +357,8 @@ export async function runRealWorldCompanyDiscovery(
   }
 
   let stored: GrowthRealWorldCompanyCandidate[] = []
+  let persist_warning: string | null = null
+
   if (inserts.length) {
     const { data: inserted, error: insertError } = await admin
       .schema("growth")
@@ -277,6 +368,29 @@ export async function runRealWorldCompanyDiscovery(
 
     if (!insertError && inserted?.length) {
       stored = inserted.map((r) => rowToCandidate(r as Record<string, unknown>))
+    } else {
+      const detail = insertError
+        ? `${insertError.code ?? "error"}: ${insertError.message}`
+        : "candidate_insert_empty"
+      logGrowthEngine("real_world_discovery_candidate_insert_failed", {
+        detail,
+        run_id: runId,
+        candidate_count: inserts.length,
+      })
+      if (process.env.NODE_ENV !== "production") {
+        console.error("[real-world-discovery:candidate-insert]", detail)
+      }
+      stored = await buildInMemoryCandidates(
+        admin,
+        deduped,
+        providerByHash,
+        input,
+        query,
+        industry,
+        location,
+      )
+      persist_warning =
+        "Provider matches returned in memory only — candidate persistence is blocked (apply service_role grants migration)."
     }
   }
 
@@ -318,6 +432,7 @@ export async function runRealWorldCompanyDiscovery(
     privacy_note: GROWTH_REAL_WORLD_DISCOVERY_PRIVACY_NOTE,
     provider_messages,
     provider_status,
+    persist_warning,
   }
 }
 

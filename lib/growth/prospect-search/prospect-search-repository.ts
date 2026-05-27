@@ -33,6 +33,11 @@ import {
 } from "@/lib/growth/territory-intelligence/integrations/prospect-search-bridge"
 import { runProspectSearchRealWorldDiscovery } from "@/lib/growth/prospect-search/prospect-search-real-world-discovery"
 import {
+  buildProspectSearchProviderRuntimeDiagnostics,
+  GROWTH_PROVIDER_RELAXED_FILTER_RETRY_QA_MARKER,
+  GROWTH_PROVIDER_RUNTIME_DIAGNOSTICS_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-provider-runtime-diagnostics"
+import {
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_SOURCE_TYPES,
   GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER,
@@ -108,29 +113,46 @@ export async function runProspectSearch(
     )
 
     let enrichedCompanies = externalEnrichment.companies
-    let provider_status_message = realWorld.provider_status?.message ?? null
-    let provider_status_label = realWorld.provider_status?.label ?? null
+    const used_relaxed_filters = externalEnrichment.used_relaxed_filters
 
-    if (realWorld.companies.length > 0 && enrichedCompanies.length === 0) {
-      provider_status_message =
-        "Live providers returned listings but ICP filters removed all results. Employee size and revenue filters are ignored for unknown external listings when possible."
-    } else if (
-      enrichedCompanies.length === 0 &&
-      realWorld.provider_status?.label === "live_provider_active"
-    ) {
-      provider_status_message =
-        "No companies found after expanded provider search. Try adding a location or broadening filters."
+    const query_expansion = [
+      ...new Set(
+        (realWorld.provider_status?.provider_diagnostics ?? []).flatMap(
+          (row) => row.provider_query_generated ?? [],
+        ),
+      ),
+    ]
+
+    const provider_runtime_diagnostics = buildProspectSearchProviderRuntimeDiagnostics({
+      provider_diagnostics: realWorld.provider_status?.provider_diagnostics ?? [],
+      query_expansion,
+      raw_result_count: realWorld.companies.length,
+      normalized_result_count: realWorld.companies.length,
+      filtered_result_count: enrichedCompanies.length,
+      filter_diagnostics: externalEnrichment.filter_diagnostics,
+      used_relaxed_filters,
+      fixture_active: realWorld.provider_status?.fixture_active ?? false,
+    })
+
+    let provider_status_message = provider_runtime_diagnostics.provider_status_message
+    let provider_status_label = provider_runtime_diagnostics.provider_status_label
+
+    if (realWorld.persist_warning) {
+      provider_status_message = `${provider_status_message} ${realWorld.persist_warning}`
     }
 
     if (process.env.NODE_ENV !== "production") {
       console.info("[prospect-search:external]", {
+        qa_marker: GROWTH_PROVIDER_RUNTIME_DIAGNOSTICS_QA_MARKER,
         provider_status_label,
         built_query: realWorld.built_query,
+        query_expansion,
         raw_provider_count: realWorld.companies.length,
         normalized_result_count: enrichedCompanies.length,
         filter_diagnostics: externalEnrichment.filter_diagnostics,
-        used_relaxed_filters: externalEnrichment.used_relaxed_filters,
+        used_relaxed_filters,
         provider_diagnostics: realWorld.provider_status?.provider_diagnostics ?? [],
+        dropped_reason_counts: provider_runtime_diagnostics.dropped_reason_counts,
       })
     }
 
@@ -177,14 +199,20 @@ export async function runProspectSearch(
       provider_status_message: provider_status_message,
       provider_diagnostics: realWorld.provider_status?.provider_diagnostics ?? [],
       provider_fallback_reason: realWorld.provider_status?.provider_fallback_reason ?? null,
+      provider_runtime_diagnostics,
+      used_relaxed_external_filters: used_relaxed_filters,
+      provider_runtime_diagnostics_qa_marker: GROWTH_PROVIDER_RUNTIME_DIAGNOSTICS_QA_MARKER,
+      provider_relaxed_filter_retry_qa_marker: used_relaxed_filters
+        ? GROWTH_PROVIDER_RELAXED_FILTER_RETRY_QA_MARKER
+        : null,
       provider_audit_qa_marker: GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER,
       google_places_query_expansion_qa_marker: GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER,
       live_provider_query_expansion_qa_marker: GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER,
       provider_cache_qa_marker: GROWTH_PROVIDER_CACHE_QA_MARKER,
-      external_filter_diagnostics:
-        process.env.NODE_ENV !== "production" ? externalEnrichment.filter_diagnostics : undefined,
+      external_filter_diagnostics: externalEnrichment.filter_diagnostics,
       expanded_search_exhausted:
-        enrichedCompanies.length === 0 && provider_status_label === "live_provider_active",
+        enrichedCompanies.length === 0 &&
+        provider_status_label === "provider_returned_raw_0",
       },
       companiesWithMarket,
     )

@@ -73,7 +73,26 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(repoSource, /raw_payload_server_only/)
+  assert.match(repoSource, /buildInMemoryCandidates/)
+  assert.match(repoSource, /real_world_discovery_run_insert_failed/)
   assert.doesNotMatch(repoSource, /runLeadEnginePipeline|sendEmail|scrape/i)
+
+  const productionMigration = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "supabase/migrations/20270529130000_growth_engine_prospect_search_production_readiness.sql",
+    ),
+    "utf8",
+  )
+  assert.match(productionMigration, /grant select, insert, update, delete on table growth.real_world_discovery_runs to service_role/)
+  assert.match(productionMigration, /grant select, insert, update, delete on table growth.real_world_company_candidates to service_role/)
+
+  assert.match(registrySource, /provider_returned_raw_0/)
+  assert.match(registrySource, /provider_key_missing/)
+  assert.doesNotMatch(
+    registrySource,
+    /liveConfigured[\s\S]*label = "live_provider_active"[\s\S]*rawCount === 0/,
+  )
 
   const prospectRepo = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-repository.ts"),
@@ -92,6 +111,7 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(shellSource, /RealWorldProviderStatus/)
+  assert.match(shellSource, /ProviderRuntimeDiagnosticsPanel/)
 
   const googlePlacesSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/real-world-discovery/providers/google-places-provider.ts"),

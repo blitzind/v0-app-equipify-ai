@@ -14,6 +14,11 @@ import { GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER } from "@/lib/growth/rea
 import { GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER } from "@/lib/growth/real-world-discovery/live-provider-query-expansion"
 import { GROWTH_PROVIDER_CACHE_QA_MARKER } from "@/lib/growth/provider-cache/provider-cache-types"
 import type { GrowthProspectSearchExternalFilterDiagnostics } from "@/lib/growth/prospect-search/prospect-search-external-filters"
+import type { GrowthProspectSearchProviderRuntimeDiagnostics } from "@/lib/growth/prospect-search/prospect-search-provider-runtime-diagnostics"
+import {
+  GROWTH_PROVIDER_RELAXED_FILTER_RETRY_QA_MARKER,
+  GROWTH_PROVIDER_RUNTIME_DIAGNOSTICS_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-provider-runtime-diagnostics"
 
 export {
   GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER,
@@ -320,6 +325,9 @@ export type GrowthProspectSearchCompanyResult = {
   company_confidence?: GrowthCompanyConfidenceScore | null
   /** Expanded committee completion scoring. */
   committee_completion?: GrowthProspectSearchCommitteeCompletion | null
+  /** Keyword hints for external discovery industry matching. */
+  keywords?: string[]
+  notes?: string | null
 }
 
 export type GrowthProspectSearchPersonResult = {
@@ -388,6 +396,10 @@ export type GrowthProspectSearchResult = {
   live_provider_query_expansion_qa_marker?: typeof GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER | null
   provider_cache_qa_marker?: typeof GROWTH_PROVIDER_CACHE_QA_MARKER | null
   external_filter_diagnostics?: GrowthProspectSearchExternalFilterDiagnostics
+  provider_runtime_diagnostics?: GrowthProspectSearchProviderRuntimeDiagnostics
+  used_relaxed_external_filters?: boolean
+  provider_runtime_diagnostics_qa_marker?: typeof GROWTH_PROVIDER_RUNTIME_DIAGNOSTICS_QA_MARKER | null
+  provider_relaxed_filter_retry_qa_marker?: typeof GROWTH_PROVIDER_RELAXED_FILTER_RETRY_QA_MARKER | null
   expanded_search_exhausted?: boolean
   territory_intelligence?: GrowthTerritoryIntelligenceSummary | null
 }

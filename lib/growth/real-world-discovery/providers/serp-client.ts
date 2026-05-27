@@ -11,6 +11,7 @@ export function getSerpApiKey(): string | null {
   return (
     process.env.SERPAPI_API_KEY?.trim() ||
     process.env.SERP_API_KEY?.trim() ||
+    process.env.SERPAPI_KEY?.trim() ||
     null
   )
 }

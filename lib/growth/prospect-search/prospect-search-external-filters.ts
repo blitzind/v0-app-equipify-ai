@@ -52,7 +52,14 @@ export function relaxProspectSearchExternalCompanyFilters(
     ...filters,
     employee_size_bands: undefined,
     revenue_bands: undefined,
+    technologies: undefined,
+    buying_stages: undefined,
+    intent_score_min: undefined,
+    lead_score_min: undefined,
+    growth_signal_score_min: undefined,
+    growth_signal_tiers: undefined,
+    search_intent_categories: undefined,
   }
 
-  return applyProspectSearchFilters(companies, relaxedFilters)
+  return applyProspectSearchFilters(companies, relaxedFilters, { external_discovery: true })
 }
