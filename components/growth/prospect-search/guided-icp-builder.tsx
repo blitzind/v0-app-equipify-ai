@@ -1,6 +1,6 @@
 "use client"
 
-import type { Dispatch, SetStateAction } from "react"
+import type { Dispatch, ReactNode, SetStateAction } from "react"
 import { RecommendedFilters } from "@/components/growth/prospect-search/recommended-filters"
 import { SmartFilterInput } from "@/components/growth/prospect-search/smart-filter-input"
 import { TitleTargetingCard } from "@/components/growth/prospect-search/title-targeting-card"
@@ -35,28 +35,38 @@ import { cn } from "@/lib/utils"
 function FilterActions({
   onClear,
   onApply,
+  applyLabel = "Apply & search",
+  applyDisabled = false,
+  estimationSlot,
   className,
 }: {
   onClear: () => void
   onApply: () => void
+  applyLabel?: string
+  applyDisabled?: boolean
+  estimationSlot?: React.ReactNode
   className?: string
 }) {
   return (
-    <div className={cn("flex gap-2", className)}>
-      <button
-        type="button"
-        onClick={onClear}
-        className="flex-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
-      >
-        Clear all
-      </button>
-      <button
-        type="button"
-        onClick={onApply}
-        className="flex-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm"
-      >
-        Apply & search
-      </button>
+    <div className={cn("space-y-2", className)}>
+      {estimationSlot}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onClear}
+          className="flex-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+        >
+          Clear all
+        </button>
+        <button
+          type="button"
+          onClick={onApply}
+          disabled={applyDisabled}
+          className="flex-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {applyLabel}
+        </button>
+      </div>
     </div>
   )
 }
@@ -67,12 +77,18 @@ export function GuidedIcpBuilder({
   onApply,
   onClear,
   variant = "default",
+  applyLabel,
+  applyDisabled,
+  estimationSlot,
 }: {
   filters: GrowthProspectSearchFilters
   onChange: Dispatch<SetStateAction<GrowthProspectSearchFilters>>
   onApply: () => void
   onClear: () => void
   variant?: "default" | "rail"
+  applyLabel?: string
+  applyDisabled?: boolean
+  estimationSlot?: ReactNode
 }) {
   const selectedBands = employeeBandsBackendToUi(filters.employee_size_bands)
   const activeIntent = detectActiveIntentPreset(filters)
@@ -127,10 +143,22 @@ export function GuidedIcpBuilder({
               Structured filters — dropdowns, chips, and smart suggestions (no spreadsheet).
             </p>
           </div>
-          <FilterActions onClear={onClear} onApply={applyFilters} />
+          <FilterActions
+            onClear={onClear}
+            onApply={applyFilters}
+            applyLabel={applyLabel}
+            applyDisabled={applyDisabled}
+            estimationSlot={estimationSlot}
+          />
         </div>
       ) : (
-        <FilterActions onClear={onClear} onApply={applyFilters} />
+        <FilterActions
+          onClear={onClear}
+          onApply={applyFilters}
+          applyLabel={applyLabel}
+          applyDisabled={applyDisabled}
+          estimationSlot={estimationSlot}
+        />
       )}
 
       <Accordion

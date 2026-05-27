@@ -19,6 +19,7 @@ import {
   isGooglePlacesApiKeyConfigured,
   isSerpApiKeyConfigured,
 } from "@/lib/growth/prospect-search/prospect-search-provider-runtime-diagnostics"
+import { isDiscoveryProviderRuntimeEnabled } from "@/lib/growth/prospect-search/prospect-search-discovery-provider-controls"
 import { createRealWorldBusinessDirectoryProvider } from "@/lib/growth/real-world-discovery/providers/business-directory-provider"
 import { createRealWorldFixtureProvider } from "@/lib/growth/real-world-discovery/providers/fixture-provider"
 import { createRealWorldGooglePlacesProvider } from "@/lib/growth/real-world-discovery/providers/google-places-provider"
@@ -194,6 +195,15 @@ export async function runRealWorldDiscoveryProviders(
   const results: GrowthRealWorldDiscoveryProviderResult[] = []
 
   for (const provider of toRun) {
+    if (
+      provider.provider_type === "google_places" &&
+      !isDiscoveryProviderRuntimeEnabled("google_places")
+    ) {
+      continue
+    }
+    if (provider.provider_type === "serp" && !isDiscoveryProviderRuntimeEnabled("serp")) {
+      continue
+    }
     if (!provider.isConfigured() && provider.provider_type !== "fixture") {
       results.push({
         provider_name: provider.provider_name,

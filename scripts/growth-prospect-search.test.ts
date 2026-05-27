@@ -2288,6 +2288,66 @@ async function main(): Promise<void> {
   assert.match(companyCardMomentumSource, /CompanySignalMomentumPanel/)
   assert.equal(GROWTH_SIGNAL_MOMENTUM_QA_MARKER, "growth-signal-momentum-v1")
 
+  const {
+    GROWTH_LIVE_ESTIMATED_RESULTS_QA_MARKER,
+    GROWTH_FILTER_ESTIMATION_STATE_QA_MARKER,
+    GROWTH_LIVE_RESULT_ESTIMATION_QA_MARKER,
+    GROWTH_SEARCH_RESULT_PREVIEW_QA_MARKER,
+    GROWTH_PROVIDER_HEALTH_DASHBOARD_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-estimation-types")
+  assert.equal(GROWTH_LIVE_ESTIMATED_RESULTS_QA_MARKER, "growth-live-estimated-results-v1")
+  assert.equal(GROWTH_FILTER_ESTIMATION_STATE_QA_MARKER, "growth-filter-estimation-state-v1")
+  assert.equal(GROWTH_LIVE_RESULT_ESTIMATION_QA_MARKER, "growth-live-result-estimation-v1")
+  assert.equal(GROWTH_SEARCH_RESULT_PREVIEW_QA_MARKER, "growth-search-result-preview-v1")
+  assert.equal(GROWTH_PROVIDER_HEALTH_DASHBOARD_QA_MARKER, "growth-provider-health-dashboard-v1")
+
+  const { floorEstimateToRange, buildProspectSearchButtonLabel } = await import(
+    "../lib/growth/prospect-search/prospect-search-estimation-format"
+  )
+  assert.equal(floorEstimateToRange(260).label, "~250+")
+  assert.equal(floorEstimateToRange(1200).label, "~1k+")
+  assert.match(
+    buildProspectSearchButtonLabel({
+      state: "ready",
+      discovery_mode: "internal",
+      exact_count: 248,
+      confidence: "high",
+      provider_readiness: {
+        google_places: "available",
+        serp: "available",
+        any_live: true,
+        external_discovery_available: true,
+        label: "Live providers available",
+      },
+    }).label,
+    /Search 248 companies/,
+  )
+
+  assert.match(shellSource, /ProspectSearchLiveEstimation/)
+  assert.match(shellSource, /GROWTH_LIVE_RESULT_ESTIMATION_QA_MARKER/)
+  assert.match(shellSource, /useProspectSearchLiveEstimation/)
+  assert.match(filterRailSource, /estimationSlot/)
+  assert.match(shellSource, /ProspectSearchRelaxFilters/)
+
+  const estimateRouteSource = fs.readFileSync(
+    path.join(process.cwd(), "app/api/platform/growth/prospect-search/estimate/route.ts"),
+    "utf8",
+  )
+  assert.match(estimateRouteSource, /estimateProspectSearchMatches/)
+
+  const providerHealthPageSource = fs.readFileSync(
+    path.join(process.cwd(), "app/(admin)/admin/growth/settings/provider-health/page.tsx"),
+    "utf8",
+  )
+  assert.match(providerHealthPageSource, /GrowthProspectSearchProviderHealthDashboard/)
+  assert.match(providerHealthPageSource, /Provider Health/)
+
+  const providerHealthNavSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts"),
+    "utf8",
+  )
+  assert.match(providerHealthNavSource, /\/admin\/growth\/settings\/provider-health/)
+
   console.log("growth-prospect-search: all checks passed")
 }
 

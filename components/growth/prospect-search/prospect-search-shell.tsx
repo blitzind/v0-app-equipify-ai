@@ -26,6 +26,12 @@ import {
 } from "@/components/growth/prospect-search/real-world-provider-status"
 import { IcpTemplatesDrawer } from "@/components/growth/prospect-search/icp-templates-drawer"
 import { ProspectSearchFilterRail } from "@/components/growth/prospect-search/prospect-search-filter-rail"
+import { ProspectSearchLiveEstimation } from "@/components/growth/prospect-search/prospect-search-live-estimation"
+import {
+  ProspectSearchActiveFilterPills,
+  ProspectSearchRelaxFilters,
+} from "@/components/growth/prospect-search/prospect-search-active-filter-pills"
+import { ProspectSearchFilterHealthWarnings } from "@/components/growth/prospect-search/prospect-search-filter-health-warnings"
 import { TerritoryIntelligencePanel } from "@/components/growth/prospect-search/territory-intelligence-panel"
 import { PersonResultCard } from "@/components/growth/prospect-search/person-result-card"
 import { SearchEmptyState } from "@/components/growth/prospect-search/search-empty-state"
@@ -62,6 +68,11 @@ import {
   type GrowthProspectSearchSavedSearchWithWorkflow,
 } from "@/lib/growth/prospect-search/saved-search-workflows"
 import { buildProspectSearchGetRequestParams } from "@/lib/growth/prospect-search/prospect-search-client-request"
+import {
+  GROWTH_LIVE_ESTIMATED_RESULTS_QA_MARKER,
+  GROWTH_LIVE_RESULT_ESTIMATION_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-estimation-types"
+import { useProspectSearchLiveEstimation } from "@/lib/growth/prospect-search/use-prospect-search-live-estimation"
 import { cn } from "@/lib/utils"
 
 const EMPTY_FILTERS: GrowthProspectSearchFilters = {}
@@ -150,6 +161,17 @@ export function ProspectSearchShell() {
     () => rotateHeroPlaceholder(placeholderIndex),
     [placeholderIndex],
   )
+
+  const { estimate, loading: estimating, displayState } = useProspectSearchLiveEstimation({
+    query,
+    filters,
+    discoveryMode,
+  })
+
+  const searchButtonLabel = estimate?.search_button_label ?? "Search"
+  const searchButtonDisabled = loading || (estimate?.search_button_disabled ?? false)
+  const applyButtonLabel = estimate?.search_button_label ?? "Apply & search"
+  const applyButtonDisabled = estimate?.search_button_disabled ?? false
 
   useEffect(() => {
     const t = window.setInterval(() => {
@@ -560,6 +582,8 @@ export function ProspectSearchShell() {
       data-layout-marker={GROWTH_PROSPECT_SEARCH_LAYOUT_V2_QA_MARKER}
       data-saved-search-workflows-marker={GROWTH_SAVED_SEARCH_WORKFLOWS_QA_MARKER}
       data-live-provider-query-expansion-marker={GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER}
+      data-live-estimation-marker={GROWTH_LIVE_RESULT_ESTIMATION_QA_MARKER}
+      data-live-estimated-results-marker={GROWTH_LIVE_ESTIMATED_RESULTS_QA_MARKER}
     >
       {/* Search hero */}
       <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-violet-50/80 via-card to-cyan-50/50 p-6 shadow-sm dark:from-violet-950/30 dark:to-cyan-950/20">
@@ -582,25 +606,31 @@ export function ProspectSearchShell() {
             ICP Templates
           </Button>
         </div>
-        <div className="relative mt-5">
-          <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+        <div className="mt-5 space-y-3">
+          <ProspectSearchLiveEstimation
+            estimate={estimate}
+            loading={estimating}
+            displayState={displayState}
+          />
+          <div className="relative flex flex-col gap-2 sm:block">
+          <Search className="pointer-events-none absolute left-4 top-1/2 hidden size-5 -translate-y-1/2 text-muted-foreground sm:block" />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setHeroFocused(true)}
             onBlur={() => setTimeout(() => setHeroFocused(false), 180)}
-            onKeyDown={(e) => e.key === "Enter" && void runSearch()}
+            onKeyDown={(e) => e.key === "Enter" && !searchButtonDisabled && void runSearch()}
             placeholder={heroPlaceholder}
-            className="h-14 w-full rounded-xl border border-border bg-background/90 pl-12 pr-32 text-base shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+            className="h-14 w-full rounded-xl border border-border bg-background/90 pl-4 pr-4 text-base shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 sm:pl-12 sm:pr-36"
           />
           <Button
-            className="absolute right-2 top-1/2 -translate-y-1/2"
+            className="w-full sm:absolute sm:right-2 sm:top-1/2 sm:w-auto sm:-translate-y-1/2"
             size="lg"
             onClick={() => void runSearch()}
-            disabled={loading}
+            disabled={searchButtonDisabled}
           >
-            {loading ? <Loader2 className="size-4 animate-spin" /> : "Search"}
+            {loading ? <Loader2 className="size-4 animate-spin" /> : searchButtonLabel}
           </Button>
           <SearchRecommendations
             query={query}
@@ -611,6 +641,7 @@ export function ProspectSearchShell() {
               void runSearch(v)
             }}
           />
+          </div>
         </div>
       </section>
 
@@ -639,6 +670,27 @@ export function ProspectSearchShell() {
             })
           }
           onClear={() => replaceFilters(EMPTY_FILTERS)}
+          applyLabel={applyButtonLabel}
+          applyDisabled={applyButtonDisabled}
+          estimationSlot={
+            <ProspectSearchLiveEstimation
+              estimate={estimate}
+              loading={estimating}
+              displayState={displayState}
+              compact
+            />
+          }
+          filterHealthSlot={
+            <ProspectSearchFilterHealthWarnings estimate={estimate} className="mb-3" />
+          }
+          relaxFiltersSlot={
+            <ProspectSearchRelaxFilters
+              estimate={estimate}
+              filters={filters}
+              onChange={replaceFilters}
+              className="mb-3"
+            />
+          }
           savedSearches={savedSearches}
           lists={lists}
           onLoadSavedSearch={(id) => void loadSavedById(id)}
@@ -669,7 +721,9 @@ export function ProspectSearchShell() {
           />
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
+            <div className="min-w-0 flex-1 space-y-2">
+              <ProspectSearchActiveFilterPills filters={filters} onChange={replaceFilters} />
+              <div>
               <h2 className="text-sm font-semibold">
                 Results
                 {result ? (
@@ -783,6 +837,7 @@ export function ProspectSearchShell() {
                   ) : null}
                 </div>
               ) : null}
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {companies.length > 0 ? (

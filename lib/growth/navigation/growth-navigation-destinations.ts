@@ -821,6 +821,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: prefixMatch("/admin/growth/settings"),
       },
       {
+        id: "provider-health",
+        href: "/admin/growth/settings/provider-health",
+        label: "Provider Health",
+        match: prefixMatch("/admin/growth/settings/provider-health"),
+      },
+      {
         id: "governance",
         href: "/admin/growth/settings/governance",
         label: "Governance",

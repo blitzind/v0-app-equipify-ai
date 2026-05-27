@@ -1,6 +1,6 @@
 "use client"
 
-import type { Dispatch, SetStateAction } from "react"
+import type { Dispatch, ReactNode, SetStateAction } from "react"
 import { Filter } from "lucide-react"
 import { GuidedIcpBuilder } from "@/components/growth/prospect-search/guided-icp-builder"
 import { SavedSearchWorkflowSidebar } from "@/components/growth/prospect-search/saved-search-workflow-sidebar"
@@ -20,6 +20,11 @@ export function ProspectSearchFilterRail({
   refreshingSavedCounts,
   onRefreshSavedCounts,
   onDeleteSavedSearch,
+  applyLabel,
+  applyDisabled,
+  estimationSlot,
+  filterHealthSlot,
+  relaxFiltersSlot,
 }: {
   filters: GrowthProspectSearchFilters
   onChange: Dispatch<SetStateAction<GrowthProspectSearchFilters>>
@@ -32,6 +37,11 @@ export function ProspectSearchFilterRail({
   refreshingSavedCounts?: boolean
   onRefreshSavedCounts?: (id?: string) => void
   onDeleteSavedSearch?: (id: string) => void
+  applyLabel?: string
+  applyDisabled?: boolean
+  estimationSlot?: ReactNode
+  filterHealthSlot?: ReactNode
+  relaxFiltersSlot?: ReactNode
 }) {
   return (
     <aside
@@ -47,12 +57,17 @@ export function ProspectSearchFilterRail({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        {filterHealthSlot}
+        {relaxFiltersSlot}
         <GuidedIcpBuilder
           filters={filters}
           onChange={onChange}
           onApply={onApply}
           onClear={onClear}
           variant="rail"
+          applyLabel={applyLabel}
+          applyDisabled={applyDisabled}
+          estimationSlot={estimationSlot}
         />
 
         {savedSearches.length > 0 ? (
