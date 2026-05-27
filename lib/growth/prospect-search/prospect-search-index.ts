@@ -735,7 +735,6 @@ export async function buildProspectSearchIndex(
   } catch {
     /* optional */
   }
-  }
 
   return {
     companies: [...companyMap.values()]
