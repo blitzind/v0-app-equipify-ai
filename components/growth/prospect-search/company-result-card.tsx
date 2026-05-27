@@ -9,6 +9,7 @@ import {
   ResultSignalBadges,
 } from "@/components/growth/prospect-search/result-signal-badges"
 import { CompanySignalMomentumPanel } from "@/components/growth/prospect-search/company-signal-momentum-panel"
+import { CompanySignalAiInsightPanel } from "@/components/growth/prospect-search/company-signal-ai-insight-panel"
 import { CompanySignalSummaryPanel } from "@/components/growth/prospect-search/company-signal-summary-panel"
 import { CompanyEnrichmentBadges } from "@/components/growth/prospect-search/company-enrichment-badges"
 import { CompanyIntelligenceCard } from "@/components/growth/company-signals/company-intelligence-card"
@@ -119,6 +120,7 @@ export function CompanyResultCard({
       <CompanyStatusBadges row={row} />
       <ResultSignalBadges row={row} />
       <CompanySignalMomentumPanel row={row} className="mt-1" />
+      <CompanySignalAiInsightPanel row={row} />
 
       {row.growth_signal_score != null ? (
         <p className="rounded-lg border border-sky-100 bg-sky-50/50 px-3 py-2 text-xs text-sky-950">

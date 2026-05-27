@@ -24,6 +24,7 @@ import {
   GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
   type GrowthSignalMomentumLabel,
 } from "@/lib/growth/signals/company-signal-rollup"
+import type { GrowthSignalAiInsightClientFields } from "@/lib/growth/signals/ai/signal-copilot-client-types"
 
 export {
   GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER,
@@ -258,7 +259,7 @@ export type GrowthProspectSearchIndexPerson = {
   verification_status: string
 }
 
-export type GrowthProspectSearchCompanyResult = {
+export type GrowthProspectSearchCompanyResult = GrowthSignalAiInsightClientFields & {
   id: string
   source_type: GrowthProspectSearchSourceType
   /** Real-world / external discovery provider type when source_type is external_discovered. */

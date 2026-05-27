@@ -37,6 +37,8 @@ import { PLATFORM_ADMIN_GROWTH_LEADS_TAB } from "../components/admin/platform-ad
 import { buildBossBattles, buildCoachTips, buildHeatMap, detectComboChains } from "../lib/growth/command/command-dashboard-helpers"
 import { describeSequenceStartUnavailable } from "../lib/growth/sequence-enrollment/sequence-enrollment-ui"
 import { buildCommandCenterHiringMetrics, buildCommandCenterSignalMomentumSummary, buildCommandCenterWatchlistMetrics } from "../lib/growth/signals/integrations/command-center-bridge"
+import { buildCommandCenterAiSignalBriefing } from "../lib/growth/signals/ai/signal-copilot-safe-summary"
+import { GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER } from "../lib/growth/signals/ai/signal-copilot-types"
 import type { GrowthLead } from "../lib/growth/types"
 import type { GrowthSignalRow } from "../lib/growth/signals/signal-types"
 
@@ -345,5 +347,12 @@ const ccSection = fs.readFileSync(
   "utf8",
 )
 assert.match(ccSection, /GROWTH_SIGNAL_MOMENTUM_QA_MARKER/)
+assert.match(ccSection, /ai_briefing/)
+assert.match(ccSection, /GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER/)
+
+const aiBriefing = buildCommandCenterAiSignalBriefing({ momentum: momentumSummary })
+assert.ok(aiBriefing)
+assert.equal(aiBriefing!.qa_marker, GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER)
+assert.doesNotMatch(JSON.stringify(aiBriefing), /auto_enroll|raw_payload/)
 
 console.log("growth-command-center: all checks passed")

@@ -7,6 +7,9 @@ import {
   type GrowthSignalWatchlistMatchRef,
 } from "@/lib/growth/signals/company-signal-rollup"
 import type { GrowthSignalRow } from "@/lib/growth/signals/signal-types"
+import type { GrowthTerritorySignalCopilotSummaryClient } from "@/lib/growth/signals/ai/signal-copilot-client-types"
+import { SIGNAL_COPILOT_CLIENT_DISCLAIMER } from "@/lib/growth/signals/ai/signal-copilot-client-types"
+import { buildTerritorySignalCopilotSummary } from "@/lib/growth/signals/ai/signal-copilot-safe-summary"
 
 export type TerritorySignalCompanyRef = {
   company_id: string
@@ -18,6 +21,7 @@ export type TerritorySignalCompanyRef = {
 }
 
 export type TerritorySignalIntelligenceInput = {
+  territory_label?: string
   territory_states?: string[]
   territory_cities?: string[]
   companies: TerritorySignalCompanyRef[]
@@ -44,6 +48,7 @@ export type TerritorySignalIntelligenceSummary = {
   average_momentum_score: number
   momentum_label: GrowthCompanySignalRollup["momentum_label"]
   top_signal_companies: TerritoryTopSignalCompany[]
+  ai_summary?: GrowthTerritorySignalCopilotSummaryClient | null
 }
 
 function normalizeGeo(value: string | null | undefined): string {
@@ -162,7 +167,7 @@ export function buildTerritorySignalIntelligenceSummary(
       ? Math.round(rollups.reduce((sum, row) => sum + row.momentum_score, 0) / rollups.length)
       : 0
 
-  return {
+  const summary: TerritorySignalIntelligenceSummary = {
     total_signals_30d: territorySignals.length,
     high_urgency_signals: highUrgency,
     companies_with_signals: rollups.length,
@@ -174,4 +179,27 @@ export function buildTerritorySignalIntelligenceSummary(
       .sort((a, b) => b.momentum_score - a.momentum_score)
       .slice(0, 5),
   }
+
+  const territoryLabel =
+    input.territory_label?.trim() ||
+    input.territory_states?.[0]?.trim() ||
+    input.territory_cities?.[0]?.trim() ||
+    "Territory"
+
+  const aiRaw = buildTerritorySignalCopilotSummary({
+    territory_label: territoryLabel,
+    summary,
+  })
+
+  if (aiRaw) {
+    summary.ai_summary = {
+      summary: aiRaw.summary,
+      top_momentum_companies: aiRaw.top_momentum_companies,
+      operational_shifts: aiRaw.operational_shifts,
+      qa_marker: aiRaw.qa_marker,
+      disclaimer: SIGNAL_COPILOT_CLIENT_DISCLAIMER,
+    } satisfies GrowthTerritorySignalCopilotSummaryClient
+  }
+
+  return summary
 }

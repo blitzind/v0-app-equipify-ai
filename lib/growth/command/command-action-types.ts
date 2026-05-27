@@ -154,10 +154,12 @@ import type {
   CommandCenterHiringMetrics,
   CommandCenterWatchlistMetrics,
 } from "@/lib/growth/signals/integrations/command-center-bridge"
+import type { GrowthSignalCopilotCommandBriefingClient } from "@/lib/growth/signals/ai/signal-copilot-client-types"
 
 export type GrowthCommandSignalIntelligenceSummary = CommandCenterSignalMomentumSummary & {
   hiring: CommandCenterHiringMetrics
   watchlist: CommandCenterWatchlistMetrics
+  ai_briefing?: GrowthSignalCopilotCommandBriefingClient | null
 }
 
 export type GrowthCommandDashboard = {

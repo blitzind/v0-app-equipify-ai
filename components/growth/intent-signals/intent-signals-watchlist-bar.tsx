@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Loader2, Plus, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -10,7 +10,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { WatchlistIntelligenceInsightCard } from "@/components/growth/intent-signals/intent-signals-watchlist-insight-card"
 import { GROWTH_INTENT_SIGNALS_WATCHLISTS_QA_MARKER } from "@/components/growth/intent-signals/intent-signals-ux-constants"
+import { buildWatchlistSignalCopilotSummary } from "@/lib/growth/signals/ai/signal-copilot-safe-summary"
+import type { SignalCopilotWatchlistSummary } from "@/lib/growth/signals/ai/signal-copilot-types"
+import type { GrowthSignalRow } from "@/lib/growth/signals/signal-types"
 import type { GrowthSignalWatchlistRow } from "@/lib/growth/signals/signal-watchlist-types"
 
 export type IntentSignalsWatchlistSelection = {
@@ -33,6 +37,8 @@ export function IntentSignalsWatchlistBar({
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [watchlistSignals, setWatchlistSignals] = useState<GrowthSignalRow[]>([])
+  const [watchlistInsightLoading, setWatchlistInsightLoading] = useState(false)
 
   const loadWatchlists = useCallback(async () => {
     setLoading(true)
@@ -61,6 +67,47 @@ export function IntentSignalsWatchlistBar({
   useEffect(() => {
     void loadWatchlists()
   }, [loadWatchlists, refreshToken])
+
+  const loadWatchlistInsight = useCallback(async (watchlistId: string) => {
+    setWatchlistInsightLoading(true)
+    try {
+      const params = new URLSearchParams({ watchlist_id: watchlistId, limit: "50" })
+      const res = await fetch(`/api/platform/growth/signals?${params.toString()}`, { cache: "no-store" })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        items?: GrowthSignalRow[]
+      }
+      setWatchlistSignals(res.ok && data.ok ? data.items ?? [] : [])
+    } catch {
+      setWatchlistSignals([])
+    } finally {
+      setWatchlistInsightLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!selection.watchlistId) {
+      setWatchlistSignals([])
+      return
+    }
+    void loadWatchlistInsight(selection.watchlistId)
+  }, [loadWatchlistInsight, selection.watchlistId, refreshToken, refreshing])
+
+  const watchlistInsight = useMemo((): SignalCopilotWatchlistSummary | null => {
+    if (!selection.watchlist) return null
+    const topCompanies = Array.from(
+      new Set(
+        watchlistSignals
+          .map((signal) => signal.company_name?.trim() || signal.domain?.trim())
+          .filter((value): value is string => Boolean(value)),
+      ),
+    )
+    return buildWatchlistSignalCopilotSummary({
+      watchlist_name: selection.watchlist.name,
+      matched_signals: watchlistSignals,
+      top_companies: topCompanies,
+    })
+  }, [selection.watchlist, watchlistSignals])
 
   async function refreshSelected() {
     if (!selection.watchlistId) return
@@ -98,10 +145,11 @@ export function IntentSignalsWatchlistBar({
   }
 
   return (
-    <div
-      className="flex flex-col gap-2 rounded-xl border border-border bg-card px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
-      data-qa-marker={GROWTH_INTENT_SIGNALS_WATCHLISTS_QA_MARKER}
-    >
+    <div className="flex flex-col gap-2">
+      <div
+        className="flex flex-col gap-2 rounded-xl border border-border bg-card px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+        data-qa-marker={GROWTH_INTENT_SIGNALS_WATCHLISTS_QA_MARKER}
+      >
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Watchlist</span>
         {loading ? (
@@ -154,6 +202,16 @@ export function IntentSignalsWatchlistBar({
       ) : null}
 
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      </div>
+
+      {selection.watchlist && watchlistInsightLoading ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin" aria-label="Loading watchlist intelligence" />
+          Loading watchlist intelligence…
+        </div>
+      ) : null}
+
+      <WatchlistIntelligenceInsightCard summary={watchlistInsight} />
     </div>
   )
 }

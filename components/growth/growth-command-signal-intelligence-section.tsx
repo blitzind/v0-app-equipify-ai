@@ -3,6 +3,7 @@
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import type { GrowthCommandSignalIntelligenceSummary } from "@/lib/growth/command/command-action-types"
 import { GROWTH_SIGNAL_MOMENTUM_QA_MARKER } from "@/lib/growth/signals/company-signal-rollup"
+import { GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER } from "@/lib/growth/signals/ai/signal-copilot-client-types"
 
 export function GrowthCommandSignalIntelligenceSection({
   summary,
@@ -41,6 +42,31 @@ export function GrowthCommandSignalIntelligenceSection({
               </li>
             ))}
           </ul>
+        </div>
+      ) : null}
+
+      {summary.ai_briefing ? (
+        <div
+          className="mt-4 rounded-lg border border-violet-200/70 bg-violet-50/40 px-3 py-2.5"
+          data-qa-marker={GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER}
+        >
+          <p className="text-xs font-semibold text-violet-950">{summary.ai_briefing.title}</p>
+          <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-violet-950/90">
+            {summary.ai_briefing.summary_lines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          {summary.ai_briefing.urgent_shifts.length > 0 ? (
+            <p className="mt-2 text-[11px] font-medium text-violet-900">
+              Urgent shifts: {summary.ai_briefing.urgent_shifts.join(" · ")}
+            </p>
+          ) : null}
+          {summary.ai_briefing.high_priority_companies.length > 0 ? (
+            <p className="mt-1 text-[11px] text-violet-900/90">
+              High-priority companies: {summary.ai_briefing.high_priority_companies.join(", ")}
+            </p>
+          ) : null}
+          <p className="mt-2 text-[10px] text-muted-foreground">{summary.ai_briefing.disclaimer}</p>
         </div>
       ) : null}
 

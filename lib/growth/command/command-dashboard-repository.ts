@@ -42,6 +42,14 @@ import {
   buildCommandCenterSignalMomentumSummary,
   buildCommandCenterWatchlistMetrics,
 } from "@/lib/growth/signals/integrations/command-center-bridge"
+import {
+  buildCommandCenterAiSignalBriefing,
+  sanitizeSignalCopilotInsightForClient,
+} from "@/lib/growth/signals/ai/signal-copilot-safe-summary"
+import {
+  GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER,
+  SIGNAL_COPILOT_CLIENT_DISCLAIMER,
+} from "@/lib/growth/signals/ai/signal-copilot-client-types"
 import { loadGrowthSignals } from "@/lib/growth/signals/signal-repository"
 import { isGrowthSignalFoundationSchemaReady } from "@/lib/growth/signals/signal-schema-health"
 import { loadWatchlistMetricsSnapshot } from "@/lib/growth/signals/signal-watchlist-repository"
@@ -116,6 +124,7 @@ async function loadCommandCenterSignalIntelligence(
       ...emptyMomentum,
       hiring: emptyHiring,
       watchlist: emptyWatchlist,
+      ai_briefing: null,
     }
   }
 
@@ -140,10 +149,27 @@ async function loadCommandCenterSignalIntelligence(
     watchlist_metrics: watchlist,
   })
 
+  const aiBriefingRaw = buildCommandCenterAiSignalBriefing({
+    momentum,
+    watchlist_names: watchlist.top_watchlists.map((row) => row.name),
+  })
+  const ai_briefing = aiBriefingRaw
+    ? (sanitizeSignalCopilotInsightForClient({
+        title: aiBriefingRaw.title,
+        summary_lines: aiBriefingRaw.summary_lines,
+        urgent_shifts: aiBriefingRaw.urgent_shifts,
+        watchlist_highlights: aiBriefingRaw.watchlist_highlights,
+        high_priority_companies: aiBriefingRaw.high_priority_companies,
+        disclaimer: SIGNAL_COPILOT_CLIENT_DISCLAIMER,
+        qa_marker: GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER,
+      }) as import("@/lib/growth/signals/ai/signal-copilot-client-types").GrowthSignalCopilotCommandBriefingClient)
+    : null
+
   return {
     ...momentum,
     hiring,
     watchlist,
+    ai_briefing,
   }
 }
 

@@ -6,6 +6,11 @@ import {
   type GrowthCompanySignalRollup,
   type GrowthSignalWatchlistMatchRef,
 } from "@/lib/growth/signals/company-signal-rollup"
+import { buildSignalCopilotInsightBundle } from "@/lib/growth/signals/ai/signal-copilot-safe-summary"
+import {
+  GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER,
+  GROWTH_SIGNAL_COPILOT_QA_MARKER,
+} from "@/lib/growth/signals/ai/signal-copilot-client-types"
 import {
   aggregateJobPostingsToHiringVelocity,
   type HiringVelocityMetrics,
@@ -35,6 +40,14 @@ export type ProspectSearchSignalIntelligenceOverlay = {
   rollup: GrowthCompanySignalRollup
   hiring: ProspectSearchHiringOverlay
   display_summary: string
+  signal_ai_short_summary: string | null
+  signal_ai_narrative_summary: string | null
+  signal_ai_confidence: "low" | "medium" | "high" | null
+  signal_ai_reasoning_bullets: string[]
+  signal_why_now_bullets: string[]
+  signal_ai_operator_suggestions: string[]
+  signal_copilot_qa_marker: typeof GROWTH_SIGNAL_COPILOT_QA_MARKER | null
+  signal_ai_insights_qa_marker: typeof GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER | null
 }
 
 function normalizeCompanyName(name: string | null | undefined): string {
@@ -157,6 +170,13 @@ export function buildProspectSearchSignalIntelligenceOverlay(input: {
     hire_signals: input.signals,
   })
 
+  const insight = buildSignalCopilotInsightBundle({
+    ...keys,
+    signals: input.signals,
+    watchlist_matches: input.watchlist_matches,
+    now: input.now,
+  })
+
   return {
     qa_marker: GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
     signal_momentum_score: rollup.momentum_score,
@@ -170,6 +190,16 @@ export function buildProspectSearchSignalIntelligenceOverlay(input: {
     rollup,
     hiring,
     display_summary: formatCompanySignalRollupSummary(rollup),
+    signal_ai_short_summary: insight.narrative?.short_summary ?? null,
+    signal_ai_narrative_summary: insight.narrative?.detailed_summary ?? null,
+    signal_ai_confidence: insight.narrative?.confidence ?? insight.why_now?.confidence ?? null,
+    signal_ai_reasoning_bullets: insight.narrative?.reasoning_bullets ?? [],
+    signal_why_now_bullets: insight.why_now?.bullets ?? [],
+    signal_ai_operator_suggestions: insight.operator_suggestions.map((row) => row.label),
+    signal_copilot_qa_marker:
+      rollup.total_signal_count > 0 ? GROWTH_SIGNAL_COPILOT_QA_MARKER : null,
+    signal_ai_insights_qa_marker:
+      rollup.total_signal_count > 0 ? GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER : null,
   }
 }
 
@@ -189,6 +219,14 @@ export function attachProspectSearchSignalIntelligence(
       watchlist_matches: [],
       signal_evidence_count: 0,
       signal_intelligence_qa_marker: GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
+      signal_ai_short_summary: null,
+      signal_ai_narrative_summary: null,
+      signal_ai_confidence: null,
+      signal_ai_reasoning_bullets: [],
+      signal_why_now_bullets: [],
+      signal_ai_operator_suggestions: [],
+      signal_copilot_qa_marker: null,
+      signal_ai_insights_qa_marker: null,
     }
   }
 
@@ -203,6 +241,14 @@ export function attachProspectSearchSignalIntelligence(
     watchlist_matches: overlay.watchlist_matches,
     signal_evidence_count: overlay.signal_evidence_count,
     signal_intelligence_qa_marker: GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
+    signal_ai_short_summary: overlay.signal_ai_short_summary,
+    signal_ai_narrative_summary: overlay.signal_ai_narrative_summary,
+    signal_ai_confidence: overlay.signal_ai_confidence,
+    signal_ai_reasoning_bullets: overlay.signal_ai_reasoning_bullets,
+    signal_why_now_bullets: overlay.signal_why_now_bullets,
+    signal_ai_operator_suggestions: overlay.signal_ai_operator_suggestions,
+    signal_copilot_qa_marker: overlay.signal_copilot_qa_marker,
+    signal_ai_insights_qa_marker: overlay.signal_ai_insights_qa_marker,
   }
 }
 

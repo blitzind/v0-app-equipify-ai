@@ -80,6 +80,26 @@ import {
 import { buildTerritorySignalIntelligenceSummary } from "../lib/growth/signals/integrations/territory-signal-intelligence"
 import { buildCommandCenterSignalMomentumSummary } from "../lib/growth/signals/integrations/command-center-bridge"
 import {
+  GROWTH_SIGNAL_COPILOT_QA_MARKER,
+  GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER,
+} from "../lib/growth/signals/ai/signal-copilot-types"
+import {
+  buildSignalCopilotCompanyEvidencePacket,
+  buildSignalCopilotEvidencePacketJson,
+} from "../lib/growth/signals/ai/signal-copilot-context-builder"
+import {
+  buildSignalCopilotInsightBundle,
+  buildTerritorySignalCopilotSummary,
+  buildWatchlistSignalCopilotSummary,
+  buildWhyThisCompanyMattersNow,
+  generateCompanySignalNarrative,
+  buildCommandCenterAiSignalBriefing,
+} from "../lib/growth/signals/ai/signal-copilot-safe-summary"
+import {
+  validateSignalCopilotAiOutput,
+  validateSignalCopilotNarrative,
+} from "../lib/growth/signals/ai/signal-copilot-output-validator"
+import {
   evaluatePersonIdentityConfidence,
   meetsPromotionIdentityThreshold,
   PERSON_IDENTITY_REJECT_THRESHOLD,
@@ -687,9 +707,43 @@ function main(): void {
 
   const territoryEmpty = buildTerritorySignalIntelligenceSummary({
     companies: [{ company_id: "c1", company_name: "Acme", state: "TN", city: "Nashville" }],
+    territory_states: ["TN"],
     signals,
   })
   assert.equal(territoryEmpty.total_signals_30d, 0)
+  assert.equal(territoryEmpty.ai_summary, undefined)
+
+  const territorySignals = signals.map((signal) => ({
+    ...signal,
+    geography: "TN, Nashville",
+  }))
+  const territorySummary = buildTerritorySignalIntelligenceSummary({
+    territory_label: "Tennessee",
+    territory_states: ["TN"],
+    companies: [
+      {
+        company_id: "c1",
+        company_name: "Acme Health Systems",
+        domain: "acmehealth.com",
+        state: "TN",
+        city: "Nashville",
+      },
+    ],
+    signals: territorySignals,
+  })
+  assert.ok(territorySummary.total_signals_30d > 0)
+  assert.ok(territorySummary.ai_summary)
+  assert.equal(territorySummary.ai_summary!.qa_marker, GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER)
+  assert.doesNotMatch(JSON.stringify(territorySummary.ai_summary), /raw_payload|auto_enroll/)
+
+  const watchlistSummary = buildWatchlistSignalCopilotSummary({
+    watchlist_name: "Medical Expansion Targets",
+    matched_signals: territorySignals,
+    top_companies: ["Acme Health Systems"],
+  })
+  assert.ok(watchlistSummary)
+  assert.match(watchlistSummary!.summary, /Medical Expansion Targets/)
+  assert.ok(watchlistSummary!.top_companies.includes("Acme Health Systems"))
 
   const ccSummary = buildCommandCenterSignalMomentumSummary({ signals })
   assert.equal(ccSummary.qa_marker, "growth-signal-momentum-v1")
@@ -855,6 +909,79 @@ function main(): void {
     "utf8",
   )
   assert.doesNotMatch(uiActionsSource, /auto_sequence|auto_outreach|auto_enroll/)
+
+  assert.equal(GROWTH_SIGNAL_COPILOT_QA_MARKER, "growth-signal-copilot-v1")
+  assert.equal(GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER, "growth-signal-ai-insights-v1")
+
+  const sampleSignal = signals[0]!
+  const packet = buildSignalCopilotCompanyEvidencePacket({
+    domain: sampleSignal.domain,
+    company_name: sampleSignal.company_name,
+    signals: [sampleSignal],
+  })
+  const packetJson = JSON.stringify(buildSignalCopilotEvidencePacketJson(packet))
+  assert.doesNotMatch(packetJson, /raw_payload|person_external_id|provider_debug/)
+  assert.match(packetJson, /recent_signals/)
+
+  const emptyBundle = buildSignalCopilotInsightBundle({ company_name: "Empty Co", signals: [] })
+  assert.equal(emptyBundle.narrative, null)
+  assert.equal(emptyBundle.why_now, null)
+
+  const copilotRollup = buildCompanySignalRollup({
+    domain: sampleSignal.domain,
+    company_name: sampleSignal.company_name,
+    signals: [sampleSignal],
+  })
+  const narrative = generateCompanySignalNarrative({ rollup: copilotRollup, packet })
+  assert.ok(narrative)
+  assert.ok(validateSignalCopilotNarrative(narrative!).ok)
+
+  const whyNow = buildWhyThisCompanyMattersNow({ rollup: copilotRollup, packet, signals: [sampleSignal] })
+  assert.ok(whyNow)
+  assert.ok(whyNow!.bullets.length <= 4)
+
+  const rejected = validateSignalCopilotAiOutput({
+    short_summary: "They signed a $10M contract and will definitely buy.",
+    detailed_summary: "Guaranteed purchase intent confirmed.",
+    reasoning_bullets: ["Signed contract"],
+    suggested_operator_focus: ["Auto-enroll sequence"],
+    confidence: "high",
+  })
+  assert.equal(rejected.ok, false)
+
+  const ccBriefing = buildCommandCenterAiSignalBriefing({
+    momentum: buildCommandCenterSignalMomentumSummary({ signals: [sampleSignal] }),
+  })
+  assert.ok(ccBriefing)
+  assert.doesNotMatch(JSON.stringify(ccBriefing), /raw_payload|auto_enroll/)
+
+  const explanationCardSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/signals/signal-explanation-card.tsx"),
+    "utf8",
+  )
+  assert.match(explanationCardSource, /GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER/)
+  assert.match(explanationCardSource, /verified signal evidence/)
+
+  const watchlistBarSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/intent-signals/intent-signals-watchlist-bar.tsx"),
+    "utf8",
+  )
+  assert.match(watchlistBarSource, /WatchlistIntelligenceInsightCard/)
+  assert.match(watchlistBarSource, /buildWatchlistSignalCopilotSummary/)
+
+  const prospectAiSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/company-signal-ai-insight-panel.tsx"),
+    "utf8",
+  )
+  assert.match(prospectAiSource, /details/)
+  assert.match(prospectAiSource, /AI Insight/)
+
+  const commandSectionSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/growth-command-signal-intelligence-section.tsx"),
+    "utf8",
+  )
+  assert.match(commandSectionSource, /ai_briefing/)
+  assert.match(commandSectionSource, /GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER/)
 
   console.log("growth-signal-foundation: ok")
 }

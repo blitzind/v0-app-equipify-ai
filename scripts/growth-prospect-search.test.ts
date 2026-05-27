@@ -2236,6 +2236,9 @@ async function main(): Promise<void> {
     GROWTH_PROSPECT_SEARCH_GRANTS_MIGRATION,
   } = await import("../lib/growth/prospect-search/prospect-search-schema-health")
   const { GROWTH_SIGNAL_MOMENTUM_QA_MARKER } = await import("../lib/growth/signals/company-signal-rollup")
+  const { buildProspectSearchSignalIntelligenceOverlay } = await import(
+    "../lib/growth/signals/integrations/prospect-search-signal-overlay"
+  )
   assert.equal(GROWTH_SAVED_SEARCH_SCHEMA_READY_QA_MARKER, "growth-saved-search-schema-ready-v1")
   const grantsMigration = fs.readFileSync(
     path.join(process.cwd(), `supabase/migrations/${GROWTH_PROSPECT_SEARCH_GRANTS_MIGRATION}`),
@@ -2286,7 +2289,28 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(companyCardMomentumSource, /CompanySignalMomentumPanel/)
+  assert.match(companyCardMomentumSource, /CompanySignalAiInsightPanel/)
   assert.equal(GROWTH_SIGNAL_MOMENTUM_QA_MARKER, "growth-signal-momentum-v1")
+
+  const {
+    GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER,
+    GROWTH_SIGNAL_COPILOT_QA_MARKER,
+  } = await import("../lib/growth/signals/ai/signal-copilot-client-types")
+  assert.equal(GROWTH_SIGNAL_COPILOT_QA_MARKER, "growth-signal-copilot-v1")
+  assert.equal(GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER, "growth-signal-ai-insights-v1")
+
+  const overlayWithoutSignals = buildProspectSearchSignalIntelligenceOverlay({
+    company: {
+      website: "https://emptyco.com",
+      company_name: "Empty Co",
+      growth_lead_id: null,
+      prospect_id: null,
+      customer_id: null,
+    },
+    signals: [],
+  })
+  assert.equal(overlayWithoutSignals.signal_ai_short_summary, null)
+  assert.equal(overlayWithoutSignals.signal_copilot_qa_marker, null)
 
   const {
     GROWTH_LIVE_ESTIMATED_RESULTS_QA_MARKER,
