@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 865,
-  sqlMigrations: 322,
+  apiRouteHandlers: 866,
+  sqlMigrations: 323,
   dashboardPages: 65,
   componentsTsx: 607,
-  libTsFiles: 2185,
+  libTsFiles: 2196,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **865** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **322** |
+| API route handlers (\`app/api/**/route.ts\`) | **866** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **323** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
 | \`components/**/*.tsx\` | **607** |
-| \`lib/**/*.ts\` | **2185** |
+| \`lib/**/*.ts\` | **2196** |
 
 ### Vercel crons
 
@@ -42,6 +42,7 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 - \`/api/cron/growth-market-health-refresh\` — cron: \`0 1 * * *\`
 - \`/api/cron/growth-dns-verify\` — cron: \`0 */6 * * *\`
 - \`/api/cron/growth-sequence-recovery\` — cron: \`*/30 * * * *\`
+- \`/api/cron/growth-lifecycle-maintenance\` — cron: \`0 */4 * * *\`
 
 ### API routes (relative to \`app/api\`)
 
@@ -65,6 +66,7 @@ cron/growth-contact-refresh/route.ts
 cron/growth-discovery-worker/route.ts
 cron/growth-dns-verify/route.ts
 cron/growth-inbox-sync/route.ts
+cron/growth-lifecycle-maintenance/route.ts
 cron/growth-market-health-refresh/route.ts
 cron/growth-outreach-execute/route.ts
 cron/growth-sequence-recovery/route.ts
