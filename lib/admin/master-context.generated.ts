@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 839,
-  sqlMigrations: 315,
+  apiRouteHandlers: 853,
+  sqlMigrations: 316,
   dashboardPages: 65,
-  componentsTsx: 583,
-  libTsFiles: 2097,
+  componentsTsx: 584,
+  libTsFiles: 2109,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **839** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **315** |
+| API route handlers (\`app/api/**/route.ts\`) | **853** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **316** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **583** |
-| \`lib/**/*.ts\` | **2097** |
+| \`components/**/*.tsx\` | **584** |
+| \`lib/**/*.ts\` | **2109** |
 
 ### Vercel crons
 
@@ -744,6 +744,20 @@ platform/growth/personalization/generations/[id]/route.ts
 platform/growth/personalization/generations/route.ts
 platform/growth/prospect-search/index/rebuild/route.ts
 platform/growth/prospect-search/route.ts
+platform/growth/provider-setup/[providerFamily]/disable/route.ts
+platform/growth/provider-setup/[providerFamily]/reconnect/route.ts
+platform/growth/provider-setup/[providerFamily]/test-connection/route.ts
+platform/growth/provider-setup/[providerFamily]/test-send/route.ts
+platform/growth/provider-setup/dashboard/route.ts
+platform/growth/provider-setup/google/callback/route.ts
+platform/growth/provider-setup/google/start/route.ts
+platform/growth/provider-setup/microsoft/callback/route.ts
+platform/growth/provider-setup/microsoft/start/route.ts
+platform/growth/provider-setup/readiness/route.ts
+platform/growth/provider-setup/resend/route.ts
+platform/growth/provider-setup/ses/route.ts
+platform/growth/provider-setup/smtp/route.ts
+platform/growth/provider-setup/webhooks/route.ts
 platform/growth/providers/[id]/route.ts
 platform/growth/providers/connections/[connectionId]/campaigns/route.ts
 platform/growth/providers/connections/[connectionId]/credentials/route.ts

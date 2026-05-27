@@ -85,6 +85,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["inbox", "reply", "thread", "unified inbox", "reply intelligence"],
   },
   {
+    id: "provider-setup",
+    label: "Provider Setup",
+    href: "/admin/growth/providers/setup",
+    keywords: ["provider setup", "oauth", "google", "microsoft", "smtp", "ses", "resend", "credentials"],
+  },
+  {
     id: "provider-delivery",
     label: "Delivery",
     href: "/admin/growth/providers/delivery",
@@ -674,6 +680,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
     label: "Providers",
     items: [
       {
+        id: "provider-setup",
+        href: "/admin/growth/providers/setup",
+        label: "Setup",
+        match: prefixMatch("/admin/growth/providers/setup"),
+      },
+      {
         id: "provider-delivery",
         href: "/admin/growth/providers/delivery",
         label: "Delivery",
@@ -739,6 +751,7 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: (path) =>
           path.startsWith("/admin/growth/providers") &&
           !path.startsWith("/admin/growth/providers/delivery") &&
+          !path.startsWith("/admin/growth/providers/setup") &&
           !path.startsWith("/admin/growth/providers/compliance") &&
           !path.startsWith("/admin/growth/providers/webhooks"),
       },

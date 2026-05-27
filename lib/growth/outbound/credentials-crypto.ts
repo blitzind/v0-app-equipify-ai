@@ -1,7 +1,9 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto"
 
 const PEPPER =
-  process.env.GROWTH_PROVIDER_CREDENTIALS_PEPPER ?? "growth_provider_credentials_pepper_dev_only"
+  process.env.GROWTH_PROVIDER_SECRET_PEPPER?.trim() ||
+  process.env.GROWTH_PROVIDER_CREDENTIALS_PEPPER?.trim() ||
+  "growth_provider_credentials_pepper_dev_only"
 
 const ALGORITHM = "aes-256-gcm"
 const IV_BYTES = 12

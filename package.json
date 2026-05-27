@@ -190,6 +190,7 @@
     "test:organization-account-classification": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-organization-account-classification.ts",
     "test:growth-provider-delivery": "tsx scripts/test-growth-provider-delivery.ts",
     "test:growth-provider-transport": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-provider-transport.ts",
+    "test:growth-live-provider-setup": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-live-provider-setup.ts",
     "test:growth-engagement-attribution": "tsx scripts/test-growth-engagement-attribution.ts",
     "test:growth-compliance": "tsx scripts/test-growth-compliance.ts",
     "test:growth-provider-webhooks": "tsx scripts/test-growth-provider-webhooks.ts",
