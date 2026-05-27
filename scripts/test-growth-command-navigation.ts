@@ -76,6 +76,12 @@ assert.ok(GROWTH_COMMAND_PALETTE_DESTINATIONS.some((d) => d.label === "Intent Si
 assert.ok(GROWTH_COMMAND_PALETTE_ENTRIES.length > GROWTH_COMMAND_PALETTE_DESTINATIONS.length)
 
 assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.href.includes("mode=discover")))
+assert.ok(
+  GROWTH_COMMAND_REGISTRY.some(
+    (a) => a.id === "prospect-search" && a.href === "/admin/growth/search?mode=discover",
+  ),
+)
+assert.ok(GROWTH_COMMAND_PALETTE_DESTINATIONS.some((d) => d.id === "search" && d.href.includes("mode=discover")))
 assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.label === "Run Lead Research"))
 assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.label === "Open Inbox"))
 assert.equal(GROWTH_COMMAND_REGISTRY.length, 7)

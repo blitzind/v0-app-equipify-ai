@@ -2,6 +2,12 @@
 
 export const GROWTH_COMMAND_REGISTRY_QA_MARKER = "growth-command-registry-v1" as const
 
+/** Default Prospect Search entry — opens external discovery (alias: mode=discover). */
+export const GROWTH_PROSPECT_SEARCH_DISCOVER_HREF = "/admin/growth/search?mode=discover" as const
+
+/** Explicit internal index search — preserves Search internal workflow. */
+export const GROWTH_PROSPECT_SEARCH_INTERNAL_HREF = "/admin/growth/search?mode=internal" as const
+
 export type GrowthCommandRegistryEntry = {
   id: string
   label: string
@@ -17,8 +23,8 @@ export const GROWTH_COMMAND_REGISTRY: GrowthCommandRegistryEntry[] = [
   {
     id: "prospect-search",
     label: "Prospect Search",
-    href: "/admin/growth/search",
-    keywords: ["prospect", "search", "discover", "companies", "icp"],
+    href: GROWTH_PROSPECT_SEARCH_DISCOVER_HREF,
+    keywords: ["prospect", "search", "discover", "companies", "icp", "internal"],
     aliases: ["discover companies", "market discovery"],
     coreWorkflow: true,
     paletteEnabled: true,

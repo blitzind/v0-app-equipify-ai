@@ -1,7 +1,10 @@
 /** Growth Engine navigation IA — shared destinations for sidebar + command palette (IA v2). */
 
 import type { GrowthSidebarConsoleKey } from "@/hooks/use-growth-sidebar-console"
-import { GROWTH_COMMAND_REGISTRY } from "@/lib/growth/navigation/growth-command-registry"
+import {
+  GROWTH_COMMAND_REGISTRY,
+  GROWTH_PROSPECT_SEARCH_DISCOVER_HREF,
+} from "@/lib/growth/navigation/growth-command-registry"
 import type { GrowthCommandPaletteEntry } from "@/lib/growth/navigation/growth-navigation-ranking"
 
 export const GROWTH_NAVIGATION_IA_QA_MARKER = "growth-navigation-ia-v2" as const
@@ -65,7 +68,7 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
   {
     id: "search",
     label: "Prospect Search",
-    href: "/admin/growth/search",
+    href: GROWTH_PROSPECT_SEARCH_DISCOVER_HREF,
     keywords: ["discover", "prospect", "icp", "search", "companies", "apollo", "seamless"],
   },
   {
@@ -348,7 +351,7 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
       },
       {
         id: "prospect-search",
-        href: "/admin/growth/search",
+        href: GROWTH_PROSPECT_SEARCH_DISCOVER_HREF,
         label: "Prospect Search",
         match: prefixMatch("/admin/growth/search"),
       },
