@@ -24,6 +24,12 @@ import {
   rankMeetingPrepRisks,
 } from "../lib/growth/meeting-intelligence/meeting-prep-bundle"
 import { GROWTH_MEETING_PREP_QA_MARKER } from "../lib/growth/meeting-intelligence/meeting-prep-types"
+import { GROWTH_CALENDAR_INTELLIGENCE_QA_MARKER } from "../lib/growth/meeting-intelligence/calendar-event-intelligence-types"
+import {
+  assembleCalendarEventIntelligence,
+  buildCalendarFollowUpRisks,
+  buildCalendarSuggestedNextAction,
+} from "../lib/growth/meeting-intelligence/calendar-event-intelligence"
 import { GROWTH_NOTIFICATION_TYPES } from "../lib/growth/notifications/notification-types"
 import { GROWTH_LEAD_TIMELINE_EVENT_TYPES } from "../lib/growth/timeline-types"
 import type { GrowthLead } from "../lib/growth/types"
@@ -93,6 +99,9 @@ const uiSource = fs.readFileSync(
   "utf8",
 )
 assert.match(uiSource, /Meeting requests/)
+assert.match(uiSource, /GrowthMeetingPrepPanel/)
+assert.match(uiSource, /calendar-intelligence/)
+assert.match(uiSource, /View prep/)
 
 // --- Sprint 3.1 — Meeting prep polish ---
 
@@ -316,5 +325,63 @@ assert.equal(bundle.meeting.calendarEventId, "cal-event-1")
 assert.ok(bundle.openRisks.length > 0)
 assert.ok(bundle.recommendedObjectives.length > 0)
 assert.ok(bundle.readiness.score >= 0 && bundle.readiness.score <= 100)
+
+// --- Sprint 3.2 — Calendar intelligence polish ---
+
+assert.equal(GROWTH_CALENDAR_INTELLIGENCE_QA_MARKER, "growth-calendar-intelligence-v1")
+
+const calendarIntelRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/meetings/calendar-intelligence/route.ts"),
+  "utf8",
+)
+assert.match(calendarIntelRoute, /requireGrowthEnginePlatformAccess/)
+assert.match(calendarIntelRoute, /gatherCalendarIntelligenceBatch/)
+
+const calendarInlineSource = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-meeting-calendar-intelligence-inline.tsx"),
+  "utf8",
+)
+assert.match(calendarInlineSource, /data-qa-marker="growth-calendar-intelligence-v1"/)
+assert.match(calendarInlineSource, /Top objective/)
+assert.match(calendarInlineSource, /Top risk/)
+
+const completedMeeting = {
+  ...sampleMeeting,
+  status: "completed",
+  completedAt: "2026-05-25T16:00:00.000Z",
+  outcome: null,
+  nextAction: null,
+  followUpDueAt: null,
+} as GrowthMeeting
+
+const followUpRisks = buildCalendarFollowUpRisks({
+  meeting: completedMeeting,
+  prep: bundle,
+  hasFollowUpMeeting: false,
+})
+assert.ok(followUpRisks.some((risk) => risk.id === "no_follow_up_scheduled"))
+assert.ok(followUpRisks.some((risk) => risk.id === "completed_without_next_step"))
+assert.ok(followUpRisks.some((risk) => risk.id === "missing_second_meeting"))
+
+const suggestedAction = buildCalendarSuggestedNextAction({
+  meeting: completedMeeting,
+  prep: bundle,
+  followUpRisks,
+})
+assert.equal(suggestedAction?.action, "Schedule next meeting")
+assert.ok((suggestedAction?.evidence.length ?? 0) > 0)
+
+const calendarIntel = assembleCalendarEventIntelligence({
+  meeting: sampleMeeting,
+  prep: bundle,
+  hasFollowUpMeeting: false,
+})
+assert.equal(calendarIntel.qa_marker, GROWTH_CALENDAR_INTELLIGENCE_QA_MARKER)
+assert.equal(calendarIntel.leadScore, 72)
+assert.equal(calendarIntel.decisionMakerCount, 1)
+assert.ok(calendarIntel.topObjective)
+assert.ok(calendarIntel.meetingReadiness >= 0)
+assert.equal(calendarIntel.calendarAttached, true)
+assert.equal(calendarIntel.prepAvailable, true)
 
 console.log("growth-meeting-intelligence: all checks passed")

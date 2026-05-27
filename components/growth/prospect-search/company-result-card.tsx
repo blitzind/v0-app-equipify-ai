@@ -13,6 +13,7 @@ import { CompanyEnrichmentBadges } from "@/components/growth/prospect-search/com
 import { CompanyIntelligenceCard } from "@/components/growth/company-signals/company-intelligence-card"
 import { BuyingCommitteePanel } from "@/components/growth/prospect-search/buying-committee-panel"
 import { CompanyContactIntelligencePanel } from "@/components/growth/prospect-search/company-contact-intelligence-panel"
+import { CompanyContactsPanel } from "@/components/growth/prospect-search/company-contacts-panel"
 import { RealWorldSourceBadge } from "@/components/growth/prospect-search/real-world-provider-status"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
@@ -136,10 +137,20 @@ export function CompanyResultCard({
       ) : null}
 
       {selected ? (
-        <CompanyContactIntelligencePanel
-          companyName={row.company_name}
-          intelligence={row.contact_intelligence}
-        />
+        <>
+          <CompanyContactIntelligencePanel
+            companyName={row.company_name}
+            intelligence={row.contact_intelligence}
+          />
+          {row.contact_intelligence?.contact_coverage_label ? (
+            <p className="text-xs text-violet-900">
+              Contact coverage: {row.contact_intelligence.contact_coverage_label}
+              {row.contact_intelligence.contact_confidence_score != null
+                ? ` · confidence ${row.contact_intelligence.contact_confidence_score}%`
+                : ""}
+            </p>
+          ) : null}
+        </>
       ) : null}
 
       {row.source_type === "external_discovered" && selected ? (
@@ -148,6 +159,12 @@ export function CompanyResultCard({
             companyCandidateId={row.id}
             companyName={row.company_name}
             compact
+          />
+          <CompanyContactsPanel
+            companyId={row.id}
+            companyName={row.company_name}
+            website={row.website}
+            growthLeadId={row.growth_lead_id}
           />
           <BuyingCommitteePanel companyCandidateId={row.id} companyName={row.company_name} />
         </>

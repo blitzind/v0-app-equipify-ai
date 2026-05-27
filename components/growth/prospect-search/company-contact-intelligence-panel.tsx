@@ -28,9 +28,9 @@ export function CompanyContactIntelligencePanel({
         ) : null}
       </div>
 
-      {!intelligence.schema_ready ? (
+      {!intelligence.schema_ready && !intelligence.source_labels.includes("growth.company_contacts") ? (
         <p className="mt-2 text-xs text-amber-800">
-          Contact discovery schema not applied — contact overlay uses Growth lead records only.
+          Contact discovery schema not applied — run migrations 20270323120000 and 20270403120000.
         </p>
       ) : null}
 

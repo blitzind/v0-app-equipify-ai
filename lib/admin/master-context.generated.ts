@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 676,
-  sqlMigrations: 283,
+  apiRouteHandlers: 680,
+  sqlMigrations: 284,
   dashboardPages: 65,
-  componentsTsx: 531,
-  libTsFiles: 1756,
+  componentsTsx: 533,
+  libTsFiles: 1775,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **676** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **283** |
+| API route handlers (\`app/api/**/route.ts\`) | **680** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **284** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **531** |
-| \`lib/**/*.ts\` | **1756** |
+| \`components/**/*.tsx\` | **533** |
+| \`lib/**/*.ts\` | **1775** |
 
 ### Vercel crons
 
@@ -48,6 +48,7 @@ cron/ai-ops-digest/route.ts
 cron/blitzpay-memberships/route.ts
 cron/blitzpay-reminders/route.ts
 cron/blitzpay-scheduled-payments/route.ts
+cron/growth-contact-refresh/route.ts
 cron/growth-outreach-execute/route.ts
 cron/growth-sequence-scheduler/route.ts
 cron/maintenance-due/route.ts
@@ -497,6 +498,8 @@ platform/growth/capacity/dashboard/route.ts
 platform/growth/command/dashboard/route.ts
 platform/growth/communication-preferences/route.ts
 platform/growth/communication-settings/route.ts
+platform/growth/company-contacts/[contactId]/route.ts
+platform/growth/company-contacts/route.ts
 platform/growth/company-signals/route.ts
 platform/growth/contact-discovery/route.ts
 platform/growth/conversations/dashboard/route.ts
@@ -607,6 +610,7 @@ platform/growth/meetings/[meetingId]/calendar/push/route.ts
 platform/growth/meetings/[meetingId]/calendar/resolve/route.ts
 platform/growth/meetings/[meetingId]/prep/route.ts
 platform/growth/meetings/[meetingId]/route.ts
+platform/growth/meetings/calendar-intelligence/route.ts
 platform/growth/meetings/command-summary/route.ts
 platform/growth/meetings/dashboard/route.ts
 platform/growth/meetings/inbox/route.ts

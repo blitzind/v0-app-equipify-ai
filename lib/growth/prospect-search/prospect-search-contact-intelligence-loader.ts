@@ -2,6 +2,10 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { loadContactDiscoverySnapshot } from "@/lib/growth/contact-discovery/contact-repository"
+import { listCompanyContacts } from "@/lib/growth/contact-discovery/company-contact-repository"
+import { computeCompanyContactCoverage } from "@/lib/growth/contact-discovery/company-contact-coverage"
+import { isGrowthCompanyContactsSchemaReady } from "@/lib/growth/contact-discovery/company-contact-schema-health"
+import { companyContactToContactInput } from "@/lib/growth/contact-discovery/integrations/company-contacts-bridge"
 import { isGrowthContactDiscoverySchemaReady } from "@/lib/growth/contact-discovery/contact-schema-health"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import type { GrowthLeadEngineDecisionMakerHypothesisOutput } from "@/lib/growth/lead-engine/decision-maker-hypothesis-types"
@@ -73,6 +77,11 @@ async function buildContactIntelligenceForCompany(
   const contacts: ProspectSearchContactIntelligenceInputContact[] = []
   let committee_completeness: number | null = null
   let decision_maker_hypothesis: GrowthLeadEngineDecisionMakerHypothesisOutput | null = null
+  let contact_coverage_score: number | null = null
+  let contact_coverage_label: string | null = null
+  let contact_confidence_score: number | null = null
+  let primary_contact_id: string | null = null
+  let recommended_contact_id: string | null = null
 
   if (input.growth_lead_id) {
     const decisionMakers = context.decisionMakersByLead.get(input.growth_lead_id) ?? []
@@ -123,6 +132,27 @@ async function buildContactIntelligenceForCompany(
     }
   }
 
+  if (await isGrowthCompanyContactsSchemaReady(admin)) {
+    try {
+      const companyContacts = await listCompanyContacts(admin, input.id)
+      if (companyContacts.length > 0) source_labels.push("growth.company_contacts")
+      for (const contact of companyContacts) {
+        const mapped = companyContactToContactInput(contact)
+        if (mapped) contacts.push(mapped)
+      }
+      if (companyContacts.length > 0) {
+        const coverage = computeCompanyContactCoverage(companyContacts)
+        contact_coverage_score = coverage.coverage_score
+        contact_coverage_label = coverage.coverage_label
+        contact_confidence_score = coverage.contact_confidence_score
+        primary_contact_id = coverage.primary_contact_id
+        recommended_contact_id = coverage.recommended_contact_id
+      }
+    } catch {
+      // Safe fallback when company contacts unavailable.
+    }
+  }
+
   if (contacts.length === 0 && !decision_maker_hypothesis) {
     return emptyProspectSearchContactIntelligence(
       input.growth_lead_id
@@ -138,6 +168,11 @@ async function buildContactIntelligenceForCompany(
     committee_completeness,
     schema_ready: context.schema_ready,
     source_labels,
+    contact_coverage_score,
+    contact_coverage_label,
+    contact_confidence_score,
+    primary_contact_id,
+    recommended_contact_id,
   })
 }
 
@@ -189,11 +224,13 @@ export function applyContactIntelligenceToCompanyResult(
   if (!intelligence) return company
 
   const decision_maker_coverage =
-    intelligence.committee_completeness_pct != null
-      ? Number((intelligence.committee_completeness_pct / 100).toFixed(3))
-      : intelligence.contacts.length > 0
-        ? Math.min(1, Number((intelligence.contacts.length / 5).toFixed(3)))
-        : company.decision_maker_coverage
+    intelligence.contact_coverage_score != null
+      ? Number((intelligence.contact_coverage_score / 100).toFixed(3))
+      : intelligence.committee_completeness_pct != null
+        ? Number((intelligence.committee_completeness_pct / 100).toFixed(3))
+        : intelligence.contacts.length > 0
+          ? Math.min(1, Number((intelligence.contacts.length / 5).toFixed(3)))
+          : company.decision_maker_coverage
 
   return finalizeProspectSearchCompanyResult(
     {

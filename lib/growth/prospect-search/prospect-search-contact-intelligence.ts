@@ -331,6 +331,11 @@ export function buildProspectSearchContactIntelligence(input: {
   schema_ready?: boolean
   source_labels?: string[]
   empty_reason?: string | null
+  contact_coverage_score?: number | null
+  contact_coverage_label?: string | null
+  contact_confidence_score?: number | null
+  primary_contact_id?: string | null
+  recommended_contact_id?: string | null
 }): GrowthProspectSearchContactIntelligence {
   const schema_ready = input.schema_ready ?? true
   const evidenceBacked = dedupeContacts(input.contacts.filter(hasEvidence))
@@ -388,6 +393,11 @@ export function buildProspectSearchContactIntelligence(input: {
       overlays.length === 0
         ? input.empty_reason ?? "No evidence-backed contacts available for this company."
         : null,
+    contact_coverage_score: input.contact_coverage_score ?? null,
+    contact_coverage_label: input.contact_coverage_label ?? null,
+    contact_confidence_score: input.contact_confidence_score ?? null,
+    primary_contact_id: input.primary_contact_id ?? null,
+    recommended_contact_id: input.recommended_contact_id ?? null,
   }
 }
 

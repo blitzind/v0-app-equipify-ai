@@ -57,6 +57,11 @@ export type GrowthProspectSearchContactIntelligence = {
   outreach_recommendation: string | null
   source_labels: string[]
   empty_reason: string | null
+  contact_coverage_score?: number | null
+  contact_coverage_label?: string | null
+  contact_confidence_score?: number | null
+  primary_contact_id?: string | null
+  recommended_contact_id?: string | null
 }
 
 export type ProspectSearchLeadEngineContactHandoffContext = {

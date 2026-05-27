@@ -10,6 +10,7 @@ import type {
   MeetingPrepLeadScore,
 } from "@/lib/growth/meeting-intelligence/meeting-prep-types"
 import { fetchGrowthMeetingById } from "@/lib/growth/meeting-intelligence/meeting-repository"
+import type { GrowthMeeting } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import { loadProspectSearchContactIntelligenceBatch } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-loader"
 import {
   extractBuyingStageFromMetadata,
@@ -64,7 +65,13 @@ export async function gatherMeetingPrepBundle(
 ): Promise<GrowthMeetingPrepBundle | null> {
   const meeting = await fetchGrowthMeetingById(admin, meetingId)
   if (!meeting) return null
+  return gatherMeetingPrepBundleForMeeting(admin, meeting)
+}
 
+export async function gatherMeetingPrepBundleForMeeting(
+  admin: SupabaseClient,
+  meeting: GrowthMeeting,
+): Promise<GrowthMeetingPrepBundle | null> {
   const lead = await fetchGrowthLeadById(admin, meeting.leadId)
   if (!lead) return null
 

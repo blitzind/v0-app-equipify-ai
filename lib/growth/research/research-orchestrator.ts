@@ -17,6 +17,8 @@ import {
   buildProspectResearchInputHash,
 } from "@/lib/growth/research/research-input-hash"
 import { scrapeProspectWebsite } from "@/lib/growth/research/website-scraper"
+import { runWebsiteContactDiscoveryForCompany } from "@/lib/growth/contact-discovery/company-contact-repository"
+import { isGrowthCompanyContactsSchemaReady } from "@/lib/growth/contact-discovery/company-contact-schema-health"
 import {
   fetchActiveProspectResearchRun,
   fetchCachedProspectResearchRun,
@@ -97,6 +99,19 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
     await markProspectResearchRunRunning(input.admin, run.id)
 
     const scrape = await scrapeProspectWebsite(lead.website)
+
+    if (await isGrowthCompanyContactsSchemaReady(input.admin)) {
+      try {
+        await runWebsiteContactDiscoveryForCompany(input.admin, {
+          company_id: lead.id,
+          website: lead.website,
+          growth_lead_id: lead.id,
+        })
+      } catch {
+        // Contact discovery is additive — research run continues on failure.
+      }
+    }
+
     const industry = classifyProspectIndustry(lead.companyName, scrape)
     const tech = detectWebsiteTechnologies(scrape.html, scrape.plainText)
     const maturity = scoreWebsiteMaturity(scrape.html, scrape.plainText, scrape)

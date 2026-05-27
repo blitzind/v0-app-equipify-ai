@@ -20,7 +20,14 @@ import {
 } from "../lib/growth/contact-discovery/contact-discovery-types"
 import { GROWTH_CONTACT_DISCOVERY_PROVIDER_TYPES } from "../lib/growth/contact-discovery/contact-discovery-provider-types"
 import { contactDiscoveryToLeadEngineContactResearch } from "../lib/growth/contact-discovery/integrations/lead-engine-contact-research-bridge"
+import { companyContactToContactInput } from "../lib/growth/contact-discovery/integrations/company-contacts-bridge"
 import { createManualFixtureContactDiscoveryProvider } from "../lib/growth/contact-discovery/providers/manual-fixture-provider"
+import { computeCompanyContactCoverage } from "../lib/growth/contact-discovery/company-contact-coverage"
+import { GROWTH_COMPANY_CONTACTS_QA_MARKER } from "../lib/growth/contact-discovery/company-contact-types"
+import { scoreDecisionMakerTitle } from "../lib/growth/contact-discovery/decision-maker-score"
+import { extractSchemaOrgPersonContacts } from "../lib/growth/contact-discovery/extract/extract-schema-org-person"
+import { extractTeamPageContacts } from "../lib/growth/contact-discovery/extract/extract-team-page"
+import { verifyPhoneNumber } from "../lib/growth/contact-verification/verify-phone"
 
 async function main(): Promise<void> {
   assert.equal(GROWTH_CONTACT_DISCOVERY_QA_MARKER, "growth-contact-discovery-v1")
@@ -196,6 +203,119 @@ async function main(): Promise<void> {
     privacy_note: GROWTH_CONTACT_DISCOVERY_PRIVACY_NOTE,
   })
   assert.ok(leadEngine.contact_candidates.length >= 0)
+
+  // --- Company contacts (Apollo replacement layer) ---
+
+  assert.equal(GROWTH_COMPANY_CONTACTS_QA_MARKER, "growth-company-contacts-v1")
+
+  const ceoScore = scoreDecisionMakerTitle({
+    title: "CEO & Owner",
+    source_type: "team_page",
+    evidence_count: 2,
+    has_website_evidence: true,
+    exact_title_match: true,
+  })
+  assert.equal(ceoScore.decision_maker_score, 100)
+  assert.ok(ceoScore.confidence_score >= 90)
+
+  const dispatcherScore = scoreDecisionMakerTitle({ title: "Dispatcher" })
+  assert.equal(dispatcherScore.decision_maker_score, 35)
+
+  const teamHtml = `
+    <div class="team-member"><h3>Jane Owner</h3><p class="title">President</p><a href="mailto:jane@acmehvac.com">Email</a></div>
+    <div class="team-member"><h3>John Smith</h3><p class="title">Service Manager</p></div>
+  `
+  const extracted = extractTeamPageContacts(teamHtml, "https://acmehvac.com/team")
+  assert.ok(extracted.some((item) => item.full_name === "Jane Owner"))
+  assert.ok(extracted.some((item) => item.email === "jane@acmehvac.com"))
+
+  const schemaHtml = `<script type="application/ld+json">{"@type":"Person","name":"Alex Director","jobTitle":"Operations Director","email":"alex@example.com"}</script>`
+  const schemaContacts = extractSchemaOrgPersonContacts(schemaHtml, "https://example.com/about")
+  assert.ok(schemaContacts.some((item) => item.full_name === "Alex Director"))
+
+  const phone = verifyPhoneNumber("(512) 555-0100", "office main line")
+  assert.equal(phone?.phone_status, "business")
+
+  const coverage = computeCompanyContactCoverage([
+    {
+      id: "c1",
+      company_id: "co1",
+      growth_lead_id: null,
+      contact_candidate_id: null,
+      lead_decision_maker_id: null,
+      full_name: "Jane Owner",
+      first_name: "Jane",
+      last_name: "Owner",
+      title: "President",
+      department: null,
+      email: "jane@acme.com",
+      email_status: "verified",
+      phone: "(512) 555-0100",
+      phone_status: "business",
+      linkedin_url: null,
+      confidence_score: 88,
+      decision_maker_score: 100,
+      source_type: "team_page",
+      source_evidence: [{ claim: "President", evidence: "Team page", source: "team_page" }],
+      contact_status: "verified",
+      last_verified_at: new Date().toISOString(),
+      dedupe_hash: "abc",
+      created_at: "",
+      updated_at: "",
+      metadata: {},
+    },
+  ])
+  assert.equal(coverage.coverage_label, "75%")
+  assert.ok(coverage.decision_maker_discovered)
+
+  const bridged = companyContactToContactInput({
+    id: "c1",
+    company_id: "co1",
+    growth_lead_id: null,
+    contact_candidate_id: null,
+    lead_decision_maker_id: null,
+    full_name: "Jane Owner",
+    first_name: "Jane",
+    last_name: "Owner",
+    title: "President",
+    department: null,
+    email: "jane@acme.com",
+    email_status: "verified",
+    phone: null,
+    phone_status: "unknown",
+    linkedin_url: null,
+    confidence_score: 88,
+    decision_maker_score: 100,
+    source_type: "team_page",
+    source_evidence: [{ claim: "President", evidence: "Team page", source: "team_page" }],
+    contact_status: "candidate",
+    last_verified_at: null,
+    dedupe_hash: "abc",
+    created_at: "",
+    updated_at: "",
+    metadata: {},
+  })
+  assert.equal(bridged?.full_name, "Jane Owner")
+
+  const migrationSource = fs.readFileSync(
+    path.join(process.cwd(), "supabase/migrations/20270403120000_growth_engine_company_contacts.sql"),
+    "utf8",
+  )
+  assert.match(migrationSource, /create table if not exists growth\.company_contacts/)
+  assert.match(migrationSource, /company_contact_refresh_queue/)
+
+  const companyContactsRoute = fs.readFileSync(
+    path.join(process.cwd(), "app/api/platform/growth/company-contacts/route.ts"),
+    "utf8",
+  )
+  assert.match(companyContactsRoute, /requireGrowthEnginePlatformAccess/)
+
+  const panelSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/company-contacts-panel.tsx"),
+    "utf8",
+  )
+  assert.match(panelSource, /Decision makers/)
+  assert.match(panelSource, /Research contacts/)
 
   console.log("growth-contact-discovery-v1 checks passed")
 }
