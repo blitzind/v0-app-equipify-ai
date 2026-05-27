@@ -165,7 +165,14 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(suppressionSource, /recordExperimentMetricFromDeliveryAttempt/)
+  assert.match(suppressionSource, /recordPerformanceEngagementFromDeliveryAttempt/)
   assert.match(suppressionSource, /unsubscribes/)
+
+  const complianceRepo = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/compliance/compliance-repository.ts"),
+    "utf8",
+  )
+  assert.match(complianceRepo, /recordPerformanceEngagementFromDeliveryAttempt/)
 
   console.log("growth-compliance-suppression-v1: all checks passed")
 }

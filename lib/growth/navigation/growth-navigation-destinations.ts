@@ -185,6 +185,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["experiment", "ab test", "variant", "sequence test", "winner", "intelligence"],
   },
   {
+    id: "revenue-intelligence",
+    label: "Revenue Intelligence",
+    href: "/admin/growth/revenue-intelligence",
+    keywords: ["revenue intelligence", "sequence performance", "attribution", "analytics", "funnel"],
+  },
+  {
     id: "settings",
     label: "Growth Settings",
     href: "/admin/growth/settings",
@@ -377,9 +383,15 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: prefixMatch("/admin/growth/experiments"),
       },
       {
+        id: "revenue-intelligence",
+        href: "/admin/growth/revenue-intelligence",
+        label: "Revenue Intelligence",
+        match: prefixMatch("/admin/growth/revenue-intelligence"),
+      },
+      {
         id: "revenue-operating",
         href: "/admin/growth/revenue-operating",
-        label: "Revenue Intelligence",
+        label: "Revenue Forecast",
         consoleKey: "revenue",
         match: prefixMatch("/admin/growth/revenue-operating"),
       },

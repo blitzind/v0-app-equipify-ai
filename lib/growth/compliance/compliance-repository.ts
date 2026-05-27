@@ -222,6 +222,14 @@ export async function recordEmailBounce(
     metric: "bounces",
   }).catch(() => undefined)
 
+  const { recordPerformanceEngagementFromDeliveryAttempt } = await import(
+    "@/lib/growth/revenue-intelligence/performance-snapshots"
+  )
+  await recordPerformanceEngagementFromDeliveryAttempt(admin, {
+    deliveryAttemptId: attempt.id,
+    metric: "bounces",
+  }).catch(() => undefined)
+
   return { recorded: true, classification }
 }
 

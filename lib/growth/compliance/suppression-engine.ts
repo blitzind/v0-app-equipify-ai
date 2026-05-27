@@ -91,6 +91,14 @@ export async function registerUnsubscribe(
       deliveryAttemptId: input.deliveryAttemptId,
       metric: "unsubscribes",
     }).catch(() => undefined)
+
+    const { recordPerformanceEngagementFromDeliveryAttempt } = await import(
+      "@/lib/growth/revenue-intelligence/performance-snapshots"
+    )
+    await recordPerformanceEngagementFromDeliveryAttempt(admin, {
+      deliveryAttemptId: input.deliveryAttemptId,
+      metric: "unsubscribes",
+    }).catch(() => undefined)
   }
 
   return { ok: true, emailHash }

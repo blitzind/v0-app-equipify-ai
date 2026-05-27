@@ -493,6 +493,18 @@ export async function sendApprovedReplyDraft(
     draftId: draft.id,
   })
 
+  if (draft.leadId) {
+    const { recordReplyDraftPerformanceAttribution } = await import(
+      "@/lib/growth/revenue-intelligence/revenue-attribution"
+    )
+    await recordReplyDraftPerformanceAttribution(admin, {
+      leadId: draft.leadId,
+      draftId: draft.id,
+      deliveryAttemptId: transport.attempt.id,
+      sequenceEnrollmentId: draft.sequenceEnrollmentId ?? null,
+    }).catch(() => undefined)
+  }
+
   return { draft, deliveryAttemptId: transport.attempt.id }
 }
 

@@ -75,6 +75,14 @@ export async function recordEmailComplaint(
     metric: "complaints",
   }).catch(() => undefined)
 
+  const { recordPerformanceEngagementFromDeliveryAttempt } = await import(
+    "@/lib/growth/revenue-intelligence/performance-snapshots"
+  )
+  await recordPerformanceEngagementFromDeliveryAttempt(admin, {
+    deliveryAttemptId: attempt.id,
+    metric: "complaints",
+  }).catch(() => undefined)
+
   return { recorded: true }
 }
 

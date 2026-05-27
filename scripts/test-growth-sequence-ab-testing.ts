@@ -167,6 +167,13 @@ async function main(): Promise<void> {
 
   const complianceSource = readSource("lib/growth/compliance/compliance-repository.ts")
   assert.match(complianceSource, /recordExperimentMetricFromDeliveryAttempt/)
+  assert.match(complianceSource, /recordPerformanceEngagementFromDeliveryAttempt/)
+
+  const complianceRepo = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/compliance/compliance-repository.ts"),
+    "utf8",
+  )
+  assert.match(complianceRepo, /recordPerformanceEngagementFromDeliveryAttempt/)
 
   const suppressionSource = readSource("lib/growth/compliance/suppression-engine.ts")
   assert.match(suppressionSource, /recordExperimentMetricFromDeliveryAttempt/)

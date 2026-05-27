@@ -178,6 +178,14 @@ export async function recordEmailOpen(
     metric: "opens",
   }).catch(() => undefined)
 
+  const { recordPerformanceEngagementFromDeliveryAttempt } = await import(
+    "@/lib/growth/revenue-intelligence/performance-snapshots"
+  )
+  await recordPerformanceEngagementFromDeliveryAttempt(admin, {
+    deliveryAttemptId: attempt.id,
+    metric: "opens",
+  }).catch(() => undefined)
+
   return { recorded: true, open: mapOpen(data as OpenRow) }
 }
 
@@ -248,6 +256,14 @@ export async function recordEmailClick(
   }
 
   await recordExperimentMetricFromDeliveryAttempt(admin, {
+    deliveryAttemptId: attempt.id,
+    metric: "clicks",
+  }).catch(() => undefined)
+
+  const { recordPerformanceEngagementFromDeliveryAttempt } = await import(
+    "@/lib/growth/revenue-intelligence/performance-snapshots"
+  )
+  await recordPerformanceEngagementFromDeliveryAttempt(admin, {
     deliveryAttemptId: attempt.id,
     metric: "clicks",
   }).catch(() => undefined)

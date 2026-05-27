@@ -177,6 +177,7 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(trackingRepo, /recordExperimentMetricFromDeliveryAttempt/)
+  assert.match(trackingRepo, /recordPerformanceEngagementFromDeliveryAttempt/)
 
   const families = listTransportAdapterFamilies()
   assert.deepEqual(families.sort(), ["google", "microsoft", "resend", "ses", "smtp"].sort())

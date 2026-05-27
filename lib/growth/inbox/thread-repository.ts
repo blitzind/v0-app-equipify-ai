@@ -10,6 +10,7 @@ import {
 import { listReplyIntelligenceEvents, persistReplyEventDrafts } from "@/lib/growth/inbox/reply-events"
 import { evaluateThreadHealth } from "@/lib/growth/inbox/thread-health"
 import { recordExperimentEngagementForLead } from "@/lib/growth/experiments/experiment-metrics"
+import { recordMeetingAttributionForLead } from "@/lib/growth/revenue-intelligence/revenue-attribution"
 import { computeThreadPriorityScore, priorityScoreToTier } from "@/lib/growth/inbox/thread-priority"
 import type {
   GrowthInboxDashboard,
@@ -332,15 +333,28 @@ export async function addInboxMessage(
   })
 
   if (input.direction === "inbound" && thread.lead_id) {
+    const { recordPerformanceEngagementForLead } = await import(
+      "@/lib/growth/revenue-intelligence/performance-snapshots"
+    )
     await recordExperimentEngagementForLead(admin, { leadId: thread.lead_id, metric: "replies" }).catch(() => undefined)
+    await recordPerformanceEngagementForLead(admin, { leadId: thread.lead_id, metric: "replies" }).catch(() => undefined)
     if (classificationResult.classification === "positive_interest") {
       await recordExperimentEngagementForLead(admin, {
+        leadId: thread.lead_id,
+        metric: "positive_replies",
+      }).catch(() => undefined)
+      await recordPerformanceEngagementForLead(admin, {
         leadId: thread.lead_id,
         metric: "positive_replies",
       }).catch(() => undefined)
     }
     if (classificationResult.classification === "meeting_intent") {
       await recordExperimentEngagementForLead(admin, { leadId: thread.lead_id, metric: "meetings" }).catch(() => undefined)
+      await recordPerformanceEngagementForLead(admin, { leadId: thread.lead_id, metric: "meetings" }).catch(() => undefined)
+      await recordMeetingAttributionForLead(admin, {
+        leadId: thread.lead_id,
+        metadata: { source: "inbox_meeting_intent", thread_id: input.thread_id },
+      }).catch(() => undefined)
     }
   }
 

@@ -314,6 +314,19 @@ export async function runSequenceExecutionJob(
     })
   }
 
+  const { recordPerformanceSnapshotAfterSend } = await import(
+    "@/lib/growth/revenue-intelligence/performance-snapshots"
+  )
+  await recordPerformanceSnapshotAfterSend(admin, {
+    leadId: locked.leadId,
+    sequenceEnrollmentId: locked.sequenceEnrollmentId,
+    senderAccountId: payload.senderAccountId,
+    providerId: transport.attempt.provider_id,
+    deliveryAttemptId: transport.attempt.id,
+    experimentId: payload.experimentId ?? null,
+    variantId: payload.experimentVariantId ?? null,
+  }).catch(() => undefined)
+
   await recordSequenceExecutionTimelineEvent(admin, {
     leadId: locked.leadId,
     eventType: "sequence_step_sent",
