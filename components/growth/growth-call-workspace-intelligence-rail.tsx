@@ -31,7 +31,7 @@ import type {
   NativeCallWorkspaceSessionPublicView,
   NativeDialerLeadContext,
 } from "@/lib/growth/native-dialer/native-dialer-types"
-import { commandLeadFocusHref } from "@/lib/growth/command/command-action-catalog"
+import { GrowthCallWorkspaceRelationshipSummaryPanel } from "@/components/growth/growth-call-workspace-relationship-summary-panel"
 import { cn } from "@/lib/utils"
 
 function IntelligenceRow({
@@ -144,6 +144,8 @@ export function GrowthCallWorkspaceIntelligenceRail({
               <Link href={commandLeadFocusHref(leadContext.leadId, "command")}>View Lead</Link>
             </Button>
           </div>
+
+          <GrowthCallWorkspaceRelationshipSummaryPanel leadId={leadContext.leadId} />
 
           <div className="rounded-xl border border-border/50 px-3 dark:border-white/5">
             <IntelligenceRow

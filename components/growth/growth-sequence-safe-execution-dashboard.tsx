@@ -39,6 +39,8 @@ export function GrowthSequenceSafeExecutionDashboard() {
   const [meetingIntentReviews, setMeetingIntentReviews] = useState(0)
   const [sequenceStopCandidates, setSequenceStopCandidates] = useState(0)
   const [channelTasks, setChannelTasks] = useState<GrowthSequenceChannelTask[]>([])
+  const [objectionMemoryCount, setObjectionMemoryCount] = useState(0)
+  const [topObjections, setTopObjections] = useState<Array<{ objectionLabel: string; evidenceSnippet: string }>>([])
   const [loading, setLoading] = useState(true)
   const [actionJobId, setActionJobId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -70,6 +72,15 @@ export function GrowthSequenceSafeExecutionDashboard() {
         tasks?: GrowthSequenceChannelTask[]
       }
       if (multichannelRes.ok) setChannelTasks(multichannelData.tasks ?? [])
+
+      const memoryRes = await fetch("/api/platform/growth/lead-memory/dashboard", { cache: "no-store" })
+      const memoryData = (await memoryRes.json().catch(() => ({}))) as {
+        dashboard?: { topObjections?: Array<{ objectionLabel: string; evidenceSnippet: string }> }
+      }
+      if (memoryRes.ok && memoryData.dashboard) {
+        setTopObjections(memoryData.dashboard.topObjections?.slice(0, 5) ?? [])
+        setObjectionMemoryCount(memoryData.dashboard.topObjections?.length ?? 0)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
     } finally {
@@ -154,6 +165,9 @@ export function GrowthSequenceSafeExecutionDashboard() {
           <Button variant="outline" size="sm" asChild>
             <Link href="/admin/growth/copilot/content-library">Content Library</Link>
           </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/intelligence/relationship-memory">Relationship Memory</Link>
+          </Button>
           <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
             <RefreshCw className={cn("mr-1 size-3.5", loading && "animate-spin")} />
             Refresh
@@ -187,6 +201,22 @@ export function GrowthSequenceSafeExecutionDashboard() {
           </div>
         ) : null}
       </GrowthEngineCard>
+
+      {objectionMemoryCount > 0 ? (
+        <GrowthEngineCard title="Objection Memory">
+          <p className="mb-3 text-xs text-muted-foreground">
+            Evidence-backed objections surfaced from relationship memory — review before sequence execution.
+          </p>
+          <ul className="space-y-2 text-sm">
+            {topObjections.map((objection, index) => (
+              <li key={`${objection.objectionLabel}-${index}`} className="rounded-lg border border-border/60 px-3 py-2">
+                <p className="font-medium">{objection.objectionLabel}</p>
+                <p className="text-xs text-muted-foreground">{objection.evidenceSnippet}</p>
+              </li>
+            ))}
+          </ul>
+        </GrowthEngineCard>
+      ) : null}
 
       <GrowthEngineCard title="Job queue">
         {!dashboard?.jobs.length ? (

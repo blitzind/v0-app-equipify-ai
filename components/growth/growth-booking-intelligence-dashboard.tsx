@@ -33,6 +33,9 @@ export function GrowthBookingIntelligenceDashboardView() {
   const [error, setError] = useState<string | null>(null)
   const [dashboard, setDashboard] = useState<GrowthBookingIntelligenceDashboard | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [communicationPreferences, setCommunicationPreferences] = useState<
+    Array<{ preferenceValue: string; evidenceSnippet: string; leadLabel: string }>
+  >([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -44,6 +47,20 @@ export function GrowthBookingIntelligenceDashboardView() {
         throw new Error(payload.message ?? "Could not load booking intelligence dashboard.")
       }
       setDashboard(payload.dashboard)
+
+      const memoryRes = await fetch("/api/platform/growth/lead-memory/dashboard", { cache: "no-store" })
+      const memoryPayload = (await memoryRes.json().catch(() => ({}))) as {
+        dashboard?: {
+          communicationPreferences?: Array<{
+            preferenceValue: string
+            evidenceSnippet: string
+            leadLabel: string
+          }>
+        }
+      }
+      if (memoryRes.ok && memoryPayload.dashboard) {
+        setCommunicationPreferences(memoryPayload.dashboard.communicationPreferences?.slice(0, 8) ?? [])
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Could not load booking intelligence dashboard.")
     } finally {
@@ -102,6 +119,9 @@ export function GrowthBookingIntelligenceDashboardView() {
           <Button type="button" variant="outline" size="sm" asChild>
             <Link href="/admin/growth/meetings">Meetings</Link>
           </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/intelligence/relationship-memory">Relationship Memory</Link>
+          </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
             <RefreshCw className="mr-1.5 size-3.5" />
             Refresh
@@ -123,6 +143,24 @@ export function GrowthBookingIntelligenceDashboardView() {
           <StatTile label="Conversion Attribution" value={String(dashboard?.conversionAttribution.length ?? 0)} />
         </div>
       </GrowthEngineCard>
+
+      {communicationPreferences.length > 0 ? (
+        <GrowthEngineCard title="Preference Memory">
+          <p className="mb-3 text-xs text-muted-foreground">
+            Communication preferences from relationship memory — use when routing meetings and follow-ups.
+          </p>
+          <ul className="space-y-2 text-sm">
+            {communicationPreferences.map((pref, index) => (
+              <li key={`${pref.leadLabel}-${pref.preferenceValue}-${index}`} className="rounded-lg border border-border/60 px-3 py-2">
+                <p className="font-medium">
+                  {pref.leadLabel}: {pref.preferenceValue.replace(/_/g, " ")}
+                </p>
+                <p className="text-xs text-muted-foreground">{pref.evidenceSnippet}</p>
+              </li>
+            ))}
+          </ul>
+        </GrowthEngineCard>
+      ) : null}
 
       <GrowthEngineCard title="Pending Booking Reviews">
         {(dashboard?.pendingBookingReviews ?? []).length === 0 ? (

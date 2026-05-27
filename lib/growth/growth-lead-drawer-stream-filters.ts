@@ -134,6 +134,7 @@ export const GROWTH_DRAWER_CARD_KEYS = {
   opportunity: "opportunity-readiness",
   opportunityIntelligence: "opportunity-intelligence",
   bookingIntelligence: "booking-intelligence",
+  relationshipMemory: "relationship-memory",
   multichannelTimeline: "multichannel-timeline",
   relationship: "relationship-intelligence",
   conversation: "conversation-intelligence",

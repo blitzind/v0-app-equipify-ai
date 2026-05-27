@@ -225,6 +225,19 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["opportunity intelligence", "crm intelligence", "buying signals", "committee", "sequence pause"],
   },
   {
+    id: "relationship-memory",
+    label: "Relationship Memory",
+    href: "/admin/growth/intelligence/relationship-memory",
+    keywords: [
+      "relationship memory",
+      "lead memory",
+      "objection memory",
+      "preference memory",
+      "committee context",
+      "relationship timeline",
+    ],
+  },
+  {
     id: "booking-intelligence",
     label: "Booking Intelligence",
     href: "/admin/growth/booking-intelligence",
@@ -414,6 +427,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         label: "Relationships",
         consoleKey: "relationships",
         match: prefixMatch("/admin/growth/relationships"),
+      },
+      {
+        id: "relationship-memory",
+        href: "/admin/growth/intelligence/relationship-memory",
+        label: "Relationship Memory",
+        match: prefixMatch("/admin/growth/intelligence/relationship-memory"),
       },
       {
         id: "engagement",
