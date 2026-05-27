@@ -5,6 +5,7 @@ import { Send } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import { GrowthOutreachApprovalDashboard } from "@/components/growth/growth-outreach-approval-dashboard"
+import { OutboundLaunchContextBanner } from "@/components/growth/outbound-launch/outbound-launch-context-banner"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -15,6 +16,7 @@ import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 export default function AdminGrowthOutreachApprovalPage() {
   const searchParams = useSearchParams()
   const highlightQueueId = searchParams.get("highlight")
+  const filterLeadId = searchParams.get("leadId")
   const { sessionIdentity } = useAdmin()
   const header = usePlatformAdminHeaderIdentity({
     displayName: sessionIdentity?.displayName,
@@ -42,7 +44,8 @@ export default function AdminGrowthOutreachApprovalPage() {
         </section>
 
         <GrowthSectionLayout>
-          <GrowthOutreachApprovalDashboard highlightQueueId={highlightQueueId} />
+          <OutboundLaunchContextBanner className="mb-4" />
+          <GrowthOutreachApprovalDashboard highlightQueueId={highlightQueueId} filterLeadId={filterLeadId} />
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>

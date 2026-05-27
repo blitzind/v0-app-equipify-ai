@@ -37,6 +37,7 @@ export function CompanyResultCard({
   onWorkflowLaunch,
   workflowBusy = false,
   searchQuery,
+  savedSearchId,
 }: {
   row: GrowthProspectSearchCompanyResult
   selected: boolean
@@ -52,6 +53,7 @@ export function CompanyResultCard({
   }) => void | Promise<void>
   workflowBusy?: boolean
   searchQuery?: string
+  savedSearchId?: string | null
 }) {
   const motion = recommendedMotion(row)
 
@@ -228,6 +230,7 @@ export function CompanyResultCard({
           <ProspectWorkflowLauncher
             company={row}
             query={searchQuery}
+            savedSearchId={savedSearchId}
             busy={workflowBusy}
             onLaunch={({ action, launchUrl, serverAction, timelineEventKind }) =>
               onWorkflowLaunch({

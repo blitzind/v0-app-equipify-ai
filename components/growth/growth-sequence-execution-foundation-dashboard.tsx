@@ -88,8 +88,10 @@ const DEFAULT_STEPS = [
 
 export function GrowthSequenceExecutionFoundationDashboard({
   highlightEnrollmentId,
+  filterLeadId,
 }: {
   highlightEnrollmentId?: string | null
+  filterLeadId?: string | null
 }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -143,6 +145,15 @@ export function GrowthSequenceExecutionFoundationDashboard({
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (filterLeadId) setEnrollLeadId(filterLeadId)
+  }, [filterLeadId])
+
+  const visibleEnrollments = useMemo(
+    () => (filterLeadId ? enrollments.filter((e) => e.leadId === filterLeadId) : enrollments),
+    [enrollments, filterLeadId],
+  )
 
   async function runAction(key: string, action: () => Promise<void>) {
     setActionLoading(key)
@@ -216,6 +227,12 @@ export function GrowthSequenceExecutionFoundationDashboard({
 
   return (
     <div className="space-y-6">
+      {filterLeadId ? (
+        <p className="text-sm text-muted-foreground">
+          Guided sequence scoped to lead <span className="font-mono">{filterLeadId.slice(0, 8)}…</span> — enrollment
+          requires operator confirmation. No autonomous send.
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
           {GROWTH_SEQUENCE_EXECUTION_FOUNDATION_QA_MARKER} · Orchestration only — human approval required, no sending or workers.
@@ -405,14 +422,14 @@ export function GrowthSequenceExecutionFoundationDashboard({
               </tr>
             </thead>
             <tbody>
-              {enrollments.length === 0 ? (
+              {visibleEnrollments.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-2 py-6 text-muted-foreground">
                     No enrollments yet. Enroll a lead into an active template.
                   </td>
                 </tr>
               ) : (
-                enrollments.map((enrollment) => (
+                visibleEnrollments.map((enrollment) => (
                   <tr
                     key={enrollment.id}
                     id={`sequence-enrollment-${enrollment.id}`}

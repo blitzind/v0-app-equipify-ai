@@ -51,7 +51,7 @@ function GenerationList({
   )
 }
 
-export function GrowthAiCopilotDashboard() {
+export function GrowthAiCopilotDashboard({ filterLeadId }: { filterLeadId?: string | null }) {
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -93,11 +93,23 @@ export function GrowthAiCopilotDashboard() {
   if (error && !dashboard) return <p className="text-sm text-rose-600">{error}</p>
   if (!dashboard) return null
 
+  const filterByLead = <T extends { leadId: string }>(items: T[]) =>
+    filterLeadId ? items.filter((item) => item.leadId === filterLeadId) : items
+
+  const recentGenerations = filterByLead(dashboard.recentGenerations)
+  const approvalQueue = filterByLead(dashboard.approvalQueue)
+
   return (
     <div className="space-y-6">
+      {filterLeadId ? (
+        <p className="text-sm text-muted-foreground">
+          Copilot scoped to lead <span className="font-mono">{filterLeadId.slice(0, 8)}…</span> — generate draft, then
+          approve before queueing. No auto-send.
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatTile icon={<Bot className="size-3.5" />} label="Approval queue" value={dashboard.approvalQueue.length} />
+          <StatTile icon={<Bot className="size-3.5" />} label="Approval queue" value={approvalQueue.length} />
           <StatTile label="Approved rate" value={`${dashboard.generationEffectiveness.approvedRate}%`} />
           <StatTile label="Generated (30d)" value={dashboard.generationEffectiveness.outcomeCounts.generated ?? 0} />
           <StatTile label="Approved (30d)" value={dashboard.generationEffectiveness.outcomeCounts.approved ?? 0} />
@@ -109,8 +121,8 @@ export function GrowthAiCopilotDashboard() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <GenerationList title="Recent generations" items={dashboard.recentGenerations} />
-        <GenerationList title="Approval queue" items={dashboard.approvalQueue} />
+        <GenerationList title="Recent generations" items={recentGenerations} />
+        <GenerationList title="Approval queue" items={approvalQueue} />
       </div>
 
       <GrowthEngineCard title="Top classifications">

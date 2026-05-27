@@ -17,6 +17,7 @@ import { GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import { CompanyIntelligenceCard } from "@/components/growth/company-signals/company-intelligence-card"
 import { VerificationEnrichmentCard } from "@/components/growth/lead-operator/verification-enrichment-card"
 import { HighIntentActivityCard } from "@/components/growth/revenue-intelligence/high-intent-activity-card"
+import { LeadInboxOutboundLaunchBar } from "@/components/growth/outbound-launch/lead-inbox-outbound-launch-bar"
 import { RevenueIntelligenceWorkspaceLayout } from "@/components/growth/revenue-intelligence/workspace-layout"
 import { LEAD_ENGINE_STAGE_UI } from "@/lib/growth/lead-engine/lead-engine-stage-ui"
 import type { GrowthLeadEngineOrchestratorStageResult } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
@@ -284,6 +285,11 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
         </TabsList>
 
         <TabsContent value="guidance" className="mt-4 space-y-4">
+          <LeadInboxOutboundLaunchBar
+            row={workspace.row}
+            buyingStage={workspace.buying_stage?.detected_stage ?? null}
+            decisionMakerConfidence={workspace.card.decision_maker_confidence}
+          />
           {typeof workspace.row.metadata?.prospect_search === "object" &&
           workspace.row.metadata.prospect_search &&
           typeof (workspace.row.metadata.prospect_search as Record<string, unknown>).source_id ===

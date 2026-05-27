@@ -150,8 +150,8 @@ async function main(): Promise<void> {
   assert.match(shellSource, /GROWTH_SEARCH_HAS_SEARCHED_STATE_QA_MARKER/)
   assert.match(shellSource, /GROWTH_SEARCH_CLEAN_START_QA_MARKER/)
   assert.match(shellSource, /GROWTH_SEARCH_DIAGNOSTICS_HIDDEN_QA_MARKER/)
-  assert.doesNotMatch(shellSource, /<ProspectSearchLiveEstimation/)
-  assert.match(shellSource, /enabled: hasSearched && showEmpty/)
+  assert.match(shellSource, /<ProspectSearchLiveEstimation/)
+  assert.match(shellSource, /enabled: true/)
   const providerStatusSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/real-world-provider-status.tsx"),
     "utf8",
@@ -2333,11 +2333,26 @@ async function main(): Promise<void> {
   assert.equal(GROWTH_SEARCH_RESULT_PREVIEW_QA_MARKER, "growth-search-result-preview-v1")
   assert.equal(GROWTH_PROVIDER_HEALTH_DASHBOARD_QA_MARKER, "growth-provider-health-dashboard-v1")
 
-  const { floorEstimateToRange, buildProspectSearchButtonLabel } = await import(
-    "../lib/growth/prospect-search/prospect-search-estimation-format"
-  )
+  const { floorEstimateToRange, buildProspectSearchButtonLabel, formatProspectSearchMarketSizeHeadline } =
+    await import("../lib/growth/prospect-search/prospect-search-estimation-format")
   assert.equal(floorEstimateToRange(260).label, "~250+")
   assert.equal(floorEstimateToRange(1200).label, "~1k+")
+  assert.match(
+    formatProspectSearchMarketSizeHeadline({
+      exact_count: 2413,
+      confidence: "high",
+      discovery_mode: "discover_external",
+    }).headline,
+    /2,413 matching companies ready to search/,
+  )
+  assert.match(
+    formatProspectSearchMarketSizeHeadline({
+      exact_count: 312,
+      confidence: "high",
+      discovery_mode: "internal",
+    }).helper,
+    /indexed CRM/i,
+  )
   assert.match(
     buildProspectSearchButtonLabel({
       state: "ready",
@@ -2356,8 +2371,15 @@ async function main(): Promise<void> {
   )
 
   assert.match(shellSource, /useProspectSearchLiveEstimation/)
-  assert.doesNotMatch(shellSource, /<ProspectSearchLiveEstimation/)
-  assert.doesNotMatch(shellSource, /estimationSlot/)
+  assert.match(shellSource, /<ProspectSearchLiveEstimation/)
+  assert.match(shellSource, /estimationSlot/)
+  assert.match(shellSource, /prominent/)
+
+  const liveEstimationSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-live-estimation.tsx"),
+    "utf8",
+  )
+  assert.match(liveEstimationSource, /data-market-size-prominent/)
   assert.match(shellSource, /ProspectSearchRelaxFilters/)
   assert.match(shellSource, /GROWTH_RESULTS_HEADER_LAYOUT_V1_QA_MARKER/)
   assert.doesNotMatch(shellSource, /GROWTH_PROVIDER_STATUS_LAYOUT_V1_QA_MARKER/)
@@ -2422,6 +2444,8 @@ async function main(): Promise<void> {
   await testProspectSearchProviderIntent()
 
   await testProspectSearchIntelligenceSchemaHealth()
+
+  await testProspectOutboundLaunchMotion()
 
   console.log("growth-prospect-search: all checks passed")
 }
@@ -2583,8 +2607,11 @@ async function testProspectSearchProviderIntent(): Promise<void> {
     path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-provider-search-intent.ts"),
     "utf8",
   )
-  assert.match(intentSource, /Template applied\. Review filters, then click Search providers\./)
-  assert.match(intentSource, /Workflow restored — click Search providers\./)
+  assert.match(intentSource, /Template applied\. Review filters, then click Search\./)
+  assert.match(intentSource, /Workflow restored — click Search\./)
+  assert.doesNotMatch(intentSource, /Search providers/)
+  assert.doesNotMatch(shellSource, /Search providers/)
+  assert.doesNotMatch(shellSource, /Searching providers/)
 }
 
 async function testProspectPipelineAutomation(): Promise<void> {
@@ -2730,7 +2757,7 @@ async function testProspectPipelineAutomation(): Promise<void> {
     (action) => action.id === "queue_outreach_draft",
   )
   assert.equal(suppressedLaunch?.enabled, false)
-  assert.match(suppressedLaunch?.disabled_reason ?? "", /Suppressed/i)
+  assert.match(suppressedLaunch?.disabled_reason ?? "", /Do not contact|Suppressed/i)
 
   const sequenceLaunch = launcherActions.find((action) => action.id === "launch_qualification_sequence")
   assert.equal(sequenceLaunch?.enabled, true)
@@ -2765,6 +2792,102 @@ async function testProspectPipelineAutomation(): Promise<void> {
     "utf8",
   )
   assert.match(actionsSource, /record_prospect_workflow_continuity/)
+
+  const draftAction = launcherActions.find((action) => action.id === "generate_outreach_draft")
+  assert.equal(draftAction?.enabled, true)
+  assert.ok(draftAction?.launch_url?.includes("/admin/growth/copilot"))
+  assert.ok(draftAction?.launch_url?.includes("leadId=lead-1"))
+  assert.doesNotMatch(draftAction?.launch_url ?? "", /lead_inbox_id|inbox-1/)
+}
+
+async function testProspectOutboundLaunchMotion(): Promise<void> {
+  const {
+    assertNoAutonomousOutboundSend,
+    buildOutboundApprovalChain,
+    buildOutboundLaunchUrls,
+    buildSavedSearchBatchLaunchPreview,
+    GROWTH_OUTBOUND_LAUNCH_MOTION_QA_MARKER,
+    OUTBOUND_LAUNCH_BATCH_MAX,
+    runOutboundLaunchPreflight,
+  } = await import("../lib/growth/outbound-launch/outbound-launch-motion")
+
+  assert.equal(GROWTH_OUTBOUND_LAUNCH_MOTION_QA_MARKER, "growth-outbound-launch-motion-v1")
+  assert.deepEqual(assertNoAutonomousOutboundSend(), { auto_send: false, autonomous_enrollment: false })
+
+  const company = {
+    id: "co-1",
+    growth_lead_id: "lead-1",
+    lead_inbox_id: "inbox-1",
+    company_name: "Acme",
+    is_suppressed: false,
+    suppression_reason: null,
+    existing_customer: false,
+    existing_prospect: false,
+    decision_maker_coverage: 50,
+    contact_intelligence: null,
+    committee_completion: null,
+    in_lead_inbox: true,
+    buying_stage: "consideration",
+    lead_engine_score: 55,
+    lead_score: 55,
+    recommended_next_action: "Queue Outreach Draft",
+    recommended_sequence_confidence: 45,
+  }
+
+  const preflight = runOutboundLaunchPreflight({ company, contact_email: "pat@acme.example" })
+  assert.equal(preflight.can_launch, true)
+  assert.equal(preflight.growth_lead_id, "lead-1")
+
+  const suppressed = runOutboundLaunchPreflight({
+    company: { ...company, is_suppressed: true, suppression_reason: "Unsubscribed", growth_lead_id: "lead-1" },
+  })
+  assert.equal(suppressed.can_launch, false)
+
+  const inboxOnly = runOutboundLaunchPreflight({
+    company: { ...company, growth_lead_id: null },
+  })
+  assert.equal(inboxOnly.can_launch, false)
+  assert.match(inboxOnly.checks.find((c) => c.id === "crm_lead")?.detail ?? "", /CRM lead/i)
+
+  const urls = buildOutboundLaunchUrls({ company })
+  assert.ok(urls.generate_draft?.includes("leadId=lead-1"))
+  assert.ok(urls.approval_queue?.includes("leadId=lead-1"))
+  assert.doesNotMatch(urls.approval_queue ?? "", /inbox-1/)
+
+  const chain = buildOutboundApprovalChain({ currentStepId: "review" })
+  assert.equal(chain.find((s) => s.id === "draft")?.status, "complete")
+  assert.equal(chain.find((s) => s.id === "review")?.status, "current")
+
+  const batch = buildSavedSearchBatchLaunchPreview({
+    savedSearchId: "saved-1",
+    companies: [
+      company as import("../lib/growth/prospect-search/prospect-search-types").GrowthProspectSearchCompanyResult,
+      {
+        ...company,
+        id: "co-2",
+        growth_lead_id: null,
+        decision_maker_coverage: 10,
+        lead_engine_score: 20,
+        lead_score: 20,
+      } as import("../lib/growth/prospect-search/prospect-search-types").GrowthProspectSearchCompanyResult,
+    ],
+  })
+  assert.equal(batch.auto_send, false)
+  assert.equal(batch.approval_required, true)
+  assert.ok(batch.rows.length <= OUTBOUND_LAUNCH_BATCH_MAX)
+
+  const launcherSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-workflow-launcher.tsx"),
+    "utf8",
+  )
+  assert.match(launcherSource, /OutboundLaunchMotionPanel/)
+
+  const approvalPage = fs.readFileSync(
+    path.join(process.cwd(), "app/(admin)/admin/growth/outreach/approval/page.tsx"),
+    "utf8",
+  )
+  assert.match(approvalPage, /filterLeadId/)
+  assert.match(approvalPage, /OutboundLaunchContextBanner/)
 }
 
 void main()

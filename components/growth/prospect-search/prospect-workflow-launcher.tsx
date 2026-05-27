@@ -17,6 +17,7 @@ import type {
   GrowthProspectSearchFilters,
 } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
+import { OutboundLaunchMotionPanel } from "@/components/growth/outbound-launch/outbound-launch-motion-panel"
 
 const GROUP_LABELS: Record<GrowthProspectWorkflowActionGroup, string> = {
   qualification: "Qualification",
@@ -31,6 +32,7 @@ export function ProspectWorkflowLauncher({
   query,
   filters,
   discoveryMode,
+  savedSearchId,
   compact = false,
   busy = false,
   onLaunch,
@@ -39,6 +41,7 @@ export function ProspectWorkflowLauncher({
   query?: string
   filters?: GrowthProspectSearchFilters
   discoveryMode?: GrowthProspectSearchDiscoveryMode
+  savedSearchId?: string | null
   compact?: boolean
   busy?: boolean
   onLaunch: (input: {
@@ -48,7 +51,13 @@ export function ProspectWorkflowLauncher({
     timelineEventKind?: GrowthProspectWorkflowContinuityEventKind | null
   }) => void | Promise<void>
 }) {
-  const actions = buildProspectWorkflowLauncherActions({ company, query, filters, discoveryMode })
+  const actions = buildProspectWorkflowLauncherActions({
+    company,
+    query,
+    filters,
+    discoveryMode,
+    savedSearchId,
+  })
   const primary = actions.find((action) => action.is_primary) ?? actions.find((action) => action.enabled)
 
   return (
@@ -110,6 +119,13 @@ export function ProspectWorkflowLauncher({
           </div>
         ) : null}
       </div>
+
+      <OutboundLaunchMotionPanel
+        company={company}
+        query={query}
+        savedSearchId={savedSearchId}
+        compact={compact}
+      />
 
       {GROWTH_PROSPECT_WORKFLOW_ACTION_GROUPS.map((group) => {
         const groupActions = actions.filter((action) => action.group === group)

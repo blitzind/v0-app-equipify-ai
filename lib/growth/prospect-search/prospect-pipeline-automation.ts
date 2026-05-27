@@ -1,6 +1,11 @@
 /** Deterministic Prospect → Growth Engine pipeline automation (Sprint 4.2). Client-safe. */
 
 import { buildProspectSearchLeadEngineHandoffUrl } from "@/lib/growth/prospect-search/prospect-search-lead-engine-handoff"
+import {
+  buildOutboundLaunchUrls,
+  outboundLaunchActionDisabledReason,
+  runOutboundLaunchPreflight,
+} from "@/lib/growth/outbound-launch/outbound-launch-motion"
 import type {
   GrowthProspectSearchCompanyResult,
   GrowthProspectSearchDiscoveryMode,
@@ -317,9 +322,15 @@ export function buildProspectWorkflowLauncherActions(input: {
   query?: string
   filters?: GrowthProspectSearchFilters
   discoveryMode?: GrowthProspectSearchDiscoveryMode
+  savedSearchId?: string | null
 }): GrowthProspectWorkflowLauncherAction[] {
   const { company } = input
   const context = buildContextForCompany(company, input.query, input.filters, input.discoveryMode)
+  if (input.savedSearchId) {
+    context.saved_search_id = input.savedSearchId
+  }
+  const preflight = runOutboundLaunchPreflight({ company })
+  const launchUrls = buildOutboundLaunchUrls({ company, workflowContext: context })
   const suppressed = company.is_suppressed === true
   const hasLead = hasLeadRecord(company)
   const primaryAction = company.recommended_next_action ?? "Run Lead Engine"
@@ -327,8 +338,12 @@ export function buildProspectWorkflowLauncherActions(input: {
   function action(
     partial: Omit<GrowthProspectWorkflowLauncherAction, "is_primary"> & { id: string },
   ): GrowthProspectWorkflowLauncherAction {
+    const disabledReason =
+      partial.disabled_reason ??
+      (!partial.enabled ? outboundLaunchActionDisabledReason({ actionId: partial.id, preflight }) : null)
     return {
       ...partial,
+      disabled_reason: disabledReason,
       is_primary: partial.label === primaryAction,
     }
   }
@@ -338,41 +353,24 @@ export function buildProspectWorkflowLauncherActions(input: {
     context,
   )
 
-  const outreachApprovalUrl = hasLead
+  const meetingUrl = preflight.growth_lead_id
     ? appendWorkflowContextToUrl(
-        `/admin/growth/outreach/approval?leadId=${company.growth_lead_id ?? company.lead_inbox_id}`,
-        context,
-      )
-    : null
-
-  const sequenceUrl = hasLead
-    ? appendWorkflowContextToUrl(
-        `/admin/growth/sequences/execution?leadId=${company.growth_lead_id ?? company.lead_inbox_id}`,
-        context,
-      )
-    : null
-
-  const meetingUrl = hasLead
-    ? appendWorkflowContextToUrl(
-        `/admin/growth/meetings?leadId=${company.growth_lead_id ?? company.lead_inbox_id}`,
+        `/admin/growth/meetings?leadId=${preflight.growth_lead_id}`,
         context,
       )
     : appendWorkflowContextToUrl(`/admin/growth/meetings?company=${encodeURIComponent(company.company_name)}`, context)
 
-  const copilotUrl = hasLead
-    ? appendWorkflowContextToUrl(`/admin/growth/copilot?leadId=${company.growth_lead_id}`, context)
-    : null
-
-  const conversationsUrl = hasLead
-    ? appendWorkflowContextToUrl(`/admin/growth/conversations?leadId=${company.growth_lead_id}`, context)
+  const conversationsUrl = preflight.growth_lead_id
+    ? appendWorkflowContextToUrl(`/admin/growth/conversations?leadId=${preflight.growth_lead_id}`, context)
     : null
 
   const executionUrl = appendWorkflowContextToUrl("/admin/growth/execution", context)
-  const callCoachingUrl = hasLead
-    ? appendWorkflowContextToUrl(`/admin/growth/calls/live?leadId=${company.growth_lead_id}`, context)
+  const callCoachingUrl = preflight.growth_lead_id
+    ? appendWorkflowContextToUrl(`/admin/growth/calls/live?leadId=${preflight.growth_lead_id}`, context)
     : null
 
-  const needsLeadReason = "Push to Lead Inbox or open an existing lead workspace first."
+  const needsLeadReason = "Push to Lead Inbox or open an existing CRM lead workspace first."
+  const sequenceConfidence = company.recommended_sequence_confidence ?? 0
 
   return [
     action({
@@ -406,28 +404,33 @@ export function buildProspectWorkflowLauncherActions(input: {
       timeline_event_kind: null,
     }),
     action({
-      id: "launch_qualification_sequence",
-      label: "Launch Sequence Workflow",
+      id: "generate_outreach_draft",
+      label: "Generate Outreach Draft",
       group: "outreach",
-      enabled: !suppressed && hasLead && (company.recommended_sequence_confidence ?? 0) >= 35,
-      disabled_reason: suppressed
-        ? "Suppressed account."
-        : !hasLead
-          ? needsLeadReason
-          : (company.recommended_sequence_confidence ?? 0) < 35
-            ? "Insufficient sequence confidence from evidence."
-            : null,
-      launch_url: suppressed || !hasLead ? null : sequenceUrl,
+      enabled: !suppressed && preflight.can_draft,
+      disabled_reason: null,
+      launch_url: launchUrls.generate_draft,
+      server_action: null,
+      timeline_event_kind: "outreach_workflow_started",
+    }),
+    action({
+      id: "launch_qualification_sequence",
+      label: "Start Guided Sequence",
+      group: "outreach",
+      enabled: !suppressed && preflight.can_sequence && sequenceConfidence >= 35,
+      disabled_reason:
+        sequenceConfidence < 35 ? "Insufficient sequence confidence from evidence." : null,
+      launch_url: launchUrls.guided_sequence,
       server_action: null,
       timeline_event_kind: "sequence_workflow_started",
     }),
     action({
       id: "queue_outreach_draft",
-      label: "Queue Outreach Draft",
+      label: "Queue For Approval",
       group: "outreach",
-      enabled: !suppressed && hasLead,
-      disabled_reason: suppressed ? "Suppressed account." : !hasLead ? needsLeadReason : null,
-      launch_url: suppressed || !hasLead ? null : outreachApprovalUrl,
+      enabled: !suppressed && preflight.can_queue,
+      disabled_reason: null,
+      launch_url: launchUrls.queue_for_approval,
       server_action: null,
       timeline_event_kind: "outreach_workflow_started",
     }),
@@ -435,9 +438,9 @@ export function buildProspectWorkflowLauncherActions(input: {
       id: "open_outreach_approval",
       label: "Open Approval Queue",
       group: "outreach",
-      enabled: !suppressed && hasLead,
-      disabled_reason: suppressed ? "Suppressed account." : !hasLead ? needsLeadReason : null,
-      launch_url: suppressed || !hasLead ? null : outreachApprovalUrl,
+      enabled: !suppressed && preflight.can_queue,
+      disabled_reason: null,
+      launch_url: launchUrls.approval_queue,
       server_action: null,
       timeline_event_kind: "outreach_workflow_started",
     }),
@@ -485,9 +488,9 @@ export function buildProspectWorkflowLauncherActions(input: {
       id: "open_copilot",
       label: "Open AI Copilot",
       group: "relationship_expansion",
-      enabled: !suppressed && hasLead,
-      disabled_reason: suppressed ? "Suppressed account." : !hasLead ? needsLeadReason : null,
-      launch_url: suppressed || !hasLead ? null : copilotUrl,
+      enabled: !suppressed && preflight.can_draft,
+      disabled_reason: null,
+      launch_url: launchUrls.copilot,
       server_action: null,
       timeline_event_kind: null,
     }),
@@ -521,6 +524,7 @@ export function buildSavedSearchWorkflowLaunchLinks(input?: {
     { id: "review_opportunities", label: "Review opportunities", href: `/admin/growth/opportunities/workspace${suffix}` },
     { id: "run_qualification", label: "Run qualification", href: `/admin/growth/leads/lead-engine${suffix}` },
     { id: "open_outreach_queue", label: "Open outreach queue", href: `/admin/growth/outreach/approval${suffix}` },
+    { id: "batch_outbound_preview", label: "Batch outbound preview", href: `/admin/growth/search${suffix}${suffix ? "&" : "?"}batchOutbound=1` },
     { id: "executive_review", label: "Executive review", href: `/admin/growth/executive${suffix}` },
   ]
 }

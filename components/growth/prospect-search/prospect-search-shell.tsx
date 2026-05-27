@@ -58,6 +58,7 @@ import { GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER } from "@/lib/growth/pro
 import { GROWTH_PROSPECT_PIPELINE_AUTOMATION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-pipeline-automation"
 import type { GrowthProspectWorkflowContinuityEventKind } from "@/lib/growth/prospect-search/prospect-pipeline-automation"
 import { ProspectWorkflowLauncher } from "@/components/growth/prospect-search/prospect-workflow-launcher"
+import { SavedSearchBatchLaunchPanel } from "@/components/growth/outbound-launch/saved-search-batch-launch-panel"
 import { prospectSearchSelectionKey } from "@/lib/growth/prospect-search/prospect-search-selection"
 import { CompanyStatusBadges } from "@/components/growth/prospect-search/company-status-badges"
 import { ProspectSearchPagination } from "@/components/growth/prospect-search/prospect-search-pagination"
@@ -74,6 +75,8 @@ import {
   shouldFetchProspectSearchResults,
   type ProspectSearchFetchTrigger,
 } from "@/lib/growth/prospect-search/prospect-search-provider-search-intent"
+import { ProspectSearchLiveEstimation } from "@/components/growth/prospect-search/prospect-search-live-estimation"
+import { ProspectSearchFilterHealthWarnings } from "@/components/growth/prospect-search/prospect-search-filter-health-warnings"
 import { useProspectSearchLiveEstimation } from "@/lib/growth/prospect-search/use-prospect-search-live-estimation"
 import { cn } from "@/lib/utils"
 
@@ -171,17 +174,21 @@ export function ProspectSearchShell() {
   const people = result?.people ?? []
   const showEmpty = hasSearched && !loading && companies.length === 0 && people.length === 0
 
-  const { estimate } = useProspectSearchLiveEstimation({
-    query,
-    filters,
-    discoveryMode,
-    enabled: hasSearched && showEmpty,
-  })
+  const { estimate, loading: estimateLoading, displayState: estimateDisplayState } =
+    useProspectSearchLiveEstimation({
+      query,
+      filters,
+      discoveryMode,
+      enabled: true,
+    })
 
-  const searchButtonLabel = discoveryMode === "discover_external" ? "Search providers" : "Search"
+  const searchLoadingLabel =
+    discoveryMode === "discover_external" ? "Searching companies…" : "Searching…"
+  const searchButtonLabel = estimate?.search_button_label ?? "Search"
   const applyButtonLabel = searchButtonLabel
-  const searchButtonDisabled = loading
-  const applyButtonDisabled = loading
+  const searchButtonDisabled =
+    loading || (estimate != null && estimate.search_button_disabled && !estimateLoading)
+  const applyButtonDisabled = searchButtonDisabled
 
   useEffect(() => {
     const t = window.setInterval(() => {
@@ -727,11 +734,12 @@ export function ProspectSearchShell() {
             size="lg"
             onClick={() => void runSearch({ trigger: "explicit_operator_search" })}
             disabled={searchButtonDisabled}
+            aria-label={discoveryMode === "discover_external" ? "Search companies" : "Search"}
           >
             {loading ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
-                {discoveryMode === "discover_external" ? "Searching providers…" : "Searching…"}
+                {searchLoadingLabel}
               </>
             ) : (
               searchButtonLabel
@@ -748,6 +756,13 @@ export function ProspectSearchShell() {
           />
           </div>
         </div>
+        <ProspectSearchLiveEstimation
+          estimate={estimate}
+          loading={estimateLoading}
+          displayState={estimateDisplayState}
+          prominent
+          className="mt-4"
+        />
       </section>
 
       {pendingProviderSearchHint ? (
@@ -793,6 +808,18 @@ export function ProspectSearchShell() {
           refreshingSavedCounts={refreshingSavedCounts}
           onRefreshSavedCounts={(id) => void refreshSavedCounts(id)}
           onDeleteSavedSearch={(id) => void deleteSavedSearch(id)}
+          estimationSlot={
+            <ProspectSearchLiveEstimation
+              estimate={estimate}
+              loading={estimateLoading}
+              displayState={estimateDisplayState}
+              compact
+              className="mb-3"
+            />
+          }
+          filterHealthSlot={
+            <ProspectSearchFilterHealthWarnings estimate={estimate} className="mb-3" />
+          }
         />
 
         <div
@@ -826,13 +853,22 @@ export function ProspectSearchShell() {
                 }}
               />
 
+              {companies.length > 0 ? (
+                <SavedSearchBatchLaunchPanel
+                  savedSearchId={activeSavedSearchId}
+                  companies={companies}
+                  onOpenCompany={(companyId) => {
+                    const match = companies.find((row) => row.id === companyId)
+                    if (match) setSelectedCompany(match)
+                  }}
+                />
+              ) : null}
+
               <div className="w-full min-w-0 space-y-3">
                 <ProspectSearchActiveFilterPills filters={filters} onChange={replaceFilters} />
 
                 {loading ? (
-                  <p className="text-sm text-muted-foreground">
-                    {discoveryMode === "discover_external" ? "Searching providers…" : "Searching…"}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{searchLoadingLabel}</p>
                 ) : null}
 
                 <div className="flex w-full min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -958,6 +994,7 @@ export function ProspectSearchShell() {
                       onWorkflowLaunch={(launchInput) => void handleWorkflowLaunch(row, launchInput)}
                       workflowBusy={workflowLaunchBusy}
                       searchQuery={query}
+                      savedSearchId={activeSavedSearchId}
                     />
                   ))}
                 </div>
@@ -980,6 +1017,7 @@ export function ProspectSearchShell() {
                       query={query}
                       filters={filters}
                       discoveryMode={discoveryMode}
+                      savedSearchId={activeSavedSearchId}
                       busy={workflowLaunchBusy}
                       onLaunch={(launchInput) =>
                         void handleWorkflowLaunch(selectedCompany, {
@@ -1037,6 +1075,7 @@ export function ProspectSearchShell() {
             query={query}
             filters={filters}
             discoveryMode={discoveryMode}
+            savedSearchId={activeSavedSearchId}
             compact
             busy={workflowLaunchBusy}
             onLaunch={(launchInput) =>

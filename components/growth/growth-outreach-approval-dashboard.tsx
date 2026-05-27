@@ -140,7 +140,13 @@ function formatDuration(ms: number | null): string {
   return `${Math.round(hours / 24)}d`
 }
 
-export function GrowthOutreachApprovalDashboard({ highlightQueueId }: { highlightQueueId?: string | null }) {
+export function GrowthOutreachApprovalDashboard({
+  highlightQueueId,
+  filterLeadId,
+}: {
+  highlightQueueId?: string | null
+  filterLeadId?: string | null
+}) {
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -213,8 +219,27 @@ export function GrowthOutreachApprovalDashboard({ highlightQueueId }: { highligh
     )
   }
 
+  const filterItem = (items: GrowthOutreachQueueItemWithLead[]) =>
+    filterLeadId ? items.filter((item) => item.leadId === filterLeadId) : items
+
+  const filteredSections = {
+    pendingApproval: filterItem(dashboard.sections.pendingApproval),
+    scheduled: filterItem(dashboard.sections.scheduled),
+    failed: filterItem(dashboard.sections.failed),
+    executedRecently: filterItem(dashboard.sections.executedRecently),
+    followUpDraftsPendingApproval: filterLeadId
+      ? dashboard.sections.followUpDraftsPendingApproval.filter((d) => d.leadId === filterLeadId)
+      : dashboard.sections.followUpDraftsPendingApproval,
+  }
+
   return (
     <div className="space-y-6">
+      {filterLeadId ? (
+        <p className="text-sm text-muted-foreground">
+          Filtered to lead <span className="font-mono">{filterLeadId.slice(0, 8)}…</span> — human approval required for
+          every send.
+        </p>
+      ) : null}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatTile label="Approval rate" value={`${dashboard.analytics.approvalRate}%`} />
         <StatTile label="Time to approval" value={formatDuration(dashboard.analytics.medianTimeToApprovalMs)} />
@@ -272,37 +297,37 @@ export function GrowthOutreachApprovalDashboard({ highlightQueueId }: { highligh
 
       <QueueList
         title="Pending approval"
-        items={dashboard.sections.pendingApproval}
+        items={filteredSections.pendingApproval}
         onAction={handleAction}
         actingId={actingId}
         highlightQueueId={highlightQueueId}
       />
       <QueueList
         title="Scheduled"
-        items={dashboard.sections.scheduled}
+        items={filteredSections.scheduled}
         onAction={handleAction}
         actingId={actingId}
         highlightQueueId={highlightQueueId}
       />
       <QueueList
         title="Failed"
-        items={dashboard.sections.failed}
+        items={filteredSections.failed}
         onAction={handleAction}
         actingId={actingId}
         highlightQueueId={highlightQueueId}
       />
       <QueueList
         title="Executed recently"
-        items={dashboard.sections.executedRecently}
+        items={filteredSections.executedRecently}
         onAction={handleAction}
         actingId={actingId}
         highlightQueueId={highlightQueueId}
       />
 
-      {dashboard.sections.followUpDraftsPendingApproval.length > 0 ? (
+      {filteredSections.followUpDraftsPendingApproval.length > 0 ? (
         <GrowthEngineCard title="Follow-up drafts pending approval" icon={<Mail className="size-4" />}>
           <ul className="space-y-2 text-sm">
-            {dashboard.sections.followUpDraftsPendingApproval.map((draft) => (
+            {filteredSections.followUpDraftsPendingApproval.map((draft) => (
               <li key={draft.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
                 <div>
                   <p className="font-medium">{draft.companyName}</p>

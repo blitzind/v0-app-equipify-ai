@@ -1,8 +1,10 @@
 "use client"
 
 import { Bot } from "lucide-react"
+import { useSearchParams } from "next/navigation"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthAiCopilotDashboard } from "@/components/growth/growth-ai-copilot-dashboard"
+import { OutboundLaunchContextBanner } from "@/components/growth/outbound-launch/outbound-launch-context-banner"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -12,6 +14,8 @@ import {
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 export default function AdminGrowthCopilotPage() {
+  const searchParams = useSearchParams()
+  const filterLeadId = searchParams.get("leadId")
   const { sessionIdentity } = useAdmin()
   const header = usePlatformAdminHeaderIdentity({
     displayName: sessionIdentity?.displayName,
@@ -39,7 +43,8 @@ export default function AdminGrowthCopilotPage() {
         </section>
 
         <GrowthSectionLayout>
-          <GrowthAiCopilotDashboard />
+          <OutboundLaunchContextBanner className="mb-4" />
+          <GrowthAiCopilotDashboard filterLeadId={filterLeadId} />
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>

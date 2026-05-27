@@ -5,6 +5,7 @@ import { PlayCircle } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthSequenceExecutionFoundationDashboard } from "@/components/growth/growth-sequence-execution-foundation-dashboard"
 import { GrowthSequenceSafeExecutionDashboard } from "@/components/growth/growth-sequence-safe-execution-dashboard"
+import { OutboundLaunchContextBanner } from "@/components/growth/outbound-launch/outbound-launch-context-banner"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -16,6 +17,7 @@ import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 export default function AdminGrowthSequenceExecutionPage() {
   const searchParams = useSearchParams()
   const highlightEnrollmentId = searchParams.get("highlight")
+  const filterLeadId = searchParams.get("leadId")
   const { sessionIdentity } = useAdmin()
   const header = usePlatformAdminHeaderIdentity({
     displayName: sessionIdentity?.displayName,
@@ -43,9 +45,13 @@ export default function AdminGrowthSequenceExecutionPage() {
         </section>
 
         <GrowthSectionLayout>
+          <OutboundLaunchContextBanner className="mb-4" />
           <GrowthSequenceSafeExecutionDashboard />
           <div className="mt-8">
-            <GrowthSequenceExecutionFoundationDashboard highlightEnrollmentId={highlightEnrollmentId} />
+            <GrowthSequenceExecutionFoundationDashboard
+              highlightEnrollmentId={highlightEnrollmentId}
+              filterLeadId={filterLeadId}
+            />
           </div>
         </GrowthSectionLayout>
       </div>

@@ -6,10 +6,10 @@ export const GROWTH_PROSPECT_SEARCH_PROVIDER_INTENT_QA_MARKER =
   "growth-prospect-search-provider-intent-v1" as const
 
 export const PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES = {
-  templateApplied: "Template applied. Review filters, then click Search providers.",
-  workflowRestored: "Workflow restored — click Search providers.",
-  filtersUpdated: "Filters updated — click Search providers.",
-  queryPrefilled: "Query updated — click Search providers.",
+  templateApplied: "Template applied. Review filters, then click Search.",
+  workflowRestored: "Workflow restored — click Search.",
+  filtersUpdated: "Filters updated — click Search.",
+  queryPrefilled: "Query updated — click Search.",
 } as const
 
 export type ProspectSearchExternalPendingMessageKey = keyof typeof PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES

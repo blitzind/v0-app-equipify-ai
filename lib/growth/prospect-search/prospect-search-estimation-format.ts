@@ -30,19 +30,56 @@ export function formatExactOrRangeLabel(input: {
   discovery_mode: GrowthProspectSearchDiscoveryMode
 }): { display_label: string; range_floor: number | null } {
   const count = input.exact_count ?? 0
-  if (input.confidence === "high" && input.exact_count != null) {
+  if (input.confidence === "high" && input.exact_count != null && count > 0) {
+    if (input.discovery_mode === "discover_external") {
+      return {
+        display_label: `${input.exact_count.toLocaleString()} matching companies ready to search`,
+        range_floor: input.exact_count,
+      }
+    }
     return {
-      display_label: `~${input.exact_count.toLocaleString()} estimated matches`,
+      display_label: `${input.exact_count.toLocaleString()} companies match your filters`,
       range_floor: input.exact_count,
     }
   }
   if (count <= 0 && input.discovery_mode === "discover_external") {
-    return { display_label: "External discovery estimate unavailable", range_floor: null }
+    return { display_label: "No likely matches in estimated market", range_floor: null }
+  }
+  if (count <= 0) {
+    return { display_label: "No likely matches", range_floor: null }
   }
   const ranged = floorEstimateToRange(count)
+  if (input.discovery_mode === "discover_external") {
+    return {
+      display_label: `${ranged.label} companies in estimated market`,
+      range_floor: ranged.floor,
+    }
+  }
   return {
-    display_label: `${ranged.label} estimated matches`,
+    display_label: `${ranged.label} companies match current ICP`,
     range_floor: ranged.floor,
+  }
+}
+
+export function formatProspectSearchMarketSizeHeadline(input: {
+  exact_count: number | null
+  confidence: GrowthProspectSearchEstimateConfidence
+  discovery_mode: GrowthProspectSearchDiscoveryMode
+}): { headline: string; helper: string } {
+  const { display_label } = formatExactOrRangeLabel(input)
+  const count = input.exact_count ?? 0
+
+  if (input.discovery_mode === "internal") {
+    return {
+      headline: count > 0 ? display_label : "Refine filters to size your market",
+      helper: "Counts reflect indexed CRM and Growth Engine records — no external discovery.",
+    }
+  }
+
+  return {
+    headline: count > 0 ? display_label : "Refine ICP filters to estimate reachable market",
+    helper:
+      "Estimated reachable market from your current ICP. External search runs only when you click Search.",
   }
 }
 
@@ -73,7 +110,7 @@ export function buildProspectSearchButtonLabel(input: {
       }
       return { label: `Search estimated ${ranged.label.replace("~", "")} companies`, disabled: false }
     }
-    return { label: "Search providers", disabled: false }
+    return { label: "Search", disabled: false }
   }
 
   const count = input.exact_count ?? 0
