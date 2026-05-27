@@ -72,7 +72,7 @@ export function GrowthLeadInboxDashboard() {
           <Button asChild variant="outline" size="sm">
             <Link href="/admin/growth/leads/lead-engine">
               <Workflow className="mr-2 size-4" />
-              Lead Engine tools
+              Lead Intelligence Inspector
             </Link>
           </Button>
           <Button asChild variant="outline" size="sm">

@@ -262,7 +262,7 @@ export default function AdminGrowthLeadsPage() {
               <Button asChild variant="outline" size="sm">
                 <Link href="/admin/growth/leads/lead-engine">
                   <Sparkles className="mr-2 size-4" />
-                  Lead Engine tools
+                  Lead Intelligence Inspector
                 </Link>
               </Button>
               <Button asChild variant="outline" size="sm">

@@ -94,7 +94,7 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = [
       },
       {
         href: "/admin/growth/leads/lead-engine",
-        label: "Lead Engine",
+        label: "Lead Intelligence Inspector",
         icon: Workflow,
         match: (path) => path.startsWith("/admin/growth/leads/lead-engine"),
       },
