@@ -38,6 +38,8 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "email_unmatched",
   "engagement_score_changed",
   "engagement_tier_changed",
+  "engagement_increased",
+  "high_engagement_detected",
   "lead_became_hot",
   "lead_became_dormant",
   "relationship_strength_changed",

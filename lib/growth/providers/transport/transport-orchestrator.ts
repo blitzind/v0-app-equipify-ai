@@ -10,6 +10,7 @@ import {
 import { getTransportAdapter } from "@/lib/growth/providers/adapters/adapter-registry"
 import { selectDeliveryRoute } from "@/lib/growth/providers/provider-router"
 import { getSenderAccount } from "@/lib/growth/sender/sender-repository"
+import { applyOutboundEmailTracking } from "@/lib/growth/tracking/tracking-links"
 import { checkTransportRateLimit } from "@/lib/growth/providers/transport/transport-rate-limit"
 import { resolveTransportFallbackRoute, simulateTransportDelivery } from "@/lib/growth/providers/transport/transport-fallback"
 import { recordTransportAuditEvent } from "@/lib/growth/providers/transport/transport-events"
@@ -83,6 +84,10 @@ export async function simulateTransportForSender(
     rate_limit: rateLimit,
     requested_volume: input.volume ?? 1,
   })
+}
+
+function isTrackingEnabledForSend(): boolean {
+  return process.env.GROWTH_TRACKING_DISABLED?.trim() !== "true"
 }
 
 async function executeAttemptOnRoute(
@@ -202,10 +207,29 @@ async function executeAttemptOnRoute(
     return { ok: false, attempt: failed, error: validation.summary, requires_human_review: true }
   }
 
+  let outboundHtml = input.message.html
+  let trackingMetadata: Record<string, unknown> | null = null
+  if (isTrackingEnabledForSend() && outboundHtml) {
+    const tracked = applyOutboundEmailTracking({
+      html: outboundHtml,
+      deliveryAttemptId: attempt.id,
+    })
+    outboundHtml = tracked.html
+    trackingMetadata = tracked.metadata
+    if (trackingMetadata) {
+      await updateDeliveryAttempt(admin, attempt.id, {
+        metadata: {
+          ...attempt.metadata,
+          tracking: trackingMetadata,
+        },
+      })
+    }
+  }
+
   const sendResult = await adapter.send(credentials, {
     to: input.message.to,
     subject: input.message.subject,
-    html: input.message.html,
+    html: outboundHtml,
     text: input.message.text,
     from: credentials.from_address ?? sender?.email_address ?? "noreply@equipify.local",
     fromName: sender?.display_name ?? undefined,

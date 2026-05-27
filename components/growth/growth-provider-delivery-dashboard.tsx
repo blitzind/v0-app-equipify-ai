@@ -44,8 +44,14 @@ import {
   GROWTH_LIVE_PROVIDER_TRANSPORT_PRIVACY_NOTE,
 } from "@/lib/growth/providers/adapters/provider-adapter-types"
 import { transportHealthLabel } from "@/lib/growth/providers/transport/transport-health"
-import { supportsLiveTransport } from "@/lib/growth/providers/adapters/adapter-registry"
+import { supportsLiveTransport } from "@/lib/growth/providers/adapters/provider-transport-capability-registry"
 import type { GrowthSenderAccount } from "@/lib/growth/sender/sender-types"
+import {
+  GROWTH_ENGAGEMENT_ATTRIBUTION_QA_MARKER,
+  type GrowthEngagementAttributionDashboard,
+  type GrowthTrackingHealthSnapshot,
+} from "@/lib/growth/tracking/tracking-types"
+import { supportsTrackingSimulation, trackingHealthLabel } from "@/lib/growth/tracking/tracking-health"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
   draft: "neutral",
@@ -116,6 +122,7 @@ export function GrowthProviderDeliveryDashboardPanel() {
   const [attempts, setAttempts] = useState<GrowthDeliveryAttempt[]>([])
   const [rateLimits, setRateLimits] = useState<Array<GrowthProviderRateLimitRow & { status?: { allowed: boolean; reason: string } }>>([])
   const [transportHealth, setTransportHealth] = useState<GrowthTransportHealthSnapshot | null>(null)
+  const [trackingHealth, setTrackingHealth] = useState<GrowthTrackingHealthSnapshot | null>(null)
   const [testSendOpen, setTestSendOpen] = useState(false)
   const [testSendTo, setTestSendTo] = useState("")
   const [testSendConfirmed, setTestSendConfirmed] = useState(false)
@@ -132,17 +139,21 @@ export function GrowthProviderDeliveryDashboardPanel() {
     setLoading(true)
     setError(null)
     try {
-      const [listResponse, dashboardResponse, attemptsResponse, rateLimitsResponse] = await Promise.all([
+      const [listResponse, dashboardResponse, attemptsResponse, rateLimitsResponse, engagementResponse] = await Promise.all([
         fetch("/api/platform/growth/providers"),
         fetch("/api/platform/growth/providers/dashboard"),
         fetch("/api/platform/growth/providers/delivery-attempts?limit=20"),
         fetch("/api/platform/growth/providers/rate-limits"),
+        fetch("/api/platform/growth/engagement"),
       ])
       const listPayload = (await listResponse.json()) as ListPayload
       const dashboardPayload = (await dashboardResponse.json()) as DashboardPayload
       const attemptsPayload = (await attemptsResponse.json()) as { attempts?: GrowthDeliveryAttempt[] }
       const rateLimitsPayload = (await rateLimitsResponse.json()) as {
         rate_limits?: Array<GrowthProviderRateLimitRow & { status?: { allowed: boolean; reason: string } }>
+      }
+      const engagementPayload = (await engagementResponse.json()) as {
+        dashboard?: GrowthEngagementAttributionDashboard
       }
       if (!listResponse.ok) throw new Error(listPayload.message ?? "Could not load delivery providers.")
       if (!dashboardResponse.ok) throw new Error(dashboardPayload.message ?? "Could not load delivery dashboard.")
@@ -166,6 +177,7 @@ export function GrowthProviderDeliveryDashboardPanel() {
         rate_limited_providers: (rateLimitsPayload.rate_limits ?? []).filter((row) => row.status && !row.status.allowed).length,
         healthy_providers: Math.max(0, connectedCount - (rateLimitsPayload.rate_limits ?? []).filter((row) => row.status && !row.status.allowed).length),
       })
+      setTrackingHealth(engagementPayload.dashboard?.trackingHealth ?? null)
 
       if (!selectedProviderId && mergedProviders.length > 0) {
         setSelectedProviderId(mergedProviders[0].id)
@@ -322,7 +334,7 @@ export function GrowthProviderDeliveryDashboardPanel() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
           {GROWTH_PROVIDER_DELIVERY_FOUNDATION_QA_MARKER} · {GROWTH_LIVE_PROVIDER_TRANSPORT_QA_MARKER} ·{" "}
-          {GROWTH_LIVE_PROVIDER_TRANSPORT_PRIVACY_NOTE}
+          {GROWTH_ENGAGEMENT_ATTRIBUTION_QA_MARKER} · {GROWTH_LIVE_PROVIDER_TRANSPORT_PRIVACY_NOTE}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
@@ -355,6 +367,15 @@ export function GrowthProviderDeliveryDashboardPanel() {
           <StatTile label="Failed (recent)" value={String(transportHealth?.failed_count_24h ?? 0)} />
           <StatTile label="Retry scheduled" value={String(transportHealth?.retry_scheduled_count ?? 0)} />
           <StatTile label="System" value={transportHealth ? transportHealthLabel(transportHealth) : "—"} />
+        </div>
+      </GrowthEngineCard>
+
+      <GrowthEngineCard title="Attribution Health">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatTile label="Tracking enabled" value={trackingHealth?.tracking_enabled ? "Yes" : "No"} />
+          <StatTile label="Attribution health" value={trackingHealth ? trackingHealthLabel(trackingHealth.attribution_health) : "—"} />
+          <StatTile label="Opens (24h)" value={String(trackingHealth?.open_events_24h ?? 0)} />
+          <StatTile label="Clicks (24h)" value={String(trackingHealth?.click_events_24h ?? 0)} />
         </div>
       </GrowthEngineCard>
 
@@ -418,6 +439,9 @@ export function GrowthProviderDeliveryDashboardPanel() {
               </div>
               {attempt.failure_reason ? (
                 <p className="mt-1 text-xs text-muted-foreground">{attempt.failure_reason}</p>
+              ) : null}
+              {(attempt.metadata.tracking as { tracking_enabled?: boolean } | undefined)?.tracking_enabled === true ? (
+                <p className="mt-1 text-xs text-emerald-700">Tracking enabled</p>
               ) : null}
             </div>
           ))}
@@ -670,6 +694,22 @@ export function GrowthProviderDeliveryDashboardPanel() {
               <p>
                 <span className="font-medium">Fallback route:</span> {transportSimulation.fallback_route.provider_name ?? "None"}
               </p>
+              {(() => {
+                const sim = supportsTrackingSimulation()
+                return (
+                  <>
+                    <p>
+                      <span className="font-medium">Tracking support:</span> {sim.trackingSupport ? "Enabled" : "Disabled"}
+                    </p>
+                    <p>
+                      <span className="font-medium">Link rewrite support:</span> {sim.linkRewriteSupport ? "Enabled" : "Disabled"}
+                    </p>
+                    <p>
+                      <span className="font-medium">Pixel support:</span> {sim.pixelSupport ? "Enabled" : "Disabled"}
+                    </p>
+                  </>
+                )
+              })()}
               <p className="text-muted-foreground">{transportSimulation.route.reason}</p>
             </div>
           ) : simulation ? (

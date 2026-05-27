@@ -1,3 +1,5 @@
+import "server-only"
+
 import { createHash, createHmac } from "crypto"
 import { buildRfc822Message, hasCredential, truncateTransportError } from "@/lib/growth/providers/adapters/adapter-utils"
 import type {

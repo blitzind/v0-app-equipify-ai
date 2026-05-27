@@ -1,3 +1,5 @@
+import "server-only"
+
 import {
   buildRfc822Message,
   encodeBase64Url,

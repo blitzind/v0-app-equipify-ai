@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import type { GrowthEngagementTrendWindow } from "@/lib/growth/engagement-types"
 import type { GrowthLead } from "@/lib/growth/types"
+import type { GrowthEngagementAttributionDashboard } from "@/lib/growth/tracking/tracking-types"
+import { GROWTH_ENGAGEMENT_ATTRIBUTION_QA_MARKER } from "@/lib/growth/tracking/tracking-types"
+import { trackingHealthLabel } from "@/lib/growth/tracking/tracking-health"
 
 type DashboardPayload = {
   averageEngagement: number
@@ -48,8 +51,13 @@ function LeadBucket({
   )
 }
 
+function formatRate(value: number): string {
+  return `${value.toFixed(1)}%`
+}
+
 export function GrowthEngagementDashboard() {
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null)
+  const [attribution, setAttribution] = useState<GrowthEngagementAttributionDashboard | null>(null)
   const [trendWindow, setTrendWindow] = useState<GrowthEngagementTrendWindow>("7d")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -59,11 +67,17 @@ export function GrowthEngagementDashboard() {
     setError(null)
     try {
       const res = await fetch("/api/platform/growth/engagement/dashboard", { cache: "no-store" })
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; dashboard?: DashboardPayload; message?: string }
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        dashboard?: DashboardPayload
+        attribution?: GrowthEngagementAttributionDashboard | null
+        message?: string
+      }
       if (!res.ok || !data.ok || !data.dashboard) {
         throw new Error(data.message ?? "Could not load engagement dashboard.")
       }
       setDashboard(data.dashboard)
+      setAttribution(data.attribution ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
     } finally {
@@ -91,12 +105,19 @@ export function GrowthEngagementDashboard() {
   if (!dashboard) return null
 
   const trend = dashboard.trend[trendWindow] ?? []
+  const rates = attribution?.rates
 
   return (
     <div className="space-y-6">
+      <p className="text-xs text-muted-foreground">{GROWTH_ENGAGEMENT_ATTRIBUTION_QA_MARKER} · First-party attribution only.</p>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
           <StatTile icon={<Activity className="size-3.5" />} label="Average engagement" value={dashboard.averageEngagement} />
+          <StatTile label="Open rate" value={rates ? formatRate(rates.openRate) : "—"} />
+          <StatTile label="Click rate" value={rates ? formatRate(rates.clickRate) : "—"} />
+          <StatTile label="Reply rate" value={rates ? formatRate(rates.replyRate) : "—"} />
+          <StatTile label="Meeting rate" value={rates ? formatRate(rates.meetingRate) : "—"} />
           <StatTile label="Hot leads" value={dashboard.hotLeads.length} />
           <StatTile label="Engaged leads" value={dashboard.engagedLeads.length} />
           <StatTile label="No activity >30d" value={dashboard.noActivity30d.length} />
@@ -106,6 +127,34 @@ export function GrowthEngagementDashboard() {
           Refresh
         </Button>
       </div>
+
+      {attribution ? (
+        <GrowthEngineCard title="Top engaged">
+          {attribution.topEngaged.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No first-party engagement scores recorded yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {attribution.topEngaged.map((lead) => (
+                <li key={lead.leadId} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm">
+                  <div>
+                    <p className="font-medium">{lead.companyName}</p>
+                    <p className="text-muted-foreground">
+                      {lead.opens} opens · {lead.clicks} clicks
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="tabular-nums font-semibold">{lead.score}</span>
+                    <GrowthBadge label={lead.tier} tone="healthy" />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            Attribution health: {trackingHealthLabel(attribution.trackingHealth.attribution_health)}
+          </p>
+        </GrowthEngineCard>
+      ) : null}
 
       <GrowthEngineCard title="Activity trend">
         <div className="mb-4 flex flex-wrap gap-2">

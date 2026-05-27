@@ -225,6 +225,7 @@ async function main(): Promise<void> {
   assert.match(uiSource, /Transport Simulator/)
   assert.match(uiSource, /GROWTH_PROVIDER_DELIVERY_FOUNDATION_QA_MARKER/)
   assert.doesNotMatch(uiSource, /encrypted_access_token|smtp_password|apiKey/)
+  assert.doesNotMatch(uiSource, /adapter-registry/)
 
   const navSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts"),

@@ -1,6 +1,6 @@
-import { connect } from "net"
-import { connect as tlsConnect } from "tls"
-import { buildRfc822Message, hasCredential, truncateTransportError } from "@/lib/growth/providers/adapters/adapter-utils"
+import "server-only"
+
+import { hasCredential } from "@/lib/growth/providers/adapters/adapter-utils"
 import type {
   GrowthProviderAdapter,
   ProviderAdapterCredentials,
@@ -8,96 +8,21 @@ import type {
   ProviderSendResult,
 } from "@/lib/growth/providers/adapters/provider-adapter-types"
 
-function readSmtpResponse(socket: NodeJS.ReadableStream): Promise<string> {
-  return new Promise((resolve, reject) => {
-    function onData(chunk: Buffer | string) {
-      const text = String(chunk)
-      if (/^\d{3} /.test(text)) {
-        socket.off("data", onData)
-        socket.off("error", onError)
-        resolve(text.trim())
-      }
-    }
-    function onError(error: Error) {
-      socket.off("data", onData)
-      reject(error)
-    }
-    socket.on("data", onData)
-    socket.on("error", onError)
-  })
-}
-
-async function smtpCommand(socket: NodeJS.ReadWriteStream, command: string): Promise<string> {
-  socket.write(`${command}\r\n`)
-  return readSmtpResponse(socket)
-}
+const SMTP_NOT_CONFIGURED_MESSAGE =
+  "SMTP transport requires server runtime adapter wiring before live sends."
 
 export async function sendViaSmtpNative(
-  credentials: ProviderAdapterCredentials,
-  message: ProviderSendMessage,
+  _credentials: ProviderAdapterCredentials,
+  _message: ProviderSendMessage,
 ): Promise<ProviderSendResult> {
-  const host = credentials.smtp_host
-  const port = credentials.smtp_port ?? 587
-  const user = credentials.smtp_user
-  const pass = credentials.smtp_password
-  const secure = credentials.smtp_secure ?? port === 465
-
-  if (!host || !user || !pass) {
-    return { ok: false, error: "SMTP host, user, and password are required." }
-  }
-
   if (process.env.GROWTH_TRANSPORT_SIMULATE === "true") {
     return { ok: true, provider_message_id: `sim-smtp-${Date.now()}`, simulated: true }
   }
 
-  return new Promise((resolve) => {
-    const socket = secure
-      ? tlsConnect({ host, port, servername: host })
-      : connect({ host, port })
-
-    const fail = (error: string) => {
-      socket.destroy()
-      resolve({ ok: false, error: truncateTransportError(error) })
-    }
-
-    socket.once("error", (error) => fail(error.message))
-
-    void (async () => {
-      try {
-        await readSmtpResponse(socket)
-        await smtpCommand(socket, `EHLO equipify.local`)
-        if (!secure && port === 587) {
-          await smtpCommand(socket, "STARTTLS")
-          fail("STARTTLS upgrade not supported in native SMTP adapter — use port 465 with smtp_secure.")
-          return
-        }
-        await smtpCommand(socket, "AUTH LOGIN")
-        await smtpCommand(socket, Buffer.from(user).toString("base64"))
-        const authResponse = await smtpCommand(socket, Buffer.from(pass).toString("base64"))
-        if (!authResponse.startsWith("235")) {
-          fail(`SMTP authentication failed: ${authResponse}`)
-          return
-        }
-
-        const from = credentials.from_address ?? message.from
-        await smtpCommand(socket, `MAIL FROM:<${from}>`)
-        await smtpCommand(socket, `RCPT TO:<${message.to}>`)
-        await smtpCommand(socket, "DATA")
-        socket.write(`${buildRfc822Message({ ...message, from })}\r\n.\r\n`)
-        const dataResponse = await readSmtpResponse(socket)
-        await smtpCommand(socket, "QUIT")
-        socket.destroy()
-
-        if (!dataResponse.startsWith("250")) {
-          resolve({ ok: false, error: truncateTransportError(dataResponse) })
-          return
-        }
-        resolve({ ok: true, provider_message_id: `smtp-${Date.now()}` })
-      } catch (error) {
-        fail(error instanceof Error ? error.message : "SMTP send failed.")
-      }
-    })()
-  })
+  return {
+    ok: false,
+    error: SMTP_NOT_CONFIGURED_MESSAGE,
+  }
 }
 
 export const smtpProviderAdapter: GrowthProviderAdapter = {
@@ -120,7 +45,14 @@ export const smtpProviderAdapter: GrowthProviderAdapter = {
   health(credentials) {
     const validation = this.validate(credentials)
     if (!validation.ok) return { ok: false, tier: "degraded", summary: validation.summary }
-    return { ok: true, tier: "healthy", summary: "SMTP transport adapter ready." }
+    if (process.env.GROWTH_TRANSPORT_SIMULATE === "true") {
+      return { ok: true, tier: "healthy", summary: "SMTP transport adapter ready (simulation mode)." }
+    }
+    return {
+      ok: false,
+      tier: "degraded",
+      summary: "SMTP live send not configured — simulation or server runtime wiring required.",
+    }
   },
 
   async send(credentials, message) {

@@ -12,9 +12,11 @@ import { sesProviderAdapter } from "../lib/growth/providers/adapters/ses-provide
 import { smtpProviderAdapter } from "../lib/growth/providers/adapters/smtp-provider"
 import {
   getTransportAdapter,
+} from "../lib/growth/providers/adapters/adapter-registry"
+import {
   listTransportAdapterFamilies,
   supportsLiveTransport,
-} from "../lib/growth/providers/adapters/adapter-registry"
+} from "../lib/growth/providers/adapters/provider-transport-capability-registry"
 import {
   GROWTH_LIVE_PROVIDER_TRANSPORT_PRIVACY_NOTE,
   GROWTH_LIVE_PROVIDER_TRANSPORT_QA_MARKER,
@@ -136,6 +138,34 @@ async function main(): Promise<void> {
     { to: "lead@example.com", subject: "Test", html: "<p>Hi</p>", from: "ops@example.com" },
   )
   assert.equal(resendSend.ok, true)
+
+  const smtpSimulated = await smtpProviderAdapter.send(
+    {
+      provider_family: "smtp",
+      smtp_host: "smtp.example.com",
+      smtp_user: "user",
+      smtp_password: "pass",
+    },
+    { to: "lead@example.com", subject: "Test", html: "<p>Hi</p>", from: "ops@example.com" },
+  )
+  assert.equal(smtpSimulated.ok, true)
+  assert.match(smtpSimulated.provider_message_id ?? "", /sim-smtp/)
+
+  const previousSimulate = process.env.GROWTH_TRANSPORT_SIMULATE
+  delete process.env.GROWTH_TRANSPORT_SIMULATE
+  const smtpLive = await smtpProviderAdapter.send(
+    {
+      provider_family: "smtp",
+      smtp_host: "smtp.example.com",
+      smtp_user: "user",
+      smtp_password: "pass",
+    },
+    { to: "lead@example.com", subject: "Test", html: "<p>Hi</p>", from: "ops@example.com" },
+  )
+  assert.equal(smtpLive.ok, false)
+  assert.match(smtpLive.error ?? "", /server runtime adapter wiring/i)
+  if (previousSimulate) process.env.GROWTH_TRANSPORT_SIMULATE = previousSimulate
+  else process.env.GROWTH_TRANSPORT_SIMULATE = "true"
 
   const rateRow = {
     id: "rl1",
@@ -260,6 +290,22 @@ async function main(): Promise<void> {
   assert.match(uiSource, /Live Send Test/)
   assert.match(uiSource, /human-approved/i)
   assert.doesNotMatch(uiSource, /encrypted_access_token|smtp_password|apiKey/)
+  assert.doesNotMatch(uiSource, /adapter-registry/)
+
+  const smtpSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/providers/adapters/smtp-provider.ts"),
+    "utf8",
+  )
+  assert.doesNotMatch(smtpSource, /from \"net\"|from \"tls\"|nodemailer/)
+  assert.match(smtpSource, /server-only/)
+  assert.match(smtpSource, /GROWTH_TRANSPORT_SIMULATE/)
+
+  const capabilityRegistrySource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/providers/adapters/provider-transport-capability-registry.ts"),
+    "utf8",
+  )
+  assert.doesNotMatch(capabilityRegistrySource, /adapter-registry|smtp-provider|net|tls/)
+  assert.match(capabilityRegistrySource, /supportsLiveTransport/)
 
   console.log("growth-provider-transport: all checks passed")
 }

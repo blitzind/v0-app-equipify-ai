@@ -32,6 +32,7 @@ import type {
   GrowthSequenceTemplate,
 } from "@/lib/growth/sequences/sequence-types"
 import { GROWTH_SEQUENCE_EXECUTION_FOUNDATION_QA_MARKER } from "@/lib/growth/sequences/sequence-types"
+import type { GrowthAttributionRates } from "@/lib/growth/tracking/tracking-types"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
   draft: "neutral",
@@ -75,6 +76,7 @@ type DashboardPayload = {
   templates?: GrowthSequenceTemplate[]
   enrollments?: GrowthSequenceEnrollment[]
   events?: GrowthSequenceExecutionEvent[]
+  attribution_rates?: GrowthAttributionRates | null
   message?: string
 }
 
@@ -95,6 +97,7 @@ export function GrowthSequenceExecutionFoundationDashboard({
   const [templates, setTemplates] = useState<GrowthSequenceTemplate[]>([])
   const [enrollments, setEnrollments] = useState<GrowthSequenceEnrollment[]>([])
   const [events, setEvents] = useState<GrowthSequenceExecutionEvent[]>([])
+  const [attributionRates, setAttributionRates] = useState<GrowthAttributionRates | null>(null)
   const [leads, setLeads] = useState<Array<{ id: string; label: string }>>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState("")
   const [newName, setNewName] = useState("")
@@ -126,6 +129,7 @@ export function GrowthSequenceExecutionFoundationDashboard({
       setLeads(listPayload.leads ?? [])
       setDashboard(dashboardPayload.dashboard ?? null)
       setEvents(dashboardPayload.events ?? [])
+      setAttributionRates(dashboardPayload.attribution_rates ?? null)
       if (!selectedTemplateId && (listPayload.templates?.length ?? 0) > 0) {
         setSelectedTemplateId(listPayload.templates![0].id)
       }
@@ -239,6 +243,17 @@ export function GrowthSequenceExecutionFoundationDashboard({
           <StatTile label="Completed" value={String(dashboard?.completed_count ?? 0)} />
         </div>
       </GrowthEngineCard>
+
+      {attributionRates ? (
+        <GrowthEngineCard title="Sequence attribution (30d)">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StatTile label="Open %" value={`${attributionRates.openRate.toFixed(1)}%`} />
+            <StatTile label="Click %" value={`${attributionRates.clickRate.toFixed(1)}%`} />
+            <StatTile label="Reply %" value={`${attributionRates.replyRate.toFixed(1)}%`} />
+            <StatTile label="Meeting %" value={`${attributionRates.meetingRate.toFixed(1)}%`} />
+          </div>
+        </GrowthEngineCard>
+      ) : null}
 
       <GrowthEngineCard title="Live Execution Engine">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-border px-4 py-3">

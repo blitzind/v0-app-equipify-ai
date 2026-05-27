@@ -1,3 +1,5 @@
+import "server-only"
+
 import { hasCredential, truncateTransportError } from "@/lib/growth/providers/adapters/adapter-utils"
 import type {
   GrowthProviderAdapter,

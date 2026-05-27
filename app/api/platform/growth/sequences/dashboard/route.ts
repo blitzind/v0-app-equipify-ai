@@ -4,6 +4,8 @@ import { fetchSequenceExecutionFoundationDashboard } from "@/lib/growth/sequence
 import { listSequenceExecutionEvents } from "@/lib/growth/sequences/sequence-events"
 import { isGrowthSequenceExecutionSchemaReady } from "@/lib/growth/sequences/sequence-schema-health"
 import { GROWTH_SEQUENCE_EXECUTION_PRIVACY_NOTE } from "@/lib/growth/sequences/sequence-types"
+import { fetchAttributionRates } from "@/lib/growth/tracking/tracking-repository"
+import { isGrowthEngagementTrackingSchemaReady } from "@/lib/growth/tracking/tracking-schema-health"
 
 export const runtime = "nodejs"
 
@@ -22,14 +24,17 @@ export async function GET() {
   }
 
   try {
-    const [overview, events] = await Promise.all([
+    const [overview, events, trackingReady] = await Promise.all([
       fetchSequenceExecutionFoundationDashboard(access.admin),
       listSequenceExecutionEvents(access.admin, { limit: 30 }),
+      isGrowthEngagementTrackingSchemaReady(access.admin),
     ])
+    const attributionRates = trackingReady ? await fetchAttributionRates(access.admin) : null
     return NextResponse.json({
       ok: true,
       ...overview,
       events,
+      attribution_rates: attributionRates,
       privacy_note: GROWTH_SEQUENCE_EXECUTION_PRIVACY_NOTE,
     })
   } catch {

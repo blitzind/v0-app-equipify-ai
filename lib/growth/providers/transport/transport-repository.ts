@@ -269,8 +269,8 @@ export async function resolveProviderAdapterCredentials(
 
   return {
     provider_family: family,
-    access_token: mailbox.access_token ?? asString(decrypted.accessToken) || null,
-    refresh_token: mailbox.refresh_token ?? asString(decrypted.refreshToken) || null,
+    access_token: mailbox.access_token ?? (asString(decrypted.accessToken) || null),
+    refresh_token: mailbox.refresh_token ?? (asString(decrypted.refreshToken) || null),
     api_key: asString(decrypted.apiKey) || asString(decrypted.api_key) || null,
     smtp_host: asString(decrypted.smtpHost) || asString(decrypted.smtp_host) || null,
     smtp_port: asNumber(decrypted.smtpPort ?? decrypted.smtp_port, 587),
@@ -280,7 +280,7 @@ export async function resolveProviderAdapterCredentials(
     aws_access_key_id: asString(decrypted.awsAccessKeyId) || asString(decrypted.aws_access_key_id) || null,
     aws_secret_access_key: asString(decrypted.awsSecretAccessKey) || asString(decrypted.aws_secret_access_key) || null,
     aws_region: asString(decrypted.awsRegion) || asString(decrypted.aws_region) || null,
-    from_address: sender?.email_address ?? mailbox.email_address ?? asString(decrypted.fromAddress) || null,
+    from_address: sender?.email_address ?? mailbox.email_address ?? (asString(decrypted.fromAddress) || null),
   }
 }
 
