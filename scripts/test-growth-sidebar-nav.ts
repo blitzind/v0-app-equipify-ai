@@ -6,6 +6,7 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import {
+  GROWTH_SIDEBAR_FLYOUT_QA_MARKER,
   GROWTH_SIDEBAR_GROUPS_COLLAPSED_STORAGE_KEY,
   GROWTH_SIDEBAR_NAV_QA_MARKER,
 } from "../components/growth/growth-section-sidebar-nav"
@@ -17,6 +18,7 @@ import { GROWTH_COMMAND_REGISTRY } from "../lib/growth/navigation/growth-command
 import { GROWTH_NAVIGATION_POLISH_QA_MARKER } from "../lib/growth/navigation/growth-navigation-ranking"
 
 assert.equal(GROWTH_SIDEBAR_NAV_QA_MARKER, "growth-sidebar-nav-v2")
+assert.equal(GROWTH_SIDEBAR_FLYOUT_QA_MARKER, "growth-sidebar-flyout-v1")
 assert.equal(GROWTH_NAVIGATION_IA_QA_MARKER, "growth-navigation-ia-v2")
 assert.equal(GROWTH_NAVIGATION_POLISH_QA_MARKER, "growth-navigation-polish-v1")
 assert.match(GROWTH_SIDEBAR_GROUPS_COLLAPSED_STORAGE_KEY, /groups-collapsed/)
@@ -27,8 +29,16 @@ const source = fs.readFileSync(
 )
 
 assert.match(source, /ChevronDown/)
+assert.match(source, /ChevronRight/)
 assert.match(source, /useGrowthSidebarGroupCollapse/)
+assert.match(source, /useGrowthNavFlyout/)
+assert.match(source, /GrowthNavFlyoutPanel/)
+assert.match(source, /GrowthNavSectionRow/)
+assert.match(source, /GrowthNavFlyoutSections/)
+assert.match(source, /clickableNavItems/)
 assert.match(source, /GROWTH_NAV_GROUP_DEFS/)
+assert.match(source, /GROWTH_SIDEBAR_FLYOUT_QA_MARKER/)
+assert.match(source, /data-flyout-marker=\{GROWTH_SIDEBAR_FLYOUT_QA_MARKER\}/)
 assert.match(source, /GROWTH_NAVIGATION_IA_QA_MARKER/)
 assert.match(source, /GROWTH_NAVIGATION_POLISH_QA_MARKER/)
 assert.match(source, /growthNavigationShortcutLabel/)
@@ -43,13 +53,19 @@ assert.doesNotMatch(source, /Run Research/)
 assert.doesNotMatch(source, /Generate Copilot Draft/)
 assert.match(source, /dark:bg-slate-800/)
 assert.match(source, /data-qa-marker=\{GROWTH_SIDEBAR_NAV_QA_MARKER\}/)
-assert.match(source, /aria-expanded=\{!groupCollapsed\}/)
+assert.match(source, /aria-expanded=\{flyoutOpen\}/)
+assert.match(source, /aria-haspopup="menu"/)
+assert.match(source, /role="menu"/)
+assert.match(source, /scheduleClose/)
+assert.match(source, /Escape/)
 assert.match(source, /TooltipContent side="right"/)
 assert.match(source, /resolveNavBadge/)
 assert.match(source, /safeMatchGrowthNavItem/)
 assert.match(source, /normalizeGrowthPathname/)
 assert.match(source, /GrowthSidebarNavErrorBoundary/)
 assert.match(source, /futurePlaceholder/)
+assert.match(source, /lg:hidden/)
+assert.match(source, /clickableNavItems\(group\)/)
 
 const coreGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "core")
 assert.ok(coreGroup?.items.some((i) => i.label === "Revenue Inbox"))
@@ -85,6 +101,8 @@ assert.ok(leadEngineGroup?.items.some((i) => i.label === "Imports"))
 const providersGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "providers-nav")
 assert.equal(providersGroup?.label, "Providers")
 assert.ok(providersGroup?.items.some((i) => i.label === "Delivery"))
+assert.ok(providersGroup?.items.some((i) => i.label === "Compliance"))
+assert.ok(providersGroup?.items.some((i) => i.label === "Webhooks"))
 assert.ok(providersGroup?.items.some((i) => i.label === "Provider Diagnostics"))
 assert.ok(providersGroup?.items.some((i) => i.label === "Mailbox Connections"))
 

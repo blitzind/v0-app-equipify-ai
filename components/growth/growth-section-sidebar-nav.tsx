@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Component, useCallback, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from "react"
+import { Component, useCallback, useEffect, useRef, useState, type ErrorInfo, type FocusEvent, type ReactNode } from "react"
 import type { LucideIcon } from "lucide-react"
 import {
   Activity,
@@ -64,7 +64,11 @@ import { cn } from "@/lib/utils"
 
 export const GROWTH_SIDEBAR_NAV_QA_MARKER = "growth-sidebar-nav-v2" as const
 
+export const GROWTH_SIDEBAR_FLYOUT_QA_MARKER = "growth-sidebar-flyout-v1" as const
+
 export const GROWTH_SIDEBAR_GROUPS_COLLAPSED_STORAGE_KEY = "equipify-growth-sidebar-groups-collapsed"
+
+const GROWTH_NAV_FLYOUT_CLOSE_DELAY_MS = 120
 
 type GrowthNavItem = GrowthNavItemDef & {
   icon: LucideIcon
@@ -144,6 +148,81 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = GROWTH_NAV_GROUP_DEFS.map((group) =>
   label: group.label,
   items: toNavItems(group.items),
 }))
+
+const GROWTH_NAV_GROUP_ICONS: Record<string, LucideIcon> = {
+  core: LayoutDashboard,
+  intelligence: Radar,
+  execution: PlayCircle,
+  "lead-engine": Workflow,
+  "providers-nav": Truck,
+  ai: Bot,
+  settings: Settings,
+}
+
+function clickableNavItems(group: GrowthNavGroup): GrowthNavItem[] {
+  return group.items.filter((item) => !item.futurePlaceholder)
+}
+
+function resolveGroupBadge(
+  group: GrowthNavGroup,
+  badges: Partial<Record<GrowthSidebarConsoleKey, number>> | null | undefined,
+): number | undefined {
+  let total = 0
+  for (const item of clickableNavItems(group)) {
+    const count = resolveNavBadge(item, badges)
+    if (count) total += count
+  }
+  return total > 0 ? total : undefined
+}
+
+function useGrowthNavFlyout() {
+  const [activeFlyoutGroupId, setActiveFlyoutGroupId] = useState<string | null>(null)
+  const closeTimerRef = useRef<number | null>(null)
+
+  const cancelClose = useCallback(() => {
+    if (closeTimerRef.current != null) {
+      window.clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+  }, [])
+
+  const openFlyout = useCallback(
+    (groupId: string) => {
+      cancelClose()
+      setActiveFlyoutGroupId(groupId)
+    },
+    [cancelClose],
+  )
+
+  const scheduleClose = useCallback(() => {
+    cancelClose()
+    closeTimerRef.current = window.setTimeout(() => {
+      setActiveFlyoutGroupId(null)
+      closeTimerRef.current = null
+    }, GROWTH_NAV_FLYOUT_CLOSE_DELAY_MS)
+  }, [cancelClose])
+
+  const closeFlyout = useCallback(() => {
+    cancelClose()
+    setActiveFlyoutGroupId(null)
+  }, [cancelClose])
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") closeFlyout()
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [closeFlyout])
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current != null) window.clearTimeout(closeTimerRef.current)
+    }
+  }, [])
+
+  return { activeFlyoutGroupId, openFlyout, scheduleClose, cancelClose, closeFlyout }
+}
 
 function resolveNavBadge(
   item: GrowthNavItem,
@@ -296,6 +375,7 @@ function GrowthNavLink({
   compact,
   badge,
   previewLines,
+  onNavigate,
 }: {
   item: GrowthNavItem
   pathname: string
@@ -303,6 +383,7 @@ function GrowthNavLink({
   compact?: boolean
   badge?: number
   previewLines?: GrowthSidebarPreviewLine[]
+  onNavigate?: () => void
 }) {
   const active = safeMatchGrowthNavItem(item, pathname)
   const Icon = item.icon
@@ -364,12 +445,12 @@ function GrowthNavLink({
   }
 
   const link = (
-    <Link href={item.href} className={rowClassName}>
+    <Link href={item.href} className={rowClassName} onClick={onNavigate}>
       {rowContent}
     </Link>
   )
 
-  if (collapsed && !compact) {
+  if (collapsed && !compact && !onNavigate) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>{link}</TooltipTrigger>
@@ -399,6 +480,210 @@ function GrowthNavLink({
   }
 
   return link
+}
+
+function GrowthNavFlyoutPanel({
+  group,
+  pathname,
+  badges,
+  previews,
+  onNavigate,
+  onMouseEnter,
+  onMouseLeave,
+  onFocus,
+  onBlur,
+}: {
+  group: GrowthNavGroup
+  pathname: string
+  badges: Partial<Record<GrowthSidebarConsoleKey, number>>
+  previews: Partial<Record<GrowthSidebarConsoleKey, GrowthSidebarPreviewLine[]>>
+  onNavigate: () => void
+  onMouseEnter: () => void
+  onMouseLeave: () => void
+  onFocus: () => void
+  onBlur: (event: FocusEvent) => void
+}) {
+  const items = clickableNavItems(group)
+
+  return (
+    <div
+      role="navigation"
+      aria-label={`${group.label} navigation`}
+      className="absolute left-[calc(100%+6px)] top-0 z-50 min-w-[13rem] rounded-xl border border-border bg-card p-2 shadow-lg dark:border-border/80 dark:bg-card/95"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onFocus={onFocus}
+      onBlur={onBlur}
+    >
+      <p className="mb-1.5 px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
+      <div role="menu" className="space-y-0.5">
+        {items.map((item) => (
+          <GrowthNavLink
+            key={item.id}
+            item={item}
+            pathname={pathname}
+            badge={resolveNavBadge(item, badges)}
+            previewLines={resolvePreviewLines(item, previews)}
+            onNavigate={onNavigate}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function GrowthNavSectionRow({
+  group,
+  pathname,
+  collapsed,
+  badges,
+  previews,
+  flyoutOpen,
+  onOpen,
+  onScheduleClose,
+  onCancelClose,
+  onCloseFlyout,
+}: {
+  group: GrowthNavGroup
+  pathname: string
+  collapsed: boolean
+  badges: Partial<Record<GrowthSidebarConsoleKey, number>>
+  previews: Partial<Record<GrowthSidebarConsoleKey, GrowthSidebarPreviewLine[]>>
+  flyoutOpen: boolean
+  onOpen: () => void
+  onScheduleClose: () => void
+  onCancelClose: () => void
+  onCloseFlyout: () => void
+}) {
+  const groupActive = groupHasActiveRoute(group, pathname)
+  const GroupIcon = GROWTH_NAV_GROUP_ICONS[group.id] ?? LayoutDashboard
+  const groupBadge = resolveGroupBadge(group, badges)
+  const items = clickableNavItems(group)
+
+  if (items.length === 0) return null
+
+  const handleBlur = (event: FocusEvent) => {
+    const next = event.relatedTarget as Node | null
+    if (next && event.currentTarget.contains(next)) return
+    onScheduleClose()
+  }
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => {
+        onCancelClose()
+        onOpen()
+      }}
+      onMouseLeave={onScheduleClose}
+    >
+      <button
+        type="button"
+        aria-expanded={flyoutOpen}
+        aria-haspopup="menu"
+        aria-controls={`growth-nav-flyout-${group.id}`}
+        onFocus={() => {
+          onCancelClose()
+          onOpen()
+        }}
+        onBlur={handleBlur}
+        className={cn(
+          "group relative flex w-full min-w-0 items-center gap-2",
+          GROWTH_NAV_ROW_MOTION,
+          collapsed ? "justify-center px-2 py-2" : "px-3 py-2",
+          groupActive ? GROWTH_NAV_ROW_ACTIVE : GROWTH_NAV_ROW_INACTIVE,
+        )}
+      >
+        {groupActive && !collapsed ? (
+          <span
+            className={cn("absolute left-0 top-1/2 z-[1] h-5 w-0.5 -translate-y-1/2 rounded-r-full", GROWTH_NAV_ACTIVE_RAIL)}
+            aria-hidden
+          />
+        ) : null}
+        {groupActive && collapsed ? (
+          <span
+            className={cn("absolute bottom-1 left-1/2 z-[1] h-1.5 w-1.5 -translate-x-1/2 rounded-full", GROWTH_NAV_ACTIVE_RAIL)}
+            aria-hidden
+          />
+        ) : null}
+        <GroupIcon
+          className={cn("size-4 shrink-0", groupActive ? GROWTH_NAV_ICON_ACTIVE : GROWTH_NAV_ICON_INACTIVE)}
+          aria-hidden
+        />
+        {!collapsed ? (
+          <>
+            <span className="min-w-0 flex-1 truncate text-left text-sm">{group.label}</span>
+            <NavBadge count={groupBadge} active={groupActive} />
+            <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/70" aria-hidden />
+          </>
+        ) : null}
+        {collapsed && groupBadge ? (
+          <span
+            className={cn(
+              "absolute -right-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full px-1 py-0.5 text-[9px] font-semibold tabular-nums",
+              groupActive
+                ? "bg-blue-100 text-blue-800 dark:bg-cyan-500/20 dark:text-cyan-100"
+                : "bg-emerald-100 text-emerald-800 dark:bg-slate-700 dark:text-slate-200",
+            )}
+            aria-label={`${groupBadge} notifications`}
+          >
+            {groupBadge > 9 ? "9+" : groupBadge}
+          </span>
+        ) : null}
+      </button>
+
+      {flyoutOpen ? (
+        <div id={`growth-nav-flyout-${group.id}`}>
+          <GrowthNavFlyoutPanel
+            group={group}
+            pathname={pathname}
+            badges={badges}
+            previews={previews}
+            onNavigate={onCloseFlyout}
+            onMouseEnter={onCancelClose}
+            onMouseLeave={onScheduleClose}
+            onFocus={onCancelClose}
+            onBlur={handleBlur}
+          />
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function GrowthNavFlyoutSections({
+  pathname,
+  collapsed,
+  badges,
+  previews,
+  flyout,
+}: {
+  pathname: string
+  collapsed: boolean
+  badges: Partial<Record<GrowthSidebarConsoleKey, number>>
+  previews: Partial<Record<GrowthSidebarConsoleKey, GrowthSidebarPreviewLine[]>>
+  flyout: ReturnType<typeof useGrowthNavFlyout>
+}) {
+  return (
+    <div className="space-y-0.5">
+      {GROWTH_NAV_GROUPS.map((group, groupIndex) => (
+        <div key={group.id} className={cn(groupIndex > 0 ? "mt-2 border-t border-border/50 pt-2 dark:border-border/40" : "")}>
+          <GrowthNavSectionRow
+            group={group}
+            pathname={pathname}
+            collapsed={collapsed}
+            badges={badges}
+            previews={previews}
+            flyoutOpen={flyout.activeFlyoutGroupId === group.id}
+            onOpen={() => flyout.openFlyout(group.id)}
+            onScheduleClose={flyout.scheduleClose}
+            onCancelClose={flyout.cancelClose}
+            onCloseFlyout={flyout.closeFlyout}
+          />
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function GrowthNavGroups({
@@ -471,7 +756,7 @@ function GrowthNavGroups({
               hidden={hideItems}
               className={cn(compact ? "space-y-0.5" : "space-y-0.5 pb-0.5")}
             >
-              {group.items.map((item) => (
+              {clickableNavItems(group).map((item) => (
                 <GrowthNavLink
                   key={item.id}
                   item={item}
@@ -661,6 +946,7 @@ function GrowthSectionSidebarNavInner() {
   const pathname = normalizeGrowthPathname(usePathname())
   const consoleState = useGrowthSidebarConsole()
   const [collapsed, setCollapsed] = useState(false)
+  const flyout = useGrowthNavFlyout()
   const { collapsedGroups, toggleGroup } = useGrowthSidebarGroupCollapse(pathname, GROWTH_NAV_GROUPS)
 
   useGrowthSidebarKeyboardShortcuts()
@@ -691,11 +977,12 @@ function GrowthSectionSidebarNavInner() {
       <nav
         aria-label="Growth Engine"
         data-qa-marker={GROWTH_SIDEBAR_NAV_QA_MARKER}
+        data-flyout-marker={GROWTH_SIDEBAR_FLYOUT_QA_MARKER}
         data-navigation-ia-marker={GROWTH_NAVIGATION_IA_QA_MARKER}
         data-navigation-polish-marker={GROWTH_NAVIGATION_POLISH_QA_MARKER}
-        className={cn("hidden shrink-0 lg:block", collapsed ? "w-[4.5rem]" : "w-60")}
+        className={cn("hidden shrink-0 overflow-visible lg:block", collapsed ? "w-[4.5rem]" : "w-60")}
       >
-        <div className="sticky top-6 flex flex-col rounded-2xl border border-border bg-card p-3 shadow-sm dark:border-border/80 dark:bg-card/95">
+        <div className="sticky top-6 flex flex-col overflow-visible rounded-2xl border border-border bg-card p-3 shadow-sm dark:border-border/80 dark:bg-card/95">
           <div className={cn("mb-2 flex items-center gap-1", collapsed ? "justify-center" : "justify-between")}>
             {!collapsed ? (
               <p className="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Growth Engine</p>
@@ -712,33 +999,13 @@ function GrowthSectionSidebarNavInner() {
             </Button>
           </div>
 
-          {collapsed ? (
-            <>
-              {GROWTH_NAV_GROUPS.map((group, groupIndex) => (
-                <div key={group.id} className={cn("space-y-0.5", groupIndex > 0 ? "mt-3 border-t border-border/50 pt-3 dark:border-border/40" : "")}>
-                  {group.items.map((item) => (
-                    <GrowthNavLink
-                      key={item.id}
-                      item={item}
-                      pathname={pathname}
-                      collapsed
-                      badge={resolveNavBadge(item, consoleState.badges)}
-                      previewLines={resolvePreviewLines(item, consoleState.previews)}
-                    />
-                  ))}
-                </div>
-              ))}
-            </>
-          ) : (
-            <GrowthNavGroups
-              pathname={pathname}
-              collapsed={collapsed}
-              badges={consoleState.badges}
-              previews={consoleState.previews}
-              collapsedGroups={collapsedGroups}
-              toggleGroup={toggleGroup}
-            />
-          )}
+          <GrowthNavFlyoutSections
+            pathname={pathname}
+            collapsed={collapsed}
+            badges={consoleState.badges}
+            previews={consoleState.previews}
+            flyout={flyout}
+          />
 
           <GrowthSidebarHealthStrip
             collapsed={collapsed}
@@ -758,6 +1025,7 @@ function GrowthSectionSidebarNavInner() {
       <nav
         aria-label="Growth Engine"
         data-qa-marker={GROWTH_SIDEBAR_NAV_QA_MARKER}
+        data-flyout-marker={GROWTH_SIDEBAR_FLYOUT_QA_MARKER}
         data-navigation-ia-marker={GROWTH_NAVIGATION_IA_QA_MARKER}
         data-navigation-polish-marker={GROWTH_NAVIGATION_POLISH_QA_MARKER}
         className="lg:hidden"

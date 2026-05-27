@@ -94,6 +94,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["compliance", "bounce", "unsubscribe", "complaint", "suppression", "reputation"],
   },
   {
+    id: "provider-webhooks",
+    label: "Webhooks",
+    href: "/admin/growth/providers/webhooks",
+    keywords: ["webhook", "provider event", "delivery event", "bounce webhook", "signature"],
+  },
+  {
     id: "lead-intelligence",
     label: "Lead Intelligence Inspector",
     href: "/admin/growth/leads/lead-engine",
@@ -548,6 +554,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: prefixMatch("/admin/growth/providers/compliance"),
       },
       {
+        id: "provider-webhooks",
+        href: "/admin/growth/providers/webhooks",
+        label: "Webhooks",
+        match: prefixMatch("/admin/growth/providers/webhooks"),
+      },
+      {
         id: "mailbox-connections",
         href: "/admin/growth/infrastructure/mailboxes",
         label: "Mailbox Connections",
@@ -583,7 +595,8 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: (path) =>
           path.startsWith("/admin/growth/providers") &&
           !path.startsWith("/admin/growth/providers/delivery") &&
-          !path.startsWith("/admin/growth/providers/compliance"),
+          !path.startsWith("/admin/growth/providers/compliance") &&
+          !path.startsWith("/admin/growth/providers/webhooks"),
       },
     ],
   },

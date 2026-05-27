@@ -57,6 +57,10 @@ import {
   type GrowthEngagementAttributionDashboard,
   type GrowthTrackingHealthSnapshot,
 } from "@/lib/growth/tracking/tracking-types"
+import {
+  GROWTH_PROVIDER_WEBHOOK_INGESTION_QA_MARKER,
+  type GrowthProviderWebhookDashboard,
+} from "@/lib/growth/webhooks/webhook-types"
 import { supportsTrackingSimulation, trackingHealthLabel } from "@/lib/growth/tracking/tracking-health"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
@@ -147,13 +151,14 @@ export function GrowthProviderDeliveryDashboardPanel() {
     setLoading(true)
     setError(null)
     try {
-      const [listResponse, dashboardResponse, attemptsResponse, rateLimitsResponse, engagementResponse, complianceResponse] = await Promise.all([
+      const [listResponse, dashboardResponse, attemptsResponse, rateLimitsResponse, engagementResponse, complianceResponse, webhooksResponse] = await Promise.all([
         fetch("/api/platform/growth/providers"),
         fetch("/api/platform/growth/providers/dashboard"),
         fetch("/api/platform/growth/providers/delivery-attempts?limit=20"),
         fetch("/api/platform/growth/providers/rate-limits"),
         fetch("/api/platform/growth/engagement"),
         fetch("/api/platform/growth/compliance/dashboard"),
+        fetch("/api/platform/growth/webhooks/provider-events"),
       ])
       const listPayload = (await listResponse.json()) as ListPayload
       const dashboardPayload = (await dashboardResponse.json()) as DashboardPayload
@@ -191,6 +196,7 @@ export function GrowthProviderDeliveryDashboardPanel() {
       })
       setTrackingHealth(engagementPayload.dashboard?.trackingHealth ?? null)
       setComplianceDashboard(compliancePayload.dashboard ?? null)
+      setWebhookDashboard(webhooksPayload.dashboard ?? null)
       setComplianceHealth(
         compliancePayload.dashboard
           ? {
@@ -431,6 +437,24 @@ export function GrowthProviderDeliveryDashboardPanel() {
         <div className="mt-3">
           <Button type="button" variant="outline" size="sm" asChild>
             <Link href="/admin/growth/providers/compliance">Open Compliance</Link>
+          </Button>
+        </div>
+      </GrowthEngineCard>
+
+      <GrowthEngineCard title="Webhook Health">
+        <p className="mb-3 text-xs text-muted-foreground">{GROWTH_PROVIDER_WEBHOOK_INGESTION_QA_MARKER}</p>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatTile label="Received (24h)" value={String(webhookDashboard?.received24h ?? 0)} />
+          <StatTile label="Last Provider Event" value={formatDate(webhookDashboard?.lastProviderEventAt)} />
+          <StatTile
+            label="Delivery Confirmation Rate"
+            value={webhookDashboard ? `${webhookDashboard.deliveryConfirmationRate.toFixed(1)}%` : "—"}
+          />
+          <StatTile label="Signature Failures (24h)" value={String(webhookDashboard?.signatureFailures24h ?? 0)} />
+        </div>
+        <div className="mt-3">
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/providers/webhooks">Open Webhooks</Link>
           </Button>
         </div>
       </GrowthEngineCard>
