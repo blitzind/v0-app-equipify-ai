@@ -2,7 +2,20 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Component, useCallback, useEffect, useRef, useState, type ErrorInfo, type FocusEvent, type ReactNode } from "react"
+import {
+  Component,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ErrorInfo,
+  type FocusEvent,
+  type ReactNode,
+  type RefObject,
+  type CSSProperties,
+} from "react"
+import { createPortal } from "react-dom"
 import type { LucideIcon } from "lucide-react"
 import {
   Activity,
@@ -60,11 +73,14 @@ import {
 } from "@/lib/growth/navigation/growth-navigation-destinations"
 import { GROWTH_NAVIGATION_POLISH_QA_MARKER } from "@/lib/growth/navigation/growth-navigation-ranking"
 import { isGrowthNavigationInputTarget } from "@/lib/growth/navigation/growth-navigation-input-guard"
+import { APP_Z_GROWTH_NAV_FLYOUT } from "@/lib/layout/app-z-layers"
 import { cn } from "@/lib/utils"
 
 export const GROWTH_SIDEBAR_NAV_QA_MARKER = "growth-sidebar-nav-v2" as const
 
-export const GROWTH_SIDEBAR_FLYOUT_QA_MARKER = "growth-sidebar-flyout-v1" as const
+export const GROWTH_SIDEBAR_FLYOUT_QA_MARKER = "growth-sidebar-flyout-zindex-v1" as const
+
+const GROWTH_NAV_FLYOUT_BRIDGE_PX = 28
 
 export const GROWTH_SIDEBAR_GROUPS_COLLAPSED_STORAGE_KEY = "equipify-growth-sidebar-groups-collapsed"
 
@@ -492,6 +508,9 @@ function GrowthNavFlyoutPanel({
   onMouseLeave,
   onFocus,
   onBlur,
+  panelRef,
+  style,
+  panelId,
 }: {
   group: GrowthNavGroup
   pathname: string
@@ -502,14 +521,25 @@ function GrowthNavFlyoutPanel({
   onMouseLeave: () => void
   onFocus: () => void
   onBlur: (event: FocusEvent) => void
+  panelRef?: RefObject<HTMLDivElement | null>
+  style?: CSSProperties
+  panelId?: string
 }) {
   const items = clickableNavItems(group)
 
   return (
     <div
+      ref={panelRef}
+      id={panelId}
       role="navigation"
       aria-label={`${group.label} navigation`}
-      className="absolute left-[calc(100%+6px)] top-0 z-50 min-w-[13rem] rounded-xl border border-border bg-card p-2 shadow-lg dark:border-border/80 dark:bg-card/95"
+      data-flyout-layer="growth-nav-flyout"
+      data-flyout-marker={GROWTH_SIDEBAR_FLYOUT_QA_MARKER}
+      className={cn(
+        APP_Z_GROWTH_NAV_FLYOUT,
+        "fixed min-w-[13rem] rounded-xl border border-border bg-card p-2 shadow-lg dark:border-border/80 dark:bg-card/95",
+      )}
+      style={style}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onFocus={onFocus}
@@ -529,6 +559,134 @@ function GrowthNavFlyoutPanel({
         ))}
       </div>
     </div>
+  )
+}
+
+type GrowthNavFlyoutAnchor = {
+  top: number
+  left: number
+  height: number
+  triggerRight: number
+}
+
+function useGrowthNavFlyoutAnchor(
+  anchorRef: RefObject<HTMLElement | null>,
+  active: boolean,
+): GrowthNavFlyoutAnchor | null {
+  const [anchor, setAnchor] = useState<GrowthNavFlyoutAnchor | null>(null)
+
+  const updateAnchor = useCallback(() => {
+    const element = anchorRef.current
+    if (!element) return
+    const rect = element.getBoundingClientRect()
+    setAnchor({
+      top: rect.top,
+      left: rect.right + 6,
+      height: rect.height,
+      triggerRight: rect.right,
+    })
+  }, [anchorRef])
+
+  useLayoutEffect(() => {
+    if (!active) {
+      setAnchor(null)
+      return
+    }
+    updateAnchor()
+    window.addEventListener("scroll", updateAnchor, true)
+    window.addEventListener("resize", updateAnchor)
+    return () => {
+      window.removeEventListener("scroll", updateAnchor, true)
+      window.removeEventListener("resize", updateAnchor)
+    }
+  }, [active, updateAnchor])
+
+  return anchor
+}
+
+function useDocumentBodyPortalReady(): boolean {
+  const [ready, setReady] = useState(false)
+  useEffect(() => setReady(true), [])
+  return ready
+}
+
+function GrowthNavFlyoutPortal({
+  group,
+  pathname,
+  badges,
+  previews,
+  anchor,
+  onNavigate,
+  onMouseEnter,
+  onMouseLeave,
+  onFocus,
+  onBlur,
+  panelId,
+}: {
+  group: GrowthNavGroup
+  pathname: string
+  badges: Partial<Record<GrowthSidebarConsoleKey, number>>
+  previews: Partial<Record<GrowthSidebarConsoleKey, GrowthSidebarPreviewLine[]>>
+  anchor: GrowthNavFlyoutAnchor
+  onNavigate: () => void
+  onMouseEnter: () => void
+  onMouseLeave: () => void
+  onFocus: () => void
+  onBlur: (event: FocusEvent) => void
+  panelId: string
+}) {
+  const portalReady = useDocumentBodyPortalReady()
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [panelHeight, setPanelHeight] = useState(0)
+
+  useLayoutEffect(() => {
+    const panel = panelRef.current
+    if (!panel) return
+    const measure = () => setPanelHeight(panel.getBoundingClientRect().height)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(panel)
+    return () => observer.disconnect()
+  }, [group.id, pathname])
+
+  if (!portalReady) return null
+
+  const bridgeTop = anchor.top - 4
+  const bridgeHeight = Math.max(anchor.height + 8, panelHeight + 8, 48)
+  const bridgeLeft = anchor.triggerRight - GROWTH_NAV_FLYOUT_BRIDGE_PX
+  const bridgeWidth = anchor.left - bridgeLeft + 8
+
+  return createPortal(
+    <>
+      <div
+        aria-hidden
+        data-flyout-bridge="growth-nav-flyout"
+        className={cn(APP_Z_GROWTH_NAV_FLYOUT, "fixed")}
+        style={{
+          top: bridgeTop,
+          left: bridgeLeft,
+          width: Math.max(bridgeWidth, GROWTH_NAV_FLYOUT_BRIDGE_PX),
+          height: bridgeHeight,
+        }}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+      />
+      <GrowthNavFlyoutPanel
+        group={group}
+        pathname={pathname}
+        badges={badges}
+        previews={previews}
+        onNavigate={onNavigate}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        panelRef={panelRef}
+        panelId={panelId}
+        style={{ top: anchor.top, left: anchor.left }}
+      />
+    </>,
+    document.body,
   )
 }
 
@@ -559,8 +717,12 @@ function GrowthNavSectionRow({
   const GroupIcon = GROWTH_NAV_GROUP_ICONS[group.id] ?? LayoutDashboard
   const groupBadge = resolveGroupBadge(group, badges)
   const items = clickableNavItems(group)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const flyoutAnchor = useGrowthNavFlyoutAnchor(triggerRef, flyoutOpen)
 
   if (items.length === 0) return null
+
+  const flyoutPanelId = `growth-nav-flyout-${group.id}`
 
   const handleBlur = (event: FocusEvent) => {
     const next = event.relatedTarget as Node | null
@@ -578,10 +740,11 @@ function GrowthNavSectionRow({
       onMouseLeave={onScheduleClose}
     >
       <button
+        ref={triggerRef}
         type="button"
         aria-expanded={flyoutOpen}
         aria-haspopup="menu"
-        aria-controls={`growth-nav-flyout-${group.id}`}
+        aria-controls={flyoutPanelId}
         onFocus={() => {
           onCancelClose()
           onOpen()
@@ -632,20 +795,20 @@ function GrowthNavSectionRow({
         ) : null}
       </button>
 
-      {flyoutOpen ? (
-        <div id={`growth-nav-flyout-${group.id}`}>
-          <GrowthNavFlyoutPanel
-            group={group}
-            pathname={pathname}
-            badges={badges}
-            previews={previews}
-            onNavigate={onCloseFlyout}
-            onMouseEnter={onCancelClose}
-            onMouseLeave={onScheduleClose}
-            onFocus={onCancelClose}
-            onBlur={handleBlur}
-          />
-        </div>
+      {flyoutOpen && flyoutAnchor ? (
+        <GrowthNavFlyoutPortal
+          group={group}
+          pathname={pathname}
+          badges={badges}
+          previews={previews}
+          anchor={flyoutAnchor}
+          panelId={flyoutPanelId}
+          onNavigate={onCloseFlyout}
+          onMouseEnter={onCancelClose}
+          onMouseLeave={onScheduleClose}
+          onFocus={onCancelClose}
+          onBlur={handleBlur}
+        />
       ) : null}
     </div>
   )

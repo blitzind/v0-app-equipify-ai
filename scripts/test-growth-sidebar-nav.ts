@@ -16,9 +16,10 @@ import {
 } from "../lib/growth/navigation/growth-navigation-destinations"
 import { GROWTH_COMMAND_REGISTRY } from "../lib/growth/navigation/growth-command-registry"
 import { GROWTH_NAVIGATION_POLISH_QA_MARKER } from "../lib/growth/navigation/growth-navigation-ranking"
+import { APP_Z_GROWTH_NAV_FLYOUT } from "../lib/layout/app-z-layers"
 
 assert.equal(GROWTH_SIDEBAR_NAV_QA_MARKER, "growth-sidebar-nav-v2")
-assert.equal(GROWTH_SIDEBAR_FLYOUT_QA_MARKER, "growth-sidebar-flyout-v1")
+assert.equal(GROWTH_SIDEBAR_FLYOUT_QA_MARKER, "growth-sidebar-flyout-zindex-v1")
 assert.equal(GROWTH_NAVIGATION_IA_QA_MARKER, "growth-navigation-ia-v2")
 assert.equal(GROWTH_NAVIGATION_POLISH_QA_MARKER, "growth-navigation-polish-v1")
 assert.match(GROWTH_SIDEBAR_GROUPS_COLLAPSED_STORAGE_KEY, /groups-collapsed/)
@@ -33,6 +34,15 @@ assert.match(source, /ChevronRight/)
 assert.match(source, /useGrowthSidebarGroupCollapse/)
 assert.match(source, /useGrowthNavFlyout/)
 assert.match(source, /GrowthNavFlyoutPanel/)
+assert.match(source, /GrowthNavFlyoutPortal/)
+assert.match(source, /createPortal/)
+assert.match(source, /document\.body/)
+assert.match(source, /APP_Z_GROWTH_NAV_FLYOUT/)
+assert.match(source, /data-flyout-layer="growth-nav-flyout"/)
+assert.match(source, /data-flyout-bridge="growth-nav-flyout"/)
+assert.match(source, /useGrowthNavFlyoutAnchor/)
+assert.doesNotMatch(source, /left-\[calc\(100%\+6px\)\]/)
+assert.equal(APP_Z_GROWTH_NAV_FLYOUT, "z-[120]")
 assert.match(source, /GrowthNavSectionRow/)
 assert.match(source, /GrowthNavFlyoutSections/)
 assert.match(source, /clickableNavItems/)
@@ -138,5 +148,11 @@ const layoutSource = fs.readFileSync(
   "utf8",
 )
 assert.match(layoutSource, /GrowthSectionSidebarNav/)
+
+const zLayerSource = fs.readFileSync(path.join(process.cwd(), "lib/layout/app-z-layers.ts"), "utf8")
+assert.match(zLayerSource, /APP_Z_GROWTH_NAV_FLYOUT/)
+assert.match(zLayerSource, /z-\[120\]/)
+assert.match(zLayerSource, /APP_Z_DIALOG/)
+assert.match(zLayerSource, /z-\[150\]/)
 
 console.log("growth-sidebar-nav: all checks passed")
