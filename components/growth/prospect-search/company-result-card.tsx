@@ -8,6 +8,7 @@ import {
   ResultSignalBadges,
 } from "@/components/growth/prospect-search/result-signal-badges"
 import { CompanySignalSummaryPanel } from "@/components/growth/prospect-search/company-signal-summary-panel"
+import { CompanyEnrichmentBadges } from "@/components/growth/prospect-search/company-enrichment-badges"
 import { CompanyIntelligenceCard } from "@/components/growth/company-signals/company-intelligence-card"
 import { BuyingCommitteePanel } from "@/components/growth/prospect-search/buying-committee-panel"
 import { RealWorldSourceBadge } from "@/components/growth/prospect-search/real-world-provider-status"
@@ -77,10 +78,11 @@ export function CompanyResultCard({
             ) : null}
             {row.employees ? (
               <Badge variant="outline" className="text-[10px]">
-                {row.employees} employees
+                {row.employees}
               </Badge>
             ) : null}
           </div>
+          <CompanyEnrichmentBadges row={row} />
         </div>
         <div className="text-right">
           <p className="text-[10px] uppercase text-muted-foreground">Confidence</p>

@@ -109,6 +109,7 @@ export async function runProspectSearch(
     input.query,
     parsed,
     limit,
+    mergedFilters,
   )
   const people = rankProspectSearchPeople(filteredPeople, input.query, limit)
 

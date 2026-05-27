@@ -27,6 +27,14 @@ import {
   hasDisplayableCompanySignalSummary,
 } from "../lib/growth/prospect-search/internal-company-signal-hydration"
 import {
+  GROWTH_PROSPECT_SEARCH_INDEX_ENRICHMENT_QA_MARKER,
+  mapCrmCustomerIndexEnrichment,
+  mapCrmProspectIndexEnrichment,
+  mapGrowthLeadIndexEnrichment,
+  mapLeadInboxIndexEnrichment,
+  pickWebsitePlatformFromTechnologies,
+} from "../lib/growth/prospect-search/prospect-search-index-enrichment"
+import {
   GROWTH_PROSPECT_SEARCH_DISCOVERY_MODES,
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS,
@@ -70,6 +78,13 @@ async function main(): Promise<void> {
   assert.doesNotMatch(indexSource, /scrape|outbound|apollo\.io/)
   assert.match(indexSource, /hydrateInternalCompanySignals/)
   assert.match(indexSource, /applyInternalSignalHydration/)
+  assert.match(indexSource, /mapGrowthLeadIndexEnrichment/)
+  assert.match(indexSource, /loadProspectResearchOverlays/)
+  assert.match(indexSource, /loadCustomerDefaultLocations/)
+  assert.equal(
+    GROWTH_PROSPECT_SEARCH_INDEX_ENRICHMENT_QA_MARKER,
+    "growth-prospect-search-index-enrichment-v1",
+  )
 
   const actionsSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-actions.ts"),
@@ -121,6 +136,7 @@ async function main(): Promise<void> {
   assert.match(companyCardSource, /CompanyIntelligenceCard/)
   assert.match(companyCardSource, /company_signal_summary/)
   assert.match(companyCardSource, /CompanySignalSummaryPanel/)
+  assert.match(companyCardSource, /CompanyEnrichmentBadges/)
 
   const hydrationSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/prospect-search/internal-company-signal-hydration.ts"),
@@ -186,6 +202,112 @@ async function main(): Promise<void> {
   )
   assert.match(badgeSource, /companyIntelligenceBadges/)
   assert.match(badgeSource, /inferProspectSearchResultBadges/)
+
+  const growthLeadEnrichment = mapGrowthLeadIndexEnrichment({
+    raw: {
+      website: "https://acme-hvac.com",
+      city: "Nashville",
+      state: "TN",
+      country: "US",
+      notes: "Uses FieldPulse",
+      estimated_employee_count: "45",
+      estimated_annual_revenue: "$5m",
+      crm_detected: "HubSpot",
+      field_service_stack_detected: "FieldPulse",
+      metadata: { industry: "HVAC", service_area: "Middle Tennessee" },
+    },
+    research: {
+      industry_guess: "HVAC",
+      employee_size_guess: "50+ employees",
+      revenue_size_guess: "$5m-$10m",
+      detected_technologies: ["WordPress", "ServiceTitan"],
+    },
+  })
+  assert.equal(growthLeadEnrichment.industry, "HVAC")
+  assert.equal(growthLeadEnrichment.crm_detected, "HubSpot")
+  assert.equal(growthLeadEnrichment.field_service_software, "FieldPulse")
+  assert.equal(growthLeadEnrichment.website_platform, "WordPress")
+  assert.equal(growthLeadEnrichment.service_area, "Middle Tennessee")
+
+  const inboxEnrichment = mapLeadInboxIndexEnrichment({
+    raw: {
+      domain: "example.com",
+      metadata: {
+        industry: "Medical Equipment",
+        service_area: "Texas",
+        crm_detected: "Salesforce",
+        website_platform: "WordPress",
+      },
+    },
+  })
+  assert.equal(inboxEnrichment.industry, "Medical Equipment")
+  assert.equal(inboxEnrichment.crm_detected, "Salesforce")
+  assert.equal(inboxEnrichment.website_platform, "WordPress")
+
+  const prospectEnrichment = mapCrmProspectIndexEnrichment({
+    raw: {
+      website: "https://prospect.example",
+      city: "Austin",
+      state: "TX",
+      notes: "Quoted account",
+      estimated_value_cents: 2_500_000,
+    },
+  })
+  assert.equal(prospectEnrichment.website, "https://prospect.example")
+  assert.equal(prospectEnrichment.location, "Austin, TX")
+  assert.ok(prospectEnrichment.revenue_range)
+
+  const customerEnrichment = mapCrmCustomerIndexEnrichment({
+    raw: { notes: "Active service contract" },
+    location: { city: "Dallas", state: "TX", postal_code: "75201", address_line1: "100 Main St" },
+  })
+  assert.equal(customerEnrichment.location, "Dallas, TX")
+  assert.equal(pickWebsitePlatformFromTechnologies(["HubSpot", "Google Analytics"]), "HubSpot")
+
+  const techFiltered = applyProspectSearchFilters(
+    [
+      {
+        id: "1",
+        source_type: "growth_lead",
+        company_name: "Acme HVAC",
+        website: null,
+        industry: "HVAC",
+        subindustry: null,
+        employees: "50",
+        revenue_range: "$5m",
+        location: "Tennessee",
+        city: null,
+        state: "TN",
+        service_area: "Middle Tennessee",
+        notes: null,
+        keywords: [],
+        crm_detected: "HubSpot",
+        website_platform: "WordPress",
+        field_service_software: "FieldPulse",
+        intent_score: 15,
+        buying_stage: "consideration",
+        lead_score: 40,
+        company_match_confidence: 0.7,
+        decision_maker_count: 2,
+        verification_status: "unverified",
+        priority: null,
+        signals: [],
+        search_intent_category: null,
+        returning_visitor: false,
+        existing_account: false,
+        lead_inbox_id: null,
+        growth_lead_id: "1",
+        prospect_id: null,
+        customer_id: null,
+      },
+    ],
+    normalizeProspectSearchFilters({ technologies: ["FieldPulse"], crm_detected: "HubSpot" }),
+  )
+  assert.equal(techFiltered.length, 1)
+
+  const sparseCustomer = mapCrmCustomerIndexEnrichment({ raw: { notes: null }, location: null })
+  assert.equal(sparseCustomer.location, null)
+  assert.equal(sparseCustomer.revenue_range, null)
 
   const suggestionSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/search-suggestion-engine.ts"),
@@ -283,6 +405,8 @@ async function main(): Promise<void> {
         notes: "FieldPulse dispatch scheduling",
         crm_detected: "HubSpot",
         field_service_software: "FieldPulse",
+        website_platform: "WordPress",
+        service_area: "Middle Tennessee",
         company_signal_summary: leadHydration!.company_signal_summary,
         signal_confidence: leadHydration!.signal_confidence,
         signal_count: leadHydration!.signal_count,
@@ -291,10 +415,17 @@ async function main(): Promise<void> {
     "hvac Tennessee",
     parsed,
     10,
+    normalizeProspectSearchFilters({
+      industry: "hvac",
+      crm_detected: "HubSpot",
+      service_area: "Tennessee",
+    }),
   )
   assert.ok(rankedWithSignals[0]!.rank_score >= ranked[0]!.rank_score)
   assert.ok(rankedWithSignals[0]!.company_signal_summary)
   assert.ok((rankedWithSignals[0]!.signal_confidence ?? 0) > 0)
+  assert.equal(rankedWithSignals[0]!.crm_detected, "HubSpot")
+  assert.equal(rankedWithSignals[0]!.service_area, "Middle Tennessee")
 
   const internal = createInternalProspectSearchProvider()
   assert.equal(internal.slot, "internal_observable_index")

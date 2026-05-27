@@ -143,6 +143,19 @@ export function applyProspectSearchFilters(
       const blob = [row.company_name, row.website, row.industry, row.notes, ...row.keywords].join(" ")
       if (!filters.keywords.every((kw) => includesFold(blob, kw))) return false
     }
+    if (filters.technologies?.length) {
+      const blob = [
+        row.crm_detected,
+        row.field_service_software,
+        row.website_platform,
+        row.notes,
+        ...row.keywords,
+        ...(row.company_signal_summary?.technology_signals ?? []),
+      ]
+        .filter(Boolean)
+        .join(" ")
+      if (!filters.technologies.every((tech) => includesFold(blob, tech))) return false
+    }
     if (filters.crm_detected && !includesFold(row.crm_detected, filters.crm_detected)) return false
     if (filters.website_platform && !includesFold(row.website_platform, filters.website_platform)) {
       return false

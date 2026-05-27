@@ -156,6 +156,11 @@ export type GrowthProspectSearchCompanyResult = {
   /** Average detector confidence when internal signals are hydrated. */
   signal_confidence?: number | null
   signal_count?: number
+  service_area?: string | null
+  crm_detected?: string | null
+  website_platform?: string | null
+  field_service_software?: string | null
+  existing_account?: boolean
 }
 
 export type GrowthProspectSearchPersonResult = {

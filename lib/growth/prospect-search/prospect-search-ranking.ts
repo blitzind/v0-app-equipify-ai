@@ -1,10 +1,86 @@
 import type {
   GrowthProspectSearchCompanyResult,
+  GrowthProspectSearchFilters,
   GrowthProspectSearchIndexCompany,
   GrowthProspectSearchParsedQuery,
   GrowthProspectSearchPersonResult,
 } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthProspectSearchIndexPerson } from "@/lib/growth/prospect-search/prospect-search-index"
+import { inferEmployeeSizeBand, inferRevenueBand } from "@/lib/growth/prospect-search/prospect-search-filters"
+
+function includesFold(hay: string | null | undefined, needle: string): boolean {
+  if (!hay || !needle) return false
+  return hay.toLowerCase().includes(needle.toLowerCase())
+}
+
+const MAX_ENRICHMENT_RANK_BOOST = 0.1
+
+function computeEnrichmentRankBoost(
+  row: GrowthProspectSearchIndexCompany,
+  parsed: GrowthProspectSearchParsedQuery,
+  filters?: GrowthProspectSearchFilters,
+): number {
+  let boost = 0
+
+  const industryNeedle = filters?.industry?.trim()
+  if (industryNeedle && row.industry && includesFold(row.industry, industryNeedle)) {
+    boost += 0.025
+  } else if (
+    parsed.industry_hints.length > 0 &&
+    row.industry &&
+    parsed.industry_hints.some((hint) => includesFold(row.industry, hint))
+  ) {
+    boost += 0.02
+  }
+
+  if (filters?.service_area && row.service_area && includesFold(row.service_area, filters.service_area)) {
+    boost += 0.025
+  }
+  if (filters?.location && row.service_area && includesFold(row.service_area, filters.location)) {
+    boost += 0.015
+  }
+
+  if (filters?.crm_detected && row.crm_detected && includesFold(row.crm_detected, filters.crm_detected)) {
+    boost += 0.025
+  }
+  if (
+    filters?.field_service_software &&
+    row.field_service_software &&
+    includesFold(row.field_service_software, filters.field_service_software)
+  ) {
+    boost += 0.025
+  }
+  if (
+    filters?.website_platform &&
+    row.website_platform &&
+    includesFold(row.website_platform, filters.website_platform)
+  ) {
+    boost += 0.025
+  }
+
+  if (filters?.employee_size_bands?.length && row.employees) {
+    const band = inferEmployeeSizeBand(row.employees)
+    if (filters.employee_size_bands.includes(band)) boost += 0.015
+  }
+  if (filters?.revenue_bands?.length && row.revenue_range) {
+    const band = inferRevenueBand(row.revenue_range)
+    if (filters.revenue_bands.includes(band)) boost += 0.015
+  }
+
+  if (filters?.technologies?.length) {
+    const blob = [
+      row.crm_detected,
+      row.field_service_software,
+      row.website_platform,
+      ...(row.company_signal_summary?.technology_signals ?? []),
+    ]
+      .filter(Boolean)
+      .join(" ")
+    if (filters.technologies.every((tech) => includesFold(blob, tech))) boost += 0.02
+  }
+
+  return Math.min(MAX_ENRICHMENT_RANK_BOOST, boost)
+}
 
 function textMatchScore(query: string, blob: string): number {
   const q = query.trim().toLowerCase()
@@ -23,6 +99,7 @@ export function rankProspectSearchCompanies(
   query: string,
   parsed: GrowthProspectSearchParsedQuery,
   limit = 100,
+  filters?: GrowthProspectSearchFilters,
 ): GrowthProspectSearchCompanyResult[] {
   const scored = rows.map((row) => {
     const blob = [
@@ -56,6 +133,7 @@ export function rankProspectSearchCompanies(
     if (summary?.growth_indicators.length) rank += 0.02
     if (row.crm_detected?.trim()) rank += 0.02
     if (summary?.operational_maturity === "Mature operations") rank += 0.02
+    rank += computeEnrichmentRankBoost(row, parsed, filters)
 
     const reasoning: string[] = []
     if (rank > 0.5) reasoning.push("Strong text match to search query.")
@@ -108,6 +186,11 @@ export function rankProspectSearchCompanies(
       company_signal_summary: row.company_signal_summary ?? null,
       signal_confidence: row.signal_confidence ?? null,
       signal_count: row.signal_count ?? 0,
+      service_area: row.service_area,
+      crm_detected: row.crm_detected,
+      website_platform: row.website_platform,
+      field_service_software: row.field_service_software,
+      existing_account: row.existing_account,
     }
   })
 

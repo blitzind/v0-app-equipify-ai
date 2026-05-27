@@ -5,6 +5,15 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
 import { probeGrowthLeadArchiveSchema } from "@/lib/growth/lead-archive-schema-health"
 import { hydrateInternalCompanySignals } from "@/lib/growth/prospect-search/internal-company-signal-hydration"
+import {
+  buildProspectSearchIndexSignals,
+  mapCrmCustomerIndexEnrichment,
+  mapCrmProspectIndexEnrichment,
+  mapGrowthLeadIndexEnrichment,
+  mapLeadInboxIndexEnrichment,
+  type ProspectSearchCustomerLocationOverlay,
+  type ProspectSearchResearchOverlay,
+} from "@/lib/growth/prospect-search/prospect-search-index-enrichment"
 import type { GrowthCompanySignalUiSummary } from "@/lib/growth/company-signals/company-signal-types"
 import type { GrowthProspectSearchSourceType } from "@/lib/growth/prospect-search/prospect-search-types"
 
@@ -182,6 +191,77 @@ async function loadBuyingStageOverlays(admin: SupabaseClient): Promise<Map<strin
   return map
 }
 
+async function loadProspectResearchOverlays(
+  admin: SupabaseClient,
+  runIds: string[],
+): Promise<Map<string, ProspectSearchResearchOverlay>> {
+  const map = new Map<string, ProspectSearchResearchOverlay>()
+  const uniqueIds = [...new Set(runIds.filter(Boolean))].slice(0, 80)
+  if (!uniqueIds.length) return map
+
+  try {
+    const { data } = await admin
+      .schema("growth")
+      .from("research_runs")
+      .select("id, industry_guess, employee_size_guess, revenue_size_guess, detected_technologies, status")
+      .in("id", uniqueIds)
+      .eq("status", "completed")
+
+    for (const row of data ?? []) {
+      const r = row as Record<string, unknown>
+      const id = asString(r.id)
+      if (!id) continue
+      map.set(id, {
+        industry_guess: asString(r.industry_guess) || null,
+        employee_size_guess: asString(r.employee_size_guess) || null,
+        revenue_size_guess: asString(r.revenue_size_guess) || null,
+        detected_technologies: Array.isArray(r.detected_technologies)
+          ? (r.detected_technologies as string[]).filter((item) => typeof item === "string")
+          : [],
+      })
+    }
+  } catch {
+    /* optional */
+  }
+
+  return map
+}
+
+async function loadCustomerDefaultLocations(
+  admin: SupabaseClient,
+  customerIds: string[],
+  orgId: string,
+): Promise<Map<string, ProspectSearchCustomerLocationOverlay>> {
+  const map = new Map<string, ProspectSearchCustomerLocationOverlay>()
+  const uniqueIds = [...new Set(customerIds.filter(Boolean))].slice(0, 60)
+  if (!uniqueIds.length) return map
+
+  try {
+    const { data } = await admin
+      .from("customer_locations")
+      .select("customer_id, city, state, postal_code, address_line1, is_default")
+      .eq("organization_id", orgId)
+      .in("customer_id", uniqueIds)
+      .order("is_default", { ascending: false })
+
+    for (const row of data ?? []) {
+      const r = row as Record<string, unknown>
+      const customerId = asString(r.customer_id)
+      if (!customerId || map.has(customerId)) continue
+      map.set(customerId, {
+        city: asString(r.city) || null,
+        state: asString(r.state) || null,
+        postal_code: asString(r.postal_code) || null,
+        address_line1: asString(r.address_line1) || null,
+      })
+    }
+  } catch {
+    /* optional */
+  }
+
+  return map
+}
+
 function mergeKey(source: GrowthProspectSearchSourceType, id: string): string {
   return `${source}:${id}`
 }
@@ -229,36 +309,43 @@ export async function buildProspectSearchIndex(
       .schema("growth")
       .from("leads")
       .select(
-        "id, company_name, website, city, state, country, notes, score, status, estimated_employee_count, estimated_annual_revenue, crm_detected, field_service_stack_detected, decision_maker_status",
+        "id, company_name, website, city, state, country, address_line1, postal_code, notes, score, status, metadata, estimated_employee_count, estimated_annual_revenue, crm_detected, field_service_stack_detected, decision_maker_status, latest_prospect_research_run_id",
       )
       .order("updated_at", { ascending: false })
       .limit(hasQuery ? 60 : 40)
     if (hasQuery) leadQuery = leadQuery.ilike("company_name", pattern)
     leadQuery = await applyLeadArchiveFilter(admin, leadQuery)
     const { data } = await leadQuery
-    for (const raw of data ?? []) {
-      const r = raw as Record<string, unknown>
+    const leadRows = (data ?? []) as Record<string, unknown>[]
+    const researchOverlays = await loadProspectResearchOverlays(
+      admin,
+      leadRows
+        .map((row) => asString(row.latest_prospect_research_run_id))
+        .filter(Boolean),
+    )
+
+    for (const r of leadRows) {
       const id = asString(r.id)
       if (!id) continue
-      const location = [asString(r.city), asString(r.state), asString(r.country)].filter(Boolean).join(", ")
+      const researchRunId = asString(r.latest_prospect_research_run_id)
+      const enrichment = mapGrowthLeadIndexEnrichment({
+        raw: r,
+        research: researchRunId ? researchOverlays.get(researchRunId) ?? null : null,
+      })
+      const signals = buildProspectSearchIndexSignals({
+        source_type: "growth_lead",
+        notes: enrichment.notes,
+        crm_detected: enrichment.crm_detected,
+        field_service_software: enrichment.field_service_software,
+        website_platform: enrichment.website_platform,
+        service_area: enrichment.service_area,
+      })
+
       upsertCompany({
         id,
         source_type: "growth_lead",
         company_name: asString(r.company_name) || "Unknown",
-        website: asString(r.website) || null,
-        industry: null,
-        subindustry: null,
-        employees: asString(r.estimated_employee_count) || null,
-        revenue_range: asString(r.estimated_annual_revenue) || null,
-        location: location || null,
-        city: asString(r.city) || null,
-        state: asString(r.state) || null,
-        service_area: null,
-        notes: asString(r.notes) || null,
-        keywords: [],
-        crm_detected: asString(r.crm_detected) || null,
-        website_platform: null,
-        field_service_software: asString(r.field_service_stack_detected) || null,
+        ...enrichment,
         intent_score: null,
         buying_stage: null,
         lead_score: typeof r.score === "number" ? r.score : null,
@@ -266,7 +353,7 @@ export async function buildProspectSearchIndex(
         decision_maker_count: asString(r.decision_maker_status) === "identified" ? 1 : 0,
         verification_status: "unverified",
         priority: null,
-        signals: asString(r.notes) ? [`Notes: ${asString(r.notes).slice(0, 80)}`] : [],
+        signals,
         search_intent_category: null,
         returning_visitor: false,
         existing_account: false,
@@ -308,25 +395,25 @@ export async function buildProspectSearchIndex(
         r.existing_account_match && typeof r.existing_account_match === "object"
           ? (r.existing_account_match as { matched?: boolean })
           : null
+      const enrichment = mapLeadInboxIndexEnrichment({ raw: r })
+      const existing_account = accountMatch?.matched === true
+      const signals = buildProspectSearchIndexSignals({
+        source_type: "lead_inbox",
+        crm_detected: enrichment.crm_detected,
+        field_service_software: enrichment.field_service_software,
+        website_platform: enrichment.website_platform,
+        service_area: enrichment.service_area,
+        existing_account,
+      })
+      if (intentOverlay?.search_intent_category) {
+        signals.unshift(`Search intent: ${intentOverlay.search_intent_category}`)
+      }
 
       upsertCompany({
         id,
         source_type: "lead_inbox",
         company_name: asString(r.company_name) || "Unknown",
-        website: asString(r.domain) || null,
-        industry: asString(meta.industry) || null,
-        subindustry: null,
-        employees: null,
-        revenue_range: null,
-        location: asString(meta.location) || null,
-        city: null,
-        state: null,
-        service_area: null,
-        notes: null,
-        keywords: [],
-        crm_detected: null,
-        website_platform: null,
-        field_service_software: null,
+        ...enrichment,
         intent_score:
           typeof r.intent_score === "number"
             ? r.intent_score
@@ -340,12 +427,10 @@ export async function buildProspectSearchIndex(
         decision_maker_count: 0,
         verification_status: "candidate",
         priority: asString(r.candidate_priority) || null,
-        signals: intentOverlay?.search_intent_category
-          ? [`Search intent: ${intentOverlay.search_intent_category}`]
-          : [],
+        signals: [...new Set(signals)].slice(0, 6),
         search_intent_category: intentOverlay?.search_intent_category ?? null,
         returning_visitor: intentOverlay?.returning_visitor ?? false,
-        existing_account: accountMatch?.matched === true,
+        existing_account,
         lead_inbox_id: id,
         growth_lead_id: null,
         prospect_id: null,
@@ -361,7 +446,9 @@ export async function buildProspectSearchIndex(
     try {
       let prospectQuery = admin
         .from("prospects")
-        .select("id, company_name, website, notes")
+        .select(
+          "id, company_name, website, notes, city, state, address_line1, postal_code, estimated_value_cents",
+        )
         .eq("organization_id", orgId)
         .order("updated_at", { ascending: false })
         .limit(hasQuery ? 40 : 30)
@@ -371,24 +458,12 @@ export async function buildProspectSearchIndex(
         const r = raw as Record<string, unknown>
         const id = asString(r.id)
         if (!id) continue
+        const enrichment = mapCrmProspectIndexEnrichment({ raw: r })
         upsertCompany({
           id,
           source_type: "crm_prospect",
           company_name: asString(r.company_name) || "Unknown",
-          website: asString(r.website) || null,
-          industry: null,
-          subindustry: null,
-          employees: null,
-          revenue_range: null,
-          location: null,
-          city: null,
-          state: null,
-          service_area: null,
-          notes: asString(r.notes) || null,
-          keywords: [],
-          crm_detected: null,
-          website_platform: null,
-          field_service_software: null,
+          ...enrichment,
           intent_score: null,
           buying_stage: null,
           lead_score: null,
@@ -396,7 +471,10 @@ export async function buildProspectSearchIndex(
           decision_maker_count: 0,
           verification_status: "crm_prospect",
           priority: null,
-          signals: ["CRM prospect record."],
+          signals: buildProspectSearchIndexSignals({
+            source_type: "crm_prospect",
+            notes: enrichment.notes,
+          }),
           search_intent_category: null,
           returning_visitor: false,
           existing_account: false,
@@ -418,29 +496,26 @@ export async function buildProspectSearchIndex(
         .order("updated_at", { ascending: false })
         .limit(hasQuery ? 40 : 30)
       if (hasQuery) customerQuery = customerQuery.ilike("company_name", pattern)
-      const { data } = await customerQuery
-      for (const raw of data ?? []) {
-        const r = raw as Record<string, unknown>
+      const { data: customerData } = await customerQuery
+      const customerRows = (customerData ?? []) as Record<string, unknown>[]
+      const customerLocations = await loadCustomerDefaultLocations(
+        admin,
+        customerRows.map((row) => asString(row.id)).filter(Boolean),
+        orgId,
+      )
+
+      for (const r of customerRows) {
         const id = asString(r.id)
         if (!id) continue
+        const enrichment = mapCrmCustomerIndexEnrichment({
+          raw: r,
+          location: customerLocations.get(id) ?? null,
+        })
         upsertCompany({
           id,
           source_type: "crm_customer",
           company_name: asString(r.company_name) || "Unknown",
-          website: null,
-          industry: null,
-          subindustry: null,
-          employees: null,
-          revenue_range: null,
-          location: null,
-          city: null,
-          state: null,
-          service_area: null,
-          notes: asString(r.notes) || null,
-          keywords: [],
-          crm_detected: null,
-          website_platform: null,
-          field_service_software: null,
+          ...enrichment,
           intent_score: null,
           buying_stage: null,
           lead_score: null,
@@ -448,7 +523,11 @@ export async function buildProspectSearchIndex(
           decision_maker_count: 0,
           verification_status: "existing_account",
           priority: null,
-          signals: ["Existing CRM customer."],
+          signals: buildProspectSearchIndexSignals({
+            source_type: "crm_customer",
+            notes: enrichment.notes,
+            existing_account: true,
+          }),
           search_intent_category: null,
           returning_visitor: false,
           existing_account: true,
