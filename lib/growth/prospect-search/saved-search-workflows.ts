@@ -111,3 +111,5 @@ export const GROWTH_SAVED_SEARCH_WORKFLOW_LINKS = {
   unifiedInbox: "/admin/growth/inbox",
   leadEngine: "/admin/growth/leads/lead-engine",
 } as const
+
+export { buildSavedSearchWorkflowLaunchLinks } from "@/lib/growth/prospect-search/prospect-pipeline-automation"

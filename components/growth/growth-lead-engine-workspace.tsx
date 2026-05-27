@@ -25,6 +25,10 @@ import {
 } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
 import type { GrowthLeadEngineSandboxInput } from "@/lib/growth/lead-engine/workspace-types"
 import { parseProspectSearchLeadEngineHandoffParams } from "@/lib/growth/prospect-search/prospect-search-lead-engine-handoff"
+import {
+  decodeGrowthWorkflowContext,
+  summarizeGrowthWorkflowContext,
+} from "@/lib/growth/prospect-search/prospect-workflow-context"
 
 export function GrowthLeadEngineWorkspace() {
   const searchParams = useSearchParams()
@@ -37,6 +41,7 @@ export function GrowthLeadEngineWorkspace() {
   const [contactHandoff, setContactHandoff] = useState<
     import("@/lib/growth/prospect-search/prospect-search-contact-intelligence-types").ProspectSearchLeadEngineContactHandoffContext | null
   >(null)
+  const [workflowContextSummary, setWorkflowContextSummary] = useState<string | null>(null)
 
   useEffect(() => {
     if (handoffApplied || !searchParams) return
@@ -44,6 +49,8 @@ export function GrowthLeadEngineWorkspace() {
     if (!handoff) return
     setInput(handoff)
     setContactHandoff(handoff.contactHandoff ?? null)
+    const workflowContext = decodeGrowthWorkflowContext(searchParams.get("workflowContext"))
+    setWorkflowContextSummary(workflowContext ? summarizeGrowthWorkflowContext(workflowContext) : null)
     setActivePresetId(null)
     setHandoffApplied(true)
   }, [handoffApplied, searchParams])
@@ -203,6 +210,13 @@ export function GrowthLeadEngineWorkspace() {
                   : ""}
               </p>
             )}
+          </div>
+        ) : null}
+
+        {workflowContextSummary ? (
+          <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50/60 px-3 py-2 text-sm text-sky-950">
+            <p className="font-semibold">Prospect workflow continuity</p>
+            <p className="mt-1 text-xs">{workflowContextSummary}</p>
           </div>
         ) : null}
 

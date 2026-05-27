@@ -1,4 +1,5 @@
 import { buildProspectSearchExplanations } from "@/lib/growth/prospect-search/prospect-search-explanations"
+import { applyProspectPipelineAutomationOverlay } from "@/lib/growth/prospect-search/prospect-pipeline-automation"
 import {
   evaluateTerritoryMatch,
   formatTerritoryLocationLabel,
@@ -7,6 +8,7 @@ import { deriveProspectSearchCompanyStatus } from "@/lib/growth/prospect-search/
 import type { GrowthProspectSearchParsedQuery } from "@/lib/growth/prospect-search/prospect-search-types"
 import type {
   GrowthProspectSearchCompanyResult,
+  GrowthProspectSearchDiscoveryMode,
   GrowthProspectSearchFilters,
 } from "@/lib/growth/prospect-search/prospect-search-types"
 
@@ -16,6 +18,8 @@ export function finalizeProspectSearchCompanyResult(
     query?: string
     filters?: GrowthProspectSearchFilters
     parsed?: GrowthProspectSearchParsedQuery
+    discoveryMode?: GrowthProspectSearchDiscoveryMode
+    savedSearchId?: string | null
   },
 ): GrowthProspectSearchCompanyResult {
   const status = deriveProspectSearchCompanyStatus(row)
@@ -44,12 +48,20 @@ export function finalizeProspectSearchCompanyResult(
       )
     : { matches: true, reasons: [] as string[] }
 
-  return {
-    ...merged,
-    matched_territory_label: territoryMatch.reasons[0] ?? formatTerritoryLocationLabel(merged),
-    territory_match_reasons: territoryMatch.reasons,
-    score_explanation_items: explanations.score_explanation_items,
-    confidence_explanation_items: explanations.confidence_explanation_items,
-    recommended_next_step_reason: explanations.recommended_next_step_reason,
-  }
+  return applyProspectPipelineAutomationOverlay(
+    {
+      ...merged,
+      matched_territory_label: territoryMatch.reasons[0] ?? formatTerritoryLocationLabel(merged),
+      territory_match_reasons: territoryMatch.reasons,
+      score_explanation_items: explanations.score_explanation_items,
+      confidence_explanation_items: explanations.confidence_explanation_items,
+      recommended_next_step_reason: explanations.recommended_next_step_reason,
+    },
+    {
+      query: context?.query,
+      filters: context?.filters,
+      discoveryMode: context?.discoveryMode,
+      savedSearchId: context?.savedSearchId,
+    },
+  )
 }

@@ -55,6 +55,9 @@ import type {
   GrowthProspectSearchSortBy,
 } from "@/lib/growth/prospect-search/prospect-search-types"
 import { GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-types"
+import { GROWTH_PROSPECT_PIPELINE_AUTOMATION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-pipeline-automation"
+import type { GrowthProspectWorkflowContinuityEventKind } from "@/lib/growth/prospect-search/prospect-pipeline-automation"
+import { ProspectWorkflowLauncher } from "@/components/growth/prospect-search/prospect-workflow-launcher"
 import { prospectSearchSelectionKey } from "@/lib/growth/prospect-search/prospect-search-selection"
 import { CompanyStatusBadges } from "@/components/growth/prospect-search/company-status-badges"
 import { ProspectSearchPagination } from "@/components/growth/prospect-search/prospect-search-pagination"
@@ -112,6 +115,7 @@ export function ProspectSearchShell() {
   const [view, setView] = useState<"card" | "table">("card")
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
   const [bulkPushing, setBulkPushing] = useState(false)
+  const [workflowLaunchBusy, setWorkflowLaunchBusy] = useState(false)
   const [heroFocused, setHeroFocused] = useState(false)
   const [placeholderIndex, setPlaceholderIndex] = useState(0)
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
@@ -383,6 +387,43 @@ export function ProspectSearchShell() {
     [query, filters, discoveryMode, selectedCompany, runSearch],
   )
 
+  const handleWorkflowLaunch = useCallback(
+    async (
+      company: GrowthProspectSearchCompanyResult,
+      input: {
+        launchUrl?: string | null
+        serverAction?: string | null
+        timelineEventKind?: string | null
+      },
+    ) => {
+      setWorkflowLaunchBusy(true)
+      try {
+        if (input.timelineEventKind) {
+          await fetch("/api/platform/growth/prospect-search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "record_prospect_workflow_continuity",
+              query,
+              filters,
+              discovery_mode: discoveryMode,
+              company,
+              workflow_event_kind: input.timelineEventKind as GrowthProspectWorkflowContinuityEventKind,
+            }),
+          })
+        }
+        if (input.serverAction) {
+          await runAction(input.serverAction, { company })
+        } else if (input.launchUrl) {
+          window.open(input.launchUrl, "_blank", "noopener,noreferrer")
+        }
+      } finally {
+        setWorkflowLaunchBusy(false)
+      }
+    },
+    [query, filters, discoveryMode, runAction],
+  )
+
   const applyTemplate = useCallback((template: ProspectSearchIcpTemplate) => {
     const nextFilters = { ...EMPTY_FILTERS, ...template.filters }
     setActiveTemplateId(template.id)
@@ -593,6 +634,7 @@ export function ProspectSearchShell() {
       data-ux-marker={GROWTH_PROSPECT_SEARCH_UX_QA_MARKER}
       data-layout-marker={GROWTH_PROSPECT_SEARCH_LAYOUT_V2_QA_MARKER}
       data-saved-search-workflows-marker={GROWTH_SAVED_SEARCH_WORKFLOWS_QA_MARKER}
+      data-pipeline-automation-marker={GROWTH_PROSPECT_PIPELINE_AUTOMATION_QA_MARKER}
       data-live-provider-query-expansion-marker={GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER}
       data-clean-start-marker={GROWTH_SEARCH_CLEAN_START_QA_MARKER}
       data-has-searched-marker={GROWTH_SEARCH_HAS_SEARCHED_STATE_QA_MARKER}
@@ -857,10 +899,14 @@ export function ProspectSearchShell() {
                         setSelectedCompany(row)
                         void runAction(action, { ...extra, company: row })
                       }}
+                      onWorkflowLaunch={(launchInput) => void handleWorkflowLaunch(row, launchInput)}
+                      workflowBusy={workflowLaunchBusy}
+                      searchQuery={query}
                     />
                   ))}
                 </div>
               ) : (
+                <>
                 <CompanyResultsTable
                   rows={companies}
                   selectedId={selectedCompany?.id ?? null}
@@ -870,6 +916,26 @@ export function ProspectSearchShell() {
                   onSelectAllVisible={selectAllVisible}
                   onClearSelection={clearSelection}
                 />
+                {selectedCompany ? (
+                  <div className="hidden rounded-xl border border-border bg-card p-4 lg:block">
+                    <p className="mb-3 text-sm font-semibold">{selectedCompany.company_name}</p>
+                    <ProspectWorkflowLauncher
+                      company={selectedCompany}
+                      query={query}
+                      filters={filters}
+                      discoveryMode={discoveryMode}
+                      busy={workflowLaunchBusy}
+                      onLaunch={(launchInput) =>
+                        void handleWorkflowLaunch(selectedCompany, {
+                          launchUrl: launchInput.launchUrl,
+                          serverAction: launchInput.serverAction,
+                          timelineEventKind: launchInput.timelineEventKind,
+                        })
+                      }
+                    />
+                  </div>
+                ) : null}
+                </>
               )}
 
               {people.length > 0 ? (
@@ -907,6 +973,26 @@ export function ProspectSearchShell() {
         onSave={(input) => void saveSearchWorkflow(input)}
         saving={savingSearch}
       />
+
+      {selectedCompany && hasSearched ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 backdrop-blur md:hidden">
+          <ProspectWorkflowLauncher
+            company={selectedCompany}
+            query={query}
+            filters={filters}
+            discoveryMode={discoveryMode}
+            compact
+            busy={workflowLaunchBusy}
+            onLaunch={(launchInput) =>
+              void handleWorkflowLaunch(selectedCompany, {
+                launchUrl: launchInput.launchUrl,
+                serverAction: launchInput.serverAction,
+                timelineEventKind: launchInput.timelineEventKind,
+              })
+            }
+          />
+        </div>
+      ) : null}
     </div>
   )
 }

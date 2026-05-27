@@ -2417,7 +2417,189 @@ async function main(): Promise<void> {
   )
   assert.match(providerHealthNavSource, /\/admin\/growth\/settings\/provider-health/)
 
+  await testProspectPipelineAutomation()
+
   console.log("growth-prospect-search: all checks passed")
+}
+
+async function testProspectPipelineAutomation(): Promise<void> {
+  const {
+    GROWTH_PROSPECT_PIPELINE_AUTOMATION_QA_MARKER,
+    deriveProspectPipelineRecommendation,
+    deriveProspectSequenceBridge,
+    buildProspectWorkflowLauncherActions,
+    applyProspectPipelineAutomationOverlay,
+  } = await import("../lib/growth/prospect-search/prospect-pipeline-automation")
+  const {
+    buildGrowthWorkflowContext,
+    decodeGrowthWorkflowContext,
+    encodeGrowthWorkflowContext,
+    GROWTH_PROSPECT_WORKFLOW_CONTEXT_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-workflow-context")
+  const { finalizeProspectSearchCompanyResult } = await import(
+    "../lib/growth/prospect-search/prospect-search-result-finalize"
+  )
+
+  assert.equal(GROWTH_PROSPECT_PIPELINE_AUTOMATION_QA_MARKER, "growth-prospect-pipeline-automation-v1")
+  assert.equal(GROWTH_PROSPECT_WORKFLOW_CONTEXT_QA_MARKER, "growth-prospect-pipeline-automation-v1")
+  assert.ok(GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS.includes("record_prospect_workflow_continuity"))
+
+  const baseCompany = {
+    id: "co-1",
+    source_type: "growth_lead" as const,
+    company_name: "Acme HVAC",
+    website: "https://acme.example",
+    industry: "HVAC",
+    subindustry: null,
+    employees: "25-50",
+    revenue_range: null,
+    location: "Austin, TX",
+    city: "Austin",
+    state: "TX",
+    postal_code: "78701",
+    country: "US",
+    metro: null,
+    lat: null,
+    lng: null,
+    intent_score: 40,
+    buying_stage: "consideration",
+    buying_stage_confidence: 70,
+    buying_stage_reason: "Recent hiring signal",
+    buying_stage_last_assessed_at: null,
+    lead_score: 62,
+    lead_engine_score: 68,
+    lead_engine_score_label: "qualified",
+    lead_engine_score_explanation: "Strong fit",
+    lead_engine_last_run_at: "2026-05-01T00:00:00.000Z",
+    confidence: 0.72,
+    company_match_confidence: 0.8,
+    decision_maker_coverage: 55,
+    verification_status: "verified",
+    signals: ["Reply received last week"],
+    search_intent_category: null,
+    lead_inbox_id: "inbox-1",
+    growth_lead_id: "lead-1",
+    prospect_id: null,
+    customer_id: null,
+    rank_score: 88,
+    match_reasoning: ["Industry match"],
+    crm_detected: null,
+    field_service_software: null,
+    in_lead_inbox: true,
+    existing_customer: false,
+    existing_prospect: false,
+    already_pushed: true,
+    is_suppressed: false,
+    suppression_reason: null,
+    contact_intelligence: {
+      qa_marker: "growth-prospect-search-contact-intelligence-v1",
+      schema_ready: true,
+      has_contacts: true,
+      contacts: [],
+      committee_roles: [],
+      committee_completeness_pct: 60,
+      first_contact: {
+        contact_id: "c1",
+        role: "Owner",
+        name: "Pat",
+        confidence: 0.8,
+        reasons: ["Named owner on website"],
+      },
+      confidence_explanation: null,
+      outreach_recommendation: "Follow up on prior reply",
+      source_labels: ["website"],
+      empty_reason: null,
+      contact_coverage_label: "partial",
+      contact_confidence_score: 55,
+    },
+    committee_completion: { completeness_score: 60, missing_roles: [], covered_roles: ["owner"] },
+    growth_signal_recommended_action: "Send follow-up draft for operator review",
+    recommended_next_step_reason: "Continue qualification review",
+  }
+
+  const sequenceBridge = deriveProspectSequenceBridge(baseCompany)
+  assert.ok(sequenceBridge.recommended_sequence_label)
+  assert.ok((sequenceBridge.recommended_sequence_confidence ?? 0) >= 40)
+
+  const recommendation = deriveProspectPipelineRecommendation(baseCompany, sequenceBridge)
+  assert.equal(recommendation.recommended_next_action, "Open Meeting Prep")
+  assert.match(recommendation.recommended_next_action_reason, /Buying stage/i)
+
+  const suppressed = {
+    ...baseCompany,
+    is_suppressed: true,
+    suppression_reason: "Do not contact",
+    growth_lead_id: null,
+    lead_inbox_id: null,
+  }
+  const suppressedRec = deriveProspectPipelineRecommendation(
+    suppressed,
+    deriveProspectSequenceBridge(suppressed),
+  )
+  assert.equal(suppressedRec.recommended_next_action, "Review suppression")
+
+  const finalized = finalizeProspectSearchCompanyResult(baseCompany, { query: "hvac austin" })
+  assert.equal(finalized.pipeline_automation?.qa_marker, GROWTH_PROSPECT_PIPELINE_AUTOMATION_QA_MARKER)
+  assert.equal(finalized.recommended_next_action, recommendation.recommended_next_action)
+  assert.equal(finalized.rank_score, baseCompany.rank_score)
+
+  const overlay = applyProspectPipelineAutomationOverlay(baseCompany, { query: "hvac austin" })
+  const context = buildGrowthWorkflowContext({
+    company: overlay,
+    query: "hvac austin",
+    recommendation: overlay.pipeline_automation!.recommendation,
+    sequenceBridge: overlay.pipeline_automation!.sequence_bridge,
+  })
+  const encoded = encodeGrowthWorkflowContext(context)
+  const decoded = decodeGrowthWorkflowContext(encoded)
+  assert.ok(decoded)
+  assert.equal(decoded!.company_name, "Acme HVAC")
+  assert.equal(decoded!.qualification.lead_engine_score, 68)
+  assert.equal(decoded!.search_query, "hvac austin")
+
+  const launcherActions = buildProspectWorkflowLauncherActions({
+    company: overlay,
+    query: "hvac austin",
+  })
+  const suppressedLaunch = buildProspectWorkflowLauncherActions({ company: suppressed }).find(
+    (action) => action.id === "queue_outreach_draft",
+  )
+  assert.equal(suppressedLaunch?.enabled, false)
+  assert.match(suppressedLaunch?.disabled_reason ?? "", /Suppressed/i)
+
+  const sequenceLaunch = launcherActions.find((action) => action.id === "launch_qualification_sequence")
+  assert.equal(sequenceLaunch?.enabled, true)
+  assert.ok(sequenceLaunch?.launch_url?.includes("leadId=lead-1"))
+
+  const noLead = buildProspectWorkflowLauncherActions({
+    company: { ...baseCompany, growth_lead_id: null, lead_inbox_id: null, in_lead_inbox: false },
+  }).find((action) => action.id === "open_copilot")
+  assert.equal(noLead?.enabled, false)
+
+  const pipelineAutomationSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-pipeline-automation.ts"),
+    "utf8",
+  )
+  assert.match(pipelineAutomationSource, /growth-prospect-pipeline-automation-v1/)
+
+  const launcherSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-workflow-launcher.tsx"),
+    "utf8",
+  )
+  assert.match(launcherSource, /GROWTH_PROSPECT_PIPELINE_AUTOMATION_QA_MARKER/)
+
+  const shellSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-shell.tsx"),
+    "utf8",
+  )
+  assert.match(shellSource, /data-pipeline-automation-marker/)
+  assert.match(shellSource, /ProspectWorkflowLauncher/)
+
+  const actionsSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-actions.ts"),
+    "utf8",
+  )
+  assert.match(actionsSource, /record_prospect_workflow_continuity/)
 }
 
 void main()

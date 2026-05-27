@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils"
 import { CompanyQualificationMetrics } from "@/components/growth/prospect-search/company-qualification-metrics"
 import { CompanyResultExplanations } from "@/components/growth/prospect-search/company-result-explanations"
 import { CompanyStatusBadges } from "@/components/growth/prospect-search/company-status-badges"
+import { ProspectWorkflowLauncher } from "@/components/growth/prospect-search/prospect-workflow-launcher"
 
 export function CompanyResultCard({
   row,
@@ -33,6 +34,9 @@ export function CompanyResultCard({
   onSelect,
   onCheckedChange,
   onAction,
+  onWorkflowLaunch,
+  workflowBusy = false,
+  searchQuery,
 }: {
   row: GrowthProspectSearchCompanyResult
   selected: boolean
@@ -40,6 +44,14 @@ export function CompanyResultCard({
   onSelect: () => void
   onCheckedChange: (checked: boolean) => void
   onAction: (action: string, extra?: Record<string, unknown>) => void
+  onWorkflowLaunch?: (input: {
+    actionId: string
+    launchUrl?: string | null
+    serverAction?: string | null
+    timelineEventKind?: string | null
+  }) => void | Promise<void>
+  workflowBusy?: boolean
+  searchQuery?: string
 }) {
   const motion = recommendedMotion(row)
 
@@ -207,6 +219,24 @@ export function CompanyResultCard({
         </>
       ) : selected && row.related_companies?.length ? (
         <RelatedCompaniesPanel relatedCompanies={row.related_companies} companyName={row.company_name} />
+      ) : null}
+
+      {selected && onWorkflowLaunch ? (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ProspectWorkflowLauncher
+            company={row}
+            query={searchQuery}
+            busy={workflowBusy}
+            onLaunch={({ action, launchUrl, serverAction, timelineEventKind }) =>
+              onWorkflowLaunch({
+                actionId: action.id,
+                launchUrl,
+                serverAction,
+                timelineEventKind,
+              })
+            }
+          />
+        </div>
       ) : null}
 
       <div

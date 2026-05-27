@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Loader2, RefreshCw, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
+  buildSavedSearchWorkflowLaunchLinks,
   formatSavedSearchCountDelta,
   formatSavedSearchRefreshedAt,
   GROWTH_SAVED_SEARCH_WORKFLOW_LINKS,
@@ -118,6 +119,12 @@ export function SavedSearchWorkflowSidebar({
                   <WorkflowLink href={GROWTH_SAVED_SEARCH_WORKFLOW_LINKS.leadInbox} label="Inbox" />
                   <WorkflowLink href={GROWTH_SAVED_SEARCH_WORKFLOW_LINKS.leadEngine} label="Research" />
                   <WorkflowLink href={GROWTH_SAVED_SEARCH_WORKFLOW_LINKS.unifiedInbox} label="Replies" />
+                  {buildSavedSearchWorkflowLaunchLinks({
+                    savedSearchId: saved.id,
+                    query: saved.query_text,
+                  }).map((link) => (
+                    <WorkflowLink key={link.id} href={link.href} label={link.label} />
+                  ))}
                 </div>
               </div>
             </li>

@@ -120,6 +120,7 @@ export const GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS = [
   "bulk_push_to_lead_inbox",
   "run_lead_engine",
   "open_workspace",
+  "record_prospect_workflow_continuity",
   "export_csv",
 ] as const
 
@@ -323,6 +324,16 @@ export type GrowthProspectSearchCompanyResult = GrowthSignalAiInsightClientField
   score_explanation_items?: string[]
   confidence_explanation_items?: string[]
   recommended_next_step_reason?: string | null
+  /** Deterministic pipeline automation overlay (Sprint 4.2). Does not affect rank_score. */
+  recommended_next_action?: string | null
+  recommended_next_action_reason?: string | null
+  recommended_workflow_path?: string | null
+  recommended_sequence_label?: string | null
+  recommended_sequence_confidence?: number | null
+  recommended_sequence_reason?: string | null
+  recommended_first_touch?: string | null
+  pipeline_automation?: import("@/lib/growth/prospect-search/prospect-pipeline-automation").GrowthProspectPipelineAutomationOverlay | null
+  workflow_context_token?: string | null
   matched_territory_label?: string | null
   territory_match_reasons?: string[]
   /** Evidence-backed decision maker / committee overlay (Sprint 4C). */

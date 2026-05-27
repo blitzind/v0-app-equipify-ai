@@ -9,6 +9,15 @@ import {
 } from "@/lib/growth/prospect-search/list-management"
 import { buildProspectSearchLeadEngineHandoffUrl } from "@/lib/growth/prospect-search/prospect-search-lead-engine-handoff"
 import {
+  buildProspectWorkflowTimelinePayload,
+  type GrowthProspectWorkflowContinuityEventKind,
+} from "@/lib/growth/prospect-search/prospect-pipeline-automation"
+import {
+  appendWorkflowContextToUrl,
+  buildGrowthWorkflowContext,
+} from "@/lib/growth/prospect-search/prospect-workflow-context"
+import { appendGrowthLeadTimelineEvent } from "@/lib/growth/timeline-repository"
+import {
   executeBulkPushToLeadInbox,
   pushProspectSearchCompanyToLeadInbox,
   type ProspectSearchSelectionRef,
@@ -59,6 +68,7 @@ export async function executeProspectSearchAction(
     save_pagination?: boolean
     result_count?: number | null
     owner_label?: string | null
+    workflow_event_kind?: GrowthProspectWorkflowContinuityEventKind
   },
 ): Promise<GrowthProspectSearchActionResult> {
   const { action } = input
@@ -343,16 +353,77 @@ export async function executeProspectSearchAction(
     }
   }
 
+  if (action === "record_prospect_workflow_continuity") {
+    const company = input.company
+    const eventKind = input.workflow_event_kind
+    if (!company || !eventKind) {
+      return { ok: true, action, message: "Workflow continuity skipped — missing context." }
+    }
+
+    const leadId = company.growth_lead_id ?? company.lead_inbox_id
+    if (!leadId) {
+      return { ok: true, action, message: "Workflow continuity skipped — no lead record yet." }
+    }
+
+    const payload = buildProspectWorkflowTimelinePayload({ company, eventKind })
+    const titles: Record<GrowthProspectWorkflowContinuityEventKind, string> = {
+      prospect_workflow_started: "Prospect workflow started",
+      lead_engine_launched: "Lead Engine launched from Prospect Search",
+      outreach_workflow_started: "Outreach workflow started from Prospect Search",
+      meeting_workflow_started: "Meeting workflow started from Prospect Search",
+      sequence_workflow_started: "Sequence workflow started from Prospect Search",
+    }
+
+    await appendGrowthLeadTimelineEvent(admin, {
+      leadId,
+      eventType: "manual_touch",
+      title: titles[eventKind],
+      summary: company.recommended_next_action_reason ?? company.recommended_next_step_reason ?? null,
+      payload: payload as unknown as Record<string, unknown>,
+      actorUserId: input.userId ?? null,
+    })
+
+    return { ok: true, action, message: "Workflow continuity recorded.", growth_lead_id: leadId }
+  }
+
   if (action === "run_lead_engine") {
     const company = input.company
     if (!company?.company_name) {
       return { ok: false, action, message: "Select a company to run Lead Engine sandbox." }
     }
+
+    const workflowContext = buildGrowthWorkflowContext({
+      company,
+      query: input.query,
+      filters: input.filters,
+      discoveryMode: input.discovery_mode,
+    })
+    const workspaceUrl = appendWorkflowContextToUrl(
+      buildProspectSearchLeadEngineHandoffUrl(company, input.query),
+      workflowContext,
+    )
+
+    const leadId = company.growth_lead_id ?? company.lead_inbox_id
+    if (leadId) {
+      const payload = buildProspectWorkflowTimelinePayload({
+        company,
+        eventKind: "lead_engine_launched",
+      })
+      await appendGrowthLeadTimelineEvent(admin, {
+        leadId,
+        eventType: "manual_touch",
+        title: "Lead Engine launched from Prospect Search",
+        summary: company.recommended_next_action_reason ?? null,
+        payload: payload as unknown as Record<string, unknown>,
+        actorUserId: input.userId ?? null,
+      })
+    }
+
     return {
       ok: true,
       action,
       message: "Open Lead Engine workspace with company context prefilled.",
-      workspace_url: buildProspectSearchLeadEngineHandoffUrl(company, input.query),
+      workspace_url: workspaceUrl,
       growth_lead_id: company.growth_lead_id,
     }
   }
