@@ -3,6 +3,8 @@ import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { archiveInboxThread, getInboxThread, updateInboxThread } from "@/lib/growth/inbox/thread-repository"
 import { isGrowthUnifiedInboxSchemaReady } from "@/lib/growth/inbox/inbox-schema-health"
+import { fetchInboxThreadSyncDetail } from "@/lib/growth/inbox-sync/inbox-sync-repository"
+import { isGrowthInboxSyncSchemaReady } from "@/lib/growth/inbox-sync/inbox-sync-schema-health"
 import { GROWTH_INBOX_THREAD_STATUSES } from "@/lib/growth/inbox/inbox-types"
 
 export const runtime = "nodejs"
@@ -30,7 +32,9 @@ export async function GET(_request: Request, context: RouteContext) {
     if (!thread) {
       return NextResponse.json({ error: "inbox_thread_not_found", message: "Inbox thread not found." }, { status: 404 })
     }
-    return NextResponse.json({ ok: true, thread })
+    const syncDetail =
+      (await isGrowthInboxSyncSchemaReady(access.admin)) ? await fetchInboxThreadSyncDetail(access.admin, id) : null
+    return NextResponse.json({ ok: true, thread, syncDetail })
   } catch (error) {
     return NextResponse.json(
       {

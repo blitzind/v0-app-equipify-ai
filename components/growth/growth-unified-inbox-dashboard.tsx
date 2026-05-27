@@ -26,6 +26,12 @@ import type {
   GrowthReplyIntelligenceSummary,
 } from "@/lib/growth/inbox/inbox-types"
 import { GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER } from "@/lib/growth/inbox/inbox-types"
+import {
+  GROWTH_INBOX_SYNC_THREAD_CONTINUITY_QA_MARKER,
+  type GrowthInboxSyncDashboard,
+  type GrowthInboxThreadSyncDetail,
+  inboxSyncStatusLabel,
+} from "@/lib/growth/inbox-sync/inbox-sync-types"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
   open: "healthy",
@@ -69,6 +75,18 @@ type DashboardPayload = {
   message?: string
 }
 
+type SyncDashboardPayload = {
+  ok?: boolean
+  dashboard?: GrowthInboxSyncDashboard
+  message?: string
+}
+
+type ThreadDetailPayload = {
+  thread?: GrowthInboxThread
+  syncDetail?: GrowthInboxThreadSyncDetail | null
+  message?: string
+}
+
 export function GrowthUnifiedInboxDashboardPanel() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -76,6 +94,8 @@ export function GrowthUnifiedInboxDashboardPanel() {
   const [threads, setThreads] = useState<GrowthInboxThread[]>([])
   const [events, setEvents] = useState<GrowthReplyIntelligenceEvent[]>([])
   const [intelligence, setIntelligence] = useState<GrowthReplyIntelligenceSummary | null>(null)
+  const [syncDashboard, setSyncDashboard] = useState<GrowthInboxSyncDashboard | null>(null)
+  const [syncDetail, setSyncDetail] = useState<GrowthInboxThreadSyncDetail | null>(null)
   const [leads, setLeads] = useState<Array<{ id: string; label: string }>>([])
   const [selectedThreadId, setSelectedThreadId] = useState("")
   const [newLeadId, setNewLeadId] = useState("")
@@ -93,23 +113,26 @@ export function GrowthUnifiedInboxDashboardPanel() {
 
   const loadThreadDetail = useCallback(async (threadId: string) => {
     const response = await fetch(`/api/platform/growth/inbox/thread/${threadId}`)
-    const payload = (await response.json()) as { thread?: GrowthInboxThread; message?: string }
+    const payload = (await response.json()) as ThreadDetailPayload
     if (!response.ok) throw new Error(payload.message ?? "Could not load thread detail.")
     if (payload.thread) {
       setThreads((current) => current.map((thread) => (thread.id === threadId ? payload.thread! : thread)))
     }
+    setSyncDetail(payload.syncDetail ?? null)
   }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [listResponse, dashboardResponse] = await Promise.all([
+      const [listResponse, dashboardResponse, syncResponse] = await Promise.all([
         fetch("/api/platform/growth/inbox"),
         fetch("/api/platform/growth/inbox/dashboard"),
+        fetch("/api/platform/growth/inbox/sync/dashboard"),
       ])
       const listPayload = (await listResponse.json()) as ListPayload
       const dashboardPayload = (await dashboardResponse.json()) as DashboardPayload
+      const syncPayload = (await syncResponse.json()) as SyncDashboardPayload
       if (!listResponse.ok) throw new Error(listPayload.message ?? "Could not load inbox threads.")
       if (!dashboardResponse.ok) throw new Error(dashboardPayload.message ?? "Could not load inbox dashboard.")
 
@@ -119,6 +142,7 @@ export function GrowthUnifiedInboxDashboardPanel() {
       setDashboard(dashboardPayload.dashboard ?? null)
       setIntelligence(dashboardPayload.intelligence ?? null)
       setEvents(dashboardPayload.events ?? [])
+      if (syncResponse.ok && syncPayload.dashboard) setSyncDashboard(syncPayload.dashboard)
 
       const nextSelected = selectedThreadId || mergedThreads[0]?.id || ""
       if (nextSelected && !selectedThreadId) setSelectedThreadId(nextSelected)
@@ -260,13 +284,76 @@ export function GrowthUnifiedInboxDashboardPanel() {
         </div>
       </GrowthEngineCard>
 
-      <GrowthEngineCard title="Live Mailbox Sync">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-border px-4 py-3">
-          <p className="text-sm text-muted-foreground">
-            Provider mailbox polling and sync are not enabled in this foundation phase.
-          </p>
+      <GrowthEngineCard title="Sync Health">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <GrowthBadge label={GROWTH_INBOX_SYNC_THREAD_CONTINUITY_QA_MARKER} tone="neutral" />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <StatTile label="Last Sync" value={formatDate(syncDashboard?.lastSyncAt)} />
+          <StatTile label="Imported 24h" value={String(syncDashboard?.imported24h ?? 0)} />
+          <StatTile label="Duplicates Skipped" value={String(syncDashboard?.duplicatesSkipped24h ?? 0)} />
+          <StatTile label="Failed Runs" value={String(syncDashboard?.failedRuns24h ?? 0)} />
+          <StatTile label="Thread Match Rate" value={`${syncDashboard?.threadMatchRate ?? 0}%`} />
+        </div>
+      </GrowthEngineCard>
+
+      <GrowthEngineCard title="Sync Runs">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-muted-foreground">
+                <th className="px-2 py-2 font-medium">Mailbox</th>
+                <th className="px-2 py-2 font-medium">Provider</th>
+                <th className="px-2 py-2 font-medium">Status</th>
+                <th className="px-2 py-2 font-medium">Seen</th>
+                <th className="px-2 py-2 font-medium">Imported</th>
+                <th className="px-2 py-2 font-medium">Matched</th>
+                <th className="px-2 py-2 font-medium">Created</th>
+                <th className="px-2 py-2 font-medium">Duplicates</th>
+                <th className="px-2 py-2 font-medium">Started</th>
+                <th className="px-2 py-2 font-medium">Completed</th>
+                <th className="px-2 py-2 font-medium">Failure</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(syncDashboard?.runs ?? []).length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="px-2 py-6 text-center text-muted-foreground">
+                    No sync runs yet. Run inbox sync from platform API or cron when mailboxes are connected.
+                  </td>
+                </tr>
+              ) : (
+                (syncDashboard?.runs ?? []).slice(0, 20).map((run) => (
+                  <tr key={run.id} className="border-b">
+                    <td className="px-2 py-2">{run.mailboxLabel}</td>
+                    <td className="px-2 py-2">{run.providerFamily}</td>
+                    <td className="px-2 py-2">{inboxSyncStatusLabel(run.status)}</td>
+                    <td className="px-2 py-2">{run.messagesSeen}</td>
+                    <td className="px-2 py-2">{run.messagesImported}</td>
+                    <td className="px-2 py-2">{run.threadsMatched}</td>
+                    <td className="px-2 py-2">{run.threadsCreated}</td>
+                    <td className="px-2 py-2">{run.duplicatesSkipped}</td>
+                    <td className="px-2 py-2">{formatDate(run.startedAt)}</td>
+                    <td className="px-2 py-2">{formatDate(run.completedAt)}</td>
+                    <td className="max-w-[160px] truncate px-2 py-2 text-destructive" title={run.failureReason ?? undefined}>
+                      {run.failureReason ?? "—"}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </GrowthEngineCard>
+
+      <GrowthEngineCard title="Provider Mailbox Controls">
+        <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" disabled>
-            Live Mailbox Sync
+            Archive provider thread
+            <GrowthBadge label="Coming Soon" tone="neutral" className="ml-2" />
+          </Button>
+          <Button type="button" variant="outline" size="sm" disabled>
+            Mark read/unread provider thread
             <GrowthBadge label="Coming Soon" tone="neutral" className="ml-2" />
           </Button>
         </div>
@@ -413,6 +500,36 @@ export function GrowthUnifiedInboxDashboardPanel() {
 
           <GrowthEngineCard title="Thread Actions">
             <div className="space-y-4">
+              {syncDetail ? (
+                <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs">
+                  <p className="font-medium">Thread continuity</p>
+                  <dl className="mt-2 space-y-1 text-muted-foreground">
+                    <div className="flex justify-between gap-2">
+                      <dt>Provider thread id</dt>
+                      <dd className="font-mono">{syncDetail.providerThreadId?.slice(0, 12) ?? "—"}…</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt>Matched by</dt>
+                      <dd>{syncDetail.matchedBy ?? "—"}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt>Confidence</dt>
+                      <dd>{syncDetail.confidence}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt>Linked sequence</dt>
+                      <dd>{syncDetail.sequenceEnrollmentId ? syncDetail.sequenceEnrollmentId.slice(0, 8) : "—"}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt>Linked delivery attempt</dt>
+                      <dd>{syncDetail.deliveryAttemptId ? syncDetail.deliveryAttemptId.slice(0, 8) : "—"}</dd>
+                    </div>
+                  </dl>
+                  {syncDetail.sequenceExitCandidate ? (
+                    <p className="mt-2 text-amber-800">Sequence exit review recommended — human approval required.</p>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="space-y-2">
                 <Label htmlFor="message-direction">Direction</Label>
                 <Select value={messageDirection} onValueChange={(value) => setMessageDirection(value as "inbound" | "outbound")}>

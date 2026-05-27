@@ -172,6 +172,7 @@
     "test:growth-deliverability": "tsx scripts/test-growth-deliverability.ts",
     "test:growth-warmup": "tsx scripts/test-growth-warmup.ts",
     "test:growth-unified-inbox": "tsx scripts/test-growth-unified-inbox.ts",
+    "test:growth-inbox-sync": "tsx scripts/test-growth-inbox-sync.ts",
     "test:growth-provider-delivery": "tsx scripts/test-growth-provider-delivery.ts",
     "test:growth-provider-transport": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-provider-transport.ts",
     "test:growth-engagement-attribution": "tsx scripts/test-growth-engagement-attribution.ts",

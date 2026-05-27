@@ -172,7 +172,8 @@ async function main(): Promise<void> {
   assert.match(uiSource, /Message Viewer/)
   assert.match(uiSource, /Reply Intelligence/)
   assert.match(uiSource, /Assign Owner/)
-  assert.match(uiSource, /Coming Soon/)
+  assert.match(uiSource, /Sync Health/)
+  assert.match(uiSource, /GROWTH_INBOX_SYNC_THREAD_CONTINUITY_QA_MARKER/)
   assert.match(uiSource, /GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER/)
 
   const navSource = fs.readFileSync(

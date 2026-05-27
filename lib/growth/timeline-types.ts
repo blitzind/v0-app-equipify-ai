@@ -155,6 +155,12 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "renewal_due",
   "expansion_candidate_detected",
   "churn_risk_detected",
+  "inbox_sync_started",
+  "inbox_sync_completed",
+  "inbox_reply_imported",
+  "inbox_thread_matched",
+  "inbox_thread_created",
+  "inbox_duplicate_skipped",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]
