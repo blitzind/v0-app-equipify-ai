@@ -184,6 +184,10 @@ export async function runSequenceExecutionJob(
     sequenceStepId: locked.sequenceStepId,
     leadId: locked.leadId,
     sequenceEnrollmentId: locked.sequenceEnrollmentId,
+    senderPoolId: locked.senderPoolId,
+    allowAutoRotation: locked.allowAutoRotation,
+    manualSenderAccountId: locked.manualSenderAccountId,
+    sequenceExecutionJobId: locked.id,
   })
 
   if ("error" in payload) {
@@ -209,6 +213,10 @@ export async function runSequenceExecutionJob(
 
   const transport = await executeTransportSend(admin, {
     sender_account_id: payload.senderAccountId,
+    sender_pool_id: payload.senderPoolId ?? locked.senderPoolId,
+    allow_auto_rotation: payload.allowAutoRotation ?? locked.allowAutoRotation,
+    manual_sender_account_id: payload.manualSenderAccountId ?? locked.manualSenderAccountId,
+    sequence_execution_job_id: locked.id,
     to: payload.to,
     subject: payload.subject,
     html: payload.html,

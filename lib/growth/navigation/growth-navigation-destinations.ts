@@ -88,6 +88,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["delivery", "provider", "route", "transport", "send routing"],
   },
   {
+    id: "sender-pools",
+    label: "Sender Pools",
+    href: "/admin/growth/providers/sender-pools",
+    keywords: ["sender pool", "rotation", "round robin", "deliverability", "sender fatigue"],
+  },
+  {
     id: "provider-compliance",
     label: "Compliance",
     href: "/admin/growth/providers/compliance",
@@ -606,6 +612,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         href: "/admin/growth/providers/delivery",
         label: "Delivery",
         match: prefixMatch("/admin/growth/providers/delivery"),
+      },
+      {
+        id: "sender-pools",
+        href: "/admin/growth/providers/sender-pools",
+        label: "Sender Pools",
+        match: prefixMatch("/admin/growth/providers/sender-pools"),
       },
       {
         id: "provider-compliance",

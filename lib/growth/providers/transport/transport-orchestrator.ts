@@ -25,6 +25,7 @@ import {
   updateDeliveryAttempt,
 } from "@/lib/growth/providers/transport/transport-repository"
 import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
+import { resolveTransportSenderWithPool } from "@/lib/growth/sender-pools/sender-pool-rotation-service"
 
 export class TransportHumanApprovalRequiredError extends Error {
   constructor() {
@@ -41,6 +42,10 @@ export type TransportSendInput = {
   text?: string
   lead_id?: string | null
   sequence_enrollment_id?: string | null
+  sequence_execution_job_id?: string | null
+  sender_pool_id?: string | null
+  allow_auto_rotation?: boolean
+  manual_sender_account_id?: string | null
   human_approved: boolean
   human_approval_confirmed?: boolean
   actorUserId: string
@@ -56,6 +61,12 @@ export type TransportSendResult = {
   error?: string
   used_fallback?: boolean
   requires_human_review?: boolean
+  sender_rotation?: {
+    selectedSenderLabel?: string | null
+    reason?: string
+    riskLevel?: string
+    fallbackCandidates?: Array<{ senderLabel: string; reason: string; riskLevel: string }>
+  }
 }
 
 function assertHumanApproval(input: TransportSendInput): void {
@@ -330,7 +341,36 @@ export async function executeTransportSend(
 ): Promise<TransportSendResult> {
   assertHumanApproval(input)
 
-  const routes = await loadRouteCandidatesForSender(admin, input.sender_account_id)
+  let senderAccountId = input.sender_account_id
+  let rotationMeta: TransportSendResult["sender_rotation"]
+
+  if (input.sender_pool_id) {
+    const resolved = await resolveTransportSenderWithPool(admin, {
+      senderAccountId: input.sender_account_id,
+      senderPoolId: input.sender_pool_id,
+      allowAutoRotation: input.allow_auto_rotation,
+      manualSenderAccountId: input.manual_sender_account_id,
+      sequenceExecutionJobId: input.sequence_execution_job_id,
+    })
+    if (!resolved?.senderAccountId) {
+      return {
+        ok: false,
+        attempt: null,
+        error: "No eligible sender in pool.",
+        requires_human_review: true,
+      }
+    }
+    senderAccountId = resolved.senderAccountId
+    const sender = await getSenderAccount(admin, senderAccountId)
+    rotationMeta = {
+      selectedSenderLabel: sender?.display_name || sender?.email_address || null,
+      reason: "health_score",
+      riskLevel: "low",
+      fallbackCandidates: [],
+    }
+  }
+
+  const routes = await loadRouteCandidatesForSender(admin, senderAccountId)
   const selection = selectDeliveryRoute({ routes, requested_volume: 1 })
 
   if (!selection.selected_route_id) {
@@ -342,7 +382,7 @@ export async function executeTransportSend(
     route_id: primaryRoute.route_id,
     provider_id: primaryRoute.provider_id,
     provider_family: primaryRoute.provider_family,
-    sender_account_id: input.sender_account_id,
+    sender_account_id: senderAccountId,
     message: { to: input.to, subject: input.subject, html: input.html, text: input.text },
     lead_id: input.lead_id,
     sequence_enrollment_id: input.sequence_enrollment_id,
@@ -352,7 +392,9 @@ export async function executeTransportSend(
     extra_metadata: input.metadata,
   })
 
-  if (primaryResult.ok) return primaryResult
+  if (primaryResult.ok) {
+    return rotationMeta ? { ...primaryResult, sender_rotation: rotationMeta } : primaryResult
+  }
 
   const fallback = resolveTransportFallbackRoute({
     routes,
@@ -369,7 +411,7 @@ export async function executeTransportSend(
     route_id: fallbackRoute.route_id,
     provider_id: fallbackRoute.provider_id,
     provider_family: fallbackRoute.provider_family,
-    sender_account_id: input.sender_account_id,
+    sender_account_id: senderAccountId,
     message: { to: input.to, subject: input.subject, html: input.html, text: input.text },
     lead_id: input.lead_id,
     sequence_enrollment_id: input.sequence_enrollment_id,

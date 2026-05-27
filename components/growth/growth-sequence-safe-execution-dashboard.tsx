@@ -200,6 +200,7 @@ export function GrowthSequenceSafeExecutionDashboard() {
                   <th className="px-2 py-2 font-medium">Due</th>
                   <th className="px-2 py-2 font-medium">Approval</th>
                   <th className="px-2 py-2 font-medium">Provider</th>
+                  <th className="px-2 py-2 font-medium">Sender pool</th>
                   <th className="px-2 py-2 font-medium">Experiment</th>
                   <th className="px-2 py-2 font-medium">Last Error</th>
                   <th className="px-2 py-2 font-medium">Actions</th>
@@ -296,6 +297,18 @@ function JobRow({
         )}
       </td>
       <td className="px-2 py-3 text-muted-foreground">{job.providerLabel ?? "—"}</td>
+      <td className="px-2 py-3 text-muted-foreground">
+        {job.senderPoolLabel ? (
+          <span>
+            {job.senderPoolLabel}
+            {job.rotationRiskLevel ? (
+              <GrowthBadge label={job.rotationRiskLevel} tone={STATUS_TONE[job.rotationRiskLevel] ?? "neutral"} />
+            ) : null}
+          </span>
+        ) : (
+          "—"
+        )}
+      </td>
       <td className="px-2 py-3 text-muted-foreground">
         {job.experimentVariantLabel ? (
           <span title={job.experimentName ?? undefined}>

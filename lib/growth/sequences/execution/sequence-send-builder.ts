@@ -6,6 +6,7 @@ import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { applyOutboundEmailTracking } from "@/lib/growth/tracking/tracking-links"
 import { applyExperimentVariantToSendPayload } from "@/lib/growth/experiments/experiment-repository"
 import { fetchGrowthSequenceEnrollmentStepById } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
+import { resolveSenderRotationForPool } from "@/lib/growth/sender-pools/sender-pool-rotation-service"
 import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 import { listSenderAccounts } from "@/lib/growth/sender/sender-repository"
 import type { GrowthSequenceSendPayload } from "@/lib/growth/sequences/execution/sequence-execution-types"
@@ -19,7 +20,51 @@ function sanitizeHtml(value: string): string {
 
 export async function resolveSequenceExecutionSender(
   admin: SupabaseClient,
-): Promise<{ senderAccountId: string; providerId: string | null } | null> {
+  options?: {
+    senderPoolId?: string | null
+    allowAutoRotation?: boolean
+    manualSenderAccountId?: string | null
+    sequenceExecutionJobId?: string | null
+  },
+): Promise<{
+  senderAccountId: string
+  providerId: string | null
+  senderPoolId?: string | null
+  allowAutoRotation?: boolean
+  manualSenderAccountId?: string | null
+  rotationReason?: string | null
+  rotationRiskLevel?: string | null
+} | null> {
+  if (options?.senderPoolId && options.allowAutoRotation !== false) {
+    const rotation = await resolveSenderRotationForPool(admin, {
+      senderPoolId: options.senderPoolId,
+      allowAutoRotation: options.allowAutoRotation,
+      manualSenderAccountId: options.manualSenderAccountId,
+      sequenceExecutionJobId: options.sequenceExecutionJobId,
+    })
+    if (rotation.selectedSenderAccountId) {
+      return {
+        senderAccountId: rotation.selectedSenderAccountId,
+        providerId: rotation.selectedProviderId,
+        senderPoolId: options.senderPoolId,
+        allowAutoRotation: options.allowAutoRotation ?? true,
+        manualSenderAccountId: options.manualSenderAccountId ?? null,
+        rotationReason: rotation.reason,
+        rotationRiskLevel: rotation.riskLevel,
+      }
+    }
+  }
+
+  if (options?.manualSenderAccountId && options.allowAutoRotation === false) {
+    return {
+      senderAccountId: options.manualSenderAccountId,
+      providerId: null,
+      senderPoolId: options.senderPoolId ?? null,
+      allowAutoRotation: false,
+      manualSenderAccountId: options.manualSenderAccountId,
+    }
+  }
+
   const [routes, senders] = await Promise.all([listDeliveryRoutes(admin), listSenderAccounts(admin)])
   const enabledRoute = routes.find((route) => route.enabled)
   if (enabledRoute) {
@@ -37,6 +82,10 @@ export async function buildSequenceExecutionSendPayload(
     leadId: string
     deliveryAttemptId?: string | null
     sequenceEnrollmentId?: string | null
+    senderPoolId?: string | null
+    allowAutoRotation?: boolean
+    manualSenderAccountId?: string | null
+    sequenceExecutionJobId?: string | null
   },
 ): Promise<GrowthSequenceSendPayload | { error: string }> {
   const [step, lead] = await Promise.all([
@@ -47,7 +96,12 @@ export async function buildSequenceExecutionSendPayload(
   if (!lead?.contactEmail) return { error: "missing_recipient_email" }
   if (step.channel !== "email") return { error: "unsupported_channel" }
 
-  const sender = await resolveSequenceExecutionSender(admin)
+  const sender = await resolveSequenceExecutionSender(admin, {
+    senderPoolId: input.senderPoolId,
+    allowAutoRotation: input.allowAutoRotation,
+    manualSenderAccountId: input.manualSenderAccountId,
+    sequenceExecutionJobId: input.sequenceExecutionJobId,
+  })
   if (!sender) return { error: "no_sender_route" }
 
   let subject = "Follow up"
@@ -93,6 +147,11 @@ export async function buildSequenceExecutionSendPayload(
     text: text.slice(0, 10000),
     senderAccountId: sender.senderAccountId,
     providerId: sender.providerId,
+    senderPoolId: sender.senderPoolId ?? input.senderPoolId ?? null,
+    allowAutoRotation: sender.allowAutoRotation ?? input.allowAutoRotation ?? true,
+    manualSenderAccountId: sender.manualSenderAccountId ?? input.manualSenderAccountId ?? null,
+    rotationReason: sender.rotationReason ?? null,
+    rotationRiskLevel: sender.rotationRiskLevel ?? null,
     experimentId: experimentOverlay.experimentId,
     experimentVariantId: experimentOverlay.variantId,
     experimentVariantLabel: experimentOverlay.variantLabel,

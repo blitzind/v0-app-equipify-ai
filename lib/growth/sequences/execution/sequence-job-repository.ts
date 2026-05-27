@@ -17,6 +17,10 @@ type JobRow = {
   lead_id: string
   sender_account_id: string | null
   provider_id: string | null
+  sender_pool_id?: string | null
+  allow_auto_rotation?: boolean
+  manual_sender_account_id?: string | null
+  sender_rotation_decision_id?: string | null
   status: string
   scheduled_for: string
   locked_at: string | null
@@ -58,6 +62,10 @@ function mapJob(row: JobRow): GrowthSequenceExecutionJob {
     leadId: row.lead_id,
     senderAccountId: row.sender_account_id,
     providerId: row.provider_id,
+    senderPoolId: row.sender_pool_id ?? null,
+    allowAutoRotation: row.allow_auto_rotation !== false,
+    manualSenderAccountId: row.manual_sender_account_id ?? null,
+    senderRotationDecisionId: row.sender_rotation_decision_id ?? null,
     status: row.status as GrowthSequenceExecutionJobStatus,
     scheduledFor: row.scheduled_for,
     lockedAt: row.locked_at,
@@ -270,8 +278,9 @@ export async function enrichSequenceExecutionJobViews(
   const enrollmentIds = [...new Set(jobs.map((job) => job.sequenceEnrollmentId))]
   const stepIds = [...new Set(jobs.map((job) => job.sequenceStepId).filter(Boolean))] as string[]
   const providerIds = [...new Set(jobs.map((job) => job.providerId).filter(Boolean))] as string[]
+  const poolIds = [...new Set(jobs.map((job) => job.senderPoolId).filter(Boolean))] as string[]
 
-  const [leadsRes, enrollmentsRes, stepsRes, providersRes] = await Promise.all([
+  const [leadsRes, enrollmentsRes, stepsRes, providersRes, poolsRes] = await Promise.all([
     admin.schema("growth").from("leads").select("id, company_name").in("id", leadIds),
     admin.schema("growth").from("sequence_enrollments").select("id, sequence_pattern_id").in("id", enrollmentIds),
     stepIds.length > 0
@@ -279,6 +288,9 @@ export async function enrichSequenceExecutionJobViews(
       : Promise.resolve({ data: [] }),
     providerIds.length > 0
       ? admin.schema("growth").from("delivery_providers").select("id, provider_name").in("id", providerIds)
+      : Promise.resolve({ data: [] }),
+    poolIds.length > 0
+      ? admin.schema("growth").from("sender_pools").select("id, name").in("id", poolIds)
       : Promise.resolve({ data: [] }),
   ])
 
@@ -297,6 +309,7 @@ export async function enrichSequenceExecutionJobViews(
   const providerMap = new Map(
     (providersRes.data ?? []).map((row) => [row.id as string, row.provider_name as string]),
   )
+  const poolMap = new Map((poolsRes.data ?? []).map((row) => [row.id as string, row.name as string]))
 
   const experimentPreviews = await resolveExperimentAssignmentPreviewsForJobs(
     admin,
@@ -312,6 +325,9 @@ export async function enrichSequenceExecutionJobViews(
       sequenceLabel: enrollmentMap.get(job.sequenceEnrollmentId)?.slice(0, 8) ?? "Sequence",
       stepLabel: step ? `Step ${step.stepOrder} · ${step.channel}` : "—",
       providerLabel: job.providerId ? providerMap.get(job.providerId) ?? null : null,
+      senderPoolLabel: job.senderPoolId ? poolMap.get(job.senderPoolId) ?? "Sender pool" : null,
+      rotationReason: null,
+      rotationRiskLevel: null,
       experimentId: experimentPreview?.experimentId ?? null,
       experimentName: experimentPreview?.experimentName ?? null,
       experimentVariantId: experimentPreview?.variantId ?? null,

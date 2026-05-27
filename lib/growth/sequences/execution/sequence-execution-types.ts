@@ -46,6 +46,10 @@ export type GrowthSequenceExecutionJob = {
   leadId: string
   senderAccountId: string | null
   providerId: string | null
+  senderPoolId: string | null
+  allowAutoRotation: boolean
+  manualSenderAccountId: string | null
+  senderRotationDecisionId: string | null
   status: GrowthSequenceExecutionJobStatus
   scheduledFor: string
   lockedAt: string | null
@@ -76,6 +80,9 @@ export type GrowthSequenceExecutionJobView = GrowthSequenceExecutionJob & {
   sequenceLabel: string
   stepLabel: string
   providerLabel: string | null
+  senderPoolLabel?: string | null
+  rotationReason?: string | null
+  rotationRiskLevel?: string | null
   experimentId?: string | null
   experimentName?: string | null
   experimentVariantId?: string | null
@@ -128,6 +135,11 @@ export type GrowthSequenceSendPayload = {
   text: string
   senderAccountId: string
   providerId: string | null
+  senderPoolId?: string | null
+  allowAutoRotation?: boolean
+  manualSenderAccountId?: string | null
+  rotationReason?: string | null
+  rotationRiskLevel?: string | null
   experimentId?: string | null
   experimentVariantId?: string | null
   experimentVariantLabel?: string | null

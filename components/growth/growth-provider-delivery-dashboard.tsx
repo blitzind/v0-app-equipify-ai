@@ -701,6 +701,16 @@ export function GrowthProviderDeliveryDashboardPanel() {
         </div>
       </GrowthEngineCard>
 
+      <GrowthEngineCard title="Sender pool rotation">
+        <p className="text-sm text-muted-foreground">
+          When a sequence or delivery job references a sender pool, the rotation engine selects an eligible sender before
+          provider route selection. Manual sender selection is preserved when auto-rotation is off.
+        </p>
+        <Button asChild variant="outline" size="sm" className="mt-3">
+          <Link href="/admin/growth/providers/sender-pools">Open Sender Pools</Link>
+        </Button>
+      </GrowthEngineCard>
+
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
         <GrowthEngineCard title="Transport Simulator">
           <div className="grid gap-4 sm:grid-cols-2">
