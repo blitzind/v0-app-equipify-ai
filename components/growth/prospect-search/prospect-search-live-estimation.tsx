@@ -7,7 +7,7 @@ import {
   GROWTH_LIVE_ESTIMATED_RESULTS_QA_MARKER,
   GROWTH_SEARCH_RESULT_PREVIEW_QA_MARKER,
 } from "@/lib/growth/prospect-search/prospect-search-estimation-types"
-import { formatProspectSearchMarketSizeHeadline } from "@/lib/growth/prospect-search/prospect-search-estimation-format"
+import { formatProspectSearchMarketSizeHeadline, PROSPECT_SEARCH_ESTIMATE_UNAVAILABLE_LABEL } from "@/lib/growth/prospect-search/prospect-search-estimation-format"
 import { cn } from "@/lib/utils"
 
 function stateLabel(state: string): string {
@@ -72,24 +72,19 @@ export function ProspectSearchLiveEstimation({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
-              {estimate?.discovery_mode === "discover_external" ? "Estimated market" : "Matching companies"}
+              Matching companies
             </p>
             <p className="mt-0.5 text-lg font-semibold leading-tight text-foreground sm:text-xl">
               {showSpinner && !estimate
                 ? "Sizing your market…"
-                : marketCopy?.headline ?? stateText ?? "Adjust filters to preview market size"}
+                : marketCopy?.headline ?? stateText ?? PROSPECT_SEARCH_ESTIMATE_UNAVAILABLE_LABEL}
             </p>
             <p className="mt-1 text-xs text-muted-foreground break-words">
               {marketCopy?.helper ??
                 (estimate?.discovery_mode === "discover_external"
-                  ? "External search has not run yet — counts use your index and ICP filters."
-                  : "Counts update as you change filters — no search required.")}
+                  ? "Based on your current filters. External discovery runs only when you click Search."
+                  : "Based on your current filters. Counts reflect indexed CRM and Growth Engine records.")}
             </p>
-            {estimate && estimate.discovery_mode === "discover_external" ? (
-              <p className="mt-1 text-[11px] font-medium text-violet-900 dark:text-violet-200">
-                External discovery not yet executed — click Search when ready.
-              </p>
-            ) : null}
           </div>
         </div>
       </div>

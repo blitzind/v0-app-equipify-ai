@@ -2333,17 +2333,48 @@ async function main(): Promise<void> {
   assert.equal(GROWTH_SEARCH_RESULT_PREVIEW_QA_MARKER, "growth-search-result-preview-v1")
   assert.equal(GROWTH_PROVIDER_HEALTH_DASHBOARD_QA_MARKER, "growth-provider-health-dashboard-v1")
 
-  const { floorEstimateToRange, buildProspectSearchButtonLabel, formatProspectSearchMarketSizeHeadline } =
-    await import("../lib/growth/prospect-search/prospect-search-estimation-format")
+  const {
+    floorEstimateToRange,
+    buildProspectSearchButtonLabel,
+    formatExactOrRangeLabel,
+    formatProspectSearchMarketSizeHeadline,
+    formatProspectSearchMatchingCount,
+    PROSPECT_SEARCH_ESTIMATE_UNAVAILABLE_LABEL,
+  } = await import("../lib/growth/prospect-search/prospect-search-estimation-format")
   assert.equal(floorEstimateToRange(260).label, "~250+")
   assert.equal(floorEstimateToRange(1200).label, "~1k+")
+  assert.equal(formatProspectSearchMatchingCount(29000), "29,000")
+  assert.match(
+    formatExactOrRangeLabel({
+      exact_count: 29000,
+      confidence: "high",
+      discovery_mode: "discover_external",
+    }).display_label,
+    /29,000 matching companies/,
+  )
+  assert.doesNotMatch(
+    formatExactOrRangeLabel({
+      exact_count: 29000,
+      confidence: "high",
+      discovery_mode: "discover_external",
+    }).display_label,
+    /50\+/,
+  )
   assert.match(
     formatProspectSearchMarketSizeHeadline({
       exact_count: 2413,
       confidence: "high",
       discovery_mode: "discover_external",
     }).headline,
-    /2,413 matching companies ready to search/,
+    /2,413 matching companies/,
+  )
+  assert.match(
+    formatProspectSearchMarketSizeHeadline({
+      exact_count: 2413,
+      confidence: "high",
+      discovery_mode: "discover_external",
+    }).helper,
+    /External discovery runs only when you click Search/,
   )
   assert.match(
     formatProspectSearchMarketSizeHeadline({
@@ -2352,6 +2383,30 @@ async function main(): Promise<void> {
       discovery_mode: "internal",
     }).helper,
     /indexed CRM/i,
+  )
+  assert.equal(
+    formatProspectSearchMarketSizeHeadline({
+      exact_count: null,
+      confidence: "low",
+      discovery_mode: "discover_external",
+    }).headline,
+    PROSPECT_SEARCH_ESTIMATE_UNAVAILABLE_LABEL,
+  )
+  assert.match(
+    buildProspectSearchButtonLabel({
+      state: "ready",
+      discovery_mode: "discover_external",
+      exact_count: 29000,
+      confidence: "high",
+      provider_readiness: {
+        google_places: "available",
+        serp: "available",
+        any_live: true,
+        external_discovery_available: true,
+        label: "Live providers available",
+      },
+    }).label,
+    /^Search$/,
   )
   assert.match(
     buildProspectSearchButtonLabel({
@@ -2448,6 +2503,8 @@ async function main(): Promise<void> {
   await testProspectOutboundLaunchMotion()
 
   await testProspectTerritoryOpportunityHeatmap()
+
+  await testProspectSearchCountCorrection()
 
   console.log("growth-prospect-search: all checks passed")
 }
@@ -3055,6 +3112,66 @@ async function testProspectTerritoryOpportunityHeatmap(): Promise<void> {
     "utf8",
   )
   assert.match(savedSearchSource, /loadTerritoryOpportunitySnapshotForSavedSearch/)
+}
+
+async function testProspectSearchCountCorrection(): Promise<void> {
+  const estimationSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-estimation.ts"),
+    "utf8",
+  )
+  assert.match(estimationSource, /countProspectSearchMatchesInternal/)
+  assert.doesNotMatch(estimationSource, /loadCachedProviderEstimate/)
+  assert.doesNotMatch(estimationSource, /loadSavedSearchEstimateHint/)
+  assert.doesNotMatch(estimationSource, /exact_count = restrictive >= 4 \? 10 : restrictive >= 2 \? 50 : 250/)
+  assert.doesNotMatch(estimationSource, /exact_count = 50/)
+
+  const countSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-count.ts"),
+    "utf8",
+  )
+  assert.match(countSource, /countProspectSearchMatchesInternal/)
+  assert.match(countSource, /applyProspectSearchFilters/)
+  assert.doesNotMatch(countSource, /google_places|serp|discover_external/)
+
+  const repositorySource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-repository.ts"),
+    "utf8",
+  )
+  assert.match(repositorySource, /total_companies: companyPageMeta.total_count/)
+
+  const liveEstimationSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-live-estimation.tsx"),
+    "utf8",
+  )
+  assert.match(liveEstimationSource, /Matching companies/)
+  assert.doesNotMatch(liveEstimationSource, /Estimated market/)
+  assert.match(liveEstimationSource, /External discovery runs only when you click Search/)
+  assert.doesNotMatch(liveEstimationSource, /companies in estimated market/)
+
+  const hookSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/use-prospect-search-live-estimation.ts"),
+    "utf8",
+  )
+  assert.match(hookSource, /prospect-search\/estimate/)
+  assert.match(hookSource, /DEBOUNCE_MS/)
+
+  const shellSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-shell.tsx"),
+    "utf8",
+  )
+  assert.match(shellSource, /enabled: true/)
+  assert.match(shellSource, /totalCount={result.total_companies}/)
+  assert.match(shellSource, /trigger: "icp_template_selection"/)
+  assert.match(shellSource, /trigger: "saved_workflow_restore"/)
+  assert.match(shellSource, /shouldFetchProspectSearchResults/)
+
+  const formatSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-estimation-format.ts"),
+    "utf8",
+  )
+  assert.match(formatSource, /formatProspectSearchMatchingCount/)
+  assert.match(formatSource, /toLocaleString\(\)/)
+  assert.match(formatSource, /PROSPECT_SEARCH_ESTIMATE_UNAVAILABLE_LABEL/)
 }
 
 void main()

@@ -30,7 +30,7 @@ import {
   buildProspectSearchRelaxSuggestions,
 } from "@/lib/growth/prospect-search/prospect-search-filter-health"
 import { normalizeProspectSearchFilters } from "@/lib/growth/prospect-search/prospect-search-filters"
-import { getProspectSearchMaterializedIndexStats } from "@/lib/growth/prospect-search/prospect-search-materialized-index"
+import { isProspectSearchMaterializedIndexAvailable } from "@/lib/growth/prospect-search/prospect-search-materialized-index"
 import {
   isGooglePlacesApiKeyConfigured,
   isSerpApiKeyConfigured,
@@ -39,7 +39,6 @@ import type {
   GrowthProspectSearchDiscoveryMode,
   GrowthProspectSearchFilters,
 } from "@/lib/growth/prospect-search/prospect-search-types"
-import { parseSavedSearchWorkflowMetadata } from "@/lib/growth/prospect-search/saved-search-workflows"
 
 function buildProviderReadiness(): GrowthProspectSearchProviderReadiness {
   const controls = listDiscoveryProviderRuntimeControls()
@@ -84,65 +83,6 @@ function buildProviderReadiness(): GrowthProspectSearchProviderReadiness {
   }
 }
 
-async function loadCachedProviderEstimate(
-  admin: SupabaseClient,
-  query: string,
-): Promise<{ count: number; source: GrowthProspectSearchEstimateSource } | null> {
-  const needle = query.trim().slice(0, 80).toLowerCase()
-  if (!needle) return null
-
-  const { data, error } = await admin
-    .schema("growth")
-    .from("provider_query_cache")
-    .select("candidate_count, normalized_query, cache_hit_count")
-    .or(`normalized_query.ilike.%${needle.replace(/[%_]/g, "")}%`)
-    .order("last_used_at", { ascending: false })
-    .limit(5)
-
-  if (error || !data?.length) return null
-
-  const total = data.reduce((sum, row) => {
-    const count =
-      typeof (row as Record<string, unknown>).candidate_count === "number"
-        ? ((row as Record<string, unknown>).candidate_count as number)
-        : 0
-    return sum + count
-  }, 0)
-
-  if (total <= 0) return null
-  return { count: total, source: "provider_cache" }
-}
-
-async function loadSavedSearchEstimateHint(
-  admin: SupabaseClient,
-  input: { query: string; filters: GrowthProspectSearchFilters },
-): Promise<{ count: number; source: GrowthProspectSearchEstimateSource } | null> {
-  const { data, error } = await admin
-    .schema("growth")
-    .from("prospect_search_saved_searches")
-    .select("query_text, filters, metadata")
-    .order("updated_at", { ascending: false })
-    .limit(20)
-
-  if (error || !data?.length) return null
-
-  const queryNeedle = input.query.trim().toLowerCase()
-  for (const row of data) {
-    const record = row as Record<string, unknown>
-    const savedQuery = typeof record.query_text === "string" ? record.query_text.trim().toLowerCase() : ""
-    const workflow = parseSavedSearchWorkflowMetadata(record.metadata)
-    if (workflow.discoveryMode === "discover_external") continue
-    const similarQuery =
-      !queryNeedle || savedQuery.includes(queryNeedle) || queryNeedle.includes(savedQuery)
-    if (!similarQuery) continue
-    if (typeof workflow.result_count === "number" && workflow.result_count > 0) {
-      return { count: workflow.result_count, source: "saved_search_stats" }
-    }
-  }
-
-  return null
-}
-
 function resolveEstimateState(input: {
   discovery_mode: GrowthProspectSearchDiscoveryMode
   exact_count: number | null
@@ -158,7 +98,8 @@ function resolveEstimateState(input: {
     return "provider_unavailable"
   }
   if (input.cached) return "using_cached_estimate"
-  const count = input.exact_count ?? 0
+  if (input.exact_count == null) return "ready"
+  const count = input.exact_count
   if (count <= 0 && input.active_filters >= 4) return "filters_too_restrictive"
   if (count <= 0) return "no_likely_matches"
   if (count < 10 && input.active_filters >= 3 && input.confidence !== "high") {
@@ -193,47 +134,17 @@ export async function estimateProspectSearchMatches(
   let exact_count: number | null = null
   let confidence: GrowthProspectSearchEstimateConfidence = "low"
 
-  if (input.discovery_mode === "internal") {
-    const internalCount = await countProspectSearchMatchesInternal(admin, {
+  try {
+    const materializedAvailable = await isProspectSearchMaterializedIndexAvailable(admin)
+    exact_count = await countProspectSearchMatchesInternal(admin, {
       query: input.query,
       filters,
     })
-    exact_count = internalCount
     confidence = "high"
-    sources.push("materialized_index")
-  } else {
-    const [cacheHint, savedHint, indexStats] = await Promise.all([
-      loadCachedProviderEstimate(admin, input.query),
-      loadSavedSearchEstimateHint(admin, { query: input.query, filters }),
-      getProspectSearchMaterializedIndexStats(admin).catch(() => ({ row_count: 0, last_indexed_at: null })),
-    ])
-
-    if (cacheHint) {
-      exact_count = cacheHint.count
-      confidence = "medium"
-      sources.push(cacheHint.source)
-    } else if (savedHint) {
-      exact_count = savedHint.count
-      confidence = "medium"
-      sources.push(savedHint.source)
-    } else {
-      sources.push("provider_readiness_heuristic")
-      const queryPresent = input.query.trim().length > 0
-      const restrictive = countActiveProspectSearchFilters(filters)
-      if (provider_readiness.external_discovery_available && queryPresent) {
-        exact_count = restrictive >= 4 ? 10 : restrictive >= 2 ? 50 : 250
-        confidence = "low"
-      } else if (provider_readiness.external_discovery_available) {
-        exact_count = 50
-        confidence = "low"
-      } else {
-        exact_count = 0
-        confidence = "low"
-      }
-      if (indexStats.row_count > 0 && exact_count != null) {
-        sources.push("materialized_index")
-      }
-    }
+    sources.push(materializedAvailable ? "materialized_index" : "index_fallback")
+  } catch {
+    exact_count = null
+    confidence = "low"
   }
 
   const active_filters = countActiveProspectSearchFilters(filters)

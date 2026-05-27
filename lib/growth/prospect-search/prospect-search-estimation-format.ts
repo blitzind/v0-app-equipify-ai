@@ -12,6 +12,14 @@ import type {
 
 const RANGE_FLOORS = [10, 50, 250, 1000] as const
 
+export const PROSPECT_SEARCH_ESTIMATE_UNAVAILABLE_LABEL =
+  "Estimate unavailable — click Search to run discovery" as const
+
+/** Same numeric formatting as pagination (`totalCount.toLocaleString()`). */
+export function formatProspectSearchMatchingCount(count: number): string {
+  return count.toLocaleString()
+}
+
 export function floorEstimateToRange(count: number): { floor: number; label: string } {
   if (count <= 0) return { floor: 0, label: "No likely matches" }
   if (count < 10) return { floor: count, label: `~${count}` }
@@ -29,34 +37,29 @@ export function formatExactOrRangeLabel(input: {
   confidence: GrowthProspectSearchEstimateConfidence
   discovery_mode: GrowthProspectSearchDiscoveryMode
 }): { display_label: string; range_floor: number | null } {
-  const count = input.exact_count ?? 0
-  if (input.confidence === "high" && input.exact_count != null && count > 0) {
-    if (input.discovery_mode === "discover_external") {
-      return {
-        display_label: `${input.exact_count.toLocaleString()} matching companies ready to search`,
-        range_floor: input.exact_count,
-      }
+  if (input.exact_count == null) {
+    return { display_label: PROSPECT_SEARCH_ESTIMATE_UNAVAILABLE_LABEL, range_floor: null }
+  }
+
+  const count = input.exact_count
+
+  if (input.confidence === "high") {
+    if (count <= 0) {
+      return { display_label: "No likely matches", range_floor: 0 }
     }
     return {
-      display_label: `${input.exact_count.toLocaleString()} companies match your filters`,
-      range_floor: input.exact_count,
+      display_label: `${formatProspectSearchMatchingCount(count)} matching companies`,
+      range_floor: count,
     }
   }
-  if (count <= 0 && input.discovery_mode === "discover_external") {
-    return { display_label: "No likely matches in estimated market", range_floor: null }
-  }
+
   if (count <= 0) {
-    return { display_label: "No likely matches", range_floor: null }
+    return { display_label: "No likely matches", range_floor: 0 }
   }
+
   const ranged = floorEstimateToRange(count)
-  if (input.discovery_mode === "discover_external") {
-    return {
-      display_label: `${ranged.label} companies in estimated market`,
-      range_floor: ranged.floor,
-    }
-  }
   return {
-    display_label: `${ranged.label} companies match current ICP`,
+    display_label: `${ranged.label} matching companies`,
     range_floor: ranged.floor,
   }
 }
@@ -66,20 +69,43 @@ export function formatProspectSearchMarketSizeHeadline(input: {
   confidence: GrowthProspectSearchEstimateConfidence
   discovery_mode: GrowthProspectSearchDiscoveryMode
 }): { headline: string; helper: string } {
-  const { display_label } = formatExactOrRangeLabel(input)
-  const count = input.exact_count ?? 0
-
-  if (input.discovery_mode === "internal") {
+  if (input.exact_count == null) {
     return {
-      headline: count > 0 ? display_label : "Refine filters to size your market",
-      helper: "Counts reflect indexed CRM and Growth Engine records — no external discovery.",
+      headline: PROSPECT_SEARCH_ESTIMATE_UNAVAILABLE_LABEL,
+      helper:
+        input.discovery_mode === "discover_external"
+          ? "Based on your current filters. External discovery runs only when you click Search."
+          : "Counts reflect indexed CRM and Growth Engine records — no external discovery.",
+    }
+  }
+
+  const count = input.exact_count
+
+  if (count <= 0) {
+    return {
+      headline: "No likely matches",
+      helper:
+        input.discovery_mode === "discover_external"
+          ? "Based on your current filters. External discovery runs only when you click Search."
+          : "Refine filters to find indexed companies — no search required.",
+    }
+  }
+
+  const headline =
+    input.confidence === "high"
+      ? `${formatProspectSearchMatchingCount(count)} matching companies`
+      : formatExactOrRangeLabel(input).display_label
+
+  if (input.discovery_mode === "discover_external") {
+    return {
+      headline,
+      helper: "Based on your current filters. External discovery runs only when you click Search.",
     }
   }
 
   return {
-    headline: count > 0 ? display_label : "Refine ICP filters to estimate reachable market",
-    helper:
-      "Estimated reachable market from your current ICP. External search runs only when you click Search.",
+    headline,
+    helper: "Based on your current filters. Counts reflect indexed CRM and Growth Engine records.",
   }
 }
 
@@ -93,26 +119,20 @@ export function buildProspectSearchButtonLabel(input: {
   if (input.state === "provider_unavailable" && input.discovery_mode === "discover_external") {
     return { label: "Provider unavailable", disabled: true }
   }
-  if (input.state === "no_likely_matches") {
-    return { label: "No likely matches", disabled: true }
-  }
+
   if (input.discovery_mode === "discover_external") {
     if (!input.provider_readiness.external_discovery_available) {
       return { label: "Provider unavailable", disabled: true }
     }
-    if (input.exact_count != null && input.exact_count > 0 && input.confidence !== "low") {
-      const ranged = floorEstimateToRange(input.exact_count)
-      if (input.confidence === "high") {
-        return { label: `Search ${input.exact_count.toLocaleString()} companies`, disabled: false }
-      }
-      if (ranged.floor >= 1000) {
-        return { label: "Search estimated 1k+ companies", disabled: false }
-      }
-      return { label: `Search estimated ${ranged.label.replace("~", "")} companies`, disabled: false }
+    if (input.state === "no_likely_matches" && (input.exact_count ?? 0) <= 0) {
+      return { label: "No likely matches", disabled: true }
     }
     return { label: "Search", disabled: false }
   }
 
+  if (input.state === "no_likely_matches") {
+    return { label: "No likely matches", disabled: true }
+  }
   const count = input.exact_count ?? 0
   if (count <= 0 && input.state === "filters_too_restrictive") {
     return { label: "No likely matches", disabled: true }
@@ -121,7 +141,7 @@ export function buildProspectSearchButtonLabel(input: {
     return { label: "No likely matches", disabled: true }
   }
   if (input.confidence === "high" && input.exact_count != null) {
-    return { label: `Search ${input.exact_count.toLocaleString()} companies`, disabled: false }
+    return { label: `Search ${formatProspectSearchMatchingCount(input.exact_count)} companies`, disabled: false }
   }
   const ranged = floorEstimateToRange(count)
   if (ranged.floor >= 1000) {
