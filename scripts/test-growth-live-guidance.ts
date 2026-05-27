@@ -158,4 +158,69 @@ assert.ok(["building", "stable", "slowing", "at_risk"].includes(momentum))
 
 assert.deepEqual(LIVE_GUIDANCE_AUTONOMOUS_ACTIONS, [], "no autonomous actions invariant")
 
+import fs from "node:fs"
+import path from "node:path"
+import {
+  GROWTH_LIVE_COACHING_UX_QA_MARKER,
+  LIVE_COACHING_TOP_GUIDANCE_COUNT,
+  buildExecutionScoreContributors,
+  guidancePriorityLabel,
+  guidancePriorityScore,
+  partitionLiveCoachingGuidance,
+  rankActiveGuidance,
+} from "../lib/growth/live-guidance/live-guidance-priority"
+
+assert.equal(GROWTH_LIVE_COACHING_UX_QA_MARKER, "growth-live-coaching-ux-v1")
+assert.equal(LIVE_COACHING_TOP_GUIDANCE_COUNT, 3)
+
+const sampleEvents = candidates.map((candidate, index) => ({
+  id: `g-${index}`,
+  organizationId: null,
+  leadId: "lead-1",
+  realtimeCallSessionId: "s1",
+  eventType: candidate.eventType,
+  severity: candidate.severity,
+  title: candidate.title,
+  operatorPrompt: candidate.operatorPrompt,
+  recommendation: candidate.recommendation,
+  supportingReason: candidate.supportingReason,
+  confidenceScore: candidate.confidenceScore,
+  surfacedAt: `2026-05-18T12:00:0${index}.000Z`,
+  dismissedAt: null,
+  acceptedAt: null,
+  createdAt: `2026-05-18T12:00:0${index}.000Z`,
+}))
+
+const ranked = rankActiveGuidance(sampleEvents)
+assert.ok(ranked.length > 0)
+const { topPriority, additional } = partitionLiveCoachingGuidance(sampleEvents)
+assert.ok(topPriority.length <= 3)
+assert.equal(topPriority.length + additional.length, sampleEvents.length)
+
+const critical = topPriority.find((event) => guidancePriorityLabel(event) === "Critical")
+const styleOnly = sampleEvents.find((event) => event.eventType === "talking_too_much")
+if (critical && styleOnly) {
+  assert.ok(
+    guidancePriorityScore(critical) > guidancePriorityScore(styleOnly),
+    "critical guidance should outrank style coaching",
+  )
+}
+
+const contributors = buildExecutionScoreContributors({ score: executionScore, snapshot })
+assert.equal(contributors.topContributors.length, 3)
+
+const drawerSource = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-realtime-call-intelligence.tsx"),
+  "utf8",
+)
+const workspaceSource = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace-live-coaching-panel.tsx"),
+  "utf8",
+)
+assert.match(drawerSource, /LiveCoachingGuidancePanel/)
+assert.match(drawerSource, /StableLiveTranscriptList/)
+assert.match(drawerSource, /refreshCoachingDetail/)
+assert.match(workspaceSource, /LiveCoachingExecutionScorePanel/)
+assert.match(workspaceSource, /Top actions/)
+
 console.log("growth-live-guidance: all checks passed")

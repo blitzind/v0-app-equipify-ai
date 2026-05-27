@@ -9,6 +9,7 @@ import {
   updateLiveGuidanceEventAction,
 } from "@/lib/growth/live-guidance/live-guidance-repository"
 import type { GrowthLiveCoachingState } from "@/lib/growth/live-guidance/live-guidance-types"
+import { rankActiveGuidance } from "@/lib/growth/live-guidance/live-guidance-priority"
 import {
   computeCallExecutionScore,
   computeLiveMomentum,
@@ -107,7 +108,7 @@ export async function syncLiveGuidanceForSession(
     suggestedNextQuestion: pickSuggestedNextQuestion({ snapshot: input.snapshot, candidates }),
     riskLevel: computeLiveRiskLevel(input.snapshot),
     momentum: computeLiveMomentum(input.snapshot),
-    activeGuidance: activeGuidance,
+    activeGuidance: rankActiveGuidance(activeGuidance),
     guidanceLatencyMs: Date.now() - startedAt,
   }
 }

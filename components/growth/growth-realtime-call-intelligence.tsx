@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import { Check, Copy, Loader2, Mic, MicOff, MonitorSpeaker, Pause, Play, Square, StopCircle, X } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { Loader2, Mic, MicOff, MonitorSpeaker, Pause, Play, Square, StopCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useGrowthCallWorkflow } from "@/components/growth/growth-call-workflow-context"
@@ -9,6 +9,12 @@ import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/gr
 import { GrowthLiveCoachingSessionTimeline } from "@/components/growth/growth-live-coaching-session-timeline"
 import { GrowthLiveCoachingSessionInsights } from "@/components/growth/growth-live-coaching-session-insights"
 import { GrowthCallIntelligenceScorecardCard } from "@/components/growth/growth-call-intelligence-scorecard-card"
+import {
+  LiveCoachingExecutionScorePanel,
+  LiveCoachingGuidancePanel,
+  LiveCoachingSection,
+  StableLiveTranscriptList,
+} from "@/components/growth/live-coaching/live-coaching-guidance-ui"
 import { useGrowthBrowserAudioCapture } from "@/hooks/growth/use-growth-browser-audio-capture"
 import { GROWTH_CALL_AUDIO_CAPTURE_ENABLED, GROWTH_CALL_DIALER_SAFETY_COPY } from "@/lib/growth/call-workflow-copy"
 import { formatGrowthCallDialerNextStep } from "@/lib/growth/call-workflow"
@@ -22,16 +28,13 @@ import { REALTIME_PROVIDER_LABELS } from "@/lib/growth/realtime/browser-audio/pr
 import type {
   GrowthLiveCoachingState,
   GrowthLiveGuidanceEvent,
-  GrowthLiveGuidanceSeverity,
 } from "@/lib/growth/live-guidance/live-guidance-types"
-import { GROWTH_LIVE_EXECUTION_BADGE_LABELS } from "@/lib/growth/live-guidance/live-guidance-types"
 import type {
   GrowthRealtimeCallSession,
   GrowthRealtimeCallSpeaker,
   GrowthRealtimeTranscriptEvent,
 } from "@/lib/growth/realtime/realtime-call-types"
 import type { GrowthLead } from "@/lib/growth/types"
-import { cn } from "@/lib/utils"
 
 type GrowthRealtimeCallIntelligenceProps = {
   lead: GrowthLead
@@ -113,6 +116,31 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
     }
   }, [lead.id])
 
+  const refreshCoachingDetail = useCallback(async () => {
+    const current = sessions.find((session) => ["preparing", "active", "paused"].includes(session.status))
+    if (!current) return
+    try {
+      const detailRes = await fetch(
+        `/api/platform/growth/leads/${lead.id}/realtime-call/sessions/${current.id}`,
+        { cache: "no-store" },
+      )
+      const detail = (await detailRes.json().catch(() => ({}))) as {
+        ok?: boolean
+        events?: GrowthRealtimeTranscriptEvent[]
+        session?: GrowthRealtimeCallSession
+        coachingState?: GrowthLiveCoachingState | null
+      }
+      if (!detailRes.ok || !detail.ok) return
+      setEvents(detail.events ?? [])
+      setCoachingState(detail.coachingState ?? null)
+      if (detail.session) {
+        setSessions((prev) => prev.map((item) => (item.id === detail.session!.id ? detail.session! : item)))
+      }
+    } catch {
+      /* silent refresh — avoid UI flash */
+    }
+  }, [lead.id, sessions])
+
   useEffect(() => {
     void load()
   }, [load, refreshToken])
@@ -157,8 +185,24 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
     onSessionUpdated: (updated) => {
       setSessions((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
       void loadCaptureCapability(updated)
+      void refreshCoachingDetail()
     },
   })
+
+  useEffect(() => {
+    if (!activeSession || activeSession.status !== "active") return
+    if (!browserAudio.isCaptureActive && activeSession.transcriptStatus !== "live") return
+    const interval = window.setInterval(() => {
+      void refreshCoachingDetail()
+    }, 4000)
+    return () => window.clearInterval(interval)
+  }, [
+    activeSession?.id,
+    activeSession?.status,
+    activeSession?.transcriptStatus,
+    browserAudio.isCaptureActive,
+    refreshCoachingDetail,
+  ])
 
   async function createSession() {
     setActing("create")
@@ -623,13 +667,15 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
         ) : null}
 
         {snapshot && coachingState ? (
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-            <div className="space-y-4 min-w-0">
-              <ExecutionScoreBanner coachingState={coachingState} snapshot={snapshot} />
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,280px)]">
+            <div className="min-w-0 space-y-4">
+              <LiveCoachingExecutionScorePanel coachingState={coachingState} snapshot={snapshot} />
 
               {coachingState.suggestedNextQuestion ? (
-                <div className="rounded-xl border-2 border-violet-200 bg-violet-50/50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Suggested Next Question</p>
+                <div className="rounded-xl border-2 border-violet-200 bg-violet-50/50 p-4 dark:border-violet-500/30 dark:bg-violet-500/10">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-200">
+                    Suggested Next Question
+                  </p>
                   <p className="mt-2 text-base font-medium leading-relaxed">{coachingState.suggestedNextQuestion}</p>
                 </div>
               ) : null}
@@ -643,7 +689,7 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
                 />
               </div>
 
-              <Section title="Detected objections">
+              <LiveCoachingSection title="Detected objections">
                 {snapshot.objections.length === 0 ? (
                   <p className="text-sm text-muted-foreground">None yet.</p>
                 ) : (
@@ -656,9 +702,9 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
                     ))}
                   </ul>
                 )}
-              </Section>
+              </LiveCoachingSection>
 
-              <Section title="Buying signals">
+              <LiveCoachingSection title="Buying signals">
                 {snapshot.buyingSignals.length === 0 ? (
                   <p className="text-sm text-muted-foreground">None yet.</p>
                 ) : (
@@ -671,9 +717,9 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
                     ))}
                   </ul>
                 )}
-              </Section>
+              </LiveCoachingSection>
 
-              <Section title="Missing discovery">
+              <LiveCoachingSection title="Missing discovery">
                 {snapshot.discovery.missing.length === 0 ? (
                   <GrowthBadge label="Discovery complete" tone="healthy" />
                 ) : (
@@ -683,51 +729,23 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
                     ))}
                   </div>
                 )}
-              </Section>
+              </LiveCoachingSection>
 
-              <Section title="Live transcript">
-                {events.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No transcript lines yet.</p>
-                ) : (
-                  <ul className="max-h-56 space-y-2 overflow-y-auto">
-                    {events.map((event) => (
-                      <li
-                        key={event.id}
-                        className={cn(
-                          "rounded-lg px-3 py-2 text-sm",
-                          event.speaker === "rep" ? "bg-muted/40" : "bg-background border border-border",
-                        )}
-                      >
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          {event.speaker}
-                        </p>
-                        <p>{event.content}</p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Section>
+              <LiveCoachingSection title="Live transcript">
+                <StableLiveTranscriptList events={events} />
+              </LiveCoachingSection>
             </div>
 
-            <aside className="space-y-3 xl:sticky xl:top-4 xl:self-start">
+            <aside className="min-w-0 space-y-3 xl:sticky xl:top-4 xl:self-start">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Live Guidance</p>
-              {coachingState.activeGuidance.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
-                  Coaching cards appear here as the call progresses.
-                </p>
-              ) : (
-                coachingState.activeGuidance.map((event) => (
-                  <LiveGuidanceCard
-                    key={event.id}
-                    event={event}
-                    acting={acting}
-                    copied={copiedId === event.id}
-                    onCopy={() => void copyRecommendation(event)}
-                    onDismiss={() => void guidanceAction(event.id, "dismiss")}
-                    onAccept={() => void guidanceAction(event.id, "accept")}
-                  />
-                ))
-              )}
+              <LiveCoachingGuidancePanel
+                events={coachingState.activeGuidance}
+                acting={acting}
+                copiedId={copiedId}
+                onCopy={(event) => void copyRecommendation(event)}
+                onDismiss={(eventId) => void guidanceAction(eventId, "dismiss")}
+                onAccept={(eventId) => void guidanceAction(eventId, "accept")}
+              />
             </aside>
           </div>
         ) : snapshot ? (
@@ -740,20 +758,9 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
                 hint={snapshot.talkRatio.inGoalRange ? "In 45–60% goal" : "Outside goal range"}
               />
             </div>
-            <Section title="Live transcript">
-              {events.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No transcript lines yet.</p>
-              ) : (
-                <ul className="max-h-56 space-y-2 overflow-y-auto">
-                  {events.map((event) => (
-                    <li key={event.id} className="rounded-lg border border-border px-3 py-2 text-sm">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{event.speaker}</p>
-                      <p>{event.content}</p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Section>
+            <LiveCoachingSection title="Live transcript">
+              <StableLiveTranscriptList events={events} />
+            </LiveCoachingSection>
           </>
         ) : null}
       </div>
@@ -777,112 +784,6 @@ export function GrowthRealtimeCallIntelligence({ lead }: GrowthRealtimeCallIntel
         refreshToken={refreshToken}
       />
     </GrowthCollapsibleEngineCard>
-  )
-}
-
-function ExecutionScoreBanner({
-  coachingState,
-  snapshot,
-}: {
-  coachingState: GrowthLiveCoachingState
-  snapshot: NonNullable<GrowthRealtimeCallSession["liveSnapshot"]>
-}) {
-  const score = coachingState.executionScore
-  const discoveryPct = Math.round((snapshot.discovery.covered.length / 5) * 100)
-
-  return (
-    <div className="rounded-xl border border-border bg-gradient-to-r from-slate-900 to-slate-800 p-4 text-white">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-300">Call Execution Score</p>
-          <p className="mt-1 text-4xl font-bold tabular-nums">{score.score}</p>
-          <p className="text-sm text-emerald-300">{GROWTH_LIVE_EXECUTION_BADGE_LABELS[score.badge]}</p>
-        </div>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs sm:grid-cols-3">
-          <StatPill label="Talk ratio" value={`${snapshot.talkRatio.repTalkPercent}% rep`} />
-          <StatPill label="Buying signals" value={String(snapshot.buyingSignals.length)} />
-          <StatPill label="Discovery" value={`${discoveryPct}%`} />
-          <StatPill label="Risk" value={coachingState.riskLevel} />
-          <StatPill label="Momentum" value={coachingState.momentum.replace(/_/g, " ")} />
-          <StatPill label="Guidance latency" value={`${coachingState.guidanceLatencyMs}ms`} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function StatPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-slate-400">{label}</p>
-      <p className="font-semibold capitalize">{value}</p>
-    </div>
-  )
-}
-
-function severityStyles(severity: GrowthLiveGuidanceSeverity, eventType: string) {
-  if (eventType === "buying_signal_detected") {
-    return "border-emerald-300 bg-emerald-50/80"
-  }
-  switch (severity) {
-    case "high":
-      return "border-rose-300 bg-rose-50/80"
-    case "medium":
-      return "border-amber-300 bg-amber-50/80"
-    default:
-      return "border-sky-300 bg-sky-50/80"
-  }
-}
-
-function LiveGuidanceCard({
-  event,
-  acting,
-  copied,
-  onCopy,
-  onDismiss,
-  onAccept,
-}: {
-  event: GrowthLiveGuidanceEvent
-  acting: string | null
-  copied: boolean
-  onCopy: () => void
-  onDismiss: () => void
-  onAccept: () => void
-}) {
-  const busy = acting?.startsWith("dismiss:") || acting?.startsWith("accept:")
-  return (
-    <div className={cn("rounded-xl border p-3 shadow-sm", severityStyles(event.severity, event.eventType))}>
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-semibold">{event.title}</p>
-        <GrowthBadge label={`${event.confidenceScore}%`} tone="neutral" />
-      </div>
-      <p className="mt-1 text-xs text-muted-foreground">{event.supportingReason}</p>
-      <p className="mt-2 text-sm font-medium">{event.operatorPrompt}</p>
-      <p className="mt-2 rounded-lg bg-background/70 px-2 py-1.5 text-sm italic">&ldquo;{event.recommendation}&rdquo;</p>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        <Button type="button" size="sm" variant="outline" disabled={!!busy} onClick={onCopy}>
-          {copied ? <Check className="mr-1 size-3.5" /> : <Copy className="mr-1 size-3.5" />}
-          {copied ? "Copied" : "Copy"}
-        </Button>
-        <Button type="button" size="sm" variant="ghost" disabled={acting === `dismiss:${event.id}`} onClick={onDismiss}>
-          <X className="mr-1 size-3.5" />
-          Dismiss
-        </Button>
-        <Button type="button" size="sm" disabled={acting === `accept:${event.id}`} onClick={onAccept}>
-          <Check className="mr-1 size-3.5" />
-          Accept
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
-      {children}
-    </div>
   )
 }
 

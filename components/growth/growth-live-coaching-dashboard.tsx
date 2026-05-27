@@ -113,7 +113,7 @@ export function GrowthLiveCoachingDashboard() {
       <GrowthLiveCoachingTrends />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile label="Avg execution score" value={dashboard.stats.averageExecutionScore} />
           <StatTile label="Buying signal capture" value={`${dashboard.stats.buyingSignalCapturePercent}%`} />
           <StatTile label="Discovery completion" value={`${dashboard.stats.discoveryCompletionPercent}%`} />
@@ -138,10 +138,16 @@ export function GrowthLiveCoachingDashboard() {
             <p className="text-sm text-muted-foreground">No objections recorded yet.</p>
           ) : (
             <ul className="space-y-2">
-              {dashboard.topObjections.map((entry) => (
-                <li key={entry.key} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
-                  <span>{entry.key.replace(/_/g, " ")}</span>
-                  <span className="font-semibold tabular-nums">{entry.count}</span>
+              {dashboard.topObjections.slice(0, 5).map((entry, index) => (
+                <li
+                  key={entry.key}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm"
+                >
+                  <span className="min-w-0 truncate">
+                    <span className="mr-2 text-xs font-semibold text-muted-foreground">#{index + 1}</span>
+                    {entry.key.replace(/_/g, " ")}
+                  </span>
+                  <span className="shrink-0 font-semibold tabular-nums">{entry.count}</span>
                 </li>
               ))}
             </ul>
@@ -158,19 +164,22 @@ export function GrowthLiveCoachingDashboard() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <GrowthEngineCard title="Most effective guidance cards">
+        <GrowthEngineCard title="Most effective guidance">
           {dashboard.mostEffectiveGuidance.length === 0 ? (
             <p className="text-sm text-muted-foreground">No guidance usage yet.</p>
           ) : (
             <ul className="space-y-2">
-              {dashboard.mostEffectiveGuidance.map((entry) => (
+              {dashboard.mostEffectiveGuidance.slice(0, 5).map((entry, index) => (
                 <li key={entry.eventType} className="rounded-lg border border-border px-3 py-2 text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium">{entry.title}</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="min-w-0 font-medium">
+                      <span className="mr-2 text-xs text-muted-foreground">#{index + 1}</span>
+                      {entry.title}
+                    </p>
                     <GrowthBadge label={`${entry.acceptanceRate}% accepted`} tone="healthy" />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {entry.accepted}/{entry.surfaced} accepted
+                    {entry.accepted}/{entry.surfaced} accepted · {entry.eventType.replace(/_/g, " ")}
                   </p>
                 </li>
               ))}
@@ -202,10 +211,10 @@ export function GrowthLiveCoachingDashboard() {
           <p className="text-sm text-muted-foreground">No high-risk completed sessions.</p>
         ) : (
           <ul className="space-y-2">
-            {dashboard.highRiskCalls.map((call) => (
+            {dashboard.highRiskCalls.slice(0, 6).map((call) => (
               <li key={call.sessionId} className="rounded-lg border border-rose-200 bg-rose-50/40 px-3 py-2 text-sm">
                 <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                  <Link href={`/admin/growth/leads?open=${call.leadId}&focus=call-copilot`} className="font-medium hover:underline">
+                  <Link href={`/admin/growth/leads?open=${call.leadId}&focus=call-copilot`} className="min-w-0 truncate font-medium hover:underline">
                     {call.companyName}
                   </Link>
                   <div className="flex flex-wrap items-center gap-2">
@@ -220,15 +229,17 @@ export function GrowthLiveCoachingDashboard() {
                         setTimelineSession({ leadId: call.leadId, sessionId: call.sessionId })
                       }
                     >
-                      View timeline
+                      Timeline
                     </Button>
                   </div>
                 </div>
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {call.riskFlags.map((flag) => (
-                    <GrowthBadge key={flag} label={flag.replace(/_/g, " ")} tone="neutral" />
-                  ))}
-                </div>
+                {call.riskFlags.length > 0 ? (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {call.riskFlags.slice(0, 4).map((flag) => (
+                      <GrowthBadge key={flag} label={flag.replace(/_/g, " ")} tone="neutral" />
+                    ))}
+                  </div>
+                ) : null}
                 <GrowthLiveCoachingSessionInsightsPreview insightsPreview={call.insightsPreview} />
               </li>
             ))}
