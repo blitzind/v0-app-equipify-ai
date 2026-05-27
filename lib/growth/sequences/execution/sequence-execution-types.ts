@@ -143,6 +143,8 @@ export type GrowthSequenceSendPayload = {
   experimentId?: string | null
   experimentVariantId?: string | null
   experimentVariantLabel?: string | null
+  contentTemplateVersionId?: string | null
+  contentTemplateId?: string | null
 }
 
 export function maskSequenceExecutionLeadLabel(leadId: string, companyName?: string | null): string {

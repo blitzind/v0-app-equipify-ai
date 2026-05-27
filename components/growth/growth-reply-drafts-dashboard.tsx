@@ -83,6 +83,9 @@ export function GrowthReplyDraftsDashboard() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/copilot/content-library">Content Library</Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
             <Link href="/admin/growth/inbox">Unified Inbox</Link>
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => void load()}>

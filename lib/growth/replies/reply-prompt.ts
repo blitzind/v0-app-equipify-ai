@@ -6,6 +6,7 @@ export function buildReplyDraftSystemPrompt(context: GrowthReplyDraftContext): s
     "Generate a concise, professional email reply draft for human review.",
     "Never send autonomously. Never include secrets or internal identifiers.",
     "Respect compliance flags and unsubscribe intent.",
+    "When approved reply_draft templates exist in Content Library, align tone and structure — templates require human approval before live send.",
     `Draft type: ${context.draftType}`,
     `Classification: ${context.classification}`,
     context.complianceFlags.length > 0 ? `Compliance flags: ${context.complianceFlags.join(", ")}` : "",

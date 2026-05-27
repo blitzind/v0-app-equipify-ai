@@ -207,6 +207,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["experiment", "ab test", "variant", "sequence test", "winner", "intelligence"],
   },
   {
+    id: "content-library",
+    label: "Content Library",
+    href: "/admin/growth/copilot/content-library",
+    keywords: ["content library", "template", "snippet", "merge field", "copy", "message block"],
+  },
+  {
     id: "revenue-intelligence",
     label: "Revenue Intelligence",
     href: "/admin/growth/revenue-intelligence",
@@ -711,6 +717,13 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         label: "Playbooks",
         consoleKey: "playbooks",
         match: prefixMatch("/admin/growth/copilot/playbooks"),
+      },
+      {
+        id: "content-library",
+        href: "/admin/growth/copilot/content-library",
+        label: "Content Library",
+        consoleKey: "content-library",
+        match: prefixMatch("/admin/growth/copilot/content-library"),
       },
       {
         id: "reply-drafts",

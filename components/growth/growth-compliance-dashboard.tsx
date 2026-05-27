@@ -144,6 +144,16 @@ export function GrowthComplianceDashboardPanel() {
         </div>
       </GrowthEngineCard>
 
+      <GrowthEngineCard title="Compliance merge fields">
+        <p className="text-sm text-muted-foreground">
+          Outbound templates must include <code>{`{{unsubscribe.link}}`}</code> when compliance footer is required.
+          Manage approved templates in Content Library.
+        </p>
+        <Button asChild variant="outline" size="sm" className="mt-3">
+          <Link href="/admin/growth/copilot/content-library">Open Content Library</Link>
+        </Button>
+      </GrowthEngineCard>
+
       <GrowthEngineCard title="Deliverability compliance risks">
         <p className="text-sm text-muted-foreground">
           Bounce rate {formatRate(dashboard.hardBounceRate)} · Complaint rate {formatRate(dashboard.complaintRate)}.

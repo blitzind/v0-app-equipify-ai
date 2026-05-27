@@ -9,6 +9,7 @@ import { fetchGrowthSequenceEnrollmentStepById } from "@/lib/growth/sequence-enr
 import { resolveSenderRotationForPool } from "@/lib/growth/sender-pools/sender-pool-rotation-service"
 import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 import { listSenderAccounts } from "@/lib/growth/sender/sender-repository"
+import { resolveApprovedTemplateContent } from "@/lib/growth/content/dashboard"
 import type { GrowthSequenceSendPayload } from "@/lib/growth/sequences/execution/sequence-execution-types"
 
 const UNSUBSCRIBE_FOOTER =
@@ -86,6 +87,7 @@ export async function buildSequenceExecutionSendPayload(
     allowAutoRotation?: boolean
     manualSenderAccountId?: string | null
     sequenceExecutionJobId?: string | null
+    contentTemplateVersionId?: string | null
   },
 ): Promise<GrowthSequenceSendPayload | { error: string }> {
   const [step, lead] = await Promise.all([
@@ -106,6 +108,25 @@ export async function buildSequenceExecutionSendPayload(
 
   let subject = "Follow up"
   let body = step.instructions?.trim() || "Following up on our conversation."
+  let contentTemplateVersionId: string | null = input.contentTemplateVersionId ?? null
+  let contentTemplateId: string | null = null
+
+  if (input.contentTemplateVersionId) {
+    const resolved = await resolveApprovedTemplateContent(admin, {
+      templateVersionId: input.contentTemplateVersionId,
+      templateType: "sequence_email",
+      mergeValues: {
+        "lead.contact_name": lead.contactName ?? "[contact]",
+        "lead.company_name": lead.companyName ?? "[company]",
+        "lead.industry": "[industry]",
+      },
+    })
+    if (!resolved) return { error: "content_template_not_approved" }
+    subject = resolved.subject || subject
+    body = resolved.body || body
+    contentTemplateVersionId = resolved.templateVersionId
+    contentTemplateId = resolved.templateId
+  }
 
   if (step.generationId) {
     const generation = await fetchGrowthAiCopilotGenerationById(admin, step.generationId)
@@ -155,5 +176,7 @@ export async function buildSequenceExecutionSendPayload(
     experimentId: experimentOverlay.experimentId,
     experimentVariantId: experimentOverlay.variantId,
     experimentVariantLabel: experimentOverlay.variantLabel,
+    contentTemplateVersionId,
+    contentTemplateId,
   }
 }

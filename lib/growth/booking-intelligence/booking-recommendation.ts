@@ -31,7 +31,8 @@ export function generateBookingRecommendations(input: {
     recommendations.push({
       recommendationType: "book_meeting",
       title: "Book meeting",
-      description: "Meeting intent detected — human should review routing and send booking options manually.",
+      description:
+        "Meeting intent detected — use an approved booking_followup template from Content Library when drafting follow-up.",
       evidence,
       routingRuleType: "owner",
       availabilityHint: "Review rep availability before proposing times.",

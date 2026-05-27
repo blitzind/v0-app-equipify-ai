@@ -63,6 +63,7 @@ export type GrowthSequenceExperimentVariantPayload = {
   senderAccountId?: string
   providerRouteId?: string
   sequenceStepId?: string
+  contentTemplateVersionId?: string
 }
 
 export type GrowthSequenceExperimentVariant = {

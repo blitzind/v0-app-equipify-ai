@@ -227,14 +227,21 @@ export async function runSequenceExecutionJob(
     human_approval_confirmed: true,
     actorUserId: input.actingUserId,
     actorEmail: input.actingUserEmail,
-    metadata:
-      payload.experimentId && payload.experimentVariantId
+    metadata: {
+      ...(payload.experimentId && payload.experimentVariantId
         ? {
             experiment_id: payload.experimentId,
             experiment_variant_id: payload.experimentVariantId,
             experiment_variant_label: payload.experimentVariantLabel ?? null,
           }
-        : undefined,
+        : {}),
+      ...(payload.contentTemplateVersionId
+        ? {
+            content_template_version_id: payload.contentTemplateVersionId,
+            content_template_id: payload.contentTemplateId ?? null,
+          }
+        : {}),
+    },
   })
 
   if (!transport.ok || !transport.attempt) {
