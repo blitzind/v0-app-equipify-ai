@@ -197,6 +197,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["opportunity intelligence", "crm intelligence", "buying signals", "committee", "sequence pause"],
   },
   {
+    id: "booking-intelligence",
+    label: "Booking Intelligence",
+    href: "/admin/growth/booking-intelligence",
+    keywords: ["booking intelligence", "meeting intent", "calendar routing", "meeting conversion"],
+  },
+  {
     id: "settings",
     label: "Growth Settings",
     href: "/admin/growth/settings",
@@ -498,6 +504,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         label: "Sequence Execution",
         consoleKey: "sequence_execution",
         match: prefixMatch("/admin/growth/sequences/execution"),
+      },
+      {
+        id: "booking-intelligence",
+        href: "/admin/growth/booking-intelligence",
+        label: "Booking Intelligence",
+        match: prefixMatch("/admin/growth/booking-intelligence"),
       },
       {
         id: "live-coaching",

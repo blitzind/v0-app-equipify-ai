@@ -516,6 +516,17 @@ export async function sendApprovedReplyDraft(
       body: draft.draftBody ?? undefined,
       draftStatus: "sent",
     }).catch(() => undefined)
+
+    const { ingestBookingIntelligenceFromReplyDraft } = await import("@/lib/growth/booking-intelligence/booking-events")
+    await ingestBookingIntelligenceFromReplyDraft(admin, {
+      leadId: draft.leadId,
+      inboxThreadId: draft.inboxThreadId,
+      draftId: draft.id,
+      classification: (draft.classification as import("@/lib/growth/inbox/inbox-types").GrowthInboxClassification | null) ?? null,
+      subject: draft.draftSubject ?? undefined,
+      body: draft.draftBody ?? undefined,
+      draftStatus: "sent",
+    }).catch(() => undefined)
   }
 
   return { draft, deliveryAttemptId: transport.attempt.id }

@@ -35,6 +35,8 @@ function formatWhen(value: string | null | undefined): string {
 
 export function GrowthSequenceSafeExecutionDashboard() {
   const [dashboard, setDashboard] = useState<GrowthSequenceSafeExecutionDashboard | null>(null)
+  const [meetingIntentReviews, setMeetingIntentReviews] = useState(0)
+  const [sequenceStopCandidates, setSequenceStopCandidates] = useState(0)
   const [loading, setLoading] = useState(true)
   const [actionJobId, setActionJobId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -51,6 +53,15 @@ export function GrowthSequenceSafeExecutionDashboard() {
       }
       if (!res.ok || !data.ok || !data.dashboard) throw new Error(data.message ?? "Load failed.")
       setDashboard(data.dashboard)
+
+      const bookingRes = await fetch("/api/platform/growth/booking-intelligence/dashboard", { cache: "no-store" })
+      const bookingData = (await bookingRes.json().catch(() => ({}))) as {
+        dashboard?: { pendingBookingReviews?: unknown[]; sequenceStopCandidates?: unknown[] }
+      }
+      if (bookingRes.ok && bookingData.dashboard) {
+        setMeetingIntentReviews(bookingData.dashboard.pendingBookingReviews?.length ?? 0)
+        setSequenceStopCandidates(bookingData.dashboard.sequenceStopCandidates?.length ?? 0)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
     } finally {
@@ -150,6 +161,20 @@ export function GrowthSequenceSafeExecutionDashboard() {
           <StatTile label="Blocked" value={dashboard?.blocked ?? 0} />
           <StatTile label="Sent 24h" value={dashboard?.sent24h ?? 0} />
         </div>
+
+        {(meetingIntentReviews > 0 || sequenceStopCandidates > 0) ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {meetingIntentReviews > 0 ? (
+              <GrowthBadge label={`${meetingIntentReviews} meeting intent reviews`} tone="attention" />
+            ) : null}
+            {sequenceStopCandidates > 0 ? (
+              <GrowthBadge label={`${sequenceStopCandidates} sequence stop candidates`} tone="critical" />
+            ) : null}
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/admin/growth/booking-intelligence">Booking Intelligence</Link>
+            </Button>
+          </div>
+        ) : null}
       </GrowthEngineCard>
 
       <GrowthEngineCard title="Job queue">

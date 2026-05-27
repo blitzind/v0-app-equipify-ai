@@ -366,6 +366,14 @@ export async function addInboxMessage(
       body: bodyPreview,
       classification: classificationResult.classification,
     }).catch(() => undefined)
+    const { ingestBookingIntelligenceFromInbox } = await import("@/lib/growth/booking-intelligence/booking-events")
+    await ingestBookingIntelligenceFromInbox(admin, {
+      leadId: thread.lead_id,
+      inboxThreadId: input.thread_id,
+      subject,
+      body: bodyPreview,
+      classification: classificationResult.classification,
+    }).catch(() => undefined)
   }
 
   return { thread: updatedThread, message: mapMessage(data as Row) }

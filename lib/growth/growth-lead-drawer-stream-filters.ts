@@ -133,6 +133,7 @@ export const GROWTH_DRAWER_CARD_KEYS = {
   revenue: "revenue-forecast",
   opportunity: "opportunity-readiness",
   opportunityIntelligence: "opportunity-intelligence",
+  bookingIntelligence: "booking-intelligence",
   relationship: "relationship-intelligence",
   conversation: "conversation-intelligence",
   sequence: "sequence-intelligence",
