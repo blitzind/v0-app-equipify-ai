@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { PLATFORM_CASH_ORG_SAMPLE_CAP, fetchBlitzpayOrgCashPlanningPayload } from "@/lib/blitzpay/blitzpay-cash-accounts-service"
+import { PLATFORM_METRICS_INCLUDED_ORG_EQ } from "@/lib/platform/platform-metrics-organizations"
 
 export type BlitzpayPlatformCashAccountsRollup = {
   reportingWindowDays: number
@@ -24,6 +25,7 @@ export async function fetchBlitzpayPlatformCashAccountsRollup(
   const { data: orgs, error } = await admin
     .from("organizations")
     .select("id")
+    .eq("exclude_from_platform_metrics", PLATFORM_METRICS_INCLUDED_ORG_EQ)
     .order("created_at", { ascending: false })
     .limit(PLATFORM_CASH_ORG_SAMPLE_CAP)
   if (error) throw new Error(error.message)

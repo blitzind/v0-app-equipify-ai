@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { fetchBlitzpayRecurringRevenueMetrics } from "@/lib/blitzpay/blitzpay-recurring-billing"
+import { PLATFORM_METRICS_INCLUDED_ORG_EQ } from "@/lib/platform/platform-metrics-organizations"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -28,6 +29,7 @@ export async function fetchBlitzpayPlatformRecurringRevenueRollup(
   const { data: orgs, error } = await admin
     .from("organizations")
     .select("id")
+    .eq("exclude_from_platform_metrics", PLATFORM_METRICS_INCLUDED_ORG_EQ)
     .not("stripe_connect_account_id", "is", null)
     .limit(ORG_SAMPLE_CAP * 4)
   if (error) throw new Error(error.message)

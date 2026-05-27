@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { PLATFORM_PAYROLL_ORG_SAMPLE_CAP, summarizePayrollHealth } from "@/lib/blitzpay/blitzpay-payroll-runs"
+import { PLATFORM_METRICS_INCLUDED_ORG_EQ } from "@/lib/platform/platform-metrics-organizations"
 
 export type BlitzpayPlatformPayrollRollup = {
   reportingWindowDays: number
@@ -20,9 +21,12 @@ export async function fetchBlitzpayPlatformPayrollRollup(
   opts?: { reportingWindowDays?: number },
 ): Promise<BlitzpayPlatformPayrollRollup> {
   const reportingWindowDays = Math.min(90, Math.max(7, Math.round(Number(opts?.reportingWindowDays ?? 30))))
-  const { data: orgs, error } = await admin.from("organizations").select("id").order("created_at", { ascending: false }).limit(
-    PLATFORM_PAYROLL_ORG_SAMPLE_CAP,
-  )
+  const { data: orgs, error } = await admin
+    .from("organizations")
+    .select("id")
+    .eq("exclude_from_platform_metrics", PLATFORM_METRICS_INCLUDED_ORG_EQ)
+    .order("created_at", { ascending: false })
+    .limit(PLATFORM_PAYROLL_ORG_SAMPLE_CAP)
   if (error) throw new Error(error.message)
 
   let orgsWithDraftPayrollApprox = 0

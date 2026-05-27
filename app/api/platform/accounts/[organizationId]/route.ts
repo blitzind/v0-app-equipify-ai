@@ -5,6 +5,7 @@ import { isPlatformAdminEmail } from "@/lib/platform-admin"
 import { persistOrganizationSubscriptionDiscount } from "@/lib/billing/organization-subscription-discount"
 import { evaluateOrganizationDeleteGuards } from "@/lib/platform/organization-delete-guards"
 import { executeOrganizationHardDelete } from "@/lib/platform/execute-organization-hard-delete"
+import { parseOrganizationHardDeleteFailure } from "@/lib/platform/platform-metrics-organizations"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -112,12 +113,31 @@ export async function DELETE(
         { status: guard.httpStatus },
       )
     }
+    if (guard.error === "immutable_audit_records") {
+      return NextResponse.json(
+        {
+          error: guard.error,
+          message: guard.message,
+          suggestMarkInternalOrExclude: guard.suggestMarkInternalOrExclude,
+          details: guard.details,
+        },
+        { status: guard.httpStatus },
+      )
+    }
     return NextResponse.json({ error: guard.error, message: guard.message }, { status: guard.httpStatus })
   }
 
   const deleteResult = await executeOrganizationHardDelete(admin, organizationId)
   if (!deleteResult.ok) {
-    return NextResponse.json({ error: "delete_failed", message: deleteResult.message }, { status: 400 })
+    const parsed = parseOrganizationHardDeleteFailure(deleteResult.message)
+    return NextResponse.json(
+      {
+        error: parsed.code,
+        message: parsed.userMessage,
+        suggestMarkInternalOrExclude: parsed.suggestMarkInternalOrExclude,
+      },
+      { status: 409 },
+    )
   }
 
   return NextResponse.json({ ok: true, alreadyDeleted: deleteResult.alreadyDeleted === true })

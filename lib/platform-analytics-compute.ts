@@ -3,8 +3,13 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import { computePlatformAdminMrr } from "@/lib/billing/platform-admin-mrr"
+import { filterOrganizationsForPlatformMetrics } from "@/lib/platform/platform-metrics-organizations"
 
-type OrgRow = { id: string; status: string | null }
+type OrgRow = {
+  id: string
+  status: string | null
+  exclude_from_platform_metrics?: boolean | null
+}
 type SubRow = {
   organization_id: string
   plan_id: string | null
@@ -82,13 +87,15 @@ export type PlatformMetricsComputed = {
  * Paid vs trial MRR matches `computePlatformAdminMrr` in `app/api/platform/accounts/route.ts`.
  */
 export async function computePlatformMetrics(admin: SupabaseClient): Promise<PlatformMetricsComputed> {
-  const { data: orgs, error: orgErr } = await admin.from("organizations").select("id, status")
+  const { data: orgs, error: orgErr } = await admin
+    .from("organizations")
+    .select("id, status, exclude_from_platform_metrics")
 
   if (orgErr) {
     throw new Error(orgErr.message)
   }
 
-  const list = (orgs ?? []) as OrgRow[]
+  const list = filterOrganizationsForPlatformMetrics((orgs ?? []) as OrgRow[])
   const ids = list.map((o) => o.id)
 
   if (ids.length === 0) {

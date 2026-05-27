@@ -7,6 +7,11 @@ import { computePlatformAdminMrr } from "@/lib/billing/platform-admin-mrr"
 import { planTierLabelFromDbPlanId } from "@/lib/plan-display"
 import { subscriptionDisplayStatus } from "@/lib/platform-analytics-compute"
 import { formatHowHeardAboutEquipifyDisplay } from "@/lib/onboarding/how-heard-about-equipify"
+import {
+  filterOrganizationsForPlatformMetrics,
+  isOrganizationIncludedInPlatformMetrics,
+  mapOrganizationMetricsClassificationFromRow,
+} from "@/lib/platform/platform-metrics-organizations"
 import type { AccountDisplayStatus, PlatformAccount, PlatformAccountsSummary } from "@/lib/admin-data"
 
 function normalizeOrgKey(id: string): string {
@@ -65,7 +70,7 @@ export async function GET() {
   const { data: orgs, error: orgErr } = await admin
     .from("organizations")
     .select(
-      "id, name, slug, status, created_at, updated_at, industry, how_heard_about_equipify, how_heard_about_equipify_other",
+      "id, name, slug, status, created_at, updated_at, industry, how_heard_about_equipify, how_heard_about_equipify_other, account_type, exclude_from_platform_metrics, exclusion_reason, excluded_at, excluded_by",
     )
     .order("created_at", { ascending: false })
 
@@ -170,6 +175,8 @@ export async function GET() {
     const displayPlan = orgArchived && !sub ? "—" : planTierLabelFromDbPlanId(sub?.plan_id ?? null)
     const displayStatus = mapSubscriptionStatusToDisplay(orgArchived, sub?.status ?? null)
 
+    const classification = mapOrganizationMetricsClassificationFromRow(o)
+
     return {
       id: o.id,
       name: o.name,
@@ -217,12 +224,18 @@ export async function GET() {
         value: (o as { how_heard_about_equipify?: string | null }).how_heard_about_equipify ?? null,
         other: (o as { how_heard_about_equipify_other?: string | null }).how_heard_about_equipify_other ?? null,
       }),
+      accountType: classification.accountType,
+      excludeFromPlatformMetrics: classification.excludeFromPlatformMetrics,
+      accountTypeBadge: classification.accountTypeBadge,
+      exclusionReason: classification.exclusionReason,
+      excludedAt: classification.excludedAt,
     }
   })
 
   let paidMrrCents = 0
   let trialPipelineMrrCents = 0
   for (const o of list) {
+    if (!isOrganizationIncludedInPlatformMetrics(o)) continue
     const orgArchived = o.status === "archived"
     const sub = subByOrg.get(normalizeOrgKey(o.id)) ?? null
     const parts = computePlatformAdminMrr(sub, orgArchived)
@@ -239,7 +252,9 @@ export async function GET() {
   let activeSeats = 0
   let newAccountsLast30Days = 0
 
-  for (const o of list) {
+  const metricsOrgs = filterOrganizationsForPlatformMetrics(list)
+
+  for (const o of metricsOrgs) {
     const orgArchived = o.status === "archived"
     const sub = subByOrg.get(normalizeOrgKey(o.id)) ?? null
     if (!orgArchived) {

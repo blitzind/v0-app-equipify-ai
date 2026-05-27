@@ -41,9 +41,34 @@ import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis } from "rec
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import { planTierLabelFromDbPlanId } from "@/lib/plan-display"
 import { applyDiscountToMrrCents, resolveListMrrCents } from "@/lib/billing/discount-pricing"
-import type { OrganizationDeleteInvoiceBlockDetails } from "@/lib/platform/organization-delete-guards"
+import type {
+  OrganizationDeleteInvoiceBlockDetails,
+  OrganizationDeleteImmutableAuditBlockDetails,
+} from "@/lib/platform/organization-delete-guards"
+import type { OrganizationAccountType } from "@/lib/platform/platform-metrics-organizations"
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+function accountTypeBadgeClass(badge: string): string {
+  switch (badge) {
+    case "Demo":
+      return "bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+    case "Internal":
+      return "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300"
+    case "Test":
+      return "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+    case "Unbillable":
+      return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+    default:
+      return "bg-muted text-muted-foreground"
+  }
+}
+
+const ACCOUNT_CLASSIFICATION_OPTIONS: { id: OrganizationAccountType; label: string }[] = [
+  { id: "customer", label: "Real customer" },
+  { id: "demo", label: "Demo account" },
+  { id: "internal", label: "Internal account" },
+  { id: "test", label: "Test account" },
+  { id: "unbillable", label: "Unbillable account" },
+]
 
 const ADMIN_PLAN_OPTIONS = [
   { id: "solo", label: "Solo" },
@@ -306,6 +331,16 @@ function AccountsTab({
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [deleteInvoiceBlockDetails, setDeleteInvoiceBlockDetails] =
     useState<OrganizationDeleteInvoiceBlockDetails | null>(null)
+  const [deleteImmutableAuditDetails, setDeleteImmutableAuditDetails] =
+    useState<OrganizationDeleteImmutableAuditBlockDetails | null>(null)
+  const [deleteSuggestExclude, setDeleteSuggestExclude] = useState(false)
+  const [markInternalBusy, setMarkInternalBusy] = useState(false)
+
+  const [classificationTarget, setClassificationTarget] = useState<PlatformAccount | null>(null)
+  const [classificationType, setClassificationType] = useState<OrganizationAccountType>("customer")
+  const [classificationReason, setClassificationReason] = useState("")
+  const [classificationBusy, setClassificationBusy] = useState(false)
+  const [classificationError, setClassificationError] = useState<string | null>(null)
 
   const [planTarget, setPlanTarget] = useState<PlatformAccount | null>(null)
   const [planFormPlanId, setPlanFormPlanId] = useState<string>("solo")
@@ -506,17 +541,26 @@ function AccountsTab({
     setDeleteBusy(true)
     setDeleteError(null)
     setDeleteInvoiceBlockDetails(null)
+    setDeleteImmutableAuditDetails(null)
+    setDeleteSuggestExclude(false)
     try {
       const res = await fetch(`/api/platform/accounts/${deleteTarget.id}`, { method: "DELETE" })
       const data = (await res.json()) as {
         message?: string
         error?: string
-        details?: OrganizationDeleteInvoiceBlockDetails
+        suggestMarkInternalOrExclude?: boolean
+        details?: OrganizationDeleteInvoiceBlockDetails | OrganizationDeleteImmutableAuditBlockDetails
       }
       if (!res.ok) {
         setDeleteError(data.message ?? "Delete failed.")
-        if (data.error === "unpaid_invoices" && data.details) {
+        if (data.error === "unpaid_invoices" && data.details && "blockingRealInvoiceCount" in data.details) {
           setDeleteInvoiceBlockDetails(data.details)
+        }
+        if (data.error === "immutable_audit_records" && data.details && "immutableAuditRecordCount" in data.details) {
+          setDeleteImmutableAuditDetails(data.details)
+        }
+        if (data.suggestMarkInternalOrExclude) {
+          setDeleteSuggestExclude(true)
         }
         return
       }
@@ -525,6 +569,67 @@ function AccountsTab({
       onRefresh()
     } finally {
       setDeleteBusy(false)
+    }
+  }
+
+  function openClassificationDialog(account: PlatformAccount) {
+    setClassificationTarget(account)
+    setClassificationType(account.accountType ?? "customer")
+    setClassificationReason(account.exclusionReason ?? "")
+    setClassificationError(null)
+    setMenuOpen(null)
+  }
+
+  async function saveClassification() {
+    if (!classificationTarget) return
+    setClassificationBusy(true)
+    setClassificationError(null)
+    try {
+      const res = await fetch(`/api/platform/accounts/${classificationTarget.id}/classification`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountType: classificationType,
+          exclusionReason: classificationReason,
+        }),
+      })
+      const data = (await res.json()) as { message?: string; ok?: boolean }
+      if (!res.ok || !data.ok) {
+        setClassificationError(data.message ?? "Could not update account classification.")
+        return
+      }
+      setClassificationTarget(null)
+      onRefresh()
+    } finally {
+      setClassificationBusy(false)
+    }
+  }
+
+  async function markDeleteTargetInternalExcluded() {
+    if (!deleteTarget) return
+    setMarkInternalBusy(true)
+    setDeleteError(null)
+    try {
+      const res = await fetch(`/api/platform/accounts/${deleteTarget.id}/classification`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountType: "internal",
+          exclusionReason: "Marked internal/excluded instead of hard delete (immutable audit records).",
+        }),
+      })
+      const data = (await res.json()) as { message?: string; ok?: boolean }
+      if (!res.ok || !data.ok) {
+        setDeleteError(data.message ?? "Could not mark account as internal/excluded.")
+        return
+      }
+      setDeleteTarget(null)
+      setDeleteConfirmName("")
+      setDeleteImmutableAuditDetails(null)
+      setDeleteSuggestExclude(false)
+      onRefresh()
+    } finally {
+      setMarkInternalBusy(false)
     }
   }
 
@@ -862,7 +967,19 @@ function AccountsTab({
                           {account.name[0]}
                         </div>
                         <div>
-                          <p className="font-medium text-foreground text-sm">{account.name}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium text-foreground text-sm">{account.name}</p>
+                            {account.accountTypeBadge ? (
+                              <span
+                                className={cn(
+                                  "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                                  accountTypeBadgeClass(account.accountTypeBadge),
+                                )}
+                              >
+                                {account.accountTypeBadge}
+                              </span>
+                            ) : null}
+                          </div>
                           <p className="text-xs text-muted-foreground">{account.ownerEmail}</p>
                         </div>
                       </div>
@@ -1050,6 +1167,13 @@ function AccountsTab({
                             </button>
                             <button
                               type="button"
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left"
+                              onClick={() => openClassificationDialog(account)}
+                            >
+                              <Flag size={13} className="text-muted-foreground" /> Account classification…
+                            </button>
+                            <button
+                              type="button"
                               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-700 dark:text-amber-500 hover:bg-amber-500/10 transition-colors text-left disabled:opacity-50"
                               onClick={() => {
                                 void archiveAccount(account)
@@ -1071,6 +1195,8 @@ function AccountsTab({
                                 setDeleteConfirmName("")
                                 setDeleteError(null)
                                 setDeleteInvoiceBlockDetails(null)
+                                setDeleteImmutableAuditDetails(null)
+                                setDeleteSuggestExclude(false)
                                 setMenuOpen(null)
                               }}
                             >
@@ -1110,6 +1236,8 @@ function AccountsTab({
             setDeleteConfirmName("")
             setDeleteError(null)
             setDeleteInvoiceBlockDetails(null)
+            setDeleteImmutableAuditDetails(null)
+            setDeleteSuggestExclude(false)
           }
         }}
       >
@@ -1135,6 +1263,18 @@ function AccountsTab({
             autoComplete="off"
           />
           {deleteError && <p className="text-xs text-destructive">{deleteError}</p>}
+          {deleteImmutableAuditDetails && deleteImmutableAuditDetails.immutableAuditRecordCount > 0 && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs space-y-2">
+              <p className="font-medium text-foreground">
+                Immutable audit records: {deleteImmutableAuditDetails.immutableAuditRecordCount}
+              </p>
+              <p className="text-muted-foreground">
+                This organization has financial audit history that must be preserved. Hard deletion is not available.
+                Mark the account as internal/excluded or archive it instead — platform metrics will ignore it while audit
+                data stays intact.
+              </p>
+            </div>
+          )}
           {deleteInvoiceBlockDetails && deleteInvoiceBlockDetails.blockingRealInvoiceCount > 0 && (
             <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs space-y-2">
               <p className="font-medium text-foreground">
@@ -1170,7 +1310,18 @@ function AccountsTab({
               </p>
             </div>
           )}
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="gap-2 sm:gap-0 flex-col sm:flex-row sm:justify-end">
+            {deleteSuggestExclude ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full sm:w-auto"
+                disabled={markInternalBusy || deleteBusy}
+                onClick={() => void markDeleteTargetInternalExcluded()}
+              >
+                {markInternalBusy ? <Loader2 size={14} className="animate-spin" /> : "Mark as internal/excluded"}
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="outline"
@@ -1179,6 +1330,8 @@ function AccountsTab({
                 setDeleteConfirmName("")
                 setDeleteError(null)
                 setDeleteInvoiceBlockDetails(null)
+                setDeleteImmutableAuditDetails(null)
+                setDeleteSuggestExclude(false)
               }}
             >
               Cancel
@@ -1188,12 +1341,82 @@ function AccountsTab({
               variant="destructive"
               disabled={
                 deleteBusy ||
+                markInternalBusy ||
                 !deleteTarget ||
                 deleteConfirmName.trim() !== (deleteTarget?.name ?? "").trim()
               }
               onClick={() => void confirmDelete()}
             >
               {deleteBusy ? <Loader2 size={14} className="animate-spin" /> : "Delete permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={classificationTarget != null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setClassificationTarget(null)
+            setClassificationError(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Account classification</DialogTitle>
+          </DialogHeader>
+          {classificationTarget ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Control whether <span className="font-medium text-foreground">{classificationTarget.name}</span> counts
+                toward platform business metrics. Non-customer types are excluded from KPIs; financial and audit records
+                are unchanged.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Classification</label>
+                  <select
+                    className="input-base w-full text-sm"
+                    value={classificationType}
+                    onChange={(e) => setClassificationType(e.target.value as OrganizationAccountType)}
+                  >
+                    {ACCOUNT_CLASSIFICATION_OPTIONS.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {classificationType !== "customer" ? (
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      Exclusion reason (optional)
+                    </label>
+                    <textarea
+                      className="input-base w-full min-h-[88px] text-sm"
+                      value={classificationReason}
+                      onChange={(e) => setClassificationReason(e.target.value)}
+                      placeholder="Why this account is excluded from platform metrics…"
+                    />
+                  </div>
+                ) : null}
+              </div>
+              {classificationError ? (
+                <p className="text-xs text-destructive">{classificationError}</p>
+              ) : null}
+            </>
+          ) : null}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setClassificationTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={classificationBusy || !classificationTarget}
+              onClick={() => void saveClassification()}
+            >
+              {classificationBusy ? <Loader2 size={14} className="animate-spin" /> : "Save classification"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1987,9 +2210,14 @@ export default function PlatformAdminPage() {
     }
   }, [])
 
-  const nonArchivedAccounts = useMemo(
-    () => accounts.filter((a) => !a.organizationArchived),
+  const metricsEligibleAccounts = useMemo(
+    () => accounts.filter((a) => !a.excludeFromPlatformMetrics),
     [accounts],
+  )
+
+  const nonArchivedAccounts = useMemo(
+    () => metricsEligibleAccounts.filter((a) => !a.organizationArchived),
+    [metricsEligibleAccounts],
   )
 
   /** Legacy fallback if an older API omits `summary` (should not happen in production). */

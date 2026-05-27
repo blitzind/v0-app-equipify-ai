@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { fetchBlitzpayBusinessHealth } from "@/lib/blitzpay/blitzpay-business-health"
+import { PLATFORM_METRICS_INCLUDED_ORG_EQ } from "@/lib/platform/platform-metrics-organizations"
 
 const MAX_ORGS = 10
 
@@ -48,6 +49,7 @@ export async function fetchBlitzpayPlatformBusinessHealthRollup(
   const { data: orgs, error } = await admin
     .from("organizations")
     .select("id")
+    .eq("exclude_from_platform_metrics", PLATFORM_METRICS_INCLUDED_ORG_EQ)
     .eq("status", "active")
     .not("stripe_connect_account_id", "is", null)
     .order("id", { ascending: true })

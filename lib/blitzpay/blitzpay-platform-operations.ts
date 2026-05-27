@@ -13,6 +13,8 @@ import {
   buildBlitzpayPlatformCommercialPackagingHistogram,
   type BlitzpayPlatformCommercialPackagingHistogram,
 } from "@/lib/billing/blitzpay-commercial-packaging"
+import { PLATFORM_METRICS_INCLUDED_ORG_EQ } from "@/lib/platform/platform-metrics-organizations"
+import { fetchPlatformMetricsOrganizationIdSet } from "@/lib/platform/platform-metrics-organizations-query"
 
 const BLITZPAY_COMMERCIAL_PLAN_SAMPLE_LIMIT = 800
 
@@ -63,9 +65,10 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
   const connectStaleBefore = new Date(Date.now() - 7 * 86400_000).toISOString()
 
   const schemaHealth = await runBlitzpaySchemaHealthCheckCached(admin)
+  const metricsOrgIdSet = await fetchPlatformMetricsOrganizationIdSet(admin)
 
   const [
-    payEnabledRes,
+    payEnabledRows,
     chargesReadyRes,
     volRow,
     failedAttemptsRes,
@@ -84,17 +87,19 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
   ] = await Promise.all([
     admin
       .from("blitzpay_org_settings")
-      .select("organization_id", { count: "exact", head: true })
-      .eq("blitzpay_invoice_pay_enabled", true),
+      .select("organization_id")
+      .eq("blitzpay_invoice_pay_enabled", true)
+      .limit(5000),
     admin
       .from("organizations")
       .select("id", { count: "exact", head: true })
+      .eq("exclude_from_platform_metrics", PLATFORM_METRICS_INCLUDED_ORG_EQ)
       .not("stripe_connect_account_id", "is", null)
       .eq("stripe_charges_enabled", true)
       .eq("status", "active"),
     admin
       .from("blitzpay_payment_intents")
-      .select("amount_cents")
+      .select("amount_cents, organization_id")
       .eq("status", "succeeded")
       .gte("created_at", since30d)
       .limit(5000),
@@ -130,12 +135,14 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
     admin
       .from("organizations")
       .select("id", { count: "exact", head: true })
+      .eq("exclude_from_platform_metrics", PLATFORM_METRICS_INCLUDED_ORG_EQ)
       .eq("status", "active")
       .not("stripe_connect_account_id", "is", null)
       .is("last_stripe_connect_sync_at", null),
     admin
       .from("organizations")
       .select("id", { count: "exact", head: true })
+      .eq("exclude_from_platform_metrics", PLATFORM_METRICS_INCLUDED_ORG_EQ)
       .eq("status", "active")
       .not("stripe_connect_account_id", "is", null)
       .not("last_stripe_connect_sync_at", "is", null)
@@ -143,6 +150,7 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
     admin
       .from("organizations")
       .select("id", { count: "exact", head: true })
+      .eq("exclude_from_platform_metrics", PLATFORM_METRICS_INCLUDED_ORG_EQ)
       .eq("status", "active")
       .not("stripe_connect_account_id", "is", null)
       .eq("stripe_charges_enabled", true)
@@ -150,6 +158,7 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
     admin
       .from("organizations")
       .select("id", { count: "exact", head: true })
+      .eq("exclude_from_platform_metrics", PLATFORM_METRICS_INCLUDED_ORG_EQ)
       .eq("status", "active")
       .not("stripe_connect_account_id", "is", null)
       .in("stripe_connect_status", ["action_required", "pending_verification", "onboarding_started"]),
@@ -160,13 +169,21 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
       .limit(15),
     admin
       .from("organization_subscriptions")
-      .select("plan_id")
+      .select("plan_id, organization_id")
       .in("status", ["active", "trialing"])
       .limit(BLITZPAY_COMMERCIAL_PLAN_SAMPLE_LIMIT),
   ])
 
+  let orgsBlitzpayEnabled = 0
+  for (const row of payEnabledRows.data ?? []) {
+    const orgId = String((row as { organization_id?: string }).organization_id ?? "")
+    if (orgId && metricsOrgIdSet.has(orgId)) orgsBlitzpayEnabled += 1
+  }
+
   let volumeCapturedCents30d = 0
-  for (const row of (volRow.data ?? []) as Array<{ amount_cents?: string | number }>) {
+  for (const row of (volRow.data ?? []) as Array<{ amount_cents?: string | number; organization_id?: string }>) {
+    const orgId = String(row.organization_id ?? "")
+    if (!orgId || !metricsOrgIdSet.has(orgId)) continue
     const n = Math.round(Number(row.amount_cents ?? 0))
     if (Number.isFinite(n)) volumeCapturedCents30d += n
   }
@@ -276,14 +293,16 @@ export async function fetchBlitzpayPlatformOperationsSummary(admin: SupabaseClie
     ignoredUnknownEvents7dApprox: 0,
   })
 
-  const planIds = ((planSampleRes.data ?? []) as Array<{ plan_id?: string | null }>).map((r) => String(r.plan_id ?? ""))
+  const planIds = ((planSampleRes.data ?? []) as Array<{ plan_id?: string | null; organization_id?: string }>)
+    .filter((r) => metricsOrgIdSet.has(String(r.organization_id ?? "")))
+    .map((r) => String(r.plan_id ?? ""))
   const commercialPackagingHistogram =
     planSampleRes.error ? null : (
       buildBlitzpayPlatformCommercialPackagingHistogram(planIds, BLITZPAY_COMMERCIAL_PLAN_SAMPLE_LIMIT)
     )
 
   return {
-    orgsBlitzpayEnabled: payEnabledRes.count ?? 0,
+    orgsBlitzpayEnabled,
     orgsConnectChargesReady: chargesReadyRes.count ?? 0,
     volumeCapturedCents30d,
     failedPaymentAttempts7d: failedAttemptsRes.count ?? 0,

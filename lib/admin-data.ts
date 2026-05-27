@@ -72,6 +72,13 @@ export interface PlatformAccount {
   industry: string
   /** Human-readable attribution from onboarding (self-serve signups). */
   howHeardAboutEquipify?: string | null
+  /** Platform-admin classification; omitted from tenant-facing APIs. */
+  accountType?: "customer" | "demo" | "internal" | "test" | "unbillable"
+  excludeFromPlatformMetrics?: boolean
+  /** Short badge label when accountType is not customer (Demo, Internal, etc.). */
+  accountTypeBadge?: string | null
+  exclusionReason?: string | null
+  excludedAt?: string | null
 }
 
 // ─── Feature flags ────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { PLATFORM_METRICS_INCLUDED_ORG_EQ } from "@/lib/platform/platform-metrics-organizations"
 
 export const PLATFORM_MEMBERSHIP_ORG_SAMPLE_CAP = 60
 
@@ -19,9 +20,12 @@ export type BlitzpayPlatformMembershipRollup = {
 export async function fetchBlitzpayPlatformMembershipRollup(
   admin: SupabaseClient,
 ): Promise<BlitzpayPlatformMembershipRollup> {
-  const { data: orgs, error } = await admin.from("organizations").select("id").order("created_at", { ascending: false }).limit(
-    PLATFORM_MEMBERSHIP_ORG_SAMPLE_CAP,
-  )
+  const { data: orgs, error } = await admin
+    .from("organizations")
+    .select("id")
+    .eq("exclude_from_platform_metrics", PLATFORM_METRICS_INCLUDED_ORG_EQ)
+    .order("created_at", { ascending: false })
+    .limit(PLATFORM_MEMBERSHIP_ORG_SAMPLE_CAP)
   if (error) throw new Error(error.message)
   const ids = (orgs ?? []).map((o) => (o as { id: string }).id)
   let organizationsWithMemberships = 0

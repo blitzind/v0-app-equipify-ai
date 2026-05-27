@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { computeInvoicePaymentAllocation, invoiceGrandTotalCents } from "@/lib/billing/invoice-payment-allocation"
 import { normalizeStripeIdColumn } from "@/lib/billing/subscriptions"
+import { countOrganizationImmutableAuditRecords } from "@/lib/platform/organization-immutable-audit-guard"
 
 /**
  * Subscription states that block hard-delete when a real Stripe subscription id exists.
@@ -142,6 +143,11 @@ export type OrganizationDeleteInvoiceBlockDetails = {
   }>
 }
 
+export type OrganizationDeleteImmutableAuditBlockDetails = {
+  immutableAuditRecordCount: number
+  blitzpayMobileAuditCount: number
+}
+
 export type OrganizationDeleteGuardResult =
   | { ok: true }
   | { ok: false; httpStatus: 409; error: "active_subscription"; message: string }
@@ -151,6 +157,14 @@ export type OrganizationDeleteGuardResult =
       error: "unpaid_invoices"
       message: string
       details: OrganizationDeleteInvoiceBlockDetails
+    }
+  | {
+      ok: false
+      httpStatus: 409
+      error: "immutable_audit_records"
+      message: string
+      suggestMarkInternalOrExclude: true
+      details: OrganizationDeleteImmutableAuditBlockDetails
     }
   | { ok: false; httpStatus: 500; error: string; message: string }
 
@@ -170,6 +184,26 @@ export async function evaluateOrganizationDeleteGuards(
 
   if (subErr) {
     return { ok: false, httpStatus: 500, error: "subscription_check_failed", message: subErr.message }
+  }
+
+  let immutableAudit: OrganizationDeleteImmutableAuditBlockDetails
+  try {
+    immutableAudit = await countOrganizationImmutableAuditRecords(admin, organizationId)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Could not verify audit records."
+    return { ok: false, httpStatus: 500, error: "audit_check_failed", message }
+  }
+
+  if (immutableAudit.immutableAuditRecordCount > 0) {
+    const n = immutableAudit.immutableAuditRecordCount
+    return {
+      ok: false,
+      httpStatus: 409,
+      error: "immutable_audit_records",
+      suggestMarkInternalOrExclude: true,
+      message: `Cannot permanently delete: this organization has ${n} immutable financial audit record${n === 1 ? "" : "s"} (for example BlitzPay mobile audit history). Archive the account or mark it as internal/excluded instead — audit data is preserved for compliance.`,
+      details: immutableAudit,
+    }
   }
 
   if (subscriptionBlocksOrganizationDelete(sub)) {

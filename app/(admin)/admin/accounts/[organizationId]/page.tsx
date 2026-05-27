@@ -7,6 +7,23 @@ import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
+import type { OrganizationAccountType } from "@/lib/platform/platform-metrics-organizations"
+
+const CLASSIFICATION_OPTIONS: { id: OrganizationAccountType; label: string }[] = [
+  { id: "customer", label: "Real customer" },
+  { id: "demo", label: "Demo account" },
+  { id: "internal", label: "Internal account" },
+  { id: "test", label: "Test account" },
+  { id: "unbillable", label: "Unbillable account" },
+]
+
+type ClassificationData = {
+  accountType: OrganizationAccountType
+  excludeFromPlatformMetrics: boolean
+  accountTypeBadge: string | null
+  exclusionReason: string | null
+  excludedAt: string | null
+}
 
 type AidenActionsAvailability = {
   enabled: boolean
@@ -39,6 +56,9 @@ export default function AdminAccountFeaturePage() {
   const params = useParams<{ organizationId: string }>()
   const organizationId = params.organizationId
   const [data, setData] = useState<ResponseData | null>(null)
+  const [classification, setClassification] = useState<ClassificationData | null>(null)
+  const [classificationType, setClassificationType] = useState<OrganizationAccountType>("customer")
+  const [classificationReason, setClassificationReason] = useState("")
   const [reason, setReason] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
@@ -48,11 +68,25 @@ export default function AdminAccountFeaturePage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/platform/accounts/${organizationId}/features`, { cache: "no-store" })
-      const json = (await res.json().catch(() => ({}))) as ResponseData
-      if (!res.ok || !json.ok) throw new Error(json.message ?? json.error ?? "Could not load account features.")
+      const [featuresRes, classificationRes] = await Promise.all([
+        fetch(`/api/platform/accounts/${organizationId}/features`, { cache: "no-store" }),
+        fetch(`/api/platform/accounts/${organizationId}/classification`, { cache: "no-store" }),
+      ])
+      const json = (await featuresRes.json().catch(() => ({}))) as ResponseData
+      if (!featuresRes.ok || !json.ok) throw new Error(json.message ?? json.error ?? "Could not load account features.")
       setData(json)
       setReason(json.aidenActions?.reason ?? "")
+
+      const classJson = (await classificationRes.json().catch(() => ({}))) as {
+        ok?: boolean
+        classification?: ClassificationData
+        message?: string
+      }
+      if (classificationRes.ok && classJson.ok && classJson.classification) {
+        setClassification(classJson.classification)
+        setClassificationType(classJson.classification.accountType)
+        setClassificationReason(classJson.classification.exclusionReason ?? "")
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load account features.")
     } finally {
@@ -63,6 +97,36 @@ export default function AdminAccountFeaturePage() {
   useEffect(() => {
     void load()
   }, [organizationId])
+
+  async function saveClassification() {
+    setSaving("classification")
+    setError(null)
+    try {
+      const res = await fetch(`/api/platform/accounts/${organizationId}/classification`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountType: classificationType,
+          exclusionReason: classificationReason,
+        }),
+      })
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        classification?: ClassificationData
+        message?: string
+      }
+      if (!res.ok || !json.ok) throw new Error(json.message ?? "Could not update account classification.")
+      if (json.classification) {
+        setClassification(json.classification)
+        setClassificationType(json.classification.accountType)
+        setClassificationReason(json.classification.exclusionReason ?? "")
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update account classification.")
+    } finally {
+      setSaving(null)
+    }
+  }
 
   async function save(mode: "manual_enable" | "forced_disable" | "clear_override") {
     setSaving(mode)
@@ -115,6 +179,55 @@ export default function AdminAccountFeaturePage() {
           ) : availability ? (
             <div className="mt-6 space-y-5">
               {error ? <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div> : null}
+
+              <div className="rounded-xl border border-border bg-muted/20 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold">Platform metrics classification</p>
+                  {classification?.accountTypeBadge ? (
+                    <span className="rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700">
+                      {classification.accountTypeBadge}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Mark demo, internal, test, or unbillable accounts so they are excluded from platform KPIs.
+                </p>
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Classification</label>
+                    <select
+                      className="input-base w-full text-sm"
+                      value={classificationType}
+                      onChange={(e) => setClassificationType(e.target.value as OrganizationAccountType)}
+                    >
+                      {CLASSIFICATION_OPTIONS.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {classificationType !== "customer" ? (
+                    <label className="block space-y-1">
+                      <span className="text-xs font-medium text-muted-foreground">Exclusion reason (optional)</span>
+                      <Textarea
+                        value={classificationReason}
+                        onChange={(e) => setClassificationReason(e.target.value)}
+                        placeholder="Why this account is excluded from platform metrics…"
+                      />
+                    </label>
+                  ) : null}
+                  {classification?.excludedAt ? (
+                    <p className="text-xs text-muted-foreground">
+                      Last excluded: {classification.excludedAt.slice(0, 10)}
+                    </p>
+                  ) : null}
+                  <Button onClick={() => void saveClassification()} disabled={saving === "classification"}>
+                    {saving === "classification" ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                    Save classification
+                  </Button>
+                </div>
+              </div>
 
               {onboardingMeta ? (
                 <div className="rounded-xl border border-border bg-muted/20 p-4">
