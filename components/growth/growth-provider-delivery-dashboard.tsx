@@ -711,6 +711,16 @@ export function GrowthProviderDeliveryDashboardPanel() {
         </Button>
       </GrowthEngineCard>
 
+      <GrowthEngineCard title="Deliverability operations">
+        <p className="text-sm text-muted-foreground">
+          Monitor sender, domain, provider, and compliance health with human-gated recommendations. No autonomous DNS,
+          sender, volume, or provider route changes.
+        </p>
+        <Button asChild variant="outline" size="sm" className="mt-3">
+          <Link href="/admin/growth/providers/deliverability-ops">Open Deliverability Ops</Link>
+        </Button>
+      </GrowthEngineCard>
+
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
         <GrowthEngineCard title="Transport Simulator">
           <div className="grid gap-4 sm:grid-cols-2">

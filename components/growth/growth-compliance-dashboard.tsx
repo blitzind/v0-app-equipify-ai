@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import { Loader2, RefreshCw, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -141,6 +142,16 @@ export function GrowthComplianceDashboardPanel() {
             </tbody>
           </table>
         </div>
+      </GrowthEngineCard>
+
+      <GrowthEngineCard title="Deliverability compliance risks">
+        <p className="text-sm text-muted-foreground">
+          Bounce rate {formatRate(dashboard.hardBounceRate)} · Complaint rate {formatRate(dashboard.complaintRate)}.
+          Review bounce, complaint, and unsubscribe spikes in Deliverability Ops.
+        </p>
+        <Button asChild variant="outline" size="sm" className="mt-3">
+          <Link href="/admin/growth/providers/deliverability-ops">Open Deliverability Ops</Link>
+        </Button>
       </GrowthEngineCard>
 
       <div className="grid gap-4 xl:grid-cols-2">

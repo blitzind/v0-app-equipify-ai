@@ -94,6 +94,22 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["sender pool", "rotation", "round robin", "deliverability", "sender fatigue"],
   },
   {
+    id: "deliverability-ops",
+    label: "Deliverability Ops",
+    href: "/admin/growth/providers/deliverability-ops",
+    keywords: [
+      "deliverability ops",
+      "reputation",
+      "spf",
+      "dkim",
+      "dmarc",
+      "bounce",
+      "complaint",
+      "remediation",
+      "risk alerts",
+    ],
+  },
+  {
     id: "provider-compliance",
     label: "Compliance",
     href: "/admin/growth/providers/compliance",
@@ -618,6 +634,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         href: "/admin/growth/providers/sender-pools",
         label: "Sender Pools",
         match: prefixMatch("/admin/growth/providers/sender-pools"),
+      },
+      {
+        id: "deliverability-ops",
+        href: "/admin/growth/providers/deliverability-ops",
+        label: "Deliverability Ops",
+        match: prefixMatch("/admin/growth/providers/deliverability-ops"),
       },
       {
         id: "provider-compliance",

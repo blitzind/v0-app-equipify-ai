@@ -181,6 +181,7 @@
     "test:growth-booking-intelligence": "tsx scripts/test-growth-booking-intelligence.ts",
     "test:growth-multichannel-sequences": "tsx scripts/test-growth-multichannel-sequences.ts",
     "test:growth-sender-pools": "tsx scripts/test-growth-sender-pools.ts",
+    "test:growth-deliverability-ops": "tsx scripts/test-growth-deliverability-ops.ts",
     "test:organization-account-classification": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-organization-account-classification.ts",
     "test:growth-provider-delivery": "tsx scripts/test-growth-provider-delivery.ts",
     "test:growth-provider-transport": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-provider-transport.ts",

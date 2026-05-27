@@ -178,6 +178,9 @@ export function GrowthWarmupDashboardPanel() {
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/providers/deliverability-ops">Deliverability Ops</Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
             <Link href="/admin/growth/infrastructure/deliverability">Deliverability</Link>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
@@ -201,6 +204,16 @@ export function GrowthWarmupDashboardPanel() {
           <StatTile label="Completed" value={String(dashboard?.completed_count ?? 0)} />
           <StatTile label="Average Warmup Score" value={`${dashboard?.average_warmup_score ?? 0}%`} />
         </div>
+      </GrowthEngineCard>
+
+      <GrowthEngineCard title="Warmup mismatch warnings">
+        <p className="text-sm text-muted-foreground">
+          When send volume exceeds warmup stage limits, Deliverability Ops surfaces warmup mismatch risks. Review advisory
+          recommendations before increasing outbound volume.
+        </p>
+        <Button asChild variant="outline" size="sm" className="mt-3">
+          <Link href="/admin/growth/providers/deliverability-ops">Review in Deliverability Ops</Link>
+        </Button>
       </GrowthEngineCard>
 
       <GrowthEngineCard title="Live Warmup Execution">

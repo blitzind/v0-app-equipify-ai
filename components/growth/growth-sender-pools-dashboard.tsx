@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import { Loader2, Plus, RefreshCw, Shuffle } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -303,6 +304,17 @@ export function GrowthSenderPoolsDashboardView() {
             </tbody>
           </table>
         </div>
+      </GrowthEngineCard>
+
+      <GrowthEngineCard title="Pool health & fatigue risks">
+        <p className="text-sm text-muted-foreground">
+          {(dashboard?.fatigueWarnings ?? 0) > 0
+            ? `${dashboard?.fatigueWarnings ?? 0} fatigue warning(s) detected across active pools — review in Deliverability Ops.`
+            : "No active pool fatigue warnings. Monitor deliverability trends in Deliverability Ops."}
+        </p>
+        <Button asChild variant="outline" size="sm" className="mt-3">
+          <Link href="/admin/growth/providers/deliverability-ops">Open Deliverability Ops</Link>
+        </Button>
       </GrowthEngineCard>
 
       <p className="text-xs text-muted-foreground">

@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 799,
-  sqlMigrations: 309,
+  apiRouteHandlers: 806,
+  sqlMigrations: 310,
   dashboardPages: 65,
-  componentsTsx: 565,
-  libTsFiles: 2031,
+  componentsTsx: 566,
+  libTsFiles: 2041,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **799** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **309** |
+| API route handlers (\`app/api/**/route.ts\`) | **806** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **310** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **565** |
-| \`lib/**/*.ts\` | **2031** |
+| \`components/**/*.tsx\` | **566** |
+| \`lib/**/*.ts\` | **2041** |
 
 ### Vercel crons
 
@@ -541,6 +541,13 @@ platform/growth/customer-lifecycle/customers/route.ts
 platform/growth/customer-lifecycle/dashboard/route.ts
 platform/growth/customer-lifecycle/onboarding-tasks/[taskId]/route.ts
 platform/growth/deal-intelligence/dashboard/route.ts
+platform/growth/deliverability-ops/dashboard/route.ts
+platform/growth/deliverability-ops/recommendations/[id]/acknowledge/route.ts
+platform/growth/deliverability-ops/recommendations/[id]/complete/route.ts
+platform/growth/deliverability-ops/recommendations/[id]/dismiss/route.ts
+platform/growth/deliverability-ops/recommendations/route.ts
+platform/growth/deliverability-ops/risks/route.ts
+platform/growth/deliverability-ops/tasks/route.ts
 platform/growth/deliverability/dashboard/route.ts
 platform/growth/deliverability/domain/[id]/validate/route.ts
 platform/growth/deliverability/events/[id]/route.ts
