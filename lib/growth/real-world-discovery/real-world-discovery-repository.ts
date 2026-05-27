@@ -245,6 +245,17 @@ export async function runRealWorldCompanyDiscovery(
           typeof row.raw_payload_server_only?.google_place_id === "string"
             ? row.raw_payload_server_only.google_place_id
             : null,
+        icp_fit_score:
+          typeof row.raw_payload_server_only?.icp_fit_score === "number"
+            ? row.raw_payload_server_only.icp_fit_score
+            : null,
+        google_places_icp_fit_score:
+          typeof row.raw_payload_server_only?.icp_fit_score === "number"
+            ? row.raw_payload_server_only.icp_fit_score
+            : null,
+        matched_queries: Array.isArray(row.raw_payload_server_only?.matched_queries)
+          ? row.raw_payload_server_only.matched_queries
+          : null,
         serp_place_id:
           typeof row.raw_payload_server_only?.serp_place_id === "string"
             ? row.raw_payload_server_only.serp_place_id

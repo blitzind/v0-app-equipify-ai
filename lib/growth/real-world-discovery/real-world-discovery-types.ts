@@ -112,6 +112,9 @@ export type GrowthRealWorldProviderExecutionDiagnostic = {
   provider_latency_ms: number
   provider_result_count: number
   provider_fallback_reason?: string | null
+  provider_query_generated?: string[]
+  provider_query_result_count?: number[]
+  provider_merged_result_count?: number
 }
 
 export const GROWTH_REAL_WORLD_DISCOVERY_PRIVACY_NOTE =

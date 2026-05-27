@@ -48,6 +48,14 @@ export function rankRealWorldCompanyCandidates(
     if (row.existing_customer_match || row.existing_prospect_match) rank -= 0.15
     if (row.existing_growth_lead_match) rank -= 0.05
 
+    const icpFit =
+      typeof row.metadata?.icp_fit_score === "number"
+        ? row.metadata.icp_fit_score
+        : typeof row.metadata?.google_places_icp_fit_score === "number"
+          ? row.metadata.google_places_icp_fit_score
+          : 0
+    if (icpFit > 0) rank += icpFit * 0.45
+
     return { ...row, rank_score: Number(rank.toFixed(4)) }
   })
 

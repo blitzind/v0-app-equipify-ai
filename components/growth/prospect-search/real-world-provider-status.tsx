@@ -1,7 +1,9 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
+import { GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER } from "@/lib/growth/real-world-discovery/providers/google-places-query-expansion"
 import { GROWTH_GOOGLE_PLACES_PROVIDER_QA_MARKER } from "@/lib/growth/real-world-discovery/providers/google-places-types"
+import type { GrowthProspectSearchProviderDiagnostic } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
 
 const STATUS_STYLES: Record<string, string> = {
@@ -57,5 +59,42 @@ export function RealWorldSourceBadge({
     >
       {badge ?? providerType}
     </Badge>
+  )
+}
+
+export function GooglePlacesQueryDiagnostics({
+  diagnostic,
+  qaMarker,
+  className,
+}: {
+  diagnostic: GrowthProspectSearchProviderDiagnostic
+  qaMarker?: string | null
+  className?: string
+}) {
+  if (diagnostic.provider_type !== "google_places") return null
+  if (!diagnostic.provider_query_generated?.length) return null
+
+  const merged =
+    diagnostic.provider_merged_result_count ?? diagnostic.provider_result_count ?? 0
+
+  return (
+    <div
+      className={cn(
+        "mt-2 rounded-md border border-violet-200 bg-violet-50/70 px-2.5 py-2 text-[11px] text-violet-950",
+        className,
+      )}
+      data-qa-marker={qaMarker ?? GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER}
+    >
+      <p className="font-semibold">Google Places</p>
+      <p className="mt-1 font-medium">Queries executed:</p>
+      <ul className="mt-1 space-y-0.5">
+        {diagnostic.provider_query_generated.map((query, index) => (
+          <li key={`${query}-${index}`}>
+            {query} ({diagnostic.provider_query_result_count?.[index] ?? 0})
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1.5 font-medium">Total merged results: {merged}</p>
+    </div>
   )
 }

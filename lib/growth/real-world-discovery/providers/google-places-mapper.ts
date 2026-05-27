@@ -50,7 +50,7 @@ function computeGooglePlacesConfidence(place: GooglePlacesTextSearchPlace): numb
 
 export function mapGooglePlaceToCandidate(
   place: GooglePlacesTextSearchPlace,
-  input: { query: string; source_rank: number },
+  input: { query: string; source_rank: number; matched_queries?: string[] },
 ): GrowthRealWorldDiscoveryProviderRawCandidate | null {
   const company_name = place.displayName?.text?.trim() ?? ""
   if (!company_name || company_name.length < 2) return null
@@ -111,6 +111,8 @@ export function mapGooglePlaceToCandidate(
       google_place_id,
       categories,
       google_maps_uri: source_url,
+      matched_query: input.query,
+      matched_queries: input.matched_queries ?? [input.query],
     },
   }
 }

@@ -24,6 +24,13 @@ import {
 import { createRealWorldFixtureProvider } from "../lib/growth/real-world-discovery/providers/fixture-provider"
 import { buildGooglePlacesDiscoveryQuery } from "../lib/growth/real-world-discovery/providers/google-places-query-builder"
 import {
+  buildGooglePlacesDiscoveryQueries,
+  computeGooglePlacesIcpFitScore,
+  GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER,
+  googlePlacesIcpInputs,
+} from "../lib/growth/real-world-discovery/providers/google-places-query-expansion"
+import { mergeGooglePlacesCandidates } from "../lib/growth/real-world-discovery/providers/google-places-merge"
+import {
   mapGooglePlaceToCandidate,
   parseGooglePlaceId,
 } from "../lib/growth/real-world-discovery/providers/google-places-mapper"
@@ -88,8 +95,107 @@ async function main(): Promise<void> {
   )
   assert.match(googlePlacesSource, /GOOGLE_PLACES_API_KEY/)
   assert.match(googlePlacesSource, /searchGooglePlacesText/)
-  assert.match(googlePlacesSource, /buildGooglePlacesDiscoveryQuery/)
+  assert.match(googlePlacesSource, /buildGooglePlacesDiscoveryQueries/)
+  assert.match(googlePlacesSource, /mergeGooglePlacesCandidates/)
   assert.doesNotMatch(googlePlacesSource, /scrape|puppeteer|cheerio/i)
+
+  assert.equal(GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER, "growth-google-places-query-expansion-v2")
+
+  const medicalTn = buildGooglePlacesDiscoveryQueries({
+    industry: "Medical Equipment Service",
+    location: "Tennessee",
+    intent_category: "buying intent",
+    technology_hints: ["QuickBooks"],
+    decision_maker_role_hints: ["VP Operations"],
+  })
+  assert.ok(medicalTn.queries.length >= 3)
+  assert.ok(medicalTn.queries.length <= 8)
+  for (const q of medicalTn.queries) {
+    assert.match(q, /Tennessee/i)
+    assert.doesNotMatch(q, /companies/i)
+    assert.doesNotMatch(q, /QuickBooks/i)
+    assert.doesNotMatch(q, /buying intent/i)
+    assert.doesNotMatch(q, /VP Operations/i)
+  }
+  assert.ok(medicalTn.queries.some((q) => /medical equipment repair/i.test(q)))
+  assert.ok(medicalTn.queries.some((q) => /biomedical calibration/i.test(q)))
+  assert.ok(medicalTn.queries.some((q) => /healthcare equipment field service/i.test(q)))
+
+  const icpOnly = googlePlacesIcpInputs({
+    industry: "Medical Equipment Service",
+    location: "Tennessee",
+    intent_category: "ignored",
+    technology_hints: ["ignored"],
+    decision_maker_role_hints: ["ignored"],
+  })
+  assert.equal(icpOnly.intent_category, undefined)
+  assert.equal(icpOnly.technology_hints, undefined)
+  assert.equal(icpOnly.decision_maker_role_hints, undefined)
+
+  const merged = mergeGooglePlacesCandidates(
+    [
+      {
+        company_name: "Acme Biomed",
+        city: "Nashville",
+        state: "TN",
+        category: "Medical equipment repair",
+        confidence: 0.7,
+        evidence: [{ claim: "a", evidence: "a", source: "test" }],
+        source_attribution: [
+          {
+            source: "test",
+            provider_type: "google_places",
+            provider_name: "google_places",
+            signal: "test",
+            evidence: "q1",
+            confidence: 0.7,
+          },
+        ],
+        raw_payload_server_only: {
+          google_place_id: "place-1",
+          matched_queries: ["medical equipment repair Tennessee"],
+        },
+      },
+      {
+        company_name: "Acme Biomed",
+        city: "Nashville",
+        state: "TN",
+        category: "Biomedical service",
+        confidence: 0.72,
+        evidence: [{ claim: "b", evidence: "b", source: "test" }],
+        source_attribution: [
+          {
+            source: "test",
+            provider_type: "google_places",
+            provider_name: "google_places",
+            signal: "test",
+            evidence: "q2",
+            confidence: 0.72,
+          },
+        ],
+        raw_payload_server_only: {
+          google_place_id: "place-1",
+          matched_queries: ["biomedical calibration Tennessee"],
+        },
+      },
+    ],
+    { industry: "Medical Equipment Service", location: "Tennessee" },
+  )
+  assert.equal(merged.length, 1)
+  assert.ok(typeof merged[0]!.raw_payload_server_only?.icp_fit_score === "number")
+  assert.equal((merged[0]!.raw_payload_server_only?.matched_queries as string[]).length, 2)
+
+  const fit = computeGooglePlacesIcpFitScore(
+    {
+      company_name: "Precision Biomed Services",
+      category: "Medical equipment repair",
+      city: "Nashville",
+      state: "TN",
+    },
+    { industry: "Medical Equipment Service", location: "Tennessee" },
+    ["medical equipment repair Tennessee"],
+  )
+  assert.ok(fit > 0.5)
 
   assert.equal(GROWTH_GOOGLE_PLACES_PROVIDER_QA_MARKER, "growth-google-places-provider-v1")
 
@@ -97,14 +203,14 @@ async function main(): Promise<void> {
     industry: "medical equipment service",
     location: "Boston MA",
   })
-  assert.match(gp1, /medical equipment service/)
+  assert.match(gp1, /medical equipment/i)
   assert.match(gp1, /Boston MA/)
 
   const gp2 = buildGooglePlacesDiscoveryQuery({
     industry: "biomedical calibration",
     location: "California",
   })
-  assert.match(gp2, /biomedical calibration/)
+  assert.match(gp2, /biomedical calibration/i)
   assert.match(gp2, /California/)
 
   const gp3 = buildGooglePlacesDiscoveryQuery({
@@ -115,7 +221,7 @@ async function main(): Promise<void> {
   })
   assert.match(gp3, /HVAC|hvac/i)
   assert.match(gp3, /Nashville TN/)
-  assert.match(gp3, /20-100|PM contracts/)
+  assert.doesNotMatch(gp3, /20-100 employees/)
 
   const mapped = mapGooglePlaceToCandidate(
     {
@@ -153,6 +259,8 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(badgeSource, /GROWTH_GOOGLE_PLACES_PROVIDER_QA_MARKER/)
+  assert.match(badgeSource, /GooglePlacesQueryDiagnostics/)
+  assert.match(badgeSource, /GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER/)
   assert.match(badgeSource, /Google Places/)
 
   const q1 = buildRealWorldDiscoveryQuery({

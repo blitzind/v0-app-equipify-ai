@@ -63,8 +63,11 @@ function mergeProviderDiagnostics(
   return {
     provider_executed: result.diagnostics?.provider_executed ?? executed,
     provider_latency_ms: result.diagnostics?.provider_latency_ms ?? latencyMs,
-    provider_result_count: result.candidates.length,
+    provider_result_count: result.diagnostics?.provider_result_count ?? result.candidates.length,
     provider_fallback_reason: fallbackReason,
+    provider_query_generated: result.diagnostics?.provider_query_generated,
+    provider_query_result_count: result.diagnostics?.provider_query_result_count,
+    provider_merged_result_count: result.diagnostics?.provider_merged_result_count,
   }
 }
 
@@ -78,6 +81,9 @@ function toExecutionDiagnostic(
     provider_latency_ms: result.diagnostics?.provider_latency_ms ?? 0,
     provider_result_count: result.diagnostics?.provider_result_count ?? result.candidates.length,
     provider_fallback_reason: result.diagnostics?.provider_fallback_reason ?? null,
+    provider_query_generated: result.diagnostics?.provider_query_generated,
+    provider_query_result_count: result.diagnostics?.provider_query_result_count,
+    provider_merged_result_count: result.diagnostics?.provider_merged_result_count,
   }
 }
 
