@@ -1,0 +1,103 @@
+/** Meeting prep bundle types (Sprint 3.1). Client-safe. */
+
+import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
+import type { GrowthMeeting } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
+
+export const GROWTH_MEETING_PREP_QA_MARKER = "growth-meeting-prep-v1" as const
+
+export const MEETING_PREP_RISK_PRIORITIES = ["Critical", "High", "Medium", "Low"] as const
+export type MeetingPrepRiskPriority = (typeof MEETING_PREP_RISK_PRIORITIES)[number]
+
+export type MeetingPrepCompanySnapshot = {
+  companyName: string
+  website: string | null
+  industry: string | null
+  location: string | null
+  employees: string | null
+  revenue: string | null
+}
+
+export type MeetingPrepLeadScore = {
+  score: number | null
+  label: string | null
+  explanation: string | null
+  source: "lead_engine" | "lead_score" | null
+}
+
+export type MeetingPrepBuyingStage = {
+  stage: string | null
+  confidence: number | null
+  reason: string | null
+}
+
+export type MeetingPrepDecisionMaker = {
+  id: string
+  name: string
+  title: string | null
+  confidence: number | null
+  status: string
+  isPrimary: boolean
+}
+
+export type MeetingPrepTerritoryContext = {
+  label: string | null
+  reasons: string[]
+}
+
+export type MeetingPrepOpenRisk = {
+  id: string
+  label: string
+  priority: MeetingPrepRiskPriority
+  reason: string
+  source: string
+}
+
+export type MeetingPrepObjective = {
+  objective: string
+  reasons: string[]
+  evidence: string[]
+  priority: number
+}
+
+export type MeetingPrepReadiness = {
+  score: number
+  label: string
+  summary: string
+  missing: string[]
+}
+
+export type MeetingPrepResearchSummary = {
+  summary: string | null
+  pitchAngle: string | null
+  confidence: number | null
+  painSignals: string[]
+  recommendedNextAction: string | null
+}
+
+export type GrowthMeetingPrepBundle = {
+  qa_marker: typeof GROWTH_MEETING_PREP_QA_MARKER
+  meeting: Pick<
+    GrowthMeeting,
+    | "id"
+    | "leadId"
+    | "title"
+    | "status"
+    | "startAt"
+    | "endAt"
+    | "source"
+    | "calendarEventId"
+    | "attendeeEmails"
+    | "meetingUrl"
+  >
+  companySnapshot: MeetingPrepCompanySnapshot
+  leadScore: MeetingPrepLeadScore
+  buyingStage: MeetingPrepBuyingStage
+  decisionMakers: MeetingPrepDecisionMaker[]
+  contactIntelligence: GrowthProspectSearchContactIntelligence | null
+  territoryContext: MeetingPrepTerritoryContext
+  signals: string[]
+  openRisks: MeetingPrepOpenRisk[]
+  researchSummary: MeetingPrepResearchSummary
+  recommendedObjectives: MeetingPrepObjective[]
+  readiness: MeetingPrepReadiness
+}

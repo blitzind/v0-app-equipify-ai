@@ -26,6 +26,7 @@ import {
 import type { GrowthLead } from "@/lib/growth/types"
 import { GrowthCallIntelligenceScorecardCard } from "@/components/growth/growth-call-intelligence-scorecard-card"
 import { GrowthMeetingOutcomeIntelligenceInline } from "@/components/growth/growth-meeting-outcome-intelligence-inline"
+import { GrowthMeetingPrepPanel } from "@/components/growth/growth-meeting-prep-panel"
 import type { MeetingOutcomeIntelligenceScorePublicView } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-intelligence-types"
 
 type GrowthLeadMeetingIntelligenceProps = {
@@ -359,6 +360,7 @@ export function GrowthLeadMeetingIntelligence({
 
         {selected ? (
           <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
+            <GrowthMeetingPrepPanel meetingId={selected.id} meetingStatus={selected.status} />
             <p className="text-sm font-medium">Update {selected.title}</p>
             <div className="grid gap-2 text-xs sm:grid-cols-2">
               <div>
