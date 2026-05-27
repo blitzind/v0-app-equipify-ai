@@ -12,6 +12,7 @@ import { selectDeliveryRoute } from "@/lib/growth/providers/provider-router"
 import { getSenderAccount } from "@/lib/growth/sender/sender-repository"
 import { applyOutboundEmailTracking } from "@/lib/growth/tracking/tracking-links"
 import { assertPreSendSuppressionAllowed } from "@/lib/growth/compliance/suppression-engine"
+import { enforceGovernanceIfReady } from "@/lib/growth/governance/governance-enforcement"
 import { checkTransportRateLimit } from "@/lib/growth/providers/transport/transport-rate-limit"
 import { resolveTransportFallbackRoute, simulateTransportDelivery } from "@/lib/growth/providers/transport/transport-fallback"
 import { recordTransportAuditEvent } from "@/lib/growth/providers/transport/transport-events"
@@ -340,6 +341,18 @@ export async function executeTransportSend(
   input: TransportSendInput,
 ): Promise<TransportSendResult> {
   assertHumanApproval(input)
+
+  await enforceGovernanceIfReady(admin, {
+    action: input.is_test ? "provider_test_send" : "provider_send",
+    actorUserId: input.actorUserId,
+    actorEmail: input.actorEmail,
+    sourceRoute: input.is_test ? "provider.test_send" : "provider.send",
+    entityType: "delivery_attempt",
+    recipientEmail: input.to,
+    humanApprovalConfirmed: input.human_approval_confirmed,
+    recordAudit: !input.metadata?.governance_audit_recorded,
+    approvalReason: input.is_test ? "Human confirmed provider test send." : "Human confirmed provider send.",
+  })
 
   let senderAccountId = input.sender_account_id
   let rotationMeta: TransportSendResult["sender_rotation"]

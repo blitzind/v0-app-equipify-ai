@@ -32,6 +32,8 @@ export async function POST(request: Request, context: RouteContext) {
     const snippet = await approveContentSnippet(access.admin, {
       snippetId: id,
       actorUserId: access.userId,
+      actorEmail: access.userEmail,
+      humanApprovalConfirmed: true,
     })
     return NextResponse.json({ ok: true, snippet, privacy_note: GROWTH_CONTENT_PRIVACY_NOTE })
   } catch (e) {

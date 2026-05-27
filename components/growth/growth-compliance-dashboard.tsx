@@ -90,10 +90,15 @@ export function GrowthComplianceDashboardPanel() {
           <StatTile label="Suppression count" value={dashboard.suppressionCount} />
           <StatTile label="Sender reputation" value={dashboard.senderReputation.score} />
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
-          {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-          Refresh
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/settings/governance">Governance Exports</Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <GrowthEngineCard title="Sender health" icon={<ShieldAlert className="size-4" />}>

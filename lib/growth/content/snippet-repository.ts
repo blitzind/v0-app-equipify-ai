@@ -13,6 +13,7 @@ import type {
   GrowthContentVariable,
 } from "@/lib/growth/content/content-types"
 import { buildAllowedVariableKeySet } from "@/lib/growth/content/variable-registry"
+import { enforceGovernanceIfReady } from "@/lib/growth/governance/governance-enforcement"
 
 function snippetsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("content_snippets")
@@ -245,7 +246,7 @@ export async function updateContentSnippet(
 
 export async function approveContentSnippet(
   admin: SupabaseClient,
-  input: { snippetId: string; actorUserId: string },
+  input: { snippetId: string; actorUserId: string; actorEmail?: string; humanApprovalConfirmed?: boolean },
 ): Promise<GrowthContentSnippet> {
   const snippet = await getContentSnippet(admin, input.snippetId)
   if (!snippet?.currentVersion) throw new Error("snippet_not_found")
@@ -256,6 +257,18 @@ export async function approveContentSnippet(
     allowedKeys: buildAllowedVariableKeySet(variables),
   })
   if (!validation.ok) throw new Error(validation.reason)
+
+  await enforceGovernanceIfReady(admin, {
+    action: "content_snippet_approve",
+    actorUserId: input.actorUserId,
+    actorEmail: input.actorEmail ?? input.actorUserId,
+    sourceRoute: "content.snippet.approve",
+    entityType: "content_snippet",
+    entityId: input.snippetId,
+    requiresAiReview: snippet.status === "pending_review",
+    humanApprovalConfirmed: input.humanApprovalConfirmed ?? true,
+    approvalReason: "Human approved content snippet.",
+  })
 
   const now = new Date().toISOString()
   await snippetVersionsTable(admin)

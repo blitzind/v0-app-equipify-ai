@@ -19,6 +19,7 @@ export async function POST(_request: Request, context: RouteContext) {
     const result = await approveSequenceExecutionJob(access.admin, {
       jobId,
       approvedBy: access.userId,
+      actorEmail: access.userEmail,
     })
     if (!result.ok) {
       return NextResponse.json({ error: "approve_failed", message: result.message ?? "Approve failed." }, { status: 400 })

@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { assertPreSendSuppressionAllowed } from "@/lib/growth/compliance/suppression-engine"
+import { enforceGovernanceIfReady } from "@/lib/growth/governance/governance-enforcement"
 import { advanceGrowthSequenceEnrollmentAfterStep } from "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
 import { skipGrowthSequenceEnrollmentStep } from "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
 import { executeTransportSend } from "@/lib/growth/providers/transport/transport-orchestrator"
@@ -31,7 +32,7 @@ export type SequenceExecutionRunInput = {
 
 export async function approveSequenceExecutionJob(
   admin: SupabaseClient,
-  input: { jobId: string; approvedBy: string },
+  input: { jobId: string; approvedBy: string; actorEmail?: string },
 ): Promise<GrowthSequenceExecutionRunResult> {
   const job = await getSequenceExecutionJob(admin, input.jobId)
   if (!job) return { ok: false, jobId: input.jobId, status: "failed", message: "job_not_found" }
@@ -41,6 +42,17 @@ export async function approveSequenceExecutionJob(
   if (!["draft", "pending_approval", "blocked", "failed"].includes(job.status)) {
     return { ok: false, jobId: job.id, status: job.status, message: "invalid_status_for_approval" }
   }
+
+  await enforceGovernanceIfReady(admin, {
+    action: "sequence_job_approve",
+    actorUserId: input.approvedBy,
+    actorEmail: input.actorEmail ?? input.approvedBy,
+    sourceRoute: "sequence_execution.approve",
+    entityType: "sequence_execution_job",
+    entityId: job.id,
+    approvalReason: "Human approved sequence execution job.",
+    humanApprovalConfirmed: true,
+  })
 
   const now = new Date().toISOString()
   const updated = await updateSequenceExecutionJob(admin, job.id, {
@@ -195,6 +207,24 @@ export async function runSequenceExecutionJob(
     return { ok: false, jobId: locked.id, status: "blocked", message: payload.error, blocked: true }
   }
 
+  try {
+    await enforceGovernanceIfReady(admin, {
+      action: "sequence_job_run",
+      actorUserId: input.actingUserId,
+      actorEmail: input.actingUserEmail,
+      sourceRoute: "sequence_execution.run",
+      entityType: "sequence_execution_job",
+      entityId: locked.id,
+      recipientEmail: payload.to,
+      humanApprovalConfirmed: input.humanApprovalConfirmed ?? true,
+      approvalReason: "Human confirmed sequence execution run.",
+    })
+  } catch (e) {
+    const code = e instanceof Error ? e.message : "governance_policy_blocked"
+    await finalizeBlockedJob(admin, locked, code)
+    return { ok: false, jobId: locked.id, status: "blocked", message: code, blocked: true }
+  }
+
   const suppression = await assertPreSendSuppressionAllowed(admin, {
     email: payload.to,
     leadId: locked.leadId,
@@ -241,6 +271,7 @@ export async function runSequenceExecutionJob(
             content_template_id: payload.contentTemplateId ?? null,
           }
         : {}),
+      governance_audit_recorded: true,
     },
   })
 

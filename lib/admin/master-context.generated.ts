@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 821,
-  sqlMigrations: 312,
+  apiRouteHandlers: 829,
+  sqlMigrations: 313,
   dashboardPages: 65,
-  componentsTsx: 571,
-  libTsFiles: 2060,
+  componentsTsx: 572,
+  libTsFiles: 2071,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **821** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **312** |
+| API route handlers (\`app/api/**/route.ts\`) | **829** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **313** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **571** |
-| \`lib/**/*.ts\` | **2060** |
+| \`components/**/*.tsx\` | **572** |
+| \`lib/**/*.ts\` | **2071** |
 
 ### Vercel crons
 
@@ -584,6 +584,14 @@ platform/growth/experiments/[id]/route.ts
 platform/growth/experiments/[id]/start/route.ts
 platform/growth/experiments/dashboard/route.ts
 platform/growth/experiments/route.ts
+platform/growth/governance/audit/route.ts
+platform/growth/governance/dashboard/route.ts
+platform/growth/governance/exports/route.ts
+platform/growth/governance/policies/[id]/activate/route.ts
+platform/growth/governance/policies/[id]/pause/route.ts
+platform/growth/governance/policies/[id]/route.ts
+platform/growth/governance/policies/route.ts
+platform/growth/governance/retention/route.ts
 platform/growth/human-execution/approvals/[approvalId]/route.ts
 platform/growth/human-execution/approvals/route.ts
 platform/growth/human-execution/dashboard/route.ts

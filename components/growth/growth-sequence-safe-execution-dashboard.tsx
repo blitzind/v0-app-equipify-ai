@@ -163,6 +163,9 @@ export function GrowthSequenceSafeExecutionDashboard() {
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <GrowthBadge label={GROWTH_SEQUENCE_SAFE_EXECUTION_QA_MARKER} tone="neutral" />
           <Button variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/settings/governance">Governance</Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
             <Link href="/admin/growth/copilot/content-library">Content Library</Link>
           </Button>
           <Button variant="outline" size="sm" asChild>

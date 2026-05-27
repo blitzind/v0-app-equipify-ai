@@ -20,6 +20,7 @@ import type {
 } from "@/lib/growth/content/content-types"
 import { buildAllowedVariableKeySet } from "@/lib/growth/content/variable-registry"
 import { listContentVariables } from "@/lib/growth/content/snippet-repository"
+import { enforceGovernanceIfReady } from "@/lib/growth/governance/governance-enforcement"
 
 function templatesTable(admin: SupabaseClient) {
   return admin.schema("growth").from("content_templates")
@@ -370,13 +371,25 @@ export async function submitContentTemplateForReview(
 
 export async function approveContentTemplate(
   admin: SupabaseClient,
-  input: { templateId: string; actorUserId: string },
+  input: { templateId: string; actorUserId: string; actorEmail?: string; humanApprovalConfirmed?: boolean },
 ): Promise<GrowthContentTemplate> {
   const template = await getContentTemplate(admin, input.templateId)
   if (!template) throw new Error("template_not_found")
   if (!canApproveTemplate(template.status)) throw new Error("invalid_status")
   const version = template.currentVersion
   if (!version) throw new Error("version_not_found")
+
+  await enforceGovernanceIfReady(admin, {
+    action: "content_template_approve",
+    actorUserId: input.actorUserId,
+    actorEmail: input.actorEmail ?? input.actorUserId,
+    sourceRoute: "content.template.approve",
+    entityType: "content_template",
+    entityId: input.templateId,
+    requiresAiReview: version.status === "pending_review",
+    humanApprovalConfirmed: input.humanApprovalConfirmed ?? true,
+    approvalReason: "Human approved content template.",
+  })
 
   const now = new Date().toISOString()
   await versionsTable(admin)

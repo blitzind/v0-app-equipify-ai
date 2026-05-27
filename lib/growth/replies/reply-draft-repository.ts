@@ -6,6 +6,7 @@ import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
 import { growthAiCopilotModelSchema, mapGrowthAiCopilotModelOutput } from "@/lib/growth/ai-copilot-schema"
 import { runGrowthAiCopilotGeneration } from "@/lib/growth/run-ai-copilot-generation"
 import { assertPreSendSuppressionAllowed } from "@/lib/growth/compliance/suppression-engine"
+import { enforceGovernanceIfReady } from "@/lib/growth/governance/governance-enforcement"
 import { addInboxMessage } from "@/lib/growth/inbox/thread-repository"
 import { executeTransportSend } from "@/lib/growth/providers/transport/transport-orchestrator"
 import {
@@ -421,6 +422,19 @@ export async function sendApprovedReplyDraft(
   const payload = await buildApprovedReplySendPayload(admin, { draft: existing })
   if ("error" in payload) throw new Error(payload.error)
 
+  await enforceGovernanceIfReady(admin, {
+    action: "reply_draft_send",
+    actorUserId: input.actingUserId,
+    actorEmail: input.actingUserEmail,
+    sourceRoute: "reply_draft.send",
+    entityType: "inbox_reply_draft",
+    entityId: existing.id,
+    recipientEmail: payload.to,
+    requiresAiReview: existing.requiresHumanReview,
+    humanApprovalConfirmed: input.humanApprovalConfirmed ?? true,
+    approvalReason: "Human confirmed reply draft send.",
+  })
+
   const suppression = await assertPreSendSuppressionAllowed(admin, {
     email: payload.to,
     leadId: existing.leadId,
@@ -440,6 +454,9 @@ export async function sendApprovedReplyDraft(
     human_approval_confirmed: true,
     actorUserId: input.actingUserId,
     actorEmail: input.actingUserEmail,
+    metadata: {
+      governance_audit_recorded: true,
+    },
   })
 
   if (!transport.ok || !transport.attempt) throw new Error(transport.error ?? "transport_failed")

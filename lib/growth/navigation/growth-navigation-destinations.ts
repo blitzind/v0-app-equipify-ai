@@ -255,6 +255,21 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     href: "/admin/growth/settings",
     keywords: ["communication", "config"],
   },
+  {
+    id: "governance",
+    label: "Governance",
+    href: "/admin/growth/settings/governance",
+    keywords: [
+      "governance",
+      "enterprise governance",
+      "policy",
+      "audit",
+      "retention",
+      "export",
+      "compliance export",
+      "approval audit",
+    ],
+  },
 ]
 
 /** @deprecated Sidebar quick actions removed — use GROWTH_COMMAND_REGISTRY for palette foundation. */
@@ -774,6 +789,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         href: "/admin/growth/settings",
         label: "Growth Settings",
         match: prefixMatch("/admin/growth/settings"),
+      },
+      {
+        id: "governance",
+        href: "/admin/growth/settings/governance",
+        label: "Governance",
+        match: prefixMatch("/admin/growth/settings/governance"),
       },
       {
         id: "communication-settings",

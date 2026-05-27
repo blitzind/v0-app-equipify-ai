@@ -32,6 +32,8 @@ export async function POST(request: Request, context: RouteContext) {
     const template = await approveContentTemplate(access.admin, {
       templateId: id,
       actorUserId: access.userId,
+      actorEmail: access.userEmail,
+      humanApprovalConfirmed: true,
     })
     return NextResponse.json({
       ok: true,
