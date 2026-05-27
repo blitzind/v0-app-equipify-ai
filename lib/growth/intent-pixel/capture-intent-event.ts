@@ -1,5 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { normalizeConsentStatus, resolveTrackingMode } from "@/lib/growth/intent-pixel/consent-gate"
+import {
+  allowsMarketingAttribution,
+  allowsPersonalizationTracking,
+  normalizeConsentStatus,
+  resolveConsentCategories,
+  resolveTrackingMode,
+} from "@/lib/growth/intent-pixel/consent-gate"
+import { normalizeConsentCategories } from "@/lib/growth/intent-pixel/intent-consent-categories"
 import {
   buildCollectRejectionDiagnostics,
   type GrowthIntentPixelCollectRejectionDiagnostics,
@@ -52,6 +59,14 @@ export function normalizeCollectPayload(body: Record<string, unknown>): GrowthIn
     visitor_key: asString(body.visitor_key) || undefined,
     session_key: asString(body.session_key) || undefined,
     consent_status: normalizeConsentStatus(body.consent_status),
+    consent_categories:
+      body.consent_categories && typeof body.consent_categories === "object"
+        ? normalizeConsentCategories(body.consent_categories)
+        : undefined,
+    personalization_segment:
+      body.personalization_segment && typeof body.personalization_segment === "object"
+        ? (body.personalization_segment as GrowthIntentPixelCollectPayload["personalization_segment"])
+        : undefined,
     page_url: asString(body.page_url) || undefined,
     page_path: asString(body.page_path) || undefined,
     page_title: asString(body.page_title) || undefined,
@@ -172,11 +187,16 @@ export async function captureIntentPixelEvent(
   }
 
   const consentStatus = normalizeConsentStatus(payload.consent_status)
+  const consentCategories = resolveConsentCategories({
+    consent_status: consentStatus,
+    consent_categories: payload.consent_categories,
+  })
   const gate = resolveTrackingMode(
     site,
     consentStatus,
     payload.event_type,
     payload.conversion_type,
+    consentCategories,
   )
 
   if (!gate.accepted) {
@@ -188,13 +208,19 @@ export async function captureIntentPixelEvent(
     })
   }
 
-  const session = await upsertVisitorSession(admin, site, payload, consentStatus)
+  const session = await upsertVisitorSession(admin, site, payload, consentStatus, {
+    consentCategories,
+    allowMarketingAttribution: allowsMarketingAttribution(consentStatus, consentCategories),
+    allowPersonalizationTracking: allowsPersonalizationTracking(consentStatus, consentCategories),
+  })
 
   let piiAttached = false
   let piiReason = ""
 
   if (payload.event_type === "pageview") {
-    await recordPageview(admin, site, session, payload)
+    await recordPageview(admin, site, session, payload, {
+      allowMarketingAttribution: allowsMarketingAttribution(consentStatus, consentCategories),
+    })
   } else if (payload.event_type === "page_exit" || payload.event_type === "heartbeat") {
     const durationMs = payload.duration_ms ?? 0
     if (durationMs > 0) {

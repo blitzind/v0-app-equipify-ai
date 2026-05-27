@@ -9,6 +9,7 @@ import {
   allowsSearchIntentSignals,
   resolveTrackingMode,
 } from "@/lib/growth/intent-pixel/consent-gate"
+import { normalizeConsentCategories } from "@/lib/growth/intent-pixel/intent-consent-categories"
 import { fetchIntentPixelAdminDiagnostics } from "@/lib/growth/intent-pixel/intent-pixel-admin-repository"
 import {
   GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER,
@@ -84,13 +85,25 @@ function buyingStageLabel(stage: string | null): string | null {
   return stage.replace(/_/g, " ")
 }
 
+function consentCategoriesFromSessionRow(
+  row: Record<string, unknown>,
+): ReturnType<typeof normalizeConsentCategories> | null {
+  const browser = row.browser_metadata
+  if (!browser || typeof browser !== "object") return null
+  const categories = (browser as Record<string, unknown>).consent_categories
+  if (!categories) return null
+  return normalizeConsentCategories(categories)
+}
+
 function consentAllowsBehavioralIntelligence(
   site: Awaited<ReturnType<typeof fetchIntentPixelSite>>,
   consentStatus: GrowthIntentPixelConsentStatus,
+  row?: Record<string, unknown>,
 ): boolean {
   if (!site) return false
-  const mode = resolveTrackingMode(site, consentStatus, "pageview").mode
-  return allowsBehavioralTracking(consentStatus, mode)
+  const categories = row ? consentCategoriesFromSessionRow(row) : null
+  const mode = resolveTrackingMode(site, consentStatus, "pageview", null, categories ?? undefined).mode
+  return allowsBehavioralTracking(consentStatus, mode, categories)
 }
 
 export async function buildInstallVerification(
@@ -456,7 +469,8 @@ export async function fetchLiveVisitorMonitorSnapshot(
     const buying = overlays.buyingBySession.get(id) ?? null
     const matchConf = overlays.matchConfidenceBySession.get(id) ?? null
     const consent_status = asString(row.consent_status) as GrowthLiveVisitorRow["consent_status"]
-    const behavioralAllowed = consentAllowsBehavioralIntelligence(site, consent_status)
+    const sessionCategories = consentCategoriesFromSessionRow(row)
+    const behavioralAllowed = consentAllowsBehavioralIntelligence(site, consent_status, row)
     const pricingViewed = behavioralAllowed && path.toLowerCase().includes("pricing")
     const high_intent =
       behavioralAllowed &&
@@ -484,11 +498,11 @@ export async function fetchLiveVisitorMonitorSnapshot(
       utm_source: utm.utm_source,
       utm_medium: utm.utm_medium,
       utm_campaign: utm.utm_campaign,
-      search_intent_detected: allowsSearchIntentSignals(consent_status)
+      search_intent_detected: allowsSearchIntentSignals(consent_status, sessionCategories)
         ? overlays.searchIntentBySession.get(id) ?? null
         : null,
       company_match_confidence: matchConf,
-      buying_stage_candidate: allowsBuyingStageInference(consent_status)
+      buying_stage_candidate: allowsBuyingStageInference(consent_status, sessionCategories)
         ? buyingStageLabel(buying)
         : null,
       consent_status,
@@ -521,9 +535,10 @@ export async function fetchLiveVisitorMonitorSnapshot(
     const badges = pathSignals(path)
     const buying = overlays.buyingBySession.get(sessionId) ?? null
     const consent_status = asString(session.consent_status) as GrowthIntentPixelConsentStatus
+    const sessionCategories = consentCategoriesFromSessionRow(session)
     const timeline_badges = [...badges]
     if (overlays.returningVisitors.has(visitor_key)) timeline_badges.push("Returning session")
-    if (allowsBuyingStageInference(consent_status)) {
+    if (allowsBuyingStageInference(consent_status, sessionCategories)) {
       if (buying === "vendor_evaluation" || buying === "comparison") {
         timeline_badges.push("Vendor comparison")
       }
@@ -548,10 +563,10 @@ export async function fetchLiveVisitorMonitorSnapshot(
       page_title: asString(r.page_title) || path,
       kind: "pageview",
       visitor_type: is_identified ? "identified" : "anonymous",
-      search_intent_label: allowsSearchIntentSignals(consent_status)
+      search_intent_label: allowsSearchIntentSignals(consent_status, sessionCategories)
         ? overlays.searchIntentBySession.get(sessionId) ?? null
         : null,
-      buying_stage_candidate: allowsBuyingStageInference(consent_status)
+      buying_stage_candidate: allowsBuyingStageInference(consent_status, sessionCategories)
         ? buyingStageLabel(buying)
         : null,
       timeline_badges: [...new Set(timeline_badges)],
@@ -570,7 +585,10 @@ export async function fetchLiveVisitorMonitorSnapshot(
     let lead_engine_eligible = false
     let bridgeSignals: string[] = []
 
-    if (allowsIntentScoring(visitor.consent_status)) {
+    const visitorRow = sessionById.get(visitor.session_id)
+    const visitorCategories = visitorRow ? consentCategoriesFromSessionRow(visitorRow) : null
+
+    if (allowsIntentScoring(visitor.consent_status, visitorCategories)) {
       try {
         const bridge = await bridgeIntentSessionFromStore(admin, siteKey, visitor.session_id)
         const candidate = bridge.lead_candidate
@@ -588,7 +606,8 @@ export async function fetchLiveVisitorMonitorSnapshot(
     const pricing_viewed =
       allowsBehavioralTracking(
         visitor.consent_status,
-        resolveTrackingMode(site, visitor.consent_status, "pageview").mode,
+        resolveTrackingMode(site, visitor.consent_status, "pageview", null, visitorCategories ?? undefined).mode,
+        visitorCategories,
       ) && visitor.current_page.toLowerCase().includes("pricing")
 
     high_intent_queue.push({

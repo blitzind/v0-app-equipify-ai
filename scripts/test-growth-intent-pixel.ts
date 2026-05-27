@@ -305,7 +305,7 @@ assert.match(script, /growth-intent-pixel-v1/)
 assert.match(script, /EquipifyIntentPixel/)
 assert.match(script, /trackConversion/)
 assert.match(script, /equipify_intent_consent_ts/)
-assert.match(script, /allowsBehavioral/)
+assert.match(script, /allowsAnalytics/)
 assert.doesNotMatch(script, /email.*inferred/i)
 
 const monitorUi = fs.readFileSync(

@@ -68,6 +68,20 @@ export type GrowthIntentPixelBrowserMetadata = {
   referrer: string
   landing_url: string
   page_url: string
+  consent_categories?: {
+    analytics: boolean
+    personalization: boolean
+    marketing: boolean
+  }
+  personalization_segment?: {
+    industry_affinity: string | null
+    content_affinity: string | null
+    returning_visitor: boolean
+    visit_count: number
+    last_industry_slug: string | null
+    recommended_cta: string | null
+    recommended_case_study_slug: string | null
+  }
 }
 
 export type GrowthIntentPixelSubmittedIdentity = {
@@ -84,6 +98,12 @@ export type GrowthIntentPixelCollectPayload = {
   visitor_key?: string
   session_key?: string
   consent_status?: GrowthIntentPixelConsentStatus
+  consent_categories?: Partial<{
+    analytics: boolean
+    personalization: boolean
+    marketing: boolean
+  }>
+  personalization_segment?: GrowthIntentPixelBrowserMetadata["personalization_segment"]
   page_url?: string
   page_path?: string
   page_title?: string

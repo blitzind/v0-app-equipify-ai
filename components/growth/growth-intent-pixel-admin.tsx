@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import {
+  GROWTH_INTENT_CONSENT_CATEGORIES_QA_MARKER,
   GROWTH_INTENT_CONSENT_MANAGER_QA_MARKER,
   GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER,
   GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION,
@@ -505,6 +506,43 @@ export function GrowthIntentPixelAdmin() {
           {diagnostics?.consent_breakdown ? (
             <ConsentBreakdownChart breakdown={diagnostics.consent_breakdown} />
           ) : null}
+          <div
+            className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-4"
+            data-qa-marker={GROWTH_INTENT_CONSENT_CATEGORIES_QA_MARKER}
+          >
+            <StatCard
+              label="Personalization coverage %"
+              value={
+                diagnostics?.personalization_coverage_pct != null
+                  ? `${diagnostics.personalization_coverage_pct}%`
+                  : "—"
+              }
+            />
+            <StatCard
+              label="Marketing attribution coverage %"
+              value={
+                diagnostics?.marketing_attribution_coverage_pct != null
+                  ? `${diagnostics.marketing_attribution_coverage_pct}%`
+                  : "—"
+              }
+            />
+            <StatCard
+              label="Segmented visitors %"
+              value={
+                diagnostics?.segmented_visitors_pct != null
+                  ? `${diagnostics.segmented_visitors_pct}%`
+                  : "—"
+              }
+            />
+            <StatCard
+              label="Campaign-attributed sessions %"
+              value={
+                diagnostics?.campaign_attributed_sessions_pct != null
+                  ? `${diagnostics.campaign_attributed_sessions_pct}%`
+                  : "—"
+              }
+            />
+          </div>
         </div>
         {schemaReadyResolved ? (
           <div className="flex flex-wrap items-center gap-2 border-t border-border px-5 py-3">

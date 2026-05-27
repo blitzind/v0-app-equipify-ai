@@ -121,17 +121,33 @@ export async function upsertVisitorSession(
   site: GrowthIntentPixelSite,
   payload: GrowthIntentPixelCollectPayload,
   consentStatus: GrowthIntentPixelConsentStatus,
+  options: {
+    consentCategories?: import("@/lib/growth/intent-pixel/intent-consent-categories").IntentConsentCategories
+    allowMarketingAttribution?: boolean
+    allowPersonalizationTracking?: boolean
+  } = {},
 ): Promise<GrowthIntentPixelVisitorSession> {
   const visitorKey = asString(payload.visitor_key) || generateVisitorKey()
   const sessionKey = asString(payload.session_key) || generateSessionKey()
   const pageUrl = asString(payload.page_url)
-  const utm = mergeUtmAttribution(payload.utm, pageUrl)
+  const allowMarketingAttribution = options.allowMarketingAttribution === true
+  const utm = allowMarketingAttribution
+    ? mergeUtmAttribution(payload.utm, pageUrl)
+    : mergeUtmAttribution({})
   const referrer = asString(payload.referrer)
   const device = normalizeDeviceMetadata(payload.device)
-  const browser = normalizeBrowserMetadata(payload.browser, {
-    page_url: pageUrl,
-    referrer,
-  })
+  const browser = normalizeBrowserMetadata(
+    {
+      ...payload.browser,
+      consent_categories: options.consentCategories,
+      personalization_segment:
+        options.allowPersonalizationTracking === true ? payload.personalization_segment : undefined,
+    },
+    {
+      page_url: pageUrl,
+      referrer,
+    },
+  )
 
   const { data: existing } = await admin
     .schema("growth")
@@ -203,9 +219,13 @@ export async function recordPageview(
   site: GrowthIntentPixelSite,
   session: GrowthIntentPixelVisitorSession,
   payload: GrowthIntentPixelCollectPayload,
+  options: { allowMarketingAttribution?: boolean } = {},
 ): Promise<GrowthIntentPixelPageviewEvent> {
   const pageUrl = asString(payload.page_url) || session.last_page_url || ""
-  const utm = mergeUtmAttribution(payload.utm, pageUrl)
+  const utm =
+    options.allowMarketingAttribution === true
+      ? mergeUtmAttribution(payload.utm, pageUrl)
+      : mergeUtmAttribution({})
   const durationMs =
     typeof payload.duration_ms === "number" && payload.duration_ms >= 0
       ? Math.round(payload.duration_ms)

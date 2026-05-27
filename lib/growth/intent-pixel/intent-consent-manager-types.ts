@@ -3,6 +3,8 @@
 export const GROWTH_INTENT_CONSENT_MANAGER_QA_MARKER =
   "growth-intent-consent-manager-v1" as const
 
+export { GROWTH_INTENT_CONSENT_CATEGORIES_QA_MARKER } from "@/lib/growth/intent-pixel/intent-consent-categories"
+
 export const EQUIPIFY_INTENT_CONSENT_STORAGE_KEY = "equipify_intent_consent" as const
 
 export const EQUIPIFY_INTENT_CONSENT_TIMESTAMP_KEY = "equipify_intent_consent_ts" as const
@@ -27,3 +29,11 @@ export type ExplicitCaptureConversionType = (typeof EXPLICIT_CAPTURE_CONVERSION_
 
 /** When denied + unknown exceed this share of resolved consent, tracking visibility is impacted. */
 export const TRACKING_VISIBILITY_IMPACTED_THRESHOLD = 0.45
+
+export {
+  EQUIPIFY_INTENT_CONSENT_CATEGORIES_KEY,
+  ALL_CONSENT_CATEGORIES,
+  NO_CONSENT_CATEGORIES,
+  type IntentConsentCategories,
+  type AnonymousPersonalizationSegment,
+} from "@/lib/growth/intent-pixel/intent-consent-categories"

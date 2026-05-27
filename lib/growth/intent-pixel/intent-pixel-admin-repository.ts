@@ -26,8 +26,9 @@ import type {
   GrowthIntentPixelSite,
 } from "@/lib/growth/intent-pixel/intent-pixel-types"
 import { GROWTH_INTENT_PIXEL_PRIVACY_NOTE } from "@/lib/growth/intent-pixel/pii-policy"
-import { mergeUtmAttribution } from "@/lib/growth/intent-pixel/utm-attribution"
+import { mergeUtmAttribution, hasUtmSignal } from "@/lib/growth/intent-pixel/utm-attribution"
 import { TRACKING_VISIBILITY_IMPACTED_THRESHOLD } from "@/lib/growth/intent-pixel/intent-consent-manager-types"
+import { normalizeConsentCategories } from "@/lib/growth/intent-pixel/intent-consent-categories"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -108,6 +109,58 @@ function buildConsentDiagnostics(input: {
     tracking_visibility_impacted:
       consent_required && consentTotal >= 3 && blockedRatio > TRACKING_VISIBILITY_IMPACTED_THRESHOLD,
   }
+}
+
+function buildCategoryCoverageDiagnostics(input: {
+  session_count_24h: number
+  personalization_sessions_24h: number
+  marketing_sessions_24h: number
+  segmented_sessions_24h: number
+  campaign_attributed_sessions_24h: number
+}): Pick<
+  GrowthIntentPixelAdminDiagnostics,
+  | "personalization_coverage_pct"
+  | "marketing_attribution_coverage_pct"
+  | "segmented_visitors_pct"
+  | "campaign_attributed_sessions_pct"
+> {
+  const {
+    session_count_24h,
+    personalization_sessions_24h,
+    marketing_sessions_24h,
+    segmented_sessions_24h,
+    campaign_attributed_sessions_24h,
+  } = input
+
+  const pct = (count: number) =>
+    session_count_24h > 0 ? Math.round((count / session_count_24h) * 100) : null
+
+  return {
+    personalization_coverage_pct: pct(personalization_sessions_24h),
+    marketing_attribution_coverage_pct: pct(marketing_sessions_24h),
+    segmented_visitors_pct: pct(segmented_sessions_24h),
+    campaign_attributed_sessions_pct: pct(campaign_attributed_sessions_24h),
+  }
+}
+
+function readSessionConsentCategories(row: Record<string, unknown>): {
+  analytics: boolean
+  personalization: boolean
+  marketing: boolean
+} {
+  const browser = row.browser_metadata
+  if (!browser || typeof browser !== "object") {
+    return normalizeConsentCategories(null)
+  }
+  const categories = (browser as Record<string, unknown>).consent_categories
+  return normalizeConsentCategories(categories)
+}
+
+function hasPersonalizationSegment(row: Record<string, unknown>): boolean {
+  const browser = row.browser_metadata
+  if (!browser || typeof browser !== "object") return false
+  const segment = (browser as Record<string, unknown>).personalization_segment
+  return segment != null && typeof segment === "object"
 }
 
 function sanitizeEventMetadata(meta: Record<string, unknown>): Record<string, unknown> {
@@ -246,6 +299,13 @@ export async function fetchIntentPixelAdminDiagnostics(
       high_intent_sessions_blocked_by_consent_24h: 0,
       consent_required: true,
     })
+    const emptyCategoryCoverage = buildCategoryCoverageDiagnostics({
+      session_count_24h: 0,
+      personalization_sessions_24h: 0,
+      marketing_sessions_24h: 0,
+      segmented_sessions_24h: 0,
+      campaign_attributed_sessions_24h: 0,
+    })
     return {
       qa_marker: GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER,
       schema_ready: false,
@@ -259,6 +319,7 @@ export async function fetchIntentPixelAdminDiagnostics(
       consent_unknown_sessions_24h: 0,
       consent_granted_sessions_24h: 0,
       ...emptyConsent,
+      ...emptyCategoryCoverage,
       install_status: "schema_missing",
       last_event_at: null,
       privacy_note: GROWTH_INTENT_PIXEL_PRIVACY_NOTE,
@@ -277,6 +338,10 @@ export async function fetchIntentPixelAdminDiagnostics(
   let consent_unknown_sessions_24h = 0
   let consent_granted_sessions_24h = 0
   let high_intent_sessions_blocked_by_consent_24h = 0
+  let personalization_sessions_24h = 0
+  let marketing_sessions_24h = 0
+  let segmented_sessions_24h = 0
+  let campaign_attributed_sessions_24h = 0
 
   if (siteId) {
     const [sessions, pageviews, conversions, identified, denied, unknown, granted, highIntentBlocked] =
@@ -344,6 +409,30 @@ export async function fetchIntentPixelAdminDiagnostics(
     consent_unknown_sessions_24h = unknown.count ?? 0
     consent_granted_sessions_24h = granted.count ?? 0
     high_intent_sessions_blocked_by_consent_24h = highIntentBlocked.count ?? 0
+
+    const { data: sessionCoverageRows } = await admin
+      .schema("growth")
+      .from("intent_visitor_sessions")
+      .select("browser_metadata, first_touch_utm, last_touch_utm")
+      .eq("site_id", siteId)
+      .gte("started_at", since)
+      .limit(1000)
+
+    for (const row of sessionCoverageRows ?? []) {
+      const record = row as Record<string, unknown>
+      const categories = readSessionConsentCategories(record)
+      if (categories.personalization) personalization_sessions_24h += 1
+      if (categories.marketing) marketing_sessions_24h += 1
+      if (hasPersonalizationSegment(record)) segmented_sessions_24h += 1
+      if (categories.marketing) {
+        const utm = mergeUtmAttribution(
+          record.first_touch_utm && typeof record.first_touch_utm === "object"
+            ? (record.first_touch_utm as Record<string, string>)
+            : {},
+        )
+        if (hasUtmSignal(utm)) campaign_attributed_sessions_24h += 1
+      }
+    }
   }
 
   let last_event_at: string | null = null
@@ -386,6 +475,14 @@ export async function fetchIntentPixelAdminDiagnostics(
     consent_required: site?.consent_required !== false,
   })
 
+  const categoryMetrics = buildCategoryCoverageDiagnostics({
+    session_count_24h,
+    personalization_sessions_24h,
+    marketing_sessions_24h,
+    segmented_sessions_24h,
+    campaign_attributed_sessions_24h,
+  })
+
   return {
     qa_marker: GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER,
     schema_ready: true,
@@ -399,6 +496,7 @@ export async function fetchIntentPixelAdminDiagnostics(
     consent_unknown_sessions_24h,
     consent_granted_sessions_24h,
     ...consentMetrics,
+    ...categoryMetrics,
     install_status,
     last_event_at,
     privacy_note: GROWTH_INTENT_PIXEL_PRIVACY_NOTE,

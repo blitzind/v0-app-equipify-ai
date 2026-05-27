@@ -9,11 +9,17 @@ import {
   allowsBehavioralTracking,
   allowsBuyingStageInference,
   allowsIntentScoring,
+  allowsMarketingAttribution,
+  allowsPersonalizationTracking,
   allowsSearchIntentSignals,
   isExplicitCaptureConversion,
   normalizeConsentStatus,
   resolveTrackingMode,
 } from "../lib/growth/intent-pixel/consent-gate"
+import {
+  GROWTH_INTENT_CONSENT_CATEGORIES_QA_MARKER,
+  normalizeConsentCategories,
+} from "../lib/growth/intent-pixel/intent-consent-categories"
 import { buildIntentPixelScript } from "../lib/growth/intent-pixel/pixel-script"
 import {
   EQUIPIFY_INTENT_CONSENT_STORAGE_KEY,
@@ -25,6 +31,7 @@ import {
 } from "../lib/growth/intent-pixel/intent-consent-manager-types"
 
 assert.equal(GROWTH_INTENT_CONSENT_MANAGER_QA_MARKER, "growth-intent-consent-manager-v1")
+assert.equal(GROWTH_INTENT_CONSENT_CATEGORIES_QA_MARKER, "growth-intent-consent-categories-v1")
 assert.equal(EQUIPIFY_INTENT_CONSENT_STORAGE_KEY, "equipify_intent_consent")
 assert.equal(EQUIPIFY_INTENT_CONSENT_TIMESTAMP_KEY, "equipify_intent_consent_ts")
 assert.equal(EQUIPIFY_INTENT_CONSENT_TTL_MS, 365 * 24 * 60 * 60 * 1000)
@@ -72,7 +79,11 @@ assert.match(adminUi, /Tracking coverage %/)
 assert.match(adminUi, /Anonymous sessions blocked/)
 assert.match(adminUi, /High intent blocked by consent/)
 assert.match(adminUi, /ConsentBreakdownChart/)
-assert.match(adminUi, /Tracking visibility impacted/)
+assert.match(adminUi, /GROWTH_INTENT_CONSENT_CATEGORIES_QA_MARKER/)
+assert.match(adminUi, /Personalization coverage %/)
+assert.match(adminUi, /Marketing attribution coverage %/)
+assert.match(adminUi, /Segmented visitors %/)
+assert.match(adminUi, /Campaign-attributed sessions %/)
 
 const adminRepo = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/intent-pixel/intent-pixel-admin-repository.ts"),
@@ -80,7 +91,8 @@ const adminRepo = fs.readFileSync(
 )
 assert.match(adminRepo, /buildConsentDiagnostics/)
 assert.match(adminRepo, /consent_acceptance_pct/)
-assert.match(adminRepo, /tracking_visibility_impacted/)
+assert.match(adminRepo, /buildCategoryCoverageDiagnostics/)
+assert.match(adminRepo, /personalization_coverage_pct/)
 
 const site = {
   id: "1",
@@ -104,9 +116,34 @@ assert.equal(gate.mode, "essential_only")
 gate = resolveTrackingMode(anonSite, "unknown", "conversion")
 assert.equal(gate.accepted, false)
 
-gate = resolveTrackingMode(site, "granted", "pageview")
+gate = resolveTrackingMode(site, "granted", "pageview", null, {
+  analytics: true,
+  personalization: false,
+  marketing: false,
+})
 assert.equal(gate.accepted, true)
 assert.equal(gate.mode, "full")
+
+gate = resolveTrackingMode(site, "granted", "pageview", null, {
+  analytics: false,
+  personalization: true,
+  marketing: false,
+})
+assert.equal(gate.accepted, false)
+
+assert.equal(
+  allowsIntentScoring("granted", { analytics: false, personalization: true, marketing: false }),
+  false,
+)
+assert.equal(
+  allowsPersonalizationTracking("granted", { analytics: false, personalization: true, marketing: false }),
+  true,
+)
+assert.equal(
+  allowsMarketingAttribution("granted", { analytics: false, personalization: false, marketing: true }),
+  true,
+)
+assert.equal(normalizeConsentCategories({ analytics: "yes" }).analytics, false)
 
 gate = resolveTrackingMode(site, "denied", "consent_update")
 assert.equal(gate.accepted, true)
@@ -139,8 +176,11 @@ const script = buildIntentPixelScript({
 })
 assert.match(script, /equipify_intent_consent/)
 assert.match(script, /equipify_intent_consent_ts/)
-assert.match(script, /allowsBehavioral/)
-assert.match(script, /allowsOperational/)
+assert.match(script, /allowsAnalytics/)
+assert.match(script, /equipify_intent_consent_categories/)
+assert.match(script, /consent_categories/)
+assert.match(script, /allowsPersonalization/)
+assert.match(script, /allowsMarketing/)
 assert.doesNotMatch(script, /if\(allowsOperational\(\)\)send\("pageview"\)[\s\S]*if\(allowsOperational\(\)\)send\("pageview"\)/)
 
 const marketingSiteRoot = path.resolve(process.cwd(), "../equipify-site")
@@ -177,7 +217,28 @@ if (fs.existsSync(marketingSiteRoot)) {
   assert.match(modal, /Analytics/)
   assert.match(modal, /Personalization/)
   assert.match(modal, /Marketing/)
-  assert.match(modal, /Intent Pixel analytics/)
+  assert.match(provider, /GROWTH_INTENT_CONSENT_CATEGORIES_QA_MARKER/)
+  assert.match(provider, /IntentPersonalizationBridge/)
+  assert.match(modal, /Anonymous industry and content affinity/)
+  assert.match(modal, /Campaign attribution for Google Ads/)
+  assert.doesNotMatch(modal, /Reserved for future use/)
+
+  const gatedTags = fs.readFileSync(
+    path.join(marketingSiteRoot, "components/privacy/consent-gated-marketing-tags.tsx"),
+    "utf8",
+  )
+  assert.match(gatedTags, /categories\.marketing/)
+  assert.match(gatedTags, /MetaPixel/)
+  assert.match(gatedTags, /GoogleAdsTag/)
+
+  const personalization = fs.readFileSync(
+    path.join(marketingSiteRoot, "lib/personalization/intent-personalization.ts"),
+    "utf8",
+  )
+  assert.match(personalization, /GROWTH_INTENT_CONSENT_CATEGORIES_QA_MARKER/)
+  assert.match(personalization, /Never stores name/)
+  assert.match(personalization, /industry_affinity/)
+  assert.doesNotMatch(personalization, /submitted_identity|linkedin_url|company_name/)
 
   const consentLib = fs.readFileSync(
     path.join(marketingSiteRoot, "lib/analytics/equipify-intent-consent.ts"),
@@ -187,4 +248,6 @@ if (fs.existsSync(marketingSiteRoot)) {
   assert.match(consentLib, /365/)
 }
 
-console.log(`${GROWTH_INTENT_CONSENT_MANAGER_QA_MARKER} consent manager checks passed`)
+console.log(
+  `${GROWTH_INTENT_CONSENT_MANAGER_QA_MARKER} + ${GROWTH_INTENT_CONSENT_CATEGORIES_QA_MARKER} consent manager checks passed`,
+)

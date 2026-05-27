@@ -5,6 +5,7 @@ import type { GrowthIntentPixelConsentStatus } from "@/lib/growth/intent-pixel/i
 export const GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER = "growth-intent-pixel-admin-v1" as const
 
 export { GROWTH_INTENT_CONSENT_MANAGER_QA_MARKER } from "@/lib/growth/intent-pixel/intent-consent-manager-types"
+export { GROWTH_INTENT_CONSENT_CATEGORIES_QA_MARKER } from "@/lib/growth/intent-pixel/intent-consent-categories"
 
 /** Live activation — admin handoff + schema readiness (Prompt 23). */
 export const GROWTH_INTENT_PIXEL_LIVE_QA_MARKER = "growth-intent-pixel-live-v1" as const
@@ -83,6 +84,10 @@ export type GrowthIntentPixelAdminDiagnostics = {
     unknown: number
   }
   tracking_visibility_impacted: boolean
+  personalization_coverage_pct: number | null
+  marketing_attribution_coverage_pct: number | null
+  segmented_visitors_pct: number | null
+  campaign_attributed_sessions_pct: number | null
   install_status: GrowthIntentPixelInstallStatus
   last_event_at: string | null
   privacy_note: string
