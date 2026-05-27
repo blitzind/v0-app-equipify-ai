@@ -11,11 +11,14 @@ import type { GrowthBuyingStage } from "@/lib/growth/buying-stage/buying-stage-t
 import type { GrowthSearchIntentCategory } from "@/lib/growth/search-intent/search-intent-types"
 import { GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER } from "@/lib/growth/real-world-discovery/providers/serp-types"
 import { GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER } from "@/lib/growth/real-world-discovery/providers/google-places-query-expansion"
+import { GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER } from "@/lib/growth/real-world-discovery/live-provider-query-expansion"
 import { GROWTH_PROVIDER_CACHE_QA_MARKER } from "@/lib/growth/provider-cache/provider-cache-types"
+import type { GrowthProspectSearchExternalFilterDiagnostics } from "@/lib/growth/prospect-search/prospect-search-external-filters"
 
 export {
   GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER,
   GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER,
+  GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER,
   GROWTH_PROVIDER_CACHE_QA_MARKER,
 }
 
@@ -382,7 +385,10 @@ export type GrowthProspectSearchResult = {
   provider_fallback_reason?: string | null
   provider_audit_qa_marker?: typeof GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER | null
   google_places_query_expansion_qa_marker?: typeof GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER | null
+  live_provider_query_expansion_qa_marker?: typeof GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER | null
   provider_cache_qa_marker?: typeof GROWTH_PROVIDER_CACHE_QA_MARKER | null
+  external_filter_diagnostics?: GrowthProspectSearchExternalFilterDiagnostics
+  expanded_search_exhausted?: boolean
   territory_intelligence?: GrowthTerritoryIntelligenceSummary | null
 }
 

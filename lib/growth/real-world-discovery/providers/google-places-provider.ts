@@ -24,6 +24,55 @@ function placesDiagnostics(
   return input
 }
 
+type GooglePlacesCandidate = NonNullable<ReturnType<typeof mapGooglePlaceToCandidate>>
+
+async function runGooglePlacesQueryBatch(
+  admin: SupabaseClient | null,
+  icp: ReturnType<typeof googlePlacesIcpInputs>,
+  queries: string[],
+  perQueryLimit: number,
+): Promise<{
+  collected: GooglePlacesCandidate[]
+  queryResultCounts: number[]
+  perQueryCacheResults: Awaited<ReturnType<typeof executeCachedRealWorldProviderQuery>>[]
+  executedQueries: string[]
+}> {
+  const collected: GooglePlacesCandidate[] = []
+  const queryResultCounts: number[] = []
+  const perQueryCacheResults: Awaited<ReturnType<typeof executeCachedRealWorldProviderQuery>>[] = []
+  const executedQueries: string[] = []
+
+  for (const textQuery of queries) {
+    executedQueries.push(textQuery)
+    const cachedQuery = await executeCachedRealWorldProviderQuery(
+      { admin },
+      {
+        providerName: "google_places",
+        query: textQuery,
+        queryInput: { limit: perQueryLimit },
+        executeLive: async () => {
+          const places = await searchGooglePlacesText(textQuery, { limit: perQueryLimit })
+          return places
+            .map((place, index) =>
+              mapGooglePlaceToCandidate(place, {
+                query: textQuery,
+                source_rank: index + 1,
+                matched_queries: [textQuery],
+              }),
+            )
+            .filter((row): row is NonNullable<typeof row> => row !== null)
+        },
+      },
+    )
+
+    perQueryCacheResults.push(cachedQuery)
+    queryResultCounts.push(cachedQuery.candidates.length)
+    collected.push(...cachedQuery.candidates)
+  }
+
+  return { collected, queryResultCounts, perQueryCacheResults, executedQueries }
+}
+
 /** Google Places Text Search — official API only, multi-query ICP expansion + cache. */
 export function createRealWorldGooglePlacesProvider(options?: {
   admin?: SupabaseClient | null
@@ -37,46 +86,41 @@ export function createRealWorldGooglePlacesProvider(options?: {
     discover: async (input: GrowthRealWorldDiscoveryQuery) => {
       const icp = googlePlacesIcpInputs(input)
       const expansion = buildGooglePlacesDiscoveryQueries(icp)
-      const queries = expansion.queries
       const totalLimit = input.limit ?? 50
-      const perQueryLimit = Math.min(20, Math.max(5, Math.ceil(totalLimit / Math.max(queries.length, 1))))
+      const perQueryLimit = Math.min(20, Math.max(5, Math.ceil(totalLimit / Math.max(expansion.queries.length, 1))))
       const started = performance.now()
-      const queryResultCounts: number[] = []
-      const perQueryCacheResults: Awaited<ReturnType<typeof executeCachedRealWorldProviderQuery>>[] = []
-      const collected: ReturnType<typeof mapGooglePlaceToCandidate>[] = []
+      let queryResultCounts: number[] = []
+      let perQueryCacheResults: Awaited<ReturnType<typeof executeCachedRealWorldProviderQuery>>[] = []
+      let executedQueries = expansion.queries
 
       try {
-        for (const textQuery of queries) {
-          const cachedQuery = await executeCachedRealWorldProviderQuery(
-            { admin },
-            {
-              providerName: "google_places",
-              query: textQuery,
-              queryInput: { limit: perQueryLimit },
-              executeLive: async () => {
-                const places = await searchGooglePlacesText(textQuery, { limit: perQueryLimit })
-                return places
-                  .map((place, index) =>
-                    mapGooglePlaceToCandidate(place, {
-                      query: textQuery,
-                      source_rank: index + 1,
-                      matched_queries: [textQuery],
-                    }),
-                  )
-                  .filter((row): row is NonNullable<typeof row> => row !== null)
-              },
-            },
-          )
+        let batch = await runGooglePlacesQueryBatch(admin, icp, expansion.queries, perQueryLimit)
+        queryResultCounts = batch.queryResultCounts
+        perQueryCacheResults = batch.perQueryCacheResults
+        executedQueries = batch.executedQueries
 
-          perQueryCacheResults.push(cachedQuery)
-          queryResultCounts.push(cachedQuery.candidates.length)
-          collected.push(...cachedQuery.candidates)
-        }
-
-        const merged = mergeGooglePlacesCandidates(
-          collected.filter((row): row is NonNullable<typeof row> => row !== null),
+        let merged = mergeGooglePlacesCandidates(
+          batch.collected.filter((row): row is NonNullable<typeof row> => row !== null),
           icp,
         ).slice(0, totalLimit)
+
+        if (merged.length === 0 && (expansion.fallback_queries?.length ?? 0) > 0) {
+          const fallbackBatch = await runGooglePlacesQueryBatch(
+            admin,
+            icp,
+            expansion.fallback_queries ?? [],
+            perQueryLimit,
+          )
+          queryResultCounts = [...queryResultCounts, ...fallbackBatch.queryResultCounts]
+          perQueryCacheResults = [...perQueryCacheResults, ...fallbackBatch.perQueryCacheResults]
+          executedQueries = [...executedQueries, ...fallbackBatch.executedQueries]
+          merged = mergeGooglePlacesCandidates(
+            [...batch.collected, ...fallbackBatch.collected].filter(
+              (row): row is NonNullable<typeof row> => row !== null,
+            ),
+            icp,
+          ).slice(0, totalLimit)
+        }
 
         const cacheStats = buildRealWorldProviderCacheDiagnostics(
           perQueryCacheResults,
@@ -88,15 +132,15 @@ export function createRealWorldGooglePlacesProvider(options?: {
           provider_type: "google_places",
           status: "success",
           message: merged.length
-            ? `${merged.length} merged listing(s) from Google Places across ${queries.length} queries (${cacheStats.provider_cache_hit_count} cache hits, ${cacheStats.provider_live_request_count} live).`
-            : `Google Places returned no matches across ${queries.length} expanded queries.`,
+            ? `${merged.length} merged listing(s) from Google Places across ${executedQueries.length} queries (${cacheStats.provider_cache_hit_count} cache hits, ${cacheStats.provider_live_request_count} live).`
+            : `Google Places returned no matches across ${executedQueries.length} expanded queries.`,
           candidates: merged,
           diagnostics: placesDiagnostics({
             provider_executed: cacheStats.provider_executed,
             provider_latency_ms: cacheStats.provider_latency_ms,
             provider_result_count: merged.length,
             provider_fallback_reason: cacheStats.provider_fallback_reason,
-            provider_query_generated: queries,
+            provider_query_generated: executedQueries,
             provider_query_result_count: queryResultCounts,
             provider_merged_result_count: merged.length,
             provider_cache_hit: cacheStats.provider_cache_hit,
@@ -123,7 +167,7 @@ export function createRealWorldGooglePlacesProvider(options?: {
             provider_latency_ms: cacheStats.provider_latency_ms,
             provider_result_count: 0,
             provider_fallback_reason: err instanceof Error ? err.message : "Google Places request failed.",
-            provider_query_generated: queries,
+            provider_query_generated: executedQueries,
             provider_query_result_count: queryResultCounts,
             provider_merged_result_count: 0,
             provider_cache_hit: cacheStats.provider_cache_hit,

@@ -41,7 +41,7 @@ import type {
   GrowthProspectSearchResult,
   GrowthProspectSearchSavedSearchRow,
 } from "@/lib/growth/prospect-search/prospect-search-types"
-import { GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-types"
+import { GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER, GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-types"
 import { prospectSearchSelectionKey } from "@/lib/growth/prospect-search/prospect-search-selection"
 import { CompanyStatusBadges } from "@/components/growth/prospect-search/company-status-badges"
 import { ProspectSearchIndexDiagnostics } from "@/components/growth/prospect-search/prospect-search-index-diagnostics"
@@ -543,6 +543,7 @@ export function ProspectSearchShell() {
       data-ux-marker={GROWTH_PROSPECT_SEARCH_UX_QA_MARKER}
       data-layout-marker={GROWTH_PROSPECT_SEARCH_LAYOUT_V2_QA_MARKER}
       data-saved-search-workflows-marker={GROWTH_SAVED_SEARCH_WORKFLOWS_QA_MARKER}
+      data-live-provider-query-expansion-marker={GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER}
     >
       {/* Search hero */}
       <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-violet-50/80 via-card to-cyan-50/50 p-6 shadow-sm dark:from-violet-950/30 dark:to-cyan-950/20">
@@ -734,6 +735,26 @@ export function ProspectSearchShell() {
                   </div>
                 </>
               ) : null}
+              {process.env.NODE_ENV === "development" &&
+              result?.discovery_mode === "discover_external" &&
+              result.external_filter_diagnostics ? (
+                <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-950">
+                  <p className="font-medium">External filter diagnostics (dev only)</p>
+                  <p>
+                    raw={result.external_filter_diagnostics.raw_provider_count} · normalized=
+                    {result.external_filter_diagnostics.normalized_result_count} · dropped=
+                    {result.external_filter_diagnostics.dropped_result_count}
+                  </p>
+                  {Object.keys(result.external_filter_diagnostics.dropped_reasons).length > 0 ? (
+                    <p className="mt-1 opacity-90">
+                      dropped reasons:{" "}
+                      {Object.entries(result.external_filter_diagnostics.dropped_reasons)
+                        .map(([reason, count]) => `${reason}=${count}`)
+                        .join(", ")}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {companies.length > 0 ? (
@@ -775,6 +796,14 @@ export function ProspectSearchShell() {
               onRunQuery={(q) => void runSearch(q)}
               onSelectTemplate={applyTemplate}
               recentSaved={savedSearches}
+              title={result?.expanded_search_exhausted ? "No companies found" : undefined}
+              emptyMessage={
+                result?.expanded_search_exhausted
+                  ? "No companies found after expanded provider search. Try adding a location or broadening filters."
+                  : result?.discovery_mode === "discover_external" && hasSearched
+                    ? "No companies matched this search yet. Try a starter ICP template or broaden industry filters."
+                    : undefined
+              }
             />
           ) : view === "card" ? (
             <div className="flex flex-col gap-4">

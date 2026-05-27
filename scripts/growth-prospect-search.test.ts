@@ -7,10 +7,17 @@ import fs from "node:fs"
 import path from "node:path"
 import {
   applyProspectSearchFilters,
+  explainProspectSearchFilterDrop,
   filterProspectPeopleByTitle,
   inferEmployeeSizeBand,
   normalizeProspectSearchFilters,
 } from "../lib/growth/prospect-search/prospect-search-filters"
+import {
+  buildLiveProviderDiscoveryQueries,
+  buildLiveProviderFallbackQueries,
+  GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER,
+  liveProviderIcpInputs,
+} from "../lib/growth/real-world-discovery/live-provider-query-expansion"
 import {
   mergeParsedQueryIntoFilters,
   parseProspectSearchQuery,
@@ -39,6 +46,7 @@ import {
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS,
   GROWTH_PROSPECT_SEARCH_SOURCE_TYPES,
+  GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER as GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER_TYPE,
 } from "../lib/growth/prospect-search/prospect-search-types"
 import {
   GROWTH_TITLE_TARGETING_SMART_QA_MARKER,
@@ -2155,6 +2163,73 @@ async function main(): Promise<void> {
   assert.match(savedWorkflowIcpSource, /onChange\(\(prev\)/)
   assert.match(shellSource, /replaceFilters\(row\.filters\)/)
   assert.match(shellSource, /filters: nextFilters/)
+
+  assert.equal(GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER, "growth-live-provider-query-expansion-v1")
+  assert.equal(GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER_TYPE, "growth-live-provider-query-expansion-v1")
+  assert.match(shellSource, /data-live-provider-query-expansion-marker=\{GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER\}/)
+  assert.match(shellSource, /No companies found after expanded provider search/)
+
+  const medicalPlan = buildLiveProviderDiscoveryQueries({
+    industry: "Medical Equipment Service",
+    raw_query: "medical equipment service companies",
+    location: "",
+  })
+  assert.ok(medicalPlan.queries.length >= 3)
+  assert.ok(medicalPlan.fallback_queries.length >= 3)
+  assert.ok(
+    medicalPlan.queries.some((q) => /biomedical equipment repair|clinical engineering service/i.test(q)),
+  )
+  for (const q of medicalPlan.queries) {
+    assert.doesNotMatch(q, /employees/i)
+  }
+
+  const fallbackOnly = buildLiveProviderFallbackQueries(
+    liveProviderIcpInputs({ industry: "Medical Equipment Service", raw_query: "medical equipment service companies" }),
+    medicalPlan.queries,
+  )
+  assert.ok(fallbackOnly.length >= 3)
+
+  const externalRow = {
+    id: "ext-1",
+    source_type: "external_discovered" as const,
+    company_name: "Acme Biomedical Repair",
+    website: "https://acmebiomed.example",
+    industry: null,
+    subindustry: "Medical equipment repair service",
+    employees: null,
+    revenue_range: null,
+    location: "Nashville, TN",
+    intent_score: null,
+    buying_stage: null,
+    lead_score: null,
+    confidence: 0.7,
+    company_match_confidence: null,
+    decision_maker_coverage: null,
+    verification_status: "external_unverified" as const,
+    signals: [],
+    search_intent_category: null,
+    lead_inbox_id: null,
+    growth_lead_id: null,
+    prospect_id: null,
+    customer_id: null,
+    rank_score: 0.5,
+    match_reasoning: [],
+    keywords: [],
+    notes: null,
+  }
+  const medFilters = normalizeProspectSearchFilters({
+    industry: "Medical Equipment Service",
+    employee_size_bands: ["21-50", "51-100"],
+  })
+  assert.equal(explainProspectSearchFilterDrop(externalRow, medFilters, { external_discovery: true }), null)
+  assert.equal(
+    explainProspectSearchFilterDrop(
+      { ...externalRow, subindustry: "Unrelated retail", company_name: "Generic Store" },
+      medFilters,
+      { external_discovery: true },
+    ),
+    "industry",
+  )
 
   console.log("growth-prospect-search: all checks passed")
 }

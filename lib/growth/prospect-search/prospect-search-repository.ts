@@ -37,6 +37,7 @@ import {
   GROWTH_PROSPECT_SEARCH_SOURCE_TYPES,
   GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER,
   GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER,
+  GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER,
   GROWTH_PROVIDER_CACHE_QA_MARKER,
   type GrowthProspectSearchCompanyResult,
   type GrowthProspectSearchDiscoveryMode,
@@ -96,7 +97,7 @@ export async function runProspectSearch(
       limit: input.limit ?? 50,
     })
 
-    const enrichedCompanies = await enrichProspectSearchExternalCompanies(
+    const externalEnrichment = await enrichProspectSearchExternalCompanies(
       admin,
       realWorld.companies,
       {
@@ -105,6 +106,33 @@ export async function runProspectSearch(
         parsed,
       },
     )
+
+    let enrichedCompanies = externalEnrichment.companies
+    let provider_status_message = realWorld.provider_status?.message ?? null
+    let provider_status_label = realWorld.provider_status?.label ?? null
+
+    if (realWorld.companies.length > 0 && enrichedCompanies.length === 0) {
+      provider_status_message =
+        "Live providers returned listings but ICP filters removed all results. Employee size and revenue filters are ignored for unknown external listings when possible."
+    } else if (
+      enrichedCompanies.length === 0 &&
+      realWorld.provider_status?.label === "live_provider_active"
+    ) {
+      provider_status_message =
+        "No companies found after expanded provider search. Try adding a location or broadening filters."
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[prospect-search:external]", {
+        provider_status_label,
+        built_query: realWorld.built_query,
+        raw_provider_count: realWorld.companies.length,
+        normalized_result_count: enrichedCompanies.length,
+        filter_diagnostics: externalEnrichment.filter_diagnostics,
+        used_relaxed_filters: externalEnrichment.used_relaxed_filters,
+        provider_diagnostics: realWorld.provider_status?.provider_diagnostics ?? [],
+      })
+    }
 
     const companiesWithContacts = await applyProspectSearchContactIntelligenceOverlay(
       admin,
@@ -145,13 +173,18 @@ export async function runProspectSearch(
       real_world_discovery_run_id: realWorld.discovery_run_id,
       real_world_built_query: realWorld.built_query,
       provider_messages: realWorld.provider_messages,
-      provider_status_label: realWorld.provider_status?.label ?? null,
-      provider_status_message: realWorld.provider_status?.message ?? null,
+      provider_status_label: provider_status_label,
+      provider_status_message: provider_status_message,
       provider_diagnostics: realWorld.provider_status?.provider_diagnostics ?? [],
       provider_fallback_reason: realWorld.provider_status?.provider_fallback_reason ?? null,
       provider_audit_qa_marker: GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER,
       google_places_query_expansion_qa_marker: GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER,
+      live_provider_query_expansion_qa_marker: GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER,
       provider_cache_qa_marker: GROWTH_PROVIDER_CACHE_QA_MARKER,
+      external_filter_diagnostics:
+        process.env.NODE_ENV !== "production" ? externalEnrichment.filter_diagnostics : undefined,
+      expanded_search_exhausted:
+        enrichedCompanies.length === 0 && provider_status_label === "live_provider_active",
       },
       companiesWithMarket,
     )

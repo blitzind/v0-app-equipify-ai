@@ -13,19 +13,24 @@ export function SearchEmptyState({
   onRunQuery,
   onSelectTemplate,
   recentSaved,
+  emptyMessage,
+  title,
 }: {
   onRunQuery: (query: string) => void
   onSelectTemplate: (template: ProspectSearchIcpTemplate) => void
   recentSaved: GrowthProspectSearchSavedSearchRow[]
+  emptyMessage?: string | null
+  title?: string | null
 }) {
   return (
     <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center">
       <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-violet-100 text-violet-700">
         <Search className="size-6" />
       </div>
-      <h3 className="mt-4 text-lg font-semibold">Discover your next ICP</h3>
+      <h3 className="mt-4 text-lg font-semibold">{title ?? "Discover your next ICP"}</h3>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-        Start with a suggested search, starter ICP template, or popular industry — then refine with guided filters.
+        {emptyMessage ??
+          "Start with a suggested search, starter ICP template, or popular industry — then refine with guided filters."}
       </p>
 
       <div className="mt-8 grid gap-6 text-left sm:grid-cols-2 lg:grid-cols-3">

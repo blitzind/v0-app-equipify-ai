@@ -80,16 +80,12 @@ export function prospectSearchFiltersToRealWorldInputs(
   filters: GrowthProspectSearchFilters,
   rawQuery: string,
 ): GrowthRealWorldDiscoverySearchInputs {
-  const employeeBand = filters.employee_size_bands?.[0]
-  const employee_size_estimate =
-    employeeBand && employeeBand !== "unknown" ? employeeBand.replace(/_/g, "-") : null
-
   return {
     raw_query: rawQuery,
     industry: filters.industry ?? null,
     subindustry: filters.subindustry ?? null,
     location: filters.location ?? filters.service_area ?? null,
-    employee_size_estimate,
+    employee_size_estimate: null,
     keywords: filters.keywords ?? [],
     service_category: filters.field_service_software ?? null,
     business_type: filters.crm_detected ?? null,

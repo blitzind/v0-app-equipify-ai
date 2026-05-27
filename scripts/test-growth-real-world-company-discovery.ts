@@ -29,6 +29,10 @@ import {
   GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER,
   googlePlacesIcpInputs,
 } from "../lib/growth/real-world-discovery/providers/google-places-query-expansion"
+import {
+  buildLiveProviderDiscoveryQueries,
+  GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER,
+} from "../lib/growth/real-world-discovery/live-provider-query-expansion"
 import { mergeGooglePlacesCandidates } from "../lib/growth/real-world-discovery/providers/google-places-merge"
 import {
   mapGooglePlaceToCandidate,
@@ -95,10 +99,28 @@ async function main(): Promise<void> {
   )
   assert.match(googlePlacesSource, /executeCachedRealWorldProviderQuery/)
   assert.match(googlePlacesSource, /buildGooglePlacesDiscoveryQueries/)
+  assert.match(googlePlacesSource, /fallbackBatch/)
   assert.match(googlePlacesSource, /mergeGooglePlacesCandidates/)
   assert.doesNotMatch(googlePlacesSource, /scrape|puppeteer|cheerio/i)
 
+  const serpSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/real-world-discovery/providers/serp-provider.ts"),
+    "utf8",
+  )
+  assert.match(serpSource, /buildLiveProviderDiscoveryQueries/)
+  assert.match(serpSource, /runSerpQueryBatch/)
+
   assert.equal(GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER, "growth-google-places-query-expansion-v2")
+  assert.equal(GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER, "growth-live-provider-query-expansion-v1")
+
+  const medicalBroad = buildLiveProviderDiscoveryQueries({
+    industry: "Medical Equipment Service",
+    raw_query: "medical equipment service companies",
+    location: "",
+  })
+  assert.ok(medicalBroad.queries.length >= 3)
+  assert.ok(medicalBroad.fallback_queries.length >= 3)
+  assert.ok(medicalBroad.queries.some((q) => /hospital equipment repair|biomedical field service/i.test(q)))
 
   const medicalTn = buildGooglePlacesDiscoveryQueries({
     industry: "Medical Equipment Service",
@@ -117,8 +139,8 @@ async function main(): Promise<void> {
     assert.doesNotMatch(q, /VP Operations/i)
   }
   assert.ok(medicalTn.queries.some((q) => /medical equipment repair/i.test(q)))
-  assert.ok(medicalTn.queries.some((q) => /biomedical calibration/i.test(q)))
-  assert.ok(medicalTn.queries.some((q) => /healthcare equipment field service/i.test(q)))
+  assert.ok(medicalTn.queries.some((q) => /biomedical equipment repair|clinical engineering service/i.test(q)))
+  assert.ok(medicalTn.queries.some((q) => /healthcare equipment maintenance|hospital equipment repair/i.test(q)))
 
   const icpOnly = googlePlacesIcpInputs({
     industry: "Medical Equipment Service",

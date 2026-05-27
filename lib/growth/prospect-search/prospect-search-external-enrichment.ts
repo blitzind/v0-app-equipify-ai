@@ -1,11 +1,12 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { filterProspectPeopleByTitle } from "@/lib/growth/prospect-search/prospect-search-filters"
 import {
-  applyProspectSearchFilters,
-  filterProspectPeopleByTitle,
-  normalizeProspectSearchFilters,
-} from "@/lib/growth/prospect-search/prospect-search-filters"
+  applyProspectSearchExternalCompanyFilters,
+  relaxProspectSearchExternalCompanyFilters,
+  type GrowthProspectSearchExternalFilterDiagnostics,
+} from "@/lib/growth/prospect-search/prospect-search-external-filters"
 import { finalizeProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-result-finalize"
 import { deriveProspectSearchCompanyStatus } from "@/lib/growth/prospect-search/prospect-search-status"
 import {
@@ -29,6 +30,12 @@ const EXTERNAL_SAFETY_DEFAULTS = {
   suppressed_at: null as string | null,
 }
 
+export type EnrichProspectSearchExternalCompaniesResult = {
+  companies: GrowthProspectSearchCompanyResult[]
+  filter_diagnostics: GrowthProspectSearchExternalFilterDiagnostics
+  used_relaxed_filters: boolean
+}
+
 export async function enrichProspectSearchExternalCompanies(
   admin: SupabaseClient,
   companies: GrowthProspectSearchCompanyResult[],
@@ -37,7 +44,7 @@ export async function enrichProspectSearchExternalCompanies(
     filters: GrowthProspectSearchFilters
     parsed: GrowthProspectSearchParsedQuery
   },
-): Promise<GrowthProspectSearchCompanyResult[]> {
+): Promise<EnrichProspectSearchExternalCompaniesResult> {
   const suppressionLookup = await loadProspectSearchSuppressionLookup(admin)
 
   const enriched = companies.map((company) => {
@@ -53,5 +60,34 @@ export async function enrichProspectSearchExternalCompanies(
     return finalizeProspectSearchCompanyResult(withSafety, context)
   })
 
-  return applyProspectSearchFilters(enriched, context.filters)
+  const filtered = applyProspectSearchExternalCompanyFilters(enriched, context.filters)
+  if (filtered.companies.length > 0 || enriched.length === 0) {
+    return {
+      companies: filtered.companies,
+      filter_diagnostics: filtered.diagnostics,
+      used_relaxed_filters: false,
+    }
+  }
+
+  const relaxed = relaxProspectSearchExternalCompanyFilters(enriched, context.filters)
+  const relaxedFiltered = applyProspectSearchExternalCompanyFilters(relaxed, {
+    ...context.filters,
+    employee_size_bands: undefined,
+    revenue_bands: undefined,
+  })
+
+  return {
+    companies: relaxedFiltered.companies,
+    filter_diagnostics: {
+      ...filtered.diagnostics,
+      normalized_result_count: relaxedFiltered.companies.length,
+      dropped_result_count: enriched.length - relaxedFiltered.companies.length,
+      dropped_reasons: {
+        ...filtered.diagnostics.dropped_reasons,
+        ...relaxedFiltered.diagnostics.dropped_reasons,
+        relaxed_filter_pass: relaxedFiltered.companies.length,
+      },
+    },
+    used_relaxed_filters: relaxedFiltered.companies.length > 0,
+  }
 }

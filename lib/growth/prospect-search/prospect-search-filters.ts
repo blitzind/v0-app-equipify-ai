@@ -26,6 +26,197 @@ function includesFold(hay: string | null | undefined, needle: string): boolean {
   return hay.toLowerCase().includes(needle.toLowerCase())
 }
 
+const INDUSTRY_FILTER_ALIAS_TOKENS: Record<string, readonly string[]> = {
+  "medical equipment service": [
+    "medical equipment",
+    "biomedical",
+    "biomed",
+    "clinical engineering",
+    "healthcare equipment",
+    "hospital equipment",
+    "medical device",
+    "equipment repair",
+    "equipment service",
+    "equipment maintenance",
+    "field service",
+    "calibration",
+  ],
+}
+
+function industryFilterAliasMatch(blob: string, filterIndustry: string): boolean {
+  const aliases = INDUSTRY_FILTER_ALIAS_TOKENS[normalizeKey(filterIndustry)]
+  if (!aliases?.length) return false
+  const lower = blob.toLowerCase()
+  return aliases.some((token) => lower.includes(token))
+}
+
+function normalizeKey(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ")
+}
+
+function matchesProspectSearchIndustryFilter(
+  row: Pick<
+    GrowthProspectSearchIndexCompany | GrowthProspectSearchCompanyResult,
+    "industry" | "subindustry" | "keywords" | "company_name" | "notes"
+  >,
+  filterIndustry: string,
+): boolean {
+  if (includesFold(row.industry, filterIndustry)) return true
+  const blob = [row.industry, row.subindustry, ...row.keywords, row.company_name, row.notes].join(" ")
+  if (includesFold(blob, filterIndustry)) return true
+  return industryFilterAliasMatch(blob, filterIndustry)
+}
+
+export type ProspectSearchFilterOptions = {
+  external_discovery?: boolean
+}
+
+export function explainProspectSearchFilterDrop<
+  T extends GrowthProspectSearchIndexCompany | GrowthProspectSearchCompanyResult,
+>(row: T, filters: GrowthProspectSearchFilters, options?: ProspectSearchFilterOptions): string | null {
+  if (filters.source_types?.length && !filters.source_types.includes(row.source_type)) {
+    return "source_type"
+  }
+  if (filters.industry && !matchesProspectSearchIndustryFilter(row, filters.industry)) {
+    return "industry"
+  }
+  if (filters.subindustry && !includesFold(row.subindustry ?? row.industry, filters.subindustry)) {
+    return "subindustry"
+  }
+  if (filters.location) {
+    const loc = [row.location, row.city, row.state, row.service_area].join(" ")
+    if (!includesFold(loc, filters.location)) return "location"
+  }
+  if (filters.service_area && !includesFold(row.service_area, filters.service_area)) {
+    return "service_area"
+  }
+  if (
+    filters.territory_filter &&
+    !rowMatchesTerritoryFilter(
+      {
+        city: row.city,
+        state: row.state,
+        postal_code: row.postal_code,
+        country: row.country,
+        location: row.location,
+        service_area: row.service_area,
+        metro: row.metro,
+        lat: row.lat,
+        lng: row.lng,
+      },
+      filters.territory_filter,
+    )
+  ) {
+    return "territory"
+  }
+  if (filters.employee_size_bands?.length) {
+    const band = inferEmployeeSizeBand(row.employees)
+    if (options?.external_discovery && band === "unknown") {
+      // External listings rarely include headcount — do not drop on unknown.
+    } else if (!filters.employee_size_bands.includes(band)) {
+      return "employee_size_band"
+    }
+  }
+  if (filters.revenue_bands?.length) {
+    const band = inferRevenueBand(row.revenue_range)
+    if (options?.external_discovery && band === "unknown") {
+      // External listings rarely include revenue — do not drop on unknown.
+    } else if (!filters.revenue_bands.includes(band)) {
+      return "revenue_band"
+    }
+  }
+  if (filters.keywords?.length) {
+    const blob = [row.company_name, row.website, row.industry, row.notes, ...row.keywords].join(" ")
+    if (!filters.keywords.every((kw) => includesFold(blob, kw))) return "keywords"
+  }
+  if (filters.technologies?.length) {
+    const blob = [
+      row.crm_detected,
+      row.field_service_software,
+      row.website_platform,
+      row.notes,
+      ...row.keywords,
+      ...(row.company_signal_summary?.technology_signals ?? []),
+    ]
+      .filter(Boolean)
+      .join(" ")
+    if (!filters.technologies.every((tech) => includesFold(blob, tech))) return "technologies"
+  }
+  if (filters.crm_detected && !includesFold(row.crm_detected, filters.crm_detected)) return "crm_detected"
+  if (filters.website_platform && !includesFold(row.website_platform, filters.website_platform)) {
+    return "website_platform"
+  }
+  if (
+    filters.field_service_software &&
+    !includesFold(row.field_service_software, filters.field_service_software)
+  ) {
+    return "field_service_software"
+  }
+  if (filters.intent_score_min != null && (row.intent_score ?? 0) < filters.intent_score_min) {
+    return "intent_score_min"
+  }
+  if (filters.lead_score_min != null && (row.lead_score ?? 0) < filters.lead_score_min) {
+    return "lead_score_min"
+  }
+  if (
+    filters.growth_signal_score_min != null &&
+    (row.growth_signal_score ?? 0) < filters.growth_signal_score_min
+  ) {
+    return "growth_signal_score_min"
+  }
+  if (filters.growth_signal_tiers?.length) {
+    if (!row.growth_signal_tier || !filters.growth_signal_tiers.includes(row.growth_signal_tier)) {
+      return "growth_signal_tier"
+    }
+  }
+  if (filters.buying_stages?.length) {
+    if (!row.buying_stage || !filters.buying_stages.includes(row.buying_stage as GrowthBuyingStage)) {
+      return "buying_stage"
+    }
+  }
+  if (filters.search_intent_categories?.length) {
+    if (
+      !row.search_intent_category ||
+      !filters.search_intent_categories.includes(row.search_intent_category)
+    ) {
+      return "search_intent_category"
+    }
+  }
+  if (
+    filters.company_identification_confidence_min != null &&
+    (row.company_match_confidence ?? 0) < filters.company_identification_confidence_min
+  ) {
+    return "company_identification_confidence_min"
+  }
+  if (filters.returning_visitor_only && !row.returning_visitor) return "returning_visitor_only"
+
+  const status = row.existing_customer || row.existing_prospect || row.existing_account
+  if (filters.existing_account_mode === "include_only" && !status) return "existing_account_mode"
+  if (filters.existing_account_mode === "exclude" && status) return "existing_account_mode"
+  if (filters.existing_account_mode === "exclude_customers" && row.existing_customer) {
+    return "existing_account_mode"
+  }
+  if (
+    filters.existing_account_mode === "exclude_crm" &&
+    (row.existing_customer || row.existing_prospect)
+  ) {
+    return "existing_account_mode"
+  }
+
+  if (filters.suppression_mode === "exclude" && row.is_suppressed) return "suppression_mode"
+  if (filters.suppression_mode === "include_only" && !row.is_suppressed) return "suppression_mode"
+  if (filters.suppression_mode === "suppressed_only" && !row.is_suppressed) return "suppression_mode"
+
+  if (filters.verification_status && row.verification_status !== filters.verification_status) {
+    return "verification_status"
+  }
+  if (filters.priority && row.priority !== filters.priority) return "priority"
+  if (filters.decision_maker_role) {
+    if ((row.decision_maker_count ?? 0) === 0) return "decision_maker_role"
+  }
+  return null
+}
+
 function parseEmployeeCount(raw: string | null | undefined): number | null {
   const text = (raw ?? "").toLowerCase()
   const match = text.match(/(\d[\d,]*)/)
@@ -139,141 +330,8 @@ export function normalizeProspectSearchFilters(
 
 export function applyProspectSearchFilters<
   T extends GrowthProspectSearchIndexCompany | GrowthProspectSearchCompanyResult,
->(companies: T[], filters: GrowthProspectSearchFilters): T[] {
-  return companies.filter((row) => {
-    if (filters.source_types?.length && !filters.source_types.includes(row.source_type)) {
-      return false
-    }
-    if (filters.industry && !includesFold(row.industry, filters.industry)) {
-      const blob = [row.industry, row.subindustry, ...row.keywords, row.company_name, row.notes].join(" ")
-      if (!includesFold(blob, filters.industry)) return false
-    }
-    if (filters.subindustry && !includesFold(row.subindustry ?? row.industry, filters.subindustry)) {
-      return false
-    }
-    if (filters.location) {
-      const loc = [row.location, row.city, row.state, row.service_area].join(" ")
-      if (!includesFold(loc, filters.location)) return false
-    }
-    if (filters.service_area && !includesFold(row.service_area, filters.service_area)) {
-      return false
-    }
-    if (
-      filters.territory_filter &&
-      !rowMatchesTerritoryFilter(
-        {
-          city: row.city,
-          state: row.state,
-          postal_code: row.postal_code,
-          country: row.country,
-          location: row.location,
-          service_area: row.service_area,
-          metro: row.metro,
-          lat: row.lat,
-          lng: row.lng,
-        },
-        filters.territory_filter,
-      )
-    ) {
-      return false
-    }
-    if (filters.employee_size_bands?.length) {
-      const band = inferEmployeeSizeBand(row.employees)
-      if (!filters.employee_size_bands.includes(band)) return false
-    }
-    if (filters.revenue_bands?.length) {
-      const band = inferRevenueBand(row.revenue_range)
-      if (!filters.revenue_bands.includes(band)) return false
-    }
-    if (filters.keywords?.length) {
-      const blob = [row.company_name, row.website, row.industry, row.notes, ...row.keywords].join(" ")
-      if (!filters.keywords.every((kw) => includesFold(blob, kw))) return false
-    }
-    if (filters.technologies?.length) {
-      const blob = [
-        row.crm_detected,
-        row.field_service_software,
-        row.website_platform,
-        row.notes,
-        ...row.keywords,
-        ...(row.company_signal_summary?.technology_signals ?? []),
-      ]
-        .filter(Boolean)
-        .join(" ")
-      if (!filters.technologies.every((tech) => includesFold(blob, tech))) return false
-    }
-    if (filters.crm_detected && !includesFold(row.crm_detected, filters.crm_detected)) return false
-    if (filters.website_platform && !includesFold(row.website_platform, filters.website_platform)) {
-      return false
-    }
-    if (
-      filters.field_service_software &&
-      !includesFold(row.field_service_software, filters.field_service_software)
-    ) {
-      return false
-    }
-    if (filters.intent_score_min != null && (row.intent_score ?? 0) < filters.intent_score_min) {
-      return false
-    }
-    if (filters.lead_score_min != null && (row.lead_score ?? 0) < filters.lead_score_min) {
-      return false
-    }
-    if (
-      filters.growth_signal_score_min != null &&
-      (row.growth_signal_score ?? 0) < filters.growth_signal_score_min
-    ) {
-      return false
-    }
-    if (filters.growth_signal_tiers?.length) {
-      if (!row.growth_signal_tier || !filters.growth_signal_tiers.includes(row.growth_signal_tier)) {
-        return false
-      }
-    }
-    if (filters.buying_stages?.length) {
-      if (!row.buying_stage || !filters.buying_stages.includes(row.buying_stage as GrowthBuyingStage)) {
-        return false
-      }
-    }
-    if (filters.search_intent_categories?.length) {
-      if (
-        !row.search_intent_category ||
-        !filters.search_intent_categories.includes(row.search_intent_category)
-      ) {
-        return false
-      }
-    }
-    if (
-      filters.company_identification_confidence_min != null &&
-      (row.company_match_confidence ?? 0) < filters.company_identification_confidence_min
-    ) {
-      return false
-    }
-    if (filters.returning_visitor_only && !row.returning_visitor) return false
-
-    const status = row.existing_customer || row.existing_prospect || row.existing_account
-    if (filters.existing_account_mode === "include_only" && !status) return false
-    if (filters.existing_account_mode === "exclude" && status) return false
-    if (filters.existing_account_mode === "exclude_customers" && row.existing_customer) return false
-    if (
-      filters.existing_account_mode === "exclude_crm" &&
-      (row.existing_customer || row.existing_prospect)
-    ) {
-      return false
-    }
-
-    if (filters.suppression_mode === "exclude" && row.is_suppressed) return false
-    if (filters.suppression_mode === "include_only" && !row.is_suppressed) return false
-    if (filters.suppression_mode === "suppressed_only" && !row.is_suppressed) return false
-
-    if (filters.verification_status && row.verification_status !== filters.verification_status) {
-      return false
-    }
-    if (filters.priority && row.priority !== filters.priority) return false
-    if (filters.decision_maker_role) {
-      if ((row.decision_maker_count ?? 0) === 0) return false
-    }
-    return true
-  })
+>(companies: T[], filters: GrowthProspectSearchFilters, options?: ProspectSearchFilterOptions): T[] {
+  return companies.filter((row) => !explainProspectSearchFilterDrop(row, filters, options))
 }
 
 function matchTitleToken(blob: string, token: string): boolean {

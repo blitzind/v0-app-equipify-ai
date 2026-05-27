@@ -141,7 +141,7 @@ export function summarizeRealWorldProviderStatus(
     message = "Fixture fallback active — no live public-source API configured."
   } else if (liveConfigured) {
     label = "live_provider_active"
-    message = "Live provider configured but returned no matches for this query."
+    message = "No companies found after expanded provider search. Try adding a location or broadening filters."
   }
 
   return {
