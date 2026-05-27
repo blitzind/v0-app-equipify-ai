@@ -18,6 +18,8 @@ import {
   updateSequenceExecutionJob,
 } from "@/lib/growth/sequences/execution/sequence-job-repository"
 import { buildSequenceExecutionSendPayload } from "@/lib/growth/sequences/execution/sequence-send-builder"
+import { applyReputationSafeScheduleGate } from "@/lib/growth/outbound/reputation-safe-scheduler"
+import { shouldSuppressCampaignFollowUp } from "@/lib/growth/outbound/reply-intelligence"
 
 export type SequenceExecutionRunInput = {
   jobId: string
@@ -192,6 +194,14 @@ export async function runSequenceExecutionJob(
     return { ok: false, jobId: locked.id, status: "blocked", message: "missing_step", blocked: true }
   }
 
+  const followUp = await shouldSuppressCampaignFollowUp(admin, {
+    sequenceEnrollmentId: locked.sequenceEnrollmentId,
+  })
+  if (followUp.suppress) {
+    await finalizeBlockedJob(admin, locked, followUp.reason ?? "follow_up_suppressed")
+    return { ok: false, jobId: locked.id, status: "blocked", message: followUp.reason ?? "follow_up_suppressed", blocked: true }
+  }
+
   const payload = await buildSequenceExecutionSendPayload(admin, {
     sequenceStepId: locked.sequenceStepId,
     leadId: locked.leadId,
@@ -205,6 +215,29 @@ export async function runSequenceExecutionJob(
   if ("error" in payload) {
     await finalizeBlockedJob(admin, locked, payload.error)
     return { ok: false, jobId: locked.id, status: "blocked", message: payload.error, blocked: true }
+  }
+
+  const scheduleGate = await applyReputationSafeScheduleGate(admin, {
+    entityType: "sequence_job",
+    entityId: locked.id,
+    senderAccountId: payload.senderAccountId,
+    senderPoolId: payload.senderPoolId ?? locked.senderPoolId,
+    domain: payload.to.split("@")[1]?.toLowerCase() ?? null,
+    priority: "normal",
+  })
+  if (!scheduleGate.proceed) {
+    const reason = scheduleGate.result.reasons.join("; ") || "reputation_safe_scheduler_blocked"
+    if (scheduleGate.result.decision === "defer") {
+      await updateSequenceExecutionJob(admin, locked.id, {
+        status: "approved",
+        lockedAt: null,
+        lockedBy: null,
+        lastError: reason,
+      })
+      return { ok: false, jobId: locked.id, status: "approved", message: reason, blocked: false }
+    }
+    await finalizeBlockedJob(admin, locked, reason)
+    return { ok: false, jobId: locked.id, status: "blocked", message: reason, blocked: true }
   }
 
   try {

@@ -12,6 +12,7 @@ import {
 import type { GrowthInternalOutboundOperationsDashboard } from "@/lib/growth/operations/internal-outbound-operations-dashboard"
 import { GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER } from "@/lib/growth/operations/internal-outbound-ops-types"
 import { GROWTH_DELIVERABILITY_INTELLIGENCE_QA_MARKER } from "@/lib/growth/deliverability/deliverability-intelligence-types"
+import { GROWTH_REPUTATION_SAFE_SCALING_QA_MARKER } from "@/lib/growth/outbound/reputation-safe-scaling-types"
 
 function formatDate(value: string | null): string {
   if (!value) return "—"
@@ -242,6 +243,135 @@ export function GrowthInternalOutboundOperationsDashboardView() {
           </table>
         </div>
       </GrowthEngineCard>
+
+      <div
+        className="flex flex-col gap-5"
+        data-qa-marker={GROWTH_REPUTATION_SAFE_SCALING_QA_MARKER}
+      >
+        <GrowthEngineCard title="Execution command center" icon={<Activity size={16} />}>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatTile
+              label="Active campaign load"
+              value={String(dashboard.execution_command_center.summary.activeCampaignLoad)}
+            />
+            <StatTile
+              label="Deferred sends (24h)"
+              value={String(dashboard.execution_command_center.summary.deferredSends24h)}
+            />
+            <StatTile
+              label="Overloaded senders"
+              value={String(dashboard.execution_command_center.summary.overloadedSenders)}
+            />
+            <StatTile
+              label="Infrastructure risk"
+              value={dashboard.execution_command_center.summary.infrastructureRiskLevel}
+            />
+            <StatTile
+              label="Avg reply quality"
+              value={String(dashboard.execution_command_center.summary.avgReplyQuality)}
+            />
+            <StatTile
+              label="Degraded campaigns"
+              value={String(dashboard.execution_command_center.summary.degradedCampaigns)}
+            />
+            <StatTile
+              label="Throttled pools"
+              value={String(dashboard.execution_command_center.summary.throttledPools)}
+            />
+            <StatTile
+              label="Paused domains"
+              value={String(dashboard.execution_command_center.summary.pausedDomains)}
+            />
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            {dashboard.execution_command_center.partial_telemetry_note}
+          </p>
+        </GrowthEngineCard>
+
+        <div data-qa-marker={`${GROWTH_REPUTATION_SAFE_SCALING_QA_MARKER}-throughput`}>
+          <GrowthEngineCard title="Throughput utilization" icon={<Server size={16} />}>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-left text-xs">
+                <thead>
+                  <tr className="border-b text-muted-foreground">
+                    <th className="py-2 pr-3">Entity</th>
+                    <th className="py-2 pr-3">Used / limit</th>
+                    <th className="py-2 pr-3">Utilization</th>
+                    <th className="py-2">Saturation</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dashboard.execution_command_center.throughput_utilization.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-3 text-muted-foreground">
+                        No throughput data.
+                      </td>
+                    </tr>
+                  ) : (
+                    dashboard.execution_command_center.throughput_utilization.slice(0, 20).map((row) => (
+                      <tr key={`${row.entityType}-${row.entityId ?? row.label}`} className="border-b border-border/60">
+                        <td className="py-2 pr-3">
+                          <div className="font-medium">{row.label}</div>
+                          <div className="text-muted-foreground">{row.entityType}</div>
+                        </td>
+                        <td className="py-2 pr-3">
+                          {row.dailyUsed}/{row.dailyLimit}
+                        </td>
+                        <td className="py-2 pr-3">{row.utilizationPct}%</td>
+                        <td className="py-2">
+                          <GrowthBadge
+                            label={row.saturationLevel}
+                            tone={row.saturationLevel === "critical" ? "critical" : "neutral"}
+                          />
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </GrowthEngineCard>
+        </div>
+
+        <div data-qa-marker={`${GROWTH_REPUTATION_SAFE_SCALING_QA_MARKER}-allocation`}>
+          <GrowthEngineCard title="Infrastructure recommendations" icon={<Shield size={16} />}>
+            <ul className="space-y-2 text-xs">
+              {dashboard.execution_command_center.infrastructure_recommendations.length === 0 ? (
+                <li className="text-muted-foreground">No recommendations — infrastructure within normal bounds.</li>
+              ) : (
+                dashboard.execution_command_center.infrastructure_recommendations.map((rec) => (
+                  <li key={`${rec.type}-${rec.title}`} className="rounded-lg border p-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium">{rec.title}</span>
+                      <GrowthBadge label={rec.severity} tone={rec.severity === "critical" ? "critical" : "attention"} />
+                    </div>
+                    <p className="text-muted-foreground">{rec.detail}</p>
+                    <p className="text-[10px] text-muted-foreground">Operator action required — no autonomous execution.</p>
+                  </li>
+                ))
+              )}
+            </ul>
+          </GrowthEngineCard>
+        </div>
+
+        <GrowthEngineCard title="Sequence execution diagnostics" icon={<Server size={16} />}>
+          <ul className="space-y-2 text-xs">
+            {dashboard.execution_command_center.sequence_diagnostics.length === 0 ? (
+              <li className="text-muted-foreground">No stuck or dead-letter jobs detected.</li>
+            ) : (
+              dashboard.execution_command_center.sequence_diagnostics.map((diag) => (
+                <li key={diag.id} className="rounded-lg border p-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium">{diag.title}</span>
+                    <GrowthBadge label={diag.diagnosticType} tone={diag.severity === "critical" ? "critical" : "neutral"} />
+                  </div>
+                  <p className="text-muted-foreground">{diag.summary ?? diag.jobId}</p>
+                </li>
+              ))
+            )}
+          </ul>
+        </GrowthEngineCard>
+      </div>
 
       <div
         className="flex flex-col gap-5"

@@ -26,6 +26,8 @@ import { listSenderPoolMembers, listSenderPools } from "@/lib/growth/sender-pool
 import { buildSenderPoolMemberContext } from "@/lib/growth/sender-pools/sender-pool-rotation-service"
 import { fetchDeliverabilityIntelligenceDashboard } from "@/lib/growth/deliverability/deliverability-intelligence-dashboard"
 import type { GrowthDeliverabilityIntelligenceDashboard } from "@/lib/growth/deliverability/deliverability-intelligence-dashboard"
+import { fetchExecutionCommandCenterDashboard } from "@/lib/growth/outbound/execution-command-center-dashboard"
+import type { GrowthExecutionCommandCenterDashboard } from "@/lib/growth/outbound/execution-command-center-dashboard"
 import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 
 export type GrowthInternalOutboundOperationsDashboard = {
@@ -54,6 +56,7 @@ export type GrowthInternalOutboundOperationsDashboard = {
   }
   readiness_catalog: ReturnType<typeof buildGrowthInfrastructureReadinessCatalog>
   deliverability_intelligence: GrowthDeliverabilityIntelligenceDashboard
+  execution_command_center: GrowthExecutionCommandCenterDashboard
 }
 
 function since24hIso(): string {
@@ -84,6 +87,7 @@ export async function fetchGrowthInternalOutboundOperationsDashboard(
     bounces24h,
     complaints24h,
     deliverabilityIntelligence,
+    executionCommandCenter,
   ] = await Promise.all([
     fetchGrowthOutboundOperationsDashboard(admin),
     listMailboxConnections(admin),
@@ -117,6 +121,7 @@ export async function fetchGrowthInternalOutboundOperationsDashboard(
       .select("id", { count: "exact", head: true })
       .gte("occurred_at", since24h),
     fetchDeliverabilityIntelligenceDashboard(admin),
+    fetchExecutionCommandCenterDashboard(admin),
   ])
 
   const senderById = new Map(senders.map((s) => [s.id, s]))
@@ -284,5 +289,6 @@ export async function fetchGrowthInternalOutboundOperationsDashboard(
     },
     readiness_catalog: buildGrowthInfrastructureReadinessCatalog(),
     deliverability_intelligence: deliverabilityIntelligence,
+    execution_command_center: executionCommandCenter,
   }
 }

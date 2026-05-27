@@ -14,6 +14,7 @@ export const GROWTH_CRON_ROUTE_IDS = [
   "growth-territory-refresh",
   "growth-market-health-refresh",
   "growth-dns-verify",
+  "growth-sequence-recovery",
 ] as const
 
 export type GrowthCronRouteId = (typeof GROWTH_CRON_ROUTE_IDS)[number]

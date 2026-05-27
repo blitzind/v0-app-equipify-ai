@@ -83,6 +83,7 @@ function mapDomain(row: Record<string, unknown>): GrowthSenderDomain {
     domain_health_score: asNumber(row.domain_health_score, asNumber(row.deliverability_score, 0)),
     domain_risk_level: asString(row.domain_risk_level) || "medium",
     operational_status: asString(row.operational_status) || "healthy",
+    domain_segment: (asString(row.domain_segment) || "primary") as GrowthSenderDomain["domain_segment"],
     created_at: asString(row.created_at),
     updated_at: asString(row.updated_at),
   }

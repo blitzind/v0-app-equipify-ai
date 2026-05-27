@@ -23,6 +23,7 @@ import type {
 } from "@/lib/growth/outreach/outreach-queue-types"
 import { fetchGrowthOutreachSettings } from "@/lib/growth/outreach/outreach-settings-repository"
 import { resolveScheduledFor } from "@/lib/growth/outreach/outreach-scheduling"
+import { applyReputationSafeScheduleGate } from "@/lib/growth/outbound/reputation-safe-scheduler"
 import {
   emitGrowthLeadOutreachApprovedTimeline,
   emitGrowthLeadOutreachCancelledTimeline,
@@ -255,6 +256,31 @@ export async function runDueScheduledOutreachExecutions(
 
   for (const item of due) {
     try {
+      const domain = item.payloadSnapshot.toEmail?.split("@")[1]?.toLowerCase() ?? null
+      const gate = await applyReputationSafeScheduleGate(admin, {
+        entityType: "outreach_queue",
+        entityId: item.id,
+        domain,
+        priority: item.priority,
+      })
+      if (!gate.proceed) {
+        if (gate.result.decision === "defer" && gate.result.deferredUntil) {
+          await updateGrowthOutreachQueueItem(admin, item.id, {
+            status: "scheduled",
+            scheduledFor: gate.result.deferredUntil,
+            failureReason: gate.result.reasons.join("; ") || "Deferred by reputation-safe scheduler",
+          })
+        } else {
+          await updateGrowthOutreachQueueItem(admin, item.id, {
+            status: "failed",
+            failedAt: new Date().toISOString(),
+            failureReason: gate.result.reasons.join("; ") || "Skipped by reputation-safe scheduler",
+          })
+          failed += 1
+        }
+        continue
+      }
+
       await executeGrowthOutreachQueueItem(admin, {
         queueItem: item,
         actingUserId: input.actingUserId,

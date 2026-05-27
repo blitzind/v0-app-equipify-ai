@@ -79,6 +79,7 @@ export type GrowthSenderDomain = {
   domain_health_score: number
   domain_risk_level: string
   operational_status: string
+  domain_segment: "primary" | "secondary" | "experimental" | "warming" | "paused" | "high_trust"
   created_at: string
   updated_at: string
 }
