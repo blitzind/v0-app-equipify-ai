@@ -16,6 +16,7 @@ export type ProspectSearchExternalPendingMessageKey = keyof typeof PROSPECT_SEAR
 
 export type ProspectSearchFetchTrigger =
   | "explicit_operator_search"
+  | "filters_updated"
   | "icp_template_selection"
   | "saved_workflow_restore"
   | "suggested_query_click"
@@ -43,6 +44,8 @@ export function resolveProspectSearchExternalPendingMessage(
       return PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.templateApplied
     case "saved_workflow_restore":
       return PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.workflowRestored
+    case "filters_updated":
+      return PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.filtersUpdated
     case "suggested_query_click":
     case "search_recommendation_select":
       return PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.queryPrefilled

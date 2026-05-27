@@ -2464,6 +2464,8 @@ async function main(): Promise<void> {
 
   await testProspectSearchProviderIntent()
 
+  await testProspectSearchDiscoverUiState()
+
   await testProspectSearchIntelligenceSchemaHealth()
 
   await testProspectOutboundLaunchMotion()
@@ -2627,6 +2629,11 @@ async function testProspectSearchProviderIntent(): Promise<void> {
   assert.match(shellSource, /resolveProspectSearchExternalPendingMessage/)
   assert.doesNotMatch(shellSource, /void runSearch\(\{ queryText: template\.query, filters: nextFilters \}\)/)
   assert.match(shellSource, /trigger: "suggested_query_click"/)
+  assert.match(shellSource, /searchCompleted/)
+  assert.match(shellSource, /ProspectSearchDiscoverReadyPanel/)
+  assert.match(shellSource, /GROWTH_DISCOVER_READY_TO_SEARCH_QA_MARKER/)
+  assert.match(shellSource, /Apply filters/)
+  assert.match(shellSource, /Filters are hiding all discovered companies/)
 
   const intentSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-provider-search-intent.ts"),
@@ -2637,6 +2644,99 @@ async function testProspectSearchProviderIntent(): Promise<void> {
   assert.doesNotMatch(intentSource, /Search providers/)
   assert.doesNotMatch(shellSource, /Search providers/)
   assert.doesNotMatch(shellSource, /Searching providers/)
+}
+
+async function testProspectSearchDiscoverUiState(): Promise<void> {
+  const {
+    GROWTH_DISCOVER_READY_TO_SEARCH_QA_MARKER,
+    resolveProspectSearchDiscoverResultsPhase,
+    resolveRawProviderCount,
+    shouldShowProspectSearchCleanStart,
+    shouldShowProspectSearchResultsCount,
+    formatProspectSearchResultsCountLabel,
+  } = await import("../lib/growth/prospect-search/prospect-search-discover-ui-state")
+
+  assert.equal(GROWTH_DISCOVER_READY_TO_SEARCH_QA_MARKER, "growth-discover-ready-to-search-v1")
+
+  assert.equal(
+    resolveProspectSearchDiscoverResultsPhase({
+      discoveryMode: "discover_external",
+      isSearching: false,
+      searchCompleted: false,
+      filteredCount: 0,
+      rawProviderCount: null,
+    }),
+    "ready_to_search",
+  )
+  assert.equal(
+    resolveProspectSearchDiscoverResultsPhase({
+      discoveryMode: "discover_external",
+      isSearching: true,
+      searchCompleted: false,
+      filteredCount: 0,
+      rawProviderCount: null,
+    }),
+    "searching",
+  )
+  assert.equal(
+    resolveProspectSearchDiscoverResultsPhase({
+      discoveryMode: "discover_external",
+      isSearching: false,
+      searchCompleted: true,
+      filteredCount: 0,
+      rawProviderCount: 0,
+    }),
+    "no_raw_results",
+  )
+  assert.equal(
+    resolveProspectSearchDiscoverResultsPhase({
+      discoveryMode: "discover_external",
+      isSearching: false,
+      searchCompleted: true,
+      filteredCount: 0,
+      rawProviderCount: 12,
+    }),
+    "filters_hiding_results",
+  )
+
+  assert.equal(
+    shouldShowProspectSearchCleanStart({
+      discoveryMode: "discover_external",
+      hasSearched: false,
+      searchCompleted: false,
+    }),
+    false,
+  )
+  assert.equal(
+    shouldShowProspectSearchResultsCount({
+      discoveryMode: "discover_external",
+      searchCompleted: false,
+      loading: false,
+    }),
+    false,
+  )
+  assert.match(
+    formatProspectSearchResultsCountLabel({
+      discoveryMode: "discover_external",
+      searchCompleted: false,
+      totalCompanies: 0,
+    }),
+    /Not searched yet/i,
+  )
+
+  assert.equal(
+    resolveRawProviderCount({
+      external_filter_diagnostics: { raw_provider_count: 8, normalized_result_count: 0, dropped_result_count: 8, dropped_reasons: {} },
+    } as never),
+    8,
+  )
+
+  const readyPanel = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-discover-ready-panel.tsx"),
+    "utf8",
+  )
+  assert.match(readyPanel, /prospect-search-discover-ui-state/)
+  assert.match(readyPanel, /Ready to search this market/)
 }
 
 async function testProspectPipelineAutomation(): Promise<void> {

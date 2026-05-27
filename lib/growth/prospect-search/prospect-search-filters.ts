@@ -155,15 +155,17 @@ export function explainProspectSearchFilterDrop<
     if (!filters.technologies.every((tech) => includesFold(blob, tech))) return "technologies"
     }
   }
-  if (filters.crm_detected && !includesFold(row.crm_detected, filters.crm_detected)) return "crm_detected"
+  if (filters.crm_detected && !includesFold(row.crm_detected, filters.crm_detected)) {
+    if (!options?.external_discovery) return "crm_detected"
+  }
   if (filters.website_platform && !includesFold(row.website_platform, filters.website_platform)) {
-    return "website_platform"
+    if (!options?.external_discovery) return "website_platform"
   }
   if (
     filters.field_service_software &&
     !includesFold(row.field_service_software, filters.field_service_software)
   ) {
-    return "field_service_software"
+    if (!options?.external_discovery) return "field_service_software"
   }
   if (!options?.external_discovery) {
     if (filters.intent_score_min != null && (row.intent_score ?? 0) < filters.intent_score_min) {
@@ -201,7 +203,7 @@ export function explainProspectSearchFilterDrop<
     filters.company_identification_confidence_min != null &&
     (row.company_match_confidence ?? 0) < filters.company_identification_confidence_min
   ) {
-    return "company_identification_confidence_min"
+    if (!options?.external_discovery) return "company_identification_confidence_min"
   }
   if (filters.returning_visitor_only && !row.returning_visitor) return "returning_visitor_only"
 
@@ -223,11 +225,15 @@ export function explainProspectSearchFilterDrop<
   if (filters.suppression_mode === "suppressed_only" && !row.is_suppressed) return "suppression_mode"
 
   if (filters.verification_status && row.verification_status !== filters.verification_status) {
-    return "verification_status"
+    if (!options?.external_discovery) return "verification_status"
   }
-  if (filters.priority && row.priority !== filters.priority) return "priority"
+  if (filters.priority && row.priority !== filters.priority) {
+    if (!options?.external_discovery) return "priority"
+  }
   if (filters.decision_maker_role) {
-    if ((row.decision_maker_count ?? 0) === 0) return "decision_maker_role"
+    if ((row.decision_maker_count ?? 0) === 0) {
+      if (!options?.external_discovery) return "decision_maker_role"
+    }
   }
   return null
 }

@@ -21,6 +21,7 @@ import { DiscoveryModeToggle } from "@/components/growth/prospect-search/discove
 import { IcpTemplatesDrawer } from "@/components/growth/prospect-search/icp-templates-drawer"
 import { ProspectSearchFilterRail } from "@/components/growth/prospect-search/prospect-search-filter-rail"
 import { ProspectSearchCleanStartPanel } from "@/components/growth/prospect-search/prospect-search-clean-start-panel"
+import { ProspectSearchDiscoverReadyPanel } from "@/components/growth/prospect-search/prospect-search-discover-ready-panel"
 import { ProspectSearchDiagnosticsDisclosure } from "@/components/growth/prospect-search/prospect-search-diagnostics-disclosure"
 import {
   ProspectSearchActiveFilterPills,
@@ -70,6 +71,14 @@ import {
   type GrowthProspectSearchSavedSearchWithWorkflow,
 } from "@/lib/growth/prospect-search/saved-search-workflows"
 import { buildProspectSearchGetRequestParams } from "@/lib/growth/prospect-search/prospect-search-client-request"
+import {
+  formatProspectSearchResultsCountLabel,
+  GROWTH_DISCOVER_READY_TO_SEARCH_QA_MARKER,
+  resolveProspectSearchDiscoverResultsPhase,
+  resolveRawProviderCount,
+  shouldShowProspectSearchCleanStart,
+  shouldShowProspectSearchResultsCount,
+} from "@/lib/growth/prospect-search/prospect-search-discover-ui-state"
 import {
   GROWTH_PROSPECT_SEARCH_PROVIDER_INTENT_QA_MARKER,
   resolveProspectSearchExternalPendingMessage,
@@ -127,6 +136,7 @@ export function ProspectSearchShell() {
   )
   const [loading, setLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+  const [searchCompleted, setSearchCompleted] = useState(false)
   const [actionMessage, setActionMessage] = useState<ActionFeedback | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<"card" | "table">("card")
@@ -179,7 +189,39 @@ export function ProspectSearchShell() {
 
   const companies = result?.companies ?? []
   const people = result?.people ?? []
-  const showEmpty = hasSearched && !loading && companies.length === 0 && people.length === 0
+  const rawProviderCount = resolveRawProviderCount(result)
+  const discoverPhase = resolveProspectSearchDiscoverResultsPhase({
+    discoveryMode,
+    isSearching: loading,
+    searchCompleted,
+    filteredCount: companies.length,
+    rawProviderCount,
+  })
+  const showCleanStart = shouldShowProspectSearchCleanStart({
+    discoveryMode,
+    hasSearched,
+    searchCompleted,
+  })
+  const showResultsCount = shouldShowProspectSearchResultsCount({
+    discoveryMode,
+    searchCompleted,
+    loading,
+  })
+  const showInternalEmpty =
+    discoveryMode === "internal" && hasSearched && !loading && companies.length === 0 && people.length === 0
+  const showDiscoverNoResults =
+    discoveryMode === "discover_external" &&
+    searchCompleted &&
+    !loading &&
+    discoverPhase === "no_raw_results"
+  const showDiscoverFiltersHiding =
+    discoveryMode === "discover_external" &&
+    searchCompleted &&
+    !loading &&
+    discoverPhase === "filters_hiding_results"
+  const showDiscoverReady =
+    discoveryMode === "discover_external" && !searchCompleted && !loading
+  const filtersKey = useMemo(() => JSON.stringify(filters), [filters])
 
   const { estimate, loading: estimateLoading, displayState: estimateDisplayState } =
     useProspectSearchLiveEstimation({
@@ -201,7 +243,8 @@ export function ProspectSearchShell() {
   const searchLoadingLabel =
     discoveryMode === "discover_external" ? "Searching companies…" : "Searching…"
   const searchButtonLabel = estimate?.search_button_label ?? "Search"
-  const applyButtonLabel = searchButtonLabel
+  const applyButtonLabel =
+    discoveryMode === "discover_external" ? "Apply filters" : searchButtonLabel
   const searchButtonDisabled =
     loading || (estimate != null && estimate.search_button_disabled && !estimateLoading)
   const applyButtonDisabled = searchButtonDisabled
@@ -221,6 +264,15 @@ export function ProspectSearchShell() {
       setDiscoveryMode("discover_external")
     }
   }, [searchParams])
+
+  useEffect(() => {
+    if (discoveryMode !== "discover_external") return
+    setSearchCompleted(false)
+    setHasSearched(false)
+    setResult(null)
+    setSelectedCompany(null)
+    setSelectedKeys(new Set())
+  }, [discoveryMode, filtersKey])
 
   const fetchResults = useCallback(
     async (input: {
@@ -249,6 +301,9 @@ export function ProspectSearchShell() {
       if (input.sortByOverride != null) setSortBy(input.sortByOverride)
       setLoading(true)
       setHasSearched(true)
+      if (activeDiscoveryMode === "discover_external") {
+        setSearchCompleted(false)
+      }
       setError(null)
       setActionMessage(null)
       if (input.resetSelection !== false) setSelectedKeys(new Set())
@@ -284,6 +339,9 @@ export function ProspectSearchShell() {
         setError(e instanceof Error ? e.message : String(e))
       } finally {
         setLoading(false)
+        if (activeDiscoveryMode === "discover_external") {
+          setSearchCompleted(true)
+        }
       }
     },
     [],
@@ -795,6 +853,9 @@ export function ProspectSearchShell() {
       data-clean-start-marker={GROWTH_SEARCH_CLEAN_START_QA_MARKER}
       data-has-searched-marker={GROWTH_SEARCH_HAS_SEARCHED_STATE_QA_MARKER}
       data-has-searched={hasSearched ? "true" : "false"}
+      data-search-completed={searchCompleted ? "true" : "false"}
+      data-discover-phase={discoverPhase ?? "internal"}
+      data-discover-ready-qa={GROWTH_DISCOVER_READY_TO_SEARCH_QA_MARKER}
       data-diagnostics-hidden-marker={GROWTH_SEARCH_DIAGNOSTICS_HIDDEN_QA_MARKER}
     >
       {/* Search hero */}
@@ -811,6 +872,13 @@ export function ProspectSearchShell() {
             onChange={(mode) => {
               setDiscoveryMode(mode)
               setSelectedKeys(new Set())
+              if (mode === "discover_external") {
+                setHasSearched(false)
+                setSearchCompleted(false)
+                setResult(null)
+                setSelectedCompany(null)
+                setPendingProviderSearchHint(null)
+              }
             }}
           />
           <Button type="button" variant="outline" size="sm" onClick={() => setIcpTemplatesOpen(true)}>
@@ -892,14 +960,20 @@ export function ProspectSearchShell() {
         <ProspectSearchFilterRail
           filters={filters}
           onChange={updateFilters}
-          onApply={() =>
+          onApply={() => {
+            if (discoveryModeRef.current === "discover_external") {
+              setPendingProviderSearchHint(
+                resolveProspectSearchExternalPendingMessage("filters_updated"),
+              )
+              return
+            }
             void runSearch({
               queryText: queryRef.current,
               filters: filtersRef.current,
               discoveryMode: discoveryModeRef.current,
               trigger: "explicit_operator_search",
             })
-          }
+          }}
           onClear={() => replaceFilters(EMPTY_FILTERS)}
           applyLabel={applyButtonLabel}
           applyDisabled={applyButtonDisabled}
@@ -928,43 +1002,29 @@ export function ProspectSearchShell() {
           className="flex min-w-0 flex-1 flex-col gap-6"
           data-qa-marker={GROWTH_RESULTS_HEADER_LAYOUT_V1_QA_MARKER}
         >
-          {!hasSearched ? (
+          {!showCleanStart ? (
             <>
-              {territoryHeatmapVisible ? (
-                <TerritoryOpportunityHeatmapPanel
-                  heatmap={heatmap}
-                  loading={heatmapLoading}
-                  compact
-                  onDrilldown={handleTerritoryHeatmapDrilldown}
-                  onRecommendedAction={(action) => void handleTerritoryHeatmapRecommendedAction(action)}
+              {(discoveryMode === "internal" && hasSearched) ||
+              (discoveryMode === "discover_external" && searchCompleted) ? (
+                <TerritoryIntelligencePanel
+                  summary={result?.territory_intelligence}
+                  filters={filters}
+                  query={query}
+                  loading={loading}
+                  onSaveTerritory={async (name) => {
+                    await runAction("save_territory", { territory_name: name })
+                  }}
+                  onRefreshTerritory={async () => {
+                    await runAction("refresh_territory", {
+                      territory_id: filters.territory_id ?? result?.territory_intelligence?.territory_id,
+                    })
+                    await runSearch()
+                  }}
+                  onPushTopProspects={async () => {
+                    await runAction("push_territory_top_prospects")
+                  }}
                 />
               ) : null}
-              <ProspectSearchCleanStartPanel
-                savedSearches={savedSearches}
-                onRunQuery={(q) => void runSearch({ queryText: q, trigger: "suggested_query_click" })}
-                onRestoreSavedSearch={(id) => void loadSavedById(id)}
-              />
-            </>
-          ) : (
-            <>
-              <TerritoryIntelligencePanel
-                summary={result?.territory_intelligence}
-                filters={filters}
-                query={query}
-                loading={loading}
-                onSaveTerritory={async (name) => {
-                  await runAction("save_territory", { territory_name: name })
-                }}
-                onRefreshTerritory={async () => {
-                  await runAction("refresh_territory", {
-                    territory_id: filters.territory_id ?? result?.territory_intelligence?.territory_id,
-                  })
-                  await runSearch()
-                }}
-                onPushTopProspects={async () => {
-                  await runAction("push_territory_top_prospects")
-                }}
-              />
 
               {territoryHeatmapVisible ? (
                 <TerritoryOpportunityHeatmapPanel
@@ -975,7 +1035,16 @@ export function ProspectSearchShell() {
                 />
               ) : null}
 
-              {companies.length > 0 ? (
+              {showDiscoverReady ? <ProspectSearchDiscoverReadyPanel /> : null}
+
+              {loading && discoveryMode === "discover_external" && !searchCompleted ? (
+                <p className="text-sm text-muted-foreground">{searchLoadingLabel}</p>
+              ) : null}
+
+              {(discoveryMode === "internal" && hasSearched) ||
+              (discoveryMode === "discover_external" && (searchCompleted || loading)) ? (
+                <>
+              {companies.length > 0 && searchCompleted ? (
                 <div id="growth-outbound-launch-review">
                   <SavedSearchBatchLaunchPanel
                   savedSearchId={activeSavedSearchId}
@@ -991,7 +1060,7 @@ export function ProspectSearchShell() {
               <div id="growth-prospect-search-results" className="w-full min-w-0 space-y-3">
                 <ProspectSearchActiveFilterPills filters={filters} onChange={replaceFilters} />
 
-                {loading ? (
+                {loading && discoveryMode === "internal" ? (
                   <p className="text-sm text-muted-foreground">{searchLoadingLabel}</p>
                 ) : null}
 
@@ -1000,10 +1069,14 @@ export function ProspectSearchShell() {
                     <h2 className="text-sm font-semibold leading-snug text-foreground">
                       <span className="inline-flex max-w-full flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
                         <span className="whitespace-nowrap">Results</span>
-                        {result && !loading ? (
+                        {result && showResultsCount ? (
                           <>
                             <span className="whitespace-nowrap font-normal text-muted-foreground">
-                              {result.total_companies.toLocaleString()} companies found
+                              {formatProspectSearchResultsCountLabel({
+                                discoveryMode,
+                                searchCompleted,
+                                totalCompanies: result.total_companies,
+                              })}
                             </span>
                             {result.discovery_mode === "internal" ? (
                               <>
@@ -1016,6 +1089,10 @@ export function ProspectSearchShell() {
                               </>
                             ) : null}
                           </>
+                        ) : discoveryMode === "discover_external" && !searchCompleted && !loading ? (
+                          <span className="whitespace-nowrap font-normal text-muted-foreground">
+                            Not searched yet
+                          </span>
                         ) : null}
                       </span>
                     </h2>
@@ -1057,7 +1134,8 @@ export function ProspectSearchShell() {
 
                 {result ? <ProspectSearchDiagnosticsDisclosure result={result} /> : null}
 
-                {showEmpty ? (
+                {(showInternalEmpty || showDiscoverNoResults || showDiscoverFiltersHiding) &&
+                !showDiscoverReady ? (
                   <ProspectSearchRelaxFilters
                     estimate={estimate}
                     filters={filters}
@@ -1066,6 +1144,7 @@ export function ProspectSearchShell() {
                 ) : null}
               </div>
 
+              {searchCompleted ? (
               <ProspectSearchBulkActionBar
                 selectedCount={selectedKeys.size}
                 pushableCount={pushableSelectedCount}
@@ -1074,6 +1153,7 @@ export function ProspectSearchShell() {
                 onPush={() => void runBulkPush()}
                 onClear={clearSelection}
               />
+              ) : null}
 
               {result && result.discovery_mode === "internal" && result.total_companies > 0 ? (
                 <ProspectSearchPagination
@@ -1087,21 +1167,36 @@ export function ProspectSearchShell() {
                 />
               ) : null}
 
-              {showEmpty ? (
+              {showDiscoverFiltersHiding ? (
+                <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/50 px-6 py-10 text-center">
+                  <h3 className="text-lg font-semibold">Filters are hiding all discovered companies</h3>
+                  <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+                    External discovery returned {rawProviderCount?.toLocaleString() ?? "some"} companies, but
+                    your current filters removed every match. Broaden firmographic filters or clear enrichment
+                    filters that provider rows do not include yet.
+                  </p>
+                </div>
+              ) : showDiscoverNoResults ? (
                 <SearchEmptyState
                   onRunQuery={(q) => void runSearch({ queryText: q, trigger: "suggested_query_click" })}
                   onSelectTemplate={applyTemplate}
                   recentSaved={savedSearches}
-                  title={result?.expanded_search_exhausted ? "No companies found" : "No companies found"}
+                  title="No companies found"
                   emptyMessage={
                     result?.expanded_search_exhausted
                       ? "No companies found after expanded provider search. Try adding a location or broadening filters."
-                      : result?.discovery_mode === "discover_external"
-                        ? "No companies matched this search yet. Try broadening industry or location filters."
-                        : "No companies matched this search yet. Try broadening filters or adjusting your query."
+                      : "No companies matched this external discovery search. Try broadening industry or location filters."
                   }
                 />
-              ) : view === "card" ? (
+              ) : showInternalEmpty ? (
+                <SearchEmptyState
+                  onRunQuery={(q) => void runSearch({ queryText: q, trigger: "suggested_query_click" })}
+                  onSelectTemplate={applyTemplate}
+                  recentSaved={savedSearches}
+                  title="No companies found"
+                  emptyMessage="No companies matched this search yet. Try broadening filters or adjusting your query."
+                />
+              ) : searchCompleted && view === "card" ? (
                 <div className="flex flex-col gap-4">
                   {companies.map((row) => (
                     <CompanyResultCard
@@ -1122,7 +1217,7 @@ export function ProspectSearchShell() {
                     />
                   ))}
                 </div>
-              ) : (
+              ) : searchCompleted ? (
                 <>
                 <CompanyResultsTable
                   rows={companies}
@@ -1154,7 +1249,7 @@ export function ProspectSearchShell() {
                   </div>
                 ) : null}
                 </>
-              )}
+              ) : null}
 
               {people.length > 0 ? (
                 <div>
@@ -1166,6 +1261,25 @@ export function ProspectSearchShell() {
                   </div>
                 </div>
               ) : null}
+                </>
+              ) : null}
+            </>
+          ) : (
+            <>
+              {territoryHeatmapVisible ? (
+                <TerritoryOpportunityHeatmapPanel
+                  heatmap={heatmap}
+                  loading={heatmapLoading}
+                  compact
+                  onDrilldown={handleTerritoryHeatmapDrilldown}
+                  onRecommendedAction={(action) => void handleTerritoryHeatmapRecommendedAction(action)}
+                />
+              ) : null}
+              <ProspectSearchCleanStartPanel
+                savedSearches={savedSearches}
+                onRunQuery={(q) => void runSearch({ queryText: q, trigger: "suggested_query_click" })}
+                onRestoreSavedSearch={(id) => void loadSavedById(id)}
+              />
             </>
           )}
         </div>
@@ -1192,7 +1306,8 @@ export function ProspectSearchShell() {
         saving={savingSearch}
       />
 
-      {selectedCompany && hasSearched ? (
+      {selectedCompany &&
+      (discoveryMode === "internal" ? hasSearched : searchCompleted) ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 backdrop-blur md:hidden">
           <ProspectWorkflowLauncher
             company={selectedCompany}
