@@ -11,6 +11,7 @@ import { evaluateSenderPoolMemberEligibility } from "@/lib/growth/sender-pools/s
 import { buildSenderPoolMemberContext } from "@/lib/growth/sender-pools/sender-pool-rotation-service"
 import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 import { recordInternalOutboundAuditEvent } from "@/lib/growth/operations/internal-outbound-audit"
+import { evaluateReputationProtectionPreSend } from "@/lib/growth/deliverability/reputation-protection-pre-send"
 
 export type GrowthPreSendInfrastructureResult = {
   allowed: boolean
@@ -22,6 +23,8 @@ export type GrowthPreSendInfrastructureResult = {
     | "domain_protection"
     | "pool_inactive"
     | "daily_cap_exhausted"
+    | "reputation_paused"
+    | "reputation_throttled"
     | null
 }
 
@@ -59,6 +62,29 @@ export async function evaluatePreSendInfrastructureAllowed(
       allowed: false,
       reason: "Sender daily send cap exhausted.",
       blockCode: "daily_cap_exhausted",
+    }
+  }
+
+  const reputation = await evaluateReputationProtectionPreSend(admin, {
+    senderAccountId: input.senderAccountId,
+  })
+  if (!reputation.allowed) {
+    await recordInternalOutboundAuditEvent(admin, {
+      eventType: "pre_send_blocked",
+      severity: reputation.blockCode === "reputation_paused" ? "critical" : "high",
+      title: "Send blocked — deliverability reputation protection",
+      summary: reputation.reason,
+      senderAccountId: input.senderAccountId,
+      metadata: {
+        block_code: reputation.blockCode,
+        rule_id: reputation.throttle?.rule_id,
+      },
+    }).catch(() => undefined)
+
+    return {
+      allowed: false,
+      reason: reputation.reason ?? "Deliverability reputation protection blocked send.",
+      blockCode: reputation.blockCode,
     }
   }
 

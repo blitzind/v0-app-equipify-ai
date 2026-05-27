@@ -195,6 +195,7 @@
     "test:growth-multichannel-sequences": "tsx scripts/test-growth-multichannel-sequences.ts",
     "test:growth-sender-pools": "tsx scripts/test-growth-sender-pools.ts",
     "test:growth-deliverability-ops": "tsx scripts/test-growth-deliverability-ops.ts",
+    "test:growth-deliverability-reputation-protection": "tsx scripts/test-growth-deliverability-reputation-protection.ts",
     "test:growth-content-library": "tsx scripts/test-growth-content-library.ts",
     "test:organization-account-classification": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-organization-account-classification.ts",
     "test:growth-provider-delivery": "tsx scripts/test-growth-provider-delivery.ts",

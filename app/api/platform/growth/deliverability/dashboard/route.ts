@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
-import { collectTopIssues } from "@/lib/growth/deliverability/deliverability-dashboard"
-import { listDeliverabilityTimelineEvents } from "@/lib/growth/deliverability/deliverability-events"
+import { buildReputationProtectionDashboard } from "@/lib/growth/deliverability/reputation-protection-dashboard"
 import {
-  fetchDeliverabilityDashboard,
-  fetchDeliverabilityOverview,
-  listDeliverabilityEvents,
-} from "@/lib/growth/deliverability/deliverability-repository"
-import { isGrowthDnsDeliverabilitySchemaReady } from "@/lib/growth/deliverability/deliverability-schema-health"
-import { GROWTH_DNS_DELIVERABILITY_PRIVACY_NOTE } from "@/lib/growth/deliverability/deliverability-types"
+  GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_MIGRATION,
+  isGrowthDeliverabilityReputationProtectionSchemaReady,
+} from "@/lib/growth/deliverability/reputation-protection-schema-health"
+import { GROWTH_REPUTATION_PROTECTION_PRIVACY_NOTE } from "@/lib/growth/deliverability/reputation-protection-types"
 
 export const runtime = "nodejs"
 
@@ -16,40 +13,26 @@ export async function GET() {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 
-  if (!(await isGrowthDnsDeliverabilitySchemaReady(access.admin))) {
+  const schemaReady = await isGrowthDeliverabilityReputationProtectionSchemaReady(access.admin)
+  if (!schemaReady) {
     return NextResponse.json(
       {
         error: "growth_schema_incomplete",
-        message: "Apply migration 20270126120000_growth_dns_deliverability.sql, then reload.",
+        migration: GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_MIGRATION,
       },
       { status: 503 },
     )
   }
 
   try {
-    const [dashboard, overview, events, timeline] = await Promise.all([
-      fetchDeliverabilityDashboard(access.admin),
-      fetchDeliverabilityOverview(access.admin),
-      listDeliverabilityEvents(access.admin, { limit: 30, unresolved_only: true }),
-      listDeliverabilityTimelineEvents(access.admin, { limit: 20 }),
-    ])
-
+    const dashboard = await buildReputationProtectionDashboard(access.admin)
     return NextResponse.json({
       ok: true,
       dashboard,
-      domains: overview.domains,
-      top_issues: collectTopIssues(overview.domains),
-      events,
-      timeline,
-      privacy_note: GROWTH_DNS_DELIVERABILITY_PRIVACY_NOTE,
+      privacy_note: GROWTH_REPUTATION_PROTECTION_PRIVACY_NOTE,
     })
-  } catch (error) {
-    return NextResponse.json(
-      {
-        error: "deliverability_dashboard_failed",
-        message: error instanceof Error ? error.message : "Could not load deliverability dashboard.",
-      },
-      { status: 500 },
-    )
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ error: "fetch_failed", message }, { status: 500 })
   }
 }
