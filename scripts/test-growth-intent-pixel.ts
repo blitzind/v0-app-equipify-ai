@@ -150,6 +150,7 @@ const adminPage = fs.readFileSync(
   "utf8",
 )
 assert.match(adminPage, /GrowthIntentPixelAdmin/)
+assert.match(adminPage, /Intent Signals/)
 assert.doesNotMatch(adminPage, /GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER/)
 assert.doesNotMatch(adminPage, /growth-intent-pixel-admin-v1/)
 
@@ -157,24 +158,53 @@ const adminUi = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-intent-pixel-admin.tsx"),
   "utf8",
 )
-assert.match(adminUi, /Privacy guardrails/)
-assert.match(adminUi, /Copy script/)
-assert.match(adminUi, /Event stream/)
 assert.match(adminUi, /GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER/)
 assert.match(adminUi, /data-qa-marker=\{GROWTH_INTENT_PIXEL_ADMIN_QA_MARKER\}/)
-assert.match(adminUi, /Process recent intent/)
-assert.match(adminUi, /Schema:/)
-assert.match(adminUi, /"Ready"/)
-assert.match(adminUi, /GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION/)
+assert.match(adminUi, /IntentSignalsShell/)
+assert.match(adminUi, /IntentSignalsSetupDrawer/)
+assert.match(adminUi, /buildIntentPixelScriptSnippet/)
+assert.match(adminUi, /scriptSnippet/)
 assert.doesNotMatch(adminUi, /submitted_identity/)
 assert.doesNotMatch(adminUi, /identified_contacts.*select.*email/i)
+
+const signalsShell = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/intent-signals/intent-signals-shell.tsx"),
+  "utf8",
+)
+assert.match(signalsShell, /GROWTH_INTENT_SIGNALS_LAYOUT_V2_QA_MARKER/)
+assert.match(signalsShell, /data-qa-marker=\{GROWTH_INTENT_SIGNALS_LAYOUT_V2_QA_MARKER\}/)
+
+const signalsUxConstants = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/intent-signals/intent-signals-ux-constants.ts"),
+  "utf8",
+)
+assert.match(signalsUxConstants, /growth-intent-signals-layout-v2/)
+
+const setupDrawer = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/intent-signals/intent-signals-setup-drawer.tsx"),
+  "utf8",
+)
+assert.match(setupDrawer, /GROWTH_INTENT_SIGNALS_SETUP_DRAWER_QA_MARKER/)
+assert.match(signalsUxConstants, /growth-intent-signals-setup-drawer-v1/)
+assert.match(setupDrawer, /Privacy guardrails/)
+assert.match(setupDrawer, /Copy script/)
+assert.match(setupDrawer, /Event stream/)
+assert.match(setupDrawer, /Schema:/)
+assert.match(setupDrawer, /"Ready"/)
+assert.match(setupDrawer, /GROWTH_INTENT_PIXEL_SCHEMA_MIGRATION/)
+
+const websiteVisitorsTab = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/intent-signals/tabs/website-visitors-tab.tsx"),
+  "utf8",
+)
+assert.match(websiteVisitorsTab, /Process recent intent/)
 
 const sidebar = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts"),
   "utf8",
 )
 assert.match(sidebar, /\/admin\/growth\/intent-pixel/)
-assert.match(sidebar, /Intent Pixel/)
+assert.match(sidebar, /Intent Signals/)
 
 const adminRepo = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/intent-pixel/intent-pixel-admin-repository.ts"),
@@ -351,7 +381,11 @@ if (fs.existsSync(marketingSiteRoot)) {
     "utf8",
   )
   assert.match(adminUi, /buildIntentPixelScriptSnippet/)
-  assert.match(adminUi, /script_snippet/)
+  const setupDrawer = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/intent-signals/intent-signals-setup-drawer.tsx"),
+    "utf8",
+  )
+  assert.match(setupDrawer, /scriptSnippet/)
 }
 
 console.log(

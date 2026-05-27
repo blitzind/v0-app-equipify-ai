@@ -73,17 +73,23 @@ const adminUi = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-intent-pixel-admin.tsx"),
   "utf8",
 )
-assert.match(adminUi, /GROWTH_INTENT_CONSENT_MANAGER_QA_MARKER/)
-assert.match(adminUi, /Consent acceptance %/)
-assert.match(adminUi, /Tracking coverage %/)
-assert.match(adminUi, /Anonymous sessions blocked/)
-assert.match(adminUi, /High intent blocked by consent/)
-assert.match(adminUi, /ConsentBreakdownChart/)
-assert.match(adminUi, /GROWTH_INTENT_CONSENT_CATEGORIES_QA_MARKER/)
-assert.match(adminUi, /Personalization coverage %/)
-assert.match(adminUi, /Marketing attribution coverage %/)
-assert.match(adminUi, /Segmented visitors %/)
-assert.match(adminUi, /Campaign-attributed sessions %/)
+assert.match(adminUi, /IntentSignalsSetupDrawer/)
+
+const setupDrawer = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/intent-signals/intent-signals-setup-drawer.tsx"),
+  "utf8",
+)
+assert.match(setupDrawer, /GROWTH_INTENT_CONSENT_MANAGER_QA_MARKER/)
+assert.match(setupDrawer, /Consent acceptance %/)
+assert.match(setupDrawer, /Tracking coverage %/)
+assert.match(setupDrawer, /Anonymous sessions blocked/)
+assert.match(setupDrawer, /High intent blocked by consent/)
+assert.match(setupDrawer, /ConsentBreakdownChart/)
+assert.match(setupDrawer, /GROWTH_INTENT_CONSENT_CATEGORIES_QA_MARKER/)
+assert.match(setupDrawer, /Personalization coverage %/)
+assert.match(setupDrawer, /Marketing attribution coverage %/)
+assert.match(setupDrawer, /Segmented visitors %/)
+assert.match(setupDrawer, /Campaign-attributed sessions %/)
 
 const adminRepo = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/intent-pixel/intent-pixel-admin-repository.ts"),
