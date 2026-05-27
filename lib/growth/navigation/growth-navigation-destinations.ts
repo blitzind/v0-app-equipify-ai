@@ -139,6 +139,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["dns", "spf", "dkim", "dmarc", "deliverability", "mx"],
   },
   {
+    id: "warmup",
+    label: "Warmup",
+    href: "/admin/growth/infrastructure/warmup",
+    keywords: ["warmup", "ramp", "volume", "schedule", "sender"],
+  },
+  {
     id: "outreach-approval",
     label: "Outreach Approval",
     href: "/admin/growth/outreach/approval",
@@ -485,7 +491,8 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: (path) =>
           path.startsWith("/admin/growth/infrastructure") &&
           !path.startsWith("/admin/growth/infrastructure/mailboxes") &&
-          !path.startsWith("/admin/growth/infrastructure/deliverability"),
+          !path.startsWith("/admin/growth/infrastructure/deliverability") &&
+          !path.startsWith("/admin/growth/infrastructure/warmup"),
       },
       {
         id: "mailbox-connections",
@@ -498,6 +505,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         href: "/admin/growth/infrastructure/deliverability",
         label: "Deliverability",
         match: prefixMatch("/admin/growth/infrastructure/deliverability"),
+      },
+      {
+        id: "warmup",
+        href: "/admin/growth/infrastructure/warmup",
+        label: "Warmup",
+        match: prefixMatch("/admin/growth/infrastructure/warmup"),
       },
       {
         id: "copilot",

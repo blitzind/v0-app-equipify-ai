@@ -15,6 +15,8 @@ export type GrowthSenderProviderCapabilities = {
   supportsValidation: boolean
   supportsDnsValidation: boolean
   supportsDeliverabilityMonitoring: boolean
+  supportsWarmupScheduling: boolean
+  supportsWarmupExecution: boolean
 }
 
 export const GROWTH_SENDER_PROVIDER_CAPABILITIES: Record<
@@ -34,6 +36,8 @@ export const GROWTH_SENDER_PROVIDER_CAPABILITIES: Record<
     supportsValidation: true,
     supportsDnsValidation: true,
     supportsDeliverabilityMonitoring: true,
+    supportsWarmupScheduling: true,
+    supportsWarmupExecution: false,
   },
   microsoft: {
     provider_family: "microsoft",
@@ -48,6 +52,8 @@ export const GROWTH_SENDER_PROVIDER_CAPABILITIES: Record<
     supportsValidation: true,
     supportsDnsValidation: true,
     supportsDeliverabilityMonitoring: true,
+    supportsWarmupScheduling: true,
+    supportsWarmupExecution: false,
   },
   smtp: {
     provider_family: "smtp",
@@ -62,6 +68,8 @@ export const GROWTH_SENDER_PROVIDER_CAPABILITIES: Record<
     supportsValidation: true,
     supportsDnsValidation: true,
     supportsDeliverabilityMonitoring: true,
+    supportsWarmupScheduling: false,
+    supportsWarmupExecution: false,
   },
   custom: {
     provider_family: "custom",
@@ -76,6 +84,8 @@ export const GROWTH_SENDER_PROVIDER_CAPABILITIES: Record<
     supportsValidation: true,
     supportsDnsValidation: false,
     supportsDeliverabilityMonitoring: true,
+    supportsWarmupScheduling: false,
+    supportsWarmupExecution: false,
   },
 }
 

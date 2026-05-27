@@ -143,6 +143,9 @@ export function GrowthDeliverabilityDashboard() {
             <Link href="/admin/growth/infrastructure/mailboxes">Mailbox Connections</Link>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/infrastructure/warmup">Warmup</Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
             <Link href="/admin/growth/infrastructure">Sender Infrastructure</Link>
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>

@@ -169,6 +169,7 @@
     "test:growth-sender-infrastructure": "tsx scripts/test-growth-sender-infrastructure.ts",
     "test:growth-mailbox-connections": "tsx scripts/test-growth-mailbox-connections.ts",
     "test:growth-deliverability": "tsx scripts/test-growth-deliverability.ts",
+    "test:growth-warmup": "tsx scripts/test-growth-warmup.ts",
     "test:schedule-work-order-flow": "tsx scripts/test-schedule-work-order-flow.ts",
     "test:growth-contact-discovery": "tsx scripts/test-growth-contact-discovery.ts",
     "test:growth-verification-enrichment": "tsx scripts/test-growth-verification-enrichment.ts",
