@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { Loader2, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -221,10 +222,18 @@ export function GrowthSenderInfrastructureDashboard() {
         <p className="text-xs text-muted-foreground">
           {GROWTH_SENDER_INFRASTRUCTURE_QA_MARKER} · Infrastructure only — no outbound sending, OAuth, or DNS execution.
         </p>
-        <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
-          <RefreshCw className="mr-1.5 size-3.5" />
-          Refresh
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/infrastructure/mailboxes">Mailbox Connections</Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/infrastructure/deliverability">Deliverability</Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
+            <RefreshCw className="mr-1.5 size-3.5" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {error ? (

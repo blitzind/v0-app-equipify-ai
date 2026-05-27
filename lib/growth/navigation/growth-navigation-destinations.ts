@@ -133,6 +133,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["mailbox", "oauth", "google", "microsoft", "smtp", "token"],
   },
   {
+    id: "deliverability",
+    label: "Deliverability",
+    href: "/admin/growth/infrastructure/deliverability",
+    keywords: ["dns", "spf", "dkim", "dmarc", "deliverability", "mx"],
+  },
+  {
     id: "outreach-approval",
     label: "Outreach Approval",
     href: "/admin/growth/outreach/approval",
@@ -478,13 +484,20 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         label: "Infrastructure",
         match: (path) =>
           path.startsWith("/admin/growth/infrastructure") &&
-          !path.startsWith("/admin/growth/infrastructure/mailboxes"),
+          !path.startsWith("/admin/growth/infrastructure/mailboxes") &&
+          !path.startsWith("/admin/growth/infrastructure/deliverability"),
       },
       {
         id: "mailbox-connections",
         href: "/admin/growth/infrastructure/mailboxes",
         label: "Mailbox Connections",
         match: prefixMatch("/admin/growth/infrastructure/mailboxes"),
+      },
+      {
+        id: "deliverability",
+        href: "/admin/growth/infrastructure/deliverability",
+        label: "Deliverability",
+        match: prefixMatch("/admin/growth/infrastructure/deliverability"),
       },
       {
         id: "copilot",

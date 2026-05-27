@@ -13,6 +13,8 @@ export type GrowthSenderProviderCapabilities = {
   supportsMailboxConnection: boolean
   supportsTokenRefresh: boolean
   supportsValidation: boolean
+  supportsDnsValidation: boolean
+  supportsDeliverabilityMonitoring: boolean
 }
 
 export const GROWTH_SENDER_PROVIDER_CAPABILITIES: Record<
@@ -30,6 +32,8 @@ export const GROWTH_SENDER_PROVIDER_CAPABILITIES: Record<
     supportsMailboxConnection: true,
     supportsTokenRefresh: true,
     supportsValidation: true,
+    supportsDnsValidation: true,
+    supportsDeliverabilityMonitoring: true,
   },
   microsoft: {
     provider_family: "microsoft",
@@ -42,6 +46,8 @@ export const GROWTH_SENDER_PROVIDER_CAPABILITIES: Record<
     supportsMailboxConnection: true,
     supportsTokenRefresh: true,
     supportsValidation: true,
+    supportsDnsValidation: true,
+    supportsDeliverabilityMonitoring: true,
   },
   smtp: {
     provider_family: "smtp",
@@ -54,6 +60,8 @@ export const GROWTH_SENDER_PROVIDER_CAPABILITIES: Record<
     supportsMailboxConnection: true,
     supportsTokenRefresh: false,
     supportsValidation: true,
+    supportsDnsValidation: true,
+    supportsDeliverabilityMonitoring: true,
   },
   custom: {
     provider_family: "custom",
@@ -66,6 +74,8 @@ export const GROWTH_SENDER_PROVIDER_CAPABILITIES: Record<
     supportsMailboxConnection: true,
     supportsTokenRefresh: false,
     supportsValidation: true,
+    supportsDnsValidation: false,
+    supportsDeliverabilityMonitoring: true,
   },
 }
 

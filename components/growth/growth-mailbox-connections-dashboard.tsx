@@ -205,6 +205,9 @@ export function GrowthMailboxConnectionsDashboard() {
           <Button type="button" variant="outline" size="sm" asChild>
             <Link href="/admin/growth/infrastructure">Sender Infrastructure</Link>
           </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/infrastructure/deliverability">Deliverability</Link>
+          </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
             <RefreshCw className="mr-1.5 size-3.5" />
             Refresh
