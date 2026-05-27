@@ -1,11 +1,15 @@
 /** Shared `.select()` fragments so list/detail queries can retry without `work_order_number` if the column is missing. */
 
 export const WO_LIST_SELECT_WITH_NUM =
-  "id, work_order_number, customer_id, customer_location_id, equipment_id, title, status, priority, type, scheduled_on, scheduled_time, completed_at, assigned_user_id, assigned_technician_id, created_at, invoice_number, total_labor_cents, total_parts_cents, notes, maintenance_plan_id, calibration_template_id, created_by_pm_automation, archived_at, billing_state, billable_to_customer, warranty_review_required"
+  "id, work_order_number, customer_id, customer_location_id, equipment_id, title, status, priority, type, scheduled_on, scheduled_time, scheduled_end_time, completed_at, assigned_user_id, assigned_technician_id, created_at, invoice_number, total_labor_cents, total_parts_cents, notes, maintenance_plan_id, calibration_template_id, created_by_pm_automation, archived_at, billing_state, billable_to_customer, warranty_review_required"
 
 export const WO_LIST_SELECT = WO_LIST_SELECT_WITH_NUM.replace("work_order_number, ", "")
 
 /** Strip lifecycle/billing intelligence columns when DB migrations are not applied yet. */
+export function stripScheduledEndTimeFromSelect(select: string): string {
+  return select.replace(", scheduled_end_time", "")
+}
+
 export function stripOperationalBillingColumnsFromSelect(select: string): string {
   let s = select
   s = s.replace(
@@ -38,12 +42,12 @@ export function buildWorkOrderListSelect(opts: {
 
 /** Same fields as detail drawer but without `organization_id` (e.g. work order `/[id]` page). Declared before builders reference it. */
 export const WO_DETAIL_PAGE_SELECT_WITH_NUM =
-  "id, work_order_number, customer_id, customer_location_id, equipment_id, title, status, priority, type, scheduled_on, scheduled_time, completed_at, assigned_user_id, assigned_technician_id, created_at, updated_at, invoice_number, total_labor_cents, total_parts_cents, notes, repair_log, maintenance_plan_id, calibration_template_id, signature_url, signature_captured_at, problem_reported, billable_to_customer, warranty_review_required, warranty_vendor_id, archived_at, billing_state"
+  "id, work_order_number, customer_id, customer_location_id, equipment_id, title, status, priority, type, scheduled_on, scheduled_time, scheduled_end_time, completed_at, assigned_user_id, assigned_technician_id, created_at, updated_at, invoice_number, total_labor_cents, total_parts_cents, notes, repair_log, maintenance_plan_id, calibration_template_id, signature_url, signature_captured_at, problem_reported, billable_to_customer, warranty_review_required, warranty_vendor_id, archived_at, billing_state"
 
 export const WO_DETAIL_PAGE_SELECT = WO_DETAIL_PAGE_SELECT_WITH_NUM.replace("work_order_number, ", "")
 
 export const WO_DETAIL_SELECT_WITH_NUM =
-  "id, work_order_number, organization_id, customer_id, customer_location_id, equipment_id, title, status, priority, type, scheduled_on, scheduled_time, completed_at, assigned_user_id, assigned_technician_id, created_at, updated_at, invoice_number, total_labor_cents, total_parts_cents, notes, repair_log, maintenance_plan_id, calibration_template_id, created_by_pm_automation, signature_url, signature_captured_at, problem_reported, billable_to_customer, warranty_review_required, warranty_vendor_id, archived_at, billing_state"
+  "id, work_order_number, organization_id, customer_id, customer_location_id, equipment_id, title, status, priority, type, scheduled_on, scheduled_time, scheduled_end_time, completed_at, assigned_user_id, assigned_technician_id, created_at, updated_at, invoice_number, total_labor_cents, total_parts_cents, notes, repair_log, maintenance_plan_id, calibration_template_id, created_by_pm_automation, signature_url, signature_captured_at, problem_reported, billable_to_customer, warranty_review_required, warranty_vendor_id, archived_at, billing_state"
 
 export const WO_DETAIL_SELECT = WO_DETAIL_SELECT_WITH_NUM.replace("work_order_number, ", "")
 
@@ -91,8 +95,8 @@ export function buildWorkOrderDetailPageSelect(opts: {
  * `billing_state`, `billable_to_customer`, `warranty_review_required` when DB lacks migrations.
  */
 export const WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM =
-  "id, work_order_number, customer_id, customer_location_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id, assigned_technician_id, priority, type, maintenance_plan_id, calibration_template_id, created_by_pm_automation, total_parts_cents, created_at, completed_at"
+  "id, work_order_number, customer_id, customer_location_id, equipment_id, title, status, scheduled_on, scheduled_time, scheduled_end_time, assigned_user_id, assigned_technician_id, priority, type, maintenance_plan_id, calibration_template_id, created_by_pm_automation, total_parts_cents, created_at, completed_at"
 
 /** Same as {@link WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM} when `assigned_technician_id` is not migrated yet. */
 export const WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_NO_ASSIGN_TECH_WITH_NUM =
-  "id, work_order_number, customer_id, customer_location_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id, priority, type, maintenance_plan_id, calibration_template_id, created_by_pm_automation, total_parts_cents, created_at, completed_at"
+  "id, work_order_number, customer_id, customer_location_id, equipment_id, title, status, scheduled_on, scheduled_time, scheduled_end_time, assigned_user_id, priority, type, maintenance_plan_id, calibration_template_id, created_by_pm_automation, total_parts_cents, created_at, completed_at"

@@ -1,5 +1,6 @@
 /** Growth Engine — Prospect Search + ICP Builder types (Prompt 23). Client-safe. */
 
+import type { GrowthCompanySignalUiSummary } from "@/lib/growth/company-signals/company-signal-types"
 import type { GrowthBuyingStage } from "@/lib/growth/buying-stage/buying-stage-types"
 import type { GrowthSearchIntentCategory } from "@/lib/growth/search-intent/search-intent-types"
 
@@ -141,6 +142,8 @@ export type GrowthProspectSearchCompanyResult = {
   customer_id: string | null
   rank_score: number
   match_reasoning: string[]
+  /** Evidence-backed company signal summary when intelligence run. */
+  company_signal_summary?: GrowthCompanySignalUiSummary | null
 }
 
 export type GrowthProspectSearchPersonResult = {

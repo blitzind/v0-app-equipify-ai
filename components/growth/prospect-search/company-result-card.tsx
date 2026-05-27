@@ -7,6 +7,7 @@ import {
   recommendedMotion,
   ResultSignalBadges,
 } from "@/components/growth/prospect-search/result-signal-badges"
+import { CompanyIntelligenceCard } from "@/components/growth/company-signals/company-intelligence-card"
 import { BuyingCommitteePanel } from "@/components/growth/prospect-search/buying-committee-panel"
 import { RealWorldSourceBadge } from "@/components/growth/prospect-search/real-world-provider-status"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
@@ -88,6 +89,22 @@ export function CompanyResultCard({
 
       <ResultSignalBadges row={row} />
 
+      {row.company_signal_summary ? (
+        <div className="space-y-2 rounded-lg border border-violet-100 bg-violet-50/40 p-3">
+          {row.company_signal_summary.technology_signals.length > 0 ? (
+            <p className="text-xs">
+              <span className="font-semibold text-violet-900">Technology: </span>
+              {row.company_signal_summary.technology_signals.join(" · ")}
+            </p>
+          ) : null}
+          <p className="text-xs text-muted-foreground">
+            Ops {row.company_signal_summary.operational_maturity} · Digital{" "}
+            {row.company_signal_summary.digital_maturity} · Field service{" "}
+            {row.company_signal_summary.field_service_maturity}
+          </p>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <MetricPill label="Lead score" value={row.lead_score ?? "—"} />
         <MetricPill label="Intent" value={row.intent_score ?? "—"} />
@@ -114,7 +131,14 @@ export function CompanyResultCard({
       ) : null}
 
       {row.source_type === "external_discovered" && selected ? (
-        <BuyingCommitteePanel companyCandidateId={row.id} companyName={row.company_name} />
+        <>
+          <CompanyIntelligenceCard
+            companyCandidateId={row.id}
+            companyName={row.company_name}
+            compact
+          />
+          <BuyingCommitteePanel companyCandidateId={row.id} companyName={row.company_name} />
+        </>
       ) : null}
 
       <div

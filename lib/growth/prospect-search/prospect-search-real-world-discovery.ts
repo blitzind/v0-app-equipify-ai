@@ -6,6 +6,8 @@ import {
   prospectSearchFiltersToRealWorldInputs,
 } from "@/lib/growth/real-world-discovery/real-world-discovery-query-builder"
 import { runRealWorldCompanyDiscovery } from "@/lib/growth/real-world-discovery/real-world-discovery-repository"
+import { attachCompanySignalSummaryToProspectCompany } from "@/lib/growth/company-signals/integrations/prospect-search-bridge"
+import { runCompanySignalIntelligence } from "@/lib/growth/company-signals/company-signal-repository"
 import {
   GROWTH_REAL_WORLD_SOURCE_BADGE_LABELS,
   type GrowthRealWorldCompanyCandidate,
@@ -108,7 +110,7 @@ export async function runProspectSearchRealWorldDiscovery(
     limit: input.limit ?? 50,
   })
 
-  const companies = discovery.candidates.map((row, i) => {
+  let companies = discovery.candidates.map((row, i) => {
     const ranked = row as GrowthRealWorldCompanyCandidate & { rank_score?: number }
     const rank_score =
       typeof ranked.rank_score === "number"
@@ -116,6 +118,24 @@ export async function runProspectSearchRealWorldDiscovery(
         : Math.max(0.1, discovery.candidates.length - i) * 0.01
     return realWorldCandidateToCompanyResult(row, rank_score)
   })
+
+  if (discovery.schema_ready && companies.length > 0) {
+    companies = await Promise.all(
+      companies.map(async (company) => {
+        try {
+          const signals = await runCompanySignalIntelligence(admin, {
+            company_candidate_id: company.id,
+          })
+          return attachCompanySignalSummaryToProspectCompany(
+            company,
+            signals.schema_ready ? signals.ui_summary : null,
+          )
+        } catch {
+          return company
+        }
+      }),
+    )
+  }
 
   return {
     companies,

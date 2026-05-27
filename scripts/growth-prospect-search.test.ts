@@ -71,6 +71,7 @@ async function main(): Promise<void> {
   assert.match(pageSource, /GROWTH_PROSPECT_SEARCH_UX_QA_MARKER/)
   assert.match(pageSource, /GROWTH_EXTERNAL_COMPANY_DISCOVERY_QA_MARKER/)
   assert.match(pageSource, /GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER/)
+  assert.match(pageSource, /GROWTH_COMPANY_SIGNAL_INTELLIGENCE_QA_MARKER/)
   assert.match(pageSource, /GROWTH_CONTACT_DISCOVERY_QA_MARKER/)
   assert.match(pageSource, /GROWTH_VERIFICATION_ENRICHMENT_QA_MARKER/)
 
@@ -92,6 +93,8 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(companyCardSource, /BuyingCommitteePanel/)
+  assert.match(companyCardSource, /CompanyIntelligenceCard/)
+  assert.match(companyCardSource, /company_signal_summary/)
 
   const suggestionSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/search-suggestion-engine.ts"),

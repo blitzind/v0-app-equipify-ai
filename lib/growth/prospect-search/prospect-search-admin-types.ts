@@ -3,6 +3,7 @@
 export { GROWTH_PROSPECT_SEARCH_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-types"
 export { GROWTH_EXTERNAL_COMPANY_DISCOVERY_QA_MARKER } from "@/lib/growth/external-discovery/external-discovery-types"
 export { GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER } from "@/lib/growth/real-world-discovery/real-world-discovery-types"
+export { GROWTH_COMPANY_SIGNAL_INTELLIGENCE_QA_MARKER } from "@/lib/growth/company-signals/company-signal-types"
 export { GROWTH_CONTACT_DISCOVERY_QA_MARKER } from "@/lib/growth/contact-discovery/contact-discovery-types"
 export { GROWTH_VERIFICATION_ENRICHMENT_QA_MARKER } from "@/lib/growth/enrichment/enrichment-types"
 

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { CompanyIntelligenceCard } from "@/components/growth/company-signals/company-intelligence-card"
 import { VerificationEnrichmentCard } from "@/components/growth/lead-operator/verification-enrichment-card"
 import { HighIntentActivityCard } from "@/components/growth/revenue-intelligence/high-intent-activity-card"
 import { RevenueIntelligenceWorkspaceLayout } from "@/components/growth/revenue-intelligence/workspace-layout"
@@ -289,11 +290,18 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
             "string" &&
           (workspace.row.metadata.prospect_search as Record<string, unknown>).source_type ===
             "external_discovered" ? (
-            <VerificationEnrichmentCard
-              companyCandidateId={
-                (workspace.row.metadata.prospect_search as Record<string, unknown>).source_id as string
-              }
-            />
+            <>
+              <CompanyIntelligenceCard
+                companyCandidateId={
+                  (workspace.row.metadata.prospect_search as Record<string, unknown>).source_id as string
+                }
+              />
+              <VerificationEnrichmentCard
+                companyCandidateId={
+                  (workspace.row.metadata.prospect_search as Record<string, unknown>).source_id as string
+                }
+              />
+            </>
           ) : null}
           <GrowthEngineCard title="Next action">
             <p className="text-sm font-medium text-foreground">

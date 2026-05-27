@@ -21,6 +21,16 @@ import {
 } from "@/components/ui/select"
 import type { WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
+import {
+  addMinutesToTimeHm,
+  scheduleTimeRangeError,
+  SCHEDULE_WORK_ORDER_FLOW_QA_MARKER,
+} from "@/lib/work-orders/schedule-time"
+import {
+  WORK_ORDER_TYPE_PICKER_OPTIONS,
+  workOrderTypeUiLabel,
+} from "@/lib/work-orders/work-order-type-labels"
+import { CustomerSearchPicker } from "@/components/work-orders/customer-search-picker"
 import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import { loadTechnicianAssignOptions, ASSIGNEE_PICKER_EMPTY_HINT } from "@/lib/work-orders/load-technician-assign-options"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -57,7 +67,7 @@ interface Props {
 }
 
 const PRIORITIES: WorkOrderPriority[] = ["Low", "Normal", "High", "Critical"]
-const TYPES: WorkOrderType[] = ["Repair", "PM", "Inspection", "Install", "Emergency"]
+const TYPES = WORK_ORDER_TYPE_PICKER_OPTIONS
 
 type CustomerOption = { id: string; company_name: string }
 type EquipmentOption = {
@@ -116,6 +126,8 @@ export function CreateWorkOrderModal({
   const [technicianId, setTechnicianId] = useState("")
   const [scheduledDate, setScheduledDate] = useState("")
   const [scheduledTime, setScheduledTime] = useState("08:00")
+  const [scheduledEndTime, setScheduledEndTime] = useState("10:00")
+  const [customerSearch, setCustomerSearch] = useState("")
   const [description, setDescription] = useState("")
   const [problemReported, setProblemReported] = useState("")
   const [customerLocations, setCustomerLocations] = useState<CustomerLocationPick[]>([])
@@ -190,6 +202,7 @@ export function CreateWorkOrderModal({
   useEffect(() => {
     if (open && !prevOpenRef.current) {
       setCustomerId(initialCustomerId ?? "")
+      setCustomerSearch("")
     }
     prevOpenRef.current = open
     if (!open) prevOpenRef.current = false
@@ -367,6 +380,12 @@ export function CreateWorkOrderModal({
     }
     if (!organizationId) return
 
+    const timeErr = scheduleTimeRangeError(scheduledTime, scheduledEndTime)
+    if (timeErr) {
+      setSubmitError(timeErr)
+      return
+    }
+
     const primaryEquipmentId = selectedEquipmentIds[0]!
     const primaryJob = jobByEquipmentId[primaryEquipmentId] ?? defaultJob()
     for (const id of selectedEquipmentIds) {
@@ -395,6 +414,11 @@ export function CreateWorkOrderModal({
       technicianId && technicianId.trim() ? technicianId.trim() : null,
     )
 
+    const hasSchedule = Boolean(
+      scheduledDate && scheduledTime && technicianId && (assign.assigned_technician_id || assign.assigned_user_id),
+    )
+    const status = hasSchedule ? "scheduled" : "open"
+
     const { data: inserted, error: insertError } = await supabase
       .from("work_orders")
       .insert({
@@ -402,11 +426,14 @@ export function CreateWorkOrderModal({
         customer_id: customerId,
         equipment_id: primaryEquipmentId,
         title: description.trim(),
-        status: "open",
+        status,
         priority: uiPriorityToDb(primaryJob.priority),
         type: uiTypeToDb(primaryJob.type),
         scheduled_on: scheduledDate,
         scheduled_time: normalizeTimeForDb(scheduledTime),
+        scheduled_end_time: scheduledEndTime.trim()
+          ? normalizeTimeForDb(scheduledEndTime)
+          : null,
         notes: null,
         problem_reported: problemText,
         customer_location_id: workOrderLocationId.trim() || null,
@@ -482,6 +509,8 @@ export function CreateWorkOrderModal({
     setTechnicianId("")
     setScheduledDate("")
     setScheduledTime("08:00")
+    setScheduledEndTime("10:00")
+    setCustomerSearch("")
     setDescription("")
     setProblemReported("")
     setWorkOrderLocationId("")
@@ -546,7 +575,10 @@ export function CreateWorkOrderModal({
           if (!v && !addEquipmentOpen) handleClose()
         }}
       >
-        <DialogContent className="max-w-4xl w-[calc(100vw-1.5rem)] sm:w-full max-h-[92vh] overflow-y-auto gap-0 p-0">
+        <DialogContent
+          className="max-w-4xl w-[calc(100vw-1.5rem)] sm:w-full max-h-[92vh] overflow-y-auto gap-0 p-0"
+          data-qa-marker={SCHEDULE_WORK_ORDER_FLOW_QA_MARKER}
+        >
           <div className="px-6 pt-6 pb-2">
             <DialogHeader className="space-y-1">
               <DialogTitle>Create Work Order</DialogTitle>
@@ -561,36 +593,22 @@ export function CreateWorkOrderModal({
             )}
 
             <DrawerSection title="Customer">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="create-wo-customer">
-                  Customer <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={customerId}
-                  onValueChange={(v) => {
-                    setCustomerId(v)
-                    setSelectedEquipmentIds([])
-                    setJobByEquipmentId({})
-                  }}
-                >
-                  <SelectTrigger
-                    id="create-wo-customer"
-                    className={cn(
-                      DRAWER_FIELD_CLASS,
-                      "w-full max-w-none h-9 rounded-md px-3 text-sm shadow-xs justify-between",
-                    )}
-                  >
-                    <SelectValue placeholder="Select customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.company_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <CustomerSearchPicker
+                id="create-wo-customer"
+                customers={customers}
+                value={customerId}
+                onValueChange={(v) => {
+                  setCustomerId(v)
+                  setSelectedEquipmentIds([])
+                  setJobByEquipmentId({})
+                }}
+                search={customerSearch}
+                onSearchChange={setCustomerSearch}
+                loading={Boolean(loadError) && customers.length === 0}
+                required
+                label="Customer"
+                qaMarker="work-order-customer-search"
+              />
             </DrawerSection>
 
             {customerId && customerLocations.length > 0 && (
@@ -736,7 +754,7 @@ export function CreateWorkOrderModal({
                                     <SelectContent>
                                       {TYPES.map((t) => (
                                         <SelectItem key={t} value={t}>
-                                          {t}
+                                          {workOrderTypeUiLabel(t)}
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
@@ -788,7 +806,7 @@ export function CreateWorkOrderModal({
             </DrawerSection>
 
             <DrawerSection title="Scheduling">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="flex flex-col gap-1.5 md:col-span-1">
                   <Label>
                     Assign technician <span className="text-destructive">*</span>
@@ -838,7 +856,7 @@ export function CreateWorkOrderModal({
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label>Scheduled time</Label>
+                  <Label>Start time</Label>
                   <Input
                     type="time"
                     className={cn(
@@ -846,7 +864,24 @@ export function CreateWorkOrderModal({
                       "h-9 rounded-md px-3 text-sm shadow-xs transition-[color,box-shadow,border-color]",
                     )}
                     value={scheduledTime}
-                    onChange={(e) => setScheduledTime(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setScheduledTime(next)
+                      setScheduledEndTime(addMinutesToTimeHm(next, 120))
+                    }}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label>End time</Label>
+                  <Input
+                    type="time"
+                    className={cn(
+                      DRAWER_FIELD_CLASS,
+                      "h-9 rounded-md px-3 text-sm shadow-xs transition-[color,box-shadow,border-color]",
+                    )}
+                    value={scheduledEndTime}
+                    onChange={(e) => setScheduledEndTime(e.target.value)}
+                    min={scheduledTime || undefined}
                   />
                 </div>
               </div>

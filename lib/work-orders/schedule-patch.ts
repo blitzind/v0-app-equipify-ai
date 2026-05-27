@@ -4,6 +4,7 @@ import { normalizeTimeForDb } from "@/lib/work-orders/db-map"
 export function buildSchedulePatch(args: {
   scheduledOn: string
   scheduledTimeHhMm: string | null
+  scheduledEndTimeHhMm?: string | null
   previousStatus: string
   /** Legacy: selection is auth user id only (pre-technicians table). */
   assignedUserId?: string | null
@@ -21,6 +22,10 @@ export function buildSchedulePatch(args: {
     scheduled_on: args.scheduledOn,
     scheduled_time:
       args.scheduledTimeHhMm != null ? normalizeTimeForDb(args.scheduledTimeHhMm) : null,
+    scheduled_end_time:
+      args.scheduledEndTimeHhMm != null && args.scheduledEndTimeHhMm.trim()
+        ? normalizeTimeForDb(args.scheduledEndTimeHhMm)
+        : null,
     assigned_technician_id: resolved.assigned_technician_id,
     assigned_user_id: resolved.assigned_user_id,
     updated_at: new Date().toISOString(),
@@ -39,11 +44,16 @@ export function buildDispatchPreserveAssignmentSchedulePatch(args: {
   assigned_user_id: string | null | undefined
   scheduledOn: string
   scheduledTimeHhMm: string | null
+  scheduledEndTimeHhMm?: string | null
 }) {
   return {
     scheduled_on: args.scheduledOn,
     scheduled_time:
       args.scheduledTimeHhMm != null ? normalizeTimeForDb(args.scheduledTimeHhMm) : null,
+    scheduled_end_time:
+      args.scheduledEndTimeHhMm != null && args.scheduledEndTimeHhMm.trim()
+        ? normalizeTimeForDb(args.scheduledEndTimeHhMm)
+        : null,
     assigned_technician_id: args.assigned_technician_id ?? null,
     assigned_user_id: args.assigned_user_id ?? null,
     updated_at: new Date().toISOString(),
@@ -60,6 +70,7 @@ export function buildDispatchTimeOnlyPatch(args: {
   scheduled_on: string | null | undefined
   fallbackDateYmd: string
   scheduledTimeHhMm: string | null
+  scheduledEndTimeHhMm?: string | null
 }) {
   const head = args.scheduled_on?.trim()
   const on =
@@ -68,6 +79,10 @@ export function buildDispatchTimeOnlyPatch(args: {
     scheduled_on: on,
     scheduled_time:
       args.scheduledTimeHhMm != null ? normalizeTimeForDb(args.scheduledTimeHhMm) : null,
+    scheduled_end_time:
+      args.scheduledEndTimeHhMm != null && args.scheduledEndTimeHhMm.trim()
+        ? normalizeTimeForDb(args.scheduledEndTimeHhMm)
+        : null,
     assigned_technician_id: args.assigned_technician_id ?? null,
     assigned_user_id: args.assigned_user_id ?? null,
     updated_at: new Date().toISOString(),

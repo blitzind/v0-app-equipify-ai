@@ -25,9 +25,17 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import {
   missingOperationalBillingColumns,
+  missingScheduledEndTimeColumn,
   missingWorkOrderNumberColumn,
 } from "@/lib/work-orders/postgrest-fallback"
-import { WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM } from "@/lib/work-orders/supabase-select"
+import {
+  stripScheduledEndTimeFromSelect,
+  WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM,
+} from "@/lib/work-orders/supabase-select"
+import {
+  formatScheduleTimeRange,
+  SCHEDULE_WORK_ORDER_FLOW_QA_MARKER,
+} from "@/lib/work-orders/schedule-time"
 import { enrichDispatchWorkOrders, filterDispatchRows } from "@/lib/dispatch/build-dispatch-wos"
 import type { DispatchWoRow } from "@/lib/dispatch/build-dispatch-wos"
 import { DISPATCH_FOCUS_OPTIONS, type DispatchFilterId } from "@/lib/dispatch/operational-badges"
@@ -1068,6 +1076,7 @@ type DbScheduledWoRow = {
   status: string
   scheduled_on: string
   scheduled_time: string | null
+  scheduled_end_time?: string | null
   assigned_user_id: string | null
   assigned_technician_id?: string | null
   priority?: string | null
@@ -1109,6 +1118,7 @@ function mapDbRowToDispatchWoRow(r: DbScheduledWoRow, mini: boolean): DispatchWo
     status: r.status,
     scheduled_on: r.scheduled_on,
     scheduled_time: r.scheduled_time,
+    scheduled_end_time: r.scheduled_end_time ?? null,
     assigned_user_id: r.assigned_user_id,
     assigned_technician_id: r.assigned_technician_id ?? null,
     customer_id: r.customer_id,
@@ -1195,10 +1205,11 @@ function ScheduledWorkOrdersSection({
             const wo = row.wo
             const softWarnings = scheduleWarningsByWoId.get(wo.id)
             const days = daysUntil(wo.scheduled_on ?? "")
-            const timeStr = formatScheduleTimeHm(wo.scheduled_time)
+            const timeStr = formatScheduleTimeRange(wo.scheduled_time, wo.scheduled_end_time)
+            const assignKey = assignedScheduleKey(wo)
             const slotKey =
-              wo.assigned_user_id && wo.scheduled_on
-                ? `${wo.assigned_user_id}|${wo.scheduled_on}|${timeToSlotIndex(wo.scheduled_time)}`
+              assignKey && wo.scheduled_on
+                ? `${assignKey}|${wo.scheduled_on}|${timeToSlotIndex(wo.scheduled_time)}`
                 : ""
             const slotOverlap = Boolean(slotKey && overlapKeys.has(slotKey))
             return (
@@ -1457,7 +1468,8 @@ function ScheduleDragCard({
         {wo.customerName}
       </p>
       <p className="truncate text-[10px] text-muted-foreground">
-        {formatScheduleTimeHm(wo.scheduled_time) || "No time"} · {row.location || wo.serviceLocationLabel || "No location"}
+        {formatScheduleTimeRange(wo.scheduled_time, wo.scheduled_end_time)} ·{" "}
+        {row.location || wo.serviceLocationLabel || "No location"}
       </p>
       {!compact && state.dispatchIncomplete ? (
         <p className="mt-1 text-[10px] text-[color:var(--status-warning)]">Dispatch incomplete</p>
@@ -2025,10 +2037,10 @@ function ServiceSchedulePageInner() {
       const assignedWorkOrderIds = assignedScope?.workOrderIds ?? []
 
       const selFull =
-        "id, work_order_number, customer_id, customer_location_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id, assigned_technician_id, priority, type, billing_state, maintenance_plan_id, calibration_template_id, created_by_pm_automation, billable_to_customer, warranty_review_required, total_parts_cents, created_at, completed_at"
+        "id, work_order_number, customer_id, customer_location_id, equipment_id, title, status, scheduled_on, scheduled_time, scheduled_end_time, assigned_user_id, assigned_technician_id, priority, type, billing_state, maintenance_plan_id, calibration_template_id, created_by_pm_automation, billable_to_customer, warranty_review_required, total_parts_cents, created_at, completed_at"
       const selNoBilling = WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM
       const selMini =
-        "id, work_order_number, customer_id, customer_location_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id, assigned_technician_id, priority, type, created_by_pm_automation, created_at"
+        "id, work_order_number, customer_id, customer_location_id, equipment_id, title, status, scheduled_on, scheduled_time, scheduled_end_time, assigned_user_id, assigned_technician_id, priority, type, created_by_pm_automation, created_at"
 
       async function fetchScheduled() {
         let mini = false
@@ -2046,6 +2058,59 @@ function ServiceSchedulePageInner() {
         let res = await fullQuery
           .order("scheduled_on", { ascending: true })
           .order("scheduled_time", { ascending: true, nullsFirst: false })
+        if (res.error && missingScheduledEndTimeColumn(res.error)) {
+          const strippedFull = stripScheduledEndTimeFromSelect(selFull)
+          const strippedNoBilling = stripScheduledEndTimeFromSelect(selNoBilling)
+          const strippedMini = stripScheduledEndTimeFromSelect(selMini)
+          let retryQuery = supabase
+            .from("work_orders")
+            .select(strippedFull)
+            .eq("organization_id", orgId)
+            .is("archived_at", null)
+            .not("scheduled_on", "is", null)
+          if (assignedOnlyView) {
+            retryQuery = assignedWorkOrderIds.length > 0
+              ? retryQuery.in("id", assignedWorkOrderIds)
+              : retryQuery.eq("id", "__none__")
+          }
+          res = await retryQuery
+            .order("scheduled_on", { ascending: true })
+            .order("scheduled_time", { ascending: true, nullsFirst: false })
+          if (res.error && missingOperationalBillingColumns(res.error)) {
+            let noBillingQuery = supabase
+              .from("work_orders")
+              .select(strippedNoBilling)
+              .eq("organization_id", orgId)
+              .is("archived_at", null)
+              .not("scheduled_on", "is", null)
+            if (assignedOnlyView) {
+              noBillingQuery = assignedWorkOrderIds.length > 0
+                ? noBillingQuery.in("id", assignedWorkOrderIds)
+                : noBillingQuery.eq("id", "__none__")
+            }
+            res = await noBillingQuery
+              .order("scheduled_on", { ascending: true })
+              .order("scheduled_time", { ascending: true, nullsFirst: false })
+          }
+          if (res.error && missingWorkOrderNumberColumn(res.error)) {
+            mini = true
+            let miniQuery = supabase
+              .from("work_orders")
+              .select(strippedMini)
+              .eq("organization_id", orgId)
+              .is("archived_at", null)
+              .not("scheduled_on", "is", null)
+            if (assignedOnlyView) {
+              miniQuery = assignedWorkOrderIds.length > 0
+                ? miniQuery.in("id", assignedWorkOrderIds)
+                : miniQuery.eq("id", "__none__")
+            }
+            res = await miniQuery
+              .order("scheduled_on", { ascending: true })
+              .order("scheduled_time", { ascending: true, nullsFirst: false })
+          }
+          return { data: res.data, error: res.error, mini }
+        }
         if (res.error && missingOperationalBillingColumns(res.error)) {
           let noBillingQuery = supabase
             .from("work_orders")
@@ -2325,6 +2390,11 @@ function ServiceSchedulePageInner() {
       setSelectedPlanId(openId)
       router.replace("/service-schedule", { scroll: false })
     }
+    const scheduleDate = searchParams.get("scheduleDate")?.trim()
+    if (scheduleDate && /^\d{4}-\d{2}-\d{2}$/.test(scheduleDate)) {
+      setScheduleSelectedYmd(scheduleDate)
+      setCalDate(new Date(`${scheduleDate}T12:00:00`))
+    }
   }, [searchParams, router])
 
   const [today, setToday] = useState<Date>(() => new Date(0))
@@ -2379,6 +2449,7 @@ function ServiceSchedulePageInner() {
         scheduledOn: wo.scheduled_on,
         scheduledTime: wo.scheduled_time,
         assignedUserId: wo.assigned_user_id,
+        assignedTechnicianId: wo.assigned_technician_id,
       })
       if (unassignedFilter === "needs_assignment" && !state.needsAssignment) return false
       if (unassignedFilter === "needs_scheduling" && !state.needsScheduling) return false
@@ -2412,9 +2483,10 @@ function ServiceSchedulePageInner() {
     const counts = new Map<string, number>()
     for (const row of filteredScheduledWoRows) {
       const w = row.wo
-      if (!w.assigned_user_id || !w.scheduled_on) continue
+      const assignKey = assignedScheduleKey(w)
+      if (!assignKey || !w.scheduled_on) continue
       const slot = timeToSlotIndex(w.scheduled_time)
-      const k = `${w.assigned_user_id}|${w.scheduled_on}|${slot}`
+      const k = `${assignKey}|${w.scheduled_on}|${slot}`
       counts.set(k, (counts.get(k) ?? 0) + 1)
     }
     return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([k]) => k))
@@ -2452,7 +2524,7 @@ function ServiceSchedulePageInner() {
   const scheduleTechnicians = useMemo<DispatchTech[]>(() => {
     const map = new Map<string, DispatchTech>()
     for (const row of scheduledWoRows) {
-      const id = row.wo.assigned_user_id
+      const id = assignedScheduleKey(row.wo)
       if (!id) continue
       const label = row.wo.technicianLabel?.trim() || "Technician"
       if (!map.has(id)) {
@@ -2610,7 +2682,7 @@ function ServiceSchedulePageInner() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5" data-qa-marker={SCHEDULE_WORK_ORDER_FLOW_QA_MARKER}>
 
       {assignedOnlyView ? (
         <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">

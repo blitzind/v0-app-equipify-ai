@@ -10,6 +10,15 @@ export function missingWorkOrderNumberColumn(error: PostgrestError | null | unde
 }
 
 /** True when `assigned_technician_id` column is missing (migration not applied). */
+/** True when `scheduled_end_time` column is missing (migration not applied). */
+export function missingScheduledEndTimeColumn(error: PostgrestError | null | undefined): boolean {
+  if (!error) return false
+  const m = (error.message ?? "").toLowerCase()
+  if (!m.includes("scheduled_end_time")) return false
+  if (error.code === "42703") return true
+  return m.includes("does not exist") || m.includes("could not find")
+}
+
 export function missingAssignedTechnicianColumn(error: PostgrestError | null | undefined): boolean {
   if (!error) return false
   const m = (error.message ?? "").toLowerCase()

@@ -47,6 +47,7 @@ import {
   loadTechnicianAssignOptions,
   toScheduleAssigneePickerOptions,
 } from "@/lib/work-orders/load-technician-assign-options"
+import { workOrderTypeUiLabel } from "@/lib/work-orders/work-order-type-labels"
 
 const UUID_PARAM =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -651,7 +652,7 @@ function TableView({
                 <TableCell className="font-medium text-sm">{wo.customerName}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{wo.equipmentName}</TableCell>
                 <TableCell>
-                  <span className="text-xs text-muted-foreground">{wo.type}</span>
+                  <span className="text-xs text-muted-foreground">{workOrderTypeUiLabel(wo.type)}</span>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1.5">

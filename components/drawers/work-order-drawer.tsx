@@ -65,6 +65,7 @@ import { WorkOrderArchiveDialog } from "@/components/work-orders/work-order-arch
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
 import type { Part, RepairLog, WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
+import { workOrderTypeUiLabel } from "@/lib/work-orders/work-order-type-labels"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -311,8 +312,16 @@ function EditInput({
   )
 }
 
-function EditSelect({ value, onChange, options }: {
-  value: string; onChange: (v: string) => void; options: string[]
+function EditSelect({
+  value,
+  onChange,
+  options,
+  optionLabel,
+}: {
+  value: string
+  onChange: (v: string) => void
+  options: string[]
+  optionLabel?: (v: string) => string
 }) {
   return (
     <select
@@ -323,7 +332,11 @@ function EditSelect({ value, onChange, options }: {
         "w-full cursor-pointer shadow-xs transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20",
       )}
     >
-      {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      {options.map((o) => (
+        <option key={o} value={o}>
+          {optionLabel ? optionLabel(o) : o}
+        </option>
+      ))}
     </select>
   )
 }
@@ -2784,11 +2797,12 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
           {editing && (
             <div className="max-h-[42vh] shrink-0 space-y-4 overflow-y-auto border-b border-border px-5 py-4">
               <DrawerSection title="Job settings">
-                <EditRow label="Type" view={wo.type} editing>
+                <EditRow label="Type" view={workOrderTypeUiLabel(wo.type)} editing>
                   <EditSelect
                     value={(draft.type ?? wo.type) as string}
                     onChange={(v) => setField("type", v as WorkOrderType)}
                     options={ALL_TYPES}
+                    optionLabel={workOrderTypeUiLabel}
                   />
                 </EditRow>
                 <EditRow

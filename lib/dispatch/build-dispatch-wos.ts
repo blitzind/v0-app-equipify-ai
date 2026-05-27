@@ -31,6 +31,7 @@ export type DispatchWoRow = {
   status: string
   scheduled_on: string | null
   scheduled_time: string | null
+  scheduled_end_time?: string | null
   assigned_user_id: string | null
   assigned_technician_id?: string | null
   customer_id: string
@@ -340,6 +341,7 @@ export async function enrichDispatchWorkOrders(
       status: wo.status,
       scheduled_on: wo.scheduled_on,
       scheduled_time: wo.scheduled_time,
+      scheduled_end_time: wo.scheduled_end_time ?? null,
       assigned_user_id: wo.assigned_user_id,
       assigned_technician_id: wo.assigned_technician_id ?? null,
       customer_id: wo.customer_id,

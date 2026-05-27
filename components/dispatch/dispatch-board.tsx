@@ -55,6 +55,7 @@ export type DispatchWo = {
   status: string
   scheduled_on: string | null
   scheduled_time: string | null
+  scheduled_end_time?: string | null
   assigned_user_id: string | null
   assigned_technician_id?: string | null
   customer_id: string

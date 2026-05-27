@@ -4,6 +4,11 @@ import { useState, useEffect, type ComponentProps, type ElementType } from "reac
 import type { WorkOrderType, WorkOrderPriority } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
+import { scheduleTimeRangeError, SCHEDULE_WORK_ORDER_FLOW_QA_MARKER } from "@/lib/work-orders/schedule-time"
+import {
+  WORK_ORDER_TYPE_PICKER_OPTIONS,
+  workOrderTypeUiLabel,
+} from "@/lib/work-orders/work-order-type-labels"
 import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import {
   ASSIGNEE_PICKER_EMPTY_HINT,
@@ -99,7 +104,7 @@ type LocationOption = {
   state: string
 }
 
-const SERVICE_TYPES: WorkOrderType[] = ["PM", "Inspection", "Repair", "Install", "Emergency"]
+const SERVICE_TYPES = WORK_ORDER_TYPE_PICKER_OPTIONS
 const PRIORITIES: WorkOrderPriority[] = ["Low", "Normal", "High", "Critical"]
 
 const TIME_WINDOWS = [
@@ -136,7 +141,12 @@ const BLANK_LOC: NewLocForm = { name: "", address: "", city: "", state: "", zip:
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function windowStartTime(window: string): string {
-  return window.split(" – ")[0] ?? "08:00"
+  return window.split(" – ")[0]?.trim() ?? "08:00"
+}
+
+function windowEndTime(window: string): string {
+  const parts = window.split(" – ")
+  return (parts[1] ?? parts[0] ?? "10:00").trim()
 }
 
 function locationLabel(loc: LocationOption): string {
@@ -465,7 +475,16 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
     }
     const notesCombined = notesParts.filter(Boolean).join("\n\n") || null
 
-    const scheduledTime = normalizeTimeForDb(windowStartTime(form.timeWindow))
+    const startHm = windowStartTime(form.timeWindow)
+    const endHm = windowEndTime(form.timeWindow)
+    const timeErr = scheduleTimeRangeError(startHm, endHm)
+    if (timeErr) {
+      setSubmitError(timeErr)
+      setSubmitting(false)
+      return
+    }
+    const scheduledTime = normalizeTimeForDb(startHm)
+    const scheduledEndTime = normalizeTimeForDb(endHm)
     const problemReported = form.notes.trim() || title
     const assign = await workOrderAssignmentColumns(
       supabase,
@@ -485,6 +504,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
         type: uiTypeToDb(form.serviceType as WorkOrderType),
         scheduled_on: form.date,
         scheduled_time: scheduledTime,
+        scheduled_end_time: scheduledEndTime,
         ...assign,
         notes: notesCombined,
         problem_reported: problemReported,
@@ -576,6 +596,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
       width="md"
       noScroll
     >
+      <div data-qa-marker={SCHEDULE_WORK_ORDER_FLOW_QA_MARKER} className="contents">
       {submitted ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
           <div className="w-12 h-12 rounded-full bg-[var(--ds-success-subtle)] flex items-center justify-center">
@@ -791,7 +812,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
                     <DrawerSelectContent>
                       {SERVICE_TYPES.map((t) => (
                         <SelectItem key={t} value={t}>
-                          {t}
+                          {workOrderTypeUiLabel(t)}
                         </SelectItem>
                       ))}
                     </DrawerSelectContent>
@@ -954,6 +975,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
           </div>
         </>
       )}
+      </div>
     </DetailDrawer>
   )
 }

@@ -36,6 +36,16 @@ import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload
 import { ASSIGNEE_PICKER_EMPTY_HINT } from "@/lib/work-orders/load-technician-assign-options"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import type { WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
+import {
+  addMinutesToTimeHm,
+  scheduleTimeRangeError,
+  SCHEDULE_WORK_ORDER_FLOW_QA_MARKER,
+} from "@/lib/work-orders/schedule-time"
+import {
+  WORK_ORDER_TYPE_PICKER_OPTIONS,
+  workOrderTypeUiLabel,
+} from "@/lib/work-orders/work-order-type-labels"
+import { CustomerSearchPicker } from "@/components/work-orders/customer-search-picker"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { DRAWER_BACKDROP_Z, EQUIPIFY_SCRIM } from "@/components/detail-drawer"
 import type { DispatchWo } from "@/components/dispatch/dispatch-board"
@@ -110,7 +120,7 @@ type Props = {
   existingWorkOrders?: DispatchWo[]
 }
 
-const SERVICE_TYPES: WorkOrderType[] = ["Repair", "PM", "Inspection", "Install", "Emergency"]
+const SERVICE_TYPES = WORK_ORDER_TYPE_PICKER_OPTIONS
 const PRIORITIES: WorkOrderPriority[] = ["Normal", "High", "Critical", "Low"]
 
 function todayYmd(): string {
@@ -150,6 +160,9 @@ export function QuickAppointmentDialog({
   const [priority, setPriority] = useState<WorkOrderPriority>("Normal")
   const [date, setDate] = useState<string>(defaultDate ?? todayYmd())
   const [timeHhMm, setTimeHhMm] = useState<string>(defaultTimeHhMm ?? "09:00")
+  const [endTimeHhMm, setEndTimeHhMm] = useState<string>(
+    addMinutesToTimeHm(defaultTimeHhMm ?? "09:00", 120),
+  )
   const [technicianId, setTechnicianId] = useState<string>(defaultTechnicianId ?? "")
   const [notes, setNotes] = useState("")
   // Phase: Scheduling Field-Speed Polish — optional confirmation send.
@@ -167,6 +180,7 @@ export function QuickAppointmentDialog({
     setPriority("Normal")
     setDate(defaultDate ?? todayYmd())
     setTimeHhMm(defaultTimeHhMm ?? "09:00")
+    setEndTimeHhMm(addMinutesToTimeHm(defaultTimeHhMm ?? "09:00", 120))
     setTechnicianId(defaultTechnicianId ?? "")
     setNotes("")
     setSendConfirmation(false)
@@ -384,6 +398,12 @@ export function QuickAppointmentDialog({
       return
     }
 
+    const timeErr = scheduleTimeRangeError(timeHhMm, endTimeHhMm)
+    if (timeErr) {
+      setSubmitError(timeErr)
+      return
+    }
+
     setSubmitting(true)
     setSubmitError(null)
 
@@ -420,6 +440,8 @@ export function QuickAppointmentDialog({
         type: uiTypeToDb(serviceType),
         scheduled_on: date || null,
         scheduled_time: hasSchedule ? normalizeTimeForDb(timeHhMm) : null,
+        scheduled_end_time:
+          hasSchedule && endTimeHhMm.trim() ? normalizeTimeForDb(endTimeHhMm) : null,
         ...assign,
         notes: [
           trimmedNotes || null,
@@ -542,6 +564,7 @@ export function QuickAppointmentDialog({
     priority,
     date,
     timeHhMm,
+    endTimeHhMm,
     onCreated,
     onClose,
     conflicts,
@@ -555,15 +578,27 @@ export function QuickAppointmentDialog({
 
   const selectedCustomer = customers.find((c) => c.id === customerId)
   const selectedCustomerName = selectedCustomer?.company_name ?? ""
-  const filteredCustomers = customers.filter((c) =>
-    c.company_name.toLowerCase().includes(customerSearch.trim().toLowerCase()),
-  )
+  const customerPickerOptions = customers.map((c) => ({
+    id: c.id,
+    company_name: c.company_name,
+    hint:
+      c.parent_customer_id
+        ? "· child/site"
+        : c.child_count
+          ? `· ${c.child_count} sites`
+          : c.location_count
+            ? `· ${c.location_count} locations`
+            : null,
+  }))
   const poBeforeService = Boolean(selectedCustomer?.po_required || selectedCustomer?.po_number_required_before_service)
 
   return (
     <div className={cn("fixed inset-0 flex items-center justify-center p-4", DRAWER_BACKDROP_Z)} aria-modal="true">
       <div className={cn("absolute inset-0", EQUIPIFY_SCRIM)} onClick={onClose} aria-hidden />
-      <div className="relative z-10 w-full max-w-md rounded-xl border border-border bg-background dark:bg-card shadow-2xl flex flex-col">
+      <div
+        className="relative z-10 w-full max-w-md rounded-xl border border-border bg-background dark:bg-card shadow-2xl flex flex-col"
+        data-qa-marker={SCHEDULE_WORK_ORDER_FLOW_QA_MARKER}
+      >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-primary" />
@@ -586,38 +621,24 @@ export function QuickAppointmentDialog({
             </p>
           ) : null}
 
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs font-medium">
-              Customer <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              value={customerSearch}
-              onChange={(e) => setCustomerSearch(e.target.value)}
-              placeholder="Search customers..."
-              className="h-10 text-sm"
-            />
-            <Select
-              value={customerId}
-              onValueChange={(v) => {
-                setCustomerId(v)
-                setLocationId("")
-                setEquipmentId("")
-              }}
-            >
-              <SelectTrigger className="h-9 text-sm w-full">
-                <SelectValue placeholder={loadingRefs ? "Loading…" : "Select customer…"} />
-              </SelectTrigger>
-              <SelectContent position="popper" side="bottom" align="start">
-                {filteredCustomers.slice(0, 80).map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.company_name}
-                    {c.parent_customer_id ? " · child/site" : c.child_count ? ` · ${c.child_count} sites` : ""}
-                    {c.location_count ? ` · ${c.location_count} locations` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <CustomerSearchPicker
+            customers={customerPickerOptions}
+            value={customerId}
+            onValueChange={(v) => {
+              setCustomerId(v)
+              setLocationId("")
+              setEquipmentId("")
+            }}
+            search={customerSearch}
+            onSearchChange={setCustomerSearch}
+            loading={loadingRefs}
+            label={
+              <span className="text-xs font-medium">
+                Customer <span className="text-destructive">*</span>
+              </span>
+            }
+            qaMarker="quick-appointment-customer-search"
+          />
 
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs font-medium">
@@ -715,10 +736,27 @@ export function QuickAppointmentDialog({
               <Input
                 type="time"
                 value={timeHhMm}
-                onChange={(e) => setTimeHhMm(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setTimeHhMm(next)
+                  setEndTimeHhMm(addMinutesToTimeHm(next, 120))
+                }}
                 className="h-9 text-sm"
               />
             </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-medium flex items-center gap-1">
+              <Clock className="h-3 w-3" /> End time
+            </Label>
+            <Input
+              type="time"
+              value={endTimeHhMm}
+              onChange={(e) => setEndTimeHhMm(e.target.value)}
+              className="h-9 text-sm"
+              min={timeHhMm || undefined}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -731,7 +769,7 @@ export function QuickAppointmentDialog({
                 <SelectContent position="popper" side="bottom" align="start">
                   {SERVICE_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {workOrderTypeUiLabel(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>

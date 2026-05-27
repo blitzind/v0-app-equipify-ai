@@ -64,6 +64,12 @@ async function main(): Promise<void> {
   )
   assert.match(prospectRepo, /runProspectSearchRealWorldDiscovery/)
 
+  const prospectDiscovery = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-real-world-discovery.ts"),
+    "utf8",
+  )
+  assert.match(prospectDiscovery, /runCompanySignalIntelligence/)
+
   const shellSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/prospect-search-shell.tsx"),
     "utf8",
