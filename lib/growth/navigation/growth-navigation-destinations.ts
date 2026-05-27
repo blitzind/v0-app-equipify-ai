@@ -619,6 +619,13 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: prefixMatch("/admin/growth/copilot/playbooks"),
       },
       {
+        id: "reply-drafts",
+        href: "/admin/growth/copilot/reply-drafts",
+        label: "Reply Drafts",
+        consoleKey: "reply-drafts",
+        match: prefixMatch("/admin/growth/copilot/reply-drafts"),
+      },
+      {
         id: "ai-research",
         href: "/admin/growth/leads/lead-engine",
         label: "AI Research",

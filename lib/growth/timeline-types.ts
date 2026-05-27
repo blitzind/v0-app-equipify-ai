@@ -161,6 +161,11 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "inbox_thread_matched",
   "inbox_thread_created",
   "inbox_duplicate_skipped",
+  "reply_draft_generated",
+  "reply_draft_approved",
+  "reply_draft_discarded",
+  "reply_draft_sent",
+  "reply_draft_blocked",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]

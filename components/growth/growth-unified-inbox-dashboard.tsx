@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthReplyDraftingPanel } from "@/components/growth/growth-reply-drafting-panel"
 import { classificationLabel } from "@/lib/growth/inbox/reply-classifier"
 import { priorityTierLabel } from "@/lib/growth/inbox/thread-priority"
 import { threadStatusLabel } from "@/lib/growth/inbox/thread-health"
@@ -471,7 +472,8 @@ export function GrowthUnifiedInboxDashboardPanel() {
       </div>
 
       {selectedThread ? (
-        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <>
+          <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <GrowthEngineCard title="Message Viewer">
             <div className="space-y-3">
               {selectedMessages.length === 0 ? (
@@ -568,7 +570,10 @@ export function GrowthUnifiedInboxDashboardPanel() {
               </div>
             </div>
           </GrowthEngineCard>
-        </div>
+          </div>
+
+          <GrowthReplyDraftingPanel threadId={selectedThread.id} disabled={Boolean(actionLoading)} />
+        </>
       ) : null}
     </div>
   )

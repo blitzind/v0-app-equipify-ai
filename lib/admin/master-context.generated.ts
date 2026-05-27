@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 752,
-  sqlMigrations: 300,
+  apiRouteHandlers: 759,
+  sqlMigrations: 301,
   dashboardPages: 65,
-  componentsTsx: 551,
-  libTsFiles: 1954,
+  componentsTsx: 553,
+  libTsFiles: 1963,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **752** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **300** |
+| API route handlers (\`app/api/**/route.ts\`) | **759** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **301** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **551** |
-| \`lib/**/*.ts\` | **1954** |
+| \`components/**/*.tsx\` | **553** |
+| \`lib/**/*.ts\` | **1963** |
 
 ### Vercel crons
 
@@ -698,6 +698,13 @@ platform/growth/realtime/providers/operations/cleanup/route.ts
 platform/growth/relationships/dashboard/route.ts
 platform/growth/replies/[replyId]/assign/route.ts
 platform/growth/replies/dashboard/route.ts
+platform/growth/replies/drafts/[id]/approve/route.ts
+platform/growth/replies/drafts/[id]/discard/route.ts
+platform/growth/replies/drafts/[id]/route.ts
+platform/growth/replies/drafts/[id]/send/route.ts
+platform/growth/replies/drafts/dashboard/route.ts
+platform/growth/replies/drafts/generate/route.ts
+platform/growth/replies/drafts/route.ts
 platform/growth/replies/inbox/route.ts
 platform/growth/revenue-operating/command-summary/route.ts
 platform/growth/revenue-operating/dashboard/route.ts
