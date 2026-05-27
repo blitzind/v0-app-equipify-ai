@@ -53,7 +53,7 @@ export const GROWTH_COMMAND_QUERY_BOOSTS: Record<string, Record<string, number>>
   discover: {
     search: 140,
     "intent-pixel": 100,
-    "discover-companies": 70,
+    "prospect-search": 70,
   },
 }
 
@@ -61,9 +61,9 @@ const CORE_WORKFLOW_IDS = new Set([
   "command",
   "inbox",
   "search",
+  "prospect-search",
   "intent-pixel",
   "call-workspace",
-  "discover-companies",
   "open-inbox",
   "unified-inbox",
 ])

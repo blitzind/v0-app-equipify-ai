@@ -193,17 +193,16 @@ assert.equal(commandActionImpactTone(45), "neutral")
 
 assert.ok(GROWTH_COMMAND_JUMP_DESTINATIONS.some((entry) => entry.label === "Inbox" && entry.href === "/admin/growth/leads"))
 assert.ok(GROWTH_COMMAND_JUMP_DESTINATIONS.some((entry) => entry.label === "Dogfood Validation"))
-assert.equal(GROWTH_COMMAND_SECTION_TABS.length, 6)
+assert.equal(GROWTH_COMMAND_SECTION_TABS.length, 7)
 assert.equal(GROWTH_COMMAND_SECTION_TABS[0]?.anchor, "cc-today")
 assert.equal(GROWTH_COMMAND_COMM_SECTION_LINKS.length, 5)
 
 assert.equal(GROWTH_COMMAND_CENTER_ACTIONS_QA_MARKER, "growth-command-center-actions-v3")
-assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS.length, 9)
+assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS.length, 8)
 assert.deepEqual(
   GROWTH_COMMAND_CENTER_QUICK_ACTIONS.map((action) => action.label),
   [
-    "Search Companies",
-    "Discover Companies",
+    "Prospect Search",
     "View Intent Activity",
     "Run Research",
     "Generate Copilot Draft",
@@ -214,8 +213,7 @@ assert.deepEqual(
   ],
 )
 assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS[0]?.href, "/admin/growth/search")
-assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS[1]?.href, "/admin/growth/search?mode=discover")
-assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS[2]?.href, "/admin/growth/intent-pixel")
+assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS[1]?.href, "/admin/growth/intent-pixel")
 assert.ok(!GROWTH_COMMAND_CENTER_QUICK_ACTIONS.some((action) => action.label === "Import Leads"))
 assert.ok(!GROWTH_COMMAND_CENTER_QUICK_ACTIONS.some((action) => action.label === "Open Sequences"))
 

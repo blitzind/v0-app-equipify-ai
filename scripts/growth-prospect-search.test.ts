@@ -139,7 +139,11 @@ async function main(): Promise<void> {
   assert.match(providerStatusSource, /data-qa-marker=\{GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER\}/)
   assert.match(providerStatusSource, /GROWTH_GOOGLE_PLACES_QUERY_EXPANSION_QA_MARKER/)
   assert.match(providerStatusSource, /GROWTH_PROVIDER_CACHE_QA_MARKER/)
-  assert.match(shellSource, /GuidedIcpBuilder/)
+  assert.match(shellSource, /ProspectSearchFilterRail/)
+  assert.match(shellSource, /IcpTemplatesDrawer/)
+  assert.match(shellSource, /GROWTH_PROSPECT_SEARCH_LAYOUT_V2_QA_MARKER/)
+  assert.match(shellSource, /flex flex-col gap-4/)
+  assert.doesNotMatch(shellSource, /lg:grid-cols-2/)
   assert.match(shellSource, /SearchRecommendations/)
   assert.match(shellSource, /CompanyResultCard/)
   assert.doesNotMatch(shellSource, /runLeadEnginePipeline/)
@@ -2096,11 +2100,11 @@ async function main(): Promise<void> {
   assert.match(savedWorkflowShellSource, /save_pagination/)
   assert.match(savedWorkflowShellSource, /GROWTH_SAVED_SEARCH_WORKFLOWS_QA_MARKER/)
 
-  const icpRailSource = fs.readFileSync(
-    path.join(process.cwd(), "components/growth/prospect-search/icp-template-rail.tsx"),
+  const filterRailSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-filter-rail.tsx"),
     "utf8",
   )
-  assert.match(icpRailSource, /SavedSearchWorkflowSidebar/)
+  assert.match(filterRailSource, /SavedSearchWorkflowSidebar/)
 
   const sidebarSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/saved-search-workflow-sidebar.tsx"),
@@ -2114,6 +2118,7 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "components/growth/prospect-search/guided-icp-builder.tsx"),
     "utf8",
   )
+  assert.match(savedWorkflowIcpSource, /Accordion/)
   assert.match(savedWorkflowIcpSource, /lead_score_min/)
   assert.match(savedWorkflowIcpSource, /revenue_bands/)
   assert.match(savedWorkflowIcpSource, /buying_stages/)

@@ -3,7 +3,6 @@
 import type { LucideIcon } from "lucide-react"
 import {
   CheckCircle2,
-  Compass,
   GitBranch,
   Headphones,
   Radar,
@@ -22,8 +21,7 @@ export type GrowthCommandCenterQuickAction = {
 }
 
 export const GROWTH_COMMAND_CENTER_QUICK_ACTIONS: readonly GrowthCommandCenterQuickAction[] = [
-  { href: "/admin/growth/search", label: "Search Companies", icon: Search },
-  { href: "/admin/growth/search?mode=discover", label: "Discover Companies", icon: Compass },
+  { href: "/admin/growth/search", label: "Prospect Search", icon: Search },
   { href: "/admin/growth/intent-pixel", label: "View Intent Activity", icon: Radar },
   { href: "/admin/growth/leads?focus=research", label: "Run Research", icon: Sparkles },
   { href: "/admin/growth/leads?focus=ai-copilot", label: "Generate Copilot Draft", icon: Sparkles },

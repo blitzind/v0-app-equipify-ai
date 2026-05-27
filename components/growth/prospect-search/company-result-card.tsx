@@ -141,8 +141,10 @@ export function CompanyResultCard({
         />
       ) : null}
 
-      <CompanyQualificationMetrics row={row} />
-      <CompanyResultExplanations row={row} />
+      <div className="grid gap-3 xl:grid-cols-2">
+        <CompanyQualificationMetrics row={row} />
+        <CompanyResultExplanations row={row} />
+      </div>
 
       {!row.recommended_next_step_reason ? (
         <p className="rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2 text-xs text-violet-900">

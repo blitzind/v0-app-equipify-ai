@@ -4,6 +4,8 @@ import type { GrowthProspectSearchFilters } from "@/lib/growth/prospect-search/p
 
 export const GROWTH_PROSPECT_SEARCH_UX_QA_MARKER = "growth-prospect-search-ux-v1" as const
 
+export const GROWTH_PROSPECT_SEARCH_LAYOUT_V2_QA_MARKER = "growth-prospect-search-layout-v2" as const
+
 export const PROSPECT_SEARCH_HERO_PLACEHOLDERS = [
   "medical equipment service companies California",
   "hvac companies 20-100 employees",

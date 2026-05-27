@@ -15,11 +15,11 @@ export type GrowthCommandRegistryEntry = {
 
 export const GROWTH_COMMAND_REGISTRY: GrowthCommandRegistryEntry[] = [
   {
-    id: "discover-companies",
-    label: "Discover Companies",
-    href: "/admin/growth/search?mode=discover",
-    keywords: ["prospect", "search", "discover", "companies"],
-    aliases: ["discover", "market discovery"],
+    id: "prospect-search",
+    label: "Prospect Search",
+    href: "/admin/growth/search",
+    keywords: ["prospect", "search", "discover", "companies", "icp"],
+    aliases: ["discover companies", "market discovery"],
     coreWorkflow: true,
     paletteEnabled: true,
   },
@@ -64,14 +64,6 @@ export const GROWTH_COMMAND_REGISTRY: GrowthCommandRegistryEntry[] = [
     href: "/admin/growth/outreach/approval",
     keywords: ["outreach", "approval", "review", "pending"],
     coreWorkflow: true,
-    paletteEnabled: true,
-  },
-  {
-    id: "ai-personalization",
-    label: "AI Personalization",
-    href: "/admin/growth/copilot/personalization",
-    keywords: ["personalization", "ai copy", "evidence", "approval queue", "prospect messaging"],
-    aliases: ["personalization", "ai personalization"],
     paletteEnabled: true,
   },
   {

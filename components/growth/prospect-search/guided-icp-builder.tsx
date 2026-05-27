@@ -1,6 +1,5 @@
 "use client"
 
-import { FilterGroupCard } from "@/components/growth/prospect-search/filter-group-card"
 import { RecommendedFilters } from "@/components/growth/prospect-search/recommended-filters"
 import { SmartFilterInput } from "@/components/growth/prospect-search/smart-filter-input"
 import { TitleTargetingCard } from "@/components/growth/prospect-search/title-targeting-card"
@@ -19,6 +18,12 @@ import {
   type ProspectSearchEmployeeBandUi,
   type ProspectSearchIntentPresetId,
 } from "@/components/growth/prospect-search/prospect-search-ux-constants"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import type { GrowthBuyingStage } from "@/lib/growth/buying-stage/buying-stage-types"
 import type {
   GrowthProspectSearchFilters,
@@ -26,19 +31,51 @@ import type {
 } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
 
+function FilterActions({
+  onClear,
+  onApply,
+  className,
+}: {
+  onClear: () => void
+  onApply: () => void
+  className?: string
+}) {
+  return (
+    <div className={cn("flex gap-2", className)}>
+      <button
+        type="button"
+        onClick={onClear}
+        className="flex-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+      >
+        Clear all
+      </button>
+      <button
+        type="button"
+        onClick={onApply}
+        className="flex-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm"
+      >
+        Apply & search
+      </button>
+    </div>
+  )
+}
+
 export function GuidedIcpBuilder({
   filters,
   onChange,
   onApply,
   onClear,
+  variant = "default",
 }: {
   filters: GrowthProspectSearchFilters
   onChange: (filters: GrowthProspectSearchFilters) => void
   onApply: () => void
   onClear: () => void
+  variant?: "default" | "rail"
 }) {
   const selectedBands = employeeBandsBackendToUi(filters.employee_size_bands)
   const activeIntent = detectActiveIntentPreset(filters)
+  const isRail = variant === "rail"
 
   function toggleBand(band: ProspectSearchEmployeeBandUi) {
     const next = selectedBands.includes(band)
@@ -68,155 +105,110 @@ export function GuidedIcpBuilder({
     onChange({ ...filters, ...intentPresetToFilters(id) })
   }
 
+  const accordionDefaults = ["industry", "company-size", "location", "territory"]
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-base font-semibold">Guided ICP Builder</h2>
-          <p className="text-xs text-muted-foreground">
-            Structured filters — dropdowns, chips, and smart suggestions (no spreadsheet).
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onClear}
-            className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
-          >
-            Clear all
-          </button>
-          <button
-            type="button"
-            onClick={onApply}
-            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm"
-          >
-            Apply & search
-          </button>
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <FilterGroupCard title="Industry" description="Vertical focus for your ICP">
-          <SmartFilterInput
-            label="Primary industry"
-            field="industry"
-            value={filters.industry ?? ""}
-            onChange={(v) => onChange({ ...filters, industry: v || null })}
-            placeholder="e.g. HVAC, Biomedical"
-          />
-          <RecommendedFilters
-            field="industry"
-            query={filters.industry ?? ""}
-            onPick={(v) => onChange({ ...filters, industry: v })}
-          />
-        </FilterGroupCard>
-
-        <FilterGroupCard title="Company size" description="Employee count bands">
-          <div className="flex flex-wrap gap-1.5">
-            {PROSPECT_SEARCH_EMPLOYEE_BANDS_UI.map((band) => (
-              <button
-                key={band}
-                type="button"
-                onClick={() => toggleBand(band)}
-                className={cn(
-                  "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                  selectedBands.includes(band)
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border hover:bg-muted",
-                )}
-              >
-                {band}
-              </button>
-            ))}
+    <div className={cn("space-y-3", isRail ? "" : "space-y-4")}>
+      {!isRail ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-base font-semibold">Guided ICP Builder</h2>
+            <p className="text-xs text-muted-foreground">
+              Structured filters — dropdowns, chips, and smart suggestions (no spreadsheet).
+            </p>
           </div>
-        </FilterGroupCard>
+          <FilterActions onClear={onClear} onApply={onApply} />
+        </div>
+      ) : (
+        <FilterActions onClear={onClear} onApply={onApply} />
+      )}
 
-        <FilterGroupCard title="Location" description="Free-text region (backward compatible)">
-          <SmartFilterInput
-            label="Location"
-            field="location"
-            value={filters.location ?? ""}
-            onChange={(v) => onChange({ ...filters, location: v || null })}
-            placeholder="e.g. California, Tennessee"
-          />
-          <RecommendedFilters
-            field="location"
-            query={filters.location ?? ""}
-            onPick={(v) => onChange({ ...filters, location: v })}
-          />
-        </FilterGroupCard>
+      <Accordion
+        type="multiple"
+        defaultValue={accordionDefaults}
+        className={cn(isRail && "rounded-lg border border-border/60 bg-muted/10 px-1")}
+      >
+        <AccordionItem value="industry" className="border-border/60 px-2">
+          <AccordionTrigger className="py-3 text-sm hover:no-underline">Industry</AccordionTrigger>
+          <AccordionContent className="space-y-2 pb-3">
+            <SmartFilterInput
+              label="Primary industry"
+              field="industry"
+              value={filters.industry ?? ""}
+              onChange={(v) => onChange({ ...filters, industry: v || null })}
+              placeholder="e.g. HVAC, Biomedical"
+            />
+            <RecommendedFilters
+              field="industry"
+              query={filters.industry ?? ""}
+              onPick={(v) => onChange({ ...filters, industry: v })}
+            />
+          </AccordionContent>
+        </AccordionItem>
 
-        <FilterGroupCard title="Territory" description="Structured state, city, ZIP, and radius filters">
-          <TerritoryFilterCard filters={filters} onChange={onChange} />
-        </FilterGroupCard>
-
-        <FilterGroupCard title="Intent" description="Observable buying & traffic signals">
-          <div className="flex flex-wrap gap-1.5">
-            {PROSPECT_SEARCH_INTENT_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                title={preset.description}
-                onClick={() => applyIntentPreset(preset.id)}
-                className={cn(
-                  "rounded-full border px-2.5 py-1 text-xs font-medium",
-                  activeIntent === preset.id
-                    ? "border-violet-400 bg-violet-50 text-violet-900"
-                    : "border-border hover:bg-muted",
-                )}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-        </FilterGroupCard>
-
-        <FilterGroupCard title="Technology" description="CRM & field service stack">
-          <div className="flex flex-wrap gap-1.5">
-            {PROSPECT_SEARCH_TECHNOLOGIES.map((tech) => {
-              const active =
-                (filters.technologies ?? []).includes(tech) ||
-                filters.crm_detected === tech ||
-                filters.field_service_software === tech
-              return (
+        <AccordionItem value="company-size" className="border-border/60 px-2">
+          <AccordionTrigger className="py-3 text-sm hover:no-underline">Company size</AccordionTrigger>
+          <AccordionContent className="pb-3">
+            <div className="flex flex-wrap gap-1.5">
+              {PROSPECT_SEARCH_EMPLOYEE_BANDS_UI.map((band) => (
                 <button
-                  key={tech}
+                  key={band}
                   type="button"
-                  onClick={() => toggleTechnology(tech)}
+                  onClick={() => toggleBand(band)}
                   className={cn(
-                    "rounded-full border px-2.5 py-1 text-xs font-medium",
-                    active ? "border-cyan-400 bg-cyan-50 text-cyan-900" : "border-border hover:bg-muted",
+                    "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                    selectedBands.includes(band)
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border hover:bg-muted",
                   )}
                 >
-                  {tech}
+                  {band}
                 </button>
-              )
-            })}
-          </div>
-        </FilterGroupCard>
+              ))}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
 
-        <FilterGroupCard title="Title targeting" description="Decision maker roles & titles">
-          <TitleTargetingCard filters={filters} onChange={onChange} />
-        </FilterGroupCard>
+        <AccordionItem value="location" className="border-border/60 px-2">
+          <AccordionTrigger className="py-3 text-sm hover:no-underline">Location</AccordionTrigger>
+          <AccordionContent className="space-y-2 pb-3">
+            <SmartFilterInput
+              label="Location"
+              field="location"
+              value={filters.location ?? ""}
+              onChange={(v) => onChange({ ...filters, location: v || null })}
+              placeholder="e.g. California, Tennessee"
+            />
+            <RecommendedFilters
+              field="location"
+              query={filters.location ?? ""}
+              onPick={(v) => onChange({ ...filters, location: v })}
+            />
+          </AccordionContent>
+        </AccordionItem>
 
-        <FilterGroupCard title="Qualification" description="Lead score, revenue, buying stage, and match confidence">
-          <div className="space-y-3">
+        <AccordionItem value="territory" className="border-border/60 px-2">
+          <AccordionTrigger className="py-3 text-sm hover:no-underline">Territory</AccordionTrigger>
+          <AccordionContent className="pb-3">
+            <TerritoryFilterCard filters={filters} onChange={onChange} />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="intent" className="border-border/60 px-2">
+          <AccordionTrigger className="py-3 text-sm hover:no-underline">Buying stage / intent</AccordionTrigger>
+          <AccordionContent className="space-y-3 pb-3">
             <div>
-              <p className="mb-1.5 text-xs font-medium text-muted-foreground">Lead score minimum</p>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">Intent presets</p>
               <div className="flex flex-wrap gap-1.5">
-                {PROSPECT_SEARCH_LEAD_SCORE_PRESETS.map((preset) => (
+                {PROSPECT_SEARCH_INTENT_PRESETS.map((preset) => (
                   <button
-                    key={preset.label}
+                    key={preset.id}
                     type="button"
-                    onClick={() =>
-                      onChange({
-                        ...filters,
-                        lead_score_min: preset.value,
-                      })
-                    }
+                    title={preset.description}
+                    onClick={() => applyIntentPreset(preset.id)}
                     className={cn(
                       "rounded-full border px-2.5 py-1 text-xs font-medium",
-                      (filters.lead_score_min ?? null) === preset.value
+                      activeIntent === preset.id
                         ? "border-violet-400 bg-violet-50 text-violet-900"
                         : "border-border hover:bg-muted",
                     )}
@@ -224,36 +216,6 @@ export function GuidedIcpBuilder({
                     {preset.label}
                   </button>
                 ))}
-              </div>
-            </div>
-            <div>
-              <p className="mb-1.5 text-xs font-medium text-muted-foreground">Revenue bands</p>
-              <div className="flex flex-wrap gap-1.5">
-                {PROSPECT_SEARCH_REVENUE_BANDS_UI.map((band) => {
-                  const active = (filters.revenue_bands ?? []).includes(band.id as GrowthProspectSearchRevenueBand)
-                  return (
-                    <button
-                      key={band.id}
-                      type="button"
-                      onClick={() => {
-                        const current = filters.revenue_bands ?? []
-                        const next = active
-                          ? current.filter((value) => value !== band.id)
-                          : [...current, band.id as GrowthProspectSearchRevenueBand]
-                        onChange({
-                          ...filters,
-                          revenue_bands: next.length ? next : undefined,
-                        })
-                      }}
-                      className={cn(
-                        "rounded-full border px-2.5 py-1 text-xs font-medium",
-                        active ? "border-amber-400 bg-amber-50 text-amber-900" : "border-border hover:bg-muted",
-                      )}
-                    >
-                      {band.label}
-                    </button>
-                  )
-                })}
               </div>
             </div>
             <div>
@@ -284,6 +246,104 @@ export function GuidedIcpBuilder({
                     </button>
                   )
                 })}
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="technology" className="border-border/60 px-2">
+          <AccordionTrigger className="py-3 text-sm hover:no-underline">Technology</AccordionTrigger>
+          <AccordionContent className="pb-3">
+            <div className="flex flex-wrap gap-1.5">
+              {PROSPECT_SEARCH_TECHNOLOGIES.map((tech) => {
+                const active =
+                  (filters.technologies ?? []).includes(tech) ||
+                  filters.crm_detected === tech ||
+                  filters.field_service_software === tech
+                return (
+                  <button
+                    key={tech}
+                    type="button"
+                    onClick={() => toggleTechnology(tech)}
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 text-xs font-medium",
+                      active ? "border-cyan-400 bg-cyan-50 text-cyan-900" : "border-border hover:bg-muted",
+                    )}
+                  >
+                    {tech}
+                  </button>
+                )
+              })}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="title-targeting" className="border-border/60 px-2">
+          <AccordionTrigger className="py-3 text-sm hover:no-underline">Title targeting</AccordionTrigger>
+          <AccordionContent className="pb-3">
+            <TitleTargetingCard filters={filters} onChange={onChange} />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="revenue" className="border-border/60 px-2">
+          <AccordionTrigger className="py-3 text-sm hover:no-underline">Revenue</AccordionTrigger>
+          <AccordionContent className="pb-3">
+            <div className="flex flex-wrap gap-1.5">
+              {PROSPECT_SEARCH_REVENUE_BANDS_UI.map((band) => {
+                const active = (filters.revenue_bands ?? []).includes(band.id as GrowthProspectSearchRevenueBand)
+                return (
+                  <button
+                    key={band.id}
+                    type="button"
+                    onClick={() => {
+                      const current = filters.revenue_bands ?? []
+                      const next = active
+                        ? current.filter((value) => value !== band.id)
+                        : [...current, band.id as GrowthProspectSearchRevenueBand]
+                      onChange({
+                        ...filters,
+                        revenue_bands: next.length ? next : undefined,
+                      })
+                    }}
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 text-xs font-medium",
+                      active ? "border-amber-400 bg-amber-50 text-amber-900" : "border-border hover:bg-muted",
+                    )}
+                  >
+                    {band.label}
+                  </button>
+                )
+              })}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="confidence-fit" className="border-border/60 px-2">
+          <AccordionTrigger className="py-3 text-sm hover:no-underline">Confidence / fit</AccordionTrigger>
+          <AccordionContent className="space-y-3 pb-3">
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">Lead score minimum</p>
+              <div className="flex flex-wrap gap-1.5">
+                {PROSPECT_SEARCH_LEAD_SCORE_PRESETS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() =>
+                      onChange({
+                        ...filters,
+                        lead_score_min: preset.value,
+                      })
+                    }
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 text-xs font-medium",
+                      (filters.lead_score_min ?? null) === preset.value
+                        ? "border-violet-400 bg-violet-50 text-violet-900"
+                        : "border-border hover:bg-muted",
+                    )}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
               </div>
             </div>
             <div>
@@ -318,11 +378,12 @@ export function GuidedIcpBuilder({
               onChange={(v) => onChange({ ...filters, service_area: v || null })}
               placeholder="e.g. Southeast, Dallas metro"
             />
-          </div>
-        </FilterGroupCard>
+          </AccordionContent>
+        </AccordionItem>
 
-        <FilterGroupCard title="Account safety" description="Existing accounts and outreach suppression">
-          <div className="space-y-3">
+        <AccordionItem value="account-safety" className="border-border/60 px-2">
+          <AccordionTrigger className="py-3 text-sm hover:no-underline">Account safety</AccordionTrigger>
+          <AccordionContent className="space-y-3 pb-3">
             <div>
               <p className="mb-1.5 text-xs font-medium text-muted-foreground">Existing accounts</p>
               <div className="flex flex-wrap gap-1.5">
@@ -376,9 +437,11 @@ export function GuidedIcpBuilder({
                 ))}
               </div>
             </div>
-          </div>
-        </FilterGroupCard>
-      </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
+      {isRail ? <FilterActions onClear={onClear} onApply={onApply} className="pt-1" /> : null}
     </div>
   )
 }

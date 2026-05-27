@@ -103,8 +103,8 @@ assert.ok(executionGroup?.items.some((i) => i.label === "Call Providers"))
 
 const leadEngineGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "lead-engine")
 assert.equal(leadEngineGroup?.label, "Lead Engine")
-assert.ok(leadEngineGroup?.items.some((i) => i.label === "Discover Companies"))
 assert.ok(leadEngineGroup?.items.some((i) => i.label === "CRM Leads"))
+assert.ok(!leadEngineGroup?.items.some((i) => i.label === "Discover Companies"))
 assert.ok(leadEngineGroup?.items.some((i) => i.label === "Lead Intelligence Inspector"))
 assert.ok(leadEngineGroup?.items.some((i) => i.label === "Imports"))
 
@@ -121,7 +121,8 @@ assert.equal(aiGroup?.label, "AI")
 assert.ok(aiGroup?.items.some((i) => i.label === "Copilot"))
 assert.ok(aiGroup?.items.some((i) => i.label === "Playbooks"))
 
-assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.label === "Discover Companies"))
+assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.label === "Prospect Search"))
+assert.ok(!GROWTH_COMMAND_REGISTRY.some((a) => a.label === "Discover Companies"))
 
 const navIds = GROWTH_NAV_GROUP_DEFS.flatMap((group) => group.items.map((item) => item.id))
 assert.equal(navIds.length, new Set(navIds).size, "duplicate sidebar nav ids")

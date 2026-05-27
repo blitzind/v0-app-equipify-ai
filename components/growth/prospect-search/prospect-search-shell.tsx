@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Bookmark, Loader2, Search } from "lucide-react"
+import { Bookmark, LayoutTemplate, Loader2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { CompanyResultCard } from "@/components/growth/prospect-search/company-result-card"
@@ -16,9 +16,9 @@ import {
   ProviderCacheCostDiagnostics,
   RealWorldProviderStatus,
 } from "@/components/growth/prospect-search/real-world-provider-status"
-import { GuidedIcpBuilder } from "@/components/growth/prospect-search/guided-icp-builder"
+import { IcpTemplatesDrawer } from "@/components/growth/prospect-search/icp-templates-drawer"
+import { ProspectSearchFilterRail } from "@/components/growth/prospect-search/prospect-search-filter-rail"
 import { TerritoryIntelligencePanel } from "@/components/growth/prospect-search/territory-intelligence-panel"
-import { IcpTemplateRail } from "@/components/growth/prospect-search/icp-template-rail"
 import { PersonResultCard } from "@/components/growth/prospect-search/person-result-card"
 import { SearchEmptyState } from "@/components/growth/prospect-search/search-empty-state"
 import { SearchRecommendations } from "@/components/growth/prospect-search/search-recommendations"
@@ -26,6 +26,7 @@ import { SearchViewToggle } from "@/components/growth/prospect-search/search-vie
 import { rotateHeroPlaceholder } from "@/components/growth/prospect-search/search-suggestion-engine"
 import {
   GROWTH_PROSPECT_SEARCH_UX_QA_MARKER,
+  GROWTH_PROSPECT_SEARCH_LAYOUT_V2_QA_MARKER,
   type ProspectSearchIcpTemplate,
 } from "@/components/growth/prospect-search/prospect-search-ux-constants"
 import {
@@ -54,6 +55,15 @@ import {
 import { cn } from "@/lib/utils"
 
 const EMPTY_FILTERS: GrowthProspectSearchFilters = {}
+
+function resolveDiscoveryModeFromParams(
+  searchParams: ReturnType<typeof useSearchParams>,
+): GrowthProspectSearchDiscoveryMode {
+  const mode = searchParams.get("mode")
+  if (mode === "internal") return "internal"
+  if (mode === "discover" || mode === "discover_external") return "discover_external"
+  return "discover_external"
+}
 
 type ActionFeedback = {
   message: string
@@ -85,8 +95,10 @@ export function ProspectSearchShell() {
   const [heroFocused, setHeroFocused] = useState(false)
   const [placeholderIndex, setPlaceholderIndex] = useState(0)
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
-  const [discoveryMode, setDiscoveryMode] =
-    useState<GrowthProspectSearchDiscoveryMode>("internal")
+  const [icpTemplatesOpen, setIcpTemplatesOpen] = useState(false)
+  const [discoveryMode, setDiscoveryMode] = useState<GrowthProspectSearchDiscoveryMode>(() =>
+    resolveDiscoveryModeFromParams(searchParams),
+  )
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
 
@@ -104,7 +116,9 @@ export function ProspectSearchShell() {
 
   useEffect(() => {
     const mode = searchParams.get("mode")
-    if (mode === "discover" || mode === "discover_external") {
+    if (mode === "internal") {
+      setDiscoveryMode("internal")
+    } else if (mode === "discover" || mode === "discover_external") {
       setDiscoveryMode("discover_external")
     }
   }, [searchParams])
@@ -482,6 +496,7 @@ export function ProspectSearchShell() {
       className="flex flex-col gap-6"
       data-qa-marker={GROWTH_PROSPECT_SEARCH_QA_MARKER}
       data-ux-marker={GROWTH_PROSPECT_SEARCH_UX_QA_MARKER}
+      data-layout-marker={GROWTH_PROSPECT_SEARCH_LAYOUT_V2_QA_MARKER}
       data-saved-search-workflows-marker={GROWTH_SAVED_SEARCH_WORKFLOWS_QA_MARKER}
     >
       {/* Search hero */}
@@ -492,7 +507,7 @@ export function ProspectSearchShell() {
             ? "Search observable Growth Engine + CRM records. No scraping, no outbound."
             : "Discover new companies from real-world public sources (Google Places, SERP, business directory). No Apollo, Seamless, Clay, or PDL. Candidates are not automatic leads."}
         </p>
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <DiscoveryModeToggle
             mode={discoveryMode}
             onChange={(mode) => {
@@ -500,6 +515,10 @@ export function ProspectSearchShell() {
               setSelectedKeys(new Set())
             }}
           />
+          <Button type="button" variant="outline" size="sm" onClick={() => setIcpTemplatesOpen(true)}>
+            <LayoutTemplate className="mr-1.5 size-3.5" />
+            ICP Templates
+          </Button>
         </div>
         <div className="relative mt-5">
           <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
@@ -546,16 +565,12 @@ export function ProspectSearchShell() {
         />
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
-        <IcpTemplateRail
-          activeTemplateId={activeTemplateId}
-          onSelectTemplate={applyTemplate}
-          onCreateCustom={() => {
-            setActiveTemplateId(null)
-            setActiveSavedSearchId(null)
-            setFilters(EMPTY_FILTERS)
-            setQuery("")
-          }}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <ProspectSearchFilterRail
+          filters={filters}
+          onChange={setFilters}
+          onApply={() => void runSearch()}
+          onClear={() => setFilters(EMPTY_FILTERS)}
           savedSearches={savedSearches}
           lists={lists}
           onLoadSavedSearch={(id) => void loadSavedById(id)}
@@ -565,16 +580,7 @@ export function ProspectSearchShell() {
           onDeleteSavedSearch={(id) => void deleteSavedSearch(id)}
         />
 
-        <div className="flex min-w-0 flex-col gap-6">
-          <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <GuidedIcpBuilder
-              filters={filters}
-              onChange={setFilters}
-              onApply={() => void runSearch()}
-              onClear={() => setFilters(EMPTY_FILTERS)}
-            />
-          </section>
-
+        <div className="flex min-w-0 flex-1 flex-col gap-6">
           <TerritoryIntelligencePanel
             summary={result?.territory_intelligence}
             filters={filters}
@@ -720,7 +726,7 @@ export function ProspectSearchShell() {
               recentSaved={savedSearches}
             />
           ) : view === "card" ? (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="flex flex-col gap-4">
               {companies.map((row) => (
                 <CompanyResultCard
                   key={`${row.source_type}-${row.id}`}
@@ -751,7 +757,7 @@ export function ProspectSearchShell() {
           {people.length > 0 ? (
             <div>
               <h3 className="mb-3 text-sm font-semibold">Contacts ({people.length})</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-3">
                 {people.map((row) => (
                   <PersonResultCard key={row.id} row={row} />
                 ))}
@@ -760,6 +766,19 @@ export function ProspectSearchShell() {
           ) : null}
         </div>
       </div>
+
+      <IcpTemplatesDrawer
+        open={icpTemplatesOpen}
+        onOpenChange={setIcpTemplatesOpen}
+        activeTemplateId={activeTemplateId}
+        onSelectTemplate={applyTemplate}
+        onCreateCustom={() => {
+          setActiveTemplateId(null)
+          setActiveSavedSearchId(null)
+          setFilters(EMPTY_FILTERS)
+          setQuery("")
+        }}
+      />
 
       <SaveSearchWorkflowDialog
         open={saveDialogOpen}

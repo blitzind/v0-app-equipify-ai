@@ -625,12 +625,6 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
     label: "Lead Engine",
     items: [
       {
-        id: "discover-companies",
-        href: "/admin/growth/search?mode=discover",
-        label: "Discover Companies",
-        match: (path) => path.startsWith("/admin/growth/search"),
-      },
-      {
         id: "crm-leads",
         href: "/admin/growth/leads/crm",
         label: "CRM Leads",

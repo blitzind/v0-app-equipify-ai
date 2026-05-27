@@ -114,7 +114,7 @@ assert.ok(!coreGroup?.items.some((item) => item.label === "Imports"))
 
 const leadEngineGroup = GROWTH_NAV_GROUP_DEFS.find((group) => group.id === "lead-engine")
 assert.ok(leadEngineGroup?.items.some((item) => item.label === "Imports"))
-assert.ok(leadEngineGroup?.items.some((item) => item.label === "Discover Companies"))
+assert.ok(!leadEngineGroup?.items.some((item) => item.label === "Discover Companies"))
 
 const intelligenceGroup = GROWTH_NAV_GROUP_DEFS.find((group) => group.id === "intelligence")
 assert.equal(intelligenceGroup?.label, "Intelligence")
