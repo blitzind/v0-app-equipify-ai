@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 730,
-  sqlMigrations: 295,
+  apiRouteHandlers: 738,
+  sqlMigrations: 297,
   dashboardPages: 65,
-  componentsTsx: 545,
-  libTsFiles: 1893,
+  componentsTsx: 547,
+  libTsFiles: 1913,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **730** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **295** |
+| API route handlers (\`app/api/**/route.ts\`) | **738** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **297** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **65** |
-| \`components/**/*.tsx\` | **545** |
-| \`lib/**/*.ts\` | **1893** |
+| \`components/**/*.tsx\` | **547** |
+| \`lib/**/*.ts\` | **1913** |
 
 ### Vercel crons
 
@@ -70,6 +70,8 @@ email/quote/route.ts
 email/work-order-summary/route.ts
 growth/intent-pixel/collect/route.ts
 growth/intent-pixel/pixel.js/route.ts
+growth/track/click/[token]/route.ts
+growth/track/open/[token]/route.ts
 growth/webhooks/outbound/lemlist/[connectionId]/route.ts
 insights/draft-email/route.ts
 insights/generate/route.ts
@@ -506,6 +508,11 @@ platform/growth/company-contacts/[contactId]/route.ts
 platform/growth/company-contacts/route.ts
 platform/growth/company-growth-signals/route.ts
 platform/growth/company-signals/route.ts
+platform/growth/compliance/bounce/route.ts
+platform/growth/compliance/complaint/route.ts
+platform/growth/compliance/dashboard/route.ts
+platform/growth/compliance/suppressions/route.ts
+platform/growth/compliance/unsubscribe/route.ts
 platform/growth/contact-discovery/route.ts
 platform/growth/conversations/dashboard/route.ts
 platform/growth/copilot/dashboard/route.ts
@@ -535,6 +542,7 @@ platform/growth/dogfood/issues/[issueId]/route.ts
 platform/growth/dogfood/issues/route.ts
 platform/growth/dogfood/runs/route.ts
 platform/growth/engagement/dashboard/route.ts
+platform/growth/engagement/route.ts
 platform/growth/enrichment/route.ts
 platform/growth/execution/dashboard/route.ts
 platform/growth/execution/queue/route.ts

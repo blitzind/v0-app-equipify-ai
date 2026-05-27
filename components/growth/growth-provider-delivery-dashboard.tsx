@@ -47,6 +47,12 @@ import { transportHealthLabel } from "@/lib/growth/providers/transport/transport
 import { supportsLiveTransport } from "@/lib/growth/providers/adapters/provider-transport-capability-registry"
 import type { GrowthSenderAccount } from "@/lib/growth/sender/sender-types"
 import {
+  GROWTH_COMPLIANCE_SUPPRESSION_QA_MARKER,
+  type GrowthComplianceDashboard,
+} from "@/lib/growth/compliance/compliance-types"
+import { senderReputationTierLabel } from "@/lib/growth/compliance/sender-reputation"
+import { complianceHealthLabel, type GrowthSuppressionHealthSnapshot } from "@/lib/growth/compliance/suppression-health"
+import {
   GROWTH_ENGAGEMENT_ATTRIBUTION_QA_MARKER,
   type GrowthEngagementAttributionDashboard,
   type GrowthTrackingHealthSnapshot,
@@ -123,6 +129,8 @@ export function GrowthProviderDeliveryDashboardPanel() {
   const [rateLimits, setRateLimits] = useState<Array<GrowthProviderRateLimitRow & { status?: { allowed: boolean; reason: string } }>>([])
   const [transportHealth, setTransportHealth] = useState<GrowthTransportHealthSnapshot | null>(null)
   const [trackingHealth, setTrackingHealth] = useState<GrowthTrackingHealthSnapshot | null>(null)
+  const [complianceDashboard, setComplianceDashboard] = useState<GrowthComplianceDashboard | null>(null)
+  const [complianceHealth, setComplianceHealth] = useState<GrowthSuppressionHealthSnapshot | null>(null)
   const [testSendOpen, setTestSendOpen] = useState(false)
   const [testSendTo, setTestSendTo] = useState("")
   const [testSendConfirmed, setTestSendConfirmed] = useState(false)
@@ -139,12 +147,13 @@ export function GrowthProviderDeliveryDashboardPanel() {
     setLoading(true)
     setError(null)
     try {
-      const [listResponse, dashboardResponse, attemptsResponse, rateLimitsResponse, engagementResponse] = await Promise.all([
+      const [listResponse, dashboardResponse, attemptsResponse, rateLimitsResponse, engagementResponse, complianceResponse] = await Promise.all([
         fetch("/api/platform/growth/providers"),
         fetch("/api/platform/growth/providers/dashboard"),
         fetch("/api/platform/growth/providers/delivery-attempts?limit=20"),
         fetch("/api/platform/growth/providers/rate-limits"),
         fetch("/api/platform/growth/engagement"),
+        fetch("/api/platform/growth/compliance/dashboard"),
       ])
       const listPayload = (await listResponse.json()) as ListPayload
       const dashboardPayload = (await dashboardResponse.json()) as DashboardPayload
@@ -154,6 +163,9 @@ export function GrowthProviderDeliveryDashboardPanel() {
       }
       const engagementPayload = (await engagementResponse.json()) as {
         dashboard?: GrowthEngagementAttributionDashboard
+      }
+      const compliancePayload = (await complianceResponse.json()) as {
+        dashboard?: GrowthComplianceDashboard
       }
       if (!listResponse.ok) throw new Error(listPayload.message ?? "Could not load delivery providers.")
       if (!dashboardResponse.ok) throw new Error(dashboardPayload.message ?? "Could not load delivery dashboard.")
@@ -178,6 +190,26 @@ export function GrowthProviderDeliveryDashboardPanel() {
         healthy_providers: Math.max(0, connectedCount - (rateLimitsPayload.rate_limits ?? []).filter((row) => row.status && !row.status.allowed).length),
       })
       setTrackingHealth(engagementPayload.dashboard?.trackingHealth ?? null)
+      setComplianceDashboard(compliancePayload.dashboard ?? null)
+      setComplianceHealth(
+        compliancePayload.dashboard
+          ? {
+              qa_marker: GROWTH_COMPLIANCE_SUPPRESSION_QA_MARKER,
+              schema_ready: true,
+              active_suppressions: compliancePayload.dashboard.suppressionCount,
+              unsubscribes_30d: 0,
+              hard_bounces_30d: 0,
+              complaints_30d: 0,
+              compliance_health:
+                compliancePayload.dashboard.senderReputation.tier === "critical"
+                  ? "critical"
+                  : compliancePayload.dashboard.senderReputation.tier === "warning"
+                    ? "degraded"
+                    : "healthy",
+              notes: [],
+            }
+          : null,
+      )
 
       if (!selectedProviderId && mergedProviders.length > 0) {
         setSelectedProviderId(mergedProviders[0].id)
@@ -334,7 +366,7 @@ export function GrowthProviderDeliveryDashboardPanel() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
           {GROWTH_PROVIDER_DELIVERY_FOUNDATION_QA_MARKER} · {GROWTH_LIVE_PROVIDER_TRANSPORT_QA_MARKER} ·{" "}
-          {GROWTH_ENGAGEMENT_ATTRIBUTION_QA_MARKER} · {GROWTH_LIVE_PROVIDER_TRANSPORT_PRIVACY_NOTE}
+          {GROWTH_ENGAGEMENT_ATTRIBUTION_QA_MARKER} · {GROWTH_COMPLIANCE_SUPPRESSION_QA_MARKER} · {GROWTH_LIVE_PROVIDER_TRANSPORT_PRIVACY_NOTE}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
@@ -376,6 +408,30 @@ export function GrowthProviderDeliveryDashboardPanel() {
           <StatTile label="Attribution health" value={trackingHealth ? trackingHealthLabel(trackingHealth.attribution_health) : "—"} />
           <StatTile label="Opens (24h)" value={String(trackingHealth?.open_events_24h ?? 0)} />
           <StatTile label="Clicks (24h)" value={String(trackingHealth?.click_events_24h ?? 0)} />
+        </div>
+      </GrowthEngineCard>
+
+      <GrowthEngineCard title="Compliance status">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatTile
+            label="Compliance health"
+            value={complianceHealth ? complianceHealthLabel(complianceHealth.compliance_health) : "—"}
+          />
+          <StatTile
+            label="Reputation trend"
+            value={
+              complianceDashboard
+                ? `${complianceDashboard.senderReputation.score} (${senderReputationTierLabel(complianceDashboard.senderReputation.tier)})`
+                : "—"
+            }
+          />
+          <StatTile label="Suppression protection" value={String(complianceDashboard?.suppressionCount ?? 0)} />
+          <StatTile label="Hard bounce rate" value={complianceDashboard ? `${complianceDashboard.hardBounceRate.toFixed(1)}%` : "—"} />
+        </div>
+        <div className="mt-3">
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/providers/compliance">Open Compliance</Link>
+          </Button>
         </div>
       </GrowthEngineCard>
 

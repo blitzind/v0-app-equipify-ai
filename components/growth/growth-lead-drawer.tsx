@@ -7,6 +7,7 @@ import { GrowthDecisionMakersPanel } from "@/components/growth/growth-decision-m
 import { GrowthOutboundPanel } from "@/components/growth/growth-outbound-panel"
 import { GrowthLeadActivityStream } from "@/components/growth/growth-lead-activity-stream"
 import { GrowthLeadEngagement } from "@/components/growth/growth-lead-engagement"
+import { GrowthLeadCompliance } from "@/components/growth/growth-lead-compliance"
 import { GrowthRelationshipIntelligence } from "@/components/growth/growth-relationship-intelligence"
 import { GrowthConversationIntelligence } from "@/components/growth/growth-conversation-intelligence"
 import { GrowthSequenceIntelligence } from "@/components/growth/growth-sequence-intelligence"
@@ -122,6 +123,8 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
           />
 
           <GrowthLeadEngagement lead={activeLead} />
+
+          <GrowthLeadCompliance lead={activeLead} />
 
           <GrowthCallCopilot lead={activeLead} />
 

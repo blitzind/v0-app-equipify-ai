@@ -88,6 +88,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["delivery", "provider", "route", "transport", "send routing"],
   },
   {
+    id: "provider-compliance",
+    label: "Compliance",
+    href: "/admin/growth/providers/compliance",
+    keywords: ["compliance", "bounce", "unsubscribe", "complaint", "suppression", "reputation"],
+  },
+  {
     id: "lead-intelligence",
     label: "Lead Intelligence Inspector",
     href: "/admin/growth/leads/lead-engine",
@@ -536,6 +542,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: prefixMatch("/admin/growth/providers/delivery"),
       },
       {
+        id: "provider-compliance",
+        href: "/admin/growth/providers/compliance",
+        label: "Compliance",
+        match: prefixMatch("/admin/growth/providers/compliance"),
+      },
+      {
         id: "mailbox-connections",
         href: "/admin/growth/infrastructure/mailboxes",
         label: "Mailbox Connections",
@@ -569,7 +581,9 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         label: "Provider Diagnostics",
         consoleKey: "providers",
         match: (path) =>
-          path.startsWith("/admin/growth/providers") && !path.startsWith("/admin/growth/providers/delivery"),
+          path.startsWith("/admin/growth/providers") &&
+          !path.startsWith("/admin/growth/providers/delivery") &&
+          !path.startsWith("/admin/growth/providers/compliance"),
       },
     ],
   },

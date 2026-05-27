@@ -11,6 +11,7 @@ import { getTransportAdapter } from "@/lib/growth/providers/adapters/adapter-reg
 import { selectDeliveryRoute } from "@/lib/growth/providers/provider-router"
 import { getSenderAccount } from "@/lib/growth/sender/sender-repository"
 import { applyOutboundEmailTracking } from "@/lib/growth/tracking/tracking-links"
+import { assertPreSendSuppressionAllowed } from "@/lib/growth/compliance/suppression-engine"
 import { checkTransportRateLimit } from "@/lib/growth/providers/transport/transport-rate-limit"
 import { resolveTransportFallbackRoute, simulateTransportDelivery } from "@/lib/growth/providers/transport/transport-fallback"
 import { recordTransportAuditEvent } from "@/lib/growth/providers/transport/transport-events"
@@ -106,6 +107,36 @@ async function executeAttemptOnRoute(
     retry_count?: number
   },
 ): Promise<TransportSendResult> {
+  const suppression = await assertPreSendSuppressionAllowed(admin, {
+    email: input.message.to,
+    leadId: input.lead_id,
+    senderAccountId: input.sender_account_id,
+  })
+
+  if (!suppression.allowed) {
+    await recordTransportAuditEvent(admin, {
+      provider_id: input.provider_id,
+      event_type: "delivery_failed",
+      title: "Delivery blocked by compliance",
+      description: suppression.reason ?? "Pre-send suppression blocked delivery.",
+      severity: "high",
+      metadata: {
+        block_code: suppression.blockCode,
+        route_id: input.route_id,
+        sender_account_id: input.sender_account_id,
+        to: input.message.to,
+      },
+      actorUserId: input.actorUserId,
+      actorEmail: input.actorEmail,
+    })
+    return {
+      ok: false,
+      attempt: null,
+      error: suppression.reason ?? "Pre-send suppression blocked delivery.",
+      requires_human_review: true,
+    }
+  }
+
   const rateLimitRow = await ensureProviderRateLimit(admin, input.provider_id)
   const rateCheck = checkTransportRateLimit(rateLimitRow, 1)
   if (!rateCheck.allowed) {

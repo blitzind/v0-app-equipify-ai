@@ -252,6 +252,7 @@ async function main(): Promise<void> {
   assert.match(orchestratorSource, /TransportHumanApprovalRequiredError/)
   assert.match(orchestratorSource, /human_approved/)
   assert.match(orchestratorSource, /executeAttemptOnRoute/)
+  assert.match(orchestratorSource, /assertPreSendSuppressionAllowed/)
   assert.match(orchestratorSource, /GROWTH_TRANSPORT_MAX_RETRIES/)
 
   const eventsSource = fs.readFileSync(

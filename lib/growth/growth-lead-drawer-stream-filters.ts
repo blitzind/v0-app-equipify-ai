@@ -136,6 +136,7 @@ export const GROWTH_DRAWER_CARD_KEYS = {
   conversation: "conversation-intelligence",
   sequence: "sequence-intelligence",
   engagement: "engagement",
+  compliance: "compliance",
   callCopilot: "call-copilot",
   realtimeCall: "realtime-call",
   aiCopilot: "ai-copilot",
