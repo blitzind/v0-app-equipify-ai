@@ -18,6 +18,8 @@ import type {
   GrowthDomainDnsCheck,
 } from "@/lib/growth/deliverability/deliverability-types"
 import { validateDnsDomain } from "@/lib/growth/deliverability/dns-validator"
+import { isLiveDnsVerificationEnabled } from "@/lib/growth/deliverability/live-dns-verifier"
+import { runLiveDnsVerificationForDomain } from "@/lib/growth/deliverability/live-dns-service"
 import { listSenderDomains, updateSenderDomain } from "@/lib/growth/sender/sender-repository"
 
 function asString(value: unknown): string {
@@ -171,6 +173,36 @@ export async function validateDeliverabilityDomain(
   const domainName = asString((domainRow as Record<string, unknown>).domain)
   const previousCheck = await getLatestDnsCheckByDomain(admin, domainId)
   const previousScore = previousCheck?.dns_health_score ?? asNumber((domainRow as Record<string, unknown>).deliverability_score, 0)
+  const manualOverride = Boolean((domainRow as Record<string, unknown>).manual_override)
+
+  if (isLiveDnsVerificationEnabled() && !manualOverride && !input?.hints) {
+    const live = await runLiveDnsVerificationForDomain(admin, domainId)
+    if (!live.ok) throw new Error(live.error ?? "live_dns_verification_failed")
+    const { data: refreshed } = await admin.schema("growth").from("sender_domains").select("*").eq("id", domainId).maybeSingle()
+    const latestCheck = await getLatestDnsCheckByDomain(admin, domainId)
+    if (!refreshed || !latestCheck) throw new Error("domain_refresh_failed")
+    return {
+      domain: {
+        domain_id: domainId,
+        domain: domainName,
+        spf_present: latestCheck.spf_present,
+        spf_valid: latestCheck.spf_valid,
+        dkim_present: latestCheck.dkim_present,
+        dkim_valid: latestCheck.dkim_valid,
+        dmarc_present: latestCheck.dmarc_present,
+        dmarc_valid: latestCheck.dmarc_valid,
+        mx_present: latestCheck.mx_present,
+        mx_valid: latestCheck.mx_valid,
+        dns_health_score: latestCheck.dns_health_score,
+        health_tier: latestCheck.health_tier,
+        deliverability_score: latestCheck.dns_health_score,
+        risk_level: deliverabilityScoreToRiskLevel(latestCheck.dns_health_score),
+        last_checked_at: latestCheck.last_checked_at,
+        recommendations: latestCheck.recommendations,
+      },
+      dns_check: latestCheck,
+    }
+  }
 
   const validation = validateDnsDomain({
     domain: domainName,

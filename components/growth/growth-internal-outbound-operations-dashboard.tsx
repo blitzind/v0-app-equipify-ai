@@ -11,6 +11,7 @@ import {
 } from "@/components/growth/growth-infrastructure-readiness-badge"
 import type { GrowthInternalOutboundOperationsDashboard } from "@/lib/growth/operations/internal-outbound-operations-dashboard"
 import { GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER } from "@/lib/growth/operations/internal-outbound-ops-types"
+import { GROWTH_DELIVERABILITY_INTELLIGENCE_QA_MARKER } from "@/lib/growth/deliverability/deliverability-intelligence-types"
 
 function formatDate(value: string | null): string {
   if (!value) return "—"
@@ -151,7 +152,9 @@ export function GrowthInternalOutboundOperationsDashboardView() {
 
       <GrowthEngineCard title="Domains (manual DNS verification)" icon={<Shield size={16} />}>
         <p className="mb-3 text-xs text-amber-900">
-          MANUAL VERIFICATION REQUIRED — DNS state reflects stored flags only; no live DNS probes in Phase 1.
+          {dashboard.deliverability_intelligence.live_dns_enabled
+            ? "Live DNS verification enabled (GROWTH_LIVE_DNS_VERIFICATION=true). Failed checks degrade readiness."
+            : "MANUAL VERIFICATION REQUIRED — set GROWTH_LIVE_DNS_VERIFICATION=true for live DNS probes."}
         </p>
         <div className="space-y-2">
           {dashboard.domains.length === 0 ? (
@@ -164,6 +167,13 @@ export function GrowthInternalOutboundOperationsDashboardView() {
                   <p className="text-xs text-muted-foreground">
                     SPF {domain.spfStatus} · DKIM {domain.dkimStatus} · DMARC {domain.dmarcStatus} · MX {domain.mxStatus}
                   </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {domain.verificationLabel}
+                    {domain.lastVerifiedAt ? ` · Verified ${formatDate(domain.lastVerifiedAt)}` : ""}
+                  </p>
+                  {domain.verificationError ? (
+                    <p className="mt-1 text-xs text-rose-800">{domain.verificationError}</p>
+                  ) : null}
                   {domain.reputationWarnings.length > 0 ? (
                     <p className="mt-1 text-xs text-rose-800">{domain.reputationWarnings.join(" ")}</p>
                   ) : null}
@@ -232,6 +242,125 @@ export function GrowthInternalOutboundOperationsDashboardView() {
           </table>
         </div>
       </GrowthEngineCard>
+
+      <div
+        className="flex flex-col gap-5"
+        data-qa-marker={GROWTH_DELIVERABILITY_INTELLIGENCE_QA_MARKER}
+      >
+        <GrowthEngineCard title="Deliverability intelligence" icon={<Shield size={16} />}>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatTile
+              label="Unhealthy domains"
+              value={String(dashboard.deliverability_intelligence.intelligence_summary.unhealthyDomainCount)}
+            />
+            <StatTile
+              label="Degraded mailboxes"
+              value={String(dashboard.deliverability_intelligence.intelligence_summary.degradedMailboxCount)}
+            />
+            <StatTile
+              label="DNS failures"
+              value={String(dashboard.deliverability_intelligence.intelligence_summary.dnsFailureCount)}
+            />
+            <StatTile
+              label="Paused senders"
+              value={String(dashboard.deliverability_intelligence.intelligence_summary.pausedSenderCount)}
+            />
+            <StatTile
+              label="Bounce spike domains"
+              value={String(dashboard.deliverability_intelligence.intelligence_summary.bounceSpikeDomains)}
+            />
+            <StatTile
+              label="Complaint spike domains"
+              value={String(dashboard.deliverability_intelligence.intelligence_summary.complaintSpikeDomains)}
+            />
+            <StatTile
+              label="Webhook silence"
+              value={String(dashboard.deliverability_intelligence.intelligence_summary.webhookOutageMailboxes)}
+            />
+            <StatTile
+              label="Provider rejections"
+              value={String(dashboard.deliverability_intelligence.intelligence_summary.providerRejectionSenders)}
+            />
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Real telemetry only — no Postmaster, blacklist, or inbox placement integrations unless configured separately.
+          </p>
+        </GrowthEngineCard>
+
+        <div data-qa-marker={`${GROWTH_DELIVERABILITY_INTELLIGENCE_QA_MARKER}-domain-readiness`}>
+          <GrowthEngineCard title="Domain readiness cards" icon={<Shield size={16} />}>
+            <div className="space-y-2">
+              {dashboard.deliverability_intelligence.domain_readiness_cards.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No domains to assess.</p>
+              ) : (
+                dashboard.deliverability_intelligence.domain_readiness_cards.map((card) => (
+                  <div key={card.domainId} className="rounded-lg border p-3 text-xs">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold">{card.domain}</p>
+                        <p className="text-muted-foreground">
+                          {card.verificationLabel} · Score {card.readinessScore} · Health {card.domainHealthScore} ·{" "}
+                          {card.operationalStatus}
+                        </p>
+                      </div>
+                      <GrowthBadge
+                        label={card.domainRiskLevel}
+                        tone={card.domainRiskLevel === "critical" ? "critical" : "neutral"}
+                      />
+                    </div>
+                    {card.riskReasons.length > 0 ? (
+                      <p className="mt-1 text-rose-800">{card.riskReasons.join(" ")}</p>
+                    ) : null}
+                    {card.recommendations.length > 0 ? (
+                      <p className="mt-1 text-muted-foreground">{card.recommendations[0]}</p>
+                    ) : null}
+                  </div>
+                ))
+              )}
+            </div>
+          </GrowthEngineCard>
+        </div>
+
+        <div data-qa-marker={`${GROWTH_DELIVERABILITY_INTELLIGENCE_QA_MARKER}-timeline`}>
+          <GrowthEngineCard title="Operational timeline" icon={<Activity size={16} />}>
+            <ul className="space-y-2 text-xs">
+              {dashboard.deliverability_intelligence.timeline_feed.length === 0 ? (
+                <li className="text-muted-foreground">No normalized timeline events yet.</li>
+              ) : (
+                dashboard.deliverability_intelligence.timeline_feed.slice(0, 20).map((event) => (
+                  <li key={event.id} className="rounded-lg border p-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium">{event.title}</span>
+                      <GrowthBadge label={event.normalizedType} tone="neutral" />
+                    </div>
+                    <p className="text-muted-foreground">{event.summary ?? event.normalizedType}</p>
+                    <p className="text-[10px] text-muted-foreground">{formatDate(event.occurredAt)}</p>
+                  </li>
+                ))
+              )}
+            </ul>
+          </GrowthEngineCard>
+        </div>
+
+        <GrowthEngineCard title="Domain ↔ sender mapping" icon={<Users size={16} />}>
+          <div className="space-y-2 text-xs">
+            {dashboard.deliverability_intelligence.domain_sender_mappings.map((mapping) => (
+              <div key={mapping.domainId} className="rounded-lg border p-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{mapping.domain}</span>
+                  <GrowthBadge
+                    label={`${mapping.concentrationRisk} concentration`}
+                    tone={mapping.concentrationRisk === "high" ? "attention" : "neutral"}
+                  />
+                </div>
+                <p className="text-muted-foreground">
+                  {mapping.senderCount} senders · {mapping.poolCount} pools · {mapping.pools.join(", ") || "no pools"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </GrowthEngineCard>
+      </div>
 
       <GrowthEngineCard title="Deliverability (deterministic)" icon={<Shield size={16} />}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

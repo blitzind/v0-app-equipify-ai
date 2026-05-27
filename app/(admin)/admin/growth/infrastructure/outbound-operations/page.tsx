@@ -12,7 +12,7 @@ import {
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import { Button } from "@/components/ui/button"
-import { GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER } from "@/lib/growth/operations/internal-outbound-ops-types"
+import { GROWTH_DELIVERABILITY_INTELLIGENCE_QA_MARKER } from "@/lib/growth/deliverability/deliverability-intelligence-types"
 
 export default function AdminGrowthInternalOutboundOperationsPage() {
   const { sessionIdentity } = useAdmin()
@@ -24,7 +24,10 @@ export default function AdminGrowthInternalOutboundOperationsPage() {
 
   return (
     <PlatformAdminPageShell header={header}>
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8" data-qa-marker={GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER}>
+      <div
+        className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8"
+        data-qa-marker={GROWTH_DELIVERABILITY_INTELLIGENCE_QA_MARKER}
+      >
         <PlatformAdminTabNav activeKey="growth_leads" />
 
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">

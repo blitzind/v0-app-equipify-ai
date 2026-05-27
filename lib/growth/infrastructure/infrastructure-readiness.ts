@@ -8,6 +8,7 @@ import {
   isGrowthInboxSyncSimulationEnabled,
   isGrowthTransportSimulationEnabled,
 } from "@/lib/growth/runtime/runtime-guards"
+import { isLiveDnsVerificationEnabled } from "@/lib/growth/deliverability/live-dns-verifier"
 import type {
   GrowthInfrastructureReadinessCatalogEntry,
   GrowthInfrastructureReadinessDescriptor,
@@ -58,9 +59,12 @@ export function resolveMailboxProviderReadiness(
 }
 
 export function resolveDnsValidationReadiness(): GrowthInfrastructureReadinessDescriptor {
+  if (isLiveDnsVerificationEnabled()) {
+    return descriptor("live", "GROWTH_LIVE_DNS_VERIFICATION=true — scheduled cron probes SPF/DKIM/DMARC/MX via resolver.")
+  }
   return descriptor(
     "stub",
-    "MANUAL VERIFICATION REQUIRED — no live DNS probe; operator must verify SPF/DKIM/DMARC/MX externally.",
+    "MANUAL VERIFICATION REQUIRED — set GROWTH_LIVE_DNS_VERIFICATION=true for live DNS probes.",
   )
 }
 
@@ -73,7 +77,13 @@ export function resolveWebhookIngestionReadiness(): GrowthInfrastructureReadines
 }
 
 export function resolveDeliverabilityReadiness(): GrowthInfrastructureReadinessDescriptor {
-  return descriptor("internal", "Deliverability dashboards aggregate real bounces/complaints — no fake scores.")
+  if (isLiveDnsVerificationEnabled()) {
+    return descriptor(
+      "live",
+      "Deliverability intelligence uses live DNS verification, real bounces/complaints, and protection rules — no fake scores.",
+    )
+  }
+  return descriptor("internal", "Deliverability dashboards aggregate real bounces/complaints — DNS live probe disabled.")
 }
 
 export function resolveOutboundProviderReadiness(providerFamily: string): GrowthInfrastructureReadinessDescriptor {

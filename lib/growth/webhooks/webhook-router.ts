@@ -7,6 +7,7 @@ import { registerUnsubscribe } from "@/lib/growth/compliance/unsubscribe-engine"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { updateDeliveryAttempt } from "@/lib/growth/providers/transport/transport-repository"
 import { recordEmailClick, recordEmailOpen } from "@/lib/growth/tracking/tracking-repository"
+import { recordDeliveryTimelineFromWebhook } from "@/lib/growth/deliverability/delivery-event-timeline"
 import {
   recordProviderBounceReceivedTimelineEvent,
   recordProviderComplaintReceivedTimelineEvent,
@@ -298,6 +299,17 @@ export async function ingestProviderWebhook(
       senderAccountId: attempt?.sender_account_id ?? null,
       providerId: attempt?.provider_id ?? null,
     })
+
+    await recordDeliveryTimelineFromWebhook(admin, {
+      providerFamily: input.providerFamily,
+      normalizedEventType: normalized.normalizedEventType,
+      providerEventId: event.id,
+      providerDeliveryEventId: event.id,
+      deliveryAttemptId: attempt?.id ?? null,
+      senderAccountId: attempt?.sender_account_id ?? null,
+      occurredAt,
+      sanitizedPayload,
+    }).catch(() => undefined)
 
     if (endpoint) {
       await updateProviderWebhookEndpoint(admin, endpoint.id, {

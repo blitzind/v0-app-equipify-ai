@@ -3,12 +3,18 @@ import "server-only"
 import type { GrowthSenderDomain } from "@/lib/growth/sender/sender-types"
 import type { GrowthInfrastructureReadinessDescriptor } from "@/lib/growth/infrastructure/infrastructure-readiness-types"
 import { growthInfrastructureReadinessLabel } from "@/lib/growth/infrastructure/infrastructure-readiness-types"
+import { isLiveDnsVerificationEnabled } from "@/lib/growth/deliverability/live-dns-verifier"
 
 export type GrowthDomainReadinessRow = {
   domainId: string
   domain: string
   readinessStatus: GrowthInfrastructureReadinessDescriptor["status"]
   readinessScore: number
+  verificationSource: GrowthSenderDomain["verification_source"]
+  verificationLabel: string
+  lastVerifiedAt: string | null
+  verificationError: string | null
+  manualOverride: boolean
   spfStatus: "verified" | "missing" | "manual_required"
   dkimStatus: "verified" | "missing" | "manual_required"
   dmarcStatus: "verified" | "missing" | "manual_required"
@@ -17,45 +23,85 @@ export type GrowthDomainReadinessRow = {
   manualVerificationRequired: boolean
   reputationWarnings: string[]
   healthTier: string
+  operationalStatus: string
   checklist: Array<{ id: string; label: string; complete: boolean; manual: boolean }>
 }
 
-function recordStatus(present: boolean, valid: boolean): "verified" | "missing" | "manual_required" {
-  if (present && valid) return "verified"
-  if (present && !valid) return "manual_required"
+function recordStatus(valid: boolean, liveVerified: boolean): "verified" | "missing" | "manual_required" {
+  if (valid && liveVerified) return "verified"
+  if (valid) return "manual_required"
   return "missing"
 }
 
-export function computeDomainReadiness(domain: GrowthSenderDomain): GrowthDomainReadinessRow {
-  const spfStatus = recordStatus(domain.spf_valid, domain.spf_valid)
-  const dkimStatus = recordStatus(domain.dkim_valid, domain.dkim_valid)
-  const dmarcStatus = recordStatus(domain.dmarc_valid, domain.dmarc_valid)
-  const mxStatus = recordStatus(domain.mx_valid, domain.mx_valid)
+function verificationLabel(domain: GrowthSenderDomain, liveEnabled: boolean): string {
+  if (domain.manual_override) return "MANUAL OVERRIDE"
+  if (domain.verification_source === "live" && liveEnabled && !domain.verification_error) return "LIVE VERIFIED"
+  if (domain.verification_error) return "LIVE VERIFICATION FAILED"
+  if (liveEnabled) return "LIVE DNS ENABLED — AWAITING VERIFICATION"
+  return "MANUAL VERIFICATION REQUIRED"
+}
 
-  const manualVerificationRequired = true
+export function computeDomainReadiness(domain: GrowthSenderDomain): GrowthDomainReadinessRow {
+  const liveEnabled = isLiveDnsVerificationEnabled()
+  const liveVerified =
+    domain.verification_source === "live" && !domain.verification_error && Boolean(domain.last_verified_at)
+  const manualOverride = domain.manual_override
+
+  const spfStatus = recordStatus(domain.spf_valid, liveVerified || manualOverride)
+  const dkimStatus = recordStatus(domain.dkim_valid, liveVerified || manualOverride)
+  const dmarcStatus = recordStatus(domain.dmarc_valid, liveVerified || manualOverride)
+  const mxStatus = recordStatus(domain.mx_valid, liveVerified || manualOverride)
+
+  const manualVerificationRequired = !liveVerified && !manualOverride
   const verifiedCount = [spfStatus, dkimStatus, dmarcStatus, mxStatus].filter((s) => s === "verified").length
-  const readinessScore = Math.round((verifiedCount / 4) * 100)
+  let readinessScore = Math.round((verifiedCount / 4) * 100)
+  if (domain.verification_error) readinessScore = Math.min(readinessScore, 40)
+  if (!liveVerified && !manualOverride && liveEnabled) readinessScore = Math.min(readinessScore, 60)
 
   const reputationWarnings: string[] = []
+  if (domain.verification_error) reputationWarnings.push(`DNS verification error: ${domain.verification_error}`)
   if ((domain.bounce_rate ?? 0) >= 5) reputationWarnings.push("Elevated bounce rate on domain.")
   if ((domain.spam_risk ?? 0) >= 50) reputationWarnings.push("Spam risk flagged on domain record.")
   if (domain.deliverability_score < 50) reputationWarnings.push("Deliverability score below operational threshold.")
+  if (domain.operational_status === "paused") reputationWarnings.push("Domain operationally paused.")
 
   let readinessStatus: GrowthInfrastructureReadinessDescriptor["status"] = "stub"
-  if (domain.status === "disabled") readinessStatus = "disabled"
-  else if (reputationWarnings.length > 0 || domain.deliverability_score < 30) readinessStatus = "error"
+  if (domain.status === "disabled" || domain.operational_status === "paused") readinessStatus = "disabled"
+  else if (domain.verification_error || reputationWarnings.length > 2 || domain.deliverability_score < 30) {
+    readinessStatus = "error"
+  } else if (manualOverride) readinessStatus = "degraded"
+  else if (liveVerified) readinessStatus = "live"
   else if (readinessScore < 100 || domain.deliverability_score < 60) readinessStatus = "degraded"
-  else if (readinessScore === 100) readinessStatus = "live"
 
   const checklist = [
-    { id: "spf", label: "SPF record published and aligned", complete: spfStatus === "verified", manual: true },
-    { id: "dkim", label: "DKIM record published and aligned", complete: dkimStatus === "verified", manual: true },
-    { id: "dmarc", label: "DMARC policy published", complete: dmarcStatus === "verified", manual: true },
-    { id: "mx", label: "MX records valid for mailbox provider", complete: mxStatus === "verified", manual: true },
+    {
+      id: "spf",
+      label: "SPF record published and aligned",
+      complete: spfStatus === "verified",
+      manual: !liveVerified && !manualOverride,
+    },
+    {
+      id: "dkim",
+      label: "DKIM record published and aligned",
+      complete: dkimStatus === "verified",
+      manual: !liveVerified && !manualOverride,
+    },
+    {
+      id: "dmarc",
+      label: "DMARC policy published",
+      complete: dmarcStatus === "verified",
+      manual: !liveVerified && !manualOverride,
+    },
+    {
+      id: "mx",
+      label: "MX records valid for mailbox provider",
+      complete: mxStatus === "verified",
+      manual: !liveVerified && !manualOverride,
+    },
     {
       id: "tracking",
       label: "Tracking domain configured (if used)",
-      complete: false,
+      complete: Boolean(domain.tracking_domain),
       manual: true,
     },
   ]
@@ -65,14 +111,25 @@ export function computeDomainReadiness(domain: GrowthSenderDomain): GrowthDomain
     domain: domain.domain,
     readinessStatus,
     readinessScore,
+    verificationSource: domain.verification_source,
+    verificationLabel: verificationLabel(domain, liveEnabled),
+    lastVerifiedAt: domain.last_verified_at,
+    verificationError: domain.verification_error,
+    manualOverride,
     spfStatus,
     dkimStatus,
     dmarcStatus,
     mxStatus,
-    trackingDomainReady: false,
+    trackingDomainReady: Boolean(domain.tracking_domain),
     manualVerificationRequired,
     reputationWarnings,
-    healthTier: domain.deliverability_score >= 70 ? "healthy" : domain.deliverability_score >= 40 ? "degraded" : "critical",
+    healthTier:
+      domain.domain_health_score >= 70
+        ? "healthy"
+        : domain.domain_health_score >= 40
+          ? "degraded"
+          : "critical",
+    operationalStatus: domain.operational_status,
     checklist,
   }
 }
@@ -88,6 +145,9 @@ export function resolveDnsValidationReadinessFromDomains(
     }
   }
 
+  const liveEnabled = isLiveDnsVerificationEnabled()
+  const hasLiveVerified = domains.some((d) => d.verificationLabel === "LIVE VERIFIED")
+  const hasManualOverride = domains.some((d) => d.manualOverride)
   const hasError = domains.some((d) => d.readinessStatus === "error")
   const hasDegraded = domains.some((d) => d.readinessStatus === "degraded")
 
@@ -95,21 +155,37 @@ export function resolveDnsValidationReadinessFromDomains(
     return {
       status: "error",
       label: growthInfrastructureReadinessLabel("error"),
-      detail: "One or more domains have critical deliverability risk — manual verification required.",
+      detail: "One or more domains have DNS verification failures or critical deliverability risk.",
     }
   }
 
-  if (hasDegraded) {
+  if (hasLiveVerified && !hasDegraded) {
+    return {
+      status: "live",
+      label: growthInfrastructureReadinessLabel("live"),
+      detail: "LIVE VERIFIED — DNS records probed via resolver (GROWTH_LIVE_DNS_VERIFICATION=true).",
+    }
+  }
+
+  if (hasManualOverride) {
     return {
       status: "degraded",
       label: growthInfrastructureReadinessLabel("degraded"),
-      detail: "MANUAL VERIFICATION REQUIRED — DNS checks use stored flags only; no live DNS probes.",
+      detail: "MANUAL OVERRIDE — operator attested DNS readiness; live probe skipped for flagged domains.",
+    }
+  }
+
+  if (liveEnabled) {
+    return {
+      status: "degraded",
+      label: growthInfrastructureReadinessLabel("degraded"),
+      detail: "Live DNS enabled — domains awaiting successful verification run.",
     }
   }
 
   return {
     status: "stub",
     label: growthInfrastructureReadinessLabel("stub"),
-    detail: "MANUAL VERIFICATION REQUIRED — live DNS probe not enabled; operator must verify SPF/DKIM/DMARC/MX externally.",
+    detail: "MANUAL VERIFICATION REQUIRED — set GROWTH_LIVE_DNS_VERIFICATION=true for live DNS probes.",
   }
 }

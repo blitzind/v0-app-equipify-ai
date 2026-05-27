@@ -87,7 +87,7 @@ export async function evaluatePreSendInfrastructureAllowed(
     const domainRow = domains.find((d) => d.domain.toLowerCase() === domainName.toLowerCase())
     if (domainRow) {
       const readiness = computeDomainReadiness(domainRow)
-      if (readiness.readinessStatus === "error") {
+      if (readiness.readinessStatus === "error" || domainRow.operational_status === "paused") {
         await recordInternalOutboundAuditEvent(admin, {
           eventType: "domain_risk_alert",
           severity: "critical",

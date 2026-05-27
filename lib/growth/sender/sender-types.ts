@@ -69,6 +69,16 @@ export type GrowthSenderDomain = {
   reply_rate: number | null
   spam_risk: number | null
   health_summary: string | null
+  dkim_selector: string | null
+  tracking_domain: string | null
+  domain_age_note: string | null
+  manual_override: boolean
+  verification_source: "stub" | "live" | "manual_override"
+  last_verified_at: string | null
+  verification_error: string | null
+  domain_health_score: number
+  domain_risk_level: string
+  operational_status: string
   created_at: string
   updated_at: string
 }

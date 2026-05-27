@@ -24,6 +24,8 @@ import {
 } from "@/lib/growth/sender-pools/sender-operational-pause"
 import { listSenderPoolMembers, listSenderPools } from "@/lib/growth/sender-pools/sender-pool-repository"
 import { buildSenderPoolMemberContext } from "@/lib/growth/sender-pools/sender-pool-rotation-service"
+import { fetchDeliverabilityIntelligenceDashboard } from "@/lib/growth/deliverability/deliverability-intelligence-dashboard"
+import type { GrowthDeliverabilityIntelligenceDashboard } from "@/lib/growth/deliverability/deliverability-intelligence-dashboard"
 import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 
 export type GrowthInternalOutboundOperationsDashboard = {
@@ -51,6 +53,7 @@ export type GrowthInternalOutboundOperationsDashboard = {
     readinessStatus: string
   }
   readiness_catalog: ReturnType<typeof buildGrowthInfrastructureReadinessCatalog>
+  deliverability_intelligence: GrowthDeliverabilityIntelligenceDashboard
 }
 
 function since24hIso(): string {
@@ -80,6 +83,7 @@ export async function fetchGrowthInternalOutboundOperationsDashboard(
     webhookEvents,
     bounces24h,
     complaints24h,
+    deliverabilityIntelligence,
   ] = await Promise.all([
     fetchGrowthOutboundOperationsDashboard(admin),
     listMailboxConnections(admin),
@@ -112,6 +116,7 @@ export async function fetchGrowthInternalOutboundOperationsDashboard(
       .from("email_complaints")
       .select("id", { count: "exact", head: true })
       .gte("occurred_at", since24h),
+    fetchDeliverabilityIntelligenceDashboard(admin),
   ])
 
   const senderById = new Map(senders.map((s) => [s.id, s]))
@@ -171,6 +176,12 @@ export async function fetchGrowthInternalOutboundOperationsDashboard(
       domain: domain.domain,
       readinessStatus: readiness.readinessStatus,
       readinessScore: readiness.readinessScore,
+      verificationLabel: readiness.verificationLabel,
+      verificationSource: readiness.verificationSource,
+      lastVerifiedAt: readiness.lastVerifiedAt,
+      verificationError: readiness.verificationError,
+      manualOverride: readiness.manualOverride,
+      operationalStatus: readiness.operationalStatus,
       spfStatus: readiness.spfStatus,
       dkimStatus: readiness.dkimStatus,
       dmarcStatus: readiness.dmarcStatus,
@@ -272,5 +283,6 @@ export async function fetchGrowthInternalOutboundOperationsDashboard(
       readinessStatus: googleProviderOAuthConfigured() ? "live" : "stub",
     },
     readiness_catalog: buildGrowthInfrastructureReadinessCatalog(),
+    deliverability_intelligence: deliverabilityIntelligence,
   }
 }

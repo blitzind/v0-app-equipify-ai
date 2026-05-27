@@ -173,6 +173,7 @@
     "test:growth-deliverability": "tsx scripts/test-growth-deliverability.ts",
     "test:growth-operational-send-plane": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-operational-send-plane.ts",
     "test:growth-internal-outbound-ops": "tsx scripts/test-growth-internal-outbound-ops.ts",
+    "test:growth-deliverability-intelligence": "tsx scripts/test-growth-deliverability-intelligence.ts",
     "test:growth-warmup": "tsx scripts/test-growth-warmup.ts",
     "test:growth-unified-inbox": "tsx scripts/test-growth-unified-inbox.ts",
     "test:growth-inbox-sync": "tsx scripts/test-growth-inbox-sync.ts",

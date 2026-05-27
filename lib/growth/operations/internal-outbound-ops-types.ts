@@ -40,6 +40,12 @@ export type GrowthInternalOutboundDomainRow = {
   domain: string
   readinessStatus: string
   readinessScore: number
+  verificationLabel: string
+  verificationSource: string
+  lastVerifiedAt: string | null
+  verificationError: string | null
+  manualOverride: boolean
+  operationalStatus: string
   spfStatus: string
   dkimStatus: string
   dmarcStatus: string

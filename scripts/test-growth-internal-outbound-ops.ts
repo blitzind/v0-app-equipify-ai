@@ -6,6 +6,7 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import { GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER } from "../lib/growth/operations/internal-outbound-ops-types"
+import { GROWTH_DELIVERABILITY_INTELLIGENCE_QA_MARKER } from "../lib/growth/deliverability/deliverability-intelligence-types"
 import { GROWTH_INFRASTRUCTURE_READINESS_STATUSES } from "../lib/growth/infrastructure/infrastructure-readiness-types"
 
 const INTERNAL_OUTBOUND_AUDIT_MIGRATION = "20270528120000_growth_engine_internal_outbound_ops.sql"
@@ -26,7 +27,7 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "app/(admin)/admin/growth/infrastructure/outbound-operations/page.tsx"),
     "utf8",
   )
-  assert.match(page, /GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER/)
+  assert.match(page, /GROWTH_DELIVERABILITY_INTELLIGENCE_QA_MARKER/)
   assert.match(page, /data-qa-marker/)
 
   const infraPage = fs.readFileSync(
@@ -57,7 +58,7 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "lib/growth/infrastructure/domain-readiness.ts"),
     "utf8",
   )
-  assert.match(domainReadiness, /MANUAL VERIFICATION REQUIRED/)
+  assert.match(domainReadiness, /MANUAL VERIFICATION REQUIRED|MANUAL OVERRIDE|LIVE VERIFIED/)
 
   const dashboard = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/operations/internal-outbound-operations-dashboard.ts"),
