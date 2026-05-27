@@ -1,11 +1,11 @@
 import type {
   GrowthProspectSearchCompanyResult,
   GrowthProspectSearchFilters,
+  GrowthProspectSearchIndexCompany,
+  GrowthProspectSearchIndexPerson,
   GrowthProspectSearchParsedQuery,
   GrowthProspectSearchPersonResult,
 } from "@/lib/growth/prospect-search/prospect-search-types"
-import type { GrowthProspectSearchIndexCompany } from "@/lib/growth/prospect-search/prospect-search-index"
-import type { GrowthProspectSearchIndexPerson } from "@/lib/growth/prospect-search/prospect-search-index"
 import { inferEmployeeSizeBand, inferRevenueBand } from "@/lib/growth/prospect-search/prospect-search-filters"
 import { finalizeProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-result-finalize"
 
@@ -240,6 +240,35 @@ export function rankProspectSearchCompanies(
     .slice(0, limit)
 }
 
+export function paginateRankedProspectSearchCompanies(
+  rows: GrowthProspectSearchIndexCompany[],
+  query: string,
+  parsed: GrowthProspectSearchParsedQuery,
+  page: number,
+  pageSize: number,
+  filters?: GrowthProspectSearchFilters,
+): {
+  companies: GrowthProspectSearchCompanyResult[]
+  total_count: number
+  page: number
+  page_size: number
+  has_next_page: boolean
+} {
+  const safePage = Math.max(1, page)
+  const safePageSize = Math.min(200, Math.max(1, pageSize))
+  const ranked = rankProspectSearchCompanies(rows, query, parsed, rows.length || 1, filters)
+  const offset = (safePage - 1) * safePageSize
+  const companies = ranked.slice(offset, offset + safePageSize)
+
+  return {
+    companies,
+    total_count: ranked.length,
+    page: safePage,
+    page_size: safePageSize,
+    has_next_page: offset + safePageSize < ranked.length,
+  }
+}
+
 export function rankProspectSearchPeople(
   rows: GrowthProspectSearchIndexPerson[],
   query: string,
@@ -267,4 +296,31 @@ export function rankProspectSearchPeople(
     .filter((r) => r.rank_score > 0.05 || query.trim().length < 3)
     .sort((a, b) => b.rank_score - a.rank_score)
     .slice(0, limit)
+}
+
+export function paginateRankedProspectSearchPeople(
+  rows: GrowthProspectSearchIndexPerson[],
+  query: string,
+  page: number,
+  pageSize: number,
+): {
+  people: GrowthProspectSearchPersonResult[]
+  total_count: number
+  page: number
+  page_size: number
+  has_next_page: boolean
+} {
+  const safePage = Math.max(1, page)
+  const safePageSize = Math.min(200, Math.max(1, pageSize))
+  const ranked = rankProspectSearchPeople(rows, query, rows.length || 1)
+  const offset = (safePage - 1) * safePageSize
+  const people = ranked.slice(offset, offset + safePageSize)
+
+  return {
+    people,
+    total_count: ranked.length,
+    page: safePage,
+    page_size: safePageSize,
+    has_next_page: offset + safePageSize < ranked.length,
+  }
 }

@@ -14,12 +14,15 @@ import {
   type ProspectSearchCustomerLocationOverlay,
   type ProspectSearchResearchOverlay,
 } from "@/lib/growth/prospect-search/prospect-search-index-enrichment"
-import type { GrowthCompanySignalUiSummary } from "@/lib/growth/company-signals/company-signal-types"
 import {
   applyProspectSearchQualificationToIndexRow,
   buyingStageOverlayFromAssessmentRow,
 } from "@/lib/growth/prospect-search/prospect-search-qualification-overlays"
-import type { GrowthProspectSearchSourceType } from "@/lib/growth/prospect-search/prospect-search-types"
+import type {
+  GrowthProspectSearchIndexCompany,
+  GrowthProspectSearchIndexPerson,
+  GrowthProspectSearchSourceType,
+} from "@/lib/growth/prospect-search/prospect-search-types"
 import { deriveProspectSearchCompanyStatus } from "@/lib/growth/prospect-search/prospect-search-status"
 import {
   applyProspectSearchSuppressionOverlay,
@@ -46,72 +49,7 @@ export function buildProspectSearchIlikePattern(query: string): string {
   return sanitized ? `%${sanitized}%` : "%"
 }
 
-export type GrowthProspectSearchIndexCompany = {
-  id: string
-  source_type: GrowthProspectSearchSourceType
-  company_name: string
-  website: string | null
-  industry: string | null
-  subindustry: string | null
-  employees: string | null
-  revenue_range: string | null
-  location: string | null
-  city: string | null
-  state: string | null
-  service_area: string | null
-  notes: string | null
-  keywords: string[]
-  crm_detected: string | null
-  website_platform: string | null
-  field_service_software: string | null
-  intent_score: number | null
-  buying_stage: string | null
-  buying_stage_confidence: number | null
-  buying_stage_reason: string | null
-  buying_stage_last_assessed_at: string | null
-  lead_score: number | null
-  lead_engine_score: number | null
-  lead_engine_score_label: string | null
-  lead_engine_score_explanation: string | null
-  lead_engine_last_run_at: string | null
-  company_match_confidence: number | null
-  decision_maker_count: number
-  verification_status: string
-  priority: string | null
-  signals: string[]
-  search_intent_category: string | null
-  returning_visitor: boolean
-  existing_account: boolean
-  in_lead_inbox: boolean
-  existing_customer: boolean
-  existing_prospect: boolean
-  already_pushed: boolean
-  is_suppressed: boolean
-  suppression_reason: string | null
-  suppression_scope: string | null
-  suppressed_at: string | null
-  lead_inbox_id: string | null
-  growth_lead_id: string | null
-  prospect_id: string | null
-  customer_id: string | null
-  /** Evidence-backed signal summary from internal hydration (in-memory). */
-  company_signal_summary?: GrowthCompanySignalUiSummary | null
-  signal_confidence?: number | null
-  signal_count?: number
-}
-
-export type GrowthProspectSearchIndexPerson = {
-  id: string
-  source_type: GrowthProspectSearchSourceType
-  company_id: string
-  company_name: string
-  full_name: string | null
-  title: string | null
-  email: string | null
-  phone: string | null
-  role: string | null
-  verification_status: string
-}
+export type { GrowthProspectSearchIndexCompany, GrowthProspectSearchIndexPerson } from "@/lib/growth/prospect-search/prospect-search-types"
 
 type IntentOverlay = {
   intent_score?: number
@@ -341,12 +279,40 @@ const INDEX_SAFETY_DEFAULTS = {
   | "suppressed_at"
 >
 
+export type ProspectSearchIndexBuildOptions = {
+  mode?: "search" | "materialized"
+  source_type?: GrowthProspectSearchSourceType
+  source_id?: string
+}
+
+const MATERIALIZED_SOURCE_BATCH_SIZE = 200
+
+async function fetchAllRows<T extends Record<string, unknown>>(
+  fetchPage: (offset: number, limit: number) => Promise<T[]>,
+  pageSize = MATERIALIZED_SOURCE_BATCH_SIZE,
+): Promise<T[]> {
+  const rows: T[] = []
+  let offset = 0
+  while (true) {
+    const page = await fetchPage(offset, pageSize)
+    if (!page.length) break
+    rows.push(...page)
+    if (page.length < pageSize) break
+    offset += pageSize
+  }
+  return rows
+}
+
 export async function buildProspectSearchIndex(
   admin: SupabaseClient,
   query: string,
+  options: ProspectSearchIndexBuildOptions = {},
 ): Promise<{ companies: GrowthProspectSearchIndexCompany[]; people: GrowthProspectSearchIndexPerson[] }> {
+  const materialized = options.mode === "materialized"
   const pattern = buildProspectSearchIlikePattern(query)
-  const hasQuery = sanitizeProspectSearchQuery(query).length > 0
+  const hasQuery = !materialized && sanitizeProspectSearchQuery(query).length > 0
+  const sourceTypeFilter = options.source_type
+  const sourceIdFilter = options.source_id?.trim()
   const companyMap = new Map<string, GrowthProspectSearchIndexCompany>()
   const people: GrowthProspectSearchIndexPerson[] = []
 
@@ -367,19 +333,37 @@ export async function buildProspectSearchIndex(
   }
 
   // growth.leads
+  if (!sourceTypeFilter || sourceTypeFilter === "growth_lead") {
   try {
-    let leadQuery = admin
-      .schema("growth")
-      .from("leads")
-      .select(
-        "id, company_name, website, city, state, country, address_line1, postal_code, notes, score, status, metadata, estimated_employee_count, estimated_annual_revenue, crm_detected, field_service_stack_detected, decision_maker_status, latest_prospect_research_run_id",
-      )
-      .order("updated_at", { ascending: false })
-      .limit(hasQuery ? 60 : 40)
-    if (hasQuery) leadQuery = leadQuery.ilike("company_name", pattern)
-    leadQuery = await applyLeadArchiveFilter(admin, leadQuery)
-    const { data } = await leadQuery
-    const leadRows = (data ?? []) as Record<string, unknown>[]
+    const leadRows = materialized
+      ? await fetchAllRows(async (offset, limit) => {
+          let leadQuery = admin
+            .schema("growth")
+            .from("leads")
+            .select(
+              "id, company_name, website, city, state, country, address_line1, postal_code, notes, score, status, metadata, estimated_employee_count, estimated_annual_revenue, crm_detected, field_service_stack_detected, decision_maker_status, latest_prospect_research_run_id, updated_at",
+            )
+            .order("updated_at", { ascending: false })
+            .range(offset, offset + limit - 1)
+          if (sourceIdFilter) leadQuery = leadQuery.eq("id", sourceIdFilter)
+          leadQuery = await applyLeadArchiveFilter(admin, leadQuery)
+          const { data } = await leadQuery
+          return (data ?? []) as Record<string, unknown>[]
+        })
+      : await (async () => {
+          let leadQuery = admin
+            .schema("growth")
+            .from("leads")
+            .select(
+              "id, company_name, website, city, state, country, address_line1, postal_code, notes, score, status, metadata, estimated_employee_count, estimated_annual_revenue, crm_detected, field_service_stack_detected, decision_maker_status, latest_prospect_research_run_id, updated_at",
+            )
+            .order("updated_at", { ascending: false })
+            .limit(hasQuery ? 60 : 40)
+          if (hasQuery) leadQuery = leadQuery.ilike("company_name", pattern)
+          leadQuery = await applyLeadArchiveFilter(admin, leadQuery)
+          const { data } = await leadQuery
+          return (data ?? []) as Record<string, unknown>[]
+        })()
     const researchOverlays = await loadProspectResearchOverlays(
       admin,
       leadRows
@@ -446,20 +430,40 @@ export async function buildProspectSearchIndex(
   } catch {
     /* growth.leads optional */
   }
+  }
 
   // growth.lead_inbox
+  if (!sourceTypeFilter || sourceTypeFilter === "lead_inbox") {
   try {
-    let inboxQuery = admin
-      .schema("growth")
-      .from("lead_inbox")
-      .select(
-        "id, company_name, domain, intent_score, candidate_priority, status, metadata, existing_account_match",
-      )
-      .order("updated_at", { ascending: false })
-      .limit(hasQuery ? 60 : 40)
-    if (hasQuery) inboxQuery = inboxQuery.ilike("company_name", pattern)
-    const { data } = await inboxQuery
-    for (const raw of data ?? []) {
+    const inboxRows = materialized
+      ? await fetchAllRows(async (offset, limit) => {
+          let inboxQuery = admin
+            .schema("growth")
+            .from("lead_inbox")
+            .select(
+              "id, company_name, domain, intent_score, candidate_priority, status, metadata, existing_account_match, updated_at",
+            )
+            .order("updated_at", { ascending: false })
+            .range(offset, offset + limit - 1)
+          if (sourceIdFilter) inboxQuery = inboxQuery.eq("id", sourceIdFilter)
+          const { data } = await inboxQuery
+          return (data ?? []) as Record<string, unknown>[]
+        })
+      : await (async () => {
+          let inboxQuery = admin
+            .schema("growth")
+            .from("lead_inbox")
+            .select(
+              "id, company_name, domain, intent_score, candidate_priority, status, metadata, existing_account_match, updated_at",
+            )
+            .order("updated_at", { ascending: false })
+            .limit(hasQuery ? 60 : 40)
+          if (hasQuery) inboxQuery = inboxQuery.ilike("company_name", pattern)
+          const { data } = await inboxQuery
+          return (data ?? []) as Record<string, unknown>[]
+        })()
+
+    for (const raw of inboxRows) {
       const r = raw as Record<string, unknown>
       const id = asString(r.id)
       if (!id) continue
@@ -535,21 +539,41 @@ export async function buildProspectSearchIndex(
   } catch {
     /* optional */
   }
+  }
 
   const orgId = getGrowthEngineAiOrgId()
   if (orgId) {
+    if (!sourceTypeFilter || sourceTypeFilter === "crm_prospect") {
     try {
-      let prospectQuery = admin
-        .from("prospects")
-        .select(
-          "id, company_name, website, notes, city, state, address_line1, postal_code, estimated_value_cents",
-        )
-        .eq("organization_id", orgId)
-        .order("updated_at", { ascending: false })
-        .limit(hasQuery ? 40 : 30)
-      if (hasQuery) prospectQuery = prospectQuery.ilike("company_name", pattern)
-      const { data } = await prospectQuery
-      for (const raw of data ?? []) {
+      const prospectRows = materialized
+        ? await fetchAllRows(async (offset, limit) => {
+            let prospectQuery = admin
+              .from("prospects")
+              .select(
+                "id, company_name, website, notes, city, state, address_line1, postal_code, estimated_value_cents, updated_at",
+              )
+              .eq("organization_id", orgId)
+              .order("updated_at", { ascending: false })
+              .range(offset, offset + limit - 1)
+            if (sourceIdFilter) prospectQuery = prospectQuery.eq("id", sourceIdFilter)
+            const { data } = await prospectQuery
+            return (data ?? []) as Record<string, unknown>[]
+          })
+        : await (async () => {
+            let prospectQuery = admin
+              .from("prospects")
+              .select(
+                "id, company_name, website, notes, city, state, address_line1, postal_code, estimated_value_cents, updated_at",
+              )
+              .eq("organization_id", orgId)
+              .order("updated_at", { ascending: false })
+              .limit(hasQuery ? 40 : 30)
+            if (hasQuery) prospectQuery = prospectQuery.ilike("company_name", pattern)
+            const { data } = await prospectQuery
+            return (data ?? []) as Record<string, unknown>[]
+          })()
+
+      for (const raw of prospectRows) {
         const r = raw as Record<string, unknown>
         const id = asString(r.id)
         if (!id) continue
@@ -589,17 +613,33 @@ export async function buildProspectSearchIndex(
     } catch {
       /* optional */
     }
+    }
 
+    if (!sourceTypeFilter || sourceTypeFilter === "crm_customer") {
     try {
-      let customerQuery = admin
-        .from("customers")
-        .select("id, company_name, notes")
-        .eq("organization_id", orgId)
-        .order("updated_at", { ascending: false })
-        .limit(hasQuery ? 40 : 30)
-      if (hasQuery) customerQuery = customerQuery.ilike("company_name", pattern)
-      const { data: customerData } = await customerQuery
-      const customerRows = (customerData ?? []) as Record<string, unknown>[]
+      const customerRows = materialized
+        ? await fetchAllRows(async (offset, limit) => {
+            let customerQuery = admin
+              .from("customers")
+              .select("id, company_name, notes, updated_at")
+              .eq("organization_id", orgId)
+              .order("updated_at", { ascending: false })
+              .range(offset, offset + limit - 1)
+            if (sourceIdFilter) customerQuery = customerQuery.eq("id", sourceIdFilter)
+            const { data } = await customerQuery
+            return (data ?? []) as Record<string, unknown>[]
+          })
+        : await (async () => {
+            let customerQuery = admin
+              .from("customers")
+              .select("id, company_name, notes, updated_at")
+              .eq("organization_id", orgId)
+              .order("updated_at", { ascending: false })
+              .limit(hasQuery ? 40 : 30)
+            if (hasQuery) customerQuery = customerQuery.ilike("company_name", pattern)
+            const { data } = await customerQuery
+            return (data ?? []) as Record<string, unknown>[]
+          })()
       const customerLocations = await loadCustomerDefaultLocations(
         admin,
         customerRows.map((row) => asString(row.id)).filter(Boolean),
@@ -649,10 +689,11 @@ export async function buildProspectSearchIndex(
     } catch {
       /* optional */
     }
+    }
   }
 
   // Decision makers → people index
-  try {
+  if (!materialized) try {
     let dmQuery = admin
       .schema("growth")
       .from("lead_decision_makers")
@@ -693,6 +734,7 @@ export async function buildProspectSearchIndex(
     }
   } catch {
     /* optional */
+  }
   }
 
   return {

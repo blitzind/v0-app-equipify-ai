@@ -1177,6 +1177,166 @@ async function main(): Promise<void> {
   assert.equal(normalizeProspectSearchFilters({}).suppression_mode, "exclude")
   assert.match(pushSource, /Suppressed from outreach/)
 
+  const indexMigration = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "supabase/migrations/20270401120000_growth_engine_prospect_search_index.sql",
+    ),
+    "utf8",
+  )
+  assert.match(indexMigration, /growth\.prospect_search_index/)
+  assert.match(indexMigration, /unique \(source_type, source_id\)/)
+  assert.match(indexMigration, /search_text/)
+  assert.match(indexMigration, /force row level security/)
+
+  const {
+    indexCompanyToMaterializedRow,
+    materializedRowToIndexCompany,
+  } = await import("../lib/growth/prospect-search/prospect-search-materialized-index-map")
+  const {
+    paginateRankedProspectSearchCompanies,
+  } = await import("../lib/growth/prospect-search/prospect-search-ranking")
+
+  const materializedSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-materialized-index.ts"),
+    "utf8",
+  )
+  assert.match(materializedSource, /growth-prospect-search-materialized-index-v1/)
+
+  const builderSourceEarly = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-index-builder.ts"),
+    "utf8",
+  )
+  assert.match(builderSourceEarly, /growth-prospect-search-index-builder-v1/)
+
+  const sampleIndexRow = {
+    id: "lead-1",
+    source_type: "growth_lead" as const,
+    company_name: "Acme HVAC",
+    website: "https://acme-hvac.com",
+    industry: "HVAC",
+    subindustry: null,
+    employees: "21-50",
+    revenue_range: "1m_5m",
+    location: "Nashville, TN",
+    city: "Nashville",
+    state: "TN",
+    service_area: "Middle Tennessee",
+    notes: "Field service operator",
+    keywords: ["hvac"],
+    crm_detected: "HubSpot",
+    website_platform: "WordPress",
+    field_service_software: "FieldPulse",
+    intent_score: 12,
+    buying_stage: "consideration",
+    buying_stage_confidence: 0.7,
+    buying_stage_reason: "Pricing interest",
+    buying_stage_last_assessed_at: null,
+    lead_score: 55,
+    lead_engine_score: 72,
+    lead_engine_score_label: "Strong",
+    lead_engine_score_explanation: "Strong ICP fit",
+    lead_engine_last_run_at: null,
+    company_match_confidence: 0.8,
+    decision_maker_count: 1,
+    verification_status: "unverified",
+    priority: null,
+    signals: ["CRM indicators"],
+    search_intent_category: "pricing",
+    returning_visitor: false,
+    existing_account: false,
+    in_lead_inbox: false,
+    existing_customer: false,
+    existing_prospect: false,
+    already_pushed: false,
+    is_suppressed: false,
+    suppression_reason: null,
+    suppression_scope: null,
+    suppressed_at: null,
+    lead_inbox_id: null,
+    growth_lead_id: "lead-1",
+    prospect_id: null,
+    customer_id: null,
+    company_signal_summary: {
+      technology_signals: ["Field service software detected"],
+      growth_indicators: [],
+      fit_indicators: [],
+      operational_maturity: "Growing operations",
+    },
+    signal_confidence: 0.82,
+    signal_count: 2,
+  }
+
+  const materialized = indexCompanyToMaterializedRow(sampleIndexRow)
+  assert.equal(materialized.source_type, "growth_lead")
+  assert.equal(materialized.source_id, "lead-1")
+  assert.equal(materialized.domain, "acme-hvac.com")
+  assert.equal(materialized.is_customer, false)
+
+  const roundTrip = materializedRowToIndexCompany(materialized)
+  assert.equal(roundTrip.id, "lead-1")
+  assert.equal(roundTrip.company_name, "Acme HVAC")
+  assert.equal(roundTrip.lead_engine_score, 72)
+  assert.equal(roundTrip.signals[0], "CRM indicators")
+
+  const paged = paginateRankedProspectSearchCompanies(
+    [
+      { ...sampleIndexRow, id: "1", company_name: "Alpha HVAC" },
+      { ...sampleIndexRow, id: "2", company_name: "Beta Plumbing", industry: "Plumbing", keywords: [] },
+      { ...sampleIndexRow, id: "3", company_name: "Gamma HVAC" },
+    ],
+    "hvac",
+    parseProspectSearchQuery("hvac"),
+    1,
+    2,
+  )
+  assert.ok(paged.total_count >= 2)
+  assert.equal(paged.companies.length, 2)
+  assert.equal(paged.page, 1)
+  assert.equal(paged.page_size, 2)
+
+  const pageTwo = paginateRankedProspectSearchCompanies(
+    Array.from({ length: 5 }, (_, index) => ({
+      ...sampleIndexRow,
+      id: `row-${index}`,
+      company_name: `Company ${index}`,
+    })),
+    "",
+    parseProspectSearchQuery(""),
+    2,
+    2,
+  )
+  assert.equal(pageTwo.companies.length, 2)
+  assert.equal(pageTwo.page, 2)
+  assert.ok(pageTwo.has_next_page)
+
+  const repositorySource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-repository.ts"),
+    "utf8",
+  )
+  assert.match(repositorySource, /loadProspectSearchMaterializedCompanies/)
+  assert.match(repositorySource, /buildProspectSearchIndex/)
+  assert.match(repositorySource, /index_diagnostics/)
+  assert.match(repositorySource, /resolveProspectSearchCompanyResultsForPush/)
+
+  const builderSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-index-builder.ts"),
+    "utf8",
+  )
+  assert.match(builderSource, /rebuildProspectSearchMaterializedIndex/)
+  assert.match(builderSource, /mode: "materialized"/)
+
+  const rebuildRouteSource = fs.readFileSync(
+    path.join(process.cwd(), "app/api/platform/growth/prospect-search/index/rebuild/route.ts"),
+    "utf8",
+  )
+  assert.match(rebuildRouteSource, /requireGrowthEnginePlatformAccess/)
+  assert.match(rebuildRouteSource, /rows_indexed/)
+
+  assert.match(shellSource, /ProspectSearchPagination/)
+  assert.match(shellSource, /ProspectSearchIndexDiagnostics/)
+  assert.match(shellSource, /page_size/)
+
   console.log("growth-prospect-search: all checks passed")
 }
 

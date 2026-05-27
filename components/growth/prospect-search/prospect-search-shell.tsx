@@ -42,6 +42,8 @@ import type {
 import { GROWTH_SERP_PROVIDER_AUDIT_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-types"
 import { prospectSearchSelectionKey } from "@/lib/growth/prospect-search/prospect-search-selection"
 import { CompanyStatusBadges } from "@/components/growth/prospect-search/company-status-badges"
+import { ProspectSearchIndexDiagnostics } from "@/components/growth/prospect-search/prospect-search-index-diagnostics"
+import { ProspectSearchPagination } from "@/components/growth/prospect-search/prospect-search-pagination"
 import { cn } from "@/lib/utils"
 
 const EMPTY_FILTERS: GrowthProspectSearchFilters = {}
@@ -74,6 +76,8 @@ export function ProspectSearchShell() {
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
   const [discoveryMode, setDiscoveryMode] =
     useState<GrowthProspectSearchDiscoveryMode>("internal")
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
 
   const heroPlaceholder = useMemo(
     () => rotateHeroPlaceholder(placeholderIndex),
@@ -94,17 +98,31 @@ export function ProspectSearchShell() {
     }
   }, [searchParams])
 
-  const runSearch = useCallback(
-    async (queryOverride?: string) => {
-      const q = queryOverride ?? query
-      if (queryOverride) setQuery(queryOverride)
+  const fetchResults = useCallback(
+    async (input: {
+      queryText?: string
+      nextPage?: number
+      nextPageSize?: number
+      resetSelection?: boolean
+    } = {}) => {
+      const q = input.queryText ?? query
+      const activePage = input.nextPage ?? page
+      const activePageSize = input.nextPageSize ?? pageSize
+      if (input.queryText != null) setQuery(input.queryText)
+      if (input.nextPage != null) setPage(input.nextPage)
+      if (input.nextPageSize != null) setPageSize(input.nextPageSize)
       setLoading(true)
       setHasSearched(true)
       setError(null)
       setActionMessage(null)
-      setSelectedKeys(new Set())
+      if (input.resetSelection !== false) setSelectedKeys(new Set())
       try {
-        const params = new URLSearchParams({ meta: "1", q })
+        const params = new URLSearchParams({
+          meta: "1",
+          q,
+          page: String(activePage),
+          page_size: String(activePageSize),
+        })
         if (discoveryMode === "discover_external") {
           params.set("mode", "discover_external")
         }
@@ -136,7 +154,30 @@ export function ProspectSearchShell() {
         setLoading(false)
       }
     },
-    [query, filters, discoveryMode],
+    [query, filters, discoveryMode, page, pageSize],
+  )
+
+  const runSearch = useCallback(
+    async (queryOverride?: string) => {
+      setPage(1)
+      await fetchResults({ queryText: queryOverride ?? query, nextPage: 1, resetSelection: true })
+    },
+    [fetchResults, query],
+  )
+
+  const goToPage = useCallback(
+    async (nextPage: number) => {
+      await fetchResults({ nextPage, resetSelection: true })
+    },
+    [fetchResults],
+  )
+
+  const changePageSize = useCallback(
+    async (nextPageSize: number) => {
+      setPage(1)
+      await fetchResults({ nextPage: 1, nextPageSize, resetSelection: true })
+    },
+    [fetchResults],
   )
 
   useEffect(() => {
@@ -401,11 +442,14 @@ export function ProspectSearchShell() {
                 Results
                 {result ? (
                   <span className="ml-2 font-normal text-muted-foreground">
-                    {companies.length} companies
-                    {result.discovery_mode === "internal" ? ` · ${people.length} contacts` : " · external discovery"}
+                    {result.total_companies.toLocaleString()} companies
+                    {result.discovery_mode === "internal" ? ` · ${result.total_people.toLocaleString()} contacts` : " · external discovery"}
                   </span>
                 ) : null}
               </h2>
+              {result?.discovery_mode === "internal" ? (
+                <ProspectSearchIndexDiagnostics diagnostics={result.index_diagnostics} />
+              ) : null}
               {result?.discovery_mode === "discover_external" &&
               (result.provider_status_label || result.provider_status_message) ? (
                 <RealWorldProviderStatus
@@ -502,6 +546,18 @@ export function ProspectSearchShell() {
             onPush={() => void runBulkPush()}
             onClear={clearSelection}
           />
+
+          {result && result.discovery_mode === "internal" && result.total_companies > 0 ? (
+            <ProspectSearchPagination
+              page={result.page ?? page}
+              pageSize={result.page_size ?? pageSize}
+              totalCount={result.total_companies}
+              hasNextPage={result.has_next_page ?? false}
+              loading={loading}
+              onPageChange={(nextPage) => void goToPage(nextPage)}
+              onPageSizeChange={(nextPageSize) => void changePageSize(nextPageSize)}
+            />
+          ) : null}
 
           {showEmpty ? (
             <SearchEmptyState

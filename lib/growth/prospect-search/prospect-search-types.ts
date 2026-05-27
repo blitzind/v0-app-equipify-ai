@@ -136,6 +136,72 @@ export type GrowthProspectSearchParsedQuery = {
   title_hints: string[]
 }
 
+export type GrowthProspectSearchIndexCompany = {
+  id: string
+  source_type: GrowthProspectSearchSourceType
+  company_name: string
+  website: string | null
+  industry: string | null
+  subindustry: string | null
+  employees: string | null
+  revenue_range: string | null
+  location: string | null
+  city: string | null
+  state: string | null
+  service_area: string | null
+  notes: string | null
+  keywords: string[]
+  crm_detected: string | null
+  website_platform: string | null
+  field_service_software: string | null
+  intent_score: number | null
+  buying_stage: string | null
+  buying_stage_confidence: number | null
+  buying_stage_reason: string | null
+  buying_stage_last_assessed_at: string | null
+  lead_score: number | null
+  lead_engine_score: number | null
+  lead_engine_score_label: string | null
+  lead_engine_score_explanation: string | null
+  lead_engine_last_run_at: string | null
+  company_match_confidence: number | null
+  decision_maker_count: number
+  verification_status: string
+  priority: string | null
+  signals: string[]
+  search_intent_category: string | null
+  returning_visitor: boolean
+  existing_account: boolean
+  in_lead_inbox: boolean
+  existing_customer: boolean
+  existing_prospect: boolean
+  already_pushed: boolean
+  is_suppressed: boolean
+  suppression_reason: string | null
+  suppression_scope: string | null
+  suppressed_at: string | null
+  lead_inbox_id: string | null
+  growth_lead_id: string | null
+  prospect_id: string | null
+  customer_id: string | null
+  company_signal_summary?: GrowthCompanySignalUiSummary | null
+  signal_confidence?: number | null
+  signal_count?: number
+}
+
+export type GrowthProspectSearchIndexPerson = {
+  id: string
+  source_type: GrowthProspectSearchSourceType
+  company_id: string
+  company_name: string
+  full_name: string | null
+  title: string | null
+  email: string | null
+  phone: string | null
+  role: string | null
+  verification_status: string
+}
+
 export type GrowthProspectSearchCompanyResult = {
   id: string
   source_type: GrowthProspectSearchSourceType
@@ -226,6 +292,12 @@ export type GrowthProspectSearchProviderDiagnostic = {
   provider_cache_hit_count?: number
 }
 
+export type GrowthProspectSearchIndexDiagnostics = {
+  index_mode: "materialized" | "fallback"
+  index_row_count: number | null
+  last_indexed_at: string | null
+}
+
 export type GrowthProspectSearchResult = {
   qa_marker: typeof GROWTH_PROSPECT_SEARCH_QA_MARKER
   discovery_mode: GrowthProspectSearchDiscoveryMode
@@ -236,6 +308,10 @@ export type GrowthProspectSearchResult = {
   people: GrowthProspectSearchPersonResult[]
   total_companies: number
   total_people: number
+  page?: number
+  page_size?: number
+  has_next_page?: boolean
+  index_diagnostics?: GrowthProspectSearchIndexDiagnostics
   source_counts: Record<GrowthProspectSearchSourceType, number>
   external_discovery_run_id?: string | null
   real_world_discovery_run_id?: string | null

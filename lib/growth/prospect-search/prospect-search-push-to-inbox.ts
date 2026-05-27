@@ -11,7 +11,7 @@ import {
   type GrowthProspectSearchPushOutcome,
   type ProspectSearchSelectionRef,
 } from "@/lib/growth/prospect-search/prospect-search-push-metadata"
-import { runProspectSearch } from "@/lib/growth/prospect-search/prospect-search-repository"
+import { resolveProspectSearchCompanyResultsForPush } from "@/lib/growth/prospect-search/prospect-search-repository"
 import { prospectSearchSelectionKey } from "@/lib/growth/prospect-search/prospect-search-selection"
 import type {
   GrowthProspectSearchCompanyResult,
@@ -139,18 +139,12 @@ export async function resolveProspectSearchCompaniesForPush(
     selected: ProspectSearchSelectionRef[]
   },
 ): Promise<Map<string, GrowthProspectSearchCompanyResult>> {
-  const search = await runProspectSearch(admin, {
+  return resolveProspectSearchCompanyResultsForPush(admin, {
     query: input.query,
     filters: input.filters,
     discovery_mode: input.discovery_mode,
-    limit: 200,
+    selected: input.selected,
   })
-
-  const map = new Map<string, GrowthProspectSearchCompanyResult>()
-  for (const company of search.companies) {
-    map.set(prospectSearchSelectionKey(company), company)
-  }
-  return map
 }
 
 export async function executeBulkPushToLeadInbox(
