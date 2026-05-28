@@ -1,3 +1,4 @@
+import { isVoiceAiReceptionistEnabled } from "@/lib/voice/ai-receptionist/provider-types"
 import type {
   VoiceBusinessHoursStatus,
   VoiceNumberRecord,
@@ -32,7 +33,8 @@ export type ResolveInboundVoiceRouteInput = {
 }
 
 function isFutureOnlyMode(mode: VoiceRoutingMode | null | undefined): boolean {
-  return mode === "ai_receptionist_future"
+  if (mode !== "ai_receptionist_future") return false
+  return !isVoiceAiReceptionistEnabled()
 }
 
 export function resolveInboundVoiceRoute(input: ResolveInboundVoiceRouteInput): InboundVoiceRouteResolution {
@@ -87,8 +89,21 @@ export function resolveInboundVoiceRoute(input: ResolveInboundVoiceRouteInput): 
       forwardingNumbers: [],
       voicemailBoxId: input.routingProfile?.voicemailBoxId ?? null,
       businessHoursStatus,
-      fallbackReason: "AI receptionist is not enabled in Phase 1B",
+      fallbackReason: "AI receptionist is not enabled — set VOICE_AI_RECEPTIONIST_ENABLED=true",
       warnings: [VOICE_ROUTING_MODE_LABELS.ai_receptionist_future],
+    }
+  }
+
+  if (effectiveMode === "ai_receptionist_future" && isVoiceAiReceptionistEnabled()) {
+    return {
+      routeStatus: "resolved",
+      routingMode: effectiveMode,
+      destinationUserIds: [],
+      forwardingNumbers: [],
+      voicemailBoxId: input.routingProfile?.voicemailBoxId ?? null,
+      businessHoursStatus,
+      fallbackReason: null,
+      warnings: ["AI inbound receptionist — bounded, operator-overridable."],
     }
   }
 

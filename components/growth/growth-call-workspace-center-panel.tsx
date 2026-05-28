@@ -45,6 +45,7 @@ import type {
 import type { VoiceCallTranscriptSnapshot } from "@/lib/voice/media-streaming/types"
 import type { UnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/types"
 import type { VoiceAiCopilotWorkspaceSnapshot } from "@/lib/voice/ai-copilot/types"
+import type { VoiceAiReceptionistWorkspaceSnapshot } from "@/lib/voice/ai-receptionist/types"
 import type { CallWorkspaceCoachingMode } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import { GrowthCallWorkspaceLiveTranscriptPanel } from "@/components/growth/growth-call-workspace-live-transcript-panel"
 import { NATIVE_DIALER_PROVIDER_LABELS } from "@/lib/growth/native-dialer/native-dialer-types"
@@ -224,6 +225,7 @@ export function GrowthCallWorkspaceCenterPanel({
   voiceLiveTranscript = null,
   operatorAssist = null,
   aiCopilot = null,
+  aiReceptionist = null,
   voiceCallId = null,
   onOperatorAssistRefresh,
   muted = false,
@@ -260,6 +262,7 @@ export function GrowthCallWorkspaceCenterPanel({
   voiceLiveTranscript?: VoiceCallTranscriptSnapshot | null
   operatorAssist?: UnifiedOperatorAssistSnapshot | null
   aiCopilot?: VoiceAiCopilotWorkspaceSnapshot | null
+  aiReceptionist?: VoiceAiReceptionistWorkspaceSnapshot | null
   voiceCallId?: string | null
   onOperatorAssistRefresh?: () => Promise<void>
   muted?: boolean
@@ -380,6 +383,7 @@ export function GrowthCallWorkspaceCenterPanel({
               leadLinked={leadLinked}
               operatorAssist={operatorAssist}
               aiCopilot={aiCopilot}
+              aiReceptionist={aiReceptionist}
               voiceCallId={voiceCallId}
               onSnapshotRefresh={onOperatorAssistRefresh}
             />
@@ -411,6 +415,7 @@ export function GrowthCallWorkspaceCenterPanel({
               startSignal={coachingStartSignal}
               operatorAssist={operatorAssist}
               aiCopilot={aiCopilot}
+              aiReceptionist={aiReceptionist}
               voiceCallId={voiceCallId}
               onSnapshotRefresh={onOperatorAssistRefresh}
             />
@@ -429,6 +434,7 @@ export function GrowthCallWorkspaceCenterPanel({
               startSignal={coachingStartSignal}
               operatorAssist={operatorAssist}
               aiCopilot={aiCopilot}
+              aiReceptionist={aiReceptionist}
               voiceCallId={voiceCallId}
               onSnapshotRefresh={onOperatorAssistRefresh}
             />
@@ -473,6 +479,7 @@ export function GrowthCallWorkspaceCenterPanel({
               leadLinked={leadLinked}
               operatorAssist={operatorAssist}
               aiCopilot={aiCopilot}
+              aiReceptionist={aiReceptionist}
               voiceCallId={voiceCallId}
             />
             <GrowthPostCallWrapup session={activeSession} submitting={submittingWrapup} onSubmit={onSubmitWrapup} embedded />

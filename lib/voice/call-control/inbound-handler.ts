@@ -6,10 +6,11 @@ import {
   resolveInboundDialTargetsWithBrowser,
   resolveRoundRobinMemberUserId,
 } from "@/lib/voice/browser-calling/inbound-browser-routing"
-import {
-  createInboundVoiceCallFromTwilio,
+import { createInboundVoiceCallFromTwilio,
   provisionInboundBrowserWorkspaceOffers,
 } from "@/lib/voice/browser-calling/workspace-bridge"
+import { startAiReceptionistSessionForCall } from "@/lib/voice/ai-receptionist/receptionist-service"
+import { isVoiceAiReceptionistEnabled } from "@/lib/voice/ai-receptionist/provider-types"
 import {
   mapInboundRouteToCallControlDecision,
   resolveDialNumbersFromRoute,
@@ -244,6 +245,31 @@ export async function handleTwilioInboundCall(
       fromNumber,
       toNumber,
     })
+  }
+
+  if (callSid && decision.action === "ai_receptionist" && isVoiceAiReceptionistEnabled()) {
+    try {
+      const voiceCallId = await createInboundVoiceCallFromTwilio(input.admin, {
+        organizationId,
+        providerCallId: callSid,
+        fromNumber,
+        toNumber,
+        assignedUserId: voiceNumber.assignedUserId,
+      })
+
+      await startAiReceptionistSessionForCall(input.admin, {
+        organizationId,
+        voiceCallId,
+        afterHours: bundle.route.businessHoursStatus === "closed",
+        callerNumber: fromNumber,
+      })
+    } catch (error) {
+      logVoiceInfrastructure("voice_ai_receptionist_session_start_failed", {
+        organizationId,
+        callSid,
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
   }
 
   logVoiceInfrastructure("voice_inbound_route_decision", {

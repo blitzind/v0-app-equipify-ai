@@ -94,6 +94,26 @@ export function recordCallTwiml(input: { recordingCallbackUrl: string; disclosur
   return `<?xml version="1.0" encoding="UTF-8"?><Response>${preamble}<Record recordingStatusCallback="${xmlEscape(input.recordingCallbackUrl)}" recordingStatusCallbackMethod="POST" maxLength="3600" playBeep="true"/></Response>`
 }
 
+export function buildAiReceptionistTwiml(input: {
+  greetingText: string
+  mediaStreamUrl?: string | null
+  recordingDisclosureText?: string | null
+  gatherActionUrl?: string | null
+}): string {
+  const preamble = input.recordingDisclosureText?.trim()
+    ? `<Say>${xmlEscape(input.recordingDisclosureText.trim())}</Say>`
+    : ""
+  const greeting = `<Say>${xmlEscape(input.greetingText)}</Say>`
+  const stream =
+    input.mediaStreamUrl?.trim()
+      ? `<Connect><Stream url="${xmlEscape(input.mediaStreamUrl.trim())}" /></Connect>`
+      : ""
+  const gather = input.gatherActionUrl
+    ? `<Gather input="speech" speechTimeout="auto" action="${xmlEscape(input.gatherActionUrl)}" method="POST"><Say>How can I help you?</Say></Gather>`
+    : ""
+  return `<?xml version="1.0" encoding="UTF-8"?><Response>${preamble}${greeting}${stream}${gather}</Response>`
+}
+
 export function generateInboundCallResponseTwiml(input: TwilioCallControlVerbInput): string {
   const { decision } = input
   const record = decision.recordingEnabled
@@ -129,6 +149,16 @@ export function generateInboundCallResponseTwiml(input: TwilioCallControlVerbInp
         greetingText: decision.fallbackReason ?? undefined,
         record: true,
         recordingCallbackUrl,
+      })
+    case "ai_receptionist":
+      return buildAiReceptionistTwiml({
+        greetingText:
+          decision.fallbackReason ??
+          "Thank you for calling. This call is assisted by our automated receptionist. How can I help you today?",
+        mediaStreamUrl: process.env.VOICE_MEDIA_STREAM_PUBLIC_ORIGIN
+          ? `${process.env.VOICE_MEDIA_STREAM_PUBLIC_ORIGIN.replace(/\/$/, "")}/api/voice/media/twilio`
+          : null,
+        recordingDisclosureText: decision.recordingDisclosureText,
       })
     default:
       return buildTwilioSayAndHangup("Unable to route this call.")

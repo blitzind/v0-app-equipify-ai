@@ -30,7 +30,7 @@ export type InboundCallControlDecision = {
   qaMarker: typeof VOICE_CALL_CONTROL_QA_MARKER
   routeStatus: "resolved" | "degraded" | "blocked"
   routingMode: string | null
-  action: "forward" | "dial" | "voicemail" | "reject" | "say_and_hangup"
+  action: "forward" | "dial" | "voicemail" | "reject" | "say_and_hangup" | "ai_receptionist"
   dialNumbers: string[]
   dialClientIdentities?: string[]
   voicemailBoxId: string | null

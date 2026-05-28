@@ -226,6 +226,7 @@
     "test:voice-retention-intelligence-phase-2e": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-retention-intelligence-phase-2e.ts",
     "test:voice-ai-copilot-phase-3a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-ai-copilot-phase-3a.ts",
     "test:voice-deep-copilot-phase-3b": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-deep-copilot-phase-3b.ts",
+    "test:voice-ai-receptionist-phase-4a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-ai-receptionist-phase-4a.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
     "test:growth-assemblyai-browser-streaming": "tsx scripts/test-growth-assemblyai-browser-streaming.ts",
     "test:growth-openai-realtime-browser-streaming": "tsx scripts/test-growth-openai-realtime-browser-streaming.ts",

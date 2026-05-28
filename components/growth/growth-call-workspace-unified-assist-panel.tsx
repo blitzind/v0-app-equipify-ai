@@ -26,7 +26,9 @@ import {
   type UnifiedOperatorAssistSnapshot,
 } from "@/lib/growth/operator-assist/types"
 import { GrowthCallWorkspaceAiCopilotSection } from "@/components/growth/growth-call-workspace-ai-copilot-section"
+import { GrowthCallWorkspaceAiReceptionistSection } from "@/components/growth/growth-call-workspace-ai-receptionist-section"
 import type { VoiceAiCopilotWorkspaceSnapshot } from "@/lib/voice/ai-copilot/types"
+import type { VoiceAiReceptionistWorkspaceSnapshot } from "@/lib/voice/ai-receptionist/types"
 import { cn } from "@/lib/utils"
 
 export function GrowthCallWorkspaceUnifiedAssistPanel({
@@ -38,6 +40,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   startSignal,
   operatorAssist,
   aiCopilot = null,
+  aiReceptionist = null,
   voiceCallId = null,
   onSnapshotRefresh,
 }: {
@@ -49,6 +52,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   startSignal?: number
   operatorAssist: UnifiedOperatorAssistSnapshot | null
   aiCopilot?: VoiceAiCopilotWorkspaceSnapshot | null
+  aiReceptionist?: VoiceAiReceptionistWorkspaceSnapshot | null
   voiceCallId?: string | null
   onSnapshotRefresh?: () => Promise<void>
 }) {
@@ -365,6 +369,12 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
         </div>
 
         <p className="text-xs leading-relaxed text-muted-foreground">{GROWTH_CALL_DIALER_SAFETY_COPY}</p>
+
+        <GrowthCallWorkspaceAiReceptionistSection
+          voiceCallId={voiceCallId}
+          aiReceptionist={aiReceptionist}
+          onSnapshotRefresh={onSnapshotRefresh}
+        />
 
         <GrowthCallWorkspaceAiCopilotSection
           voiceCallId={voiceCallId}

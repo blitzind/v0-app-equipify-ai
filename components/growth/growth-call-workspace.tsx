@@ -49,6 +49,7 @@ import { VOICE_RELATIONSHIP_MEMORY_QA_MARKER } from "@/lib/voice/relationship-me
 import { VOICE_REVENUE_INTELLIGENCE_QA_MARKER } from "@/lib/voice/revenue-intelligence/types"
 import { VOICE_RETENTION_INTELLIGENCE_QA_MARKER } from "@/lib/voice/retention-intelligence/types"
 import { VOICE_AI_COPILOT_QA_MARKER, VOICE_DEEP_COPILOT_QA_MARKER } from "@/lib/voice/ai-copilot/types"
+import { VOICE_AI_RECEPTIONIST_QA_MARKER } from "@/lib/voice/ai-receptionist/types"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 export function GrowthCallWorkspace() {
@@ -431,6 +432,7 @@ export function GrowthCallWorkspace() {
       data-voice-retention-intelligence-qa-marker={VOICE_RETENTION_INTELLIGENCE_QA_MARKER}
       data-voice-ai-copilot-qa-marker={VOICE_AI_COPILOT_QA_MARKER}
       data-voice-deep-copilot-qa-marker={VOICE_DEEP_COPILOT_QA_MARKER}
+      data-voice-ai-receptionist-qa-marker={VOICE_AI_RECEPTIONIST_QA_MARKER}
     >
       {voiceBrowser.registrationState === "error" && voiceBrowser.error ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
@@ -523,6 +525,7 @@ export function GrowthCallWorkspace() {
           voiceLiveTranscript={voiceBrowser.snapshot?.liveTranscript ?? null}
           operatorAssist={voiceBrowser.snapshot?.operatorAssist ?? null}
           aiCopilot={voiceBrowser.snapshot?.aiCopilot ?? null}
+          aiReceptionist={voiceBrowser.snapshot?.aiReceptionist ?? null}
           voiceCallId={voiceBrowser.snapshot?.activeVoiceCallId ?? null}
           onOperatorAssistRefresh={voiceBrowser.refresh}
           muted={sessionMuted}

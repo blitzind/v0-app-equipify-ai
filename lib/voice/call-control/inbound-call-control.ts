@@ -28,7 +28,7 @@ export function mapInboundRouteToCallControlDecision(
         voicemailBoxId: route.voicemailBoxId,
         recordingEnabled: false,
         recordingDisclosureText: null,
-        fallbackReason: "AI receptionist is not enabled. Sending to voicemail or unavailable message.",
+        fallbackReason: route.fallbackReason ?? "AI receptionist is not enabled. Sending to voicemail or unavailable message.",
         warnings: route.warnings,
       }
     }
@@ -79,7 +79,12 @@ export function mapInboundRouteToCallControlDecision(
     }
   }
 
-  const action = route.routingMode === "forward_to_number" ? "forward" : "dial"
+  const action =
+    route.routingMode === "ai_receptionist_future" && route.routeStatus === "resolved"
+      ? "ai_receptionist"
+      : route.routingMode === "forward_to_number"
+        ? "forward"
+        : "dial"
 
   return {
     qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
