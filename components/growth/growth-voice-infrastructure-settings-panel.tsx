@@ -10,6 +10,7 @@ import {
   GROWTH_SETTINGS_SECTION_GAP,
   GrowthSettingsCard,
 } from "@/components/growth/growth-settings-ui"
+import { VOICE_CONVERSATION_INTELLIGENCE_QA_MARKER } from "@/lib/voice/intelligence/types"
 import {
   VOICE_CALL_CONTROL_QA_MARKER,
   VOICE_FOUNDATION_QA_MARKER,
@@ -139,6 +140,7 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
   const callControl = readiness?.callControlReadiness
   const transferControl = readiness?.transferControlReadiness
   const mediaStreaming = readiness?.mediaStreamingReadiness
+  const conversationIntelligence = readiness?.conversationIntelligenceReadiness
 
   const loadOperations = useCallback(async () => {
     const [numbersRes, profilesRes, hoursRes, boxesRes] = await Promise.all([
@@ -305,7 +307,7 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
     <GrowthSettingsCard title="Voice Infrastructure" icon={<PhoneCall className="size-4" />}>
       <div
         className={GROWTH_SETTINGS_SECTION_GAP}
-        data-qa-marker={`${VOICE_FOUNDATION_QA_MARKER} ${VOICE_OPERATIONS_QA_MARKER} ${VOICE_CALL_CONTROL_QA_MARKER} ${VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER} ${VOICE_TRANSFER_CONTROL_QA_MARKER} ${VOICE_MEDIA_STREAMING_QA_MARKER}`}
+        data-qa-marker={`${VOICE_FOUNDATION_QA_MARKER} ${VOICE_OPERATIONS_QA_MARKER} ${VOICE_CALL_CONTROL_QA_MARKER} ${VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER} ${VOICE_TRANSFER_CONTROL_QA_MARKER} ${VOICE_MEDIA_STREAMING_QA_MARKER} ${VOICE_CONVERSATION_INTELLIGENCE_QA_MARKER}`}
       >
         <p className="text-sm text-muted-foreground">
           Voice operations layer — number inventory, routing profiles, business hours, and voicemail scaffolding.
@@ -614,6 +616,25 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
                 <p>Participant count: {mediaStreaming?.diagnostics.participantCount ?? 0}</p>
                 <p>Reconnect count: {mediaStreaming?.diagnostics.reconnectCount ?? 0}</p>
                 <p>Stale streams cleaned: {mediaStreaming?.diagnostics.staleStreamsCleaned ?? 0}</p>
+              </div>
+            </section>
+
+            <section className={GROWTH_SETTINGS_SECTION_GAP}>
+              <p className="flex items-center gap-2 text-sm font-medium">
+                <ShieldCheck className="size-4" />
+                Voice intelligence readiness
+              </p>
+              <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                <p>Intelligence ready: {conversationIntelligence?.intelligenceReady ? "yes" : "not yet"}</p>
+                <p>Transcript provider status: {conversationIntelligence?.transcriptProviderStatus ?? "unknown"}</p>
+                <p>AI analysis provider: {conversationIntelligence?.analysisProviderStatus ?? "unknown"}</p>
+                <p>Passive mode enabled: {conversationIntelligence?.passiveModeEnabled ? "yes" : "no"}</p>
+                <p>Autonomous actions disabled: {conversationIntelligence?.autonomousActionsDisabled ? "yes" : "no"}</p>
+                <p>Evidence requirement enabled: {conversationIntelligence?.evidenceRequirementEnabled ? "yes" : "no"}</p>
+                <p>{conversationIntelligence?.message}</p>
+                {conversationIntelligence?.warnings.map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
               </div>
             </section>
 

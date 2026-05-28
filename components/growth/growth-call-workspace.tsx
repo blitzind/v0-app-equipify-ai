@@ -43,6 +43,7 @@ import { mapBrowserCallStateLabel } from "@/lib/voice/browser-calling/status-map
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
 import { VOICE_TRANSFER_CONTROL_QA_MARKER } from "@/lib/voice/transfer-control/types"
 import { VOICE_MEDIA_STREAMING_QA_MARKER } from "@/lib/voice/media-streaming/types"
+import { VOICE_CONVERSATION_INTELLIGENCE_QA_MARKER } from "@/lib/voice/intelligence/types"
 
 export function GrowthCallWorkspace() {
   const { toast } = useToast()
@@ -417,6 +418,7 @@ export function GrowthCallWorkspace() {
       data-voice-native-dialer-integration-qa-marker={VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER}
       data-voice-transfer-control-qa-marker={VOICE_TRANSFER_CONTROL_QA_MARKER}
       data-voice-media-streaming-qa-marker={VOICE_MEDIA_STREAMING_QA_MARKER}
+      data-voice-conversation-intelligence-qa-marker={VOICE_CONVERSATION_INTELLIGENCE_QA_MARKER}
     >
       {voiceBrowser.registrationState === "error" && voiceBrowser.error ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
@@ -493,6 +495,7 @@ export function GrowthCallWorkspace() {
           voiceParticipants={voiceBrowser.snapshot?.participants ?? []}
           voiceActiveTransfer={voiceBrowser.snapshot?.activeTransfer ?? null}
           voiceLiveTranscript={voiceBrowser.snapshot?.liveTranscript ?? null}
+          voiceConversationIntelligence={voiceBrowser.snapshot?.conversationIntelligence ?? null}
           muted={sessionMuted}
           onHold={sessionOnHold}
           transferTarget={transferTarget}

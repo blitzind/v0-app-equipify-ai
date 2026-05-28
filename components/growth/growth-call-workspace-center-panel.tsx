@@ -43,8 +43,10 @@ import type {
   VoiceConferenceParticipantPublicView,
 } from "@/lib/voice/transfer-control/types"
 import type { VoiceCallTranscriptSnapshot } from "@/lib/voice/media-streaming/types"
+import type { VoiceCallConversationIntelligenceSnapshot } from "@/lib/voice/intelligence/types"
 import type { CallWorkspaceCoachingMode } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import { GrowthCallWorkspaceLiveTranscriptPanel } from "@/components/growth/growth-call-workspace-live-transcript-panel"
+import { GrowthCallWorkspaceConversationIntelligencePanel } from "@/components/growth/growth-call-workspace-conversation-intelligence-panel"
 import { NATIVE_DIALER_PROVIDER_LABELS } from "@/lib/growth/native-dialer/native-dialer-types"
 import { cn } from "@/lib/utils"
 
@@ -220,6 +222,7 @@ export function GrowthCallWorkspaceCenterPanel({
   voiceParticipants = [],
   voiceActiveTransfer = null,
   voiceLiveTranscript = null,
+  voiceConversationIntelligence = null,
   muted = false,
   onHold = false,
   transferTarget = "",
@@ -252,6 +255,7 @@ export function GrowthCallWorkspaceCenterPanel({
   voiceParticipants?: VoiceConferenceParticipantPublicView[]
   voiceActiveTransfer?: VoiceCallTransferPublicView | null
   voiceLiveTranscript?: VoiceCallTranscriptSnapshot | null
+  voiceConversationIntelligence?: VoiceCallConversationIntelligenceSnapshot | null
   muted?: boolean
   onHold?: boolean
   transferTarget?: string
@@ -422,6 +426,7 @@ export function GrowthCallWorkspaceCenterPanel({
               browserCallStateLabel={voiceBrowserCallStateLabel ?? null}
             />
             <GrowthCallWorkspaceLiveTranscriptPanel transcript={voiceLiveTranscript} />
+            <GrowthCallWorkspaceConversationIntelligencePanel intelligence={voiceConversationIntelligence} />
             <ActiveParticipantsPanel participants={voiceParticipants} activeTransfer={voiceActiveTransfer} />
             {controlsEnabled ? (
               <div className="flex flex-col gap-2 rounded-xl border border-border/60 bg-muted/10 px-3 py-2 dark:border-white/5">

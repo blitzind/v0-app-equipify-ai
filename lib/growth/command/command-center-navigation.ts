@@ -25,7 +25,7 @@ export const GROWTH_COMMAND_JUMP_DESTINATIONS: readonly GrowthCommandNavLink[] =
   { label: "Customer Lifecycle", href: "/admin/growth/customer-lifecycle" },
   { label: "Dogfood Validation", href: "/admin/growth/dogfood" },
   { label: "Providers", href: "/admin/growth/providers" },
-  { label: "Settings", href: "/admin/growth/settings" },
+  { label: "Settings", href: "/admin/growth/settings/growth" },
 ] as const
 
 export const GROWTH_COMMAND_SECTION_TABS: readonly GrowthCommandSectionTab[] = [

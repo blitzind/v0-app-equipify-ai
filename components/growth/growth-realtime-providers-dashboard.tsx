@@ -240,8 +240,8 @@ export function GrowthRealtimeProvidersDashboard() {
             <p>
               Configure Deepgram, AssemblyAI, or OpenAI Realtime in Call Providers to enable browser mic coaching.
               Add a connection here, run Test Connection, then choose the provider in{" "}
-              <Link href="/admin/growth/settings" className="font-medium text-indigo-600 hover:underline">
-                Growth Settings → Live Coaching
+              <Link href="/admin/growth/settings/communications" className="font-medium text-indigo-600 hover:underline">
+                Communications settings → Live Coaching
               </Link>
               .
             </p>

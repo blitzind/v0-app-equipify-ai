@@ -232,11 +232,11 @@ assert.match(nativeDialerSettings, /Google Voice Bridge/)
 assert.match(nativeDialerSettings, /cannot auto-dial/)
 assert.match(nativeDialerSettings, /manually place it/)
 
-const growthSettingsPage = fs.readFileSync(
-  path.join(process.cwd(), "app/(admin)/admin/growth/settings/page.tsx"),
+const growthCommunicationsSettingsPage = fs.readFileSync(
+  path.join(process.cwd(), "app/(admin)/admin/growth/settings/communications/page.tsx"),
   "utf8",
 )
-assert.match(growthSettingsPage, /GrowthNativeDialerSettingsPanel/)
+assert.match(growthCommunicationsSettingsPage, /GrowthNativeDialerSettingsPanel/)
 
 const repository = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/native-dialer/native-dialer-repository.ts"),

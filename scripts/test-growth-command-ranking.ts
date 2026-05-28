@@ -109,10 +109,13 @@ const boostedSearch = rankGrowthCommandPaletteEntries(GROWTH_COMMAND_PALETTE_ENT
 assert.equal(boostedSearch[0]?.id, "search")
 
 const coreGroup = GROWTH_NAV_GROUP_DEFS.find((group) => group.id === "core")
+assert.equal(coreGroup?.label, "Command Center")
 assert.ok(coreGroup?.items.some((item) => item.label === "Revenue Inbox"))
 assert.ok(!coreGroup?.items.some((item) => item.label === "Imports"))
+assert.ok(!coreGroup?.items.some((item) => item.label === "Prospect Search"))
 
 const leadEngineGroup = GROWTH_NAV_GROUP_DEFS.find((group) => group.id === "lead-engine")
+assert.ok(leadEngineGroup?.items.some((item) => item.label === "Prospect Search"))
 assert.ok(leadEngineGroup?.items.some((item) => item.label === "Imports"))
 assert.ok(!leadEngineGroup?.items.some((item) => item.label === "Discover Companies"))
 
@@ -123,18 +126,20 @@ assert.ok(intelligenceGroup?.items.some((item) => item.label === "Relationships"
 
 const executionGroup = GROWTH_NAV_GROUP_DEFS.find((group) => group.id === "execution")
 assert.equal(executionGroup?.label, "Execution")
+assert.ok(executionGroup?.items.some((item) => item.label === "Outreach"))
+assert.ok(executionGroup?.items.some((item) => item.label === "Sequences"))
 assert.ok(executionGroup?.items.some((item) => item.label === "Live Coaching"))
 assert.ok(executionGroup?.items.some((item) => item.label === "Call Providers"))
 assert.ok(executionGroup?.items.some((item) => item.label === "Outreach Approval"))
 
 const aiGroup = GROWTH_NAV_GROUP_DEFS.find((group) => group.id === "ai")
-assert.equal(aiGroup?.label, "AI")
+assert.equal(aiGroup?.label, "Copilot")
 assert.ok(aiGroup?.items.some((item) => item.label === "Playbooks"))
 assert.ok(aiGroup?.items.some((item) => item.label === "Copilot"))
 
 const providersGroup = GROWTH_NAV_GROUP_DEFS.find((group) => group.id === "providers-nav")
-assert.ok(providersGroup?.items.some((item) => item.label === "Delivery"))
-assert.ok(providersGroup?.items.some((item) => item.label === "Warmup"))
+assert.ok(providersGroup?.items.some((item) => item.label === "Send Routing"))
+assert.ok(providersGroup?.items.some((item) => item.label === "Diagnostics"))
 
 const navIds = GROWTH_NAV_GROUP_DEFS.flatMap((group) => group.items.map((item) => item.id))
 assert.equal(navIds.length, new Set(navIds).size, "duplicate sidebar nav ids")

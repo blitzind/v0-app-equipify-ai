@@ -51,7 +51,7 @@ assert.throws(() =>
 
 const state = signGrowthCalendarOAuthState({
   userId: "11111111-1111-4111-8111-111111111111",
-  returnTo: "/admin/growth/settings",
+  returnTo: "/admin/growth/settings/communications",
   ts: Date.now(),
 })
 assert.ok(state)

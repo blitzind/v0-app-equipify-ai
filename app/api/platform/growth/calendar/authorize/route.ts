@@ -17,8 +17,8 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const returnTo = request.nextUrl.searchParams.get("returnTo")?.trim() || "/admin/growth/settings"
-  const safeReturnTo = returnTo.startsWith("/admin/growth") ? returnTo : "/admin/growth/settings"
+  const returnTo = request.nextUrl.searchParams.get("returnTo")?.trim() || "/admin/growth/settings/communications"
+  const safeReturnTo = returnTo.startsWith("/admin/growth") ? returnTo : "/admin/growth/settings/communications"
 
   const state = signGrowthCalendarOAuthState({
     userId: access.userId,

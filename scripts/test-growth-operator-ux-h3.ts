@@ -39,13 +39,14 @@ assert.equal(GROWTH_DELIVERABILITY_IA.operations.label, "Deliverability Ops")
 assert.ok(GROWTH_OPERATOR_DAILY_WORKFLOW.length >= 7)
 
 const operationsGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "providers-nav")
-assert.equal(operationsGroup?.label, "Operations")
+assert.equal(operationsGroup?.label, "Delivery Ops")
 assert.ok(operationsGroup?.items.some((i) => i.label === "Outbound Console"))
-assert.ok(operationsGroup?.items.some((i) => i.label === "Protection"))
-assert.ok(operationsGroup?.items.some((i) => i.label === "DNS & Setup"))
-assert.ok(operationsGroup?.items.some((i) => i.label === "Deliverability Ops"))
-assert.ok(operationsGroup?.items.some((i) => i.label === "Diagnostics (Advanced)"))
-assert.ok(!operationsGroup?.items.some((i) => i.label === "Provider Diagnostics"))
+assert.ok(operationsGroup?.items.some((i) => i.label === "Provider Connections"))
+assert.ok(operationsGroup?.items.some((i) => i.label === "Outbound Readiness"))
+assert.ok(operationsGroup?.items.some((i) => i.label === "Deliverability"))
+assert.ok(operationsGroup?.items.some((i) => i.label === "Diagnostics"))
+assert.ok(!operationsGroup?.items.some((i) => i.label === "DNS & Setup"))
+assert.ok(!operationsGroup?.items.some((i) => i.label === "Diagnostics (Advanced)"))
 
 const attentionStripSource = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-operator-attention-strip.tsx"),

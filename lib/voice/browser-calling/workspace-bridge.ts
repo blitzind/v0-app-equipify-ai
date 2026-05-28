@@ -17,6 +17,7 @@ import {
 } from "@/lib/voice/repository/voice-browser-calling-repository"
 import { fetchVoiceCallControlSnapshot } from "@/lib/voice/transfer-control/call-control-service"
 import { fetchVoiceCallTranscriptSnapshot } from "@/lib/voice/media-streaming/media-session-service"
+import { fetchVoiceCallConversationIntelligenceSnapshot } from "@/lib/voice/intelligence/intelligence-service"
 import { appendVoiceCallEvent } from "@/lib/voice/repository/voice-repository"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import type { VoiceCallStatus } from "@/lib/voice/types"
@@ -217,6 +218,9 @@ export async function buildVoiceBrowserSyncSnapshot(
   const liveTranscript = activeVoiceCallId
     ? await fetchVoiceCallTranscriptSnapshot(admin, input.organizationId, activeVoiceCallId)
     : null
+  const conversationIntelligence = activeVoiceCallId
+    ? await fetchVoiceCallConversationIntelligenceSnapshot(admin, input.organizationId, activeVoiceCallId)
+    : null
   const inboundRinging = await fetchInboundBrowserOfferForUser(admin, {
     organizationId: input.organizationId,
     userId: input.userId,
@@ -245,6 +249,7 @@ export async function buildVoiceBrowserSyncSnapshot(
     participants: controlSnapshot.participants,
     activeTransfer: controlSnapshot.activeTransfer,
     liveTranscript,
+    conversationIntelligence,
   }
 }
 

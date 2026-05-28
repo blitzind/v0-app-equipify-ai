@@ -229,7 +229,7 @@ export function GrowthMeetingIntelligenceDashboard() {
           {!dashboard.calendarSyncReady && dashboard.calendarSetupMessage ? (
             <p className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-950">
               {dashboard.calendarSetupMessage}{" "}
-              <Link href="/admin/growth/settings" className="font-medium text-indigo-700 hover:underline">
+              <Link href="/admin/growth/settings/communications" className="font-medium text-indigo-700 hover:underline">
                 Connect in Settings
               </Link>
             </p>

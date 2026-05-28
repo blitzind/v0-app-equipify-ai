@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 
-  const returnTo = "/admin/growth/settings"
+  const returnTo = "/admin/growth/settings/communications"
   const oauthError = request.nextUrl.searchParams.get("error")
   if (oauthError) {
     return redirectResult(request, returnTo, { calendar_error: oauthError })

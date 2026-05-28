@@ -39,6 +39,7 @@ import {
   updateTranscriptSessionStatus,
 } from "@/lib/voice/repository/voice-media-streaming-repository"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
+import { processTranscriptSegmentIntelligence } from "@/lib/voice/intelligence/intelligence-service"
 import { createVoiceTranscriptProvider } from "@/lib/voice/transcripts/providers/registry"
 import { resolveConfiguredTranscriptProviderKind } from "@/lib/voice/transcripts/providers/types"
 import {
@@ -385,6 +386,26 @@ export async function ingestVoiceTranscriptProviderEvent(
       speakerType: segment.speakerType,
     },
   })
+
+  try {
+    await processTranscriptSegmentIntelligence(admin, {
+      organizationId: input.organizationId,
+      voiceCallId: input.voiceCallId,
+      transcriptSessionId: transcriptSession.id,
+      transcriptSegmentId: segment.id,
+      sequenceNumber: segment.sequenceNumber,
+      speakerType: segment.speakerType,
+      transcriptText: segment.transcriptText,
+      confidenceScore: segment.confidenceScore,
+    })
+  } catch (intelligenceError) {
+    logVoiceInfrastructure("voice_conversation_intelligence_failed", {
+      organizationId: input.organizationId,
+      voiceCallId: input.voiceCallId,
+      transcriptSegmentId: segment.id,
+      message: intelligenceError instanceof Error ? intelligenceError.message : String(intelligenceError),
+    })
+  }
 
   return { appended: true, sequenceNumber: segment.sequenceNumber }
 }

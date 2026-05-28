@@ -5,6 +5,7 @@ import type {
   VoiceConferenceParticipantPublicView,
 } from "@/lib/voice/transfer-control/types"
 import type { VoiceCallTranscriptSnapshot } from "@/lib/voice/media-streaming/types"
+import type { VoiceCallConversationIntelligenceSnapshot } from "@/lib/voice/intelligence/types"
 
 export const VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER = "voice-native-dialer-integration-v1" as const
 
@@ -106,6 +107,7 @@ export type VoiceBrowserSyncSnapshot = {
   participants: VoiceConferenceParticipantPublicView[]
   activeTransfer: VoiceCallTransferPublicView | null
   liveTranscript: VoiceCallTranscriptSnapshot | null
+  conversationIntelligence: VoiceCallConversationIntelligenceSnapshot | null
 }
 
 export type VoiceInboundBrowserOfferView = {

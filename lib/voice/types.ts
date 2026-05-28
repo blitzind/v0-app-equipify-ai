@@ -2,6 +2,7 @@
 
 import type { VoiceCallControlReadinessSnapshot, VoiceRecordingPolicy } from "@/lib/voice/call-control/types"
 import type { VoiceMediaStreamingReadinessSnapshot } from "@/lib/voice/media-streaming/types"
+import type { VoiceConversationIntelligenceReadinessSnapshot } from "@/lib/voice/intelligence/types"
 import type { VoiceTransferControlReadinessSnapshot } from "@/lib/voice/transfer-control/types"
 
 export const VOICE_FOUNDATION_QA_MARKER = "voice-foundation-v1" as const
@@ -283,4 +284,5 @@ export type VoiceOperationsReadinessSnapshot = VoiceInfrastructureReadinessSnaps
   callControlReadiness?: VoiceCallControlReadinessSnapshot
   transferControlReadiness?: VoiceTransferControlReadinessSnapshot
   mediaStreamingReadiness?: VoiceMediaStreamingReadinessSnapshot
+  conversationIntelligenceReadiness?: VoiceConversationIntelligenceReadinessSnapshot
 }

@@ -44,7 +44,7 @@ function formatWhen(iso: string | null): string {
 function meetingLocationWarning(meeting: GrowthMeeting): string | null {
   if (!meeting.providerConnectionRequired) return null
   if (meeting.meetingLocationType === "google_meet") {
-    return "Connect Google Calendar in Growth Settings to auto-create Google Meet links."
+    return "Connect Google Calendar in Communications settings to auto-create Google Meet links."
   }
   if (meeting.meetingLocationType === "zoom") {
     return "Zoom connection required — paste a manual Zoom URL or connect Zoom when available."

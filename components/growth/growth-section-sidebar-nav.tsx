@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   Component,
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -25,6 +26,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   Crown,
   Flame,
   Funnel,
@@ -32,6 +34,7 @@ import {
   GitBranch,
   Headphones,
   Inbox,
+  Layers,
   LayoutDashboard,
   Mail,
   Map as MapIcon,
@@ -42,10 +45,13 @@ import {
   Plug,
   Radio,
   Radar,
+  Route,
+  Scale,
   Search,
   Send,
   Server,
   Settings,
+  Shield,
   ShieldCheck,
   Sparkles,
   Target,
@@ -53,7 +59,9 @@ import {
   Truck,
   Upload,
   Users,
+  Webhook,
   Workflow,
+  Wrench,
   Zap,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -66,6 +74,7 @@ import {
 } from "@/hooks/use-growth-sidebar-console"
 import {
   GROWTH_NAV_GROUP_DEFS,
+  GROWTH_DELIVERY_OPS_NAV_QA_MARKER,
   GROWTH_NAVIGATION_IA_QA_MARKER,
   GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER,
   growthNavigationShortcutLabel,
@@ -129,8 +138,16 @@ const GROWTH_NAV_ICONS: Record<string, LucideIcon> = {
   "lead-engine-inspector": Workflow,
   "crm-leads": Users,
   "discover-companies": Search,
-  providers: Plug,
-  "provider-delivery": Truck,
+  "outbound-operations": Gauge,
+  "provider-setup": Plug,
+  "deliverability-ops": ClipboardCheck,
+  "provider-delivery": Route,
+  providers: Wrench,
+  "provider-compliance": Scale,
+  "provider-webhooks": Webhook,
+  "sender-pools": Layers,
+  "internal-outbound-operations": Network,
+  "deliverability-protection": Shield,
   infrastructure: Server,
   "mailbox-connections": Mail,
   deliverability: ShieldCheck,
@@ -178,6 +195,64 @@ const GROWTH_NAV_GROUP_ICONS: Record<string, LucideIcon> = {
 
 function clickableNavItems(group: GrowthNavGroup): GrowthNavItem[] {
   return group.items.filter((item) => !item.futurePlaceholder)
+}
+
+function GrowthNavSubsectionHeader({ label, first }: { label: string; first: boolean }) {
+  return (
+    <p
+      className={cn(
+        "px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/75",
+        first ? "mb-1 mt-0" : "mb-1 mt-2.5 border-t border-border/40 pt-2 dark:border-border/30",
+      )}
+      role="presentation"
+    >
+      {label}
+    </p>
+  )
+}
+
+function GrowthNavGroupedLinks({
+  items,
+  pathname,
+  badges,
+  previews,
+  collapsed,
+  compact,
+  onNavigate,
+}: {
+  items: GrowthNavItem[]
+  pathname: string
+  badges: Partial<Record<GrowthSidebarConsoleKey, number>>
+  previews: Partial<Record<GrowthSidebarConsoleKey, GrowthSidebarPreviewLine[]>>
+  collapsed?: boolean
+  compact?: boolean
+  onNavigate?: () => void
+}) {
+  let lastSection: string | undefined
+
+  return items.map((item, index) => {
+    const sectionChanged = Boolean(item.section && item.section !== lastSection)
+    if (item.section) lastSection = item.section
+    const isFirstSectionHeader =
+      sectionChanged && !items.slice(0, index).some((entry) => entry.section === item.section)
+
+    return (
+      <Fragment key={item.id}>
+        {sectionChanged && item.section ? (
+          <GrowthNavSubsectionHeader label={item.section} first={isFirstSectionHeader && index === 0} />
+        ) : null}
+        <GrowthNavLink
+          item={item}
+          pathname={pathname}
+          collapsed={collapsed}
+          compact={compact}
+          badge={resolveNavBadge(item, badges)}
+          previewLines={resolvePreviewLines(item, previews)}
+          onNavigate={onNavigate}
+        />
+      </Fragment>
+    )
+  })
 }
 
 function resolveGroupBadge(
@@ -536,6 +611,9 @@ function GrowthNavFlyoutPanel({
       aria-label={`${group.label} navigation`}
       data-flyout-layer="growth-nav-flyout"
       data-flyout-marker={GROWTH_SIDEBAR_FLYOUT_QA_MARKER}
+      data-delivery-ops-nav-marker={
+        group.id === "providers-nav" ? GROWTH_DELIVERY_OPS_NAV_QA_MARKER : undefined
+      }
       className={cn(
         APP_Z_GROWTH_NAV_FLYOUT,
         "fixed min-w-[13rem] rounded-xl border border-border bg-card p-2 shadow-lg dark:border-border/80 dark:bg-card/95",
@@ -548,16 +626,13 @@ function GrowthNavFlyoutPanel({
     >
       <p className="mb-1.5 px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
       <div role="menu" className="space-y-0.5">
-        {items.map((item) => (
-          <GrowthNavLink
-            key={item.id}
-            item={item}
-            pathname={pathname}
-            badge={resolveNavBadge(item, badges)}
-            previewLines={resolvePreviewLines(item, previews)}
-            onNavigate={onNavigate}
-          />
-        ))}
+        <GrowthNavGroupedLinks
+          items={items}
+          pathname={pathname}
+          badges={badges}
+          previews={previews}
+          onNavigate={onNavigate}
+        />
       </div>
     </div>
   )
@@ -919,18 +994,18 @@ function GrowthNavGroups({
               id={`growth-nav-group-${group.id}`}
               hidden={hideItems}
               className={cn(compact ? "space-y-0.5" : "space-y-0.5 pb-0.5")}
+              data-delivery-ops-nav-marker={
+                group.id === "providers-nav" ? GROWTH_DELIVERY_OPS_NAV_QA_MARKER : undefined
+              }
             >
-              {clickableNavItems(group).map((item) => (
-                <GrowthNavLink
-                  key={item.id}
-                  item={item}
-                  pathname={pathname}
-                  collapsed={collapsed}
-                  compact={compact}
-                  badge={resolveNavBadge(item, badges)}
-                  previewLines={resolvePreviewLines(item, previews)}
-                />
-              ))}
+              <GrowthNavGroupedLinks
+                items={clickableNavItems(group)}
+                pathname={pathname}
+                badges={badges}
+                previews={previews}
+                collapsed={collapsed}
+                compact={compact}
+              />
             </div>
           </div>
         )

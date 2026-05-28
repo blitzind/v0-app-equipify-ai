@@ -226,7 +226,7 @@ export function GrowthGoogleCalendarSettingsPanel() {
               <div className="flex flex-wrap items-center gap-2">
                 {summary?.configured ? (
                   <Button asChild size="sm" className="h-7 px-2.5 text-xs" disabled={working}>
-                    <a href="/api/platform/growth/calendar/authorize?returnTo=/admin/growth/settings">
+                    <a href="/api/platform/growth/calendar/authorize?returnTo=/admin/growth/settings/communications">
                       Connect Google Calendar
                     </a>
                   </Button>

@@ -12,6 +12,8 @@ import {
 } from "../components/growth/growth-section-sidebar-nav"
 import {
   GROWTH_NAV_GROUP_DEFS,
+  GROWTH_DELIVERY_OPS_NAV_QA_MARKER,
+  GROWTH_DELIVERY_OPS_NAV_SECTIONS,
   GROWTH_NAVIGATION_IA_QA_MARKER,
   GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER,
   resolveGrowthNavigationEntryFromPathname,
@@ -79,18 +81,32 @@ assert.match(source, /GrowthSidebarNavErrorBoundary/)
 assert.match(source, /futurePlaceholder/)
 assert.match(source, /lg:hidden/)
 assert.match(source, /data-qa=\{GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER\}/)
-assert.match(source, /clickableNavItems\(group\)\.some/)
+assert.match(source, /GrowthNavGroupedLinks/)
+assert.match(source, /GrowthNavSubsectionHeader/)
+assert.match(source, /GROWTH_DELIVERY_OPS_NAV_QA_MARKER/)
 assert.match(source, /pipeline: Funnel/)
 
 const coreGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "core")
+assert.equal(coreGroup?.label, "Command Center")
 assert.ok(coreGroup?.items.some((i) => i.label === "Revenue Inbox"))
 assert.ok(coreGroup?.items.some((i) => i.label === "Inbox"))
-assert.ok(coreGroup?.items.some((i) => i.label === "Prospect Search"))
+assert.ok(!coreGroup?.items.some((i) => i.label === "Prospect Search"))
+assert.ok(!coreGroup?.items.some((i) => i.label === "Outreach"))
+assert.ok(!coreGroup?.items.some((i) => i.label === "Sequences"))
 assert.ok(!coreGroup?.items.some((i) => i.label === "Intent Signals"))
 assert.ok(!coreGroup?.items.some((i) => i.label === "Sequence Execution"))
 assert.ok(!coreGroup?.items.some((i) => i.label === "Outreach Approval"))
 assert.ok(!coreGroup?.items.some((i) => i.label === "Lead Intelligence Inspector"))
 assert.ok(!coreGroup?.items.some((i) => i.label === "Imports"))
+
+const leadEngineGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "lead-engine")
+assert.equal(leadEngineGroup?.label, "Lead Engine")
+assert.equal(GROWTH_NAV_GROUP_DEFS[1]?.id, "lead-engine")
+assert.ok(leadEngineGroup?.items.some((i) => i.label === "Prospect Search"))
+assert.ok(leadEngineGroup?.items.some((i) => i.label === "CRM Leads"))
+assert.ok(!leadEngineGroup?.items.some((i) => i.label === "Discover Companies"))
+assert.ok(leadEngineGroup?.items.some((i) => i.label === "Lead Intelligence Inspector"))
+assert.ok(leadEngineGroup?.items.some((i) => i.label === "Imports"))
 
 const intelligenceGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "intelligence")
 assert.equal(intelligenceGroup?.label, "Intelligence")
@@ -101,34 +117,45 @@ assert.ok(intelligenceGroup?.items.some((i) => i.label === "Revenue Intelligence
 
 const executionGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "execution")
 assert.equal(executionGroup?.label, "Execution")
+assert.ok(executionGroup?.items.some((i) => i.label === "Outreach"))
+assert.ok(executionGroup?.items.some((i) => i.label === "Sequences"))
 assert.ok(executionGroup?.items.some((i) => i.label === "Call Workspace"))
 assert.ok(executionGroup?.items.some((i) => i.label === "Outreach Approval"))
 assert.ok(executionGroup?.items.some((i) => i.label === "Sequence Execution"))
 assert.ok(executionGroup?.items.some((i) => i.label === "Live Coaching"))
 assert.ok(executionGroup?.items.some((i) => i.label === "Call Providers"))
 
-const leadEngineGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "lead-engine")
-assert.equal(leadEngineGroup?.label, "Lead Engine")
-assert.ok(leadEngineGroup?.items.some((i) => i.label === "CRM Leads"))
-assert.ok(!leadEngineGroup?.items.some((i) => i.label === "Discover Companies"))
-assert.ok(leadEngineGroup?.items.some((i) => i.label === "Lead Intelligence Inspector"))
-assert.ok(leadEngineGroup?.items.some((i) => i.label === "Imports"))
-
 const providersGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "providers-nav")
-assert.equal(providersGroup?.label, "Operations")
+assert.equal(providersGroup?.label, "Delivery Ops")
+assert.equal(GROWTH_DELIVERY_OPS_NAV_QA_MARKER, "growth-delivery-ops-nav-v1")
 assert.ok(providersGroup?.items.some((i) => i.label === "Outbound Console"))
+assert.ok(providersGroup?.items.some((i) => i.label === "Provider Connections"))
+assert.ok(providersGroup?.items.some((i) => i.label === "Outbound Readiness"))
+assert.ok(providersGroup?.items.some((i) => i.label === "Sender Management"))
+assert.ok(providersGroup?.items.some((i) => i.label === "Deliverability"))
 assert.ok(providersGroup?.items.some((i) => i.label === "Protection"))
-assert.ok(providersGroup?.items.some((i) => i.label === "DNS & Setup"))
-assert.ok(providersGroup?.items.some((i) => i.label === "Deliverability Ops"))
-assert.ok(providersGroup?.items.some((i) => i.label === "Delivery"))
+assert.ok(providersGroup?.items.some((i) => i.label === "Warmup"))
 assert.ok(providersGroup?.items.some((i) => i.label === "Compliance"))
 assert.ok(providersGroup?.items.some((i) => i.label === "Webhooks"))
-assert.ok(providersGroup?.items.some((i) => i.label === "Diagnostics (Advanced)"))
+assert.ok(providersGroup?.items.some((i) => i.label === "Diagnostics"))
 assert.ok(providersGroup?.items.some((i) => i.label === "Mailbox Connections"))
-assert.ok(!providersGroup?.items.some((i) => i.label === "Provider Diagnostics"))
+assert.ok(providersGroup?.items.some((i) => i.label === "Sender Pools"))
+assert.ok(!providersGroup?.items.some((i) => i.label === "DNS & Setup"))
+assert.ok(!providersGroup?.items.some((i) => i.label === "Setup"))
+assert.ok(!providersGroup?.items.some((i) => i.label === "Diagnostics (Advanced)"))
+
+const deliveryOpsSections = providersGroup?.items
+  .map((item) => item.section)
+  .filter((section): section is string => Boolean(section))
+assert.ok(deliveryOpsSections?.includes(GROWTH_DELIVERY_OPS_NAV_SECTIONS.configuration))
+assert.ok(deliveryOpsSections?.includes(GROWTH_DELIVERY_OPS_NAV_SECTIONS.sendingAssets))
+assert.ok(deliveryOpsSections?.includes(GROWTH_DELIVERY_OPS_NAV_SECTIONS.deliverability))
+assert.ok(deliveryOpsSections?.includes(GROWTH_DELIVERY_OPS_NAV_SECTIONS.system))
+assert.equal(providersGroup?.items[0]?.label, "Outbound Console")
+assert.equal(providersGroup?.items[0]?.section, undefined)
 
 const aiGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "ai")
-assert.equal(aiGroup?.label, "AI")
+assert.equal(aiGroup?.label, "Copilot")
 assert.ok(aiGroup?.items.some((i) => i.label === "Copilot"))
 assert.ok(aiGroup?.items.some((i) => i.label === "Playbooks"))
 assert.ok(!aiGroup?.items.some((i) => i.href === "/admin/growth/leads/lead-engine"))
@@ -148,6 +175,41 @@ const leadEngineActive = leadEngineGroup?.items.some(
 assert.equal(intelligenceActive, false)
 assert.equal(aiActive, false)
 assert.equal(leadEngineActive, true)
+
+const settingsGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "settings")
+assert.ok(settingsGroup?.items.some((i) => i.label === "Growth"))
+assert.ok(settingsGroup?.items.some((i) => i.label === "Communications"))
+assert.ok(settingsGroup?.items.some((i) => i.label === "Providers"))
+assert.ok(settingsGroup?.items.some((i) => i.label === "Provider Health"))
+assert.ok(settingsGroup?.items.some((i) => i.label === "Governance"))
+
+const growthSettingsItem = settingsGroup?.items.find((i) => i.id === "growth-settings")
+const communicationsItem = settingsGroup?.items.find((i) => i.id === "communication-settings")
+const providerHealthItem = settingsGroup?.items.find((i) => i.id === "provider-health")
+const governanceItem = settingsGroup?.items.find((i) => i.id === "governance")
+assert.ok(growthSettingsItem?.match("/admin/growth/settings/growth"))
+assert.ok(growthSettingsItem?.match("/admin/growth/settings"))
+assert.equal(growthSettingsItem?.match("/admin/growth/settings/governance"), false)
+assert.equal(growthSettingsItem?.match("/admin/growth/settings/provider-health"), false)
+assert.ok(communicationsItem?.match("/admin/growth/settings/communications"))
+assert.equal(communicationsItem?.match("/admin/growth/settings/growth"), false)
+assert.ok(providerHealthItem?.match("/admin/growth/settings/provider-health"))
+assert.equal(providerHealthItem?.match("/admin/growth/settings/governance"), false)
+assert.equal(providerHealthItem?.match("/admin/growth/settings/growth"), false)
+assert.ok(governanceItem?.match("/admin/growth/settings/governance"))
+assert.equal(governanceItem?.match("/admin/growth/settings/provider-health"), false)
+assert.equal(governanceItem?.match("/admin/growth/settings/growth"), false)
+
+const groupOrder = GROWTH_NAV_GROUP_DEFS.map((group) => group.label)
+assert.deepEqual(groupOrder, [
+  "Command Center",
+  "Lead Engine",
+  "Intelligence",
+  "Execution",
+  "Delivery Ops",
+  "Copilot",
+  "Settings",
+])
 
 assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.label === "Prospect Search"))
 assert.ok(!GROWTH_COMMAND_REGISTRY.some((a) => a.label === "Discover Companies"))
