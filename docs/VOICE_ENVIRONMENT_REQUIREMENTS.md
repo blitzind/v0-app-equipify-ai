@@ -110,7 +110,7 @@ Telnyx and SIP providers are scaffold-only today.
 **TwiML App setup:**
 
 1. Create a TwiML App in Twilio Console.
-2. Set Voice Request URL to `{ORIGIN}/api/voice/inbound/twilio` (for inbound) or configure per your outbound flow.
+2. Set Voice Request URL to `{ORIGIN}/api/twilio/voice/incoming` (AI operator stub) or `{ORIGIN}/api/voice/inbound/twilio` (full Growth inbound routing).
 3. Copy App SID to `TWILIO_TWIML_APP_SID`.
 
 ### Webhook routes (exact paths)
@@ -119,7 +119,8 @@ Configure these in Twilio Console using your deployment origin (`https://app.equ
 
 | Route | Method | Purpose |
 | --- | --- | --- |
-| `/api/voice/inbound/twilio` | POST | Inbound call → TwiML response |
+| `/api/twilio/voice/incoming` | POST | **AI operator inbound stub** — greeting TwiML while realtime streaming is wired |
+| `/api/voice/inbound/twilio` | POST | Full inbound call routing → TwiML response |
 | `/api/voice/webhooks/twilio` | POST | Call status callbacks |
 | `/api/voice/webhooks/twilio/recording` | POST | Recording completion callbacks |
 | `/api/voice/media/twilio` | GET/POST | Media Streams ingestion / WebSocket upgrade |
@@ -129,6 +130,7 @@ URL builders: `lib/voice/call-control/urls.ts`
 **Example production URLs:**
 
 ```
+https://app.equipify.ai/api/twilio/voice/incoming
 https://app.equipify.ai/api/voice/inbound/twilio
 https://app.equipify.ai/api/voice/webhooks/twilio
 https://app.equipify.ai/api/voice/webhooks/twilio/recording
@@ -303,7 +305,8 @@ Used only when receptionist/outbound provider mode is `elevenlabs` and key is pr
 
 | Flag | Risk | Build guard? |
 | --- | --- | --- |
-| `VOICE_WEBHOOK_SKIP_SIGNATURE_VALIDATION=true` | Accepts forged Twilio webhooks — full telephony compromise | **No** — manual discipline only |
+| `TWILIO_WEBHOOK_SKIP_SIGNATURE_VALIDATION=true` | Accepts forged Twilio webhooks — full telephony compromise | **No** — manual discipline only |
+| `VOICE_WEBHOOK_SKIP_SIGNATURE_VALIDATION=true` | Same as above (legacy alias) | **No** — manual discipline only |
 | `GROWTH_TRANSPORT_SIMULATE=true` | Fake outbound email sends | **Yes** — production build fails |
 | `GROWTH_INBOX_SYNC_SIMULATE=true` | No live mailbox polling | **Yes** — production build fails |
 | Dev fallback `GROWTH_PROVIDER_CREDENTIALS_PEPPER` | Weak credential encryption | **Yes** — production build fails |
@@ -442,7 +445,8 @@ Use [VOICE_DEPLOYMENT_CHECKLIST.md](./VOICE_DEPLOYMENT_CHECKLIST.md) for Twilio,
 | --- | --- | --- | --- |
 | `GROWTH_ENGINE_ENABLED` | Optional | Recommended | Required for voice |
 | Twilio webhooks | ngrok + skip sig validation **dev only** | Trial number + real validation | Production number + real validation |
-| `VOICE_WEBHOOK_SKIP_SIGNATURE_VALIDATION` | May use locally | **Never** | **Never** |
+| `TWILIO_WEBHOOK_SKIP_SIGNATURE_VALIDATION` | May use locally | **Never** | **Never** |
+| `VOICE_WEBHOOK_SKIP_SIGNATURE_VALIDATION` | May use locally (alias) | **Never** | **Never** |
 | Simulate flags | Allowed (warnings) | Allowed (warnings) | **Build fails** |
 | AI feature flags | Off by default | Enable per phase for testing | Enable incrementally |
 | Credential pepper | Dev fallback OK | Set real pepper | **Required** real pepper |

@@ -17,6 +17,13 @@ import { createVoiceProviderInstance, listRegisteredVoiceProviders } from "../li
 import { mapProviderEventToCanonicalType } from "../lib/voice/webhooks/types"
 import { normalizeVoiceWebhookEvent, parseTwilioFormBody } from "../lib/voice/webhooks/normalizer"
 import {
+  buildTwilioVoiceIncomingStubTwiml,
+  extractTwilioIncomingCallMetadata,
+  shouldSkipTwilioWebhookSignatureValidation,
+  TWILIO_VOICE_INCOMING_QA_MARKER,
+} from "../lib/voice/webhooks/twilio-incoming-webhook"
+import { buildTwilioVoiceIncomingUrl } from "../lib/voice/call-control/urls"
+import {
   VOICE_CALL_DISPOSITIONS,
   VOICE_CALL_STATUSES,
   VOICE_FOUNDATION_QA_MARKER,
@@ -96,5 +103,44 @@ const settingsPanel = fs.readFileSync(
 )
 assert.match(settingsPanel, /Voice Infrastructure/)
 assert.match(settingsPanel, /VOICE_FOUNDATION_QA_MARKER/)
+
+assert.equal(TWILIO_VOICE_INCOMING_QA_MARKER, "twilio-voice-incoming-v1")
+assert.match(buildTwilioVoiceIncomingStubTwiml(), /Thank you for calling Equipify/)
+assert.match(buildTwilioVoiceIncomingStubTwiml(), /<Hangup\/>/)
+assert.match(buildTwilioVoiceIncomingUrl("https://app.equipify.ai"), /\/api\/twilio\/voice\/incoming/)
+
+const metadata = extractTwilioIncomingCallMetadata({
+  CallSid: "CA123",
+  From: "+14155550100",
+  To: "+14155550199",
+  Direction: "inbound",
+  AccountSid: "AC123",
+})
+assert.equal(metadata.callSid, "CA123")
+assert.equal(metadata.direction, "inbound")
+
+const incomingRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/twilio/voice/incoming/route.ts"),
+  "utf8",
+)
+assert.match(incomingRoute, /text\/xml/)
+assert.match(incomingRoute, /validateTwilioIncomingWebhook/)
+assert.match(incomingRoute, /TWILIO_VOICE_INCOMING_QA_MARKER/)
+assert.match(incomingRoute, /logTwilioIncomingWebhookReceived/)
+
+const prevTwilioSkip = process.env.TWILIO_WEBHOOK_SKIP_SIGNATURE_VALIDATION
+const prevVoiceSkip = process.env.VOICE_WEBHOOK_SKIP_SIGNATURE_VALIDATION
+const prevNodeEnv = process.env.NODE_ENV
+process.env.TWILIO_WEBHOOK_SKIP_SIGNATURE_VALIDATION = "true"
+assert.equal(shouldSkipTwilioWebhookSignatureValidation(), true)
+process.env.TWILIO_WEBHOOK_SKIP_SIGNATURE_VALIDATION = undefined
+process.env.VOICE_WEBHOOK_SKIP_SIGNATURE_VALIDATION = "true"
+assert.equal(shouldSkipTwilioWebhookSignatureValidation(), true)
+process.env.VOICE_WEBHOOK_SKIP_SIGNATURE_VALIDATION = prevVoiceSkip
+process.env.TWILIO_WEBHOOK_SKIP_SIGNATURE_VALIDATION = prevTwilioSkip
+process.env.NODE_ENV = "production"
+process.env.TWILIO_AUTH_TOKEN = "test"
+assert.equal(shouldSkipTwilioWebhookSignatureValidation(), false)
+process.env.NODE_ENV = prevNodeEnv
 
 console.log("voice-foundation-phase-1a checks passed")

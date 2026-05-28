@@ -21,3 +21,9 @@ export function buildVoiceMediaStreamTwilioUrl(origin?: string | null): string {
   const resolvedBase = configured?.replace(/\/$/, "") || base
   return `${resolvedBase}/api/voice/media/twilio`
 }
+
+/** AI operator inbound webhook — Twilio Console voice URL for Equipify AI operator stub. */
+export function buildTwilioVoiceIncomingUrl(origin?: string | null): string {
+  const base = origin?.replace(/\/$/, "") || "https://your-deployment.example"
+  return `${base}/api/twilio/voice/incoming`
+}

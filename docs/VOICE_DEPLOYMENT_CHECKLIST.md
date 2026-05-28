@@ -20,8 +20,8 @@ Operational checklists for rolling out Equipify voice infrastructure safely.
 
 - [ ] `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` from Twilio trial account
 - [ ] ngrok (or similar) tunnel to `localhost:3000`
-- [ ] Twilio Console webhook URLs point to ngrok origin + `/api/voice/inbound/twilio`
-- [ ] `VOICE_WEBHOOK_SKIP_SIGNATURE_VALIDATION=true` **only on local machine** — remove before any shared/preview deploy
+- [ ] Twilio Console webhook URLs point to ngrok origin + `/api/twilio/voice/incoming` (AI operator stub) or `/api/voice/inbound/twilio` (full routing)
+- [ ] `TWILIO_WEBHOOK_SKIP_SIGNATURE_VALIDATION=true` or `VOICE_WEBHOOK_SKIP_SIGNATURE_VALIDATION=true` **only on local machine** — remove before any shared/preview deploy
 - [ ] Place test inbound call; verify TwiML response in Twilio debugger
 
 ### Browser calling (local)
@@ -58,7 +58,7 @@ Operational checklists for rolling out Equipify voice infrastructure safely.
 
 ### Twilio preview
 
-- [ ] Twilio trial number voice URL → `https://<preview>/api/voice/inbound/twilio`
+- [ ] Twilio trial number voice URL → `https://<preview>/api/twilio/voice/incoming` (AI operator) or `https://<preview>/api/voice/inbound/twilio` (full routing)
 - [ ] Status callback → `https://<preview>/api/voice/webhooks/twilio`
 - [ ] Recording callback → `https://<preview>/api/voice/webhooks/twilio/recording`
 - [ ] Twilio Debugger shows **200** on webhook POSTs (not 401/403/503)
@@ -130,6 +130,7 @@ Enable incrementally — do not enable all at once:
 **Webhook paths:**
 
 ```
+POST {ORIGIN}/api/twilio/voice/incoming
 POST {ORIGIN}/api/voice/inbound/twilio
 POST {ORIGIN}/api/voice/webhooks/twilio
 POST {ORIGIN}/api/voice/webhooks/twilio/recording

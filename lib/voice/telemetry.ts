@@ -20,6 +20,8 @@ export type VoiceTelemetryEvent =
   | "voice_supervisor_joined"
   | "voice_participant_hold"
   | "voice_participant_mute"
+  | "twilio_voice_incoming_webhook"
+  | "twilio_voice_incoming_webhook_failed"
 
 export function logVoiceInfrastructure(
   event: VoiceTelemetryEvent,
