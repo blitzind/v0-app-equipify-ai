@@ -43,6 +43,12 @@ import {
   buildProspectSearchOrgIntelligence,
   GROWTH_ORG_INTELLIGENCE_QA_MARKER,
 } from "@/lib/growth/prospect-search/prospect-search-org-intelligence"
+import {
+  buildProspectSearchRelationshipIntelligence,
+  type ProspectSearchRelationshipIntelligenceBundle,
+} from "@/lib/growth/prospect-search/prospect-search-relationship-intelligence"
+import { resolveRelationshipQueueBoost } from "@/lib/growth/prospect-search/prospect-search-relationship-memory"
+import { resolveProgressionQueueBoost } from "@/lib/growth/prospect-search/prospect-search-account-progression"
 import type { ProspectSearchTerritoryOpportunityScore } from "@/lib/growth/prospect-search/prospect-search-territory-prioritization"
 import { resolveCompanyTerritoryOpportunityBoost } from "@/lib/growth/prospect-search/prospect-search-territory-prioritization"
 import {
@@ -78,6 +84,12 @@ export {
 export { GROWTH_ORG_INTELLIGENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-org-intelligence"
 export { GROWTH_CONTACT_INFLUENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-influence"
 export { GROWTH_TERRITORY_PRIORITIZATION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-territory-prioritization"
+export { GROWTH_RELATIONSHIP_MEMORY_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-relationship-memory"
+export { GROWTH_ACCOUNT_TIMELINE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-account-timeline"
+export { GROWTH_ACCOUNT_PROGRESSION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-account-progression"
+export {
+  enrichPeopleRowsWithRelationshipMemory,
+} from "@/lib/growth/prospect-search/prospect-search-relationship-intelligence"
 
 export type ProspectSearchResultMode = "companies" | "people"
 
@@ -154,6 +166,11 @@ export type GrowthProspectSearchPeopleResultRow = GrowthProspectSearchPersonResu
   sequencing_role: string | null
   sequencing_note: string | null
   outreach_sequence_position: number | null
+  relationship_status: string
+  relationship_momentum: string
+  relationship_strength_score: number
+  relationship_last_interaction_at: string | null
+  relationship_summary: string | null
 }
 
 export type ProspectSearchPeopleTimelineEvent = {
@@ -486,18 +503,24 @@ export function enrichProspectSearchPeopleRowsWithRanking(
 ): GrowthProspectSearchPeopleResultRow[] {
   if (rows.length === 0) return rows
 
-  const rankingInputs = rows.map((row) => ({
-    ...row,
-    contact_id: row.contact_id,
-    company_id: row.company_id,
-    confidence_score: row.confidence,
-    persona: row.persona,
-    in_lead_inbox: row.company.in_lead_inbox,
-    existing_customer: row.company.existing_customer,
-    existing_prospect: row.company.existing_prospect,
-    lead_engine_score: row.company.lead_engine_score ?? row.company.lead_score,
-    company_suppressed: row.company.is_suppressed,
-  }))
+  const rankingInputs = rows.map((row) => {
+    const memory = row.company.contact_intelligence?.relationship_memory
+    return {
+      ...row,
+      contact_id: row.contact_id,
+      company_id: row.company_id,
+      confidence_score: row.confidence,
+      persona: row.persona,
+      in_lead_inbox: row.company.in_lead_inbox,
+      existing_customer: row.company.existing_customer,
+      existing_prospect: row.company.existing_prospect,
+      lead_engine_score: row.company.lead_engine_score ?? row.company.lead_score,
+      company_suppressed: row.company.is_suppressed,
+      relationship_strength_score: memory?.relationship_strength_score ?? null,
+      relationship_status: memory?.relationship_status ?? null,
+      relationship_momentum: memory?.momentum_direction ?? null,
+    }
+  })
 
   const ranked = applyProspectSearchContactRankingToPeopleRows(rankingInputs)
 
@@ -639,8 +662,16 @@ export function attachProspectSearchCompanyCoverageIntelligence(
       contacts: orgContacts,
     })
 
+    const relationshipBundle: ProspectSearchRelationshipIntelligenceBundle =
+      buildProspectSearchRelationshipIntelligence({
+        company,
+        peopleRows: contacts,
+        leadHydration: company.contact_intelligence?.lead_relationship_hydration ?? null,
+      })
+
     const influenceByContact = new Map(
       contacts.map((row) => {
+        const memory = relationshipBundle.relationship_memory
         const influence = computeContactInfluenceScore({
           contact: {
             contact_id: row.contact_id,
@@ -659,6 +690,8 @@ export function attachProspectSearchCompanyCoverageIntelligence(
             is_recommended_contact: row.is_recommended_contact,
             in_lead_inbox: company.in_lead_inbox,
             existing_prospect: company.existing_prospect,
+            relationship_strength_score: memory?.relationship_strength_score,
+            relationship_status: memory?.relationship_status,
           },
           relationship_graph: org_intelligence.relationship_graph,
         })
@@ -733,6 +766,28 @@ export function attachProspectSearchCompanyCoverageIntelligence(
         outreach_sequence.sequence_summary ?? accountStrategy.strategy_summary
     }
 
+    const relBoost = resolveRelationshipQueueBoost(relationshipBundle.relationship_memory)
+    const progBoost = resolveProgressionQueueBoost(relationshipBundle.account_progression)
+    const relationshipBoost = relBoost + progBoost
+    if (relationshipBoost !== 0) {
+      accountStrategy.queue_priority_score = Math.round(
+        Math.min(100, Math.max(0, accountStrategy.queue_priority_score + relationshipBoost)),
+      )
+      if (relBoost !== 0) {
+        accountStrategy.strategy_reasons.push(
+          `Relationship memory boost ${relBoost > 0 ? "+" : ""}${relBoost}`,
+        )
+      }
+      if (progBoost !== 0) {
+        accountStrategy.strategy_reasons.push(
+          `Account progression boost ${progBoost > 0 ? "+" : ""}${progBoost}`,
+        )
+      }
+      accountStrategy.queue_prioritization_reason =
+        relationshipBundle.account_progression.next_best_action ??
+        accountStrategy.queue_prioritization_reason
+    }
+
     const intelligence = company.contact_intelligence
     if (!intelligence) return company
 
@@ -745,6 +800,9 @@ export function attachProspectSearchCompanyCoverageIntelligence(
         org_intelligence,
         outreach_sequence,
         contact_influences: [...influenceByContact.values()],
+        relationship_memory: relationshipBundle.relationship_memory,
+        account_timeline: relationshipBundle.account_timeline,
+        account_progression: relationshipBundle.account_progression,
         outreach_recommendation:
           accountStrategy.strategy_summary ??
           coverage.ranking_summary ??
@@ -847,6 +905,11 @@ function buildProspectSearchPeopleRowDraft(input: {
     sequencing_role: null,
     sequencing_note: null,
     outreach_sequence_position: null,
+    relationship_status: "new",
+    relationship_momentum: "stable",
+    relationship_strength_score: 0,
+    relationship_last_interaction_at: null,
+    relationship_summary: null,
     timeline_events: buildProspectSearchPeopleTimelineEvents({
       contact,
       company,
@@ -1080,6 +1143,11 @@ export function mergeProspectSearchPeopleResults(
       sequencing_role: null,
       sequencing_note: null,
       outreach_sequence_position: null,
+      relationship_status: "new",
+      relationship_momentum: "stable",
+      relationship_strength_score: 0,
+      relationship_last_interaction_at: null,
+      relationship_summary: null,
       timeline_events: [
         {
           id: "discovered-server",

@@ -16,6 +16,11 @@ import {
   type GrowthProspectSearchPeopleResultRow,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import { GROWTH_CONTACT_INFLUENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-influence"
+import {
+  GROWTH_RELATIONSHIP_MEMORY_QA_MARKER,
+  GROWTH_ACCOUNT_TIMELINE_QA_MARKER,
+  GROWTH_ACCOUNT_PROGRESSION_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import { formatProspectSearchFreshnessLabel } from "@/lib/growth/prospect-search/prospect-search-contact-freshness"
 import { prospectSearchPeopleSelectionKey } from "@/lib/growth/prospect-search/prospect-search-people-selection"
 import { cn } from "@/lib/utils"
@@ -121,6 +126,9 @@ export function ProspectSearchDiscoverPeopleTable({
       data-revenue-persona-marker={GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER}
       data-contact-verification-depth-marker={GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER}
       data-contact-influence-marker={GROWTH_CONTACT_INFLUENCE_QA_MARKER}
+      data-relationship-memory-marker={GROWTH_RELATIONSHIP_MEMORY_QA_MARKER}
+      data-account-timeline-marker={GROWTH_ACCOUNT_TIMELINE_QA_MARKER}
+      data-account-progression-marker={GROWTH_ACCOUNT_PROGRESSION_QA_MARKER}
       data-result-mode="people"
     >
       <table className="w-full min-w-[1280px] text-left text-xs">
@@ -146,6 +154,7 @@ export function ProspectSearchDiscoverPeopleTable({
             <th className="px-3 py-2">Source</th>
             <th className="px-3 py-2">Priority</th>
             <th className="px-3 py-2">Influence</th>
+            <th className="px-3 py-2">Relationship</th>
             <th className="px-3 py-2">Freshness</th>
             <th className="px-3 py-2">Eligibility</th>
             <th className="px-3 py-2">Actions</th>
@@ -242,6 +251,26 @@ export function ProspectSearchDiscoverPeopleTable({
                       title={row.influence_reasons.join(" · ")}
                     >
                       {row.influence_reasons[0]}
+                    </p>
+                  ) : null}
+                </td>
+                <td className="px-3 py-2">
+                  <Badge variant="outline" className="text-[10px]">
+                    {row.relationship_status.replace(/_/g, " ")}
+                  </Badge>
+                  {row.relationship_strength_score > 0 ? (
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      Strength {row.relationship_strength_score}%
+                    </p>
+                  ) : null}
+                  {row.relationship_summary ? (
+                    <p className="mt-1 text-[10px] text-rose-900" title={row.relationship_summary}>
+                      {row.relationship_summary}
+                    </p>
+                  ) : null}
+                  {row.relationship_last_interaction_at ? (
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">
+                      Last {new Date(row.relationship_last_interaction_at).toLocaleDateString()}
                     </p>
                   ) : null}
                 </td>

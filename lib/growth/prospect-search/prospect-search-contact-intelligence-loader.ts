@@ -30,6 +30,7 @@ import {
   loadPhoneDncLookup,
 } from "@/lib/growth/prospect-search/prospect-search-contact-eligibility-server"
 import { loadProspectSearchSuppressionLookup } from "@/lib/growth/prospect-search/prospect-search-suppression-overlays"
+import { loadProspectSearchLeadRelationshipHydrationBatch } from "@/lib/growth/prospect-search/prospect-search-relationship-memory-loader"
 import { normalizePhoneNumber } from "@/lib/voice/phone-normalization"
 
 function isPipelineRun(value: unknown): value is GrowthLeadEnginePipelineRun {
@@ -214,6 +215,10 @@ export async function loadProspectSearchContactIntelligenceBatch(
   const schema_ready = schema_health.ready
   const leadIds = [...new Set(companies.map((c) => c.growth_lead_id).filter(Boolean))] as string[]
   const leadMetadataById = await loadLeadMetadataByIds(admin, leadIds)
+  const leadRelationshipHydrationById = await loadProspectSearchLeadRelationshipHydrationBatch(
+    admin,
+    leadIds,
+  )
 
   const decisionMakersByLead = new Map<
     string,
@@ -227,12 +232,18 @@ export async function loadProspectSearchContactIntelligenceBatch(
 
   await Promise.all(
     companies.map(async (company) => {
-      const intelligence = await buildContactIntelligenceForCompany(admin, company, {
+      let intelligence = await buildContactIntelligenceForCompany(admin, company, {
         schema_ready,
         schema_health,
         decisionMakersByLead,
         leadMetadataById,
       })
+      if (company.growth_lead_id) {
+        const hydration = leadRelationshipHydrationById.get(company.growth_lead_id)
+        if (hydration) {
+          intelligence = { ...intelligence, lead_relationship_hydration: hydration }
+        }
+      }
       map.set(`${company.source_type}:${company.id}`, intelligence)
     }),
   )

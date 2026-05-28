@@ -16,8 +16,15 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import { ProspectSearchAccountStrategyPanel } from "@/components/growth/prospect-search/prospect-search-account-strategy-panel"
 import { ProspectSearchOrgIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-org-intelligence-panel"
+import { ProspectSearchRelationshipIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-relationship-intelligence-panel"
+import { ProspectSearchAccountTimelinePanel } from "@/components/growth/prospect-search/prospect-search-account-timeline-panel"
 import { GROWTH_CONTACT_INFLUENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-influence"
 import { GROWTH_ORG_INTELLIGENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-org-intelligence"
+import {
+  GROWTH_RELATIONSHIP_MEMORY_QA_MARKER,
+  GROWTH_ACCOUNT_TIMELINE_QA_MARKER,
+  GROWTH_ACCOUNT_PROGRESSION_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import { formatProspectSearchFreshnessLabel } from "@/lib/growth/prospect-search/prospect-search-contact-freshness"
 
 function eligibilityBadgeVariant(state: string): "default" | "outline" | "destructive" | "secondary" {
@@ -53,6 +60,9 @@ export function ProspectSearchContactEvidenceDrawer({
       data-contact-verification-depth-marker={GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER}
       data-contact-influence-marker={GROWTH_CONTACT_INFLUENCE_QA_MARKER}
       data-org-intelligence-marker={GROWTH_ORG_INTELLIGENCE_QA_MARKER}
+      data-relationship-memory-marker={GROWTH_RELATIONSHIP_MEMORY_QA_MARKER}
+      data-account-timeline-marker={GROWTH_ACCOUNT_TIMELINE_QA_MARKER}
+      data-account-progression-marker={GROWTH_ACCOUNT_PROGRESSION_QA_MARKER}
       onClick={onClose}
     >
       <div
@@ -153,6 +163,31 @@ export function ProspectSearchContactEvidenceDrawer({
                 <ProspectSearchOrgIntelligencePanel
                   orgIntelligence={row.company.contact_intelligence.org_intelligence}
                   outreachSequence={row.company.contact_intelligence.outreach_sequence}
+                />
+              </div>
+            </section>
+          ) : null}
+
+          {row.company.contact_intelligence?.relationship_memory ? (
+            <section>
+              <h4 className="font-medium text-foreground">Relationship intelligence</h4>
+              <div className="mt-2">
+                <ProspectSearchRelationshipIntelligencePanel
+                  memory={row.company.contact_intelligence.relationship_memory}
+                  compact
+                />
+              </div>
+            </section>
+          ) : null}
+
+          {row.company.contact_intelligence?.account_timeline ? (
+            <section>
+              <h4 className="font-medium text-foreground">Account timeline</h4>
+              <div className="mt-2">
+                <ProspectSearchAccountTimelinePanel
+                  timeline={row.company.contact_intelligence.account_timeline}
+                  progression={row.company.contact_intelligence.account_progression}
+                  compact
                 />
               </div>
             </section>

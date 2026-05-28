@@ -40,6 +40,9 @@ export type ProspectSearchContactRankingInput = {
   existing_customer?: boolean
   existing_prospect?: boolean
   lead_engine_score?: number | null
+  relationship_strength_score?: number | null
+  relationship_status?: string | null
+  relationship_momentum?: string | null
 }
 
 export type ProspectSearchContactRankingResult = {
@@ -160,6 +163,27 @@ export function rankProspectSearchContactsForOutreach(
   }
   if (input.existing_prospect) {
     ranking_reasons.push("Known CRM prospect")
+  }
+
+  if (input.relationship_status === "engaged" || input.relationship_status === "active") {
+    score += 0.05
+    ranking_reasons.push("Previously responsive relationship on record")
+  } else if (input.relationship_status === "warming") {
+    score += 0.03
+    ranking_reasons.push("Warming relationship — prior operator engagement")
+  } else if (input.relationship_status === "stalled" || input.relationship_status === "disengaged") {
+    score -= 0.06
+    ranking_risks.push("Stalled or disengaged relationship — review before outreach")
+  }
+  if (input.relationship_momentum === "strengthening") {
+    score += 0.03
+    ranking_reasons.push("Relationship momentum strengthening")
+  } else if (input.relationship_momentum === "weakening") {
+    score -= 0.04
+    ranking_risks.push("Relationship momentum weakening")
+  }
+  if ((input.relationship_strength_score ?? 0) >= 60) {
+    score += 0.02
   }
 
   if (input.email_eligibility === "needs_review" || input.call_eligibility === "needs_review") {

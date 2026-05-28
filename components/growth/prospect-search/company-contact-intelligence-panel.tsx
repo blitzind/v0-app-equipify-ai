@@ -6,6 +6,8 @@ import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prosp
 import { GROWTH_CONTACT_RANKING_QA_MARKER, GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import { ProspectSearchAccountStrategyPanel } from "@/components/growth/prospect-search/prospect-search-account-strategy-panel"
 import { ProspectSearchOrgIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-org-intelligence-panel"
+import { ProspectSearchRelationshipIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-relationship-intelligence-panel"
+import { ProspectSearchAccountTimelinePanel } from "@/components/growth/prospect-search/prospect-search-account-timeline-panel"
 import { ProspectSearchSchemaHealthNotice } from "@/components/growth/prospect-search/prospect-search-schema-health-notice"
 
 export function CompanyContactIntelligencePanel({
@@ -54,6 +56,21 @@ export function CompanyContactIntelligencePanel({
           <ProspectSearchOrgIntelligencePanel
             orgIntelligence={intelligence.org_intelligence}
             outreachSequence={intelligence.outreach_sequence}
+          />
+        </div>
+      ) : null}
+
+      {intelligence.relationship_memory ? (
+        <div className="mt-3">
+          <ProspectSearchRelationshipIntelligencePanel memory={intelligence.relationship_memory} />
+        </div>
+      ) : null}
+
+      {intelligence.account_timeline ? (
+        <div className="mt-3">
+          <ProspectSearchAccountTimelinePanel
+            timeline={intelligence.account_timeline}
+            progression={intelligence.account_progression}
           />
         </div>
       ) : null}

@@ -68,6 +68,8 @@ type InfluenceContactInput = {
   is_recommended_contact?: boolean
   in_lead_inbox?: boolean
   existing_prospect?: boolean
+  relationship_strength_score?: number
+  relationship_status?: string
 }
 
 function graphCentrality(contactId: string, graph: ProspectSearchRelationshipGraph | null): number {
@@ -134,6 +136,17 @@ export function computeContactInfluenceScore(input: {
     score += 0.04
     influence_reasons.push("Existing relationship in CRM or inbox")
   }
+  if ((contact.relationship_strength_score ?? 0) >= 50) {
+    score += Math.min(0.08, contact.relationship_strength_score! * 0.0008)
+    if (contact.relationship_status === "engaged" || contact.relationship_status === "active") {
+      influence_reasons.push("Engaged relationship history increases operational relevance")
+    }
+  }
+  if (contact.relationship_status === "stalled" || contact.relationship_status === "disengaged") {
+    score -= 0.05
+    influence_risks.push("Stalled relationship — influence may not translate to responsiveness")
+  }
+
   if (contact.persona_type === "owner" || contact.persona_type === "founder") {
     influence_reasons.push("Owner/founder title evidence")
   }

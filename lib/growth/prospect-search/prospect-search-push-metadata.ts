@@ -204,6 +204,49 @@ export function buildProspectSearchPushMetadata(
           })),
         }
       : {}),
+    ...(company.contact_intelligence?.relationship_memory
+      ? {
+          relationship_memory: {
+            relationship_strength_score:
+              company.contact_intelligence.relationship_memory.relationship_strength_score,
+            relationship_status:
+              company.contact_intelligence.relationship_memory.relationship_status,
+            momentum_direction:
+              company.contact_intelligence.relationship_memory.momentum_direction,
+            recommended_next_action:
+              company.contact_intelligence.relationship_memory.recommended_next_action,
+            last_interaction_at:
+              company.contact_intelligence.relationship_memory.last_interaction_at,
+            strength_reasons: company.contact_intelligence.relationship_memory.strength_reasons,
+            risks: company.contact_intelligence.relationship_memory.risks,
+          },
+        }
+      : {}),
+    ...(company.contact_intelligence?.account_progression
+      ? {
+          account_progression: {
+            progression_state: company.contact_intelligence.account_progression.progression_state,
+            progression_confidence:
+              company.contact_intelligence.account_progression.progression_confidence,
+            momentum_trend: company.contact_intelligence.account_progression.momentum_trend,
+            next_best_action: company.contact_intelligence.account_progression.next_best_action,
+            progression_blockers:
+              company.contact_intelligence.account_progression.progression_blockers,
+          },
+        }
+      : {}),
+    ...(company.contact_intelligence?.account_timeline
+      ? {
+          account_timeline: {
+            timeline_summary: company.contact_intelligence.account_timeline.timeline_summary,
+            recommended_next_action:
+              company.contact_intelligence.account_timeline.recommended_next_action,
+            recent_outreach_count:
+              company.contact_intelligence.account_timeline.recent_outreach_count,
+            event_count: company.contact_intelligence.account_timeline.events.length,
+          },
+        }
+      : {}),
   }
 }
 

@@ -4369,6 +4369,121 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   assert.match(pushMetadataSource, /org_intelligence/)
   assert.match(pushMetadataSource, /outreach_sequence/)
   assert.match(pushMetadataSource, /contact_influences/)
+
+  const {
+    computeRelationshipStrength,
+    GROWTH_RELATIONSHIP_MEMORY_QA_MARKER,
+    resolveRelationshipQueueBoost,
+  } = await import("../lib/growth/prospect-search/prospect-search-relationship-memory")
+
+  assert.equal(GROWTH_RELATIONSHIP_MEMORY_QA_MARKER, "growth-relationship-memory-v1")
+
+  const memory = computeRelationshipStrength({
+    company_name: "Acme HVAC",
+    growth_lead_id: "lead-1",
+    in_lead_inbox: true,
+    timeline_events: [
+      {
+        kind: "email_reply",
+        label: "Positive reply",
+        detail: "Interested in scheduling",
+        occurred_at: new Date().toISOString(),
+        source: "lead_timeline",
+      },
+    ],
+    lead_touch: {
+      last_human_touch_at: new Date().toISOString(),
+      last_call_at: null,
+      connected_call_count: 1,
+      call_attempt_count: 2,
+      engagement_score: 72,
+      status: "replied",
+    },
+  })
+  assert.ok(memory.relationship_strength_score > 20)
+  assert.equal(memory.qa_marker, "growth-relationship-memory-v1")
+  assert.ok(["warming", "engaged", "active"].includes(memory.relationship_status))
+  assert.ok(resolveRelationshipQueueBoost(memory) >= 0)
+
+  const {
+    buildProspectSearchAccountTimeline,
+    GROWTH_ACCOUNT_TIMELINE_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-account-timeline")
+
+  assert.equal(GROWTH_ACCOUNT_TIMELINE_QA_MARKER, "growth-account-timeline-v1")
+
+  const timeline = buildProspectSearchAccountTimeline({
+    company: {
+      id: "co1",
+      company_name: "Acme",
+      source_type: "discover_candidate",
+      in_lead_inbox: true,
+      is_suppressed: false,
+    } as never,
+    peopleRows: [
+      {
+        company_id: "co1",
+        contact_id: "c1",
+        full_name: "Jamie Ops",
+        persona_label: "Operations Manager",
+        persona_evidence: ["Title match"],
+        timeline_events: [
+          {
+            id: "discovered",
+            kind: "discovered",
+            label: "Discovered",
+            detail: "Website contact",
+            occurred_at: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+    ] as never,
+    relationshipMemory: memory,
+  })
+  assert.ok(timeline.events.length >= 2)
+  assert.equal(timeline.qa_marker, "growth-account-timeline-v1")
+
+  const {
+    computeAccountProgression,
+    GROWTH_ACCOUNT_PROGRESSION_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-account-progression")
+
+  assert.equal(GROWTH_ACCOUNT_PROGRESSION_QA_MARKER, "growth-account-progression-v1")
+
+  const progression = computeAccountProgression({
+    company: { id: "co1", company_name: "Acme", is_suppressed: false } as never,
+    relationshipMemory: memory,
+    timeline,
+  })
+  assert.ok(progression.progression_confidence > 0)
+  assert.ok(progression.next_best_action.length > 0)
+
+  const relationshipPanelSource = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "components/growth/prospect-search/prospect-search-relationship-intelligence-panel.tsx",
+    ),
+    "utf8",
+  )
+  const timelinePanelSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-account-timeline-panel.tsx"),
+    "utf8",
+  )
+  const peopleRelationshipSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-discover-people-table.tsx"),
+    "utf8",
+  )
+
+  assert.match(relationshipPanelSource, /data-relationship-memory-marker/)
+  assert.match(timelinePanelSource, /data-account-timeline-marker/)
+  assert.match(timelinePanelSource, /data-account-progression-marker/)
+  assert.match(peopleRelationshipSource, /Relationship/)
+  assert.match(peopleRelationshipSource, /data-relationship-memory-marker/)
+  assert.match(shellSource, /data-relationship-memory-marker/)
+  assert.match(shellSource, /peopleRowsWithRelationship/)
+  assert.match(pushMetadataSource, /relationship_memory/)
+  assert.match(pushMetadataSource, /account_progression/)
+  assert.match(pushMetadataSource, /account_timeline/)
 }
 
 void main()
