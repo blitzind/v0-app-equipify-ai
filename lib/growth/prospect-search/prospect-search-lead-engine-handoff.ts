@@ -1,5 +1,9 @@
 /** Safe Lead Engine workspace handoff from Prospect Search (Sprint 3). Client-safe. */
 
+import {
+  encodeUtf8ToBase64Url,
+  safeDecodeBase64UrlToUtf8,
+} from "@/lib/encoding/base64url-runtime"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthLeadEngineSandboxInput } from "@/lib/growth/lead-engine/workspace-types"
 import {
@@ -104,13 +108,7 @@ export function buildProspectSearchLeadEngineHandoffUrl(
 
 function encodeContactHandoffContext(context: ProspectSearchLeadEngineContactHandoffContext): string {
   const json = JSON.stringify(context)
-  if (typeof Buffer !== "undefined") {
-    return Buffer.from(json, "utf8").toString("base64url")
-  }
-  const bytes = new TextEncoder().encode(json)
-  let binary = ""
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+  return encodeUtf8ToBase64Url(json)
 }
 
 function decodeContactHandoffContext(
@@ -119,15 +117,8 @@ function decodeContactHandoffContext(
   const value = encoded?.trim()
   if (!value) return null
   try {
-    let json = ""
-    if (typeof Buffer !== "undefined") {
-      json = Buffer.from(value, "base64url").toString("utf8")
-    } else {
-      const normalized = value.replace(/-/g, "+").replace(/_/g, "/")
-      json = decodeURIComponent(
-        Array.from(atob(normalized), (char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`).join(""),
-      )
-    }
+    const json = safeDecodeBase64UrlToUtf8(value)
+    if (!json) return null
     const parsed = JSON.parse(json) as ProspectSearchLeadEngineContactHandoffContext
     if (typeof parsed.contact_count !== "number") return null
     return parsed

@@ -1,5 +1,9 @@
 /** Growth Engine — Prospect → pipeline workflow continuity (Sprint 4.2). Client-safe. */
 
+import {
+  encodeUtf8ToBase64Url,
+  safeDecodeBase64UrlToUtf8,
+} from "@/lib/encoding/base64url-runtime"
 import type {
   GrowthProspectSearchCompanyResult,
   GrowthProspectSearchDiscoveryMode,
@@ -174,13 +178,7 @@ export function buildGrowthWorkflowContext(input: {
 
 export function encodeGrowthWorkflowContext(context: GrowthWorkflowContextHandoff): string {
   const json = JSON.stringify(context)
-  if (typeof Buffer !== "undefined") {
-    return Buffer.from(json, "utf8").toString("base64url")
-  }
-  const bytes = new TextEncoder().encode(json)
-  let binary = ""
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+  return encodeUtf8ToBase64Url(json)
 }
 
 export function decodeGrowthWorkflowContext(
@@ -189,15 +187,8 @@ export function decodeGrowthWorkflowContext(
   const value = encoded?.trim()
   if (!value) return null
   try {
-    let json = ""
-    if (typeof Buffer !== "undefined") {
-      json = Buffer.from(value, "base64url").toString("utf8")
-    } else {
-      const normalized = value.replace(/-/g, "+").replace(/_/g, "/")
-      json = decodeURIComponent(
-        Array.from(atob(normalized), (char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`).join(""),
-      )
-    }
+    const json = safeDecodeBase64UrlToUtf8(value)
+    if (!json) return null
     const parsed = JSON.parse(json) as GrowthWorkflowContextHandoff
     if (parsed.qa_marker !== GROWTH_PROSPECT_WORKFLOW_CONTEXT_QA_MARKER) return null
     if (!parsed.company_name) return null

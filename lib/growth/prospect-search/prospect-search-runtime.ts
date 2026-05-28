@@ -1,6 +1,9 @@
 /** Prospect Search runtime initialization — client-safe mode parsing + diagnostics. */
 
+import { GROWTH_BASE64URL_RUNTIME_FIX_QA_MARKER } from "@/lib/encoding/base64url-runtime"
 import type { GrowthProspectSearchDiscoveryMode } from "@/lib/growth/prospect-search/prospect-search-types"
+
+export { GROWTH_BASE64URL_RUNTIME_FIX_QA_MARKER }
 
 export const GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER =
   "growth-prospect-search-runtime-fix-v1" as const

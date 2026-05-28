@@ -16,6 +16,7 @@ import {
   GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER,
 } from "@/lib/growth/admin-route-runtime-types"
 import { GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-runtime"
+import { GROWTH_BASE64URL_RUNTIME_FIX_QA_MARKER } from "@/lib/encoding/base64url-runtime"
 
 function ProspectSearchFallback() {
   return <p className="text-sm text-muted-foreground">Loading prospect search…</p>
@@ -36,6 +37,7 @@ export default function AdminGrowthProspectSearchPage() {
         data-qa={GROWTH_ADMIN_ROUTE_RUNTIME_STABLE_QA_MARKER}
         data-qa-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER}
         data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
+        data-base64url-runtime-fix-marker={GROWTH_BASE64URL_RUNTIME_FIX_QA_MARKER}
       >
         <PlatformAdminTabNav activeKey="growth_leads" />
 

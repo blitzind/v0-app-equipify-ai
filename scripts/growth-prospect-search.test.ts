@@ -2515,6 +2515,8 @@ async function main(): Promise<void> {
 
   await testProspectSearchFilterUx()
 
+  await testBase64UrlRuntimeFix()
+
   console.log("growth-prospect-search: all checks passed")
 }
 
@@ -3473,6 +3475,111 @@ async function testProspectSearchFilterUx(): Promise<void> {
     "utf8",
   )
   assert.match(shellSource, /applyButtonLabel[\s\S]*Search market/)
+}
+
+async function testBase64UrlRuntimeFix(): Promise<void> {
+  const {
+    GROWTH_BASE64URL_RUNTIME_FIX_QA_MARKER,
+    decodeBase64UrlToUtf8,
+    encodeUtf8ToBase64Url,
+    normalizeBase64UrlToStandard,
+    safeDecodeBase64UrlToUtf8,
+  } = await import("../lib/encoding/base64url-runtime")
+  const { GROWTH_BASE64URL_RUNTIME_FIX_QA_MARKER: runtimeReexport } = await import(
+    "../lib/growth/prospect-search/prospect-search-runtime"
+  )
+  const { decodeGrowthWorkflowContext, encodeGrowthWorkflowContext, buildGrowthWorkflowContext } =
+    await import("../lib/growth/prospect-search/prospect-workflow-context")
+  const { resolveProspectSearchDiscoveryMode } = await import(
+    "../lib/growth/prospect-search/prospect-search-runtime"
+  )
+
+  assert.equal(GROWTH_BASE64URL_RUNTIME_FIX_QA_MARKER, "growth-base64url-runtime-fix-v1")
+  assert.equal(runtimeReexport, "growth-base64url-runtime-fix-v1")
+
+  const payload = '{"hello":"world","mode":"discover"}'
+  const encoded = encodeUtf8ToBase64Url(payload)
+  assert.ok(encoded.includes("-") || encoded.includes("_") || /^[A-Za-z0-9_-]+$/.test(encoded))
+  assert.equal(decodeBase64UrlToUtf8(encoded), payload)
+
+  const urlSafe = Buffer.from(payload, "utf8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+  assert.equal(decodeBase64UrlToUtf8(urlSafe), payload)
+  assert.equal(normalizeBase64UrlToStandard("YQ"), "YQ==")
+  assert.equal(safeDecodeBase64UrlToUtf8("!!!not-valid!!!"), null)
+  assert.equal(safeDecodeBase64UrlToUtf8(""), null)
+
+  const context = buildGrowthWorkflowContext({
+    company: {
+      id: "co-1",
+      source_type: "external_discovered",
+      company_name: "Acme HVAC",
+      website: null,
+      industry: "HVAC",
+      location: "Austin, TX",
+      city: "Austin",
+      state: "TX",
+      postal_code: null,
+      country: "US",
+      metro: null,
+      service_area: null,
+      buying_stage: null,
+      buying_stage_confidence: null,
+      buying_stage_reason: null,
+      lead_score: null,
+      lead_engine_score: null,
+      lead_engine_score_label: null,
+      lead_engine_score_explanation: null,
+      lead_engine_last_run_at: null,
+      decision_maker_coverage: null,
+      growth_lead_id: null,
+      lead_inbox_id: null,
+      prospect_id: null,
+      customer_id: null,
+      is_suppressed: false,
+      suppression_reason: null,
+      in_lead_inbox: false,
+      already_pushed: false,
+      existing_customer: false,
+      existing_prospect: false,
+      matched_territory_label: null,
+      territory_match_reasons: [],
+      contact_intelligence: null,
+      committee_completion: null,
+      growth_signal_recommended_action: null,
+      recommended_next_step_reason: null,
+    },
+    query: "hvac austin",
+    discoveryMode: "discover_external",
+  })
+  const workflowToken = encodeGrowthWorkflowContext(context)
+  const hydrated = decodeGrowthWorkflowContext(workflowToken)
+  assert.ok(hydrated)
+  assert.equal(hydrated!.discovery_mode, "discover_external")
+  assert.equal(hydrated!.company_name, "Acme HVAC")
+
+  assert.equal(resolveProspectSearchDiscoveryMode("discover"), "discover_external")
+
+  const workflowSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-workflow-context.ts"),
+    "utf8",
+  )
+  assert.doesNotMatch(workflowSource, /Buffer\.from\([^)]*,\s*["']base64url["']\)/)
+  assert.doesNotMatch(workflowSource, /toString\(["']base64url["']\)/)
+  assert.match(workflowSource, /encodeUtf8ToBase64Url/)
+  assert.match(workflowSource, /safeDecodeBase64UrlToUtf8/)
+
+  const handoffSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-lead-engine-handoff.ts"),
+    "utf8",
+  )
+  assert.doesNotMatch(handoffSource, /Buffer\.from\([^)]*,\s*["']base64url["']\)/)
+  assert.doesNotMatch(handoffSource, /toString\(["']base64url["']\)/)
+
+  const searchPageSource = fs.readFileSync(
+    path.join(process.cwd(), "app/(admin)/admin/growth/search/page.tsx"),
+    "utf8",
+  )
+  assert.match(searchPageSource, /data-base64url-runtime-fix-marker/)
 }
 
 void main()
