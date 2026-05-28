@@ -49,6 +49,7 @@ function mapVoiceCall(row: Record<string, unknown>): VoiceCallRecord {
     transferred: Boolean(row.transferred),
     transferredTo: row.transferred_to ? String(row.transferred_to) : null,
     assignedUserId: row.assigned_user_id ? String(row.assigned_user_id) : null,
+    voiceConversationId: row.voice_conversation_id ? String(row.voice_conversation_id) : null,
     relatedCustomerId: row.related_customer_id ? String(row.related_customer_id) : null,
     relatedProspectId: row.related_prospect_id ? String(row.related_prospect_id) : null,
     relatedOpportunityId: row.related_opportunity_id ? String(row.related_opportunity_id) : null,
@@ -216,6 +217,7 @@ export async function upsertVoiceCallFromWebhook(
     recordingAvailable?: boolean
     costCurrency?: string
     costAmount?: number | null
+    voiceConversationId?: string | null
     metadataJson?: Record<string, unknown>
   },
 ): Promise<VoiceCallRecord | null> {
@@ -242,6 +244,7 @@ export async function upsertVoiceCallFromWebhook(
     transcription_available: existing?.transcriptionAvailable ?? false,
     cost_currency: input.costCurrency ?? existing?.costCurrency ?? "USD",
     cost_amount: input.costAmount ?? existing?.costAmount ?? null,
+    voice_conversation_id: input.voiceConversationId ?? existing?.voiceConversationId ?? null,
     metadata_json: {
       ...(existing?.metadataJson ?? {}),
       ...(input.metadataJson ?? {}),

@@ -95,6 +95,6 @@ const settingsPanel = fs.readFileSync(
   "utf8",
 )
 assert.match(settingsPanel, /Voice Infrastructure/)
-assert.match(settingsPanel, /infrastructure only/)
+assert.match(settingsPanel, /VOICE_FOUNDATION_QA_MARKER/)
 
 console.log("voice-foundation-phase-1a checks passed")

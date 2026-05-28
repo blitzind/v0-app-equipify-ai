@@ -13,6 +13,11 @@ import {
   resolveVoiceOrganizationFromWebhook,
   upsertVoiceCallFromWebhook,
 } from "@/lib/voice/repository/voice-repository"
+import {
+  attachCallToConversation,
+  resolveConversationPhoneForCall,
+  resolveOrCreateVoiceConversation,
+} from "@/lib/voice/conversations/conversation-engine"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import type { VoiceCallDirection, VoiceProviderId } from "@/lib/voice/types"
 import { sanitizeVoiceWebhookPayload } from "@/lib/voice/audit"
@@ -169,6 +174,32 @@ export async function ingestVoiceProviderWebhook(
     return { ok: false, code: "persistence_failed", message: "Failed to persist voice call record." }
   }
 
+  let voiceConversationId = persistedCall.voiceConversationId
+
+  if (persistedCall.direction === "inbound") {
+    const conversationPhone = resolveConversationPhoneForCall({
+      direction: persistedCall.direction,
+      fromNumber: persistedCall.fromNumber,
+      toNumber: persistedCall.toNumber,
+    })
+    if (conversationPhone) {
+      const conversation = await resolveOrCreateVoiceConversation(admin, {
+        organizationId,
+        primaryPhoneNumber: conversationPhone,
+        activityAt: enriched.eventTimestamp,
+      })
+      if (conversation) {
+        await attachCallToConversation(admin, {
+          organizationId,
+          voiceCallId: persistedCall.id,
+          voiceConversationId: conversation.id,
+          activityAt: enriched.eventTimestamp,
+        })
+        voiceConversationId = conversation.id
+      }
+    }
+  }
+
   const eventKey = buildVoiceEventIdempotencyKey({
     provider: input.provider,
     providerCallId: enriched.providerCallId,
@@ -205,12 +236,14 @@ export async function ingestVoiceProviderWebhook(
     providerCallId: enriched.providerCallId,
     eventType: enriched.canonicalEventType,
     voiceCallId: persistedCall.id,
+    voiceConversationId,
   })
 
   return {
     ok: true,
     duplicate: false,
     voiceCallId: persistedCall.id,
+    voiceConversationId,
     normalizedEvent: enriched,
   }
 }

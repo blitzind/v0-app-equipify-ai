@@ -80,6 +80,7 @@ export async function POST(request: Request) {
     ok: true,
     duplicate: result.duplicate,
     voiceCallId: result.voiceCallId,
+    voiceConversationId: result.voiceConversationId ?? null,
     eventType: result.normalizedEvent.canonicalEventType,
     qaMarker: VOICE_WEBHOOK_INGESTION_QA_MARKER,
   })

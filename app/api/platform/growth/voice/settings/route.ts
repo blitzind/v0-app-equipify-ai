@@ -2,11 +2,11 @@ import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import {
   ensureDefaultVoiceProviderConfigurations,
-  fetchVoiceInfrastructureReadiness,
   resolveVoiceInfrastructureOrganizationId,
 } from "@/lib/voice/repository/voice-repository"
+import { fetchVoiceOperationsReadiness } from "@/lib/voice/repository/voice-operations-repository"
 import { probeVoiceSchemaHealth } from "@/lib/voice/schema-health"
-import { VOICE_FOUNDATION_QA_MARKER } from "@/lib/voice/types"
+import { VOICE_FOUNDATION_QA_MARKER, VOICE_OPERATIONS_QA_MARKER } from "@/lib/voice/types"
 
 export const runtime = "nodejs"
 
@@ -16,11 +16,12 @@ export async function GET() {
 
   const organizationId = resolveVoiceInfrastructureOrganizationId()
   const schemaProbe = await probeVoiceSchemaHealth(access.admin)
-  const readiness = await fetchVoiceInfrastructureReadiness(access.admin, organizationId)
+  const readiness = await fetchVoiceOperationsReadiness(access.admin, organizationId)
 
   return NextResponse.json({
     ok: true,
     qaMarker: VOICE_FOUNDATION_QA_MARKER,
+    operationsQaMarker: VOICE_OPERATIONS_QA_MARKER,
     schema: schemaProbe,
     readiness,
   })
@@ -47,11 +48,12 @@ export async function POST() {
   }
 
   await ensureDefaultVoiceProviderConfigurations(access.admin, organizationId)
-  const readiness = await fetchVoiceInfrastructureReadiness(access.admin, organizationId)
+  const readiness = await fetchVoiceOperationsReadiness(access.admin, organizationId)
 
   return NextResponse.json({
     ok: true,
     qaMarker: VOICE_FOUNDATION_QA_MARKER,
+    operationsQaMarker: VOICE_OPERATIONS_QA_MARKER,
     readiness,
     message: "Default voice provider configuration rows ensured.",
   })

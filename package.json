@@ -214,6 +214,7 @@
     "test:growth-native-dialer": "tsx scripts/test-growth-native-dialer.ts",
     "test:growth-native-dialer-schema-health": "tsx scripts/test-growth-native-dialer-schema-health.ts",
     "test:voice-foundation-phase-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-foundation-phase-1a.ts",
+    "test:voice-operations-phase-1b": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-operations-phase-1b.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
     "test:growth-assemblyai-browser-streaming": "tsx scripts/test-growth-assemblyai-browser-streaming.ts",
     "test:growth-openai-realtime-browser-streaming": "tsx scripts/test-growth-openai-realtime-browser-streaming.ts",

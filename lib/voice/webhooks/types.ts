@@ -8,6 +8,7 @@ export type VoiceWebhookIngestResult =
       ok: true
       duplicate: boolean
       voiceCallId: string | null
+      voiceConversationId?: string | null
       normalizedEvent: NormalizedVoiceWebhookEvent
     }
   | {
