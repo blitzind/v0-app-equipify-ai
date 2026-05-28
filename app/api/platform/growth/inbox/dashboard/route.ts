@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchInboxDashboard } from "@/lib/growth/inbox/thread-repository"
+import { sanitizeGrowthInboxApiErrorMessage } from "@/lib/growth/inbox/inbox-api-errors"
 import { isGrowthUnifiedInboxSchemaReady } from "@/lib/growth/inbox/inbox-schema-health"
 import { GROWTH_UNIFIED_INBOX_PRIVACY_NOTE } from "@/lib/growth/inbox/inbox-types"
 
@@ -31,7 +32,7 @@ export async function GET() {
     return NextResponse.json(
       {
         error: "inbox_dashboard_failed",
-        message: error instanceof Error ? error.message : "Could not load inbox dashboard.",
+        message: sanitizeGrowthInboxApiErrorMessage(error, "Could not load inbox dashboard."),
       },
       { status: 500 },
     )

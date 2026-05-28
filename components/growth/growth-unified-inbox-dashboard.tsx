@@ -20,6 +20,8 @@ import { GrowthInboxOpportunityIntelligencePanel } from "@/components/growth/gro
 import { GrowthInboxBookingRecommendationPanel } from "@/components/growth/growth-inbox-booking-recommendation-panel"
 import { GrowthInboxRelationshipMemoryPanel } from "@/components/growth/growth-inbox-relationship-memory-panel"
 import { GrowthInboxTeamQueuePanel } from "@/components/growth/growth-inbox-team-queue-panel"
+import { GrowthInboxWidgetErrorBoundary } from "@/components/growth/growth-inbox-widget-error-boundary"
+import { GrowthInboxSetupEmptyState } from "@/components/growth/growth-inbox-setup-empty-state"
 import { classificationLabel } from "@/lib/growth/inbox/reply-classifier"
 import { priorityTierLabel } from "@/lib/growth/inbox/thread-priority"
 import { threadStatusLabel } from "@/lib/growth/inbox/thread-health"
@@ -30,13 +32,19 @@ import type {
   GrowthReplyIntelligenceEvent,
   GrowthReplyIntelligenceSummary,
 } from "@/lib/growth/inbox/inbox-types"
-import { GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER } from "@/lib/growth/inbox/inbox-types"
 import {
   GROWTH_INBOX_SYNC_THREAD_CONTINUITY_QA_MARKER,
   type GrowthInboxSyncDashboard,
   type GrowthInboxThreadSyncDetail,
   inboxSyncStatusLabel,
 } from "@/lib/growth/inbox-sync/inbox-sync-types"
+import {
+  GROWTH_INBOX_RUNTIME_STABLE_QA_MARKER,
+  resolveGrowthInboxSetupPhase,
+  shouldShowGrowthInboxHonestEmptyState,
+} from "@/lib/growth/inbox/inbox-runtime-types"
+import { GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER } from "@/lib/growth/inbox/inbox-types"
+import { safeFormatLeadLabel } from "@/lib/growth/lead-label"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
   open: "healthy",
@@ -64,6 +72,19 @@ function formatDate(value: string | null | undefined): string {
   return date.toLocaleString()
 }
 
+function sanitizeInboxUiErrorMessage(message: string | null | undefined): string | null {
+  const trimmed = message?.trim()
+  if (!trimmed) return null
+  if (/\bis not defined$/i.test(trimmed) || /^ReferenceError/i.test(trimmed)) {
+    return "Inbox data could not be loaded due to a server configuration issue. Retry shortly."
+  }
+  return trimmed
+}
+
+function displayLeadLabel(thread: GrowthInboxThread): string {
+  return safeFormatLeadLabel(thread.lead_label || thread.lead_id)
+}
+
 type ListPayload = {
   ok?: boolean
   threads?: GrowthInboxThread[]
@@ -86,6 +107,12 @@ type SyncDashboardPayload = {
   message?: string
 }
 
+type MailboxesPayload = {
+  ok?: boolean
+  mailboxes?: Array<{ id: string }>
+  message?: string
+}
+
 type ThreadDetailPayload = {
   thread?: GrowthInboxThread
   syncDetail?: GrowthInboxThreadSyncDetail | null
@@ -100,6 +127,8 @@ export function GrowthUnifiedInboxDashboardPanel() {
   const [events, setEvents] = useState<GrowthReplyIntelligenceEvent[]>([])
   const [intelligence, setIntelligence] = useState<GrowthReplyIntelligenceSummary | null>(null)
   const [syncDashboard, setSyncDashboard] = useState<GrowthInboxSyncDashboard | null>(null)
+  const [syncSchemaReady, setSyncSchemaReady] = useState(true)
+  const [mailboxConnectionCount, setMailboxConnectionCount] = useState<number | null>(null)
   const [syncDetail, setSyncDetail] = useState<GrowthInboxThreadSyncDetail | null>(null)
   const [leads, setLeads] = useState<Array<{ id: string; label: string }>>([])
   const [selectedThreadId, setSelectedThreadId] = useState("")
@@ -116,6 +145,28 @@ export function GrowthUnifiedInboxDashboardPanel() {
 
   const selectedMessages = useMemo(() => selectedThread?.messages ?? [], [selectedThread])
 
+  const setupPhase = useMemo(
+    () =>
+      resolveGrowthInboxSetupPhase({
+        threadCount: threads.length,
+        syncRunCount: syncDashboard?.runs?.length ?? 0,
+        mailboxConnectionCount,
+        syncSchemaReady,
+      }),
+    [mailboxConnectionCount, syncDashboard?.runs?.length, syncSchemaReady, threads.length],
+  )
+
+  const showHonestEmptyState = useMemo(
+    () =>
+      shouldShowGrowthInboxHonestEmptyState({
+        threadCount: threads.length,
+        syncRunCount: syncDashboard?.runs?.length ?? 0,
+        mailboxConnectionCount,
+        syncSchemaReady,
+      }),
+    [mailboxConnectionCount, syncDashboard?.runs?.length, syncSchemaReady, threads.length],
+  )
+
   const loadThreadDetail = useCallback(async (threadId: string) => {
     const response = await fetch(`/api/platform/growth/inbox/thread/${threadId}`)
     const payload = (await response.json()) as ThreadDetailPayload
@@ -130,16 +181,22 @@ export function GrowthUnifiedInboxDashboardPanel() {
     setLoading(true)
     setError(null)
     try {
-      const [listResponse, dashboardResponse, syncResponse] = await Promise.all([
+      const [listResponse, dashboardResponse, syncResponse, mailboxesResponse] = await Promise.all([
         fetch("/api/platform/growth/inbox"),
         fetch("/api/platform/growth/inbox/dashboard"),
         fetch("/api/platform/growth/inbox/sync/dashboard"),
+        fetch("/api/platform/growth/mailboxes"),
       ])
       const listPayload = (await listResponse.json()) as ListPayload
       const dashboardPayload = (await dashboardResponse.json()) as DashboardPayload
       const syncPayload = (await syncResponse.json()) as SyncDashboardPayload
-      if (!listResponse.ok) throw new Error(listPayload.message ?? "Could not load inbox threads.")
-      if (!dashboardResponse.ok) throw new Error(dashboardPayload.message ?? "Could not load inbox dashboard.")
+      const mailboxesPayload = (await mailboxesResponse.json()) as MailboxesPayload
+      if (!listResponse.ok) {
+        throw new Error(sanitizeInboxUiErrorMessage(listPayload.message) ?? "Could not load inbox threads.")
+      }
+      if (!dashboardResponse.ok) {
+        throw new Error(sanitizeInboxUiErrorMessage(dashboardPayload.message) ?? "Could not load inbox dashboard.")
+      }
 
       const mergedThreads = dashboardPayload.threads ?? listPayload.threads ?? []
       setThreads(mergedThreads)
@@ -147,13 +204,21 @@ export function GrowthUnifiedInboxDashboardPanel() {
       setDashboard(dashboardPayload.dashboard ?? null)
       setIntelligence(dashboardPayload.intelligence ?? null)
       setEvents(dashboardPayload.events ?? [])
+      setSyncSchemaReady(syncResponse.ok)
       if (syncResponse.ok && syncPayload.dashboard) setSyncDashboard(syncPayload.dashboard)
+      else setSyncDashboard(null)
+      if (mailboxesResponse.ok) setMailboxConnectionCount(mailboxesPayload.mailboxes?.length ?? 0)
+      else setMailboxConnectionCount(null)
 
       const nextSelected = selectedThreadId || mergedThreads[0]?.id || ""
       if (nextSelected && !selectedThreadId) setSelectedThreadId(nextSelected)
       if (nextSelected) await loadThreadDetail(nextSelected)
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Could not load unified inbox.")
+      setError(
+        loadError instanceof Error
+          ? sanitizeInboxUiErrorMessage(loadError.message) ?? "Could not load unified inbox."
+          : "Could not load unified inbox.",
+      )
     } finally {
       setLoading(false)
     }
@@ -170,7 +235,11 @@ export function GrowthUnifiedInboxDashboardPanel() {
       await action()
       await load()
     } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Inbox action failed.")
+      setError(
+        actionError instanceof Error
+          ? sanitizeInboxUiErrorMessage(actionError.message) ?? "Inbox action failed."
+          : "Inbox action failed.",
+      )
     } finally {
       setActionLoading(null)
     }
@@ -260,10 +329,10 @@ export function GrowthUnifiedInboxDashboardPanel() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-equipify-qa-marker={GROWTH_INBOX_RUNTIME_STABLE_QA_MARKER}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
-          {GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER} · Manual ingestion and deterministic reply intelligence only — no mailbox sync or auto replies.
+          {GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER} · {GROWTH_INBOX_RUNTIME_STABLE_QA_MARKER} · Manual ingestion and deterministic reply intelligence only — no auto replies.
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
@@ -280,6 +349,9 @@ export function GrowthUnifiedInboxDashboardPanel() {
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{error}</div>
       ) : null}
 
+      {showHonestEmptyState ? <GrowthInboxSetupEmptyState phase={setupPhase} /> : null}
+
+      {!showHonestEmptyState ? (
       <GrowthEngineCard title="Inbox Health">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatTile label="Open" value={String(dashboard?.open_count ?? 0)} />
@@ -288,7 +360,9 @@ export function GrowthUnifiedInboxDashboardPanel() {
           <StatTile label="Critical Priority" value={String(dashboard?.critical_priority_count ?? 0)} />
         </div>
       </GrowthEngineCard>
+      ) : null}
 
+      {!showHonestEmptyState ? (
       <GrowthEngineCard title="Sync Health">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <GrowthBadge label={GROWTH_INBOX_SYNC_THREAD_CONTINUITY_QA_MARKER} tone="neutral" />
@@ -301,7 +375,9 @@ export function GrowthUnifiedInboxDashboardPanel() {
           <StatTile label="Thread Match Rate" value={`${syncDashboard?.threadMatchRate ?? 0}%`} />
         </div>
       </GrowthEngineCard>
+      ) : null}
 
+      {!showHonestEmptyState ? (
       <GrowthEngineCard title="Sync Runs">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -350,6 +426,7 @@ export function GrowthUnifiedInboxDashboardPanel() {
           </table>
         </div>
       </GrowthEngineCard>
+      ) : null}
 
       <GrowthEngineCard title="Provider Mailbox Controls">
         <div className="flex flex-wrap gap-2">
@@ -429,7 +506,7 @@ export function GrowthUnifiedInboxDashboardPanel() {
                         void loadThreadDetail(thread.id)
                       }}
                     >
-                      <td className="px-2 py-2">{thread.lead_label}</td>
+                      <td className="px-2 py-2">{displayLeadLabel(thread)}</td>
                       <td className="px-2 py-2">{thread.subject || "—"}</td>
                       <td className="px-2 py-2">
                         <GrowthBadge label={classificationLabel(thread.classification)} tone={STATUS_TONE[thread.priority_tier] ?? "neutral"} />
@@ -475,14 +552,16 @@ export function GrowthUnifiedInboxDashboardPanel() {
         </GrowthEngineCard>
       </div>
 
-      <GrowthInboxTeamQueuePanel
-        selectedThreadId={selectedThread?.id ?? null}
-        onSelectThread={(threadId) => {
-          setSelectedThreadId(threadId)
-          void loadThreadDetail(threadId)
-        }}
-        disabled={Boolean(actionLoading)}
-      />
+      <GrowthInboxWidgetErrorBoundary label="Team queue">
+        <GrowthInboxTeamQueuePanel
+          selectedThreadId={selectedThread?.id ?? null}
+          onSelectThread={(threadId) => {
+            setSelectedThreadId(threadId)
+            void loadThreadDetail(threadId)
+          }}
+          disabled={Boolean(actionLoading)}
+        />
+      </GrowthInboxWidgetErrorBoundary>
 
       {selectedThread ? (
         <>
@@ -585,25 +664,33 @@ export function GrowthUnifiedInboxDashboardPanel() {
           </GrowthEngineCard>
           </div>
 
-          <GrowthReplyDraftingPanel threadId={selectedThread.id} disabled={Boolean(actionLoading)} />
+          <GrowthInboxWidgetErrorBoundary label="Reply drafting">
+            <GrowthReplyDraftingPanel threadId={selectedThread.id} disabled={Boolean(actionLoading)} />
+          </GrowthInboxWidgetErrorBoundary>
 
-          <GrowthInboxOpportunityIntelligencePanel
-            leadId={selectedThread.lead_id}
-            threadId={selectedThread.id}
-            disabled={Boolean(actionLoading)}
-          />
+          <GrowthInboxWidgetErrorBoundary label="Opportunity intelligence">
+            <GrowthInboxOpportunityIntelligencePanel
+              leadId={selectedThread.lead_id}
+              threadId={selectedThread.id}
+              disabled={Boolean(actionLoading)}
+            />
+          </GrowthInboxWidgetErrorBoundary>
 
-          <GrowthInboxBookingRecommendationPanel
-            leadId={selectedThread.lead_id}
-            threadId={selectedThread.id}
-            disabled={Boolean(actionLoading)}
-          />
+          <GrowthInboxWidgetErrorBoundary label="Booking recommendations">
+            <GrowthInboxBookingRecommendationPanel
+              leadId={selectedThread.lead_id}
+              threadId={selectedThread.id}
+              disabled={Boolean(actionLoading)}
+            />
+          </GrowthInboxWidgetErrorBoundary>
 
-          <GrowthInboxRelationshipMemoryPanel
-            leadId={selectedThread.lead_id}
-            threadId={selectedThread.id}
-            disabled={Boolean(actionLoading)}
-          />
+          <GrowthInboxWidgetErrorBoundary label="Relationship memory">
+            <GrowthInboxRelationshipMemoryPanel
+              leadId={selectedThread.lead_id}
+              threadId={selectedThread.id}
+              disabled={Boolean(actionLoading)}
+            />
+          </GrowthInboxWidgetErrorBoundary>
         </>
       ) : null}
     </div>

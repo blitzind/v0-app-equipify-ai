@@ -7,6 +7,7 @@ import type {
   GrowthReplyIntelligenceEvent,
 } from "@/lib/growth/inbox/inbox-types"
 import type { ReplyEventDraft } from "@/lib/growth/inbox/reply-event-builder"
+import { formatLeadLabel } from "@/lib/growth/lead-label"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -53,7 +54,7 @@ async function loadLeadLabelsForThreads(admin: SupabaseClient, threadIds: string
     const record = row as Record<string, unknown>
     const threadId = asString(record.id)
     const leadId = asString(record.lead_id)
-    labels.set(threadId, companyByLead.get(leadId) || "Lead")
+    labels.set(threadId, formatLeadLabel(companyByLead.get(leadId)))
   }
 
   return labels

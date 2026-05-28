@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { listInboxThreads, listLeadsForInbox } from "@/lib/growth/inbox/thread-repository"
+import { sanitizeGrowthInboxApiErrorMessage } from "@/lib/growth/inbox/inbox-api-errors"
 import { isGrowthUnifiedInboxSchemaReady } from "@/lib/growth/inbox/inbox-schema-health"
 import {
   GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER,
@@ -39,7 +40,7 @@ export async function GET() {
     return NextResponse.json(
       {
         error: "inbox_list_failed",
-        message: error instanceof Error ? error.message : "Could not load inbox threads.",
+        message: sanitizeGrowthInboxApiErrorMessage(error, "Could not load inbox threads."),
       },
       { status: 500 },
     )

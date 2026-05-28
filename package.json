@@ -182,6 +182,7 @@
     "test:growth-outbound-lifecycle-ops": "tsx scripts/test-growth-outbound-lifecycle-ops.ts",
     "test:growth-warmup": "tsx scripts/test-growth-warmup.ts",
     "test:growth-unified-inbox": "tsx scripts/test-growth-unified-inbox.ts",
+    "test:growth-inbox": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-inbox.ts && tsx scripts/test-growth-unified-inbox.ts",
     "test:growth-inbox-sync": "tsx scripts/test-growth-inbox-sync.ts",
     "test:growth-ai-reply-drafting": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-ai-reply-drafting.ts",
     "test:growth-inbox-team-ownership": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-inbox-team-ownership.ts",

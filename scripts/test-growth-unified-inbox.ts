@@ -147,6 +147,8 @@ async function main(): Promise<void> {
   assert.match(repoSource, /addInboxMessage/)
   assert.match(repoSource, /persistReplyEventDrafts/)
   assert.match(repoSource, /classifyReply/)
+  assert.match(repoSource, /from "@\/lib\/growth\/lead-label"/)
+  assert.match(repoSource, /formatLeadLabel/)
   assert.doesNotMatch(repoSource, /pollMailbox|syncMailbox|sendMail|autoReply|openai|anthropic/i)
 
   for (const route of [
@@ -175,6 +177,9 @@ async function main(): Promise<void> {
   assert.match(uiSource, /Sync Health/)
   assert.match(uiSource, /GROWTH_INBOX_SYNC_THREAD_CONTINUITY_QA_MARKER/)
   assert.match(uiSource, /GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER/)
+  assert.match(uiSource, /GROWTH_INBOX_RUNTIME_STABLE_QA_MARKER/)
+  assert.match(uiSource, /GrowthInboxSetupEmptyState/)
+  assert.match(uiSource, /GrowthInboxWidgetErrorBoundary/)
   assert.match(uiSource, /GrowthInboxTeamQueuePanel/)
 
   const navSource = fs.readFileSync(

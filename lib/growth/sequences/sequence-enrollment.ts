@@ -1,6 +1,7 @@
 /** Sequence enrollment planning helpers. Client-safe. */
 
 import type { GrowthSequenceTemplateStep } from "@/lib/growth/sequences/sequence-types"
+export { formatLeadLabel } from "@/lib/growth/lead-label"
 
 export function computeNextStepDueAt(from: Date, delayDays: number): string {
   const due = new Date(from.getTime())
@@ -29,9 +30,4 @@ export function computeEnrollmentNextDueAt(
 
 export function isEnrollmentComplete(currentStep: number, totalSteps: number): boolean {
   return totalSteps > 0 && currentStep > totalSteps
-}
-
-export function formatLeadLabel(companyName: string | null | undefined, fallback = "Lead"): string {
-  const label = (companyName ?? "").trim()
-  return label || fallback
 }
