@@ -11,9 +11,17 @@ import {
 } from "@/components/growth/growth-infrastructure-readiness-badge"
 import type { GrowthOutboundOperationsDashboard } from "@/lib/growth/operations/outbound-operations-dashboard"
 import {
+  GROWTH_OUTBOUND_CRON_HEALTH_V2_QA_MARKER,
+  GROWTH_OUTBOUND_QUEUE_ALERT_OPERATOR_LABELS,
+  GROWTH_OUTBOUND_SETUP_AWARE_ALERTS_QA_MARKER,
+  isOutboundSetupAwareAlertSeverity,
+  outboundQueueAlertTone,
+} from "@/lib/growth/operations/outbound-cron-health-operator-types"
+import {
   GROWTH_OUTBOUND_OPERATIONS_RUNTIME_STABLE_QA_MARKER,
   GROWTH_OUTBOUND_RELIABILITY_H2_QA_MARKER,
   type GrowthOutboundOperationsFailureReason,
+  type GrowthOutboundQueueHealthAlert,
 } from "@/lib/growth/outbound/outbound-reliability-types"
 import { GROWTH_CRON_TELEMETRY_QA_MARKER } from "@/lib/growth/runtime/cron-telemetry-types"
 import { GrowthOperatorDiagnosticsDisclosure } from "@/components/growth/growth-operator-diagnostics-disclosure"
@@ -22,6 +30,38 @@ import { GROWTH_OPERATOR_UX_H3_QA_MARKER } from "@/lib/growth/operator-ux/operat
 function formatDate(value: string | null): string {
   if (!value) return "—"
   return new Date(value).toLocaleString()
+}
+
+function outboundCronOperatorBadgeTone(
+  status: GrowthOutboundOperationsDashboard["outbound_cron_health"][number]["operator_status"],
+): "healthy" | "attention" | "critical" | "neutral" {
+  switch (status) {
+    case "ready":
+      return "healthy"
+    case "stale":
+    case "never_succeeded":
+    case "outage":
+      return "critical"
+    case "pending_activation":
+      return "neutral"
+    default:
+      return "neutral"
+  }
+}
+
+function queueHealthAlertKey(alert: GrowthOutboundQueueHealthAlert): string {
+  const cronRoute = alert.metadata.cron_route
+  return typeof cronRoute === "string" ? `${alert.rule_id}:${cronRoute}` : `${alert.rule_id}:${alert.count}`
+}
+
+function queueHealthAlertBorderClass(alert: GrowthOutboundQueueHealthAlert): string {
+  if (isOutboundSetupAwareAlertSeverity(alert.severity)) {
+    return "border-border bg-muted/30"
+  }
+  if (alert.severity === "critical" || alert.severity === "high") {
+    return "border-amber-200 bg-amber-50"
+  }
+  return "border-border bg-background"
 }
 
 function sanitizeOutboundOperationsUiError(message: string | null | undefined): string {
@@ -218,6 +258,8 @@ function GrowthOutboundOperationsDashboardContent() {
       data-qa-marker={GROWTH_CRON_TELEMETRY_QA_MARKER}
       data-h2-qa={dashboard.h2_qa_marker}
       data-h3-qa={GROWTH_OPERATOR_UX_H3_QA_MARKER}
+      data-cron-health-qa={dashboard.cron_health_qa_marker}
+      data-setup-aware-alerts-qa={dashboard.outbound_activation.qa_marker}
     >
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" size="sm" asChild>
@@ -310,6 +352,64 @@ function GrowthOutboundOperationsDashboardContent() {
         </GrowthEngineCard>
       </GrowthOperatorDiagnosticsDisclosure>
 
+      <GrowthEngineCard
+        title="Outbound cron health"
+        icon={<Activity size={16} />}
+        data-qa={GROWTH_OUTBOUND_CRON_HEALTH_V2_QA_MARKER}
+        data-qa-marker={GROWTH_OUTBOUND_SETUP_AWARE_ALERTS_QA_MARKER}
+      >
+        {dashboard.outbound_activation.mode === "setup" ? (
+          <div className="mb-4 rounded-xl border border-border bg-muted/30 p-4 text-sm">
+            <p className="font-semibold">{dashboard.outbound_activation.headline}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{dashboard.outbound_activation.summary}</p>
+            {dashboard.outbound_activation.blockers.length > 0 ? (
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+                {dashboard.outbound_activation.blockers.map((blocker) => (
+                  <li key={blocker}>{blocker}</li>
+                ))}
+              </ul>
+            ) : null}
+            <Button type="button" variant="outline" size="sm" className="mt-4" asChild>
+              <Link href={dashboard.outbound_activation.activation_cta_href}>
+                {dashboard.outbound_activation.activation_cta_label}
+              </Link>
+            </Button>
+          </div>
+        ) : (
+          <p className="mb-4 text-xs text-muted-foreground">{dashboard.outbound_activation.headline}</p>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-left text-xs">
+            <thead>
+              <tr className="border-b text-muted-foreground">
+                <th className="py-2 pr-3 font-medium">Route</th>
+                <th className="py-2 pr-3 font-medium">Status</th>
+                <th className="py-2 pr-3 font-medium">Last successful run</th>
+                <th className="py-2 pr-3 font-medium">Failures 24h</th>
+                <th className="py-2 font-medium">Summary</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dashboard.outbound_cron_health.map((route) => (
+                <tr key={route.routeId} className="border-b border-border/60">
+                  <td className="py-2 pr-3 font-mono">{route.routeId}</td>
+                  <td className="py-2 pr-3">
+                    <GrowthBadge
+                      label={route.operator_label}
+                      tone={outboundCronOperatorBadgeTone(route.operator_status)}
+                    />
+                  </td>
+                  <td className="py-2 pr-3">{formatDate(route.lastSuccessAt)}</td>
+                  <td className="py-2 pr-3">{route.failureCount24h}</td>
+                  <td className="py-2 text-muted-foreground">{route.operator_summary}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </GrowthEngineCard>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <GrowthEngineCard title="Queue health">
           <dl className="grid grid-cols-2 gap-3 text-xs">
@@ -371,12 +471,22 @@ function GrowthOutboundOperationsDashboardContent() {
         <GrowthEngineCard title="Queue health alerts">
           <ul className="space-y-2 text-sm">
             {dashboard.queue_health_alerts.map((alert) => (
-              <li key={alert.rule_id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <li key={queueHealthAlertKey(alert)} className={`rounded-lg border p-3 ${queueHealthAlertBorderClass(alert)}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-medium">{alert.title}</span>
-                  <GrowthBadge label={alert.severity} tone={alert.severity === "critical" ? "critical" : "attention"} />
+                  <GrowthBadge
+                    label={GROWTH_OUTBOUND_QUEUE_ALERT_OPERATOR_LABELS[alert.severity]}
+                    tone={outboundQueueAlertTone(alert.severity)}
+                  />
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{alert.summary}</p>
+                {typeof alert.metadata.last_success_at === "string" ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Last success: {formatDate(alert.metadata.last_success_at)}
+                  </p>
+                ) : alert.rule_id === "cron_stale" ? (
+                  <p className="mt-1 text-xs text-muted-foreground">Last success: —</p>
+                ) : null}
               </li>
             ))}
           </ul>

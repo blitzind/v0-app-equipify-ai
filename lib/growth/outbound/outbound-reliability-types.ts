@@ -42,7 +42,18 @@ export const GROWTH_OUTBOUND_QUEUE_HEALTH_ALERT_RULES = [
   "queue_lag_high",
 ] as const
 
+export type GrowthOutboundQueueHealthAlertSeverity =
+  | "low"
+  | "medium"
+  | "high"
+  | "critical"
+  | "setup"
+  | "informational"
+  | "pending_activation"
+
 export type GrowthOutboundQueueHealthAlertRule = (typeof GROWTH_OUTBOUND_QUEUE_HEALTH_ALERT_RULES)[number]
+
+export type GrowthOutboundQueueHealthAlertKind = "setup" | "informational" | "outage"
 
 export type GrowthProviderFailureClassification = {
   failure_class: GrowthProviderFailureClass
@@ -68,7 +79,8 @@ export type GrowthOutreachQueueRecoveryItem = {
 
 export type GrowthOutboundQueueHealthAlert = {
   rule_id: GrowthOutboundQueueHealthAlertRule
-  severity: "low" | "medium" | "high" | "critical"
+  severity: GrowthOutboundQueueHealthAlertSeverity
+  alert_kind?: GrowthOutboundQueueHealthAlertKind
   title: string
   summary: string
   count: number

@@ -90,6 +90,27 @@ async function main(): Promise<void> {
   assert.ok(Array.isArray(diagnostics.violations))
   assert.ok(Array.isArray(diagnostics.warnings))
 
+  const activation = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/operations/outbound-execution-activation.ts"),
+    "utf8",
+  )
+  assert.match(activation, /resolveOutboundExecutionActivationState/)
+  assert.match(activation, /GROWTH_OUTBOUND_SETUP_AWARE_ALERTS_QA_MARKER/)
+
+  const cronHealthAlerts = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/operations/outbound-queue-health-alerts.ts"),
+    "utf8",
+  )
+  assert.match(cronHealthAlerts, /alert_kind: "setup"/)
+  assert.match(cronHealthAlerts, /alert_kind === "setup"/)
+
+  const outboundUi = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/growth-outbound-operations-dashboard.tsx"),
+    "utf8",
+  )
+  assert.match(outboundUi, /GROWTH_OUTBOUND_CRON_HEALTH_V2_QA_MARKER/)
+  assert.match(outboundUi, /GROWTH_OUTBOUND_SETUP_AWARE_ALERTS_QA_MARKER/)
+
   console.log("growth operational send plane tests passed")
 }
 

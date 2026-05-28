@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { isOutboundOutageAlert } from "@/lib/growth/operations/outbound-cron-health-operator-types"
 import { fetchGrowthOutboundOperationsDashboard } from "@/lib/growth/operations/outbound-operations-dashboard"
 import {
   GROWTH_OPERATOR_UX_H3_QA_MARKER,
@@ -54,7 +55,8 @@ export async function buildGrowthOperatorAttentionStrip(
     severity: recoveryTotal >= 3 ? "high" : "medium",
   })
 
-  const queueAlerts = outbound?.queue_health_alerts.length ?? 0
+  const outageAlerts =
+    outbound?.queue_health_alerts.filter((alert) => isOutboundOutageAlert(alert)).length ?? 0
   const stuck =
     (outbound?.outreach_queue.stuck_processing ?? 0) + (outbound?.outreach_queue.overdue_scheduled ?? 0)
 
@@ -62,10 +64,10 @@ export async function buildGrowthOperatorAttentionStrip(
     id: "queue_lag",
     category: "queue",
     label: "Queue attention",
-    summary: `${queueAlerts} alert(s) · ${stuck} overdue/stuck`,
-    count: queueAlerts + stuck,
+    summary: `${outageAlerts} outage alert(s) · ${stuck} overdue/stuck`,
+    count: outageAlerts + stuck,
     href: "/admin/growth/operations/outbound",
-    severity: queueAlerts > 0 ? "high" : stuck > 0 ? "medium" : "low",
+    severity: outageAlerts > 0 ? "high" : stuck > 0 ? "medium" : "low",
   })
 
   pushItem(items, {

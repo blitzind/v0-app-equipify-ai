@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { appendDeliverabilityGovernanceEvent } from "@/lib/growth/deliverability/deliverability-governance-events"
 import { recordInternalOutboundAuditEvent } from "@/lib/growth/operations/internal-outbound-audit"
 import type { GrowthOutboundQueueHealthAlert } from "@/lib/growth/outbound/outbound-reliability-types"
+import { resolveOutboundExecutionActivationState } from "@/lib/growth/operations/outbound-execution-activation"
+import type { GrowthOutboundExecutionActivationState } from "@/lib/growth/operations/outbound-cron-health-operator-types"
 import { growthCronApiPath } from "@/lib/growth/runtime/cron-telemetry-types"
 import { listRecentGrowthCronExecutionRuns } from "@/lib/growth/runtime/cron-telemetry-repository"
 
@@ -34,7 +36,9 @@ async function hasRecentOutboundAlert(
 
 export async function evaluateOutboundQueueHealthAlerts(
   admin: SupabaseClient,
+  options?: { activation?: GrowthOutboundExecutionActivationState },
 ): Promise<GrowthOutboundQueueHealthAlert[]> {
+  const activation = options?.activation ?? (await resolveOutboundExecutionActivationState(admin))
   const now = Date.now()
   const nowIso = new Date(now).toISOString()
   const overdueThreshold = new Date(now - 30 * 60 * 1000).toISOString()
@@ -143,15 +147,62 @@ export async function evaluateOutboundQueueHealthAlerts(
     const path = growthCronApiPath(routeId)
     const lastRun = cronRuns.find((run) => run.cronRoute === path && run.ok)
     if (!lastRun || lastRun.finishedAt < cronStaleThreshold) {
+      if (activation.mode === "setup" && !lastRun) {
+        alerts.push({
+          rule_id: "cron_stale",
+          severity: routeId === "growth-outreach-execute" ? "setup" : "pending_activation",
+          alert_kind: "setup",
+          title:
+            routeId === "growth-outreach-execute"
+              ? "Outbound execution not enabled yet"
+              : "Scheduler inactive until outbound activation",
+          summary: `No successful run recorded for ${routeId}. Complete outbound setup before expecting live scheduler telemetry.`,
+          count: 1,
+          metadata: {
+            cron_route: routeId,
+            last_success_at: null,
+            activation_mode: activation.mode,
+            setup_aware: true,
+          },
+        })
+        continue
+      }
+
+      if (lastRun) {
+        alerts.push({
+          rule_id: "cron_stale",
+          severity: routeId === "growth-outreach-execute" ? "critical" : "high",
+          alert_kind: "outage",
+          title: `Cron stale: ${routeId}`,
+          summary: `Last success ${lastRun.finishedAt} — exceeds 2h threshold.`,
+          count: 1,
+          metadata: {
+            cron_route: routeId,
+            last_success_at: lastRun.finishedAt,
+            activation_mode: activation.mode,
+          },
+        })
+        continue
+      }
+
       alerts.push({
         rule_id: "cron_stale",
-        severity: routeId === "growth-outreach-execute" ? "critical" : "high",
-        title: `Cron stale: ${routeId}`,
-        summary: lastRun
-          ? `Last success ${lastRun.finishedAt} — exceeds 2h threshold.`
-          : `No successful run recorded for ${routeId}.`,
+        severity: activation.mode === "operational" ? "high" : "informational",
+        alert_kind: activation.mode === "operational" ? "outage" : "informational",
+        title:
+          activation.mode === "operational"
+            ? `Cron never succeeded: ${routeId}`
+            : "Scheduler inactive until outbound activation",
+        summary:
+          activation.mode === "operational"
+            ? `No successful run recorded for ${routeId} while outbound is active. Verify CRON_SECRET and Vercel cron deployment.`
+            : `No successful run recorded for ${routeId}.`,
         count: 1,
-        metadata: { cron_route: routeId, last_success_at: lastRun?.finishedAt ?? null },
+        metadata: {
+          cron_route: routeId,
+          last_success_at: null,
+          activation_mode: activation.mode,
+        },
       })
     }
   }
@@ -179,10 +230,11 @@ export async function persistOutboundQueueHealthAlerts(
   for (const alert of alerts) {
     const entityKey = `${alert.rule_id}:${alert.count}`
     if (await hasRecentOutboundAlert(admin, alert.rule_id, entityKey)) continue
+    if (alert.alert_kind === "setup" || alert.alert_kind === "informational") continue
 
     await recordInternalOutboundAuditEvent(admin, {
       eventType: "outbound_queue_health_alert",
-      severity: alert.severity,
+      severity: alert.severity === "critical" || alert.severity === "high" ? alert.severity : "medium",
       title: alert.title,
       summary: alert.summary,
       metadata: {

@@ -9,7 +9,14 @@ import {
   type GrowthOutreachQueueRecoveryItem,
   type GrowthOutboundQueueHealthAlert,
 } from "@/lib/growth/outbound/outbound-reliability-types"
+import {
+  buildOutboundCronRouteOperatorHealth,
+  GROWTH_OUTBOUND_CRON_HEALTH_V2_QA_MARKER,
+  type GrowthOutboundCronRouteOperatorHealth,
+  type GrowthOutboundExecutionActivationState,
+} from "@/lib/growth/operations/outbound-cron-health-operator-types"
 import { evaluateOutboundQueueHealthAlerts } from "@/lib/growth/operations/outbound-queue-health-alerts"
+import { resolveOutboundExecutionActivationState } from "@/lib/growth/operations/outbound-execution-activation"
 import { listProviderConnectionSettingsRows } from "@/lib/growth/provider-setup/dashboard"
 import { collectGrowthRuntimeDiagnostics } from "@/lib/growth/runtime/runtime-guards"
 import {
@@ -27,7 +34,10 @@ import { GROWTH_CRON_ROUTE_IDS } from "@/lib/growth/runtime/cron-telemetry-types
 export type GrowthOutboundOperationsDashboard = {
   qa_marker: typeof GROWTH_CRON_TELEMETRY_QA_MARKER
   h2_qa_marker: typeof GROWTH_OUTBOUND_RELIABILITY_H2_QA_MARKER
+  cron_health_qa_marker: typeof GROWTH_OUTBOUND_CRON_HEALTH_V2_QA_MARKER
   generated_at: string
+  outbound_activation: GrowthOutboundExecutionActivationState
+  outbound_cron_health: GrowthOutboundCronRouteOperatorHealth[]
   runtime: ReturnType<typeof collectGrowthRuntimeDiagnostics>
   cron_routes: Awaited<ReturnType<typeof summarizeGrowthCronRouteHealth>>
   recent_cron_runs: Awaited<ReturnType<typeof listRecentGrowthCronExecutionRuns>>
@@ -195,16 +205,24 @@ export async function fetchGrowthOutboundOperationsDashboard(
 
   const [recoveryQueue, queueAlerts, adapterAttempts24h] = await Promise.all([
     listOutreachQueueRecoveryItems(admin, 12).catch(() => []),
-    evaluateOutboundQueueHealthAlerts(admin).catch(() => []),
+    evaluateOutboundQueueHealthAlerts(admin, { activation: outboundActivation }).catch(() => []),
     countTable(admin, "delivery_attempts", (q) =>
       q.eq("send_plane", "adapter").gte("created_at", since24h),
     ).catch(() => 0),
   ])
 
+  const outboundCronHealth = buildOutboundCronRouteOperatorHealth({
+    routes: cronRoutes,
+    activation: outboundActivation,
+  })
+
   return {
     qa_marker: GROWTH_CRON_TELEMETRY_QA_MARKER,
     h2_qa_marker: GROWTH_OUTBOUND_RELIABILITY_H2_QA_MARKER,
+    cron_health_qa_marker: GROWTH_OUTBOUND_CRON_HEALTH_V2_QA_MARKER,
     generated_at: new Date().toISOString(),
+    outbound_activation: outboundActivation,
+    outbound_cron_health: outboundCronHealth,
     runtime: collectGrowthRuntimeDiagnostics(),
     cron_routes: cronRoutes,
     recent_cron_runs: recentCronRuns,
