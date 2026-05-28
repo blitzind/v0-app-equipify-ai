@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Clock3, Loader2, Phone, PhoneCall, RefreshCw, Route, ShieldCheck, Voicemail } from "lucide-react"
+import { Clock3, Loader2, Phone, PhoneCall, Radio, RefreshCw, Route, ShieldCheck, Voicemail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,10 +11,14 @@ import {
   GrowthSettingsCard,
 } from "@/components/growth/growth-settings-ui"
 import {
+  VOICE_CALL_CONTROL_QA_MARKER,
   VOICE_FOUNDATION_QA_MARKER,
   VOICE_OPERATIONS_QA_MARKER,
   VOICE_PROVIDER_LABELS,
+  VOICE_RECORDING_POLICIES,
+  VOICE_RECORDING_POLICY_LABELS,
   VOICE_ROUTING_MODE_LABELS,
+  type InboundCallControlDecision,
   type VoiceBusinessHoursRecord,
   type VoiceNumberListItem,
   type VoiceOperationsReadinessSnapshot,
@@ -117,6 +121,11 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
   const [newProfileName, setNewProfileName] = useState("")
   const [newHoursName, setNewHoursName] = useState("")
   const [newVoicemailName, setNewVoicemailName] = useState("")
+  const [recordingPolicy, setRecordingPolicy] = useState("disabled")
+  const [disclosureText, setDisclosureText] = useState("")
+  const [routingTestNumberId, setRoutingTestNumberId] = useState("")
+  const [routingTestFrom, setRoutingTestFrom] = useState("+14155550199")
+  const [routingTestResult, setRoutingTestResult] = useState<InboundCallControlDecision | null>(null)
 
   const loadOperations = useCallback(async () => {
     const [numbersRes, profilesRes, hoursRes, boxesRes] = await Promise.all([
@@ -145,6 +154,11 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
       setReadiness(data.readiness ?? null)
       setSchemaReady(Boolean(data.schema?.ready))
       setSchemaMessage(data.schema?.message ?? null)
+      setRecordingPolicy(data.readiness?.callControlReadiness?.defaultRecordingPolicy ?? "disabled")
+      setDisclosureText(
+        data.readiness?.callControlReadiness?.recordingDisclosureText ??
+          "This call may be recorded for quality assurance.",
+      )
       await loadOperations()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
@@ -233,7 +247,7 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
     <GrowthSettingsCard title="Voice Infrastructure" icon={<PhoneCall className="size-4" />}>
       <div
         className={GROWTH_SETTINGS_SECTION_GAP}
-        data-qa-marker={`${VOICE_FOUNDATION_QA_MARKER} ${VOICE_OPERATIONS_QA_MARKER}`}
+        data-qa-marker={`${VOICE_FOUNDATION_QA_MARKER} ${VOICE_OPERATIONS_QA_MARKER} ${VOICE_CALL_CONTROL_QA_MARKER}`}
       >
         <p className="text-sm text-muted-foreground">
           Voice operations layer — number inventory, routing profiles, business hours, and voicemail scaffolding.
@@ -423,14 +437,92 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
 
             <section className={GROWTH_SETTINGS_SECTION_GAP}>
               <p className="flex items-center gap-2 text-sm font-medium">
+                <Radio className="size-4" />
+                Call control readiness
+              </p>
+              <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                <p>Inbound webhook: {callControl?.inboundWebhookUrl ?? "—"}</p>
+                <p>Status webhook: {callControl?.statusWebhookUrl ?? "—"}</p>
+                <p>Recording callback: {callControl?.recordingCallbackUrl ?? "—"}</p>
+                <p>Inbound control ready: {callControl?.inboundCallControlReady ? "yes" : "not yet"}</p>
+                <p>Voicemail callback ready: {callControl?.voicemailCallbackReady ? "yes" : "not yet"}</p>
+                <p>{callControl?.callControlMessage}</p>
+              </div>
+            </section>
+
+            <section className={GROWTH_SETTINGS_SECTION_GAP}>
+              <p className="text-sm font-medium">Recording policy</p>
+              <p className="text-xs text-muted-foreground">{callControl?.recordingDisclosureMessage}</p>
+              <div className="grid gap-2 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="recording-policy">Default recording policy</Label>
+                  <select
+                    id="recording-policy"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={recordingPolicy}
+                    onChange={(e) => setRecordingPolicy(e.target.value)}
+                  >
+                    {VOICE_RECORDING_POLICIES.map((policy) => (
+                      <option key={policy} value={policy}>
+                        {VOICE_RECORDING_POLICY_LABELS[policy]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="disclosure-text">Disclosure placeholder</Label>
+                  <Input
+                    id="disclosure-text"
+                    value={disclosureText}
+                    onChange={(e) => setDisclosureText(e.target.value)}
+                  />
+                </div>
+              </div>
+              <Button type="button" size="sm" variant="outline" onClick={() => void saveCallControlSettings().catch((e) => setError(e instanceof Error ? e.message : "Save failed."))}>
+                Save recording policy
+              </Button>
+            </section>
+
+            <section className={GROWTH_SETTINGS_SECTION_GAP}>
+              <p className="text-sm font-medium">Routing test tool</p>
+              <p className="text-xs text-muted-foreground">Planning-only — returns deterministic route decision without placing a call.</p>
+              <div className={`grid gap-2 md:grid-cols-2 ${GROWTH_SETTINGS_FORM_GAP}`}>
+                <div>
+                  <Label htmlFor="routing-test-number">Voice number id</Label>
+                  <Input
+                    id="routing-test-number"
+                    value={routingTestNumberId}
+                    onChange={(e) => setRoutingTestNumberId(e.target.value)}
+                    placeholder={numbers[0]?.id ?? "uuid"}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="routing-test-from">Simulated caller</Label>
+                  <Input id="routing-test-from" value={routingTestFrom} onChange={(e) => setRoutingTestFrom(e.target.value)} />
+                </div>
+              </div>
+              <Button type="button" size="sm" onClick={() => void runRoutingTest().catch((e) => setError(e instanceof Error ? e.message : "Test failed."))}>
+                Run routing test
+              </Button>
+              {routingTestResult ? (
+                <div className="rounded-md border border-border/60 px-3 py-2 text-xs text-muted-foreground">
+                  Action: {routingTestResult.action} · Mode: {routingTestResult.routingMode ?? "none"} · Status:{" "}
+                  {routingTestResult.routeStatus}
+                  {routingTestResult.dialNumbers.length > 0 ? ` · Dial: ${routingTestResult.dialNumbers.join(", ")}` : ""}
+                </div>
+              ) : null}
+            </section>
+
+            <section className={GROWTH_SETTINGS_SECTION_GAP}>
+              <p className="flex items-center gap-2 text-sm font-medium">
                 <ShieldCheck className="size-4" />
                 Compliance readiness
               </p>
               <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
-                <p>Opt-out registry: {compliance?.optOutTableReady ? "table ready" : "pending"} ({compliance?.optOutCount ?? 0} records)</p>
-                <p>{compliance?.dncEnforcementMessage}</p>
-                <p>{compliance?.callRecordingDisclosureMessage}</p>
-                <p>{compliance?.aiDisclosureMessage}</p>
+                <p>Opt-out registry: {readiness?.complianceReadinessExtended?.optOutTableReady ? "table ready" : "pending"} ({readiness?.complianceReadinessExtended?.optOutCount ?? 0} records)</p>
+                <p>{readiness?.complianceReadinessExtended?.dncEnforcementMessage}</p>
+                <p>{readiness?.complianceReadinessExtended?.callRecordingDisclosureMessage}</p>
+                <p>{readiness?.complianceReadinessExtended?.aiDisclosureMessage}</p>
               </div>
             </section>
 

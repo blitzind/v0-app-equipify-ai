@@ -1,9 +1,21 @@
 /** Voice Infrastructure Foundation — Phase 1A shared types (client-safe). */
 
+import type { VoiceCallControlReadinessSnapshot, VoiceRecordingPolicy } from "@/lib/voice/call-control/types"
+
 export const VOICE_FOUNDATION_QA_MARKER = "voice-foundation-v1" as const
 export const VOICE_PROVIDER_ABSTRACTION_QA_MARKER = "voice-provider-abstraction-v1" as const
 export const VOICE_WEBHOOK_INGESTION_QA_MARKER = "voice-webhook-ingestion-v1" as const
 export const VOICE_OPERATIONS_QA_MARKER = "voice-operations-v1" as const
+
+export {
+  VOICE_CALL_CONTROL_QA_MARKER,
+  VOICE_RECORDING_POLICIES,
+  VOICE_RECORDING_POLICY_LABELS,
+  type VoiceRecordingPolicy,
+  type VoiceCallControlSettingsRecord,
+  type VoiceCallControlReadinessSnapshot,
+  type InboundCallControlDecision,
+} from "@/lib/voice/call-control/types"
 
 export const VOICE_PROVIDER_IDS = ["twilio", "telnyx", "plivo", "sip", "stub"] as const
 export type VoiceProviderId = (typeof VOICE_PROVIDER_IDS)[number]
@@ -95,6 +107,7 @@ export type VoiceNumberRecord = {
   routingProfileId: string | null
   routingMode: VoiceRoutingMode | null
   defaultForwardingTarget: string
+  recordingPolicy: VoiceRecordingPolicy | null
   metadataJson: Record<string, unknown>
   createdAt: string
   updatedAt: string
@@ -198,6 +211,7 @@ export type VoiceRoutingProfileMemberRecord = {
   userId: string
   priority: number
   isActive: boolean
+  forwardingPhoneNumber: string
   createdAt: string
   updatedAt: string
 }
@@ -249,4 +263,5 @@ export type VoiceOperationsReadinessSnapshot = VoiceInfrastructureReadinessSnaps
   businessHoursCount: number
   voicemailBoxCount: number
   complianceReadinessExtended: VoiceComplianceReadinessSnapshot
+  callControlReadiness?: VoiceCallControlReadinessSnapshot
 }

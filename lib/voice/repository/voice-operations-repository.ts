@@ -22,6 +22,7 @@ import {
   VOICE_OPERATIONS_QA_MARKER,
   VOICE_ROUTING_MODE_LABELS,
 } from "@/lib/voice/types"
+import { fetchVoiceCallControlReadiness } from "@/lib/voice/call-control/readiness"
 import {
   countVoiceOptOuts,
   fetchVoiceInfrastructureReadiness,
@@ -43,6 +44,7 @@ function mapNumber(row: Record<string, unknown>): VoiceNumberRecord {
     routingProfileId: row.routing_profile_id ? String(row.routing_profile_id) : null,
     routingMode: (row.routing_mode as VoiceRoutingMode | null) ?? null,
     defaultForwardingTarget: String(row.default_forwarding_target ?? ""),
+    recordingPolicy: (row.recording_policy as VoiceNumberRecord["recordingPolicy"]) ?? null,
     metadataJson: (row.metadata_json as Record<string, unknown>) ?? {},
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
@@ -74,6 +76,7 @@ function mapRoutingMember(row: Record<string, unknown>): VoiceRoutingProfileMemb
     userId: String(row.user_id),
     priority: Number(row.priority ?? 0),
     isActive: Boolean(row.is_active),
+    forwardingPhoneNumber: String(row.forwarding_phone_number ?? ""),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   }
@@ -182,6 +185,7 @@ export async function updateVoiceNumber(
     status: VoiceNumberStatus
     voiceEnabled: boolean
     smsEnabled: boolean
+    recordingPolicy: import("@/lib/voice/call-control/types").VoiceRecordingPolicy | null
   }>,
 ): Promise<VoiceNumberRecord | null> {
   const payload: Record<string, unknown> = {}
@@ -195,6 +199,7 @@ export async function updateVoiceNumber(
   if (patch.status !== undefined) payload.status = patch.status
   if (patch.voiceEnabled !== undefined) payload.voice_enabled = patch.voiceEnabled
   if (patch.smsEnabled !== undefined) payload.sms_enabled = patch.smsEnabled
+  if (patch.recordingPolicy !== undefined) payload.recording_policy = patch.recordingPolicy
 
   const { data, error } = await admin
     .schema("voice")
@@ -559,11 +564,12 @@ export async function fetchVoiceOperationsReadiness(
     }
   }
 
-  const [profiles, hours, boxes, compliance] = await Promise.all([
+  const [profiles, hours, boxes, compliance, callControlReadiness] = await Promise.all([
     fetchVoiceRoutingProfiles(admin, organizationId),
     fetchVoiceBusinessHoursList(admin, organizationId),
     fetchVoiceVoicemailBoxes(admin, organizationId),
     buildVoiceComplianceReadiness(admin, organizationId),
+    fetchVoiceCallControlReadiness(admin, organizationId),
   ])
 
   return {
@@ -573,6 +579,7 @@ export async function fetchVoiceOperationsReadiness(
     businessHoursCount: hours.length,
     voicemailBoxCount: boxes.length,
     complianceReadinessExtended: compliance,
+    callControlReadiness,
     infrastructureMessage:
       base.phoneNumberCount === 0
         ? "Number provisioning will be connected after provider credentials are fully validated."

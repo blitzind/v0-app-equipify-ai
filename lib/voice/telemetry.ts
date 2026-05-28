@@ -11,6 +11,9 @@ export type VoiceTelemetryEvent =
   | "voice_call_lifecycle_transition"
   | "voice_provider_health"
   | "voice_schema_probe"
+  | "voice_inbound_route_decision"
+  | "voice_recording_callback_received"
+  | "voice_recording_callback_stored"
 
 export function logVoiceInfrastructure(
   event: VoiceTelemetryEvent,

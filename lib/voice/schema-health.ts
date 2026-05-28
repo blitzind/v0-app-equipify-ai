@@ -5,8 +5,8 @@ import { looksLikePostgrestMissingSchemaError } from "@/lib/blitzpay/blitzpay-sc
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import { VOICE_FOUNDATION_QA_MARKER } from "@/lib/voice/types"
 
-export const VOICE_SCHEMA_PROBE_VERSION = "v2" as const
-export const VOICE_SCHEMA_MIGRATION_ID = "20270527150000_voice_operations_phase_1b" as const
+export const VOICE_SCHEMA_PROBE_VERSION = "v3" as const
+export const VOICE_SCHEMA_MIGRATION_ID = "20270527160000_voice_call_control_phase_1c" as const
 
 const REQUIRED_TABLES = [
   "voice_numbers",
@@ -22,6 +22,7 @@ const REQUIRED_TABLES = [
   "voice_routing_profile_members",
   "voice_business_hours",
   "voice_voicemail_boxes",
+  "voice_call_control_settings",
 ] as const
 
 export type VoiceSchemaHealthProbe = {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireVoicePlatformRouteContext, UUID_RE, voiceInvalidIdResponse } from "@/lib/voice/api/voice-platform-route"
 import { updateVoiceNumber } from "@/lib/voice/repository/voice-operations-repository"
-import { VOICE_NUMBER_STATUSES, VOICE_ROUTING_MODES, VOICE_OPERATIONS_QA_MARKER } from "@/lib/voice/types"
+import { VOICE_NUMBER_STATUSES, VOICE_ROUTING_MODES, VOICE_OPERATIONS_QA_MARKER, VOICE_RECORDING_POLICIES } from "@/lib/voice/types"
 
 export const runtime = "nodejs"
 
@@ -15,6 +15,7 @@ const PatchSchema = z.object({
   status: z.enum(VOICE_NUMBER_STATUSES).optional(),
   voiceEnabled: z.boolean().optional(),
   smsEnabled: z.boolean().optional(),
+  recordingPolicy: z.enum(VOICE_RECORDING_POLICIES).nullable().optional(),
 })
 
 export async function PATCH(
