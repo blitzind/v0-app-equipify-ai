@@ -183,6 +183,7 @@ export async function runProspectSearch(
         parsed,
         sort_by,
         operator_intent: peopleFirstMode,
+        pdl_augmentation: peopleFirstMode,
       })
 
     const source_counts = buildSourceCounts(companiesWithSignals)

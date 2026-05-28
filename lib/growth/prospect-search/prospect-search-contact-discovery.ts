@@ -271,6 +271,9 @@ export function resolveProspectSearchContactProviderState(
   ) {
     return "website_crawl"
   }
+  if (labels.some((label) => label.includes("people_data_labs") || label.includes("pdl"))) {
+    return "connected"
+  }
   if (labels.some((label) => label.includes("contact_discovery"))) return "connected"
   if (labels.some((label) => label.includes("lead_decision_makers") || label.includes("lead_engine"))) {
     return "internal_sources"

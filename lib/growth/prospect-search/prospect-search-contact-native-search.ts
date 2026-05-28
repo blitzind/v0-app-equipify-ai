@@ -155,6 +155,7 @@ export async function runContactNativePeopleSearch(
     page: number
     page_size: number
     result_mode: ProspectSearchResultMode
+    pdl_augmentation?: boolean
   },
 ): Promise<ContactNativePeopleSearchResult> {
   const page_size = clampProspectSearchPageSize(input.page_size)
@@ -178,6 +179,9 @@ export async function runContactNativePeopleSearch(
       parsed: input.parsed,
       sort_by: input.sort_by,
       operator_intent: input.result_mode === "queue",
+      pdl_augmentation:
+        input.pdl_augmentation ??
+        (input.result_mode === "people" || input.result_mode === "queue"),
     },
   )
 

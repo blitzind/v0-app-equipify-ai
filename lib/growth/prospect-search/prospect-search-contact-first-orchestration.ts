@@ -11,6 +11,8 @@ import {
   shouldRunProspectSearchDeepOverlays,
 } from "@/lib/growth/prospect-search/prospect-search-progressive-enrichment"
 import { GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-safe-fetch-json"
+import { augmentProspectSearchCompaniesWithPdl } from "@/lib/growth/prospect-search/prospect-search-pdl-augmentation"
+import { GROWTH_PDL_PROVIDER_QA_MARKER } from "@/lib/growth/providers/pdl/pdl-types"
 import { applyProspectSearchSignalIntelligenceOverlay } from "@/lib/growth/signals/integrations/prospect-search-signal-intelligence-loader"
 import type {
   GrowthProspectSearchCompanyResult,
@@ -28,6 +30,8 @@ export type GrowthProspectSearchContactFirstHydrationSnapshot = {
   summary: string | null
   contact_first_applied: boolean
   deep_overlays_skipped_count: number
+  pdl_augmentation_qa_marker?: typeof GROWTH_PDL_PROVIDER_QA_MARKER | null
+  pdl_augmented_count?: number
 }
 
 function pushDiagnostic(
@@ -53,6 +57,7 @@ export async function applyProspectSearchContactFirstHydrationLayers(
     parsed: GrowthProspectSearchParsedQuery
     sort_by: GrowthProspectSearchSortBy
     operator_intent?: boolean
+    pdl_augmentation?: boolean
   },
 ): Promise<{
   companies: GrowthProspectSearchCompanyResult[]
@@ -90,6 +95,38 @@ export async function applyProspectSearchContactFirstHydrationLayers(
       err,
       "Contact intelligence unavailable — showing lightweight company rows.",
     )
+  }
+
+  if (input.pdl_augmentation) {
+    try {
+      const pdl = await augmentProspectSearchCompaniesWithPdl(admin, {
+        companies,
+        query: input.query,
+        filters: input.filters,
+        parsed: input.parsed,
+      })
+      companies = pdl.companies
+      if (pdl.augmented > 0) {
+        diagnostics.push({
+          layer: "pdl_acquisition",
+          status: "success",
+          message: `PDL augmented ${pdl.augmented} account(s) after internal contact discovery.`,
+        })
+      } else if (pdl.skipped_reason) {
+        diagnostics.push({
+          layer: "pdl_acquisition",
+          status: "skipped",
+          message: pdl.skipped_reason,
+        })
+      }
+    } catch (err) {
+      pushDiagnostic(
+        diagnostics,
+        "pdl_acquisition",
+        err,
+        "PDL contact augmentation unavailable — continuing with internal contacts only.",
+      )
+    }
   }
 
   companies = attachReachableHumanToCompanies(companies)

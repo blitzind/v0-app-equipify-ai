@@ -175,6 +175,17 @@ async function buildContactIntelligenceForCompany(
       if (companyContacts.some((c) => c.source_type !== "manual" && c.source_type !== "crm")) {
         source_labels.push("website_public_extract")
       }
+      if (
+        companyContacts.some((contact) => {
+          const meta = contact.metadata ?? {}
+          return (
+            meta.discovery_provider === "people_data_labs" ||
+            meta.pdl_provider_qa_marker === "growth-pdl-provider-v1"
+          )
+        })
+      ) {
+        source_labels.push("people_data_labs")
+      }
       for (const contact of companyContacts) {
         const mapped = companyContactToContactInput(contact)
         if (mapped) contacts.push(mapped)

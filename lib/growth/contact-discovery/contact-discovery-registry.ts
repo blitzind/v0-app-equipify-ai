@@ -10,10 +10,10 @@ import type {
 import { createInternalGrowthContactDiscoveryProvider } from "@/lib/growth/contact-discovery/providers/internal-growth-provider"
 import { createManualFixtureContactDiscoveryProvider } from "@/lib/growth/contact-discovery/providers/manual-fixture-provider"
 import { createWebsitePublicExtractContactDiscoveryProvider } from "@/lib/growth/contact-discovery/providers/website-public-extract-provider"
+import { createPeopleDataLabsContactDiscoveryProvider } from "@/lib/growth/contact-discovery/providers/people-data-labs-provider"
 import {
   createFutureApolloContactProvider,
   createFutureClayContactProvider,
-  createFuturePeopleDataLabsContactProvider,
   createFutureProviderContactSlot,
   createFutureSeamlessContactProvider,
 } from "@/lib/growth/contact-discovery/providers/future-provider-slots"
@@ -25,9 +25,9 @@ export function listContactDiscoveryProviders(
     createManualFixtureContactDiscoveryProvider(),
     createInternalGrowthContactDiscoveryProvider(admin),
     createWebsitePublicExtractContactDiscoveryProvider(admin),
+    createPeopleDataLabsContactDiscoveryProvider(admin),
     createFutureApolloContactProvider(),
     createFutureSeamlessContactProvider(),
-    createFuturePeopleDataLabsContactProvider(),
     createFutureClayContactProvider(),
     createFutureProviderContactSlot(),
   ]

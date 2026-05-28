@@ -592,6 +592,59 @@ async function main(): Promise<void> {
   )
   assert.match(evidenceDrawer, /ProspectSearchContactAcquisitionPanel/)
 
+  const {
+    GROWTH_PDL_PROVIDER_QA_MARKER,
+    buildPdlPersonSearchQuery,
+    mapPdlPeopleToContactDiscoveryRaw,
+    isPdlSandboxEnabled,
+  } = await import("../lib/growth/providers/pdl/index")
+  assert.equal(GROWTH_PDL_PROVIDER_QA_MARKER, "growth-pdl-provider-v1")
+  assert.equal(isPdlSandboxEnabled(), true)
+
+  const query = buildPdlPersonSearchQuery({
+    company_name: "Acme Medical Service",
+    domain: "acmemedical.example",
+    prefer_reachable: true,
+  })
+  assert.match(query.summary, /acmemedical.example/)
+
+  const pdlMapped = mapPdlPeopleToContactDiscoveryRaw({
+    company_name: "Acme Medical Service",
+    domain: "acmemedical.example",
+    sandbox: true,
+    people: [
+      {
+        id: "pdl-1",
+        full_name: "Jordan Lee",
+        job_title: "Service Manager",
+        work_email: "jordan@acmemedical.example",
+        phone_numbers: [{ number: "+1 512 555 0100" }],
+        likelihood: 8,
+      },
+    ],
+  })
+  assert.equal(pdlMapped.length, 1)
+  assert.equal(pdlMapped[0]?.full_name, "Jordan Lee")
+  assert.equal(pdlMapped[0]?.pii_observed, true)
+  assert.match(pdlMapped[0]?.source_attribution[0]?.provider_name ?? "", /people_data_labs/)
+
+  assert.match(operatorProvidersSource, /future_people_data_labs/)
+  assert.match(registrySource, /createPeopleDataLabsContactDiscoveryProvider/)
+
+  const pdlProviderSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/contact-discovery/providers/people-data-labs-provider.ts"),
+    "utf8",
+  )
+  assert.match(pdlProviderSource, /GROWTH_PDL_PROVIDER_QA_MARKER/)
+  assert.match(pdlProviderSource, /Equipify contact graph/)
+
+  const orchestrationSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-contact-first-orchestration.ts"),
+    "utf8",
+  )
+  assert.match(orchestrationSource, /augmentProspectSearchCompaniesWithPdl/)
+  assert.match(orchestrationSource, /pdl_augmentation/)
+
   console.log("growth-contact-discovery-v1 checks passed")
 }
 
