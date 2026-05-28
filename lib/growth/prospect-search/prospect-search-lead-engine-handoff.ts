@@ -135,6 +135,8 @@ function decodeContactHandoffContext(
       compliance_status: parsed.compliance_status ?? "review_required",
       outreach_ready: parsed.outreach_ready === true,
       contact_research_required_message: parsed.contact_research_required_message ?? null,
+      freshness_status: parsed.freshness_status ?? null,
+      confidence_reason: parsed.confidence_reason ?? null,
     }
   } catch {
     return null

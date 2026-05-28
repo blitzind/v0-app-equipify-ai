@@ -35,6 +35,10 @@ export type ProspectSearchContactIntelligenceInputContact = {
   last_checked_at?: string | null
   verification_status?: string | null
   discovery_sources?: string[]
+  discovered_at?: string | null
+  last_verified_at?: string | null
+  email_status?: string | null
+  phone_status?: string | null
 }
 
 function normalizeName(name: string): string {
@@ -232,6 +236,9 @@ function toOverlay(
   if (contact.linkedin_url) overlay.linkedin_url = contact.linkedin_url
   if (contact.phone) overlay.phone = contact.phone
   if (contact.email) overlay.email = contact.email
+  if (contact.discovered_at) overlay.discovered_at = contact.discovered_at
+  if (contact.last_verified_at) overlay.last_verified_at = contact.last_verified_at
+  if (contact.last_checked_at) overlay.source_last_seen_at = contact.last_checked_at
   return overlay
 }
 
@@ -469,6 +476,14 @@ export function buildLeadEngineContactHandoffContext(
   const contactCount = contacts.length
   const suppressed = company?.is_suppressed === true
   const outreachReady = !suppressed && contactCount > 0 && (emailAvailable || phoneAvailable)
+  const firstContact = intelligence?.first_contact
+  const staleCount = contacts.filter(
+    (c) => c.freshness_status === "stale" || c.freshness_status === "expired",
+  ).length
+  const freshnessNote =
+    staleCount > 0
+      ? `${staleCount} contact${staleCount === 1 ? "" : "s"} stale or expired — refresh before outreach`
+      : null
 
   return {
     first_contact_role: intelligence?.first_contact?.role ?? null,
@@ -476,7 +491,9 @@ export function buildLeadEngineContactHandoffContext(
     first_contact_confidence: intelligence?.first_contact?.confidence ?? null,
     committee_completeness_pct: intelligence?.committee_completeness_pct ?? null,
     contact_count: contactCount,
-    summary: intelligence?.outreach_recommendation ?? null,
+    summary: [intelligence?.outreach_recommendation ?? null, freshnessNote]
+      .filter(Boolean)
+      .join(" · ") || null,
     email_available: emailAvailable,
     phone_available: phoneAvailable,
     contact_sources: intelligence?.source_labels ?? [],
@@ -484,10 +501,15 @@ export function buildLeadEngineContactHandoffContext(
     outreach_ready: outreachReady,
     contact_research_required_message:
       outreachReady || suppressed
-        ? null
+        ? freshnessNote
         : company?.source_type === "external_discovered"
           ? "Contact research required before outreach."
           : "No verified contacts yet — run contact research before outreach.",
+    freshness_status:
+      contacts.find((c) => c.id === firstContact?.contact_id)?.freshness_status ?? null,
+    confidence_reason: firstContact
+      ? `${Math.round(firstContact.confidence * 100)}% confidence from evidence-backed sources`
+      : null,
   }
 }
 

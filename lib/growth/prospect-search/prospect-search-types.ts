@@ -125,6 +125,8 @@ export const GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS = [
   "export_people_csv",
   "add_people_to_list",
   "refresh_people_verification",
+  "refresh_visible_contacts",
+  "refresh_stale_contacts",
   "enqueue_people_call_queue",
 ] as const
 
@@ -406,6 +408,15 @@ export type GrowthProspectSearchPeopleActionRow = {
   call_block_reason?: string | null
   sms_block_reason?: string | null
   compliance_status?: string
+  freshness_status?: string
+  last_verified_at?: string | null
+  discovered_at?: string | null
+  verification_expires_at?: string | null
+  email_verification_depth?: string
+  phone_verification_depth?: string
+  confidence_label?: string
+  confidence_reason?: string
+  stale_warning?: string | null
   company?: GrowthProspectSearchCompanyResult | null
 }
 

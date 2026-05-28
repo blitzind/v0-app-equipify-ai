@@ -3811,6 +3811,57 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   assert.equal(selected.length, 1)
   assert.match(buildProspectSearchPeopleCsv([sampleRow as never]), /Maria Chen/)
   assert.match(buildProspectSearchPeopleCsv([sampleRow as never]), /email_verified/)
+
+  const { resolveProspectSearchContactFreshness, GROWTH_CONTACT_FRESHNESS_QA_MARKER } =
+    await import("../lib/growth/prospect-search/prospect-search-contact-freshness")
+  const {
+    classifyProspectSearchEmailVerificationDepth,
+    GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-contact-verification-depth")
+  const { buildProspectSearchContactConfidenceReasoning } = await import(
+    "../lib/growth/prospect-search/prospect-search-contact-confidence-reasoning"
+  )
+
+  assert.equal(GROWTH_CONTACT_FRESHNESS_QA_MARKER, "growth-contact-freshness-v1")
+  assert.equal(GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER, "growth-contact-verification-depth-v1")
+
+  const fresh = resolveProspectSearchContactFreshness({
+    last_checked_at: new Date().toISOString(),
+  })
+  assert.equal(fresh.freshness_status, "fresh")
+
+  const stale = resolveProspectSearchContactFreshness({
+    last_checked_at: new Date(Date.now() - 100 * 86_400_000).toISOString(),
+    last_verified_at: new Date().toISOString(),
+  })
+  assert.equal(stale.freshness_status, "stale")
+
+  assert.equal(
+    classifyProspectSearchEmailVerificationDepth({
+      email: "info@acme.example",
+      source_page_url: "https://acme.example/contact",
+      source_label: "Website public extract",
+    }),
+    "role_email",
+  )
+
+  const reasoning = buildProspectSearchContactConfidenceReasoning({
+    confidence: 0.82,
+    email: "maria@acme.example",
+    title: "Owner",
+    source_page_url: "https://acme.example/team",
+    email_verification_depth: "published_on_website",
+    freshness_status: "fresh",
+  })
+  assert.equal(reasoning.confidence_label, "high")
+  assert.ok(reasoning.top_reasons.length > 0)
+
+  const drawerSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-contact-evidence-drawer.tsx"),
+    "utf8",
+  )
+  assert.match(drawerSource, /data-contact-freshness-marker/)
+  assert.match(drawerSource, /data-contact-verification-depth-marker/)
 }
 
 void main()

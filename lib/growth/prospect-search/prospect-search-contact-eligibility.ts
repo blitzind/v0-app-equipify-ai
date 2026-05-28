@@ -1,6 +1,9 @@
 /** Unified outreach eligibility engine — client-safe single source of truth. */
 
 import { computeProspectSearchContactOutreachReadiness } from "@/lib/growth/prospect-search/prospect-search-contact-readiness"
+import {
+  freshnessAffectsEligibility,
+} from "@/lib/growth/prospect-search/prospect-search-contact-freshness"
 
 export const GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER =
   "growth-contact-eligibility-engine-v1" as const
@@ -35,6 +38,9 @@ export type ProspectSearchContactEligibilityInput = {
   last_checked_at?: string | null
   source_label?: string | null
   source_page_url?: string | null
+  freshness_status?: import("@/lib/growth/prospect-search/prospect-search-contact-freshness").ProspectSearchContactFreshnessStatus
+  email_verification_depth?: string | null
+  phone_verification_depth?: string | null
 }
 
 export type ProspectSearchContactEligibilityResult = {
@@ -84,6 +90,14 @@ export function resolveContactOutreachEligibility(
     }
   }
 
+  const freshnessStatus = input.freshness_status ?? "unknown"
+  const staleFreshness = freshnessAffectsEligibility(freshnessStatus)
+  if (freshnessStatus === "expired") {
+    evidence.push("Verification expired — refresh required")
+  } else if (freshnessStatus === "stale") {
+    evidence.push("Contact data is stale")
+  }
+
   const readiness = computeProspectSearchContactOutreachReadiness({
     email: input.email,
     phone: input.phone,
@@ -121,6 +135,41 @@ export function resolveContactOutreachEligibility(
         state: "verification_required",
         eligible: false,
         reason: "Email found — verification pending before outreach",
+        evidence,
+        last_checked_at: input.last_checked_at ?? null,
+        source: input.source_label ?? null,
+      }
+    }
+    if (freshnessStatus === "expired") {
+      return {
+        channel: input.channel,
+        state: "verification_required",
+        eligible: false,
+        reason: "Verification expired — refresh before email outreach",
+        evidence,
+        last_checked_at: input.last_checked_at ?? null,
+        source: input.source_label ?? null,
+      }
+    }
+    if (staleFreshness) {
+      const publishedEmail =
+        input.email_verification_depth === "published_on_website" && readiness.email_verified
+      if (publishedEmail) {
+        return {
+          channel: input.channel,
+          state: "eligible",
+          eligible: (input.confidence ?? 0) >= 0.45,
+          reason: "Email published on website — freshness warning, verify before outreach",
+          evidence,
+          last_checked_at: input.last_checked_at ?? null,
+          source: input.source_label ?? null,
+        }
+      }
+      return {
+        channel: input.channel,
+        state: "needs_review",
+        eligible: false,
+        reason: "Stale verified email — operator review required before outreach",
         evidence,
         last_checked_at: input.last_checked_at ?? null,
         source: input.source_label ?? null,
@@ -193,11 +242,51 @@ export function resolveContactOutreachEligibility(
         source: input.source_label ?? null,
       }
     }
+    if (freshnessStatus === "expired") {
+      return {
+        channel: input.channel,
+        state: "verification_required",
+        eligible: false,
+        reason: "Verification expired — refresh before calling",
+        evidence,
+        last_checked_at: input.last_checked_at ?? null,
+        source: input.source_label ?? null,
+      }
+    }
+    if (staleFreshness) {
+      const publishedPhone =
+        input.phone_verification_depth === "published_on_website" && readiness.call_ready
+      if (publishedPhone) {
+        const callEligible = (input.confidence ?? 0) >= 0.45
+        return {
+          channel: input.channel,
+          state: callEligible ? "eligible" : "needs_review",
+          eligible: callEligible,
+          reason:
+            "Call ready — website-published phone; freshness warning, review before dialing",
+          evidence,
+          last_checked_at: input.last_checked_at ?? null,
+          source: input.source_label ?? null,
+        }
+      }
+      if (readiness.call_ready) {
+        return {
+          channel: input.channel,
+          state: "needs_review",
+          eligible: false,
+          reason: "Stale phone record — review before calling",
+          evidence,
+          last_checked_at: input.last_checked_at ?? null,
+          source: input.source_label ?? null,
+        }
+      }
+    }
+    const callEligible = readiness.call_ready && (input.confidence ?? 0) >= 0.45
     return {
       channel: input.channel,
-      state: readiness.call_ready ? "eligible" : "needs_review",
-      eligible: readiness.call_ready && (input.confidence ?? 0) >= 0.45,
-      reason: readiness.call_ready
+      state: callEligible ? "eligible" : "needs_review",
+      eligible: callEligible,
+      reason: callEligible
         ? "Call ready — operator may dial after compliance review"
         : "Office line only — review before calling",
       evidence,

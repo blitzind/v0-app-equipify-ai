@@ -4,6 +4,8 @@ import { Download, ListPlus, Phone, RefreshCw, Users, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER,
+  GROWTH_CONTACT_FRESHNESS_QA_MARKER,
+  GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER,
   GROWTH_PEOPLE_WORKFLOWS_QA_MARKER,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import type { GrowthProspectSearchPeopleResultRow } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
@@ -22,6 +24,8 @@ export function ProspectSearchPeopleBulkActionBar({
   onSaveToList,
   onExport,
   onRefreshVerification,
+  onRefreshVisible,
+  onRefreshStale,
   className,
 }: {
   selectedCount: number
@@ -36,6 +40,8 @@ export function ProspectSearchPeopleBulkActionBar({
   onSaveToList: () => void
   onExport: () => void
   onRefreshVerification: () => void
+  onRefreshVisible?: () => void
+  onRefreshStale?: () => void
   className?: string
 }) {
   if (selectedCount <= 0) return null
@@ -51,6 +57,8 @@ export function ProspectSearchPeopleBulkActionBar({
       )}
       data-qa-marker={GROWTH_PEOPLE_WORKFLOWS_QA_MARKER}
       data-contact-eligibility-marker={GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER}
+      data-contact-freshness-marker={GROWTH_CONTACT_FRESHNESS_QA_MARKER}
+      data-contact-verification-depth-marker={GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER}
     >
       <div className="min-w-0 space-y-1">
         <p className="text-sm font-semibold text-cyan-950">
@@ -95,8 +103,18 @@ export function ProspectSearchPeopleBulkActionBar({
         </Button>
         <Button size="sm" variant="ghost" disabled={busy} onClick={onRefreshVerification}>
           <RefreshCw className="mr-1 size-3.5" />
-          Refresh verification
+          Refresh selected
         </Button>
+        {onRefreshVisible ? (
+          <Button size="sm" variant="ghost" disabled={busy} onClick={onRefreshVisible}>
+            Refresh visible
+          </Button>
+        ) : null}
+        {onRefreshStale ? (
+          <Button size="sm" variant="ghost" disabled={busy} onClick={onRefreshStale}>
+            Refresh stale
+          </Button>
+        ) : null}
       </div>
     </div>
   )

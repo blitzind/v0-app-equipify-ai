@@ -49,6 +49,10 @@ export function companyContactToContactInput(
       (typeof contact.metadata.last_checked_at === "string" ? contact.metadata.last_checked_at : null) ??
       contact.updated_at,
     verification_status: resolveCompanyContactVerificationStatus(contact),
+    discovered_at: contact.created_at,
+    last_verified_at: contact.last_verified_at,
+    email_status: contact.email_status,
+    phone_status: contact.phone_status,
     discovery_sources: [
       "website_public_extract",
       contact.source_type,

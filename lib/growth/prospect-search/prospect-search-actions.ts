@@ -9,6 +9,7 @@ import {
   personResultToListMember,
 } from "@/lib/growth/prospect-search/list-management"
 import { runContactDiscoveryForCompany } from "@/lib/growth/contact-discovery/contact-repository"
+import { logProspectSearchContactRefresh } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import {
   buildProspectSearchPeopleCsv,
   logProspectSearchPeopleExport,
@@ -53,6 +54,65 @@ import type {
   GrowthProspectSearchPersonResult,
   GrowthProspectSearchResultAction,
 } from "@/lib/growth/prospect-search/prospect-search-types"
+
+async function executeProspectSearchContactRefresh(
+  admin: SupabaseClient,
+  input: {
+    action: GrowthProspectSearchResultAction
+    userId?: string | null
+    people?: GrowthProspectSearchPeopleActionRow[]
+  },
+  scope: "selected" | "visible" | "stale",
+): Promise<GrowthProspectSearchActionResult> {
+  const { action } = input
+  let people = input.people ?? []
+  if (scope === "stale") {
+    people = people.filter(
+      (row) => row.freshness_status === "stale" || row.freshness_status === "expired",
+    )
+  }
+  if (people.length === 0) {
+    return {
+      ok: false,
+      action,
+      message:
+        scope === "stale"
+          ? "No stale or expired contacts in selection."
+          : "Select contacts to refresh verification.",
+    }
+  }
+
+  const companyIds = [...new Set(people.map((row) => row.company_id))]
+  let refreshed = 0
+  let failed = 0
+  for (const companyId of companyIds) {
+    try {
+      await runContactDiscoveryForCompany(admin, {
+        company_candidate_id: companyId,
+        created_by: input.userId ?? null,
+      })
+      refreshed += 1
+    } catch {
+      failed += 1
+    }
+  }
+
+  logProspectSearchContactRefresh({
+    userId: input.userId,
+    scope,
+    count: people.length,
+    company_ids: companyIds,
+  })
+
+  return {
+    ok: failed === 0,
+    action,
+    message:
+      failed > 0
+        ? `Refreshed ${refreshed} compan${refreshed === 1 ? "y" : "ies"}; ${failed} failed.`
+        : `Verification refresh completed for ${people.length} contact${people.length === 1 ? "" : "s"} across ${refreshed} compan${refreshed === 1 ? "y" : "ies"}.`,
+  }
+}
 
 export async function executeProspectSearchAction(
   admin: SupabaseClient,
@@ -142,34 +202,15 @@ export async function executeProspectSearchAction(
   }
 
   if (action === "refresh_people_verification") {
-    const people = input.people ?? []
-    if (people.length === 0) {
-      return { ok: false, action, message: "Select contacts to refresh verification." }
-    }
+    return executeProspectSearchContactRefresh(admin, input, "selected")
+  }
 
-    const companyIds = [...new Set(people.map((row) => row.company_id))]
-    let refreshed = 0
-    let failed = 0
-    for (const companyId of companyIds) {
-      try {
-        await runContactDiscoveryForCompany(admin, {
-          company_candidate_id: companyId,
-          created_by: input.userId ?? null,
-        })
-        refreshed += 1
-      } catch {
-        failed += 1
-      }
-    }
+  if (action === "refresh_visible_contacts") {
+    return executeProspectSearchContactRefresh(admin, input, "visible")
+  }
 
-    return {
-      ok: failed === 0,
-      action,
-      message:
-        failed > 0
-          ? `Refreshed ${refreshed} compan${refreshed === 1 ? "y" : "ies"}; ${failed} failed.`
-          : `Verification refresh queued for ${refreshed} compan${refreshed === 1 ? "y" : "ies"}.`,
-    }
+  if (action === "refresh_stale_contacts") {
+    return executeProspectSearchContactRefresh(admin, input, "stale")
   }
 
   if (action === "enqueue_people_call_queue") {

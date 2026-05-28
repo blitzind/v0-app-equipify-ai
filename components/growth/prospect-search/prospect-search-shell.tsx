@@ -117,6 +117,8 @@ import {
   GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER,
   GROWTH_PEOPLE_WORKFLOWS_QA_MARKER,
   GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER,
+  GROWTH_CONTACT_FRESHNESS_QA_MARKER,
+  GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER,
   logProspectSearchContactDiscoveryIssue,
   mergeProspectSearchPeopleResults,
   resolveDefaultProspectSearchResultMode,
@@ -173,6 +175,15 @@ function serializeProspectSearchPeopleActionRows(
     call_block_reason: row.call_block_reason,
     sms_block_reason: row.sms_block_reason,
     compliance_status: row.compliance_status,
+    freshness_status: row.freshness_status,
+    last_verified_at: row.last_verified_at,
+    discovered_at: row.discovered_at,
+    verification_expires_at: row.verification_expires_at,
+    email_verification_depth: row.email_verification_depth,
+    phone_verification_depth: row.phone_verification_depth,
+    confidence_label: row.confidence_label,
+    confidence_reason: row.confidence_reason,
+    stale_warning: row.stale_warning,
     company: row.company,
   }))
 }
@@ -992,9 +1003,15 @@ function ProspectSearchShellInner() {
           json.ok &&
           (action === "add_people_to_list" ||
             action === "refresh_people_verification" ||
+            action === "refresh_visible_contacts" ||
+            action === "refresh_stale_contacts" ||
             action === "enqueue_people_call_queue")
         ) {
-          if (action === "refresh_people_verification") {
+          if (
+            action === "refresh_people_verification" ||
+            action === "refresh_visible_contacts" ||
+            action === "refresh_stale_contacts"
+          ) {
             await refreshContactDiscoveryResults()
           }
           if (action === "add_people_to_list") {
@@ -1267,6 +1284,8 @@ function ProspectSearchShellInner() {
       data-runtime-stable-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER}
       data-people-workflows-marker={GROWTH_PEOPLE_WORKFLOWS_QA_MARKER}
       data-contact-eligibility-marker={GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER}
+      data-contact-freshness-marker={GROWTH_CONTACT_FRESHNESS_QA_MARKER}
+      data-contact-verification-depth-marker={GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER}
       data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
       data-contact-discovery-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}
       data-website-contact-provider-marker={GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER}
@@ -1553,6 +1572,12 @@ function ProspectSearchShellInner() {
                   onExport={() => void runPeopleAction("export_people_csv", selectedPeopleRows)}
                   onRefreshVerification={() =>
                     void runPeopleAction("refresh_people_verification", selectedPeopleRows)
+                  }
+                  onRefreshVisible={() =>
+                    void runPeopleAction("refresh_visible_contacts", peopleRows)
+                  }
+                  onRefreshStale={() =>
+                    void runPeopleAction("refresh_stale_contacts", selectedPeopleRows)
                   }
                 />
               ) : (

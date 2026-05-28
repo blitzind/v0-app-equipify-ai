@@ -5,9 +5,19 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER,
+  GROWTH_CONTACT_FRESHNESS_QA_MARKER,
+  GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER,
   GROWTH_PEOPLE_WORKFLOWS_QA_MARKER,
   type GrowthProspectSearchPeopleResultRow,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
+import { formatProspectSearchFreshnessLabel } from "@/lib/growth/prospect-search/prospect-search-contact-freshness"
+
+function eligibilityBadgeVariant(state: string): "default" | "outline" | "destructive" | "secondary" {
+  if (state === "eligible") return "default"
+  if (state === "suppressed" || state === "blocked") return "destructive"
+  if (state === "unsupported") return "secondary"
+  return "outline"
+}
 
 export function ProspectSearchContactEvidenceDrawer({
   row,
@@ -27,6 +37,8 @@ export function ProspectSearchContactEvidenceDrawer({
       className="fixed inset-0 z-50 flex justify-end bg-black/30"
       data-qa-marker={GROWTH_PEOPLE_WORKFLOWS_QA_MARKER}
       data-contact-eligibility-marker={GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER}
+      data-contact-freshness-marker={GROWTH_CONTACT_FRESHNESS_QA_MARKER}
+      data-contact-verification-depth-marker={GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER}
       onClick={onClose}
     >
       <div
@@ -45,22 +57,87 @@ export function ProspectSearchContactEvidenceDrawer({
           </Button>
         </div>
 
+        {row.stale_warning ? (
+          <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+            {row.stale_warning}
+          </p>
+        ) : null}
+
         <div className="mt-4 space-y-4 text-xs">
+          <section>
+            <h4 className="font-medium text-foreground">Freshness</h4>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Badge variant="outline">
+                {formatProspectSearchFreshnessLabel(row.freshness_status)}
+              </Badge>
+              {row.last_checked_at ? (
+                <Badge variant="secondary">
+                  Checked {new Date(row.last_checked_at).toLocaleDateString()}
+                </Badge>
+              ) : null}
+            </div>
+            <ul className="mt-2 space-y-1 text-muted-foreground">
+              {row.discovered_at ? <li>Discovered {new Date(row.discovered_at).toLocaleString()}</li> : null}
+              {row.last_verified_at ? (
+                <li>Last verified {new Date(row.last_verified_at).toLocaleString()}</li>
+              ) : null}
+              {row.verification_expires_at ? (
+                <li>Verification expires {new Date(row.verification_expires_at).toLocaleDateString()}</li>
+              ) : null}
+            </ul>
+          </section>
+
+          <section>
+            <h4 className="font-medium text-foreground">Verification depth</h4>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Badge variant="outline">
+                Email: {(row.email_verification_depth ?? "unknown").replace(/_/g, " ")}
+              </Badge>
+              <Badge variant="outline">
+                Phone: {(row.phone_verification_depth ?? "unknown").replace(/_/g, " ")}
+              </Badge>
+            </div>
+          </section>
+
           <section>
             <h4 className="font-medium text-foreground">Outreach eligibility</h4>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Badge variant="outline">Email: {row.email_eligibility.replace(/_/g, " ")}</Badge>
-              <Badge variant="outline">Call: {row.call_eligibility.replace(/_/g, " ")}</Badge>
-              <Badge variant="outline">SMS: {row.sms_eligibility.replace(/_/g, " ")}</Badge>
+              <Badge variant={eligibilityBadgeVariant(row.email_eligibility)}>
+                Email: {row.email_eligibility.replace(/_/g, " ")}
+              </Badge>
+              <Badge variant={eligibilityBadgeVariant(row.call_eligibility)}>
+                Call: {row.call_eligibility.replace(/_/g, " ")}
+              </Badge>
+              <Badge variant={eligibilityBadgeVariant(row.sms_eligibility)}>
+                SMS: {row.sms_eligibility.replace(/_/g, " ")}
+              </Badge>
             </div>
-            {row.call_block_reason ? (
-              <p className="mt-2 text-muted-foreground">Call block: {row.call_block_reason}</p>
+            <ul className="mt-2 space-y-1 text-muted-foreground">
+              <li>Email: {row.email ?? row.email_reason ?? "Not on file"}</li>
+              <li>Phone: {row.phone ?? row.phone_reason ?? "Not on file"}</li>
+              {row.call_block_reason ? <li>Call block: {row.call_block_reason}</li> : null}
+              {row.sms_block_reason ? <li>SMS block: {row.sms_block_reason}</li> : null}
+              {row.phone_on_dnc === true ? <li className="text-red-700">Matched voice DNC registry</li> : null}
+            </ul>
+          </section>
+
+          <section>
+            <h4 className="font-medium text-foreground">Confidence reasoning</h4>
+            <p className="mt-2 font-medium capitalize">{row.confidence_label} confidence</p>
+            <p className="mt-1 text-muted-foreground">{row.confidence_reason}</p>
+            {row.confidence_top_reasons.length > 0 ? (
+              <ul className="mt-2 list-disc space-y-1 pl-4 text-muted-foreground">
+                {row.confidence_top_reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
             ) : null}
-            {row.sms_block_reason ? (
-              <p className="mt-1 text-muted-foreground">SMS block: {row.sms_block_reason}</p>
-            ) : null}
-            {row.phone_on_dnc === true ? (
-              <p className="mt-1 text-red-700">Matched voice DNC registry</p>
+            {row.confidence_risk_notes.length > 0 ? (
+              <ul className="mt-2 space-y-1 text-amber-900">
+                {row.confidence_risk_notes.map((note) => (
+                  <li key={note}>Risk: {note}</li>
+                ))}
+              </ul>
             ) : null}
           </section>
 
@@ -112,22 +189,9 @@ export function ProspectSearchContactEvidenceDrawer({
             </ul>
           </section>
 
-          <section>
-            <h4 className="font-medium text-foreground">Confidence reasoning</h4>
-            <p className="mt-2 text-muted-foreground">
-              Confidence {Math.round(row.confidence * 100)}% · verification{" "}
-              {row.verification_status.replace(/_/g, " ")}
-            </p>
-            {row.company.contact_intelligence?.confidence_explanation?.reasoning.map((line) => (
-              <p key={line} className="mt-1 text-muted-foreground">
-                {line}
-              </p>
-            ))}
-          </section>
-
           {onRerunDiscovery ? (
             <Button type="button" size="sm" variant="outline" onClick={() => onRerunDiscovery(row)}>
-              Re-run discovery for company
+              Refresh company contacts
             </Button>
           ) : null}
         </div>

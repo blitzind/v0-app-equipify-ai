@@ -6,11 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER,
+  GROWTH_CONTACT_FRESHNESS_QA_MARKER,
+  GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER,
   GROWTH_PEOPLE_HYDRATION_QA_MARKER,
   GROWTH_PEOPLE_WORKFLOWS_QA_MARKER,
   GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER,
   type GrowthProspectSearchPeopleResultRow,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
+import { formatProspectSearchFreshnessLabel } from "@/lib/growth/prospect-search/prospect-search-contact-freshness"
 import { prospectSearchPeopleSelectionKey } from "@/lib/growth/prospect-search/prospect-search-people-selection"
 import { cn } from "@/lib/utils"
 
@@ -18,6 +21,15 @@ function eligibilityBadgeVariant(state: string): "default" | "outline" | "destru
   if (state === "eligible") return "default"
   if (state === "suppressed" || state === "blocked") return "destructive"
   if (state === "unsupported") return "secondary"
+  return "outline"
+}
+
+function freshnessBadgeVariant(
+  status: string,
+): "default" | "outline" | "destructive" | "secondary" {
+  if (status === "fresh") return "default"
+  if (status === "expired" || status === "stale") return "destructive"
+  if (status === "aging") return "secondary"
   return "outline"
 }
 
@@ -75,6 +87,8 @@ export function ProspectSearchDiscoverPeopleTable({
       data-people-hydration-marker={GROWTH_PEOPLE_HYDRATION_QA_MARKER}
       data-people-workflows-marker={GROWTH_PEOPLE_WORKFLOWS_QA_MARKER}
       data-contact-eligibility-marker={GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER}
+      data-contact-freshness-marker={GROWTH_CONTACT_FRESHNESS_QA_MARKER}
+      data-contact-verification-depth-marker={GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER}
       data-result-mode="people"
     >
       <table className="w-full min-w-[1280px] text-left text-xs">
@@ -98,6 +112,7 @@ export function ProspectSearchDiscoverPeopleTable({
             <th className="px-3 py-2">Email</th>
             <th className="px-3 py-2">Phone</th>
             <th className="px-3 py-2">Source</th>
+            <th className="px-3 py-2">Freshness</th>
             <th className="px-3 py-2">Eligibility</th>
             <th className="px-3 py-2">Actions</th>
           </tr>
@@ -132,16 +147,22 @@ export function ProspectSearchDiscoverPeopleTable({
                     {row.full_name ?? "—"}
                   </button>
                   <p className="mt-0.5 text-[10px] text-muted-foreground">
-                    {Math.round(row.confidence * 100)}% confidence
+                    {row.confidence_label ?? "moderate"} · {Math.round(row.confidence * 100)}%
                   </p>
                 </td>
                 <td className="px-3 py-2">{row.company_name}</td>
                 <td className="px-3 py-2">{row.title ?? row.role ?? "—"}</td>
                 <td className="px-3 py-2">
-                  <div>{row.email ?? row.email_reason ?? "No verified email yet"}</div>
+                  <div>{row.email ?? "—"}</div>
+                  {!row.email?.trim() && row.email_reason ? (
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">{row.email_reason}</p>
+                  ) : null}
                 </td>
                 <td className="px-3 py-2">
-                  <div>{row.phone ?? row.phone_reason ?? "Phone unavailable from current sources"}</div>
+                  <div>{row.phone ?? "—"}</div>
+                  {!row.phone?.trim() && row.phone_reason ? (
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">{row.phone_reason}</p>
+                  ) : null}
                 </td>
                 <td className="px-3 py-2">
                   <div className="max-w-[180px] truncate" title={row.source_label ?? undefined}>
@@ -151,6 +172,14 @@ export function ProspectSearchDiscoverPeopleTable({
                     <p className="mt-0.5 text-[10px] text-muted-foreground">
                       Checked {new Date(row.last_checked_at).toLocaleDateString()}
                     </p>
+                  ) : null}
+                </td>
+                <td className="px-3 py-2">
+                  <Badge variant={freshnessBadgeVariant(row.freshness_status)} className="text-[10px]">
+                    {formatProspectSearchFreshnessLabel(row.freshness_status)}
+                  </Badge>
+                  {row.stale_warning ? (
+                    <p className="mt-1 text-[10px] text-amber-800">{row.stale_warning}</p>
                   ) : null}
                 </td>
                 <td className="px-3 py-2">

@@ -30,6 +30,13 @@ export type ProspectSearchContactOverlay = {
   source_label?: string | null
   phone_on_dnc?: boolean | null
   email_suppressed?: boolean
+  discovered_at?: string | null
+  last_verified_at?: string | null
+  source_last_seen_at?: string | null
+  verification_expires_at?: string | null
+  freshness_status?: string | null
+  email_verification_depth?: string | null
+  phone_verification_depth?: string | null
 }
 
 export type ProspectSearchCommitteeRoleMapping = {
@@ -88,4 +95,6 @@ export type ProspectSearchLeadEngineContactHandoffContext = {
   compliance_status: "ready" | "suppressed" | "review_required"
   outreach_ready: boolean
   contact_research_required_message: string | null
+  freshness_status?: string | null
+  confidence_reason?: string | null
 }
