@@ -260,7 +260,7 @@ function ProspectSearchShellInner() {
   const heroSearchButtonLabel =
     discoveryMode === "discover_external" ? "Search market" : "Search"
   const applyButtonLabel =
-    discoveryMode === "discover_external" ? "Apply filters" : "Search"
+    discoveryMode === "discover_external" ? "Search market" : "Search"
   const searchButtonDisabled = loading
   const applyButtonDisabled = loading
 
@@ -990,15 +990,6 @@ function ProspectSearchShellInner() {
           filters={filters}
           onChange={updateFilters}
           onApply={() => {
-            if (discoveryModeRef.current === "discover_external") {
-              setPendingProviderSearchHint(
-                resolveProspectSearchExternalPendingMessage(
-                  "filters_updated",
-                  discoveryModeRef.current,
-                ),
-              )
-              return
-            }
             void runSearch({
               queryText: queryRef.current,
               filters: filtersRef.current,

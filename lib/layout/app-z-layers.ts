@@ -18,6 +18,9 @@ export const APP_Z_DRAWER = "z-[100]" as const
 /** Growth sidebar section flyout navigation (desktop hover menus). */
 export const APP_Z_GROWTH_NAV_FLYOUT = "z-[120]" as const
 
+/** Prospect Search filter autocomplete / suggestion panels (portaled above filter rail scroll). */
+export const APP_Z_FILTER_SUGGESTION = "z-[115]" as const
+
 /** Modal dialogs and Radix overlays above flyouts. */
 export const APP_Z_DIALOG = "z-[150]" as const
 

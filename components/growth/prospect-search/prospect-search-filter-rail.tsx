@@ -7,6 +7,7 @@ import { SavedSearchWorkflowSidebar } from "@/components/growth/prospect-search/
 import type { GrowthProspectSearchFilters } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthProspectSearchSavedSearchWithWorkflow } from "@/lib/growth/prospect-search/saved-search-workflows"
 import { GROWTH_PROSPECT_SEARCH_LAYOUT_V2_QA_MARKER } from "@/components/growth/prospect-search/prospect-search-ux-constants"
+import { GROWTH_PROSPECT_SEARCH_FILTER_UX_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-filter-ux"
 
 export function ProspectSearchFilterRail({
   filters,
@@ -47,6 +48,7 @@ export function ProspectSearchFilterRail({
     <aside
       className="flex w-full shrink-0 flex-col rounded-2xl border border-border bg-card shadow-sm lg:sticky lg:top-4 lg:w-[340px] lg:max-h-[calc(100vh-8rem)] lg:overflow-hidden"
       data-qa-marker={GROWTH_PROSPECT_SEARCH_LAYOUT_V2_QA_MARKER}
+      data-filter-ux-qa-marker={GROWTH_PROSPECT_SEARCH_FILTER_UX_QA_MARKER}
     >
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <Filter className="size-4 text-violet-600" />

@@ -7,6 +7,13 @@ import { TitleTargetingCard } from "@/components/growth/prospect-search/title-ta
 import { TerritoryFilterCard } from "@/components/growth/prospect-search/territory-filter-card"
 import { GROWTH_SEARCH_FILTERS_COLLAPSED_DEFAULT_QA_MARKER } from "@/components/growth/prospect-search/prospect-search-ux-constants"
 import {
+  allProspectSearchFilterSectionsCollapsed,
+  allProspectSearchFilterSectionsExpanded,
+  GROWTH_PROSPECT_SEARCH_FILTER_UX_QA_MARKER,
+  PROSPECT_SEARCH_FILTER_ACCORDION_SECTIONS,
+  safeProspectSearchFilterAccordionSections,
+} from "@/lib/growth/prospect-search/prospect-search-filter-ux"
+import {
   PROSPECT_SEARCH_BUYING_STAGE_UI,
   PROSPECT_SEARCH_CONFIDENCE_PRESETS,
   PROSPECT_SEARCH_EMPLOYEE_BANDS_UI,
@@ -133,9 +140,22 @@ export function GuidedIcpBuilder({
   }
 
   const [expandedSections, setExpandedSections] = useState<string[]>([])
+  const allSectionsExpanded = allProspectSearchFilterSectionsExpanded(expandedSections)
+  const allSectionsCollapsed = allProspectSearchFilterSectionsCollapsed(expandedSections)
+
+  function expandAllFilterSections() {
+    setExpandedSections([...PROSPECT_SEARCH_FILTER_ACCORDION_SECTIONS])
+  }
+
+  function collapseAllFilterSections() {
+    setExpandedSections([])
+  }
 
   return (
-    <div className={cn("space-y-3", isRail ? "" : "space-y-4")}>
+    <div
+      className={cn("space-y-3", isRail ? "" : "space-y-4")}
+      data-filter-ux-qa-marker={GROWTH_PROSPECT_SEARCH_FILTER_UX_QA_MARKER}
+    >
       {!isRail ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -152,20 +172,48 @@ export function GuidedIcpBuilder({
             estimationSlot={estimationSlot}
           />
         </div>
-      ) : (
-        <FilterActions
-          onClear={onClear}
-          onApply={applyFilters}
-          applyLabel={applyLabel}
-          applyDisabled={applyDisabled}
-          estimationSlot={estimationSlot}
-        />
-      )}
+      ) : null}
+
+      {isRail && estimationSlot ? <div className="min-w-0">{estimationSlot}</div> : null}
+
+      <div className="flex items-center justify-end gap-1.5 text-xs">
+        <button
+          type="button"
+          onClick={expandAllFilterSections}
+          className={cn(
+            "rounded px-2 py-1 transition-colors",
+            allSectionsExpanded
+              ? "font-semibold text-primary"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+          aria-label="Expand all filter categories"
+        >
+          Expand all
+        </button>
+        <span className="text-muted-foreground/60" aria-hidden>
+          ·
+        </span>
+        <button
+          type="button"
+          onClick={collapseAllFilterSections}
+          className={cn(
+            "rounded px-2 py-1 transition-colors",
+            allSectionsCollapsed
+              ? "font-semibold text-primary"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+          aria-label="Collapse all filter categories"
+        >
+          Collapse all
+        </button>
+      </div>
 
       <Accordion
         type="multiple"
         value={expandedSections}
-        onValueChange={setExpandedSections}
+        onValueChange={(next) =>
+          setExpandedSections(safeProspectSearchFilterAccordionSections(next))
+        }
         className={cn(isRail && "rounded-lg border border-border/60 bg-muted/10 px-1")}
         data-qa-marker={GROWTH_SEARCH_FILTERS_COLLAPSED_DEFAULT_QA_MARKER}
       >
@@ -486,7 +534,15 @@ export function GuidedIcpBuilder({
         </AccordionItem>
       </Accordion>
 
-      {isRail ? <FilterActions onClear={onClear} onApply={applyFilters} className="pt-1" /> : null}
+      {isRail ? (
+        <FilterActions
+          onClear={onClear}
+          onApply={applyFilters}
+          applyLabel={applyLabel}
+          applyDisabled={applyDisabled}
+          className="pt-1"
+        />
+      ) : null}
     </div>
   )
 }

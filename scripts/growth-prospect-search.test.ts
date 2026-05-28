@@ -2513,6 +2513,8 @@ async function main(): Promise<void> {
 
   await testProspectSearchPresearchMarketEstimation()
 
+  await testProspectSearchFilterUx()
+
   console.log("growth-prospect-search: all checks passed")
 }
 
@@ -2671,8 +2673,12 @@ async function testProspectSearchProviderIntent(): Promise<void> {
   assert.match(shellSource, /searchCompleted/)
   assert.match(shellSource, /ProspectSearchDiscoverReadyPanel/)
   assert.match(shellSource, /GROWTH_DISCOVER_READY_TO_SEARCH_QA_MARKER/)
-  assert.match(shellSource, /Apply filters/)
   assert.match(shellSource, /Search market/)
+  assert.match(shellSource, /trigger: "explicit_operator_search"/)
+  assert.doesNotMatch(
+    shellSource,
+    /discoveryModeRef\.current === "discover_external"[\s\S]*?return[\s\S]*?void runSearch/,
+  )
   assert.match(shellSource, /clearAllFilters/)
   assert.match(shellSource, /resetExecutionState/)
   assert.match(shellSource, /setQuery\(""\)/)
@@ -3412,5 +3418,61 @@ const errorBoundarySource = fs.readFileSync(
 )
 assert.match(errorBoundarySource, /errorMessage/)
 assert.doesNotMatch(errorBoundarySource, /ReferenceError: panel render failed/)
+
+async function testProspectSearchFilterUx(): Promise<void> {
+  const {
+    GROWTH_PROSPECT_SEARCH_FILTER_UX_QA_MARKER,
+    PROSPECT_SEARCH_FILTER_ACCORDION_SECTIONS,
+    allProspectSearchFilterSectionsCollapsed,
+    allProspectSearchFilterSectionsExpanded,
+    safeProspectSearchFilterAccordionSections,
+  } = await import("../lib/growth/prospect-search/prospect-search-filter-ux")
+
+  assert.equal(GROWTH_PROSPECT_SEARCH_FILTER_UX_QA_MARKER, "growth-prospect-search-filter-ux-v1")
+  assert.equal(PROSPECT_SEARCH_FILTER_ACCORDION_SECTIONS.length, 10)
+  assert.equal(allProspectSearchFilterSectionsExpanded([...PROSPECT_SEARCH_FILTER_ACCORDION_SECTIONS]), true)
+  assert.equal(allProspectSearchFilterSectionsCollapsed([]), true)
+  assert.deepEqual(
+    safeProspectSearchFilterAccordionSections(["industry", "bogus", "location"]),
+    ["industry", "location"],
+  )
+  assert.deepEqual(safeProspectSearchFilterAccordionSections(null), [])
+
+  const filterRailSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-filter-rail.tsx"),
+    "utf8",
+  )
+  assert.match(filterRailSource, /data-filter-ux-qa-marker=\{GROWTH_PROSPECT_SEARCH_FILTER_UX_QA_MARKER\}/)
+
+  const icpBuilderSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/guided-icp-builder.tsx"),
+    "utf8",
+  )
+  assert.match(icpBuilderSource, /Expand all/)
+  assert.match(icpBuilderSource, /Collapse all/)
+  assert.match(icpBuilderSource, /expandAllFilterSections/)
+  assert.match(icpBuilderSource, /safeProspectSearchFilterAccordionSections/)
+  assert.match(icpBuilderSource, /applyLabel={applyLabel}/)
+
+  const smartFilterSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/smart-filter-input.tsx"),
+    "utf8",
+  )
+  assert.match(smartFilterSource, /createPortal/)
+  assert.match(smartFilterSource, /APP_Z_FILTER_SUGGESTION/)
+  assert.match(smartFilterSource, /logProspectSearchFilterUxIssue/)
+
+  const zLayersSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/layout/app-z-layers.ts"),
+    "utf8",
+  )
+  assert.match(zLayersSource, /APP_Z_FILTER_SUGGESTION/)
+
+  const shellSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-shell.tsx"),
+    "utf8",
+  )
+  assert.match(shellSource, /applyButtonLabel[\s\S]*Search market/)
+}
 
 void main()
