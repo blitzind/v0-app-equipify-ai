@@ -1,7 +1,6 @@
 "use client"
 
 import { ShieldAlert } from "lucide-react"
-import Link from "next/link"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import { GrowthReputationProtectionDashboardView } from "@/components/growth/growth-reputation-protection-dashboard"
@@ -11,8 +10,9 @@ import {
   usePlatformAdminHeaderIdentity,
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
-import { Button } from "@/components/ui/button"
+import { GrowthDeliverabilityIaNav } from "@/components/growth/growth-deliverability-ia-nav"
 import { GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_QA_MARKER } from "@/lib/growth/deliverability/reputation-protection-types"
+import { GROWTH_OPERATOR_UX_H3_QA_MARKER } from "@/lib/growth/operator-ux/operator-ux-h3-types"
 
 export default function AdminGrowthDeliverabilityProtectionPage() {
   const { sessionIdentity } = useAdmin()
@@ -27,6 +27,7 @@ export default function AdminGrowthDeliverabilityProtectionPage() {
       <div
         className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8"
         data-qa-marker={GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_QA_MARKER}
+        data-h3-qa={GROWTH_OPERATOR_UX_H3_QA_MARKER}
       >
         <PlatformAdminTabNav activeKey="growth_leads" />
 
@@ -37,24 +38,15 @@ export default function AdminGrowthDeliverabilityProtectionPage() {
                 <ShieldAlert size={17} />
               </span>
               <div>
-                <h1 className={PAGE_STANDARD_PAGE_TITLE}>Deliverability Protection</h1>
+                <h1 className={PAGE_STANDARD_PAGE_TITLE}>Protection</h1>
                 <p className="text-sm text-muted-foreground">
-                  Operational enforcement: mailbox reputation, send throttles, persistent pause state, and auditable
-                  governance. Snapshot rollup runs daily via cron.
+                  Sender health, reputation enforcement, throttles, and persistent pause state — daily operator surface.
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" asChild>
-                <Link href="/admin/growth/infrastructure/mailboxes">Mailbox connections</Link>
-              </Button>
-              <Button type="button" variant="outline" size="sm" asChild>
-                <Link href="/admin/growth/infrastructure/deliverability">Deliverability Infrastructure</Link>
-              </Button>
-              <Button type="button" variant="outline" size="sm" asChild>
-                <Link href="/admin/growth/providers/deliverability-ops">Deliverability Operations</Link>
-              </Button>
-            </div>
+          </div>
+          <div className="mt-4">
+            <GrowthDeliverabilityIaNav active="protection" />
           </div>
         </section>
 

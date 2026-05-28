@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { AlertTriangle, Loader2, RefreshCw, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthOperatorDiagnosticsDisclosure } from "@/components/growth/growth-operator-diagnostics-disclosure"
 import {
   GROWTH_DELIVERABILITY_GOVERNANCE_QA_MARKER,
   GROWTH_DELIVERABILITY_H1_HARDENING_QA_MARKER,
@@ -110,8 +111,7 @@ export function GrowthReputationProtectionDashboardView() {
         <div className="max-w-3xl space-y-1">
           <p className="text-sm text-muted-foreground">{GROWTH_REPUTATION_PROTECTION_PRIVACY_NOTE}</p>
           <p className="text-xs text-muted-foreground">
-            Operational enforcement and sender health. DNS setup lives under Deliverability Infrastructure; telemetry
-            under Deliverability Operations.
+            Operational enforcement and sender health. DNS setup lives under DNS &amp; Setup; telemetry under Deliverability Ops.
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
@@ -211,6 +211,10 @@ export function GrowthReputationProtectionDashboardView() {
         </GrowthEngineCard>
       ) : null}
 
+      <GrowthOperatorDiagnosticsDisclosure
+        title="Advanced diagnostics"
+        description="Trend analysis, full mailbox health table, and governance timeline."
+      >
       <div className="grid gap-4 lg:grid-cols-3">
         <GrowthEngineCard title="Bounce trends">
           <div className="space-y-2">
@@ -350,6 +354,7 @@ export function GrowthReputationProtectionDashboardView() {
           </div>
         )}
       </GrowthEngineCard>
+      </GrowthOperatorDiagnosticsDisclosure>
     </div>
   )
 }

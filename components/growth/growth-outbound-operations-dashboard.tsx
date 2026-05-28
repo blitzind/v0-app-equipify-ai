@@ -12,6 +12,8 @@ import {
 import type { GrowthOutboundOperationsDashboard } from "@/lib/growth/operations/outbound-operations-dashboard"
 import { GROWTH_OUTBOUND_RELIABILITY_H2_QA_MARKER } from "@/lib/growth/outbound/outbound-reliability-types"
 import { GROWTH_CRON_TELEMETRY_QA_MARKER } from "@/lib/growth/runtime/cron-telemetry-types"
+import { GrowthOperatorDiagnosticsDisclosure } from "@/components/growth/growth-operator-diagnostics-disclosure"
+import { GROWTH_OPERATOR_UX_H3_QA_MARKER } from "@/lib/growth/operator-ux/operator-ux-h3-types"
 
 function formatDate(value: string | null): string {
   if (!value) return "—"
@@ -80,25 +82,25 @@ export function GrowthOutboundOperationsDashboard() {
       className="flex flex-col gap-5"
       data-qa-marker={GROWTH_CRON_TELEMETRY_QA_MARKER}
       data-h2-qa={dashboard.h2_qa_marker}
+      data-h3-qa={GROWTH_OPERATOR_UX_H3_QA_MARKER}
     >
-      <GrowthInfrastructureReadinessBanner
-        title="Transport send plane"
-        readiness={transportReadiness}
-      />
-
-      {dashboard.runtime.violations.length > 0 ? (
-        <div className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-950">
-          <div className="flex items-center gap-2 font-semibold">
-            <AlertTriangle className="size-4" />
-            Production runtime guard violations
-          </div>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
-            {dashboard.runtime.violations.map((v) => (
-              <li key={v.code}>{v.message}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" size="sm" asChild>
+          <Link href="/admin/growth/outreach/approval">Outreach approvals ({dashboard.approvals.outreach_pending_approval})</Link>
+        </Button>
+        <Button type="button" variant="outline" size="sm" asChild>
+          <Link href="/admin/growth/sequences/execution">Sequence approvals ({dashboard.approvals.sequence_pending_approval})</Link>
+        </Button>
+        <Button type="button" variant="outline" size="sm" asChild>
+          <Link href="/admin/growth/copilot/personalization">AI personalization</Link>
+        </Button>
+        <Button type="button" variant="outline" size="sm" asChild>
+          <Link href="/admin/growth/copilot/reply-drafts">Reply drafts</Link>
+        </Button>
+        <Button type="button" variant="outline" size="sm" asChild>
+          <Link href="/admin/growth/deliverability">Protection</Link>
+        </Button>
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="Outreach pending approval" value={String(dashboard.approvals.outreach_pending_approval)} />
@@ -107,34 +109,71 @@ export function GrowthOutboundOperationsDashboard() {
         <StatTile label="Suppression blocks (24h)" value={String(dashboard.suppression.pre_send_blocks_24h)} />
       </div>
 
-      <GrowthEngineCard title="Cron execution health" icon={<Activity size={16} />}>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-xs">
-            <thead>
-              <tr className="border-b text-muted-foreground">
-                <th className="py-2 pr-3 font-medium">Route</th>
-                <th className="py-2 pr-3 font-medium">Registered</th>
-                <th className="py-2 pr-3 font-medium">Last success</th>
-                <th className="py-2 pr-3 font-medium">Failures 24h</th>
-                <th className="py-2 font-medium">Duration</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dashboard.cron_routes.map((route) => (
-                <tr key={route.routeId} className="border-b border-border/60">
-                  <td className="py-2 pr-3 font-mono">{route.routeId}</td>
-                  <td className="py-2 pr-3">
-                    <GrowthBadge label={route.registered ? "yes" : "no"} tone={route.registered ? "healthy" : "critical"} />
-                  </td>
-                  <td className="py-2 pr-3">{formatDate(route.lastSuccessAt)}</td>
-                  <td className="py-2 pr-3">{route.failureCount24h}</td>
-                  <td className="py-2">{route.lastDurationMs != null ? `${route.lastDurationMs}ms` : "—"}</td>
-                </tr>
+      <GrowthOperatorDiagnosticsDisclosure title="Engineering diagnostics" description="Cron telemetry, runtime guards, and infrastructure readiness catalog.">
+        <GrowthInfrastructureReadinessBanner title="Transport send plane" readiness={transportReadiness} />
+
+        {dashboard.runtime.violations.length > 0 ? (
+          <div className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-950">
+            <div className="flex items-center gap-2 font-semibold">
+              <AlertTriangle className="size-4" />
+              Production runtime guard violations
+            </div>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
+              {dashboard.runtime.violations.map((v) => (
+                <li key={v.code}>{v.message}</li>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </GrowthEngineCard>
+            </ul>
+          </div>
+        ) : null}
+
+        <GrowthEngineCard title="Cron execution health" icon={<Activity size={16} />}>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-xs">
+              <thead>
+                <tr className="border-b text-muted-foreground">
+                  <th className="py-2 pr-3 font-medium">Route</th>
+                  <th className="py-2 pr-3 font-medium">Registered</th>
+                  <th className="py-2 pr-3 font-medium">Last success</th>
+                  <th className="py-2 pr-3 font-medium">Failures 24h</th>
+                  <th className="py-2 font-medium">Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dashboard.cron_routes.map((route) => (
+                  <tr key={route.routeId} className="border-b border-border/60">
+                    <td className="py-2 pr-3 font-mono">{route.routeId}</td>
+                    <td className="py-2 pr-3">
+                      <GrowthBadge label={route.registered ? "yes" : "no"} tone={route.registered ? "healthy" : "critical"} />
+                    </td>
+                    <td className="py-2 pr-3">{formatDate(route.lastSuccessAt)}</td>
+                    <td className="py-2 pr-3">{route.failureCount24h}</td>
+                    <td className="py-2">{route.lastDurationMs != null ? `${route.lastDurationMs}ms` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </GrowthEngineCard>
+
+        <GrowthEngineCard title="Infrastructure readiness catalog" icon={<Server size={16} />}>
+          <ul className="space-y-2">
+            {dashboard.readiness_catalog.map((entry, index) => (
+              <li
+                key={`${entry.surfaceId}-${entry.title}-${index}`}
+                className="flex flex-wrap items-start justify-between gap-2 rounded-lg border p-3"
+              >
+                <div>
+                  <p className="text-sm font-medium">{entry.title}</p>
+                  {entry.readiness.detail ? (
+                    <p className="mt-0.5 text-xs text-muted-foreground">{entry.readiness.detail}</p>
+                  ) : null}
+                </div>
+                <GrowthInfrastructureReadinessBadge readiness={entry.readiness} />
+              </li>
+            ))}
+          </ul>
+        </GrowthEngineCard>
+      </GrowthOperatorDiagnosticsDisclosure>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <GrowthEngineCard title="Queue health">
@@ -245,25 +284,6 @@ export function GrowthOutboundOperationsDashboard() {
             ))}
           </div>
         )}
-      </GrowthEngineCard>
-
-      <GrowthEngineCard title="Infrastructure readiness catalog" icon={<Server size={16} />}>
-        <ul className="space-y-2">
-          {dashboard.readiness_catalog.map((entry, index) => (
-            <li
-              key={`${entry.surfaceId}-${entry.title}-${index}`}
-              className="flex flex-wrap items-start justify-between gap-2 rounded-lg border p-3"
-            >
-              <div>
-                <p className="text-sm font-medium">{entry.title}</p>
-                {entry.readiness.detail ? (
-                  <p className="mt-0.5 text-xs text-muted-foreground">{entry.readiness.detail}</p>
-                ) : null}
-              </div>
-              <GrowthInfrastructureReadinessBadge readiness={entry.readiness} />
-            </li>
-          ))}
-        </ul>
       </GrowthEngineCard>
 
       <div className="flex justify-end">

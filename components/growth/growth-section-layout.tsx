@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react"
 import { GrowthSectionSidebarNav } from "@/components/growth/growth-section-sidebar-nav"
+import { GrowthOperatorAttentionStrip } from "@/components/growth/growth-operator-attention-strip"
 
 type GrowthSectionLayoutProps = {
   children: ReactNode
@@ -12,7 +13,10 @@ export function GrowthSectionLayout({ children }: GrowthSectionLayoutProps) {
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
       <GrowthSectionSidebarNav />
-      <div className="flex min-w-0 flex-1 flex-col gap-4">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-col gap-4">
+        <GrowthOperatorAttentionStrip compact />
+        {children}
+      </div>
     </div>
   )
 }

@@ -1,18 +1,18 @@
 "use client"
 
 import { ShieldCheck } from "lucide-react"
-import Link from "next/link"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import { GrowthInfrastructureReadinessStrip } from "@/components/growth/growth-infrastructure-readiness-strip"
 import { GrowthDeliverabilityDashboard } from "@/components/growth/growth-deliverability-dashboard"
+import { GrowthDeliverabilityIaNav } from "@/components/growth/growth-deliverability-ia-nav"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
   usePlatformAdminHeaderIdentity,
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
-import { Button } from "@/components/ui/button"
+import { GROWTH_OPERATOR_UX_H3_QA_MARKER } from "@/lib/growth/operator-ux/operator-ux-h3-types"
 
 export default function AdminGrowthDeliverabilityPage() {
   const { sessionIdentity } = useAdmin()
@@ -24,7 +24,7 @@ export default function AdminGrowthDeliverabilityPage() {
 
   return (
     <PlatformAdminPageShell header={header}>
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8" data-h3-qa={GROWTH_OPERATOR_UX_H3_QA_MARKER}>
         <PlatformAdminTabNav activeKey="growth_leads" />
 
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -34,15 +34,15 @@ export default function AdminGrowthDeliverabilityPage() {
                 <ShieldCheck size={17} />
               </span>
               <div>
-                <h1 className={PAGE_STANDARD_PAGE_TITLE}>Deliverability</h1>
+                <h1 className={PAGE_STANDARD_PAGE_TITLE}>DNS &amp; Setup</h1>
                 <p className="text-sm text-muted-foreground">
-                  DNS validation intelligence, authentication coverage, and deliverability risk monitoring — infrastructure only.
+                  DNS validation, authentication coverage, and mailbox warmup — infrastructure setup only.
                 </p>
               </div>
             </div>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/admin/growth/infrastructure/mailboxes">Back to Mailbox Connections</Link>
-            </Button>
+          </div>
+          <div className="mt-4">
+            <GrowthDeliverabilityIaNav active="infrastructure" />
           </div>
         </section>
 

@@ -10,6 +10,8 @@ import {
   GrowthInfrastructureReadinessBanner,
 } from "@/components/growth/growth-infrastructure-readiness-badge"
 import type { GrowthInternalOutboundOperationsDashboard } from "@/lib/growth/operations/internal-outbound-operations-dashboard"
+import { GrowthOperatorDiagnosticsDisclosure } from "@/components/growth/growth-operator-diagnostics-disclosure"
+import { GROWTH_OPERATOR_UX_H3_QA_MARKER } from "@/lib/growth/operator-ux/operator-ux-h3-types"
 import { GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER } from "@/lib/growth/operations/internal-outbound-ops-types"
 import { GROWTH_DELIVERABILITY_INTELLIGENCE_QA_MARKER } from "@/lib/growth/deliverability/deliverability-intelligence-types"
 import { GROWTH_REPUTATION_SAFE_SCALING_QA_MARKER } from "@/lib/growth/outbound/reputation-safe-scaling-types"
@@ -77,8 +79,19 @@ export function GrowthInternalOutboundOperationsDashboardView() {
     }
 
   return (
-    <div className="flex flex-col gap-5" data-qa-marker={GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER}>
+    <div className="flex flex-col gap-5" data-qa-marker={GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER} data-h3-qa={GROWTH_OPERATOR_UX_H3_QA_MARKER}>
       <GrowthInfrastructureReadinessBanner title="Internal transport send plane" readiness={transportReadiness} />
+
+      <div className="rounded-xl border border-indigo-200/80 bg-indigo-50/40 px-4 py-3 text-sm dark:border-indigo-900/40 dark:bg-indigo-950/20">
+        <p className="font-medium text-indigo-950 dark:text-indigo-100">Daily operations live in the Outbound Console</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Approvals, queue recovery, and provider alerts —{" "}
+          <Link href="/admin/growth/operations/outbound" className="font-medium text-indigo-700 underline dark:text-indigo-300">
+            open Outbound Console
+          </Link>
+          .
+        </p>
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="Connected mailboxes" value={String(dashboard.mailboxes.filter((m) => m.status === "connected").length)} />
@@ -214,6 +227,22 @@ export function GrowthInternalOutboundOperationsDashboardView() {
         </div>
       </GrowthEngineCard>
 
+      <GrowthEngineCard title="Deliverability (deterministic)" icon={<Shield size={16} />}>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatTile label="Bounce rate (24h)" value={`${dashboard.deliverability.bounceRate24h}%`} />
+          <StatTile label="Complaint rate (24h)" value={`${dashboard.deliverability.complaintRate24h}%`} />
+          <StatTile label="Suppression hits (24h)" value={String(dashboard.deliverability.suppressionHits24h)} />
+          <StatTile label="Failed sends (24h)" value={String(dashboard.deliverability.failedSends24h)} />
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Open/click rates require webhook engagement events — not estimated here.
+        </p>
+      </GrowthEngineCard>
+
+      <GrowthOperatorDiagnosticsDisclosure
+        title="Engineering diagnostics"
+        description="Cron telemetry, execution command center, deliverability intelligence, lifecycle ops, and audit history."
+      >
       <GrowthEngineCard title="Queue + cron health" icon={<Activity size={16} />}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile label="Scheduled outreach" value={String(dashboard.queue_health.outreach_queue.scheduled)} />
@@ -591,18 +620,6 @@ export function GrowthInternalOutboundOperationsDashboardView() {
         </div>
       </div>
 
-      <GrowthEngineCard title="Deliverability (deterministic)" icon={<Shield size={16} />}>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatTile label="Bounce rate (24h)" value={`${dashboard.deliverability.bounceRate24h}%`} />
-          <StatTile label="Complaint rate (24h)" value={`${dashboard.deliverability.complaintRate24h}%`} />
-          <StatTile label="Suppression hits (24h)" value={String(dashboard.deliverability.suppressionHits24h)} />
-          <StatTile label="Failed sends (24h)" value={String(dashboard.deliverability.failedSends24h)} />
-        </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          Open/click rates require webhook engagement events — not estimated here.
-        </p>
-      </GrowthEngineCard>
-
       <GrowthEngineCard title="Operational audit" icon={<Server size={16} />}>
         <ul className="space-y-2 text-xs">
           {dashboard.audit_events.length === 0 ? (
@@ -621,6 +638,7 @@ export function GrowthInternalOutboundOperationsDashboardView() {
           )}
         </ul>
       </GrowthEngineCard>
+      </GrowthOperatorDiagnosticsDisclosure>
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" size="sm" asChild>

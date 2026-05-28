@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
   Check,
-  LayoutDashboard,
   ListOrdered,
   Loader2,
   Maximize2,
@@ -36,6 +35,9 @@ import {
 import { GrowthCommandPipelineRevenueSection } from "@/components/growth/growth-command-pipeline-revenue-section"
 import { GrowthCommandQuickActionsRail } from "@/components/growth/growth-command-quick-actions-rail"
 import { GrowthCommandSectionTabs } from "@/components/growth/growth-command-section-tabs"
+import { GrowthOperatorAttentionStrip } from "@/components/growth/growth-operator-attention-strip"
+import { GrowthOperatorDailyWorkflow } from "@/components/growth/growth-operator-daily-workflow"
+import { GROWTH_OPERATOR_UX_H3_QA_MARKER } from "@/lib/growth/operator-ux/operator-ux-h3-types"
 import { useAdmin } from "@/lib/admin-store"
 import { selectFocusSprintActions } from "@/lib/growth/command/command-action-engine"
 import type {
@@ -378,8 +380,11 @@ export function GrowthCommandCenterDashboard() {
   ) : null
 
   return (
-    <div className="space-y-6" data-qa-marker={GROWTH_COMMAND_CENTER_SPACING_QA_MARKER}>
+    <div className="space-y-6" data-qa-marker={GROWTH_COMMAND_CENTER_SPACING_QA_MARKER} data-h3-qa={GROWTH_OPERATOR_UX_H3_QA_MARKER}>
       {sprintPanel}
+
+      <GrowthOperatorAttentionStrip />
+      <GrowthOperatorDailyWorkflow />
 
       <GrowthCommandSectionTabs />
 
@@ -439,22 +444,6 @@ export function GrowthCommandCenterDashboard() {
           </GrowthEngineCard>
 
           <GrowthCommandQuickActionsRail variant="chips" />
-
-          <GrowthEngineCard
-            title="Today's Pipeline Operations"
-            icon={<LayoutDashboard className="size-4" />}
-            className="p-6 shadow-sm sm:p-6 [&>div:first-child]:mb-5"
-          >
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-              <StatTile label="Critical actions" value={mission.criticalActions} />
-              <StatTile label="Revenue at risk" value={mission.revenueAtRisk} />
-              <StatTile label="Approvals waiting" value={mission.approvalsWaiting} />
-              <StatTile label="Stalled opportunities" value={mission.stalledOpportunities} />
-              <StatTile label="Unassigned" value={mission.ownershipGaps} />
-              <StatTile label="High-priority unassigned" value={mission.unassignedHighPriority} />
-              <StatTile label="Pipeline protected" value={mission.pipelineProtected} />
-            </div>
-          </GrowthEngineCard>
 
           <GrowthEngineCard
             title="Ranked Action Queue"

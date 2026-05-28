@@ -86,15 +86,15 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
   },
   {
     id: "internal-outbound-operations",
-    label: "Internal Outbound Operations",
+    label: "Send Infrastructure",
     href: "/admin/growth/infrastructure/outbound-operations",
-    keywords: ["internal", "outbound", "operations", "mailboxes", "sender pools", "deliverability"],
+    keywords: ["mailboxes", "sender pools", "transport", "internal outbound", "advanced"],
   },
   {
     id: "outbound-operations",
-    label: "Outbound Operations",
+    label: "Outbound Console",
     href: "/admin/growth/operations/outbound",
-    keywords: ["operations", "cron", "queue", "telemetry", "outbound ops", "send plane"],
+    keywords: ["operations", "cron", "queue", "telemetry", "outbound ops", "recovery", "approvals"],
   },
   {
     id: "provider-setup",
@@ -116,7 +116,7 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
   },
   {
     id: "deliverability-protection",
-    label: "Deliverability Protection",
+    label: "Protection",
     href: "/admin/growth/deliverability",
     keywords: [
       "deliverability",
@@ -131,7 +131,7 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
   },
   {
     id: "deliverability-ops",
-    label: "Deliverability Operations",
+    label: "Deliverability Ops",
     href: "/admin/growth/providers/deliverability-ops",
     keywords: [
       "deliverability operations",
@@ -525,6 +525,7 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         href: "/admin/growth/revenue-operating",
         label: "Revenue Forecast",
         consoleKey: "revenue",
+        shortcutKey: "r",
         match: prefixMatch("/admin/growth/revenue-operating"),
       },
       {
@@ -583,14 +584,6 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         label: "Opportunities",
         consoleKey: "opportunities",
         match: (path) => path === "/admin/growth/opportunities",
-      },
-      {
-        id: "revenue",
-        href: "/admin/growth/revenue",
-        label: "Revenue Forecast",
-        consoleKey: "revenue",
-        shortcutKey: "r",
-        match: (path) => path === "/admin/growth/revenue",
       },
     ],
   },
@@ -701,19 +694,37 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
   },
   {
     id: "providers-nav",
-    label: "Providers",
+    label: "Operations",
     items: [
-      {
-        id: "internal-outbound-operations",
-        href: "/admin/growth/infrastructure/outbound-operations",
-        label: "Internal Outbound Ops",
-        match: prefixMatch("/admin/growth/infrastructure/outbound-operations"),
-      },
       {
         id: "outbound-operations",
         href: "/admin/growth/operations/outbound",
-        label: "Cron Telemetry",
+        label: "Outbound Console",
         match: prefixMatch("/admin/growth/operations/outbound"),
+      },
+      {
+        id: "deliverability-protection",
+        href: "/admin/growth/deliverability",
+        label: "Protection",
+        match: prefixMatch("/admin/growth/deliverability"),
+      },
+      {
+        id: "deliverability",
+        href: "/admin/growth/infrastructure/deliverability",
+        label: "DNS & Setup",
+        match: prefixMatch("/admin/growth/infrastructure/deliverability"),
+      },
+      {
+        id: "deliverability-ops",
+        href: "/admin/growth/providers/deliverability-ops",
+        label: "Deliverability Ops",
+        match: prefixMatch("/admin/growth/providers/deliverability-ops"),
+      },
+      {
+        id: "internal-outbound-operations",
+        href: "/admin/growth/infrastructure/outbound-operations",
+        label: "Send Infrastructure",
+        match: prefixMatch("/admin/growth/infrastructure/outbound-operations"),
       },
       {
         id: "provider-setup",
@@ -732,18 +743,6 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         href: "/admin/growth/providers/sender-pools",
         label: "Sender Pools",
         match: prefixMatch("/admin/growth/providers/sender-pools"),
-      },
-      {
-        id: "deliverability-protection",
-        href: "/admin/growth/deliverability",
-        label: "Deliverability Protection",
-        match: prefixMatch("/admin/growth/deliverability"),
-      },
-      {
-        id: "deliverability-ops",
-        href: "/admin/growth/providers/deliverability-ops",
-        label: "Deliverability Operations",
-        match: prefixMatch("/admin/growth/providers/deliverability-ops"),
       },
       {
         id: "provider-compliance",
@@ -771,13 +770,8 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
           path.startsWith("/admin/growth/infrastructure") &&
           !path.startsWith("/admin/growth/infrastructure/mailboxes") &&
           !path.startsWith("/admin/growth/infrastructure/deliverability") &&
-          !path.startsWith("/admin/growth/infrastructure/warmup"),
-      },
-      {
-        id: "deliverability",
-        href: "/admin/growth/infrastructure/deliverability",
-        label: "Deliverability Infrastructure",
-        match: prefixMatch("/admin/growth/infrastructure/deliverability"),
+          !path.startsWith("/admin/growth/infrastructure/warmup") &&
+          !path.startsWith("/admin/growth/infrastructure/outbound-operations"),
       },
       {
         id: "warmup",
@@ -788,7 +782,7 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
       {
         id: "providers",
         href: "/admin/growth/providers",
-        label: "Provider Diagnostics",
+        label: "Diagnostics (Advanced)",
         consoleKey: "providers",
         match: (path) =>
           path.startsWith("/admin/growth/providers") &&
@@ -842,13 +836,8 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         id: "ai-research",
         href: "/admin/growth/leads/lead-engine",
         label: "AI Research",
+        futurePlaceholder: true,
         match: prefixMatch("/admin/growth/leads/lead-engine"),
-      },
-      {
-        id: "ai-generations",
-        href: "/admin/growth/copilot",
-        label: "AI Generations",
-        match: (path) => path === "/admin/growth/copilot",
       },
     ],
   },

@@ -109,12 +109,17 @@ assert.ok(leadEngineGroup?.items.some((i) => i.label === "Lead Intelligence Insp
 assert.ok(leadEngineGroup?.items.some((i) => i.label === "Imports"))
 
 const providersGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "providers-nav")
-assert.equal(providersGroup?.label, "Providers")
+assert.equal(providersGroup?.label, "Operations")
+assert.ok(providersGroup?.items.some((i) => i.label === "Outbound Console"))
+assert.ok(providersGroup?.items.some((i) => i.label === "Protection"))
+assert.ok(providersGroup?.items.some((i) => i.label === "DNS & Setup"))
+assert.ok(providersGroup?.items.some((i) => i.label === "Deliverability Ops"))
 assert.ok(providersGroup?.items.some((i) => i.label === "Delivery"))
 assert.ok(providersGroup?.items.some((i) => i.label === "Compliance"))
 assert.ok(providersGroup?.items.some((i) => i.label === "Webhooks"))
-assert.ok(providersGroup?.items.some((i) => i.label === "Provider Diagnostics"))
+assert.ok(providersGroup?.items.some((i) => i.label === "Diagnostics (Advanced)"))
 assert.ok(providersGroup?.items.some((i) => i.label === "Mailbox Connections"))
+assert.ok(!providersGroup?.items.some((i) => i.label === "Provider Diagnostics"))
 
 const aiGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "ai")
 assert.equal(aiGroup?.label, "AI")
@@ -149,6 +154,7 @@ const layoutSource = fs.readFileSync(
   "utf8",
 )
 assert.match(layoutSource, /GrowthSectionSidebarNav/)
+assert.match(layoutSource, /GrowthOperatorAttentionStrip/)
 
 const zLayerSource = fs.readFileSync(path.join(process.cwd(), "lib/layout/app-z-layers.ts"), "utf8")
 assert.match(zLayerSource, /APP_Z_GROWTH_NAV_FLYOUT/)

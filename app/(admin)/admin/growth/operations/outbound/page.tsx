@@ -11,6 +11,7 @@ import {
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import { GROWTH_CRON_TELEMETRY_QA_MARKER } from "@/lib/growth/runtime/cron-telemetry-types"
+import { GROWTH_OPERATOR_UX_H3_QA_MARKER } from "@/lib/growth/operator-ux/operator-ux-h3-types"
 
 export default function AdminGrowthOutboundOperationsPage() {
   const { sessionIdentity } = useAdmin()
@@ -22,7 +23,11 @@ export default function AdminGrowthOutboundOperationsPage() {
 
   return (
     <PlatformAdminPageShell header={header}>
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8" data-qa-marker={GROWTH_CRON_TELEMETRY_QA_MARKER}>
+      <div
+        className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8"
+        data-qa-marker={GROWTH_CRON_TELEMETRY_QA_MARKER}
+        data-h3-qa={GROWTH_OPERATOR_UX_H3_QA_MARKER}
+      >
         <PlatformAdminTabNav activeKey="growth_leads" />
 
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -31,9 +36,10 @@ export default function AdminGrowthOutboundOperationsPage() {
               <Radar size={17} />
             </span>
             <div>
-              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Outbound Operations</h1>
+              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Outbound Console</h1>
               <p className="text-sm text-muted-foreground">
-                Cron telemetry, queue health, provider status, and honest infrastructure readiness — platform admin only.
+                Daily operator surface — approvals, queue health, recovery, and provider status. Engineering diagnostics
+                are collapsed by default.
               </p>
             </div>
           </div>
