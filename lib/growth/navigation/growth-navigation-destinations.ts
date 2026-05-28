@@ -8,6 +8,10 @@ import {
 import type { GrowthCommandPaletteEntry } from "@/lib/growth/navigation/growth-navigation-ranking"
 
 export const GROWTH_NAVIGATION_IA_QA_MARKER = "growth-navigation-ia-v2" as const
+export const GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER =
+  "growth-nav-lead-intelligence-single-home-v1" as const
+
+export const GROWTH_LEAD_INTELLIGENCE_INSPECTOR_HREF = "/admin/growth/leads/lead-engine" as const
 
 export type GrowthNavigationDestination = {
   id: string
@@ -157,7 +161,7 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
   {
     id: "lead-intelligence",
     label: "Lead Intelligence Inspector",
-    href: "/admin/growth/leads/lead-engine",
+    href: GROWTH_LEAD_INTELLIGENCE_INSPECTOR_HREF,
     keywords: ["lead engine", "inspector", "pipeline", "lead intelligence", "pipeline inspector"],
   },
   {
@@ -463,12 +467,6 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: prefixMatch("/admin/growth/intent-pixel"),
       },
       {
-        id: "lead-intelligence",
-        href: "/admin/growth/leads/lead-engine",
-        label: "Lead Intelligence",
-        match: prefixMatch("/admin/growth/leads/lead-engine"),
-      },
-      {
         id: "conversations",
         href: "/admin/growth/conversations",
         label: "Conversations",
@@ -658,9 +656,9 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
       },
       {
         id: "lead-engine-inspector",
-        href: "/admin/growth/leads/lead-engine",
+        href: GROWTH_LEAD_INTELLIGENCE_INSPECTOR_HREF,
         label: "Lead Intelligence Inspector",
-        match: prefixMatch("/admin/growth/leads/lead-engine"),
+        match: prefixMatch(GROWTH_LEAD_INTELLIGENCE_INSPECTOR_HREF),
       },
       {
         id: "imports",
@@ -832,13 +830,6 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         consoleKey: "ai-personalization",
         match: prefixMatch("/admin/growth/copilot/personalization"),
       },
-      {
-        id: "ai-research",
-        href: "/admin/growth/leads/lead-engine",
-        label: "AI Research",
-        futurePlaceholder: true,
-        match: prefixMatch("/admin/growth/leads/lead-engine"),
-      },
     ],
   },
   {
@@ -911,8 +902,23 @@ export function resolveGrowthNavigationEntryFromPathname(
   if (!normalized) return null
 
   try {
+    if (normalized.startsWith(GROWTH_LEAD_INTELLIGENCE_INSPECTOR_HREF)) {
+      const leadEngineGroup = GROWTH_NAV_GROUP_DEFS.find((group) => group.id === "lead-engine")
+      const inspector = leadEngineGroup?.items.find((item) => item.id === "lead-engine-inspector")
+      if (inspector) {
+        return {
+          id: inspector.id,
+          label: inspector.label,
+          href: normalized.startsWith(GROWTH_LEAD_INTELLIGENCE_INSPECTOR_HREF)
+            ? normalized
+            : inspector.href,
+        }
+      }
+    }
+
     for (const group of GROWTH_NAV_GROUP_DEFS) {
       for (const item of group.items) {
+        if (item.futurePlaceholder) continue
         if (safeMatchGrowthNavItem(item, normalized)) {
           const baseHref = item.href.split("?")[0] ?? item.href
           return {

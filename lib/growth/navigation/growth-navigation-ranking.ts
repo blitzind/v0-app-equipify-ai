@@ -20,6 +20,7 @@ export const GROWTH_COMMAND_QUERY_BOOSTS: Record<string, Record<string, number>>
   lead: {
     inbox: 120,
     "lead-intelligence": 110,
+    "lead-engine-inspector": 110,
     search: 95,
     "crm-leads": 70,
   },
@@ -39,6 +40,7 @@ export const GROWTH_COMMAND_QUERY_BOOSTS: Record<string, Record<string, number>>
     search: 120,
     inbox: 95,
     "lead-intelligence": 75,
+    "lead-engine-inspector": 75,
   },
   coach: {
     "live-coaching": 120,

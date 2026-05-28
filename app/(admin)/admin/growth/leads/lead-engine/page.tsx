@@ -11,6 +11,7 @@ import {
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import { GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER } from "@/lib/growth/lead-engine/lead-intelligence-inspector-types"
+import { GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER } from "@/lib/growth/navigation/growth-navigation-destinations"
 
 export default function AdminGrowthLeadEnginePage() {
   const { sessionIdentity } = useAdmin()
@@ -28,6 +29,7 @@ export default function AdminGrowthLeadEnginePage() {
         <section
           className="rounded-2xl border border-border bg-card p-5 shadow-sm"
           data-qa-marker={GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER}
+          data-qa={GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER}
         >
           <div className="flex items-center gap-2">
             <span className="flex size-9 items-center justify-center rounded-full bg-violet-50 text-violet-600">

@@ -66,6 +66,7 @@ import {
 import {
   GROWTH_NAV_GROUP_DEFS,
   GROWTH_NAVIGATION_IA_QA_MARKER,
+  GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER,
   growthNavigationShortcutLabel,
   normalizeGrowthPathname,
   safeMatchGrowthNavItem,
@@ -123,7 +124,6 @@ const GROWTH_NAV_ICONS: Record<string, LucideIcon> = {
   "calls-live": Radio,
   "live-coaching": Sparkles,
   "call-providers": Plug,
-  "lead-intelligence": Workflow,
   "lead-engine-inspector": Workflow,
   "crm-leads": Users,
   "discover-companies": Search,
@@ -135,7 +135,6 @@ const GROWTH_NAV_ICONS: Record<string, LucideIcon> = {
   warmup: Flame,
   copilot: Bot,
   playbooks: BookOpen,
-  "ai-research": Sparkles,
   "ai-generations": Bot,
   relationships: Users,
   "market-graph": Network,
@@ -263,7 +262,7 @@ function resolveNavBadge(
 }
 
 function groupHasActiveRoute(group: GrowthNavGroup, pathname: string): boolean {
-  return group.items.some((item) => safeMatchGrowthNavItem(item, pathname))
+  return clickableNavItems(group).some((item) => safeMatchGrowthNavItem(item, pathname))
 }
 
 function readCollapsedGrowthGroups(): Set<string> {
@@ -1143,6 +1142,7 @@ function GrowthSectionSidebarNavInner() {
         data-flyout-marker={GROWTH_SIDEBAR_FLYOUT_QA_MARKER}
         data-navigation-ia-marker={GROWTH_NAVIGATION_IA_QA_MARKER}
         data-navigation-polish-marker={GROWTH_NAVIGATION_POLISH_QA_MARKER}
+        data-qa={GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER}
         className={cn("hidden shrink-0 overflow-visible lg:block", collapsed ? "w-[4.5rem]" : "w-60")}
       >
         <div className="sticky top-6 flex flex-col overflow-visible rounded-2xl border border-border bg-card p-3 shadow-sm dark:border-border/80 dark:bg-card/95">
@@ -1191,6 +1191,7 @@ function GrowthSectionSidebarNavInner() {
         data-flyout-marker={GROWTH_SIDEBAR_FLYOUT_QA_MARKER}
         data-navigation-ia-marker={GROWTH_NAVIGATION_IA_QA_MARKER}
         data-navigation-polish-marker={GROWTH_NAVIGATION_POLISH_QA_MARKER}
+        data-qa={GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER}
         className="lg:hidden"
       >
         <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card p-2 shadow-sm dark:border-border/80 dark:bg-card/95">

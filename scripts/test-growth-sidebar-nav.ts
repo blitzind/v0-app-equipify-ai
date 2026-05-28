@@ -13,6 +13,8 @@ import {
 import {
   GROWTH_NAV_GROUP_DEFS,
   GROWTH_NAVIGATION_IA_QA_MARKER,
+  GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER,
+  resolveGrowthNavigationEntryFromPathname,
 } from "../lib/growth/navigation/growth-navigation-destinations"
 import { GROWTH_COMMAND_REGISTRY } from "../lib/growth/navigation/growth-command-registry"
 import { GROWTH_NAVIGATION_POLISH_QA_MARKER } from "../lib/growth/navigation/growth-navigation-ranking"
@@ -21,6 +23,7 @@ import { APP_Z_GROWTH_NAV_FLYOUT } from "../lib/layout/app-z-layers"
 assert.equal(GROWTH_SIDEBAR_NAV_QA_MARKER, "growth-sidebar-nav-v2")
 assert.equal(GROWTH_SIDEBAR_FLYOUT_QA_MARKER, "growth-sidebar-flyout-zindex-v1")
 assert.equal(GROWTH_NAVIGATION_IA_QA_MARKER, "growth-navigation-ia-v2")
+assert.equal(GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER, "growth-nav-lead-intelligence-single-home-v1")
 assert.equal(GROWTH_NAVIGATION_POLISH_QA_MARKER, "growth-navigation-polish-v1")
 assert.match(GROWTH_SIDEBAR_GROUPS_COLLAPSED_STORAGE_KEY, /groups-collapsed/)
 
@@ -75,7 +78,8 @@ assert.match(source, /normalizeGrowthPathname/)
 assert.match(source, /GrowthSidebarNavErrorBoundary/)
 assert.match(source, /futurePlaceholder/)
 assert.match(source, /lg:hidden/)
-assert.match(source, /clickableNavItems\(group\)/)
+assert.match(source, /data-qa=\{GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER\}/)
+assert.match(source, /clickableNavItems\(group\)\.some/)
 
 const coreGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "core")
 assert.ok(coreGroup?.items.some((i) => i.label === "Revenue Inbox"))
@@ -90,7 +94,8 @@ assert.ok(!coreGroup?.items.some((i) => i.label === "Imports"))
 const intelligenceGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "intelligence")
 assert.equal(intelligenceGroup?.label, "Intelligence")
 assert.ok(intelligenceGroup?.items.some((i) => i.label === "Intent Signals"))
-assert.ok(intelligenceGroup?.items.some((i) => i.label === "Lead Intelligence"))
+assert.ok(!intelligenceGroup?.items.some((i) => i.label === "Lead Intelligence"))
+assert.ok(!intelligenceGroup?.items.some((i) => i.label === "Lead Intelligence Inspector"))
 assert.ok(intelligenceGroup?.items.some((i) => i.label === "Revenue Intelligence"))
 
 const executionGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "execution")
@@ -125,6 +130,23 @@ const aiGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "ai")
 assert.equal(aiGroup?.label, "AI")
 assert.ok(aiGroup?.items.some((i) => i.label === "Copilot"))
 assert.ok(aiGroup?.items.some((i) => i.label === "Playbooks"))
+assert.ok(!aiGroup?.items.some((i) => i.href === "/admin/growth/leads/lead-engine"))
+
+const leadEnginePath = "/admin/growth/leads/lead-engine"
+const resolvedLeadEngine = resolveGrowthNavigationEntryFromPathname(leadEnginePath)
+assert.equal(resolvedLeadEngine?.id, "lead-engine-inspector")
+assert.equal(resolvedLeadEngine?.label, "Lead Intelligence Inspector")
+
+const intelligenceActive = intelligenceGroup?.items.some(
+  (item) => !item.futurePlaceholder && item.match(leadEnginePath),
+)
+const aiActive = aiGroup?.items.some((item) => !item.futurePlaceholder && item.match(leadEnginePath))
+const leadEngineActive = leadEngineGroup?.items.some(
+  (item) => !item.futurePlaceholder && item.match(leadEnginePath),
+)
+assert.equal(intelligenceActive, false)
+assert.equal(aiActive, false)
+assert.equal(leadEngineActive, true)
 
 assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.label === "Prospect Search"))
 assert.ok(!GROWTH_COMMAND_REGISTRY.some((a) => a.label === "Discover Companies"))
