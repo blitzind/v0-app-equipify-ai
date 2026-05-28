@@ -8,11 +8,11 @@ import type {
 import { upsertProviderCompanyContacts } from "@/lib/growth/providers/pdl/pdl-contact-persistence"
 import { mapPdlPeopleToContactDiscoveryRaw } from "@/lib/growth/providers/pdl/pdl-person-mapper"
 import {
-  GROWTH_PDL_PROVIDER_QA_MARKER,
   isPdlApiConfigured,
   isPdlDiscoveryDisabled,
   searchPdlPeopleByCompany,
 } from "@/lib/growth/providers/pdl/pdl-client"
+import { GROWTH_PDL_PROVIDER_QA_MARKER } from "@/lib/growth/providers/pdl/pdl-types"
 
 export { GROWTH_PDL_PROVIDER_QA_MARKER }
 
