@@ -84,10 +84,14 @@ function since24hIso(): string {
 }
 
 async function countOutreach(admin: SupabaseClient, status: string, since?: string): Promise<number> {
-  let query = admin.schema("growth").from("outreach_queue").select("id", { count: "exact", head: true }).eq("status", status)
-  if (since) query = query.gte("executed_at", since)
-  const { count } = await query
-  return count ?? 0
+  try {
+    let query = admin.schema("growth").from("outreach_queue").select("id", { count: "exact", head: true }).eq("status", status)
+    if (since) query = query.gte("executed_at", since)
+    const { count } = await query
+    return count ?? 0
+  } catch {
+    return 0
+  }
 }
 
 async function countTable(
@@ -95,10 +99,14 @@ async function countTable(
   table: string,
   apply?: (q: ReturnType<SupabaseClient["schema"]>["from"] extends (name: string) => infer Q ? Q : never) => unknown,
 ): Promise<number> {
-  let query = admin.schema("growth").from(table).select("id", { count: "exact", head: true })
-  if (apply) query = apply(query as never) as typeof query
-  const { count } = await query
-  return count ?? 0
+  try {
+    let query = admin.schema("growth").from(table).select("id", { count: "exact", head: true })
+    if (apply) query = apply(query as never) as typeof query
+    const { count } = await query
+    return count ?? 0
+  } catch {
+    return 0
+  }
 }
 
 export async function fetchGrowthOutboundOperationsDashboard(
@@ -182,6 +190,8 @@ export async function fetchGrowthOutboundOperationsDashboard(
     .select("id", { count: "exact", head: true })
     .gte("created_at", since24h)
     .contains("metadata", { simulated: true })
+    .then((res) => res.count ?? 0)
+    .catch(() => 0)
 
   const [recoveryQueue, queueAlerts, adapterAttempts24h] = await Promise.all([
     listOutreachQueueRecoveryItems(admin, 12).catch(() => []),

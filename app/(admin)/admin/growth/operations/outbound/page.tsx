@@ -12,6 +12,7 @@ import {
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import { GROWTH_CRON_TELEMETRY_QA_MARKER } from "@/lib/growth/runtime/cron-telemetry-types"
 import { GROWTH_OPERATOR_UX_H3_QA_MARKER } from "@/lib/growth/operator-ux/operator-ux-h3-types"
+import { GROWTH_OUTBOUND_OPERATIONS_RUNTIME_STABLE_QA_MARKER } from "@/lib/growth/outbound/outbound-reliability-types"
 
 export default function AdminGrowthOutboundOperationsPage() {
   const { sessionIdentity } = useAdmin()
@@ -27,6 +28,7 @@ export default function AdminGrowthOutboundOperationsPage() {
         className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8"
         data-qa-marker={GROWTH_CRON_TELEMETRY_QA_MARKER}
         data-h3-qa={GROWTH_OPERATOR_UX_H3_QA_MARKER}
+        data-qa={GROWTH_OUTBOUND_OPERATIONS_RUNTIME_STABLE_QA_MARKER}
       >
         <PlatformAdminTabNav activeKey="growth_leads" />
 

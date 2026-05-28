@@ -2,6 +2,16 @@
 
 export const GROWTH_OUTBOUND_RELIABILITY_H2_QA_MARKER = "growth-outbound-reliability-h2-v1" as const
 
+export const GROWTH_OUTBOUND_OPERATIONS_RUNTIME_STABLE_QA_MARKER =
+  "growth-outbound-operations-runtime-stable-v1" as const
+
+export type GrowthOutboundOperationsFailureReason =
+  | "fetch_failed"
+  | "schema_not_ready"
+  | "permission_blocked"
+  | "render_error"
+  | "unknown"
+
 export const GROWTH_PROVIDER_FAILURE_CLASSES = [
   "auth_failure",
   "rate_limit",

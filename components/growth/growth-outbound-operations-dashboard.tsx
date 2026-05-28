@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useState } from "react"
+import React, { useCallback, useEffect, useState } from "react"
 import { Activity, AlertTriangle, Loader2, RefreshCw, Server } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
@@ -10,7 +10,11 @@ import {
   GrowthInfrastructureReadinessBanner,
 } from "@/components/growth/growth-infrastructure-readiness-badge"
 import type { GrowthOutboundOperationsDashboard } from "@/lib/growth/operations/outbound-operations-dashboard"
-import { GROWTH_OUTBOUND_RELIABILITY_H2_QA_MARKER } from "@/lib/growth/outbound/outbound-reliability-types"
+import {
+  GROWTH_OUTBOUND_OPERATIONS_RUNTIME_STABLE_QA_MARKER,
+  GROWTH_OUTBOUND_RELIABILITY_H2_QA_MARKER,
+  type GrowthOutboundOperationsFailureReason,
+} from "@/lib/growth/outbound/outbound-reliability-types"
 import { GROWTH_CRON_TELEMETRY_QA_MARKER } from "@/lib/growth/runtime/cron-telemetry-types"
 import { GrowthOperatorDiagnosticsDisclosure } from "@/components/growth/growth-operator-diagnostics-disclosure"
 import { GROWTH_OPERATOR_UX_H3_QA_MARKER } from "@/lib/growth/operator-ux/operator-ux-h3-types"
@@ -20,9 +24,136 @@ function formatDate(value: string | null): string {
   return new Date(value).toLocaleString()
 }
 
-export function GrowthOutboundOperationsDashboard() {
+function sanitizeOutboundOperationsUiError(message: string | null | undefined): string {
+  const trimmed = message?.trim()
+  if (!trimmed) return "Outbound operations data could not be loaded."
+  if (/\bis not defined$/i.test(trimmed) || /^ReferenceError/i.test(trimmed)) {
+    return "Outbound operations panel hit a configuration issue. Retry or open engineering diagnostics after deploy."
+  }
+  return trimmed
+}
+
+function degradedCopy(failureReason: GrowthOutboundOperationsFailureReason): {
+  title: string
+  message: string
+  actions: string[]
+} {
+  switch (failureReason) {
+    case "schema_not_ready":
+      return {
+        title: "Outbound operations setup incomplete",
+        message: "Required Growth outbound tables or migrations are not ready on this Supabase project.",
+        actions: [
+          "Apply pending Growth Engine migrations",
+          "Reload PostgREST schema cache",
+          "Retry after migrations complete",
+        ],
+      }
+    case "permission_blocked":
+      return {
+        title: "Outbound operations blocked by permissions",
+        message: "The service role cannot read outbound queue or delivery tables required for this console.",
+        actions: ["Verify service role grants on growth outbound tables", "Retry after grants are applied"],
+      }
+    case "render_error":
+      return {
+        title: "Outbound console panel unavailable",
+        message: "One panel failed to render safely. Other admin areas remain available.",
+        actions: ["Refresh the page", "Retry load", "Contact platform support if this persists"],
+      }
+    default:
+      return {
+        title: "Outbound operations degraded",
+        message: "Live queue metrics could not be loaded right now.",
+        actions: [
+          "Retry load",
+          "Open outreach approvals",
+          "Check provider setup and deliverability protection",
+        ],
+      }
+  }
+}
+
+function GrowthOutboundOperationsDegradedState({
+  failureReason,
+  message,
+  onRetry,
+}: {
+  failureReason: GrowthOutboundOperationsFailureReason
+  message: string
+  onRetry: () => void
+}) {
+  const copy = degradedCopy(failureReason)
+
+  return (
+    <div
+      className="rounded-xl border border-amber-200 bg-amber-50/90 p-4 text-sm text-amber-950"
+      data-qa={GROWTH_OUTBOUND_OPERATIONS_RUNTIME_STABLE_QA_MARKER}
+    >
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">{copy.title}</p>
+          <p className="mt-1">{copy.message}</p>
+          <p className="mt-2 text-xs opacity-90">{sanitizeOutboundOperationsUiError(message)}</p>
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-xs">
+            {copy.actions.map((action) => (
+              <li key={action}>{action}</li>
+            ))}
+          </ul>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+              <RefreshCw className="mr-2 size-3.5" />
+              Retry
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/admin/growth/outreach/approval">Open outreach approvals</Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/admin/growth/providers/setup">Provider setup</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+class GrowthOutboundOperationsErrorBoundary extends React.Component<
+  { children: React.ReactNode; onRetry: () => void },
+  { hasError: boolean }
+> {
+  state = { hasError: false }
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error) {
+    console.error(`[${GROWTH_OUTBOUND_OPERATIONS_RUNTIME_STABLE_QA_MARKER}] panel render failed`, error)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <GrowthOutboundOperationsDegradedState
+          failureReason="render_error"
+          message="Outbound console panel failed to render safely."
+          onRetry={() => {
+            this.setState({ hasError: false })
+            this.props.onRetry()
+          }}
+        />
+      )
+    }
+    return this.props.children
+  }
+}
+
+function GrowthOutboundOperationsDashboardContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [failureReason, setFailureReason] = useState<GrowthOutboundOperationsFailureReason>("unknown")
   const [dashboard, setDashboard] = useState<GrowthOutboundOperationsDashboard | null>(null)
 
   const load = useCallback(async () => {
@@ -32,14 +163,18 @@ export function GrowthOutboundOperationsDashboard() {
       const res = await fetch("/api/platform/growth/operations/outbound", { cache: "no-store" })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
-        dashboard?: GrowthOutboundOperationsDashboard
+        dashboard?: GrowthOutboundOperationsDashboard | null
         message?: string
+        failureReason?: GrowthOutboundOperationsFailureReason
       }
       if (!res.ok || !data.ok || !data.dashboard) {
+        setFailureReason(data.failureReason ?? "fetch_failed")
         throw new Error(data.message ?? "Could not load outbound operations dashboard.")
       }
       setDashboard(data.dashboard)
+      setFailureReason("unknown")
     } catch (e) {
+      setDashboard(null)
       setError(e instanceof Error ? e.message : "Load failed.")
     } finally {
       setLoading(false)
@@ -49,13 +184,6 @@ export function GrowthOutboundOperationsDashboard() {
   useEffect(() => {
     void load()
   }, [load])
-
-  const transportReadiness =
-    dashboard.readiness_catalog.find((entry) => entry.surfaceId === "transport_send")?.readiness ?? {
-      status: "internal" as const,
-      label: "Internal",
-      detail: "Transport readiness unavailable.",
-    }
 
   if (loading) {
     return (
@@ -68,18 +196,25 @@ export function GrowthOutboundOperationsDashboard() {
 
   if (error || !dashboard) {
     return (
-      <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
-        {error ?? "Dashboard unavailable."}
-        <Button type="button" variant="outline" size="sm" className="ml-3" onClick={() => void load()}>
-          Retry
-        </Button>
-      </div>
+      <GrowthOutboundOperationsDegradedState
+        failureReason={failureReason}
+        message={error ?? "Dashboard unavailable."}
+        onRetry={() => void load()}
+      />
     )
   }
+
+  const transportReadiness =
+    dashboard.readiness_catalog.find((entry) => entry.surfaceId === "transport_send")?.readiness ?? {
+      status: "internal" as const,
+      label: "Internal",
+      detail: "Transport readiness unavailable.",
+    }
 
   return (
     <div
       className="flex flex-col gap-5"
+      data-qa={GROWTH_OUTBOUND_OPERATIONS_RUNTIME_STABLE_QA_MARKER}
       data-qa-marker={GROWTH_CRON_TELEMETRY_QA_MARKER}
       data-h2-qa={dashboard.h2_qa_marker}
       data-h3-qa={GROWTH_OPERATOR_UX_H3_QA_MARKER}
@@ -293,5 +428,15 @@ export function GrowthOutboundOperationsDashboard() {
         </Button>
       </div>
     </div>
+  )
+}
+
+export function GrowthOutboundOperationsDashboard() {
+  const [retryKey, setRetryKey] = useState(0)
+
+  return (
+    <GrowthOutboundOperationsErrorBoundary onRetry={() => setRetryKey((value) => value + 1)}>
+      <GrowthOutboundOperationsDashboardContent key={retryKey} />
+    </GrowthOutboundOperationsErrorBoundary>
   )
 }

@@ -63,6 +63,10 @@ async function main(): Promise<void> {
 
   const ui = readSource("components/growth/growth-outbound-operations-dashboard.tsx")
   assert.match(ui, /GROWTH_OUTBOUND_RELIABILITY_H2_QA_MARKER/)
+  assert.match(ui, /GROWTH_OUTBOUND_OPERATIONS_RUNTIME_STABLE_QA_MARKER/)
+  assert.match(ui, /GrowthOutboundOperationsErrorBoundary/)
+  assert.match(ui, /dashboard\.readiness_catalog\.find/)
+  assert.doesNotMatch(ui, /const transportReadiness[\s\S]*if \(loading\)/)
   assert.match(ui, /Failed outreach recovery/)
 
   assert.ok(fs.existsSync(path.join(process.cwd(), "app/api/platform/growth/outreach/queue/[queueId]/replay/route.ts")))
