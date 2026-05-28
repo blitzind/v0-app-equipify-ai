@@ -63,7 +63,7 @@ export function GrowthDeliverabilityDashboard() {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch("/api/platform/growth/deliverability/dashboard")
+      const response = await fetch("/api/platform/growth/deliverability/dns-dashboard")
       const payload = (await response.json()) as DashboardPayload
       if (!response.ok) {
         throw new Error(payload.message ?? "Could not load deliverability dashboard.")

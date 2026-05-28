@@ -23,6 +23,14 @@ import {
   GROWTH_DNS_DELIVERABILITY_QA_MARKER,
 } from "../lib/growth/deliverability/deliverability-types"
 import { GROWTH_DNS_DELIVERABILITY_SCHEMA_MIGRATION } from "../lib/growth/deliverability/deliverability-schema-health"
+import {
+  GROWTH_DELIVERABILITY_DNS_HEALTH_QA_MARKER,
+  GROWTH_DELIVERABILITY_DEGRADED_MODE_QA_MARKER,
+  GROWTH_DELIVERABILITY_OPS_V2_QA_MARKER,
+  GROWTH_DELIVERABILITY_QUEUE_OPS_QA_MARKER,
+  GROWTH_DELIVERABILITY_SENDER_HEALTH_QA_MARKER,
+  GROWTH_DELIVERABILITY_WIDGET_FALLBACK_QA_MARKER,
+} from "../lib/growth/deliverability/deliverability-protection-console-types"
 import { GROWTH_SENDER_PROVIDER_CAPABILITIES } from "../lib/growth/sender/provider-sender-capabilities"
 
 async function main(): Promise<void> {
@@ -228,12 +236,57 @@ async function main(): Promise<void> {
   for (const route of [
     "app/api/platform/growth/deliverability/route.ts",
     "app/api/platform/growth/deliverability/dashboard/route.ts",
+    "app/api/platform/growth/deliverability/dns-dashboard/route.ts",
+    "app/api/platform/growth/deliverability/protection/console/route.ts",
+    "app/api/platform/growth/deliverability/protection/modules/[moduleId]/route.ts",
     "app/api/platform/growth/deliverability/domain/[id]/validate/route.ts",
     "app/api/platform/growth/deliverability/events/[id]/route.ts",
   ]) {
     const apiSource = fs.readFileSync(path.join(process.cwd(), route), "utf8")
     assert.match(apiSource, /requireGrowthEnginePlatformAccess/)
   }
+
+  assert.match(
+    fs.readFileSync(path.join(process.cwd(), "components/growth/growth-deliverability-dashboard.tsx"), "utf8"),
+    /deliverability\/dns-dashboard/,
+  )
+
+  assert.equal(GROWTH_DELIVERABILITY_OPS_V2_QA_MARKER, "growth-deliverability-ops-v2")
+  assert.equal(GROWTH_DELIVERABILITY_WIDGET_FALLBACK_QA_MARKER, "growth-deliverability-widget-fallback-v1")
+  assert.equal(GROWTH_DELIVERABILITY_DEGRADED_MODE_QA_MARKER, "growth-deliverability-degraded-mode-v1")
+  assert.equal(GROWTH_DELIVERABILITY_QUEUE_OPS_QA_MARKER, "growth-deliverability-queue-ops-v1")
+  assert.equal(GROWTH_DELIVERABILITY_SENDER_HEALTH_QA_MARKER, "growth-deliverability-sender-health-v1")
+  assert.equal(GROWTH_DELIVERABILITY_DNS_HEALTH_QA_MARKER, "growth-deliverability-dns-health-v1")
+
+  const consoleSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/deliverability/deliverability-protection-console.tsx"),
+    "utf8",
+  )
+  assert.match(consoleSource, /GROWTH_DELIVERABILITY_OPS_V2_QA_MARKER/)
+  assert.match(consoleSource, /GROWTH_DELIVERABILITY_WIDGET_FALLBACK_QA_MARKER/)
+  assert.match(consoleSource, /GROWTH_DELIVERABILITY_DEGRADED_MODE_QA_MARKER/)
+  assert.match(consoleSource, /GROWTH_DELIVERABILITY_QUEUE_OPS_QA_MARKER/)
+  assert.match(consoleSource, /GROWTH_DELIVERABILITY_SENDER_HEALTH_QA_MARKER/)
+  assert.match(consoleSource, /GROWTH_DELIVERABILITY_DNS_HEALTH_QA_MARKER/)
+  assert.match(consoleSource, /Priority alerts/)
+  assert.match(consoleSource, /SenderHealthWidget/)
+  assert.doesNotMatch(consoleSource, /Could not load deliverability protection dashboard/)
+
+  const shellSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/deliverability/deliverability-module-shell.tsx"),
+    "utf8",
+  )
+  assert.match(shellSource, /DeliverabilityModuleShell/)
+  assert.match(shellSource, /still_available/)
+
+  const builderSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/deliverability/deliverability-protection-console.ts"),
+    "utf8",
+  )
+  assert.match(builderSource, /buildSenderHealthModule/)
+  assert.match(builderSource, /buildQueueOpsModule/)
+  assert.match(builderSource, /buildDeliverabilityOpsAlerts/)
+  assert.match(builderSource, /safeModule/)
 
   const uiSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/growth-deliverability-dashboard.tsx"),

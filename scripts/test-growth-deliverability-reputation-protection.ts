@@ -153,21 +153,20 @@ async function main(): Promise<void> {
   const cronRoute = readSource("app/api/cron/growth-reputation-snapshot/route.ts")
   assert.match(cronRoute, /runGrowthReputationSnapshotRollup/)
 
-  const apiRoute = readSource("app/api/platform/growth/deliverability/dashboard/route.ts")
-  assert.match(apiRoute, /buildReputationProtectionDashboard/)
+  const apiRoute = readSource("app/api/platform/growth/deliverability/protection/console/route.ts")
+  assert.match(apiRoute, /buildDeliverabilityProtectionConsole/)
 
   const page = readSource("app/(admin)/admin/growth/deliverability/page.tsx")
   assert.match(page, /GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_QA_MARKER/)
-  assert.match(page, /Deliverability Infrastructure/)
+  assert.match(page, /Protection/)
 
   const dashboard = readSource("components/growth/growth-reputation-protection-dashboard.tsx")
-  assert.match(dashboard, /GROWTH_DELIVERABILITY_H1_HARDENING_QA_MARKER/)
-  assert.match(dashboard, /Governance timeline/)
-  assert.match(dashboard, /Persistent pause enforcement/)
+  assert.match(dashboard, /deliverability-protection-console/)
+  assert.match(dashboard, /GrowthDeliverabilityProtectionConsole/)
 
   const nav = readSource("lib/growth/navigation/growth-navigation-destinations.ts")
-  assert.match(nav, /Deliverability Protection/)
-  assert.match(nav, /Deliverability Operations/)
+  assert.match(nav, /label: "Protection"/)
+  assert.match(nav, /Deliverability Ops/)
   assert.match(nav, /Deliverability Infrastructure/)
 
   const governance = readSource("lib/growth/deliverability/deliverability-governance-events.ts")
