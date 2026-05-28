@@ -11,6 +11,7 @@ import type { VoiceRelationshipMemoryWorkspaceSnapshot } from "@/lib/voice/relat
 import type { VoiceRevenueIntelligenceWorkspaceSnapshot } from "@/lib/voice/revenue-intelligence/types"
 import type { VoiceRetentionIntelligenceWorkspaceSnapshot } from "@/lib/voice/retention-intelligence/types"
 import type { VoiceAiReceptionistWorkspaceSnapshot } from "@/lib/voice/ai-receptionist/types"
+import type { VoiceMissedCallRecoveryWorkspaceSnapshot } from "@/lib/voice/missed-call-recovery/types"
 import type { VoiceAiCopilotWorkspaceSnapshot } from "@/lib/voice/ai-copilot/types"
 
 export const VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER = "voice-native-dialer-integration-v1" as const
@@ -120,6 +121,7 @@ export type VoiceBrowserSyncSnapshot = {
   retentionIntelligence: VoiceRetentionIntelligenceWorkspaceSnapshot | null
   aiCopilot: VoiceAiCopilotWorkspaceSnapshot | null
   aiReceptionist: VoiceAiReceptionistWorkspaceSnapshot | null
+  missedCallRecovery: VoiceMissedCallRecoveryWorkspaceSnapshot | null
 }
 
 export type VoiceInboundBrowserOfferView = {

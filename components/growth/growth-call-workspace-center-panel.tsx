@@ -46,6 +46,7 @@ import type { VoiceCallTranscriptSnapshot } from "@/lib/voice/media-streaming/ty
 import type { UnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/types"
 import type { VoiceAiCopilotWorkspaceSnapshot } from "@/lib/voice/ai-copilot/types"
 import type { VoiceAiReceptionistWorkspaceSnapshot } from "@/lib/voice/ai-receptionist/types"
+import type { VoiceMissedCallRecoveryWorkspaceSnapshot } from "@/lib/voice/missed-call-recovery/types"
 import type { CallWorkspaceCoachingMode } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import { GrowthCallWorkspaceLiveTranscriptPanel } from "@/components/growth/growth-call-workspace-live-transcript-panel"
 import { NATIVE_DIALER_PROVIDER_LABELS } from "@/lib/growth/native-dialer/native-dialer-types"
@@ -226,6 +227,7 @@ export function GrowthCallWorkspaceCenterPanel({
   operatorAssist = null,
   aiCopilot = null,
   aiReceptionist = null,
+  missedCallRecovery = null,
   voiceCallId = null,
   onOperatorAssistRefresh,
   muted = false,
@@ -263,6 +265,7 @@ export function GrowthCallWorkspaceCenterPanel({
   operatorAssist?: UnifiedOperatorAssistSnapshot | null
   aiCopilot?: VoiceAiCopilotWorkspaceSnapshot | null
   aiReceptionist?: VoiceAiReceptionistWorkspaceSnapshot | null
+  missedCallRecovery?: VoiceMissedCallRecoveryWorkspaceSnapshot | null
   voiceCallId?: string | null
   onOperatorAssistRefresh?: () => Promise<void>
   muted?: boolean
@@ -384,6 +387,7 @@ export function GrowthCallWorkspaceCenterPanel({
               operatorAssist={operatorAssist}
               aiCopilot={aiCopilot}
               aiReceptionist={aiReceptionist}
+              missedCallRecovery={missedCallRecovery}
               voiceCallId={voiceCallId}
               onSnapshotRefresh={onOperatorAssistRefresh}
             />
@@ -416,6 +420,7 @@ export function GrowthCallWorkspaceCenterPanel({
               operatorAssist={operatorAssist}
               aiCopilot={aiCopilot}
               aiReceptionist={aiReceptionist}
+              missedCallRecovery={missedCallRecovery}
               voiceCallId={voiceCallId}
               onSnapshotRefresh={onOperatorAssistRefresh}
             />
@@ -435,6 +440,7 @@ export function GrowthCallWorkspaceCenterPanel({
               operatorAssist={operatorAssist}
               aiCopilot={aiCopilot}
               aiReceptionist={aiReceptionist}
+              missedCallRecovery={missedCallRecovery}
               voiceCallId={voiceCallId}
               onSnapshotRefresh={onOperatorAssistRefresh}
             />
@@ -480,6 +486,7 @@ export function GrowthCallWorkspaceCenterPanel({
               operatorAssist={operatorAssist}
               aiCopilot={aiCopilot}
               aiReceptionist={aiReceptionist}
+              missedCallRecovery={missedCallRecovery}
               voiceCallId={voiceCallId}
             />
             <GrowthPostCallWrapup session={activeSession} submitting={submittingWrapup} onSubmit={onSubmitWrapup} embedded />

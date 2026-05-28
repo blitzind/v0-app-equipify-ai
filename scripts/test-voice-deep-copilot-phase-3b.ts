@@ -32,8 +32,8 @@ import { VOICE_SCHEMA_MIGRATION_ID, VOICE_SCHEMA_PROBE_VERSION } from "../lib/vo
 
 assert.equal(VOICE_DEEP_COPILOT_QA_MARKER, "voice-deep-copilot-v1")
 assert.equal(SNAPSHOT_DEEP_MARKER, "voice-deep-copilot-v1")
-assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v14")
-assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270614120000_voice_ai_inbound_receptionist_phase_4a")
+assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v16")
+assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270616120000_voice_compliance_orchestration_phase_4c")
 assert.equal(VOICE_CONVERSATION_PHASES.length, 10)
 assert.equal(VOICE_DEEP_COPILOT_SUGGESTION_TYPES.length, 11)
 assert.equal(VOICE_DEEP_COPILOT_MAX_ACTIVE_SUGGESTIONS, 6)

@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import { GrowthCommandCommunicationOpsSection } from "@/components/growth/growth-command-communication-ops-section"
+import { GrowthCommandMissedCallRecoverySection } from "@/components/growth/growth-command-missed-call-recovery-section"
 import { GrowthCommandDogfoodCompactSection } from "@/components/growth/growth-command-dogfood-compact-section"
 import { GrowthCommandLifecycleCompactSection } from "@/components/growth/growth-command-lifecycle-compact-section"
 import { GrowthCommandResearchCoverageSection } from "@/components/growth/growth-command-research-coverage-section"
@@ -485,6 +486,7 @@ export function GrowthCommandCenterDashboard() {
           {/* 3. Communication Operations */}
           <div id="cc-communication" className={SECTION_SCROLL_CLASS}>
           <GrowthCommandCommunicationOpsSection />
+          <GrowthCommandMissedCallRecoverySection />
           </div>
 
           {/* 4. Pipeline + Revenue */}

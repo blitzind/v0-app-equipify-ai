@@ -27,6 +27,8 @@ import {
 } from "@/lib/growth/operator-assist/types"
 import { GrowthCallWorkspaceAiCopilotSection } from "@/components/growth/growth-call-workspace-ai-copilot-section"
 import { GrowthCallWorkspaceAiReceptionistSection } from "@/components/growth/growth-call-workspace-ai-receptionist-section"
+import { GrowthCallWorkspaceMissedCallRecoverySection } from "@/components/growth/growth-call-workspace-missed-call-recovery-section"
+import type { VoiceMissedCallRecoveryWorkspaceSnapshot } from "@/lib/voice/missed-call-recovery/types"
 import type { VoiceAiCopilotWorkspaceSnapshot } from "@/lib/voice/ai-copilot/types"
 import type { VoiceAiReceptionistWorkspaceSnapshot } from "@/lib/voice/ai-receptionist/types"
 import { cn } from "@/lib/utils"
@@ -41,6 +43,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   operatorAssist,
   aiCopilot = null,
   aiReceptionist = null,
+  missedCallRecovery = null,
   voiceCallId = null,
   onSnapshotRefresh,
 }: {
@@ -53,6 +56,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   operatorAssist: UnifiedOperatorAssistSnapshot | null
   aiCopilot?: VoiceAiCopilotWorkspaceSnapshot | null
   aiReceptionist?: VoiceAiReceptionistWorkspaceSnapshot | null
+  missedCallRecovery?: VoiceMissedCallRecoveryWorkspaceSnapshot | null
   voiceCallId?: string | null
   onSnapshotRefresh?: () => Promise<void>
 }) {
@@ -369,6 +373,11 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
         </div>
 
         <p className="text-xs leading-relaxed text-muted-foreground">{GROWTH_CALL_DIALER_SAFETY_COPY}</p>
+
+        <GrowthCallWorkspaceMissedCallRecoverySection
+          missedCallRecovery={missedCallRecovery}
+          onSnapshotRefresh={onSnapshotRefresh}
+        />
 
         <GrowthCallWorkspaceAiReceptionistSection
           voiceCallId={voiceCallId}

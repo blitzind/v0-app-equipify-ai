@@ -15,6 +15,10 @@ import { GrowthRevenueIntelligenceReadinessSection } from "@/components/growth/g
 import { GrowthRetentionIntelligenceReadinessSection } from "@/components/growth/growth-retention-intelligence-readiness-section"
 import { GrowthAiCopilotReadinessSection } from "@/components/growth/growth-ai-copilot-readiness-section"
 import { GrowthAiReceptionistReadinessSection } from "@/components/growth/growth-ai-receptionist-readiness-section"
+import { GrowthMissedCallRecoveryReadinessSection } from "@/components/growth/growth-missed-call-recovery-readiness-section"
+import { GrowthVoiceDropReadinessSection } from "@/components/growth/growth-voice-drop-readiness-section"
+import { GrowthComplianceOrchestrationReadinessSection } from "@/components/growth/growth-compliance-orchestration-readiness-section"
+import { GrowthComplianceManualReviewPanel } from "@/components/growth/growth-compliance-manual-review-panel"
 import { VOICE_CONVERSATION_INTELLIGENCE_QA_MARKER } from "@/lib/voice/intelligence/types"
 import {
   VOICE_CALL_CONTROL_QA_MARKER,
@@ -714,6 +718,10 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
             <GrowthRetentionIntelligenceReadinessSection />
             <GrowthAiCopilotReadinessSection />
             <GrowthAiReceptionistReadinessSection />
+            <GrowthMissedCallRecoveryReadinessSection />
+            <GrowthVoiceDropReadinessSection />
+            <GrowthComplianceOrchestrationReadinessSection />
+            <GrowthComplianceManualReviewPanel />
 
             <section className={GROWTH_SETTINGS_SECTION_GAP}>
               <p className="flex items-center gap-2 text-sm font-medium">

@@ -5,8 +5,8 @@ import { looksLikePostgrestMissingSchemaError } from "@/lib/blitzpay/blitzpay-sc
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import { VOICE_FOUNDATION_QA_MARKER } from "@/lib/voice/types"
 
-export const VOICE_SCHEMA_PROBE_VERSION = "v14" as const
-export const VOICE_SCHEMA_MIGRATION_ID = "20270614120000_voice_ai_inbound_receptionist_phase_4a" as const
+export const VOICE_SCHEMA_PROBE_VERSION = "v16" as const
+export const VOICE_SCHEMA_MIGRATION_ID = "20270616120000_voice_compliance_orchestration_phase_4c" as const
 
 const REQUIRED_TABLES = [
   "voice_numbers",
@@ -50,6 +50,16 @@ const REQUIRED_TABLES = [
   "voice_ai_receptionist_qualification_flows",
   "voice_ai_receptionist_sessions",
   "voice_ai_receptionist_events",
+  "voice_missed_call_recovery_events",
+  "voice_callback_tasks",
+  "voice_drop_campaigns",
+  "voice_drop_recipients",
+  "voice_drop_delivery_attempts",
+  "voice_consent_records",
+  "voice_suppression_entries",
+  "voice_dnc_entries",
+  "voice_call_hour_rules",
+  "voice_compliance_audit_events",
 ] as const
 
 const TABLE_PROBE_COLUMNS: Partial<Record<(typeof REQUIRED_TABLES)[number], string>> = {

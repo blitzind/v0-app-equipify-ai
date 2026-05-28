@@ -1,6 +1,10 @@
 /** Provider scaffolds — Phase 4A (not tightly coupled). */
 
 import { deterministicReceptionistProvider } from "@/lib/voice/ai-receptionist/deterministic-provider"
+import {
+  buildProviderFailureFallbackResponse,
+  sanitizeReceptionistResponse,
+} from "@/lib/voice/ai-receptionist/guardrails"
 import type {
   ReceptionistProviderContext,
   ReceptionistProviderResponse,

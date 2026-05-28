@@ -42,8 +42,8 @@ import { buildAiReceptionistTwiml } from "../lib/voice/call-control/twilio-twiml
 import { VOICE_SCHEMA_MIGRATION_ID, VOICE_SCHEMA_PROBE_VERSION } from "../lib/voice/schema-health"
 
 assert.equal(VOICE_AI_RECEPTIONIST_QA_MARKER, "voice-ai-receptionist-v1")
-assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v14")
-assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270614120000_voice_ai_inbound_receptionist_phase_4a")
+assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v16")
+assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270616120000_voice_compliance_orchestration_phase_4c")
 assert.equal(VOICE_AI_RECEPTIONIST_AUTONOMOUS_OUTBOUND_DISABLED, true)
 assert.equal(VOICE_AI_RECEPTIONIST_BOUNDED_CONVERSATION_ONLY, true)
 assert.equal(VOICE_AI_RECEPTIONIST_PROVIDER_TIMEOUT_MS, 1500)
@@ -283,7 +283,7 @@ async function main() {
 
   const schemaHealth = fs.readFileSync(path.join(process.cwd(), "lib/voice/schema-health.ts"), "utf8")
   assert.match(schemaHealth, /voice_ai_receptionist_sessions/)
-  assert.match(schemaHealth, /"v14"/)
+  assert.match(schemaHealth, /"v16"/)
 
   const migration = fs.readFileSync(
     path.join(process.cwd(), "supabase/migrations/20270614120000_voice_ai_inbound_receptionist_phase_4a.sql"),

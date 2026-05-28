@@ -52,6 +52,7 @@ import {
   listReceptionistEvents,
   updateReceptionistSession,
 } from "@/lib/voice/repository/voice-ai-receptionist-repository"
+import { recordMissedCallRecoveryFromReceptionistHook } from "@/lib/voice/missed-call-recovery/missed-call-recovery-service"
 import { probeVoiceSchemaHealth } from "@/lib/voice/schema-health"
 
 function resolveProvider(mode: ReturnType<typeof resolveVoiceAiReceptionistProviderMode>): VoiceAiReceptionistProvider {
@@ -479,6 +480,18 @@ export async function operatorTakeoverAiReceptionist(
     providerSource: session.aiProvider,
     payload: recoveryHook,
   })
+
+  try {
+    await recordMissedCallRecoveryFromReceptionistHook(admin, {
+      organizationId: input.organizationId,
+      voiceCallId: input.voiceCallId,
+      callerNumber: String(session.metadata.callerNumber ?? ""),
+      handoffSummary: handoff.summary,
+      relationshipMemoryProfileId: session.relationshipMemoryProfileId,
+    })
+  } catch {
+    // Recovery persistence is best-effort — receptionist takeover must still succeed.
+  }
 
   return fetchAiReceptionistWorkspaceSnapshot(admin, {
     organizationId: input.organizationId,
