@@ -1873,7 +1873,7 @@ async function main(): Promise<void> {
   assert.match(contactIntelLoaderSource, /listGrowthLeadDecisionMakers/)
   assert.match(contactIntelLoaderSource, /finalizeProspectSearchCompanyResult/)
   assert.match(contactIntelLoaderSource, /prospect-search-result-finalize/)
-  assert.match(repositorySource, /applyProspectSearchContactIntelligenceOverlay/)
+  assert.match(repositorySource, /applyProspectSearchContactFirstHydrationLayers/)
   assert.match(companyCardSource, /CompanyContactIntelligencePanel/)
   assert.match(leadEngineWorkspaceSource, /contactHandoff/)
   const rankingSource = fs.readFileSync(
@@ -1932,7 +1932,7 @@ async function main(): Promise<void> {
   } = await import("../lib/growth/company-growth-signals/integrations/prospect-search-growth-signals-overlay")
   const { growthSignalRankBoost } = await import("../lib/growth/company-growth-signals/growth-signal-scoring")
 
-  assert.match(repositorySource, /applyProspectSearchIntelligenceOverlays/)
+  assert.match(repositorySource, /applyProspectSearchContactFirstHydrationLayers/)
   assert.match(rankingSource, /growthSignalRankBoost/)
   assert.match(companyCardSource, /CompanyGrowthSignalsPanel/)
   assert.match(companyCardSource, /growth_signal_score/)
@@ -2021,7 +2021,7 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "components/growth/prospect-search/related-companies-panel.tsx"),
     "utf8",
   )
-  assert.match(repositorySource, /applyProspectSearchIntelligenceOverlays/)
+  assert.match(repositorySource, /applyProspectSearchContactFirstHydrationLayers/)
   assert.match(marketPanelSource, /Related Companies/)
   assert.match(marketPanelSource, /GROWTH_MARKET_INTELLIGENCE_QA_MARKER/)
   assert.match(companyCardSource, /company_confidence/)
@@ -5032,6 +5032,100 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   assert.match(contactIdentityIntelSource, /resolveProspectSearchContactIdentities/)
   assert.match(peopleTableSource, /data-contact-identity-resolution-marker/)
   assert.match(pushMetadataSource, /contact_identities/)
+
+  const {
+    scoreProspectSearchReachableHumanFromContacts,
+    GROWTH_REACHABLE_HUMAN_PRIORITY_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-reachable-human-scoring")
+  const { computeProspectSearchIndexContactabilityBoost, GROWTH_CONTACTABILITY_RANKING_QA_MARKER } =
+    await import("../lib/growth/prospect-search/prospect-search-contactability-ranking")
+  const {
+    resolveProspectSearchProgressiveEnrichmentPlan,
+    GROWTH_PROGRESSIVE_ENRICHMENT_QA_MARKER,
+    GROWTH_CONTACT_FIRST_DISCOVERY_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-progressive-enrichment")
+  const {
+    clampProspectSearchPageSize,
+    GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-scalable-pagination")
+  const { resolveProspectSearchOutreachReadinessGate, GROWTH_OUTREACH_READINESS_GATE_QA_MARKER } =
+    await import("../lib/growth/prospect-search/prospect-search-outreach-readiness-gate")
+  const { buildProspectSearchLightweightMarketIndexRecord, GROWTH_MASSIVE_MARKET_INDEX_QA_MARKER } =
+    await import("../lib/growth/prospect-search/prospect-search-massive-market-index")
+  const { enqueueProspectSearchBackgroundEnrichmentJobs, GROWTH_BACKGROUND_ENRICHMENT_QUEUE_QA_MARKER } =
+    await import("../lib/growth/prospect-search/prospect-search-background-enrichment-queue")
+
+  assert.equal(GROWTH_REACHABLE_HUMAN_PRIORITY_QA_MARKER, "growth-reachable-human-priority-v1")
+  assert.equal(GROWTH_CONTACTABILITY_RANKING_QA_MARKER, "growth-contactability-ranking-v1")
+  assert.equal(GROWTH_CONTACT_FIRST_DISCOVERY_QA_MARKER, "growth-contact-first-discovery-v1")
+  assert.equal(GROWTH_PROGRESSIVE_ENRICHMENT_QA_MARKER, "growth-progressive-enrichment-v1")
+  assert.equal(GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER, "growth-scalable-prospect-search-v1")
+  assert.equal(GROWTH_MASSIVE_MARKET_INDEX_QA_MARKER, "growth-massive-market-index-v1")
+  assert.equal(GROWTH_OUTREACH_READINESS_GATE_QA_MARKER, "growth-outreach-readiness-gate-v1")
+  assert.equal(GROWTH_BACKGROUND_ENRICHMENT_QUEUE_QA_MARKER, "growth-background-enrichment-queue-v1")
+  assert.equal(clampProspectSearchPageSize(999), 500)
+
+  const reachable = scoreProspectSearchReachableHumanFromContacts([
+    {
+      id: "c1",
+      name: "Maria Chen",
+      title: "Service Manager",
+      confidence: 0.9,
+      email: "maria@acme.example",
+      phone: "+1 512 555 0100",
+      verification_status: "verified_channels",
+      email_verification_depth: "published_on_website",
+      phone_verification_depth: "published_on_website",
+      outreach_ready: true,
+      source_evidence: [],
+      role_type: "operations",
+      recommended_priority: 1,
+    },
+  ])
+  assert.equal(reachable.label, "outreach_ready")
+  assert.ok(reachable.score >= 75)
+
+  const indexBoost = computeProspectSearchIndexContactabilityBoost({
+    id: "co1",
+    source_type: "growth_lead",
+    company_name: "Acme",
+    website: "https://acme.example",
+    decision_maker_count: 3,
+  } as never)
+  assert.ok(indexBoost.boost > 0.1)
+
+  const plan = resolveProspectSearchProgressiveEnrichmentPlan({
+    company: { contact_intelligence: { contacts: [] } } as never,
+  })
+  assert.equal(plan.skip_market_overlays, true)
+
+  const gate = resolveProspectSearchOutreachReadinessGate({
+    company: { is_suppressed: false, contact_intelligence: { contacts: [] } } as never,
+  })
+  assert.equal(gate.gated, true)
+
+  const indexRecord = buildProspectSearchLightweightMarketIndexRecord({
+    id: "co1",
+    source_type: "growth_lead",
+    company_name: "Acme HVAC",
+    website: "https://acmehvac.com",
+    industry: "HVAC",
+    location: "Austin, TX",
+    employees: "21-50",
+    revenue_range: "5m_10m",
+    decision_maker_count: 2,
+    keywords: ["hvac", "service"],
+  } as never)
+  assert.ok(indexRecord.company_identity_hash.startsWith("mkt_"))
+
+  assert.match(shellSource, /data-contact-first-discovery-marker/)
+  assert.match(shellSource, /data-scalable-prospect-search-marker/)
+  assert.match(shellSource, /data-background-enrichment-queue-marker/)
+  const paginationSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-pagination.tsx"),
+    "utf8",
+  )
+  assert.match(paginationSource, /PROSPECT_SEARCH_SCALABLE_PAGE_SIZE_OPTIONS/)
 }
 
 void main()

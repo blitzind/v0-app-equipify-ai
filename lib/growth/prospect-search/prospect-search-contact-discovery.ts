@@ -1134,6 +1134,15 @@ export function resolveDefaultProspectSearchResultMode(input: {
     countProspectSearchPeopleRows(input.companies) + (input.serverPeopleCount ?? 0)
   if (hydratedPeopleCount === 0) return "companies"
   if (hasProspectSearchDecisionMakerFilters(input.filters)) return "people"
+
+  const outreachReadyCount = input.companies.filter(
+    (company) =>
+      company.contactability_status === "outreach_ready" ||
+      company.reachable_human?.label === "outreach_ready" ||
+      company.reachable_human?.label === "partial_contactability",
+  ).length
+
+  if (outreachReadyCount > 0 || hydratedPeopleCount >= 3) return "people"
   return "companies"
 }
 

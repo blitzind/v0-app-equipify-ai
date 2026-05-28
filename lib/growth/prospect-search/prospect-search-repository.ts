@@ -26,9 +26,10 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-ranking"
 import { enrichProspectSearchExternalCompanies } from "@/lib/growth/prospect-search/prospect-search-external-enrichment"
 import { mapProspectSearchCompaniesToDiscoverResults } from "@/lib/growth/prospect-search/prospect-search-discover-results"
-import { applyProspectSearchDiscoverHydrationLayers } from "@/lib/growth/prospect-search/prospect-search-discovery-hydration"
-import { applyProspectSearchContactIntelligenceOverlay } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-loader"
-import { applyProspectSearchIntelligenceOverlays } from "@/lib/growth/market-intelligence/integrations/prospect-search-bridge"
+import { applyProspectSearchContactFirstHydrationLayers } from "@/lib/growth/prospect-search/prospect-search-contact-first-orchestration"
+import { attachReachableHumanToCompanies } from "@/lib/growth/prospect-search/prospect-search-contactability-ranking"
+import { GROWTH_CONTACT_FIRST_DISCOVERY_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-progressive-enrichment"
+import { clampProspectSearchPageSize, GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-scalable-pagination"
 import {
   applyTerritoryFiltersToSearchInput,
   attachTerritoryIntelligenceToSearchResult,
@@ -102,14 +103,15 @@ export async function runProspectSearch(
   const discovery_mode = input.discovery_mode ?? "internal"
   const sort_by: GrowthProspectSearchSortBy = input.sort_by ?? "rank"
   const page = Math.max(1, input.page ?? 1)
-  const page_size = Math.min(200, Math.max(1, input.page_size ?? input.limit ?? 50))
+  const page_size = clampProspectSearchPageSize(input.page_size ?? input.limit ?? 50)
+  const external_limit = clampProspectSearchPageSize(input.limit ?? page_size)
 
   if (discovery_mode === "discover_external") {
     const realWorld = await runProspectSearchRealWorldDiscovery(admin, {
       query: input.query,
       filters: mergedFilters,
       created_by: input.created_by,
-      limit: input.limit ?? 50,
+      limit: external_limit,
     })
 
     const externalEnrichment = await enrichProspectSearchExternalCompanies(
@@ -166,13 +168,14 @@ export async function runProspectSearch(
       })
     }
 
-    const { companies: companiesWithSignals, hydration: discovery_hydration } =
-      await applyProspectSearchDiscoverHydrationLayers(admin, {
+    const { companies: companiesWithSignals, hydration: contact_first_hydration } =
+      await applyProspectSearchContactFirstHydrationLayers(admin, {
         companies: enrichedCompanies,
         query: input.query,
         filters: mergedFilters,
         parsed,
         sort_by,
+        operator_intent: false,
       })
 
     const source_counts = buildSourceCounts(companiesWithSignals)
@@ -221,7 +224,16 @@ export async function runProspectSearch(
       expanded_search_exhausted:
         enrichedCompanies.length === 0 &&
         provider_status_label === "provider_returned_raw_0",
-      discovery_hydration,
+      discovery_hydration: {
+        qa_marker: contact_first_hydration.qa_marker,
+        hydration_complete: contact_first_hydration.hydration_complete,
+        partial_intelligence: contact_first_hydration.partial_intelligence,
+        diagnostics: contact_first_hydration.diagnostics,
+        summary: contact_first_hydration.summary,
+      },
+      contact_first_hydration,
+      contact_first_qa_marker: GROWTH_CONTACT_FIRST_DISCOVERY_QA_MARKER,
+      scalable_search_qa_marker: GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER,
       discovery_runtime_hardening_qa_marker: GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER,
       },
       companiesWithSignals,
@@ -327,26 +339,22 @@ export async function runProspectSearch(
 
   const source_counts = buildSourceCounts(companyPageCompanies)
 
-  const companiesWithContacts = await applyProspectSearchContactIntelligenceOverlay(
-    admin,
-    companyPageCompanies,
-    { query: input.query, filters: mergedFilters, parsed },
-  )
-  const companiesWithMarket = await applyProspectSearchIntelligenceOverlays(
-    admin,
-    companiesWithContacts,
-    {
-      territory_id: mergedFilters.territory_id ?? null,
-      industry: mergedFilters.industry ?? parsed.industry ?? null,
-      territory_label: mergedFilters.territory_filter?.states?.[0]
-        ? `${mergedFilters.territory_filter.states[0]} ${mergedFilters.industry ?? parsed.industry ?? ""}`.trim()
-        : null,
-    },
-  )
+  const { companies: contactFirstCompanies, hydration: contact_first_hydration } =
+    await applyProspectSearchContactFirstHydrationLayers(admin, {
+      companies: companyPageCompanies,
+      query: input.query,
+      filters: mergedFilters,
+      parsed,
+      sort_by,
+      operator_intent: false,
+    })
+
   const companiesWithSignals =
     sort_by === "signal_momentum"
-      ? companiesWithMarket
-      : await applyProspectSearchSignalIntelligenceOverlay(admin, companiesWithMarket, { sort_by })
+      ? await applyProspectSearchSignalIntelligenceOverlay(admin, contactFirstCompanies, {
+          sort_by,
+        }).catch(() => contactFirstCompanies)
+      : attachReachableHumanToCompanies(contactFirstCompanies)
 
   return attachTerritoryIntelligenceToSearchResult(
     admin,
@@ -367,6 +375,9 @@ export async function runProspectSearch(
     has_next_page: companyPageMeta.has_next_page,
     index_diagnostics,
     source_counts,
+    contact_first_hydration,
+    contact_first_qa_marker: GROWTH_CONTACT_FIRST_DISCOVERY_QA_MARKER,
+    scalable_search_qa_marker: GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER,
     },
     companiesWithSignals,
   )

@@ -7,8 +7,10 @@ import type {
   GrowthProspectSearchPersonResult,
 } from "@/lib/growth/prospect-search/prospect-search-types"
 import { inferEmployeeSizeBand, inferRevenueBand } from "@/lib/growth/prospect-search/prospect-search-filters"
+import { clampProspectSearchPageSize } from "@/lib/growth/prospect-search/prospect-search-scalable-pagination"
 import { finalizeProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-result-finalize"
 import { computeContactCoverageRankBoost } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence"
+import { computeProspectSearchIndexContactabilityBoost } from "@/lib/growth/prospect-search/prospect-search-contactability-ranking"
 import { growthSignalRankBoost } from "@/lib/growth/company-growth-signals/growth-signal-scoring"
 
 function includesFold(hay: string | null | undefined, needle: string): boolean {
@@ -151,8 +153,10 @@ export function rankProspectSearchCompanies(
       rank = Math.max(rank, textMatchScore(parsed.keywords.join(" "), blob))
     }
     rank += computeQualificationRankBoost(row)
-    rank += computeContactRankBoost(row)
-    rank += growthSignalRankBoost(row.growth_signal_score)
+    const contactability = computeProspectSearchIndexContactabilityBoost(row)
+    rank += contactability.boost
+    rank += computeContactRankBoost(row) * 0.35
+    rank += growthSignalRankBoost(row.growth_signal_score) * 0.5
 
     const summary = row.company_signal_summary
     if (summary?.technology_signals.length) rank += 0.02
@@ -175,6 +179,7 @@ export function rankProspectSearchCompanies(
     if (row.decision_maker_count > 0) {
       reasoning.push(`${row.decision_maker_count} evidence-backed decision maker(s) indexed.`)
     }
+    if (contactability.reasons[0]) reasoning.push(contactability.reasons[0])
     if (row.signals.length) reasoning.push(row.signals[0]!)
     if (summary?.technology_signals[0]) {
       reasoning.push(`Technology signal: ${summary.technology_signals[0]}.`)
@@ -274,7 +279,7 @@ export function paginateRankedProspectSearchCompanies(
   has_next_page: boolean
 } {
   const safePage = Math.max(1, page)
-  const safePageSize = Math.min(200, Math.max(1, pageSize))
+  const safePageSize = clampProspectSearchPageSize(pageSize)
   const ranked = rankProspectSearchCompanies(rows, query, parsed, rows.length || 1, filters)
   const offset = (safePage - 1) * safePageSize
   const companies = ranked.slice(offset, offset + safePageSize)
@@ -330,7 +335,7 @@ export function paginateRankedProspectSearchPeople(
   has_next_page: boolean
 } {
   const safePage = Math.max(1, page)
-  const safePageSize = Math.min(200, Math.max(1, pageSize))
+  const safePageSize = clampProspectSearchPageSize(pageSize)
   const ranked = rankProspectSearchPeople(rows, query, rows.length || 1)
   const offset = (safePage - 1) * safePageSize
   const people = ranked.slice(offset, offset + safePageSize)

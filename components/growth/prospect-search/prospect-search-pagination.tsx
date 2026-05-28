@@ -1,6 +1,10 @@
 "use client"
 
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import {
+  PROSPECT_SEARCH_SCALABLE_PAGE_SIZE_OPTIONS,
+  GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-scalable-pagination"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -36,6 +40,7 @@ export function ProspectSearchPagination({
     <div
       className="flex flex-col gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
       data-qa-marker="growth-prospect-search-pagination-v1"
+      data-scalable-prospect-search-marker={GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER}
     >
       <p className="text-xs text-muted-foreground">
         Showing {start}–{end} of {totalCount.toLocaleString()}
@@ -49,7 +54,7 @@ export function ProspectSearchPagination({
             <SelectValue placeholder="Page size" />
           </SelectTrigger>
           <SelectContent>
-            {[25, 50, 100].map((size) => (
+            {PROSPECT_SEARCH_SCALABLE_PAGE_SIZE_OPTIONS.map((size) => (
               <SelectItem key={size} value={String(size)}>
                 {size} / page
               </SelectItem>

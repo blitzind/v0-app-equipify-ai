@@ -20,7 +20,17 @@ import {
   GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER,
   type GrowthProspectSearchPeopleResultRow,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
-import { formatWebsiteEvidenceQualityLabel } from "@/lib/growth/contact-discovery/website-acquisition-metadata-bridge"
+import {
+  formatWebsiteEvidenceQualityLabel,
+  GROWTH_PUBLIC_PROFILE_REFERENCE_QA_MARKER,
+} from "@/lib/growth/contact-discovery/website-acquisition-metadata-bridge"
+import {
+  GROWTH_CONTACT_FIRST_DISCOVERY_QA_MARKER,
+  GROWTH_PROGRESSIVE_ENRICHMENT_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-progressive-enrichment"
+import { GROWTH_REACHABLE_HUMAN_PRIORITY_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-reachable-human-scoring"
+import { GROWTH_CONTACTABILITY_RANKING_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contactability-ranking"
+import { GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-scalable-pagination"
 import { formatProspectSearchContactConflictLabel } from "@/lib/growth/prospect-search/prospect-search-contact-identity-operator-review"
 import { GROWTH_CONTACT_INFLUENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-influence"
 import {
@@ -144,6 +154,11 @@ export function ProspectSearchDiscoverPeopleTable({
       data-contact-identity-resolution-marker={GROWTH_CONTACT_IDENTITY_RESOLUTION_QA_MARKER}
       data-evidence-fusion-marker={GROWTH_EVIDENCE_FUSION_QA_MARKER}
       data-contact-conflict-review-marker={GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER}
+      data-contact-first-discovery-marker={GROWTH_CONTACT_FIRST_DISCOVERY_QA_MARKER}
+      data-reachable-human-priority-marker={GROWTH_REACHABLE_HUMAN_PRIORITY_QA_MARKER}
+      data-contactability-ranking-marker={GROWTH_CONTACTABILITY_RANKING_QA_MARKER}
+      data-progressive-enrichment-marker={GROWTH_PROGRESSIVE_ENRICHMENT_QA_MARKER}
+      data-scalable-prospect-search-marker={GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER}
       data-result-mode="people"
     >
       <table className="w-full min-w-[1280px] text-left text-xs">

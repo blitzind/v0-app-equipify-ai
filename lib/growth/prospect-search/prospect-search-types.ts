@@ -358,6 +358,13 @@ export type GrowthProspectSearchCompanyResult = GrowthSignalAiInsightClientField
   /** Keyword hints for external discovery industry matching. */
   keywords?: string[]
   notes?: string | null
+  /** Contact-first reachable human scoring overlay. */
+  reachable_human?: import("@/lib/growth/prospect-search/prospect-search-reachable-human-scoring").ProspectSearchReachableHumanSnapshot | null
+  contactability_status?: import("@/lib/growth/prospect-search/prospect-search-reachable-human-scoring").ProspectSearchReachableHumanLabel | null
+  contact_first_rank_score?: number | null
+  lightweight_mode?: boolean
+  lightweight_market_index?: import("@/lib/growth/prospect-search/prospect-search-massive-market-index").ProspectSearchLightweightMarketIndexRecord | null
+  progressive_enrichment?: import("@/lib/growth/prospect-search/prospect-search-progressive-enrichment").ProspectSearchProgressiveEnrichmentPlan | null
   /** Intent Signals momentum overlay (Milestone E). */
   signal_momentum_score?: number | null
   signal_momentum_label?: GrowthSignalMomentumLabel | null
@@ -525,6 +532,9 @@ export type GrowthProspectSearchResult = {
   expanded_search_exhausted?: boolean
   territory_intelligence?: GrowthTerritoryIntelligenceSummary | null
   discovery_hydration?: import("@/lib/growth/prospect-search/prospect-search-discovery-hydration").GrowthProspectSearchHydrationSnapshot | null
+  contact_first_hydration?: import("@/lib/growth/prospect-search/prospect-search-contact-first-orchestration").GrowthProspectSearchContactFirstHydrationSnapshot | null
+  contact_first_qa_marker?: typeof import("@/lib/growth/prospect-search/prospect-search-progressive-enrichment").GROWTH_CONTACT_FIRST_DISCOVERY_QA_MARKER | null
+  scalable_search_qa_marker?: typeof import("@/lib/growth/prospect-search/prospect-search-scalable-pagination").GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER | null
   discovery_runtime_hardening_qa_marker?: typeof import("@/lib/growth/prospect-search/prospect-search-safe-fetch-json").GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER | null
 }
 

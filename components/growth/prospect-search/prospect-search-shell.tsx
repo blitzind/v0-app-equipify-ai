@@ -175,6 +175,18 @@ import { enrichPeopleRowWithIdentityReview } from "@/components/growth/prospect-
 import { applyProspectSearchContactIdentityOperatorReview } from "@/lib/growth/prospect-search/prospect-search-contact-identity-operator-review"
 import type { ProspectSearchContactIdentityOperatorAction } from "@/lib/growth/prospect-search/prospect-search-contact-identity-types"
 import {
+  enqueueProspectSearchBackgroundEnrichmentJobs,
+  GROWTH_BACKGROUND_ENRICHMENT_QUEUE_QA_MARKER,
+  type ProspectSearchBackgroundEnrichmentJob,
+} from "@/lib/growth/prospect-search/prospect-search-background-enrichment-queue"
+import { GROWTH_CONTACTABILITY_RANKING_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contactability-ranking"
+import { GROWTH_CONTACT_FIRST_DISCOVERY_QA_MARKER, GROWTH_PROGRESSIVE_ENRICHMENT_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-progressive-enrichment"
+import { GROWTH_MASSIVE_MARKET_INDEX_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-massive-market-index"
+import { GROWTH_REACHABLE_HUMAN_PRIORITY_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-reachable-human-scoring"
+import { GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-scalable-pagination"
+import { GROWTH_OUTREACH_READINESS_GATE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-outreach-readiness-gate"
+import { ProspectSearchLightweightCompanyRow } from "@/components/growth/prospect-search/prospect-search-lightweight-company-row"
+import {
   mergeProspectSearchPeopleSelectionStore,
   prospectSearchPeopleSelectionKey,
   buildProspectSearchPeopleRowsVisibilityKey,
@@ -297,6 +309,9 @@ function ProspectSearchShellInner() {
   )
   const [identityReviewByKey, setIdentityReviewByKey] = useState<
     Map<string, NonNullable<GrowthProspectSearchPeopleResultRow["identity_resolution"]>>
+  >(new Map())
+  const [backgroundEnrichmentQueue, setBackgroundEnrichmentQueue] = useState<
+    Map<string, ProspectSearchBackgroundEnrichmentJob>
   >(new Map())
   const [commandWorkViewFilter, setCommandWorkViewFilter] = useState<string>("all")
 
@@ -534,6 +549,21 @@ function ProspectSearchShellInner() {
     const mode = searchParams.get("mode")
     setDiscoveryMode(resolveProspectSearchDiscoveryMode(mode))
   }, [searchParams])
+
+  useEffect(() => {
+    if (!searchCompleted || companies.length === 0) return
+    const lightweight = companies.filter((company) => company.lightweight_mode)
+    if (lightweight.length === 0) return
+    setBackgroundEnrichmentQueue((prev) => {
+      const { queue } = enqueueProspectSearchBackgroundEnrichmentJobs({
+        companies: lightweight,
+        trigger: "viewed",
+        target_tier: "tier_2_contact_acquisition",
+        existing: prev,
+      })
+      return queue.size === prev.size ? prev : queue
+    })
+  }, [searchCompleted, companies])
 
   useEffect(() => {
     if (!searchCompleted || companies.length === 0) return
@@ -1535,6 +1565,15 @@ function ProspectSearchShellInner() {
       data-contact-identity-resolution-marker={GROWTH_CONTACT_IDENTITY_RESOLUTION_QA_MARKER}
       data-evidence-fusion-marker={GROWTH_EVIDENCE_FUSION_QA_MARKER}
       data-contact-conflict-review-marker={GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER}
+      data-contact-first-discovery-marker={GROWTH_CONTACT_FIRST_DISCOVERY_QA_MARKER}
+      data-reachable-human-priority-marker={GROWTH_REACHABLE_HUMAN_PRIORITY_QA_MARKER}
+      data-contactability-ranking-marker={GROWTH_CONTACTABILITY_RANKING_QA_MARKER}
+      data-massive-market-index-marker={GROWTH_MASSIVE_MARKET_INDEX_QA_MARKER}
+      data-progressive-enrichment-marker={GROWTH_PROGRESSIVE_ENRICHMENT_QA_MARKER}
+      data-scalable-prospect-search-marker={GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER}
+      data-background-enrichment-queue-marker={GROWTH_BACKGROUND_ENRICHMENT_QUEUE_QA_MARKER}
+      data-background-enrichment-pending={backgroundEnrichmentQueue.size}
+      data-outreach-readiness-gate-marker={GROWTH_OUTREACH_READINESS_GATE_QA_MARKER}
       data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
       data-prospect-search-render-loop-fix-marker={GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER}
       data-contact-discovery-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}
@@ -1949,7 +1988,18 @@ function ProspectSearchShellInner() {
                 />
               ) : searchCompleted && view === "card" ? (
                 <div className="flex flex-col gap-4">
-                  {commandFilteredCompanies.map((row) => (
+                  {commandFilteredCompanies.map((row) =>
+                    row.lightweight_mode ? (
+                      <ProspectSearchLightweightCompanyRow
+                        key={`${row.source_type}-${row.id}`}
+                        company={row}
+                        onFindContacts={() => {
+                          setSelectedCompany(row)
+                          toggleCompanySelection(row, true)
+                          void runBulkContactDiscovery("selected")
+                        }}
+                      />
+                    ) : (
                     <CompanyResultCard
                       key={`${row.source_type}-${row.id}`}
                       row={row}
@@ -1967,7 +2017,8 @@ function ProspectSearchShellInner() {
                       searchQuery={query}
                       savedSearchId={activeSavedSearchId}
                     />
-                  ))}
+                    ),
+                  )}
                 </div>
               ) : searchCompleted && discoveryMode === "discover_external" ? (
                 <>

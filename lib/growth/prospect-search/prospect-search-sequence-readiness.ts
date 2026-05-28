@@ -8,6 +8,10 @@ import type { ProspectSearchRelationshipMemorySnapshot } from "@/lib/growth/pros
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthProspectSearchPeopleResultRow } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 
+import {
+  resolveProspectSearchOutreachReadinessGate,
+} from "@/lib/growth/prospect-search/prospect-search-outreach-readiness-gate"
+
 export const GROWTH_SEQUENCE_READINESS_QA_MARKER = "growth-sequence-readiness-v1" as const
 
 export const PROSPECT_SEARCH_SEQUENCE_READINESS_STATES = [
@@ -84,6 +88,31 @@ export function resolveAccountSequenceReadiness(input: {
       recommended_first_contact_name: null,
       suggested_sequence_type: "Do not sequence — compliance blocked",
       readiness_score: 0,
+    }
+  }
+
+  const outreachGate = resolveProspectSearchOutreachReadinessGate({
+    company,
+    reachable: company.reachable_human ?? undefined,
+  })
+
+  if (
+    outreachGate.gated &&
+    outreachGate.state === "contact_acquisition_required" &&
+    peopleRows.length === 0
+  ) {
+    return {
+      qa_marker: GROWTH_SEQUENCE_READINESS_QA_MARKER,
+      readiness_state: "research_required",
+      sequence_suitability: "research_first",
+      readiness_reasons: outreachGate.reasons,
+      blockers: outreachGate.blockers,
+      missing_requirements: ["Acquire reachable humans before sequencing"],
+      safest_recommended_channel: "research",
+      recommended_first_contact_id: null,
+      recommended_first_contact_name: null,
+      suggested_sequence_type: "Contact acquisition required before outreach",
+      readiness_score: Math.max(0, outreachGate.reachable.score / 5),
     }
   }
 

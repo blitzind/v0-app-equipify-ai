@@ -11,6 +11,8 @@ import type { ProspectSearchRelationshipMemorySnapshot } from "@/lib/growth/pros
 import type { ProspectSearchSequenceReadiness } from "@/lib/growth/prospect-search/prospect-search-sequence-readiness"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthProspectSearchPeopleResultRow } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
+import { resolveProspectSearchReachableHumanScore } from "@/lib/growth/prospect-search/prospect-search-reachable-human-scoring"
+import { resolveProspectSearchOutreachReadinessGate } from "@/lib/growth/prospect-search/prospect-search-outreach-readiness-gate"
 
 export const GROWTH_OPERATOR_RECOMMENDATIONS_QA_MARKER = "growth-operator-recommendations-v1" as const
 
@@ -29,6 +31,7 @@ export const PROSPECT_SEARCH_OPERATOR_RECOMMENDATION_TYPES = [
   "follow_up_recommended",
   "research_before_outreach",
   "identity_conflict_review",
+  "contact_acquisition_required",
 ] as const
 
 export type ProspectSearchOperatorRecommendationType =
@@ -118,6 +121,11 @@ export function buildProspectSearchOperatorRecommendations(input: {
     queue_priority_score,
   } = input
 
+  const outreachGate = resolveProspectSearchOutreachReadinessGate({
+    company,
+    reachable: company.reachable_human ?? undefined,
+  })
+
   const staleCount = peopleRows.filter(
     (row) => row.freshness_status === "stale" || row.freshness_status === "expired",
   ).length
@@ -128,6 +136,9 @@ export function buildProspectSearchOperatorRecommendations(input: {
       row.conflict_status !== "no_conflict" &&
       row.conflict_status !== "likely_same_person",
   )
+  const noReachableHumans =
+    resolveProspectSearchReachableHumanScore(company).label === "no_reachable_humans" &&
+    peopleRows.length === 0
   const topInfluence = [...(contactInfluences ?? [])].sort(
     (a, b) => b.influence_score - a.influence_score,
   )[0]
@@ -215,6 +226,29 @@ export function buildProspectSearchOperatorRecommendations(input: {
       contributing_signals: ["coverage_gaps"],
       uncertainty_notes: [],
       blocker_explanations: sequenceReadiness?.missing_requirements ?? [],
+    })
+  }
+
+  if (noReachableHumans) {
+    pushRecommendation(recommendations, {
+      recommendation_type: "contact_acquisition_required",
+      title: "Contact acquisition required — no reachable humans",
+      confidence: 0.88,
+      urgency: "high",
+      evidence: outreachGate?.blockers?.length
+        ? outreachGate.blockers
+        : ["No verified contacts on account"],
+      reasoning: [
+        "Contact-first policy blocks sequence and outreach execution until humans are discoverable",
+        "Run focused website contact acquisition before deep intelligence expansion",
+      ],
+      recommended_operator_action: "Find contacts on this account (team, leadership, contact pages)",
+      recommended_timing: "Now — before queue, pipeline, or sequence actions",
+      risk_notes: ["Deep intelligence without contacts wastes compute and blocks execution"],
+      contributing_signals: ["reachable_human_score", "contact_first_policy"],
+      uncertainty_notes: [],
+      blocker_explanations: [],
+      priority_score: 72,
     })
   }
 
