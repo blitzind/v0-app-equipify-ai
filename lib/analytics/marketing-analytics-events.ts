@@ -59,8 +59,11 @@ function invokeGtag(args: unknown[]) {
 const ADS_CONVERSION_SETTLE_MS = 1500
 
 /**
- * Google Ads signup conversion — beacon + `event_callback` + timeout so navigation
- * can wait without racing the network. Calls `onSettled` exactly once.
+ * Google Ads signup conversion ("Free Trial Signup") — intentionally fires only
+ * after successful onboarding completion (`trackOnboardingCompleted`), never on
+ * page load, button click, or partial steps. Uses beacon + `event_callback` +
+ * timeout so navigation can wait without racing the network. Calls `onSettled`
+ * exactly once.
  */
 function fireGoogleAdsSignupConversionOnceWithSettle(
   userId: string,
@@ -74,7 +77,7 @@ function fireGoogleAdsSignupConversionOnceWithSettle(
 
   const sendTo = getGoogleAdsSignupSendTo()
   if (!sendTo) {
-    marketingAnalyticsDebug("Ads conversion skipped: NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO unset")
+    marketingAnalyticsDebug("Ads conversion skipped: signup send_to disabled or unset")
     onSettled()
     return
   }

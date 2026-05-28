@@ -25,6 +25,8 @@ import {
   type UnifiedOperatorAssistEvent,
   type UnifiedOperatorAssistSnapshot,
 } from "@/lib/growth/operator-assist/types"
+import { GrowthCallWorkspaceAiCopilotSection } from "@/components/growth/growth-call-workspace-ai-copilot-section"
+import type { VoiceAiCopilotWorkspaceSnapshot } from "@/lib/voice/ai-copilot/types"
 import { cn } from "@/lib/utils"
 
 export function GrowthCallWorkspaceUnifiedAssistPanel({
@@ -35,6 +37,8 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   leadLinked,
   startSignal,
   operatorAssist,
+  aiCopilot = null,
+  voiceCallId = null,
   onSnapshotRefresh,
 }: {
   phase: "idle" | "incoming" | "bridge_pending" | "active" | "wrapup"
@@ -44,6 +48,8 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   leadLinked: boolean
   startSignal?: number
   operatorAssist: UnifiedOperatorAssistSnapshot | null
+  aiCopilot?: VoiceAiCopilotWorkspaceSnapshot | null
+  voiceCallId?: string | null
   onSnapshotRefresh?: () => Promise<void>
 }) {
   const [acting, setActing] = useState<string | null>(null)
@@ -359,6 +365,12 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
         </div>
 
         <p className="text-xs leading-relaxed text-muted-foreground">{GROWTH_CALL_DIALER_SAFETY_COPY}</p>
+
+        <GrowthCallWorkspaceAiCopilotSection
+          voiceCallId={voiceCallId}
+          aiCopilot={aiCopilot}
+          onRefresh={onSnapshotRefresh}
+        />
       </div>
     </>
   )

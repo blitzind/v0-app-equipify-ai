@@ -8,7 +8,7 @@ This app mirrors the marketing stack used on [www.equipify.ai](https://www.equip
 |----------|----------|-------------|
 | `NEXT_PUBLIC_GA4_ID` | No* | GA4 measurement ID (`G-…`). Default when unset: `G-YZMS47H63H` (same as marketing site). |
 | `NEXT_PUBLIC_GOOGLE_ADS_ID` | No* | Google Ads tag ID (`AW-…`). Default when unset: `AW-18160904774` (same as marketing site). |
-| `NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO` | No | Full Ads conversion `send_to` value (`AW-…/label`). Without it, GA4 events still fire but the Ads `conversion` event is skipped. Copy the exact value from Google Ads → Goals → Conversions → Tag setup. |
+| `NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO` | No | Full Ads conversion `send_to` for **Free Trial Signup**. Default when unset: `AW-18160904774/0J7wCMeXtqwcEMbU5dND`. Set to `off` to disable Ads conversion hits while keeping GA4 events. |
 | `NEXT_PUBLIC_ANALYTICS_COOKIE_DOMAIN` | No | Override first-party cookie domain. Default: `.equipify.ai` when the hostname ends with `equipify.ai`; omitted on `localhost`. |
 | `NEXT_PUBLIC_ANALYTICS_LINKER_DOMAINS` | No | Comma-separated hostnames for `linker.domains` (cross-domain / subdomain measurement). Default: `www.equipify.ai,app.equipify.ai,equipify.ai`. |
 | `NEXT_PUBLIC_ANALYTICS_DEBUG` | No | Set to `1` to log gtag init, SPA `page_view`, and conversion-related calls to the browser console. |
@@ -36,7 +36,7 @@ They run only after the server confirms success:
 
 | Event / action | When it fires |
 |----------------|----------------|
-| `trackOnboardingCompleted` → GA4 `sign_up`, `onboarding_completed`, optional Ads `conversion` | After successful `POST /api/invites/accept` or `POST /api/onboarding/provision` in `app/(auth)/onboarding/page.tsx` (`finalizeOnboarding`), with parsed `organizationId`. The page **awaits** `onRedirectReady` from `trackOnboardingCompleted` before `router.push` so the Google Ads hit is not cut off by navigation. Ads conversion uses `transport_type: 'beacon'`, `event_callback`, and a **1500ms** timeout fallback (first wins). |
+| `trackOnboardingCompleted` → GA4 `sign_up`, `onboarding_completed`, Google Ads `conversion` (`Free Trial Signup`) | After successful `POST /api/invites/accept` or `POST /api/onboarding/provision` in `app/(auth)/onboarding/page.tsx` (`finalizeOnboarding`), with parsed `organizationId`. The page **awaits** `onRedirectReady` from `trackOnboardingCompleted` before `router.push` so the Google Ads hit is not cut off by navigation. Ads conversion uses `send_to: AW-18160904774/0J7wCMeXtqwcEMbU5dND` (override via env), `transport_type: 'beacon'`, `event_callback`, and a **1500ms** timeout fallback (first wins). **Does not fire on page load, onboarding start, or button click.** |
 | `trackFreeTrialSignup` → GA4 `free_trial_signup` | Same success path, **only** for self-serve provisioning (`completionFlow === "self_serve"`), i.e. when the trial subscription is bootstrapped server-side. |
 
 Client-side deduplication uses `sessionStorage` keys so refresh/retry in the same tab does not double-send the same completion.
@@ -62,12 +62,12 @@ Use `lib/analytics/third-party-marketing-pixels.ts` and invoke `registerFutureMa
 
 ## Manual QA
 
-1. Set `NEXT_PUBLIC_GA4_ID`, `NEXT_PUBLIC_GOOGLE_ADS_ID`, and optionally `NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO` in `.env.local`.
+1. Optional: override `NEXT_PUBLIC_GA4_ID`, `NEXT_PUBLIC_GOOGLE_ADS_ID`, or `NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO` in `.env.local` (defaults are production-ready).
 2. **View source** or DevTools → Elements on `/onboarding`: confirm `<body data-equipify-google-tags="app-subdomain-v1">`, a `<head>` `<script async src="https://www.googletagmanager.com/gtag/js?id=G-YZMS47H63H">`, and an inline `<script id="equipify-marketing-gtag-bootstrap">` with `gtag('config','G-YZMS47H63H'` and `gtag('config','AW-18160904774'`.
 3. DevTools → Console: `typeof window.gtag` should be `"function"` on `/onboarding` without signing in.
 4. Set `NEXT_PUBLIC_ANALYTICS_DEBUG=1`, run the app; filter console for `equipify-analytics`.
 5. Navigate between routes: confirm a `page_view` log per navigation without double bursts on a single navigation (Strict Mode may still mount twice in dev; dedupe should collapse identical path+search within ~450ms).
-6. Complete onboarding on a test account: confirm logs for `GA4 sign_up + onboarding_completed`, `GA4 free_trial_signup` (self-serve only), and `Ads conversion` when `SIGNUP_SEND_TO` is set.
+6. Complete onboarding on a test account: confirm logs for `GA4 sign_up + onboarding_completed`, `GA4 free_trial_signup` (self-serve only), and `Google Ads conversion fired` (with `NEXT_PUBLIC_ANALYTICS_DEBUG=1`). In DevTools → Network, filter `collect` / `gtag` / `ads` and confirm a single conversion request after success — not on `/onboarding` page load.
 7. In GA4 **DebugView** (with debug mode or GA Debugger), confirm events and page views for `app.equipify.ai`.
 8. Optional: land on `www.equipify.ai` with UTM/gclid, then continue to `app.equipify.ai` onboarding; in Ads/GA4 reporting, verify attributed conversions within your attribution window (not real-time in all surfaces).
 9. Tag Assistant: connect to `https://app.equipify.ai/onboarding` and confirm the Google tag is detected after deploy.

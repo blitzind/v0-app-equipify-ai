@@ -15,6 +15,13 @@ export const EQUIPIFY_MARKETING_GA4_MEASUREMENT_ID = "G-YZMS47H63H" as const
 /** Same Google Ads destination as the marketing site — public tag ID. */
 export const EQUIPIFY_MARKETING_GOOGLE_ADS_ID = "AW-18160904774" as const
 
+/**
+ * Google Ads "Free Trial Signup" conversion label — fires only after successful
+ * onboarding completion via `trackOnboardingCompleted` (not on page load).
+ */
+export const EQUIPIFY_MARKETING_GOOGLE_ADS_SIGNUP_SEND_TO =
+  "AW-18160904774/0J7wCMeXtqwcEMbU5dND" as const
+
 export type EquipifyMarketingPublicEnv = {
   ga4Id: string | null
   googleAdsId: string | null
@@ -44,6 +51,12 @@ function resolvePublicMeasurementId(
   return trimmed ?? defaultId
 }
 
+function resolveSignupSendTo(envValue: string | undefined): string | null {
+  const trimmed = trimEnv(envValue)
+  if (trimmed === "0" || trimmed === "false" || trimmed === "off") return null
+  return trimmed ?? EQUIPIFY_MARKETING_GOOGLE_ADS_SIGNUP_SEND_TO
+}
+
 function publicEnvFromWindow(): EquipifyMarketingPublicEnv | null {
   if (typeof window === "undefined") return null
   const raw = window.__EQUIPIFY_MARKETING_ENV__
@@ -62,7 +75,7 @@ export function readMarketingPublicEnvForServerScript(): EquipifyMarketingPublic
       process.env.NEXT_PUBLIC_GOOGLE_ADS_ID,
       EQUIPIFY_MARKETING_GOOGLE_ADS_ID,
     ),
-    signupSendTo: trimEnv(process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO),
+    signupSendTo: resolveSignupSendTo(process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO),
     analyticsDebug: trimEnv(process.env.NEXT_PUBLIC_ANALYTICS_DEBUG),
     cookieDomainOverride: trimEnv(process.env.NEXT_PUBLIC_ANALYTICS_COOKIE_DOMAIN),
     linkerDomainsRaw: trimEnv(process.env.NEXT_PUBLIC_ANALYTICS_LINKER_DOMAINS),
@@ -87,12 +100,18 @@ export function getGoogleAdsId(): string | null {
 }
 
 /**
- * Full Google Ads conversion `send_to` value, e.g. `AW-18160904774/AbCdEfGhIj`.
- * Optional: when unset, GA4 events still fire but the Ads `conversion` event is skipped.
+ * Full Google Ads conversion `send_to` for the Free Trial Signup action.
+ * Defaults to `EQUIPIFY_MARKETING_GOOGLE_ADS_SIGNUP_SEND_TO` when env is unset.
+ * Set env to `off` to disable Ads conversion hits while keeping GA4 events.
  */
 export function getGoogleAdsSignupSendTo(): string | null {
   const w = publicEnvFromWindow()
-  return trimEnv(w?.signupSendTo ?? undefined) ?? trimEnv(process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO)
+  if (w?.signupSendTo !== undefined) {
+    const fromWindow = trimEnv(w.signupSendTo)
+    if (fromWindow === "0" || fromWindow === "false" || fromWindow === "off") return null
+    return fromWindow ?? EQUIPIFY_MARKETING_GOOGLE_ADS_SIGNUP_SEND_TO
+  }
+  return resolveSignupSendTo(process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO)
 }
 
 export function isMarketingAnalyticsDebugEnabled(): boolean {

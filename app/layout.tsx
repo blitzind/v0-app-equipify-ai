@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next'
 import {
   EQUIPIFY_MARKETING_GA4_MEASUREMENT_ID,
   EQUIPIFY_MARKETING_GOOGLE_ADS_ID,
+  readMarketingPublicEnvForServerScript,
 } from '@/lib/analytics/marketing-analytics-config'
 import { GlobalProviders } from '@/components/global-providers'
 import './globals.css'
@@ -32,6 +33,7 @@ function buildEquipifyGoogleTagBootstrap(): string {
   const configJson = JSON.stringify(configPayload)
   const ga4Id = EQUIPIFY_MARKETING_GA4_MEASUREMENT_ID
   const adsId = EQUIPIFY_MARKETING_GOOGLE_ADS_ID
+  const marketingEnv = readMarketingPublicEnvForServerScript()
   const analyticsDebug = process.env.NEXT_PUBLIC_ANALYTICS_DEBUG === '1' ? '1' : null
 
   const lines = [
@@ -45,10 +47,10 @@ function buildEquipifyGoogleTagBootstrap(): string {
     `window.__EQUIPIFY_MARKETING_ENV__=${JSON.stringify({
       ga4Id,
       googleAdsId: adsId,
-      signupSendTo: null,
+      signupSendTo: marketingEnv.signupSendTo,
       analyticsDebug,
-      cookieDomainOverride: null,
-      linkerDomainsRaw: null,
+      cookieDomainOverride: marketingEnv.cookieDomainOverride,
+      linkerDomainsRaw: marketingEnv.linkerDomainsRaw,
     })}`,
   ]
 
