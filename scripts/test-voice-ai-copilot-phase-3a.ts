@@ -35,8 +35,8 @@ import {
 import { VOICE_SCHEMA_MIGRATION_ID, VOICE_SCHEMA_PROBE_VERSION } from "../lib/voice/schema-health"
 
 assert.equal(VOICE_AI_COPILOT_QA_MARKER, "voice-ai-copilot-v1")
-assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v17")
-assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270617120000_voice_ai_outbound_phase_5a")
+assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v18")
+assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270618120000_voice_observability_analytics_phase_5b")
 assert.equal(VOICE_AI_COPILOT_PASSIVE_MODE_ENABLED, true)
 assert.equal(VOICE_AI_COPILOT_AUTONOMOUS_ACTIONS_DISABLED, true)
 assert.equal(VOICE_AI_COPILOT_EVIDENCE_REQUIRED, true)

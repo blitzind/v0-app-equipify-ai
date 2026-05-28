@@ -21,8 +21,8 @@ import { partitionUnifiedAssistFeed, rankUnifiedAssistEvents } from "../lib/grow
 import { VOICE_SCHEMA_MIGRATION_ID, VOICE_SCHEMA_PROBE_VERSION } from "../lib/voice/schema-health"
 
 assert.equal(VOICE_UNIFIED_OPERATOR_ASSIST_QA_MARKER, "voice-unified-operator-assist-v1")
-assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v17")
-assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270617120000_voice_ai_outbound_phase_5a")
+assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v18")
+assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270618120000_voice_observability_analytics_phase_5b")
 
 const dedupeKey = buildAssistDedupeKey({
   category: "objection",
