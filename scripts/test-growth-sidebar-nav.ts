@@ -19,6 +19,7 @@ import {
   GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER,
   resolveGrowthNavigationEntryFromPathname,
 } from "../lib/growth/navigation/growth-navigation-destinations"
+import { GROWTH_CALLS_RUNTIME_HARDENING_QA_MARKER } from "../lib/growth/navigation/growth-workspace-consolidation"
 import { GROWTH_COMMAND_REGISTRY } from "../lib/growth/navigation/growth-command-registry"
 import { GROWTH_NAVIGATION_POLISH_QA_MARKER } from "../lib/growth/navigation/growth-navigation-ranking"
 import { APP_Z_GROWTH_NAV_FLYOUT } from "../lib/layout/app-z-layers"
@@ -87,6 +88,7 @@ assert.match(source, /GrowthNavGroupedLinks/)
 assert.match(source, /GrowthNavSubsectionHeader/)
 assert.match(source, /GROWTH_DELIVERY_OPS_NAV_QA_MARKER/)
 assert.equal(GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER, "growth-workspace-consolidation-v2")
+assert.equal(GROWTH_CALLS_RUNTIME_HARDENING_QA_MARKER, "growth-calls-runtime-hardening-v1")
 assert.match(source, /data-workspace-consolidation-marker/)
 assert.match(source, /GROWTH_WORKSPACE_GROUP_DESCRIPTION/)
 

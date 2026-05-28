@@ -80,8 +80,26 @@ const workspacePage = fs.readFileSync(
   path.join(process.cwd(), "app/(admin)/admin/growth/calls/workspace/page.tsx"),
   "utf8",
 )
-assert.match(workspacePage, /GrowthCallWorkspace/)
+assert.match(workspacePage, /GrowthCallsOperatingShell/)
+assert.match(workspacePage, /GROWTH_CALLS_RUNTIME_HARDENING_QA_MARKER/)
 assert.match(workspacePage, /max-w-\[1700px\]/)
+
+const operatingShell = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-calls-operating-shell.tsx"),
+  "utf8",
+)
+assert.match(operatingShell, /GrowthCallWorkspace/)
+assert.match(operatingShell, /GrowthCallCopilotDashboard embedded/)
+assert.match(operatingShell, /GrowthCallsOperatingErrorBoundary/)
+assert.match(operatingShell, /GROWTH_CALLS_RUNTIME_HARDENING_QA_MARKER/)
+
+const operatingTabs = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-calls-operating-tabs.tsx"),
+  "utf8",
+)
+assert.match(operatingTabs, /from "@\/components\/ui\/button"/)
+assert.match(operatingTabs, /resolveGrowthCallsOperatingView/)
+assert.match(operatingTabs, /Suspense/)
 
 const workspaceComponent = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-workspace.tsx"),
