@@ -149,9 +149,7 @@ export function GrowthAttentionCenter() {
           <Loader2 className="size-4 animate-spin" />
           Loading attention queue…
         </div>
-      ) : items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No notifications in this view.</p>
-      ) : (
+      ) : items.length > 0 ? (
         <div className="space-y-2">
           {items.map((item) => (
             <div key={item.id} className="rounded-lg border border-border px-4 py-3">
@@ -193,7 +191,7 @@ export function GrowthAttentionCenter() {
             </div>
           ))}
         </div>
-      )}
+      ) : null}
     </GrowthEngineCard>
   )
 }

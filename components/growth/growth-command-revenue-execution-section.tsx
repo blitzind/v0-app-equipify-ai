@@ -61,37 +61,37 @@ export function GrowthCommandRevenueExecutionSection({
       </div>
 
       <div className="mt-6 space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Top revenue priorities
-        </p>
-        {morningFocus.topRevenuePriorities.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Execution queue is clear.</p>
-        ) : (
-          <ul className="space-y-2">
-            {morningFocus.topRevenuePriorities.map((item, index) => (
-              <li key={item.id} className="rounded-lg border border-border/80 px-3 py-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Priority {index + 1}
-                    </p>
-                    <p className="text-sm font-medium">{item.companyName}</p>
-                    <p className="text-sm text-muted-foreground">{item.title}</p>
+        {morningFocus.topRevenuePriorities.length > 0 ? (
+          <>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Top revenue priorities
+            </p>
+            <ul className="space-y-2">
+              {morningFocus.topRevenuePriorities.map((item, index) => (
+                <li key={item.id} className="rounded-lg border border-border/80 px-3 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Priority {index + 1}
+                      </p>
+                      <p className="text-sm font-medium">{item.companyName}</p>
+                      <p className="text-sm text-muted-foreground">{item.title}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <GrowthBadge
+                        label={`Score ${item.executionPriorityScore}`}
+                        tone={executionPriorityBandTone(item.priorityBand)}
+                      />
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={item.ctaHref}>{item.ctaLabel}</Link>
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <GrowthBadge
-                      label={`Score ${item.executionPriorityScore}`}
-                      tone={executionPriorityBandTone(item.priorityBand)}
-                    />
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={item.ctaHref}>{item.ctaLabel}</Link>
-                    </Button>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
       </div>
 
       {topSprint ? (

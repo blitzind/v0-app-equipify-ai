@@ -136,6 +136,7 @@ export function GrowthDeliverabilityOpsDashboardView() {
             <StatTile label="Risk Alerts" value={String(dashboard.riskAlerts)} />
           </div>
 
+          {dashboard.recommendations.length > 0 ? (
           <GrowthEngineCard title="Recommendations">
             <p className="mb-3 text-sm text-muted-foreground">
               Advisory only — every recommendation requires evidence. No automatic DNS, sender, volume, or provider changes.
@@ -154,14 +155,7 @@ export function GrowthDeliverabilityOpsDashboardView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {dashboard.recommendations.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-6 text-center text-muted-foreground">
-                        No recommendations — platform looks healthy.
-                      </td>
-                    </tr>
-                  ) : (
-                    dashboard.recommendations.map((rec) => (
+                    {dashboard.recommendations.map((rec) => (
                       <tr key={rec.id} className="border-b border-border/50 align-top">
                         <td className="py-2 pr-3">{deliverabilityRecommendationTypeLabel(rec.recommendationType)}</td>
                         <td className="py-2 pr-3">
@@ -225,12 +219,12 @@ export function GrowthDeliverabilityOpsDashboardView() {
                           </div>
                         </td>
                       </tr>
-                    ))
-                  )}
+                    ))}
                 </tbody>
               </table>
             </div>
           </GrowthEngineCard>
+          ) : null}
 
           <div className="grid gap-6 xl:grid-cols-2">
             <GrowthEngineCard title="Risk Events">

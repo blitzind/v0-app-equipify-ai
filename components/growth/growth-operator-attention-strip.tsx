@@ -2,8 +2,13 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
-import { AlertCircle, ArrowRight, Loader2 } from "lucide-react"
+import { AlertCircle, ArrowRight } from "lucide-react"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import {
+  GROWTH_ATTENTION_ACTIONABLE_ONLY_QA_MARKER,
+  GROWTH_ATTENTION_QUIET_HEALTHY_QA_MARKER,
+  hasActionableOperatorAttention,
+} from "@/lib/growth/operator-ux/operator-attention-utils"
 import {
   GROWTH_OPERATOR_UX_H3_QA_MARKER,
   type GrowthOperatorAttentionStrip,
@@ -19,10 +24,8 @@ function severityTone(severity: string): "critical" | "high" | "attention" | "ne
 
 export function GrowthOperatorAttentionStrip({ compact = false }: { compact?: boolean }) {
   const [strip, setStrip] = useState<GrowthOperatorAttentionStrip | null>(null)
-  const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    setLoading(true)
     try {
       const res = await fetch("/api/platform/growth/operator/attention-strip", { cache: "no-store" })
       const data = (await res.json().catch(() => ({}))) as {
@@ -33,8 +36,6 @@ export function GrowthOperatorAttentionStrip({ compact = false }: { compact?: bo
       else setStrip(null)
     } catch {
       setStrip(null)
-    } finally {
-      setLoading(false)
     }
   }, [])
 
@@ -42,25 +43,13 @@ export function GrowthOperatorAttentionStrip({ compact = false }: { compact?: bo
     void load()
   }, [load])
 
-  if (loading) {
+  if (!hasActionableOperatorAttention(strip)) {
     return (
-      <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        Loading operator attention…
-      </div>
-    )
-  }
-
-  if (!strip || strip.items.length === 0) {
-    return (
-      <div
-        id="operator-attention"
-        className="rounded-xl border border-emerald-200/80 bg-emerald-50/40 px-4 py-3 text-sm text-emerald-950 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-100"
-        data-qa={GROWTH_OPERATOR_UX_H3_QA_MARKER}
-        data-qa-marker={GROWTH_OPERATOR_UX_H3_QA_MARKER}
-      >
-        No urgent operator attention right now.
-      </div>
+      <span
+        className="sr-only"
+        data-qa={GROWTH_ATTENTION_QUIET_HEALTHY_QA_MARKER}
+        data-qa-marker={GROWTH_ATTENTION_ACTIONABLE_ONLY_QA_MARKER}
+      />
     )
   }
 
@@ -72,20 +61,21 @@ export function GrowthOperatorAttentionStrip({ compact = false }: { compact?: bo
         compact && "py-2.5",
       )}
       data-qa={GROWTH_OPERATOR_UX_H3_QA_MARKER}
-      data-qa-marker={GROWTH_OPERATOR_UX_H3_QA_MARKER}
+      data-qa-marker={GROWTH_ATTENTION_ACTIONABLE_ONLY_QA_MARKER}
+      data-attention-quiet-qa={GROWTH_ATTENTION_QUIET_HEALTHY_QA_MARKER}
     >
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <AlertCircle className="size-4 text-amber-700 dark:text-amber-300" />
           <p className="text-sm font-semibold">Operator attention</p>
-          <GrowthBadge label={`${strip.total_attention} items`} tone="attention" />
+          <GrowthBadge label={`${strip!.total_attention} items`} tone="attention" />
         </div>
         <Link href="/admin/growth/command#operator-attention" className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300">
           Open command center
         </Link>
       </div>
       <div className={cn("grid gap-2", compact ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-4")}>
-        {strip.items.map((item) => (
+        {strip!.items.map((item) => (
           <Link
             key={item.id}
             href={item.href}

@@ -77,6 +77,7 @@ import { GROWTH_NAVIGATION_POLISH_QA_MARKER } from "@/lib/growth/navigation/grow
 import { isGrowthNavigationInputTarget } from "@/lib/growth/navigation/growth-navigation-input-guard"
 import { APP_Z_GROWTH_NAV_FLYOUT } from "@/lib/layout/app-z-layers"
 import { cn } from "@/lib/utils"
+import { hasActionableGrowthSidebarHealth } from "@/lib/growth/operator-ux/operator-attention-utils"
 
 export const GROWTH_SIDEBAR_NAV_QA_MARKER = "growth-sidebar-nav-v2" as const
 
@@ -968,6 +969,18 @@ function GrowthSidebarHealthStrip({
       : safeHealth.systemHealthLabel === "Monitor"
         ? "text-amber-700"
         : "text-rose-700"
+
+  if (
+    !hasActionableGrowthSidebarHealth({
+      openInbox: safeHealth.openInbox,
+      pendingApproval: safeHealth.pendingApproval,
+      criticalSignals: safeHealth.criticalSignals,
+      systemHealthLabel: safeHealth.systemHealthLabel,
+      degraded,
+    })
+  ) {
+    return null
+  }
 
   if (collapsed) {
     return (

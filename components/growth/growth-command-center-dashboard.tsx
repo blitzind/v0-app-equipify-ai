@@ -445,6 +445,7 @@ export function GrowthCommandCenterDashboard() {
 
           <GrowthCommandQuickActionsRail variant="chips" />
 
+          {filteredActions.length > 0 ? (
           <GrowthEngineCard
             title="Ranked Action Queue"
             icon={<ListOrdered className="size-4" />}
@@ -458,9 +459,6 @@ export function GrowthCommandCenterDashboard() {
                 </Button>
               </p>
             ) : null}
-            {filteredActions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Queue is clear — no ranked actions right now.</p>
-            ) : (
               <>
                 <ul className="space-y-3">
                   {visibleActions.map((action) => (
@@ -480,8 +478,8 @@ export function GrowthCommandCenterDashboard() {
                   </Button>
                 ) : null}
               </>
-            )}
           </GrowthEngineCard>
+          ) : null}
           </div>
 
           {/* 3. Communication Operations */}

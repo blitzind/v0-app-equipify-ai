@@ -1,14 +1,17 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { MessageSquare, Loader2 } from "lucide-react"
+import { MessageSquare } from "lucide-react"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import { GrowthCommandSectionLinks } from "@/components/growth/growth-command-section-links"
 import { GROWTH_COMMAND_COMM_SECTION_LINKS } from "@/lib/growth/command/command-center-navigation"
 import type { GrowthCadenceCommandSummary } from "@/lib/growth/cadence/cadence-types"
 import type { GrowthMeetingCommandSummary } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import type { GrowthAttentionDashboard } from "@/lib/growth/notifications/notification-types"
-import type { GrowthReplyInboxDashboard } from "@/lib/growth/reply-intelligence/reply-intent-types"
+import {
+  GROWTH_ATTENTION_ACTIONABLE_ONLY_QA_MARKER,
+  hasActionableCommunicationOpsMetrics,
+} from "@/lib/growth/operator-ux/operator-attention-utils"
 
 type CommunicationOpsData = {
   attention: GrowthAttentionDashboard | null
@@ -74,49 +77,45 @@ export function GrowthCommandCommunicationOpsSection() {
     void load()
   }, [load])
 
-  const needsAttention =
-    (data?.attention?.criticalCount ?? 0) +
-    (data?.attention?.needsApprovalCount ?? 0) +
-    (data?.attention?.myWorkCount ?? 0)
-
-  const hasMetrics =
-    needsAttention > 0 ||
-    (data?.replies?.highPriorityCount ?? 0) > 0 ||
-    (data?.cadence?.callTasksDueCount ?? 0) > 0 ||
-    (data?.meetings?.meetingsTodayCount ?? 0) > 0 ||
-    (data?.cadence?.tasksDueTodayCount ?? 0) > 0 ||
-    (data?.cadence?.overdueCadenceTasksCount ?? 0) > 0 ||
-    (data?.providerIssues ?? 0) > 0 ||
-    data?.liveCoachingActive
+  const hasMetrics = hasActionableCommunicationOpsMetrics({
+    criticalCount: data?.attention?.criticalCount,
+    needsApprovalCount: data?.attention?.needsApprovalCount,
+    myWorkCount: data?.attention?.myWorkCount,
+    highPriorityReplies: data?.replies?.highPriorityCount,
+    callTasksDue: data?.cadence?.callTasksDueCount,
+    meetingsToday: data?.meetings?.meetingsTodayCount,
+    cadenceDue: data?.cadence?.tasksDueTodayCount,
+    overdueCadence: data?.cadence?.overdueCadenceTasksCount,
+    providerIssues: data?.providerIssues,
+    liveCoachingActive: data?.liveCoachingActive,
+  })
 
   if (loading) {
-    return (
-      <GrowthEngineCard title="Communication Operations" icon={<MessageSquare className="size-4" />}>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          Loading communication metrics…
-        </div>
-        <GrowthCommandSectionLinks links={QUICK_LINKS} className="mt-3" />
-      </GrowthEngineCard>
-    )
+    return null
   }
 
   if (!hasMetrics) {
-    return (
-      <GrowthEngineCard title="Communication Operations" icon={<MessageSquare className="size-4" />}>
-        <p className="text-sm text-muted-foreground">Communication queues are clear — no urgent items right now.</p>
-        <GrowthCommandSectionLinks links={QUICK_LINKS} className="mt-3" />
-      </GrowthEngineCard>
-    )
+    return null
   }
 
   return (
-    <GrowthEngineCard title="Communication Operations" icon={<MessageSquare className="size-4" />}>
+    <GrowthEngineCard
+      title="Communication Operations"
+      icon={<MessageSquare className="size-4" />}
+      data-qa-marker={GROWTH_ATTENTION_ACTIONABLE_ONLY_QA_MARKER}
+    >
       <p className="mb-3 text-sm text-muted-foreground">
         Attention, replies, calls, meetings, cadence, and provider health at a glance.
       </p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile label="Needs attention" value={needsAttention} />
+        <StatTile
+          label="Needs attention"
+          value={
+            (data?.attention?.criticalCount ?? 0) +
+            (data?.attention?.needsApprovalCount ?? 0) +
+            (data?.attention?.myWorkCount ?? 0)
+          }
+        />
         <StatTile label="High priority replies" value={data?.replies?.highPriorityCount ?? 0} />
         <StatTile label="Calls due" value={data?.cadence?.callTasksDueCount ?? 0} />
         <StatTile label="Meetings today" value={data?.meetings?.meetingsTodayCount ?? 0} />

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Activity, AlertTriangle, CheckCircle2, Circle, Loader2, Mail, RefreshCw, Server, Shield, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
@@ -17,6 +17,7 @@ import {
   formatDomainVerificationLabel,
   GROWTH_SEND_INFRASTRUCTURE_OPERATIONAL_MODE_QA_MARKER,
   GROWTH_SEND_INFRASTRUCTURE_OPERATOR_READY_QA_MARKER,
+  GROWTH_SEND_INFRASTRUCTURE_RUNTIME_STABLE_V2_QA_MARKER,
   GROWTH_SEND_INFRASTRUCTURE_SETUP_MODE_QA_MARKER,
   GROWTH_SEND_INFRASTRUCTURE_CHECKLIST_STATUS_LABELS,
   hasMeaningfulOutboundOperationalMetrics,
@@ -29,6 +30,7 @@ import { GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER } from "@/lib/growth/operations/
 import { GROWTH_DELIVERABILITY_INTELLIGENCE_QA_MARKER } from "@/lib/growth/deliverability/deliverability-intelligence-types"
 import { GROWTH_REPUTATION_SAFE_SCALING_QA_MARKER } from "@/lib/growth/outbound/reputation-safe-scaling-types"
 import { GROWTH_OUTBOUND_LIFECYCLE_OPS_QA_MARKER } from "@/lib/growth/outbound/lifecycle-ops-types"
+import { GROWTH_ATTENTION_ACTIONABLE_ONLY_QA_MARKER } from "@/lib/growth/operator-ux/operator-attention-utils"
 
 const CHECKLIST_TONE: Record<
   keyof typeof GROWTH_SEND_INFRASTRUCTURE_CHECKLIST_STATUS_LABELS,
@@ -51,7 +53,74 @@ function formatMailboxStatus(status: string): string {
   return status.replace(/_/g, " ")
 }
 
-export function GrowthInternalOutboundOperationsDashboardView() {
+function sanitizeSendInfrastructureUiError(message: string | null | undefined): string {
+  const trimmed = message?.trim()
+  if (!trimmed) return "Send infrastructure data could not be loaded."
+  if (/is not defined$/i.test(trimmed) || /^ReferenceError/i.test(trimmed)) {
+    return "Send infrastructure panel hit a configuration issue. Retry after deploy or open engineering diagnostics."
+  }
+  return trimmed
+}
+
+function GrowthSendInfrastructureDegradedState({
+  message,
+  onRetry,
+}: {
+  message: string
+  onRetry: () => void
+}) {
+  return (
+    <div
+      className="rounded-xl border border-amber-200 bg-amber-50/90 p-4 text-sm text-amber-950"
+      data-qa={GROWTH_SEND_INFRASTRUCTURE_RUNTIME_STABLE_V2_QA_MARKER}
+      data-attention-actionable-qa={GROWTH_ATTENTION_ACTIONABLE_ONLY_QA_MARKER}
+    >
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">Send infrastructure degraded</p>
+          <p className="mt-1">{sanitizeSendInfrastructureUiError(message)}</p>
+          <Button type="button" variant="outline" size="sm" className="mt-4" onClick={onRetry}>
+            <RefreshCw className="mr-2 size-3.5" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+class GrowthSendInfrastructureErrorBoundary extends React.Component<
+  { children: React.ReactNode; onRetry: () => void },
+  { hasError: boolean; message: string }
+> {
+  state = { hasError: false, message: "" }
+
+  static getDerivedStateFromError(error: Error): { hasError: boolean; message: string } {
+    return { hasError: true, message: error.message }
+  }
+
+  componentDidCatch(error: Error) {
+    console.error(`[${GROWTH_SEND_INFRASTRUCTURE_RUNTIME_STABLE_V2_QA_MARKER}] panel render failed`, error)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <GrowthSendInfrastructureDegradedState
+          message={this.state.message}
+          onRetry={() => {
+            this.setState({ hasError: false, message: "" })
+            this.props.onRetry()
+          }}
+        />
+      )
+    }
+    return this.props.children
+  }
+}
+
+function GrowthInternalOutboundOperationsDashboardContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dashboard, setDashboard] = useState<GrowthInternalOutboundOperationsDashboard | null>(null)
@@ -118,12 +187,10 @@ export function GrowthInternalOutboundOperationsDashboardView() {
 
   if (error || !dashboard || !snapshot) {
     return (
-      <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
-        {error ?? "Dashboard unavailable."}
-        <Button type="button" variant="outline" size="sm" className="ml-3" onClick={() => void load()}>
-          Retry
-        </Button>
-      </div>
+      <GrowthSendInfrastructureDegradedState
+        message={error ?? "Dashboard unavailable."}
+        onRetry={() => void load()}
+      />
     )
   }
 
@@ -138,6 +205,7 @@ export function GrowthInternalOutboundOperationsDashboardView() {
       data-qa={GROWTH_SEND_INFRASTRUCTURE_OPERATOR_READY_QA_MARKER}
       data-qa-marker={GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER}
       data-h3-qa={GROWTH_OPERATOR_UX_H3_QA_MARKER}
+      data-runtime-stable-qa={GROWTH_SEND_INFRASTRUCTURE_RUNTIME_STABLE_V2_QA_MARKER}
     >
       <div
         data-qa={setupMode ? GROWTH_SEND_INFRASTRUCTURE_SETUP_MODE_QA_MARKER : GROWTH_SEND_INFRASTRUCTURE_OPERATIONAL_MODE_QA_MARKER}
@@ -593,12 +661,10 @@ export function GrowthInternalOutboundOperationsDashboardView() {
         </div>
 
         <div data-qa-marker={`${GROWTH_REPUTATION_SAFE_SCALING_QA_MARKER}-allocation`}>
+          {dashboard.execution_command_center.infrastructure_recommendations.length > 0 ? (
           <GrowthEngineCard title="Infrastructure recommendations" icon={<Shield size={16} />}>
             <ul className="space-y-2 text-xs">
-              {dashboard.execution_command_center.infrastructure_recommendations.length === 0 ? (
-                <li className="text-muted-foreground">No recommendations — infrastructure within normal bounds.</li>
-              ) : (
-                dashboard.execution_command_center.infrastructure_recommendations.map((rec) => (
+                {dashboard.execution_command_center.infrastructure_recommendations.map((rec) => (
                   <li key={`${rec.type}-${rec.title}`} className="rounded-lg border p-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="font-medium">{rec.title}</span>
@@ -607,18 +673,16 @@ export function GrowthInternalOutboundOperationsDashboardView() {
                     <p className="text-muted-foreground">{rec.detail}</p>
                     <p className="text-[10px] text-muted-foreground">Operator action required — no autonomous execution.</p>
                   </li>
-                ))
-              )}
+                ))}
             </ul>
           </GrowthEngineCard>
+          ) : null}
         </div>
 
+        {dashboard.execution_command_center.sequence_diagnostics.length > 0 ? (
         <GrowthEngineCard title="Sequence execution diagnostics" icon={<Server size={16} />}>
           <ul className="space-y-2 text-xs">
-            {dashboard.execution_command_center.sequence_diagnostics.length === 0 ? (
-              <li className="text-muted-foreground">No stuck or dead-letter jobs detected.</li>
-            ) : (
-              dashboard.execution_command_center.sequence_diagnostics.map((diag) => (
+              {dashboard.execution_command_center.sequence_diagnostics.map((diag) => (
                 <li key={diag.id} className="rounded-lg border p-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-medium">{diag.title}</span>
@@ -626,10 +690,10 @@ export function GrowthInternalOutboundOperationsDashboardView() {
                   </div>
                   <p className="text-muted-foreground">{diag.summary ?? diag.jobId}</p>
                 </li>
-              ))
-            )}
+              ))}
           </ul>
         </GrowthEngineCard>
+        ) : null}
       </div>
 
       <div
@@ -869,5 +933,15 @@ export function GrowthInternalOutboundOperationsDashboardView() {
       </GrowthEngineCard>
       </GrowthOperatorDiagnosticsDisclosure>
     </div>
+  )
+}
+
+export function GrowthInternalOutboundOperationsDashboardView() {
+  const [retryKey, setRetryKey] = useState(0)
+
+  return (
+    <GrowthSendInfrastructureErrorBoundary onRetry={() => setRetryKey((value) => value + 1)}>
+      <GrowthInternalOutboundOperationsDashboardContent key={retryKey} />
+    </GrowthSendInfrastructureErrorBoundary>
   )
 }

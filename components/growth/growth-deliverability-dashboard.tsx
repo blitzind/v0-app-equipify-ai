@@ -25,6 +25,7 @@ import type {
 } from "@/lib/growth/deliverability/deliverability-types"
 import { GROWTH_DNS_DELIVERABILITY_QA_MARKER } from "@/lib/growth/deliverability/deliverability-types"
 import type { GrowthInfrastructureReadinessCatalogEntry } from "@/lib/growth/infrastructure/infrastructure-readiness-types"
+import { hasActionableDnsSetupStatus } from "@/lib/growth/operator-ux/operator-attention-utils"
 
 const TIER_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
   healthy: "healthy",
@@ -230,6 +231,7 @@ export function GrowthDeliverabilityDashboard() {
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{error}</div>
       ) : null}
 
+      {hasActionableDnsSetupStatus(summary) ? (
       <GrowthEngineCard title="Setup status">
         <div className="grid gap-4 lg:grid-cols-3">
           <div>
@@ -258,9 +260,7 @@ export function GrowthDeliverabilityDashboard() {
                   </li>
                 ))}
               </ul>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground">All required integrations are connected or in progress.</p>
-            )}
+            ) : null}
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Do this next</p>
@@ -270,12 +270,11 @@ export function GrowthDeliverabilityDashboard() {
                   <li key={step}>{step}</li>
                 ))}
               </ol>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground">Review domain authentication and warmup progress below.</p>
-            )}
+            ) : null}
           </div>
         </div>
       </GrowthEngineCard>
+      ) : null}
 
       <GrowthEngineCard title="Setup checklist">
         <ul className="divide-y divide-border/70">

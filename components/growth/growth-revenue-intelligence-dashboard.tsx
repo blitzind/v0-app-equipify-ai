@@ -141,10 +141,8 @@ export function GrowthRevenueIntelligenceDashboardView() {
       </GrowthEngineCard>
 
       <div className="grid gap-6 xl:grid-cols-2">
+        {(dashboard?.riskAlerts ?? []).length > 0 ? (
         <GrowthEngineCard title="Risk Alerts">
-          {(dashboard?.riskAlerts ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">No active risk alerts.</p>
-          ) : (
             <div className="space-y-2">
               {(dashboard?.riskAlerts ?? []).map((alert, index) => (
                 <div key={`${alert.riskType}-${index}`} className="rounded-lg border border-border px-3 py-2 text-sm">
@@ -158,8 +156,8 @@ export function GrowthRevenueIntelligenceDashboardView() {
                 </div>
               ))}
             </div>
-          )}
         </GrowthEngineCard>
+        ) : null}
 
         <GrowthEngineCard title="Top Sequences">
           {(dashboard?.topSequences ?? []).length === 0 ? (

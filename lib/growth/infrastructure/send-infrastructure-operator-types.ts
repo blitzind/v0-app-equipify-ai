@@ -15,6 +15,8 @@ export const GROWTH_SEND_INFRASTRUCTURE_SETUP_MODE_QA_MARKER =
   "growth-send-infrastructure-setup-mode-v1" as const
 export const GROWTH_SEND_INFRASTRUCTURE_OPERATIONAL_MODE_QA_MARKER =
   "growth-send-infrastructure-operational-mode-v1" as const
+export const GROWTH_SEND_INFRASTRUCTURE_RUNTIME_STABLE_V2_QA_MARKER =
+  "growth-send-infrastructure-runtime-stable-v2" as const
 
 export const GROWTH_SEND_INFRASTRUCTURE_CHECKLIST_STATUSES = [
   "ready",

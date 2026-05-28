@@ -7,6 +7,10 @@ import {
 } from "@/components/growth/growth-infrastructure-readiness-badge"
 import type { GrowthInfrastructureReadinessCatalogEntry } from "@/lib/growth/infrastructure/infrastructure-readiness-types"
 import { GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER } from "@/lib/growth/operations/internal-outbound-ops-types"
+import {
+  GROWTH_ATTENTION_ACTIONABLE_ONLY_QA_MARKER,
+  isActionableInfrastructureReadiness,
+} from "@/lib/growth/operator-ux/operator-attention-utils"
 
 export function GrowthInfrastructureReadinessStrip({
   surfaceId,
@@ -33,10 +37,10 @@ export function GrowthInfrastructureReadinessStrip({
       .catch(() => setEntry(null))
   }, [surfaceId, matchTitle])
 
-  if (!entry) return null
+  if (!entry || !isActionableInfrastructureReadiness(entry.readiness.status)) return null
 
   return (
-    <div data-qa-marker={GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER}>
+    <div data-qa-marker={GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER} data-attention-actionable-qa={GROWTH_ATTENTION_ACTIONABLE_ONLY_QA_MARKER}>
       <GrowthInfrastructureReadinessBanner title={title ?? entry.title} readiness={entry.readiness} />
       <div className="mt-2 flex justify-end">
         <GrowthInfrastructureReadinessBadge readiness={entry.readiness} />

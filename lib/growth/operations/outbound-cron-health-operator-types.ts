@@ -35,6 +35,26 @@ export type GrowthOutboundExecutionActivationState = {
   sent_24h: number
 }
 
+export function createFallbackOutboundExecutionActivationState(
+  summary = "Using safe setup defaults until activation telemetry is available.",
+): GrowthOutboundExecutionActivationState {
+  return {
+    qa_marker: GROWTH_OUTBOUND_SETUP_AWARE_ALERTS_QA_MARKER,
+    mode: "setup",
+    headline: "Outbound execution is still in setup — scheduler alerts stay informational until activation.",
+    summary,
+    activation_cta_label: "Activate outbound execution",
+    activation_cta_href: "/admin/growth/infrastructure/outbound-operations",
+    blockers: [summary],
+    connected_mailboxes: 0,
+    connected_providers: 0,
+    transport_live: false,
+    cron_telemetry_ready: false,
+    has_prior_outbound_cron_success: false,
+    sent_24h: 0,
+  }
+}
+
 export type GrowthOutboundCronRouteOperatorHealth = GrowthCronRouteHealth & {
   operator_status: "ready" | "pending_activation" | "stale" | "never_succeeded" | "outage"
   operator_label: string

@@ -11,6 +11,7 @@ import {
 } from "@/lib/growth/outbound/outbound-reliability-types"
 import {
   buildOutboundCronRouteOperatorHealth,
+  createFallbackOutboundExecutionActivationState,
   GROWTH_OUTBOUND_CRON_HEALTH_V2_QA_MARKER,
   type GrowthOutboundCronRouteOperatorHealth,
   type GrowthOutboundExecutionActivationState,
@@ -123,7 +124,16 @@ export async function fetchGrowthOutboundOperationsDashboard(
   admin: SupabaseClient,
 ): Promise<GrowthOutboundOperationsDashboard> {
   const since24h = since24hIso()
-  const telemetryReady = await isGrowthCronTelemetrySchemaReady(admin)
+  const [telemetryReady, outboundActivation] = await Promise.all([
+    isGrowthCronTelemetrySchemaReady(admin),
+    resolveOutboundExecutionActivationState(admin).catch((error) =>
+      createFallbackOutboundExecutionActivationState(
+        error instanceof Error
+          ? `Activation telemetry unavailable — ${error.message}`
+          : "Activation telemetry unavailable.",
+      ),
+    ),
+  ])
 
   const [
     cronRoutes,

@@ -115,10 +115,8 @@ export function GrowthHumanExecutionDashboardPanel() {
         </div>
       </GrowthEngineCard>
 
+      {approvalQueue.length > 0 ? (
       <GrowthEngineCard title="Approval queue" subtitle="All execution requires explicit operator approval">
-        {approvalQueue.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Approval queue is clear.</p>
-        ) : (
           <ul className="space-y-2">
             {approvalQueue.map((item) => (
               <li key={item.id} className="rounded-lg border border-border/80 px-3 py-3">
@@ -164,8 +162,8 @@ export function GrowthHumanExecutionDashboardPanel() {
               </li>
             ))}
           </ul>
-        )}
       </GrowthEngineCard>
+      ) : null}
     </div>
   )
 }

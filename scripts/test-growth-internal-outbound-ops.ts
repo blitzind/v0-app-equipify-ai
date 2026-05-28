@@ -68,6 +68,22 @@ async function main(): Promise<void> {
   assert.match(dashboard, /sender_pools/)
   assert.match(dashboard, /google_provider/)
 
+  const outboundDashboard = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/operations/outbound-operations-dashboard.ts"),
+    "utf8",
+  )
+  assert.match(outboundDashboard, /outboundActivation/)
+  assert.match(outboundDashboard, /resolveOutboundExecutionActivationState/)
+
+  const sendInfraUi = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/growth-internal-outbound-operations-dashboard.tsx"),
+    "utf8",
+  )
+  assert.match(sendInfraUi, /GROWTH_SEND_INFRASTRUCTURE_RUNTIME_STABLE_V2_QA_MARKER/)
+  assert.match(sendInfraUi, /GrowthSendInfrastructureErrorBoundary/)
+  assert.match(sendInfraUi, /sanitizeSendInfrastructureUiError/)
+  assert.doesNotMatch(sendInfraUi, /No urgent operator attention right now/)
+
   console.log("growth internal outbound ops tests passed")
 }
 

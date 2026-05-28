@@ -150,6 +150,9 @@ async function main(): Promise<void> {
   assert.match(dashboard, /recovery_queue/)
   assert.match(dashboard, /h2_qa_marker/)
   assert.match(dashboard, /outbound_activation/)
+  assert.match(dashboard, /resolveOutboundExecutionActivationState/)
+  assert.match(dashboard, /createFallbackOutboundExecutionActivationState/)
+  assert.doesNotMatch(dashboard, /activation: outboundActivation\)[\s\S]*const telemetryReady = await isGrowthCronTelemetrySchemaReady/)
   assert.match(dashboard, /outbound_cron_health/)
 
   const ui = readSource("components/growth/growth-outbound-operations-dashboard.tsx")

@@ -42,6 +42,7 @@ import {
 import {
   GROWTH_SEND_INFRASTRUCTURE_OPERATIONAL_MODE_QA_MARKER,
   GROWTH_SEND_INFRASTRUCTURE_OPERATOR_READY_QA_MARKER,
+  GROWTH_SEND_INFRASTRUCTURE_RUNTIME_STABLE_V2_QA_MARKER,
   GROWTH_SEND_INFRASTRUCTURE_SETUP_MODE_QA_MARKER,
   buildSendInfrastructureChecklist,
   isSendInfrastructureSetupMode,
@@ -460,6 +461,7 @@ async function main(): Promise<void> {
   assert.equal(GROWTH_SEND_INFRASTRUCTURE_OPERATOR_READY_QA_MARKER, "growth-send-infrastructure-operator-ready-v1")
   assert.equal(GROWTH_SEND_INFRASTRUCTURE_SETUP_MODE_QA_MARKER, "growth-send-infrastructure-setup-mode-v1")
   assert.equal(GROWTH_SEND_INFRASTRUCTURE_OPERATIONAL_MODE_QA_MARKER, "growth-send-infrastructure-operational-mode-v1")
+  assert.equal(GROWTH_SEND_INFRASTRUCTURE_RUNTIME_STABLE_V2_QA_MARKER, "growth-send-infrastructure-runtime-stable-v2")
 
   const sendInfraDashboard = fs.readFileSync(
     path.join(process.cwd(), "components/growth/growth-internal-outbound-operations-dashboard.tsx"),
@@ -467,6 +469,8 @@ async function main(): Promise<void> {
   )
   assert.match(sendInfraDashboard, /Outbound readiness/)
   assert.match(sendInfraDashboard, /Mailbox providers/)
+  assert.match(sendInfraDashboard, /GROWTH_SEND_INFRASTRUCTURE_RUNTIME_STABLE_V2_QA_MARKER/)
+  assert.match(sendInfraDashboard, /GrowthSendInfrastructureErrorBoundary/)
   assert.doesNotMatch(sendInfraDashboard, /Google Workspace \(live path\)/)
   assert.doesNotMatch(sendInfraDashboard, /MANUAL VERIFICATION REQUIRED/)
   assert.doesNotMatch(sendInfraDashboard, /set GROWTH_LIVE_DNS_VERIFICATION=true/)

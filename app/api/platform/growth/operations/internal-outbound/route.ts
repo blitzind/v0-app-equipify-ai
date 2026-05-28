@@ -12,7 +12,10 @@ export async function GET() {
     const dashboard = await fetchGrowthInternalOutboundOperationsDashboard(access.admin)
     return NextResponse.json({ ok: true, dashboard })
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    return NextResponse.json({ error: "fetch_failed", message }, { status: 500 })
+    const raw = error instanceof Error ? error.message : String(error)
+    const message = /is not defined$/i.test(raw) || /^ReferenceError/i.test(raw)
+      ? "Send infrastructure telemetry is temporarily unavailable. Retry in a moment."
+      : raw
+    return NextResponse.json({ ok: false, error: "fetch_failed", message }, { status: 500 })
   }
 }
