@@ -17,6 +17,7 @@ import { GrowthLeadBookingIntelligencePanel } from "@/components/growth/growth-l
 import { GrowthLeadRelationshipMemoryPanel } from "@/components/growth/growth-lead-relationship-memory-panel"
 import { GrowthLeadMultichannelTimelinePanel } from "@/components/growth/growth-lead-multichannel-timeline-panel"
 import { GrowthRevenueForecast } from "@/components/growth/growth-revenue-forecast"
+import { GrowthVoiceRevenueIntelligencePassiveCard } from "@/components/growth/growth-voice-revenue-intelligence-passive-card"
 import { GrowthExecutiveOperatingIntelligence } from "@/components/growth/growth-executive-operating-intelligence"
 import { GrowthOperationalCapacityIntelligence } from "@/components/growth/growth-operational-capacity-intelligence"
 import { GrowthAiCopilot } from "@/components/growth/growth-ai-copilot"
@@ -96,6 +97,8 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
           <GrowthOperationalCapacityIntelligence lead={activeLead} />
 
           <GrowthRevenueForecast lead={activeLead} />
+
+          <GrowthVoiceRevenueIntelligencePassiveCard leadId={activeLead.id} />
 
           <GrowthOpportunityReadiness lead={activeLead} />
 

@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { CallWorkspaceLeadSearchResultsPanel } from "@/components/growth/call-workspace-lead-search-results"
 import { GrowthCallWorkspaceRelationshipMemoryPanel } from "@/components/growth/growth-call-workspace-relationship-memory-panel"
+import { GrowthCallWorkspaceRevenueIntelligencePanel } from "@/components/growth/growth-call-workspace-revenue-intelligence-panel"
 import { useCallWorkspaceLeadSearch } from "@/components/growth/use-call-workspace-lead-search"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import {
@@ -32,6 +33,8 @@ import { commandLeadFocusHref } from "@/lib/growth/command/command-action-catalo
 import type { UnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/types"
 import type { VoiceRelationshipMemoryWorkspaceSnapshot } from "@/lib/voice/relationship-memory/types"
 import { VOICE_RELATIONSHIP_MEMORY_QA_MARKER } from "@/lib/voice/relationship-memory/types"
+import type { VoiceRevenueIntelligenceWorkspaceSnapshot } from "@/lib/voice/revenue-intelligence/types"
+import { VOICE_REVENUE_INTELLIGENCE_QA_MARKER } from "@/lib/voice/revenue-intelligence/types"
 import type {
   NativeCallWorkspaceSessionPublicView,
   NativeDialerLeadContext,
@@ -66,7 +69,9 @@ export function GrowthCallWorkspaceIntelligenceRail({
   sessionPhone,
   operatorAssist = null,
   relationshipMemory = null,
+  revenueIntelligence = null,
   onRelationshipMemoryRefresh,
+  onRevenueIntelligenceRefresh,
   onLeadAttached,
 }: {
   leadContext: NativeDialerLeadContext | null
@@ -74,7 +79,9 @@ export function GrowthCallWorkspaceIntelligenceRail({
   sessionPhone?: string | null
   operatorAssist?: UnifiedOperatorAssistSnapshot | null
   relationshipMemory?: VoiceRelationshipMemoryWorkspaceSnapshot | null
+  revenueIntelligence?: VoiceRevenueIntelligenceWorkspaceSnapshot | null
   onRelationshipMemoryRefresh?: () => Promise<void>
+  onRevenueIntelligenceRefresh?: () => Promise<void>
   onLeadAttached?: (leadId: string, session?: NativeCallWorkspaceSessionPublicView) => void
 }) {
   const {
@@ -122,6 +129,7 @@ export function GrowthCallWorkspaceIntelligenceRail({
       data-google-voice-bridge-coaching-qa-marker={GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER}
       data-native-dialer-lead-search-qa-marker={GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER}
       data-voice-relationship-memory-qa-marker={VOICE_RELATIONSHIP_MEMORY_QA_MARKER}
+      data-voice-revenue-intelligence-qa-marker={VOICE_REVENUE_INTELLIGENCE_QA_MARKER}
     >
       <h3 className="mb-3 text-sm font-semibold">Prospect Intelligence</h3>
 
@@ -158,12 +166,18 @@ export function GrowthCallWorkspaceIntelligenceRail({
             </>
           ) : null}
           {sessionPhone ? (
-            <GrowthCallWorkspaceRelationshipMemoryPanel
-              relationshipMemory={relationshipMemory}
-              pendingDrafts={pendingDrafts}
-              sessionPhone={sessionPhone}
-              onRefresh={onRelationshipMemoryRefresh}
-            />
+            <>
+              <GrowthCallWorkspaceRevenueIntelligencePanel
+                revenueIntelligence={revenueIntelligence}
+                onRefresh={onRevenueIntelligenceRefresh ?? onRelationshipMemoryRefresh}
+              />
+              <GrowthCallWorkspaceRelationshipMemoryPanel
+                relationshipMemory={relationshipMemory}
+                pendingDrafts={pendingDrafts}
+                sessionPhone={sessionPhone}
+                onRefresh={onRelationshipMemoryRefresh}
+              />
+            </>
           ) : null}
         </div>
       ) : (
@@ -249,6 +263,11 @@ export function GrowthCallWorkspaceIntelligenceRail({
             </div>
             <p className="text-sm leading-snug">{recommendedAction}</p>
           </div>
+
+          <GrowthCallWorkspaceRevenueIntelligencePanel
+            revenueIntelligence={revenueIntelligence}
+            onRefresh={onRevenueIntelligenceRefresh ?? onRelationshipMemoryRefresh}
+          />
 
           <GrowthCallWorkspaceRelationshipMemoryPanel
             relationshipMemory={relationshipMemory}

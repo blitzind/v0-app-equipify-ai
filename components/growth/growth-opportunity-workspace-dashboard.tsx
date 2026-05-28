@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Bot, Loader2, RefreshCw, Target, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthVoiceRevenueIntelligencePassiveCard } from "@/components/growth/growth-voice-revenue-intelligence-passive-card"
 import {
   GROWTH_OPPORTUNITY_WORKSPACE_VIEWS,
   GROWTH_REVENUE_INTELLIGENCE_PRIVACY_NOTE,
@@ -155,6 +156,7 @@ export function GrowthOpportunityWorkspaceDashboard() {
             <p className="text-sm text-muted-foreground">Select an account above for AI-assisted revenue intelligence (human executes all actions).</p>
           ) : (
             <div className="space-y-3 text-sm">
+              <GrowthVoiceRevenueIntelligencePassiveCard leadId={selectedLeadId} compact />
               <GrowthBadge label={copilot.assistedLabel} tone="attention" />
               <p>{copilot.accountSummary}</p>
               <p><span className="font-medium">Momentum:</span> {copilot.momentumSummary}</p>

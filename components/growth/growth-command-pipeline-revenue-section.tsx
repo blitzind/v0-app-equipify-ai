@@ -6,6 +6,7 @@ import { Loader2, TrendingUp } from "lucide-react"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import { GrowthCommandSectionLinks } from "@/components/growth/growth-command-section-links"
 import { GROWTH_COMMAND_PIPELINE_SECTION_LINKS } from "@/lib/growth/command/command-center-navigation"
+import type { VoiceRevenueIntelligenceReadinessSnapshot } from "@/lib/voice/revenue-intelligence/types"
 import type { GrowthOpportunityPipelineDashboard } from "@/lib/growth/opportunity-pipeline/pipeline-types"
 import type { GrowthRevenueExecutiveCommandSummary } from "@/lib/growth/revenue-operating/revenue-operating-types"
 import type { GrowthCommandAction } from "@/lib/growth/command/command-action-types"
@@ -21,6 +22,8 @@ type GrowthCommandPipelineRevenueSectionProps = {
 export function GrowthCommandPipelineRevenueSection({ atRiskActions = [] }: GrowthCommandPipelineRevenueSectionProps) {
   const [revenue, setRevenue] = useState<GrowthRevenueExecutiveCommandSummary | null>(null)
   const [pipeline, setPipeline] = useState<GrowthOpportunityPipelineDashboard | null>(null)
+  const [voiceRevenueReadiness, setVoiceRevenueReadiness] =
+    useState<VoiceRevenueIntelligenceReadinessSnapshot | null>(null)
   const [setupMessage, setSetupMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -28,9 +31,10 @@ export function GrowthCommandPipelineRevenueSection({ atRiskActions = [] }: Grow
     setLoading(true)
     setSetupMessage(null)
     try {
-      const [revenueRes, pipelineRes] = await Promise.all([
+      const [revenueRes, pipelineRes, voiceRiRes] = await Promise.all([
         fetch("/api/platform/growth/revenue-operating/command-summary", { cache: "no-store" }),
         fetch("/api/platform/growth/opportunities/pipeline?view=all_pipeline&limit=1", { cache: "no-store" }),
+        fetch("/api/platform/growth/voice/revenue-intelligence/readiness", { cache: "no-store" }),
       ])
       const revenueData = (await revenueRes.json().catch(() => ({}))) as {
         ok?: boolean
@@ -50,6 +54,10 @@ export function GrowthCommandPipelineRevenueSection({ atRiskActions = [] }: Grow
           setPipeline(pipelineData.dashboard ?? null)
         }
       }
+      const voiceRiData = (await voiceRiRes.json().catch(() => ({}))) as {
+        readiness?: VoiceRevenueIntelligenceReadinessSnapshot
+      }
+      if (voiceRiRes.ok && voiceRiData.readiness) setVoiceRevenueReadiness(voiceRiData.readiness)
     } finally {
       setLoading(false)
     }
@@ -135,6 +143,16 @@ export function GrowthCommandPipelineRevenueSection({ atRiskActions = [] }: Grow
               </li>
             ))}
           </ul>
+        </div>
+      ) : null}
+      {voiceRevenueReadiness?.schemaReady ? (
+        <div className="mt-4 rounded-lg border border-border/60 bg-muted/10 px-3 py-2 text-xs text-muted-foreground">
+          <p className="mb-1 font-medium text-foreground">Voice revenue intelligence (passive)</p>
+          <p>
+            {voiceRevenueReadiness.unresolvedRiskCount} unresolved voice risks ·{" "}
+            {voiceRevenueReadiness.followUpRiskCount} follow-up risks ·{" "}
+            {voiceRevenueReadiness.opportunityLinkageCoveragePercent}% opportunity linkage
+          </p>
         </div>
       ) : null}
       <GrowthCommandSectionLinks links={GROWTH_COMMAND_PIPELINE_SECTION_LINKS} className="mt-4" />

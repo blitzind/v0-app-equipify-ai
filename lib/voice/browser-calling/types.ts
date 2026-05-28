@@ -8,6 +8,7 @@ import type { VoiceCallTranscriptSnapshot } from "@/lib/voice/media-streaming/ty
 import type { VoiceCallConversationIntelligenceSnapshot } from "@/lib/voice/intelligence/types"
 import type { UnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/types"
 import type { VoiceRelationshipMemoryWorkspaceSnapshot } from "@/lib/voice/relationship-memory/types"
+import type { VoiceRevenueIntelligenceWorkspaceSnapshot } from "@/lib/voice/revenue-intelligence/types"
 
 export const VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER = "voice-native-dialer-integration-v1" as const
 
@@ -112,6 +113,7 @@ export type VoiceBrowserSyncSnapshot = {
   conversationIntelligence: VoiceCallConversationIntelligenceSnapshot | null
   operatorAssist: UnifiedOperatorAssistSnapshot | null
   relationshipMemory: VoiceRelationshipMemoryWorkspaceSnapshot | null
+  revenueIntelligence: VoiceRevenueIntelligenceWorkspaceSnapshot | null
 }
 
 export type VoiceInboundBrowserOfferView = {
