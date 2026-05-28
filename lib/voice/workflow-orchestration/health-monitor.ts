@@ -23,9 +23,8 @@ export function buildWorkflowHealthSummary(
   orchestrations: VoiceWorkflowOrchestrationPublicView[],
 ): VoiceWorkflowHealthSummary {
   const stalled = detectStalledWorkflows(orchestrations)
-  const active = orchestrations.filter((o) =>
-    ["pending", "active", "awaiting_operator", "awaiting_customer", "escalated"].includes(o.orchestrationStatus),
-  )
+  const activeStatuses = ["pending", "active", "awaiting_operator", "awaiting_customer", "escalated", "compliance_hold", "blocked"]
+  const active = orchestrations.filter((o) => activeStatuses.includes(o.orchestrationStatus))
 
   const bottleneckMap = new Map<string, number>()
   const hotspotMap = new Map<string, number>()

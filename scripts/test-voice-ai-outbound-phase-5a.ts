@@ -57,8 +57,8 @@ import {
 import { VOICE_SCHEMA_MIGRATION_ID, VOICE_SCHEMA_PROBE_VERSION } from "../lib/voice/schema-health"
 
 assert.equal(VOICE_AI_OUTBOUND_QA_MARKER, "voice-ai-outbound-v1")
-assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v18")
-assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270618120000_voice_observability_analytics_phase_5b")
+assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v19")
+assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270619120000_voice_workflow_orchestration_phase_5c")
 assert.equal(VOICE_AI_OUTBOUND_AUTONOMOUS_OUTBOUND_DISABLED, true)
 assert.equal(VOICE_AI_OUTBOUND_AUTONOMOUS_COLD_CALLING_DISABLED, true)
 assert.equal(VOICE_AI_OUTBOUND_APPROVAL_REQUIRED, true)

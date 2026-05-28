@@ -61,8 +61,8 @@ import {
 import { VOICE_SCHEMA_MIGRATION_ID, VOICE_SCHEMA_PROBE_VERSION } from "../lib/voice/schema-health"
 
 assert.equal(VOICE_OBSERVABILITY_QA_MARKER, "voice-observability-analytics-v1")
-assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v18")
-assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270618120000_voice_observability_analytics_phase_5b")
+assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v19")
+assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270619120000_voice_workflow_orchestration_phase_5c")
 assert.equal(VOICE_OBSERVABILITY_AUTONOMOUS_REMEDIATION_DISABLED, true)
 assert.equal(VOICE_OBSERVABILITY_AUTO_PROVIDER_SWITCH_DISABLED, true)
 assert.equal(VOICE_OBSERVABILITY_HIDDEN_AI_SCORING_DISABLED, true)
@@ -223,7 +223,8 @@ assert.ok(fs.existsSync(path.join(process.cwd(), "components/growth/growth-voice
 assert.ok(fs.existsSync(path.join(process.cwd(), "components/growth/growth-voice-observability-readiness-section.tsx")))
 
 const schemaHealth = fs.readFileSync(path.join(process.cwd(), "lib/voice/schema-health.ts"), "utf8")
-assert.match(schemaHealth, /"v18"/)
+assert.match(schemaHealth, /"v19"/)
 assert.match(schemaHealth, /voice_observability_events/)
+assert.match(schemaHealth, /voice_workflow_orchestrations/)
 
 console.log("voice-observability-phase-5b: all checks passed")

@@ -22,6 +22,8 @@ import { GrowthAiOutboundReadinessSection } from "@/components/growth/growth-ai-
 import { GrowthAiOutboundApprovalPanel } from "@/components/growth/growth-ai-outbound-approval-panel"
 import { GrowthVoiceObservabilityDashboard } from "@/components/growth/growth-voice-observability-dashboard"
 import { GrowthVoiceObservabilityReadinessSection } from "@/components/growth/growth-voice-observability-readiness-section"
+import { GrowthWorkflowOrchestrationReadinessSection } from "@/components/growth/growth-workflow-orchestration-readiness-section"
+import { GrowthWorkflowOrchestrationWorkspace } from "@/components/growth/growth-workflow-orchestration-workspace"
 import { GrowthComplianceManualReviewPanel } from "@/components/growth/growth-compliance-manual-review-panel"
 import { VOICE_CONVERSATION_INTELLIGENCE_QA_MARKER } from "@/lib/voice/intelligence/types"
 import {
@@ -728,6 +730,10 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
             <GrowthAiOutboundReadinessSection />
             <GrowthAiOutboundApprovalPanel />
             <GrowthVoiceObservabilityReadinessSection />
+            <GrowthWorkflowOrchestrationReadinessSection />
+            <section className={GROWTH_SETTINGS_SECTION_GAP}>
+              <GrowthWorkflowOrchestrationWorkspace />
+            </section>
             <section className={GROWTH_SETTINGS_SECTION_GAP}>
               <GrowthVoiceObservabilityDashboard />
             </section>
