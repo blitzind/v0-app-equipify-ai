@@ -1,6 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import { formatInfrastructureReadinessForOperator } from "@/lib/growth/deliverability/dns-setup-operator-types"
 import type { GrowthInfrastructureReadinessDescriptor } from "@/lib/growth/infrastructure/infrastructure-readiness-types"
 import { growthInfrastructureReadinessLabel } from "@/lib/growth/infrastructure/infrastructure-readiness-types"
 
@@ -19,26 +20,32 @@ export function GrowthInfrastructureReadinessBadge({
   readiness,
   className,
   showDetail = false,
+  operatorFacing = false,
 }: {
   readiness: GrowthInfrastructureReadinessDescriptor
   className?: string
   showDetail?: boolean
+  operatorFacing?: boolean
 }) {
-  const label = readiness.label || growthInfrastructureReadinessLabel(readiness.status)
+  const resolved = operatorFacing ? formatInfrastructureReadinessForOperator(readiness) : readiness
+  const label = resolved.label || growthInfrastructureReadinessLabel(readiness.status)
 
   return (
     <span className={cn("inline-flex flex-col gap-0.5", className)}>
       <span
         className={cn(
-          "inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider",
-          STATUS_STYLES[readiness.status],
+          "inline-flex items-center rounded-md border px-2.5 py-1",
+          operatorFacing
+            ? "text-xs font-semibold normal-case tracking-normal"
+            : "text-[11px] font-bold uppercase tracking-wider",
+          STATUS_STYLES[resolved.status],
         )}
-        title={readiness.detail}
+        title={resolved.detail}
       >
         {label}
       </span>
-      {showDetail && readiness.detail ? (
-        <span className="max-w-md text-[11px] leading-snug text-muted-foreground">{readiness.detail}</span>
+      {showDetail && resolved.detail ? (
+        <span className="max-w-md text-[11px] leading-snug text-muted-foreground">{resolved.detail}</span>
       ) : null}
     </span>
   )
@@ -47,26 +54,30 @@ export function GrowthInfrastructureReadinessBadge({
 export function GrowthInfrastructureReadinessBanner({
   readiness,
   title,
+  operatorFacing = false,
 }: {
   readiness: GrowthInfrastructureReadinessDescriptor
   title?: string
+  operatorFacing?: boolean
 }) {
   if (readiness.status === "live") return null
+
+  const resolved = operatorFacing ? formatInfrastructureReadinessForOperator(readiness) : readiness
 
   return (
     <div
       className={cn(
         "rounded-xl border px-4 py-3 text-sm",
-        readiness.status === "simulated"
+        resolved.status === "simulated"
           ? "border-amber-300 bg-amber-50 text-amber-950"
           : "border-border bg-muted/50 text-foreground",
       )}
     >
       <div className="flex flex-wrap items-center gap-2">
         {title ? <span className="font-semibold">{title}</span> : null}
-        <GrowthInfrastructureReadinessBadge readiness={readiness} />
+        <GrowthInfrastructureReadinessBadge readiness={readiness} operatorFacing={operatorFacing} />
       </div>
-      {readiness.detail ? <p className="mt-1 text-xs opacity-90">{readiness.detail}</p> : null}
+      {resolved.detail ? <p className="mt-1 text-xs opacity-90">{resolved.detail}</p> : null}
     </div>
   )
 }

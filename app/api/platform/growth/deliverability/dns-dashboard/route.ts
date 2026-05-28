@@ -7,6 +7,7 @@ import {
 import { listDeliverabilityEvents } from "@/lib/growth/deliverability/deliverability-events"
 import { isGrowthDnsDeliverabilitySchemaReady } from "@/lib/growth/deliverability/deliverability-schema-health"
 import { GROWTH_DNS_DELIVERABILITY_PRIVACY_NOTE } from "@/lib/growth/deliverability/deliverability-types"
+import { isLiveDnsVerificationEnabled } from "@/lib/growth/deliverability/live-dns-verifier"
 
 export const runtime = "nodejs"
 
@@ -63,6 +64,9 @@ export async function GET() {
       top_issues: collectTopIssues(domains),
       events,
       privacy_note: GROWTH_DNS_DELIVERABILITY_PRIVACY_NOTE,
+      operator_context: {
+        live_dns_verification_enabled: isLiveDnsVerificationEnabled(),
+      },
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

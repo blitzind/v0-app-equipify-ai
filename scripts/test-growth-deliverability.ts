@@ -31,10 +31,19 @@ import {
   GROWTH_DELIVERABILITY_SENDER_HEALTH_QA_MARKER,
   GROWTH_DELIVERABILITY_WIDGET_FALLBACK_QA_MARKER,
 } from "../lib/growth/deliverability/deliverability-protection-console-types"
+import {
+  buildDnsSetupChecklist,
+  buildDnsSetupOperatorSummary,
+  GROWTH_DNS_SETUP_OPERATOR_READY_QA_MARKER,
+  growthInfrastructureReadinessOperatorLabel,
+  hasMeaningfulDnsDashboardMetrics,
+  sanitizeInfrastructureReadinessDetailForOperator,
+} from "../lib/growth/deliverability/dns-setup-operator-types"
 import { GROWTH_SENDER_PROVIDER_CAPABILITIES } from "../lib/growth/sender/provider-sender-capabilities"
 
 async function main(): Promise<void> {
   assert.equal(GROWTH_DNS_DELIVERABILITY_QA_MARKER, "growth-dns-deliverability-v1")
+  assert.equal(GROWTH_DNS_SETUP_OPERATOR_READY_QA_MARKER, "growth-dns-setup-operator-ready-v1")
   assert.match(GROWTH_DNS_DELIVERABILITY_PRIVACY_NOTE, /stub-safe|no live dns/i)
   assert.equal(GROWTH_DELIVERABILITY_TIMELINE_EVENT_TYPES.length, 6)
 
@@ -212,6 +221,100 @@ async function main(): Promise<void> {
   ])
   assert.ok(issues.some((issue) => issue.includes("SPF missing")))
 
+  assert.equal(growthInfrastructureReadinessOperatorLabel("stub"), "Setup required")
+  assert.equal(growthInfrastructureReadinessOperatorLabel("internal"), "Internal data only")
+  assert.equal(
+    sanitizeInfrastructureReadinessDetailForOperator(
+      "MANUAL VERIFICATION REQUIRED — set GROWTH_LIVE_DNS_VERIFICATION=true for live DNS probes.",
+    ),
+    "Live DNS checks are not enabled yet.",
+  )
+
+  const checklist = buildDnsSetupChecklist({
+    domains: [],
+    liveDnsEnabled: false,
+    readinessCatalog: [
+      {
+        surfaceId: "mailbox_provider",
+        title: "Google mailbox (primary)",
+        readiness: { status: "stub", label: "Stub", detail: "Google OAuth env incomplete." },
+      },
+      {
+        surfaceId: "warmup",
+        title: "Mailbox warmup",
+        readiness: { status: "disabled", label: "Disabled", detail: "Warmup execution is not enabled." },
+      },
+    ],
+  })
+  assert.equal(checklist.length, 7)
+  assert.equal(checklist.find((item) => item.id === "live_dns")?.status, "needs_setup")
+  assert.equal(checklist.find((item) => item.id === "sending_domain")?.status, "needs_setup")
+
+  const operatorSummary = buildDnsSetupOperatorSummary({
+    checklist,
+    liveDnsEnabled: false,
+    domainCount: 0,
+  })
+  assert.match(operatorSummary.headline, /not connected yet/i)
+  assert.ok(operatorSummary.nextSteps.length > 0)
+
+  assert.equal(
+    hasMeaningfulDnsDashboardMetrics({
+      domainCount: 0,
+      liveDnsEnabled: false,
+      dashboard: null,
+      domains: [],
+    }),
+    false,
+  )
+  assert.equal(
+    hasMeaningfulDnsDashboardMetrics({
+      domainCount: 1,
+      liveDnsEnabled: true,
+      dashboard: buildDeliverabilityDashboard([
+        {
+          domain_id: "d1",
+          domain: "alpha.com",
+          spf_present: false,
+          spf_valid: false,
+          dkim_present: false,
+          dkim_valid: false,
+          dmarc_present: false,
+          dmarc_valid: false,
+          mx_present: false,
+          mx_valid: false,
+          dns_health_score: 0,
+          health_tier: "critical",
+          deliverability_score: 0,
+          risk_level: "critical",
+          last_checked_at: null,
+          recommendations: [],
+        },
+      ]),
+      domains: [
+        {
+          domain_id: "d1",
+          domain: "alpha.com",
+          spf_present: false,
+          spf_valid: false,
+          dkim_present: false,
+          dkim_valid: false,
+          dmarc_present: false,
+          dmarc_valid: false,
+          mx_present: false,
+          mx_valid: false,
+          dns_health_score: 0,
+          health_tier: "critical",
+          deliverability_score: 0,
+          risk_level: "critical",
+          last_checked_at: null,
+          recommendations: [],
+        },
+      ],
+    }),
+    true,
+  )
+
   assert.equal(GROWTH_SENDER_PROVIDER_CAPABILITIES.google.supportsDnsValidation, true)
   assert.equal(GROWTH_SENDER_PROVIDER_CAPABILITIES.custom.supportsDnsValidation, false)
   assert.equal(GROWTH_SENDER_PROVIDER_CAPABILITIES.smtp.supportsDeliverabilityMonitoring, true)
@@ -292,11 +395,20 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "components/growth/growth-deliverability-dashboard.tsx"),
     "utf8",
   )
-  assert.match(uiSource, /DNS Health/)
-  assert.match(uiSource, /Authentication Coverage/)
-  assert.match(uiSource, /Validate Domain/)
-  assert.match(uiSource, /Coming Soon/)
-  assert.match(uiSource, /GROWTH_DNS_DELIVERABILITY_QA_MARKER/)
+  assert.match(uiSource, /GROWTH_DNS_SETUP_OPERATOR_READY_QA_MARKER/)
+  assert.match(uiSource, /Setup checklist/)
+  assert.match(uiSource, /Validate domain/)
+  assert.match(uiSource, /GrowthOperatorDiagnosticsDisclosure/)
+  assert.doesNotMatch(uiSource, /Stub-safe DNS intelligence/)
+  assert.doesNotMatch(uiSource, /Coming Soon/)
+  assert.doesNotMatch(uiSource, /set GROWTH_LIVE_DNS_VERIFICATION=true/)
+  assert.match(uiSource.slice(uiSource.indexOf("GrowthOperatorDiagnosticsDisclosure")), /GROWTH_LIVE_DNS_VERIFICATION/)
+
+  const dnsDashboardRoute = fs.readFileSync(
+    path.join(process.cwd(), "app/api/platform/growth/deliverability/dns-dashboard/route.ts"),
+    "utf8",
+  )
+  assert.match(dnsDashboardRoute, /live_dns_verification_enabled/)
 
   const navSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts"),

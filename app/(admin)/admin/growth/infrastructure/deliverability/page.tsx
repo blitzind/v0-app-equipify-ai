@@ -3,7 +3,6 @@
 import { ShieldCheck } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
-import { GrowthInfrastructureReadinessStrip } from "@/components/growth/growth-infrastructure-readiness-strip"
 import { GrowthDeliverabilityDashboard } from "@/components/growth/growth-deliverability-dashboard"
 import { GrowthDeliverabilityIaNav } from "@/components/growth/growth-deliverability-ia-nav"
 import {
@@ -45,9 +44,6 @@ export default function AdminGrowthDeliverabilityPage() {
             <GrowthDeliverabilityIaNav active="infrastructure" />
           </div>
         </section>
-
-        <GrowthInfrastructureReadinessStrip surfaceId="dns_validation" title="DNS validation" />
-        <GrowthInfrastructureReadinessStrip surfaceId="deliverability" title="Deliverability intelligence" />
 
         <GrowthSectionLayout>
           <GrowthDeliverabilityDashboard />
