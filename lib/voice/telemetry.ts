@@ -14,6 +14,12 @@ export type VoiceTelemetryEvent =
   | "voice_inbound_route_decision"
   | "voice_recording_callback_received"
   | "voice_recording_callback_stored"
+  | "voice_transfer_started"
+  | "voice_transfer_completed"
+  | "voice_transfer_canceled"
+  | "voice_supervisor_joined"
+  | "voice_participant_hold"
+  | "voice_participant_mute"
 
 export function logVoiceInfrastructure(
   event: VoiceTelemetryEvent,

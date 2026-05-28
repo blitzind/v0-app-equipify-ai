@@ -217,6 +217,7 @@
     "test:voice-operations-phase-1b": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-operations-phase-1b.ts",
     "test:voice-call-control-phase-1c": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-call-control-phase-1c.ts",
     "test:voice-native-dialer-integration-phase-1d": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-native-dialer-integration-phase-1d.ts",
+    "test:voice-transfer-control-phase-1e": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-transfer-control-phase-1e.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
     "test:growth-assemblyai-browser-streaming": "tsx scripts/test-growth-assemblyai-browser-streaming.ts",
     "test:growth-openai-realtime-browser-streaming": "tsx scripts/test-growth-openai-realtime-browser-streaming.ts",

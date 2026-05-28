@@ -15,6 +15,7 @@ import {
   heartbeatVoiceBrowserDevice,
   listOnlineVoiceBrowserDevices,
 } from "@/lib/voice/repository/voice-browser-calling-repository"
+import { fetchVoiceCallControlSnapshot } from "@/lib/voice/transfer-control/call-control-service"
 import { appendVoiceCallEvent } from "@/lib/voice/repository/voice-repository"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import type { VoiceCallStatus } from "@/lib/voice/types"
@@ -209,6 +210,9 @@ export async function buildVoiceBrowserSyncSnapshot(
   const recording = activeVoiceCallId
     ? await fetchVoiceCallRecordingVisibility(admin, activeVoiceCallId)
     : null
+  const controlSnapshot = activeVoiceCallId
+    ? await fetchVoiceCallControlSnapshot(admin, input.organizationId, activeVoiceCallId)
+    : { participants: [], activeTransfer: null }
   const inboundRinging = await fetchInboundBrowserOfferForUser(admin, {
     organizationId: input.organizationId,
     userId: input.userId,
@@ -234,6 +238,8 @@ export async function buildVoiceBrowserSyncSnapshot(
     timeline,
     recording,
     inboundRinging,
+    participants: controlSnapshot.participants,
+    activeTransfer: controlSnapshot.activeTransfer,
   }
 }
 

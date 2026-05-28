@@ -1,6 +1,7 @@
 /** Voice Infrastructure Foundation — Phase 1A shared types (client-safe). */
 
 import type { VoiceCallControlReadinessSnapshot, VoiceRecordingPolicy } from "@/lib/voice/call-control/types"
+import type { VoiceTransferControlReadinessSnapshot } from "@/lib/voice/transfer-control/types"
 
 export const VOICE_FOUNDATION_QA_MARKER = "voice-foundation-v1" as const
 export const VOICE_PROVIDER_ABSTRACTION_QA_MARKER = "voice-provider-abstraction-v1" as const
@@ -16,6 +17,13 @@ export {
   type VoiceCallControlReadinessSnapshot,
   type InboundCallControlDecision,
 } from "@/lib/voice/call-control/types"
+
+export {
+  VOICE_TRANSFER_CONTROL_QA_MARKER,
+  type VoiceTransferControlReadinessSnapshot,
+  type VoiceConferenceParticipantPublicView,
+  type VoiceCallTransferPublicView,
+} from "@/lib/voice/transfer-control/types"
 
 export const VOICE_PROVIDER_IDS = ["twilio", "telnyx", "plivo", "sip", "stub"] as const
 export type VoiceProviderId = (typeof VOICE_PROVIDER_IDS)[number]
@@ -265,4 +273,5 @@ export type VoiceOperationsReadinessSnapshot = VoiceInfrastructureReadinessSnaps
   voicemailBoxCount: number
   complianceReadinessExtended: VoiceComplianceReadinessSnapshot
   callControlReadiness?: VoiceCallControlReadinessSnapshot
+  transferControlReadiness?: VoiceTransferControlReadinessSnapshot
 }

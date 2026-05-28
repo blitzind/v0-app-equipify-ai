@@ -20,12 +20,9 @@ import {
   resolveRoundRobinMemberUserId,
 } from "../lib/voice/browser-calling/inbound-browser-routing"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "../lib/voice/browser-calling/types"
-import { VOICE_SCHEMA_MIGRATION_ID, VOICE_SCHEMA_PROBE_VERSION } from "../lib/voice/schema-health"
 import { resolveInboundVoiceRoute } from "../lib/voice/routing/routing-resolver"
 
 assert.equal(VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER, "voice-native-dialer-integration-v1")
-assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v4")
-assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270527170000_voice_browser_calling_phase_1d")
 
 const organizationId = "11111111-1111-4111-8111-111111111111"
 const userId = "22222222-2222-4222-8222-222222222222"

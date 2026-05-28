@@ -1,5 +1,10 @@
 /** Voice browser calling — Phase 1D shared types (client-safe). */
 
+import type {
+  VoiceCallTransferPublicView,
+  VoiceConferenceParticipantPublicView,
+} from "@/lib/voice/transfer-control/types"
+
 export const VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER = "voice-native-dialer-integration-v1" as const
 
 export const VOICE_BROWSER_CALL_STATES = [
@@ -97,6 +102,8 @@ export type VoiceBrowserSyncSnapshot = {
   timeline: VoiceCallTimelineEventView[]
   recording: VoiceCallRecordingVisibilityView | null
   inboundRinging: VoiceInboundBrowserOfferView | null
+  participants: VoiceConferenceParticipantPublicView[]
+  activeTransfer: VoiceCallTransferPublicView | null
 }
 
 export type VoiceInboundBrowserOfferView = {

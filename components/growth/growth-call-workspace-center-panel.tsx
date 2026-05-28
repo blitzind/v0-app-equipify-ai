@@ -6,9 +6,13 @@ import {
   Grid3X3,
   Headphones,
   Mic,
+  MicOff,
   Pause,
+  PhoneForwarded,
   PhoneOff,
+  Play,
   SquarePen,
+  Users,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -34,6 +38,10 @@ import type {
   VoiceCallRecordingVisibilityView,
   VoiceCallTimelineEventView,
 } from "@/lib/voice/browser-calling/types"
+import type {
+  VoiceCallTransferPublicView,
+  VoiceConferenceParticipantPublicView,
+} from "@/lib/voice/transfer-control/types"
 import type { CallWorkspaceCoachingMode } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import { NATIVE_DIALER_PROVIDER_LABELS } from "@/lib/growth/native-dialer/native-dialer-types"
 import { cn } from "@/lib/utils"
@@ -70,12 +78,14 @@ function ControlDockButton({
   icon: Icon,
   disabled,
   destructive,
+  active,
   onClick,
 }: {
   label: string
   icon: LucideIcon
   disabled?: boolean
   destructive?: boolean
+  active?: boolean
   onClick?: () => void
 }) {
   return (
@@ -86,12 +96,48 @@ function ControlDockButton({
       onClick={onClick}
       className={cn(
         "h-14 flex-1 flex-col gap-1 rounded-xl text-[11px] font-medium",
+        active && "bg-primary/10 text-primary",
         destructive && "text-destructive hover:bg-destructive/10 hover:text-destructive",
       )}
     >
       <Icon className="size-4" />
       {label}
     </Button>
+  )
+}
+
+function ActiveParticipantsPanel({
+  participants,
+  activeTransfer,
+}: {
+  participants: VoiceConferenceParticipantPublicView[]
+  activeTransfer: VoiceCallTransferPublicView | null
+}) {
+  if (participants.length <= 1 && !activeTransfer) return null
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-muted/10 px-3 py-2 text-sm dark:border-white/5">
+      <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <Users className="size-3.5" />
+        Active participants
+      </div>
+      <ul className="space-y-1 text-xs text-muted-foreground">
+        {participants.map((participant) => (
+          <li key={participant.id} className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-foreground">{participant.label}</span>
+            <span>{participant.participantRole.replace("_", " ")}</span>
+            {participant.isMuted ? <span>· muted</span> : null}
+            {participant.isOnHold ? <span>· hold</span> : null}
+          </li>
+        ))}
+      </ul>
+      {activeTransfer ? (
+        <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+          Transfer in progress ({activeTransfer.transferKind}) →{" "}
+          {activeTransfer.targetPhoneNumber || activeTransfer.targetClientIdentity || "target pending"}
+        </p>
+      ) : null}
+    </div>
   )
 }
 
@@ -169,6 +215,13 @@ export function GrowthCallWorkspaceCenterPanel({
   voiceBrowserCallStateLabel,
   voiceTimeline = [],
   voiceRecording = null,
+  voiceParticipants = [],
+  voiceActiveTransfer = null,
+  muted = false,
+  onHold = false,
+  transferTarget = "",
+  onTransferTargetChange,
+  callActionPending = false,
   answering,
   declining,
   ending,
@@ -180,6 +233,9 @@ export function GrowthCallWorkspaceCenterPanel({
   onAnswer,
   onDecline,
   onEndCall,
+  onToggleMute,
+  onToggleHold,
+  onStartTransfer,
   onMarkBridgeStarted,
   onStartLiveCoaching,
   onSubmitWrapup,
@@ -190,6 +246,13 @@ export function GrowthCallWorkspaceCenterPanel({
   voiceBrowserCallStateLabel?: string | null
   voiceTimeline?: VoiceCallTimelineEventView[]
   voiceRecording?: VoiceCallRecordingVisibilityView | null
+  voiceParticipants?: VoiceConferenceParticipantPublicView[]
+  voiceActiveTransfer?: VoiceCallTransferPublicView | null
+  muted?: boolean
+  onHold?: boolean
+  transferTarget?: string
+  onTransferTargetChange?: (value: string) => void
+  callActionPending?: boolean
   answering?: boolean
   declining?: boolean
   ending?: boolean
@@ -201,6 +264,9 @@ export function GrowthCallWorkspaceCenterPanel({
   onAnswer: () => void
   onDecline: () => void
   onEndCall: () => void
+  onToggleMute?: () => void
+  onToggleHold?: () => void
+  onStartTransfer?: () => void
   onMarkBridgeStarted: () => void
   onStartLiveCoaching: () => void
   onSubmitWrapup: (input: {
@@ -350,6 +416,21 @@ export function GrowthCallWorkspaceCenterPanel({
               recording={voiceRecording}
               browserCallStateLabel={voiceBrowserCallStateLabel ?? null}
             />
+            <ActiveParticipantsPanel participants={voiceParticipants} activeTransfer={voiceActiveTransfer} />
+            {controlsEnabled ? (
+              <div className="flex flex-col gap-2 rounded-xl border border-border/60 bg-muted/10 px-3 py-2 dark:border-white/5">
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="transfer-target">
+                  Transfer target (E.164 or client identity)
+                </label>
+                <input
+                  id="transfer-target"
+                  className="rounded-md border border-border/60 bg-background px-2 py-1 text-sm"
+                  value={transferTarget}
+                  onChange={(event) => onTransferTargetChange?.(event.target.value)}
+                  placeholder="+14155550199"
+                />
+              </div>
+            ) : null}
           </>
         ) : null}
 
@@ -373,8 +454,26 @@ export function GrowthCallWorkspaceCenterPanel({
             <div className="flex gap-1">
               {!externalBridge ? (
                 <>
-                  <ControlDockButton label="Mute" icon={Mic} disabled={!controlsEnabled} />
-                  <ControlDockButton label="Hold" icon={Pause} disabled={!controlsEnabled} />
+                  <ControlDockButton
+                    label={muted ? "Unmute" : "Mute"}
+                    icon={muted ? MicOff : Mic}
+                    disabled={!controlsEnabled || callActionPending}
+                    active={muted}
+                    onClick={onToggleMute}
+                  />
+                  <ControlDockButton
+                    label={onHold ? "Resume" : "Hold"}
+                    icon={onHold ? Play : Pause}
+                    disabled={!controlsEnabled || callActionPending}
+                    active={onHold}
+                    onClick={onToggleHold}
+                  />
+                  <ControlDockButton
+                    label="Transfer"
+                    icon={PhoneForwarded}
+                    disabled={!controlsEnabled || callActionPending || !transferTarget.trim()}
+                    onClick={onStartTransfer}
+                  />
                 </>
               ) : null}
               <ControlDockButton label="Keypad" icon={Grid3X3} disabled={!controlsEnabled && !bridgeControlsEnabled} />

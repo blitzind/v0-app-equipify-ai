@@ -18,6 +18,7 @@ import {
   VOICE_RECORDING_POLICIES,
   VOICE_RECORDING_POLICY_LABELS,
   VOICE_ROUTING_MODE_LABELS,
+  VOICE_TRANSFER_CONTROL_QA_MARKER,
   type InboundCallControlDecision,
   type VoiceBusinessHoursRecord,
   type VoiceNumberListItem,
@@ -135,6 +136,7 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
   const [operatorPresence, setOperatorPresence] = useState<VoiceOperatorPresencePublicView[]>([])
 
   const callControl = readiness?.callControlReadiness
+  const transferControl = readiness?.transferControlReadiness
 
   const loadOperations = useCallback(async () => {
     const [numbersRes, profilesRes, hoursRes, boxesRes] = await Promise.all([
@@ -301,7 +303,7 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
     <GrowthSettingsCard title="Voice Infrastructure" icon={<PhoneCall className="size-4" />}>
       <div
         className={GROWTH_SETTINGS_SECTION_GAP}
-        data-qa-marker={`${VOICE_FOUNDATION_QA_MARKER} ${VOICE_OPERATIONS_QA_MARKER} ${VOICE_CALL_CONTROL_QA_MARKER} ${VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER}`}
+        data-qa-marker={`${VOICE_FOUNDATION_QA_MARKER} ${VOICE_OPERATIONS_QA_MARKER} ${VOICE_CALL_CONTROL_QA_MARKER} ${VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER} ${VOICE_TRANSFER_CONTROL_QA_MARKER}`}
       >
         <p className="text-sm text-muted-foreground">
           Voice operations layer — number inventory, routing profiles, business hours, and voicemail scaffolding.
@@ -549,6 +551,23 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
                 <p>Inbound control ready: {callControl?.inboundCallControlReady ? "yes" : "not yet"}</p>
                 <p>Voicemail callback ready: {callControl?.voicemailCallbackReady ? "yes" : "not yet"}</p>
                 <p>{callControl?.callControlMessage}</p>
+              </div>
+            </section>
+
+            <section className={GROWTH_SETTINGS_SECTION_GAP}>
+              <p className="flex items-center gap-2 text-sm font-medium">
+                <PhoneCall className="size-4" />
+                Multi-party call control readiness
+              </p>
+              <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                <p>Multi-party control ready: {transferControl?.multiPartyCallControlReady ? "yes" : "not yet"}</p>
+                <p>Transfer readiness: {transferControl?.transferReadiness ?? "unknown"}</p>
+                <p>Supervisor join readiness: {transferControl?.supervisorJoinReadiness ?? "unknown"}</p>
+                <p>Provider conference capability: {transferControl?.providerConferenceCapability ?? "unknown"}</p>
+                <p>{transferControl?.message}</p>
+                {transferControl?.warnings.map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
               </div>
             </section>
 

@@ -23,6 +23,7 @@ import {
   VOICE_ROUTING_MODE_LABELS,
 } from "@/lib/voice/types"
 import { fetchVoiceCallControlReadiness } from "@/lib/voice/call-control/readiness"
+import { fetchVoiceTransferControlReadiness } from "@/lib/voice/transfer-control/readiness"
 import {
   countVoiceOptOuts,
   fetchVoiceInfrastructureReadiness,
@@ -565,12 +566,13 @@ export async function fetchVoiceOperationsReadiness(
     }
   }
 
-  const [profiles, hours, boxes, compliance, callControlReadiness] = await Promise.all([
+  const [profiles, hours, boxes, compliance, callControlReadiness, transferControlReadiness] = await Promise.all([
     fetchVoiceRoutingProfiles(admin, organizationId),
     fetchVoiceBusinessHoursList(admin, organizationId),
     fetchVoiceVoicemailBoxes(admin, organizationId),
     buildVoiceComplianceReadiness(admin, organizationId),
     fetchVoiceCallControlReadiness(admin, organizationId),
+    fetchVoiceTransferControlReadiness(admin, organizationId),
   ])
 
   return {
@@ -581,6 +583,7 @@ export async function fetchVoiceOperationsReadiness(
     voicemailBoxCount: boxes.length,
     complianceReadinessExtended: compliance,
     callControlReadiness,
+    transferControlReadiness,
     infrastructureMessage:
       base.phoneNumberCount === 0
         ? "Number provisioning will be connected after provider credentials are fully validated."

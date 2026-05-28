@@ -41,6 +41,7 @@ import {
 import { useVoiceBrowserCalling } from "@/hooks/voice/use-voice-browser-calling"
 import { mapBrowserCallStateLabel } from "@/lib/voice/browser-calling/status-mapping"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
+import { VOICE_TRANSFER_CONTROL_QA_MARKER } from "@/lib/voice/transfer-control/types"
 
 export function GrowthCallWorkspace() {
   const { toast } = useToast()
@@ -68,6 +69,8 @@ export function GrowthCallWorkspace() {
   const [coachingStartSignal, setCoachingStartSignal] = useState(0)
   const [coachingMode, setCoachingMode] = useState<CallWorkspaceCoachingMode>("transcript_only")
   const [leadLinked, setLeadLinked] = useState(false)
+  const [transferTarget, setTransferTarget] = useState("")
+  const [callActionPending, setCallActionPending] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -122,6 +125,84 @@ export function GrowthCallWorkspace() {
       void load()
     },
   })
+
+  const voiceCallId = voiceBrowser.snapshot?.activeVoiceCallId ?? null
+  const operatorParticipant =
+    voiceBrowser.snapshot?.participants.find((participant) => participant.participantRole === "operator") ??
+    voiceBrowser.snapshot?.participants[0] ??
+    null
+  const sessionMuted = activeSession?.muted ?? false
+  const sessionOnHold = activeSession?.onHold ?? false
+
+  useEffect(() => {
+    if (activeSession?.transferTarget && !transferTarget) {
+      setTransferTarget(activeSession.transferTarget)
+    }
+  }, [activeSession?.transferTarget, transferTarget])
+
+  async function postCallControl(path: string, body: Record<string, unknown>) {
+    if (!voiceCallId) throw new Error("No canonical voice call linked to this workspace session.")
+    const res = await fetch(`/api/platform/growth/voice/calls/${voiceCallId}/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+    const data = (await res.json().catch(() => ({}))) as { message?: string; ok?: boolean }
+    if (!res.ok || !data.ok) throw new Error(data.message ?? "Call control action failed.")
+    await voiceBrowser.refresh()
+    await load()
+  }
+
+  async function toggleMute() {
+    setCallActionPending(true)
+    setError(null)
+    try {
+      await postCallControl("participants/mute", {
+        ...(operatorParticipant ? { participantId: operatorParticipant.id } : {}),
+        muted: !sessionMuted,
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Mute action failed.")
+    } finally {
+      setCallActionPending(false)
+    }
+  }
+
+  async function toggleHold() {
+    setCallActionPending(true)
+    setError(null)
+    try {
+      await postCallControl("participants/hold", {
+        ...(operatorParticipant ? { participantId: operatorParticipant.id } : {}),
+        hold: !sessionOnHold,
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Hold action failed.")
+    } finally {
+      setCallActionPending(false)
+    }
+  }
+
+  async function startTransfer() {
+    const target = transferTarget.trim()
+    if (!target) {
+      setError("Enter a transfer target before starting transfer.")
+      return
+    }
+    setCallActionPending(true)
+    setError(null)
+    try {
+      const isClientIdentity = target.startsWith("org_")
+      await postCallControl("transfer/start", {
+        transferKind: "cold",
+        ...(isClientIdentity ? { targetClientIdentity: target } : { targetPhoneNumber: target }),
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Transfer failed.")
+    } finally {
+      setCallActionPending(false)
+    }
+  }
 
   useEffect(() => {
     void load()
@@ -333,6 +414,7 @@ export function GrowthCallWorkspace() {
       data-google-voice-bridge-qa-marker={GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER}
       data-google-voice-bridge-coaching-qa-marker={GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER}
       data-voice-native-dialer-integration-qa-marker={VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER}
+      data-voice-transfer-control-qa-marker={VOICE_TRANSFER_CONTROL_QA_MARKER}
     >
       {voiceBrowser.registrationState === "error" && voiceBrowser.error ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
@@ -406,6 +488,13 @@ export function GrowthCallWorkspace() {
           }
           voiceTimeline={voiceBrowser.snapshot?.timeline ?? []}
           voiceRecording={voiceBrowser.snapshot?.recording ?? null}
+          voiceParticipants={voiceBrowser.snapshot?.participants ?? []}
+          voiceActiveTransfer={voiceBrowser.snapshot?.activeTransfer ?? null}
+          muted={sessionMuted}
+          onHold={sessionOnHold}
+          transferTarget={transferTarget}
+          onTransferTargetChange={setTransferTarget}
+          callActionPending={callActionPending}
           answering={answering}
           declining={declining}
           ending={ending}
@@ -417,6 +506,9 @@ export function GrowthCallWorkspace() {
           onAnswer={() => void answerCall()}
           onDecline={() => void declineCall()}
           onEndCall={() => void endCall()}
+          onToggleMute={() => void toggleMute()}
+          onToggleHold={() => void toggleHold()}
+          onStartTransfer={() => void startTransfer()}
           onMarkBridgeStarted={() => void markBridgeStarted()}
           onStartLiveCoaching={() => setCoachingStartSignal((value) => value + 1)}
           onSubmitWrapup={submitWrapup}
