@@ -80,6 +80,7 @@ assert.match(source, /futurePlaceholder/)
 assert.match(source, /lg:hidden/)
 assert.match(source, /data-qa=\{GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER\}/)
 assert.match(source, /clickableNavItems\(group\)\.some/)
+assert.match(source, /pipeline: Funnel/)
 
 const coreGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "core")
 assert.ok(coreGroup?.items.some((i) => i.label === "Revenue Inbox"))
