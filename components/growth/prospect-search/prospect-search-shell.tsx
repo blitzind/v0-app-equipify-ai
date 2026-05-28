@@ -88,7 +88,6 @@ import {
   type ProspectSearchFetchTrigger,
 } from "@/lib/growth/prospect-search/prospect-search-provider-search-intent"
 import { ProspectSearchLiveEstimation } from "@/components/growth/prospect-search/prospect-search-live-estimation"
-import { ProspectSearchFilterHealthWarnings } from "@/components/growth/prospect-search/prospect-search-filter-health-warnings"
 import { useProspectSearchLiveEstimation } from "@/lib/growth/prospect-search/use-prospect-search-live-estimation"
 import { useProspectSearchTerritoryHeatmap } from "@/lib/growth/prospect-search/use-prospect-search-territory-heatmap"
 import {
@@ -226,12 +225,11 @@ export function ProspectSearchShell() {
     discoveryMode === "discover_external" && !searchCompleted && !loading
   const filtersKey = useMemo(() => JSON.stringify(filters), [filters])
 
-  const { estimate, loading: estimateLoading, displayState: estimateDisplayState } =
+  const { estimate, loading: estimateLoading, displayState: estimateDisplayState, resetEstimate } =
     useProspectSearchLiveEstimation({
       query,
       filters,
       discoveryMode,
-      enabled: true,
     })
 
   const { heatmap, loading: heatmapLoading, panelVisible: territoryHeatmapVisible } =
@@ -245,12 +243,29 @@ export function ProspectSearchShell() {
 
   const searchLoadingLabel =
     discoveryMode === "discover_external" ? "Searching companies…" : "Searching…"
-  const searchButtonLabel = estimate?.search_button_label ?? "Search"
+  const heroSearchButtonLabel =
+    discoveryMode === "discover_external" ? "Search market" : estimate?.search_button_label ?? "Search"
   const applyButtonLabel =
-    discoveryMode === "discover_external" ? "Apply filters" : searchButtonLabel
+    discoveryMode === "discover_external" ? "Apply filters" : heroSearchButtonLabel
   const searchButtonDisabled =
-    loading || (estimate != null && estimate.search_button_disabled && !estimateLoading)
-  const applyButtonDisabled = searchButtonDisabled
+    loading ||
+    (discoveryMode === "discover_external" &&
+      estimate != null &&
+      estimate.search_button_disabled &&
+      !estimateLoading)
+  const applyButtonDisabled = loading
+
+  const clearAllFilters = useCallback(() => {
+    replaceFilters(EMPTY_FILTERS)
+    resetEstimate()
+    setPendingProviderSearchHint(null)
+    setSearchCompleted(false)
+    setHasSearched(false)
+    setResult(null)
+    setSelectedCompany(null)
+    setSelectedKeys(new Set())
+    setPage(1)
+  }, [replaceFilters, resetEstimate])
 
   useEffect(() => {
     const t = window.setInterval(() => {
@@ -915,7 +930,7 @@ export function ProspectSearchShell() {
                 {searchLoadingLabel}
               </>
             ) : (
-              searchButtonLabel
+              heroSearchButtonLabel
             )}
           </Button>
           <SearchRecommendations
@@ -977,7 +992,7 @@ export function ProspectSearchShell() {
               trigger: "explicit_operator_search",
             })
           }}
-          onClear={() => replaceFilters(EMPTY_FILTERS)}
+          onClear={clearAllFilters}
           applyLabel={applyButtonLabel}
           applyDisabled={applyButtonDisabled}
           savedSearches={savedSearches}
@@ -995,9 +1010,6 @@ export function ProspectSearchShell() {
               compact
               className="mb-3"
             />
-          }
-          filterHealthSlot={
-            <ProspectSearchFilterHealthWarnings estimate={estimate} className="mb-3" />
           }
         />
 

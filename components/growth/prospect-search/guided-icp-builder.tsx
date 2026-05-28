@@ -1,15 +1,11 @@
 "use client"
 
-import { useEffect, useState, type Dispatch, ReactNode, SetStateAction } from "react"
+import { useState, type Dispatch, ReactNode, SetStateAction } from "react"
 import { RecommendedFilters } from "@/components/growth/prospect-search/recommended-filters"
 import { SmartFilterInput } from "@/components/growth/prospect-search/smart-filter-input"
 import { TitleTargetingCard } from "@/components/growth/prospect-search/title-targeting-card"
 import { TerritoryFilterCard } from "@/components/growth/prospect-search/territory-filter-card"
-import {
-  GROWTH_SEARCH_FILTERS_COLLAPSED_DEFAULT_QA_MARKER,
-  readProspectSearchFilterAccordionExpanded,
-  writeProspectSearchFilterAccordionExpanded,
-} from "@/components/growth/prospect-search/prospect-search-filter-accordion-state"
+import { GROWTH_SEARCH_FILTERS_COLLAPSED_DEFAULT_QA_MARKER } from "@/components/growth/prospect-search/prospect-search-ux-constants"
 import {
   PROSPECT_SEARCH_BUYING_STAGE_UI,
   PROSPECT_SEARCH_CONFIDENCE_PRESETS,
@@ -138,10 +134,6 @@ export function GuidedIcpBuilder({
 
   const [expandedSections, setExpandedSections] = useState<string[]>([])
 
-  useEffect(() => {
-    setExpandedSections(readProspectSearchFilterAccordionExpanded())
-  }, [])
-
   return (
     <div className={cn("space-y-3", isRail ? "" : "space-y-4")}>
       {!isRail ? (
@@ -173,10 +165,7 @@ export function GuidedIcpBuilder({
       <Accordion
         type="multiple"
         value={expandedSections}
-        onValueChange={(value) => {
-          setExpandedSections(value)
-          writeProspectSearchFilterAccordionExpanded(value)
-        }}
+        onValueChange={setExpandedSections}
         className={cn(isRail && "rounded-lg border border-border/60 bg-muted/10 px-1")}
         data-qa-marker={GROWTH_SEARCH_FILTERS_COLLAPSED_DEFAULT_QA_MARKER}
       >

@@ -2349,9 +2349,9 @@ async function main(): Promise<void> {
     unavailable_filter_reasons: [],
   })
   assert.match(numerical.numerical_headline, /29,000 matching companies/)
-  assert.match(numerical.market_helper, /8,400 likely contacts/)
-  assert.match(numerical.market_helper, /1,250 decision makers/)
   assert.match(numerical.market_helper, /No credits used for estimate/)
+  assert.match(numerical.market_helper, /Based on internal index/)
+  assert.doesNotMatch(numerical.market_helper, /likely contacts/)
   assert.match(
     buildProspectSearchButtonLabel({
       state: "ready",
@@ -2405,6 +2405,18 @@ async function main(): Promise<void> {
     /^Search$/,
   )
 
+  const {
+    GROWTH_DISCOVER_ESTIMATE_HIDDEN_WHEN_STALE_QA_MARKER,
+    hasProspectSearchEstimateCriteria,
+    isProspectSearchLiveEstimateStale,
+  } = await import("../lib/growth/prospect-search/prospect-search-estimate-visibility")
+  assert.equal(GROWTH_DISCOVER_ESTIMATE_HIDDEN_WHEN_STALE_QA_MARKER, "growth-discover-estimate-hidden-when-stale-v1")
+  assert.equal(hasProspectSearchEstimateCriteria("", {}), false)
+  assert.equal(hasProspectSearchEstimateCriteria("hvac", {}), true)
+  assert.equal(hasProspectSearchEstimateCriteria("", { industry: "HVAC" }), true)
+  assert.equal(isProspectSearchLiveEstimateStale("a", "b"), true)
+  assert.equal(isProspectSearchLiveEstimateStale("a", "a"), false)
+
   assert.match(shellSource, /useProspectSearchLiveEstimation/)
   assert.match(shellSource, /<ProspectSearchLiveEstimation/)
   assert.match(shellSource, /estimationSlot/)
@@ -2414,13 +2426,13 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "components/growth/prospect-search/prospect-search-live-estimation.tsx"),
     "utf8",
   )
-  assert.match(liveEstimationSource, /data-market-size-prominent/)
+  assert.match(liveEstimationSource, /data-estimate-hidden-stale-qa=\{GROWTH_DISCOVER_ESTIMATE_HIDDEN_WHEN_STALE_QA_MARKER\}/)
   assert.match(shellSource, /ProspectSearchRelaxFilters/)
   assert.match(shellSource, /GROWTH_RESULTS_HEADER_LAYOUT_V1_QA_MARKER/)
   assert.doesNotMatch(shellSource, /GROWTH_PROVIDER_STATUS_LAYOUT_V1_QA_MARKER/)
   assert.match(shellSource, /inline-flex max-w-full flex-wrap items-baseline/)
   assert.match(savedWorkflowIcpSource, /GROWTH_SEARCH_FILTERS_COLLAPSED_DEFAULT_QA_MARKER/)
-  assert.match(savedWorkflowIcpSource, /writeProspectSearchFilterAccordionExpanded/)
+  assert.doesNotMatch(savedWorkflowIcpSource, /writeProspectSearchFilterAccordionExpanded/)
   assert.doesNotMatch(savedWorkflowIcpSource, /defaultValue=\{accordionDefaults\}/)
   assert.doesNotMatch(savedWorkflowIcpSource, /accordionDefaults = \["industry"/)
 
@@ -2647,6 +2659,10 @@ async function testProspectSearchProviderIntent(): Promise<void> {
   assert.match(shellSource, /ProspectSearchDiscoverReadyPanel/)
   assert.match(shellSource, /GROWTH_DISCOVER_READY_TO_SEARCH_QA_MARKER/)
   assert.match(shellSource, /Apply filters/)
+  assert.match(shellSource, /Search market/)
+  assert.match(shellSource, /clearAllFilters/)
+  assert.match(shellSource, /resetEstimate/)
+  assert.doesNotMatch(shellSource, /ProspectSearchFilterHealthWarnings/)
   assert.match(shellSource, /Filters are hiding all discovered companies/)
 
   const intentSource = fs.readFileSync(
@@ -3282,6 +3298,8 @@ async function testProspectSearchPresearchMarketEstimation(): Promise<void> {
   assert.match(estimationSource, /numerical_headline/)
   assert.match(estimationSource, /credits_used: false/)
   assert.match(estimationSource, /company_count/)
+  assert.match(estimationSource, /estimate_visible/)
+  assert.match(estimationSource, /buildHiddenProspectSearchEstimate/)
 
   const liveEstimationSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/prospect-search-live-estimation.tsx"),
@@ -3291,7 +3309,8 @@ async function testProspectSearchPresearchMarketEstimation(): Promise<void> {
   assert.match(liveEstimationSource, /GROWTH_DISCOVER_LIVE_ESTIMATE_QA_MARKER/)
   assert.match(liveEstimationSource, /GROWTH_DISCOVER_NO_CREDITS_ESTIMATE_QA_MARKER/)
   assert.match(liveEstimationSource, /numerical_headline/)
-  assert.match(liveEstimationSource, /likely contacts/)
+  assert.match(liveEstimationSource, /GROWTH_DISCOVER_ESTIMATE_HIDDEN_WHEN_STALE_QA_MARKER/)
+  assert.doesNotMatch(liveEstimationSource, /likely contacts/)
   assert.doesNotMatch(liveEstimationSource, /Large market/)
   assert.doesNotMatch(liveEstimationSource, /No likely matches/)
 

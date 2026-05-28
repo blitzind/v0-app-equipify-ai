@@ -30,6 +30,10 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-filter-health"
 import { normalizeProspectSearchFilters } from "@/lib/growth/prospect-search/prospect-search-filters"
 import {
+  countActiveProspectSearchFilters,
+  PROSPECT_SEARCH_NO_CREDITS_ESTIMATE_NOTE,
+} from "@/lib/growth/prospect-search/prospect-search-estimation-format"
+import {
   computePresearchMarketEstimate,
   formatPresearchMarketHeadline,
   GROWTH_MARKET_ESTIMATION_TIER_QA_MARKER,
@@ -128,6 +132,13 @@ export async function estimateProspectSearchMatches(
 ): Promise<GrowthProspectSearchLiveEstimate> {
   const filters = normalizeProspectSearchFilters(input.filters ?? {})
   const filtersJson = JSON.stringify(filters)
+  const hasEstimateCriteria =
+    input.query.trim().length > 0 || countActiveProspectSearchFilters(filters) > 0
+
+  if (!hasEstimateCriteria) {
+    return buildHiddenProspectSearchEstimate(input.discovery_mode)
+  }
+
   const cacheKey = buildProspectSearchEstimateCacheKey({
     query: input.query,
     filtersJson,
@@ -135,8 +146,8 @@ export async function estimateProspectSearchMatches(
   })
 
   const cached = readProspectSearchEstimateCache<GrowthProspectSearchLiveEstimate>(cacheKey)
-  if (cached) {
-    return { ...cached, cached: true, state: "using_cached_estimate" }
+  if (input.cached) {
+    return { ...cached, cached: true, state: "using_cached_estimate", estimate_visible: true }
   }
 
   const provider_readiness = buildProviderReadiness()
@@ -260,8 +271,58 @@ export async function estimateProspectSearchMatches(
     relax_suggestions,
     search_button_label: button.label,
     search_button_disabled: button.disabled,
+    estimate_visible: true,
   }
 
   writeProspectSearchEstimateCache(cacheKey, estimate)
-  return estimate
+  return { ...estimate, estimate_visible: true }
+}
+
+function buildHiddenProspectSearchEstimate(
+  discovery_mode: GrowthProspectSearchDiscoveryMode,
+): GrowthProspectSearchLiveEstimate {
+  const provider_readiness = buildProviderReadiness()
+  const button = buildProspectSearchButtonLabel({
+    state: "ready",
+    discovery_mode,
+    exact_count: null,
+    confidence: "broad",
+    provider_readiness,
+  })
+
+  return {
+    qa_marker: GROWTH_LIVE_ESTIMATED_RESULTS_QA_MARKER,
+    estimation_state_marker: GROWTH_FILTER_ESTIMATION_STATE_QA_MARKER,
+    preview_marker: GROWTH_SEARCH_RESULT_PREVIEW_QA_MARKER,
+    presearch_market_qa_marker: GROWTH_MARKET_ESTIMATION_TIER_QA_MARKER,
+    presearch_vs_results_qa_marker: GROWTH_PRESEARCH_ESTIMATION_VS_RESULTS_QA_MARKER,
+    no_false_negative_qa_marker: GROWTH_NO_FALSE_NEGATIVE_ESTIMATES_QA_MARKER,
+    phase: "presearch",
+    state: "ready",
+    confidence: "broad",
+    confidence_label: "",
+    discovery_mode,
+    exact_count: null,
+    company_count: null,
+    contact_count: null,
+    decision_maker_count: null,
+    indexed_count_hint: null,
+    estimated_from: null,
+    credits_used: false,
+    unavailable_filter_reasons: [],
+    numerical_headline: "",
+    market_tier: null,
+    broad_market_category: false,
+    display_label: "",
+    market_helper: "",
+    range_floor: null,
+    provider_readiness,
+    sources: [],
+    cached: false,
+    filter_health_warnings: [],
+    relax_suggestions: [],
+    search_button_label: button.label,
+    search_button_disabled: button.disabled,
+    estimate_visible: false,
+  }
 }

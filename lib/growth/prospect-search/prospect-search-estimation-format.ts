@@ -18,8 +18,10 @@ const RANGE_FLOORS = [10, 50, 250, 1000, 2500, 10000] as const
 export const PROSPECT_SEARCH_ESTIMATE_UNAVAILABLE_LABEL =
   "Estimate unavailable — click Search to run discovery" as const
 
+export const PROSPECT_SEARCH_ESTIMATE_SOURCE_NOTE = "Based on internal index." as const
+
 export const PROSPECT_SEARCH_NO_CREDITS_ESTIMATE_NOTE =
-  "No credits used for estimate — internal index and cached metadata only." as const
+  "No credits used for estimate." as const
 
 /** Same numeric formatting as pagination (`totalCount.toLocaleString()`). */
 export function formatProspectSearchMatchingCount(count: number): string {
@@ -77,24 +79,10 @@ export function buildProspectSearchNumericalEstimateDisplay(input: {
   } else if (effectiveCount > 0) {
     companyLabel = `${formatProspectSearchMatchingCount(effectiveCount)} matching companies`
   } else {
-    companyLabel = "0 matching companies in internal index"
+    companyLabel = "0 matching companies"
   }
 
-  const helperLines = [PROSPECT_SEARCH_NO_CREDITS_ESTIMATE_NOTE]
-  if (input.contact_count != null && input.contact_count > 0) {
-    helperLines.unshift(`${formatProspectSearchMatchingCount(input.contact_count)} likely contacts`)
-  }
-  if (input.decision_maker_count != null && input.decision_maker_count > 0) {
-    helperLines.unshift(`${formatProspectSearchMatchingCount(input.decision_maker_count)} decision makers`)
-  }
-  if (input.unavailable_filter_reasons.length > 0) {
-    helperLines.push("Estimate excludes filters not available in the internal index.")
-  }
-  if (input.discovery_mode === "discover_external") {
-    helperLines.push("Click Search market to run external discovery — that action may use provider credits.")
-  } else {
-    helperLines.push("Based on indexed CRM and Growth Engine coverage.")
-  }
+  const helperLines = [PROSPECT_SEARCH_NO_CREDITS_ESTIMATE_NOTE, PROSPECT_SEARCH_ESTIMATE_SOURCE_NOTE]
 
   return {
     numerical_headline: companyLabel,

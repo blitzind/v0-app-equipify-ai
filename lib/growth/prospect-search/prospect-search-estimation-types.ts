@@ -27,6 +27,8 @@ export const GROWTH_DISCOVER_LIVE_ESTIMATE_QA_MARKER = "growth-discover-live-est
 export const GROWTH_DISCOVER_NO_CREDITS_ESTIMATE_QA_MARKER =
   "growth-discover-no-credits-estimate-v1" as const
 
+export { GROWTH_DISCOVER_ESTIMATE_HIDDEN_WHEN_STALE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-estimate-visibility"
+
 export type GrowthProspectSearchEstimateFromSource = "internal_index" | "cached_metadata" | "mixed"
 
 export type GrowthProspectSearchEstimateConfidence = "high" | "medium" | "low" | "broad" | "heuristic"
@@ -92,4 +94,6 @@ export type GrowthProspectSearchLiveEstimate = {
   relax_suggestions: string[]
   search_button_label: string
   search_button_disabled: boolean
+  /** False when no filter/query criteria or estimate should not render. */
+  estimate_visible: boolean
 }

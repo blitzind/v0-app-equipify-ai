@@ -1,14 +1,19 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { buildProspectSearchGetRequestParams } from "@/lib/growth/prospect-search/prospect-search-client-request"
+import {
+  buildProspectSearchEstimateCriteriaKey,
+  hasProspectSearchEstimateCriteria,
+  isProspectSearchLiveEstimateStale,
+} from "@/lib/growth/prospect-search/prospect-search-estimate-visibility"
 import type { GrowthProspectSearchLiveEstimate } from "@/lib/growth/prospect-search/prospect-search-estimation-types"
 import type {
   GrowthProspectSearchDiscoveryMode,
   GrowthProspectSearchFilters,
 } from "@/lib/growth/prospect-search/prospect-search-types"
 
-const DEBOUNCE_MS = 500
+const DEBOUNCE_MS = 400
 
 export function useProspectSearchLiveEstimation(input: {
   query: string
@@ -17,13 +22,33 @@ export function useProspectSearchLiveEstimation(input: {
   enabled?: boolean
 }) {
   const [estimate, setEstimate] = useState<GrowthProspectSearchLiveEstimate | null>(null)
+  const [matchedCriteriaKey, setMatchedCriteriaKey] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const requestIdRef = useRef(0)
-  const filtersKey = useMemo(() => JSON.stringify(input.filters), [input.filters])
+
+  const criteriaKey = useMemo(
+    () => buildProspectSearchEstimateCriteriaKey(input.query, input.filters),
+    [input.query, input.filters],
+  )
+  const hasCriteria = useMemo(
+    () => hasProspectSearchEstimateCriteria(input.query, input.filters),
+    [input.query, input.filters],
+  )
+
+  const isStale = isProspectSearchLiveEstimateStale(criteriaKey, matchedCriteriaKey)
 
   useEffect(() => {
-    if (input.enabled === false) return
+    if (input.enabled === false || !hasCriteria) {
+      abortRef.current?.abort()
+      requestIdRef.current += 1
+      setEstimate(null)
+      setMatchedCriteriaKey(null)
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
 
     const timer = window.setTimeout(() => {
       abortRef.current?.abort()
@@ -31,7 +56,7 @@ export function useProspectSearchLiveEstimation(input: {
       abortRef.current = controller
       const requestId = requestIdRef.current + 1
       requestIdRef.current = requestId
-      setLoading(true)
+      const fetchCriteriaKey = criteriaKey
 
       const params = buildProspectSearchGetRequestParams({
         query: input.query,
@@ -53,19 +78,25 @@ export function useProspectSearchLiveEstimation(input: {
         .then(async (res) => {
           const json = (await res.json()) as {
             ok?: boolean
-            estimate?: GrowthProspectSearchLiveEstimate
+            estimate?: GrowthProspectSearchLiveEstimate | null
           }
           if (requestId !== requestIdRef.current) return
-          if (!res.ok || !json.ok || !json.estimate) {
+          if (fetchCriteriaKey !== buildProspectSearchEstimateCriteriaKey(input.query, input.filters)) {
+            return
+          }
+          if (!res.ok || !json.ok || !json.estimate || json.estimate.estimate_visible === false) {
             setEstimate(null)
+            setMatchedCriteriaKey(fetchCriteriaKey)
             return
           }
           setEstimate(json.estimate)
+          setMatchedCriteriaKey(fetchCriteriaKey)
         })
         .catch((error: unknown) => {
           if (error instanceof DOMException && error.name === "AbortError") return
           if (requestId !== requestIdRef.current) return
           setEstimate(null)
+          setMatchedCriteriaKey(fetchCriteriaKey)
         })
         .finally(() => {
           if (requestId === requestIdRef.current) setLoading(false)
@@ -76,15 +107,38 @@ export function useProspectSearchLiveEstimation(input: {
       window.clearTimeout(timer)
       abortRef.current?.abort()
     }
-  }, [input.query, filtersKey, input.discoveryMode, input.enabled, input.filters])
+  }, [
+    criteriaKey,
+    hasCriteria,
+    input.discoveryMode,
+    input.enabled,
+    input.filters,
+    input.query,
+  ])
 
-  const displayState = loading
-    ? ("estimating" as const)
-    : (estimate?.state ?? "ready")
+  const displayState = !hasCriteria
+    ? ("awaiting_filters" as const)
+    : loading || isStale
+      ? ("estimating" as const)
+      : (estimate?.state ?? "ready")
+
+  const visibleEstimate =
+    hasCriteria && !isStale && estimate?.estimate_visible !== false ? estimate : null
+
+  const resetEstimate = useCallback(() => {
+    abortRef.current?.abort()
+    requestIdRef.current += 1
+    setEstimate(null)
+    setMatchedCriteriaKey(null)
+    setLoading(false)
+  }, [])
 
   return {
-    estimate,
-    loading,
+    estimate: visibleEstimate,
+    loading: hasCriteria && (loading || isStale),
     displayState,
+    hasCriteria,
+    isStale,
+    resetEstimate,
   }
 }
