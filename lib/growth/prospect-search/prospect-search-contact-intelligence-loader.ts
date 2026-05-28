@@ -32,6 +32,8 @@ import {
 import { loadProspectSearchSuppressionLookup } from "@/lib/growth/prospect-search/prospect-search-suppression-overlays"
 import { loadProspectSearchLeadRelationshipHydrationBatch } from "@/lib/growth/prospect-search/prospect-search-relationship-memory-loader"
 import { parseWebsiteExtractionDiagnosticsFromMetadata } from "@/lib/growth/contact-discovery/website-acquisition-metadata-bridge"
+import { resolveProspectSearchContactEligibilityHints } from "@/lib/growth/prospect-search/prospect-search-contact-eligibility-server"
+import { finalizeProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-result-finalize"
 import { normalizePhoneNumber } from "@/lib/voice/phone-normalization"
 
 function isPipelineRun(value: unknown): value is GrowthLeadEnginePipelineRun {
@@ -287,6 +289,8 @@ export async function loadProspectSearchContactIntelligenceBatch(
 
   return map
 }
+
+export { GROWTH_RUNTIME_REGRESSION_FIX_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-safe-fetch-json"
 
 export function applyContactIntelligenceToCompanyResult(
   company: GrowthProspectSearchCompanyResult,

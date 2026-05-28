@@ -4,6 +4,10 @@ import { MapPin } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import type { ProspectSearchTerritoryOpportunityScore } from "@/lib/growth/prospect-search/prospect-search-territory-prioritization"
 import { GROWTH_TERRITORY_PRIORITIZATION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-territory-prioritization"
+import { GROWTH_OPERATOR_RECOMMENDATIONS_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-operator-recommendations"
+import { GROWTH_SMART_RESEARCH_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-research-gaps"
+import { GROWTH_ADAPTIVE_REFRESH_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-adaptive-refresh"
+import { GROWTH_PROSPECT_COMMAND_OVERLAYS_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-command-overlays"
 
 function tierVariant(tier: string): "default" | "outline" | "secondary" | "destructive" {
   if (tier === "high_opportunity" || tier === "strong_coverage") return "default"

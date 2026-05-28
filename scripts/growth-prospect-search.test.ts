@@ -1871,6 +1871,8 @@ async function main(): Promise<void> {
   assert.match(contactIntelSource, /hasEvidence/)
   assert.match(contactIntelLoaderSource, /applyProspectSearchContactIntelligenceOverlay/)
   assert.match(contactIntelLoaderSource, /listGrowthLeadDecisionMakers/)
+  assert.match(contactIntelLoaderSource, /finalizeProspectSearchCompanyResult/)
+  assert.match(contactIntelLoaderSource, /prospect-search-result-finalize/)
   assert.match(repositorySource, /applyProspectSearchContactIntelligenceOverlay/)
   assert.match(companyCardSource, /CompanyContactIntelligencePanel/)
   assert.match(leadEngineWorkspaceSource, /contactHandoff/)
@@ -4355,6 +4357,10 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   )
 
   assert.match(territoryPanelSource, /data-territory-prioritization-marker/)
+  assert.match(territoryPanelSource, /GROWTH_OPERATOR_RECOMMENDATIONS_QA_MARKER/)
+  assert.match(territoryPanelSource, /GROWTH_SMART_RESEARCH_QA_MARKER/)
+  assert.match(territoryPanelSource, /GROWTH_ADAPTIVE_REFRESH_QA_MARKER/)
+  assert.match(territoryPanelSource, /GROWTH_PROSPECT_COMMAND_OVERLAYS_QA_MARKER/)
   assert.match(orgPanelSource, /data-org-intelligence-marker/)
   assert.match(orgPanelSource, /data-contact-influence-marker/)
   assert.match(peopleTableInfluenceSource, /data-contact-influence-marker/)
@@ -4882,6 +4888,7 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
     safeDiscoveryProviderResponse,
     GROWTH_SAFE_PROVIDER_PARSING_QA_MARKER,
     GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER,
+    GROWTH_RUNTIME_REGRESSION_FIX_QA_MARKER,
     formatSafeJsonParseError,
   } = await import("../lib/growth/prospect-search/prospect-search-safe-fetch-json")
   const { resolveDiscoverEmptyStateMessage } = await import(
@@ -4890,6 +4897,7 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
 
   assert.equal(GROWTH_SAFE_PROVIDER_PARSING_QA_MARKER, "growth-safe-provider-parsing-v1")
   assert.equal(GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER, "growth-discovery-runtime-hardening-v1")
+  assert.equal(GROWTH_RUNTIME_REGRESSION_FIX_QA_MARKER, "growth-runtime-regression-fix-v1")
 
   const emptyParse = safeParseJsonText("", 500)
   assert.equal(emptyParse.ok, false)
@@ -4924,7 +4932,9 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   )
   assert.match(runtimeNoticeSource, /data-discovery-runtime-hardening-marker/)
   assert.match(runtimeNoticeSource, /data-safe-provider-parsing-marker/)
+  assert.match(runtimeNoticeSource, /data-runtime-regression-fix-marker/)
   assert.match(shellSource, /data-discovery-runtime-hardening-marker/)
+  assert.match(shellSource, /data-runtime-regression-fix-marker/)
   assert.match(shellSource, /safeFetchJson/)
   assert.match(shellSource, /ProspectSearchDiscoveryRuntimeNotice/)
 

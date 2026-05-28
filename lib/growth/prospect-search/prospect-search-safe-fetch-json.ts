@@ -5,6 +5,8 @@ export const GROWTH_SAFE_PROVIDER_PARSING_QA_MARKER = "growth-safe-provider-pars
 export const GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER =
   "growth-discovery-runtime-hardening-v1" as const
 
+export const GROWTH_RUNTIME_REGRESSION_FIX_QA_MARKER = "growth-runtime-regression-fix-v1" as const
+
 export type SafeJsonParseErrorKind =
   | "empty_body"
   | "invalid_json"

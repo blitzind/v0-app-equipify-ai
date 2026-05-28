@@ -161,6 +161,7 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-command-overlays"
 import {
   GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER,
+  GROWTH_RUNTIME_REGRESSION_FIX_QA_MARKER,
   GROWTH_SAFE_PROVIDER_PARSING_QA_MARKER,
   formatSafeJsonParseError,
   safeFetchJson,
@@ -335,18 +336,23 @@ function ProspectSearchShellInner() {
     () => attachProspectSearchCompanyCoverageIntelligence(companies, peopleRows),
     [companies, peopleRows],
   )
-  const territoryPrioritization = useMemo(
-    () =>
-      aggregateProspectSearchTerritoryPrioritization({
+  const territoryPrioritization = useMemo(() => {
+    try {
+      return aggregateProspectSearchTerritoryPrioritization({
         companies: companiesEnriched,
         peopleRows,
-      }),
-    [companiesEnriched, peopleRows],
-  )
-  const companiesWithContactCoverage = useMemo(
-    () => applyTerritoryOpportunityBoostToCompanies(companiesEnriched, territoryPrioritization),
-    [companiesEnriched, territoryPrioritization],
-  )
+      })
+    } catch {
+      return []
+    }
+  }, [companiesEnriched, peopleRows])
+  const companiesWithContactCoverage = useMemo(() => {
+    try {
+      return applyTerritoryOpportunityBoostToCompanies(companiesEnriched, territoryPrioritization)
+    } catch {
+      return companiesEnriched
+    }
+  }, [companiesEnriched, territoryPrioritization])
   const recommendedWorkViews = useMemo(
     () => buildProspectSearchRecommendedWorkViews({ companies: companiesWithContactCoverage }),
     [companiesWithContactCoverage],
@@ -1481,6 +1487,7 @@ function ProspectSearchShellInner() {
       data-prospect-command-overlays-marker={GROWTH_PROSPECT_COMMAND_OVERLAYS_QA_MARKER}
       data-discovery-runtime-hardening-marker={GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER}
       data-safe-provider-parsing-marker={GROWTH_SAFE_PROVIDER_PARSING_QA_MARKER}
+      data-runtime-regression-fix-marker={GROWTH_RUNTIME_REGRESSION_FIX_QA_MARKER}
       data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
       data-prospect-search-render-loop-fix-marker={GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER}
       data-contact-discovery-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}

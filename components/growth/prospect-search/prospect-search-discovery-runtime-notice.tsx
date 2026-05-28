@@ -3,6 +3,7 @@
 import { AlertTriangle } from "lucide-react"
 import {
   GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER,
+  GROWTH_RUNTIME_REGRESSION_FIX_QA_MARKER,
   GROWTH_SAFE_PROVIDER_PARSING_QA_MARKER,
 } from "@/lib/growth/prospect-search/prospect-search-safe-fetch-json"
 import type { GrowthProspectSearchResult } from "@/lib/growth/prospect-search/prospect-search-types"
@@ -32,6 +33,7 @@ export function ProspectSearchDiscoveryRuntimeNotice({
       className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm"
       data-discovery-runtime-hardening-marker={GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER}
       data-safe-provider-parsing-marker={GROWTH_SAFE_PROVIDER_PARSING_QA_MARKER}
+      data-runtime-regression-fix-marker={GROWTH_RUNTIME_REGRESSION_FIX_QA_MARKER}
     >
       <div className="flex gap-2">
         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-800" />
