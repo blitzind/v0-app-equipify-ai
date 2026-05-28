@@ -1,4 +1,4 @@
-/** AI copilot workspace snapshot builder — Phase 3A. */
+/** AI copilot workspace snapshot builder — Phase 3A/3B. */
 
 import type {
   VoiceAiCopilotProviderId,
@@ -12,7 +12,12 @@ import {
   VOICE_AI_COPILOT_MAX_SUGGESTIONS_PER_CALL,
   VOICE_AI_COPILOT_PASSIVE_MODE_ENABLED,
   VOICE_AI_COPILOT_QA_MARKER,
+  VOICE_DEEP_COPILOT_QA_MARKER,
 } from "@/lib/voice/ai-copilot/types"
+import type {
+  VoiceCopilotStrategySnapshot,
+  VoiceOperatorPerformanceInsightPublicView,
+} from "@/lib/voice/copilot-strategy/types"
 
 const DRAFT_TYPES = new Set([
   "call_note_draft",
@@ -24,6 +29,8 @@ export function buildAiCopilotWorkspaceSnapshot(input: {
   voiceCallId: string
   providerMode: VoiceAiCopilotProviderId
   suggestions: VoiceAiCopilotSuggestionPublicView[]
+  strategy?: VoiceCopilotStrategySnapshot | null
+  performanceInsights?: VoiceOperatorPerformanceInsightPublicView[]
   generationCooldownRemainingMs: number
   canGenerate: boolean
 }): VoiceAiCopilotWorkspaceSnapshot {
@@ -33,6 +40,7 @@ export function buildAiCopilotWorkspaceSnapshot(input: {
 
   return {
     qaMarker: VOICE_AI_COPILOT_QA_MARKER,
+    deepCopilotQaMarker: VOICE_DEEP_COPILOT_QA_MARKER,
     voiceCallId: input.voiceCallId,
     generatedAt: new Date().toISOString(),
     providerMode: input.providerMode,
@@ -44,6 +52,8 @@ export function buildAiCopilotWorkspaceSnapshot(input: {
     activeSuggestions,
     topSuggestions,
     draftSuggestions,
+    strategy: input.strategy ?? null,
+    performanceInsights: input.performanceInsights ?? [],
     generationCooldownRemainingMs: input.generationCooldownRemainingMs,
     canGenerate: input.canGenerate,
     message: "AI copilot suggestions are operator-reviewed only. AI does not act automatically.",

@@ -20,8 +20,8 @@ import {
 import { resolveConfiguredTranscriptProviderKind } from "../lib/voice/transcripts/providers/types"
 
 assert.equal(VOICE_MEDIA_STREAMING_QA_MARKER, "voice-media-streaming-v1")
-assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v12")
-assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270612120000_voice_ai_copilot_phase_3a")
+assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v13")
+assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270613120000_voice_deep_copilot_phase_3b")
 
 resetVoiceMediaStreamOwnershipForTests()
 const first = acquireVoiceMediaStreamOwnership({

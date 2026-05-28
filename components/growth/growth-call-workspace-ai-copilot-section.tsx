@@ -8,7 +8,7 @@ import type {
   VoiceAiCopilotSuggestionPublicView,
   VoiceAiCopilotWorkspaceSnapshot,
 } from "@/lib/voice/ai-copilot/types"
-import { VOICE_AI_COPILOT_QA_MARKER } from "@/lib/voice/ai-copilot/types"
+import { VOICE_AI_COPILOT_QA_MARKER, VOICE_DEEP_COPILOT_QA_MARKER } from "@/lib/voice/ai-copilot/types"
 import { cn } from "@/lib/utils"
 
 function formatSuggestionType(type: string): string {
@@ -57,6 +57,11 @@ function CopilotSuggestionCard({
       </div>
       <p className="text-sm font-semibold">{suggestion.title}</p>
       <p className="mt-1 text-sm text-muted-foreground">{suggestion.body}</p>
+      {suggestion.body.includes("Why this suggestion:") ? (
+        <p className="mt-2 rounded-md border border-violet-200/50 bg-violet-50/40 px-2 py-1.5 text-xs text-violet-900 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-100">
+          {suggestion.body.split("Why this suggestion:")[1]?.trim() ?? ""}
+        </p>
+      ) : null}
       <p className="mt-2 text-xs text-muted-foreground">
         <span className="font-medium text-foreground/80">Evidence:</span> {suggestion.evidenceText}
       </p>
@@ -183,7 +188,10 @@ export function GrowthCallWorkspaceAiCopilotSection({
   if (!voiceCallId) return null
 
   const suggestions = aiCopilot?.activeSuggestions ?? []
+  const topSuggestions = aiCopilot?.topSuggestions ?? []
   const draftSuggestions = aiCopilot?.draftSuggestions ?? []
+  const strategy = aiCopilot?.strategy ?? null
+  const performanceInsights = aiCopilot?.performanceInsights ?? []
   const canGenerate = aiCopilot?.canGenerate ?? false
   const cooldownMs = aiCopilot?.generationCooldownRemainingMs ?? 0
 
@@ -191,6 +199,7 @@ export function GrowthCallWorkspaceAiCopilotSection({
     <section
       className="rounded-xl border border-violet-200/60 bg-violet-50/20 p-3 dark:border-violet-900/30 dark:bg-violet-950/10"
       data-voice-ai-copilot-qa-marker={VOICE_AI_COPILOT_QA_MARKER}
+      data-voice-deep-copilot-qa-marker={VOICE_DEEP_COPILOT_QA_MARKER}
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -229,6 +238,78 @@ export function GrowthCallWorkspaceAiCopilotSection({
 
       {error ? <p className="mb-2 text-sm text-destructive">{error}</p> : null}
 
+      {strategy ? (
+        <div className="mb-3 space-y-2 rounded-lg border border-violet-200/50 bg-violet-50/30 px-3 py-2 dark:border-violet-900/40 dark:bg-violet-950/20">
+          <div className="flex flex-wrap items-center gap-2">
+            <GrowthBadge
+              label={`Phase: ${strategy.conversationPhase.phase.replace(/_/g, " ")}`}
+              tone="healthy"
+            />
+            <GrowthBadge
+              label={`${Math.round(strategy.conversationPhase.confidenceScore * 100)}% confidence`}
+              tone="neutral"
+            />
+            {strategy.escalationSafeModeEnabled ? (
+              <GrowthBadge label="Escalation-safe mode" tone="attention" />
+            ) : null}
+            {strategy.overloadPreventionActive ? (
+              <GrowthBadge label="Overload prevention" tone="neutral" />
+            ) : null}
+          </div>
+          <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+            <p>
+              Pacing: {strategy.pacing.operatorTalkPercent}% op / {strategy.pacing.customerTalkPercent}% customer (
+              {strategy.pacing.pacingLabel.replace(/_/g, " ")})
+            </p>
+            <p>
+              Escalation risk: {strategy.escalationLikelihood.level} · Discovery: {strategy.discoveryCompleteness.score}%
+            </p>
+          </div>
+          {strategy.callQualityInsights.length > 0 ? (
+            <div className="space-y-1">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Call quality coaching</p>
+              {strategy.callQualityInsights.slice(0, 2).map((insight) => (
+                <p key={insight.id} className="text-xs text-muted-foreground">
+                  {insight.title}: {insight.coachingPrompt}
+                </p>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {performanceInsights.length > 0 ? (
+        <div className="mb-3">
+          <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Operator coaching (internal, non-punitive)
+          </p>
+          <ul className="space-y-1 text-xs text-muted-foreground">
+            {performanceInsights.slice(0, 3).map((insight) => (
+              <li key={insight.id}>
+                {insight.insightType.replace(/_/g, " ")}: {insight.coachingPrompt ?? insight.evidenceText}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {topSuggestions.length > 0 ? (
+        <div className="mb-3">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Top prioritized guidance</p>
+          <div className="space-y-2">
+            {topSuggestions.map((suggestion) => (
+              <CopilotSuggestionCard
+                key={`top:${suggestion.id}`}
+                suggestion={suggestion}
+                voiceCallId={voiceCallId}
+                acting={acting}
+                onLifecycle={patchSuggestion}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {draftSuggestions.length > 0 ? (
         <div className="mb-3">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Drafts (copy/review only)</p>
@@ -257,7 +338,11 @@ export function GrowthCallWorkspaceAiCopilotSection({
       ) : (
         <div className="space-y-2">
           {suggestions
-            .filter((item) => !draftSuggestions.some((draft) => draft.id === item.id))
+            .filter(
+              (item) =>
+                !draftSuggestions.some((draft) => draft.id === item.id) &&
+                !topSuggestions.some((top) => top.id === item.id),
+            )
             .map((suggestion) => (
               <CopilotSuggestionCard
                 key={suggestion.id}

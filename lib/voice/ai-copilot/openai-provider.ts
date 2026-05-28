@@ -1,5 +1,6 @@
-/** OpenAI AI copilot provider scaffold — Phase 3A (structured outputs, evidence required). */
+/** OpenAI AI copilot provider — Phase 3B (structured JSON only, deterministic fallback). */
 
+import { validateAndSanitizeStructuredDrafts } from "@/lib/voice/ai-copilot/structured-output-validation"
 import type { VoiceAiCopilotProvider, VoiceAiCopilotProviderResult } from "@/lib/voice/ai-copilot/provider-types"
 import { generateDeterministicCopilotDrafts } from "@/lib/voice/ai-copilot/deterministic-template-provider"
 
@@ -14,18 +15,20 @@ export function isOpenAiCopilotConfigured(): boolean {
 export const openAiCopilotProvider: VoiceAiCopilotProvider = {
   id: "openai",
   async generateSuggestions(context): Promise<VoiceAiCopilotProviderResult> {
+    const fallback = generateDeterministicCopilotDrafts(context)
+
     if (!isOpenAiCopilotConfigured()) {
-      return {
-        provider: "deterministic_template",
-        drafts: generateDeterministicCopilotDrafts(context),
-      }
+      return { provider: "deterministic_template", drafts: fallback }
     }
 
-    // Scaffold only — structured OpenAI outputs remain gated until prompt review is approved.
-    // Safe fallback: deterministic templates with evidence requirements enforced downstream.
-    return {
-      provider: "openai",
-      drafts: generateDeterministicCopilotDrafts(context),
+    // Structured OpenAI augmentation scaffold — bounded JSON array validated before use.
+    // Until prompt wiring is approved, deterministic+strategy drafts remain authoritative.
+    const structuredPlaceholder: unknown[] = []
+    const sanitized = validateAndSanitizeStructuredDrafts(structuredPlaceholder)
+    if (sanitized.length === 0) {
+      return { provider: "openai", drafts: fallback }
     }
+
+    return { provider: "openai", drafts: sanitized }
   },
 }

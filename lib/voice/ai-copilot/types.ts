@@ -1,6 +1,12 @@
-/** Voice AI Copilot — Phase 3A shared types (client-safe). */
+/** Voice AI Copilot — Phase 3A/3B shared types (client-safe). */
+
+import type {
+  VoiceCopilotStrategySnapshot,
+  VoiceOperatorPerformanceInsightPublicView,
+} from "@/lib/voice/copilot-strategy/types"
 
 export const VOICE_AI_COPILOT_QA_MARKER = "voice-ai-copilot-v1" as const
+export const VOICE_DEEP_COPILOT_QA_MARKER = "voice-deep-copilot-v1" as const
 
 export const VOICE_AI_COPILOT_PASSIVE_MODE_ENABLED = true as const
 export const VOICE_AI_COPILOT_AUTONOMOUS_ACTIONS_DISABLED = true as const
@@ -19,6 +25,17 @@ export const VOICE_AI_COPILOT_SUGGESTION_TYPES = [
   "follow_up_draft",
   "retention_response",
   "expansion_response",
+  "objection_strategy",
+  "rapport_repair",
+  "de_escalation_prompt",
+  "pricing_positioning",
+  "qualification_gap",
+  "close_timing_suggestion",
+  "retention_recovery_prompt",
+  "expansion_conversation_prompt",
+  "operator_pacing_alert",
+  "operator_interrupt_alert",
+  "compliance_recovery_prompt",
 ] as const
 
 export type VoiceAiCopilotSuggestionType = (typeof VOICE_AI_COPILOT_SUGGESTION_TYPES)[number]
@@ -77,6 +94,7 @@ export type VoiceAiCopilotSuggestionPublicView = {
 
 export type VoiceAiCopilotWorkspaceSnapshot = {
   qaMarker: typeof VOICE_AI_COPILOT_QA_MARKER
+  deepCopilotQaMarker: typeof VOICE_DEEP_COPILOT_QA_MARKER
   voiceCallId: string
   generatedAt: string
   providerMode: VoiceAiCopilotProviderId
@@ -88,6 +106,8 @@ export type VoiceAiCopilotWorkspaceSnapshot = {
   activeSuggestions: VoiceAiCopilotSuggestionPublicView[]
   topSuggestions: VoiceAiCopilotSuggestionPublicView[]
   draftSuggestions: VoiceAiCopilotSuggestionPublicView[]
+  strategy: VoiceCopilotStrategySnapshot | null
+  performanceInsights: VoiceOperatorPerformanceInsightPublicView[]
   generationCooldownRemainingMs: number
   canGenerate: boolean
   message: string
@@ -99,10 +119,18 @@ export type VoiceAiCopilotReadinessSnapshot = {
   providerMode: VoiceAiCopilotProviderId
   openAiEnabled: boolean
   deterministicFallbackReady: boolean
+  deterministicModeActive: boolean
+  openAiAugmentationEnabled: boolean
+  structuredOutputEnforced: true
+  evidenceValidationEnabled: true
   evidenceRequirementEnabled: true
+  overloadPreventionEnabled: true
   autonomousActionsDisabled: true
   guardrailsEnabled: true
   maxSuggestionsPerCall: number
+  maxActiveSuggestions: number
+  escalationSafeModeEnabled: true
+  performanceInsightsReady: boolean
   activeSuggestionCount: number
   message: string
 }

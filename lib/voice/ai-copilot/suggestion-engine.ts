@@ -1,4 +1,4 @@
-/** AI copilot suggestion engine — Phase 3A. */
+/** AI copilot suggestion engine — Phase 3A/3B. */
 
 import type { UnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/types"
 import type { VoiceCallTranscriptSnapshot } from "@/lib/voice/media-streaming/types"
@@ -21,6 +21,9 @@ import {
   VOICE_AI_COPILOT_MAX_SUGGESTIONS_PER_CALL,
   VOICE_AI_COPILOT_TRANSCRIPT_WINDOW_SEGMENTS,
 } from "@/lib/voice/ai-copilot/types"
+import { applyAdaptiveCopilotPrioritization } from "@/lib/voice/copilot-strategy/prioritization"
+import { buildCopilotStrategySnapshot } from "@/lib/voice/copilot-strategy/strategy-engine"
+import type { VoiceCopilotStrategySnapshot } from "@/lib/voice/copilot-strategy/types"
 
 export type CopilotGenerationInput = {
   organizationId: string
@@ -110,7 +113,11 @@ function collectKnownEvidence(input: CopilotGenerationInput): string[] {
 
 export async function generateCopilotSuggestionDrafts(
   input: CopilotGenerationInput,
-): Promise<{ provider: VoiceAiCopilotProviderId; drafts: VoiceAiCopilotGenerationDraft[] }> {
+): Promise<{
+  provider: VoiceAiCopilotProviderId
+  drafts: VoiceAiCopilotGenerationDraft[]
+  strategy: VoiceCopilotStrategySnapshot
+}> {
   const operatorAssistEvents = mapAssistEvents(input.operatorAssist)
   const retentionSignals = mapRetentionSignals(input.retentionIntelligence)
   const revenueSignals = mapRevenueSignals(input.revenueIntelligence)
@@ -135,6 +142,12 @@ export async function generateCopilotSuggestionDrafts(
       text: segment.transcriptText,
     })) ?? []
 
+  const strategy = buildCopilotStrategySnapshot({
+    operatorAssist: input.operatorAssist,
+    liveTranscript: input.liveTranscript,
+    retentionIntelligence: input.retentionIntelligence,
+  })
+
   const provider = resolveVoiceAiCopilotProvider()
   const result = await generateCopilotSuggestionsWithTimeout(provider, {
     organizationId: input.organizationId,
@@ -146,14 +159,38 @@ export async function generateCopilotSuggestionDrafts(
     transcriptWindow,
     relationshipSummary: input.relationshipSummary ?? null,
     contactLabel: input.contactLabel ?? null,
+    strategy,
+    operatorAssistSnapshot: input.operatorAssist,
+    liveTranscriptSnapshot: input.liveTranscript,
+    retentionIntelligenceSnapshot: input.retentionIntelligence,
   })
 
   const knownEvidence = collectKnownEvidence(input)
   const guarded = filterGuardedCopilotDrafts(result.drafts, knownEvidence)
-  const deduped = dedupeCopilotDrafts(guarded)
-    .filter((draft) => !isDuplicateCopilotSuggestion(input.existingSuggestions, draft))
-    .sort((a, b) => b.priority - a.priority)
-    .slice(0, Math.max(0, VOICE_AI_COPILOT_MAX_SUGGESTIONS_PER_CALL - input.existingSuggestions.filter((s) => s.status === "active").length))
+  const deduped = dedupeCopilotDrafts(guarded).filter(
+    (draft) => !isDuplicateCopilotSuggestion(input.existingSuggestions, draft),
+  )
 
-  return { provider: result.provider, drafts: deduped }
+  const activeAssistCount = input.operatorAssist?.feed.length ?? 0
+  const prioritized = applyAdaptiveCopilotPrioritization(deduped, strategy, activeAssistCount)
+
+  const remainingSlots = Math.max(
+    0,
+    VOICE_AI_COPILOT_MAX_SUGGESTIONS_PER_CALL -
+      input.existingSuggestions.filter((s) => s.status === "active").length,
+  )
+
+  return {
+    provider: result.provider,
+    drafts: prioritized.slice(0, remainingSlots),
+    strategy,
+  }
+}
+
+export function buildStrategySnapshotForCall(input: {
+  operatorAssist: UnifiedOperatorAssistSnapshot | null
+  liveTranscript: VoiceCallTranscriptSnapshot | null
+  retentionIntelligence: VoiceRetentionIntelligenceWorkspaceSnapshot | null
+}): VoiceCopilotStrategySnapshot {
+  return buildCopilotStrategySnapshot(input)
 }

@@ -6,7 +6,10 @@ import type { VoiceCallTranscriptSnapshot } from "@/lib/voice/media-streaming/ty
 import type { VoiceRevenueIntelligenceWorkspaceSnapshot } from "@/lib/voice/revenue-intelligence/types"
 import type { VoiceRetentionIntelligenceWorkspaceSnapshot } from "@/lib/voice/retention-intelligence/types"
 import { buildAiCopilotWorkspaceSnapshot } from "@/lib/voice/ai-copilot/snapshot-builder"
-import { generateCopilotSuggestionDrafts } from "@/lib/voice/ai-copilot/suggestion-engine"
+import {
+  buildStrategySnapshotForCall,
+  generateCopilotSuggestionDrafts,
+} from "@/lib/voice/ai-copilot/suggestion-engine"
 import type {
   VoiceAiCopilotLifecycleAction,
   VoiceAiCopilotReadinessSnapshot,
@@ -31,10 +34,15 @@ import {
   updateAiCopilotSuggestionStatus,
 } from "@/lib/voice/repository/voice-ai-copilot-repository"
 import {
-  resolveVoiceAiCopilotProviderMode,
-} from "@/lib/voice/ai-copilot/provider-registry"
+  listOperatorPerformanceInsights,
+  syncOperatorPerformanceInsightsFromStrategy,
+} from "@/lib/voice/repository/voice-operator-performance-repository"
+import { resolveVoiceAiCopilotProviderMode } from "@/lib/voice/ai-copilot/provider-registry"
 import { isOpenAiCopilotConfigured } from "@/lib/voice/ai-copilot/openai-provider"
 import { probeVoiceSchemaHealth } from "@/lib/voice/schema-health"
+import {
+  VOICE_DEEP_COPILOT_MAX_ACTIVE_SUGGESTIONS,
+} from "@/lib/voice/copilot-strategy/types"
 
 const LIFECYCLE_STATUS_MAP: Record<
   VoiceAiCopilotLifecycleAction,
@@ -61,11 +69,66 @@ async function syncStaleCopilotSuggestions(
   await expireStaleAiCopilotSuggestions(admin, organizationId, voiceCallId, staleBefore)
 }
 
+type CopilotContextInput = {
+  operatorAssist: UnifiedOperatorAssistSnapshot | null
+  liveTranscript: VoiceCallTranscriptSnapshot | null
+  retentionIntelligence: VoiceRetentionIntelligenceWorkspaceSnapshot | null
+  operatorUserId?: string | null
+}
+
+async function buildSnapshotWithContext(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    voiceCallId: string
+    providerMode: ReturnType<typeof resolveVoiceAiCopilotProviderMode>
+    suggestions: Awaited<ReturnType<typeof listAiCopilotSuggestions>>
+    context: CopilotContextInput
+    generationCooldownRemainingMs: number
+    canGenerate: boolean
+    syncPerformance?: boolean
+  },
+): Promise<VoiceAiCopilotWorkspaceSnapshot> {
+  const strategy = buildStrategySnapshotForCall({
+    operatorAssist: input.context.operatorAssist,
+    liveTranscript: input.context.liveTranscript,
+    retentionIntelligence: input.context.retentionIntelligence,
+  })
+
+  let performanceInsights = await listOperatorPerformanceInsights(
+    admin,
+    input.organizationId,
+    input.voiceCallId,
+  )
+
+  if (input.syncPerformance && performanceInsights.length === 0) {
+    performanceInsights = await syncOperatorPerformanceInsightsFromStrategy(admin, {
+      organizationId: input.organizationId,
+      voiceCallId: input.voiceCallId,
+      operatorUserId: input.context.operatorUserId,
+      strategy,
+    })
+  }
+
+  return buildAiCopilotWorkspaceSnapshot({
+    voiceCallId: input.voiceCallId,
+    providerMode: input.providerMode,
+    suggestions: input.suggestions,
+    strategy,
+    performanceInsights,
+    generationCooldownRemainingMs: input.generationCooldownRemainingMs,
+    canGenerate: input.canGenerate,
+  })
+}
+
 export async function fetchAiCopilotWorkspaceSnapshot(
   admin: SupabaseClient,
   input: {
     organizationId: string
     voiceCallId: string
+    operatorAssist?: UnifiedOperatorAssistSnapshot | null
+    liveTranscript?: VoiceCallTranscriptSnapshot | null
+    retentionIntelligence?: VoiceRetentionIntelligenceWorkspaceSnapshot | null
   },
 ): Promise<VoiceAiCopilotWorkspaceSnapshot> {
   await syncStaleCopilotSuggestions(admin, input.organizationId, input.voiceCallId)
@@ -73,13 +136,18 @@ export async function fetchAiCopilotWorkspaceSnapshot(
   const latestGenerationAt = await getLatestAiCopilotGenerationAt(admin, input.organizationId, input.voiceCallId)
   const cooldownRemainingMs = resolveCooldownRemainingMs(latestGenerationAt)
   const activeCount = suggestions.filter((item) => item.status === "active").length
-  const canGenerate =
-    cooldownRemainingMs === 0 && activeCount < VOICE_AI_COPILOT_MAX_SUGGESTIONS_PER_CALL
+  const canGenerate = cooldownRemainingMs === 0 && activeCount < VOICE_AI_COPILOT_MAX_SUGGESTIONS_PER_CALL
 
-  return buildAiCopilotWorkspaceSnapshot({
+  return buildSnapshotWithContext(admin, {
+    organizationId: input.organizationId,
     voiceCallId: input.voiceCallId,
     providerMode: resolveVoiceAiCopilotProviderMode(),
     suggestions,
+    context: {
+      operatorAssist: input.operatorAssist ?? null,
+      liveTranscript: input.liveTranscript ?? null,
+      retentionIntelligence: input.retentionIntelligence ?? null,
+    },
     generationCooldownRemainingMs: cooldownRemainingMs,
     canGenerate,
   })
@@ -101,6 +169,7 @@ export async function generateAiCopilotSuggestionsForCall(
     relatedProspectId?: string | null
     relatedOpportunityId?: string | null
     relationshipSummary?: string | null
+    operatorUserId?: string | null
   },
 ): Promise<VoiceAiCopilotWorkspaceSnapshot> {
   await syncStaleCopilotSuggestions(admin, input.organizationId, input.voiceCallId)
@@ -111,10 +180,17 @@ export async function generateAiCopilotSuggestionsForCall(
   const activeCount = existingSuggestions.filter((item) => item.status === "active").length
 
   if (cooldownRemainingMs > 0 || activeCount >= VOICE_AI_COPILOT_MAX_SUGGESTIONS_PER_CALL) {
-    return buildAiCopilotWorkspaceSnapshot({
+    return buildSnapshotWithContext(admin, {
+      organizationId: input.organizationId,
       voiceCallId: input.voiceCallId,
       providerMode: resolveVoiceAiCopilotProviderMode(),
       suggestions: existingSuggestions,
+      context: {
+        operatorAssist: input.operatorAssist,
+        liveTranscript: input.liveTranscript,
+        retentionIntelligence: input.retentionIntelligence,
+        operatorUserId: input.operatorUserId,
+      },
       generationCooldownRemainingMs: cooldownRemainingMs,
       canGenerate: false,
     })
@@ -154,12 +230,20 @@ export async function generateAiCopilotSuggestionsForCall(
   const suggestions = await listAiCopilotSuggestions(admin, input.organizationId, input.voiceCallId, { limit: 30 })
   const refreshedLatest = await getLatestAiCopilotGenerationAt(admin, input.organizationId, input.voiceCallId)
 
-  return buildAiCopilotWorkspaceSnapshot({
+  return buildSnapshotWithContext(admin, {
+    organizationId: input.organizationId,
     voiceCallId: input.voiceCallId,
     providerMode: provider,
     suggestions,
+    context: {
+      operatorAssist: input.operatorAssist,
+      liveTranscript: input.liveTranscript,
+      retentionIntelligence: input.retentionIntelligence,
+      operatorUserId: input.operatorUserId,
+    },
     generationCooldownRemainingMs: resolveCooldownRemainingMs(refreshedLatest),
     canGenerate: suggestions.filter((item) => item.status === "active").length < VOICE_AI_COPILOT_MAX_SUGGESTIONS_PER_CALL,
+    syncPerformance: true,
   })
 }
 
@@ -189,7 +273,10 @@ export async function fetchAiCopilotReadiness(
   organizationId: string,
 ): Promise<VoiceAiCopilotReadinessSnapshot> {
   const schema = await probeVoiceSchemaHealth(admin)
-  const schemaReady = schema.ready && !schema.missingTables.includes("voice_ai_copilot_suggestions")
+  const schemaReady =
+    schema.ready &&
+    !schema.missingTables.includes("voice_ai_copilot_suggestions") &&
+    !schema.missingTables.includes("voice_operator_performance_insights")
   const providerMode = resolveVoiceAiCopilotProviderMode()
   const activeSuggestionCount = schemaReady
     ? await countAiCopilotSuggestionsByStatus(admin, organizationId, "active")
@@ -198,19 +285,27 @@ export async function fetchAiCopilotReadiness(
   return {
     qaMarker: VOICE_AI_COPILOT_QA_MARKER,
     schemaReady,
+    deterministicModeActive: providerMode === "deterministic_template" || !isOpenAiCopilotConfigured(),
+    openAiAugmentationEnabled: isOpenAiCopilotConfigured(),
+    structuredOutputEnforced: true,
+    evidenceValidationEnabled: true,
+    overloadPreventionEnabled: true,
+    autonomousActionsDisabled: VOICE_AI_COPILOT_AUTONOMOUS_ACTIONS_DISABLED,
+    maxActiveSuggestions: VOICE_DEEP_COPILOT_MAX_ACTIVE_SUGGESTIONS,
+    escalationSafeModeEnabled: true,
+    performanceInsightsReady: schemaReady && !schema.missingTables.includes("voice_operator_performance_insights"),
     providerMode,
     openAiEnabled: isOpenAiCopilotConfigured(),
     deterministicFallbackReady: true,
     evidenceRequirementEnabled: VOICE_AI_COPILOT_EVIDENCE_REQUIRED,
-    autonomousActionsDisabled: VOICE_AI_COPILOT_AUTONOMOUS_ACTIONS_DISABLED,
     guardrailsEnabled: VOICE_AI_COPILOT_GUARDRAILS_ENABLED,
     maxSuggestionsPerCall: VOICE_AI_COPILOT_MAX_SUGGESTIONS_PER_CALL,
     activeSuggestionCount,
     message: schemaReady
       ? providerMode === "openai"
-        ? "OpenAI copilot scaffold active with deterministic fallback. Suggestions are operator-reviewed only."
-        : "Deterministic AI copilot templates active. Suggestions are evidence-backed and operator-controlled."
-      : `Apply migration for voice AI copilot — ${schema.message}`,
+        ? "Deep copilot active with structured-output enforcement and deterministic fallback."
+        : "Deep copilot deterministic mode active. Evidence-backed, operator-controlled suggestions only."
+      : `Apply migration for voice deep copilot — ${schema.message}`,
   }
 }
 

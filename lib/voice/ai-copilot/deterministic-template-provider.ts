@@ -2,6 +2,8 @@
 
 import type { VoiceAiCopilotGenerationDraft } from "@/lib/voice/ai-copilot/types"
 import type { VoiceAiCopilotGenerationContext, VoiceAiCopilotProvider, VoiceAiCopilotProviderResult } from "@/lib/voice/ai-copilot/provider-types"
+import { generateDeepCopilotDrafts } from "@/lib/voice/copilot-strategy/deep-copilot-drafts"
+import { buildCopilotStrategySnapshot } from "@/lib/voice/copilot-strategy/strategy-engine"
 
 function draftFromEvent(
   event: VoiceAiCopilotGenerationContext["operatorAssistEvents"][number],
@@ -153,6 +155,13 @@ export function generateDeterministicCopilotDrafts(context: VoiceAiCopilotGenera
     evidenceText: "Operator-controlled live call — passive AI copilot mode.",
     sourceEventIds: [],
   })
+
+  const strategy = context.strategy ?? buildCopilotStrategySnapshot({
+    operatorAssist: context.operatorAssistSnapshot ?? null,
+    liveTranscript: context.liveTranscriptSnapshot ?? null,
+    retentionIntelligence: context.retentionIntelligenceSnapshot ?? null,
+  })
+  drafts.push(...generateDeepCopilotDrafts(context, strategy))
 
   return drafts
 }

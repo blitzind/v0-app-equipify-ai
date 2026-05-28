@@ -92,6 +92,7 @@ export async function POST(_request: Request, context: { params: Promise<{ callI
       relatedProspectId: relationshipMemory?.profile?.relatedProspectId ?? null,
       relatedOpportunityId: null,
       relationshipSummary: relationshipMemory?.profile?.primaryContactName ?? null,
+      operatorUserId: ctx.userId,
     })
 
     return NextResponse.json({

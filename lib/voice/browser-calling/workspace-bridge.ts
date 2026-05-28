@@ -275,6 +275,9 @@ export async function buildVoiceBrowserSyncSnapshot(
     ? await fetchAiCopilotWorkspaceSnapshot(admin, {
         organizationId: input.organizationId,
         voiceCallId: activeVoiceCallId,
+        operatorAssist,
+        liveTranscript,
+        retentionIntelligence,
       })
     : null
   const inboundRinging = await fetchInboundBrowserOfferForUser(admin, {
