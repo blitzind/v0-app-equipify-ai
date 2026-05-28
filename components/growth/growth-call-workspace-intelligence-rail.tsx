@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { CallWorkspaceLeadSearchResultsPanel } from "@/components/growth/call-workspace-lead-search-results"
+import { GrowthCallWorkspaceRelationshipMemoryPanel } from "@/components/growth/growth-call-workspace-relationship-memory-panel"
 import { useCallWorkspaceLeadSearch } from "@/components/growth/use-call-workspace-lead-search"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import {
@@ -29,6 +30,8 @@ import { GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER } from "@/lib/growth/native-
 import { GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import { commandLeadFocusHref } from "@/lib/growth/command/command-action-catalog"
 import type { UnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/types"
+import type { VoiceRelationshipMemoryWorkspaceSnapshot } from "@/lib/voice/relationship-memory/types"
+import { VOICE_RELATIONSHIP_MEMORY_QA_MARKER } from "@/lib/voice/relationship-memory/types"
 import type {
   NativeCallWorkspaceSessionPublicView,
   NativeDialerLeadContext,
@@ -62,12 +65,16 @@ export function GrowthCallWorkspaceIntelligenceRail({
   nativeSessionId,
   sessionPhone,
   operatorAssist = null,
+  relationshipMemory = null,
+  onRelationshipMemoryRefresh,
   onLeadAttached,
 }: {
   leadContext: NativeDialerLeadContext | null
   nativeSessionId?: string | null
   sessionPhone?: string | null
   operatorAssist?: UnifiedOperatorAssistSnapshot | null
+  relationshipMemory?: VoiceRelationshipMemoryWorkspaceSnapshot | null
+  onRelationshipMemoryRefresh?: () => Promise<void>
   onLeadAttached?: (leadId: string, session?: NativeCallWorkspaceSessionPublicView) => void
 }) {
   const {
@@ -99,11 +106,22 @@ export function GrowthCallWorkspaceIntelligenceRail({
     leadContext?.recommendedNextAction ??
     "No recommendation yet — review lead command center."
 
+  const previousConversationsLabel = relationshipMemory?.profile
+    ? `${relationshipMemory.profile.totalCallCount} prior call${relationshipMemory.profile.totalCallCount === 1 ? "" : "s"}`
+    : sessionPhone
+      ? "No prior memory"
+      : "Not linked"
+
+  const pendingDrafts =
+    operatorAssist?.conversationIntelligence?.memoryDrafts.filter((draft) => draft.status === "pending_review") ??
+    []
+
   return (
     <section
       className={cn(GROWTH_CALL_WORKSPACE_PANEL, "w-full max-w-[320px] p-4 lg:justify-self-end")}
       data-google-voice-bridge-coaching-qa-marker={GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER}
       data-native-dialer-lead-search-qa-marker={GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER}
+      data-voice-relationship-memory-qa-marker={VOICE_RELATIONSHIP_MEMORY_QA_MARKER}
     >
       <h3 className="mb-3 text-sm font-semibold">Prospect Intelligence</h3>
 
@@ -138,6 +156,14 @@ export function GrowthCallWorkspaceIntelligenceRail({
                 onSelect={(hit) => void selectHit(hit)}
               />
             </>
+          ) : null}
+          {sessionPhone ? (
+            <GrowthCallWorkspaceRelationshipMemoryPanel
+              relationshipMemory={relationshipMemory}
+              pendingDrafts={pendingDrafts}
+              sessionPhone={sessionPhone}
+              onRefresh={onRelationshipMemoryRefresh}
+            />
           ) : null}
         </div>
       ) : (
@@ -205,7 +231,7 @@ export function GrowthCallWorkspaceIntelligenceRail({
               value={String(leadContext.openTaskCount)}
               badgeTone={leadContext.openTaskCount > 0 ? "attention" : "neutral"}
             />
-            <IntelligenceRow icon={MessageSquare} label="Previous Conversations" value="Not linked" />
+            <IntelligenceRow icon={MessageSquare} label="Previous Conversations" value={previousConversationsLabel} />
             <IntelligenceRow
               icon={Sparkles}
               label="Buying Signals"
@@ -223,6 +249,15 @@ export function GrowthCallWorkspaceIntelligenceRail({
             </div>
             <p className="text-sm leading-snug">{recommendedAction}</p>
           </div>
+
+          <GrowthCallWorkspaceRelationshipMemoryPanel
+            relationshipMemory={relationshipMemory}
+            pendingDrafts={pendingDrafts}
+            sessionPhone={sessionPhone}
+            contactName={leadContext.contactName}
+            leadId={leadContext.leadId}
+            onRefresh={onRelationshipMemoryRefresh}
+          />
         </div>
       )}
     </section>

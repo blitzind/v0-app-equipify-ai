@@ -10,6 +10,7 @@ import {
   GROWTH_SETTINGS_SECTION_GAP,
   GrowthSettingsCard,
 } from "@/components/growth/growth-settings-ui"
+import { GrowthRelationshipMemoryReadinessSection } from "@/components/growth/growth-relationship-memory-readiness-section"
 import { VOICE_CONVERSATION_INTELLIGENCE_QA_MARKER } from "@/lib/voice/intelligence/types"
 import {
   VOICE_CALL_CONTROL_QA_MARKER,
@@ -703,6 +704,8 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
                 </div>
               ) : null}
             </section>
+
+            <GrowthRelationshipMemoryReadinessSection />
 
             <section className={GROWTH_SETTINGS_SECTION_GAP}>
               <p className="flex items-center gap-2 text-sm font-medium">

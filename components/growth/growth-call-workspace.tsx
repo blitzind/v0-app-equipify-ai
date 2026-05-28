@@ -45,6 +45,7 @@ import { VOICE_TRANSFER_CONTROL_QA_MARKER } from "@/lib/voice/transfer-control/t
 import { VOICE_MEDIA_STREAMING_QA_MARKER } from "@/lib/voice/media-streaming/types"
 import { VOICE_CONVERSATION_INTELLIGENCE_QA_MARKER } from "@/lib/voice/intelligence/types"
 import { VOICE_UNIFIED_OPERATOR_ASSIST_QA_MARKER } from "@/lib/growth/operator-assist/types"
+import { VOICE_RELATIONSHIP_MEMORY_QA_MARKER } from "@/lib/voice/relationship-memory/types"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 export function GrowthCallWorkspace() {
@@ -422,6 +423,7 @@ export function GrowthCallWorkspace() {
       data-voice-media-streaming-qa-marker={VOICE_MEDIA_STREAMING_QA_MARKER}
       data-voice-conversation-intelligence-qa-marker={VOICE_CONVERSATION_INTELLIGENCE_QA_MARKER}
       data-voice-unified-operator-assist-qa-marker={VOICE_UNIFIED_OPERATOR_ASSIST_QA_MARKER}
+      data-voice-relationship-memory-qa-marker={VOICE_RELATIONSHIP_MEMORY_QA_MARKER}
     >
       {voiceBrowser.registrationState === "error" && voiceBrowser.error ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
@@ -543,6 +545,8 @@ export function GrowthCallWorkspace() {
           nativeSessionId={activeSession?.id ?? null}
           sessionPhone={activeSession?.phoneNumber ?? phone}
           operatorAssist={voiceBrowser.snapshot?.operatorAssist ?? null}
+          relationshipMemory={voiceBrowser.snapshot?.relationshipMemory ?? null}
+          onRelationshipMemoryRefresh={voiceBrowser.refresh}
           onLeadAttached={(leadId, session) => {
             void loadLeadContext(leadId)
             setLeadLinked(true)

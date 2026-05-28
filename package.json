@@ -221,6 +221,7 @@
     "test:voice-media-streaming-phase-1f": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-media-streaming-phase-1f.ts",
     "test:voice-conversation-intelligence-phase-2a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-conversation-intelligence-phase-2a.ts",
     "test:voice-unified-operator-assist-phase-2b": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-unified-operator-assist-phase-2b.ts",
+    "test:voice-relationship-memory-phase-2c": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-relationship-memory-phase-2c.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
     "test:growth-assemblyai-browser-streaming": "tsx scripts/test-growth-assemblyai-browser-streaming.ts",
     "test:growth-openai-realtime-browser-streaming": "tsx scripts/test-growth-openai-realtime-browser-streaming.ts",

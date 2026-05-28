@@ -19,6 +19,7 @@ import { fetchVoiceCallControlSnapshot } from "@/lib/voice/transfer-control/call
 import { fetchVoiceCallTranscriptSnapshot } from "@/lib/voice/media-streaming/media-session-service"
 import { fetchVoiceCallConversationIntelligenceSnapshot } from "@/lib/voice/intelligence/intelligence-service"
 import { fetchUnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/operator-assist-service"
+import { fetchRelationshipMemoryWorkspaceSnapshot } from "@/lib/voice/relationship-memory/relationship-memory-service"
 import { appendVoiceCallEvent } from "@/lib/voice/repository/voice-repository"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import type { VoiceCallStatus } from "@/lib/voice/types"
@@ -165,18 +166,24 @@ export async function buildVoiceBrowserSyncSnapshot(
   let voiceStatus: VoiceCallStatus | null = null
   let muted = false
   let onHold = false
+  let sessionPhone: string | null = null
+  let sessionLeadId: string | null = null
+  let sessionContactName: string | null = null
 
   if (workspaceSessionId) {
     const { data: sessionRow } = await sessionsTable(admin)
-      .select("voice_call_id, muted, on_hold, status")
+      .select("voice_call_id, muted, on_hold, status, phone_number, lead_id, contact_name")
       .eq("id", workspaceSessionId)
       .maybeSingle()
     activeVoiceCallId = (sessionRow?.voice_call_id as string | null) ?? null
     muted = Boolean(sessionRow?.muted)
     onHold = Boolean(sessionRow?.on_hold)
+    sessionPhone = (sessionRow?.phone_number as string | null) ?? null
+    sessionLeadId = (sessionRow?.lead_id as string | null) ?? null
+    sessionContactName = (sessionRow?.contact_name as string | null) ?? null
   } else {
     const { data: activeSession } = await sessionsTable(admin)
-      .select("id, voice_call_id, muted, on_hold, status, owner_user_id")
+      .select("id, voice_call_id, muted, on_hold, status, owner_user_id, phone_number, lead_id, contact_name")
       .eq("organization_id", input.organizationId)
       .eq("owner_user_id", input.userId)
       .in("status", ["ringing", "active", "on_hold", "external_bridge_pending"])
@@ -187,6 +194,9 @@ export async function buildVoiceBrowserSyncSnapshot(
     activeVoiceCallId = (activeSession?.voice_call_id as string | null) ?? null
     muted = Boolean(activeSession?.muted)
     onHold = Boolean(activeSession?.on_hold)
+    sessionPhone = (activeSession?.phone_number as string | null) ?? null
+    sessionLeadId = (activeSession?.lead_id as string | null) ?? null
+    sessionContactName = (activeSession?.contact_name as string | null) ?? null
   }
 
   if (activeVoiceCallId) {
@@ -231,6 +241,15 @@ export async function buildVoiceBrowserSyncSnapshot(
     conversationIntelligence,
     participants: controlSnapshot.participants,
   })
+  const relationshipMemory = sessionPhone
+    ? await fetchRelationshipMemoryWorkspaceSnapshot(admin, {
+        organizationId: input.organizationId,
+        phoneNumber: sessionPhone,
+        leadId: sessionLeadId,
+        contactName: sessionContactName,
+        activeVoiceCallId,
+      })
+    : null
   const inboundRinging = await fetchInboundBrowserOfferForUser(admin, {
     organizationId: input.organizationId,
     userId: input.userId,
@@ -261,6 +280,7 @@ export async function buildVoiceBrowserSyncSnapshot(
     liveTranscript,
     conversationIntelligence,
     operatorAssist,
+    relationshipMemory,
   }
 }
 
