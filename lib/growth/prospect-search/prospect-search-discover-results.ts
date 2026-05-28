@@ -1,5 +1,9 @@
 /** Normalized Discover-mode prospect rows — client-safe. */
 
+import {
+  formatProspectSearchContactCoverageLabel,
+  resolveProspectSearchContactCoverageStatus,
+} from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import type {
   GrowthProspectSearchCompanyResult,
   GrowthProspectSearchDiscoverResult,
@@ -56,6 +60,7 @@ export function mapProspectSearchCompanyToDiscoverResult(
   company: GrowthProspectSearchCompanyResult,
 ): GrowthProspectSearchDiscoverResult {
   const contact = pickPrimaryContact(company)
+  const coverageStatus = resolveProspectSearchContactCoverageStatus(company)
   return {
     company_id: company.id,
     provider_company_id: company.id,
@@ -86,6 +91,8 @@ export function mapProspectSearchCompanyToDiscoverResult(
     buying_stage: company.buying_stage,
     buying_signals: company.signals ?? [],
     company,
+    contact_coverage_status: coverageStatus,
+    contact_coverage_label: formatProspectSearchContactCoverageLabel(coverageStatus),
   }
 }
 
@@ -98,9 +105,11 @@ export function mapProspectSearchCompaniesToDiscoverResults(
 export function formatDiscoverContactField(
   value: string | null | undefined,
   status: string | null | undefined,
+  reason?: string | null,
 ): string {
   if (value?.trim()) return value
+  if (reason?.trim()) return reason
   if (status === "reveal") return "Reveal"
   if (status === "verified") return "Verified"
-  return "Unavailable"
+  return "Not available yet"
 }

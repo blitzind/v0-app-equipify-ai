@@ -2517,6 +2517,8 @@ async function main(): Promise<void> {
 
   await testBase64UrlRuntimeFix()
 
+  await testProspectSearchContactDiscovery()
+
   console.log("growth-prospect-search: all checks passed")
 }
 
@@ -3580,6 +3582,132 @@ async function testBase64UrlRuntimeFix(): Promise<void> {
     "utf8",
   )
   assert.match(searchPageSource, /data-base64url-runtime-fix-marker/)
+}
+
+async function testProspectSearchContactDiscovery(): Promise<void> {
+  const {
+    GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER,
+    buildProspectSearchPeopleRowsFromCompanies,
+    formatProspectSearchContactCoverageLabel,
+    hasProspectSearchDecisionMakerFilters,
+    resolveDefaultProspectSearchResultMode,
+    resolveProspectSearchContactCoverageStatus,
+    resolveProspectSearchContactProviderState,
+  } = await import("../lib/growth/prospect-search/prospect-search-contact-discovery")
+  const { buildProspectSearchLeadEngineHandoffInput } = await import(
+    "../lib/growth/prospect-search/prospect-search-lead-engine-handoff"
+  )
+
+  assert.equal(GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER, "growth-prospect-contact-discovery-v1")
+
+  const externalCompany = {
+    id: "ext-1",
+    source_type: "external_discovered" as const,
+    company_name: "Acme HVAC",
+    website: "https://acme.example",
+    industry: "HVAC",
+    location: "Austin, TX",
+    signals: [],
+    is_suppressed: false,
+    contact_intelligence: {
+      qa_marker: "growth-prospect-search-contact-intelligence-v1" as const,
+      schema_ready: true,
+      has_contacts: false,
+      contacts: [],
+      committee_roles: [],
+      committee_completeness_pct: null,
+      first_contact: null,
+      confidence_explanation: null,
+      outreach_recommendation: null,
+      source_labels: [],
+      empty_reason: "No evidence-backed contacts available for this company.",
+    },
+  }
+
+  assert.equal(resolveProspectSearchContactProviderState(externalCompany as never), "no_provider_connected")
+  assert.equal(
+    resolveProspectSearchContactCoverageStatus(externalCompany as never),
+    "contact_research_needed",
+  )
+  assert.equal(
+    formatProspectSearchContactCoverageLabel("contact_research_needed"),
+    "Contact research needed",
+  )
+  assert.equal(buildProspectSearchPeopleRowsFromCompanies([externalCompany as never]).length, 0)
+  assert.equal(
+    resolveDefaultProspectSearchResultMode({ companies: [externalCompany as never], filters: {} }),
+    "companies",
+  )
+  assert.equal(
+    resolveDefaultProspectSearchResultMode({
+      companies: [
+        {
+          ...externalCompany,
+          contact_intelligence: {
+            ...externalCompany.contact_intelligence,
+            has_contacts: true,
+            contacts: [
+              {
+                id: "c1",
+                name: "Maria Chen",
+                title: "Owner",
+                confidence: 0.9,
+                source_evidence: [{ claim: "Owner", evidence: "Website team page", source: "website" }],
+                role_type: "owner",
+                recommended_priority: 1,
+                email: "maria@acme.example",
+                phone: null,
+              },
+            ],
+            first_contact: {
+              contact_id: "c1",
+              role: "owner",
+              name: "Maria Chen",
+              confidence: 0.9,
+              reasons: ["Highest authority"],
+            },
+          },
+        } as never,
+      ],
+      filters: { title_contains: "Owner" },
+    }),
+    "people",
+  )
+  assert.equal(hasProspectSearchDecisionMakerFilters({ title_contains: "Director" }), true)
+
+  const handoff = buildProspectSearchLeadEngineHandoffInput(externalCompany as never, "hvac")
+  assert.ok(handoff.contactHandoff)
+  assert.equal(handoff.contactHandoff!.outreach_ready, false)
+  assert.match(handoff.contactHandoff!.contact_research_required_message ?? "", /Contact research required/)
+
+  const companiesTableSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-discover-companies-table.tsx"),
+    "utf8",
+  )
+  assert.match(companiesTableSource, /Company/)
+  assert.match(companiesTableSource, /Contact coverage/)
+  assert.doesNotMatch(companiesTableSource, /<th className="px-3 py-2">Name<\/th>/)
+
+  const peopleTableSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-discover-people-table.tsx"),
+    "utf8",
+  )
+  assert.match(peopleTableSource, /<th className="px-3 py-2">Name<\/th>/)
+  assert.match(peopleTableSource, /No verified contacts yet/)
+
+  const bulkBarSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-bulk-action-bar.tsx"),
+    "utf8",
+  )
+  assert.match(bulkBarSource, /Find contacts for selected/)
+  assert.match(bulkBarSource, /data-contact-discovery-marker=\{GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER\}/)
+
+  const shellSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-shell.tsx"),
+    "utf8",
+  )
+  assert.match(shellSource, /ProspectSearchResultModeToggle/)
+  assert.match(shellSource, /data-contact-discovery-marker/)
 }
 
 void main()

@@ -407,6 +407,8 @@ export type GrowthProspectSearchDiscoverResult = {
   buying_signals?: string[]
   /** Full company payload for intelligence panels. */
   company: GrowthProspectSearchCompanyResult
+  contact_coverage_status?: string | null
+  contact_coverage_label?: string | null
 }
 
 export type GrowthProspectSearchProviderDiagnostic = {

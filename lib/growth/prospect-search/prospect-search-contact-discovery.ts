@@ -1,0 +1,275 @@
+/** Prospect Search contact discovery UX — coverage, people rows, provider honesty. Client-safe. */
+
+import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
+import type {
+  GrowthProspectSearchCompanyResult,
+  GrowthProspectSearchFilters,
+  GrowthProspectSearchPersonResult,
+} from "@/lib/growth/prospect-search/prospect-search-types"
+
+export const GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER =
+  "growth-prospect-contact-discovery-v1" as const
+
+export type ProspectSearchResultMode = "companies" | "people"
+
+export type ProspectSearchContactCoverageStatus =
+  | "no_contacts_found"
+  | "contact_research_needed"
+  | "contacts_found"
+  | "email_available"
+  | "phone_available"
+  | "needs_verification"
+  | "blocked_suppressed"
+
+export type ProspectSearchContactProviderState =
+  | "connected"
+  | "internal_sources"
+  | "website_crawl"
+  | "no_provider_connected"
+
+export type GrowthProspectSearchPeopleResultRow = GrowthProspectSearchPersonResult & {
+  company: GrowthProspectSearchCompanyResult
+  contact_id: string
+  email_reason: string | null
+  phone_reason: string | null
+  source_label: string | null
+  location: string | null
+  compliance_status: "ready" | "suppressed" | "review_required"
+  last_checked_at: string | null
+}
+
+export function hasProspectSearchDecisionMakerFilters(
+  filters: GrowthProspectSearchFilters,
+): boolean {
+  return Boolean(
+    filters.title_contains?.trim() ||
+      filters.decision_maker_role?.trim() ||
+      (filters.title_hints?.length ?? 0) > 0,
+  )
+}
+
+export function resolveProspectSearchContactProviderState(
+  company: GrowthProspectSearchCompanyResult,
+): ProspectSearchContactProviderState {
+  const labels = company.contact_intelligence?.source_labels ?? []
+  if (labels.some((label) => label.includes("contact_discovery"))) return "connected"
+  if (labels.some((label) => label.includes("lead_decision_makers") || label.includes("lead_engine"))) {
+    return "internal_sources"
+  }
+  if (labels.some((label) => label.includes("company_contacts"))) return "website_crawl"
+  if (company.source_type === "external_discovered") return "no_provider_connected"
+  if (company.growth_lead_id) return "internal_sources"
+  return "no_provider_connected"
+}
+
+export function resolveProspectSearchContactCoverageStatus(
+  company: GrowthProspectSearchCompanyResult,
+): ProspectSearchContactCoverageStatus {
+  if (company.is_suppressed) return "blocked_suppressed"
+
+  const intelligence = company.contact_intelligence
+  const contacts = intelligence?.contacts ?? []
+  const hasNamedContacts = contacts.some((contact) => contact.name.trim().length > 0)
+  const hasEmail = contacts.some((contact) => contact.email?.trim())
+  const hasPhone = contacts.some((contact) => contact.phone?.trim())
+  const providerState = resolveProspectSearchContactProviderState(company)
+
+  if (!hasNamedContacts) {
+    if (providerState === "no_provider_connected" && company.source_type === "external_discovered") {
+      return "contact_research_needed"
+    }
+    return "no_contacts_found"
+  }
+
+  if (hasEmail && hasPhone) return "phone_available"
+  if (hasEmail) return "email_available"
+  if (hasPhone) return "phone_available"
+
+  const needsVerification = contacts.some(
+    (contact) => !contact.email?.trim() && !contact.phone?.trim() && contact.name.trim().length > 0,
+  )
+  if (needsVerification) return "needs_verification"
+  return "contacts_found"
+}
+
+export function formatProspectSearchContactCoverageLabel(
+  status: ProspectSearchContactCoverageStatus,
+): string {
+  switch (status) {
+    case "no_contacts_found":
+      return "No contacts found"
+    case "contact_research_needed":
+      return "Contact research needed"
+    case "contacts_found":
+      return "Contacts found"
+    case "email_available":
+      return "Email available"
+    case "phone_available":
+      return "Phone available"
+    case "needs_verification":
+      return "Needs verification"
+    case "blocked_suppressed":
+      return "Blocked / suppressed"
+    default:
+      return "Contact research needed"
+  }
+}
+
+export function resolveProspectSearchContactFieldReason(input: {
+  value: string | null | undefined
+  company: GrowthProspectSearchCompanyResult
+  channel: "email" | "phone"
+}): string {
+  const { company, channel, value } = input
+  if (value?.trim()) return channel === "email" ? "Verified email on file" : "Phone on file"
+
+  if (company.is_suppressed) return "Suppressed, do not contact"
+
+  const providerState = resolveProspectSearchContactProviderState(company)
+  if (providerState === "no_provider_connected" && company.source_type === "external_discovered") {
+    return "Connect a contact discovery provider to reveal verified emails and phones"
+  }
+
+  const intelligence = company.contact_intelligence
+  if (!intelligence?.has_contacts) {
+    return channel === "email"
+      ? "No verified contacts yet — run contact research"
+      : "Phone unavailable from current sources"
+  }
+
+  return channel === "email"
+    ? "Email not found from current sources"
+    : "Phone unavailable from current sources"
+}
+
+export function buildProspectSearchPeopleRowsFromCompanies(
+  companies: GrowthProspectSearchCompanyResult[],
+): GrowthProspectSearchPeopleResultRow[] {
+  const rows: GrowthProspectSearchPeopleResultRow[] = []
+
+  for (const company of companies) {
+    const intelligence = company.contact_intelligence
+    const contacts = intelligence?.contacts ?? []
+    for (const contact of contacts) {
+      const name = contact.name?.trim()
+      if (!name) continue
+
+      rows.push({
+        id: `${company.source_type}:${company.id}:${contact.id}`,
+        source_type: company.source_type,
+        company_id: company.id,
+        company_name: company.company_name,
+        full_name: name,
+        title: contact.title,
+        email: contact.email ?? null,
+        phone: contact.phone ?? null,
+        role: contact.role_type,
+        verification_status: resolveContactVerificationStatus(contact, company),
+        rank_score: contact.confidence,
+        company,
+        contact_id: contact.id,
+        email_reason: resolveProspectSearchContactFieldReason({
+          value: contact.email,
+          company,
+          channel: "email",
+        }),
+        phone_reason: resolveProspectSearchContactFieldReason({
+          value: contact.phone,
+          company,
+          channel: "phone",
+        }),
+        source_label: contact.source_evidence[0]?.source ?? intelligence?.source_labels[0] ?? null,
+        location: company.location,
+        compliance_status: company.is_suppressed ? "suppressed" : "ready",
+        last_checked_at: null,
+      })
+    }
+  }
+
+  return rows.sort((a, b) => b.rank_score - a.rank_score)
+}
+
+export function countProspectSearchPeopleRows(
+  companies: GrowthProspectSearchCompanyResult[],
+): number {
+  return buildProspectSearchPeopleRowsFromCompanies(companies).length
+}
+
+export function resolveDefaultProspectSearchResultMode(input: {
+  companies: GrowthProspectSearchCompanyResult[]
+  filters: GrowthProspectSearchFilters
+  serverPeopleCount?: number
+}): ProspectSearchResultMode {
+  const hydratedPeopleCount =
+    countProspectSearchPeopleRows(input.companies) + (input.serverPeopleCount ?? 0)
+  if (hydratedPeopleCount === 0) return "companies"
+  if (hasProspectSearchDecisionMakerFilters(input.filters)) return "people"
+  return "companies"
+}
+
+export function mergeProspectSearchPeopleResults(
+  serverPeople: GrowthProspectSearchPersonResult[],
+  companies: GrowthProspectSearchCompanyResult[],
+): GrowthProspectSearchPeopleResultRow[] {
+  const fromIntelligence = buildProspectSearchPeopleRowsFromCompanies(companies)
+  const seen = new Set(fromIntelligence.map((row) => row.id))
+
+  for (const person of serverPeople) {
+    const company = companies.find((row) => row.id === person.company_id)
+    if (!company) continue
+    const rowId = `${person.source_type}:${person.company_id}:${person.id}`
+    if (seen.has(rowId)) continue
+    fromIntelligence.push({
+      ...person,
+      company,
+      contact_id: person.id,
+      email_reason: resolveProspectSearchContactFieldReason({
+        value: person.email,
+        company,
+        channel: "email",
+      }),
+      phone_reason: resolveProspectSearchContactFieldReason({
+        value: person.phone,
+        company,
+        channel: "phone",
+      }),
+      source_label: person.source_type,
+      location: company.location ?? null,
+      compliance_status: company.is_suppressed ? "suppressed" : "ready",
+      last_checked_at: null,
+    })
+    seen.add(rowId)
+  }
+
+  return fromIntelligence.sort((a, b) => b.rank_score - a.rank_score)
+}
+
+function resolveContactVerificationStatus(
+  contact: GrowthProspectSearchContactIntelligence["contacts"][number],
+  company: GrowthProspectSearchCompanyResult,
+): string {
+  if (company.is_suppressed) return "suppressed"
+  if (contact.email?.trim() && contact.phone?.trim()) return "verified_channels"
+  if (contact.email?.trim()) return "email_verified"
+  if (contact.phone?.trim()) return "phone_verified"
+  if (contact.name.trim()) return "pending_verification"
+  return "not_found"
+}
+
+export function buildProspectSearchContactProviderMissingMessage(
+  company: GrowthProspectSearchCompanyResult,
+): string {
+  const state = resolveProspectSearchContactProviderState(company)
+  if (state === "no_provider_connected") {
+    return "No contact provider connected. Connect a contact discovery provider to reveal verified emails and phones."
+  }
+  return "Contact research needed before outreach."
+}
+
+export function logProspectSearchContactDiscoveryIssue(
+  code: string,
+  context: Record<string, string | null | undefined> = {},
+): void {
+  if (typeof console === "undefined" || typeof console.warn !== "function") return
+  console.warn(`[${GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}]`, code, context)
+}

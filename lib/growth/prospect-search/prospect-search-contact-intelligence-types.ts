@@ -74,4 +74,10 @@ export type ProspectSearchLeadEngineContactHandoffContext = {
   committee_completeness_pct: number | null
   contact_count: number
   summary: string | null
+  email_available: boolean
+  phone_available: boolean
+  contact_sources: string[]
+  compliance_status: "ready" | "suppressed" | "review_required"
+  outreach_ready: boolean
+  contact_research_required_message: string | null
 }

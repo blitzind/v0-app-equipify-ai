@@ -62,6 +62,7 @@ export function buildProspectSearchLeadEngineHandoffInput(
     intelligence?.first_contact
       ? `First contact: ${intelligence.first_contact.role}${intelligence.first_contact.name ? ` (${intelligence.first_contact.name})` : ""} · ${Math.round(intelligence.first_contact.confidence * 100)}%`
       : null,
+    buildLeadEngineContactHandoffContext(intelligence, company)?.contact_research_required_message,
     company.crm_detected ? `CRM: ${company.crm_detected}` : null,
     company.field_service_software ? `Field service: ${company.field_service_software}` : null,
     company.service_area ? `Service area: ${company.service_area}` : null,
@@ -76,7 +77,7 @@ export function buildProspectSearchLeadEngineHandoffInput(
     notes: noteParts.join(" · ").slice(0, MAX_NOTES_LENGTH),
     sourceType: company.source_type,
     sourceId: company.id,
-    contactHandoff: buildLeadEngineContactHandoffContext(intelligence),
+    contactHandoff: buildLeadEngineContactHandoffContext(intelligence, company),
   }
 }
 
@@ -121,7 +122,20 @@ function decodeContactHandoffContext(
     if (!json) return null
     const parsed = JSON.parse(json) as ProspectSearchLeadEngineContactHandoffContext
     if (typeof parsed.contact_count !== "number") return null
-    return parsed
+    return {
+      first_contact_role: parsed.first_contact_role ?? null,
+      first_contact_name: parsed.first_contact_name ?? null,
+      first_contact_confidence: parsed.first_contact_confidence ?? null,
+      committee_completeness_pct: parsed.committee_completeness_pct ?? null,
+      contact_count: parsed.contact_count,
+      summary: parsed.summary ?? null,
+      email_available: parsed.email_available === true,
+      phone_available: parsed.phone_available === true,
+      contact_sources: Array.isArray(parsed.contact_sources) ? parsed.contact_sources : [],
+      compliance_status: parsed.compliance_status ?? "review_required",
+      outreach_ready: parsed.outreach_ready === true,
+      contact_research_required_message: parsed.contact_research_required_message ?? null,
+    }
   } catch {
     return null
   }

@@ -1,8 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { Inbox, X } from "lucide-react"
+import { Inbox, Users, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
 
@@ -10,17 +11,25 @@ export function ProspectSearchBulkActionBar({
   selectedCount,
   pushableCount,
   selectedCompanies,
+  visibleCompanyCount,
   pushing,
+  contactDiscoveryBusy = false,
   onPush,
   onClear,
+  onFindContactsSelected,
+  onFindContactsVisible,
   className,
 }: {
   selectedCount: number
   pushableCount: number
   selectedCompanies: GrowthProspectSearchCompanyResult[]
+  visibleCompanyCount: number
   pushing: boolean
+  contactDiscoveryBusy?: boolean
   onPush: () => void
   onClear: () => void
+  onFindContactsSelected?: () => void
+  onFindContactsVisible?: () => void
   className?: string
 }) {
   if (selectedCount <= 0) return null
@@ -29,6 +38,7 @@ export function ProspectSearchBulkActionBar({
     (row) => row.source_type === "external_discovered",
   ).length
   const sourceSummary = summarizeSourceTypes(selectedCompanies)
+  const busy = pushing || contactDiscoveryBusy
 
   return (
     <div
@@ -37,6 +47,7 @@ export function ProspectSearchBulkActionBar({
         className,
       )}
       data-qa-marker="growth-prospect-search-bulk-action-bar"
+      data-contact-discovery-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}
     >
       <div className="min-w-0 space-y-1">
         <p className="text-sm font-semibold text-violet-950">
@@ -59,11 +70,23 @@ export function ProspectSearchBulkActionBar({
         ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="outline" onClick={onClear} disabled={pushing}>
+        <Button size="sm" variant="outline" onClick={onClear} disabled={busy}>
           <X className="mr-1 size-3.5" />
           Clear selection
         </Button>
-        <Button size="sm" onClick={onPush} disabled={pushing}>
+        {onFindContactsSelected ? (
+          <Button size="sm" variant="outline" disabled={busy} onClick={onFindContactsSelected}>
+            <Users className="mr-1 size-3.5" />
+            {contactDiscoveryBusy ? "Finding contacts…" : "Find contacts for selected"}
+          </Button>
+        ) : null}
+        {onFindContactsVisible && visibleCompanyCount > 0 ? (
+          <Button size="sm" variant="outline" disabled={busy} onClick={onFindContactsVisible}>
+            <Users className="mr-1 size-3.5" />
+            Find contacts for visible
+          </Button>
+        ) : null}
+        <Button size="sm" onClick={onPush} disabled={busy}>
           <Inbox className="mr-1 size-3.5" />
           {pushing ? "Pushing…" : "Push selected to Lead Inbox"}
         </Button>

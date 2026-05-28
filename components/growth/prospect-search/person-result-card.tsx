@@ -12,7 +12,7 @@ export function PersonResultCard({ row }: { row: GrowthProspectSearchPersonResul
           <p className="text-sm text-muted-foreground">{row.company_name}</p>
         </div>
         <Badge variant="outline" className="text-[10px]">
-          {row.verification_status}
+          {row.verification_status.replace(/_/g, " ")}
         </Badge>
       </div>
       <dl className="mt-3 grid gap-1 text-sm">
@@ -22,7 +22,11 @@ export function PersonResultCard({ row }: { row: GrowthProspectSearchPersonResul
         </div>
         <div className="flex justify-between gap-2">
           <dt className="text-muted-foreground">Email</dt>
-          <dd className="truncate font-medium">{row.email ?? "—"}</dd>
+          <dd className="truncate font-medium">{row.email ?? "No verified email yet"}</dd>
+        </div>
+        <div className="flex justify-between gap-2">
+          <dt className="text-muted-foreground">Phone</dt>
+          <dd className="truncate font-medium">{row.phone ?? "Phone unavailable from current sources"}</dd>
         </div>
       </dl>
     </article>

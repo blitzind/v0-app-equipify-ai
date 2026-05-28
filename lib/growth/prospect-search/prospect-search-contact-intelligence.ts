@@ -14,6 +14,7 @@ import {
   type ProspectSearchFirstContactRecommendation,
   type ProspectSearchLeadEngineContactHandoffContext,
 } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
+import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 
 export const MAX_CONTACT_CONFIDENCE_RANK_BOOST = 0.05
 
@@ -439,15 +440,35 @@ export function computeContactCoverageRankBoost(decision_maker_count: number): n
 
 export function buildLeadEngineContactHandoffContext(
   intelligence: GrowthProspectSearchContactIntelligence | null | undefined,
+  company?: Pick<GrowthProspectSearchCompanyResult, "is_suppressed" | "source_type"> | null,
 ): ProspectSearchLeadEngineContactHandoffContext | null {
-  if (!intelligence) return null
+  if (!intelligence && !company) return null
+
+  const contacts = intelligence?.contacts ?? []
+  const emailAvailable = contacts.some((contact) => contact.email?.trim())
+  const phoneAvailable = contacts.some((contact) => contact.phone?.trim())
+  const contactCount = contacts.length
+  const suppressed = company?.is_suppressed === true
+  const outreachReady = !suppressed && contactCount > 0 && (emailAvailable || phoneAvailable)
+
   return {
-    first_contact_role: intelligence.first_contact?.role ?? null,
-    first_contact_name: intelligence.first_contact?.name ?? null,
-    first_contact_confidence: intelligence.first_contact?.confidence ?? null,
-    committee_completeness_pct: intelligence.committee_completeness_pct,
-    contact_count: intelligence.contacts.length,
-    summary: intelligence.outreach_recommendation,
+    first_contact_role: intelligence?.first_contact?.role ?? null,
+    first_contact_name: intelligence?.first_contact?.name ?? null,
+    first_contact_confidence: intelligence?.first_contact?.confidence ?? null,
+    committee_completeness_pct: intelligence?.committee_completeness_pct ?? null,
+    contact_count: contactCount,
+    summary: intelligence?.outreach_recommendation ?? null,
+    email_available: emailAvailable,
+    phone_available: phoneAvailable,
+    contact_sources: intelligence?.source_labels ?? [],
+    compliance_status: suppressed ? "suppressed" : outreachReady ? "ready" : "review_required",
+    outreach_ready: outreachReady,
+    contact_research_required_message:
+      outreachReady || suppressed
+        ? null
+        : company?.source_type === "external_discovered"
+          ? "Contact research required before outreach."
+          : "No verified contacts yet — run contact research before outreach.",
   }
 }
 

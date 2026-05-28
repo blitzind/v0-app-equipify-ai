@@ -23,6 +23,8 @@ import { ProspectSearchFilterRail } from "@/components/growth/prospect-search/pr
 import { ProspectSearchCleanStartPanel } from "@/components/growth/prospect-search/prospect-search-clean-start-panel"
 import { ProspectSearchDiscoverReadyPanel } from "@/components/growth/prospect-search/prospect-search-discover-ready-panel"
 import { ProspectSearchDiscoverResultsTable } from "@/components/growth/prospect-search/prospect-search-discover-results-table"
+import { ProspectSearchResultModeToggle } from "@/components/growth/prospect-search/prospect-search-result-mode-toggle"
+import { ProspectSearchPeopleResultsPanel } from "@/components/growth/prospect-search/prospect-search-discover-people-table"
 import { ProspectSearchDiagnosticsDisclosure } from "@/components/growth/prospect-search/prospect-search-diagnostics-disclosure"
 import {
   ProspectSearchActiveFilterPills,
@@ -109,7 +111,13 @@ import {
   GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER,
   sanitizeGrowthAdminUiError,
 } from "@/lib/growth/admin-route-runtime-types"
-import { cn } from "@/lib/utils"
+import {
+  GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER,
+  logProspectSearchContactDiscoveryIssue,
+  mergeProspectSearchPeopleResults,
+  resolveDefaultProspectSearchResultMode,
+  type ProspectSearchResultMode,
+} from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 
 const EMPTY_FILTERS: GrowthProspectSearchFilters = {}
 
@@ -165,6 +173,8 @@ function ProspectSearchShellInner() {
   const [sortBy, setSortBy] = useState<GrowthProspectSearchSortBy>("rank")
   const [pendingProviderSearchHint, setPendingProviderSearchHint] = useState<string | null>(null)
   const [lastSearchedCriteriaKey, setLastSearchedCriteriaKey] = useState<string | null>(null)
+  const [resultMode, setResultMode] = useState<ProspectSearchResultMode>("companies")
+  const [contactDiscoveryBusy, setContactDiscoveryBusy] = useState(false)
 
   const queryRef = useRef(query)
   const filtersRef = useRef(filters)
@@ -203,6 +213,10 @@ function ProspectSearchShellInner() {
   const companies = result?.companies ?? []
   const people = result?.people ?? []
   const discoverFilteredResults = result?.filtered_discover_results ?? []
+  const peopleRows = useMemo(
+    () => mergeProspectSearchPeopleResults(people, companies),
+    [people, companies],
+  )
   const rawProviderCount = resolveRawProviderCount(result)
   const discoverPhase = resolveProspectSearchDiscoverResultsPhase({
     discoveryMode,
@@ -295,6 +309,17 @@ function ProspectSearchShellInner() {
     const mode = searchParams.get("mode")
     setDiscoveryMode(resolveProspectSearchDiscoveryMode(mode))
   }, [searchParams])
+
+  useEffect(() => {
+    if (!searchCompleted || companies.length === 0) return
+    setResultMode(
+      resolveDefaultProspectSearchResultMode({
+        companies,
+        filters,
+        serverPeopleCount: people.length,
+      }),
+    )
+  }, [searchCompleted, lastSearchedCriteriaKey, companies, filters, people.length])
 
   useEffect(() => {
     if (lastSearchedCriteriaKey === null) return
@@ -748,6 +773,35 @@ function ProspectSearchShellInner() {
     setSelectedKeys(new Set())
   }, [])
 
+  const refreshContactDiscoveryResults = useCallback(async () => {
+    await fetchResults()
+  }, [fetchResults])
+
+  const runBulkContactDiscovery = useCallback(
+    async (scope: "selected" | "visible") => {
+      const targets = scope === "selected" ? selectedCompanies : companies
+      if (targets.length === 0) return
+      setContactDiscoveryBusy(true)
+      try {
+        for (const company of targets) {
+          const params = new URLSearchParams({ company_candidate_id: company.id, run: "1" })
+          const res = await fetch(`/api/platform/growth/contact-discovery?${params}`, {
+            cache: "no-store",
+          })
+          if (!res.ok) {
+            logProspectSearchContactDiscoveryIssue("batch_contact_discovery_failed", {
+              company_id: company.id,
+            })
+          }
+        }
+        await refreshContactDiscoveryResults()
+      } finally {
+        setContactDiscoveryBusy(false)
+      }
+    },
+    [companies, refreshContactDiscoveryResults, selectedCompanies],
+  )
+
   const runBulkPush = useCallback(async () => {
     if (selectedCompanies.length === 0) return
     setBulkPushing(true)
@@ -896,6 +950,7 @@ function ProspectSearchShellInner() {
       data-staged-search-marker={GROWTH_PROSPECT_SEARCH_STAGED_SEARCH_QA_MARKER}
       data-runtime-stable-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER}
       data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
+      data-contact-discovery-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}
       data-current-criteria-key={currentCriteriaKey}
       data-last-searched-criteria-key={lastSearchedCriteriaKey ?? ""}
       data-criteria-stale={criteriaStale ? "true" : "false"}
@@ -1125,7 +1180,15 @@ function ProspectSearchShellInner() {
                         <SelectItem value="signal_momentum">Signal momentum</SelectItem>
                       </SelectContent>
                     </Select>
-                    <SearchViewToggle view={view} onViewChange={setView} />
+                    <ProspectSearchResultModeToggle
+                      mode={resultMode}
+                      onModeChange={setResultMode}
+                      companyCount={companies.length}
+                      peopleCount={peopleRows.length}
+                    />
+                    {discoveryMode === "internal" ? (
+                      <SearchViewToggle view={view} onViewChange={setView} />
+                    ) : null}
                     <Button variant="outline" size="sm" onClick={() => setSaveDialogOpen(true)}>
                       <Bookmark className="mr-1 size-3.5" />
                       Save workflow
@@ -1157,9 +1220,13 @@ function ProspectSearchShellInner() {
                 selectedCount={selectedKeys.size}
                 pushableCount={pushableSelectedCount}
                 selectedCompanies={selectedCompanies}
+                visibleCompanyCount={companies.length}
                 pushing={bulkPushing}
+                contactDiscoveryBusy={contactDiscoveryBusy}
                 onPush={() => void runBulkPush()}
                 onClear={clearSelection}
+                onFindContactsSelected={() => void runBulkContactDiscovery("selected")}
+                onFindContactsVisible={() => void runBulkContactDiscovery("visible")}
               />
               ) : null}
 
@@ -1206,6 +1273,14 @@ function ProspectSearchShellInner() {
                   title="No companies found"
                   emptyMessage="No companies matched this search yet. Try broadening filters or adjusting your query."
                 />
+              ) : searchCompleted && view === "card" && resultMode === "people" ? (
+                <ProspectSearchPeopleResultsPanel
+                  rows={peopleRows}
+                  onOpenCompany={(companyId) => {
+                    const company = companies.find((row) => row.id === companyId)
+                    if (company) setSelectedCompany(company)
+                  }}
+                />
               ) : searchCompleted && view === "card" ? (
                 <div className="flex flex-col gap-4">
                   {companies.map((row) => (
@@ -1230,13 +1305,16 @@ function ProspectSearchShellInner() {
               ) : searchCompleted && discoveryMode === "discover_external" ? (
                 <>
                   <ProspectSearchDiscoverResultsTable
+                    mode={resultMode}
                     rows={discoverFilteredResults}
+                    peopleRows={peopleRows}
                     selectedId={selectedCompany?.id ?? null}
                     selectedKeys={selectedKeys}
                     onSelect={setSelectedCompany}
                     onToggleSelection={toggleCompanySelection}
                     onSelectAllVisible={selectAllVisible}
                     onClearSelection={clearSelection}
+                    onContactDiscoveryComplete={refreshContactDiscoveryResults}
                   />
                   {selectedCompany ? (
                     <div
@@ -1299,9 +1377,9 @@ function ProspectSearchShellInner() {
                 </>
               ) : null}
 
-              {people.length > 0 ? (
+              {resultMode === "companies" && people.length > 0 ? (
                 <div>
-                  <h3 className="mb-3 text-sm font-semibold">Contacts ({people.length})</h3>
+                  <h3 className="mb-3 text-sm font-semibold">Indexed contacts ({people.length})</h3>
                   <div className="flex flex-col gap-3">
                     {people.map((row) => (
                       <PersonResultCard key={row.id} row={row} />
