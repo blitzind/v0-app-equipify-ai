@@ -109,7 +109,7 @@ const boostedSearch = rankGrowthCommandPaletteEntries(GROWTH_COMMAND_PALETTE_ENT
 assert.equal(boostedSearch[0]?.id, "search")
 
 const coreGroup = GROWTH_NAV_GROUP_DEFS.find((group) => group.id === "core")
-assert.equal(coreGroup?.label, "Command Center")
+assert.equal(coreGroup?.label, "Workspace")
 assert.ok(coreGroup?.items.some((item) => item.label === "Revenue Inbox"))
 assert.ok(!coreGroup?.items.some((item) => item.label === "Imports"))
 assert.ok(!coreGroup?.items.some((item) => item.label === "Prospect Search"))

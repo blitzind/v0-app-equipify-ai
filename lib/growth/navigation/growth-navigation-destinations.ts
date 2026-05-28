@@ -393,7 +393,7 @@ export const GROWTH_COMMAND_PALETTE_ENTRIES: GrowthCommandPaletteEntry[] = [
 export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
   {
     id: "core",
-    label: "Command Center",
+    label: "Workspace",
     items: [
       {
         id: "command",

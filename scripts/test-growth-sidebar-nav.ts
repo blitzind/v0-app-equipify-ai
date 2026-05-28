@@ -52,6 +52,7 @@ assert.match(source, /GrowthNavSectionRow/)
 assert.match(source, /GrowthNavFlyoutSections/)
 assert.match(source, /clickableNavItems/)
 assert.match(source, /GROWTH_NAV_GROUP_DEFS/)
+assert.match(source, /core: Bolt/)
 assert.match(source, /GROWTH_SIDEBAR_FLYOUT_QA_MARKER/)
 assert.match(source, /data-flyout-marker=\{GROWTH_SIDEBAR_FLYOUT_QA_MARKER\}/)
 assert.match(source, /GROWTH_NAVIGATION_IA_QA_MARKER/)
@@ -87,7 +88,7 @@ assert.match(source, /GROWTH_DELIVERY_OPS_NAV_QA_MARKER/)
 assert.match(source, /pipeline: Funnel/)
 
 const coreGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "core")
-assert.equal(coreGroup?.label, "Command Center")
+assert.equal(coreGroup?.label, "Workspace")
 assert.ok(coreGroup?.items.some((i) => i.label === "Revenue Inbox"))
 assert.ok(coreGroup?.items.some((i) => i.label === "Inbox"))
 assert.ok(!coreGroup?.items.some((i) => i.label === "Prospect Search"))
@@ -202,7 +203,7 @@ assert.equal(governanceItem?.match("/admin/growth/settings/growth"), false)
 
 const groupOrder = GROWTH_NAV_GROUP_DEFS.map((group) => group.label)
 assert.deepEqual(groupOrder, [
-  "Command Center",
+  "Workspace",
   "Lead Engine",
   "Intelligence",
   "Execution",

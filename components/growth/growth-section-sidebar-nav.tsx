@@ -20,6 +20,7 @@ import { createPortal } from "react-dom"
 import type { LucideIcon } from "lucide-react"
 import {
   Activity,
+  Bolt,
   BookOpen,
   Bot,
   CalendarClock,
@@ -184,7 +185,7 @@ const GROWTH_NAV_GROUPS: GrowthNavGroup[] = GROWTH_NAV_GROUP_DEFS.map((group) =>
 }))
 
 const GROWTH_NAV_GROUP_ICONS: Record<string, LucideIcon> = {
-  core: LayoutDashboard,
+  core: Bolt,
   intelligence: Radar,
   execution: PlayCircle,
   "lead-engine": Workflow,
