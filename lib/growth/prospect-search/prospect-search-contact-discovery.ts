@@ -20,6 +20,18 @@ import {
   type ProspectSearchEmailVerificationDepth,
   type ProspectSearchPhoneVerificationDepth,
 } from "@/lib/growth/prospect-search/prospect-search-contact-verification-depth"
+import {
+  applyProspectSearchContactRankingToPeopleRows,
+  type ProspectSearchContactPriorityTier,
+} from "@/lib/growth/prospect-search/prospect-search-contact-ranking"
+import {
+  buildProspectSearchCompanyContactCoverageIntelligence,
+  type ProspectSearchCompanyContactCoverageIntelligence,
+} from "@/lib/growth/prospect-search/prospect-search-company-contact-coverage-intelligence"
+import {
+  resolveProspectSearchRevenuePersona,
+  type ProspectSearchRevenuePersonaIntelligence,
+} from "@/lib/growth/prospect-search/prospect-search-revenue-persona-intelligence"
 import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
 import {
   formatProspectSearchContactSourceLabel,
@@ -40,6 +52,8 @@ export { GROWTH_PEOPLE_WORKFLOWS_QA_MARKER } from "@/lib/growth/prospect-search/
 export { GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-eligibility"
 export { GROWTH_CONTACT_FRESHNESS_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-freshness"
 export { GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-verification-depth"
+export { GROWTH_CONTACT_RANKING_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-ranking"
+export { GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-revenue-persona-intelligence"
 
 export type ProspectSearchResultMode = "companies" | "people"
 
@@ -95,6 +109,20 @@ export type GrowthProspectSearchPeopleResultRow = GrowthProspectSearchPersonResu
   confidence_top_reasons: string[]
   confidence_risk_notes: string[]
   stale_warning: string | null
+  persona: ProspectSearchRevenuePersonaIntelligence
+  persona_type: ProspectSearchRevenuePersonaIntelligence["persona_type"]
+  persona_label: string
+  persona_icp_relevance: number
+  persona_buying_influence: number
+  persona_outreach_suitability: number
+  persona_evidence: string[]
+  outreach_rank_score: number
+  priority_tier: ProspectSearchContactPriorityTier
+  ranking_reasons: string[]
+  ranking_risks: string[]
+  recommended_next_action: string
+  is_recommended_contact: boolean
+  is_secondary_contact: boolean
 }
 
 export type ProspectSearchPeopleTimelineEvent = {
@@ -339,6 +367,15 @@ function buildPeopleContactProfile(input: {
     call_eligibility: eligibility.call.state,
   })
 
+  const persona = resolveProspectSearchRevenuePersona({
+    title: contact.title,
+    role_type: contact.role_type,
+    source_label,
+    source_page_url,
+    source_evidence: sourceEvidence,
+    industry: company.industry,
+  })
+
   const email_reason = contact.email?.trim()
     ? formatEmailFieldReason(email_verification_depth)
     : resolveProspectSearchContactFieldReason({
@@ -365,6 +402,7 @@ function buildPeopleContactProfile(input: {
     stale_warning,
     email_reason,
     phone_reason,
+    persona,
   }
 }
 
@@ -409,6 +447,190 @@ function formatPhoneFieldReason(
       return "Invalid phone format"
     default:
       return "Phone on file"
+  }
+}
+
+export function enrichProspectSearchPeopleRowsWithRanking(
+  rows: GrowthProspectSearchPeopleResultRow[],
+): GrowthProspectSearchPeopleResultRow[] {
+  if (rows.length === 0) return rows
+
+  const rankingInputs = rows.map((row) => ({
+    ...row,
+    contact_id: row.contact_id,
+    company_id: row.company_id,
+    confidence_score: row.confidence,
+    persona: row.persona,
+    in_lead_inbox: row.company.in_lead_inbox,
+    existing_customer: row.company.existing_customer,
+    existing_prospect: row.company.existing_prospect,
+    lead_engine_score: row.company.lead_engine_score ?? row.company.lead_score,
+    company_suppressed: row.company.is_suppressed,
+  }))
+
+  const ranked = applyProspectSearchContactRankingToPeopleRows(rankingInputs)
+
+  return ranked.map((row) => ({
+    ...row,
+    rank_score: row.outreach_rank_score,
+    outreach_rank_score: row.outreach_rank_score,
+    priority_tier: row.priority_tier,
+    ranking_reasons: row.ranking_reasons,
+    ranking_risks: row.ranking_risks,
+    recommended_next_action: row.recommended_next_action,
+    is_recommended_contact: row.is_recommended_contact,
+    is_secondary_contact: row.is_secondary_contact,
+    persona_type: row.persona.persona_type,
+    persona_label: row.persona.persona_label,
+    persona_icp_relevance: row.persona.icp_relevance,
+    persona_buying_influence: row.persona.buying_influence,
+    persona_outreach_suitability: row.persona.outreach_suitability,
+    persona_evidence: row.persona.evidence,
+  }))
+}
+
+export function attachProspectSearchCompanyCoverageIntelligence(
+  companies: GrowthProspectSearchCompanyResult[],
+  peopleRows: GrowthProspectSearchPeopleResultRow[],
+): GrowthProspectSearchCompanyResult[] {
+  const rowsByCompany = new Map<string, GrowthProspectSearchPeopleResultRow[]>()
+  for (const row of peopleRows) {
+    const list = rowsByCompany.get(row.company_id) ?? []
+    list.push(row)
+    rowsByCompany.set(row.company_id, list)
+  }
+
+  return companies.map((company) => {
+    const contacts = rowsByCompany.get(company.id) ?? []
+    if (contacts.length === 0) return company
+
+    const coverage = buildProspectSearchCompanyContactCoverageIntelligence({
+      company_name: company.company_name,
+      company_suppressed: company.is_suppressed,
+      contacts: contacts.map((row) => ({
+        contact_id: row.contact_id,
+        full_name: row.full_name,
+        persona_type: row.persona_type,
+        outreach_rank_score: row.outreach_rank_score,
+        priority_tier: row.priority_tier,
+        email_available: row.email_available,
+        phone_available: row.phone_available,
+        call_ready: row.call_ready,
+        email_eligibility: row.email_eligibility,
+        is_recommended_contact: row.is_recommended_contact,
+        verification_status: row.verification_status,
+      })),
+    })
+
+    const intelligence = company.contact_intelligence
+    if (!intelligence) return company
+
+    return {
+      ...company,
+      contact_intelligence: {
+        ...intelligence,
+        company_contact_coverage: coverage,
+        outreach_recommendation:
+          coverage.ranking_summary ??
+          intelligence.outreach_recommendation ??
+          coverage.coverage_label,
+        primary_contact_id:
+          coverage.primary_recommended_contact_id ?? intelligence.primary_contact_id,
+        recommended_contact_id:
+          coverage.primary_recommended_contact_id ?? intelligence.recommended_contact_id,
+      },
+    }
+  })
+}
+
+function buildProspectSearchPeopleRowDraft(input: {
+  company: GrowthProspectSearchCompanyResult
+  contact: GrowthProspectSearchContactIntelligence["contacts"][number]
+  intelligence: GrowthProspectSearchContactIntelligence | null | undefined
+  profile: ReturnType<typeof buildPeopleContactProfile>
+  source_label: string | null
+  source_page_url: string | null
+  phone_on_dnc: boolean | null
+  name: string
+}): GrowthProspectSearchPeopleResultRow {
+  const { company, contact, profile, source_label, source_page_url, phone_on_dnc, name } = input
+  return {
+    id: `${company.source_type}:${company.id}:${contact.id}`,
+    source_type: company.source_type,
+    company_id: company.id,
+    company_name: company.company_name,
+    full_name: name,
+    title: contact.title,
+    email: contact.email ?? null,
+    phone: contact.phone ?? null,
+    role: contact.role_type,
+    verification_status: profile.verification_status,
+    rank_score: profile.confidenceReasoning.confidence_score,
+    company,
+    contact_id: contact.id,
+    email_reason: profile.email_reason,
+    phone_reason: profile.phone_reason,
+    source_label,
+    source_page_url,
+    confidence: profile.confidenceReasoning.confidence_score,
+    location: company.location,
+    compliance_status: profile.readiness.compliance_status,
+    last_checked_at: profile.freshness.last_checked_at,
+    outreach_ready: profile.eligibility.email.eligible || profile.eligibility.call.eligible,
+    email_available: profile.readiness.email_available,
+    phone_available: profile.readiness.phone_available,
+    call_ready: profile.eligibility.call_ready,
+    sms_ready: profile.eligibility.sms_ready,
+    readiness_label:
+      profile.stale_warning ??
+      (profile.eligibility.call.eligible
+        ? "Call ready"
+        : profile.eligibility.email.eligible
+          ? "Email outreach ready"
+          : profile.readiness.readiness_label),
+    email_eligibility: profile.eligibility.email.state,
+    call_eligibility: profile.eligibility.call.state,
+    sms_eligibility: profile.eligibility.sms.state,
+    call_block_reason: profile.eligibility.call_block_reason,
+    sms_block_reason: profile.eligibility.sms_block_reason,
+    phone_on_dnc,
+    discovered_at: profile.freshness.discovered_at,
+    last_verified_at: profile.freshness.last_verified_at,
+    source_last_seen_at: profile.freshness.source_last_seen_at,
+    verification_expires_at: profile.freshness.verification_expires_at,
+    freshness_status: profile.freshness.freshness_status,
+    email_verification_depth: profile.email_verification_depth,
+    phone_verification_depth: profile.phone_verification_depth,
+    confidence_label: profile.confidenceReasoning.confidence_label,
+    confidence_reason: profile.confidenceReasoning.summary,
+    confidence_top_reasons: profile.confidenceReasoning.top_reasons,
+    confidence_risk_notes: profile.confidenceReasoning.risk_notes,
+    stale_warning: profile.stale_warning,
+    persona: profile.persona,
+    persona_type: profile.persona.persona_type,
+    persona_label: profile.persona.persona_label,
+    persona_icp_relevance: profile.persona.icp_relevance,
+    persona_buying_influence: profile.persona.buying_influence,
+    persona_outreach_suitability: profile.persona.outreach_suitability,
+    persona_evidence: profile.persona.evidence,
+    outreach_rank_score: 0,
+    priority_tier: "review",
+    ranking_reasons: [],
+    ranking_risks: [],
+    recommended_next_action: "Pending ranking",
+    is_recommended_contact: false,
+    is_secondary_contact: false,
+    timeline_events: buildProspectSearchPeopleTimelineEvents({
+      contact,
+      company,
+      source_label,
+      freshness: profile.freshness,
+      email_verification_depth: profile.email_verification_depth,
+      phone_verification_depth: profile.phone_verification_depth,
+      eligibility: profile.eligibility,
+      persona: profile.persona,
+      ranking: null,
+    }),
   }
 }
 
@@ -459,70 +681,22 @@ export function buildProspectSearchPeopleRowsFromCompanies(
             : false,
       })
 
-      rows.push({
-        id: `${company.source_type}:${company.id}:${contact.id}`,
-        source_type: company.source_type,
-        company_id: company.id,
-        company_name: company.company_name,
-        full_name: name,
-        title: contact.title,
-        email: contact.email ?? null,
-        phone: contact.phone ?? null,
-        role: contact.role_type,
-        verification_status: profile.verification_status,
-        rank_score: profile.confidenceReasoning.confidence_score,
-        company,
-        contact_id: contact.id,
-        email_reason: profile.email_reason,
-        phone_reason: profile.phone_reason,
-        source_label,
-        source_page_url: contact.source_page_url ?? sourceEvidence?.page_url ?? null,
-        confidence: profile.confidenceReasoning.confidence_score,
-        location: company.location,
-        compliance_status: profile.readiness.compliance_status,
-        last_checked_at: profile.freshness.last_checked_at,
-        outreach_ready: profile.eligibility.email.eligible || profile.eligibility.call.eligible,
-        email_available: profile.readiness.email_available,
-        phone_available: profile.readiness.phone_available,
-        call_ready: profile.eligibility.call_ready,
-        sms_ready: profile.eligibility.sms_ready,
-        readiness_label: profile.stale_warning ?? (profile.eligibility.call.eligible
-          ? "Call ready"
-          : profile.eligibility.email.eligible
-            ? "Email outreach ready"
-            : profile.readiness.readiness_label),
-        email_eligibility: profile.eligibility.email.state,
-        call_eligibility: profile.eligibility.call.state,
-        sms_eligibility: profile.eligibility.sms.state,
-        call_block_reason: profile.eligibility.call_block_reason,
-        sms_block_reason: profile.eligibility.sms_block_reason,
-        phone_on_dnc,
-        discovered_at: profile.freshness.discovered_at,
-        last_verified_at: profile.freshness.last_verified_at,
-        source_last_seen_at: profile.freshness.source_last_seen_at,
-        verification_expires_at: profile.freshness.verification_expires_at,
-        freshness_status: profile.freshness.freshness_status,
-        email_verification_depth: profile.email_verification_depth,
-        phone_verification_depth: profile.phone_verification_depth,
-        confidence_label: profile.confidenceReasoning.confidence_label,
-        confidence_reason: profile.confidenceReasoning.summary,
-        confidence_top_reasons: profile.confidenceReasoning.top_reasons,
-        confidence_risk_notes: profile.confidenceReasoning.risk_notes,
-        stale_warning: profile.stale_warning,
-        timeline_events: buildProspectSearchPeopleTimelineEvents({
-          contact,
+      rows.push(
+        buildProspectSearchPeopleRowDraft({
           company,
+          contact,
+          intelligence,
+          profile,
           source_label,
-          freshness: profile.freshness,
-          email_verification_depth: profile.email_verification_depth,
-          phone_verification_depth: profile.phone_verification_depth,
-          eligibility: profile.eligibility,
+          source_page_url: contact.source_page_url ?? sourceEvidence?.page_url ?? null,
+          phone_on_dnc,
+          name,
         }),
-      })
+      )
     }
   }
 
-  return rows.sort((a, b) => b.rank_score - a.rank_score)
+  return enrichProspectSearchPeopleRowsWithRanking(rows)
 }
 
 export function countProspectSearchPeopleRows(
@@ -595,6 +769,10 @@ export function mergeProspectSearchPeopleResults(
       phone_verification_depth,
       company_suppressed: company.is_suppressed,
     })
+    const persona = resolveProspectSearchRevenuePersona({
+      title: person.title,
+      industry: company.industry,
+    })
     fromIntelligence.push({
       ...person,
       company,
@@ -620,14 +798,15 @@ export function mergeProspectSearchPeopleResults(
       phone_available: Boolean(person.phone?.trim()),
       call_ready: eligibility.call_ready,
       sms_ready: eligibility.sms_ready,
-      readiness_label: resolveProspectSearchStaleWarning({
-        freshness_status: freshness.freshness_status,
-        email: person.email,
-        phone: person.phone,
-        email_verification_depth,
-        phone_verification_depth,
-        call_eligibility: eligibility.call.state,
-      }) ?? (company.is_suppressed ? "Suppressed for outreach" : "Needs verification"),
+      readiness_label:
+        resolveProspectSearchStaleWarning({
+          freshness_status: freshness.freshness_status,
+          email: person.email,
+          phone: person.phone,
+          email_verification_depth,
+          phone_verification_depth,
+          call_eligibility: eligibility.call.state,
+        }) ?? (company.is_suppressed ? "Suppressed for outreach" : "Needs verification"),
       email_eligibility: eligibility.email.state,
       call_eligibility: eligibility.call.state,
       sms_eligibility: eligibility.sms.state,
@@ -653,6 +832,20 @@ export function mergeProspectSearchPeopleResults(
         phone_verification_depth,
         call_eligibility: eligibility.call.state,
       }),
+      persona,
+      persona_type: persona.persona_type,
+      persona_label: persona.persona_label,
+      persona_icp_relevance: persona.icp_relevance,
+      persona_buying_influence: persona.buying_influence,
+      persona_outreach_suitability: persona.outreach_suitability,
+      persona_evidence: persona.evidence,
+      outreach_rank_score: 0,
+      priority_tier: "review" as const,
+      ranking_reasons: [],
+      ranking_risks: [],
+      recommended_next_action: "Review contact evidence",
+      is_recommended_contact: false,
+      is_secondary_contact: false,
       timeline_events: [
         {
           id: "discovered-server",
@@ -662,11 +855,11 @@ export function mergeProspectSearchPeopleResults(
           occurred_at: null,
         },
       ],
-    })
+    } as GrowthProspectSearchPeopleResultRow)
     seen.add(rowId)
   }
 
-  return fromIntelligence.sort((a, b) => b.rank_score - a.rank_score)
+  return enrichProspectSearchPeopleRowsWithRanking(fromIntelligence)
 }
 
 function buildProspectSearchPeopleTimelineEvents(input: {
@@ -677,6 +870,11 @@ function buildProspectSearchPeopleTimelineEvents(input: {
   email_verification_depth?: ProspectSearchEmailVerificationDepth
   phone_verification_depth?: ProspectSearchPhoneVerificationDepth
   eligibility?: ReturnType<typeof resolveContactOutreachEligibilityBundle>
+  persona?: ProspectSearchRevenuePersonaIntelligence
+  ranking?: Pick<
+    import("@/lib/growth/prospect-search/prospect-search-contact-ranking").ProspectSearchContactRankingResult,
+    "priority_tier" | "outreach_rank_score" | "ranking_reasons" | "recommended_next_action"
+  > | null
 }): ProspectSearchPeopleTimelineEvent[] {
   const events: ProspectSearchPeopleTimelineEvent[] = [
     {
@@ -733,6 +931,24 @@ function buildProspectSearchPeopleTimelineEvents(input: {
       kind: "verification",
       label: "Eligibility snapshot",
       detail: `Email ${input.eligibility.email.state} · Call ${input.eligibility.call.state} · SMS ${input.eligibility.sms.state}`,
+      occurred_at: input.freshness?.last_checked_at ?? null,
+    })
+  }
+  if (input.persona && input.persona.persona_type !== "unknown") {
+    events.push({
+      id: "persona",
+      kind: "verification",
+      label: "Persona",
+      detail: `${input.persona.persona_label} · ICP relevance ${Math.round(input.persona.icp_relevance * 100)}%`,
+      occurred_at: input.freshness?.last_checked_at ?? null,
+    })
+  }
+  if (input.ranking) {
+    events.push({
+      id: "ranking",
+      kind: "freshness",
+      label: "Outreach ranking",
+      detail: `${input.ranking.priority_tier.replace(/_/g, " ")} · score ${Math.round(input.ranking.outreach_rank_score * 100)} · ${input.ranking.recommended_next_action}`,
       occurred_at: input.freshness?.last_checked_at ?? null,
     })
   }

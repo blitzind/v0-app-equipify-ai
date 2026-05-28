@@ -119,7 +119,10 @@ import {
   GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER,
   GROWTH_CONTACT_FRESHNESS_QA_MARKER,
   GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER,
+  GROWTH_CONTACT_RANKING_QA_MARKER,
+  GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER,
   logProspectSearchContactDiscoveryIssue,
+  attachProspectSearchCompanyCoverageIntelligence,
   mergeProspectSearchPeopleResults,
   resolveDefaultProspectSearchResultMode,
   type GrowthProspectSearchPeopleResultRow,
@@ -184,6 +187,13 @@ function serializeProspectSearchPeopleActionRows(
     confidence_label: row.confidence_label,
     confidence_reason: row.confidence_reason,
     stale_warning: row.stale_warning,
+    outreach_rank_score: row.outreach_rank_score,
+    priority_tier: row.priority_tier,
+    persona_type: row.persona_type,
+    persona_icp_relevance: row.persona_icp_relevance,
+    ranking_reasons: row.ranking_reasons,
+    recommended_next_action: row.recommended_next_action,
+    is_recommended_contact: row.is_recommended_contact,
     company: row.company,
   }))
 }
@@ -278,6 +288,10 @@ function ProspectSearchShellInner() {
   const peopleRows = useMemo(
     () => mergeProspectSearchPeopleResults(people, companies),
     [people, companies],
+  )
+  const companiesWithContactCoverage = useMemo(
+    () => attachProspectSearchCompanyCoverageIntelligence(companies, peopleRows),
+    [companies, peopleRows],
   )
   const selectedPeopleRows = useMemo(
     () =>
@@ -1035,7 +1049,21 @@ function ProspectSearchShellInner() {
         companiesById.set(row.company_id, row.company)
       }
     }
-    const companiesToPush = [...companiesById.values()]
+    const companiesToPush = [...companiesById.values()].sort((a, b) => {
+      const rankA = Math.max(
+        ...selectedPeopleRows
+          .filter((row) => row.company_id === a.id)
+          .map((row) => row.outreach_rank_score ?? 0),
+        0,
+      )
+      const rankB = Math.max(
+        ...selectedPeopleRows
+          .filter((row) => row.company_id === b.id)
+          .map((row) => row.outreach_rank_score ?? 0),
+        0,
+      )
+      return rankB - rankA
+    })
     if (companiesToPush.length === 0) return
     setPeopleBulkBusy(true)
     setActionMessage(null)
@@ -1286,6 +1314,8 @@ function ProspectSearchShellInner() {
       data-contact-eligibility-marker={GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER}
       data-contact-freshness-marker={GROWTH_CONTACT_FRESHNESS_QA_MARKER}
       data-contact-verification-depth-marker={GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER}
+      data-contact-ranking-marker={GROWTH_CONTACT_RANKING_QA_MARKER}
+      data-revenue-persona-marker={GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER}
       data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
       data-contact-discovery-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}
       data-website-contact-provider-marker={GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER}
@@ -1455,7 +1485,7 @@ function ProspectSearchShellInner() {
                   savedSearchId={activeSavedSearchId}
                   companies={companies}
                   onOpenCompany={(companyId) => {
-                    const match = companies.find((row) => row.id === companyId)
+                    const match = companiesWithContactCoverage.find((row) => row.id === companyId)
                     if (match) setSelectedCompany(match)
                   }}
                 />
@@ -1647,7 +1677,7 @@ function ProspectSearchShellInner() {
                   onSelectAllVisible={selectAllVisiblePeople}
                   onClearSelection={clearPeopleSelection}
                   onOpenCompany={(companyId) => {
-                    const company = companies.find((row) => row.id === companyId)
+                    const company = companiesWithContactCoverage.find((row) => row.id === companyId)
                     if (company) setSelectedCompany(company)
                   }}
                   onOpenContact={setEvidenceDrawerRow}
@@ -1658,7 +1688,7 @@ function ProspectSearchShellInner() {
                 />
               ) : searchCompleted && view === "card" ? (
                 <div className="flex flex-col gap-4">
-                  {companies.map((row) => (
+                  {companiesWithContactCoverage.map((row) => (
                     <CompanyResultCard
                       key={`${row.source_type}-${row.id}`}
                       row={row}
@@ -1697,9 +1727,9 @@ function ProspectSearchShellInner() {
                     onAddPersonToQueue={handleAddPersonToQueue}
                     onAddPersonToLeadPipeline={handleAddPersonToLeadPipeline}
                     onAddPersonToCallQueue={handleAddPersonToCallQueue}
-                    onOpenPersonContact={setEvidenceDrawerRow}
-                    onRerunPersonDiscovery={handleRerunPersonDiscovery}
-                  />
+                  onOpenPersonContact={setEvidenceDrawerRow}
+                  onRerunPersonDiscovery={handleRerunPersonDiscovery}
+                />
                   {selectedCompany ? (
                     <div
                       className="rounded-xl border border-border bg-card p-2"

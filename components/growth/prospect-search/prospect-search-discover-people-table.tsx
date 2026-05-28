@@ -7,7 +7,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import {
   GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER,
   GROWTH_CONTACT_FRESHNESS_QA_MARKER,
+  GROWTH_CONTACT_RANKING_QA_MARKER,
   GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER,
+  GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER,
   GROWTH_PEOPLE_HYDRATION_QA_MARKER,
   GROWTH_PEOPLE_WORKFLOWS_QA_MARKER,
   GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER,
@@ -22,6 +24,19 @@ function eligibilityBadgeVariant(state: string): "default" | "outline" | "destru
   if (state === "suppressed" || state === "blocked") return "destructive"
   if (state === "unsupported") return "secondary"
   return "outline"
+}
+
+function priorityTierBadgeVariant(
+  tier: string,
+): "default" | "outline" | "destructive" | "secondary" {
+  if (tier === "high_priority" || tier === "recommended") return "default"
+  if (tier === "blocked") return "destructive"
+  if (tier === "low_confidence") return "secondary"
+  return "outline"
+}
+
+function formatPriorityTierLabel(tier: string): string {
+  return tier.replace(/_/g, " ")
 }
 
 function freshnessBadgeVariant(
@@ -88,6 +103,8 @@ export function ProspectSearchDiscoverPeopleTable({
       data-people-workflows-marker={GROWTH_PEOPLE_WORKFLOWS_QA_MARKER}
       data-contact-eligibility-marker={GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER}
       data-contact-freshness-marker={GROWTH_CONTACT_FRESHNESS_QA_MARKER}
+      data-contact-ranking-marker={GROWTH_CONTACT_RANKING_QA_MARKER}
+      data-revenue-persona-marker={GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER}
       data-contact-verification-depth-marker={GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER}
       data-result-mode="people"
     >
@@ -112,6 +129,7 @@ export function ProspectSearchDiscoverPeopleTable({
             <th className="px-3 py-2">Email</th>
             <th className="px-3 py-2">Phone</th>
             <th className="px-3 py-2">Source</th>
+            <th className="px-3 py-2">Priority</th>
             <th className="px-3 py-2">Freshness</th>
             <th className="px-3 py-2">Eligibility</th>
             <th className="px-3 py-2">Actions</th>
@@ -147,7 +165,8 @@ export function ProspectSearchDiscoverPeopleTable({
                     {row.full_name ?? "—"}
                   </button>
                   <p className="mt-0.5 text-[10px] text-muted-foreground">
-                    {row.confidence_label ?? "moderate"} · {Math.round(row.confidence * 100)}%
+                    {row.persona_label}
+                    {row.is_recommended_contact ? " · Recommended" : ""}
                   </p>
                 </td>
                 <td className="px-3 py-2">{row.company_name}</td>
@@ -173,6 +192,20 @@ export function ProspectSearchDiscoverPeopleTable({
                       Checked {new Date(row.last_checked_at).toLocaleDateString()}
                     </p>
                   ) : null}
+                </td>
+                <td className="px-3 py-2">
+                  <Badge variant={priorityTierBadgeVariant(row.priority_tier)} className="text-[10px]">
+                    {formatPriorityTierLabel(row.priority_tier)}
+                  </Badge>
+                  {row.is_recommended_contact ? (
+                    <p className="mt-1 text-[10px] font-medium text-violet-800">Recommended contact</p>
+                  ) : null}
+                  <p
+                    className="mt-1 text-[10px] text-muted-foreground"
+                    title={row.ranking_reasons.join(" · ")}
+                  >
+                    {row.recommended_next_action}
+                  </p>
                 </td>
                 <td className="px-3 py-2">
                   <Badge variant={freshnessBadgeVariant(row.freshness_status)} className="text-[10px]">

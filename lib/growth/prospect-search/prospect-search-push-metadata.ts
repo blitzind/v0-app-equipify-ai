@@ -95,6 +95,22 @@ export function buildProspectSearchPushMetadata(
           },
         }
       : {}),
+    ...(company.contact_intelligence?.company_contact_coverage
+      ? {
+          contact_ranking: {
+            outreach_readiness_score:
+              company.contact_intelligence.company_contact_coverage.outreach_readiness_score,
+            persona_completeness:
+              company.contact_intelligence.company_contact_coverage.persona_completeness,
+            coverage_label: company.contact_intelligence.company_contact_coverage.coverage_label,
+            ranking_summary: company.contact_intelligence.company_contact_coverage.ranking_summary,
+            persona_gap_suggestions:
+              company.contact_intelligence.company_contact_coverage.persona_gap_suggestions,
+            primary_recommended_contact_id:
+              company.contact_intelligence.company_contact_coverage.primary_recommended_contact_id,
+          },
+        }
+      : {}),
   }
 }
 

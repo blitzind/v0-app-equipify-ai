@@ -3,6 +3,7 @@
 import { Target, UserRound, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
+import { GROWTH_CONTACT_RANKING_QA_MARKER, GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import { ProspectSearchSchemaHealthNotice } from "@/components/growth/prospect-search/prospect-search-schema-health-notice"
 
 export function CompanyContactIntelligencePanel({
@@ -18,7 +19,11 @@ export function CompanyContactIntelligencePanel({
   const confidenceExplanation = intelligence.confidence_explanation
 
   return (
-    <section className="rounded-xl border border-violet-100 bg-violet-50/40 p-4">
+    <section
+      className="rounded-xl border border-violet-100 bg-violet-50/40 p-4"
+      data-contact-ranking-marker={GROWTH_CONTACT_RANKING_QA_MARKER}
+      data-revenue-persona-marker={GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER}
+    >
       <div className="flex flex-wrap items-center gap-2">
         <Users className="size-4 text-violet-700" />
         <h4 className="text-sm font-semibold text-violet-950">Decision makers — {companyName}</h4>
@@ -30,6 +35,28 @@ export function CompanyContactIntelligencePanel({
       </div>
 
       <ProspectSearchSchemaHealthNotice health={intelligence.schema_health} />
+
+      {intelligence.company_contact_coverage ? (
+        <div className="mt-3 rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs">
+          <p className="font-medium text-violet-900">
+            {intelligence.company_contact_coverage.coverage_label}
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            Outreach readiness {intelligence.company_contact_coverage.outreach_readiness_score}/100 ·
+            persona coverage {intelligence.company_contact_coverage.persona_completeness}%
+          </p>
+          {intelligence.company_contact_coverage.ranking_summary ? (
+            <p className="mt-1 font-medium">{intelligence.company_contact_coverage.ranking_summary}</p>
+          ) : null}
+          {intelligence.company_contact_coverage.persona_gap_suggestions.length > 0 ? (
+            <ul className="mt-2 list-disc space-y-0.5 pl-4 text-muted-foreground">
+              {intelligence.company_contact_coverage.persona_gap_suggestions.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       {firstContact ? (
         <div className="mt-3 rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs">

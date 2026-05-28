@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button"
 import {
   GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER,
   GROWTH_CONTACT_FRESHNESS_QA_MARKER,
+  GROWTH_CONTACT_RANKING_QA_MARKER,
   GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER,
+  GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER,
   GROWTH_PEOPLE_WORKFLOWS_QA_MARKER,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import type { GrowthProspectSearchPeopleResultRow } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
@@ -58,6 +60,8 @@ export function ProspectSearchPeopleBulkActionBar({
       data-qa-marker={GROWTH_PEOPLE_WORKFLOWS_QA_MARKER}
       data-contact-eligibility-marker={GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER}
       data-contact-freshness-marker={GROWTH_CONTACT_FRESHNESS_QA_MARKER}
+      data-contact-ranking-marker={GROWTH_CONTACT_RANKING_QA_MARKER}
+      data-revenue-persona-marker={GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER}
       data-contact-verification-depth-marker={GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER}
     >
       <div className="min-w-0 space-y-1">

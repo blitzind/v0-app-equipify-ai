@@ -9,7 +9,10 @@ import {
   personResultToListMember,
 } from "@/lib/growth/prospect-search/list-management"
 import { runContactDiscoveryForCompany } from "@/lib/growth/contact-discovery/contact-repository"
-import { logProspectSearchContactRefresh } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
+import {
+  logProspectSearchContactRefresh,
+} from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
+import { prioritizeProspectSearchRefreshCompanyIds } from "@/lib/growth/prospect-search/prospect-search-smart-refresh-prioritization"
 import {
   buildProspectSearchPeopleCsv,
   logProspectSearchPeopleExport,
@@ -82,7 +85,23 @@ async function executeProspectSearchContactRefresh(
     }
   }
 
-  const companyIds = [...new Set(people.map((row) => row.company_id))]
+  const companyIds = prioritizeProspectSearchRefreshCompanyIds(
+    people.map((row) => ({
+      company_id: row.company_id,
+      contact_id: row.contact_id ?? row.id,
+      outreach_rank_score: row.outreach_rank_score ?? 0,
+      priority_tier: (row.priority_tier ?? "review") as import("@/lib/growth/prospect-search/prospect-search-contact-ranking").ProspectSearchContactPriorityTier,
+      freshness_status: row.freshness_status ?? "unknown",
+      persona_icp_relevance: row.persona_icp_relevance ?? 0,
+      company_suppressed: row.compliance_status === "suppressed",
+      website: row.company?.website ?? null,
+      lead_engine_score: row.company?.lead_engine_score ?? row.company?.lead_score ?? null,
+      missing_persona_gap: row.persona_type === "unknown",
+    })),
+  )
+  if (companyIds.length === 0) {
+    companyIds.push(...[...new Set(people.map((row) => row.company_id))])
+  }
   let refreshed = 0
   let failed = 0
   for (const companyId of companyIds) {
@@ -219,12 +238,14 @@ export async function executeProspectSearchAction(
       return { ok: false, action, message: "Select call-ready contacts for the call queue." }
     }
 
-    const callReady = people.filter(
-      (row) =>
-        row.call_ready === true &&
-        row.call_eligibility !== "suppressed" &&
-        row.call_eligibility !== "blocked",
-    )
+    const callReady = people
+      .filter(
+        (row) =>
+          row.call_ready === true &&
+          row.call_eligibility !== "suppressed" &&
+          row.call_eligibility !== "blocked",
+      )
+      .sort((a, b) => (b.outreach_rank_score ?? 0) - (a.outreach_rank_score ?? 0))
     const blocked = people.length - callReady.length
     const companiesById = new Map<string, GrowthProspectSearchCompanyResult>()
     for (const row of callReady) {

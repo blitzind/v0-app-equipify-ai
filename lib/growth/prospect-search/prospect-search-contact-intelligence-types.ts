@@ -80,6 +80,7 @@ export type GrowthProspectSearchContactIntelligence = {
   primary_contact_id?: string | null
   recommended_contact_id?: string | null
   schema_health?: GrowthSchemaHealthSummary | null
+  company_contact_coverage?: import("@/lib/growth/prospect-search/prospect-search-company-contact-coverage-intelligence").ProspectSearchCompanyContactCoverageIntelligence | null
 }
 
 export type ProspectSearchLeadEngineContactHandoffContext = {

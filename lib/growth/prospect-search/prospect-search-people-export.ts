@@ -40,6 +40,17 @@ export function buildProspectSearchPeopleCsv(
     "sms_block_reason",
     "compliance_status",
     "stale_warning",
+    "persona_type",
+    "persona_label",
+    "persona_icp_relevance",
+    "persona_buying_influence",
+    "outreach_rank_score",
+    "priority_tier",
+    "ranking_reasons",
+    "ranking_risks",
+    "recommended_next_action",
+    "is_recommended_contact",
+    "is_secondary_contact",
   ]
 
   const lines = [headers.join(",")]
@@ -75,6 +86,17 @@ export function buildProspectSearchPeopleCsv(
         csvEscape(row.sms_block_reason),
         csvEscape(row.compliance_status),
         csvEscape(row.stale_warning),
+        csvEscape(row.persona_type ?? "unknown"),
+        csvEscape(row.persona_label ?? ""),
+        csvEscape(String(Math.round((row.persona_icp_relevance ?? 0) * 100))),
+        csvEscape(String(Math.round((row.persona_buying_influence ?? 0) * 100))),
+        csvEscape(String(Math.round((row.outreach_rank_score ?? 0) * 100))),
+        csvEscape(row.priority_tier ?? "review"),
+        csvEscape((row.ranking_reasons ?? []).join("; ")),
+        csvEscape((row.ranking_risks ?? []).join("; ")),
+        csvEscape(row.recommended_next_action ?? ""),
+        csvEscape(row.is_recommended_contact ? "true" : "false"),
+        csvEscape(row.is_secondary_contact ? "true" : "false"),
       ].join(","),
     )
   }

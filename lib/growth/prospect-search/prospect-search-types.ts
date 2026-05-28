@@ -417,6 +417,13 @@ export type GrowthProspectSearchPeopleActionRow = {
   confidence_label?: string
   confidence_reason?: string
   stale_warning?: string | null
+  outreach_rank_score?: number
+  priority_tier?: string
+  persona_type?: string
+  persona_icp_relevance?: number
+  ranking_reasons?: string[]
+  recommended_next_action?: string
+  is_recommended_contact?: boolean
   company?: GrowthProspectSearchCompanyResult | null
 }
 

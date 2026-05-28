@@ -180,6 +180,11 @@ export function CompanyResultCard({
             companyName={row.company_name}
             intelligence={row.contact_intelligence}
           />
+          {row.contact_intelligence?.company_contact_coverage?.ranking_summary ? (
+            <p className="text-xs font-medium text-violet-900">
+              {row.contact_intelligence.company_contact_coverage.ranking_summary}
+            </p>
+          ) : null}
           {row.contact_intelligence?.contact_coverage_label ? (
             <p className="text-xs text-violet-900">
               Contact coverage: {row.contact_intelligence.contact_coverage_label}

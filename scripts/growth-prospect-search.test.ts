@@ -3862,6 +3862,174 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   )
   assert.match(drawerSource, /data-contact-freshness-marker/)
   assert.match(drawerSource, /data-contact-verification-depth-marker/)
+  assert.match(drawerSource, /data-contact-ranking-marker/)
+  assert.match(drawerSource, /data-revenue-persona-marker/)
+  assert.match(drawerSource, /Outreach ranking/)
+
+  assert.match(shellSource, /data-contact-ranking-marker/)
+  assert.match(shellSource, /data-revenue-persona-marker/)
+  assert.match(peopleTableSource, /data-contact-ranking-marker/)
+  assert.match(peopleTableSource, /Priority/)
+  assert.match(peopleBulkSource, /GROWTH_CONTACT_RANKING_QA_MARKER/)
+  assert.match(peopleBulkSource, /GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER/)
+
+  const {
+    resolveProspectSearchRevenuePersona,
+    GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-revenue-persona-intelligence")
+  const {
+    rankProspectSearchContactsForOutreach,
+    applyProspectSearchContactRankingToPeopleRows,
+    GROWTH_CONTACT_RANKING_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-contact-ranking")
+  const { buildProspectSearchCompanyContactCoverageIntelligence } = await import(
+    "../lib/growth/prospect-search/prospect-search-company-contact-coverage-intelligence"
+  )
+  const { prioritizeProspectSearchRefreshCompanyIds } = await import(
+    "../lib/growth/prospect-search/prospect-search-smart-refresh-prioritization"
+  )
+
+  assert.equal(GROWTH_CONTACT_RANKING_QA_MARKER, "growth-contact-ranking-v1")
+  assert.equal(
+    GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER,
+    "growth-revenue-persona-intelligence-v1",
+  )
+
+  const ownerPersona = resolveProspectSearchRevenuePersona({
+    title: "Owner & Founder",
+    role_type: "decision_maker",
+    source_label: "Website public extract",
+    source_page_url: "https://acme.example/team",
+  })
+  assert.equal(ownerPersona.persona_type, "owner")
+  assert.ok(ownerPersona.icp_relevance >= 0.9)
+  assert.ok(ownerPersona.evidence.length > 0)
+
+  const opsPersona = resolveProspectSearchRevenuePersona({
+    title: "Operations Manager",
+    role_type: "operator",
+    source_label: "Website public extract",
+  })
+  assert.equal(opsPersona.persona_type, "operations_manager")
+
+  const highRank = rankProspectSearchContactsForOutreach({
+    contact_id: "c1",
+    company_id: "co1",
+    confidence_score: 0.88,
+    persona: ownerPersona,
+    email_eligibility: "eligible",
+    call_eligibility: "eligible",
+    freshness_status: "fresh",
+    outreach_ready: true,
+    call_ready: true,
+    email_available: true,
+    phone_available: true,
+    email_verification_depth: "published_on_website",
+    source_label: "Website public extract",
+    company_match_confidence: 0.82,
+  })
+  assert.equal(highRank.priority_tier, "high_priority")
+  assert.ok(highRank.ranking_reasons.length > 0)
+  assert.ok(highRank.outreach_rank_score >= 0.8)
+
+  const blockedRank = rankProspectSearchContactsForOutreach({
+    contact_id: "c2",
+    company_id: "co1",
+    confidence_score: 0.9,
+    persona: ownerPersona,
+    email_eligibility: "blocked",
+    call_eligibility: "blocked",
+    freshness_status: "fresh",
+    outreach_ready: false,
+    call_ready: false,
+    email_available: true,
+    phone_available: true,
+    phone_on_dnc: true,
+  })
+  assert.equal(blockedRank.priority_tier, "blocked")
+
+  const rankedRows = applyProspectSearchContactRankingToPeopleRows([
+    {
+      id: "r1",
+      contact_id: "c1",
+      company_id: "co1",
+      confidence_score: 0.88,
+      persona: ownerPersona,
+      email_eligibility: "eligible" as const,
+      call_eligibility: "eligible" as const,
+      freshness_status: "fresh" as const,
+      outreach_ready: true,
+      call_ready: true,
+      email_available: true,
+      phone_available: true,
+    },
+    {
+      id: "r2",
+      contact_id: "c2",
+      company_id: "co1",
+      confidence_score: 0.55,
+      persona: opsPersona,
+      email_eligibility: "needs_review" as const,
+      call_eligibility: "unsupported" as const,
+      freshness_status: "aging" as const,
+      outreach_ready: false,
+      call_ready: false,
+      email_available: true,
+      phone_available: false,
+    },
+  ])
+  assert.equal(rankedRows[0]?.is_recommended_contact, true)
+  assert.ok(rankedRows.some((row) => row.is_secondary_contact))
+
+  const coverage = buildProspectSearchCompanyContactCoverageIntelligence({
+    company_name: "Acme HVAC",
+    contacts: rankedRows.map((row) => ({
+      contact_id: row.contact_id,
+      full_name: "Maria Chen",
+      persona_type: row.persona.persona_type,
+      outreach_rank_score: row.outreach_rank_score,
+      priority_tier: row.priority_tier,
+      email_available: row.email_available,
+      phone_available: row.phone_available,
+      call_ready: row.call_ready,
+      email_eligibility: row.email_eligibility,
+      is_recommended_contact: row.is_recommended_contact,
+      verification_status: "email_verified",
+    })),
+  })
+  assert.ok(coverage.outreach_readiness_score > 0)
+  assert.ok(coverage.ranking_summary?.includes("Best outreach target"))
+
+  const refreshOrder = prioritizeProspectSearchRefreshCompanyIds([
+    {
+      company_id: "co-stale",
+      contact_id: "c-stale",
+      priority_tier: "review" as const,
+      freshness_status: "stale",
+      outreach_rank_score: 0.4,
+      persona_icp_relevance: 0.5,
+      website: "https://acme.example",
+      company_suppressed: false,
+    },
+    {
+      company_id: "co-hot",
+      contact_id: "c-hot",
+      priority_tier: "high_priority" as const,
+      freshness_status: "expired",
+      outreach_rank_score: 0.85,
+      persona_icp_relevance: 0.9,
+      website: "https://beta.example",
+      lead_engine_score: 78,
+    },
+  ])
+  assert.equal(refreshOrder[0], "co-hot")
+
+  const pushSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-push-to-inbox.ts"),
+    "utf8",
+  )
+  assert.match(pushSource, /outreach_readiness_score/)
+  assert.match(pushSource, /sortedSelected/)
 }
 
 void main()

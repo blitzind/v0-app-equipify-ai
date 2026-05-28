@@ -59,6 +59,10 @@ export function buildProspectSearchLeadEngineHandoffInput(
     company.lead_engine_score != null ? `Lead Engine score: ${company.lead_engine_score}` : null,
     company.lead_engine_score_explanation,
     intelligence?.outreach_recommendation ?? null,
+    intelligence?.company_contact_coverage?.ranking_summary ?? null,
+    intelligence?.company_contact_coverage?.coverage_label
+      ? `Coverage: ${intelligence.company_contact_coverage.coverage_label}`
+      : null,
     intelligence?.first_contact
       ? `First contact: ${intelligence.first_contact.role}${intelligence.first_contact.name ? ` (${intelligence.first_contact.name})` : ""} · ${Math.round(intelligence.first_contact.confidence * 100)}%`
       : null,

@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button"
 import {
   GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER,
   GROWTH_CONTACT_FRESHNESS_QA_MARKER,
+  GROWTH_CONTACT_RANKING_QA_MARKER,
   GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER,
+  GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER,
   GROWTH_PEOPLE_WORKFLOWS_QA_MARKER,
   type GrowthProspectSearchPeopleResultRow,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
@@ -38,6 +40,8 @@ export function ProspectSearchContactEvidenceDrawer({
       data-qa-marker={GROWTH_PEOPLE_WORKFLOWS_QA_MARKER}
       data-contact-eligibility-marker={GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER}
       data-contact-freshness-marker={GROWTH_CONTACT_FRESHNESS_QA_MARKER}
+      data-contact-ranking-marker={GROWTH_CONTACT_RANKING_QA_MARKER}
+      data-revenue-persona-marker={GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER}
       data-contact-verification-depth-marker={GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER}
       onClick={onClose}
     >
@@ -64,6 +68,43 @@ export function ProspectSearchContactEvidenceDrawer({
         ) : null}
 
         <div className="mt-4 space-y-4 text-xs">
+          <section>
+            <h4 className="font-medium text-foreground">Outreach ranking</h4>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Badge variant="outline">{row.priority_tier.replace(/_/g, " ")}</Badge>
+              <Badge variant="outline">{row.persona_label}</Badge>
+              {row.is_recommended_contact ? <Badge>Recommended</Badge> : null}
+            </div>
+            <p className="mt-2 text-muted-foreground">{row.recommended_next_action}</p>
+            {row.ranking_reasons.length > 0 ? (
+              <ul className="mt-2 list-disc space-y-0.5 pl-4 text-muted-foreground">
+                {row.ranking_reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            ) : null}
+            {row.ranking_risks.length > 0 ? (
+              <ul className="mt-2 space-y-0.5 text-amber-900">
+                {row.ranking_risks.map((risk) => (
+                  <li key={risk}>Risk: {risk}</li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+
+          <section>
+            <h4 className="font-medium text-foreground">Persona intelligence</h4>
+            <p className="mt-2 text-muted-foreground">
+              {row.persona_label} · ICP relevance {Math.round(row.persona_icp_relevance * 100)}% · buying
+              influence {Math.round(row.persona_buying_influence * 100)}%
+            </p>
+            <ul className="mt-2 list-disc space-y-0.5 pl-4 text-muted-foreground">
+              {row.persona_evidence.slice(0, 4).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </section>
+
           <section>
             <h4 className="font-medium text-foreground">Freshness</h4>
             <div className="mt-2 flex flex-wrap gap-2">

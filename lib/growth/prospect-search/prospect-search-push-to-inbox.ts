@@ -68,6 +68,13 @@ export async function pushProspectSearchCompanyToLeadInbox(
     ? growthSignalInboxPriority(company.growth_signal_tier)
     : "normal"
 
+  const coverage = company.contact_intelligence?.company_contact_coverage
+  const rankingReasons = [
+    ...(coverage?.ranking_summary ? [coverage.ranking_summary] : []),
+    ...(coverage?.coverage_label ? [`Contact coverage: ${coverage.coverage_label}`] : []),
+    ...(coverage?.persona_gap_suggestions?.slice(0, 2) ?? []),
+  ]
+
   const result = await createLeadCandidate(admin, {
     site_key:
       company.source_type === "external_discovered"
@@ -89,6 +96,7 @@ export async function pushProspectSearchCompanyToLeadInbox(
       ...(company.growth_signal_score != null
         ? [`Growth signal score ${company.growth_signal_score}${company.growth_signal_tier ? ` (${company.growth_signal_tier})` : ""}.`]
         : []),
+      ...rankingReasons,
       ...company.match_reasoning.slice(0, 3),
     ],
     candidate_evidence:
@@ -194,6 +202,16 @@ export async function executeBulkPushToLeadInbox(
     selected,
   })
 
+  const sortedSelected = [...selected].sort((a, b) => {
+    const companyA = resolved.get(prospectSearchSelectionKey(a))
+    const companyB = resolved.get(prospectSearchSelectionKey(b))
+    const scoreA =
+      companyA?.contact_intelligence?.company_contact_coverage?.outreach_readiness_score ?? 0
+    const scoreB =
+      companyB?.contact_intelligence?.company_contact_coverage?.outreach_readiness_score ?? 0
+    return scoreB - scoreA
+  })
+
   const items: GrowthProspectSearchPushItemResult[] = []
   let pushed = 0
   let already_exists = 0
@@ -201,7 +219,7 @@ export async function executeBulkPushToLeadInbox(
   let suppressed = 0
   let failed = 0
 
-  for (const ref of selected) {
+  for (const ref of sortedSelected) {
     const company = resolved.get(prospectSearchSelectionKey(ref))
     if (!company) {
       skipped_invalid += 1
