@@ -43,6 +43,8 @@ import type {
   NativeDialerLeadContext,
 } from "@/lib/growth/native-dialer/native-dialer-types"
 import { GrowthCallWorkspaceRelationshipSummaryPanel } from "@/components/growth/growth-call-workspace-relationship-summary-panel"
+import { isPanelVisible } from "@/lib/voice/workspace-context/panel-prioritization"
+import type { VoiceWorkspaceContextSnapshot } from "@/lib/voice/workspace-context/types"
 import { cn } from "@/lib/utils"
 
 function IntelligenceRow({
@@ -67,6 +69,9 @@ function IntelligenceRow({
 }
 
 export function GrowthCallWorkspaceIntelligenceRail({
+  embedded = false,
+  workspaceContext = null,
+  showDeepIntelligence = true,
   leadContext,
   nativeSessionId,
   sessionPhone,
@@ -79,6 +84,9 @@ export function GrowthCallWorkspaceIntelligenceRail({
   onRetentionIntelligenceRefresh,
   onLeadAttached,
 }: {
+  embedded?: boolean
+  workspaceContext?: VoiceWorkspaceContextSnapshot | null
+  showDeepIntelligence?: boolean
   leadContext: NativeDialerLeadContext | null
   nativeSessionId?: string | null
   sessionPhone?: string | null
@@ -130,16 +138,32 @@ export function GrowthCallWorkspaceIntelligenceRail({
     operatorAssist?.conversationIntelligence?.memoryDrafts.filter((draft) => draft.status === "pending_review") ??
     []
 
+  const panels = workspaceContext?.panels ?? []
+  const showLeadSearch = panels.length === 0 || isPanelVisible(panels, "lead_search")
+  const showRelationshipSummary = panels.length === 0 || isPanelVisible(panels, "relationship_context")
+  const showNextBestAction = panels.length === 0 || isPanelVisible(panels, "next_best_action")
+  const showRevenue =
+    showDeepIntelligence && (panels.length === 0 || isPanelVisible(panels, "revenue_intelligence"))
+  const showRetention =
+    showDeepIntelligence && (panels.length === 0 || isPanelVisible(panels, "retention_intelligence"))
+  const showMemory =
+    showDeepIntelligence && (panels.length === 0 || isPanelVisible(panels, "relationship_memory"))
+
+  const Wrapper = embedded ? "div" : "section"
+
   return (
-    <section
-      className={cn(GROWTH_CALL_WORKSPACE_PANEL, "w-full max-w-[320px] p-4 lg:justify-self-end")}
+    <Wrapper
+      className={cn(
+        embedded ? "space-y-3" : GROWTH_CALL_WORKSPACE_PANEL,
+        !embedded && "w-full max-w-[320px] p-4 lg:justify-self-end",
+      )}
       data-google-voice-bridge-coaching-qa-marker={GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER}
       data-native-dialer-lead-search-qa-marker={GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER}
       data-voice-relationship-memory-qa-marker={VOICE_RELATIONSHIP_MEMORY_QA_MARKER}
       data-voice-revenue-intelligence-qa-marker={VOICE_REVENUE_INTELLIGENCE_QA_MARKER}
       data-voice-retention-intelligence-qa-marker={VOICE_RETENTION_INTELLIGENCE_QA_MARKER}
     >
-      <h3 className="mb-3 text-sm font-semibold">Prospect Intelligence</h3>
+      {embedded ? null : <h3 className="mb-3 text-sm font-semibold">Prospect Intelligence</h3>}
 
       {!leadContext ? (
         <div className="space-y-3" data-qa-action="call-workspace-attach-lead">
@@ -148,7 +172,7 @@ export function GrowthCallWorkspaceIntelligenceRail({
             {sessionPhone ? ` (${formatDisplayPhone(sessionPhone)})` : ""}. Search Growth leads, prospects,
             contacts, and accounts to attach intelligence and lead-linked coaching.
           </p>
-          {nativeSessionId ? (
+          {nativeSessionId && showLeadSearch ? (
             <>
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
@@ -175,20 +199,26 @@ export function GrowthCallWorkspaceIntelligenceRail({
           ) : null}
           {sessionPhone ? (
             <>
-              <GrowthCallWorkspaceRevenueIntelligencePanel
-                revenueIntelligence={revenueIntelligence}
-                onRefresh={onRevenueIntelligenceRefresh ?? onRelationshipMemoryRefresh}
-              />
-              <GrowthCallWorkspaceRetentionIntelligencePanel
-                retentionIntelligence={retentionIntelligence}
-                onRefresh={onRetentionIntelligenceRefresh ?? onRevenueIntelligenceRefresh ?? onRelationshipMemoryRefresh}
-              />
-              <GrowthCallWorkspaceRelationshipMemoryPanel
-                relationshipMemory={relationshipMemory}
-                pendingDrafts={pendingDrafts}
-                sessionPhone={sessionPhone}
-                onRefresh={onRelationshipMemoryRefresh}
-              />
+              {showRevenue ? (
+                <GrowthCallWorkspaceRevenueIntelligencePanel
+                  revenueIntelligence={revenueIntelligence}
+                  onRefresh={onRevenueIntelligenceRefresh ?? onRelationshipMemoryRefresh}
+                />
+              ) : null}
+              {showRetention ? (
+                <GrowthCallWorkspaceRetentionIntelligencePanel
+                  retentionIntelligence={retentionIntelligence}
+                  onRefresh={onRetentionIntelligenceRefresh ?? onRevenueIntelligenceRefresh ?? onRelationshipMemoryRefresh}
+                />
+              ) : null}
+              {showMemory ? (
+                <GrowthCallWorkspaceRelationshipMemoryPanel
+                  relationshipMemory={relationshipMemory}
+                  pendingDrafts={pendingDrafts}
+                  sessionPhone={sessionPhone}
+                  onRefresh={onRelationshipMemoryRefresh}
+                />
+              ) : null}
             </>
           ) : null}
         </div>
@@ -212,7 +242,9 @@ export function GrowthCallWorkspaceIntelligenceRail({
             </Button>
           </div>
 
-          <GrowthCallWorkspaceRelationshipSummaryPanel leadId={leadContext.leadId} />
+          {showRelationshipSummary ? (
+            <GrowthCallWorkspaceRelationshipSummaryPanel leadId={leadContext.leadId} />
+          ) : null}
 
           <div className="rounded-xl border border-border/50 px-3 dark:border-white/5">
             <IntelligenceRow
@@ -266,36 +298,44 @@ export function GrowthCallWorkspaceIntelligenceRail({
             />
           </div>
 
-          <div className="rounded-xl border border-border/50 p-3 dark:border-white/5">
-            <div className="mb-1 flex items-center gap-2">
-              <Target className="size-3.5 text-muted-foreground" />
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Recommended Next Action
-              </p>
+          {showNextBestAction ? (
+            <div className="rounded-xl border border-border/50 p-3 dark:border-white/5">
+              <div className="mb-1 flex items-center gap-2">
+                <Target className="size-3.5 text-muted-foreground" />
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Recommended Next Action
+                </p>
+              </div>
+              <p className="text-sm leading-snug">{recommendedAction}</p>
             </div>
-            <p className="text-sm leading-snug">{recommendedAction}</p>
-          </div>
+          ) : null}
 
-          <GrowthCallWorkspaceRevenueIntelligencePanel
-            revenueIntelligence={revenueIntelligence}
-            onRefresh={onRevenueIntelligenceRefresh ?? onRelationshipMemoryRefresh}
-          />
+          {showRevenue ? (
+            <GrowthCallWorkspaceRevenueIntelligencePanel
+              revenueIntelligence={revenueIntelligence}
+              onRefresh={onRevenueIntelligenceRefresh ?? onRelationshipMemoryRefresh}
+            />
+          ) : null}
 
-          <GrowthCallWorkspaceRetentionIntelligencePanel
-            retentionIntelligence={retentionIntelligence}
-            onRefresh={onRetentionIntelligenceRefresh ?? onRevenueIntelligenceRefresh ?? onRelationshipMemoryRefresh}
-          />
+          {showRetention ? (
+            <GrowthCallWorkspaceRetentionIntelligencePanel
+              retentionIntelligence={retentionIntelligence}
+              onRefresh={onRetentionIntelligenceRefresh ?? onRevenueIntelligenceRefresh ?? onRelationshipMemoryRefresh}
+            />
+          ) : null}
 
-          <GrowthCallWorkspaceRelationshipMemoryPanel
-            relationshipMemory={relationshipMemory}
-            pendingDrafts={pendingDrafts}
-            sessionPhone={sessionPhone}
-            contactName={leadContext.contactName}
-            leadId={leadContext.leadId}
-            onRefresh={onRelationshipMemoryRefresh}
-          />
+          {showMemory ? (
+            <GrowthCallWorkspaceRelationshipMemoryPanel
+              relationshipMemory={relationshipMemory}
+              pendingDrafts={pendingDrafts}
+              sessionPhone={sessionPhone}
+              contactName={leadContext.contactName}
+              leadId={leadContext.leadId}
+              onRefresh={onRelationshipMemoryRefresh}
+            />
+          ) : null}
         </div>
       )}
-    </section>
+    </Wrapper>
   )
 }

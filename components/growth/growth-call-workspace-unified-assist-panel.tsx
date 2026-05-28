@@ -25,6 +25,10 @@ import {
   type UnifiedOperatorAssistEvent,
   type UnifiedOperatorAssistSnapshot,
 } from "@/lib/growth/operator-assist/types"
+import {
+  VOICE_UNIFIED_OPERATOR_WORKSPACE_UX_QA_MARKER,
+  type VoiceWorkspaceMode,
+} from "@/lib/voice/workspace-context/types"
 import { GrowthCallWorkspaceAiCopilotSection } from "@/components/growth/growth-call-workspace-ai-copilot-section"
 import { GrowthCallWorkspaceAiReceptionistSection } from "@/components/growth/growth-call-workspace-ai-receptionist-section"
 import { GrowthCallWorkspaceMissedCallRecoverySection } from "@/components/growth/growth-call-workspace-missed-call-recovery-section"
@@ -46,6 +50,9 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   missedCallRecovery = null,
   voiceCallId = null,
   onSnapshotRefresh,
+  contextualCompactMode = false,
+  showSecondaryAssistSections = true,
+  workspaceMode = null,
 }: {
   phase: "idle" | "incoming" | "bridge_pending" | "active" | "wrapup"
   nativeSessionId: string | null
@@ -59,6 +66,9 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   missedCallRecovery?: VoiceMissedCallRecoveryWorkspaceSnapshot | null
   voiceCallId?: string | null
   onSnapshotRefresh?: () => Promise<void>
+  contextualCompactMode?: boolean
+  showSecondaryAssistSections?: boolean
+  workspaceMode?: VoiceWorkspaceMode | null
 }) {
   const [acting, setActing] = useState<string | null>(null)
   const [startingCoaching, setStartingCoaching] = useState(false)
@@ -175,7 +185,15 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
     "data-qa-marker": GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER,
     "data-google-voice-bridge-coaching-qa-marker": GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER,
     "data-voice-unified-operator-assist-qa-marker": VOICE_UNIFIED_OPERATOR_ASSIST_QA_MARKER,
+    "data-voice-unified-operator-workspace-ux-qa-marker": VOICE_UNIFIED_OPERATOR_WORKSPACE_UX_QA_MARKER,
+    ...(workspaceMode ? { "data-workspace-mode": workspaceMode } : {}),
   }
+
+  const showAiHandoffSections =
+    showSecondaryAssistSections ||
+    workspaceMode === "ai_handoff" ||
+    workspaceMode === "callback_recovery" ||
+    workspaceMode === "outbound_supervision"
 
   if (phase === "idle" || phase === "incoming") {
     return (
@@ -262,7 +280,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
         </div>
       </div>
 
-      {supervisor ? (
+      {supervisor && !contextualCompactMode ? (
         <div
           className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-sky-200/70 bg-sky-50/50 px-3 py-2 text-xs dark:border-sky-900/40 dark:bg-sky-950/20"
           data-qa-action="supervisor-visibility-strip"
@@ -306,9 +324,9 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
       ) : null}
 
       <div className="min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto">
-        {coachingState && liveSnapshot ? (
+        {coachingState && liveSnapshot && !contextualCompactMode ? (
           <LiveCoachingExecutionScorePanel coachingState={coachingState} snapshot={liveSnapshot} compact />
-        ) : coachingState ? (
+        ) : coachingState && !contextualCompactMode ? (
           <div className="grid gap-2 sm:grid-cols-3">
             <div className="rounded-lg border border-border/50 px-3 py-2 dark:border-white/5">
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Momentum</p>
@@ -325,7 +343,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
           </div>
         ) : null}
 
-        {liveSnapshot ? (
+        {liveSnapshot && !contextualCompactMode ? (
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="rounded-lg border border-border/50 px-3 py-2 dark:border-white/5">
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Talk ratio</p>
@@ -374,22 +392,26 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
 
         <p className="text-xs leading-relaxed text-muted-foreground">{GROWTH_CALL_DIALER_SAFETY_COPY}</p>
 
-        <GrowthCallWorkspaceMissedCallRecoverySection
-          missedCallRecovery={missedCallRecovery}
-          onSnapshotRefresh={onSnapshotRefresh}
-        />
+        {showAiHandoffSections ? (
+          <>
+            <GrowthCallWorkspaceMissedCallRecoverySection
+              missedCallRecovery={missedCallRecovery}
+              onSnapshotRefresh={onSnapshotRefresh}
+            />
 
-        <GrowthCallWorkspaceAiReceptionistSection
-          voiceCallId={voiceCallId}
-          aiReceptionist={aiReceptionist}
-          onSnapshotRefresh={onSnapshotRefresh}
-        />
+            <GrowthCallWorkspaceAiReceptionistSection
+              voiceCallId={voiceCallId}
+              aiReceptionist={aiReceptionist}
+              onSnapshotRefresh={onSnapshotRefresh}
+            />
 
-        <GrowthCallWorkspaceAiCopilotSection
-          voiceCallId={voiceCallId}
-          aiCopilot={aiCopilot}
-          onRefresh={onSnapshotRefresh}
-        />
+            <GrowthCallWorkspaceAiCopilotSection
+              voiceCallId={voiceCallId}
+              aiCopilot={aiCopilot}
+              onRefresh={onSnapshotRefresh}
+            />
+          </>
+        ) : null}
       </div>
     </>
   )

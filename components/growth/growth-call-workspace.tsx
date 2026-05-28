@@ -6,7 +6,9 @@ import { Headphones, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthCallWorkspaceCenterPanel } from "@/components/growth/growth-call-workspace-center-panel"
 import { GrowthCallWorkspaceDialerCard } from "@/components/growth/growth-call-workspace-dialer-card"
-import { GrowthCallWorkspaceIntelligenceRail } from "@/components/growth/growth-call-workspace-intelligence-rail"
+import { GrowthCallWorkspaceUnifiedContextRail } from "@/components/growth/growth-call-workspace-unified-context-rail"
+import { GrowthCallWorkspaceActiveWorkflowStrip } from "@/components/growth/growth-call-workspace-active-workflow-strip"
+import { GrowthCallWorkspaceMobileActionBar } from "@/components/growth/growth-call-workspace-mobile-action-bar"
 import { GrowthCallWorkspaceQueueCard } from "@/components/growth/growth-call-workspace-queue-card"
 import type {
   NativeCallWrapupOutcome,
@@ -51,6 +53,9 @@ import { VOICE_RETENTION_INTELLIGENCE_QA_MARKER } from "@/lib/voice/retention-in
 import { VOICE_AI_COPILOT_QA_MARKER, VOICE_DEEP_COPILOT_QA_MARKER } from "@/lib/voice/ai-copilot/types"
 import { VOICE_AI_RECEPTIONIST_QA_MARKER } from "@/lib/voice/ai-receptionist/types"
 import { VOICE_MISSED_CALL_RECOVERY_QA_MARKER } from "@/lib/voice/missed-call-recovery/types"
+import { VOICE_UNIFIED_OPERATOR_WORKSPACE_UX_QA_MARKER } from "@/lib/voice/workspace-context/types"
+import { buildWorkspaceContextInputFromVoiceSnapshot } from "@/lib/voice/workspace-context/snapshot-input-mapper"
+import { buildWorkspaceContextSnapshot } from "@/lib/voice/workspace-context/workspace-context-builder"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader?: boolean }) {
@@ -81,6 +86,8 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   const [leadLinked, setLeadLinked] = useState(false)
   const [transferTarget, setTransferTarget] = useState("")
   const [callActionPending, setCallActionPending] = useState(false)
+  const [contextRailExpanded, setContextRailExpanded] = useState(false)
+  const [deepIntelligenceExpanded, setDeepIntelligenceExpanded] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -229,6 +236,31 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     if (activeSession && ["active", "on_hold"].includes(activeSession.status)) return "active"
     return "idle"
   }, [activeSession])
+
+  const workspaceContext = useMemo(() => {
+    const input = buildWorkspaceContextInputFromVoiceSnapshot({
+      callPhase: workspacePhase,
+      startingCall: starting,
+      leadLinked,
+      operatorAssist: voiceBrowser.snapshot?.operatorAssist ?? null,
+      aiCopilot: voiceBrowser.snapshot?.aiCopilot ?? null,
+      aiReceptionist: voiceBrowser.snapshot?.aiReceptionist ?? null,
+      missedCallRecovery: voiceBrowser.snapshot?.missedCallRecovery ?? null,
+      hasActiveTransfer: Boolean(voiceBrowser.snapshot?.activeTransfer),
+      relationshipSummary: leadContext
+        ? `${leadContext.companyName ?? "Account"} · ${leadContext.contactName ?? "Contact"}`
+        : null,
+      preferredChannel: "voice",
+      workflowStatusLabel: workspacePhase === "idle" ? "Ready" : workspacePhase,
+    })
+    return buildWorkspaceContextSnapshot(input)
+  }, [workspacePhase, starting, leadLinked, voiceBrowser.snapshot, leadContext])
+
+  useEffect(() => {
+    if (workspaceContext.contextRailExpanded) {
+      setContextRailExpanded(true)
+    }
+  }, [workspaceContext.contextRailExpanded, workspaceContext.mode])
 
   async function startCall(input?: { phoneNumber?: string; leadId?: string | null; queueItemId?: string | null }) {
     const phoneNumber = normalizeDialPhoneForApi(input?.phoneNumber ?? phone)
@@ -435,6 +467,8 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       data-voice-deep-copilot-qa-marker={VOICE_DEEP_COPILOT_QA_MARKER}
       data-voice-ai-receptionist-qa-marker={VOICE_AI_RECEPTIONIST_QA_MARKER}
       data-voice-missed-call-recovery-qa-marker={VOICE_MISSED_CALL_RECOVERY_QA_MARKER}
+      data-voice-unified-operator-workspace-ux-qa-marker={VOICE_UNIFIED_OPERATOR_WORKSPACE_UX_QA_MARKER}
+      data-workspace-mode={workspaceContext.mode}
     >
       {voiceBrowser.registrationState === "error" && voiceBrowser.error ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
@@ -452,7 +486,8 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
             <div>
               <h1 className={PAGE_STANDARD_PAGE_TITLE}>Calls</h1>
               <p className="text-sm text-muted-foreground">
-                Native dialer with embedded intelligence, coaching, and operator wrap-up.
+                Unified operator command workspace — relationship workflows, contextual intelligence, operator-controlled
+                assist.
               </p>
             </div>
           </div>
@@ -472,7 +507,9 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         </p>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)_320px]">
+      <GrowthCallWorkspaceActiveWorkflowStrip workspaceContext={workspaceContext} />
+
+      <div className="grid grid-cols-1 gap-4 pb-16 lg:grid-cols-[320px_minmax(0,1fr)_320px] lg:pb-0">
         <aside className="w-full min-w-0 space-y-4 lg:max-w-[320px]">
           <GrowthCallWorkspaceDialerCard
             phone={phone}
@@ -515,6 +552,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
 
         <GrowthCallWorkspaceCenterPanel
           phase={workspacePhase}
+          workspaceContext={workspaceContext}
           activeSession={activeSession}
           voiceBrowserCallState={voiceBrowser.snapshot?.browserCallState ?? null}
           voiceBrowserCallStateLabel={
@@ -557,7 +595,12 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           onSubmitWrapup={submitWrapup}
         />
 
-        <GrowthCallWorkspaceIntelligenceRail
+        <GrowthCallWorkspaceUnifiedContextRail
+          workspaceContext={workspaceContext}
+          expanded={contextRailExpanded}
+          onToggleExpanded={() => setContextRailExpanded((value) => !value)}
+          deepIntelligenceExpanded={deepIntelligenceExpanded}
+          onToggleDeepIntelligence={() => setDeepIntelligenceExpanded((value) => !value)}
           leadContext={leadContext}
           nativeSessionId={activeSession?.id ?? null}
           sessionPhone={activeSession?.phoneNumber ?? phone}
@@ -577,6 +620,20 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           }}
         />
       </div>
+
+      <GrowthCallWorkspaceMobileActionBar
+        workspaceContext={workspaceContext}
+        disabled={starting || ending || answering || declining}
+        onDial={() =>
+          void startCall({
+            phoneNumber: normalizeDialPhoneForApi(phone),
+            leadId: optionalUuid(initialLeadId),
+          })
+        }
+        onAnswer={() => void answerCall()}
+        onEndCall={() => void endCall()}
+        onTransfer={() => void startTransfer()}
+      />
     </div>
   )
 }

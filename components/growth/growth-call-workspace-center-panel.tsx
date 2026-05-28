@@ -49,7 +49,9 @@ import type { VoiceAiReceptionistWorkspaceSnapshot } from "@/lib/voice/ai-recept
 import type { VoiceMissedCallRecoveryWorkspaceSnapshot } from "@/lib/voice/missed-call-recovery/types"
 import type { CallWorkspaceCoachingMode } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import { GrowthCallWorkspaceLiveTranscriptPanel } from "@/components/growth/growth-call-workspace-live-transcript-panel"
+import { GrowthCallWorkspaceSimplifiedTimeline } from "@/components/growth/growth-call-workspace-simplified-timeline"
 import { NATIVE_DIALER_PROVIDER_LABELS } from "@/lib/growth/native-dialer/native-dialer-types"
+import type { VoiceWorkspaceContextSnapshot } from "@/lib/voice/workspace-context/types"
 import { cn } from "@/lib/utils"
 
 export type GrowthCallWorkspacePhase = "idle" | "incoming" | "bridge_pending" | "active" | "wrapup"
@@ -182,35 +184,20 @@ function VoiceCallTimelinePanel({
   timeline,
   recording,
   browserCallStateLabel,
+  workspaceMode,
 }: {
   timeline: VoiceCallTimelineEventView[]
   recording: VoiceCallRecordingVisibilityView | null
   browserCallStateLabel: string | null
+  workspaceMode?: VoiceWorkspaceContextSnapshot["mode"]
 }) {
-  if (timeline.length === 0 && !recording && !browserCallStateLabel) return null
-
   return (
-    <div className="rounded-xl border border-border/60 bg-muted/10 px-3 py-2 text-sm dark:border-white/5">
-      {browserCallStateLabel ? (
-        <p className="text-xs text-muted-foreground">
-          Canonical voice state: <span className="font-medium text-foreground">{browserCallStateLabel}</span>
-        </p>
-      ) : null}
-      {timeline.length > 0 ? (
-        <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-          {timeline.slice(-6).map((event) => (
-            <li key={event.id}>
-              {new Date(event.eventTimestamp).toLocaleTimeString()} · {event.label}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {recording ? (
-        <p className="mt-2 text-xs text-muted-foreground">
-          Recording: {recording.durationSeconds ?? "—"}s · {recording.playbackPlaceholder}
-        </p>
-      ) : null}
-    </div>
+    <GrowthCallWorkspaceSimplifiedTimeline
+      timeline={timeline}
+      recording={recording}
+      browserCallStateLabel={browserCallStateLabel}
+      workspaceMode={workspaceMode}
+    />
   )
 }
 
@@ -243,6 +230,7 @@ export function GrowthCallWorkspaceCenterPanel({
   coachingStartSignal,
   coachingMode,
   leadLinked,
+  workspaceContext = null,
   onAnswer,
   onDecline,
   onEndCall,
@@ -281,6 +269,7 @@ export function GrowthCallWorkspaceCenterPanel({
   coachingStartSignal?: number
   coachingMode: CallWorkspaceCoachingMode
   leadLinked: boolean
+  workspaceContext?: VoiceWorkspaceContextSnapshot | null
   onAnswer: () => void
   onDecline: () => void
   onEndCall: () => void
@@ -303,6 +292,8 @@ export function GrowthCallWorkspaceCenterPanel({
 }) {
   const [elapsed, setElapsed] = useState(activeSession?.durationSeconds ?? 0)
   const externalBridge = isExternalBridgeSession(activeSession)
+  const showSecondaryAssist = !workspaceContext?.deferredAnalytics
+  const assistCompactMode = workspaceContext?.deferredAnalytics ?? false
 
   useEffect(() => {
     if (!activeSession || !["active", "on_hold"].includes(activeSession.status) || !activeSession.connectedAt) {
@@ -342,10 +333,10 @@ export function GrowthCallWorkspaceCenterPanel({
     <section className={cn(GROWTH_CALL_WORKSPACE_PANEL, "flex min-h-[560px] flex-col p-4")}>
       {phase === "idle" ? (
         <div className="mb-3">
-          <h3 className="text-base font-semibold">Ready to call</h3>
+          <h3 className="text-base font-semibold">Operator command workspace</h3>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            Enter a number or pick a queue item. During calls, live coaching and realtime intelligence appear here.
-            After the call, complete operator wrap-up.
+            Relationship workflow center — dial, assist, and wrap-up without context switching. Intelligence expands
+            when workflows are active.
           </p>
         </div>
       ) : null}
@@ -390,11 +381,15 @@ export function GrowthCallWorkspaceCenterPanel({
               missedCallRecovery={missedCallRecovery}
               voiceCallId={voiceCallId}
               onSnapshotRefresh={onOperatorAssistRefresh}
+              contextualCompactMode={assistCompactMode}
+              showSecondaryAssistSections={showSecondaryAssist}
+              workspaceMode={workspaceContext?.mode}
             />
             <VoiceCallTimelinePanel
               timeline={voiceTimeline}
               recording={voiceRecording}
               browserCallStateLabel={voiceBrowserCallStateLabel ?? null}
+              workspaceMode={workspaceContext?.mode}
             />
             <GrowthCallWorkspaceLiveTranscriptPanel transcript={voiceLiveTranscript} />
           </>
@@ -423,6 +418,9 @@ export function GrowthCallWorkspaceCenterPanel({
               missedCallRecovery={missedCallRecovery}
               voiceCallId={voiceCallId}
               onSnapshotRefresh={onOperatorAssistRefresh}
+              contextualCompactMode={assistCompactMode}
+              showSecondaryAssistSections={showSecondaryAssist}
+              workspaceMode={workspaceContext?.mode}
             />
           </>
         ) : null}
@@ -443,6 +441,9 @@ export function GrowthCallWorkspaceCenterPanel({
               missedCallRecovery={missedCallRecovery}
               voiceCallId={voiceCallId}
               onSnapshotRefresh={onOperatorAssistRefresh}
+              contextualCompactMode={assistCompactMode}
+              showSecondaryAssistSections={showSecondaryAssist}
+              workspaceMode={workspaceContext?.mode}
             />
             <Textarea
               placeholder="Call notes (operator)"
@@ -455,6 +456,7 @@ export function GrowthCallWorkspaceCenterPanel({
               timeline={voiceTimeline}
               recording={voiceRecording}
               browserCallStateLabel={voiceBrowserCallStateLabel ?? null}
+              workspaceMode={workspaceContext?.mode}
             />
             <GrowthCallWorkspaceLiveTranscriptPanel transcript={voiceLiveTranscript} />
             <ActiveParticipantsPanel participants={voiceParticipants} activeTransfer={voiceActiveTransfer} />
