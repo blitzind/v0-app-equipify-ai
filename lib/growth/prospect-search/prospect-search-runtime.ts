@@ -8,6 +8,9 @@ export { GROWTH_BASE64URL_RUNTIME_FIX_QA_MARKER }
 export const GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER =
   "growth-prospect-search-runtime-fix-v1" as const
 
+export const GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER =
+  "growth-prospect-search-render-loop-fix-v1" as const
+
 export const GROWTH_PROSPECT_SEARCH_DEFAULT_DISCOVERY_MODE: GrowthProspectSearchDiscoveryMode =
   "discover_external"
 

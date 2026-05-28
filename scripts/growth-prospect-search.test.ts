@@ -4690,6 +4690,42 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   assert.match(pushMetadataSource, /opportunity_emergence/)
   assert.match(pushMetadataSource, /sequence_readiness/)
   assert.match(pushMetadataSource, /operating_alerts/)
+
+  const {
+    GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-runtime")
+  const {
+    buildProspectSearchPeopleRowsVisibilityKey,
+    mergeProspectSearchPeopleSelectionStore,
+  } = await import("../lib/growth/prospect-search/prospect-search-people-selection")
+
+  assert.equal(GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER, "growth-prospect-search-render-loop-fix-v1")
+  assert.match(shellSource, /data-prospect-search-render-loop-fix-marker/)
+  assert.match(shellSource, /EMPTY_COMPANIES/)
+  assert.match(shellSource, /peopleRowsVisibilityKey/)
+  assert.match(shellSource, /GrowthAdminWidgetErrorBoundary/)
+  assert.equal(buildProspectSearchPeopleRowsVisibilityKey([]), "")
+  assert.equal(
+    buildProspectSearchPeopleRowsVisibilityKey([{ id: "a" }, { id: "b" }] as never),
+    "a\u0001b",
+  )
+
+  const selectionStore = new Map<string, never>()
+  const mergedOnce = mergeProspectSearchPeopleSelectionStore({
+    store: selectionStore,
+    keys: new Set<string>(),
+    visibleRows: [],
+  })
+  assert.equal(mergedOnce, selectionStore)
+
+  const explanationsSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/company-result-explanations.tsx"),
+    "utf8",
+  )
+  assert.match(explanationsSource, /useState\(false\)/)
+  const useStateIndex = explanationsSource.indexOf("useState(false)")
+  const earlyReturnIndex = explanationsSource.indexOf("return null")
+  assert.ok(useStateIndex < earlyReturnIndex, "useState must run before conditional return")
 }
 
 void main()

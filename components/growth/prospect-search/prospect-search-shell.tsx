@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { GrowthAdminWidgetErrorBoundary } from "@/components/growth/growth-admin-widget-error-boundary"
 import { CompanyResultCard } from "@/components/growth/prospect-search/company-result-card"
 import {
   ProspectSearchBulkActionBar,
@@ -110,6 +111,7 @@ import {
 } from "@/lib/growth/prospect-search/territory-opportunity-heatmap"
 import {
   GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER,
+  GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER,
   resolveProspectSearchDiscoveryMode,
 } from "@/lib/growth/prospect-search/prospect-search-runtime"
 import {
@@ -152,11 +154,15 @@ import { ProspectSearchContactEvidenceDrawer } from "@/components/growth/prospec
 import {
   mergeProspectSearchPeopleSelectionStore,
   prospectSearchPeopleSelectionKey,
+  buildProspectSearchPeopleRowsVisibilityKey,
   selectedProspectSearchPeopleRows,
 } from "@/lib/growth/prospect-search/prospect-search-people-selection"
 import type { GrowthProspectSearchPeopleActionRow } from "@/lib/growth/prospect-search/prospect-search-types"
 
 const EMPTY_FILTERS: GrowthProspectSearchFilters = {}
+const EMPTY_COMPANIES: GrowthProspectSearchCompanyResult[] = []
+const EMPTY_PEOPLE: GrowthProspectSearchPersonResult[] = []
+const EMPTY_DISCOVER_RESULTS: GrowthProspectSearchCompanyResult[] = []
 
 type ProspectSearchRunInput = {
   queryText?: string
@@ -301,9 +307,9 @@ function ProspectSearchShellInner() {
     [placeholderIndex],
   )
 
-  const companies = result?.companies ?? []
-  const people = result?.people ?? []
-  const discoverFilteredResults = result?.filtered_discover_results ?? []
+  const companies = result?.companies ?? EMPTY_COMPANIES
+  const people = result?.people ?? EMPTY_PEOPLE
+  const discoverFilteredResults = result?.filtered_discover_results ?? EMPTY_DISCOVER_RESULTS
   const peopleRows = useMemo(
     () => mergeProspectSearchPeopleResults(people, companies),
     [people, companies],
@@ -345,6 +351,16 @@ function ProspectSearchShellInner() {
     () =>
       enrichPeopleRowsWithRelationshipMemory(peopleRowsWithInfluence, companiesWithContactCoverage),
     [peopleRowsWithInfluence, companiesWithContactCoverage],
+  )
+  const peopleRowsWithRelationshipRef = useRef(peopleRowsWithRelationship)
+  peopleRowsWithRelationshipRef.current = peopleRowsWithRelationship
+  const peopleRowsVisibilityKey = useMemo(
+    () => buildProspectSearchPeopleRowsVisibilityKey(peopleRowsWithRelationship),
+    [peopleRowsWithRelationship],
+  )
+  const savedSearchNames = useMemo(
+    () => savedSearches.map((search) => search.name),
+    [savedSearches],
   )
   const resolveEnrichedCompany = useCallback(
     (companyId: string, fallback: GrowthProspectSearchCompanyResult) =>
@@ -457,13 +473,12 @@ function ProspectSearchShellInner() {
 
   useEffect(() => {
     if (!searchCompleted || companies.length === 0) return
-    setResultMode(
-      resolveDefaultProspectSearchResultMode({
-        companies,
-        filters,
-        serverPeopleCount: people.length,
-      }),
-    )
+    const nextMode = resolveDefaultProspectSearchResultMode({
+      companies,
+      filters,
+      serverPeopleCount: people.length,
+    })
+    setResultMode((prev) => (prev === nextMode ? prev : nextMode))
   }, [searchCompleted, lastSearchedCriteriaKey, companies, filters, people.length])
 
   useEffect(() => {
@@ -471,10 +486,10 @@ function ProspectSearchShellInner() {
       mergeProspectSearchPeopleSelectionStore({
         store: prev,
         keys: selectedPeopleKeys,
-        visibleRows: peopleRowsWithRelationship,
+        visibleRows: peopleRowsWithRelationshipRef.current,
       }),
     )
-  }, [peopleRowsWithRelationship, selectedPeopleKeys])
+  }, [peopleRowsVisibilityKey, selectedPeopleKeys])
 
   useEffect(() => {
     if (lastSearchedCriteriaKey === null) return
@@ -1420,6 +1435,7 @@ function ProspectSearchShellInner() {
       data-sequence-readiness-marker={GROWTH_SEQUENCE_READINESS_QA_MARKER}
       data-revenue-operating-alerts-marker={GROWTH_REVENUE_OPERATING_ALERTS_QA_MARKER}
       data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
+      data-prospect-search-render-loop-fix-marker={GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER}
       data-contact-discovery-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}
       data-website-contact-provider-marker={GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER}
       data-people-hydration-marker={GROWTH_PEOPLE_HYDRATION_QA_MARKER}
@@ -1479,7 +1495,7 @@ function ProspectSearchShellInner() {
           </Button>
           <SearchRecommendations
             query={query}
-            savedSearchNames={savedSearches.map((s) => s.name)}
+            savedSearchNames={savedSearchNames}
             visible={heroFocused}
             onSelect={(v) => {
               setQuery(v)
@@ -1544,37 +1560,52 @@ function ProspectSearchShellInner() {
             <>
               {(discoveryMode === "internal" && hasSearched) ||
               (discoveryMode === "discover_external" && searchCompleted) ? (
-                <TerritoryIntelligencePanel
-                  summary={result?.territory_intelligence}
-                  filters={filters}
-                  query={query}
-                  loading={loading}
-                  onSaveTerritory={async (name) => {
-                    await runAction("save_territory", { territory_name: name })
-                  }}
-                  onRefreshTerritory={async () => {
-                    await runAction("refresh_territory", {
-                      territory_id: filters.territory_id ?? result?.territory_intelligence?.territory_id,
-                    })
-                    await runSearch()
-                  }}
-                  onPushTopProspects={async () => {
-                    await runAction("push_territory_top_prospects")
-                  }}
-                />
+                <GrowthAdminWidgetErrorBoundary
+                  label="Territory intelligence"
+                  qaMarker={GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER}
+                >
+                  <TerritoryIntelligencePanel
+                    summary={result?.territory_intelligence}
+                    filters={filters}
+                    query={query}
+                    loading={loading}
+                    onSaveTerritory={async (name) => {
+                      await runAction("save_territory", { territory_name: name })
+                    }}
+                    onRefreshTerritory={async () => {
+                      await runAction("refresh_territory", {
+                        territory_id: filters.territory_id ?? result?.territory_intelligence?.territory_id,
+                      })
+                      await runSearch()
+                    }}
+                    onPushTopProspects={async () => {
+                      await runAction("push_territory_top_prospects")
+                    }}
+                  />
+                </GrowthAdminWidgetErrorBoundary>
               ) : null}
 
               {territoryHeatmapVisible && hasSearched && !criteriaStale ? (
-                <TerritoryOpportunityHeatmapPanel
-                  heatmap={heatmap}
-                  loading={heatmapLoading}
-                  onDrilldown={handleTerritoryHeatmapDrilldown}
-                  onRecommendedAction={(action) => void handleTerritoryHeatmapRecommendedAction(action)}
-                />
+                <GrowthAdminWidgetErrorBoundary
+                  label="Territory opportunity heatmap"
+                  qaMarker={GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER}
+                >
+                  <TerritoryOpportunityHeatmapPanel
+                    heatmap={heatmap}
+                    loading={heatmapLoading}
+                    onDrilldown={handleTerritoryHeatmapDrilldown}
+                    onRecommendedAction={(action) => void handleTerritoryHeatmapRecommendedAction(action)}
+                  />
+                </GrowthAdminWidgetErrorBoundary>
               ) : null}
 
               {searchCompleted && territoryPrioritization.length > 0 ? (
-                <ProspectSearchTerritoryPrioritizationPanel territories={territoryPrioritization} />
+                <GrowthAdminWidgetErrorBoundary
+                  label="Territory prioritization"
+                  qaMarker={GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER}
+                >
+                  <ProspectSearchTerritoryPrioritizationPanel territories={territoryPrioritization} />
+                </GrowthAdminWidgetErrorBoundary>
               ) : null}
 
               {showDiscoverReady ? <ProspectSearchDiscoverReadyPanel /> : null}

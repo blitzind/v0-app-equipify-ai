@@ -62,7 +62,28 @@ export function mergeProspectSearchPeopleSelectionStore(input: {
     if (input.keys.has(key)) next.set(key, row)
     else next.delete(key)
   }
+  if (prospectSearchPeopleSelectionStoresEqual(input.store, next)) {
+    return input.store
+  }
   return next
+}
+
+function prospectSearchPeopleSelectionStoresEqual(
+  left: Map<string, GrowthProspectSearchPeopleResultRow>,
+  right: Map<string, GrowthProspectSearchPeopleResultRow>,
+): boolean {
+  if (left.size !== right.size) return false
+  for (const [key, row] of left) {
+    if (right.get(key) !== row) return false
+  }
+  return true
+}
+
+export function buildProspectSearchPeopleRowsVisibilityKey(
+  rows: GrowthProspectSearchPeopleResultRow[],
+): string {
+  if (rows.length === 0) return ""
+  return rows.map((row) => row.id).join("\u0001")
 }
 
 export function selectedProspectSearchPeopleRows(input: {

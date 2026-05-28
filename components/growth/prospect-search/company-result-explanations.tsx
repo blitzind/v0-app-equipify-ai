@@ -6,13 +6,12 @@ import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-se
 import { cn } from "@/lib/utils"
 
 export function CompanyResultExplanations({ row }: { row: GrowthProspectSearchCompanyResult }) {
+  const [open, setOpen] = useState(false)
   const scoreItems = row.score_explanation_items ?? []
   const confidenceItems = row.confidence_explanation_items ?? []
   const hasItems = scoreItems.length > 0 || confidenceItems.length > 0
 
   if (!hasItems && !row.recommended_next_step_reason) return null
-
-  const [open, setOpen] = useState(false)
 
   return (
     <div
