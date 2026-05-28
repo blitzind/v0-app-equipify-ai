@@ -5,6 +5,10 @@ import { listProspectSearchLists } from "@/lib/growth/prospect-search/list-manag
 import { runProspectSearch } from "@/lib/growth/prospect-search/prospect-search-repository"
 import { listProspectSearchSavedSearchesWithWorkflow, refreshAllProspectSearchSavedSearchCounts } from "@/lib/growth/prospect-search/saved-searches"
 import {
+  GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER,
+  GROWTH_SAFE_PROVIDER_PARSING_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-safe-fetch-json"
+import {
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS,
   GROWTH_PROSPECT_SEARCH_SOURCE_TYPES,
@@ -81,36 +85,67 @@ export async function GET(request: Request) {
   const page_size = Number.parseInt(url.searchParams.get("page_size") ?? "50", 10)
   const sort_by = url.searchParams.get("sort_by") === "signal_momentum" ? "signal_momentum" : "rank"
 
-  const result = await runProspectSearch(access.admin, {
-    query,
-    filters,
-    discovery_mode,
-    sort_by,
-    created_by: access.userId,
-    page: Number.isFinite(page) ? page : 1,
-    page_size: Number.isFinite(page_size) ? page_size : 50,
-  })
+  try {
+    const result = await runProspectSearch(access.admin, {
+      query,
+      filters,
+      discovery_mode,
+      sort_by,
+      created_by: access.userId,
+      page: Number.isFinite(page) ? page : 1,
+      page_size: Number.isFinite(page_size) ? page_size : 50,
+    })
 
-  if (!includeMeta) {
-    return NextResponse.json({ ok: true, ...result })
+    if (!includeMeta) {
+      return NextResponse.json({
+        ok: true,
+        qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
+        discovery_runtime_hardening_qa_marker: GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER,
+        safe_provider_parsing_qa_marker: GROWTH_SAFE_PROVIDER_PARSING_QA_MARKER,
+        result,
+      })
+    }
+
+    const refreshSavedCounts = url.searchParams.get("refresh_saved_counts") === "1"
+
+    const [savedResult, listsResult] = await Promise.allSettled([
+      refreshSavedCounts
+        ? refreshAllProspectSearchSavedSearchCounts(access.admin)
+        : listProspectSearchSavedSearchesWithWorkflow(access.admin),
+      listProspectSearchLists(access.admin),
+    ])
+
+    const saved_searches =
+      savedResult.status === "fulfilled" ? savedResult.value : []
+    const lists = listsResult.status === "fulfilled" ? listsResult.value : []
+
+    return NextResponse.json({
+      ok: true,
+      qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
+      discovery_runtime_hardening_qa_marker: GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER,
+      safe_provider_parsing_qa_marker: GROWTH_SAFE_PROVIDER_PARSING_QA_MARKER,
+      result,
+      saved_searches,
+      lists,
+      meta_partial:
+        savedResult.status === "rejected" || listsResult.status === "rejected"
+          ? "Saved search or list metadata partially unavailable."
+          : null,
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Prospect search failed."
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "prospect_search_failed",
+        message,
+        qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
+        discovery_runtime_hardening_qa_marker: GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER,
+        safe_provider_parsing_qa_marker: GROWTH_SAFE_PROVIDER_PARSING_QA_MARKER,
+      },
+      { status: 500 },
+    )
   }
-
-  const refreshSavedCounts = url.searchParams.get("refresh_saved_counts") === "1"
-
-  const [saved_searches, lists] = await Promise.all([
-    refreshSavedCounts
-      ? refreshAllProspectSearchSavedSearchCounts(access.admin)
-      : listProspectSearchSavedSearchesWithWorkflow(access.admin),
-    listProspectSearchLists(access.admin),
-  ])
-
-  return NextResponse.json({
-    ok: true,
-    qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
-    result,
-    saved_searches,
-    lists,
-  })
 }
 
 export async function POST(request: Request) {

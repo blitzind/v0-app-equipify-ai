@@ -4,6 +4,7 @@ import type {
   GooglePlacesTextSearchPlace,
   GooglePlacesTextSearchResponse,
 } from "@/lib/growth/real-world-discovery/providers/google-places-types"
+import { safeDiscoveryProviderResponse } from "@/lib/growth/prospect-search/prospect-search-safe-fetch-json"
 
 const TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
 
@@ -50,7 +51,18 @@ export async function searchGooglePlacesText(
     }),
   })
 
-  const payload = (await res.json()) as GooglePlacesTextSearchResponse
+  const parsed = await safeDiscoveryProviderResponse<GooglePlacesTextSearchResponse>(res)
+
+  if (!parsed.ok) {
+    throw new Error(
+      parsed.error ??
+        (parsed.error_kind === "empty_body"
+          ? "Google Places returned an empty response."
+          : `Google Places request failed (${parsed.status}).`),
+    )
+  }
+
+  const payload = parsed.data ?? {}
 
   if (!res.ok) {
     const message =

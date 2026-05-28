@@ -2190,7 +2190,7 @@ async function main(): Promise<void> {
   assert.equal(GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER, "growth-live-provider-query-expansion-v1")
   assert.equal(GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER_TYPE, "growth-live-provider-query-expansion-v1")
   assert.match(shellSource, /data-live-provider-query-expansion-marker=\{GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER\}/)
-  assert.match(shellSource, /No companies found after expanded provider search/)
+  assert.match(shellSource, /resolveDiscoverEmptyStateMessage/)
 
   const medicalPlan = buildLiveProviderDiscoveryQueries({
     industry: "Medical Equipment Service",
@@ -4875,6 +4875,65 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   assert.match(companyCardSource, /data-operator-recommendations-marker/)
   assert.match(territoryPanelSource2, /data-operator-recommendations-marker/)
   assert.match(pushMetadataSource, /operator_assist/)
+
+  const {
+    safeParseJsonText,
+    safeParseJsonResponse,
+    safeDiscoveryProviderResponse,
+    GROWTH_SAFE_PROVIDER_PARSING_QA_MARKER,
+    GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER,
+    formatSafeJsonParseError,
+  } = await import("../lib/growth/prospect-search/prospect-search-safe-fetch-json")
+  const { resolveDiscoverEmptyStateMessage } = await import(
+    "../lib/growth/prospect-search/prospect-search-discover-ui-state"
+  )
+
+  assert.equal(GROWTH_SAFE_PROVIDER_PARSING_QA_MARKER, "growth-safe-provider-parsing-v1")
+  assert.equal(GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER, "growth-discovery-runtime-hardening-v1")
+
+  const emptyParse = safeParseJsonText("", 500)
+  assert.equal(emptyParse.ok, false)
+  if (!emptyParse.ok) {
+    assert.equal(emptyParse.error_kind, "empty_body")
+    assert.match(formatSafeJsonParseError(emptyParse), /empty/i)
+  }
+
+  const htmlParse = safeParseJsonText("<html><body>error</body></html>", 502)
+  assert.equal(htmlParse.ok, false)
+  if (!htmlParse.ok) assert.equal(htmlParse.error_kind, "html_response")
+
+  const invalidParse = safeParseJsonText("{not-json", 200)
+  assert.equal(invalidParse.ok, false)
+  if (!invalidParse.ok) assert.equal(invalidParse.error_kind, "invalid_json")
+
+  const validParse = safeParseJsonText('{"ok":true}', 200)
+  assert.equal(validParse.ok, true)
+
+  const emptyMessage = resolveDiscoverEmptyStateMessage({
+    provider_status_label: "provider_key_missing",
+    provider_status_message: "Provider key missing",
+  })
+  assert.match(emptyMessage, /Provider key missing/i)
+
+  const runtimeNoticeSource = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "components/growth/prospect-search/prospect-search-discovery-runtime-notice.tsx",
+    ),
+    "utf8",
+  )
+  assert.match(runtimeNoticeSource, /data-discovery-runtime-hardening-marker/)
+  assert.match(runtimeNoticeSource, /data-safe-provider-parsing-marker/)
+  assert.match(shellSource, /data-discovery-runtime-hardening-marker/)
+  assert.match(shellSource, /safeFetchJson/)
+  assert.match(shellSource, /ProspectSearchDiscoveryRuntimeNotice/)
+
+  const routeSource = fs.readFileSync(
+    path.join(process.cwd(), "app/api/platform/growth/prospect-search/route.ts"),
+    "utf8",
+  )
+  assert.match(routeSource, /Promise.allSettled/)
+  assert.match(routeSource, /prospect_search_failed/)
 }
 
 void main()

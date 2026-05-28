@@ -102,6 +102,16 @@ export function ProspectSearchDiagnosticsDisclosure({
             </p>
           </div>
         ) : null}
+        {result.discovery_hydration?.partial_intelligence ? (
+          <div className="w-full min-w-0 break-words rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-2 text-[11px] text-indigo-950">
+            <p className="font-medium">Hydration diagnostics</p>
+            <ul className="mt-1 space-y-1">
+              {result.discovery_hydration.diagnostics.map((row) => (
+                <li key={row.layer}>{row.message}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
     </details>
   )

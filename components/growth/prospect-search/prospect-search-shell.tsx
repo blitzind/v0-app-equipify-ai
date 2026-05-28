@@ -26,6 +26,7 @@ import { ProspectSearchDiscoverReadyPanel } from "@/components/growth/prospect-s
 import { ProspectSearchDiscoverResultsTable } from "@/components/growth/prospect-search/prospect-search-discover-results-table"
 import { ProspectSearchResultModeToggle } from "@/components/growth/prospect-search/prospect-search-result-mode-toggle"
 import { ProspectSearchPeopleResultsPanel } from "@/components/growth/prospect-search/prospect-search-discover-people-table"
+import { ProspectSearchDiscoveryRuntimeNotice } from "@/components/growth/prospect-search/prospect-search-discovery-runtime-notice"
 import { ProspectSearchDiagnosticsDisclosure } from "@/components/growth/prospect-search/prospect-search-diagnostics-disclosure"
 import {
   ProspectSearchActiveFilterPills,
@@ -91,6 +92,7 @@ import {
   resolveRawProviderCount,
   shouldShowProspectSearchCleanStart,
   shouldShowProspectSearchResultsCount,
+  resolveDiscoverEmptyStateMessage,
 } from "@/lib/growth/prospect-search/prospect-search-discover-ui-state"
 import {
   GROWTH_PROSPECT_SEARCH_PROVIDER_INTENT_QA_MARKER,
@@ -157,6 +159,12 @@ import {
   buildProspectSearchRecommendedWorkViews,
   companyMatchesCommandOverlayFilter,
 } from "@/lib/growth/prospect-search/prospect-search-command-overlays"
+import {
+  GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER,
+  GROWTH_SAFE_PROVIDER_PARSING_QA_MARKER,
+  formatSafeJsonParseError,
+  safeFetchJson,
+} from "@/lib/growth/prospect-search/prospect-search-safe-fetch-json"
 import { ProspectSearchPeopleBulkActionBar } from "@/components/growth/prospect-search/prospect-search-people-bulk-action-bar"
 import { ProspectSearchContactEvidenceDrawer } from "@/components/growth/prospect-search/prospect-search-contact-evidence-drawer"
 import {
@@ -420,6 +428,18 @@ function ProspectSearchShellInner() {
     loading,
     criteriaStale,
   })
+  const discoverEmptyMessage = useMemo(
+    () =>
+      resolveDiscoverEmptyStateMessage({
+        provider_status_message: result?.provider_status_message,
+        provider_status_label: result?.provider_status_label,
+        hydration_summary: result?.discovery_hydration?.summary,
+        expanded_search_exhausted: result?.expanded_search_exhausted,
+        raw_provider_count: rawProviderCount,
+        filtered_count: companies.length,
+      }),
+    [result, rawProviderCount, companies.length],
+  )
   const showInternalEmpty =
     discoveryMode === "internal" && hasSearched && !loading && companies.length === 0 && people.length === 0
   const showDiscoverNoResults =
@@ -564,17 +584,21 @@ function ProspectSearchShellInner() {
           pageSize: activePageSize,
           sortBy: activeSortBy,
         })
-        const res = await fetch(`/api/platform/growth/prospect-search?${params}`, {
-          cache: "no-store",
-        })
-        const json = (await res.json()) as {
+        const parsed = await safeFetchJson<{
           ok?: boolean
           result?: GrowthProspectSearchResult
           saved_searches?: GrowthProspectSearchSavedSearchRow[]
           lists?: GrowthProspectSearchListRow[]
           message?: string
+        }>(`/api/platform/growth/prospect-search?${params}`, { cache: "no-store" })
+
+        if (!parsed.ok) {
+          setError(formatSafeJsonParseError(parsed))
+          return
         }
-        if (!res.ok || !json.ok || !json.result) {
+
+        const json = parsed.data ?? {}
+        if (!json.ok || !json.result) {
           setError(json.message ?? "Search failed.")
           return
         }
@@ -651,15 +675,13 @@ function ProspectSearchShellInner() {
 
   const loadInitialMeta = useCallback(async () => {
     try {
-      const metaRes = await fetch("/api/platform/growth/prospect-search?meta=1&q=&page=1&page_size=1", {
-        cache: "no-store",
-      })
-      const metaJson = (await metaRes.json()) as {
+      const parsed = await safeFetchJson<{
         ok?: boolean
         saved_searches?: GrowthProspectSearchSavedSearchRow[]
         lists?: GrowthProspectSearchListRow[]
-      }
-      if (!metaRes.ok || metaJson.ok === false) return
+      }>("/api/platform/growth/prospect-search?meta=1&q=&page=1&page_size=1", { cache: "no-store" })
+      if (!parsed.ok || !parsed.data?.ok) return
+      const metaJson = parsed.data
       setSavedSearches((metaJson.saved_searches ?? []).map((row) => attachSavedSearchWorkflow(row)))
       setLists(metaJson.lists ?? [])
     } catch {
@@ -1457,6 +1479,8 @@ function ProspectSearchShellInner() {
       data-smart-research-marker={GROWTH_SMART_RESEARCH_QA_MARKER}
       data-adaptive-refresh-marker={GROWTH_ADAPTIVE_REFRESH_QA_MARKER}
       data-prospect-command-overlays-marker={GROWTH_PROSPECT_COMMAND_OVERLAYS_QA_MARKER}
+      data-discovery-runtime-hardening-marker={GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER}
+      data-safe-provider-parsing-marker={GROWTH_SAFE_PROVIDER_PARSING_QA_MARKER}
       data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
       data-prospect-search-render-loop-fix-marker={GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER}
       data-contact-discovery-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}
@@ -1679,6 +1703,7 @@ function ProspectSearchShellInner() {
               ) : null}
 
               <div id="growth-prospect-search-results" className="w-full min-w-0 space-y-3">
+                <ProspectSearchDiscoveryRuntimeNotice result={result} fetchError={error} />
                 <ProspectSearchActiveFilterPills filters={filters} onChange={replaceFilters} />
 
                 {loading && discoveryMode === "internal" ? (
@@ -1841,11 +1866,7 @@ function ProspectSearchShellInner() {
                   onSelectTemplate={applyTemplate}
                   recentSaved={savedSearches}
                   title="No companies found"
-                  emptyMessage={
-                    result?.expanded_search_exhausted
-                      ? "No companies found after expanded provider search. Try adding a location or broadening filters."
-                      : "No companies matched this external discovery search. Try broadening industry or location filters."
-                  }
+                  emptyMessage={discoverEmptyMessage}
                 />
               ) : showInternalEmpty ? (
                 <SearchEmptyState

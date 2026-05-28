@@ -26,6 +26,7 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-ranking"
 import { enrichProspectSearchExternalCompanies } from "@/lib/growth/prospect-search/prospect-search-external-enrichment"
 import { mapProspectSearchCompaniesToDiscoverResults } from "@/lib/growth/prospect-search/prospect-search-discover-results"
+import { applyProspectSearchDiscoverHydrationLayers } from "@/lib/growth/prospect-search/prospect-search-discovery-hydration"
 import { applyProspectSearchContactIntelligenceOverlay } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-loader"
 import { applyProspectSearchIntelligenceOverlays } from "@/lib/growth/market-intelligence/integrations/prospect-search-bridge"
 import {
@@ -42,6 +43,7 @@ import {
   applyProspectSearchSignalIntelligenceOverlay,
   type GrowthProspectSearchSortBy,
 } from "@/lib/growth/signals/integrations/prospect-search-signal-intelligence-loader"
+import { GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-safe-fetch-json"
 import {
   GROWTH_PROSPECT_SEARCH_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_SOURCE_TYPES,
@@ -164,28 +166,14 @@ export async function runProspectSearch(
       })
     }
 
-    const companiesWithContacts = await applyProspectSearchContactIntelligenceOverlay(
-      admin,
-      enrichedCompanies,
-      { query: input.query, filters: mergedFilters, parsed },
-    )
-    const companiesWithMarket = await applyProspectSearchIntelligenceOverlays(
-      admin,
-      companiesWithContacts,
-      {
-        territory_id: mergedFilters.territory_id ?? null,
-        industry: mergedFilters.industry ?? parsed.industry ?? null,
-        territory_label: mergedFilters.territory_filter?.states?.[0]
-          ? `${mergedFilters.territory_filter.states[0]} ${mergedFilters.industry ?? parsed.industry ?? ""}`.trim()
-          : null,
-      },
-    )
-
-    const companiesWithSignals = await applyProspectSearchSignalIntelligenceOverlay(
-      admin,
-      companiesWithMarket,
-      { sort_by },
-    )
+    const { companies: companiesWithSignals, hydration: discovery_hydration } =
+      await applyProspectSearchDiscoverHydrationLayers(admin, {
+        companies: enrichedCompanies,
+        query: input.query,
+        filters: mergedFilters,
+        parsed,
+        sort_by,
+      })
 
     const source_counts = buildSourceCounts(companiesWithSignals)
     const rawProviderCompanies = externalEnrichment.raw_companies
@@ -233,6 +221,8 @@ export async function runProspectSearch(
       expanded_search_exhausted:
         enrichedCompanies.length === 0 &&
         provider_status_label === "provider_returned_raw_0",
+      discovery_hydration,
+      discovery_runtime_hardening_qa_marker: GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER,
       },
       companiesWithSignals,
     )

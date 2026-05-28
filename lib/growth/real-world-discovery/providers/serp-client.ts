@@ -4,6 +4,7 @@ import type {
   SerpApiGoogleMapsLocalResult,
   SerpApiGoogleMapsResponse,
 } from "@/lib/growth/real-world-discovery/providers/serp-types"
+import { safeDiscoveryProviderResponse } from "@/lib/growth/prospect-search/prospect-search-safe-fetch-json"
 
 const SERPAPI_SEARCH_URL = "https://serpapi.com/search.json"
 
@@ -41,7 +42,18 @@ export async function searchSerpGoogleMaps(
     headers: { Accept: "application/json" },
   })
 
-  const payload = (await res.json()) as SerpApiGoogleMapsResponse
+  const parsed = await safeDiscoveryProviderResponse<SerpApiGoogleMapsResponse>(res)
+
+  if (!parsed.ok) {
+    throw new Error(
+      parsed.error ??
+        (parsed.error_kind === "empty_body"
+          ? "SerpAPI returned an empty response."
+          : `SerpAPI request failed (${parsed.status}).`),
+    )
+  }
+
+  const payload = parsed.data ?? {}
 
   if (!res.ok) {
     throw new Error(payload.error ?? `SerpAPI request failed (${res.status}).`)

@@ -80,3 +80,42 @@ export function formatProspectSearchResultsCountLabel(input: {
   }
   return `${input.totalCompanies.toLocaleString()} companies found`
 }
+
+export function resolveDiscoverEmptyStateMessage(input: {
+  provider_status_message?: string | null
+  provider_status_label?: string | null
+  hydration_summary?: string | null
+  expanded_search_exhausted?: boolean
+  raw_provider_count?: number | null
+  filtered_count?: number
+}): string {
+  if (input.hydration_summary) {
+    return `${input.hydration_summary} Discovered companies may still appear with partial intelligence.`
+  }
+
+  if (input.provider_status_message) {
+    return input.provider_status_message
+  }
+
+  if (input.provider_status_label === "provider_key_missing") {
+    return "Live discovery providers are not configured. Add GOOGLE_PLACES_API_KEY and/or SERPAPI_API_KEY, or broaden filters to use fixture fallback when no keys are set."
+  }
+
+  if (input.provider_status_label === "results_dropped_by_filters") {
+    return "Providers returned matches but your filters removed every company. Broaden industry, location, or firmographic filters."
+  }
+
+  if (input.expanded_search_exhausted) {
+    return "No companies found after expanded provider search. Try adding a location or broadening filters."
+  }
+
+  if ((input.raw_provider_count ?? 0) === 0) {
+    return "No verified companies were discovered for this query. Try a broader location, different industry keywords, or check provider availability in diagnostics."
+  }
+
+  if ((input.filtered_count ?? 0) === 0) {
+    return "Discovery returned raw matches but none passed verification or enrichment. Partial results may appear after relaxing filters."
+  }
+
+  return "No companies matched this external discovery search. Try broadening industry or location filters."
+}

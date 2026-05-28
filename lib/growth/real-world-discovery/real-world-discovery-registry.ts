@@ -51,6 +51,21 @@ function anyLiveProviderConfigured(): boolean {
     .some((p) => p.isConfigured())
 }
 
+function anyLiveProviderRunnable(): boolean {
+  return listRealWorldDiscoveryProviders()
+    .filter((p) => GROWTH_REAL_WORLD_LIVE_PROVIDER_TYPES.includes(p.provider_type as never))
+    .some((p) => {
+      if (!p.isConfigured()) return false
+      if (p.provider_type === "google_places") {
+        return isDiscoveryProviderRuntimeEnabled("google_places")
+      }
+      if (p.provider_type === "serp") {
+        return isDiscoveryProviderRuntimeEnabled("serp")
+      }
+      return true
+    })
+}
+
 function mergeProviderDiagnostics(
   provider: GrowthRealWorldDiscoveryProvider,
   result: GrowthRealWorldDiscoveryProviderResult,
@@ -185,7 +200,7 @@ export async function runRealWorldDiscoveryProviders(
   options?: { admin?: SupabaseClient | null },
 ): Promise<GrowthRealWorldDiscoveryProviderResult[]> {
   const all = listRealWorldDiscoveryProviders({ admin: options?.admin ?? null })
-  const useFixtureFallback = !anyLiveProviderConfigured()
+  const useFixtureFallback = !anyLiveProviderRunnable()
 
   const toRun = all.filter((p) => {
     if (p.provider_type === "fixture") return useFixtureFallback
@@ -199,9 +214,47 @@ export async function runRealWorldDiscoveryProviders(
       provider.provider_type === "google_places" &&
       !isDiscoveryProviderRuntimeEnabled("google_places")
     ) {
+      results.push({
+        provider_name: provider.provider_name,
+        provider_type: provider.provider_type,
+        status: "skipped",
+        message: "Google Places disabled at runtime (GROWTH_DISCOVERY_DISABLE_GOOGLE_PLACES).",
+        candidates: [],
+        diagnostics: mergeProviderDiagnostics(
+          provider,
+          {
+            provider_name: provider.provider_name,
+            provider_type: provider.provider_type,
+            status: "skipped",
+            message: "Google Places disabled at runtime.",
+            candidates: [],
+          },
+          0,
+          false,
+        ),
+      })
       continue
     }
     if (provider.provider_type === "serp" && !isDiscoveryProviderRuntimeEnabled("serp")) {
+      results.push({
+        provider_name: provider.provider_name,
+        provider_type: provider.provider_type,
+        status: "skipped",
+        message: "Serp provider disabled at runtime (GROWTH_DISCOVERY_DISABLE_SERP).",
+        candidates: [],
+        diagnostics: mergeProviderDiagnostics(
+          provider,
+          {
+            provider_name: provider.provider_name,
+            provider_type: provider.provider_type,
+            status: "skipped",
+            message: "Serp provider disabled at runtime.",
+            candidates: [],
+          },
+          0,
+          false,
+        ),
+      })
       continue
     }
     if (!provider.isConfigured() && provider.provider_type !== "fixture") {

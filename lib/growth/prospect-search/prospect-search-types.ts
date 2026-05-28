@@ -524,6 +524,8 @@ export type GrowthProspectSearchResult = {
   signal_momentum_qa_marker?: typeof GROWTH_SIGNAL_MOMENTUM_QA_MARKER | null
   expanded_search_exhausted?: boolean
   territory_intelligence?: GrowthTerritoryIntelligenceSummary | null
+  discovery_hydration?: import("@/lib/growth/prospect-search/prospect-search-discovery-hydration").GrowthProspectSearchHydrationSnapshot | null
+  discovery_runtime_hardening_qa_marker?: typeof import("@/lib/growth/prospect-search/prospect-search-safe-fetch-json").GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER | null
 }
 
 export type GrowthProspectSearchSavedSearchRow = {

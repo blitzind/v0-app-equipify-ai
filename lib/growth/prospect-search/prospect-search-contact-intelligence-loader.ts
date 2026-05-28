@@ -211,7 +211,19 @@ export async function loadProspectSearchContactIntelligenceBatch(
   const map = new Map<string, GrowthProspectSearchContactIntelligence>()
   if (companies.length === 0) return map
 
-  const schema_health = await probeProspectSearchContactIntelligenceSchema(admin)
+  let schema_health: Awaited<ReturnType<typeof probeProspectSearchContactIntelligenceSchema>>
+  try {
+    schema_health = await probeProspectSearchContactIntelligenceSchema(admin)
+  } catch {
+    schema_health = {
+      ready: false,
+      verified: false,
+      uncertain: true,
+      missing_objects: [],
+      warning_message: "Contact intelligence schema probe unavailable.",
+      env_hint: null,
+    }
+  }
   const schema_ready = schema_health.ready
   const leadIds = [...new Set(companies.map((c) => c.growth_lead_id).filter(Boolean))] as string[]
   const leadMetadataById = await loadLeadMetadataByIds(admin, leadIds)
@@ -224,27 +236,41 @@ export async function loadProspectSearchContactIntelligenceBatch(
     string,
     Awaited<ReturnType<typeof listGrowthLeadDecisionMakers>>
   >()
-  await Promise.all(
+  await Promise.allSettled(
     leadIds.map(async (leadId) => {
-      decisionMakersByLead.set(leadId, await listGrowthLeadDecisionMakers(admin, leadId))
+      try {
+        decisionMakersByLead.set(leadId, await listGrowthLeadDecisionMakers(admin, leadId))
+      } catch {
+        decisionMakersByLead.set(leadId, [])
+      }
     }),
   )
 
-  await Promise.all(
+  await Promise.allSettled(
     companies.map(async (company) => {
-      let intelligence = await buildContactIntelligenceForCompany(admin, company, {
-        schema_ready,
-        schema_health,
-        decisionMakersByLead,
-        leadMetadataById,
-      })
-      if (company.growth_lead_id) {
-        const hydration = leadRelationshipHydrationById.get(company.growth_lead_id)
-        if (hydration) {
-          intelligence = { ...intelligence, lead_relationship_hydration: hydration }
+      try {
+        let intelligence = await buildContactIntelligenceForCompany(admin, company, {
+          schema_ready,
+          schema_health,
+          decisionMakersByLead,
+          leadMetadataById,
+        })
+        if (company.growth_lead_id) {
+          const hydration = leadRelationshipHydrationById.get(company.growth_lead_id)
+          if (hydration) {
+            intelligence = { ...intelligence, lead_relationship_hydration: hydration }
+          }
         }
+        map.set(`${company.source_type}:${company.id}`, intelligence)
+      } catch {
+        map.set(
+          `${company.source_type}:${company.id}`,
+          emptyProspectSearchContactIntelligence(
+            "Contact intelligence partially unavailable for this company.",
+            { schema_ready, schema_health, source_labels: [] },
+          ),
+        )
       }
-      map.set(`${company.source_type}:${company.id}`, intelligence)
     }),
   )
 
@@ -373,10 +399,18 @@ export async function applyProspectSearchContactIntelligenceOverlay(
         .filter((phone): phone is string => Boolean(phone)),
     ),
   ]
-  const [phoneDncLookup, suppressionLookup] = await Promise.all([
+  const [phoneDncResult, suppressionResult] = await Promise.allSettled([
     loadPhoneDncLookup(admin, allPhones),
     loadProspectSearchSuppressionLookup(admin),
   ])
+  const phoneDncLookup =
+    phoneDncResult.status === "fulfilled" ? phoneDncResult.value : new Map<string, boolean>()
+  const suppressionLookup =
+    suppressionResult.status === "fulfilled"
+      ? suppressionResult.value
+      : {
+          matchForIdentifiers: () => null,
+        }
   const eligibilityContext = { phoneDncLookup, suppressionLookup }
 
   return companies.map((company) => {
