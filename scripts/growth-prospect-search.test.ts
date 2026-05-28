@@ -150,8 +150,15 @@ async function main(): Promise<void> {
   assert.match(shellSource, /GROWTH_SEARCH_HAS_SEARCHED_STATE_QA_MARKER/)
   assert.match(shellSource, /GROWTH_SEARCH_CLEAN_START_QA_MARKER/)
   assert.match(shellSource, /GROWTH_SEARCH_DIAGNOSTICS_HIDDEN_QA_MARKER/)
-  assert.match(shellSource, /<ProspectSearchLiveEstimation/)
-  assert.match(shellSource, /enabled: true/)
+  assert.doesNotMatch(shellSource, /<ProspectSearchLiveEstimation/)
+  assert.doesNotMatch(shellSource, /useProspectSearchLiveEstimation/)
+  assert.match(shellSource, /GROWTH_PROSPECT_SEARCH_TRUTHFUL_LIFECYCLE_QA_MARKER/)
+  assert.match(shellSource, /GROWTH_PROSPECT_SEARCH_NO_PRESEARCH_COUNTS_QA_MARKER/)
+  assert.match(shellSource, /GROWTH_PROSPECT_SEARCH_STAGED_SEARCH_QA_MARKER/)
+  assert.match(shellSource, /lastSearchedCriteriaKey/)
+  assert.match(shellSource, /currentCriteriaKey/)
+  assert.match(shellSource, /fetchAbortRef/)
+  assert.match(shellSource, /enabled: hasSearched && !criteriaStale/)
   const providerStatusSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/real-world-provider-status.tsx"),
     "utf8",
@@ -2417,10 +2424,9 @@ async function main(): Promise<void> {
   assert.equal(isProspectSearchLiveEstimateStale("a", "b"), true)
   assert.equal(isProspectSearchLiveEstimateStale("a", "a"), false)
 
-  assert.match(shellSource, /useProspectSearchLiveEstimation/)
-  assert.match(shellSource, /<ProspectSearchLiveEstimation/)
-  assert.match(shellSource, /estimationSlot/)
-  assert.match(shellSource, /prominent/)
+  assert.match(shellSource, /useProspectSearchTerritoryHeatmap/)
+  assert.doesNotMatch(shellSource, /estimationSlot/)
+  assert.doesNotMatch(shellSource, /prominent/)
 
   const liveEstimationSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/prospect-search-live-estimation.tsx"),
@@ -2661,7 +2667,8 @@ async function testProspectSearchProviderIntent(): Promise<void> {
   assert.match(shellSource, /Apply filters/)
   assert.match(shellSource, /Search market/)
   assert.match(shellSource, /clearAllFilters/)
-  assert.match(shellSource, /resetEstimate/)
+  assert.match(shellSource, /resetExecutionState/)
+  assert.match(shellSource, /setQuery\(""\)/)
   assert.doesNotMatch(shellSource, /ProspectSearchFilterHealthWarnings/)
   assert.match(shellSource, /Filters are hiding all discovered companies/)
 
@@ -2670,7 +2677,9 @@ async function testProspectSearchProviderIntent(): Promise<void> {
     "utf8",
   )
   assert.match(intentSource, /Template applied\. Review filters, then click Search\./)
+  assert.match(intentSource, /Template applied\. Review filters, then click Search market\./)
   assert.match(intentSource, /Workflow restored — click Search\./)
+  assert.match(intentSource, /Filters updated — click Search market\./)
   assert.doesNotMatch(intentSource, /Search providers/)
   assert.doesNotMatch(shellSource, /Search providers/)
   assert.doesNotMatch(shellSource, /Searching providers/)
@@ -3321,6 +3330,23 @@ async function testProspectSearchPresearchMarketEstimation(): Promise<void> {
   assert.match(shellSource, /ProspectSearchDiscoverResultsTable/)
   assert.match(shellSource, /GROWTH_DISCOVER_COMPANY_INTELLIGENCE_PANEL_QA_MARKER/)
   assert.match(shellSource, /shouldFetchProspectSearchResults/)
+  assert.doesNotMatch(shellSource, /<ProspectSearchLiveEstimation/)
+  assert.match(shellSource, /data-staged-search-pending="v1"/)
+
+  const stagedLifecycleSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-staged-lifecycle.ts"),
+    "utf8",
+  )
+  assert.match(stagedLifecycleSource, /GROWTH_PROSPECT_SEARCH_TRUTHFUL_LIFECYCLE_QA_MARKER/)
+  assert.match(stagedLifecycleSource, /Filters updated — click Search market/)
+
+  const filterHealthSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-filter-health.ts"),
+    "utf8",
+  )
+  assert.match(filterHealthSource, /parseTitleChips/)
+  assert.match(filterHealthSource, /title_contains: null/)
+  assert.doesNotMatch(filterHealthSource, /title_keywords/)
 }
 
 void main()

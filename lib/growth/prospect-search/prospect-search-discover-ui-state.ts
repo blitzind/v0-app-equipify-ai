@@ -61,11 +61,13 @@ export function shouldShowProspectSearchCleanStart(input: {
 export function shouldShowProspectSearchResultsCount(input: {
   discoveryMode: GrowthProspectSearchDiscoveryMode
   searchCompleted: boolean
+  hasSearched: boolean
   loading: boolean
+  criteriaStale?: boolean
 }): boolean {
-  if (input.loading) return false
+  if (input.loading || input.criteriaStale) return false
   if (input.discoveryMode === "discover_external") return input.searchCompleted
-  return true
+  return input.hasSearched
 }
 
 export function formatProspectSearchResultsCountLabel(input: {

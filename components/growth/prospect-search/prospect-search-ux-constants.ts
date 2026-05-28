@@ -19,6 +19,12 @@ export const GROWTH_SEARCH_DIAGNOSTICS_HIDDEN_QA_MARKER = "growth-search-diagnos
 export const GROWTH_SEARCH_FILTERS_COLLAPSED_DEFAULT_QA_MARKER =
   "growth-search-filters-collapsed-default-v1" as const
 
+export {
+  GROWTH_PROSPECT_SEARCH_TRUTHFUL_LIFECYCLE_QA_MARKER,
+  GROWTH_PROSPECT_SEARCH_NO_PRESEARCH_COUNTS_QA_MARKER,
+  GROWTH_PROSPECT_SEARCH_STAGED_SEARCH_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-staged-lifecycle"
+
 export const PROSPECT_SEARCH_HERO_PLACEHOLDERS = [
   "medical equipment service companies California",
   "hvac companies 20-100 employees",

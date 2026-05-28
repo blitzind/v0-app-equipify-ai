@@ -15,8 +15,8 @@ export function ProspectSearchDiscoverReadyPanel() {
       </div>
       <h3 className="mt-4 text-lg font-semibold tracking-tight">Ready to search this market</h3>
       <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
-        Review the live numerical estimate above, then click Search market to discover companies from external
-        sources. Results appear here after discovery completes — filter changes refresh the estimate only.
+        Set your filters, then click Search market to discover companies from external sources. Apply filters
+        only stages changes — results and counts appear here after discovery completes.
       </p>
     </div>
   )

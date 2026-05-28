@@ -1,5 +1,6 @@
 /** Client-safe filter health warnings and relax suggestions for Prospect Search. */
 
+import { parseTitleChips } from "@/lib/growth/prospect-search/title-suggestion-engine"
 import type { GrowthProspectSearchDiscoveryMode, GrowthProspectSearchFilters } from "@/lib/growth/prospect-search/prospect-search-types"
 import { countActiveProspectSearchFilters } from "@/lib/growth/prospect-search/prospect-search-estimation-format"
 
@@ -146,9 +147,13 @@ export function buildProspectSearchActiveFilterChips(
   if (filters.territory_id) {
     chips.push(chip("territory-id", "Territory", "Saved territory", { territory_id: null }))
   }
-  if (filters.title_keywords?.length) {
+  const titleChips = parseTitleChips(filters.title_contains ?? filters.decision_maker_role)
+  if (titleChips.length) {
     chips.push(
-      chip("titles", "Titles", filters.title_keywords.join(", "), { title_keywords: undefined }),
+      chip("titles", "Titles", titleChips.join(", "), {
+        title_contains: null,
+        decision_maker_role: null,
+      }),
     )
   }
 

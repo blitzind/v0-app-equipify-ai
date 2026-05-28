@@ -42,6 +42,9 @@ import {
   GROWTH_SEARCH_CLEAN_START_QA_MARKER,
   GROWTH_SEARCH_DIAGNOSTICS_HIDDEN_QA_MARKER,
   GROWTH_SEARCH_HAS_SEARCHED_STATE_QA_MARKER,
+  GROWTH_PROSPECT_SEARCH_TRUTHFUL_LIFECYCLE_QA_MARKER,
+  GROWTH_PROSPECT_SEARCH_NO_PRESEARCH_COUNTS_QA_MARKER,
+  GROWTH_PROSPECT_SEARCH_STAGED_SEARCH_QA_MARKER,
   type ProspectSearchIcpTemplate,
 } from "@/components/growth/prospect-search/prospect-search-ux-constants"
 import {
@@ -87,8 +90,11 @@ import {
   shouldFetchProspectSearchResults,
   type ProspectSearchFetchTrigger,
 } from "@/lib/growth/prospect-search/prospect-search-provider-search-intent"
-import { ProspectSearchLiveEstimation } from "@/components/growth/prospect-search/prospect-search-live-estimation"
-import { useProspectSearchLiveEstimation } from "@/lib/growth/prospect-search/use-prospect-search-live-estimation"
+import {
+  buildProspectSearchCriteriaKey,
+  isProspectSearchCriteriaStale,
+  resolveProspectSearchStagedSearchPendingMessage,
+} from "@/lib/growth/prospect-search/prospect-search-staged-lifecycle"
 import { useProspectSearchTerritoryHeatmap } from "@/lib/growth/prospect-search/use-prospect-search-territory-heatmap"
 import {
   applyTerritoryHeatmapDrilldown,
@@ -155,6 +161,7 @@ export function ProspectSearchShell() {
   const [pageSize, setPageSize] = useState(50)
   const [sortBy, setSortBy] = useState<GrowthProspectSearchSortBy>("rank")
   const [pendingProviderSearchHint, setPendingProviderSearchHint] = useState<string | null>(null)
+  const [lastSearchedCriteriaKey, setLastSearchedCriteriaKey] = useState<string | null>(null)
 
   const queryRef = useRef(query)
   const filtersRef = useRef(filters)
@@ -162,6 +169,8 @@ export function ProspectSearchShell() {
   const pageRef = useRef(page)
   const pageSizeRef = useRef(pageSize)
   const sortByRef = useRef(sortBy)
+  const fetchAbortRef = useRef<AbortController | null>(null)
+  const fetchRequestIdRef = useRef(0)
 
   queryRef.current = query
   filtersRef.current = filters
@@ -204,10 +213,17 @@ export function ProspectSearchShell() {
     hasSearched,
     searchCompleted,
   })
+  const currentCriteriaKey = useMemo(
+    () => buildProspectSearchCriteriaKey(query, filters),
+    [query, filters],
+  )
+  const criteriaStale = isProspectSearchCriteriaStale(currentCriteriaKey, lastSearchedCriteriaKey)
   const showResultsCount = shouldShowProspectSearchResultsCount({
     discoveryMode,
     searchCompleted,
+    hasSearched,
     loading,
+    criteriaStale,
   })
   const showInternalEmpty =
     discoveryMode === "internal" && hasSearched && !loading && companies.length === 0 && people.length === 0
@@ -223,14 +239,9 @@ export function ProspectSearchShell() {
     discoverPhase === "filters_hiding_results"
   const showDiscoverReady =
     discoveryMode === "discover_external" && !searchCompleted && !loading
-  const filtersKey = useMemo(() => JSON.stringify(filters), [filters])
-
-  const { estimate, loading: estimateLoading, displayState: estimateDisplayState, resetEstimate } =
-    useProspectSearchLiveEstimation({
-      query,
-      filters,
-      discoveryMode,
-    })
+  const stagedSearchPendingMessage = criteriaStale
+    ? resolveProspectSearchStagedSearchPendingMessage(discoveryMode)
+    : null
 
   const { heatmap, loading: heatmapLoading, panelVisible: territoryHeatmapVisible } =
     useProspectSearchTerritoryHeatmap({
@@ -238,34 +249,37 @@ export function ProspectSearchShell() {
       filters,
       discoveryMode,
       savedSearchRestored: Boolean(activeSavedSearchId),
-      enabled: true,
+      enabled: hasSearched && !criteriaStale,
     })
 
   const searchLoadingLabel =
     discoveryMode === "discover_external" ? "Searching companies…" : "Searching…"
   const heroSearchButtonLabel =
-    discoveryMode === "discover_external" ? "Search market" : estimate?.search_button_label ?? "Search"
+    discoveryMode === "discover_external" ? "Search market" : "Search"
   const applyButtonLabel =
-    discoveryMode === "discover_external" ? "Apply filters" : heroSearchButtonLabel
-  const searchButtonDisabled =
-    loading ||
-    (discoveryMode === "discover_external" &&
-      estimate != null &&
-      estimate.search_button_disabled &&
-      !estimateLoading)
+    discoveryMode === "discover_external" ? "Apply filters" : "Search"
+  const searchButtonDisabled = loading
   const applyButtonDisabled = loading
 
-  const clearAllFilters = useCallback(() => {
-    replaceFilters(EMPTY_FILTERS)
-    resetEstimate()
-    setPendingProviderSearchHint(null)
-    setSearchCompleted(false)
-    setHasSearched(false)
+  const resetExecutionState = useCallback(() => {
+    fetchAbortRef.current?.abort()
     setResult(null)
+    setHasSearched(false)
+    setSearchCompleted(false)
+    setLastSearchedCriteriaKey(null)
+    setPendingProviderSearchHint(null)
     setSelectedCompany(null)
     setSelectedKeys(new Set())
     setPage(1)
-  }, [replaceFilters, resetEstimate])
+    setActiveSavedSearchId(null)
+    setActiveTemplateId(null)
+  }, [])
+
+  const clearAllFilters = useCallback(() => {
+    replaceFilters(EMPTY_FILTERS)
+    setQuery("")
+    resetExecutionState()
+  }, [replaceFilters, resetExecutionState])
 
   useEffect(() => {
     const t = window.setInterval(() => {
@@ -284,13 +298,14 @@ export function ProspectSearchShell() {
   }, [searchParams])
 
   useEffect(() => {
-    if (discoveryMode !== "discover_external") return
-    setSearchCompleted(false)
-    setHasSearched(false)
+    if (lastSearchedCriteriaKey === null) return
+    if (currentCriteriaKey === lastSearchedCriteriaKey) return
     setResult(null)
     setSelectedCompany(null)
     setSelectedKeys(new Set())
-  }, [discoveryMode, filtersKey])
+    setSearchCompleted(false)
+    setPendingProviderSearchHint(resolveProspectSearchStagedSearchPendingMessage(discoveryMode))
+  }, [currentCriteriaKey, lastSearchedCriteriaKey, discoveryMode])
 
   const fetchResults = useCallback(
     async (input: {
@@ -384,7 +399,9 @@ export function ProspectSearchShell() {
         })
       ) {
         if (trigger !== "post_action_refresh" && trigger !== "pagination" && trigger !== "sort_change") {
-          setPendingProviderSearchHint(resolveProspectSearchExternalPendingMessage(trigger))
+          setPendingProviderSearchHint(
+            resolveProspectSearchExternalPendingMessage(trigger, activeDiscoveryMode),
+          )
         }
         return
       }
@@ -687,7 +704,7 @@ export function ProspectSearchShell() {
         })
       ) {
         setPendingProviderSearchHint(
-          resolveProspectSearchExternalPendingMessage("saved_workflow_restore"),
+          resolveProspectSearchExternalPendingMessage("saved_workflow_restore", restoreDiscoveryMode),
         )
         return
       }
@@ -875,6 +892,12 @@ export function ProspectSearchShell() {
       data-discover-phase={discoverPhase ?? "internal"}
       data-discover-ready-qa={GROWTH_DISCOVER_READY_TO_SEARCH_QA_MARKER}
       data-diagnostics-hidden-marker={GROWTH_SEARCH_DIAGNOSTICS_HIDDEN_QA_MARKER}
+      data-truthful-lifecycle-marker={GROWTH_PROSPECT_SEARCH_TRUTHFUL_LIFECYCLE_QA_MARKER}
+      data-no-presearch-counts-marker={GROWTH_PROSPECT_SEARCH_NO_PRESEARCH_COUNTS_QA_MARKER}
+      data-staged-search-marker={GROWTH_PROSPECT_SEARCH_STAGED_SEARCH_QA_MARKER}
+      data-current-criteria-key={currentCriteriaKey}
+      data-last-searched-criteria-key={lastSearchedCriteriaKey ?? ""}
+      data-criteria-stale={criteriaStale ? "true" : "false"}
     >
       {/* Search hero */}
       <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-violet-50/80 via-card to-cyan-50/50 p-6 shadow-sm dark:from-violet-950/30 dark:to-cyan-950/20">
@@ -889,14 +912,7 @@ export function ProspectSearchShell() {
             mode={discoveryMode}
             onChange={(mode) => {
               setDiscoveryMode(mode)
-              setSelectedKeys(new Set())
-              if (mode === "discover_external") {
-                setHasSearched(false)
-                setSearchCompleted(false)
-                setResult(null)
-                setSelectedCompany(null)
-                setPendingProviderSearchHint(null)
-              }
+              resetExecutionState()
             }}
           />
           <Button type="button" variant="outline" size="sm" onClick={() => setIcpTemplatesOpen(true)}>
@@ -944,21 +960,15 @@ export function ProspectSearchShell() {
           />
           </div>
         </div>
-        <ProspectSearchLiveEstimation
-          estimate={estimate}
-          loading={estimateLoading}
-          displayState={estimateDisplayState}
-          prominent
-          className="mt-4"
-        />
       </section>
 
-      {pendingProviderSearchHint ? (
+      {pendingProviderSearchHint || stagedSearchPendingMessage ? (
         <p
           className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
           data-provider-search-pending-hint="v1"
+          data-staged-search-pending="v1"
         >
-          {pendingProviderSearchHint}
+          {stagedSearchPendingMessage ?? pendingProviderSearchHint}
         </p>
       ) : null}
       {error ? (
@@ -981,7 +991,10 @@ export function ProspectSearchShell() {
           onApply={() => {
             if (discoveryModeRef.current === "discover_external") {
               setPendingProviderSearchHint(
-                resolveProspectSearchExternalPendingMessage("filters_updated"),
+                resolveProspectSearchExternalPendingMessage(
+                  "filters_updated",
+                  discoveryModeRef.current,
+                ),
               )
               return
             }
@@ -1002,15 +1015,6 @@ export function ProspectSearchShell() {
           refreshingSavedCounts={refreshingSavedCounts}
           onRefreshSavedCounts={(id) => void refreshSavedCounts(id)}
           onDeleteSavedSearch={(id) => void deleteSavedSearch(id)}
-          estimationSlot={
-            <ProspectSearchLiveEstimation
-              estimate={estimate}
-              loading={estimateLoading}
-              displayState={estimateDisplayState}
-              compact
-              className="mb-3"
-            />
-          }
         />
 
         <div
@@ -1041,7 +1045,7 @@ export function ProspectSearchShell() {
                 />
               ) : null}
 
-              {territoryHeatmapVisible ? (
+              {territoryHeatmapVisible && hasSearched && !criteriaStale ? (
                 <TerritoryOpportunityHeatmapPanel
                   heatmap={heatmap}
                   loading={heatmapLoading}
@@ -1104,10 +1108,6 @@ export function ProspectSearchShell() {
                               </>
                             ) : null}
                           </>
-                        ) : discoveryMode === "discover_external" && !searchCompleted && !loading ? (
-                          <span className="whitespace-nowrap font-normal text-muted-foreground">
-                            Not searched yet
-                          </span>
                         ) : null}
                       </span>
                     </h2>
@@ -1152,8 +1152,9 @@ export function ProspectSearchShell() {
                 {(showInternalEmpty || showDiscoverNoResults || showDiscoverFiltersHiding) &&
                 !showDiscoverReady ? (
                   <ProspectSearchRelaxFilters
-                    estimate={estimate}
                     filters={filters}
+                    discoveryMode={discoveryMode}
+                    resultCount={result?.total_companies ?? null}
                     onChange={replaceFilters}
                   />
                 ) : null}
@@ -1320,22 +1321,11 @@ export function ProspectSearchShell() {
               ) : null}
             </>
           ) : (
-            <>
-              {territoryHeatmapVisible ? (
-                <TerritoryOpportunityHeatmapPanel
-                  heatmap={heatmap}
-                  loading={heatmapLoading}
-                  compact
-                  onDrilldown={handleTerritoryHeatmapDrilldown}
-                  onRecommendedAction={(action) => void handleTerritoryHeatmapRecommendedAction(action)}
-                />
-              ) : null}
-              <ProspectSearchCleanStartPanel
-                savedSearches={savedSearches}
-                onRunQuery={(q) => void runSearch({ queryText: q, trigger: "suggested_query_click" })}
-                onRestoreSavedSearch={(id) => void loadSavedById(id)}
-              />
-            </>
+            <ProspectSearchCleanStartPanel
+              savedSearches={savedSearches}
+              onRunQuery={(q) => void runSearch({ queryText: q, trigger: "suggested_query_click" })}
+              onRestoreSavedSearch={(id) => void loadSavedById(id)}
+            />
           )}
         </div>
       </div>
@@ -1346,10 +1336,9 @@ export function ProspectSearchShell() {
         activeTemplateId={activeTemplateId}
         onSelectTemplate={applyTemplate}
         onCreateCustom={() => {
-          setActiveTemplateId(null)
-          setActiveSavedSearchId(null)
           replaceFilters(EMPTY_FILTERS)
           setQuery("")
+          resetExecutionState()
         }}
       />
 

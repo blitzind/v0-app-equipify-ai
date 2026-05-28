@@ -4,9 +4,12 @@ import { X } from "lucide-react"
 import {
   applyProspectSearchRelaxSuggestion,
   buildProspectSearchActiveFilterChips,
+  buildProspectSearchRelaxSuggestions,
 } from "@/lib/growth/prospect-search/prospect-search-filter-health"
-import type { GrowthProspectSearchLiveEstimate } from "@/lib/growth/prospect-search/prospect-search-estimation-types"
-import type { GrowthProspectSearchFilters } from "@/lib/growth/prospect-search/prospect-search-types"
+import type {
+  GrowthProspectSearchDiscoveryMode,
+  GrowthProspectSearchFilters,
+} from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
 
 export function ProspectSearchActiveFilterPills({
@@ -52,17 +55,23 @@ export function ProspectSearchActiveFilterPills({
 }
 
 export function ProspectSearchRelaxFilters({
-  estimate,
   filters,
+  discoveryMode,
+  resultCount,
   onChange,
   className,
 }: {
-  estimate: GrowthProspectSearchLiveEstimate | null
   filters: GrowthProspectSearchFilters
+  discoveryMode: GrowthProspectSearchDiscoveryMode
+  resultCount?: number | null
   onChange: (next: GrowthProspectSearchFilters) => void
   className?: string
 }) {
-  const suggestions = estimate?.relax_suggestions ?? []
+  const suggestions = buildProspectSearchRelaxSuggestions({
+    filters,
+    discovery_mode: discoveryMode,
+    estimated_count: resultCount ?? null,
+  })
   if (!suggestions.length) return null
 
   return (

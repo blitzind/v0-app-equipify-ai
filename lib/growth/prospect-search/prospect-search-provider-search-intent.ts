@@ -7,9 +7,13 @@ export const GROWTH_PROSPECT_SEARCH_PROVIDER_INTENT_QA_MARKER =
 
 export const PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES = {
   templateApplied: "Template applied. Review filters, then click Search.",
+  templateAppliedDiscover: "Template applied. Review filters, then click Search market.",
   workflowRestored: "Workflow restored — click Search.",
+  workflowRestoredDiscover: "Workflow restored — click Search market.",
   filtersUpdated: "Filters updated — click Search.",
+  filtersUpdatedDiscover: "Filters updated — click Search market.",
   queryPrefilled: "Query updated — click Search.",
+  queryPrefilledDiscover: "Query updated — click Search market.",
 } as const
 
 export type ProspectSearchExternalPendingMessageKey = keyof typeof PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES
@@ -38,18 +42,30 @@ export function resolveProspectSearchExternalPendingMessage(
     ProspectSearchFetchTrigger,
     "explicit_operator_search" | "pagination" | "sort_change" | "post_action_refresh"
   >,
+  discoveryMode: GrowthProspectSearchDiscoveryMode = "internal",
 ): string {
+  const discover = discoveryMode === "discover_external"
   switch (trigger) {
     case "icp_template_selection":
-      return PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.templateApplied
+      return discover
+        ? PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.templateAppliedDiscover
+        : PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.templateApplied
     case "saved_workflow_restore":
-      return PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.workflowRestored
+      return discover
+        ? PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.workflowRestoredDiscover
+        : PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.workflowRestored
     case "filters_updated":
-      return PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.filtersUpdated
+      return discover
+        ? PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.filtersUpdatedDiscover
+        : PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.filtersUpdated
     case "suggested_query_click":
     case "search_recommendation_select":
-      return PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.queryPrefilled
+      return discover
+        ? PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.queryPrefilledDiscover
+        : PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.queryPrefilled
     default:
-      return PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.filtersUpdated
+      return discover
+        ? PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.filtersUpdatedDiscover
+        : PROSPECT_SEARCH_EXTERNAL_PENDING_MESSAGES.filtersUpdated
   }
 }
