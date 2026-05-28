@@ -13,6 +13,7 @@ import {
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import { Button } from "@/components/ui/button"
 import { GROWTH_DELIVERABILITY_INTELLIGENCE_QA_MARKER } from "@/lib/growth/deliverability/deliverability-intelligence-types"
+import { GROWTH_SEND_INFRASTRUCTURE_OPERATOR_READY_QA_MARKER } from "@/lib/growth/infrastructure/send-infrastructure-operator-types"
 import { GROWTH_OPERATOR_UX_H3_QA_MARKER } from "@/lib/growth/operator-ux/operator-ux-h3-types"
 
 export default function AdminGrowthInternalOutboundOperationsPage() {
@@ -26,7 +27,8 @@ export default function AdminGrowthInternalOutboundOperationsPage() {
   return (
     <PlatformAdminPageShell header={header}>
       <div
-        className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8"
+        className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-8"
+        data-qa={GROWTH_SEND_INFRASTRUCTURE_OPERATOR_READY_QA_MARKER}
         data-qa-marker={GROWTH_DELIVERABILITY_INTELLIGENCE_QA_MARKER}
         data-h3-qa={GROWTH_OPERATOR_UX_H3_QA_MARKER}
       >
@@ -41,8 +43,8 @@ export default function AdminGrowthInternalOutboundOperationsPage() {
               <div>
                 <h1 className={PAGE_STANDARD_PAGE_TITLE}>Send Infrastructure</h1>
                 <p className="text-sm text-muted-foreground">
-                  Deep setup for mailboxes, domains, sender pools, and transport. For daily approvals and recovery, use
-                  the Outbound Console.
+                  Deep setup for mailboxes, domains, sender pools, and transport. Track outbound readiness here; run
+                  daily approvals and recovery from the Outbound Console.
                 </p>
               </div>
             </div>

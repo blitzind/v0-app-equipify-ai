@@ -1,25 +1,54 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useState } from "react"
-import { Activity, Loader2, Mail, RefreshCw, Server, Shield, Users } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { Activity, AlertTriangle, CheckCircle2, Circle, Loader2, Mail, RefreshCw, Server, Shield, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
-import {
-  GrowthInfrastructureReadinessBadge,
-  GrowthInfrastructureReadinessBanner,
-} from "@/components/growth/growth-infrastructure-readiness-badge"
+import { GrowthInfrastructureReadinessBadge } from "@/components/growth/growth-infrastructure-readiness-badge"
 import type { GrowthInternalOutboundOperationsDashboard } from "@/lib/growth/operations/internal-outbound-operations-dashboard"
 import { GrowthOperatorDiagnosticsDisclosure } from "@/components/growth/growth-operator-diagnostics-disclosure"
+import {
+  buildDomainOperatorGuidance,
+  buildSendInfrastructureChecklist,
+  buildSendInfrastructureOperatorSummary,
+  buildSendInfrastructureProviderCards,
+  formatDomainReadinessOperatorLabel,
+  formatDomainVerificationLabel,
+  GROWTH_SEND_INFRASTRUCTURE_OPERATIONAL_MODE_QA_MARKER,
+  GROWTH_SEND_INFRASTRUCTURE_OPERATOR_READY_QA_MARKER,
+  GROWTH_SEND_INFRASTRUCTURE_SETUP_MODE_QA_MARKER,
+  GROWTH_SEND_INFRASTRUCTURE_CHECKLIST_STATUS_LABELS,
+  hasMeaningfulOutboundOperationalMetrics,
+  isSendInfrastructureSetupMode,
+  snapshotFromInternalOutboundDashboard,
+} from "@/lib/growth/infrastructure/send-infrastructure-operator-types"
+import { sanitizeInfrastructureReadinessDetailForOperator } from "@/lib/growth/deliverability/dns-setup-operator-types"
 import { GROWTH_OPERATOR_UX_H3_QA_MARKER } from "@/lib/growth/operator-ux/operator-ux-h3-types"
 import { GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER } from "@/lib/growth/operations/internal-outbound-ops-types"
 import { GROWTH_DELIVERABILITY_INTELLIGENCE_QA_MARKER } from "@/lib/growth/deliverability/deliverability-intelligence-types"
 import { GROWTH_REPUTATION_SAFE_SCALING_QA_MARKER } from "@/lib/growth/outbound/reputation-safe-scaling-types"
 import { GROWTH_OUTBOUND_LIFECYCLE_OPS_QA_MARKER } from "@/lib/growth/outbound/lifecycle-ops-types"
 
+const CHECKLIST_TONE: Record<
+  keyof typeof GROWTH_SEND_INFRASTRUCTURE_CHECKLIST_STATUS_LABELS,
+  "healthy" | "attention" | "critical" | "neutral"
+> = {
+  ready: "healthy",
+  needs_setup: "attention",
+  in_progress: "neutral",
+  not_connected: "neutral",
+}
+
 function formatDate(value: string | null): string {
   if (!value) return "—"
   return new Date(value).toLocaleString()
+}
+
+function formatMailboxStatus(status: string): string {
+  if (status === "connected") return "Connected"
+  if (status === "paused") return "Paused"
+  return status.replace(/_/g, " ")
 }
 
 export function GrowthInternalOutboundOperationsDashboardView() {
@@ -38,7 +67,7 @@ export function GrowthInternalOutboundOperationsDashboardView() {
         message?: string
       }
       if (!res.ok || !data.ok || !data.dashboard) {
-        throw new Error(data.message ?? "Could not load internal outbound operations.")
+        throw new Error(data.message ?? "Could not load send infrastructure.")
       }
       setDashboard(data.dashboard)
     } catch (e) {
@@ -52,16 +81,42 @@ export function GrowthInternalOutboundOperationsDashboardView() {
     void load()
   }, [load])
 
+  const snapshot = useMemo(
+    () => (dashboard ? snapshotFromInternalOutboundDashboard(dashboard) : null),
+    [dashboard],
+  )
+
+  const checklist = useMemo(
+    () => (snapshot ? buildSendInfrastructureChecklist(snapshot) : []),
+    [snapshot],
+  )
+
+  const summary = useMemo(
+    () =>
+      snapshot
+        ? buildSendInfrastructureOperatorSummary({ checklist, snapshot })
+        : { headline: "", connected: [], needsSetup: [], blockers: [], nextSteps: [] },
+    [checklist, snapshot],
+  )
+
+  const providerCards = useMemo(
+    () => (snapshot ? buildSendInfrastructureProviderCards(snapshot) : []),
+    [snapshot],
+  )
+
+  const setupMode = snapshot ? isSendInfrastructureSetupMode(snapshot) : true
+  const showOperationalMetrics = snapshot ? hasMeaningfulOutboundOperationalMetrics(snapshot) : false
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />
-        Loading internal outbound operations…
+        Loading outbound setup…
       </div>
     )
   }
 
-  if (error || !dashboard) {
+  if (error || !dashboard || !snapshot) {
     return (
       <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
         {error ?? "Dashboard unavailable."}
@@ -72,177 +127,351 @@ export function GrowthInternalOutboundOperationsDashboardView() {
     )
   }
 
-  const transportReadiness =
-    dashboard.readiness_catalog.find((e) => e.surfaceId === "transport_send")?.readiness ?? {
-      status: "internal" as const,
-      label: "Internal",
-    }
+  const dnsValidationEntry =
+    dashboard.readiness_catalog.find((entry) => entry.surfaceId === "dns_validation") ?? null
+  const deliverabilityEntry =
+    dashboard.readiness_catalog.find((entry) => entry.surfaceId === "deliverability") ?? null
 
   return (
-    <div className="flex flex-col gap-5" data-qa-marker={GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER} data-h3-qa={GROWTH_OPERATOR_UX_H3_QA_MARKER}>
-      <GrowthInfrastructureReadinessBanner title="Internal transport send plane" readiness={transportReadiness} />
-
-      <div className="rounded-xl border border-indigo-200/80 bg-indigo-50/40 px-4 py-3 text-sm dark:border-indigo-900/40 dark:bg-indigo-950/20">
-        <p className="font-medium text-indigo-950 dark:text-indigo-100">Daily operations live in the Outbound Console</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Approvals, queue recovery, and provider alerts —{" "}
-          <Link href="/admin/growth/operations/outbound" className="font-medium text-indigo-700 underline dark:text-indigo-300">
-            open Outbound Console
-          </Link>
-          .
-        </p>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile label="Connected mailboxes" value={String(dashboard.mailboxes.filter((m) => m.status === "connected").length)} />
-        <StatTile label="Pending approvals" value={String(dashboard.queue_health.approvals.outreach_pending_approval)} />
-        <StatTile label="Failed sends (24h)" value={String(dashboard.deliverability.failedSends24h)} />
-        <StatTile label="Unhealthy mailboxes" value={String(dashboard.deliverability.unhealthyMailboxCount)} />
-      </div>
-
-      <GrowthEngineCard title="Google Workspace (live path)" icon={<Mail size={16} />}>
-        <div className="flex flex-wrap items-center gap-2">
-          <GrowthInfrastructureReadinessBadge
-            readiness={{
-              status: dashboard.google_provider.oauthConfigured ? "live" : "stub",
-              label: dashboard.google_provider.oauthConfigured ? "Live" : "Stub",
-              detail: dashboard.google_provider.oauthConfigured
-                ? "OAuth configured for internal Google Workspace sending."
-                : "Complete Google OAuth env + provider setup to enable live path.",
-            }}
-          />
-          <span className="text-xs text-muted-foreground">
-            Connected accounts: {dashboard.google_provider.connectedAccounts} · Last test send:{" "}
-            {formatDate(dashboard.google_provider.lastTestSendAt)}
-          </span>
+    <div
+      className="flex flex-col gap-4"
+      data-qa={GROWTH_SEND_INFRASTRUCTURE_OPERATOR_READY_QA_MARKER}
+      data-qa-marker={GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER}
+      data-h3-qa={GROWTH_OPERATOR_UX_H3_QA_MARKER}
+    >
+      <div
+        data-qa={setupMode ? GROWTH_SEND_INFRASTRUCTURE_SETUP_MODE_QA_MARKER : GROWTH_SEND_INFRASTRUCTURE_OPERATIONAL_MODE_QA_MARKER}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="max-w-3xl text-sm text-muted-foreground">{summary.headline}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/admin/growth/operations/outbound">Outbound console</Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/admin/growth/infrastructure/mailboxes">Mailboxes</Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
+              <RefreshCw className="mr-2 size-3.5" />
+              Refresh
+            </Button>
+          </div>
         </div>
-        <Button type="button" variant="outline" size="sm" className="mt-3" asChild>
-          <Link href="/admin/growth/providers/setup">Provider setup</Link>
-        </Button>
-      </GrowthEngineCard>
 
-      <GrowthEngineCard title="Mailboxes" icon={<Mail size={16} />}>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-xs">
-            <thead>
-              <tr className="border-b text-muted-foreground">
-                <th className="py-2 pr-3">Address</th>
-                <th className="py-2 pr-3">Status</th>
-                <th className="py-2 pr-3">Health</th>
-                <th className="py-2 pr-3">Caps</th>
-                <th className="py-2 pr-3">Pool</th>
-                <th className="py-2">Last send</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dashboard.mailboxes.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-3 text-muted-foreground">
-                    No mailbox connections registered.
-                  </td>
-                </tr>
+        <GrowthEngineCard title="Outbound setup status" className="mt-4">
+          <div className="grid gap-4 lg:grid-cols-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Connected</p>
+              {summary.connected.length > 0 ? (
+                <ul className="mt-2 space-y-1.5 text-sm">
+                  {summary.connected.map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
               ) : (
-                dashboard.mailboxes.map((row) => (
-                  <tr key={row.id} className="border-b border-border/60">
-                    <td className="py-2 pr-3">
-                      <div className="font-medium">{row.emailAddress}</div>
-                      <div className="text-muted-foreground">{row.providerFamily}</div>
-                    </td>
-                    <td className="py-2 pr-3">
-                      <GrowthBadge label={row.status} tone={row.status === "connected" ? "healthy" : "attention"} />
-                    </td>
-                    <td className="py-2 pr-3">{row.connectionHealth}</td>
-                    <td className="py-2 pr-3">
-                      {row.dailySendUsed}/{row.dailySendLimit}
-                    </td>
-                    <td className="py-2 pr-3">{row.senderPoolLabels.join(", ") || "—"}</td>
-                    <td className="py-2">{formatDate(row.lastSuccessfulSendAt)}</td>
-                  </tr>
-                ))
+                <p className="mt-2 text-sm text-muted-foreground">Nothing fully connected yet.</p>
               )}
-            </tbody>
-          </table>
-        </div>
-      </GrowthEngineCard>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Still needs setup</p>
+              {summary.needsSetup.length > 0 ? (
+                <ul className="mt-2 space-y-1.5 text-sm">
+                  {summary.needsSetup.map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <Circle className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">Core setup steps are complete.</p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Blocking outbound</p>
+              {summary.blockers.length > 0 ? (
+                <ul className="mt-2 space-y-1.5 text-sm">
+                  {summary.blockers.map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">No hard blockers detected.</p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Do this next</p>
+              {summary.nextSteps.length > 0 ? (
+                <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">
+                  {summary.nextSteps.slice(0, 5).map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">Review operational health below.</p>
+              )}
+            </div>
+          </div>
+        </GrowthEngineCard>
 
-      <GrowthEngineCard title="Domains (manual DNS verification)" icon={<Shield size={16} />}>
-        <p className="mb-3 text-xs text-amber-900">
-          {dashboard.deliverability_intelligence.live_dns_enabled
-            ? "Live DNS verification enabled (GROWTH_LIVE_DNS_VERIFICATION=true). Failed checks degrade readiness."
-            : "MANUAL VERIFICATION REQUIRED — set GROWTH_LIVE_DNS_VERIFICATION=true for live DNS probes."}
-        </p>
-        <div className="space-y-2">
+        <GrowthEngineCard title="Outbound readiness" className="mt-4">
+          <ul className="divide-y divide-border/70">
+            {checklist.map((item) => (
+              <li key={item.id} className="flex flex-wrap items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {item.href ? (
+                      <Link href={item.href} className="text-sm font-medium hover:underline">
+                        {item.label}
+                      </Link>
+                    ) : (
+                      <p className="text-sm font-medium">{item.label}</p>
+                    )}
+                    <GrowthBadge
+                      label={GROWTH_SEND_INFRASTRUCTURE_CHECKLIST_STATUS_LABELS[item.status]}
+                      tone={CHECKLIST_TONE[item.status]}
+                    />
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{item.detail}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </GrowthEngineCard>
+
+        <GrowthEngineCard title="Mailbox providers" icon={<Mail size={16} />} className="mt-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            {providerCards.map((provider) => (
+              <div key={provider.id} className="rounded-lg border border-border/80 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold">{provider.label}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{provider.detail}</p>
+                  </div>
+                  <GrowthBadge label={provider.healthLabel} tone={provider.healthTone} />
+                </div>
+                <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                  <dt className="text-muted-foreground">Connection</dt>
+                  <dd>{provider.connectionStatus === "connected" ? "Connected" : "Not connected"}</dd>
+                  <dt className="text-muted-foreground">Mailboxes</dt>
+                  <dd>{provider.mailboxesAttached}</dd>
+                  <dt className="text-muted-foreground">Status</dt>
+                  <dd>{provider.lastActivityLabel}</dd>
+                </dl>
+                <Button type="button" variant="outline" size="sm" className="mt-3" asChild>
+                  <Link href={provider.ctaHref}>{provider.ctaLabel}</Link>
+                </Button>
+              </div>
+            ))}
+          </div>
+        </GrowthEngineCard>
+
+        <GrowthEngineCard title="Sending domains" icon={<Shield size={16} />} className="mt-4">
           {dashboard.domains.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No sender domains registered.</p>
+            <div className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
+              No sender domains configured yet.{" "}
+              <Link href="/admin/growth/infrastructure" className="font-medium text-foreground underline-offset-2 hover:underline">
+                Add your first sending domain
+              </Link>
+              .
+            </div>
           ) : (
-            dashboard.domains.map((domain) => (
-              <div key={domain.id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg border p-3">
-                <div>
-                  <p className="font-medium">{domain.domain}</p>
-                  <p className="text-xs text-muted-foreground">
-                    SPF {domain.spfStatus} · DKIM {domain.dkimStatus} · DMARC {domain.dmarcStatus} · MX {domain.mxStatus}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {domain.verificationLabel}
-                    {domain.lastVerifiedAt ? ` · Verified ${formatDate(domain.lastVerifiedAt)}` : ""}
-                  </p>
-                  {domain.verificationError ? (
-                    <p className="mt-1 text-xs text-rose-800">{domain.verificationError}</p>
-                  ) : null}
-                  {domain.reputationWarnings.length > 0 ? (
-                    <p className="mt-1 text-xs text-rose-800">{domain.reputationWarnings.join(" ")}</p>
-                  ) : null}
-                </div>
-                <GrowthInfrastructureReadinessBadge
-                  readiness={{
-                    status: domain.readinessStatus as "live" | "stub" | "degraded" | "error",
-                    label: domain.readinessStatus,
-                    detail: domain.manualVerificationRequired ? "Operator must verify DNS records externally." : undefined,
-                  }}
-                />
-              </div>
-            ))
+            <div className="space-y-2">
+              {dashboard.domains.map((domain) => {
+                const guidance = buildDomainOperatorGuidance(domain)
+                return (
+                  <div key={domain.id} className="rounded-lg border border-border/80 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold">{domain.domain}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDomainVerificationLabel(domain.verificationLabel)}
+                          {domain.lastVerifiedAt ? ` · Last checked ${formatDate(domain.lastVerifiedAt)}` : ""}
+                        </p>
+                      </div>
+                      <GrowthBadge
+                        label={formatDomainReadinessOperatorLabel(domain.readinessStatus)}
+                        tone={
+                          domain.readinessStatus === "live"
+                            ? "healthy"
+                            : domain.readinessStatus === "error"
+                              ? "critical"
+                              : "attention"
+                        }
+                      />
+                    </div>
+                    {guidance.length > 0 ? (
+                      <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        {guidance.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-2 text-xs text-muted-foreground">DNS authentication looks ready for this domain.</p>
+                    )}
+                    <Button type="button" variant="outline" size="sm" className="mt-2" asChild>
+                      <Link href="/admin/growth/infrastructure/deliverability">Review DNS setup</Link>
+                    </Button>
+                  </div>
+                )
+              })}
+            </div>
           )}
-        </div>
-      </GrowthEngineCard>
+        </GrowthEngineCard>
 
-      <GrowthEngineCard title="Sender pools" icon={<Users size={16} />}>
-        <div className="space-y-2">
-          {dashboard.sender_pools.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No sender pools configured.</p>
-          ) : (
-            dashboard.sender_pools.map((pool) => (
-              <div key={pool.id} className="rounded-lg border p-3 text-xs">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-semibold">{pool.name}</span>
-                  <GrowthBadge label={pool.status} tone={pool.status === "active" ? "healthy" : "neutral"} />
+        {setupMode ? (
+          <GrowthEngineCard title="Get outbound running" className="mt-4">
+            <div className="grid gap-3 md:grid-cols-3">
+              {snapshot.connectedMailboxes === 0 ? (
+                <div className="rounded-lg border border-dashed border-border p-3 text-sm">
+                  <p className="font-medium">No mailbox providers connected yet.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Add your first sending mailbox to start outbound setup.</p>
+                  <Button type="button" variant="outline" size="sm" className="mt-2" asChild>
+                    <Link href="/admin/growth/infrastructure/mailboxes">Connect mailbox</Link>
+                  </Button>
                 </div>
-                <p className="mt-1 text-muted-foreground">
-                  Active {pool.activeSenders} · Paused {pool.pausedSenders} · Unhealthy {pool.unhealthySenders} · Queue
-                  load {pool.queueLoad} · Rotation health {pool.rotationHealth}
-                </p>
-              </div>
-            ))
-          )}
-        </div>
-      </GrowthEngineCard>
+              ) : null}
+              {snapshot.domainCount === 0 ? (
+                <div className="rounded-lg border border-dashed border-border p-3 text-sm">
+                  <p className="font-medium">No sender domains configured.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Register a domain before verifying SPF, DKIM, and DMARC.</p>
+                  <Button type="button" variant="outline" size="sm" className="mt-2" asChild>
+                    <Link href="/admin/growth/infrastructure">Add sending domain</Link>
+                  </Button>
+                </div>
+              ) : null}
+              {snapshot.warmupActiveCount === 0 ? (
+                <div className="rounded-lg border border-dashed border-border p-3 text-sm">
+                  <p className="font-medium">Warmup has not started.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Plan mailbox warmup before scaling send volume.</p>
+                  <Button type="button" variant="outline" size="sm" className="mt-2" asChild>
+                    <Link href="/admin/growth/infrastructure/warmup">Start warmup</Link>
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          </GrowthEngineCard>
+        ) : null}
 
-      <GrowthEngineCard title="Deliverability (deterministic)" icon={<Shield size={16} />}>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatTile label="Bounce rate (24h)" value={`${dashboard.deliverability.bounceRate24h}%`} />
-          <StatTile label="Complaint rate (24h)" value={`${dashboard.deliverability.complaintRate24h}%`} />
-          <StatTile label="Suppression hits (24h)" value={String(dashboard.deliverability.suppressionHits24h)} />
-          <StatTile label="Failed sends (24h)" value={String(dashboard.deliverability.failedSends24h)} />
-        </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          Open/click rates require webhook engagement events — not estimated here.
-        </p>
-      </GrowthEngineCard>
+        {showOperationalMetrics ? (
+          <>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <StatTile label="Connected mailboxes" value={String(snapshot.connectedMailboxes)} />
+              <StatTile label="Pending approvals" value={String(snapshot.pendingApprovals)} />
+              <StatTile label="Failed sends (24h)" value={String(snapshot.failedSends24h)} />
+              <StatTile label="Unhealthy mailboxes" value={String(snapshot.unhealthyMailboxCount)} />
+            </div>
+
+            <GrowthEngineCard title="Connected mailboxes" icon={<Mail size={16} />} className="mt-4">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left text-xs">
+                  <thead>
+                    <tr className="border-b text-muted-foreground">
+                      <th className="py-2 pr-3">Address</th>
+                      <th className="py-2 pr-3">Status</th>
+                      <th className="py-2 pr-3">Health</th>
+                      <th className="py-2 pr-3">Caps</th>
+                      <th className="py-2 pr-3">Pool</th>
+                      <th className="py-2">Last send</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboard.mailboxes.map((row) => (
+                      <tr key={row.id} className="border-b border-border/60">
+                        <td className="py-2 pr-3">
+                          <div className="font-medium">{row.emailAddress}</div>
+                          <div className="text-muted-foreground">{row.providerFamily}</div>
+                        </td>
+                        <td className="py-2 pr-3">
+                          <GrowthBadge
+                            label={formatMailboxStatus(row.status)}
+                            tone={row.status === "connected" ? "healthy" : "attention"}
+                          />
+                        </td>
+                        <td className="py-2 pr-3">{row.connectionHealth}</td>
+                        <td className="py-2 pr-3">
+                          {row.dailySendUsed}/{row.dailySendLimit}
+                        </td>
+                        <td className="py-2 pr-3">{row.senderPoolLabels.join(", ") || "—"}</td>
+                        <td className="py-2">{formatDate(row.lastSuccessfulSendAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </GrowthEngineCard>
+
+            {dashboard.sender_pools.length > 0 ? (
+              <GrowthEngineCard title="Sender pools" icon={<Users size={16} />} className="mt-4">
+                <div className="space-y-2">
+                  {dashboard.sender_pools.map((pool) => (
+                    <div key={pool.id} className="rounded-lg border p-3 text-xs">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold">{pool.name}</span>
+                        <GrowthBadge label={pool.status} tone={pool.status === "active" ? "healthy" : "neutral"} />
+                      </div>
+                      <p className="mt-1 text-muted-foreground">
+                        Active {pool.activeSenders} · Paused {pool.pausedSenders} · Unhealthy {pool.unhealthySenders} ·
+                        Queue load {pool.queueLoad}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </GrowthEngineCard>
+            ) : null}
+
+            {snapshot.sent24h > 0 ? (
+              <GrowthEngineCard title="Deliverability (24h)" icon={<Shield size={16} />} className="mt-4">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <StatTile label="Bounce rate" value={`${dashboard.deliverability.bounceRate24h}%`} />
+                  <StatTile label="Complaint rate" value={`${dashboard.deliverability.complaintRate24h}%`} />
+                  <StatTile label="Suppression hits" value={String(dashboard.deliverability.suppressionHits24h)} />
+                  <StatTile label="Sent" value={String(dashboard.deliverability.sent24h)} />
+                </div>
+              </GrowthEngineCard>
+            ) : null}
+          </>
+        ) : null}
+      </div>
 
       <GrowthOperatorDiagnosticsDisclosure
-        title="Engineering diagnostics"
-        description="Cron telemetry, execution command center, deliverability intelligence, lifecycle ops, and audit history."
+        title="Developer diagnostics"
+        description="Technical readiness flags, cron telemetry, execution command center, and engineering config."
       >
+        <div className="space-y-3 text-xs text-muted-foreground">
+          <p>
+            Live DNS verification env:{" "}
+            <code className="rounded bg-muted px-1 py-0.5">GROWTH_LIVE_DNS_VERIFICATION=true</code> (
+            {snapshot.liveDnsEnabled ? "enabled" : "disabled"})
+          </p>
+          {dnsValidationEntry ? (
+            <div className="rounded-lg border border-border/70 bg-background p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium text-foreground">{dnsValidationEntry.title}</span>
+                <GrowthInfrastructureReadinessBadge readiness={dnsValidationEntry.readiness} />
+              </div>
+              {dnsValidationEntry.readiness.detail ? <p className="mt-1">{dnsValidationEntry.readiness.detail}</p> : null}
+              <p className="mt-1 opacity-80">
+                Operator detail: {sanitizeInfrastructureReadinessDetailForOperator(dnsValidationEntry.readiness.detail) ?? "—"}
+              </p>
+            </div>
+          ) : null}
+          {deliverabilityEntry ? (
+            <div className="rounded-lg border border-border/70 bg-background p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium text-foreground">{deliverabilityEntry.title}</span>
+                <GrowthInfrastructureReadinessBadge readiness={deliverabilityEntry.readiness} />
+              </div>
+              {deliverabilityEntry.readiness.detail ? <p className="mt-1">{deliverabilityEntry.readiness.detail}</p> : null}
+            </div>
+          ) : null}
+        </div>
       <GrowthEngineCard title="Queue + cron health" icon={<Activity size={16} />}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile label="Scheduled outreach" value={String(dashboard.queue_health.outreach_queue.scheduled)} />
@@ -639,16 +868,6 @@ export function GrowthInternalOutboundOperationsDashboardView() {
         </ul>
       </GrowthEngineCard>
       </GrowthOperatorDiagnosticsDisclosure>
-
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" size="sm" asChild>
-          <Link href="/admin/growth/infrastructure/mailboxes">Mailboxes</Link>
-        </Button>
-        <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
-          <RefreshCw className="mr-2 size-3.5" />
-          Refresh
-        </Button>
-      </div>
     </div>
   )
 }

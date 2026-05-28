@@ -39,6 +39,13 @@ import {
   hasMeaningfulDnsDashboardMetrics,
   sanitizeInfrastructureReadinessDetailForOperator,
 } from "../lib/growth/deliverability/dns-setup-operator-types"
+import {
+  GROWTH_SEND_INFRASTRUCTURE_OPERATIONAL_MODE_QA_MARKER,
+  GROWTH_SEND_INFRASTRUCTURE_OPERATOR_READY_QA_MARKER,
+  GROWTH_SEND_INFRASTRUCTURE_SETUP_MODE_QA_MARKER,
+  buildSendInfrastructureChecklist,
+  isSendInfrastructureSetupMode,
+} from "../lib/growth/infrastructure/send-infrastructure-operator-types"
 import { GROWTH_SENDER_PROVIDER_CAPABILITIES } from "../lib/growth/sender/provider-sender-capabilities"
 
 async function main(): Promise<void> {
@@ -315,6 +322,46 @@ async function main(): Promise<void> {
     true,
   )
 
+  const sendChecklist = buildSendInfrastructureChecklist({
+    liveDnsEnabled: false,
+    connectedMailboxes: 0,
+    totalMailboxes: 0,
+    mailboxes: [],
+    domainCount: 0,
+    domains: [],
+    senderPoolCount: 0,
+    activePoolSenders: 0,
+    warmupActiveCount: 0,
+    googleOAuthConfigured: false,
+    sent24h: 0,
+    failedSends24h: 0,
+    pendingApprovals: 0,
+    scheduledOutreach: 0,
+    sequenceJobsDue: 0,
+    unhealthyMailboxCount: 0,
+    readinessCatalog: [],
+  })
+  assert.equal(sendChecklist.length, 10)
+  assert.ok(isSendInfrastructureSetupMode({
+    liveDnsEnabled: false,
+    connectedMailboxes: 0,
+    totalMailboxes: 0,
+    mailboxes: [],
+    domainCount: 0,
+    domains: [],
+    senderPoolCount: 0,
+    activePoolSenders: 0,
+    warmupActiveCount: 0,
+    googleOAuthConfigured: false,
+    sent24h: 0,
+    failedSends24h: 0,
+    pendingApprovals: 0,
+    scheduledOutreach: 0,
+    sequenceJobsDue: 0,
+    unhealthyMailboxCount: 0,
+    readinessCatalog: [],
+  }))
+
   assert.equal(GROWTH_SENDER_PROVIDER_CAPABILITIES.google.supportsDnsValidation, true)
   assert.equal(GROWTH_SENDER_PROVIDER_CAPABILITIES.custom.supportsDnsValidation, false)
   assert.equal(GROWTH_SENDER_PROVIDER_CAPABILITIES.smtp.supportsDeliverabilityMonitoring, true)
@@ -409,6 +456,21 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(dnsDashboardRoute, /live_dns_verification_enabled/)
+
+  assert.equal(GROWTH_SEND_INFRASTRUCTURE_OPERATOR_READY_QA_MARKER, "growth-send-infrastructure-operator-ready-v1")
+  assert.equal(GROWTH_SEND_INFRASTRUCTURE_SETUP_MODE_QA_MARKER, "growth-send-infrastructure-setup-mode-v1")
+  assert.equal(GROWTH_SEND_INFRASTRUCTURE_OPERATIONAL_MODE_QA_MARKER, "growth-send-infrastructure-operational-mode-v1")
+
+  const sendInfraDashboard = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/growth-internal-outbound-operations-dashboard.tsx"),
+    "utf8",
+  )
+  assert.match(sendInfraDashboard, /Outbound readiness/)
+  assert.match(sendInfraDashboard, /Mailbox providers/)
+  assert.doesNotMatch(sendInfraDashboard, /Google Workspace \(live path\)/)
+  assert.doesNotMatch(sendInfraDashboard, /MANUAL VERIFICATION REQUIRED/)
+  assert.doesNotMatch(sendInfraDashboard, /set GROWTH_LIVE_DNS_VERIFICATION=true/)
+  assert.match(sendInfraDashboard.slice(sendInfraDashboard.indexOf("GrowthOperatorDiagnosticsDisclosure")), /GROWTH_LIVE_DNS_VERIFICATION/)
 
   const navSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts"),
