@@ -6,18 +6,18 @@ This app mirrors the marketing stack used on [www.equipify.ai](https://www.equip
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `NEXT_PUBLIC_GA4_ID` | No* | GA4 measurement ID (`G-…`). |
-| `NEXT_PUBLIC_GOOGLE_ADS_ID` | No* | Google Ads tag ID (`AW-…`). |
+| `NEXT_PUBLIC_GA4_ID` | No* | GA4 measurement ID (`G-…`). Default when unset: `G-YZMS47H63H` (same as marketing site). |
+| `NEXT_PUBLIC_GOOGLE_ADS_ID` | No* | Google Ads tag ID (`AW-…`). Default when unset: `AW-18160904774` (same as marketing site). |
 | `NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO` | No | Full Ads conversion `send_to` value (`AW-…/label`). Without it, GA4 events still fire but the Ads `conversion` event is skipped. Copy the exact value from Google Ads → Goals → Conversions → Tag setup. |
 | `NEXT_PUBLIC_ANALYTICS_COOKIE_DOMAIN` | No | Override first-party cookie domain. Default: `.equipify.ai` when the hostname ends with `equipify.ai`; omitted on `localhost`. |
 | `NEXT_PUBLIC_ANALYTICS_LINKER_DOMAINS` | No | Comma-separated hostnames for `linker.domains` (cross-domain / subdomain measurement). Default: `www.equipify.ai,app.equipify.ai,equipify.ai`. |
 | `NEXT_PUBLIC_ANALYTICS_DEBUG` | No | Set to `1` to log gtag init, SPA `page_view`, and conversion-related calls to the browser console. |
 
-\*At least one of `NEXT_PUBLIC_GA4_ID` or `NEXT_PUBLIC_GOOGLE_ADS_ID` must be set for any scripts to load.
+\*Scripts load when at least one ID resolves (env or built-in Equipify defaults). Set either env var to `off` to disable that destination.
 
 ## Where code runs
 
-- **Bootstrap + `gtag/js` loader (all routes):** `components/analytics/marketing-gtag-server-scripts.tsx`, mounted from **`app/layout.tsx`** (Server Component) as the first child of `<body>`. This avoids relying on client-only `next/script` inside `MarketingAnalyticsProvider` for tag discovery (e.g. Tag Assistant on `/onboarding`).
+- **Bootstrap + `gtag/js` loader (all routes):** `components/analytics/google-analytics-tags.tsx` (re-exports `MarketingGtagServerScripts`), mounted from **`app/layout.tsx`** (Server Component) as the first child of `<body>`. Inline bootstrap calls `gtag('config', …)` for GA4 + Google Ads before hydration so Tag Assistant detects destinations on `/onboarding` without waiting for React.
 - **Runtime ID mirror for the client:** the server inline script sets `window.__EQUIPIFY_MARKETING_ENV__`. `lib/analytics/marketing-analytics-config.ts` prefers that object over `process.env` so event helpers match the IDs embedded in the HTML for this response.
 - **SPA `page_view` + `gtag('config', …)`:** `components/analytics/marketing-analytics-provider.tsx` (inside `GlobalProviders`) — `usePathname` / `useSearchParams`, with dedupe in `lib/analytics/marketing-analytics-pageview-dedupe.ts`.
 - **Conversion and funnel events (client-only):** `lib/analytics/marketing-analytics-events.ts`

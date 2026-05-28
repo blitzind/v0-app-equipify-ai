@@ -1,12 +1,19 @@
 /**
  * Server- and client-safe reads of public marketing analytics env vars.
- * IDs are optional in dev; scripts and events no-op when unset.
+ * Public measurement IDs match www.equipify.ai (Google Ads + GA4) for cross-subdomain
+ * trial/signup attribution on app.equipify.ai. Override via `NEXT_PUBLIC_*` when needed.
  *
  * On the client, values prefer `window.__EQUIPIFY_MARKETING_ENV__` (injected from the
  * root Server Component) so Tag Assistant and events stay aligned with the HTML that
  * was rendered for this deployment, even when client-bundle inlining of `NEXT_PUBLIC_*`
  * differs from the server.
  */
+
+/** Same GA4 property as the marketing site — public measurement ID. */
+export const EQUIPIFY_MARKETING_GA4_MEASUREMENT_ID = "G-YZMS47H63H" as const
+
+/** Same Google Ads destination as the marketing site — public tag ID. */
+export const EQUIPIFY_MARKETING_GOOGLE_ADS_ID = "AW-18160904774" as const
 
 export type EquipifyMarketingPublicEnv = {
   ga4Id: string | null
@@ -28,6 +35,15 @@ function trimEnv(value: string | undefined | null): string | null {
   return v ? v : null
 }
 
+function resolvePublicMeasurementId(
+  envValue: string | undefined,
+  defaultId: string,
+): string | null {
+  const trimmed = trimEnv(envValue)
+  if (trimmed === "0" || trimmed === "false" || trimmed === "off") return null
+  return trimmed ?? defaultId
+}
+
 function publicEnvFromWindow(): EquipifyMarketingPublicEnv | null {
   if (typeof window === "undefined") return null
   const raw = window.__EQUIPIFY_MARKETING_ENV__
@@ -38,8 +54,14 @@ function publicEnvFromWindow(): EquipifyMarketingPublicEnv | null {
 /** Used by the root Server Component to serialize env into the HTML bootstrap script. */
 export function readMarketingPublicEnvForServerScript(): EquipifyMarketingPublicEnv {
   return {
-    ga4Id: trimEnv(process.env.NEXT_PUBLIC_GA4_ID),
-    googleAdsId: trimEnv(process.env.NEXT_PUBLIC_GOOGLE_ADS_ID),
+    ga4Id: resolvePublicMeasurementId(
+      process.env.NEXT_PUBLIC_GA4_ID,
+      EQUIPIFY_MARKETING_GA4_MEASUREMENT_ID,
+    ),
+    googleAdsId: resolvePublicMeasurementId(
+      process.env.NEXT_PUBLIC_GOOGLE_ADS_ID,
+      EQUIPIFY_MARKETING_GOOGLE_ADS_ID,
+    ),
     signupSendTo: trimEnv(process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO),
     analyticsDebug: trimEnv(process.env.NEXT_PUBLIC_ANALYTICS_DEBUG),
     cookieDomainOverride: trimEnv(process.env.NEXT_PUBLIC_ANALYTICS_COOKIE_DOMAIN),
@@ -54,12 +76,14 @@ export function isMarketingAnalyticsEnabledFromServerEnv(): boolean {
 
 export function getGa4MeasurementId(): string | null {
   const w = publicEnvFromWindow()
-  return trimEnv(w?.ga4Id ?? undefined) ?? trimEnv(process.env.NEXT_PUBLIC_GA4_ID)
+  if (w?.ga4Id !== undefined) return trimEnv(w.ga4Id)
+  return resolvePublicMeasurementId(process.env.NEXT_PUBLIC_GA4_ID, EQUIPIFY_MARKETING_GA4_MEASUREMENT_ID)
 }
 
 export function getGoogleAdsId(): string | null {
   const w = publicEnvFromWindow()
-  return trimEnv(w?.googleAdsId ?? undefined) ?? trimEnv(process.env.NEXT_PUBLIC_GOOGLE_ADS_ID)
+  if (w?.googleAdsId !== undefined) return trimEnv(w.googleAdsId)
+  return resolvePublicMeasurementId(process.env.NEXT_PUBLIC_GOOGLE_ADS_ID, EQUIPIFY_MARKETING_GOOGLE_ADS_ID)
 }
 
 /**

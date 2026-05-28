@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
-import { MarketingGtagServerScripts } from '@/components/analytics/marketing-gtag-server-scripts'
+import { GoogleAnalyticsTags } from '@/components/analytics/google-analytics-tags'
 import { GlobalProviders } from '@/components/global-providers'
 import './globals.css'
 
@@ -26,7 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="bg-background h-full">
       <body className="font-sans antialiased h-full">
-        <MarketingGtagServerScripts />
+        <GoogleAnalyticsTags />
         <GlobalProviders>
           {children}
         </GlobalProviders>
