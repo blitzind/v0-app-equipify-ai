@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { CallWorkspaceLeadSearchResultsPanel } from "@/components/growth/call-workspace-lead-search-results"
 import { GrowthCallWorkspaceRelationshipMemoryPanel } from "@/components/growth/growth-call-workspace-relationship-memory-panel"
 import { GrowthCallWorkspaceRevenueIntelligencePanel } from "@/components/growth/growth-call-workspace-revenue-intelligence-panel"
+import { GrowthCallWorkspaceRetentionIntelligencePanel } from "@/components/growth/growth-call-workspace-retention-intelligence-panel"
 import { useCallWorkspaceLeadSearch } from "@/components/growth/use-call-workspace-lead-search"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import {
@@ -35,6 +36,8 @@ import type { VoiceRelationshipMemoryWorkspaceSnapshot } from "@/lib/voice/relat
 import { VOICE_RELATIONSHIP_MEMORY_QA_MARKER } from "@/lib/voice/relationship-memory/types"
 import type { VoiceRevenueIntelligenceWorkspaceSnapshot } from "@/lib/voice/revenue-intelligence/types"
 import { VOICE_REVENUE_INTELLIGENCE_QA_MARKER } from "@/lib/voice/revenue-intelligence/types"
+import type { VoiceRetentionIntelligenceWorkspaceSnapshot } from "@/lib/voice/retention-intelligence/types"
+import { VOICE_RETENTION_INTELLIGENCE_QA_MARKER } from "@/lib/voice/retention-intelligence/types"
 import type {
   NativeCallWorkspaceSessionPublicView,
   NativeDialerLeadContext,
@@ -70,8 +73,10 @@ export function GrowthCallWorkspaceIntelligenceRail({
   operatorAssist = null,
   relationshipMemory = null,
   revenueIntelligence = null,
+  retentionIntelligence = null,
   onRelationshipMemoryRefresh,
   onRevenueIntelligenceRefresh,
+  onRetentionIntelligenceRefresh,
   onLeadAttached,
 }: {
   leadContext: NativeDialerLeadContext | null
@@ -80,8 +85,10 @@ export function GrowthCallWorkspaceIntelligenceRail({
   operatorAssist?: UnifiedOperatorAssistSnapshot | null
   relationshipMemory?: VoiceRelationshipMemoryWorkspaceSnapshot | null
   revenueIntelligence?: VoiceRevenueIntelligenceWorkspaceSnapshot | null
+  retentionIntelligence?: VoiceRetentionIntelligenceWorkspaceSnapshot | null
   onRelationshipMemoryRefresh?: () => Promise<void>
   onRevenueIntelligenceRefresh?: () => Promise<void>
+  onRetentionIntelligenceRefresh?: () => Promise<void>
   onLeadAttached?: (leadId: string, session?: NativeCallWorkspaceSessionPublicView) => void
 }) {
   const {
@@ -130,6 +137,7 @@ export function GrowthCallWorkspaceIntelligenceRail({
       data-native-dialer-lead-search-qa-marker={GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER}
       data-voice-relationship-memory-qa-marker={VOICE_RELATIONSHIP_MEMORY_QA_MARKER}
       data-voice-revenue-intelligence-qa-marker={VOICE_REVENUE_INTELLIGENCE_QA_MARKER}
+      data-voice-retention-intelligence-qa-marker={VOICE_RETENTION_INTELLIGENCE_QA_MARKER}
     >
       <h3 className="mb-3 text-sm font-semibold">Prospect Intelligence</h3>
 
@@ -170,6 +178,10 @@ export function GrowthCallWorkspaceIntelligenceRail({
               <GrowthCallWorkspaceRevenueIntelligencePanel
                 revenueIntelligence={revenueIntelligence}
                 onRefresh={onRevenueIntelligenceRefresh ?? onRelationshipMemoryRefresh}
+              />
+              <GrowthCallWorkspaceRetentionIntelligencePanel
+                retentionIntelligence={retentionIntelligence}
+                onRefresh={onRetentionIntelligenceRefresh ?? onRevenueIntelligenceRefresh ?? onRelationshipMemoryRefresh}
               />
               <GrowthCallWorkspaceRelationshipMemoryPanel
                 relationshipMemory={relationshipMemory}
@@ -267,6 +279,11 @@ export function GrowthCallWorkspaceIntelligenceRail({
           <GrowthCallWorkspaceRevenueIntelligencePanel
             revenueIntelligence={revenueIntelligence}
             onRefresh={onRevenueIntelligenceRefresh ?? onRelationshipMemoryRefresh}
+          />
+
+          <GrowthCallWorkspaceRetentionIntelligencePanel
+            retentionIntelligence={retentionIntelligence}
+            onRefresh={onRetentionIntelligenceRefresh ?? onRevenueIntelligenceRefresh ?? onRelationshipMemoryRefresh}
           />
 
           <GrowthCallWorkspaceRelationshipMemoryPanel

@@ -21,6 +21,7 @@ import { fetchVoiceCallConversationIntelligenceSnapshot } from "@/lib/voice/inte
 import { fetchUnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/operator-assist-service"
 import { fetchRelationshipMemoryWorkspaceSnapshot } from "@/lib/voice/relationship-memory/relationship-memory-service"
 import { fetchRevenueIntelligenceWorkspaceSnapshot } from "@/lib/voice/revenue-intelligence/revenue-intelligence-service"
+import { fetchRetentionIntelligenceWorkspaceSnapshot } from "@/lib/voice/retention-intelligence/retention-intelligence-service"
 import { appendVoiceCallEvent } from "@/lib/voice/repository/voice-repository"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import type { VoiceCallStatus } from "@/lib/voice/types"
@@ -260,6 +261,15 @@ export async function buildVoiceBrowserSyncSnapshot(
         relationshipMemoryProfileId: relationshipMemory?.profile?.id ?? null,
       })
     : null
+  const retentionIntelligence = sessionPhone
+    ? await fetchRetentionIntelligenceWorkspaceSnapshot(admin, {
+        organizationId: input.organizationId,
+        phoneNumber: sessionPhone,
+        leadId: sessionLeadId,
+        activeVoiceCallId,
+        relationshipMemoryProfileId: relationshipMemory?.profile?.id ?? null,
+      })
+    : null
   const inboundRinging = await fetchInboundBrowserOfferForUser(admin, {
     organizationId: input.organizationId,
     userId: input.userId,
@@ -292,6 +302,7 @@ export async function buildVoiceBrowserSyncSnapshot(
     operatorAssist,
     relationshipMemory,
     revenueIntelligence,
+    retentionIntelligence,
   }
 }
 
