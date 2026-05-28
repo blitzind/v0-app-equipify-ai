@@ -32,6 +32,7 @@ export type InboundCallControlDecision = {
   routingMode: string | null
   action: "forward" | "dial" | "voicemail" | "reject" | "say_and_hangup"
   dialNumbers: string[]
+  dialClientIdentities?: string[]
   voicemailBoxId: string | null
   recordingEnabled: boolean
   recordingDisclosureText: string | null

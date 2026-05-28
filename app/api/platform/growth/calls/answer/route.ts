@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const session = await answerGrowthNativeCall(access.admin, parsed.data.sessionId)
+    const session = await answerGrowthNativeCall(access.admin, parsed.data.sessionId, access.userId)
     return NextResponse.json({ ok: true, qaMarker: GROWTH_NATIVE_DIALER_QA_MARKER, session })
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not answer call."

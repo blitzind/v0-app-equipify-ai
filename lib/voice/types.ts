@@ -212,6 +212,7 @@ export type VoiceRoutingProfileMemberRecord = {
   priority: number
   isActive: boolean
   forwardingPhoneNumber: string
+  browserClientIdentity?: string | null
   createdAt: string
   updatedAt: string
 }

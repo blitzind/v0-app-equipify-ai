@@ -38,6 +38,9 @@ import {
   normalizeDialPhoneForApi,
   optionalUuid,
 } from "@/lib/growth/native-dialer/native-dialer-workspace-ui"
+import { useVoiceBrowserCalling } from "@/hooks/voice/use-voice-browser-calling"
+import { mapBrowserCallStateLabel } from "@/lib/voice/browser-calling/status-mapping"
+import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
 
 export function GrowthCallWorkspace() {
   const { toast } = useToast()
@@ -112,6 +115,13 @@ export function GrowthCallWorkspace() {
       setPhone(normalizeDialPhoneDigits(data.leadContext.contactPhone))
     }
   }, [phone])
+
+  const voiceBrowser = useVoiceBrowserCalling({
+    workspaceSessionId: activeSession?.id ?? null,
+    onInboundOffer: () => {
+      void load()
+    },
+  })
 
   useEffect(() => {
     void load()
@@ -322,7 +332,13 @@ export function GrowthCallWorkspace() {
       data-call-start-fix-qa-marker={GROWTH_NATIVE_DIALER_CALL_START_FIX_QA_MARKER}
       data-google-voice-bridge-qa-marker={GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER}
       data-google-voice-bridge-coaching-qa-marker={GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER}
+      data-voice-native-dialer-integration-qa-marker={VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER}
     >
+      {voiceBrowser.registrationState === "error" && voiceBrowser.error ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+          Browser calling: {voiceBrowser.error}
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button type="button" size="sm" variant="outline" onClick={() => void load()}>
           <RefreshCw className="mr-2 size-4" />
@@ -382,6 +398,14 @@ export function GrowthCallWorkspace() {
         <GrowthCallWorkspaceCenterPanel
           phase={workspacePhase}
           activeSession={activeSession}
+          voiceBrowserCallState={voiceBrowser.snapshot?.browserCallState ?? null}
+          voiceBrowserCallStateLabel={
+            voiceBrowser.snapshot?.browserCallState
+              ? mapBrowserCallStateLabel(voiceBrowser.snapshot.browserCallState)
+              : null
+          }
+          voiceTimeline={voiceBrowser.snapshot?.timeline ?? []}
+          voiceRecording={voiceBrowser.snapshot?.recording ?? null}
           answering={answering}
           declining={declining}
           ending={ending}

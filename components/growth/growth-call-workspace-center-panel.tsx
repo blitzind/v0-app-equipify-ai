@@ -29,6 +29,11 @@ import type {
   NativeCallWrapupPublicView,
   NativeCallWorkspaceSessionPublicView,
 } from "@/lib/growth/native-dialer/native-dialer-types"
+import type {
+  VoiceBrowserCallState,
+  VoiceCallRecordingVisibilityView,
+  VoiceCallTimelineEventView,
+} from "@/lib/voice/browser-calling/types"
 import type { CallWorkspaceCoachingMode } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import { NATIVE_DIALER_PROVIDER_LABELS } from "@/lib/growth/native-dialer/native-dialer-types"
 import { cn } from "@/lib/utils"
@@ -121,9 +126,49 @@ function ActiveCallHeader({
   )
 }
 
+function VoiceCallTimelinePanel({
+  timeline,
+  recording,
+  browserCallStateLabel,
+}: {
+  timeline: VoiceCallTimelineEventView[]
+  recording: VoiceCallRecordingVisibilityView | null
+  browserCallStateLabel: string | null
+}) {
+  if (timeline.length === 0 && !recording && !browserCallStateLabel) return null
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-muted/10 px-3 py-2 text-sm dark:border-white/5">
+      {browserCallStateLabel ? (
+        <p className="text-xs text-muted-foreground">
+          Canonical voice state: <span className="font-medium text-foreground">{browserCallStateLabel}</span>
+        </p>
+      ) : null}
+      {timeline.length > 0 ? (
+        <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+          {timeline.slice(-6).map((event) => (
+            <li key={event.id}>
+              {new Date(event.eventTimestamp).toLocaleTimeString()} · {event.label}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {recording ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Recording: {recording.durationSeconds ?? "—"}s · {recording.playbackPlaceholder}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
 export function GrowthCallWorkspaceCenterPanel({
   phase,
   activeSession,
+  voiceBrowserCallState,
+  voiceBrowserCallStateLabel,
+  voiceTimeline = [],
+  voiceRecording = null,
   answering,
   declining,
   ending,
@@ -141,6 +186,10 @@ export function GrowthCallWorkspaceCenterPanel({
 }: {
   phase: GrowthCallWorkspacePhase
   activeSession: NativeCallWorkspaceSessionPublicView | null
+  voiceBrowserCallState?: VoiceBrowserCallState | null
+  voiceBrowserCallStateLabel?: string | null
+  voiceTimeline?: VoiceCallTimelineEventView[]
+  voiceRecording?: VoiceCallRecordingVisibilityView | null
   answering?: boolean
   declining?: boolean
   ending?: boolean
@@ -249,6 +298,11 @@ export function GrowthCallWorkspaceCenterPanel({
               coachingMode={coachingMode}
               leadLinked={leadLinked}
             />
+            <VoiceCallTimelinePanel
+              timeline={voiceTimeline}
+              recording={voiceRecording}
+              browserCallStateLabel={voiceBrowserCallStateLabel ?? null}
+            />
           </>
         ) : null}
 
@@ -290,6 +344,11 @@ export function GrowthCallWorkspaceCenterPanel({
               readOnly
               rows={2}
               className="resize-none text-sm"
+            />
+            <VoiceCallTimelinePanel
+              timeline={voiceTimeline}
+              recording={voiceRecording}
+              browserCallStateLabel={voiceBrowserCallStateLabel ?? null}
             />
           </>
         ) : null}

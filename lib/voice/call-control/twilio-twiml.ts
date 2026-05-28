@@ -38,12 +38,14 @@ export function forwardCallTwiml(input: { toNumber: string; callerId?: string; r
 
 export function dialMultipleTwiml(input: {
   numbers: string[]
+  clientIdentities?: string[]
   callerId?: string
   simultaneous?: boolean
   record?: boolean
   recordingCallbackUrl?: string | null
 }): string {
-  if (input.numbers.length === 0) {
+  const clients = input.clientIdentities ?? []
+  if (input.numbers.length === 0 && clients.length === 0) {
     return buildTwilioSayAndHangup("No destination configured for this call.")
   }
   const attrs = [`callerId="${xmlEscape(input.callerId ?? "")}"`]
@@ -56,7 +58,8 @@ export function dialMultipleTwiml(input: {
     }
   }
   const numbers = input.numbers.map((n) => `<Number>${xmlEscape(n)}</Number>`).join("")
-  return `<?xml version="1.0" encoding="UTF-8"?><Response><Dial ${attrs.join(" ")}>${numbers}</Dial></Response>`
+  const clientTags = clients.map((c) => `<Client>${xmlEscape(c)}</Client>`).join("")
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Dial ${attrs.join(" ")}>${clientTags}${numbers}</Dial></Response>`
 }
 
 export function sendToVoicemailTwiml(input: {
@@ -115,6 +118,7 @@ export function generateInboundCallResponseTwiml(input: TwilioCallControlVerbInp
     case "dial":
       return dialMultipleTwiml({
         numbers: decision.dialNumbers,
+        clientIdentities: decision.dialClientIdentities ?? [],
         callerId: input.callerId,
         simultaneous: decision.routingMode === "simultaneous_ring",
         record,

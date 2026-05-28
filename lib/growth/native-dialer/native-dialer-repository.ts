@@ -12,6 +12,12 @@ import {
 } from "@/lib/growth/native-dialer/native-dialer-wrapup-engine"
 import { routeNativeDialerProvider } from "@/lib/growth/native-dialer/native-dialer-provider-registry"
 import { resolveCallWorkspaceLeadByPhone } from "@/lib/growth/native-dialer/call-workspace-phone-lead-resolve"
+import {
+  claimInboundVoiceCallForOperator,
+  createVoiceCallForWorkspaceSession,
+  syncWorkspaceSessionFromVoiceCall,
+} from "@/lib/voice/browser-calling/workspace-bridge"
+import { appendVoiceCallEvent } from "@/lib/voice/repository/voice-repository"
 import type {
   NativeCallSessionStatus,
   NativeCallWrapupPublicView,
@@ -22,7 +28,7 @@ import type {
 } from "@/lib/growth/native-dialer/native-dialer-types"
 
 const SESSION_SELECT =
-  "id, lead_id, owner_user_id, queue_item_id, provider, fallback_provider, dial_mode, direction, status, phone_number, contact_name, company_name, started_at, connected_at, ended_at, duration_seconds, recording_state, muted, on_hold, transfer_target, notes_draft, realtime_session_id, call_copilot_session_id, provider_call_ref, safe_summary"
+  "id, lead_id, owner_user_id, queue_item_id, provider, fallback_provider, dial_mode, direction, status, phone_number, contact_name, company_name, started_at, connected_at, ended_at, duration_seconds, recording_state, muted, on_hold, transfer_target, notes_draft, realtime_session_id, call_copilot_session_id, provider_call_ref, safe_summary, voice_call_id"
 
 type SessionRow = Record<string, unknown>
 type QueueRow = Record<string, unknown>
@@ -38,6 +44,19 @@ function queueTable(admin: SupabaseClient) {
 
 function wrapupsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("native_call_wrapups")
+}
+
+async function resolveDefaultOutboundCallerId(admin: SupabaseClient, organizationId: string): Promise<string> {
+  const { data } = await admin
+    .schema("voice")
+    .from("voice_numbers")
+    .select("phone_number")
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  return (data?.phone_number as string | null) ?? "browser:outbound"
 }
 
 function settingsTable(admin: SupabaseClient) {
@@ -70,6 +89,7 @@ export function mapNativeCallSessionRow(row: SessionRow): NativeCallWorkspaceSes
     callCopilotSessionId: (row.call_copilot_session_id as string | null) ?? null,
     providerCallRef: (row.provider_call_ref as string | null) ?? null,
     safeSummary: row.safe_summary as string,
+    voiceCallId: (row.voice_call_id as string | null) ?? null,
   }
 }
 
@@ -196,6 +216,46 @@ export async function startNativeCallSession(
 
   const now = new Date().toISOString()
   const isGoogleVoiceBridge = routed.providerId === "google_voice_bridge"
+  const isTwilioVoicePath = routed.providerId === "twilio"
+
+  if (isTwilioVoicePath) {
+    const fromNumber = await resolveDefaultOutboundCallerId(admin, orgId)
+    await createVoiceCallForWorkspaceSession(admin, {
+      organizationId: orgId,
+      sessionId: inserted.id as string,
+      ownerUserId: input.ownerUserId ?? null,
+      direction: input.direction ?? "outbound",
+      fromNumber,
+      toNumber: input.phoneNumber.trim(),
+      provider: "twilio",
+      providerCallId: startResult.providerCallRef,
+      leadId,
+      dialMode: input.dialMode ?? "manual",
+    })
+
+    const { data: pending, error: pendingError } = await sessionsTable(admin)
+      .update({
+        status: "ringing",
+        provider: routed.providerId,
+        fallback_provider: routed.failoverApplied ? providers.fallbackProvider : providers.primaryProvider,
+        provider_call_ref: startResult.providerCallRef,
+        recording_state: "pending",
+        safe_summary: "Browser calling session linked to canonical voice infrastructure — connect via Voice SDK.",
+        updated_at: now,
+      })
+      .eq("id", inserted.id as string)
+      .select(SESSION_SELECT)
+      .single()
+    if (pendingError) throw new Error(pendingError.message)
+
+    if (input.queueItemId) {
+      await queueTable(admin)
+        .update({ status: "dialing", updated_at: now })
+        .eq("id", input.queueItemId)
+    }
+
+    return mapNativeCallSessionRow(pending as SessionRow)
+  }
 
   if (isGoogleVoiceBridge) {
     const { data: pending, error: pendingError } = await sessionsTable(admin)
@@ -331,38 +391,85 @@ export async function updateNativeDialerSettingsRow(
 export async function answerNativeCallSession(
   admin: SupabaseClient,
   sessionId: string,
+  ownerUserId?: string | null,
 ): Promise<NativeCallWorkspaceSessionPublicView> {
   const { data: existing, error: fetchError } = await sessionsTable(admin).select(SESSION_SELECT).eq("id", sessionId).maybeSingle()
   if (fetchError) throw new Error(fetchError.message)
   if (!existing) throw new Error("Call session not found.")
   if (existing.status !== "ringing") throw new Error("Call is not ringing.")
 
-  const providers = await resolveNativeDialerProviders(admin)
-  const routed = await routeNativeDialerProvider(providers)
-  const startResult = await routed.provider.startCall({
-    sessionId,
-    phoneNumber: existing.phone_number as string,
-    leadId: (existing.lead_id as string | null) ?? null,
-    contactName: (existing.contact_name as string | null) ?? null,
-    companyName: (existing.company_name as string | null) ?? null,
-  })
-
+  const orgId = await getGrowthEngineAiOrgId(admin)
+  const voiceCallId = (existing.voice_call_id as string | null) ?? null
   const now = new Date().toISOString()
+
+  if (voiceCallId && ownerUserId) {
+    const claim = await claimInboundVoiceCallForOperator(admin, {
+      organizationId: orgId,
+      userId: ownerUserId,
+      voiceCallId,
+      workspaceSessionId: sessionId,
+    })
+    if (!claim.ok) throw new Error(claim.reason)
+
+    await admin
+      .schema("voice")
+      .from("voice_calls")
+      .update({ status: "in_progress", answered_at: now, updated_at: now })
+      .eq("id", voiceCallId)
+      .eq("organization_id", orgId)
+
+    await appendVoiceCallEvent(admin, {
+      organizationId: orgId,
+      voiceCallId,
+      provider: "twilio",
+      eventType: "answered",
+      eventTimestamp: now,
+      payloadJson: { source: "call_workspace", sessionId },
+      idempotencyKey: `workspace:${sessionId}:answered`,
+    })
+  } else {
+    const providers = await resolveNativeDialerProviders(admin)
+    const routed = await routeNativeDialerProvider(providers)
+    const startResult = await routed.provider.startCall({
+      sessionId,
+      phoneNumber: existing.phone_number as string,
+      leadId: (existing.lead_id as string | null) ?? null,
+      contactName: (existing.contact_name as string | null) ?? null,
+      companyName: (existing.company_name as string | null) ?? null,
+    })
+
+    const { data: active, error: activeError } = await sessionsTable(admin)
+      .update({
+        status: "active",
+        connected_at: now,
+        provider: routed.providerId,
+        fallback_provider: routed.failoverApplied ? providers.fallbackProvider : providers.primaryProvider,
+        provider_call_ref: startResult.providerCallRef,
+        recording_state: "active",
+        safe_summary: startResult.message,
+        updated_at: now,
+      })
+      .eq("id", sessionId)
+      .select(SESSION_SELECT)
+      .single()
+    if (activeError) throw new Error(activeError.message)
+    return mapNativeCallSessionRow(active as SessionRow)
+  }
+
   const { data: active, error: activeError } = await sessionsTable(admin)
     .update({
       status: "active",
       connected_at: now,
-      provider: routed.providerId,
-      fallback_provider: routed.failoverApplied ? providers.fallbackProvider : providers.primaryProvider,
-      provider_call_ref: startResult.providerCallRef,
+      owner_user_id: ownerUserId ?? existing.owner_user_id,
       recording_state: "active",
-      safe_summary: startResult.message,
+      safe_summary: "Inbound call answered via canonical voice infrastructure.",
       updated_at: now,
     })
     .eq("id", sessionId)
     .select(SESSION_SELECT)
     .single()
   if (activeError) throw new Error(activeError.message)
+  await syncWorkspaceSessionFromVoiceCall(admin, { voiceCallId: voiceCallId!, organizationId: orgId })
   return mapNativeCallSessionRow(active as SessionRow)
 }
 
@@ -370,7 +477,29 @@ export async function declineNativeCallSession(
   admin: SupabaseClient,
   sessionId: string,
 ): Promise<NativeCallWorkspaceSessionPublicView> {
+  const orgId = await getGrowthEngineAiOrgId(admin)
+  const { data: existing } = await sessionsTable(admin).select("voice_call_id").eq("id", sessionId).maybeSingle()
+  const voiceCallId = (existing?.voice_call_id as string | null) ?? null
   const now = new Date().toISOString()
+
+  if (voiceCallId) {
+    await admin
+      .schema("voice")
+      .from("voice_calls")
+      .update({ status: "no_answer", ended_at: now, updated_at: now })
+      .eq("id", voiceCallId)
+      .eq("organization_id", orgId)
+    await appendVoiceCallEvent(admin, {
+      organizationId: orgId,
+      voiceCallId,
+      provider: "twilio",
+      eventType: "no_answer",
+      eventTimestamp: now,
+      payloadJson: { source: "call_workspace", sessionId },
+      idempotencyKey: `workspace:${sessionId}:no_answer`,
+    })
+  }
+
   const { data: declined, error } = await sessionsTable(admin)
     .update({
       status: "missed",
@@ -408,6 +537,32 @@ export async function endNativeCallSession(
       fallbackProvider: (existing.fallback_provider as NativeDialerProviderId) ?? "stub",
     })
     await routed.provider.endCall(existing.provider_call_ref as string).catch(() => undefined)
+  }
+
+  const orgId = await getGrowthEngineAiOrgId(admin)
+  const voiceCallId = (existing.voice_call_id as string | null) ?? null
+  if (voiceCallId) {
+    await admin
+      .schema("voice")
+      .from("voice_calls")
+      .update({
+        status: "completed",
+        ended_at: endedAt.toISOString(),
+        duration_seconds: durationSeconds,
+        updated_at: endedAt.toISOString(),
+      })
+      .eq("id", voiceCallId)
+      .eq("organization_id", orgId)
+    await appendVoiceCallEvent(admin, {
+      organizationId: orgId,
+      voiceCallId,
+      provider: "twilio",
+      eventType: "completed",
+      eventTimestamp: endedAt.toISOString(),
+      payloadJson: { source: "call_workspace", sessionId },
+      idempotencyKey: `workspace:${sessionId}:completed`,
+    })
+    await syncWorkspaceSessionFromVoiceCall(admin, { voiceCallId, organizationId: orgId })
   }
 
   const { data, error } = await sessionsTable(admin)

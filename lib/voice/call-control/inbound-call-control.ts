@@ -5,6 +5,7 @@ import { VOICE_CALL_CONTROL_QA_MARKER } from "@/lib/voice/call-control/types"
 export type MapInboundRouteToCallControlInput = {
   route: InboundVoiceRouteResolution
   dialNumbers: string[]
+  dialClientIdentities?: string[]
   recordingEnabled: boolean
   recordingDisclosureText: string | null
   voicemailGreetingText?: string | null
@@ -13,7 +14,7 @@ export type MapInboundRouteToCallControlInput = {
 export function mapInboundRouteToCallControlDecision(
   input: MapInboundRouteToCallControlInput,
 ): InboundCallControlDecision {
-  const { route, dialNumbers } = input
+  const { route, dialNumbers, dialClientIdentities = [] } = input
 
   if (route.routeStatus === "blocked") {
     if (route.routingMode === "ai_receptionist_future") {
@@ -23,6 +24,7 @@ export function mapInboundRouteToCallControlDecision(
         routingMode: route.routingMode,
         action: route.voicemailBoxId ? "voicemail" : "say_and_hangup",
         dialNumbers: [],
+        dialClientIdentities: [],
         voicemailBoxId: route.voicemailBoxId,
         recordingEnabled: false,
         recordingDisclosureText: null,
@@ -36,6 +38,7 @@ export function mapInboundRouteToCallControlDecision(
       routingMode: route.routingMode,
       action: "reject",
       dialNumbers: [],
+      dialClientIdentities: [],
       voicemailBoxId: route.voicemailBoxId,
       recordingEnabled: false,
       recordingDisclosureText: null,
@@ -44,13 +47,14 @@ export function mapInboundRouteToCallControlDecision(
     }
   }
 
-  if (route.routingMode === "voicemail_only" || (route.routeStatus === "degraded" && route.voicemailBoxId && dialNumbers.length === 0)) {
+  if (route.routingMode === "voicemail_only" || (route.routeStatus === "degraded" && route.voicemailBoxId && dialNumbers.length === 0 && dialClientIdentities.length === 0)) {
     return {
       qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
       routeStatus: route.routeStatus,
       routingMode: route.routingMode,
       action: "voicemail",
       dialNumbers: [],
+      dialClientIdentities: [],
       voicemailBoxId: route.voicemailBoxId,
       recordingEnabled: true,
       recordingDisclosureText: null,
@@ -59,13 +63,14 @@ export function mapInboundRouteToCallControlDecision(
     }
   }
 
-  if (route.routeStatus === "degraded" && dialNumbers.length === 0) {
+  if (route.routeStatus === "degraded" && dialNumbers.length === 0 && dialClientIdentities.length === 0) {
     return {
       qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
       routeStatus: route.routeStatus,
       routingMode: route.routingMode,
       action: "say_and_hangup",
       dialNumbers: [],
+      dialClientIdentities: [],
       voicemailBoxId: route.voicemailBoxId,
       recordingEnabled: false,
       recordingDisclosureText: null,
@@ -82,6 +87,7 @@ export function mapInboundRouteToCallControlDecision(
     routingMode: route.routingMode,
     action,
     dialNumbers,
+    dialClientIdentities,
     voicemailBoxId: route.voicemailBoxId,
     recordingEnabled: input.recordingEnabled,
     recordingDisclosureText: input.recordingEnabled ? input.recordingDisclosureText : null,

@@ -26,6 +26,11 @@ import {
   type VoiceRoutingProfileRecord,
   type VoiceVoicemailBoxRecord,
 } from "@/lib/voice/types"
+import {
+  VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER,
+  type VoiceBrowserCallingReadinessSnapshot,
+  type VoiceOperatorPresencePublicView,
+} from "@/lib/voice/browser-calling/types"
 
 type VoiceSettingsResponse = {
   ok?: boolean
@@ -126,6 +131,10 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
   const [routingTestNumberId, setRoutingTestNumberId] = useState("")
   const [routingTestFrom, setRoutingTestFrom] = useState("+14155550199")
   const [routingTestResult, setRoutingTestResult] = useState<InboundCallControlDecision | null>(null)
+  const [browserReadiness, setBrowserReadiness] = useState<VoiceBrowserCallingReadinessSnapshot | null>(null)
+  const [operatorPresence, setOperatorPresence] = useState<VoiceOperatorPresencePublicView[]>([])
+
+  const callControl = readiness?.callControlReadiness
 
   const loadOperations = useCallback(async () => {
     const [numbersRes, profilesRes, hoursRes, boxesRes] = await Promise.all([
@@ -160,6 +169,15 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
           "This call may be recorded for quality assurance.",
       )
       await loadOperations()
+      const presenceRes = await fetch("/api/platform/growth/voice/browser/presence", { cache: "no-store" })
+      const presenceData = (await presenceRes.json().catch(() => ({}))) as {
+        readiness?: VoiceBrowserCallingReadinessSnapshot
+        operators?: VoiceOperatorPresencePublicView[]
+      }
+      if (presenceRes.ok) {
+        setBrowserReadiness(presenceData.readiness ?? null)
+        setOperatorPresence(presenceData.operators ?? [])
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
     } finally {
@@ -241,13 +259,49 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
     setSuccess("Voicemail box created.")
   }
 
+  async function saveCallControlSettings() {
+    const res = await fetch("/api/platform/growth/voice/call-control/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        defaultRecordingPolicy: recordingPolicy,
+        recordingDisclosureText: disclosureText,
+      }),
+    })
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
+    if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not save call control settings.")
+    setSuccess("Recording policy saved.")
+    await load()
+  }
+
+  async function runRoutingTest() {
+    if (!routingTestNumberId.trim()) throw new Error("Enter a voice number id.")
+    const res = await fetch("/api/platform/growth/voice/routing-test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        voiceNumberId: routingTestNumberId.trim(),
+        fromNumber: routingTestFrom,
+        skipRoundRobinAdvance: true,
+      }),
+    })
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean
+      decision?: InboundCallControlDecision
+      message?: string
+    }
+    if (!res.ok || !data.decision) throw new Error(data.message ?? "Routing test failed.")
+    setRoutingTestResult(data.decision)
+    setSuccess("Routing test completed (planning only).")
+  }
+
   const compliance = readiness?.complianceReadinessExtended
 
   return (
     <GrowthSettingsCard title="Voice Infrastructure" icon={<PhoneCall className="size-4" />}>
       <div
         className={GROWTH_SETTINGS_SECTION_GAP}
-        data-qa-marker={`${VOICE_FOUNDATION_QA_MARKER} ${VOICE_OPERATIONS_QA_MARKER} ${VOICE_CALL_CONTROL_QA_MARKER}`}
+        data-qa-marker={`${VOICE_FOUNDATION_QA_MARKER} ${VOICE_OPERATIONS_QA_MARKER} ${VOICE_CALL_CONTROL_QA_MARKER} ${VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER}`}
       >
         <p className="text-sm text-muted-foreground">
           Voice operations layer — number inventory, routing profiles, business hours, and voicemail scaffolding.
@@ -438,6 +492,54 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
             <section className={GROWTH_SETTINGS_SECTION_GAP}>
               <p className="flex items-center gap-2 text-sm font-medium">
                 <Radio className="size-4" />
+                Browser calling readiness
+              </p>
+              <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                <p>Browser calling ready: {browserReadiness?.browserCallingReady ? "yes" : "not yet"}</p>
+                <p>Token readiness: {browserReadiness?.tokenReadiness ?? "unknown"}</p>
+                <p>Voice SDK readiness: {browserReadiness?.voiceSdkReadiness ?? "unknown"}</p>
+                <p>Websocket readiness: {browserReadiness?.websocketReadiness ?? "unknown"}</p>
+                <p>{browserReadiness?.microphoneGuidance}</p>
+                <p>{browserReadiness?.browserCompatibilityNote}</p>
+                {browserReadiness?.warnings.map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
+              </div>
+            </section>
+
+            <section className={GROWTH_SETTINGS_SECTION_GAP}>
+              <p className="text-sm font-medium">Operator presence</p>
+              <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                <p>
+                  Connected operators: {browserReadiness?.connectedOperatorCount ?? 0} · Active devices:{" "}
+                  {browserReadiness?.activeDeviceCount ?? 0}
+                </p>
+                {operatorPresence.length === 0 ? (
+                  <p>No connected browser devices in the last heartbeat window.</p>
+                ) : (
+                  operatorPresence.slice(0, 8).map((operator) => (
+                    <p key={operator.userId}>
+                      {operator.userId.slice(0, 8)}… · {operator.status} · devices {operator.activeDeviceCount}
+                    </p>
+                  ))
+                )}
+              </div>
+            </section>
+
+            <section className={GROWTH_SETTINGS_SECTION_GAP}>
+              <p className="flex items-center gap-2 text-sm font-medium">
+                <Route className="size-4" />
+                Routing visibility
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Live routing preview uses the planning-only routing test tool below. Fallback voicemail and after-hours
+                routing remain authoritative when browser operators are offline.
+              </p>
+            </section>
+
+            <section className={GROWTH_SETTINGS_SECTION_GAP}>
+              <p className="flex items-center gap-2 text-sm font-medium">
+                <Radio className="size-4" />
                 Call control readiness
               </p>
               <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
@@ -509,6 +611,9 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
                   Action: {routingTestResult.action} · Mode: {routingTestResult.routingMode ?? "none"} · Status:{" "}
                   {routingTestResult.routeStatus}
                   {routingTestResult.dialNumbers.length > 0 ? ` · Dial: ${routingTestResult.dialNumbers.join(", ")}` : ""}
+                  {(routingTestResult.dialClientIdentities?.length ?? 0) > 0
+                    ? ` · Browser clients: ${routingTestResult.dialClientIdentities?.join(", ")}`
+                    : ""}
                 </div>
               ) : null}
             </section>

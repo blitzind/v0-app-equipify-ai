@@ -5,8 +5,8 @@ import { looksLikePostgrestMissingSchemaError } from "@/lib/blitzpay/blitzpay-sc
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import { VOICE_FOUNDATION_QA_MARKER } from "@/lib/voice/types"
 
-export const VOICE_SCHEMA_PROBE_VERSION = "v3" as const
-export const VOICE_SCHEMA_MIGRATION_ID = "20270527160000_voice_call_control_phase_1c" as const
+export const VOICE_SCHEMA_PROBE_VERSION = "v4" as const
+export const VOICE_SCHEMA_MIGRATION_ID = "20270527170000_voice_browser_calling_phase_1d" as const
 
 const REQUIRED_TABLES = [
   "voice_numbers",
@@ -23,7 +23,13 @@ const REQUIRED_TABLES = [
   "voice_business_hours",
   "voice_voicemail_boxes",
   "voice_call_control_settings",
+  "voice_browser_devices",
+  "voice_operator_presence",
 ] as const
+
+const TABLE_PROBE_COLUMNS: Partial<Record<(typeof REQUIRED_TABLES)[number], string>> = {
+  voice_operator_presence: "user_id",
+}
 
 export type VoiceSchemaHealthProbe = {
   qaMarker: typeof VOICE_FOUNDATION_QA_MARKER
@@ -40,7 +46,8 @@ export async function probeVoiceSchemaHealth(admin: SupabaseClient): Promise<Voi
   let probeUncertain = false
 
   for (const table of REQUIRED_TABLES) {
-    const { error } = await admin.schema("voice").from(table).select("id", { head: true, count: "exact" }).limit(1)
+    const column = TABLE_PROBE_COLUMNS[table] ?? "id"
+    const { error } = await admin.schema("voice").from(table).select(column, { head: true, count: "exact" }).limit(1)
     if (error) {
       if (looksLikePostgrestMissingSchemaError(error.message, error.code)) {
         missingTables.push(table)

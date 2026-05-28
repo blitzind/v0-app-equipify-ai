@@ -77,6 +77,7 @@ function mapRoutingMember(row: Record<string, unknown>): VoiceRoutingProfileMemb
     priority: Number(row.priority ?? 0),
     isActive: Boolean(row.is_active),
     forwardingPhoneNumber: String(row.forwarding_phone_number ?? ""),
+    browserClientIdentity: (row.browser_client_identity as string | null) ?? null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   }

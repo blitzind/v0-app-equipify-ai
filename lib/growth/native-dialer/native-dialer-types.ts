@@ -106,6 +106,7 @@ export type NativeCallWorkspaceSessionPublicView = {
   callCopilotSessionId: string | null
   providerCallRef: string | null
   safeSummary: string
+  voiceCallId: string | null
 }
 
 export type NativeDialerQueueItemPublicView = {

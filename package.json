@@ -216,6 +216,7 @@
     "test:voice-foundation-phase-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-foundation-phase-1a.ts",
     "test:voice-operations-phase-1b": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-operations-phase-1b.ts",
     "test:voice-call-control-phase-1c": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-call-control-phase-1c.ts",
+    "test:voice-native-dialer-integration-phase-1d": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-native-dialer-integration-phase-1d.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
     "test:growth-assemblyai-browser-streaming": "tsx scripts/test-growth-assemblyai-browser-streaming.ts",
     "test:growth-openai-realtime-browser-streaming": "tsx scripts/test-growth-openai-realtime-browser-streaming.ts",
@@ -293,6 +294,8 @@
     "sonner": "^1.7.1",
     "stripe": "^22.1.0",
     "tailwind-merge": "^3.3.1",
+    "twilio": "^5.5.2",
+    "@twilio/voice-sdk": "^2.12.3",
     "vaul": "^1.1.2",
     "xlsx": "^0.18.5",
     "zod": "^3.24.1"

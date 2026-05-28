@@ -59,8 +59,9 @@ export async function startGrowthNativeCall(
 export async function answerGrowthNativeCall(
   admin: SupabaseClient,
   sessionId: string,
+  ownerUserId?: string | null,
 ): Promise<NativeCallWorkspaceSessionPublicView> {
-  return answerNativeCallSession(admin, sessionId)
+  return answerNativeCallSession(admin, sessionId, ownerUserId)
 }
 
 export async function declineGrowthNativeCall(
