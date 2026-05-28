@@ -8,6 +8,7 @@ import type {
 export const GROWTH_CONTACT_DISCOVERY_PROVIDER_TYPES = [
   "manual_fixture",
   "internal_growth",
+  "website_public_extract",
   "future_apollo",
   "future_seamless",
   "future_people_data_labs",
@@ -22,6 +23,7 @@ export type GrowthContactDiscoveryProviderQuery = {
   company_candidate_id: string
   company_name: string
   domain: string | null
+  website_url: string | null
   growth_lead_id: string | null
   industry: string | null
   limit?: number

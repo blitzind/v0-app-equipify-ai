@@ -9,6 +9,7 @@ import type {
 } from "@/lib/growth/contact-discovery/contact-discovery-provider-types"
 import { createInternalGrowthContactDiscoveryProvider } from "@/lib/growth/contact-discovery/providers/internal-growth-provider"
 import { createManualFixtureContactDiscoveryProvider } from "@/lib/growth/contact-discovery/providers/manual-fixture-provider"
+import { createWebsitePublicExtractContactDiscoveryProvider } from "@/lib/growth/contact-discovery/providers/website-public-extract-provider"
 import {
   createFutureApolloContactProvider,
   createFutureClayContactProvider,
@@ -23,6 +24,7 @@ export function listContactDiscoveryProviders(
   return [
     createManualFixtureContactDiscoveryProvider(),
     createInternalGrowthContactDiscoveryProvider(admin),
+    createWebsitePublicExtractContactDiscoveryProvider(admin),
     createFutureApolloContactProvider(),
     createFutureSeamlessContactProvider(),
     createFuturePeopleDataLabsContactProvider(),

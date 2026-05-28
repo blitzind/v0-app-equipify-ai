@@ -3587,6 +3587,8 @@ async function testBase64UrlRuntimeFix(): Promise<void> {
 async function testProspectSearchContactDiscovery(): Promise<void> {
   const {
     GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER,
+    GROWTH_PEOPLE_HYDRATION_QA_MARKER,
+    GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER,
     buildProspectSearchPeopleRowsFromCompanies,
     formatProspectSearchContactCoverageLabel,
     hasProspectSearchDecisionMakerFilters,
@@ -3599,6 +3601,8 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   )
 
   assert.equal(GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER, "growth-prospect-contact-discovery-v1")
+  assert.equal(GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER, "growth-website-contact-provider-v1")
+  assert.equal(GROWTH_PEOPLE_HYDRATION_QA_MARKER, "growth-people-hydration-v1")
 
   const externalCompany = {
     id: "ext-1",
@@ -3627,7 +3631,11 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   assert.equal(resolveProspectSearchContactProviderState(externalCompany as never), "no_provider_connected")
   assert.equal(
     resolveProspectSearchContactCoverageStatus(externalCompany as never),
-    "contact_research_needed",
+    "website_extraction_pending",
+  )
+  assert.equal(
+    formatProspectSearchContactCoverageLabel("website_extraction_pending"),
+    "Website extraction pending",
   )
   assert.equal(
     formatProspectSearchContactCoverageLabel("contact_research_needed"),
@@ -3693,7 +3701,9 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
     "utf8",
   )
   assert.match(peopleTableSource, /<th className="px-3 py-2">Name<\/th>/)
-  assert.match(peopleTableSource, /No verified contacts yet/)
+  assert.match(peopleTableSource, /data-people-hydration-marker/)
+  assert.match(peopleTableSource, /Lead Pipeline/)
+  assert.match(peopleTableSource, /Add to Queue/)
 
   const bulkBarSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/prospect-search-bulk-action-bar.tsx"),
@@ -3708,6 +3718,8 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   )
   assert.match(shellSource, /ProspectSearchResultModeToggle/)
   assert.match(shellSource, /data-contact-discovery-marker/)
+  assert.match(shellSource, /data-website-contact-provider-marker/)
+  assert.match(shellSource, /data-people-hydration-marker/)
 }
 
 void main()

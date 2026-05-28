@@ -9,6 +9,7 @@ export type ProspectSearchContactEvidence = {
   claim: string
   evidence: string
   source: string
+  page_url?: string | null
 }
 
 export type ProspectSearchContactOverlay = {
@@ -22,6 +23,11 @@ export type ProspectSearchContactOverlay = {
   linkedin_url?: string | null
   phone?: string | null
   email?: string | null
+  source_page_url?: string | null
+  last_checked_at?: string | null
+  verification_status?: string | null
+  outreach_ready?: boolean
+  source_label?: string | null
 }
 
 export type ProspectSearchCommitteeRoleMapping = {

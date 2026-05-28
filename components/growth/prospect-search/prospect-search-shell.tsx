@@ -112,10 +112,13 @@ import {
   sanitizeGrowthAdminUiError,
 } from "@/lib/growth/admin-route-runtime-types"
 import {
+  GROWTH_PEOPLE_HYDRATION_QA_MARKER,
   GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER,
+  GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER,
   logProspectSearchContactDiscoveryIssue,
   mergeProspectSearchPeopleResults,
   resolveDefaultProspectSearchResultMode,
+  type GrowthProspectSearchPeopleResultRow,
   type ProspectSearchResultMode,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 
@@ -802,6 +805,22 @@ function ProspectSearchShellInner() {
     [companies, refreshContactDiscoveryResults, selectedCompanies],
   )
 
+  const handleAddPersonToQueue = useCallback(
+    (row: GrowthProspectSearchPeopleResultRow) => {
+      setSelectedCompany(row.company)
+      void runAction("push_to_lead_inbox", { company: row.company })
+    },
+    [runAction],
+  )
+
+  const handleAddPersonToLeadPipeline = useCallback(
+    (row: GrowthProspectSearchPeopleResultRow) => {
+      setSelectedCompany(row.company)
+      void runAction("run_lead_engine", { company: row.company })
+    },
+    [runAction],
+  )
+
   const runBulkPush = useCallback(async () => {
     if (selectedCompanies.length === 0) return
     setBulkPushing(true)
@@ -951,6 +970,8 @@ function ProspectSearchShellInner() {
       data-runtime-stable-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER}
       data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
       data-contact-discovery-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}
+      data-website-contact-provider-marker={GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER}
+      data-people-hydration-marker={GROWTH_PEOPLE_HYDRATION_QA_MARKER}
       data-current-criteria-key={currentCriteriaKey}
       data-last-searched-criteria-key={lastSearchedCriteriaKey ?? ""}
       data-criteria-stale={criteriaStale ? "true" : "false"}
@@ -1280,6 +1301,8 @@ function ProspectSearchShellInner() {
                     const company = companies.find((row) => row.id === companyId)
                     if (company) setSelectedCompany(company)
                   }}
+                  onAddToQueue={handleAddPersonToQueue}
+                  onAddToLeadPipeline={handleAddPersonToLeadPipeline}
                 />
               ) : searchCompleted && view === "card" ? (
                 <div className="flex flex-col gap-4">
@@ -1315,6 +1338,8 @@ function ProspectSearchShellInner() {
                     onSelectAllVisible={selectAllVisible}
                     onClearSelection={clearSelection}
                     onContactDiscoveryComplete={refreshContactDiscoveryResults}
+                    onAddPersonToQueue={handleAddPersonToQueue}
+                    onAddPersonToLeadPipeline={handleAddPersonToLeadPipeline}
                   />
                   {selectedCompany ? (
                     <div

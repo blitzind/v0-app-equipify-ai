@@ -92,7 +92,7 @@ function sanitizePii(
   let linkedin_url: string | null = null
 
   if (emailRaw) {
-    if (GUESSED_EMAIL_RE.test(emailRaw) && provider_type !== "internal_growth") {
+    if (GUESSED_EMAIL_RE.test(emailRaw) && !["internal_growth", "website_public_extract"].includes(provider_type)) {
       verification_state = "insufficient_evidence"
     } else if (emailRaw.includes("@")) {
       email = emailRaw

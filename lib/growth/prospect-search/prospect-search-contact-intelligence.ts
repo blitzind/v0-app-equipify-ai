@@ -15,6 +15,8 @@ import {
   type ProspectSearchLeadEngineContactHandoffContext,
 } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
+import { mergeProspectSearchContactInputs } from "@/lib/growth/prospect-search/prospect-search-contact-merge"
+import { computeProspectSearchContactOutreachReadiness } from "@/lib/growth/prospect-search/prospect-search-contact-readiness"
 
 export const MAX_CONTACT_CONFIDENCE_RANK_BOOST = 0.05
 
@@ -29,6 +31,10 @@ export type ProspectSearchContactIntelligenceInputContact = {
   role_type?: string | null
   is_primary?: boolean
   source_evidence: ProspectSearchContactEvidence[]
+  source_page_url?: string | null
+  last_checked_at?: string | null
+  verification_status?: string | null
+  discovery_sources?: string[]
 }
 
 function normalizeName(name: string): string {
@@ -75,22 +81,7 @@ function authorityScore(title: string | null | undefined): number {
 function dedupeContacts(
   contacts: ProspectSearchContactIntelligenceInputContact[],
 ): ProspectSearchContactIntelligenceInputContact[] {
-  const byName = new Map<string, ProspectSearchContactIntelligenceInputContact>()
-  for (const contact of contacts) {
-    const key = normalizeName(contact.full_name)
-    if (!key) continue
-    const existing = byName.get(key)
-    if (!existing) {
-      byName.set(key, contact)
-      continue
-    }
-    const existingScore =
-      existing.confidence + existing.source_evidence.length + (existing.is_primary ? 0.2 : 0)
-    const nextScore =
-      contact.confidence + contact.source_evidence.length + (contact.is_primary ? 0.2 : 0)
-    byName.set(key, nextScore >= existingScore ? contact : existing)
-  }
-  return [...byName.values()]
+  return mergeProspectSearchContactInputs(contacts)
 }
 
 export function decisionMakerToContactInput(
@@ -170,6 +161,11 @@ export function contactDiscoveryCandidateToInput(
     linkedin_url: string | null
     confidence: number
     evidence: ProspectSearchContactEvidence[]
+    provider_type?: string
+    provider_name?: string
+    verification_state?: string
+    updated_at?: string | null
+    metadata?: Record<string, unknown>
   },
   committeeRole?: GrowthBuyingCommitteeRole | null,
 ): ProspectSearchContactIntelligenceInputContact | null {
@@ -194,14 +190,31 @@ export function contactDiscoveryCandidateToInput(
     confidence: contact.confidence,
     role_type: committeeRole ?? null,
     source_evidence,
+    source_page_url:
+      typeof contact.metadata?.source_page_url === "string" ? contact.metadata.source_page_url : null,
+    last_checked_at: contact.updated_at ?? null,
+    verification_status: contact.verification_state,
+    discovery_sources: [contact.provider_type, contact.provider_name],
   }
 }
 
 function toOverlay(
   contact: ProspectSearchContactIntelligenceInputContact,
   recommended_priority: number,
+  companySuppressed: boolean,
 ): ProspectSearchContactOverlay {
   const role_type = inferRoleType(contact.title, contact.role_type)
+  const readiness = computeProspectSearchContactOutreachReadiness({
+    email: contact.email,
+    phone: contact.phone,
+    verification_status: contact.verification_status,
+    confidence: contact.confidence,
+    suppressed: companySuppressed,
+  })
+  const source_label =
+    contact.source_evidence[0]?.source?.replace(/_/g, " ") ??
+    contact.discovery_sources?.[0]?.replace(/_/g, " ") ??
+    null
   const overlay: ProspectSearchContactOverlay = {
     id: contact.id,
     name: contact.full_name,
@@ -210,6 +223,11 @@ function toOverlay(
     source_evidence: contact.source_evidence,
     role_type,
     recommended_priority,
+    source_page_url: contact.source_page_url ?? contact.source_evidence[0]?.page_url ?? null,
+    last_checked_at: contact.last_checked_at ?? null,
+    verification_status: contact.verification_status ?? null,
+    outreach_ready: readiness.outreach_ready,
+    source_label,
   }
   if (contact.linkedin_url) overlay.linkedin_url = contact.linkedin_url
   if (contact.phone) overlay.phone = contact.phone
@@ -338,6 +356,7 @@ export function buildProspectSearchContactIntelligence(input: {
   primary_contact_id?: string | null
   recommended_contact_id?: string | null
   schema_health?: import("@/lib/growth/schema-health/growth-schema-health-types").GrowthSchemaHealthSummary | null
+  company_suppressed?: boolean
 }): GrowthProspectSearchContactIntelligence {
   const schema_ready = input.schema_ready ?? true
   const evidenceBacked = dedupeContacts(input.contacts.filter(hasEvidence))
@@ -347,7 +366,7 @@ export function buildProspectSearchContactIntelligence(input: {
       const scoreB = b.confidence + authorityScore(b.title) * 0.04 + (b.is_primary ? 0.15 : 0)
       return scoreB - scoreA
     })
-    .map((contact, index) => toOverlay(contact, index + 1))
+    .map((contact, index) => toOverlay(contact, index + 1, input.company_suppressed === true))
 
   const committee_roles = buildCommitteeRolesFromHypothesis(input.decision_maker_hypothesis, overlays)
   const first_contact = recommendFirstContact(overlays)

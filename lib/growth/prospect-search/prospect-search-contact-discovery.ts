@@ -1,6 +1,11 @@
 /** Prospect Search contact discovery UX — coverage, people rows, provider honesty. Client-safe. */
 
+import { formatWebsiteExtractEvidenceLabel } from "@/lib/growth/contact-discovery/website-extract-mapper"
 import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
+import {
+  computeProspectSearchContactOutreachReadiness,
+  formatProspectSearchContactSourceLabel,
+} from "@/lib/growth/prospect-search/prospect-search-contact-readiness"
 import type {
   GrowthProspectSearchCompanyResult,
   GrowthProspectSearchFilters,
@@ -10,10 +15,14 @@ import type {
 export const GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER =
   "growth-prospect-contact-discovery-v1" as const
 
+export { GROWTH_PEOPLE_HYDRATION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-readiness"
+export { GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER } from "@/lib/growth/contact-discovery/website-extract-mapper"
+
 export type ProspectSearchResultMode = "companies" | "people"
 
 export type ProspectSearchContactCoverageStatus =
   | "no_contacts_found"
+  | "website_extraction_pending"
   | "contact_research_needed"
   | "contacts_found"
   | "email_available"
@@ -33,9 +42,16 @@ export type GrowthProspectSearchPeopleResultRow = GrowthProspectSearchPersonResu
   email_reason: string | null
   phone_reason: string | null
   source_label: string | null
+  source_page_url: string | null
+  confidence: number
   location: string | null
   compliance_status: "ready" | "suppressed" | "review_required"
   last_checked_at: string | null
+  outreach_ready: boolean
+  email_available: boolean
+  phone_available: boolean
+  call_ready: boolean
+  readiness_label: string
 }
 
 export function hasProspectSearchDecisionMakerFilters(
@@ -52,11 +68,18 @@ export function resolveProspectSearchContactProviderState(
   company: GrowthProspectSearchCompanyResult,
 ): ProspectSearchContactProviderState {
   const labels = company.contact_intelligence?.source_labels ?? []
+  if (
+    labels.some(
+      (label) =>
+        label.includes("website_public_extract") || label.includes("growth.company_contacts"),
+    )
+  ) {
+    return "website_crawl"
+  }
   if (labels.some((label) => label.includes("contact_discovery"))) return "connected"
   if (labels.some((label) => label.includes("lead_decision_makers") || label.includes("lead_engine"))) {
     return "internal_sources"
   }
-  if (labels.some((label) => label.includes("company_contacts"))) return "website_crawl"
   if (company.source_type === "external_discovered") return "no_provider_connected"
   if (company.growth_lead_id) return "internal_sources"
   return "no_provider_connected"
@@ -67,6 +90,7 @@ export function resolveProspectSearchContactCoverageStatus(
 ): ProspectSearchContactCoverageStatus {
   if (company.is_suppressed) return "blocked_suppressed"
 
+  const labels = company.contact_intelligence?.source_labels ?? []
   const intelligence = company.contact_intelligence
   const contacts = intelligence?.contacts ?? []
   const hasNamedContacts = contacts.some((contact) => contact.name.trim().length > 0)
@@ -75,6 +99,15 @@ export function resolveProspectSearchContactCoverageStatus(
   const providerState = resolveProspectSearchContactProviderState(company)
 
   if (!hasNamedContacts) {
+    const extracted = labels.some(
+      (label) =>
+        label.includes("website_public_extract") ||
+        label.includes("growth.company_contacts") ||
+        label.includes("contact_discovery"),
+    )
+    if (company.website?.trim() && !extracted) {
+      return "website_extraction_pending"
+    }
     if (providerState === "no_provider_connected" && company.source_type === "external_discovered") {
       return "contact_research_needed"
     }
@@ -98,6 +131,8 @@ export function formatProspectSearchContactCoverageLabel(
   switch (status) {
     case "no_contacts_found":
       return "No contacts found"
+    case "website_extraction_pending":
+      return "Website extraction pending"
     case "contact_research_needed":
       return "Contact research needed"
     case "contacts_found":
@@ -126,14 +161,19 @@ export function resolveProspectSearchContactFieldReason(input: {
   if (company.is_suppressed) return "Suppressed, do not contact"
 
   const providerState = resolveProspectSearchContactProviderState(company)
+  if (providerState === "website_crawl" || company.website?.trim()) {
+    return channel === "email"
+      ? "No verified email on public website yet — run Find contacts"
+      : "No phone on public website yet — run Find contacts"
+  }
   if (providerState === "no_provider_connected" && company.source_type === "external_discovered") {
-    return "Connect a contact discovery provider to reveal verified emails and phones"
+    return "Run Find contacts to extract public website contacts"
   }
 
   const intelligence = company.contact_intelligence
   if (!intelligence?.has_contacts) {
     return channel === "email"
-      ? "No verified contacts yet — run contact research"
+      ? "No verified contacts yet — run Find contacts"
       : "Phone unavailable from current sources"
   }
 
@@ -154,6 +194,34 @@ export function buildProspectSearchPeopleRowsFromCompanies(
       const name = contact.name?.trim()
       if (!name) continue
 
+      const verification_status = resolveContactVerificationStatus(contact, company)
+      const readiness = computeProspectSearchContactOutreachReadiness({
+        email: contact.email,
+        phone: contact.phone,
+        verification_status,
+        confidence: contact.confidence,
+        suppressed: company.is_suppressed,
+      })
+      const sourceEvidence = contact.source_evidence[0]
+      const source_label = formatProspectSearchContactSourceLabel({
+        source_label:
+          contact.source_label ??
+          (sourceEvidence
+            ? formatWebsiteExtractEvidenceLabel({
+                source_type: "website",
+                source_evidence: [
+                  {
+                    claim: sourceEvidence.claim,
+                    evidence: sourceEvidence.evidence,
+                    source: sourceEvidence.source,
+                    page_url: sourceEvidence.page_url ?? null,
+                  },
+                ],
+              })
+            : intelligence?.source_labels[0] ?? null),
+        source_page_url: contact.source_page_url ?? sourceEvidence?.page_url ?? null,
+      })
+
       rows.push({
         id: `${company.source_type}:${company.id}:${contact.id}`,
         source_type: company.source_type,
@@ -164,7 +232,7 @@ export function buildProspectSearchPeopleRowsFromCompanies(
         email: contact.email ?? null,
         phone: contact.phone ?? null,
         role: contact.role_type,
-        verification_status: resolveContactVerificationStatus(contact, company),
+        verification_status,
         rank_score: contact.confidence,
         company,
         contact_id: contact.id,
@@ -178,10 +246,17 @@ export function buildProspectSearchPeopleRowsFromCompanies(
           company,
           channel: "phone",
         }),
-        source_label: contact.source_evidence[0]?.source ?? intelligence?.source_labels[0] ?? null,
+        source_label,
+        source_page_url: contact.source_page_url ?? sourceEvidence?.page_url ?? null,
+        confidence: contact.confidence,
         location: company.location,
-        compliance_status: company.is_suppressed ? "suppressed" : "ready",
-        last_checked_at: null,
+        compliance_status: readiness.compliance_status,
+        last_checked_at: contact.last_checked_at ?? null,
+        outreach_ready: readiness.outreach_ready,
+        email_available: readiness.email_available,
+        phone_available: readiness.phone_available,
+        call_ready: readiness.call_ready,
+        readiness_label: readiness.readiness_label,
       })
     }
   }
@@ -234,9 +309,16 @@ export function mergeProspectSearchPeopleResults(
         channel: "phone",
       }),
       source_label: person.source_type,
+      source_page_url: null,
+      confidence: person.rank_score,
       location: company.location ?? null,
-      compliance_status: company.is_suppressed ? "suppressed" : "ready",
+      compliance_status: company.is_suppressed ? "suppressed" : "review_required",
       last_checked_at: null,
+      outreach_ready: false,
+      email_available: Boolean(person.email?.trim()),
+      phone_available: Boolean(person.phone?.trim()),
+      call_ready: Boolean(person.phone?.trim()),
+      readiness_label: company.is_suppressed ? "Suppressed for outreach" : "Needs verification",
     })
     seen.add(rowId)
   }
@@ -260,8 +342,11 @@ export function buildProspectSearchContactProviderMissingMessage(
   company: GrowthProspectSearchCompanyResult,
 ): string {
   const state = resolveProspectSearchContactProviderState(company)
+  if (company.website?.trim()) {
+    return "Run Find contacts to extract publicly listed names, emails, and phones from the company website."
+  }
   if (state === "no_provider_connected") {
-    return "No contact provider connected. Connect a contact discovery provider to reveal verified emails and phones."
+    return "No website on file — add a website or connect a paid contact provider for deeper research."
   }
   return "Contact research needed before outreach."
 }

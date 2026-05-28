@@ -164,6 +164,7 @@ export async function upsertExtractedCompanyContacts(
 ): Promise<GrowthCompanyContact[]> {
   if (!(await isGrowthCompanyContactsSchemaReady(admin))) return []
   const stored: GrowthCompanyContact[] = []
+  const nowIso = new Date().toISOString()
 
   for (const item of input.extracted) {
     const row = extractedToInsertRow({
@@ -171,10 +172,63 @@ export async function upsertExtractedCompanyContacts(
       growth_lead_id: input.growth_lead_id,
       extracted: item,
     })
+    const dedupe_hash = asString(row.dedupe_hash)
+
+    const { data: existing } = await admin
+      .schema("growth")
+      .from("company_contacts")
+      .select("*")
+      .eq("company_id", input.company_id)
+      .eq("dedupe_hash", dedupe_hash)
+      .maybeSingle()
+
+    if (existing) {
+      const prior = rowToCompanyContact(existing as Record<string, unknown>)
+      const mergedEvidence = [...prior.source_evidence]
+      for (const next of (row.source_evidence as GrowthCompanyContact["source_evidence"]) ?? []) {
+        const duplicate = mergedEvidence.some(
+          (item) => item.claim === next.claim && item.page_url === next.page_url,
+        )
+        if (!duplicate) mergedEvidence.push(next)
+      }
+
+      const mergedConfidence = Math.max(prior.confidence_score, Number(row.confidence_score ?? 0))
+      const { data, error } = await admin
+        .schema("growth")
+        .from("company_contacts")
+        .update({
+          email: prior.email ?? row.email,
+          phone: prior.phone ?? row.phone,
+          linkedin_url: prior.linkedin_url ?? row.linkedin_url,
+          title: prior.title ?? row.title,
+          confidence_score: mergedConfidence,
+          source_evidence: mergedEvidence,
+          updated_at: nowIso,
+          metadata: {
+            ...prior.metadata,
+            ...(row.metadata as Record<string, unknown>),
+            last_checked_at: nowIso,
+            discovery_provider: "website_public_extract",
+          },
+        })
+        .eq("id", prior.id)
+        .select("*")
+        .single()
+      if (!error && data) stored.push(rowToCompanyContact(data as Record<string, unknown>))
+      continue
+    }
+
     const { data, error } = await admin
       .schema("growth")
       .from("company_contacts")
-      .upsert(row, { onConflict: "company_id,dedupe_hash" })
+      .insert({
+        ...row,
+        metadata: {
+          ...(row.metadata as Record<string, unknown>),
+          last_checked_at: nowIso,
+          discovery_provider: "website_public_extract",
+        },
+      })
       .select("*")
       .single()
     if (!error && data) stored.push(rowToCompanyContact(data as Record<string, unknown>))

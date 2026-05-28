@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { buildBuyingCommitteeAssessment } from "@/lib/growth/contact-discovery/buying-committee-builder"
 import { runContactDiscoveryProviders } from "@/lib/growth/contact-discovery/contact-discovery-registry"
+import { OPERATOR_CONTACT_DISCOVERY_PROVIDER_TYPES } from "@/lib/growth/contact-discovery/contact-discovery-operator-providers"
 import {
   GROWTH_CONTACT_DISCOVERY_PRIVACY_NOTE,
   GROWTH_CONTACT_DISCOVERY_QA_MARKER,
@@ -59,6 +60,7 @@ export type ResolveCompanyContextResult = {
   company_candidate_id: string
   company_name: string
   domain: string | null
+  website_url: string | null
   growth_lead_id: string | null
   industry: string | null
 }
@@ -71,7 +73,7 @@ async function loadCompanyCandidateRow(
   const { data } = await admin
     .schema("growth")
     .from(table)
-    .select("id, company_name, domain, industry, metadata")
+    .select("id, company_name, domain, website, industry, metadata")
     .eq("id", companyCandidateId)
     .maybeSingle()
   return data ? (data as Record<string, unknown>) : null
@@ -95,6 +97,7 @@ export async function resolveCompanyCandidateContext(
       company_candidate_id: asString(r.id),
       company_name: asString(r.company_name),
       domain: asString(r.domain) || null,
+      website_url: asString(r.website) || null,
       growth_lead_id:
         typeof meta.matched_growth_lead_id === "string" ? meta.matched_growth_lead_id : null,
       industry: asString(r.industry) || null,
@@ -182,14 +185,19 @@ export async function runContactDiscoveryForCompany(
     }
   }
 
-  const providerResults = await runContactDiscoveryProviders(admin, {
-    company_candidate_id: ctx.company_candidate_id,
-    company_name: ctx.company_name,
-    domain: ctx.domain,
-    growth_lead_id: ctx.growth_lead_id,
-    industry: ctx.industry,
-    limit: input.limit ?? 20,
-  })
+  const providerResults = await runContactDiscoveryProviders(
+    admin,
+    {
+      company_candidate_id: ctx.company_candidate_id,
+      company_name: ctx.company_name,
+      domain: ctx.domain,
+      website_url: ctx.website_url,
+      growth_lead_id: ctx.growth_lead_id,
+      industry: ctx.industry,
+      limit: input.limit ?? 20,
+    },
+    { provider_types: [...OPERATOR_CONTACT_DISCOVERY_PROVIDER_TYPES] },
+  )
 
   const provider_messages = providerResults.map(
     (r) => `${r.provider_name}: ${r.status} — ${r.message}`,

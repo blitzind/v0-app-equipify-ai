@@ -66,6 +66,7 @@ async function buildContactIntelligenceForCompany(
     source_type: GrowthProspectSearchSourceType
     growth_lead_id: string | null
     company_name: string
+    is_suppressed?: boolean
   },
   context: {
     schema_ready: boolean
@@ -119,11 +120,21 @@ async function buildContactIntelligenceForCompany(
       }
       for (const candidate of snapshot.contacts) {
         const mapped = contactDiscoveryCandidateToInput(
-          candidate,
+          {
+            ...candidate,
+            provider_type: candidate.provider_type,
+            provider_name: candidate.provider_name,
+            verification_state: candidate.verification_state,
+            updated_at: candidate.updated_at,
+            metadata: candidate.metadata,
+          },
           (roleByContact.get(candidate.id) as Parameters<typeof contactDiscoveryCandidateToInput>[1]) ??
             null,
         )
         if (mapped) contacts.push(mapped)
+      }
+      if (snapshot.contacts.some((c) => c.provider_type === "website_public_extract")) {
+        source_labels.push("website_public_extract")
       }
       if (snapshot.buying_committee?.committee_completeness != null) {
         committee_completeness = snapshot.buying_committee.committee_completeness
@@ -137,6 +148,9 @@ async function buildContactIntelligenceForCompany(
     try {
       const companyContacts = await listCompanyContacts(admin, input.id)
       if (companyContacts.length > 0) source_labels.push("growth.company_contacts")
+      if (companyContacts.some((c) => c.source_type !== "manual" && c.source_type !== "crm")) {
+        source_labels.push("website_public_extract")
+      }
       for (const contact of companyContacts) {
         const mapped = companyContactToContactInput(contact)
         if (mapped) contacts.push(mapped)
@@ -175,6 +189,7 @@ async function buildContactIntelligenceForCompany(
     contact_confidence_score,
     primary_contact_id,
     recommended_contact_id,
+    company_suppressed: input.is_suppressed === true,
   })
 }
 
@@ -260,6 +275,7 @@ export async function applyProspectSearchContactIntelligenceOverlay(
       source_type: company.source_type,
       growth_lead_id: company.growth_lead_id,
       company_name: company.company_name,
+      is_suppressed: company.is_suppressed,
     })),
   )
 

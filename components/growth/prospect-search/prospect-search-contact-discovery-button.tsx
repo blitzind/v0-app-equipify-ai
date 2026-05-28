@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button"
 import {
   buildProspectSearchContactProviderMissingMessage,
   GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER,
+  GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER,
   logProspectSearchContactDiscoveryIssue,
-  resolveProspectSearchContactProviderState,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
@@ -24,9 +24,7 @@ export function ProspectSearchContactDiscoveryButton({
   onComplete?: () => void | Promise<void>
 }) {
   const [loading, setLoading] = useState(false)
-  const providerState = resolveProspectSearchContactProviderState(company)
-  const label =
-    providerState === "no_provider_connected" ? "Research contacts" : "Find contacts"
+  const label = "Find contacts"
 
   async function runDiscovery() {
     setLoading(true)
@@ -54,7 +52,7 @@ export function ProspectSearchContactDiscoveryButton({
   }
 
   return (
-    <div className={cn("space-y-1", className)} data-qa-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}>
+    <div className={cn("space-y-1", className)} data-qa-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER} data-website-contact-provider-marker={GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER}>
       <Button
         type="button"
         size={compact ? "sm" : "default"}
@@ -69,7 +67,7 @@ export function ProspectSearchContactDiscoveryButton({
         {loading ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : <Users className="mr-1 size-3.5" />}
         {loading ? "Researching…" : label}
       </Button>
-      {providerState === "no_provider_connected" && company.source_type === "external_discovered" ? (
+      {company.website?.trim() || company.source_type === "external_discovered" ? (
         <p className="text-[10px] leading-snug text-muted-foreground">
           {buildProspectSearchContactProviderMissingMessage(company)}
         </p>

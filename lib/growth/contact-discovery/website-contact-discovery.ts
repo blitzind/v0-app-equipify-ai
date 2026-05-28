@@ -7,6 +7,7 @@ import { fetchLeadWebsite } from "@/lib/growth/research-website-fetch"
 import { normalizeLeadWebsite } from "@/lib/growth/research-website-url"
 import { extractAboutPageContacts } from "@/lib/growth/contact-discovery/extract/extract-about-page"
 import { extractContactPageContacts } from "@/lib/growth/contact-discovery/extract/extract-contact-page"
+import { extractFooterContacts } from "@/lib/growth/contact-discovery/extract/extract-footer"
 import { extractLeadershipPageContacts } from "@/lib/growth/contact-discovery/extract/extract-leadership-page"
 import { extractSchemaOrgPersonContacts } from "@/lib/growth/contact-discovery/extract/extract-schema-org-person"
 import { extractTeamPageContacts } from "@/lib/growth/contact-discovery/extract/extract-team-page"
@@ -15,7 +16,24 @@ import {
   type ExtractedWebsiteContact,
 } from "@/lib/growth/contact-discovery/extract/extract-shared"
 
-const TEAM_PATHS = ["/team", "/about", "/leadership", "/staff", "/management", "/company", "/careers", "/contact"]
+const TEAM_PATHS = [
+  "/team",
+  "/about",
+  "/about-us",
+  "/leadership",
+  "/staff",
+  "/management",
+  "/company",
+  "/careers",
+  "/contact",
+  "/contact-us",
+  "/privacy",
+  "/privacy-policy",
+  "/service-area",
+  "/service-areas",
+  "/locations",
+  "/areas-we-serve",
+]
 
 export type WebsiteContactDiscoveryResult = {
   website_url: string | null
@@ -31,9 +49,14 @@ function buildCandidatePaths(baseUrl: string): string[] {
   return [normalized, ...TEAM_PATHS.map((path) => `${origin}${path}`)]
 }
 
-function classifyPage(url: string): "team" | "contact" | "about" | "leadership" | "generic" {
+function classifyPage(url: string): "team" | "contact" | "about" | "leadership" | "careers" | "privacy" | "service_area" | "generic" {
   const lower = url.toLowerCase()
   if (lower.includes("/contact")) return "contact"
+  if (lower.includes("/privacy")) return "privacy"
+  if (lower.includes("/service-area") || lower.includes("/locations") || lower.includes("/areas-we-serve")) {
+    return "service_area"
+  }
+  if (lower.includes("/careers")) return "careers"
   if (lower.includes("/leadership") || lower.includes("/management")) return "leadership"
   if (lower.includes("/team") || lower.includes("/staff")) return "team"
   if (lower.includes("/about") || lower.includes("/company")) return "about"
@@ -61,13 +84,18 @@ export async function discoverWebsiteContacts(rawWebsite: string | null | undefi
     const pageType = classifyPage(pageUrl)
 
     contacts.push(...extractSchemaOrgPersonContacts(html, pageUrl))
+    contacts.push(...extractFooterContacts(html, pageUrl))
     if (pageType === "team") contacts.push(...extractTeamPageContacts(html, pageUrl))
     if (pageType === "contact") contacts.push(...extractContactPageContacts(html, pageUrl))
-    if (pageType === "about") contacts.push(...extractAboutPageContacts(html, pageUrl))
+    if (pageType === "about" || pageType === "careers") contacts.push(...extractAboutPageContacts(html, pageUrl))
     if (pageType === "leadership") contacts.push(...extractLeadershipPageContacts(html, pageUrl))
+    if (pageType === "privacy" || pageType === "service_area") {
+      contacts.push(...extractContactPageContacts(html, pageUrl))
+    }
     if (pageType === "generic") {
       contacts.push(...extractTeamPageContacts(html, pageUrl))
       contacts.push(...extractAboutPageContacts(html, pageUrl))
+      contacts.push(...extractContactPageContacts(html, pageUrl))
     }
   }
 

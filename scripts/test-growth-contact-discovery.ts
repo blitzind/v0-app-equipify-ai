@@ -12,7 +12,6 @@ import {
   dedupeNormalizedContacts,
   normalizeContactCandidate,
 } from "../lib/growth/contact-discovery/contact-normalizer"
-import { GROWTH_CONTACT_DISCOVERY_SCHEMA_MIGRATION } from "../lib/growth/contact-discovery/contact-schema-health"
 import {
   GROWTH_BUYING_COMMITTEE_ROLES,
   GROWTH_CONTACT_DISCOVERY_PRIVACY_NOTE,
@@ -29,10 +28,14 @@ import { extractSchemaOrgPersonContacts } from "../lib/growth/contact-discovery/
 import { extractTeamPageContacts } from "../lib/growth/contact-discovery/extract/extract-team-page"
 import { verifyPhoneNumber } from "../lib/growth/contact-verification/verify-phone"
 
+const GROWTH_CONTACT_DISCOVERY_SCHEMA_MIGRATION =
+  "20270323120000_growth_engine_contact_discovery.sql" as const
+
 async function main(): Promise<void> {
   assert.equal(GROWTH_CONTACT_DISCOVERY_QA_MARKER, "growth-contact-discovery-v1")
   assert.ok(GROWTH_CONTACT_DISCOVERY_PROVIDER_TYPES.includes("manual_fixture"))
   assert.ok(GROWTH_CONTACT_DISCOVERY_PROVIDER_TYPES.includes("internal_growth"))
+  assert.ok(GROWTH_CONTACT_DISCOVERY_PROVIDER_TYPES.includes("website_public_extract"))
   assert.ok(GROWTH_BUYING_COMMITTEE_ROLES.includes("economic_buyer"))
   assert.match(GROWTH_CONTACT_DISCOVERY_PRIVACY_NOTE, /no guessed emails/)
 
@@ -52,6 +55,7 @@ async function main(): Promise<void> {
   )
   assert.match(repoSource, /runContactDiscoveryProviders/)
   assert.match(repoSource, /persistBuyingCommittee/)
+  assert.match(repoSource, /OPERATOR_CONTACT_DISCOVERY_PROVIDER_TYPES/)
   assert.doesNotMatch(repoSource, /createLeadCandidate|ingestIntent|sendEmail|scrape/i)
 
   const registrySource = fs.readFileSync(
@@ -60,6 +64,83 @@ async function main(): Promise<void> {
   )
   assert.match(registrySource, /createManualFixtureContactDiscoveryProvider/)
   assert.match(registrySource, /createInternalGrowthContactDiscoveryProvider/)
+  assert.match(registrySource, /createWebsitePublicExtractContactDiscoveryProvider/)
+
+  const operatorProvidersSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/contact-discovery/contact-discovery-operator-providers.ts"),
+    "utf8",
+  )
+  assert.match(operatorProvidersSource, /website_public_extract/)
+  assert.match(operatorProvidersSource, /internal_growth/)
+
+  const websiteProviderMigration = fs.readFileSync(
+    path.join(process.cwd(), "supabase/migrations/20270528120000_growth_website_public_extract_provider.sql"),
+    "utf8",
+  )
+  assert.match(websiteProviderMigration, /website_public_extract/)
+
+  const { mapExtractedWebsiteContactToProviderRaw, GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER } =
+    await import("../lib/growth/contact-discovery/website-extract-mapper")
+  assert.equal(GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER, "growth-website-contact-provider-v1")
+  const mapped = mapExtractedWebsiteContactToProviderRaw({
+    full_name: "Jane Owner",
+    first_name: "Jane",
+    last_name: "Owner",
+    title: "President",
+    department: null,
+    email: "jane@acme.com",
+    phone: null,
+    linkedin_url: null,
+    source_type: "team_page",
+    leadership_indicator: true,
+    source_evidence: [
+      {
+        claim: "Team member",
+        evidence: "President on team page",
+        source: "team_page",
+        page_url: "https://acme.com/team",
+      },
+    ],
+  })
+  assert.ok(mapped?.pii_observed)
+  assert.equal(mapped?.metadata?.qa_marker, "growth-website-contact-provider-v1")
+  assert.doesNotMatch(mapped?.full_name ?? "", /\[Fixture\]/)
+
+  const { mergeProspectSearchContactInputs } = await import(
+    "../lib/growth/prospect-search/prospect-search-contact-merge"
+  )
+  const merged = mergeProspectSearchContactInputs([
+    {
+      id: "a",
+      full_name: "Jane Owner",
+      email: "jane@acme.com",
+      confidence: 0.7,
+      source_evidence: [{ claim: "Internal", evidence: "Lead DM", source: "internal_growth" }],
+    },
+    {
+      id: "b",
+      full_name: "Jane Owner",
+      phone: "(512) 555-0100",
+      confidence: 0.8,
+      source_evidence: [{ claim: "Website", evidence: "Team page", source: "website_public_extract" }],
+    },
+  ])
+  assert.equal(merged.length, 1)
+  assert.equal(merged[0]?.email, "jane@acme.com")
+  assert.equal(merged[0]?.phone, "(512) 555-0100")
+  assert.equal(merged[0]?.source_evidence.length, 2)
+
+  const { computeProspectSearchContactOutreachReadiness, GROWTH_PEOPLE_HYDRATION_QA_MARKER } =
+    await import("../lib/growth/prospect-search/prospect-search-contact-readiness")
+  assert.equal(GROWTH_PEOPLE_HYDRATION_QA_MARKER, "growth-people-hydration-v1")
+  const readiness = computeProspectSearchContactOutreachReadiness({
+    email: "jane@acme.com",
+    phone: "(512) 555-0100",
+    verification_status: "email_verified",
+    confidence: 0.8,
+  })
+  assert.equal(readiness.email_available, true)
+  assert.equal(readiness.outreach_ready, true)
 
   const routeSource = fs.readFileSync(
     path.join(process.cwd(), "app/api/platform/growth/contact-discovery/route.ts"),

@@ -2,8 +2,10 @@
 
 import { ProspectSearchDiscoverCompaniesTable } from "@/components/growth/prospect-search/prospect-search-discover-companies-table"
 import { ProspectSearchDiscoverPeopleTable } from "@/components/growth/prospect-search/prospect-search-discover-people-table"
-import type { GrowthProspectSearchPeopleResultRow } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
-import type { ProspectSearchResultMode } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
+import type {
+  GrowthProspectSearchPeopleResultRow,
+  ProspectSearchResultMode,
+} from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import type { GrowthProspectSearchDiscoverResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 
@@ -18,6 +20,8 @@ export function ProspectSearchDiscoverResultsTable({
   onSelectAllVisible,
   onClearSelection,
   onContactDiscoveryComplete,
+  onAddPersonToQueue,
+  onAddPersonToLeadPipeline,
 }: {
   mode: ProspectSearchResultMode
   rows: GrowthProspectSearchDiscoverResult[]
@@ -29,6 +33,8 @@ export function ProspectSearchDiscoverResultsTable({
   onSelectAllVisible: () => void
   onClearSelection: () => void
   onContactDiscoveryComplete?: () => void | Promise<void>
+  onAddPersonToQueue?: (row: GrowthProspectSearchPeopleResultRow) => void
+  onAddPersonToLeadPipeline?: (row: GrowthProspectSearchPeopleResultRow) => void
 }) {
   if (mode === "people") {
     return (
@@ -38,6 +44,8 @@ export function ProspectSearchDiscoverResultsTable({
           const company = rows.find((row) => row.company_id === companyId)?.company
           if (company) onSelect(company)
         }}
+        onAddToQueue={onAddPersonToQueue}
+        onAddToLeadPipeline={onAddPersonToLeadPipeline}
       />
     )
   }
