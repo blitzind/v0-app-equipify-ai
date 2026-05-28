@@ -134,6 +134,10 @@ const ROUTE_CATEGORIES: Record<GrowthCronRouteId, GrowthCronExecutionCategory> =
   "growth-contact-refresh": "intelligence",
   "growth-territory-refresh": "intelligence",
   "growth-market-health-refresh": "intelligence",
+  "growth-dns-verify": "intelligence",
+  "growth-sequence-recovery": "outbound",
+  "growth-lifecycle-maintenance": "outbound",
+  "growth-reputation-snapshot": "outbound",
 }
 
 export async function summarizeGrowthCronRouteHealth(

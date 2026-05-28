@@ -74,6 +74,26 @@ export function computeMailboxReputationAssessment(input: {
     explanation.push(`Healthy reply rate +5.`)
   }
 
+  if (m.positive_reply_rate >= 2 && m.rolling_7d_send_volume >= 30) {
+    score += 3
+    explanation.push(`Positive reply momentum +3.`)
+  } else if (
+    m.positive_reply_rate > 0 &&
+    m.positive_reply_rate < 0.5 &&
+    m.reply_rate >= 2 &&
+    m.rolling_7d_send_volume >= 40
+  ) {
+    score -= 6
+    reasons.push(`Positive reply rate collapsed to ${m.positive_reply_rate.toFixed(1)}%.`)
+    explanation.push(`Engagement quality −6.`)
+  }
+
+  if (m.open_rate > 0 && m.open_rate < 5 && m.rolling_7d_send_volume >= 80) {
+    score -= 5
+    reasons.push(`Open rate collapsed to ${m.open_rate.toFixed(1)}%.`)
+    explanation.push(`Open engagement −5.`)
+  }
+
   const capUtil = input.daily_cap_utilization_pct ?? 0
   if (capUtil >= 100) {
     score -= 12

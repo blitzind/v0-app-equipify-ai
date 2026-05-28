@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { aggregateMailboxEngagementMetrics } from "@/lib/growth/deliverability/mailbox-engagement-metrics"
 import {
   aggregateBounceTrend,
   aggregateComplaintTrend,
@@ -13,7 +14,10 @@ import type {
   GrowthMailboxSendPolicy,
 } from "@/lib/growth/deliverability/reputation-protection-types"
 import { DEFAULT_MAILBOX_SEND_POLICY } from "@/lib/growth/deliverability/send-throttle-engine"
-import { isGrowthDeliverabilityReputationProtectionSchemaReady } from "@/lib/growth/deliverability/reputation-protection-schema-health"
+import {
+  isGrowthDeliverabilityH1SchemaReady,
+  isGrowthDeliverabilityReputationProtectionSchemaReady,
+} from "@/lib/growth/deliverability/reputation-protection-schema-health"
 import { listSenderAccounts } from "@/lib/growth/sender/sender-repository"
 
 function sinceDaysIso(days: number): string {
@@ -114,6 +118,18 @@ export async function assessMailboxReputation(
       .in("status", ["active", "paused"]),
   ])
 
+  const engagementRates = await aggregateMailboxEngagementMetrics(admin, {
+    senderAccountId,
+    mailboxConnectionId: mailbox?.id ?? null,
+    since7d,
+    sent7d,
+  }).catch(() => ({
+    reply_rate: 0,
+    positive_reply_rate: 0,
+    unsubscribe_rate: 0,
+    open_rate: 0,
+  }))
+
   const inactivityDays = sender.last_send_at
     ? Math.max(0, Math.round((Date.now() - Date.parse(sender.last_send_at)) / 86400000))
     : 0
@@ -144,11 +160,11 @@ export async function assessMailboxReputation(
     rolling_7d_send_volume: sent7d,
     rolling_30d_send_volume: sent30d,
     bounce_rate: ratePercent(bounces24h, Math.max(sent24h, sender.daily_send_used, 1)),
-    reply_rate: 0,
-    positive_reply_rate: 0,
-    unsubscribe_rate: 0,
+    reply_rate: engagementRates.reply_rate,
+    positive_reply_rate: engagementRates.positive_reply_rate,
+    unsubscribe_rate: engagementRates.unsubscribe_rate,
     spam_complaint_rate: ratePercent(complaints24h, Math.max(sent24h, 1)),
-    open_rate: 0,
+    open_rate: engagementRates.open_rate,
     inactivity_days: inactivityDays,
     sequence_participation_count: sequences.count ?? 0,
     warmup_status: warmupStatus,
@@ -176,11 +192,30 @@ export async function persistMailboxReputationSnapshot(
   if (!ready) return
 
   const m = assessment.metrics
+  const snapshotDate = new Date().toISOString().slice(0, 10)
+
+  const { data: previous } = await admin
+    .schema("growth")
+    .from("mailbox_reputation_snapshots")
+    .select("risk_score, health_tier")
+    .eq("sender_account_id", m.sender_account_id)
+    .lt("snapshot_date", snapshotDate)
+    .order("snapshot_date", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const previousRow = previous as Record<string, unknown> | null
+  const previousScore = previousRow ? Number(previousRow.risk_score) : assessment.risk_score
+  const previousTier = previousRow ? String(previousRow.health_tier) : assessment.health_tier
+  const riskScoreDelta = assessment.risk_score - previousScore
+  const healthTierChanged = previousTier !== assessment.health_tier
+  const h1Ready = await isGrowthDeliverabilityH1SchemaReady(admin)
+
   await admin.schema("growth").from("mailbox_reputation_snapshots").upsert(
     {
       sender_account_id: m.sender_account_id,
       mailbox_connection_id: m.mailbox_connection_id,
-      snapshot_date: new Date().toISOString().slice(0, 10),
+      snapshot_date: snapshotDate,
       email_address: m.email_address,
       daily_send_count: m.daily_send_count,
       rolling_7d_send_volume: m.rolling_7d_send_volume,
@@ -200,7 +235,14 @@ export async function persistMailboxReputationSnapshot(
       risk_reasons: assessment.risk_reasons,
       recommended_actions: assessment.recommended_actions,
       score_explanation: assessment.score_explanation,
-      metadata: {},
+      ...(h1Ready
+        ? {
+            risk_score_delta: riskScoreDelta,
+            previous_health_tier: previousTier,
+            health_tier_changed: healthTierChanged,
+          }
+        : {}),
+      metadata: { snapshot_source: "reputation_protection" },
     },
     { onConflict: "sender_account_id,snapshot_date" },
   )
@@ -208,15 +250,19 @@ export async function persistMailboxReputationSnapshot(
 
 export async function assessAllMailboxReputations(
   admin: SupabaseClient,
+  options?: { persistSnapshots?: boolean },
 ): Promise<GrowthMailboxReputationAssessment[]> {
   const senders = await listSenderAccounts(admin)
   const assessments: GrowthMailboxReputationAssessment[] = []
+  const persist = options?.persistSnapshots !== false
 
   for (const sender of senders.slice(0, 50)) {
     const assessment = await assessMailboxReputation(admin, sender.id)
     if (assessment) {
       assessments.push(assessment)
-      await persistMailboxReputationSnapshot(admin, assessment).catch(() => undefined)
+      if (persist) {
+        await persistMailboxReputationSnapshot(admin, assessment).catch(() => undefined)
+      }
     }
   }
 

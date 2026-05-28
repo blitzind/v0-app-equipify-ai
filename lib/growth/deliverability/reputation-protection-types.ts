@@ -12,6 +12,9 @@ export const GROWTH_WARMUP_RAMP_ENGINE_QA_MARKER = "growth-warmup-ramp-engine-v1
 
 export const GROWTH_DELIVERABILITY_GOVERNANCE_QA_MARKER = "growth-deliverability-governance-v1" as const
 
+export const GROWTH_DELIVERABILITY_H1_HARDENING_QA_MARKER =
+  "growth-deliverability-h1-hardening-v1" as const
+
 export const GROWTH_MAILBOX_REPUTATION_HEALTH_TIERS = [
   "healthy",
   "warming",
@@ -111,8 +114,19 @@ export type GrowthDeliverabilityGovernanceEvent = {
   created_at: string
 }
 
+export type GrowthSenderOperationalPauseSummary = {
+  sender_account_id: string
+  email_address: string
+  paused: boolean
+  pause_reason: string | null
+  paused_at: string | null
+  cooldown_until: string | null
+  operator_override: boolean
+}
+
 export type GrowthReputationProtectionDashboard = {
   qa_marker: typeof GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_QA_MARKER
+  h1_qa_marker: typeof GROWTH_DELIVERABILITY_H1_HARDENING_QA_MARKER
   mailbox_reputation_qa_marker: typeof GROWTH_MAILBOX_REPUTATION_INTELLIGENCE_QA_MARKER
   throttle_qa_marker: typeof GROWTH_SEND_THROTTLE_ENGINE_QA_MARKER
   warmup_qa_marker: typeof GROWTH_WARMUP_RAMP_ENGINE_QA_MARKER
@@ -137,6 +151,8 @@ export type GrowthReputationProtectionDashboard = {
   sending_velocity: Array<{ label: string; daily_send_count: number; cap_utilization_pct: number }>
   recommended_actions: string[]
   recent_governance_events: GrowthDeliverabilityGovernanceEvent[]
+  operational_pause_states: GrowthSenderOperationalPauseSummary[]
+  last_snapshot_date: string | null
 }
 
 export const GROWTH_REPUTATION_PROTECTION_PRIVACY_NOTE =

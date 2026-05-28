@@ -131,16 +131,13 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
   },
   {
     id: "deliverability-ops",
-    label: "Deliverability Ops",
+    label: "Deliverability Operations",
     href: "/admin/growth/providers/deliverability-ops",
     keywords: [
-      "deliverability ops",
-      "reputation",
-      "spf",
-      "dkim",
-      "dmarc",
-      "bounce",
-      "complaint",
+      "deliverability operations",
+      "telemetry",
+      "queue health",
+      "provider operations",
       "remediation",
       "risk alerts",
     ],
@@ -219,9 +216,9 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
   },
   {
     id: "deliverability",
-    label: "Deliverability",
+    label: "Deliverability Infrastructure",
     href: "/admin/growth/infrastructure/deliverability",
-    keywords: ["dns", "spf", "dkim", "dmarc", "deliverability", "mx"],
+    keywords: ["dns", "spf", "dkim", "dmarc", "mailbox setup", "mx", "domain authentication"],
   },
   {
     id: "warmup",
@@ -745,7 +742,7 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
       {
         id: "deliverability-ops",
         href: "/admin/growth/providers/deliverability-ops",
-        label: "Deliverability Ops",
+        label: "Deliverability Operations",
         match: prefixMatch("/admin/growth/providers/deliverability-ops"),
       },
       {
@@ -779,7 +776,7 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
       {
         id: "deliverability",
         href: "/admin/growth/infrastructure/deliverability",
-        label: "Deliverability",
+        label: "Deliverability Infrastructure",
         match: prefixMatch("/admin/growth/infrastructure/deliverability"),
       },
       {

@@ -11,6 +11,10 @@ import {
   evaluateSendThrottle,
   governanceEventTypeForThrottle,
 } from "@/lib/growth/deliverability/send-throttle-engine"
+import {
+  loadSenderDeliverabilityPauseState,
+  persistSenderDeliverabilityPause,
+} from "@/lib/growth/deliverability/sender-pause-state"
 import { getSenderAccount } from "@/lib/growth/sender/sender-repository"
 
 export type GrowthReputationProtectionPreSendResult = {
@@ -27,6 +31,27 @@ export async function evaluateReputationProtectionPreSend(
   const sender = await getSenderAccount(admin, input.senderAccountId)
   if (!sender) {
     return { allowed: true, reason: null, blockCode: null, throttle: null }
+  }
+
+  const pauseState = await loadSenderDeliverabilityPauseState(admin, input.senderAccountId)
+  if (pauseState?.paused) {
+    return {
+      allowed: false,
+      reason:
+        pauseState.pause_reason ??
+        "Mailbox is persistently paused by deliverability protection.",
+      blockCode: "reputation_paused",
+      throttle: {
+        allowed: false,
+        throttled: false,
+        paused: true,
+        reason: pauseState.pause_reason,
+        rule_id: pauseState.pause_rule_id ?? "persistent_pause",
+        recommended_delay_seconds: pauseState.cooldown_until
+          ? Math.max(0, Math.ceil((Date.parse(pauseState.cooldown_until) - Date.now()) / 1000))
+          : null,
+      },
+    }
   }
 
   const [assessment, policy] = await Promise.all([
@@ -60,6 +85,15 @@ export async function evaluateReputationProtectionPreSend(
           risk_score: assessment.risk_score,
           health_tier: assessment.health_tier,
         },
+      }).catch(() => undefined)
+    }
+
+    if (throttle.paused) {
+      await persistSenderDeliverabilityPause(admin, {
+        senderAccountId: input.senderAccountId,
+        mailboxConnectionId: assessment.metrics.mailbox_connection_id,
+        throttle,
+        cooldownHours: policy.cooldown_hours,
       }).catch(() => undefined)
     }
 

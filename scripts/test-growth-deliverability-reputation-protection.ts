@@ -1,11 +1,12 @@
 /**
- * Regression checks for Growth Deliverability & Reputation Protection v1.
+ * Regression checks for Growth Deliverability & Reputation Protection v1 + H1 hardening.
  * Run: pnpm test:growth-deliverability-reputation-protection
  */
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import { computeMailboxReputationAssessment } from "../lib/growth/deliverability/mailbox-reputation-engine"
+import { evaluateDeliverabilityRiskAlerts } from "../lib/growth/deliverability/reputation-risk-alerts"
 import {
   DEFAULT_MAILBOX_SEND_POLICY,
   evaluateSendThrottle,
@@ -15,13 +16,18 @@ import { buildWarmupRampGuidance } from "../lib/growth/deliverability/warmup-ram
 import {
   GROWTH_DELIVERABILITY_GOVERNANCE_EVENT_TYPES,
   GROWTH_DELIVERABILITY_GOVERNANCE_QA_MARKER,
+  GROWTH_DELIVERABILITY_H1_HARDENING_QA_MARKER,
   GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_QA_MARKER,
   GROWTH_MAILBOX_REPUTATION_HEALTH_TIERS,
   GROWTH_MAILBOX_REPUTATION_INTELLIGENCE_QA_MARKER,
   GROWTH_SEND_THROTTLE_ENGINE_QA_MARKER,
   GROWTH_WARMUP_RAMP_ENGINE_QA_MARKER,
 } from "../lib/growth/deliverability/reputation-protection-types"
-import { GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_MIGRATION } from "../lib/growth/deliverability/reputation-protection-schema-health"
+import {
+  GROWTH_DELIVERABILITY_H1_HARDENING_MIGRATION,
+  GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_MIGRATION,
+} from "../lib/growth/deliverability/reputation-protection-schema-health"
+import { GROWTH_CRON_ROUTE_IDS } from "../lib/growth/runtime/cron-telemetry-types"
 
 function readSource(relativePath: string): string {
   return fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
@@ -29,18 +35,28 @@ function readSource(relativePath: string): string {
 
 async function main(): Promise<void> {
   assert.equal(GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_QA_MARKER, "growth-deliverability-reputation-protection-v1")
+  assert.equal(GROWTH_DELIVERABILITY_H1_HARDENING_QA_MARKER, "growth-deliverability-h1-hardening-v1")
   assert.equal(GROWTH_MAILBOX_REPUTATION_INTELLIGENCE_QA_MARKER, "growth-mailbox-reputation-intelligence-v1")
   assert.equal(GROWTH_SEND_THROTTLE_ENGINE_QA_MARKER, "growth-send-throttle-engine-v1")
   assert.equal(GROWTH_WARMUP_RAMP_ENGINE_QA_MARKER, "growth-warmup-ramp-engine-v1")
   assert.equal(GROWTH_DELIVERABILITY_GOVERNANCE_QA_MARKER, "growth-deliverability-governance-v1")
   assert.equal(GROWTH_MAILBOX_REPUTATION_HEALTH_TIERS.length, 6)
   assert.equal(GROWTH_DELIVERABILITY_GOVERNANCE_EVENT_TYPES.length, 8)
+  assert.ok(GROWTH_CRON_ROUTE_IDS.includes("growth-reputation-snapshot"))
 
   const migration = readSource(`supabase/migrations/${GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_MIGRATION}`)
   assert.match(migration, /mailbox_reputation_snapshots/)
   assert.match(migration, /mailbox_send_policies/)
   assert.match(migration, /deliverability_governance_events/)
   assert.match(migration, /health_tier/)
+
+  const h1Migration = readSource(`supabase/migrations/${GROWTH_DELIVERABILITY_H1_HARDENING_MIGRATION}`)
+  assert.match(h1Migration, /deliverability_paused_at/)
+  assert.match(h1Migration, /risk_score_delta/)
+
+  const repo = readSource("lib/growth/deliverability/mailbox-reputation-repository.ts")
+  assert.match(repo, /aggregateMailboxEngagementMetrics/)
+  assert.match(repo, /reply_rate: engagementRates\.reply_rate/)
 
   const healthy = computeMailboxReputationAssessment({
     metrics: {
@@ -92,6 +108,14 @@ async function main(): Promise<void> {
   assert.ok(risky.risk_score < 40)
   assert.match(risky.health_tier, /paused|high_risk|protected/)
 
+  const alerts = evaluateDeliverabilityRiskAlerts({
+    assessment: risky,
+    previousReplyRate: 4,
+    dailyCapUtilizationPct: 100,
+  })
+  assert.ok(alerts.some((row) => row.rule_id === "bounce_spike"))
+  assert.ok(alerts.some((row) => row.rule_id === "reply_collapse"))
+
   const throttle = evaluateSendThrottle({
     policy: { ...DEFAULT_MAILBOX_SEND_POLICY, sender_account_id: "sa-2" },
     assessment: risky,
@@ -118,18 +142,33 @@ async function main(): Promise<void> {
   assert.match(preSend, /evaluateReputationProtectionPreSend/)
   assert.match(preSend, /reputation_paused/)
 
+  const reputationPreSend = readSource("lib/growth/deliverability/reputation-protection-pre-send.ts")
+  assert.match(reputationPreSend, /loadSenderDeliverabilityPauseState/)
+  assert.match(reputationPreSend, /persistSenderDeliverabilityPause/)
+
+  const outreachPreflight = readSource("lib/growth/outreach/outreach-preflight.ts")
+  assert.match(outreachPreflight, /resolveOutreachPreflightSenderAccountId/)
+  assert.match(outreachPreflight, /senderAccountId/)
+
+  const cronRoute = readSource("app/api/cron/growth-reputation-snapshot/route.ts")
+  assert.match(cronRoute, /runGrowthReputationSnapshotRollup/)
+
   const apiRoute = readSource("app/api/platform/growth/deliverability/dashboard/route.ts")
   assert.match(apiRoute, /buildReputationProtectionDashboard/)
 
   const page = readSource("app/(admin)/admin/growth/deliverability/page.tsx")
   assert.match(page, /GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_QA_MARKER/)
+  assert.match(page, /Deliverability Infrastructure/)
 
   const dashboard = readSource("components/growth/growth-reputation-protection-dashboard.tsx")
-  assert.match(dashboard, /GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_QA_MARKER/)
+  assert.match(dashboard, /GROWTH_DELIVERABILITY_H1_HARDENING_QA_MARKER/)
   assert.match(dashboard, /Governance timeline/)
+  assert.match(dashboard, /Persistent pause enforcement/)
 
   const nav = readSource("lib/growth/navigation/growth-navigation-destinations.ts")
-  assert.match(nav, /\/admin\/growth\/deliverability/)
+  assert.match(nav, /Deliverability Protection/)
+  assert.match(nav, /Deliverability Operations/)
+  assert.match(nav, /Deliverability Infrastructure/)
 
   const governance = readSource("lib/growth/deliverability/deliverability-governance-events.ts")
   assert.match(governance, /appendDeliverabilityGovernanceEvent/)

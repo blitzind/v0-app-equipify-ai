@@ -39,7 +39,8 @@ export default function AdminGrowthDeliverabilityProtectionPage() {
               <div>
                 <h1 className={PAGE_STANDARD_PAGE_TITLE}>Deliverability Protection</h1>
                 <p className="text-sm text-muted-foreground">
-                  Mailbox reputation, send throttles, warmup guidance, and auditable governance for internal outbound.
+                  Operational enforcement: mailbox reputation, send throttles, persistent pause state, and auditable
+                  governance. Snapshot rollup runs daily via cron.
                 </p>
               </div>
             </div>
@@ -48,7 +49,10 @@ export default function AdminGrowthDeliverabilityProtectionPage() {
                 <Link href="/admin/growth/infrastructure/mailboxes">Mailbox connections</Link>
               </Button>
               <Button type="button" variant="outline" size="sm" asChild>
-                <Link href="/admin/growth/infrastructure/deliverability">DNS deliverability</Link>
+                <Link href="/admin/growth/infrastructure/deliverability">Deliverability Infrastructure</Link>
+              </Button>
+              <Button type="button" variant="outline" size="sm" asChild>
+                <Link href="/admin/growth/providers/deliverability-ops">Deliverability Operations</Link>
               </Button>
             </div>
           </div>

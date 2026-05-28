@@ -5,6 +5,9 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 export const GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_MIGRATION =
   "20270531130000_growth_deliverability_reputation_protection.sql" as const
 
+export const GROWTH_DELIVERABILITY_H1_HARDENING_MIGRATION =
+  "20270604120000_growth_deliverability_h1_hardening.sql" as const
+
 export const GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_SETUP_MESSAGE =
   "Deliverability reputation protection schema is not applied. Run supabase db push."
 
@@ -22,4 +25,13 @@ export async function isGrowthDeliverabilityReputationProtectionSchemaReady(
     if (error) return false
   }
   return true
+}
+
+export async function isGrowthDeliverabilityH1SchemaReady(admin: SupabaseClient): Promise<boolean> {
+  const { error } = await admin
+    .schema("growth")
+    .from("sender_accounts")
+    .select("deliverability_paused_at")
+    .limit(1)
+  return !error
 }

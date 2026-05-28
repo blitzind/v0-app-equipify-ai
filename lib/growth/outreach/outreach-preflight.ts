@@ -15,6 +15,18 @@ export type OutreachPreflightResult = {
   code?: string
 }
 
+async function resolveOutreachPreflightSenderAccountId(
+  admin: SupabaseClient,
+  senderAccountId?: string | null,
+): Promise<string | null> {
+  if (senderAccountId) return senderAccountId
+  const { resolveSequenceExecutionSender } = await import(
+    "@/lib/growth/sequences/execution/sequence-send-builder"
+  )
+  const sender = await resolveSequenceExecutionSender(admin)
+  return sender?.senderAccountId ?? null
+}
+
 export async function runGrowthOutreachPreflight(
   admin: SupabaseClient,
   input: {
@@ -23,6 +35,7 @@ export async function runGrowthOutreachPreflight(
     toEmail?: string | null
     generationType?: GrowthAiCopilotGenerationType | null
     generationApproved?: boolean
+    senderAccountId?: string | null
   },
 ): Promise<OutreachPreflightResult> {
   if (input.generationType && !input.generationApproved) {
@@ -35,9 +48,17 @@ export async function runGrowthOutreachPreflight(
       return { allowed: false, code: "missing_email", reason: "Lead email required for email outreach." }
     }
 
-    const suppression = await assertEmailSendAllowed(admin, email)
+    const senderAccountId = await resolveOutreachPreflightSenderAccountId(admin, input.senderAccountId)
+    const suppression = await assertEmailSendAllowed(admin, email, {
+      leadId: input.lead.id,
+      senderAccountId: senderAccountId ?? undefined,
+    })
     if (!suppression.allowed) {
-      return { allowed: false, code: "suppressed", reason: "Lead email is suppressed." }
+      return {
+        allowed: false,
+        code: suppression.blockLayer === "infrastructure" ? "reputation_blocked" : "suppressed",
+        reason: suppression.reason ?? "Lead email is suppressed.",
+      }
     }
 
     const emailSummary = await fetchGrowthLeadEmailEventSummary(admin, input.lead.id, email)

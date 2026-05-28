@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import {
   GROWTH_DELIVERABILITY_GOVERNANCE_QA_MARKER,
+  GROWTH_DELIVERABILITY_H1_HARDENING_QA_MARKER,
   GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_QA_MARKER,
   GROWTH_MAILBOX_REPUTATION_HEALTH_TIERS,
   GROWTH_MAILBOX_REPUTATION_INTELLIGENCE_QA_MARKER,
@@ -103,9 +104,16 @@ export function GrowthReputationProtectionDashboardView() {
       data-throttle-qa={GROWTH_SEND_THROTTLE_ENGINE_QA_MARKER}
       data-warmup-qa={GROWTH_WARMUP_RAMP_ENGINE_QA_MARKER}
       data-governance-qa={GROWTH_DELIVERABILITY_GOVERNANCE_QA_MARKER}
+      data-h1-qa={GROWTH_DELIVERABILITY_H1_HARDENING_QA_MARKER}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-3xl text-sm text-muted-foreground">{GROWTH_REPUTATION_PROTECTION_PRIVACY_NOTE}</p>
+        <div className="max-w-3xl space-y-1">
+          <p className="text-sm text-muted-foreground">{GROWTH_REPUTATION_PROTECTION_PRIVACY_NOTE}</p>
+          <p className="text-xs text-muted-foreground">
+            Operational enforcement and sender health. DNS setup lives under Deliverability Infrastructure; telemetry
+            under Deliverability Operations.
+          </p>
+        </div>
         <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
           {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
           Refresh
@@ -180,6 +188,28 @@ export function GrowthReputationProtectionDashboardView() {
           )}
         </GrowthEngineCard>
       </div>
+
+      {dashboard.operational_pause_states.length > 0 ? (
+        <GrowthEngineCard title="Persistent pause enforcement">
+          <div className="space-y-3">
+            {dashboard.operational_pause_states.map((row) => (
+              <div key={row.sender_account_id} className="rounded-lg border border-border p-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{row.email_address}</span>
+                  <GrowthBadge tone={row.paused ? "critical" : "medium"}>
+                    {row.operator_override ? "Operator override" : "Paused"}
+                  </GrowthBadge>
+                </div>
+                {row.pause_reason ? <p className="mt-1 text-xs text-muted-foreground">{row.pause_reason}</p> : null}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Paused {formatWhen(row.paused_at)}
+                  {row.cooldown_until ? ` · cooldown until ${formatWhen(row.cooldown_until)}` : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+        </GrowthEngineCard>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <GrowthEngineCard title="Bounce trends">
@@ -272,6 +302,8 @@ export function GrowthReputationProtectionDashboardView() {
                 <th className="py-2 pr-4 font-medium">Risk</th>
                 <th className="py-2 pr-4 font-medium">7d volume</th>
                 <th className="py-2 pr-4 font-medium">Bounce</th>
+                <th className="py-2 pr-4 font-medium">Reply</th>
+                <th className="py-2 pr-4 font-medium">Open</th>
                 <th className="py-2 font-medium">Warmup</th>
               </tr>
             </thead>
@@ -285,6 +317,8 @@ export function GrowthReputationProtectionDashboardView() {
                   <td className="py-2 pr-4">{row.risk_score}</td>
                   <td className="py-2 pr-4">{row.metrics.rolling_7d_send_volume}</td>
                   <td className="py-2 pr-4">{row.metrics.bounce_rate.toFixed(1)}%</td>
+                  <td className="py-2 pr-4">{row.metrics.reply_rate.toFixed(1)}%</td>
+                  <td className="py-2 pr-4">{row.metrics.open_rate.toFixed(1)}%</td>
                   <td className="py-2">{row.metrics.warmup_status ?? "—"}</td>
                 </tr>
               ))}

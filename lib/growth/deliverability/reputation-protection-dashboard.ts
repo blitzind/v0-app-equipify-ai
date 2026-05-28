@@ -9,6 +9,7 @@ import {
 } from "@/lib/growth/deliverability/mailbox-reputation-repository"
 import {
   GROWTH_DELIVERABILITY_GOVERNANCE_QA_MARKER,
+  GROWTH_DELIVERABILITY_H1_HARDENING_QA_MARKER,
   GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_QA_MARKER,
   GROWTH_MAILBOX_REPUTATION_INTELLIGENCE_QA_MARKER,
   GROWTH_REPUTATION_PROTECTION_PRIVACY_NOTE,
@@ -17,6 +18,7 @@ import {
   type GrowthReputationProtectionDashboard,
 } from "@/lib/growth/deliverability/reputation-protection-types"
 import { evaluateSendThrottle } from "@/lib/growth/deliverability/send-throttle-engine"
+import { loadSenderDeliverabilityPauseState } from "@/lib/growth/deliverability/sender-pause-state"
 import { buildWarmupRampGuidance } from "@/lib/growth/deliverability/warmup-ramp-engine"
 import { listSenderAccounts } from "@/lib/growth/sender/sender-repository"
 
@@ -101,6 +103,21 @@ export async function buildReputationProtectionDashboard(
   ].slice(0, 8)
 
   const recent_governance_events = await listDeliverabilityGovernanceEvents(admin, 20)
+  const operational_pause_states = await Promise.all(
+    senders.slice(0, 20).map(async (sender) => {
+      const pause = await loadSenderDeliverabilityPauseState(admin, sender.id)
+      return {
+        sender_account_id: sender.id,
+        email_address: sender.email_address,
+        paused: pause?.paused ?? false,
+        pause_reason: pause?.pause_reason ?? null,
+        paused_at: pause?.paused_at ?? null,
+        cooldown_until: pause?.cooldown_until ?? null,
+        operator_override: pause?.operator_override ?? false,
+      }
+    }),
+  )
+  const last_snapshot_date = new Date().toISOString().slice(0, 10)
   const average_risk_score =
     assessments.length > 0
       ? Math.round(assessments.reduce((sum, row) => sum + row.risk_score, 0) / assessments.length)
@@ -108,6 +125,7 @@ export async function buildReputationProtectionDashboard(
 
   return {
     qa_marker: GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_QA_MARKER,
+    h1_qa_marker: GROWTH_DELIVERABILITY_H1_HARDENING_QA_MARKER,
     mailbox_reputation_qa_marker: GROWTH_MAILBOX_REPUTATION_INTELLIGENCE_QA_MARKER,
     throttle_qa_marker: GROWTH_SEND_THROTTLE_ENGINE_QA_MARKER,
     warmup_qa_marker: GROWTH_WARMUP_RAMP_ENGINE_QA_MARKER,
@@ -136,5 +154,7 @@ export async function buildReputationProtectionDashboard(
     })),
     recommended_actions,
     recent_governance_events,
+    operational_pause_states: operational_pause_states.filter((row) => row.paused || row.operator_override),
+    last_snapshot_date,
   }
 }
