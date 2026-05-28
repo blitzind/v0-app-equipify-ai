@@ -1,0 +1,28 @@
+import "server-only"
+
+import { VOICE_FOUNDATION_QA_MARKER } from "@/lib/voice/types"
+
+export type VoiceTelemetryEvent =
+  | "voice_webhook_received"
+  | "voice_webhook_signature_failed"
+  | "voice_webhook_idempotent_skip"
+  | "voice_webhook_ingested"
+  | "voice_webhook_ingestion_failed"
+  | "voice_call_lifecycle_transition"
+  | "voice_provider_health"
+  | "voice_schema_probe"
+
+export function logVoiceInfrastructure(
+  event: VoiceTelemetryEvent,
+  details: Record<string, unknown>,
+): void {
+  console.info(
+    JSON.stringify({
+      source: "voice-infrastructure",
+      qaMarker: VOICE_FOUNDATION_QA_MARKER,
+      event,
+      ts: new Date().toISOString(),
+      ...details,
+    }),
+  )
+}

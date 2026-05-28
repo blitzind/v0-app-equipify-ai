@@ -5,6 +5,7 @@ import { Settings2 } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthCommunicationSettingsPanel } from "@/components/growth/growth-communication-settings"
 import { GrowthNativeDialerSettingsPanel } from "@/components/growth/growth-native-dialer-settings-panel"
+import { GrowthVoiceInfrastructureSettingsPanel } from "@/components/growth/growth-voice-infrastructure-settings-panel"
 import { GrowthAiCopilotSettingsPanel } from "@/components/growth/growth-ai-copilot-settings"
 import { GrowthLiveCoachingSettingsPanel } from "@/components/growth/growth-live-coaching-settings"
 import { GrowthGoogleCalendarSettingsPanel } from "@/components/growth/growth-google-calendar-settings-panel"
@@ -56,6 +57,7 @@ export default function AdminGrowthSettingsPage() {
             <GrowthBookingPagesPanel />
           </Suspense>
           <GrowthCommunicationSettingsPanel />
+          <GrowthVoiceInfrastructureSettingsPanel />
           <GrowthNativeDialerSettingsPanel />
           <GrowthAiCopilotSettingsPanel />
           <GrowthLiveCoachingSettingsPanel />
