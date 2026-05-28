@@ -147,6 +147,9 @@ export async function POST(request: Request) {
       body.person && typeof body.person === "object"
         ? (body.person as GrowthProspectSearchPersonResult)
         : null,
+    people: Array.isArray(body.people)
+      ? (body.people as import("@/lib/growth/prospect-search/prospect-search-types").GrowthProspectSearchPeopleActionRow[])
+      : undefined,
     territory_name: typeof body.territory_name === "string" ? body.territory_name : undefined,
     territory_id: typeof body.territory_id === "string" ? body.territory_id : undefined,
     saved_search_id: typeof body.saved_search_id === "string" ? body.saved_search_id : undefined,

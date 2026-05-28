@@ -1,10 +1,14 @@
 /** Prospect Search contact discovery UX — coverage, people rows, provider honesty. Client-safe. */
 
 import { formatWebsiteExtractEvidenceLabel } from "@/lib/growth/contact-discovery/website-extract-mapper"
+import {
+  resolveContactOutreachEligibilityBundle,
+  type ProspectSearchContactEligibilityState,
+} from "@/lib/growth/prospect-search/prospect-search-contact-eligibility"
 import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
 import {
-  computeProspectSearchContactOutreachReadiness,
   formatProspectSearchContactSourceLabel,
+  computeProspectSearchContactOutreachReadiness,
 } from "@/lib/growth/prospect-search/prospect-search-contact-readiness"
 import type {
   GrowthProspectSearchCompanyResult,
@@ -17,6 +21,8 @@ export const GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER =
 
 export { GROWTH_PEOPLE_HYDRATION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-readiness"
 export { GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER } from "@/lib/growth/contact-discovery/website-extract-mapper"
+export { GROWTH_PEOPLE_WORKFLOWS_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-people-selection"
+export { GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-eligibility"
 
 export type ProspectSearchResultMode = "companies" | "people"
 
@@ -51,7 +57,23 @@ export type GrowthProspectSearchPeopleResultRow = GrowthProspectSearchPersonResu
   email_available: boolean
   phone_available: boolean
   call_ready: boolean
+  sms_ready: boolean
   readiness_label: string
+  email_eligibility: ProspectSearchContactEligibilityState
+  call_eligibility: ProspectSearchContactEligibilityState
+  sms_eligibility: ProspectSearchContactEligibilityState
+  call_block_reason: string | null
+  sms_block_reason: string | null
+  phone_on_dnc: boolean | null
+  timeline_events: ProspectSearchPeopleTimelineEvent[]
+}
+
+export type ProspectSearchPeopleTimelineEvent = {
+  id: string
+  kind: "discovered" | "verified" | "refreshed" | "routed_queue" | "added_pipeline" | "suppressed"
+  label: string
+  detail: string
+  occurred_at: string | null
 }
 
 export function hasProspectSearchDecisionMakerFilters(
@@ -195,13 +217,6 @@ export function buildProspectSearchPeopleRowsFromCompanies(
       if (!name) continue
 
       const verification_status = resolveContactVerificationStatus(contact, company)
-      const readiness = computeProspectSearchContactOutreachReadiness({
-        email: contact.email,
-        phone: contact.phone,
-        verification_status,
-        confidence: contact.confidence,
-        suppressed: company.is_suppressed,
-      })
       const sourceEvidence = contact.source_evidence[0]
       const source_label = formatProspectSearchContactSourceLabel({
         source_label:
@@ -220,6 +235,33 @@ export function buildProspectSearchPeopleRowsFromCompanies(
               })
             : intelligence?.source_labels[0] ?? null),
         source_page_url: contact.source_page_url ?? sourceEvidence?.page_url ?? null,
+      })
+      const phone_on_dnc =
+        typeof (contact as { phone_on_dnc?: unknown }).phone_on_dnc === "boolean"
+          ? ((contact as { phone_on_dnc: boolean }).phone_on_dnc as boolean)
+          : null
+      const eligibility = resolveContactOutreachEligibilityBundle({
+        email: contact.email,
+        phone: contact.phone,
+        verification_status,
+        confidence: contact.confidence,
+        company_suppressed: company.is_suppressed,
+        contact_suppressed: company.is_suppressed,
+        email_suppressed:
+          typeof (contact as { email_suppressed?: unknown }).email_suppressed === "boolean"
+            ? (contact as { email_suppressed: boolean }).email_suppressed
+            : false,
+        phone_on_dnc,
+        last_checked_at: contact.last_checked_at ?? null,
+        source_label,
+        source_page_url: contact.source_page_url ?? sourceEvidence?.page_url ?? null,
+      })
+      const readiness = computeProspectSearchContactOutreachReadiness({
+        email: contact.email,
+        phone: contact.phone,
+        verification_status,
+        confidence: contact.confidence,
+        suppressed: company.is_suppressed,
       })
 
       rows.push({
@@ -252,11 +294,27 @@ export function buildProspectSearchPeopleRowsFromCompanies(
         location: company.location,
         compliance_status: readiness.compliance_status,
         last_checked_at: contact.last_checked_at ?? null,
-        outreach_ready: readiness.outreach_ready,
+        outreach_ready: eligibility.email.eligible || eligibility.call.eligible,
         email_available: readiness.email_available,
         phone_available: readiness.phone_available,
-        call_ready: readiness.call_ready,
-        readiness_label: readiness.readiness_label,
+        call_ready: eligibility.call_ready,
+        sms_ready: eligibility.sms_ready,
+        readiness_label: eligibility.call.eligible
+          ? "Call ready"
+          : eligibility.email.eligible
+            ? "Email outreach ready"
+            : readiness.readiness_label,
+        email_eligibility: eligibility.email.state,
+        call_eligibility: eligibility.call.state,
+        sms_eligibility: eligibility.sms.state,
+        call_block_reason: eligibility.call_block_reason,
+        sms_block_reason: eligibility.sms_block_reason,
+        phone_on_dnc,
+        timeline_events: buildProspectSearchPeopleTimelineEvents({
+          contact,
+          company,
+          source_label,
+        }),
       })
     }
   }
@@ -294,6 +352,15 @@ export function mergeProspectSearchPeopleResults(
     if (!company) continue
     const rowId = `${person.source_type}:${person.company_id}:${person.id}`
     if (seen.has(rowId)) continue
+    const eligibility = resolveContactOutreachEligibilityBundle({
+      email: person.email,
+      phone: person.phone,
+      verification_status: "pending_verification",
+      confidence: person.rank_score,
+      company_suppressed: company.is_suppressed,
+      contact_suppressed: company.is_suppressed,
+      phone_on_dnc: null,
+    })
     fromIntelligence.push({
       ...person,
       company,
@@ -314,16 +381,67 @@ export function mergeProspectSearchPeopleResults(
       location: company.location ?? null,
       compliance_status: company.is_suppressed ? "suppressed" : "review_required",
       last_checked_at: null,
-      outreach_ready: false,
+      outreach_ready: eligibility.email.eligible || eligibility.call.eligible,
       email_available: Boolean(person.email?.trim()),
       phone_available: Boolean(person.phone?.trim()),
-      call_ready: Boolean(person.phone?.trim()),
+      call_ready: eligibility.call_ready,
+      sms_ready: eligibility.sms_ready,
       readiness_label: company.is_suppressed ? "Suppressed for outreach" : "Needs verification",
+      email_eligibility: eligibility.email.state,
+      call_eligibility: eligibility.call.state,
+      sms_eligibility: eligibility.sms.state,
+      call_block_reason: eligibility.call_block_reason,
+      sms_block_reason: eligibility.sms_block_reason,
+      phone_on_dnc: null,
+      timeline_events: [
+        {
+          id: "discovered-server",
+          kind: "discovered",
+          label: "Discovered",
+          detail: "Server people index record",
+          occurred_at: null,
+        },
+      ],
     })
     seen.add(rowId)
   }
 
   return fromIntelligence.sort((a, b) => b.rank_score - a.rank_score)
+}
+
+function buildProspectSearchPeopleTimelineEvents(input: {
+  contact: GrowthProspectSearchContactIntelligence["contacts"][number]
+  company: GrowthProspectSearchCompanyResult
+  source_label: string | null
+}): ProspectSearchPeopleTimelineEvent[] {
+  const events: ProspectSearchPeopleTimelineEvent[] = [
+    {
+      id: "discovered",
+      kind: "discovered",
+      label: "Discovered",
+      detail: input.source_label ?? "Evidence-backed contact discovered",
+      occurred_at: input.contact.last_checked_at ?? null,
+    },
+  ]
+  if (input.contact.verification_status?.includes("verified")) {
+    events.push({
+      id: "verified",
+      kind: "verified",
+      label: "Verified",
+      detail: `Verification state: ${input.contact.verification_status.replace(/_/g, " ")}`,
+      occurred_at: input.contact.last_checked_at ?? null,
+    })
+  }
+  if (input.company.is_suppressed) {
+    events.push({
+      id: "suppressed",
+      kind: "suppressed",
+      label: "Suppressed",
+      detail: input.company.suppression_reason ?? "Company suppressed for outreach",
+      occurred_at: input.company.suppressed_at ?? null,
+    })
+  }
+  return events
 }
 
 function resolveContactVerificationStatus(

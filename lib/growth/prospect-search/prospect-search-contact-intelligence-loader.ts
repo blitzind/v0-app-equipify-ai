@@ -25,7 +25,12 @@ import type {
   GrowthProspectSearchCompanyResult,
   GrowthProspectSearchSourceType,
 } from "@/lib/growth/prospect-search/prospect-search-types"
-import { finalizeProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-result-finalize"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import {
+  loadPhoneDncLookup,
+} from "@/lib/growth/prospect-search/prospect-search-contact-eligibility-server"
+import { loadProspectSearchSuppressionLookup } from "@/lib/growth/prospect-search/prospect-search-suppression-overlays"
+import { normalizePhoneNumber } from "@/lib/voice/phone-normalization"
 
 function isPipelineRun(value: unknown): value is GrowthLeadEnginePipelineRun {
   if (!value || typeof value !== "object") return false
@@ -261,6 +266,77 @@ export function applyContactIntelligenceToCompanyResult(
   )
 }
 
+function applyEligibilityHintsToIntelligence(
+  intelligence: GrowthProspectSearchContactIntelligence,
+  company: {
+    company_name: string
+    website?: string | null
+    growth_lead_id?: string | null
+    is_suppressed?: boolean
+  },
+  context: {
+    suppressionLookup: Awaited<ReturnType<typeof loadProspectSearchSuppressionLookup>>
+    phoneDncLookup: Map<string, boolean>
+  },
+): GrowthProspectSearchContactIntelligence {
+  if (!intelligence.has_contacts) return intelligence
+
+  const contacts = intelligence.contacts.map((contact) => {
+    const hints = resolveProspectSearchContactEligibilityHintsSync(
+      {
+        email: contact.email,
+        phone: contact.phone,
+        company_name: company.company_name,
+        website: company.website ?? null,
+        growth_lead_id: company.growth_lead_id ?? null,
+        company_suppressed: company.is_suppressed,
+      },
+      context,
+    )
+    return {
+      ...contact,
+      phone_on_dnc: hints.phone_on_dnc,
+      email_suppressed: hints.email_suppressed,
+    }
+  })
+
+  return { ...intelligence, contacts }
+}
+
+function resolveProspectSearchContactEligibilityHintsSync(
+  input: Parameters<typeof resolveProspectSearchContactEligibilityHints>[1],
+  context: {
+    suppressionLookup: Awaited<ReturnType<typeof loadProspectSearchSuppressionLookup>>
+    phoneDncLookup: Map<string, boolean>
+  },
+): Awaited<ReturnType<typeof resolveProspectSearchContactEligibilityHints>> {
+  const overlay = context.suppressionLookup.matchForIdentifiers({
+    email: input.email,
+    phone: input.phone,
+    company_name: input.company_name,
+    website: input.website,
+    growth_lead_id: input.growth_lead_id,
+  })
+
+  const email = input.email?.trim().toLowerCase() || null
+  const emailOverlay = email ? context.suppressionLookup.matchForIdentifiers({ email }) : null
+
+  const normalizedPhone = input.phone
+    ? normalizePhoneNumber(input.phone) || input.phone.replace(/\D/g, "")
+    : null
+  let phone_on_dnc: boolean | null = null
+  if (normalizedPhone) {
+    if (!getGrowthEngineAiOrgId()) phone_on_dnc = null
+    else phone_on_dnc = context.phoneDncLookup.has(normalizedPhone)
+  }
+
+  return {
+    phone_on_dnc,
+    email_suppressed: Boolean(emailOverlay?.is_suppressed),
+    contact_suppressed: Boolean(input.company_suppressed || overlay?.is_suppressed),
+  }
+}
+
 export async function applyProspectSearchContactIntelligenceOverlay(
   admin: SupabaseClient,
   companies: GrowthProspectSearchCompanyResult[],
@@ -279,11 +355,24 @@ export async function applyProspectSearchContactIntelligenceOverlay(
     })),
   )
 
-  return companies.map((company) =>
-    applyContactIntelligenceToCompanyResult(
-      company,
-      intelligenceByKey.get(`${company.source_type}:${company.id}`),
-      context,
+  const allPhones = [
+    ...new Set(
+      [...intelligenceByKey.values()]
+        .flatMap((intel) => intel.contacts.map((contact) => contact.phone?.trim()))
+        .filter((phone): phone is string => Boolean(phone)),
     ),
-  )
+  ]
+  const [phoneDncLookup, suppressionLookup] = await Promise.all([
+    loadPhoneDncLookup(admin, allPhones),
+    loadProspectSearchSuppressionLookup(admin),
+  ])
+  const eligibilityContext = { phoneDncLookup, suppressionLookup }
+
+  return companies.map((company) => {
+    const intelligence = intelligenceByKey.get(`${company.source_type}:${company.id}`)
+    const enriched = intelligence
+      ? applyEligibilityHintsToIntelligence(intelligence, company, eligibilityContext)
+      : intelligence
+    return applyContactIntelligenceToCompanyResult(company, enriched, context)
+  })
 }

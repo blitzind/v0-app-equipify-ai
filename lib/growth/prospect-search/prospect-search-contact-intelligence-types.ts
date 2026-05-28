@@ -28,6 +28,8 @@ export type ProspectSearchContactOverlay = {
   verification_status?: string | null
   outreach_ready?: boolean
   source_label?: string | null
+  phone_on_dnc?: boolean | null
+  email_suppressed?: boolean
 }
 
 export type ProspectSearchCommitteeRoleMapping = {

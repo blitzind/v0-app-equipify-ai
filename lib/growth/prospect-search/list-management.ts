@@ -132,7 +132,18 @@ export function companyResultToListMember(
   }
 }
 
-export function personResultToListMember(row: GrowthProspectSearchPersonResult): {
+export function peopleResultRowToListMember(row: {
+  id: string
+  company_name: string
+  full_name?: string | null
+  title?: string | null
+  email?: string | null
+  phone?: string | null
+  source_label?: string | null
+  confidence?: number
+  verification_status?: string
+  outreach_ready?: boolean
+}): {
   source_type: "person"
   source_id: string
   company_name: string
@@ -145,6 +156,9 @@ export function personResultToListMember(row: GrowthProspectSearchPersonResult):
     snapshot: { ...row },
   }
 }
+
+/** @deprecated Use peopleResultRowToListMember for People workflow rows. */
+export const personResultToListMember = peopleResultRowToListMember
 
 export async function listProspectSearchListMembers(
   admin: SupabaseClient,

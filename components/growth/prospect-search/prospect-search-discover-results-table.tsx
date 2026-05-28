@@ -15,37 +15,58 @@ export function ProspectSearchDiscoverResultsTable({
   peopleRows,
   selectedId,
   selectedKeys,
+  selectedPeopleKeys,
   onSelect,
   onToggleSelection,
   onSelectAllVisible,
   onClearSelection,
+  onTogglePeopleSelection,
+  onSelectAllVisiblePeople,
+  onClearPeopleSelection,
   onContactDiscoveryComplete,
   onAddPersonToQueue,
   onAddPersonToLeadPipeline,
+  onAddPersonToCallQueue,
+  onOpenPersonContact,
+  onRerunPersonDiscovery,
 }: {
   mode: ProspectSearchResultMode
   rows: GrowthProspectSearchDiscoverResult[]
   peopleRows: GrowthProspectSearchPeopleResultRow[]
   selectedId: string | null
   selectedKeys: Set<string>
+  selectedPeopleKeys?: Set<string>
   onSelect: (company: GrowthProspectSearchCompanyResult) => void
   onToggleSelection: (company: GrowthProspectSearchCompanyResult, checked: boolean) => void
   onSelectAllVisible: () => void
   onClearSelection: () => void
+  onTogglePeopleSelection?: (row: GrowthProspectSearchPeopleResultRow, checked: boolean) => void
+  onSelectAllVisiblePeople?: () => void
+  onClearPeopleSelection?: () => void
   onContactDiscoveryComplete?: () => void | Promise<void>
   onAddPersonToQueue?: (row: GrowthProspectSearchPeopleResultRow) => void
   onAddPersonToLeadPipeline?: (row: GrowthProspectSearchPeopleResultRow) => void
+  onAddPersonToCallQueue?: (row: GrowthProspectSearchPeopleResultRow) => void
+  onOpenPersonContact?: (row: GrowthProspectSearchPeopleResultRow) => void
+  onRerunPersonDiscovery?: (row: GrowthProspectSearchPeopleResultRow) => void
 }) {
   if (mode === "people") {
     return (
       <ProspectSearchDiscoverPeopleTable
         rows={peopleRows}
+        selectedKeys={selectedPeopleKeys}
+        onToggleSelection={onTogglePeopleSelection}
+        onSelectAllVisible={onSelectAllVisiblePeople}
+        onClearSelection={onClearPeopleSelection}
         onOpenCompany={(companyId) => {
           const company = rows.find((row) => row.company_id === companyId)?.company
           if (company) onSelect(company)
         }}
+        onOpenContact={onOpenPersonContact}
         onAddToQueue={onAddPersonToQueue}
         onAddToLeadPipeline={onAddPersonToLeadPipeline}
+        onAddToCallQueue={onAddPersonToCallQueue}
+        onRerunDiscovery={onRerunPersonDiscovery}
       />
     )
   }

@@ -115,12 +115,22 @@ import {
   GROWTH_PEOPLE_HYDRATION_QA_MARKER,
   GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER,
   GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER,
+  GROWTH_PEOPLE_WORKFLOWS_QA_MARKER,
+  GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER,
   logProspectSearchContactDiscoveryIssue,
   mergeProspectSearchPeopleResults,
   resolveDefaultProspectSearchResultMode,
   type GrowthProspectSearchPeopleResultRow,
   type ProspectSearchResultMode,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
+import { ProspectSearchPeopleBulkActionBar } from "@/components/growth/prospect-search/prospect-search-people-bulk-action-bar"
+import { ProspectSearchContactEvidenceDrawer } from "@/components/growth/prospect-search/prospect-search-contact-evidence-drawer"
+import {
+  mergeProspectSearchPeopleSelectionStore,
+  prospectSearchPeopleSelectionKey,
+  selectedProspectSearchPeopleRows,
+} from "@/lib/growth/prospect-search/prospect-search-people-selection"
+import type { GrowthProspectSearchPeopleActionRow } from "@/lib/growth/prospect-search/prospect-search-types"
 
 const EMPTY_FILTERS: GrowthProspectSearchFilters = {}
 
@@ -135,6 +145,36 @@ type ActionFeedback = {
   message: string
   tone: "success" | "warning" | "error"
   workspaceUrl?: string | null
+}
+
+function serializeProspectSearchPeopleActionRows(
+  rows: GrowthProspectSearchPeopleResultRow[],
+): GrowthProspectSearchPeopleActionRow[] {
+  return rows.map((row) => ({
+    id: row.id,
+    contact_id: row.contact_id,
+    company_id: row.company_id,
+    company_name: row.company_name,
+    full_name: row.full_name,
+    title: row.title,
+    email: row.email,
+    phone: row.phone,
+    linkedin_url: row.linkedin_url ?? null,
+    source_label: row.source_label,
+    source_page_url: row.source_page_url,
+    confidence: row.confidence,
+    verification_status: row.verification_status,
+    outreach_ready: row.outreach_ready,
+    call_ready: row.call_ready,
+    sms_ready: row.sms_ready,
+    call_eligibility: row.call_eligibility,
+    sms_eligibility: row.sms_eligibility,
+    email_eligibility: row.email_eligibility,
+    call_block_reason: row.call_block_reason,
+    sms_block_reason: row.sms_block_reason,
+    compliance_status: row.compliance_status,
+    company: row.company,
+  }))
 }
 
 function ProspectSearchShellFallback() {
@@ -178,6 +218,14 @@ function ProspectSearchShellInner() {
   const [lastSearchedCriteriaKey, setLastSearchedCriteriaKey] = useState<string | null>(null)
   const [resultMode, setResultMode] = useState<ProspectSearchResultMode>("companies")
   const [contactDiscoveryBusy, setContactDiscoveryBusy] = useState(false)
+  const [selectedPeopleKeys, setSelectedPeopleKeys] = useState<Set<string>>(new Set())
+  const [selectedPeopleStore, setSelectedPeopleStore] = useState<
+    Map<string, GrowthProspectSearchPeopleResultRow>
+  >(new Map())
+  const [peopleBulkBusy, setPeopleBulkBusy] = useState(false)
+  const [evidenceDrawerRow, setEvidenceDrawerRow] = useState<GrowthProspectSearchPeopleResultRow | null>(
+    null,
+  )
 
   const queryRef = useRef(query)
   const filtersRef = useRef(filters)
@@ -219,6 +267,15 @@ function ProspectSearchShellInner() {
   const peopleRows = useMemo(
     () => mergeProspectSearchPeopleResults(people, companies),
     [people, companies],
+  )
+  const selectedPeopleRows = useMemo(
+    () =>
+      selectedProspectSearchPeopleRows({
+        keys: selectedPeopleKeys,
+        store: selectedPeopleStore,
+        fallbackRows: peopleRows,
+      }),
+    [selectedPeopleKeys, selectedPeopleStore, peopleRows],
   )
   const rawProviderCount = resolveRawProviderCount(result)
   const discoverPhase = resolveProspectSearchDiscoverResultsPhase({
@@ -290,6 +347,8 @@ function ProspectSearchShellInner() {
     setPendingProviderSearchHint(null)
     setSelectedCompany(null)
     setSelectedKeys(new Set())
+    setSelectedPeopleKeys(new Set())
+    setSelectedPeopleStore(new Map())
     setPage(1)
     setActiveSavedSearchId(null)
     setActiveTemplateId(null)
@@ -325,11 +384,23 @@ function ProspectSearchShellInner() {
   }, [searchCompleted, lastSearchedCriteriaKey, companies, filters, people.length])
 
   useEffect(() => {
+    setSelectedPeopleStore((prev) =>
+      mergeProspectSearchPeopleSelectionStore({
+        store: prev,
+        keys: selectedPeopleKeys,
+        visibleRows: peopleRows,
+      }),
+    )
+  }, [peopleRows, selectedPeopleKeys])
+
+  useEffect(() => {
     if (lastSearchedCriteriaKey === null) return
     if (currentCriteriaKey === lastSearchedCriteriaKey) return
     setResult(null)
     setSelectedCompany(null)
     setSelectedKeys(new Set())
+    setSelectedPeopleKeys(new Set())
+    setSelectedPeopleStore(new Map())
     setSearchCompleted(false)
     setPendingProviderSearchHint(resolveProspectSearchStagedSearchPendingMessage(discoveryMode))
   }, [currentCriteriaKey, lastSearchedCriteriaKey, discoveryMode])
@@ -551,6 +622,30 @@ function ProspectSearchShellInner() {
         }
         if (action === "bulk_push_to_lead_inbox" && json.ok) {
           setSelectedKeys(new Set())
+        }
+        if (action === "add_people_to_list" && json.ok) {
+          await loadInitialMeta()
+        }
+        if (action === "export_people_csv" && json.ok) {
+          const exportJson = json as {
+            export_csv_content?: string
+            export_csv_filename?: string
+          }
+          if (exportJson.export_csv_content) {
+            const blob = new Blob([exportJson.export_csv_content], { type: "text/csv;charset=utf-8" })
+            const url = URL.createObjectURL(blob)
+            const anchor = document.createElement("a")
+            anchor.href = url
+            anchor.download = exportJson.export_csv_filename ?? "prospect-search-people.csv"
+            anchor.click()
+            URL.revokeObjectURL(url)
+          }
+        }
+        if (
+          (action === "enqueue_people_call_queue" || action === "run_lead_engine") &&
+          json.workspace_url
+        ) {
+          window.open(json.workspace_url, "_blank", "noopener,noreferrer")
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
@@ -821,6 +916,208 @@ function ProspectSearchShellInner() {
     [runAction],
   )
 
+  const togglePeopleSelection = useCallback(
+    (row: GrowthProspectSearchPeopleResultRow, checked: boolean) => {
+      const key = prospectSearchPeopleSelectionKey(row)
+      setSelectedPeopleKeys((prev) => {
+        const next = new Set(prev)
+        if (checked) next.add(key)
+        else next.delete(key)
+        return next
+      })
+      setSelectedPeopleStore((prev) => {
+        const next = new Map(prev)
+        if (checked) next.set(key, row)
+        else next.delete(key)
+        return next
+      })
+    },
+    [],
+  )
+
+  const selectAllVisiblePeople = useCallback(() => {
+    const keys = new Set(peopleRows.map((row) => prospectSearchPeopleSelectionKey(row)))
+    setSelectedPeopleKeys(keys)
+    setSelectedPeopleStore(new Map(peopleRows.map((row) => [prospectSearchPeopleSelectionKey(row), row])))
+  }, [peopleRows])
+
+  const clearPeopleSelection = useCallback(() => {
+    setSelectedPeopleKeys(new Set())
+    setSelectedPeopleStore(new Map())
+  }, [])
+
+  const runPeopleAction = useCallback(
+    async (action: string, rows: GrowthProspectSearchPeopleResultRow[]) => {
+      if (rows.length === 0) return
+      setPeopleBulkBusy(true)
+      setActionMessage(null)
+      setError(null)
+      try {
+        const res = await fetch("/api/platform/growth/prospect-search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action,
+            query,
+            filters,
+            discovery_mode: discoveryMode,
+            people: serializeProspectSearchPeopleActionRows(rows),
+          }),
+        })
+        const json = (await res.json()) as {
+          ok?: boolean
+          message?: string
+          workspace_url?: string | null
+          export_csv_content?: string
+          export_csv_filename?: string
+        }
+        setActionMessage({
+          message: json.message ?? (json.ok ? "Done." : "Action failed."),
+          tone: json.ok ? "success" : "error",
+          workspaceUrl: json.workspace_url,
+        })
+        if (action === "export_people_csv" && json.ok && json.export_csv_content) {
+          const blob = new Blob([json.export_csv_content], { type: "text/csv;charset=utf-8" })
+          const url = URL.createObjectURL(blob)
+          const anchor = document.createElement("a")
+          anchor.href = url
+          anchor.download = json.export_csv_filename ?? "prospect-search-people.csv"
+          anchor.click()
+          URL.revokeObjectURL(url)
+        }
+        if (json.workspace_url && action === "enqueue_people_call_queue") {
+          window.open(json.workspace_url, "_blank", "noopener,noreferrer")
+        }
+        if (
+          json.ok &&
+          (action === "add_people_to_list" ||
+            action === "refresh_people_verification" ||
+            action === "enqueue_people_call_queue")
+        ) {
+          if (action === "refresh_people_verification") {
+            await refreshContactDiscoveryResults()
+          }
+          if (action === "add_people_to_list") {
+            await loadInitialMeta()
+          }
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setPeopleBulkBusy(false)
+      }
+    },
+    [discoveryMode, filters, loadInitialMeta, query, refreshContactDiscoveryResults],
+  )
+
+  const runBulkPeoplePushToQueue = useCallback(async () => {
+    if (selectedPeopleRows.length === 0) return
+    const companiesById = new Map<string, GrowthProspectSearchCompanyResult>()
+    for (const row of selectedPeopleRows) {
+      if (row.compliance_status !== "suppressed") {
+        companiesById.set(row.company_id, row.company)
+      }
+    }
+    const companiesToPush = [...companiesById.values()]
+    if (companiesToPush.length === 0) return
+    setPeopleBulkBusy(true)
+    setActionMessage(null)
+    setError(null)
+    try {
+      const res = await fetch("/api/platform/growth/prospect-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "bulk_push_to_lead_inbox",
+          query,
+          filters,
+          discovery_mode: discoveryMode,
+          selected: companiesToPush.map((row) => ({
+            source_type: row.source_type,
+            id: row.id,
+            company_name: row.company_name,
+          })),
+        }),
+      })
+      const json = (await res.json()) as { ok?: boolean; message?: string; workspace_url?: string | null }
+      setActionMessage({
+        message: json.message ?? (json.ok ? "Bulk push completed." : "Bulk push failed."),
+        tone: json.ok ? "success" : "error",
+        workspaceUrl: json.workspace_url,
+      })
+      if (json.ok) clearPeopleSelection()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setPeopleBulkBusy(false)
+    }
+  }, [clearPeopleSelection, discoveryMode, filters, query, selectedPeopleRows])
+
+  const runBulkPeopleLeadPipeline = useCallback(async () => {
+    if (selectedPeopleRows.length === 0) return
+    const first = selectedPeopleRows[0]
+    if (!first) return
+    setSelectedCompany(first.company)
+    await runAction("run_lead_engine", { company: first.company })
+    if (selectedPeopleRows.length > 1) {
+      setActionMessage({
+        message: `Opened Lead Pipeline for ${first.company_name}. ${selectedPeopleRows.length - 1} more selected — process individually or clear selection.`,
+        tone: "warning",
+      })
+    }
+  }, [runAction, selectedPeopleRows])
+
+  const handleAddPersonToCallQueue = useCallback(
+    (row: GrowthProspectSearchPeopleResultRow) => {
+      void runPeopleAction("enqueue_people_call_queue", [row])
+    },
+    [runPeopleAction],
+  )
+
+  const handleRerunPersonDiscovery = useCallback(
+    async (row: GrowthProspectSearchPeopleResultRow) => {
+      setContactDiscoveryBusy(true)
+      try {
+        const params = new URLSearchParams({ company_candidate_id: row.company_id, run: "1" })
+        await fetch(`/api/platform/growth/contact-discovery?${params}`, { cache: "no-store" })
+        await refreshContactDiscoveryResults()
+      } finally {
+        setContactDiscoveryBusy(false)
+      }
+    },
+    [refreshContactDiscoveryResults],
+  )
+
+  const handleSavePeopleToList = useCallback(async () => {
+    const name = window.prompt("Contact list name", `People selection ${new Date().toLocaleDateString()}`)
+    if (!name?.trim()) return
+    setPeopleBulkBusy(true)
+    try {
+      const res = await fetch("/api/platform/growth/prospect-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add_people_to_list",
+          list_name: name.trim(),
+          query,
+          filters,
+          discovery_mode: discoveryMode,
+          people: serializeProspectSearchPeopleActionRows(selectedPeopleRows),
+        }),
+      })
+      const json = (await res.json()) as { ok?: boolean; message?: string }
+      setActionMessage({
+        message: json.message ?? (json.ok ? "Saved to list." : "Could not save list."),
+        tone: json.ok ? "success" : "error",
+      })
+      if (json.ok) await loadInitialMeta()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setPeopleBulkBusy(false)
+    }
+  }, [discoveryMode, filters, loadInitialMeta, query, selectedPeopleRows])
+
   const runBulkPush = useCallback(async () => {
     if (selectedCompanies.length === 0) return
     setBulkPushing(true)
@@ -968,6 +1265,8 @@ function ProspectSearchShellInner() {
       data-no-presearch-counts-marker={GROWTH_PROSPECT_SEARCH_NO_PRESEARCH_COUNTS_QA_MARKER}
       data-staged-search-marker={GROWTH_PROSPECT_SEARCH_STAGED_SEARCH_QA_MARKER}
       data-runtime-stable-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER}
+      data-people-workflows-marker={GROWTH_PEOPLE_WORKFLOWS_QA_MARKER}
+      data-contact-eligibility-marker={GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER}
       data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
       data-contact-discovery-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}
       data-website-contact-provider-marker={GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER}
@@ -1237,6 +1536,26 @@ function ProspectSearchShellInner() {
               </div>
 
               {searchCompleted ? (
+              resultMode === "people" ? (
+                <ProspectSearchPeopleBulkActionBar
+                  selectedCount={selectedPeopleKeys.size}
+                  visibleCount={peopleRows.length}
+                  selectedRows={selectedPeopleRows}
+                  busy={peopleBulkBusy || contactDiscoveryBusy}
+                  onClear={clearPeopleSelection}
+                  onSelectVisible={selectAllVisiblePeople}
+                  onAddToQueue={() => void runBulkPeoplePushToQueue()}
+                  onAddToLeadPipeline={() => void runBulkPeopleLeadPipeline()}
+                  onAddToCallQueue={() =>
+                    void runPeopleAction("enqueue_people_call_queue", selectedPeopleRows)
+                  }
+                  onSaveToList={() => void handleSavePeopleToList()}
+                  onExport={() => void runPeopleAction("export_people_csv", selectedPeopleRows)}
+                  onRefreshVerification={() =>
+                    void runPeopleAction("refresh_people_verification", selectedPeopleRows)
+                  }
+                />
+              ) : (
               <ProspectSearchBulkActionBar
                 selectedCount={selectedKeys.size}
                 pushableCount={pushableSelectedCount}
@@ -1249,6 +1568,7 @@ function ProspectSearchShellInner() {
                 onFindContactsSelected={() => void runBulkContactDiscovery("selected")}
                 onFindContactsVisible={() => void runBulkContactDiscovery("visible")}
               />
+              )
               ) : null}
 
               {result && result.discovery_mode === "internal" && result.total_companies > 0 ? (
@@ -1297,12 +1617,19 @@ function ProspectSearchShellInner() {
               ) : searchCompleted && view === "card" && resultMode === "people" ? (
                 <ProspectSearchPeopleResultsPanel
                   rows={peopleRows}
+                  selectedKeys={selectedPeopleKeys}
+                  onToggleSelection={togglePeopleSelection}
+                  onSelectAllVisible={selectAllVisiblePeople}
+                  onClearSelection={clearPeopleSelection}
                   onOpenCompany={(companyId) => {
                     const company = companies.find((row) => row.id === companyId)
                     if (company) setSelectedCompany(company)
                   }}
+                  onOpenContact={setEvidenceDrawerRow}
                   onAddToQueue={handleAddPersonToQueue}
                   onAddToLeadPipeline={handleAddPersonToLeadPipeline}
+                  onAddToCallQueue={handleAddPersonToCallQueue}
+                  onRerunDiscovery={handleRerunPersonDiscovery}
                 />
               ) : searchCompleted && view === "card" ? (
                 <div className="flex flex-col gap-4">
@@ -1333,13 +1660,20 @@ function ProspectSearchShellInner() {
                     peopleRows={peopleRows}
                     selectedId={selectedCompany?.id ?? null}
                     selectedKeys={selectedKeys}
+                    selectedPeopleKeys={selectedPeopleKeys}
                     onSelect={setSelectedCompany}
                     onToggleSelection={toggleCompanySelection}
                     onSelectAllVisible={selectAllVisible}
                     onClearSelection={clearSelection}
+                    onTogglePeopleSelection={togglePeopleSelection}
+                    onSelectAllVisiblePeople={selectAllVisiblePeople}
+                    onClearPeopleSelection={clearPeopleSelection}
                     onContactDiscoveryComplete={refreshContactDiscoveryResults}
                     onAddPersonToQueue={handleAddPersonToQueue}
                     onAddPersonToLeadPipeline={handleAddPersonToLeadPipeline}
+                    onAddPersonToCallQueue={handleAddPersonToCallQueue}
+                    onOpenPersonContact={setEvidenceDrawerRow}
+                    onRerunPersonDiscovery={handleRerunPersonDiscovery}
                   />
                   {selectedCompany ? (
                     <div
@@ -1466,6 +1800,13 @@ function ProspectSearchShellInner() {
           />
         </div>
       ) : null}
+
+      <ProspectSearchContactEvidenceDrawer
+        row={evidenceDrawerRow}
+        open={evidenceDrawerRow != null}
+        onClose={() => setEvidenceDrawerRow(null)}
+        onRerunDiscovery={handleRerunPersonDiscovery}
+      />
     </div>
   )
 }

@@ -3702,8 +3702,8 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   )
   assert.match(peopleTableSource, /<th className="px-3 py-2">Name<\/th>/)
   assert.match(peopleTableSource, /data-people-hydration-marker/)
-  assert.match(peopleTableSource, /Lead Pipeline/)
-  assert.match(peopleTableSource, /Add to Queue/)
+  assert.match(peopleTableSource, /Pipeline/)
+  assert.match(peopleTableSource, /Queue/)
 
   const bulkBarSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/prospect-search-bulk-action-bar.tsx"),
@@ -3720,6 +3720,97 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   assert.match(shellSource, /data-contact-discovery-marker/)
   assert.match(shellSource, /data-website-contact-provider-marker/)
   assert.match(shellSource, /data-people-hydration-marker/)
+  assert.match(shellSource, /data-people-workflows-marker/)
+  assert.match(shellSource, /data-contact-eligibility-marker/)
+  assert.match(shellSource, /ProspectSearchPeopleBulkActionBar/)
+  assert.match(shellSource, /ProspectSearchContactEvidenceDrawer/)
+  assert.match(shellSource, /selectedPeopleKeys/)
+
+  const peopleBulkSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-people-bulk-action-bar.tsx"),
+    "utf8",
+  )
+  assert.match(peopleBulkSource, /GROWTH_PEOPLE_WORKFLOWS_QA_MARKER/)
+  assert.match(peopleBulkSource, /GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER/)
+
+  const {
+    GROWTH_PEOPLE_WORKFLOWS_QA_MARKER,
+    prospectSearchPeopleSelectionKey,
+    selectedProspectSearchPeopleRows,
+  } = await import("../lib/growth/prospect-search/prospect-search-people-selection")
+  const {
+    GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER,
+    resolveContactOutreachEligibility,
+    resolveContactOutreachEligibilityBundle,
+  } = await import("../lib/growth/prospect-search/prospect-search-contact-eligibility")
+  const { buildProspectSearchPeopleCsv } = await import(
+    "../lib/growth/prospect-search/prospect-search-people-export"
+  )
+
+  assert.equal(GROWTH_PEOPLE_WORKFLOWS_QA_MARKER, "growth-people-workflows-v1")
+  assert.equal(GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER, "growth-contact-eligibility-engine-v1")
+
+  const eligibleEmail = resolveContactOutreachEligibility({
+    channel: "email",
+    email: "ops@acme.example",
+    verification_status: "email_verified",
+    confidence: 0.9,
+  })
+  assert.equal(eligibleEmail.state, "eligible")
+
+  const dncCall = resolveContactOutreachEligibility({
+    channel: "call",
+    phone: "+1 512 555 0100",
+    verification_status: "phone_verified",
+    confidence: 0.8,
+    phone_on_dnc: true,
+  })
+  assert.equal(dncCall.state, "blocked")
+  assert.match(dncCall.reason ?? "", /DNC/i)
+
+  const bundle = resolveContactOutreachEligibilityBundle({
+    email: "ops@acme.example",
+    phone: "+1 512 555 0100",
+    verification_status: "verified_channels",
+    confidence: 0.85,
+    phone_on_dnc: false,
+  })
+  assert.equal(bundle.call_ready, true)
+
+  const sampleRow = {
+    id: "external_discovered:ext-1:c1",
+    contact_id: "c1",
+    company_id: "ext-1",
+    company_name: "Acme HVAC",
+    full_name: "Maria Chen",
+    title: "Owner",
+    email: "maria@acme.example",
+    phone: null,
+    confidence: 0.9,
+    verification_status: "email_verified",
+    outreach_ready: true,
+    call_ready: false,
+    sms_ready: false,
+    email_eligibility: "eligible" as const,
+    call_eligibility: "blocked" as const,
+    sms_eligibility: "unsupported" as const,
+    call_block_reason: "Phone unavailable from current sources",
+    sms_block_reason: null,
+    compliance_status: "ready",
+    last_checked_at: null,
+    source_label: "Website public extract",
+    source_page_url: "https://acme.example/team",
+    linkedin_url: null,
+  }
+  assert.equal(prospectSearchPeopleSelectionKey(sampleRow as never), sampleRow.id)
+  const selected = selectedProspectSearchPeopleRows({
+    keys: new Set([sampleRow.id]),
+    store: new Map([[sampleRow.id, sampleRow as never]]),
+    fallbackRows: [],
+  })
+  assert.equal(selected.length, 1)
+  assert.match(buildProspectSearchPeopleCsv([sampleRow as never]), /Maria Chen/)
+  assert.match(buildProspectSearchPeopleCsv([sampleRow as never]), /email_verified/)
 }
 
 void main()

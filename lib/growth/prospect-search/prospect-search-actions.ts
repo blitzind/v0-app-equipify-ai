@@ -5,8 +5,15 @@ import {
   addProspectSearchListMembers,
   companyResultToListMember,
   createProspectSearchList,
+  peopleResultRowToListMember,
   personResultToListMember,
 } from "@/lib/growth/prospect-search/list-management"
+import { runContactDiscoveryForCompany } from "@/lib/growth/contact-discovery/contact-repository"
+import {
+  buildProspectSearchPeopleCsv,
+  logProspectSearchPeopleExport,
+  prospectSearchPeopleExportFilename,
+} from "@/lib/growth/prospect-search/prospect-search-people-export"
 import { buildProspectSearchLeadEngineHandoffUrl } from "@/lib/growth/prospect-search/prospect-search-lead-engine-handoff"
 import {
   buildProspectWorkflowTimelinePayload,
@@ -42,6 +49,7 @@ import type {
   GrowthProspectSearchCompanyResult,
   GrowthProspectSearchDiscoveryMode,
   GrowthProspectSearchFilters,
+  GrowthProspectSearchPeopleActionRow,
   GrowthProspectSearchPersonResult,
   GrowthProspectSearchResultAction,
 } from "@/lib/growth/prospect-search/prospect-search-types"
@@ -59,6 +67,7 @@ export async function executeProspectSearchAction(
     list_id?: string
     company?: GrowthProspectSearchCompanyResult | null
     person?: GrowthProspectSearchPersonResult | null
+    people?: GrowthProspectSearchPeopleActionRow[]
     selected?: ProspectSearchSelectionRef[]
     territory_name?: string
     territory_id?: string
@@ -78,6 +87,140 @@ export async function executeProspectSearchAction(
       ok: false,
       action,
       message: "CSV export is reserved for a future release — not executed in v1.",
+    }
+  }
+
+  if (action === "export_people_csv") {
+    const people = input.people ?? []
+    if (people.length === 0) {
+      return { ok: false, action, message: "Select contacts to export." }
+    }
+    logProspectSearchPeopleExport({
+      userId: input.userId,
+      count: people.length,
+      scope: "selected",
+    })
+    return {
+      ok: true,
+      action,
+      message: `Exported ${people.length} evidence-backed contact${people.length === 1 ? "" : "s"}.`,
+      export_csv_content: buildProspectSearchPeopleCsv(people as never),
+      export_csv_filename: prospectSearchPeopleExportFilename(people.length),
+    }
+  }
+
+  if (action === "add_people_to_list") {
+    const people = input.people ?? []
+    if (people.length === 0) {
+      return { ok: false, action, message: "Select contacts to save to a list." }
+    }
+
+    let listId = input.list_id?.trim() || null
+    if (!listId) {
+      const list = await createProspectSearchList(admin, {
+        created_by: input.userId ?? null,
+        name: input.list_name?.trim() || `People selection ${new Date().toISOString().slice(0, 10)}`,
+        description: input.query ? `From search: ${input.query}` : "Saved from People mode",
+      })
+      if (!list) {
+        return { ok: false, action, message: "Could not create contact list — schema may not be applied." }
+      }
+      listId = list.id
+    }
+
+    const added = await addProspectSearchListMembers(
+      admin,
+      listId,
+      people.map((row) => peopleResultRowToListMember(row)),
+    )
+    return {
+      ok: true,
+      action,
+      message: `Saved ${added} contact${added === 1 ? "" : "s"} to list.`,
+      list_id: listId,
+    }
+  }
+
+  if (action === "refresh_people_verification") {
+    const people = input.people ?? []
+    if (people.length === 0) {
+      return { ok: false, action, message: "Select contacts to refresh verification." }
+    }
+
+    const companyIds = [...new Set(people.map((row) => row.company_id))]
+    let refreshed = 0
+    let failed = 0
+    for (const companyId of companyIds) {
+      try {
+        await runContactDiscoveryForCompany(admin, {
+          company_candidate_id: companyId,
+          created_by: input.userId ?? null,
+        })
+        refreshed += 1
+      } catch {
+        failed += 1
+      }
+    }
+
+    return {
+      ok: failed === 0,
+      action,
+      message:
+        failed > 0
+          ? `Refreshed ${refreshed} compan${refreshed === 1 ? "y" : "ies"}; ${failed} failed.`
+          : `Verification refresh queued for ${refreshed} compan${refreshed === 1 ? "y" : "ies"}.`,
+    }
+  }
+
+  if (action === "enqueue_people_call_queue") {
+    const people = input.people ?? []
+    if (people.length === 0) {
+      return { ok: false, action, message: "Select call-ready contacts for the call queue." }
+    }
+
+    const callReady = people.filter(
+      (row) =>
+        row.call_ready === true &&
+        row.call_eligibility !== "suppressed" &&
+        row.call_eligibility !== "blocked",
+    )
+    const blocked = people.length - callReady.length
+    const companiesById = new Map<string, GrowthProspectSearchCompanyResult>()
+    for (const row of callReady) {
+      if (row.company) companiesById.set(row.company_id, row.company)
+    }
+
+    if (companiesById.size === 0) {
+      return {
+        ok: false,
+        action,
+        message:
+          blocked > 0
+            ? "All selected contacts are blocked from calling (DNC, suppression, or missing phone)."
+            : "No call-ready contacts in selection.",
+      }
+    }
+
+    const bulkResult = await executeBulkPushToLeadInbox(admin, {
+      query: input.query ?? "",
+      filters: input.filters,
+      discovery_mode: input.discovery_mode,
+      selected: [...companiesById.values()].map((company) => ({
+        source_type: company.source_type,
+        id: company.id,
+        company_name: company.company_name,
+      })),
+    })
+
+    return {
+      ok: bulkResult.ok,
+      action,
+      message: `${callReady.length} contact${callReady.length === 1 ? "" : "s"} routed to call queue review${blocked > 0 ? ` (${blocked} blocked by compliance)` : ""}.`,
+      workspace_url: "/admin/growth/leads/queue",
+      selected_total: callReady.length,
+      pushed: bulkResult.pushed,
+      suppressed: blocked + (bulkResult.suppressed ?? 0),
+      failed: bulkResult.failed,
     }
   }
 

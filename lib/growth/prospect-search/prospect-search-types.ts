@@ -122,6 +122,10 @@ export const GROWTH_PROSPECT_SEARCH_RESULT_ACTIONS = [
   "open_workspace",
   "record_prospect_workflow_continuity",
   "export_csv",
+  "export_people_csv",
+  "add_people_to_list",
+  "refresh_people_verification",
+  "enqueue_people_call_queue",
 ] as const
 
 export type GrowthProspectSearchResultAction =
@@ -378,6 +382,33 @@ export type GrowthProspectSearchPersonResult = {
   rank_score: number
 }
 
+/** Serializable People row payload for Prospect Search actions. */
+export type GrowthProspectSearchPeopleActionRow = {
+  id: string
+  contact_id: string
+  company_id: string
+  company_name: string
+  full_name?: string | null
+  title?: string | null
+  email?: string | null
+  phone?: string | null
+  linkedin_url?: string | null
+  source_label?: string | null
+  source_page_url?: string | null
+  confidence?: number
+  verification_status?: string
+  outreach_ready?: boolean
+  call_ready?: boolean
+  sms_ready?: boolean
+  call_eligibility?: string
+  sms_eligibility?: string
+  email_eligibility?: string
+  call_block_reason?: string | null
+  sms_block_reason?: string | null
+  compliance_status?: string
+  company?: GrowthProspectSearchCompanyResult | null
+}
+
 /** Normalized Discover search row — company + optional primary contact fields. */
 export type GrowthProspectSearchDiscoverResult = {
   company_id: string
@@ -532,4 +563,6 @@ export type GrowthProspectSearchActionResult = {
     source_type: GrowthProspectSearchSourceType
     message: string
   }>
+  export_csv_content?: string
+  export_csv_filename?: string
 }
