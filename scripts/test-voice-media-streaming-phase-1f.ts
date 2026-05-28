@@ -18,6 +18,15 @@ import {
   createVoiceTranscriptProvider,
 } from "../lib/voice/transcripts/providers/registry"
 import { resolveConfiguredTranscriptProviderKind } from "../lib/voice/transcripts/providers/types"
+import {
+  VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER,
+  canTransitionVoiceStreamLifecycle,
+  createInitialVoiceStreamLifecycleSnapshot,
+  transitionVoiceStreamLifecycle,
+} from "../lib/voice/media-streaming/voice-stream-lifecycle"
+import { buildTwilioVoiceIncomingStreamTwiml } from "../lib/voice/webhooks/twilio-incoming-webhook"
+import { buildVoiceMediaStreamTwilioWssUrl } from "../lib/voice/call-control/urls"
+import { resetStreamTranscriptRuntimeForTests } from "../lib/voice/media-streaming/stream-transcript-runtime-registry"
 
 assert.equal(VOICE_MEDIA_STREAMING_QA_MARKER, "voice-media-streaming-v1")
 assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v20")
@@ -165,5 +174,38 @@ const eventEngine = fs.readFileSync(
   "utf8",
 )
 assert.match(eventEngine, /emitDeterministicMediaEvent/)
+
+assert.equal(VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER, "voice-media-streaming-foundation-v1")
+assert.equal(canTransitionVoiceStreamLifecycle("initiated", "ringing"), true)
+assert.equal(canTransitionVoiceStreamLifecycle("completed", "streaming"), false)
+
+const lifecycle = createInitialVoiceStreamLifecycleSnapshot({ callSid: "CA123" })
+assert.equal(lifecycle.state, "initiated")
+assert.equal(transitionVoiceStreamLifecycle(lifecycle, "connected").state, "connected")
+
+assert.match(buildTwilioVoiceIncomingStreamTwiml({ mediaStreamWssUrl: "wss://app.equipify.ai/api/voice/media/twilio" }), /<Connect><Stream/)
+assert.match(buildVoiceMediaStreamTwilioWssUrl("https://app.equipify.ai"), /^wss:\/\//)
+
+resetStreamTranscriptRuntimeForTests()
+
+const incomingRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/twilio/voice/incoming/route.ts"),
+  "utf8",
+)
+assert.match(incomingRoute, /buildTwilioVoiceIncomingStreamTwiml/)
+assert.match(incomingRoute, /VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER/)
+
+const bridgeSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/media-streaming/deepgram-twilio-realtime-bridge.ts"),
+  "utf8",
+)
+assert.match(bridgeSource, /encoding: "mulaw"/)
+assert.match(bridgeSource, /interim_results/)
+
+const wsServerSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/media-streaming/twilio-media-websocket-server.ts"),
+  "utf8",
+)
+assert.match(wsServerSource, /attachTwilioMediaWebSocketUpgradeHandler/)
 
 console.log("voice-media-streaming-phase-1f checks passed")

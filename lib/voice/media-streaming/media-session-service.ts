@@ -2,6 +2,13 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { emitDeterministicMediaEvent } from "@/lib/voice/media-streaming/media-event-engine"
+import { isDeepgramTwilioStreamingConfigured } from "@/lib/voice/media-streaming/deepgram-twilio-realtime-bridge"
+import {
+  ingestStreamTranscriptAudio,
+  startStreamTranscriptRuntime,
+  stopStreamTranscriptRuntime,
+} from "@/lib/voice/media-streaming/stream-transcript-runtime-registry"
+import { VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER } from "@/lib/voice/media-streaming/voice-stream-lifecycle"
 import type {
   VoiceCallTranscriptSnapshot,
   VoiceMediaCorrelationSnapshot,
@@ -176,7 +183,9 @@ export async function startVoiceMediaStreamSession(
   })
 
   const providerKind = resolveConfiguredTranscriptProviderKind()
-  const transcriptProvider = createVoiceTranscriptProvider(providerKind)
+  const streamTranscriptionEnabled = isDeepgramTwilioStreamingConfigured()
+  const transcriptProviderForSession = streamTranscriptionEnabled ? "deepgram" : providerKind
+  const transcriptProvider = createVoiceTranscriptProvider(transcriptProviderForSession)
   const startResult = await transcriptProvider.startTranscriptSession({
     mediaSessionId: mediaSession.id,
     voiceCallId: input.voiceCallId,
@@ -184,12 +193,12 @@ export async function startVoiceMediaStreamSession(
   })
 
   let transcriptSessionId: string | null = null
-  if (startResult.ok && providerKind !== "none") {
+  if (startResult.ok && transcriptProviderForSession !== "none") {
     const transcriptSession = await insertTranscriptSession(admin, {
       organizationId: input.organizationId,
       mediaSessionId: mediaSession.id,
       voiceRecordingId: recording?.id ?? null,
-      transcriptProvider: providerKind,
+      transcriptProvider: transcriptProviderForSession,
       metadataJson: { providerSessionRef: startResult.providerSessionRef },
     })
     transcriptSessionId = transcriptSession.id
@@ -198,12 +207,63 @@ export async function startVoiceMediaStreamSession(
       transcriptSessionId: transcriptSession.id,
       transcriptStatus: "active",
     })
+
+    if (streamTranscriptionEnabled) {
+      const runtime = await startStreamTranscriptRuntime({
+        organizationId: input.organizationId,
+        mediaSessionId: mediaSession.id,
+        voiceCallId: input.voiceCallId,
+        transcriptSessionId: transcriptSession.id,
+        callSid: typeof input.customParameters?.callSid === "string" ? input.customParameters.callSid : null,
+        streamSid: input.providerStreamSid,
+        onFinalTranscript: async (event, track) => {
+          await ingestVoiceTranscriptProviderEvent(admin, {
+            organizationId: input.organizationId,
+            mediaSessionId: mediaSession.id,
+            voiceCallId: input.voiceCallId,
+            provider: input.provider,
+            rawEvent: {
+              speaker: event.normalized.speakerIdentity,
+              speaker_type: event.normalized.speakerType,
+              transcript_text: event.normalized.transcriptText,
+              confidence_score: event.normalized.confidenceScore,
+              is_final: true,
+              started_at: event.normalized.startedAt,
+              ended_at: event.normalized.endedAt,
+              track,
+            },
+            track,
+          })
+        },
+        onInterimTranscript: async (event, track) => {
+          logVoiceInfrastructure("voice_transcript_interim", {
+            qaMarker: VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER,
+            mediaSessionId: mediaSession.id,
+            voiceCallId: input.voiceCallId,
+            track: track ?? null,
+            latencyMs: event.latencyMs,
+            transcriptLength: event.normalized.transcriptText.length,
+          })
+        },
+      })
+      if (!runtime.ok) {
+        logVoiceInfrastructure("voice_transcript_failed", {
+          qaMarker: VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER,
+          mediaSessionId: mediaSession.id,
+          voiceCallId: input.voiceCallId,
+          message: runtime.message,
+        })
+      }
+    }
   }
 
   logVoiceInfrastructure("voice_media_stream_started", {
+    qaMarker: VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER,
     mediaSessionId: mediaSession.id,
     voiceCallId: input.voiceCallId,
     providerStreamSid: input.providerStreamSid,
+    transcriptProvider: transcriptProviderForSession,
+    deepgramRealtime: streamTranscriptionEnabled,
   })
 
   return {
@@ -291,6 +351,10 @@ export async function stopVoiceMediaStreamSession(
 
   const transcriptSession = await findActiveTranscriptSessionForMedia(admin, input.organizationId, input.mediaSessionId)
   if (transcriptSession) {
+    await stopStreamTranscriptRuntime({
+      mediaSessionId: input.mediaSessionId,
+      reason: "stream_stop",
+    })
     const provider = createVoiceTranscriptProvider(transcriptSession.transcriptProvider)
     const providerSessionRef =
       typeof transcriptSession.metadataJson.providerSessionRef === "string"
@@ -306,6 +370,7 @@ export async function stopVoiceMediaStreamSession(
   }
 
   logVoiceInfrastructure("voice_media_stream_stopped", {
+    qaMarker: VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER,
     mediaSessionId: input.mediaSessionId,
     voiceCallId: input.voiceCallId,
   })
@@ -423,6 +488,11 @@ export async function processTwilioMediaStreamMessage(
   const provider: VoiceProviderId = "twilio"
 
   if (input.frame.event === "connected") {
+    logVoiceInfrastructure("voice_stream_connected", {
+      qaMarker: VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER,
+      connectionId: input.connectionId,
+      voiceCallId: input.voiceCallId,
+    })
     return { ok: true, message: "Twilio media websocket connected." }
   }
 
@@ -458,21 +528,22 @@ export async function processTwilioMediaStreamMessage(
 
   if (input.frame.event === "media") {
     const track = input.frame.media?.track
-    await ingestVoiceTranscriptProviderEvent(admin, {
-      organizationId: input.organizationId,
-      mediaSessionId: mediaSession.id,
-      voiceCallId: input.voiceCallId,
-      provider,
-      rawEvent: {
-        transcript: "",
+    const payload = input.frame.media?.payload
+    if (payload) {
+      const ingested = ingestStreamTranscriptAudio({
+        mediaSessionId: mediaSession.id,
+        payload,
         track,
-        is_final: false,
-        metadata_only: true,
-        timestamp: input.frame.media?.timestamp ?? null,
-      },
-      track,
-    })
-    return { ok: true, message: "Media frame received (audio not processed in Phase 1F)." }
+      })
+      if (!ingested && isDeepgramTwilioStreamingConfigured()) {
+        logVoiceInfrastructure("voice_transcript_failed", {
+          qaMarker: VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER,
+          mediaSessionId: mediaSession.id,
+          message: "No active Deepgram runtime for media frame.",
+        })
+      }
+    }
+    return { ok: true, message: payload ? "Media frame forwarded to transcript runtime." : "Media frame received without payload." }
   }
 
   if (input.frame.event === "mark") {

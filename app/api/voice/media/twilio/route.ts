@@ -3,12 +3,14 @@ import { randomUUID } from "node:crypto"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isGrowthEngineEnabledEnv } from "@/lib/growth/access"
 import { buildVoiceMediaStreamTwilioUrl } from "@/lib/voice/call-control/urls"
+import { getTwilioMediaWebSocketPath } from "@/lib/voice/media-streaming/twilio-media-websocket-server"
 import { parseTwilioMediaStreamMessage } from "@/lib/voice/media-streaming/twilio-media-parser"
 import {
   processTwilioMediaStreamMessage,
   resolveOrganizationForTwilioMediaStream,
 } from "@/lib/voice/media-streaming/media-session-service"
 import { VOICE_MEDIA_STREAMING_QA_MARKER } from "@/lib/voice/media-streaming/types"
+import { VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER } from "@/lib/voice/media-streaming/voice-stream-lifecycle"
 import { probeVoiceSchemaHealth, isVoiceWebhookSchemaReady } from "@/lib/voice/schema-health"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 
@@ -42,8 +44,11 @@ export async function GET(request: Request) {
       {
         ok: false,
         qaMarker: VOICE_MEDIA_STREAMING_QA_MARKER,
+        foundationMarker: VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER,
         error: "websocket_custom_server_required",
-        message: "Attach lib/voice/media-streaming/twilio-websocket-handler to your Node HTTP upgrade listener.",
+        message:
+          "Attach lib/voice/media-streaming/twilio-media-websocket-server to your Node HTTP upgrade listener, or run pnpm voice:media-websocket-dev locally.",
+        websocketPath: getTwilioMediaWebSocketPath(),
       },
       { status: 501 },
     )
@@ -60,9 +65,11 @@ export async function GET(request: Request) {
   return NextResponse.json({
     ok: isVoiceWebhookSchemaReady(schemaProbe),
     qaMarker: VOICE_MEDIA_STREAMING_QA_MARKER,
+    foundationMarker: VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER,
     mediaStreamUrl: buildVoiceMediaStreamTwilioUrl(request.headers.get("origin")),
+    websocketPath: getTwilioMediaWebSocketPath(),
     schemaReady: schemaProbe.ready,
-    message: "Twilio Media Streams ingestion endpoint scaffold is reachable.",
+    message: "Twilio Media Streams ingestion endpoint is reachable.",
     supportedEvents: ["connected", "start", "media", "mark", "stop"],
   })
 }

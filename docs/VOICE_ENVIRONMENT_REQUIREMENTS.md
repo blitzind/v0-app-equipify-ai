@@ -119,11 +119,11 @@ Configure these in Twilio Console using your deployment origin (`https://app.equ
 
 | Route | Method | Purpose |
 | --- | --- | --- |
-| `/api/twilio/voice/incoming` | POST | **AI operator inbound stub** — greeting TwiML while realtime streaming is wired |
+| `/api/twilio/voice/incoming` | POST | **AI operator inbound** — `<Connect><Stream>` when `DEEPGRAM_API_KEY` configured |
 | `/api/voice/inbound/twilio` | POST | Full inbound call routing → TwiML response |
 | `/api/voice/webhooks/twilio` | POST | Call status callbacks |
 | `/api/voice/webhooks/twilio/recording` | POST | Recording completion callbacks |
-| `/api/voice/media/twilio` | GET/POST | Media Streams ingestion / WebSocket upgrade |
+| `/api/voice/media/twilio` | GET/POST/WSS | Media Streams ingestion + Deepgram realtime transcription |
 
 URL builders: `lib/voice/call-control/urls.ts`
 
@@ -144,7 +144,10 @@ Inbound handler sets `statusCallback` to `{ORIGIN}/api/voice/webhooks/twilio`.
 | Variable | Purpose |
 | --- | --- |
 | `VOICE_MEDIA_STREAM_PUBLIC_ORIGIN` | Public HTTPS/WSS origin Twilio uses for `<Stream>` URL (required when app sits behind proxy or origin differs from request host) |
-| `VOICE_MEDIA_WEBSOCKET_UPGRADE_ENABLED` | Set `true` to allow WebSocket upgrade on media route; otherwise **426** and readiness warns `upgrade_requires_proxy` |
+| `VOICE_MEDIA_WEBSOCKET_UPGRADE_ENABLED` | Set `true` to allow WebSocket upgrade on media route; otherwise run `pnpm voice:media-websocket-dev` or external WSS proxy |
+| `DEEPGRAM_API_KEY` | Enables Deepgram realtime transcription bridge (mulaw 8kHz from Twilio) |
+| `TWILIO_VOICE_INCOMING_STREAM_ENABLED` | Force stream TwiML on/off (`true` / `false`); defaults to on when `DEEPGRAM_API_KEY` is set |
+| `VOICE_MEDIA_WEBSOCKET_PORT` | Local dev websocket server port (default `3001`) |
 
 ### Outbound calling setup
 

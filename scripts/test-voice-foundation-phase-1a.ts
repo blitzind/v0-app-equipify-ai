@@ -106,7 +106,6 @@ assert.match(settingsPanel, /VOICE_FOUNDATION_QA_MARKER/)
 
 assert.equal(TWILIO_VOICE_INCOMING_QA_MARKER, "twilio-voice-incoming-v1")
 assert.match(buildTwilioVoiceIncomingStubTwiml(), /Thank you for calling Equipify/)
-assert.match(buildTwilioVoiceIncomingStubTwiml(), /<Hangup\/>/)
 assert.match(buildTwilioVoiceIncomingUrl("https://app.equipify.ai"), /\/api\/twilio\/voice\/incoming/)
 
 const metadata = extractTwilioIncomingCallMetadata({

@@ -22,6 +22,22 @@ export type VoiceTelemetryEvent =
   | "voice_participant_mute"
   | "twilio_voice_incoming_webhook"
   | "twilio_voice_incoming_webhook_failed"
+  | "voice_media_stream_frame_processed"
+  | "voice_media_websocket_frame"
+  | "voice_media_websocket_error"
+  | "voice_media_websocket_closed"
+  | "voice_media_stream_started"
+  | "voice_media_stream_stopped"
+  | "voice_stream_lifecycle_transition"
+  | "voice_stream_connected"
+  | "voice_stream_disconnected"
+  | "voice_transcript_started"
+  | "voice_transcript_interim"
+  | "voice_transcript_failed"
+  | "voice_deepgram_stream_open"
+  | "voice_deepgram_stream_closed"
+  | "voice_deepgram_stream_reconnect"
+  | "voice_conversation_intelligence_failed"
 
 export function logVoiceInfrastructure(
   event: VoiceTelemetryEvent,

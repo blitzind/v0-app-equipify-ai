@@ -11,6 +11,7 @@ import {
 } from "@/lib/voice/media-streaming/media-session-service"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import { VOICE_MEDIA_STREAMING_QA_MARKER } from "@/lib/voice/media-streaming/types"
+import { VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER } from "@/lib/voice/media-streaming/voice-stream-lifecycle"
 
 export type VoiceMediaWebSocketLike = {
   send(data: string): void
@@ -58,6 +59,7 @@ export function attachTwilioMediaWebSocketConnection(
 
       logVoiceInfrastructure("voice_media_websocket_frame", {
         qaMarker: VOICE_MEDIA_STREAMING_QA_MARKER,
+        foundationMarker: VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER,
         event: frame.event,
         ok: result.ok,
         connectionId,
@@ -71,7 +73,10 @@ export function attachTwilioMediaWebSocketConnection(
   })
 
   socket.on("close", () => {
-    logVoiceInfrastructure("voice_media_websocket_closed", { connectionId })
+    logVoiceInfrastructure("voice_stream_disconnected", {
+      qaMarker: VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER,
+      connectionId,
+    })
   })
 
   return { connectionId }
