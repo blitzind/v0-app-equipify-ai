@@ -8,4 +8,7 @@
  * Conversion events remain in `lib/analytics/marketing-analytics-events.ts` — this module
  * only loads/configures the shared tag bootstrap.
  */
-export { MarketingGtagServerScripts as GoogleAnalyticsTags } from "@/components/analytics/marketing-gtag-server-scripts"
+export {
+  EQUIPIFY_GOOGLE_TAGS_QA_MARKER,
+  MarketingGtagServerScripts as GoogleAnalyticsTags,
+} from "@/components/analytics/marketing-gtag-server-scripts"

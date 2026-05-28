@@ -17,7 +17,7 @@ This app mirrors the marketing stack used on [www.equipify.ai](https://www.equip
 
 ## Where code runs
 
-- **Bootstrap + `gtag/js` loader (all routes):** `components/analytics/google-analytics-tags.tsx` (re-exports `MarketingGtagServerScripts`), mounted from **`app/layout.tsx`** (Server Component) as the first child of `<body>`. Inline bootstrap calls `gtag('config', …)` for GA4 + Google Ads before hydration so Tag Assistant detects destinations on `/onboarding` without waiting for React.
+- **Bootstrap + `gtag/js` loader (all routes):** `components/analytics/google-analytics-tags.tsx` (re-exports `MarketingGtagServerScripts`), mounted from **`app/layout.tsx`** inside `<head>`. Uses the standard Google pattern: `<script async src="https://www.googletagmanager.com/gtag/js?id=…">` plus an inline bootstrap that calls `gtag('config', …)` for GA4 + Google Ads on the **initial HTML** (not deferred to post-hydration `next/script`). `<body data-equipify-google-tags="app-subdomain-v1">` confirms the deployed build.
 - **Runtime ID mirror for the client:** the server inline script sets `window.__EQUIPIFY_MARKETING_ENV__`. `lib/analytics/marketing-analytics-config.ts` prefers that object over `process.env` so event helpers match the IDs embedded in the HTML for this response.
 - **SPA `page_view` + `gtag('config', …)`:** `components/analytics/marketing-analytics-provider.tsx` (inside `GlobalProviders`) — `usePathname` / `useSearchParams`, with dedupe in `lib/analytics/marketing-analytics-pageview-dedupe.ts`.
 - **Conversion and funnel events (client-only):** `lib/analytics/marketing-analytics-events.ts`
@@ -63,7 +63,7 @@ Use `lib/analytics/third-party-marketing-pixels.ts` and invoke `registerFutureMa
 ## Manual QA
 
 1. Set `NEXT_PUBLIC_GA4_ID`, `NEXT_PUBLIC_GOOGLE_ADS_ID`, and optionally `NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO` in `.env.local`.
-2. **View source** or DevTools → Elements on `/onboarding`: confirm an inline `<script>` right after `<body>` assigns `window.__EQUIPIFY_MARKETING_ENV__` and defines `window.gtag`, and a `script[src*="googletagmanager.com/gtag/js"]` exists.
+2. **View source** or DevTools → Elements on `/onboarding`: confirm `<body data-equipify-google-tags="app-subdomain-v1">`, a `<head>` `<script async src="https://www.googletagmanager.com/gtag/js?id=G-YZMS47H63H">`, and an inline `<script id="equipify-marketing-gtag-bootstrap">` with `gtag('config','G-YZMS47H63H'` and `gtag('config','AW-18160904774'`.
 3. DevTools → Console: `typeof window.gtag` should be `"function"` on `/onboarding` without signing in.
 4. Set `NEXT_PUBLIC_ANALYTICS_DEBUG=1`, run the app; filter console for `equipify-analytics`.
 5. Navigate between routes: confirm a `page_view` log per navigation without double bursts on a single navigation (Strict Mode may still mount twice in dev; dedupe should collapse identical path+search within ~450ms).
@@ -76,4 +76,4 @@ Use `lib/analytics/third-party-marketing-pixels.ts` and invoke `registerFutureMa
 
 - The provider is a client component; the root layout stays a server component.
 - Default automatic GA pageviews are disabled (`send_page_view: false`); only explicit SPA `page_view` events run, avoiding duplicate automatic + manual pageviews.
-- The **inline** gtag bootstrap is emitted from the server layout (synchronous when parsed). The **`gtag/js`** file is loaded via `next/script` with `afterInteractive`.
+- The **inline** gtag bootstrap and **async `gtag/js` loader** are emitted from the root layout `<head>` on the server HTML response. SPA `page_view` events still run client-side via `MarketingAnalyticsProvider`.
