@@ -116,7 +116,7 @@ export function GrowthLeadEngineWorkspace() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline" size="sm">
-              <Link href="/admin/growth/leads">Lead Inbox</Link>
+              <Link href="/admin/growth/queue">Revenue Queue</Link>
             </Button>
             <Button asChild variant="outline" size="sm">
               <Link href="/admin/growth/search">

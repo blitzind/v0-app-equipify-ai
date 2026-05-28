@@ -40,7 +40,7 @@ export default function AdminGrowthUnifiedInboxPage() {
               </div>
             </div>
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/admin/growth/leads">Revenue Inbox</Link>
+              <Link href="/admin/growth/queue">Revenue Queue</Link>
             </Button>
           </div>
         </section>

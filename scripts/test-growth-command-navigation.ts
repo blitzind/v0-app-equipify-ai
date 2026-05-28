@@ -51,7 +51,7 @@ assert.match(jumpNavSource, /setOpen\(true\)/)
 
 const requiredIds = [
   "command",
-  "inbox",
+  "queue",
   "search",
   "intent-pixel",
   "lead-intelligence",
@@ -69,7 +69,8 @@ for (const id of requiredIds) {
   )
 }
 
-assert.ok(GROWTH_COMMAND_PALETTE_DESTINATIONS.some((d) => d.label === "Revenue Inbox"))
+assert.ok(GROWTH_COMMAND_PALETTE_DESTINATIONS.some((d) => d.label === "Queue"))
+assert.ok(GROWTH_COMMAND_PALETTE_DESTINATIONS.some((d) => d.href === "/admin/growth/queue"))
 assert.ok(GROWTH_COMMAND_PALETTE_DESTINATIONS.some((d) => d.label === "Intent Signals"))
 assert.ok(GROWTH_COMMAND_PALETTE_ENTRIES.length > GROWTH_COMMAND_PALETTE_DESTINATIONS.length)
 

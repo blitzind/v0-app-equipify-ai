@@ -1,47 +1,22 @@
-"use client"
+import { redirect } from "next/navigation"
+import { GROWTH_REVENUE_QUEUE_HREF } from "@/lib/growth/navigation/growth-navigation-destinations"
 
-import { Inbox } from "lucide-react"
-import { useAdmin } from "@/lib/admin-store"
-import { GrowthLeadInboxDashboard } from "@/components/growth/lead-operator/growth-lead-inbox-dashboard"
-import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
-import {
-  PlatformAdminPageShell,
-  PlatformAdminTabNav,
-  usePlatformAdminHeaderIdentity,
-} from "@/components/admin/platform-admin-shell"
-import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
+type LegacyGrowthLeadsPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}
 
-export default function AdminGrowthLeadInboxPage() {
-  const { sessionIdentity } = useAdmin()
-  const header = usePlatformAdminHeaderIdentity({
-    displayName: sessionIdentity?.displayName,
-    email: sessionIdentity?.email,
-    platformRoleLabel: sessionIdentity?.platformRoleLabel,
-  })
+/** Legacy alias — preserves bookmarks and deep links to `/admin/growth/leads`. */
+export default async function LegacyGrowthLeadsRedirect({ searchParams }: LegacyGrowthLeadsPageProps) {
+  const params = await searchParams
+  const qs = new URLSearchParams()
 
-  return (
-    <PlatformAdminPageShell header={header}>
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
-        <PlatformAdminTabNav activeKey="growth_leads" />
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === "string") qs.set(key, value)
+    else if (Array.isArray(value)) {
+      for (const entry of value) qs.append(key, entry)
+    }
+  }
 
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="flex size-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-              <Inbox size={17} />
-            </span>
-            <div>
-              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Revenue intelligence</h1>
-              <p className="text-sm text-muted-foreground">
-                Operator workspace — prioritize accounts by intent, buying stage, and evidence. Human review before any outreach.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <GrowthSectionLayout>
-          <GrowthLeadInboxDashboard />
-        </GrowthSectionLayout>
-      </div>
-    </PlatformAdminPageShell>
-  )
+  const query = qs.toString()
+  redirect(query ? `${GROWTH_REVENUE_QUEUE_HREF}?${query}` : GROWTH_REVENUE_QUEUE_HREF)
 }

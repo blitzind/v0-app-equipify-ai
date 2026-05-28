@@ -162,7 +162,7 @@ export function attachSavedSearchWorkflow(
 
 export const GROWTH_SAVED_SEARCH_WORKFLOW_LINKS = {
   prospectSearch: "/admin/growth/search",
-  leadInbox: "/admin/growth/leads",
+  leadInbox: "/admin/growth/queue",
   unifiedInbox: "/admin/growth/inbox",
   leadEngine: "/admin/growth/leads/lead-engine",
 } as const

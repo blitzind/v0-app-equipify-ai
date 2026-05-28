@@ -37,6 +37,7 @@ import {
   Inbox,
   Layers,
   LayoutDashboard,
+  ListOrdered,
   Mail,
   Map as MapIcon,
   MessageSquare,
@@ -76,6 +77,7 @@ import {
 import {
   GROWTH_NAV_GROUP_DEFS,
   GROWTH_DELIVERY_OPS_NAV_QA_MARKER,
+  GROWTH_INTELLIGENCE_NAV_CLEANUP_QA_MARKER,
   GROWTH_NAVIGATION_IA_QA_MARKER,
   GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER,
   GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER,
@@ -113,7 +115,7 @@ type GrowthNavGroup = {
 
 const GROWTH_NAV_ICONS: Record<string, LucideIcon> = {
   command: LayoutDashboard,
-  "revenue-inbox": Inbox,
+  queue: ListOrdered,
   "prospect-search": Search,
   "intent-pixel": Radar,
   "unified-inbox": Mail,
@@ -1008,6 +1010,9 @@ function GrowthNavGroups({
               className={cn(compact ? "space-y-0.5" : "space-y-0.5 pb-0.5")}
               data-delivery-ops-nav-marker={
                 group.id === "providers-nav" ? GROWTH_DELIVERY_OPS_NAV_QA_MARKER : undefined
+              }
+              data-intelligence-nav-cleanup-marker={
+                group.id === "intelligence" ? GROWTH_INTELLIGENCE_NAV_CLEANUP_QA_MARKER : undefined
               }
             >
               <GrowthNavGroupedLinks

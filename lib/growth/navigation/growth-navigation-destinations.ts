@@ -299,15 +299,15 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
   },
   {
     id: "revenue-intelligence",
-    label: "Revenue Intelligence",
+    label: "Revenue",
     href: "/admin/growth/revenue-intelligence",
-    keywords: ["revenue intelligence", "sequence performance", "attribution", "analytics", "funnel"],
+    keywords: ["revenue intelligence", "revenue", "sequence performance", "attribution", "analytics", "funnel"],
   },
   {
     id: "opportunity-intelligence",
-    label: "Opportunity Intelligence",
+    label: "Opportunities",
     href: "/admin/growth/opportunity-intelligence",
-    keywords: ["opportunity intelligence", "crm intelligence", "buying signals", "committee", "sequence pause"],
+    keywords: ["opportunity intelligence", "opportunities", "crm intelligence", "buying signals", "committee", "sequence pause"],
   },
   {
     id: "relationship-memory",
@@ -398,7 +398,7 @@ export const GROWTH_COMMAND_PALETTE_ENTRIES: GrowthCommandPaletteEntry[] = [
     href: dest.href,
     keywords: dest.keywords,
     aliases: dest.keywords,
-    coreWorkflow: ["command", "inbox", "search", "intent-pixel", "calls", "unified-inbox"].includes(dest.id),
+    coreWorkflow: ["command", "queue", "search", "intent-pixel", "calls", "unified-inbox"].includes(dest.id),
     group: "navigate" as const,
   })),
   ...GROWTH_NAV_QUICK_ACTIONS_SECONDARY.map((action) => ({
@@ -431,17 +431,18 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: prefixMatch("/admin/growth/inbox"),
       },
       {
-        id: "revenue-inbox",
-        href: "/admin/growth/leads",
-        label: "Revenue Inbox",
+        id: "queue",
+        href: GROWTH_REVENUE_QUEUE_HREF,
+        label: "Queue",
         consoleKey: "inbox",
         shortcutKey: "i",
         match: (path) => {
+          if (path === GROWTH_REVENUE_QUEUE_HREF || path.startsWith(`${GROWTH_REVENUE_QUEUE_HREF}/`)) return true
           if (!path.startsWith("/admin/growth/leads")) return false
           if (path.startsWith("/admin/growth/leads/lead-engine")) return false
           if (path.startsWith("/admin/growth/leads/crm")) return false
           if (path.startsWith("/admin/growth/leads/queue")) return false
-          return path === "/admin/growth/leads" || /^\/admin\/growth\/leads\/[0-9a-f-]{36}$/i.test(path)
+          return path === GROWTH_REVENUE_QUEUE_LEGACY_HREF || /^\/admin\/growth\/leads\/[0-9a-f-]{36}$/i.test(path)
         },
       },
       {
@@ -573,19 +574,19 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
       {
         id: "revenue-intelligence",
         href: "/admin/growth/revenue-intelligence",
-        label: "Revenue Intelligence",
+        label: "Revenue",
         match: prefixMatch("/admin/growth/revenue-intelligence"),
       },
       {
         id: "opportunity-intelligence",
         href: "/admin/growth/opportunity-intelligence",
-        label: "Opportunity Intelligence",
+        label: "Opportunities",
         match: prefixMatch("/admin/growth/opportunity-intelligence"),
       },
       {
         id: "revenue-operating",
         href: "/admin/growth/revenue-operating",
-        label: "Revenue Forecast",
+        label: "Forecast",
         consoleKey: "revenue",
         shortcutKey: "r",
         match: prefixMatch("/admin/growth/revenue-operating"),

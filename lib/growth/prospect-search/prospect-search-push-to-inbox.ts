@@ -263,6 +263,6 @@ export async function executeBulkPushToLeadInbox(
     suppressed,
     failed,
     items,
-    workspace_url: pushed > 0 ? "/admin/growth/leads" : null,
+    workspace_url: pushed > 0 ? "/admin/growth/queue" : null,
   }
 }

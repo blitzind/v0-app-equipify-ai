@@ -195,7 +195,7 @@ assert.equal(commandActionImpactTone(75), "high")
 assert.equal(commandActionImpactTone(60), "high")
 assert.equal(commandActionImpactTone(45), "neutral")
 
-assert.ok(GROWTH_COMMAND_JUMP_DESTINATIONS.some((entry) => entry.label === "Inbox" && entry.href === "/admin/growth/leads"))
+assert.ok(GROWTH_COMMAND_JUMP_DESTINATIONS.some((entry) => entry.label === "Queue" && entry.href === "/admin/growth/queue"))
 assert.ok(GROWTH_COMMAND_JUMP_DESTINATIONS.some((entry) => entry.label === "Dogfood Validation"))
 assert.equal(GROWTH_COMMAND_SECTION_TABS.length, 7)
 assert.equal(GROWTH_COMMAND_SECTION_TABS[0]?.anchor, "cc-today")

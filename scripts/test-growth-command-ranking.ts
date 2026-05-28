@@ -58,13 +58,13 @@ function topRanked(query: string) {
 }
 
 const leadRanked = topRanked("lead")
-assert.equal(leadRanked[0]?.id, "inbox")
+assert.equal(leadRanked[0]?.id, "queue")
 assert.ok(leadRanked.slice(0, 3).some((entry) => entry.id === "lead-intelligence"))
 assert.ok(leadRanked.slice(0, 4).some((entry) => entry.id === "search"))
 
 const intentRanked = topRanked("intent")
 assert.equal(intentRanked[0]?.id, "intent-pixel")
-assert.ok(intentRanked.slice(0, 3).some((entry) => entry.id === "inbox"))
+assert.ok(intentRanked.slice(0, 3).some((entry) => entry.id === "queue"))
 
 const callRanked = topRanked("call")
 assert.equal(callRanked[0]?.id, "calls")
@@ -73,7 +73,7 @@ assert.ok(callRanked.slice(0, 5).some((entry) => entry.id === "call-queue"))
 
 const prospectRanked = topRanked("prospect")
 assert.equal(prospectRanked[0]?.id, "search")
-assert.ok(prospectRanked.slice(0, 3).some((entry) => entry.id === "inbox"))
+assert.ok(prospectRanked.slice(0, 3).some((entry) => entry.id === "queue"))
 
 const coachRanked = topRanked("coach")
 assert.equal(coachRanked[0]?.id, "calls")
@@ -86,12 +86,12 @@ const discoverRanked = topRanked("discover")
 assert.equal(discoverRanked[0]?.id, "search")
 assert.ok(discoverRanked.slice(0, 4).some((entry) => entry.id === "intent-pixel"))
 
-assert.ok(GROWTH_COMMAND_QUERY_BOOSTS.lead?.inbox)
+assert.ok(GROWTH_COMMAND_QUERY_BOOSTS.lead?.queue)
 assert.ok(GROWTH_COMMAND_QUERY_BOOSTS.intent?.["intent-pixel"])
 
 const aliasScore = scoreGrowthCommandPaletteEntry(
-  GROWTH_COMMAND_PALETTE_ENTRIES.find((entry) => entry.id === "inbox")!,
-  "lead inbox",
+  GROWTH_COMMAND_PALETTE_ENTRIES.find((entry) => entry.id === "queue")!,
+  "revenue queue",
   EMPTY_GROWTH_NAVIGATION_USAGE,
 )
 assert.ok(aliasScore > 0)
@@ -109,7 +109,8 @@ assert.equal(boostedSearch[0]?.id, "search")
 
 const coreGroup = GROWTH_NAV_GROUP_DEFS.find((group) => group.id === "core")
 assert.equal(coreGroup?.label, "Workspace")
-assert.ok(coreGroup?.items.some((item) => item.label === "Revenue Inbox"))
+assert.ok(coreGroup?.items.some((item) => item.label === "Queue"))
+assert.ok(coreGroup?.items.some((item) => item.id === "queue" && item.href === "/admin/growth/queue"))
 assert.ok(coreGroup?.items.some((item) => item.id === "calls" && item.href === "/admin/growth/calls/workspace"))
 assert.ok(!coreGroup?.items.some((item) => item.label === "Imports"))
 assert.ok(!coreGroup?.items.some((item) => item.label === "Prospect Search"))
@@ -123,6 +124,9 @@ const intelligenceGroup = GROWTH_NAV_GROUP_DEFS.find((group) => group.id === "in
 assert.equal(intelligenceGroup?.label, "Intelligence")
 assert.ok(intelligenceGroup?.items.some((item) => item.label === "Intent Signals"))
 assert.ok(intelligenceGroup?.items.some((item) => item.label === "Relationships"))
+assert.ok(intelligenceGroup?.items.some((item) => item.label === "Revenue"))
+assert.ok(intelligenceGroup?.items.some((item) => item.label === "Opportunities"))
+assert.ok(intelligenceGroup?.items.some((item) => item.label === "Forecast"))
 
 const executionGroup = GROWTH_NAV_GROUP_DEFS.find((group) => group.id === "execution")
 assert.equal(executionGroup?.label, "Execution")
@@ -148,11 +152,14 @@ const paletteIds = GROWTH_COMMAND_PALETTE_ENTRIES.map((entry) => entry.id)
 assert.equal(paletteIds.length, new Set(paletteIds).size, "duplicate palette ids")
 
 const hrefs = listGrowthNavigationPaletteHrefs()
-assert.ok(hrefs.includes("/admin/growth/leads"))
+assert.ok(hrefs.includes("/admin/growth/queue"))
 assert.ok(hrefs.includes("/admin/growth/search"))
 
+const resolvedQueue = resolveGrowthNavigationEntryFromPathname("/admin/growth/queue")
+assert.equal(resolvedQueue?.id, "queue")
+
 const resolvedInbox = resolveGrowthNavigationEntryFromPathname("/admin/growth/leads")
-assert.equal(resolvedInbox?.id, "revenue-inbox")
+assert.equal(resolvedInbox?.id, "queue")
 
 const resolvedLeadEngine = resolveGrowthNavigationEntryFromPathname("/admin/growth/leads/lead-engine")
 assert.equal(resolvedLeadEngine?.id, "lead-engine-inspector")

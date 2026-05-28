@@ -229,7 +229,7 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
   const actionsBar = (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <Button asChild variant="outline" size="sm">
-        <Link href="/admin/growth/leads">← Revenue intelligence inbox</Link>
+        <Link href="/admin/growth/queue">← Revenue Queue</Link>
       </Button>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" disabled={!!acting} onClick={() => void runAction("claim")}>

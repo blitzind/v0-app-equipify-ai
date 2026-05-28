@@ -6,8 +6,8 @@ export const GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER =
 export const LEAD_INTELLIGENCE_OPERATOR_WORKFLOW_STEPS = [
   { id: "prospect_search", label: "Prospect Search", href: "/admin/growth/search" },
   { id: "discover_contacts", label: "Discover Contacts", href: "/admin/growth/search" },
-  { id: "lead_inbox", label: "Push to Lead Inbox", href: "/admin/growth/leads" },
-  { id: "operator_guidance", label: "Review Operator Guidance", href: "/admin/growth/leads" },
+  { id: "lead_inbox", label: "Push to Revenue Queue", href: "/admin/growth/queue" },
+  { id: "operator_guidance", label: "Review Operator Guidance", href: "/admin/growth/queue" },
   { id: "lead_engine", label: "Run Lead Engine", href: "/admin/growth/leads/lead-engine" },
   { id: "outreach", label: "Outreach", href: "/admin/growth/leads/queue" },
 ] as const

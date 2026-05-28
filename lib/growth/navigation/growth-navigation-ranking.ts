@@ -18,7 +18,7 @@ export type GrowthCommandPaletteEntry = {
 /** Query-specific priority boosts when the operator types these terms. */
 export const GROWTH_COMMAND_QUERY_BOOSTS: Record<string, Record<string, number>> = {
   lead: {
-    inbox: 120,
+    queue: 120,
     "lead-intelligence": 110,
     "lead-engine-inspector": 110,
     search: 95,
@@ -26,7 +26,7 @@ export const GROWTH_COMMAND_QUERY_BOOSTS: Record<string, Record<string, number>>
   },
   intent: {
     "intent-pixel": 120,
-    inbox: 90,
+    queue: 90,
     search: 60,
   },
   call: {
@@ -37,7 +37,7 @@ export const GROWTH_COMMAND_QUERY_BOOSTS: Record<string, Record<string, number>>
   },
   prospect: {
     search: 120,
-    inbox: 95,
+    queue: 95,
     "lead-intelligence": 75,
     "lead-engine-inspector": 75,
   },

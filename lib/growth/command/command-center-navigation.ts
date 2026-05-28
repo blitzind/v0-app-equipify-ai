@@ -1,6 +1,7 @@
 /** Client-safe Growth Command Center navigation destinations and section anchors. */
 
 import { GROWTH_CALLS_PRIMARY_HREF } from "@/lib/growth/navigation/growth-workspace-consolidation"
+import { GROWTH_REVENUE_QUEUE_HREF } from "@/lib/growth/navigation/growth-navigation-destinations"
 
 export type GrowthCommandNavLink = {
   label: string
@@ -13,7 +14,7 @@ export type GrowthCommandSectionTab = {
 }
 
 export const GROWTH_COMMAND_JUMP_DESTINATIONS: readonly GrowthCommandNavLink[] = [
-  { label: "Inbox", href: "/admin/growth/leads" },
+  { label: "Queue", href: GROWTH_REVENUE_QUEUE_HREF },
   { label: "Reply Inbox", href: "/admin/growth/replies" },
   { label: "Meetings", href: "/admin/growth/meetings" },
   { label: "Call Queue", href: "/admin/growth/leads/queue" },
@@ -41,7 +42,7 @@ export const GROWTH_COMMAND_SECTION_TABS: readonly GrowthCommandSectionTab[] = [
 ] as const
 
 export const GROWTH_COMMAND_COMM_SECTION_LINKS: readonly GrowthCommandNavLink[] = [
-  { label: "Inbox", href: "/admin/growth/leads" },
+  { label: "Queue", href: GROWTH_REVENUE_QUEUE_HREF },
   { label: "Calls", href: GROWTH_CALLS_PRIMARY_HREF },
   { label: "Meetings", href: "/admin/growth/meetings" },
   { label: "Cadence", href: "/admin/growth/sequences/execution" },

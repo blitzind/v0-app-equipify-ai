@@ -61,9 +61,9 @@ export function GrowthLeadInboxDashboard() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Revenue intelligence</h2>
+          <h2 className="text-lg font-semibold">Revenue Queue</h2>
           <p className="text-sm text-muted-foreground">
-            Prioritize accounts by intent, buying stage, and operator-ready signals.
+            Prioritized accounts requiring operator review, enrichment, approval, or pipeline action.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
