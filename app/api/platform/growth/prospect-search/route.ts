@@ -84,6 +84,13 @@ export async function GET(request: Request) {
   const page = Number.parseInt(url.searchParams.get("page") ?? "1", 10)
   const page_size = Number.parseInt(url.searchParams.get("page_size") ?? "50", 10)
   const sort_by = url.searchParams.get("sort_by") === "signal_momentum" ? "signal_momentum" : "rank"
+  const result_mode_param = url.searchParams.get("result_mode")
+  const result_mode =
+    result_mode_param === "companies" ||
+    result_mode_param === "territory" ||
+    result_mode_param === "queue"
+      ? result_mode_param
+      : "people"
 
   try {
     const result = await runProspectSearch(access.admin, {
@@ -94,6 +101,7 @@ export async function GET(request: Request) {
       created_by: access.userId,
       page: Number.isFinite(page) ? page : 1,
       page_size: Number.isFinite(page_size) ? page_size : 50,
+      result_mode,
     })
 
     if (!includeMeta) {

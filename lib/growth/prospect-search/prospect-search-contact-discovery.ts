@@ -111,8 +111,7 @@ export {
 export {
   enrichPeopleRowsWithRelationshipMemory,
 } from "@/lib/growth/prospect-search/prospect-search-relationship-intelligence"
-
-export type ProspectSearchResultMode = "companies" | "people"
+export { GROWTH_CONTACT_NATIVE_SEARCH_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-native-index"
 
 export type ProspectSearchContactCoverageStatus =
   | "no_contacts_found"
@@ -213,7 +212,26 @@ export type GrowthProspectSearchPeopleResultRow = GrowthProspectSearchPersonResu
   source_count: number | null
   operator_confirmed: boolean
   identity_resolution: import("@/lib/growth/prospect-search/prospect-search-contact-identity-types").ProspectSearchContactIdentityResolution | null
+  contact_native_rank_score?: number | null
+  contact_native_rank_reasons?: string[]
+  reachable_human_score?: number | null
 }
+
+export type ProspectSearchResultMode = "people" | "companies" | "territory" | "queue"
+
+export const PROSPECT_SEARCH_RESULT_MODES: ProspectSearchResultMode[] = [
+  "people",
+  "companies",
+  "territory",
+  "queue",
+]
+
+export const GROWTH_BULK_CONTACT_OPERATIONS_QA_MARKER = "growth-bulk-contact-operations-v1" as const
+export const GROWTH_CONTACT_DRAWER_QA_MARKER = "growth-contact-drawer-v1" as const
+export const GROWTH_CONTACT_NATIVE_PAGINATION_QA_MARKER = "growth-contact-native-pagination-v1" as const
+export const GROWTH_PROSPEO_STYLE_RESULTS_QA_MARKER = "growth-prospeo-style-results-v1" as const
+export const GROWTH_PROGRESSIVE_COMPANY_OVERLAY_QA_MARKER = "growth-progressive-company-overlay-v1" as const
+export const GROWTH_PEOPLE_FIRST_GRID_QA_MARKER = "growth-people-first-grid-v1" as const
 
 export type ProspectSearchPeopleTimelineEvent = {
   id: string
@@ -1133,17 +1151,7 @@ export function resolveDefaultProspectSearchResultMode(input: {
   const hydratedPeopleCount =
     countProspectSearchPeopleRows(input.companies) + (input.serverPeopleCount ?? 0)
   if (hydratedPeopleCount === 0) return "companies"
-  if (hasProspectSearchDecisionMakerFilters(input.filters)) return "people"
-
-  const outreachReadyCount = input.companies.filter(
-    (company) =>
-      company.contactability_status === "outreach_ready" ||
-      company.reachable_human?.label === "outreach_ready" ||
-      company.reachable_human?.label === "partial_contactability",
-  ).length
-
-  if (outreachReadyCount > 0 || hydratedPeopleCount >= 3) return "people"
-  return "companies"
+  return "people"
 }
 
 export function mergeProspectSearchPeopleResults(

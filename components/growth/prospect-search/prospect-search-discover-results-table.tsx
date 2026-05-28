@@ -1,7 +1,7 @@
 "use client"
 
 import { ProspectSearchDiscoverCompaniesTable } from "@/components/growth/prospect-search/prospect-search-discover-companies-table"
-import { ProspectSearchDiscoverPeopleTable } from "@/components/growth/prospect-search/prospect-search-discover-people-table"
+import { ProspectSearchPeopleFirstGrid } from "@/components/growth/prospect-search/prospect-search-people-first-grid"
 import type {
   GrowthProspectSearchPeopleResultRow,
   ProspectSearchResultMode,
@@ -50,9 +50,9 @@ export function ProspectSearchDiscoverResultsTable({
   onOpenPersonContact?: (row: GrowthProspectSearchPeopleResultRow) => void
   onRerunPersonDiscovery?: (row: GrowthProspectSearchPeopleResultRow) => void
 }) {
-  if (mode === "people") {
+  if (mode === "people" || mode === "queue") {
     return (
-      <ProspectSearchDiscoverPeopleTable
+      <ProspectSearchPeopleFirstGrid
         rows={peopleRows}
         selectedKeys={selectedPeopleKeys}
         onToggleSelection={onTogglePeopleSelection}

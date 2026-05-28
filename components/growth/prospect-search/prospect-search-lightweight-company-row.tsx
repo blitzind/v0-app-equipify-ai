@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import { GROWTH_MASSIVE_MARKET_INDEX_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-massive-market-index"
 import { GROWTH_CONTACT_FIRST_DISCOVERY_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-progressive-enrichment"
+import { GROWTH_PROGRESSIVE_COMPANY_OVERLAY_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import { GROWTH_REACHABLE_HUMAN_PRIORITY_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-reachable-human-scoring"
 
 function formatContactabilityLabel(label: string | null | undefined): string {
@@ -27,6 +28,7 @@ export function ProspectSearchLightweightCompanyRow({
       data-lightweight-company-mode="v1"
       data-massive-market-index-marker={GROWTH_MASSIVE_MARKET_INDEX_QA_MARKER}
       data-contact-first-discovery-marker={GROWTH_CONTACT_FIRST_DISCOVERY_QA_MARKER}
+      data-progressive-company-overlay-marker={GROWTH_PROGRESSIVE_COMPANY_OVERLAY_QA_MARKER}
       data-reachable-human-priority-marker={GROWTH_REACHABLE_HUMAN_PRIORITY_QA_MARKER}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">

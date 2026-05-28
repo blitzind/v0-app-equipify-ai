@@ -535,6 +535,14 @@ export type GrowthProspectSearchResult = {
   contact_first_hydration?: import("@/lib/growth/prospect-search/prospect-search-contact-first-orchestration").GrowthProspectSearchContactFirstHydrationSnapshot | null
   contact_first_qa_marker?: typeof import("@/lib/growth/prospect-search/prospect-search-progressive-enrichment").GROWTH_CONTACT_FIRST_DISCOVERY_QA_MARKER | null
   scalable_search_qa_marker?: typeof import("@/lib/growth/prospect-search/prospect-search-scalable-pagination").GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER | null
+  result_mode?: import("@/lib/growth/prospect-search/prospect-search-contact-discovery").ProspectSearchResultMode
+  people_rows?: import("@/lib/growth/prospect-search/prospect-search-contact-discovery").GrowthProspectSearchPeopleResultRow[]
+  people_cursor?: string | null
+  people_next_cursor?: string | null
+  contact_native_search_qa_marker?: typeof import("@/lib/growth/prospect-search/prospect-search-contact-native-index").GROWTH_CONTACT_NATIVE_SEARCH_QA_MARKER | null
+  contact_native_pagination_qa_marker?: typeof import("@/lib/growth/prospect-search/prospect-search-contact-native-search").GROWTH_CONTACT_NATIVE_PAGINATION_QA_MARKER | null
+  prospeo_style_results_qa_marker?: typeof import("@/lib/growth/prospect-search/prospect-search-contact-native-search").GROWTH_PROSPEO_STYLE_RESULTS_QA_MARKER | null
+  progressive_company_overlay_qa_marker?: typeof import("@/lib/growth/prospect-search/prospect-search-contact-native-search").GROWTH_PROGRESSIVE_COMPANY_OVERLAY_QA_MARKER | null
   discovery_runtime_hardening_qa_marker?: typeof import("@/lib/growth/prospect-search/prospect-search-safe-fetch-json").GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER | null
 }
 

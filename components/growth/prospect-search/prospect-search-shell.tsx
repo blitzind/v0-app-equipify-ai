@@ -150,6 +150,13 @@ import {
   enrichPeopleRowsWithRelationshipMemory,
   enrichProspectSearchPeopleRowsWithRanking,
   mergeProspectSearchPeopleResults,
+  GROWTH_CONTACT_DRAWER_QA_MARKER,
+  GROWTH_BULK_CONTACT_OPERATIONS_QA_MARKER,
+  GROWTH_CONTACT_NATIVE_PAGINATION_QA_MARKER,
+  GROWTH_PROSPEO_STYLE_RESULTS_QA_MARKER,
+  GROWTH_PROGRESSIVE_COMPANY_OVERLAY_QA_MARKER,
+  GROWTH_PEOPLE_FIRST_GRID_QA_MARKER,
+  GROWTH_CONTACT_NATIVE_SEARCH_QA_MARKER,
   resolveDefaultProspectSearchResultMode,
   type GrowthProspectSearchPeopleResultRow,
   type ProspectSearchResultMode,
@@ -186,6 +193,14 @@ import { GROWTH_REACHABLE_HUMAN_PRIORITY_QA_MARKER } from "@/lib/growth/prospect
 import { GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-scalable-pagination"
 import { GROWTH_OUTREACH_READINESS_GATE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-outreach-readiness-gate"
 import { ProspectSearchLightweightCompanyRow } from "@/components/growth/prospect-search/prospect-search-lightweight-company-row"
+import {
+  ProspectSearchBulkContactOperationsBar,
+  ProspectSearchPeopleFirstGrid,
+} from "@/components/growth/prospect-search/prospect-search-people-first-grid"
+import {
+  filterProspectSearchQueueReadyPeopleRows,
+  rankProspectSearchPeopleNativeRows,
+} from "@/lib/growth/prospect-search/prospect-search-people-native-ranking"
 import {
   mergeProspectSearchPeopleSelectionStore,
   prospectSearchPeopleSelectionKey,
@@ -297,7 +312,7 @@ function ProspectSearchShellInner() {
   const [sortBy, setSortBy] = useState<GrowthProspectSearchSortBy>("rank")
   const [pendingProviderSearchHint, setPendingProviderSearchHint] = useState<string | null>(null)
   const [lastSearchedCriteriaKey, setLastSearchedCriteriaKey] = useState<string | null>(null)
-  const [resultMode, setResultMode] = useState<ProspectSearchResultMode>("companies")
+  const [resultMode, setResultMode] = useState<ProspectSearchResultMode>("people")
   const [contactDiscoveryBusy, setContactDiscoveryBusy] = useState(false)
   const [selectedPeopleKeys, setSelectedPeopleKeys] = useState<Set<string>>(new Set())
   const [selectedPeopleStore, setSelectedPeopleStore] = useState<
@@ -321,6 +336,7 @@ function ProspectSearchShellInner() {
   const pageRef = useRef(page)
   const pageSizeRef = useRef(pageSize)
   const sortByRef = useRef(sortBy)
+  const resultModeRef = useRef(resultMode)
   const fetchAbortRef = useRef<AbortController | null>(null)
   const fetchRequestIdRef = useRef(0)
 
@@ -330,6 +346,7 @@ function ProspectSearchShellInner() {
   pageRef.current = page
   pageSizeRef.current = pageSize
   sortByRef.current = sortBy
+  resultModeRef.current = resultMode
 
   const updateFilters = useCallback((updater: SetStateAction<GrowthProspectSearchFilters>) => {
     setFilters((prev) => {
@@ -352,10 +369,12 @@ function ProspectSearchShellInner() {
   const companies = result?.companies ?? EMPTY_COMPANIES
   const people = result?.people ?? EMPTY_PEOPLE
   const discoverFilteredResults = result?.filtered_discover_results ?? EMPTY_DISCOVER_RESULTS
-  const peopleRows = useMemo(
-    () => mergeProspectSearchPeopleResults(people, companies),
-    [people, companies],
-  )
+  const peopleRows = useMemo(() => {
+    if (result?.people_rows?.length) {
+      return rankProspectSearchPeopleNativeRows(result.people_rows, query)
+    }
+    return mergeProspectSearchPeopleResults(people, companies)
+  }, [result?.people_rows, people, companies, query])
   const companiesEnriched = useMemo(
     () => attachProspectSearchCompanyCoverageIntelligence(companies, peopleRows),
     [companies, peopleRows],
@@ -419,11 +438,21 @@ function ProspectSearchShellInner() {
       enrichPeopleRowsWithRelationshipMemory(peopleRowsWithInfluence, companiesWithContactCoverage),
     [peopleRowsWithInfluence, companiesWithContactCoverage],
   )
-  const peopleRowsWithRelationshipRef = useRef(peopleRowsWithRelationship)
-  peopleRowsWithRelationshipRef.current = peopleRowsWithRelationship
+  const displayPeopleRows = useMemo(() => {
+    if (resultMode === "queue") {
+      return filterProspectSearchQueueReadyPeopleRows(peopleRowsWithRelationship)
+    }
+    return peopleRowsWithRelationship
+  }, [peopleRowsWithRelationship, resultMode])
+  const paginationTotalCount =
+    resultMode === "people" || resultMode === "queue"
+      ? (result?.total_people ?? displayPeopleRows.length)
+      : (result?.total_companies ?? companies.length)
+  const peopleRowsWithRelationshipRef = useRef(displayPeopleRows)
+  peopleRowsWithRelationshipRef.current = displayPeopleRows
   const peopleRowsVisibilityKey = useMemo(
-    () => buildProspectSearchPeopleRowsVisibilityKey(peopleRowsWithRelationship),
-    [peopleRowsWithRelationship],
+    () => buildProspectSearchPeopleRowsVisibilityKey(displayPeopleRows),
+    [displayPeopleRows],
   )
   const savedSearchNames = useMemo(
     () => savedSearches.map((search) => search.name),
@@ -619,6 +648,7 @@ function ProspectSearchShellInner() {
         setFilters(input.filtersOverride)
       }
       if (input.discoveryModeOverride != null) setDiscoveryMode(input.discoveryModeOverride)
+      const activeResultMode = resultModeRef.current
       if (input.nextPage != null) setPage(input.nextPage)
       if (input.nextPageSize != null) setPageSize(input.nextPageSize)
       if (input.sortByOverride != null) setSortBy(input.sortByOverride)
@@ -638,6 +668,7 @@ function ProspectSearchShellInner() {
           page: activePage,
           pageSize: activePageSize,
           sortBy: activeSortBy,
+          resultMode: activeResultMode,
         })
         const parsed = await safeFetchJson<{
           ok?: boolean
@@ -1574,6 +1605,13 @@ function ProspectSearchShellInner() {
       data-background-enrichment-queue-marker={GROWTH_BACKGROUND_ENRICHMENT_QUEUE_QA_MARKER}
       data-background-enrichment-pending={backgroundEnrichmentQueue.size}
       data-outreach-readiness-gate-marker={GROWTH_OUTREACH_READINESS_GATE_QA_MARKER}
+      data-contact-native-search-marker={GROWTH_CONTACT_NATIVE_SEARCH_QA_MARKER}
+      data-people-first-grid-marker={GROWTH_PEOPLE_FIRST_GRID_QA_MARKER}
+      data-prospeo-style-results-marker={GROWTH_PROSPEO_STYLE_RESULTS_QA_MARKER}
+      data-contact-native-pagination-marker={GROWTH_CONTACT_NATIVE_PAGINATION_QA_MARKER}
+      data-contact-drawer-marker={GROWTH_CONTACT_DRAWER_QA_MARKER}
+      data-bulk-contact-operations-marker={GROWTH_BULK_CONTACT_OPERATIONS_QA_MARKER}
+      data-progressive-company-overlay-marker={GROWTH_PROGRESSIVE_COMPANY_OVERLAY_QA_MARKER}
       data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
       data-prospect-search-render-loop-fix-marker={GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER}
       data-contact-discovery-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}
@@ -1855,9 +1893,14 @@ function ProspectSearchShellInner() {
                     </Select>
                     <ProspectSearchResultModeToggle
                       mode={resultMode}
-                      onModeChange={setResultMode}
+                      onModeChange={(mode) => {
+                        setResultMode(mode)
+                        if (searchCompleted) {
+                          void fetchResults({ nextPage: 1, resetSelection: true })
+                        }
+                      }}
                       companyCount={companies.length}
-                      peopleCount={peopleRows.length}
+                      peopleCount={displayPeopleRows.length || peopleRows.length}
                     />
                     {discoveryMode === "internal" ? (
                       <SearchViewToggle view={view} onViewChange={setView} />
@@ -1889,11 +1932,10 @@ function ProspectSearchShellInner() {
               </div>
 
               {searchCompleted ? (
-              resultMode === "people" ? (
-                <ProspectSearchPeopleBulkActionBar
+              resultMode === "people" || resultMode === "queue" ? (
+                <ProspectSearchBulkContactOperationsBar
                   selectedCount={selectedPeopleKeys.size}
-                  visibleCount={peopleRowsWithRelationship.length}
-                  selectedRows={selectedPeopleRows}
+                  visibleCount={displayPeopleRows.length}
                   busy={peopleBulkBusy || contactDiscoveryBusy}
                   onClear={clearPeopleSelection}
                   onSelectVisible={selectAllVisiblePeople}
@@ -1902,16 +1944,12 @@ function ProspectSearchShellInner() {
                   onAddToCallQueue={() =>
                     void runPeopleAction("enqueue_people_call_queue", selectedPeopleRows)
                   }
-                  onSaveToList={() => void handleSavePeopleToList()}
                   onExport={() => void runPeopleAction("export_people_csv", selectedPeopleRows)}
-                  onRefreshVerification={() =>
+                  onBulkEnrich={() =>
+                    void runPeopleAction("refresh_visible_contacts", displayPeopleRows)
+                  }
+                  onBulkVerify={() =>
                     void runPeopleAction("refresh_people_verification", selectedPeopleRows)
-                  }
-                  onRefreshVisible={() =>
-                    void runPeopleAction("refresh_visible_contacts", peopleRowsWithRelationship)
-                  }
-                  onRefreshStale={() =>
-                    void runPeopleAction("refresh_stale_contacts", selectedPeopleRows)
                   }
                 />
               ) : (
@@ -1930,11 +1968,11 @@ function ProspectSearchShellInner() {
               )
               ) : null}
 
-              {result && result.discovery_mode === "internal" && result.total_companies > 0 ? (
+              {result && result.discovery_mode === "internal" && paginationTotalCount > 0 ? (
                 <ProspectSearchPagination
                   page={result.page ?? page}
                   pageSize={result.page_size ?? pageSize}
-                  totalCount={result.total_companies}
+                  totalCount={paginationTotalCount}
                   hasNextPage={result.has_next_page ?? false}
                   loading={loading}
                   onPageChange={(nextPage) => void goToPage(nextPage)}
@@ -1969,9 +2007,52 @@ function ProspectSearchShellInner() {
                   title="No companies found"
                   emptyMessage="No companies matched this search yet. Try broadening filters or adjusting your query."
                 />
-              ) : searchCompleted && view === "card" && resultMode === "people" ? (
+              ) : searchCompleted && resultMode === "territory" ? (
+                <div className="flex flex-col gap-4">
+                  {territoryHeatmapVisible ? (
+                    <TerritoryOpportunityHeatmapPanel
+                      heatmap={heatmap}
+                      loading={heatmapLoading}
+                      onDrilldown={handleTerritoryHeatmapDrilldown}
+                      onRecommendedAction={(action) =>
+                        void handleTerritoryHeatmapRecommendedAction(action)
+                      }
+                    />
+                  ) : null}
+                  {territoryPrioritization.length > 0 ? (
+                    <ProspectSearchTerritoryPrioritizationPanel territories={territoryPrioritization} />
+                  ) : (
+                    <div
+                      className="rounded-xl border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground"
+                      data-progressive-company-overlay-marker={GROWTH_PROGRESSIVE_COMPANY_OVERLAY_QA_MARKER}
+                    >
+                      Territory whitespace and opportunity density appear when territory filters or indexed
+                      market coverage are active.
+                    </div>
+                  )}
+                </div>
+              ) : searchCompleted &&
+                (resultMode === "people" || resultMode === "queue") &&
+                (view === "table" || discoveryMode === "internal") ? (
+                <ProspectSearchPeopleFirstGrid
+                  rows={displayPeopleRows}
+                  selectedKeys={selectedPeopleKeys}
+                  onToggleSelection={togglePeopleSelection}
+                  onSelectAllVisible={selectAllVisiblePeople}
+                  onClearSelection={clearPeopleSelection}
+                  onOpenContact={setEvidenceDrawerRow}
+                  onOpenCompany={(companyId) => {
+                    const company = companiesWithContactCoverage.find((row) => row.id === companyId)
+                    if (company) setSelectedCompany(company)
+                  }}
+                  onAddToQueue={handleAddPersonToQueue}
+                  onAddToLeadPipeline={handleAddPersonToLeadPipeline}
+                  onAddToCallQueue={handleAddPersonToCallQueue}
+                  onRerunDiscovery={handleRerunPersonDiscovery}
+                />
+              ) : searchCompleted && view === "card" && (resultMode === "people" || resultMode === "queue") ? (
                 <ProspectSearchPeopleResultsPanel
-                  rows={peopleRowsWithRelationship}
+                  rows={displayPeopleRows}
                   selectedKeys={selectedPeopleKeys}
                   onToggleSelection={togglePeopleSelection}
                   onSelectAllVisible={selectAllVisiblePeople}
@@ -1986,7 +2067,7 @@ function ProspectSearchShellInner() {
                   onAddToCallQueue={handleAddPersonToCallQueue}
                   onRerunDiscovery={handleRerunPersonDiscovery}
                 />
-              ) : searchCompleted && view === "card" ? (
+              ) : searchCompleted && view === "card" && resultMode === "companies" ? (
                 <div className="flex flex-col gap-4">
                   {commandFilteredCompanies.map((row) =>
                     row.lightweight_mode ? (

@@ -29,6 +29,7 @@ export function buildProspectSearchGetRequestParams(input: {
   pageSize: number
   sortBy?: GrowthProspectSearchSortBy
   includeMeta?: boolean
+  resultMode?: import("@/lib/growth/prospect-search/prospect-search-contact-discovery").ProspectSearchResultMode
 }): URLSearchParams {
   const params = new URLSearchParams({
     meta: input.includeMeta === false ? "0" : "1",
@@ -43,6 +44,10 @@ export function buildProspectSearchGetRequestParams(input: {
 
   if (input.sortBy === "signal_momentum") {
     params.set("sort_by", "signal_momentum")
+  }
+
+  if (input.resultMode) {
+    params.set("result_mode", input.resultMode)
   }
 
   const normalized = normalizeProspectSearchFilters(input.filters)

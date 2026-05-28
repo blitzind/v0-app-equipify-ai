@@ -37,6 +37,7 @@ import {
   GROWTH_CONTACT_IDENTITY_RESOLUTION_QA_MARKER,
   GROWTH_EVIDENCE_FUSION_QA_MARKER,
   GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER,
+  GROWTH_CONTACT_DRAWER_QA_MARKER,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import { formatProspectSearchFreshnessLabel } from "@/lib/growth/prospect-search/prospect-search-contact-freshness"
 
@@ -90,6 +91,7 @@ export function ProspectSearchContactEvidenceDrawer({
       data-contact-identity-resolution-marker={GROWTH_CONTACT_IDENTITY_RESOLUTION_QA_MARKER}
       data-evidence-fusion-marker={GROWTH_EVIDENCE_FUSION_QA_MARKER}
       data-contact-conflict-review-marker={GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER}
+      data-contact-drawer-marker={GROWTH_CONTACT_DRAWER_QA_MARKER}
       onClick={onClose}
     >
       <div

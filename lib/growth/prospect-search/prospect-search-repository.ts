@@ -31,6 +31,10 @@ import { attachReachableHumanToCompanies } from "@/lib/growth/prospect-search/pr
 import { GROWTH_CONTACT_FIRST_DISCOVERY_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-progressive-enrichment"
 import { clampProspectSearchPageSize, GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-scalable-pagination"
 import {
+  buildContactNativePeopleFromHydratedCompanies,
+  runContactNativePeopleSearch,
+} from "@/lib/growth/prospect-search/prospect-search-contact-native-search"
+import {
   applyTerritoryFiltersToSearchInput,
   attachTerritoryIntelligenceToSearchResult,
 } from "@/lib/growth/territory-intelligence/integrations/prospect-search-bridge"
@@ -70,6 +74,7 @@ export type RunProspectSearchInput = {
   discovery_mode?: GrowthProspectSearchDiscoveryMode
   sort_by?: GrowthProspectSearchSortBy
   created_by?: string | null
+  result_mode?: import("@/lib/growth/prospect-search/prospect-search-contact-discovery").ProspectSearchResultMode
 }
 
 
@@ -105,6 +110,8 @@ export async function runProspectSearch(
   const page = Math.max(1, input.page ?? 1)
   const page_size = clampProspectSearchPageSize(input.page_size ?? input.limit ?? 50)
   const external_limit = clampProspectSearchPageSize(input.limit ?? page_size)
+  const result_mode = input.result_mode ?? "people"
+  const peopleFirstMode = result_mode === "people" || result_mode === "queue"
 
   if (discovery_mode === "discover_external") {
     const realWorld = await runProspectSearchRealWorldDiscovery(admin, {
@@ -175,11 +182,23 @@ export async function runProspectSearch(
         filters: mergedFilters,
         parsed,
         sort_by,
-        operator_intent: false,
+        operator_intent: peopleFirstMode,
       })
 
     const source_counts = buildSourceCounts(companiesWithSignals)
     const rawProviderCompanies = externalEnrichment.raw_companies
+
+    const externalNative =
+      peopleFirstMode && sort_by !== "signal_momentum"
+        ? buildContactNativePeopleFromHydratedCompanies({
+            companies: companiesWithSignals,
+            filteredPeople: [],
+            query: input.query,
+            page,
+            page_size,
+            result_mode,
+          })
+        : null
 
     return attachTerritoryIntelligenceToSearchResult(
       admin,
@@ -191,16 +210,37 @@ export async function runProspectSearch(
       query: input.query,
       parsed_query: parsed,
       filters: mergedFilters,
-      companies: companiesWithSignals,
+      companies: externalNative?.companies.length ? externalNative.companies : companiesWithSignals,
       raw_provider_companies: rawProviderCompanies,
       discover_results: mapProspectSearchCompaniesToDiscoverResults(rawProviderCompanies),
       filtered_discover_results: mapProspectSearchCompaniesToDiscoverResults(companiesWithSignals),
-      people: [],
+      people:
+        externalNative?.people_rows.map((row) => ({
+          id: row.contact_id,
+          source_type: row.source_type,
+          company_id: row.company_id,
+          company_name: row.company_name,
+          full_name: row.full_name,
+          title: row.title,
+          email: row.email,
+          phone: row.phone,
+          role: row.role,
+          verification_status: row.verification_status,
+          rank_score: row.contact_native_rank_score ?? row.rank_score,
+        })) ?? [],
+      people_rows: externalNative?.people_rows ?? [],
       total_companies: companiesWithSignals.length,
-      total_people: 0,
-      page: 1,
-      page_size: companiesWithSignals.length,
-      has_next_page: false,
+      total_people: externalNative?.total_people ?? 0,
+      page: externalNative?.page ?? 1,
+      page_size: externalNative?.page_size ?? companiesWithSignals.length,
+      has_next_page: externalNative?.has_next_page ?? false,
+      people_cursor: externalNative?.people_cursor ?? null,
+      people_next_cursor: externalNative?.people_next_cursor ?? null,
+      result_mode: peopleFirstMode ? result_mode : undefined,
+      contact_native_search_qa_marker: externalNative?.qa_markers.contact_native_search ?? null,
+      contact_native_pagination_qa_marker: externalNative?.qa_markers.contact_native_pagination ?? null,
+      prospeo_style_results_qa_marker: externalNative?.qa_markers.prospeo_style_results ?? null,
+      progressive_company_overlay_qa_marker: externalNative?.qa_markers.progressive_company_overlay ?? null,
       source_counts,
       external_discovery_run_id: realWorld.discovery_run_id,
       real_world_discovery_run_id: realWorld.discovery_run_id,
@@ -284,6 +324,67 @@ export async function runProspectSearch(
     mergedFilters.title_contains,
     mergedFilters.decision_maker_role,
   )
+
+  if (peopleFirstMode && sort_by !== "signal_momentum") {
+    const native = await runContactNativePeopleSearch(admin, {
+      filteredCompanies,
+      filteredPeople,
+      query: input.query,
+      parsed,
+      filters: mergedFilters,
+      sort_by,
+      page,
+      page_size,
+      result_mode,
+    })
+
+    const source_counts = buildSourceCounts(native.companies)
+
+    return attachTerritoryIntelligenceToSearchResult(
+      admin,
+      {
+        qa_marker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
+        discovery_mode: "internal",
+        sort_by,
+        signal_momentum_qa_marker: GROWTH_SIGNAL_MOMENTUM_QA_MARKER,
+        query: input.query,
+        parsed_query: parsed,
+        filters: mergedFilters,
+        companies: native.companies,
+        people: native.people_rows.map((row) => ({
+          id: row.contact_id,
+          source_type: row.source_type,
+          company_id: row.company_id,
+          company_name: row.company_name,
+          full_name: row.full_name,
+          title: row.title,
+          email: row.email,
+          phone: row.phone,
+          role: row.role,
+          verification_status: row.verification_status,
+          rank_score: row.contact_native_rank_score ?? row.rank_score,
+        })),
+        people_rows: native.people_rows,
+        total_companies: filteredCompanies.length,
+        total_people: native.total_people,
+        page: native.page,
+        page_size: native.page_size,
+        has_next_page: native.has_next_page,
+        people_cursor: native.people_cursor,
+        people_next_cursor: native.people_next_cursor,
+        result_mode,
+        index_diagnostics,
+        source_counts,
+        contact_first_qa_marker: GROWTH_CONTACT_FIRST_DISCOVERY_QA_MARKER,
+        scalable_search_qa_marker: GROWTH_SCALABLE_PROSPECT_SEARCH_QA_MARKER,
+        contact_native_search_qa_marker: native.qa_markers.contact_native_search,
+        contact_native_pagination_qa_marker: native.qa_markers.contact_native_pagination,
+        prospeo_style_results_qa_marker: native.qa_markers.prospeo_style_results,
+        progressive_company_overlay_qa_marker: native.qa_markers.progressive_company_overlay,
+      },
+      native.companies,
+    )
+  }
 
   let companyPageCompanies: GrowthProspectSearchCompanyResult[]
   let companyPageMeta: {

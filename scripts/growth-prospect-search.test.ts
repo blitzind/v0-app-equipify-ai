@@ -5126,6 +5126,123 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
     "utf8",
   )
   assert.match(paginationSource, /PROSPECT_SEARCH_SCALABLE_PAGE_SIZE_OPTIONS/)
+
+  const {
+    GROWTH_CONTACT_NATIVE_SEARCH_QA_MARKER,
+    buildContactNativeIndexRecordsFromCompanies,
+  } = await import("../lib/growth/prospect-search/prospect-search-contact-native-index")
+  const {
+    GROWTH_PEOPLE_FIRST_GRID_QA_MARKER,
+    rankProspectSearchPeopleNativeRows,
+    filterProspectSearchQueueReadyPeopleRows,
+  } = await import("../lib/growth/prospect-search/prospect-search-people-native-ranking")
+  const {
+    GROWTH_CONTACT_DRAWER_QA_MARKER,
+    GROWTH_BULK_CONTACT_OPERATIONS_QA_MARKER,
+    GROWTH_CONTACT_NATIVE_PAGINATION_QA_MARKER,
+    GROWTH_PROSPEO_STYLE_RESULTS_QA_MARKER,
+    GROWTH_PROGRESSIVE_COMPANY_OVERLAY_QA_MARKER,
+    PROSPECT_SEARCH_RESULT_MODES,
+  } = await import("../lib/growth/prospect-search/prospect-search-contact-discovery")
+
+  assert.equal(GROWTH_CONTACT_NATIVE_SEARCH_QA_MARKER, "growth-contact-native-search-v1")
+  assert.equal(GROWTH_PEOPLE_FIRST_GRID_QA_MARKER, "growth-people-first-grid-v1")
+  assert.equal(GROWTH_CONTACT_DRAWER_QA_MARKER, "growth-contact-drawer-v1")
+  assert.equal(GROWTH_BULK_CONTACT_OPERATIONS_QA_MARKER, "growth-bulk-contact-operations-v1")
+  assert.equal(GROWTH_CONTACT_NATIVE_PAGINATION_QA_MARKER, "growth-contact-native-pagination-v1")
+  assert.equal(GROWTH_PROSPEO_STYLE_RESULTS_QA_MARKER, "growth-prospeo-style-results-v1")
+  assert.equal(GROWTH_PROGRESSIVE_COMPANY_OVERLAY_QA_MARKER, "growth-progressive-company-overlay-v1")
+  assert.deepEqual(PROSPECT_SEARCH_RESULT_MODES, ["people", "companies", "territory", "queue"])
+
+  const companyWithContact = {
+    id: "co-native-1",
+    source_type: "growth_lead" as const,
+    company_name: "MedEquip Service Co",
+    website: "https://medequip.example",
+    industry: "Medical equipment service",
+    location: "Chicago, IL",
+    signals: [],
+    is_suppressed: false,
+    contact_intelligence: {
+      qa_marker: "growth-prospect-search-contact-intelligence-v1" as const,
+      schema_ready: true,
+      has_contacts: true,
+      contacts: [
+        {
+          id: "c-native-1",
+          name: "Alex Rivera",
+          title: "Service Manager",
+          confidence: 0.92,
+          email: "alex@medequip.example",
+          phone: "+1 312 555 0100",
+          verification_status: "verified_channels",
+          email_verification_depth: "published_on_website",
+          phone_verification_depth: "published_on_website",
+          outreach_ready: true,
+          source_evidence: [{ claim: "Team page", evidence: "Alex Rivera", source: "website_public_extract" }],
+          role_type: "operations",
+          recommended_priority: 1,
+        },
+      ],
+      committee_roles: [],
+      committee_completeness_pct: null,
+      first_contact: null,
+      confidence_explanation: null,
+      outreach_recommendation: null,
+      source_labels: [],
+      empty_reason: null,
+    },
+  }
+
+  const nativeRecords = buildContactNativeIndexRecordsFromCompanies([companyWithContact as never])
+  assert.equal(nativeRecords.length, 1)
+  assert.equal(nativeRecords[0]?.normalized_full_name, "alex rivera")
+  assert.ok(nativeRecords[0]?.verified_emails.includes("alex@medequip.example"))
+
+  const peopleRows = buildProspectSearchPeopleRowsFromCompanies([companyWithContact as never])
+  const rankedPeople = rankProspectSearchPeopleNativeRows(peopleRows, "medical equipment service")
+  assert.equal(rankedPeople[0]?.full_name, "Alex Rivera")
+  assert.ok((rankedPeople[0]?.contact_native_rank_score ?? 0) > 0.5)
+
+  const queueReady = filterProspectSearchQueueReadyPeopleRows(rankedPeople)
+  assert.equal(queueReady.length, 1)
+
+  const peopleFirstGridSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-people-first-grid.tsx"),
+    "utf8",
+  )
+  assert.match(peopleFirstGridSource, /GROWTH_PEOPLE_FIRST_GRID_QA_MARKER/)
+  assert.match(peopleFirstGridSource, /GROWTH_PROSPEO_STYLE_RESULTS_QA_MARKER/)
+  assert.match(peopleFirstGridSource, /Reachable/)
+  assert.match(peopleFirstGridSource, /Open profile/)
+
+  const discoverResultsSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-discover-results-table.tsx"),
+    "utf8",
+  )
+  assert.match(discoverResultsSource, /ProspectSearchPeopleFirstGrid/)
+
+  const resultModeToggleSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-result-mode-toggle.tsx"),
+    "utf8",
+  )
+  assert.match(resultModeToggleSource, /Territory/)
+  assert.match(resultModeToggleSource, /Queue/)
+
+  const repositorySource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-repository.ts"),
+    "utf8",
+  )
+  assert.match(repositorySource, /runContactNativePeopleSearch/)
+  assert.match(repositorySource, /buildContactNativePeopleFromHydratedCompanies/)
+
+  assert.match(routeSource, /result_mode/)
+
+  assert.match(shellSource, /ProspectSearchPeopleFirstGrid/)
+  assert.match(shellSource, /ProspectSearchBulkContactOperationsBar/)
+  assert.match(shellSource, /data-contact-native-search-marker/)
+  assert.match(shellSource, /data-people-first-grid-marker/)
+  assert.match(drawerSource, /data-contact-drawer-marker/)
 }
 
 void main()
