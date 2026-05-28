@@ -149,6 +149,14 @@ import {
   type GrowthProspectSearchPeopleResultRow,
   type ProspectSearchResultMode,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
+import { GROWTH_OPERATOR_RECOMMENDATIONS_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-operator-recommendations"
+import { GROWTH_SMART_RESEARCH_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-research-gaps"
+import { GROWTH_ADAPTIVE_REFRESH_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-adaptive-refresh"
+import {
+  GROWTH_PROSPECT_COMMAND_OVERLAYS_QA_MARKER,
+  buildProspectSearchRecommendedWorkViews,
+  companyMatchesCommandOverlayFilter,
+} from "@/lib/growth/prospect-search/prospect-search-command-overlays"
 import { ProspectSearchPeopleBulkActionBar } from "@/components/growth/prospect-search/prospect-search-people-bulk-action-bar"
 import { ProspectSearchContactEvidenceDrawer } from "@/components/growth/prospect-search/prospect-search-contact-evidence-drawer"
 import {
@@ -272,6 +280,7 @@ function ProspectSearchShellInner() {
   const [evidenceDrawerRow, setEvidenceDrawerRow] = useState<GrowthProspectSearchPeopleResultRow | null>(
     null,
   )
+  const [commandWorkViewFilter, setCommandWorkViewFilter] = useState<string>("all")
 
   const queryRef = useRef(query)
   const filtersRef = useRef(filters)
@@ -330,6 +339,16 @@ function ProspectSearchShellInner() {
     () => applyTerritoryOpportunityBoostToCompanies(companiesEnriched, territoryPrioritization),
     [companiesEnriched, territoryPrioritization],
   )
+  const recommendedWorkViews = useMemo(
+    () => buildProspectSearchRecommendedWorkViews({ companies: companiesWithContactCoverage }),
+    [companiesWithContactCoverage],
+  )
+  const commandFilteredCompanies = useMemo(() => {
+    if (commandWorkViewFilter === "all") return companiesWithContactCoverage
+    return companiesWithContactCoverage.filter((row) =>
+      companyMatchesCommandOverlayFilter(row, commandWorkViewFilter),
+    )
+  }, [companiesWithContactCoverage, commandWorkViewFilter])
   const peopleRowsWithCompanies = useMemo(
     () =>
       peopleRows.map((row) => ({
@@ -1434,6 +1453,10 @@ function ProspectSearchShellInner() {
       data-opportunity-emergence-marker={GROWTH_OPPORTUNITY_EMERGENCE_QA_MARKER}
       data-sequence-readiness-marker={GROWTH_SEQUENCE_READINESS_QA_MARKER}
       data-revenue-operating-alerts-marker={GROWTH_REVENUE_OPERATING_ALERTS_QA_MARKER}
+      data-operator-recommendations-marker={GROWTH_OPERATOR_RECOMMENDATIONS_QA_MARKER}
+      data-smart-research-marker={GROWTH_SMART_RESEARCH_QA_MARKER}
+      data-adaptive-refresh-marker={GROWTH_ADAPTIVE_REFRESH_QA_MARKER}
+      data-prospect-command-overlays-marker={GROWTH_PROSPECT_COMMAND_OVERLAYS_QA_MARKER}
       data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
       data-prospect-search-render-loop-fix-marker={GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER}
       data-contact-discovery-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}
@@ -1597,6 +1620,31 @@ function ProspectSearchShellInner() {
                     onRecommendedAction={(action) => void handleTerritoryHeatmapRecommendedAction(action)}
                   />
                 </GrowthAdminWidgetErrorBoundary>
+              ) : null}
+
+              {searchCompleted && recommendedWorkViews.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={commandWorkViewFilter === "all" ? "default" : "outline"}
+                    onClick={() => setCommandWorkViewFilter("all")}
+                  >
+                    All accounts
+                  </Button>
+                  {recommendedWorkViews.map((workView) => (
+                    <Button
+                      key={workView.id}
+                      type="button"
+                      size="sm"
+                      variant={commandWorkViewFilter === workView.id ? "default" : "outline"}
+                      onClick={() => setCommandWorkViewFilter(workView.id)}
+                      title={workView.description}
+                    >
+                      {workView.label} ({workView.company_count})
+                    </Button>
+                  ))}
+                </div>
               ) : null}
 
               {searchCompleted && territoryPrioritization.length > 0 ? (
@@ -1826,7 +1874,7 @@ function ProspectSearchShellInner() {
                 />
               ) : searchCompleted && view === "card" ? (
                 <div className="flex flex-col gap-4">
-                  {companiesWithContactCoverage.map((row) => (
+                  {commandFilteredCompanies.map((row) => (
                     <CompanyResultCard
                       key={`${row.source_type}-${row.id}`}
                       row={row}

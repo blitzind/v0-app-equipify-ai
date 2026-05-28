@@ -288,6 +288,26 @@ export function buildProspectSearchPushMetadata(
           },
         }
       : {}),
+    ...(company.contact_intelligence?.operator_assist
+      ? {
+          operator_assist: {
+            top_recommendation:
+              company.contact_intelligence.operator_assist.operator_recommendations
+                .top_recommendation?.title ?? null,
+            recommendation_type:
+              company.contact_intelligence.operator_assist.operator_recommendations
+                .top_recommendation?.recommendation_type ?? null,
+            research_task_count:
+              company.contact_intelligence.operator_assist.research_gaps.tasks.length,
+            refresh_recommended:
+              company.contact_intelligence.operator_assist.adaptive_refresh.refresh_recommended,
+            command_overlays:
+              company.contact_intelligence.operator_assist.command_overlays.overlays.map(
+                (overlay) => overlay.kind,
+              ),
+          },
+        }
+      : {}),
   }
 }
 

@@ -4726,6 +4726,155 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   const useStateIndex = explanationsSource.indexOf("useState(false)")
   const earlyReturnIndex = explanationsSource.indexOf("return null")
   assert.ok(useStateIndex < earlyReturnIndex, "useState must run before conditional return")
+
+  const {
+    buildProspectSearchOperatorRecommendations,
+    GROWTH_OPERATOR_RECOMMENDATIONS_QA_MARKER,
+    resolveOperatorRecommendationQueueBoost,
+  } = await import("../lib/growth/prospect-search/prospect-search-operator-recommendations")
+  const {
+    buildProspectResearchGaps,
+    GROWTH_SMART_RESEARCH_QA_MARKER,
+    matchesProspectSearchResearchQueue,
+  } = await import("../lib/growth/prospect-search/prospect-search-research-gaps")
+  const {
+    computeAdaptiveRefreshPriority,
+    GROWTH_ADAPTIVE_REFRESH_QA_MARKER,
+    resolveAdaptiveRefreshQueueBoost,
+  } = await import("../lib/growth/prospect-search/prospect-search-adaptive-refresh")
+  const {
+    resolveProspectSearchCommandOverlays,
+    buildProspectSearchRecommendedWorkViews,
+    GROWTH_PROSPECT_COMMAND_OVERLAYS_QA_MARKER,
+    companyMatchesCommandOverlayFilter,
+  } = await import("../lib/growth/prospect-search/prospect-search-command-overlays")
+  const {
+    buildProspectSearchOperatorAssistIntelligence,
+    applyOperatorAssistIntelligenceQueueBoost,
+  } = await import("../lib/growth/prospect-search/prospect-search-operator-assist-intelligence")
+
+  assert.equal(GROWTH_OPERATOR_RECOMMENDATIONS_QA_MARKER, "growth-operator-recommendations-v1")
+  assert.equal(GROWTH_SMART_RESEARCH_QA_MARKER, "growth-smart-research-v1")
+  assert.equal(GROWTH_ADAPTIVE_REFRESH_QA_MARKER, "growth-adaptive-refresh-v1")
+  assert.equal(GROWTH_PROSPECT_COMMAND_OVERLAYS_QA_MARKER, "growth-prospect-command-overlays-v1")
+
+  const operatorRecs = buildProspectSearchOperatorRecommendations({
+    company: { id: "co1", company_name: "Acme", is_suppressed: false } as never,
+    peopleRows: [
+      {
+        contact_id: "c1",
+        call_ready: true,
+        call_eligibility: "eligible",
+        freshness_status: "stale",
+        persona_type: "operations_manager",
+      },
+    ] as never,
+    coverage: emergenceCoverage,
+    accountStrategy: sequenceStrategy,
+    sequenceReadiness,
+    opportunityEmergence: emergence,
+  })
+  assert.ok(operatorRecs.recommendations.length >= 1)
+  assert.ok(operatorRecs.top_recommendation?.evidence.length ?? 0 > 0)
+
+  const researchGaps = buildProspectResearchGaps({
+    company: { id: "co1", company_name: "Acme", lead_engine_score: 70 } as never,
+    peopleRows: [{ contact_id: "c1", freshness_status: "stale", call_ready: false, confidence: 0.3 }] as never,
+    coverage: { ...emergenceCoverage, persona_completeness: 30 } as never,
+    accountStrategy: { ...sequenceStrategy, missing_personas: ["operations_manager"] } as never,
+  })
+  assert.ok(researchGaps.tasks.length >= 1)
+  assert.ok(matchesProspectSearchResearchQueue(researchGaps, "research_needed"))
+
+  const adaptiveRefresh = computeAdaptiveRefreshPriority({
+    company: { id: "co1", company_name: "Acme", is_suppressed: false } as never,
+    peopleRows: [{ contact_id: "c1", freshness_status: "stale" }] as never,
+    coverage: emergenceCoverage,
+    opportunityEmergence: emergence,
+    sequenceReadiness,
+    in_active_queue: true,
+  })
+  assert.equal(adaptiveRefresh.refresh_recommended, true)
+  assert.ok(resolveAdaptiveRefreshQueueBoost(adaptiveRefresh) >= 0)
+
+  const overlays = resolveProspectSearchCommandOverlays({
+    company: { id: "co1", company_name: "Acme", is_suppressed: false } as never,
+    researchGaps,
+    adaptiveRefresh,
+    sequenceReadiness,
+    opportunityEmergence: emergence,
+  })
+  assert.ok(overlays.overlays.length >= 1)
+
+  const assistBundle = buildProspectSearchOperatorAssistIntelligence({
+    company: { id: "co1", company_name: "Acme", is_suppressed: false, in_lead_inbox: true } as never,
+    peopleRows: [
+      {
+        contact_id: "c1",
+        call_ready: true,
+        call_eligibility: "eligible",
+        freshness_status: "stale",
+      },
+    ] as never,
+    coverage: emergenceCoverage,
+    accountStrategy: sequenceStrategy,
+    relationshipBundle: {
+      relationship_memory: null,
+      account_timeline: { events: [], timeline_summary: null, recommended_next_action: null, recent_outreach_count: 0 },
+      account_progression: null,
+    } as never,
+    operationalBundle: {
+      opportunity_emergence: emergence,
+      sequence_readiness: sequenceReadiness,
+      operating_alerts: alerts,
+    },
+    in_active_queue: true,
+  })
+  assert.ok(assistBundle.operator_recommendations.recommendations.length >= 1)
+
+  const assistBoosted = applyOperatorAssistIntelligenceQueueBoost(sequenceStrategy, assistBundle)
+  assert.ok(assistBoosted.queue_priority_score >= sequenceStrategy.queue_priority_score)
+
+  const workViews = buildProspectSearchRecommendedWorkViews({
+    companies: [
+      {
+        id: "co1",
+        contact_intelligence: {
+          sequence_readiness: sequenceReadiness,
+          operator_assist: assistBundle,
+        },
+      },
+    ] as never,
+  })
+  assert.ok(workViews.length >= 1)
+  assert.equal(
+    companyMatchesCommandOverlayFilter(
+      {
+        id: "co1",
+        contact_intelligence: { sequence_readiness: sequenceReadiness },
+      } as never,
+      "best_call_today",
+    ),
+    sequenceReadiness.readiness_state === "ready" &&
+      sequenceReadiness.sequence_suitability === "call_first",
+  )
+
+  const operatorAssistPanelSource = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "components/growth/prospect-search/prospect-search-operator-assist-panel.tsx",
+    ),
+    "utf8",
+  )
+  assert.match(operatorAssistPanelSource, /data-operator-recommendations-marker/)
+  assert.match(operatorAssistPanelSource, /data-smart-research-marker/)
+  assert.match(operatorAssistPanelSource, /data-adaptive-refresh-marker/)
+  assert.match(operatorAssistPanelSource, /data-prospect-command-overlays-marker/)
+  assert.match(shellSource, /data-operator-recommendations-marker/)
+  assert.match(shellSource, /buildProspectSearchRecommendedWorkViews/)
+  assert.match(companyCardSource, /data-operator-recommendations-marker/)
+  assert.match(territoryPanelSource2, /data-operator-recommendations-marker/)
+  assert.match(pushMetadataSource, /operator_assist/)
 }
 
 void main()

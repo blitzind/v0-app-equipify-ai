@@ -53,6 +53,10 @@ import {
   buildProspectSearchOperationalIntelligence,
   applyOperationalIntelligenceQueueBoost,
 } from "@/lib/growth/prospect-search/prospect-search-operational-intelligence"
+import {
+  buildProspectSearchOperatorAssistIntelligence,
+  applyOperatorAssistIntelligenceQueueBoost,
+} from "@/lib/growth/prospect-search/prospect-search-operator-assist-intelligence"
 import type { ProspectSearchTerritoryOpportunityScore } from "@/lib/growth/prospect-search/prospect-search-territory-prioritization"
 import { resolveCompanyTerritoryOpportunityBoost } from "@/lib/growth/prospect-search/prospect-search-territory-prioritization"
 import {
@@ -766,6 +770,21 @@ export function attachProspectSearchCompanyCoverageIntelligence(
       operationalBundle,
     )
 
+    const operatorAssistBundle = buildProspectSearchOperatorAssistIntelligence({
+      company,
+      peopleRows: contacts,
+      coverage,
+      accountStrategy: finalStrategy,
+      relationshipBundle,
+      operationalBundle,
+      orgIntelligence: org_intelligence,
+      contactInfluences: [...influenceByContact.values()],
+      territory_score: territoryScore,
+      in_active_queue: company.in_lead_inbox ?? false,
+    })
+
+    finalStrategy = applyOperatorAssistIntelligenceQueueBoost(finalStrategy, operatorAssistBundle)
+
     if (territoryBoost > 0) {
       finalStrategy = {
         ...finalStrategy,
@@ -844,7 +863,11 @@ export function attachProspectSearchCompanyCoverageIntelligence(
         opportunity_emergence: operationalBundle.opportunity_emergence,
         sequence_readiness: operationalBundle.sequence_readiness,
         operating_alerts: operationalBundle.operating_alerts,
+        operator_assist: operatorAssistBundle,
+        command_overlays: operatorAssistBundle.command_overlays,
         outreach_recommendation:
+          operatorAssistBundle.operator_recommendations.top_recommendation
+            ?.recommended_operator_action ??
           operationalBundle.opportunity_emergence.recommended_next_action ??
           finalStrategy.strategy_summary ??
           coverage.ranking_summary ??

@@ -27,6 +27,10 @@ export function ProspectSearchTerritoryPrioritizationPanel({
     <section
       className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4"
       data-territory-prioritization-marker={GROWTH_TERRITORY_PRIORITIZATION_QA_MARKER}
+      data-operator-recommendations-marker={GROWTH_OPERATOR_RECOMMENDATIONS_QA_MARKER}
+      data-smart-research-marker={GROWTH_SMART_RESEARCH_QA_MARKER}
+      data-adaptive-refresh-marker={GROWTH_ADAPTIVE_REFRESH_QA_MARKER}
+      data-prospect-command-overlays-marker={GROWTH_PROSPECT_COMMAND_OVERLAYS_QA_MARKER}
     >
       <div className="flex items-center gap-2">
         <MapPin className="size-4 text-emerald-800" />

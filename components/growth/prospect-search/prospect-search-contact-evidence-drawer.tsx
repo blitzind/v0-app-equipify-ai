@@ -26,6 +26,7 @@ import { ProspectSearchAccountTimelinePanel } from "@/components/growth/prospect
 import { GROWTH_CONTACT_INFLUENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-influence"
 import { GROWTH_ORG_INTELLIGENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-org-intelligence"
 import { ProspectSearchOperationalIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-operational-intelligence-panel"
+import { ProspectSearchOperatorAssistPanel } from "@/components/growth/prospect-search/prospect-search-operator-assist-panel"
 import { GROWTH_REVENUE_OPERATING_ALERTS_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-revenue-operating-alerts"
 import { formatProspectSearchFreshnessLabel } from "@/lib/growth/prospect-search/prospect-search-contact-freshness"
 
@@ -207,6 +208,18 @@ export function ProspectSearchContactEvidenceDrawer({
                   opportunity={row.company.contact_intelligence.opportunity_emergence}
                   sequenceReadiness={row.company.contact_intelligence.sequence_readiness}
                   operatingAlerts={row.company.contact_intelligence.operating_alerts}
+                  compact
+                />
+              </div>
+            </section>
+          ) : null}
+
+          {row.company.contact_intelligence?.operator_assist ? (
+            <section>
+              <h4 className="font-medium text-foreground">Operator assist</h4>
+              <div className="mt-2">
+                <ProspectSearchOperatorAssistPanel
+                  assist={row.company.contact_intelligence.operator_assist}
                   compact
                 />
               </div>

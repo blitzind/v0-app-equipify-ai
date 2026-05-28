@@ -129,6 +129,10 @@ export function CompanyResultCard({
               data-opportunity-emergence-marker="growth-opportunity-emergence-v1"
               data-sequence-readiness-marker="growth-sequence-readiness-v1"
               data-revenue-operating-alerts-marker="growth-revenue-operating-alerts-v1"
+              data-operator-recommendations-marker="growth-operator-recommendations-v1"
+              data-smart-research-marker="growth-smart-research-v1"
+              data-adaptive-refresh-marker="growth-adaptive-refresh-v1"
+              data-prospect-command-overlays-marker="growth-prospect-command-overlays-v1"
             >
               <Badge variant="outline" className="text-[10px]">
                 {row.contact_intelligence.opportunity_emergence.emergence_tier.replace(/_/g, " ")}
@@ -141,6 +145,16 @@ export function CompanyResultCard({
               {row.contact_intelligence.operating_alerts?.alert_summary ? (
                 <Badge variant="outline" className="text-[10px]">
                   {row.contact_intelligence.operating_alerts.alert_summary}
+                </Badge>
+              ) : null}
+              {row.contact_intelligence.operator_assist?.operator_recommendations.top_recommendation ? (
+                <Badge variant="default" className="text-[10px]">
+                  {row.contact_intelligence.operator_assist.operator_recommendations.top_recommendation.title}
+                </Badge>
+              ) : null}
+              {row.contact_intelligence.command_overlays?.primary_overlay ? (
+                <Badge variant="outline" className="text-[10px]">
+                  {row.contact_intelligence.command_overlays.primary_overlay.label}
                 </Badge>
               ) : null}
             </div>

@@ -92,6 +92,8 @@ export type GrowthProspectSearchContactIntelligence = {
   opportunity_emergence?: import("@/lib/growth/prospect-search/prospect-search-opportunity-emergence").ProspectSearchOpportunityEmergence | null
   sequence_readiness?: import("@/lib/growth/prospect-search/prospect-search-sequence-readiness").ProspectSearchSequenceReadiness | null
   operating_alerts?: import("@/lib/growth/prospect-search/prospect-search-revenue-operating-alerts").ProspectSearchOperatingAlertsSnapshot | null
+  operator_assist?: import("@/lib/growth/prospect-search/prospect-search-operator-assist-intelligence").ProspectSearchOperatorAssistBundle | null
+  command_overlays?: import("@/lib/growth/prospect-search/prospect-search-command-overlays").ProspectSearchCommandOverlaysSnapshot | null
 }
 
 export type ProspectSearchLeadEngineContactHandoffContext = {
