@@ -180,15 +180,15 @@ export function GrowthProviderSetupDashboard() {
         </div>
       </GrowthEngineCard>
 
-      <GrowthEngineCard title="Sender + OAuth">
-        <div className="mb-4 grid gap-3 md:grid-cols-2">
-          <div className="space-y-2">
+      <GrowthEngineCard title="Sender + OAuth" className="overflow-visible" data-qa="growth-sender-select-overlay-fix-v1">
+        <div className="relative z-20 mb-4 grid gap-3 overflow-visible md:grid-cols-2">
+          <div className="relative z-20 space-y-2 overflow-visible">
             <Label htmlFor="sender-account">Sender account</Label>
             <Select value={selectedSenderId} onValueChange={setSelectedSenderId}>
-              <SelectTrigger id="sender-account">
+              <SelectTrigger id="sender-account" className="w-full max-w-full">
                 <SelectValue placeholder="Select sender" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper" side="bottom" align="start" sideOffset={4} collisionPadding={8}>
                 {senders.map((sender) => (
                   <SelectItem key={sender.id} value={sender.id}>
                     {sender.display_name} ({sender.email_address})
@@ -198,7 +198,7 @@ export function GrowthProviderSetupDashboard() {
             </Select>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="relative z-0 flex flex-wrap gap-2">
           <Button type="button" disabled={!!actionLoading} onClick={() => runAction("google", () => startOAuth("google"))}>
             {actionLoading === "google" ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Plug className="mr-2 size-4" />}
             Connect Google

@@ -122,8 +122,15 @@ function main(): void {
     "utf8",
   )
   assert.match(uiSource, /GROWTH_LIVE_PROVIDER_SETUP_QA_MARKER/)
+  assert.match(uiSource, /growth-sender-select-overlay-fix-v1/)
   assert.match(uiSource, /Connect Google/)
   assert.match(uiSource, /humanApprovalConfirmed/)
+  assert.match(uiSource, /position="popper"/)
+
+  const selectSource = fs.readFileSync(path.join(process.cwd(), "components/ui/select.tsx"), "utf8")
+  assert.match(selectSource, /SelectPrimitive\.Portal/)
+  assert.match(selectSource, /APP_Z_DIALOG/)
+  assert.doesNotMatch(selectSource, /relative z-\[120\]/)
 
   const listRoute = fs.readFileSync(
     path.join(process.cwd(), "app/api/platform/growth/provider-setup/dashboard/route.ts"),

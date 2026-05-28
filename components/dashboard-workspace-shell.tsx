@@ -19,11 +19,8 @@ export function DashboardWorkspaceShell({ children }: { children: ReactNode }) {
   }, [setPortalContainer])
 
   return (
-    <div
-      ref={ref}
-      className="flex flex-col flex-1 min-w-0 overflow-hidden bg-background text-foreground"
-    >
-      {children}
+    <div ref={ref} className="flex min-h-0 flex-1 flex-col min-w-0 bg-background text-foreground">
+      <div className="flex min-h-0 flex-1 flex-col min-w-0 overflow-hidden">{children}</div>
     </div>
   )
 }
