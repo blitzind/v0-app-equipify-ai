@@ -13,8 +13,12 @@ import {
   GROWTH_PEOPLE_HYDRATION_QA_MARKER,
   GROWTH_PEOPLE_WORKFLOWS_QA_MARKER,
   GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER,
+  GROWTH_DEEP_CONTACT_ACQUISITION_QA_MARKER,
+  GROWTH_WEBSITE_EXTRACTION_QUALITY_QA_MARKER,
+  GROWTH_PUBLIC_PROFILE_REFERENCE_QA_MARKER,
   type GrowthProspectSearchPeopleResultRow,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
+import { formatWebsiteEvidenceQualityLabel } from "@/lib/growth/contact-discovery/website-acquisition-metadata-bridge"
 import { GROWTH_CONTACT_INFLUENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-influence"
 import {
   GROWTH_RELATIONSHIP_MEMORY_QA_MARKER,
@@ -109,6 +113,8 @@ export function ProspectSearchDiscoverPeopleTable({
         <p className="font-medium text-foreground">No verified contacts yet</p>
         <p className="mx-auto mt-2 max-w-md text-xs">
           Run Find contacts on company rows to extract publicly listed people from company websites.
+          Empty results may mean no team/contact pages were found, only generic role emails were
+          discovered, or the website was unreachable.
         </p>
       </div>
     )
@@ -128,7 +134,10 @@ export function ProspectSearchDiscoverPeopleTable({
       data-contact-influence-marker={GROWTH_CONTACT_INFLUENCE_QA_MARKER}
       data-relationship-memory-marker={GROWTH_RELATIONSHIP_MEMORY_QA_MARKER}
       data-account-timeline-marker={GROWTH_ACCOUNT_TIMELINE_QA_MARKER}
-      data-account-progression-marker={GROWTH_ACCOUNT_PROGRESSION_QA_MARKER}
+        data-account-progression-marker={GROWTH_ACCOUNT_PROGRESSION_QA_MARKER}
+      data-deep-contact-acquisition-marker={GROWTH_DEEP_CONTACT_ACQUISITION_QA_MARKER}
+      data-website-extraction-quality-marker={GROWTH_WEBSITE_EXTRACTION_QUALITY_QA_MARKER}
+      data-public-profile-reference-marker={GROWTH_PUBLIC_PROFILE_REFERENCE_QA_MARKER}
       data-result-mode="people"
     >
       <table className="w-full min-w-[1280px] text-left text-xs">
@@ -216,6 +225,14 @@ export function ProspectSearchDiscoverPeopleTable({
                     <p className="mt-0.5 text-[10px] text-muted-foreground">
                       Checked {new Date(row.last_checked_at).toLocaleDateString()}
                     </p>
+                  ) : null}
+                  {row.evidence_quality_label ? (
+                    <Badge variant="outline" className="mt-1 text-[10px]">
+                      {formatWebsiteEvidenceQualityLabel(row.evidence_quality_label)}
+                    </Badge>
+                  ) : null}
+                  {row.linkedin_reference_label ? (
+                    <p className="mt-1 text-[10px] text-muted-foreground">{row.linkedin_reference_label}</p>
                   ) : null}
                 </td>
                 <td className="px-3 py-2">

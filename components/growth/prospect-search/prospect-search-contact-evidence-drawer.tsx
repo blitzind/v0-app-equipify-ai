@@ -27,7 +27,13 @@ import { GROWTH_CONTACT_INFLUENCE_QA_MARKER } from "@/lib/growth/prospect-search
 import { GROWTH_ORG_INTELLIGENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-org-intelligence"
 import { ProspectSearchOperationalIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-operational-intelligence-panel"
 import { ProspectSearchOperatorAssistPanel } from "@/components/growth/prospect-search/prospect-search-operator-assist-panel"
+import { ProspectSearchContactAcquisitionPanel } from "@/components/growth/prospect-search/prospect-search-contact-acquisition-panel"
 import { GROWTH_REVENUE_OPERATING_ALERTS_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-revenue-operating-alerts"
+import {
+  GROWTH_DEEP_CONTACT_ACQUISITION_QA_MARKER,
+  GROWTH_PUBLIC_PROFILE_REFERENCE_QA_MARKER,
+  GROWTH_WEBSITE_EXTRACTION_QUALITY_QA_MARKER,
+} from "@/lib/growth/contact-discovery/website-acquisition-metadata-bridge"
 import { formatProspectSearchFreshnessLabel } from "@/lib/growth/prospect-search/prospect-search-contact-freshness"
 
 function eligibilityBadgeVariant(state: string): "default" | "outline" | "destructive" | "secondary" {
@@ -69,6 +75,9 @@ export function ProspectSearchContactEvidenceDrawer({
       data-opportunity-emergence-marker={GROWTH_OPPORTUNITY_EMERGENCE_QA_MARKER}
       data-sequence-readiness-marker={GROWTH_SEQUENCE_READINESS_QA_MARKER}
       data-revenue-operating-alerts-marker={GROWTH_REVENUE_OPERATING_ALERTS_QA_MARKER}
+      data-deep-contact-acquisition-marker={GROWTH_DEEP_CONTACT_ACQUISITION_QA_MARKER}
+      data-website-extraction-quality-marker={GROWTH_WEBSITE_EXTRACTION_QUALITY_QA_MARKER}
+      data-public-profile-reference-marker={GROWTH_PUBLIC_PROFILE_REFERENCE_QA_MARKER}
       onClick={onClose}
     >
       <div
@@ -302,6 +311,16 @@ export function ProspectSearchContactEvidenceDrawer({
               {row.sms_block_reason ? <li>SMS block: {row.sms_block_reason}</li> : null}
               {row.phone_on_dnc === true ? <li className="text-red-700">Matched voice DNC registry</li> : null}
             </ul>
+          </section>
+
+          <section>
+            <h4 className="font-medium text-foreground">Website acquisition quality</h4>
+            <div className="mt-2">
+              <ProspectSearchContactAcquisitionPanel
+                row={row}
+                diagnostics={row.company.contact_intelligence?.website_extraction_diagnostics}
+              />
+            </div>
           </section>
 
           <section>

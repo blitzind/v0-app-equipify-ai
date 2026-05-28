@@ -53,9 +53,13 @@ export function createWebsitePublicExtractContactDiscoveryProvider(
           status: "success",
           message:
             contacts.length > 0
-              ? `${contacts.length} contact(s) from public website extraction.${pagesSummary}`
-              : `No evidence-backed contacts on public website.${pagesSummary}`,
+              ? `${contacts.length} contact(s) from public website extraction.${pagesSummary}${discovery.diagnostics.summary ? ` ${discovery.diagnostics.summary}` : ""}`
+              : `${discovery.diagnostics.summary ?? "No evidence-backed contacts on public website."}${pagesSummary}`,
           contacts,
+          metadata: {
+            extraction_diagnostics: discovery.diagnostics,
+            linkedin_company_urls: discovery.linkedin_company_urls,
+          },
         }
       } catch (err) {
         return {

@@ -102,6 +102,21 @@ function extractedToInsertRow(input: {
       qa_marker: GROWTH_COMPANY_CONTACTS_QA_MARKER,
       confidence_reasoning: score.confidence_reasoning,
       leadership_indicator: input.extracted.leadership_indicator,
+      source_page_type: input.extracted.source_page_type,
+      source_page_url: input.extracted.source_page_url,
+      email_classification: input.extracted.email_classification,
+      phone_classification: input.extracted.phone_classification,
+      evidence_quality_score: input.extracted.evidence_quality_score,
+      evidence_quality_label: input.extracted.evidence_quality_label,
+      evidence_quality_reasons: input.extracted.evidence_quality_reasons,
+      extraction_risks: input.extracted.extraction_risks,
+      branch_name: input.extracted.branch_name,
+      branch_city: input.extracted.branch_city,
+      branch_state: input.extracted.branch_state,
+      branch_phone: input.extracted.branch_phone,
+      location_confidence: input.extracted.location_confidence,
+      linkedin_company_url: input.extracted.linkedin_company_url,
+      linkedin_reference_label: input.extracted.linkedin_reference_label,
     },
   }
 }
@@ -160,6 +175,7 @@ export async function upsertExtractedCompanyContacts(
     company_id: string
     growth_lead_id?: string | null
     extracted: ExtractedWebsiteContact[]
+    extraction_diagnostics?: import("@/lib/growth/contact-discovery/website-extraction-acquisition-types").WebsiteExtractionDiagnosticsSnapshot
   },
 ): Promise<GrowthCompanyContact[]> {
   if (!(await isGrowthCompanyContactsSchemaReady(admin))) return []
@@ -209,6 +225,9 @@ export async function upsertExtractedCompanyContacts(
             ...(row.metadata as Record<string, unknown>),
             last_checked_at: nowIso,
             discovery_provider: "website_public_extract",
+            ...(input.extraction_diagnostics
+              ? { website_extraction_diagnostics: input.extraction_diagnostics }
+              : {}),
           },
         })
         .eq("id", prior.id)
@@ -227,6 +246,9 @@ export async function upsertExtractedCompanyContacts(
           ...(row.metadata as Record<string, unknown>),
           last_checked_at: nowIso,
           discovery_provider: "website_public_extract",
+          ...(input.extraction_diagnostics
+            ? { website_extraction_diagnostics: input.extraction_diagnostics }
+            : {}),
         },
       })
       .select("*")
@@ -251,6 +273,7 @@ export async function runWebsiteContactDiscoveryForCompany(
       company_id: input.company_id,
       growth_lead_id: input.growth_lead_id,
       extracted: discovery.contacts,
+      extraction_diagnostics: discovery.diagnostics,
     })
   }
   return loadCompanyContactsSnapshot(admin, input.company_id)

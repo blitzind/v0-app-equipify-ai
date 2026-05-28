@@ -60,7 +60,11 @@ export function mapExtractedWebsiteContactToProviderRaw(
     })
   }
 
-  const confidenceBase = extracted.leadership_indicator ? 0.72 : 0.62
+  const confidenceBase =
+    (extracted.leadership_indicator ? 0.72 : 0.62) +
+    (extracted.evidence_quality_score != null
+      ? Math.min(0.12, extracted.evidence_quality_score / 1000)
+      : 0)
 
   return {
     full_name,
@@ -72,7 +76,7 @@ export function mapExtractedWebsiteContactToProviderRaw(
     phone: extracted.phone,
     linkedin_url: extracted.linkedin_url,
     pii_observed: hasPii,
-    confidence: confidenceBase,
+    confidence: Math.min(0.95, confidenceBase),
     evidence,
     source_attribution: [
       {
@@ -81,14 +85,28 @@ export function mapExtractedWebsiteContactToProviderRaw(
         provider_name: "website_public_extract",
         signal: extracted.source_type,
         evidence: evidenceLabel,
-        confidence: confidenceBase,
+        confidence: Math.min(0.95, confidenceBase),
       },
     ],
     metadata: {
       qa_marker: GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER,
       source_type: extracted.source_type,
       source_page_url: pageUrl,
+      source_page_type: extracted.source_page_type,
       leadership_indicator: extracted.leadership_indicator,
+      email_classification: extracted.email_classification,
+      phone_classification: extracted.phone_classification,
+      evidence_quality_score: extracted.evidence_quality_score,
+      evidence_quality_label: extracted.evidence_quality_label,
+      evidence_quality_reasons: extracted.evidence_quality_reasons,
+      extraction_risks: extracted.extraction_risks,
+      branch_name: extracted.branch_name,
+      branch_city: extracted.branch_city,
+      branch_state: extracted.branch_state,
+      branch_phone: extracted.branch_phone,
+      location_confidence: extracted.location_confidence,
+      linkedin_company_url: extracted.linkedin_company_url,
+      linkedin_reference_label: extracted.linkedin_reference_label,
     },
   }
 }

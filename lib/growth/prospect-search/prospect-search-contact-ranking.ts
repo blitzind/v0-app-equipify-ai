@@ -43,6 +43,14 @@ export type ProspectSearchContactRankingInput = {
   relationship_strength_score?: number | null
   relationship_status?: string | null
   relationship_momentum?: string | null
+  evidence_quality_score?: number | null
+  evidence_quality_label?: string | null
+  email_classification?: string | null
+  phone_classification?: string | null
+  linkedin_reference_label?: string | null
+  branch_name?: string | null
+  branch_city?: string | null
+  branch_state?: string | null
 }
 
 export type ProspectSearchContactRankingResult = {
@@ -142,6 +150,54 @@ export function rankProspectSearchContactsForOutreach(
   if ((input.source_label ?? "").toLowerCase().includes("website")) {
     score += 0.04
     ranking_reasons.push("Website-backed evidence")
+  }
+
+  if (input.evidence_quality_label === "strong_public_evidence") {
+    score += 0.08
+    ranking_reasons.push("Strong public website evidence")
+  } else if (input.evidence_quality_label === "moderate_public_evidence") {
+    score += 0.04
+    ranking_reasons.push("Moderate public website evidence")
+  } else if (input.evidence_quality_label === "weak_public_evidence") {
+    score += 0.01
+    ranking_risks.push("Weak public evidence — verify before outreach")
+  } else if (input.evidence_quality_label === "needs_review") {
+    score -= 0.05
+    ranking_risks.push("Evidence needs operator review")
+  } else if (input.evidence_quality_label === "invalid") {
+    score -= 0.15
+    ranking_risks.push("Invalid or unreliable extraction evidence")
+  }
+
+  const genericEmailClassifications = new Set([
+    "generic_info_email",
+    "support_email",
+    "department_email",
+    "billing_email",
+  ])
+  if (
+    input.email_classification &&
+    genericEmailClassifications.has(input.email_classification)
+  ) {
+    score -= 0.04
+    ranking_reasons.push("Generic role email — lower priority but may support outreach")
+  } else if (
+    input.email_classification === "sales_email" ||
+    input.email_classification === "dispatch_email" ||
+    input.email_classification === "owner_leadership_email"
+  ) {
+    score += 0.02
+    ranking_reasons.push("Operational or leadership email classification")
+  }
+
+  if (input.linkedin_reference_label) {
+    score += 0.03
+    ranking_reasons.push("LinkedIn reference found on company website")
+  }
+
+  if (input.branch_name || input.branch_city) {
+    score += 0.03
+    ranking_reasons.push("Branch or location mapping from website")
   }
 
   if (input.company_match_confidence != null && input.company_match_confidence >= 0.7) {

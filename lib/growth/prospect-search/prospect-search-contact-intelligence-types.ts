@@ -37,6 +37,20 @@ export type ProspectSearchContactOverlay = {
   freshness_status?: string | null
   email_verification_depth?: string | null
   phone_verification_depth?: string | null
+  source_page_type?: string | null
+  email_classification?: string | null
+  phone_classification?: string | null
+  evidence_quality_score?: number | null
+  evidence_quality_label?: string | null
+  evidence_quality_reasons?: string[]
+  extraction_risks?: string[]
+  branch_name?: string | null
+  branch_city?: string | null
+  branch_state?: string | null
+  branch_phone?: string | null
+  location_confidence?: number | null
+  linkedin_company_url?: string | null
+  linkedin_reference_label?: string | null
 }
 
 export type ProspectSearchCommitteeRoleMapping = {
@@ -94,6 +108,7 @@ export type GrowthProspectSearchContactIntelligence = {
   operating_alerts?: import("@/lib/growth/prospect-search/prospect-search-revenue-operating-alerts").ProspectSearchOperatingAlertsSnapshot | null
   operator_assist?: import("@/lib/growth/prospect-search/prospect-search-operator-assist-intelligence").ProspectSearchOperatorAssistBundle | null
   command_overlays?: import("@/lib/growth/prospect-search/prospect-search-command-overlays").ProspectSearchCommandOverlaysSnapshot | null
+  website_extraction_diagnostics?: import("@/lib/growth/contact-discovery/website-extraction-acquisition-types").WebsiteExtractionDiagnosticsSnapshot | null
 }
 
 export type ProspectSearchLeadEngineContactHandoffContext = {

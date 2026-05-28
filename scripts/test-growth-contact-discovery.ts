@@ -398,6 +398,200 @@ async function main(): Promise<void> {
   assert.match(panelSource, /Decision makers/)
   assert.match(panelSource, /Research contacts/)
 
+  const {
+    GROWTH_DEEP_CONTACT_ACQUISITION_QA_MARKER,
+    GROWTH_PUBLIC_PROFILE_REFERENCE_QA_MARKER,
+    GROWTH_WEBSITE_EXTRACTION_QUALITY_QA_MARKER,
+    parseWebsiteContactAcquisitionFromMetadata,
+  } = await import("../lib/growth/contact-discovery/website-acquisition-metadata-bridge")
+  assert.equal(GROWTH_DEEP_CONTACT_ACQUISITION_QA_MARKER, "growth-deep-contact-acquisition-v1")
+  assert.equal(GROWTH_WEBSITE_EXTRACTION_QUALITY_QA_MARKER, "growth-website-extraction-quality-v1")
+  assert.equal(GROWTH_PUBLIC_PROFILE_REFERENCE_QA_MARKER, "growth-public-profile-reference-v1")
+
+  const { classifyWebsiteEmail, classifyWebsitePhone } = await import(
+    "../lib/growth/contact-discovery/website-channel-classification"
+  )
+  const salesEmail = classifyWebsiteEmail({
+    email: "sales@acme.com",
+    pageType: "contact",
+    pageText: "Contact our sales team",
+    personName: null,
+    title: null,
+  })
+  assert.equal(salesEmail.classification, "sales_email")
+  const dispatchPhone = classifyWebsitePhone({
+    phone: "(512) 555-0100",
+    pageType: "contact",
+    pageText: "Dispatch line available 24/7",
+    branchName: null,
+  })
+  assert.equal(dispatchPhone.classification, "dispatch")
+
+  const { scoreWebsiteContactEvidenceQuality } = await import(
+    "../lib/growth/contact-discovery/website-evidence-quality"
+  )
+  const quality = scoreWebsiteContactEvidenceQuality({
+    contact: {
+      full_name: "Jane Owner",
+      first_name: "Jane",
+      last_name: "Owner",
+      title: "President",
+      department: null,
+      email: "jane@acme.com",
+      phone: null,
+      linkedin_url: null,
+      source_type: "team_page",
+      source_page_type: "team",
+      source_page_url: "https://acme.com/team",
+      leadership_indicator: true,
+      source_evidence: [
+        {
+          claim: "Team member",
+          evidence: "Jane Owner, President",
+          source: "team_page",
+          page_url: "https://acme.com/team",
+        },
+      ],
+    },
+    pageType: "team",
+    companyDomain: "acme.com",
+    repeatedEvidenceCount: 1,
+  })
+  assert.ok(quality.evidence_quality_score >= 60)
+  assert.equal(quality.evidence_quality_label, "strong_public_evidence")
+
+  const { planWebsiteCrawlUrls } = await import("../lib/growth/contact-discovery/website-crawl-planner")
+  const crawlPlan = planWebsiteCrawlUrls({
+    websiteUrl: "https://acme.com",
+    homepageHtml: '<a href="/team">Team</a><a href="/contact">Contact</a>',
+    sitemapXml: "<?xml version=\"1.0\"?><urlset><loc>https://acme.com/about</loc></urlset>",
+  })
+  assert.ok(crawlPlan.some((entry) => entry.url.includes("/team")))
+  assert.ok(crawlPlan.length <= 24)
+
+  const { enrichExtractedWebsiteContacts } = await import(
+    "../lib/growth/contact-discovery/website-extraction-enrichment"
+  )
+  const enriched = enrichExtractedWebsiteContacts({
+    contacts: [
+      {
+        full_name: "Jane Owner",
+        first_name: "Jane",
+        last_name: "Owner",
+        title: "President",
+        department: null,
+        email: "jane@acme.com",
+        phone: null,
+        linkedin_url: "https://www.linkedin.com/in/jane-owner",
+        source_type: "team_page",
+        source_page_type: "team",
+        source_page_url: "https://acme.com/team",
+        leadership_indicator: true,
+        source_evidence: [
+          {
+            claim: "Team member",
+            evidence: "Jane Owner, President",
+            source: "team_page",
+            page_url: "https://acme.com/team",
+          },
+        ],
+      },
+    ],
+    companyDomain: "acme.com",
+    linkedinCompanyUrls: ["https://www.linkedin.com/company/acme"],
+  })
+  assert.equal(enriched[0]?.email_classification, "owner_leadership_email")
+  assert.ok(enriched[0]?.linkedin_reference_label?.includes("LinkedIn reference found"))
+
+  const parsed = parseWebsiteContactAcquisitionFromMetadata({
+    source_page_type: "team",
+    email_classification: "personal_email",
+    evidence_quality_label: "strong_public_evidence",
+    evidence_quality_score: 82,
+  })
+  assert.equal(parsed.source_page_type, "team")
+  assert.equal(parsed.evidence_quality_label, "strong_public_evidence")
+
+  const bridgedAcquisition = companyContactToContactInput({
+    id: "c1",
+    company_id: "co1",
+    growth_lead_id: null,
+    contact_candidate_id: null,
+    lead_decision_maker_id: null,
+    full_name: "Jane Owner",
+    first_name: "Jane",
+    last_name: "Owner",
+    title: "President",
+    department: null,
+    email: "jane@acme.com",
+    email_status: "verified",
+    phone: null,
+    phone_status: "unknown",
+    linkedin_url: null,
+    confidence_score: 88,
+    decision_maker_score: 100,
+    source_type: "team_page",
+    source_evidence: [{ claim: "President", evidence: "Team page", source: "team_page" }],
+    contact_status: "candidate",
+    last_verified_at: null,
+    dedupe_hash: "abc",
+    created_at: "",
+    updated_at: "",
+    metadata: {
+      source_page_type: "team",
+      evidence_quality_label: "strong_public_evidence",
+      evidence_quality_score: 80,
+    },
+  })
+  assert.equal(bridgedAcquisition?.source_page_type, "team")
+  assert.equal(bridgedAcquisition?.evidence_quality_label, "strong_public_evidence")
+
+  const { rankProspectSearchContactsForOutreach } = await import(
+    "../lib/growth/prospect-search/prospect-search-contact-ranking"
+  )
+  const ranked = rankProspectSearchContactsForOutreach({
+    contact_id: "c1",
+    company_id: "co1",
+    confidence_score: 0.7,
+    persona: {
+      persona_type: "decision_maker",
+      persona_label: "Decision maker",
+      icp_relevance: 0.8,
+      buying_influence: 0.7,
+      outreach_suitability: 0.6,
+      confidence: 0.7,
+      evidence: [],
+    },
+    email_eligibility: "eligible",
+    call_eligibility: "needs_review",
+    freshness_status: "fresh",
+    outreach_ready: true,
+    call_ready: false,
+    email_available: true,
+    phone_available: false,
+    evidence_quality_label: "strong_public_evidence",
+    email_classification: "generic_info_email",
+  })
+  assert.ok(ranked.ranking_reasons.some((reason) => reason.includes("Strong public website evidence")))
+  assert.ok(
+    ranked.ranking_reasons.some((reason) => reason.includes("Generic role email")),
+  )
+
+  const acquisitionPanel = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-contact-acquisition-panel.tsx"),
+    "utf8",
+  )
+  assert.match(acquisitionPanel, /GROWTH_DEEP_CONTACT_ACQUISITION_QA_MARKER/)
+  assert.match(acquisitionPanel, /GROWTH_WEBSITE_EXTRACTION_QUALITY_QA_MARKER/)
+  assert.match(acquisitionPanel, /GROWTH_PUBLIC_PROFILE_REFERENCE_QA_MARKER/)
+  assert.match(acquisitionPanel, /linkedin_reference_label/)
+
+  const evidenceDrawer = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-contact-evidence-drawer.tsx"),
+    "utf8",
+  )
+  assert.match(evidenceDrawer, /ProspectSearchContactAcquisitionPanel/)
+
   console.log("growth-contact-discovery-v1 checks passed")
 }
 

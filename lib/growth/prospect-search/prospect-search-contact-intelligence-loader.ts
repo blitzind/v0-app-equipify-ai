@@ -31,6 +31,7 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-contact-eligibility-server"
 import { loadProspectSearchSuppressionLookup } from "@/lib/growth/prospect-search/prospect-search-suppression-overlays"
 import { loadProspectSearchLeadRelationshipHydrationBatch } from "@/lib/growth/prospect-search/prospect-search-relationship-memory-loader"
+import { parseWebsiteExtractionDiagnosticsFromMetadata } from "@/lib/growth/contact-discovery/website-acquisition-metadata-bridge"
 import { normalizePhoneNumber } from "@/lib/voice/phone-normalization"
 
 function isPipelineRun(value: unknown): value is GrowthLeadEnginePipelineRun {
@@ -150,6 +151,10 @@ async function buildContactIntelligenceForCompany(
     }
   }
 
+  let website_extraction_diagnostics: ReturnType<
+    typeof parseWebsiteExtractionDiagnosticsFromMetadata
+  > = null
+
   if (await isGrowthCompanyContactsSchemaReady(admin)) {
     try {
       const companyContacts = await listCompanyContacts(admin, input.id)
@@ -160,6 +165,11 @@ async function buildContactIntelligenceForCompany(
       for (const contact of companyContacts) {
         const mapped = companyContactToContactInput(contact)
         if (mapped) contacts.push(mapped)
+        if (!website_extraction_diagnostics) {
+          website_extraction_diagnostics = parseWebsiteExtractionDiagnosticsFromMetadata(
+            contact.metadata,
+          )
+        }
       }
       if (companyContacts.length > 0) {
         const coverage = computeCompanyContactCoverage(companyContacts)
@@ -196,6 +206,7 @@ async function buildContactIntelligenceForCompany(
     primary_contact_id,
     recommended_contact_id,
     company_suppressed: input.is_suppressed === true,
+    website_extraction_diagnostics,
   })
 }
 

@@ -4,6 +4,12 @@ import type {
   GrowthCompanyContactEvidence,
   GrowthCompanyContactSourceType,
 } from "@/lib/growth/contact-discovery/company-contact-types"
+import type {
+  WebsiteEmailClassification,
+  WebsiteEvidenceQualityLabel,
+  WebsitePageType,
+  WebsitePhoneClassification,
+} from "@/lib/growth/contact-discovery/website-extraction-acquisition-types"
 
 export type ExtractedWebsiteContact = {
   full_name: string
@@ -11,12 +17,30 @@ export type ExtractedWebsiteContact = {
   last_name: string | null
   title: string | null
   department: string | null
+  department_label: string | null
   email: string | null
   phone: string | null
   linkedin_url: string | null
+  linkedin_company_url: string | null
   source_type: GrowthCompanyContactSourceType
   source_evidence: GrowthCompanyContactEvidence[]
   leadership_indicator: boolean
+  source_page_type: WebsitePageType | null
+  source_page_url: string | null
+  email_classification: WebsiteEmailClassification | null
+  phone_classification: WebsitePhoneClassification | null
+  email_classification_confidence: number | null
+  phone_classification_confidence: number | null
+  evidence_quality_score: number | null
+  evidence_quality_label: WebsiteEvidenceQualityLabel | null
+  evidence_quality_reasons: string[]
+  extraction_risks: string[]
+  branch_name: string | null
+  branch_city: string | null
+  branch_state: string | null
+  branch_phone: string | null
+  location_confidence: number | null
+  linkedin_reference_label: string | null
 }
 
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi
@@ -106,5 +130,109 @@ export function readHeadingAndSubheading(block: string): { name: string | null; 
 
 export function leadershipIndicatorFromTitle(title: string | null): boolean {
   if (!title) return false
-  return /\b(ceo|owner|president|founder|director|vp|vice president|chief|manager)\b/i.test(title)
+  return /\b(ceo|owner|president|founder|director|vp|vice president|chief|manager|operations)\b/i.test(title)
+}
+
+export function inferDepartmentLabelFromTitle(title: string | null, pageText?: string): string | null {
+  const combined = `${title ?? ""} ${pageText ?? ""}`.toLowerCase()
+  if (/\bdispatch\b/.test(combined)) return "Dispatch"
+  if (/\bservice department\b|\bservice manager\b/.test(combined)) return "Service"
+  if (/\bsales\b/.test(combined)) return "Sales"
+  if (/\bsupport\b/.test(combined)) return "Support"
+  if (/\boperations\b/.test(combined)) return "Operations"
+  if (/\boffice\b/.test(combined)) return "Office"
+  return null
+}
+
+const SECTION_HEADING_RE =
+  /(?:meet the team|our team|leadership|our staff|management team|service department|dispatch|contact us|locations|our locations)/i
+
+export function extractSectionBlocks(html: string): string[] {
+  const blocks = extractCardBlocks(html)
+  if (blocks.length > 0) return blocks
+  const sections: string[] = []
+  for (const match of html.matchAll(/<(?:section|div)[^>]*>([\s\S]{0,4000}?)<\/(?:section|div)>/gi)) {
+    const block = match[1] ?? ""
+    if (SECTION_HEADING_RE.test(block)) sections.push(block)
+  }
+  return sections
+}
+
+export function extractBranchLocationFromPage(plainText: string): {
+  branch_name: string | null
+  branch_city: string | null
+  branch_state: string | null
+  location_confidence: number
+} {
+  const branchMatch = plainText.match(
+    /(?:branch|location|office)\s*(?:in|:|-)?\s*([A-Za-z][A-Za-z\s.'-]{2,40})(?:,\s*([A-Z]{2}))?/i,
+  )
+  const cityStateMatch = plainText.match(/\b([A-Za-z][A-Za-z\s.'-]{2,30}),\s*([A-Z]{2})\b/)
+  if (branchMatch) {
+    return {
+      branch_name: branchMatch[0]?.trim() ?? null,
+      branch_city: branchMatch[1]?.trim() ?? cityStateMatch?.[1]?.trim() ?? null,
+      branch_state: branchMatch[2]?.trim() ?? cityStateMatch?.[2]?.trim() ?? null,
+      location_confidence: 0.72,
+    }
+  }
+  if (cityStateMatch) {
+    return {
+      branch_name: null,
+      branch_city: cityStateMatch[1]?.trim() ?? null,
+      branch_state: cityStateMatch[2]?.trim() ?? null,
+      location_confidence: 0.55,
+    }
+  }
+  return { branch_name: null, branch_city: null, branch_state: null, location_confidence: 0 }
+}
+
+export function baseExtractedContact(
+  partial: Omit<
+    ExtractedWebsiteContact,
+    | "source_page_type"
+    | "source_page_url"
+    | "email_classification"
+    | "phone_classification"
+    | "email_classification_confidence"
+    | "phone_classification_confidence"
+    | "evidence_quality_score"
+    | "evidence_quality_label"
+    | "evidence_quality_reasons"
+    | "extraction_risks"
+    | "branch_name"
+    | "branch_city"
+    | "branch_state"
+    | "branch_phone"
+    | "location_confidence"
+    | "linkedin_company_url"
+    | "linkedin_reference_label"
+    | "department_label"
+  > & {
+    source_page_type?: WebsitePageType | null
+    source_page_url?: string | null
+    department_label?: string | null
+  },
+): ExtractedWebsiteContact {
+  return {
+    department_label: partial.department_label ?? partial.department,
+    source_page_type: partial.source_page_type ?? null,
+    source_page_url: partial.source_page_url ?? partial.source_evidence[0]?.page_url ?? null,
+    email_classification: null,
+    phone_classification: null,
+    email_classification_confidence: null,
+    phone_classification_confidence: null,
+    evidence_quality_score: null,
+    evidence_quality_label: null,
+    evidence_quality_reasons: [],
+    extraction_risks: [],
+    branch_name: null,
+    branch_city: null,
+    branch_state: null,
+    branch_phone: null,
+    location_confidence: null,
+    linkedin_company_url: null,
+    linkedin_reference_label: null,
+    ...partial,
+  }
 }

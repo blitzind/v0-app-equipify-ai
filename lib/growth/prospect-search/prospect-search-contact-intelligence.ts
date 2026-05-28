@@ -17,6 +17,7 @@ import {
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import { mergeProspectSearchContactInputs } from "@/lib/growth/prospect-search/prospect-search-contact-merge"
 import { computeProspectSearchContactOutreachReadiness } from "@/lib/growth/prospect-search/prospect-search-contact-readiness"
+import { parseWebsiteContactAcquisitionFromMetadata } from "@/lib/growth/contact-discovery/website-acquisition-metadata-bridge"
 
 export const MAX_CONTACT_CONFIDENCE_RANK_BOOST = 0.05
 
@@ -39,6 +40,20 @@ export type ProspectSearchContactIntelligenceInputContact = {
   last_verified_at?: string | null
   email_status?: string | null
   phone_status?: string | null
+  source_page_type?: string | null
+  email_classification?: string | null
+  phone_classification?: string | null
+  evidence_quality_score?: number | null
+  evidence_quality_label?: string | null
+  evidence_quality_reasons?: string[]
+  extraction_risks?: string[]
+  branch_name?: string | null
+  branch_city?: string | null
+  branch_state?: string | null
+  branch_phone?: string | null
+  location_confidence?: number | null
+  linkedin_company_url?: string | null
+  linkedin_reference_label?: string | null
 }
 
 function normalizeName(name: string): string {
@@ -184,6 +199,11 @@ export function contactDiscoveryCandidateToInput(
     .filter((item) => item.claim && item.evidence)
   if (source_evidence.length === 0) return null
 
+  const acquisition = parseWebsiteContactAcquisitionFromMetadata(
+    contact.metadata ?? null,
+    contact.linkedin_url,
+  )
+
   return {
     id: contact.id,
     full_name,
@@ -195,10 +215,25 @@ export function contactDiscoveryCandidateToInput(
     role_type: committeeRole ?? null,
     source_evidence,
     source_page_url:
-      typeof contact.metadata?.source_page_url === "string" ? contact.metadata.source_page_url : null,
+      acquisition.source_page_url ??
+      (typeof contact.metadata?.source_page_url === "string" ? contact.metadata.source_page_url : null),
     last_checked_at: contact.updated_at ?? null,
     verification_status: contact.verification_state,
     discovery_sources: [contact.provider_type, contact.provider_name],
+    source_page_type: acquisition.source_page_type ?? null,
+    email_classification: acquisition.email_classification ?? null,
+    phone_classification: acquisition.phone_classification ?? null,
+    evidence_quality_score: acquisition.evidence_quality_score ?? null,
+    evidence_quality_label: acquisition.evidence_quality_label ?? null,
+    evidence_quality_reasons: acquisition.evidence_quality_reasons ?? [],
+    extraction_risks: acquisition.extraction_risks ?? [],
+    branch_name: acquisition.branch_name ?? null,
+    branch_city: acquisition.branch_city ?? null,
+    branch_state: acquisition.branch_state ?? null,
+    branch_phone: acquisition.branch_phone ?? null,
+    location_confidence: acquisition.location_confidence ?? null,
+    linkedin_company_url: acquisition.linkedin_company_url ?? null,
+    linkedin_reference_label: acquisition.linkedin_reference_label ?? null,
   }
 }
 
@@ -239,6 +274,24 @@ function toOverlay(
   if (contact.discovered_at) overlay.discovered_at = contact.discovered_at
   if (contact.last_verified_at) overlay.last_verified_at = contact.last_verified_at
   if (contact.last_checked_at) overlay.source_last_seen_at = contact.last_checked_at
+  if (contact.source_page_type) overlay.source_page_type = contact.source_page_type
+  if (contact.email_classification) overlay.email_classification = contact.email_classification
+  if (contact.phone_classification) overlay.phone_classification = contact.phone_classification
+  if (contact.evidence_quality_score != null) {
+    overlay.evidence_quality_score = contact.evidence_quality_score
+  }
+  if (contact.evidence_quality_label) overlay.evidence_quality_label = contact.evidence_quality_label
+  if (contact.evidence_quality_reasons?.length) {
+    overlay.evidence_quality_reasons = contact.evidence_quality_reasons
+  }
+  if (contact.extraction_risks?.length) overlay.extraction_risks = contact.extraction_risks
+  if (contact.branch_name) overlay.branch_name = contact.branch_name
+  if (contact.branch_city) overlay.branch_city = contact.branch_city
+  if (contact.branch_state) overlay.branch_state = contact.branch_state
+  if (contact.branch_phone) overlay.branch_phone = contact.branch_phone
+  if (contact.location_confidence != null) overlay.location_confidence = contact.location_confidence
+  if (contact.linkedin_company_url) overlay.linkedin_company_url = contact.linkedin_company_url
+  if (contact.linkedin_reference_label) overlay.linkedin_reference_label = contact.linkedin_reference_label
   return overlay
 }
 
@@ -364,6 +417,7 @@ export function buildProspectSearchContactIntelligence(input: {
   recommended_contact_id?: string | null
   schema_health?: import("@/lib/growth/schema-health/growth-schema-health-types").GrowthSchemaHealthSummary | null
   company_suppressed?: boolean
+  website_extraction_diagnostics?: import("@/lib/growth/contact-discovery/website-extraction-acquisition-types").WebsiteExtractionDiagnosticsSnapshot | null
 }): GrowthProspectSearchContactIntelligence {
   const schema_ready = input.schema_ready ?? true
   const evidenceBacked = dedupeContacts(input.contacts.filter(hasEvidence))
@@ -427,6 +481,7 @@ export function buildProspectSearchContactIntelligence(input: {
     primary_contact_id: input.primary_contact_id ?? null,
     recommended_contact_id: input.recommended_contact_id ?? null,
     schema_health: input.schema_health ?? null,
+    website_extraction_diagnostics: input.website_extraction_diagnostics ?? null,
   }
 }
 

@@ -1,4 +1,5 @@
 import {
+  baseExtractedContact,
   dedupeExtractedContacts,
   evidenceFromPage,
   extractEmails,
@@ -47,17 +48,20 @@ function personFromNode(node: Record<string, unknown>, pageUrl: string): Extract
         ? extractLinkedInUrls(node.sameAs.filter((item) => typeof item === "string").join(" "))[0] ?? null
         : extractLinkedInUrls(JSON.stringify(node))[0] ?? null
   const { first_name, last_name } = splitName(full_name)
-  return {
+  return baseExtractedContact({
     full_name,
     first_name,
     last_name,
     title,
     department: typeof node.worksFor === "string" ? node.worksFor : null,
+    department_label: null,
     email,
     phone,
     linkedin_url,
     source_type: "website",
     leadership_indicator: leadershipIndicatorFromTitle(title),
+    source_page_type: "schema_org",
+    source_page_url: pageUrl,
     source_evidence: [
       evidenceFromPage({
         claim: `schema.org Person: ${full_name}${title ? ` — ${title}` : ""}`,
@@ -66,7 +70,7 @@ function personFromNode(node: Record<string, unknown>, pageUrl: string): Extract
         page_url: pageUrl,
       }),
     ],
-  }
+  })
 }
 
 export function extractSchemaOrgPersonContacts(html: string, pageUrl: string): ExtractedWebsiteContact[] {

@@ -99,6 +99,11 @@ export { GROWTH_OPPORTUNITY_EMERGENCE_QA_MARKER } from "@/lib/growth/prospect-se
 export { GROWTH_SEQUENCE_READINESS_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-sequence-readiness"
 export { GROWTH_REVENUE_OPERATING_ALERTS_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-revenue-operating-alerts"
 export {
+  GROWTH_DEEP_CONTACT_ACQUISITION_QA_MARKER,
+  GROWTH_PUBLIC_PROFILE_REFERENCE_QA_MARKER,
+  GROWTH_WEBSITE_EXTRACTION_QUALITY_QA_MARKER,
+} from "@/lib/growth/contact-discovery/website-acquisition-metadata-bridge"
+export {
   enrichPeopleRowsWithRelationshipMemory,
 } from "@/lib/growth/prospect-search/prospect-search-relationship-intelligence"
 
@@ -182,6 +187,20 @@ export type GrowthProspectSearchPeopleResultRow = GrowthProspectSearchPersonResu
   relationship_strength_score: number
   relationship_last_interaction_at: string | null
   relationship_summary: string | null
+  source_page_type: string | null
+  email_classification: string | null
+  phone_classification: string | null
+  evidence_quality_score: number | null
+  evidence_quality_label: string | null
+  evidence_quality_reasons: string[]
+  extraction_risks: string[]
+  branch_name: string | null
+  branch_city: string | null
+  branch_state: string | null
+  branch_phone: string | null
+  location_confidence: number | null
+  linkedin_company_url: string | null
+  linkedin_reference_label: string | null
 }
 
 export type ProspectSearchPeopleTimelineEvent = {
@@ -530,6 +549,14 @@ export function enrichProspectSearchPeopleRowsWithRanking(
       relationship_strength_score: memory?.relationship_strength_score ?? null,
       relationship_status: memory?.relationship_status ?? null,
       relationship_momentum: memory?.momentum_direction ?? null,
+      evidence_quality_score: row.evidence_quality_score,
+      evidence_quality_label: row.evidence_quality_label,
+      email_classification: row.email_classification,
+      phone_classification: row.phone_classification,
+      linkedin_reference_label: row.linkedin_reference_label,
+      branch_name: row.branch_name,
+      branch_city: row.branch_city,
+      branch_state: row.branch_state,
     }
   })
 
@@ -975,6 +1002,20 @@ function buildProspectSearchPeopleRowDraft(input: {
     relationship_strength_score: 0,
     relationship_last_interaction_at: null,
     relationship_summary: null,
+    source_page_type: contact.source_page_type ?? null,
+    email_classification: contact.email_classification ?? null,
+    phone_classification: contact.phone_classification ?? null,
+    evidence_quality_score: contact.evidence_quality_score ?? null,
+    evidence_quality_label: contact.evidence_quality_label ?? null,
+    evidence_quality_reasons: contact.evidence_quality_reasons ?? [],
+    extraction_risks: contact.extraction_risks ?? [],
+    branch_name: contact.branch_name ?? null,
+    branch_city: contact.branch_city ?? null,
+    branch_state: contact.branch_state ?? null,
+    branch_phone: contact.branch_phone ?? null,
+    location_confidence: contact.location_confidence ?? null,
+    linkedin_company_url: contact.linkedin_company_url ?? null,
+    linkedin_reference_label: contact.linkedin_reference_label ?? null,
     timeline_events: buildProspectSearchPeopleTimelineEvents({
       contact,
       company,
@@ -1213,6 +1254,20 @@ export function mergeProspectSearchPeopleResults(
       relationship_strength_score: 0,
       relationship_last_interaction_at: null,
       relationship_summary: null,
+      source_page_type: null,
+      email_classification: null,
+      phone_classification: null,
+      evidence_quality_score: null,
+      evidence_quality_label: null,
+      evidence_quality_reasons: [],
+      extraction_risks: [],
+      branch_name: null,
+      branch_city: null,
+      branch_state: null,
+      branch_phone: null,
+      location_confidence: null,
+      linkedin_company_url: null,
+      linkedin_reference_label: null,
       timeline_events: [
         {
           id: "discovered-server",
