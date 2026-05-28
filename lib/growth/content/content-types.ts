@@ -2,6 +2,9 @@
 
 export const GROWTH_TEMPLATE_SNIPPET_SYSTEM_QA_MARKER = "growth-template-snippet-system-v1" as const
 
+export const GROWTH_CONTENT_LIBRARY_LAYOUT_ALIGNED_QA_MARKER =
+  "growth-content-library-layout-aligned-v1" as const
+
 export const GROWTH_CONTENT_PRIVACY_NOTE =
   "Content library is platform-admin only. Templates require approval before live send — no autonomous sending, no unapproved promotion, no secrets, no unsafe merge fields."
 

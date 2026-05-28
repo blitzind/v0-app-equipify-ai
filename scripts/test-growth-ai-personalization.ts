@@ -24,6 +24,7 @@ import {
 } from "../lib/growth/personalization/personalization-validator"
 import { computeAttributionScore } from "../lib/growth/personalization/personalization-attribution"
 import {
+  GROWTH_AI_PERSONALIZATION_LAYOUT_ALIGNED_QA_MARKER,
   GROWTH_AI_PERSONALIZATION_PRIVACY_NOTE,
   GROWTH_AI_PERSONALIZATION_QA_MARKER,
   GROWTH_PERSONALIZATION_FEEDBACK_TYPES,
@@ -151,8 +152,15 @@ async function main(): Promise<void> {
   const navSource = readSource("lib/growth/navigation/growth-navigation-destinations.ts")
   assert.match(navSource, /copilot\/personalization/)
 
+  const pageSource = readSource("app/(admin)/admin/growth/copilot/personalization/page.tsx")
+  assert.match(pageSource, /GROWTH_AI_PERSONALIZATION_LAYOUT_ALIGNED_QA_MARKER/)
+  assert.match(pageSource, /GrowthSectionLayout/)
+  assert.match(pageSource, /max-w-7xl/)
+  assert.match(pageSource, /data-qa=\{GROWTH_AI_PERSONALIZATION_LAYOUT_ALIGNED_QA_MARKER\}/)
+
   const uiSource = readSource("components/growth/growth-ai-personalization-dashboard.tsx")
   assert.match(uiSource, /GROWTH_AI_PERSONALIZATION_QA_MARKER/)
+  assert.match(uiSource, /GROWTH_AI_PERSONALIZATION_LAYOUT_ALIGNED_QA_MARKER/)
   assert.match(uiSource, /humanApprovalConfirmed/)
 
   console.log("growth-ai-personalization: all checks passed")

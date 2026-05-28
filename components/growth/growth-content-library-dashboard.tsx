@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import {
   contentStatusLabel,
+  GROWTH_CONTENT_LIBRARY_LAYOUT_ALIGNED_QA_MARKER,
   GROWTH_CONTENT_PRIVACY_NOTE,
   GROWTH_CONTENT_SNIPPET_CATEGORIES,
   GROWTH_CONTENT_TEMPLATE_TYPES,
@@ -174,7 +175,10 @@ export function GrowthContentLibraryDashboardView() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div
+      className="flex min-w-0 flex-col gap-5"
+      data-qa={GROWTH_CONTENT_LIBRARY_LAYOUT_ALIGNED_QA_MARKER}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
           {GROWTH_TEMPLATE_SNIPPET_SYSTEM_QA_MARKER} · {GROWTH_CONTENT_PRIVACY_NOTE}
@@ -203,7 +207,7 @@ export function GrowthContentLibraryDashboardView() {
 
       {dashboard ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <StatTile label="Approved Templates" value={String(dashboard.approvedTemplates)} />
             <StatTile label="Pending Review" value={String(dashboard.pendingReview)} />
             <StatTile label="Drafts" value={String(dashboard.drafts)} />

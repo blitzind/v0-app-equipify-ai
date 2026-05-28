@@ -2,6 +2,9 @@
 
 export const GROWTH_AI_PERSONALIZATION_QA_MARKER = "growth-ai-personalization-v1" as const
 
+export const GROWTH_AI_PERSONALIZATION_LAYOUT_ALIGNED_QA_MARKER =
+  "growth-ai-personalization-layout-aligned-v1" as const
+
 export const GROWTH_AI_PERSONALIZATION_PRIVACY_NOTE =
   "AI personalization is evidence-backed and human-gated only. No autonomous sends, no autonomous approval, no hallucinated company facts, no unsupported claims, no hidden AI generation, no compliance bypass."
 

@@ -23,6 +23,7 @@ import {
   DEFAULT_CONTENT_VARIABLE_SEED,
 } from "../lib/growth/content/variable-registry"
 import {
+  GROWTH_CONTENT_LIBRARY_LAYOUT_ALIGNED_QA_MARKER,
   GROWTH_CONTENT_PRIVACY_NOTE,
   GROWTH_CONTENT_SNIPPET_CATEGORIES,
   GROWTH_CONTENT_STATUSES,
@@ -40,6 +41,7 @@ function readSource(relativePath: string): string {
 
 async function main(): Promise<void> {
   assert.equal(GROWTH_TEMPLATE_SNIPPET_SYSTEM_QA_MARKER, "growth-template-snippet-system-v1")
+  assert.equal(GROWTH_CONTENT_LIBRARY_LAYOUT_ALIGNED_QA_MARKER, "growth-content-library-layout-aligned-v1")
   assert.match(GROWTH_CONTENT_PRIVACY_NOTE, /require approval before live send/i)
   assert.match(GROWTH_CONTENT_PRIVACY_NOTE, /no autonomous sending/i)
   assert.match(GROWTH_CONTENT_PRIVACY_NOTE, /no unsafe merge fields/i)
@@ -146,6 +148,15 @@ async function main(): Promise<void> {
 
   const experimentSource = readSource("lib/growth/experiments/experiment-types.ts")
   assert.match(experimentSource, /contentTemplateVersionId/)
+
+  const pageSource = readSource("app/(admin)/admin/growth/copilot/content-library/page.tsx")
+  assert.match(pageSource, /GROWTH_CONTENT_LIBRARY_LAYOUT_ALIGNED_QA_MARKER/)
+  assert.match(pageSource, /GrowthSectionLayout/)
+  assert.match(pageSource, /max-w-7xl/)
+  assert.match(pageSource, /data-qa=\{GROWTH_CONTENT_LIBRARY_LAYOUT_ALIGNED_QA_MARKER\}/)
+
+  const dashboardSource = readSource("components/growth/growth-content-library-dashboard.tsx")
+  assert.match(dashboardSource, /GROWTH_CONTENT_LIBRARY_LAYOUT_ALIGNED_QA_MARKER/)
 
   console.log("growth content library checks passed")
 }

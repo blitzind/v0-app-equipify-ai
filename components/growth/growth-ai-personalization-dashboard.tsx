@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import {
+  GROWTH_AI_PERSONALIZATION_LAYOUT_ALIGNED_QA_MARKER,
   GROWTH_AI_PERSONALIZATION_PRIVACY_NOTE,
   GROWTH_AI_PERSONALIZATION_QA_MARKER,
   personalizationSourceLabel,
@@ -210,7 +211,10 @@ export function GrowthAiPersonalizationDashboardView() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div
+      className="flex min-w-0 flex-col gap-5"
+      data-qa={GROWTH_AI_PERSONALIZATION_LAYOUT_ALIGNED_QA_MARKER}
+    >
       <GrowthEngineCard title="AI Prospect Personalization" icon={<Sparkles className="size-4" />}>
         <p className="mb-4 text-xs text-muted-foreground">{GROWTH_AI_PERSONALIZATION_PRIVACY_NOTE}</p>
         <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -276,7 +280,7 @@ export function GrowthAiPersonalizationDashboardView() {
         ))}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-4">
           {tab === "generations" ? (
             <GrowthEngineCard title="Generations">
