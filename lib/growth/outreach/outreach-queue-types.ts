@@ -22,6 +22,7 @@ export const GROWTH_OUTREACH_QUEUE_STATUSES = [
   "executed",
   "failed",
   "cancelled",
+  "dead_letter",
 ] as const
 export type GrowthOutreachQueueStatus = (typeof GROWTH_OUTREACH_QUEUE_STATUSES)[number]
 
@@ -37,6 +38,9 @@ export const GROWTH_OUTREACH_QUEUE_EVENT_TYPES = [
   "executed",
   "failed",
   "cancelled",
+  "replay_requested",
+  "dead_lettered",
+  "retry_scheduled",
 ] as const
 export type GrowthOutreachQueueEventType = (typeof GROWTH_OUTREACH_QUEUE_EVENT_TYPES)[number]
 
@@ -79,6 +83,12 @@ export type GrowthOutreachQueueItem = {
   parentQueueId: string | null
   sequencePatternId: string | null
   sequenceEnrollmentStepId: string | null
+  retryCount: number
+  failureClass: string | null
+  deadLetterAt: string | null
+  lastRetryAt: string | null
+  processingStartedAt: string | null
+  deliveryAttemptId: string | null
   createdBy: string | null
   cancelledAt: string | null
   cancelledBy: string | null

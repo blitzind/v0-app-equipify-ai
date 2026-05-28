@@ -100,8 +100,13 @@ export type GrowthProviderAdapter = {
 
 export type GrowthDeliveryAttempt = {
   id: string
-  provider_id: string
-  sender_account_id: string
+  provider_id: string | null
+  sender_account_id: string | null
+  provider_connection_id?: string | null
+  outreach_queue_id?: string | null
+  failure_class?: string | null
+  latency_ms?: number | null
+  send_plane?: "transport" | "adapter"
   lead_id: string | null
   sequence_enrollment_id: string | null
   channel: GrowthTransportChannel

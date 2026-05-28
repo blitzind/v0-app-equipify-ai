@@ -40,8 +40,13 @@ function rateLimitsTable(admin: SupabaseClient) {
 function mapAttempt(row: Row): GrowthDeliveryAttempt {
   return {
     id: asString(row.id),
-    provider_id: asString(row.provider_id),
-    sender_account_id: asString(row.sender_account_id),
+    provider_id: asString(row.provider_id) || null,
+    sender_account_id: asString(row.sender_account_id) || null,
+    provider_connection_id: asString(row.provider_connection_id) || null,
+    outreach_queue_id: asString(row.outreach_queue_id) || null,
+    failure_class: asString(row.failure_class) || null,
+    latency_ms: row.latency_ms == null ? null : asNumber(row.latency_ms),
+    send_plane: (asString(row.send_plane) || "transport") as GrowthDeliveryAttempt["send_plane"],
     lead_id: asString(row.lead_id) || null,
     sequence_enrollment_id: asString(row.sequence_enrollment_id) || null,
     channel: "email",
@@ -96,28 +101,35 @@ export async function getDeliveryAttempt(admin: SupabaseClient, attemptId: strin
 export async function createDeliveryAttempt(
   admin: SupabaseClient,
   input: {
-    provider_id: string
-    sender_account_id: string
+    provider_id?: string | null
+    sender_account_id?: string | null
     lead_id?: string | null
     sequence_enrollment_id?: string | null
     metadata?: Record<string, unknown>
   },
 ): Promise<GrowthDeliveryAttempt> {
   const now = new Date().toISOString()
-  const { data, error } = await attemptsTable(admin)
-    .insert({
-      provider_id: input.provider_id,
-      sender_account_id: input.sender_account_id,
-      lead_id: input.lead_id ?? null,
-      sequence_enrollment_id: input.sequence_enrollment_id ?? null,
-      channel: "email",
-      status: "queued",
-      queued_at: now,
-      metadata: input.metadata ?? {},
-      created_at: now,
-    })
-    .select("*")
-    .single()
+  const sendPlane = input.metadata?.send_plane === "adapter" ? "adapter" : "transport"
+  const row: Record<string, unknown> = {
+    lead_id: input.lead_id ?? null,
+    sequence_enrollment_id: input.sequence_enrollment_id ?? null,
+    channel: "email",
+    status: "queued",
+    queued_at: now,
+    metadata: input.metadata ?? {},
+    created_at: now,
+    send_plane: sendPlane,
+  }
+  if (input.provider_id) row.provider_id = input.provider_id
+  if (input.sender_account_id) row.sender_account_id = input.sender_account_id
+  if (input.metadata?.provider_connection_id) {
+    row.provider_connection_id = input.metadata.provider_connection_id
+  }
+  if (input.metadata?.outreach_queue_id) {
+    row.outreach_queue_id = input.metadata.outreach_queue_id
+  }
+
+  const { data, error } = await attemptsTable(admin).insert(row).select("*").single()
 
   if (error) throw new Error(error.message)
   return mapAttempt(data as Row)

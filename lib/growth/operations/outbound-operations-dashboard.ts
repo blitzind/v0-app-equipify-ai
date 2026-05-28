@@ -3,6 +3,13 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { buildGrowthInfrastructureReadinessCatalog } from "@/lib/growth/infrastructure/infrastructure-readiness"
 import { GROWTH_INFRASTRUCTURE_READINESS_QA_MARKER } from "@/lib/growth/infrastructure/infrastructure-readiness-types"
+import { listOutreachQueueRecoveryItems } from "@/lib/growth/outreach/outreach-queue-recovery"
+import {
+  GROWTH_OUTBOUND_RELIABILITY_H2_QA_MARKER,
+  type GrowthOutreachQueueRecoveryItem,
+  type GrowthOutboundQueueHealthAlert,
+} from "@/lib/growth/outbound/outbound-reliability-types"
+import { evaluateOutboundQueueHealthAlerts } from "@/lib/growth/operations/outbound-queue-health-alerts"
 import { listProviderConnectionSettingsRows } from "@/lib/growth/provider-setup/dashboard"
 import { collectGrowthRuntimeDiagnostics } from "@/lib/growth/runtime/runtime-guards"
 import {
@@ -19,6 +26,7 @@ import { GROWTH_CRON_ROUTE_IDS } from "@/lib/growth/runtime/cron-telemetry-types
 
 export type GrowthOutboundOperationsDashboard = {
   qa_marker: typeof GROWTH_CRON_TELEMETRY_QA_MARKER
+  h2_qa_marker: typeof GROWTH_OUTBOUND_RELIABILITY_H2_QA_MARKER
   generated_at: string
   runtime: ReturnType<typeof collectGrowthRuntimeDiagnostics>
   cron_routes: Awaited<ReturnType<typeof summarizeGrowthCronRouteHealth>>
@@ -28,7 +36,10 @@ export type GrowthOutboundOperationsDashboard = {
     approved: number
     scheduled: number
     failed: number
+    dead_letter: number
     executed_24h: number
+    overdue_scheduled: number
+    stuck_processing: number
   }
   sequence_jobs: {
     pending_approval: number
@@ -39,7 +50,10 @@ export type GrowthOutboundOperationsDashboard = {
     failed_attempts_24h: number
     simulated_attempts_24h: number
     sent_attempts_24h: number
+    adapter_attempts_24h: number
   }
+  recovery_queue: GrowthOutreachQueueRecoveryItem[]
+  queue_health_alerts: GrowthOutboundQueueHealthAlert[]
   webhooks: {
     events_24h: number
     failed_processing_24h: number
@@ -101,7 +115,10 @@ export async function fetchGrowthOutboundOperationsDashboard(
     approvedQueue,
     scheduledQueue,
     failedQueue,
+    deadLetterQueue,
     executed24h,
+    overdueScheduled,
+    stuckProcessing,
     seqPending,
     seqApprovedDue,
     seqFailed24h,
@@ -121,7 +138,25 @@ export async function fetchGrowthOutboundOperationsDashboard(
     countOutreach(admin, "approved"),
     countOutreach(admin, "scheduled"),
     countOutreach(admin, "failed"),
+    countOutreach(admin, "dead_letter"),
     countOutreach(admin, "executed", since24h),
+    admin
+      .schema("growth")
+      .from("outreach_queue")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "scheduled")
+      .lte("scheduled_for", new Date(Date.now() - 30 * 60 * 1000).toISOString())
+      .then((res) => res.count ?? 0)
+      .catch(() => 0),
+    admin
+      .schema("growth")
+      .from("outreach_queue")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "approved")
+      .not("processing_started_at", "is", null)
+      .lte("processing_started_at", new Date(Date.now() - 20 * 60 * 1000).toISOString())
+      .then((res) => res.count ?? 0)
+      .catch(() => 0),
     countTable(admin, "sequence_execution_jobs", (q) => q.eq("status", "pending_approval")),
     countTable(admin, "sequence_execution_jobs", (q) =>
       q.eq("status", "approved").lte("scheduled_for", new Date().toISOString()),
@@ -148,8 +183,17 @@ export async function fetchGrowthOutboundOperationsDashboard(
     .gte("created_at", since24h)
     .contains("metadata", { simulated: true })
 
+  const [recoveryQueue, queueAlerts, adapterAttempts24h] = await Promise.all([
+    listOutreachQueueRecoveryItems(admin, 12).catch(() => []),
+    evaluateOutboundQueueHealthAlerts(admin).catch(() => []),
+    countTable(admin, "delivery_attempts", (q) =>
+      q.eq("send_plane", "adapter").gte("created_at", since24h),
+    ).catch(() => 0),
+  ])
+
   return {
     qa_marker: GROWTH_CRON_TELEMETRY_QA_MARKER,
+    h2_qa_marker: GROWTH_OUTBOUND_RELIABILITY_H2_QA_MARKER,
     generated_at: new Date().toISOString(),
     runtime: collectGrowthRuntimeDiagnostics(),
     cron_routes: cronRoutes,
@@ -159,7 +203,10 @@ export async function fetchGrowthOutboundOperationsDashboard(
       approved: approvedQueue,
       scheduled: scheduledQueue,
       failed: failedQueue,
+      dead_letter: deadLetterQueue,
       executed_24h: executed24h,
+      overdue_scheduled: overdueScheduled,
+      stuck_processing: stuckProcessing,
     },
     sequence_jobs: {
       pending_approval: seqPending,
@@ -170,7 +217,10 @@ export async function fetchGrowthOutboundOperationsDashboard(
       failed_attempts_24h: transportFailed24h,
       simulated_attempts_24h: simulatedCount ?? 0,
       sent_attempts_24h: transportSent24h,
+      adapter_attempts_24h: adapterAttempts24h,
     },
+    recovery_queue: recoveryQueue,
+    queue_health_alerts: queueAlerts,
     webhooks: {
       events_24h: webhookEvents24h,
       failed_processing_24h: webhookFailed24h,

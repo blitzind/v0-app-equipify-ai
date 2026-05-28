@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase/admin"
+import { runOutboundQueueHealthAlertScan } from "@/lib/growth/operations/outbound-queue-health-alerts"
 import { runDueScheduledOutreachExecutions } from "@/lib/growth/outreach/run-outreach-queue"
 import { runGrowthCronJob } from "@/lib/growth/runtime/growth-cron-runner"
 import { growthCronApiPath } from "@/lib/growth/runtime/cron-telemetry-types"
@@ -11,12 +12,22 @@ export async function POST(request: Request) {
   const admin = createServiceRoleClient()
   return runGrowthCronJob(
     { cronRoute: CRON_ROUTE, category: "outbound", request, admin },
-    () =>
-      runDueScheduledOutreachExecutions(admin, {
+    async () => {
+      const execution = await runDueScheduledOutreachExecutions(admin, {
         actingUserId: "system",
         actingUserEmail: "cron@growth.equipify.internal",
         limit: 25,
-      }),
-    (result) => ({ processedCount: result.executed, failedCount: result.failed }),
+      })
+      const alerts = await runOutboundQueueHealthAlertScan(admin).catch(() => ({
+        alerts: [],
+        emitted: 0,
+      }))
+      return { ...execution, alerts_emitted: alerts.emitted }
+    },
+    (result) => ({
+      processedCount: result.executed,
+      failedCount: result.failed,
+      metadata: { alerts_emitted: result.alerts_emitted },
+    }),
   )
 }

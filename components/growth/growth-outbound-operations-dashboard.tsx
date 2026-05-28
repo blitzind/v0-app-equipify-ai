@@ -10,6 +10,7 @@ import {
   GrowthInfrastructureReadinessBanner,
 } from "@/components/growth/growth-infrastructure-readiness-badge"
 import type { GrowthOutboundOperationsDashboard } from "@/lib/growth/operations/outbound-operations-dashboard"
+import { GROWTH_OUTBOUND_RELIABILITY_H2_QA_MARKER } from "@/lib/growth/outbound/outbound-reliability-types"
 import { GROWTH_CRON_TELEMETRY_QA_MARKER } from "@/lib/growth/runtime/cron-telemetry-types"
 
 function formatDate(value: string | null): string {
@@ -75,7 +76,11 @@ export function GrowthOutboundOperationsDashboard() {
   }
 
   return (
-    <div className="flex flex-col gap-5" data-qa-marker={GROWTH_CRON_TELEMETRY_QA_MARKER}>
+    <div
+      className="flex flex-col gap-5"
+      data-qa-marker={GROWTH_CRON_TELEMETRY_QA_MARKER}
+      data-h2-qa={dashboard.h2_qa_marker}
+    >
       <GrowthInfrastructureReadinessBanner
         title="Transport send plane"
         readiness={transportReadiness}
@@ -143,6 +148,22 @@ export function GrowthOutboundOperationsDashboard() {
               <dd className="font-semibold">{dashboard.outreach_queue.failed}</dd>
             </div>
             <div>
+              <dt className="text-muted-foreground">Dead letter</dt>
+              <dd className="font-semibold">{dashboard.outreach_queue.dead_letter}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Overdue scheduled</dt>
+              <dd className="font-semibold">{dashboard.outreach_queue.overdue_scheduled}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Stuck processing</dt>
+              <dd className="font-semibold">{dashboard.outreach_queue.stuck_processing}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Adapter attempts (24h)</dt>
+              <dd className="font-semibold">{dashboard.transport.adapter_attempts_24h}</dd>
+            </div>
+            <div>
               <dt className="text-muted-foreground">Sequence jobs due</dt>
               <dd className="font-semibold">{dashboard.sequence_jobs.approved_due}</dd>
             </div>
@@ -171,6 +192,60 @@ export function GrowthOutboundOperationsDashboard() {
           </Button>
         </GrowthEngineCard>
       </div>
+
+      {dashboard.queue_health_alerts.length > 0 ? (
+        <GrowthEngineCard title="Queue health alerts">
+          <ul className="space-y-2 text-sm">
+            {dashboard.queue_health_alerts.map((alert) => (
+              <li key={alert.rule_id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{alert.title}</span>
+                  <GrowthBadge label={alert.severity} tone={alert.severity === "critical" ? "critical" : "attention"} />
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{alert.summary}</p>
+              </li>
+            ))}
+          </ul>
+        </GrowthEngineCard>
+      ) : null}
+
+      <GrowthEngineCard title="Failed outreach recovery">
+        <p className="mb-3 text-xs text-muted-foreground" data-qa-marker={GROWTH_OUTBOUND_RELIABILITY_H2_QA_MARKER}>
+          Operator recovery for failed and dead-letter queue items. Replays re-run suppression and deliverability gates.
+        </p>
+        {dashboard.recovery_queue.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No failed or dead-letter outreach items.</p>
+        ) : (
+          <div className="space-y-3">
+            {dashboard.recovery_queue.map((item) => (
+              <div key={item.queue_id} className="rounded-lg border border-border p-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{item.company_name ?? item.queue_id.slice(0, 8)}</span>
+                  <GrowthBadge label={item.status} tone={item.status === "dead_letter" ? "critical" : "attention"} />
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {item.failure_class ?? "unknown"} · retries {item.retry_count}/{3}
+                  {item.retry_eligible ? " · eligible for replay" : " · not retry eligible"}
+                </p>
+                {item.failure_reason ? <p className="mt-1 text-xs">{item.failure_reason}</p> : null}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {item.retry_eligible ? (
+                    <Button type="button" variant="outline" size="sm" asChild>
+                      <Link href={`/admin/growth/outreach/approval?replay=${item.queue_id}`}>Review replay</Link>
+                    </Button>
+                  ) : null}
+                  <Button type="button" variant="ghost" size="sm" asChild>
+                    <Link href="/admin/growth/deliverability">Deliverability protection</Link>
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" asChild>
+                    <Link href="/admin/growth/providers/setup">Provider setup</Link>
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </GrowthEngineCard>
 
       <GrowthEngineCard title="Infrastructure readiness catalog" icon={<Server size={16} />}>
         <ul className="space-y-2">

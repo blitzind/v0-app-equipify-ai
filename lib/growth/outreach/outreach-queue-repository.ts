@@ -34,6 +34,12 @@ type QueueRow = {
   parent_queue_id: string | null
   sequence_pattern_id: string | null
   sequence_enrollment_step_id: string | null
+  retry_count?: number
+  failure_class?: string | null
+  dead_letter_at?: string | null
+  last_retry_at?: string | null
+  processing_started_at?: string | null
+  delivery_attempt_id?: string | null
   created_by: string | null
   cancelled_at: string | null
   cancelled_by: string | null
@@ -51,7 +57,7 @@ type QueueEventRow = {
 }
 
 const QUEUE_SELECT =
-  "id, lead_id, generation_id, campaign_id, channel, status, priority, execution_confidence, scheduled_for, approved_at, approved_by, approval_note, executed_at, failed_at, failure_reason, provider_connection_id, outbound_message_id, payload_snapshot, generation_version, parent_queue_id, sequence_pattern_id, sequence_enrollment_step_id, created_by, cancelled_at, cancelled_by, created_at, updated_at"
+  "id, lead_id, generation_id, campaign_id, channel, status, priority, execution_confidence, scheduled_for, approved_at, approved_by, approval_note, executed_at, failed_at, failure_reason, provider_connection_id, outbound_message_id, payload_snapshot, generation_version, parent_queue_id, sequence_pattern_id, sequence_enrollment_step_id, retry_count, failure_class, dead_letter_at, last_retry_at, processing_started_at, delivery_attempt_id, created_by, cancelled_at, cancelled_by, created_at, updated_at"
 
 function queueTable(admin: SupabaseClient) {
   return admin.schema("growth").from("outreach_queue")
@@ -85,6 +91,12 @@ function mapQueueRow(row: QueueRow): GrowthOutreachQueueItem {
     parentQueueId: row.parent_queue_id,
     sequencePatternId: row.sequence_pattern_id,
     sequenceEnrollmentStepId: row.sequence_enrollment_step_id,
+    retryCount: Number(row.retry_count ?? 0),
+    failureClass: row.failure_class ?? null,
+    deadLetterAt: row.dead_letter_at ?? null,
+    lastRetryAt: row.last_retry_at ?? null,
+    processingStartedAt: row.processing_started_at ?? null,
+    deliveryAttemptId: row.delivery_attempt_id ?? null,
     createdBy: row.created_by,
     cancelledAt: row.cancelled_at,
     cancelledBy: row.cancelled_by,
@@ -176,6 +188,12 @@ export async function updateGrowthOutreachQueueItem(
     payloadSnapshot: GrowthOutreachQueuePayloadSnapshot
     cancelledAt: string | null
     cancelledBy: string | null
+    retryCount: number
+    failureClass: string | null
+    deadLetterAt: string | null
+    lastRetryAt: string | null
+    processingStartedAt: string | null
+    deliveryAttemptId: string | null
   }>,
 ): Promise<GrowthOutreachQueueItem> {
   const row: Record<string, unknown> = { updated_at: new Date().toISOString() }
@@ -194,6 +212,12 @@ export async function updateGrowthOutreachQueueItem(
   if (patch.payloadSnapshot !== undefined) row.payload_snapshot = patch.payloadSnapshot
   if (patch.cancelledAt !== undefined) row.cancelled_at = patch.cancelledAt
   if (patch.cancelledBy !== undefined) row.cancelled_by = patch.cancelledBy
+  if (patch.retryCount !== undefined) row.retry_count = patch.retryCount
+  if (patch.failureClass !== undefined) row.failure_class = patch.failureClass
+  if (patch.deadLetterAt !== undefined) row.dead_letter_at = patch.deadLetterAt
+  if (patch.lastRetryAt !== undefined) row.last_retry_at = patch.lastRetryAt
+  if (patch.processingStartedAt !== undefined) row.processing_started_at = patch.processingStartedAt
+  if (patch.deliveryAttemptId !== undefined) row.delivery_attempt_id = patch.deliveryAttemptId
 
   const { data, error } = await queueTable(admin).update(row).eq("id", queueId).select(QUEUE_SELECT).single()
   if (error) throw new Error(error.message)

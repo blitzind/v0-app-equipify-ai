@@ -11,6 +11,7 @@ export const GROWTH_INTERNAL_OUTBOUND_AUDIT_EVENT_TYPES = [
   "send_verification_recorded",
   "domain_risk_alert",
   "cron_execution_failed",
+  "outbound_queue_health_alert",
 ] as const
 
 export type GrowthInternalOutboundAuditEventType = (typeof GROWTH_INTERNAL_OUTBOUND_AUDIT_EVENT_TYPES)[number]

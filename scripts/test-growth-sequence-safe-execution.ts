@@ -87,7 +87,7 @@ async function main(): Promise<void> {
 
   const runnerSource = readSource("lib/growth/sequences/execution/sequence-job-runner.ts")
   assert.match(runnerSource, /assertSequenceRunApproval/)
-  assert.match(runnerSource, /assertPreSendSuppressionAllowed/)
+  assert.match(runnerSource, /assertPreSendAllowed/)
   assert.match(runnerSource, /executeTransportSend/)
   assert.match(runnerSource, /advanceGrowthSequenceEnrollmentAfterStep/)
   assert.match(runnerSource, /incrementExperimentMetric/)
@@ -115,7 +115,7 @@ async function main(): Promise<void> {
   assert.match(repositorySource, /resolveExperimentAssignmentPreviewsForJobs/)
 
   const cronSource = readSource("app/api/cron/growth-sequence-safe-execute/route.ts")
-  assert.match(cronSource, /CRON_SECRET/)
+  assert.match(cronSource, /runGrowthCronJob/)
   assert.match(cronSource, /runApprovedDueSequenceExecutionJobs/)
   assert.doesNotMatch(cronSource, /approveSequenceExecutionJob/)
 
