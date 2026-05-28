@@ -12,6 +12,11 @@ import {
   GROWTH_ACCOUNT_CONTACT_STRATEGY_QA_MARKER,
   GROWTH_MULTI_CONTACT_ORCHESTRATION_QA_MARKER,
   GROWTH_PEOPLE_WORKFLOWS_QA_MARKER,
+  GROWTH_RELATIONSHIP_MEMORY_QA_MARKER,
+  GROWTH_ACCOUNT_TIMELINE_QA_MARKER,
+  GROWTH_ACCOUNT_PROGRESSION_QA_MARKER,
+  GROWTH_OPPORTUNITY_EMERGENCE_QA_MARKER,
+  GROWTH_SEQUENCE_READINESS_QA_MARKER,
   type GrowthProspectSearchPeopleResultRow,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import { ProspectSearchAccountStrategyPanel } from "@/components/growth/prospect-search/prospect-search-account-strategy-panel"
@@ -20,11 +25,8 @@ import { ProspectSearchRelationshipIntelligencePanel } from "@/components/growth
 import { ProspectSearchAccountTimelinePanel } from "@/components/growth/prospect-search/prospect-search-account-timeline-panel"
 import { GROWTH_CONTACT_INFLUENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-influence"
 import { GROWTH_ORG_INTELLIGENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-org-intelligence"
-import {
-  GROWTH_RELATIONSHIP_MEMORY_QA_MARKER,
-  GROWTH_ACCOUNT_TIMELINE_QA_MARKER,
-  GROWTH_ACCOUNT_PROGRESSION_QA_MARKER,
-} from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
+import { ProspectSearchOperationalIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-operational-intelligence-panel"
+import { GROWTH_REVENUE_OPERATING_ALERTS_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-revenue-operating-alerts"
 import { formatProspectSearchFreshnessLabel } from "@/lib/growth/prospect-search/prospect-search-contact-freshness"
 
 function eligibilityBadgeVariant(state: string): "default" | "outline" | "destructive" | "secondary" {
@@ -63,6 +65,9 @@ export function ProspectSearchContactEvidenceDrawer({
       data-relationship-memory-marker={GROWTH_RELATIONSHIP_MEMORY_QA_MARKER}
       data-account-timeline-marker={GROWTH_ACCOUNT_TIMELINE_QA_MARKER}
       data-account-progression-marker={GROWTH_ACCOUNT_PROGRESSION_QA_MARKER}
+      data-opportunity-emergence-marker={GROWTH_OPPORTUNITY_EMERGENCE_QA_MARKER}
+      data-sequence-readiness-marker={GROWTH_SEQUENCE_READINESS_QA_MARKER}
+      data-revenue-operating-alerts-marker={GROWTH_REVENUE_OPERATING_ALERTS_QA_MARKER}
       onClick={onClose}
     >
       <div
@@ -187,6 +192,21 @@ export function ProspectSearchContactEvidenceDrawer({
                 <ProspectSearchAccountTimelinePanel
                   timeline={row.company.contact_intelligence.account_timeline}
                   progression={row.company.contact_intelligence.account_progression}
+                  compact
+                />
+              </div>
+            </section>
+          ) : null}
+
+          {row.company.contact_intelligence?.opportunity_emergence ||
+          row.company.contact_intelligence?.sequence_readiness ? (
+            <section>
+              <h4 className="font-medium text-foreground">Operational opportunity</h4>
+              <div className="mt-2">
+                <ProspectSearchOperationalIntelligencePanel
+                  opportunity={row.company.contact_intelligence.opportunity_emergence}
+                  sequenceReadiness={row.company.contact_intelligence.sequence_readiness}
+                  operatingAlerts={row.company.contact_intelligence.operating_alerts}
                   compact
                 />
               </div>

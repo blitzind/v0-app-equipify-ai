@@ -247,6 +247,47 @@ export function buildProspectSearchPushMetadata(
           },
         }
       : {}),
+    ...(company.contact_intelligence?.opportunity_emergence
+      ? {
+          opportunity_emergence: {
+            emergence_score: company.contact_intelligence.opportunity_emergence.emergence_score,
+            emergence_tier: company.contact_intelligence.opportunity_emergence.emergence_tier,
+            opportunity_trend:
+              company.contact_intelligence.opportunity_emergence.opportunity_trend,
+            urgency_level: company.contact_intelligence.opportunity_emergence.urgency_level,
+            recommended_next_action:
+              company.contact_intelligence.opportunity_emergence.recommended_next_action,
+            emergence_reasons:
+              company.contact_intelligence.opportunity_emergence.emergence_reasons,
+          },
+        }
+      : {}),
+    ...(company.contact_intelligence?.sequence_readiness
+      ? {
+          sequence_readiness: {
+            readiness_state: company.contact_intelligence.sequence_readiness.readiness_state,
+            sequence_suitability:
+              company.contact_intelligence.sequence_readiness.sequence_suitability,
+            readiness_score: company.contact_intelligence.sequence_readiness.readiness_score,
+            suggested_sequence_type:
+              company.contact_intelligence.sequence_readiness.suggested_sequence_type,
+            blockers: company.contact_intelligence.sequence_readiness.blockers,
+          },
+        }
+      : {}),
+    ...(company.contact_intelligence?.operating_alerts
+      ? {
+          operating_alerts: {
+            alert_summary: company.contact_intelligence.operating_alerts.alert_summary,
+            alerts: company.contact_intelligence.operating_alerts.alerts.map((alert) => ({
+              kind: alert.kind,
+              title: alert.title,
+              urgency: alert.urgency,
+              suggested_action: alert.suggested_action,
+            })),
+          },
+        }
+      : {}),
   }
 }
 

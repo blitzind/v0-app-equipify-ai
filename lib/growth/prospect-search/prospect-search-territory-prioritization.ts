@@ -42,6 +42,9 @@ export type ProspectSearchTerritoryIntelligenceMetrics = {
   relationship_penetration_pct: number
   stale_coverage_pct: number
   blocked_suppressed_pct: number
+  sequence_ready_account_count: number
+  emerging_opportunity_count: number
+  relationship_strengthening_pct: number
 }
 
 export type ProspectSearchTerritoryOpportunityScore = {
@@ -106,6 +109,9 @@ export function computeTerritoryOpportunityScore(input: {
   let relationshipHits = 0
   let staleContacts = 0
   let blockedOrSuppressed = 0
+  let sequence_ready = 0
+  let emerging_opportunity = 0
+  let strengthening = 0
 
   for (const company of companies) {
     const strategy = company.contact_intelligence?.account_contact_strategy
@@ -114,6 +120,25 @@ export function computeTerritoryOpportunityScore(input: {
     if (tier === "ready") high_priority += 1
     if (company.in_lead_inbox || company.existing_prospect) relationshipHits += 1
     if (company.is_suppressed || tier === "blocked") blockedOrSuppressed += 1
+
+    const seq = company.contact_intelligence?.sequence_readiness?.readiness_state
+    if (seq === "ready" || seq === "ready_with_review") sequence_ready += 1
+
+    const emergence = company.contact_intelligence?.opportunity_emergence?.emergence_tier
+    if (
+      emergence === "emerging" ||
+      emergence === "accelerating" ||
+      emergence === "outreach_ready"
+    ) {
+      emerging_opportunity += 1
+    }
+
+    if (
+      company.contact_intelligence?.relationship_memory?.momentum_direction === "strengthening" ||
+      company.contact_intelligence?.opportunity_emergence?.opportunity_trend === "improving"
+    ) {
+      strengthening += 1
+    }
 
     icpSum += company.company_match_confidence ?? company.lead_engine_score ?? company.lead_score ?? 0
     signalSum += company.growth_signal_score ?? 0
@@ -160,6 +185,10 @@ export function computeTerritoryOpportunityScore(input: {
       total + totalContacts > 0
         ? Math.round((blockedOrSuppressed / (total + totalContacts)) * 100)
         : 0,
+    sequence_ready_account_count: sequence_ready,
+    emerging_opportunity_count: emerging_opportunity,
+    relationship_strengthening_pct:
+      total > 0 ? Math.round((strengthening / total) * 100) : 0,
   }
 
   let score = 0
@@ -171,6 +200,9 @@ export function computeTerritoryOpportunityScore(input: {
   score += metrics.icp_alignment_avg * 0.1
   score += metrics.buying_signal_concentration * 0.08
   score += metrics.relationship_penetration_pct * 0.05
+  score += Math.min(8, metrics.sequence_ready_account_count * 2)
+  score += Math.min(6, metrics.emerging_opportunity_count * 2)
+  score += metrics.relationship_strengthening_pct * 0.04
   score -= metrics.stale_coverage_pct * 0.08
   score -= metrics.blocked_suppressed_pct * 0.1
   score = Math.round(Math.min(100, Math.max(0, score)))
@@ -189,6 +221,12 @@ export function computeTerritoryOpportunityScore(input: {
   }
   if (metrics.persona_completeness_avg >= 60) {
     opportunity_reasons.push("Solid persona coverage across accounts")
+  }
+  if (metrics.sequence_ready_account_count >= 2) {
+    opportunity_reasons.push(`${metrics.sequence_ready_account_count} sequence-ready accounts in territory`)
+  }
+  if (metrics.emerging_opportunity_count >= 2) {
+    opportunity_reasons.push("Emerging opportunity density elevated")
   }
   if (metrics.stale_coverage_pct >= 40) {
     risks.push("Elevated stale contact coverage — refresh before outreach push")

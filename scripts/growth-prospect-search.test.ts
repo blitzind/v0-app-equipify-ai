@@ -4484,6 +4484,212 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   assert.match(pushMetadataSource, /relationship_memory/)
   assert.match(pushMetadataSource, /account_progression/)
   assert.match(pushMetadataSource, /account_timeline/)
+
+  const {
+    detectProspectSearchOpportunityEmergence,
+    GROWTH_OPPORTUNITY_EMERGENCE_QA_MARKER,
+    resolveOpportunityQueueBoost,
+  } = await import("../lib/growth/prospect-search/prospect-search-opportunity-emergence")
+
+  assert.equal(GROWTH_OPPORTUNITY_EMERGENCE_QA_MARKER, "growth-opportunity-emergence-v1")
+
+  const emergenceCoverage = {
+    outreach_readiness_score: 78,
+    persona_completeness: 72,
+    missing_critical_roles: [],
+    best_reachable_contact_id: "c1",
+    best_reachable_contact_name: "Jamie",
+    primary_recommended_contact_id: "c1",
+    secondary_contact_id: null,
+    email_coverage: true,
+    call_coverage: true,
+    verification_coverage: 80,
+    coverage_label: "Strong",
+    persona_gap_suggestions: [],
+    ranking_summary: "Ready",
+  }
+
+  const emergence = detectProspectSearchOpportunityEmergence({
+    company: {
+      id: "co1",
+      company_name: "Acme",
+      source_type: "discover_candidate",
+      in_lead_inbox: true,
+      is_suppressed: false,
+    } as never,
+    peopleRows: [
+      {
+        contact_id: "c1",
+        call_ready: true,
+        freshness_status: "fresh",
+        persona_type: "operations_manager",
+        timeline_events: [{ id: "d", kind: "discovered", label: "Discovered", detail: "Web", occurred_at: "2026-01-01" }],
+      },
+    ] as never,
+    coverage: emergenceCoverage,
+    relationshipMemory: {
+      qa_marker: "growth-relationship-memory-v1",
+      growth_lead_id: null,
+      relationship_strength_score: 55,
+      relationship_status: "warming",
+      momentum_direction: "strengthening",
+      trust_indicators: [],
+      conflict_indicators: [],
+      strength_reasons: ["Warming relationship"],
+      risks: [],
+      recommended_next_action: "Continue warming",
+      last_interaction_at: "2026-01-15",
+      interaction_frequency: 2,
+      prior_call_count: 1,
+      prior_email_count: 0,
+      prior_reply_count: 0,
+      prior_meeting_count: 0,
+      suppression_event_count: 0,
+      queue_action_count: 0,
+      relationship_owner: null,
+      evidence: [],
+      evidence_backed: true,
+    },
+    accountProgression: {
+      qa_marker: "growth-account-progression-v1",
+      progression_state: "outreach_ready",
+      progression_confidence: 0.72,
+      momentum_trend: "strengthening",
+      progression_blockers: [],
+      missing_requirements: [],
+      recommended_advancement_path: null,
+      next_best_action: "Review sequence",
+      progression_reasons: ["Ready"],
+    },
+  })
+  assert.ok(emergence.emergence_score > 30)
+  assert.ok(resolveOpportunityQueueBoost(emergence) >= 0)
+
+  const {
+    resolveAccountSequenceReadiness,
+    GROWTH_SEQUENCE_READINESS_QA_MARKER,
+    resolveSequenceReadinessQueueBoost,
+  } = await import("../lib/growth/prospect-search/prospect-search-sequence-readiness")
+
+  assert.equal(GROWTH_SEQUENCE_READINESS_QA_MARKER, "growth-sequence-readiness-v1")
+
+  const sequenceStrategy = {
+    qa_marker: "growth-account-contact-strategy-v1",
+    orchestration_marker: "growth-multi-contact-orchestration-v1",
+    company_id: "co1",
+    company_name: "Acme",
+    account_outreach_readiness: "ready",
+    account_outreach_readiness_score: 80,
+    recommended_channel: "call",
+    primary_contact: {
+      contact_id: "c1",
+      full_name: "Jamie",
+      title: "Ops",
+      persona_label: "Operations Manager",
+      persona_type: "operations_manager",
+      outreach_rank_score: 0.85,
+      priority_tier: "high_priority",
+      recommended_channel: "call",
+      channel_reason: "Call ready",
+      role_in_strategy: "primary",
+      block_reason: null,
+      freshness_status: "fresh",
+      email_eligibility: "eligible",
+      call_eligibility: "eligible",
+      sms_eligibility: "unsupported",
+      ranking_reasons: [],
+    },
+    secondary_contacts: [],
+    fallback_contacts: [],
+    blocked_contacts: [],
+    missing_personas: [],
+    safest_next_action: "Call primary",
+    contact_research_next_step: null,
+    strategy_reasons: [],
+    risks: [],
+    strategy_summary: null,
+    queue_priority_score: 70,
+    queue_prioritization_reason: null,
+    research_actions: [],
+  } as never
+
+  const sequenceReadiness = resolveAccountSequenceReadiness({
+    company: { id: "co1", company_name: "Acme", is_suppressed: false } as never,
+    peopleRows: [
+      {
+        contact_id: "c1",
+        call_ready: true,
+        call_eligibility: "eligible",
+        email_available: true,
+        email_eligibility: "eligible",
+        freshness_status: "fresh",
+      },
+    ] as never,
+    coverage: emergenceCoverage,
+    accountStrategy: sequenceStrategy,
+    opportunityEmergence: emergence,
+  })
+  assert.equal(sequenceReadiness.readiness_state, "ready")
+  assert.ok(resolveSequenceReadinessQueueBoost(sequenceReadiness) > 0)
+
+  const {
+    buildProspectSearchOperatingAlerts,
+    GROWTH_REVENUE_OPERATING_ALERTS_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-revenue-operating-alerts")
+
+  assert.equal(GROWTH_REVENUE_OPERATING_ALERTS_QA_MARKER, "growth-revenue-operating-alerts-v1")
+
+  const alerts = buildProspectSearchOperatingAlerts({
+    company: { id: "co1", company_name: "Acme", is_suppressed: false } as never,
+    peopleRows: [
+      {
+        contact_id: "c1",
+        persona_type: "operations_manager",
+        persona_label: "Operations Manager",
+        full_name: "Jamie",
+        title: "Ops Manager",
+        persona_evidence: ["Title match"],
+        call_ready: true,
+        call_eligibility: "eligible",
+        ranking_reasons: ["Strong persona"],
+        discovered_at: "2026-01-01",
+        last_verified_at: null,
+      },
+    ] as never,
+    accountStrategy: sequenceStrategy,
+    sequenceReadiness,
+    opportunityEmergence: emergence,
+  })
+  assert.ok(alerts.alerts.length >= 1)
+
+  const operationalPanelSource = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "components/growth/prospect-search/prospect-search-operational-intelligence-panel.tsx",
+    ),
+    "utf8",
+  )
+  const companyCardSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/company-result-card.tsx"),
+    "utf8",
+  )
+  const territoryPanelSource2 = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "components/growth/prospect-search/prospect-search-territory-prioritization-panel.tsx",
+    ),
+    "utf8",
+  )
+
+  assert.match(operationalPanelSource, /data-opportunity-emergence-marker/)
+  assert.match(operationalPanelSource, /data-sequence-readiness-marker/)
+  assert.match(operationalPanelSource, /data-revenue-operating-alerts-marker/)
+  assert.match(companyCardSource, /data-opportunity-emergence-marker/)
+  assert.match(territoryPanelSource2, /sequence-ready/)
+  assert.match(shellSource, /data-opportunity-emergence-marker/)
+  assert.match(pushMetadataSource, /opportunity_emergence/)
+  assert.match(pushMetadataSource, /sequence_readiness/)
+  assert.match(pushMetadataSource, /operating_alerts/)
 }
 
 void main()

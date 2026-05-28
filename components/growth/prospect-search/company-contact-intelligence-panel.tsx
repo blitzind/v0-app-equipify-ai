@@ -8,6 +8,7 @@ import { ProspectSearchAccountStrategyPanel } from "@/components/growth/prospect
 import { ProspectSearchOrgIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-org-intelligence-panel"
 import { ProspectSearchRelationshipIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-relationship-intelligence-panel"
 import { ProspectSearchAccountTimelinePanel } from "@/components/growth/prospect-search/prospect-search-account-timeline-panel"
+import { ProspectSearchOperationalIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-operational-intelligence-panel"
 import { ProspectSearchSchemaHealthNotice } from "@/components/growth/prospect-search/prospect-search-schema-health-notice"
 
 export function CompanyContactIntelligencePanel({
@@ -71,6 +72,16 @@ export function CompanyContactIntelligencePanel({
           <ProspectSearchAccountTimelinePanel
             timeline={intelligence.account_timeline}
             progression={intelligence.account_progression}
+          />
+        </div>
+      ) : null}
+
+      {intelligence.opportunity_emergence || intelligence.sequence_readiness ? (
+        <div className="mt-3">
+          <ProspectSearchOperationalIntelligencePanel
+            opportunity={intelligence.opportunity_emergence}
+            sequenceReadiness={intelligence.sequence_readiness}
+            operatingAlerts={intelligence.operating_alerts}
           />
         </div>
       ) : null}

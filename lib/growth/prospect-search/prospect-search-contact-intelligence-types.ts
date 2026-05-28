@@ -89,6 +89,9 @@ export type GrowthProspectSearchContactIntelligence = {
   account_timeline?: import("@/lib/growth/prospect-search/prospect-search-account-timeline").ProspectSearchAccountTimeline | null
   account_progression?: import("@/lib/growth/prospect-search/prospect-search-account-progression").ProspectSearchAccountProgression | null
   lead_relationship_hydration?: import("@/lib/growth/prospect-search/prospect-search-relationship-memory").ProspectSearchLeadRelationshipHydration | null
+  opportunity_emergence?: import("@/lib/growth/prospect-search/prospect-search-opportunity-emergence").ProspectSearchOpportunityEmergence | null
+  sequence_readiness?: import("@/lib/growth/prospect-search/prospect-search-sequence-readiness").ProspectSearchSequenceReadiness | null
+  operating_alerts?: import("@/lib/growth/prospect-search/prospect-search-revenue-operating-alerts").ProspectSearchOperatingAlertsSnapshot | null
 }
 
 export type ProspectSearchLeadEngineContactHandoffContext = {

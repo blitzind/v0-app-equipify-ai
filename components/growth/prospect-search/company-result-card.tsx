@@ -123,6 +123,28 @@ export function CompanyResultCard({
             ) : null}
           </div>
           <CompanyEnrichmentBadges row={row} />
+          {row.contact_intelligence?.opportunity_emergence ? (
+            <div
+              className="mt-2 flex flex-wrap gap-1"
+              data-opportunity-emergence-marker="growth-opportunity-emergence-v1"
+              data-sequence-readiness-marker="growth-sequence-readiness-v1"
+              data-revenue-operating-alerts-marker="growth-revenue-operating-alerts-v1"
+            >
+              <Badge variant="outline" className="text-[10px]">
+                {row.contact_intelligence.opportunity_emergence.emergence_tier.replace(/_/g, " ")}
+              </Badge>
+              {row.contact_intelligence.sequence_readiness ? (
+                <Badge variant="secondary" className="text-[10px]">
+                  {row.contact_intelligence.sequence_readiness.readiness_state.replace(/_/g, " ")}
+                </Badge>
+              ) : null}
+              {row.contact_intelligence.operating_alerts?.alert_summary ? (
+                <Badge variant="outline" className="text-[10px]">
+                  {row.contact_intelligence.operating_alerts.alert_summary}
+                </Badge>
+              ) : null}
+            </div>
+          ) : null}
           </div>
         </div>
         <div className="text-right">

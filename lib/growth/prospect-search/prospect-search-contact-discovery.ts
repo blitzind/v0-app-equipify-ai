@@ -49,6 +49,10 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-relationship-intelligence"
 import { resolveRelationshipQueueBoost } from "@/lib/growth/prospect-search/prospect-search-relationship-memory"
 import { resolveProgressionQueueBoost } from "@/lib/growth/prospect-search/prospect-search-account-progression"
+import {
+  buildProspectSearchOperationalIntelligence,
+  applyOperationalIntelligenceQueueBoost,
+} from "@/lib/growth/prospect-search/prospect-search-operational-intelligence"
 import type { ProspectSearchTerritoryOpportunityScore } from "@/lib/growth/prospect-search/prospect-search-territory-prioritization"
 import { resolveCompanyTerritoryOpportunityBoost } from "@/lib/growth/prospect-search/prospect-search-territory-prioritization"
 import {
@@ -87,6 +91,9 @@ export { GROWTH_TERRITORY_PRIORITIZATION_QA_MARKER } from "@/lib/growth/prospect
 export { GROWTH_RELATIONSHIP_MEMORY_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-relationship-memory"
 export { GROWTH_ACCOUNT_TIMELINE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-account-timeline"
 export { GROWTH_ACCOUNT_PROGRESSION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-account-progression"
+export { GROWTH_OPPORTUNITY_EMERGENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-opportunity-emergence"
+export { GROWTH_SEQUENCE_READINESS_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-sequence-readiness"
+export { GROWTH_REVENUE_OPERATING_ALERTS_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-revenue-operating-alerts"
 export {
   enrichPeopleRowsWithRelationshipMemory,
 } from "@/lib/growth/prospect-search/prospect-search-relationship-intelligence"
@@ -740,13 +747,36 @@ export function attachProspectSearchCompanyCoverageIntelligence(
       company,
       options?.territoryPrioritization ?? [],
     )
+    const territoryScore =
+      options?.territoryPrioritization?.find(
+        (t) => resolveCompanyTerritoryOpportunityBoost(company, [t]) > 0,
+      )?.territory_score ?? null
+
+    const operationalBundle = buildProspectSearchOperationalIntelligence({
+      company,
+      peopleRows: contacts,
+      coverage,
+      accountStrategy,
+      relationshipBundle,
+      territory_score: territoryScore,
+    })
+
+    let finalStrategy = applyOperationalIntelligenceQueueBoost(
+      accountStrategy,
+      operationalBundle,
+    )
+
     if (territoryBoost > 0) {
-      accountStrategy.queue_priority_score = Math.round(
-        Math.min(100, accountStrategy.queue_priority_score + territoryBoost),
-      )
-      accountStrategy.strategy_reasons.push(
-        `Territory opportunity boost +${Math.round(territoryBoost)}`,
-      )
+      finalStrategy = {
+        ...finalStrategy,
+        queue_priority_score: Math.round(
+          Math.min(100, finalStrategy.queue_priority_score + territoryBoost),
+        ),
+        strategy_reasons: [
+          ...finalStrategy.strategy_reasons,
+          `Territory opportunity boost +${Math.round(territoryBoost)}`,
+        ],
+      }
     }
 
     const topInfluence = [...influenceByContact.values()].sort(
@@ -755,37 +785,45 @@ export function attachProspectSearchCompanyCoverageIntelligence(
     if (
       topInfluence &&
       topInfluence.influence_score >= 0.7 &&
-      accountStrategy.primary_contact?.contact_id !== topInfluence.contact_id
+      finalStrategy.primary_contact?.contact_id !== topInfluence.contact_id
     ) {
-      accountStrategy.strategy_reasons.push(
-        `Highest influence: ${topInfluence.influence_tier.replace(/_/g, " ")} contact in org graph`,
-      )
+      finalStrategy = {
+        ...finalStrategy,
+        strategy_reasons: [
+          ...finalStrategy.strategy_reasons,
+          `Highest influence: ${topInfluence.influence_tier.replace(/_/g, " ")} contact in org graph`,
+        ],
+      }
     }
     if (outreach_sequence.sequence_summary) {
-      accountStrategy.strategy_summary =
-        outreach_sequence.sequence_summary ?? accountStrategy.strategy_summary
+      finalStrategy = {
+        ...finalStrategy,
+        strategy_summary: outreach_sequence.sequence_summary ?? finalStrategy.strategy_summary,
+      }
     }
 
     const relBoost = resolveRelationshipQueueBoost(relationshipBundle.relationship_memory)
     const progBoost = resolveProgressionQueueBoost(relationshipBundle.account_progression)
     const relationshipBoost = relBoost + progBoost
     if (relationshipBoost !== 0) {
-      accountStrategy.queue_priority_score = Math.round(
-        Math.min(100, Math.max(0, accountStrategy.queue_priority_score + relationshipBoost)),
-      )
-      if (relBoost !== 0) {
-        accountStrategy.strategy_reasons.push(
-          `Relationship memory boost ${relBoost > 0 ? "+" : ""}${relBoost}`,
-        )
+      finalStrategy = {
+        ...finalStrategy,
+        queue_priority_score: Math.round(
+          Math.min(100, Math.max(0, finalStrategy.queue_priority_score + relationshipBoost)),
+        ),
+        strategy_reasons: [
+          ...finalStrategy.strategy_reasons,
+          ...(relBoost !== 0
+            ? [`Relationship memory boost ${relBoost > 0 ? "+" : ""}${relBoost}`]
+            : []),
+          ...(progBoost !== 0
+            ? [`Account progression boost ${progBoost > 0 ? "+" : ""}${progBoost}`]
+            : []),
+        ],
+        queue_prioritization_reason:
+          relationshipBundle.account_progression.next_best_action ??
+          finalStrategy.queue_prioritization_reason,
       }
-      if (progBoost !== 0) {
-        accountStrategy.strategy_reasons.push(
-          `Account progression boost ${progBoost > 0 ? "+" : ""}${progBoost}`,
-        )
-      }
-      accountStrategy.queue_prioritization_reason =
-        relationshipBundle.account_progression.next_best_action ??
-        accountStrategy.queue_prioritization_reason
     }
 
     const intelligence = company.contact_intelligence
@@ -796,24 +834,28 @@ export function attachProspectSearchCompanyCoverageIntelligence(
       contact_intelligence: {
         ...intelligence,
         company_contact_coverage: coverage,
-        account_contact_strategy: accountStrategy,
+        account_contact_strategy: finalStrategy,
         org_intelligence,
         outreach_sequence,
         contact_influences: [...influenceByContact.values()],
         relationship_memory: relationshipBundle.relationship_memory,
         account_timeline: relationshipBundle.account_timeline,
         account_progression: relationshipBundle.account_progression,
+        opportunity_emergence: operationalBundle.opportunity_emergence,
+        sequence_readiness: operationalBundle.sequence_readiness,
+        operating_alerts: operationalBundle.operating_alerts,
         outreach_recommendation:
-          accountStrategy.strategy_summary ??
+          operationalBundle.opportunity_emergence.recommended_next_action ??
+          finalStrategy.strategy_summary ??
           coverage.ranking_summary ??
           intelligence.outreach_recommendation ??
           coverage.coverage_label,
         primary_contact_id:
-          accountStrategy.primary_contact?.contact_id ??
+          finalStrategy.primary_contact?.contact_id ??
           coverage.primary_recommended_contact_id ??
           intelligence.primary_contact_id,
         recommended_contact_id:
-          accountStrategy.primary_contact?.contact_id ??
+          finalStrategy.primary_contact?.contact_id ??
           coverage.primary_recommended_contact_id ??
           intelligence.recommended_contact_id,
       },

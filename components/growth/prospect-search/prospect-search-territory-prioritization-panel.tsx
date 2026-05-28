@@ -54,8 +54,10 @@ export function ProspectSearchTerritoryPrioritizationPanel({
             {!compact ? (
               <p className="mt-1 text-[10px] text-muted-foreground">
                 {territory.metrics.company_density} companies · {territory.metrics.outreach_ready_account_count}{" "}
-                outreach-ready · call-ready {territory.metrics.call_ready_coverage_pct}% · persona{" "}
-                {territory.metrics.persona_completeness_avg}%
+                outreach-ready · {territory.metrics.sequence_ready_account_count} sequence-ready ·{" "}
+                {territory.metrics.emerging_opportunity_count} emerging · call-ready{" "}
+                {territory.metrics.call_ready_coverage_pct}% · strengthening{" "}
+                {territory.metrics.relationship_strengthening_pct}%
               </p>
             ) : null}
             {territory.risks.length > 0 ? (

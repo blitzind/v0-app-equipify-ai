@@ -134,6 +134,9 @@ import {
   GROWTH_RELATIONSHIP_MEMORY_QA_MARKER,
   GROWTH_ACCOUNT_TIMELINE_QA_MARKER,
   GROWTH_ACCOUNT_PROGRESSION_QA_MARKER,
+  GROWTH_OPPORTUNITY_EMERGENCE_QA_MARKER,
+  GROWTH_SEQUENCE_READINESS_QA_MARKER,
+  GROWTH_REVENUE_OPERATING_ALERTS_QA_MARKER,
   logProspectSearchContactDiscoveryIssue,
   attachProspectSearchCompanyCoverageIntelligence,
   enrichPeopleRowsWithContactInfluence,
@@ -1413,6 +1416,9 @@ function ProspectSearchShellInner() {
       data-relationship-memory-marker={GROWTH_RELATIONSHIP_MEMORY_QA_MARKER}
       data-account-timeline-marker={GROWTH_ACCOUNT_TIMELINE_QA_MARKER}
       data-account-progression-marker={GROWTH_ACCOUNT_PROGRESSION_QA_MARKER}
+      data-opportunity-emergence-marker={GROWTH_OPPORTUNITY_EMERGENCE_QA_MARKER}
+      data-sequence-readiness-marker={GROWTH_SEQUENCE_READINESS_QA_MARKER}
+      data-revenue-operating-alerts-marker={GROWTH_REVENUE_OPERATING_ALERTS_QA_MARKER}
       data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
       data-contact-discovery-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}
       data-website-contact-provider-marker={GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER}
