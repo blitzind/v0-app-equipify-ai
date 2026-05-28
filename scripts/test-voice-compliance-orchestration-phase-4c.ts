@@ -25,8 +25,8 @@ import {
 import { VOICE_SCHEMA_MIGRATION_ID, VOICE_SCHEMA_PROBE_VERSION } from "../lib/voice/schema-health"
 
 assert.equal(VOICE_COMPLIANCE_ORCHESTRATION_QA_MARKER, "voice-compliance-orchestration-v1")
-assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v16")
-assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270616120000_voice_compliance_orchestration_phase_4c")
+assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v17")
+assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270617120000_voice_ai_outbound_phase_5a")
 assert.equal(VOICE_COMPLIANCE_AUTONOMOUS_OUTBOUND_DISABLED, true)
 assert.equal(VOICE_COMPLIANCE_CONSERVATIVE_DEFAULT, true)
 assert.equal(VOICE_COMPLIANCE_BATCH_PREVIEW_LIMIT, 500)
@@ -144,9 +144,10 @@ assert.match(migrationSql, /voice_compliance_audit_events/)
 assert.match(migrationSql, /compliance_decision/)
 
 const schemaHealth = fs.readFileSync(path.join(process.cwd(), "lib/voice/schema-health.ts"), "utf8")
-assert.match(schemaHealth, /"v16"/)
+assert.match(schemaHealth, /"v17"/)
 assert.match(schemaHealth, /voice_consent_records/)
 assert.match(schemaHealth, /voice_compliance_audit_events/)
+assert.match(schemaHealth, /voice_ai_outbound_sessions/)
 
 const voiceDropService = fs.readFileSync(path.join(process.cwd(), "lib/voice/voice-drops/voice-drop-service.ts"), "utf8")
 assert.match(voiceDropService, /evaluateCommunicationComplianceBatchForOrg/)

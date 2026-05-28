@@ -1,16 +1,19 @@
 "use client"
 
-import Link from "next/link"
+import { Suspense } from "react"
 import { usePathname, useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { Headphones, LayoutDashboard, Radio } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import {
   GROWTH_CALLS_PAGE_DESCRIPTION,
   GROWTH_CALLS_PAGE_TITLE,
+  GROWTH_CALLS_RUNTIME_HARDENING_QA_MARKER,
   GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER,
   type GrowthCallsOperatingView,
-  isGrowthCallsOperatingView,
+  resolveGrowthCallsOperatingView,
 } from "@/lib/growth/navigation/growth-workspace-consolidation"
 
 const VIEW_TABS: Array<{
@@ -29,16 +32,13 @@ const VIEW_TABS: Array<{
   { id: "live", label: "Live monitor", icon: Radio, href: "/admin/growth/calls/live" },
 ]
 
-function resolveActiveView(pathname: string, viewParam: string | null): GrowthCallsOperatingView {
-  if (pathname.startsWith("/admin/growth/calls/live")) return "live"
-  if (isGrowthCallsOperatingView(viewParam)) return viewParam
-  return "operate"
-}
-
-export function GrowthCallsOperatingTabs({ className }: { className?: string }) {
+function GrowthCallsOperatingTabsInner({ className }: { className?: string }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const activeView = resolveActiveView(pathname, searchParams.get("view"))
+  const activeView = resolveGrowthCallsOperatingView({
+    pathname,
+    viewParam: searchParams.get("view"),
+  })
 
   return (
     <nav className={cn("flex flex-wrap gap-2", className)} aria-label="Calls operating views">
@@ -65,6 +65,18 @@ export function GrowthCallsOperatingTabs({ className }: { className?: string }) 
   )
 }
 
+function TabsFallback() {
+  return <p className="text-xs text-muted-foreground">Loading call views…</p>
+}
+
+export function GrowthCallsOperatingTabs({ className }: { className?: string }) {
+  return (
+    <Suspense fallback={<TabsFallback />}>
+      <GrowthCallsOperatingTabsInner className={className} />
+    </Suspense>
+  )
+}
+
 type GrowthCallsOperatingHeaderProps = {
   showDescription?: boolean
 }
@@ -74,6 +86,7 @@ export function GrowthCallsOperatingHeader({ showDescription = true }: GrowthCal
     <section
       className="rounded-2xl border border-border/70 bg-card/90 p-5 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-slate-950/70"
       data-growth-workspace-consolidation-marker={GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER}
+      data-growth-calls-runtime-hardening-marker={GROWTH_CALLS_RUNTIME_HARDENING_QA_MARKER}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">

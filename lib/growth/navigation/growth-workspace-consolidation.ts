@@ -2,6 +2,8 @@
 
 export const GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER = "growth-workspace-consolidation-v2" as const
 
+export const GROWTH_CALLS_RUNTIME_HARDENING_QA_MARKER = "growth-calls-runtime-hardening-v1" as const
+
 export const GROWTH_CALLS_PRIMARY_HREF = "/admin/growth/calls/workspace" as const
 
 export const GROWTH_WORKSPACE_GROUP_DESCRIPTION =
@@ -24,4 +26,29 @@ export function growthCallsOperatingHref(view: GrowthCallsOperatingView = "opera
   if (view === "operate") return GROWTH_CALLS_PRIMARY_HREF
   if (view === "live") return "/admin/growth/calls/live"
   return `${GROWTH_CALLS_PRIMARY_HREF}?view=overview`
+}
+
+/** Safe view resolution — invalid query values fall back to operate (never throw). */
+export function resolveGrowthCallsOperatingView(input: {
+  pathname: string
+  viewParam: string | null
+}): GrowthCallsOperatingView {
+  if (input.pathname.startsWith("/admin/growth/calls/live")) return "live"
+  if (input.viewParam && !isGrowthCallsOperatingView(input.viewParam)) {
+    logGrowthCallsRuntimeIssue("invalid_view_param", {
+      pathname: input.pathname,
+      viewParam: input.viewParam,
+    })
+  }
+  if (isGrowthCallsOperatingView(input.viewParam)) return input.viewParam
+  return "operate"
+}
+
+/** Client-safe diagnostic logging — no secrets, no stack traces in UI. */
+export function logGrowthCallsRuntimeIssue(
+  code: string,
+  context: Record<string, string | null | undefined> = {},
+): void {
+  if (typeof console === "undefined" || typeof console.warn !== "function") return
+  console.warn("[growth-calls]", code, context)
 }

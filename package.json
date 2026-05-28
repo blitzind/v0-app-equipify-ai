@@ -229,6 +229,7 @@
     "test:voice-ai-receptionist-phase-4a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-ai-receptionist-phase-4a.ts",
     "test:voice-missed-call-voice-drop-phase-4b": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-missed-call-voice-drop-phase-4b.ts",
     "test:voice-compliance-orchestration-phase-4c": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-compliance-orchestration-phase-4c.ts",
+    "test:voice-ai-outbound-phase-5a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-ai-outbound-phase-5a.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
     "test:growth-assemblyai-browser-streaming": "tsx scripts/test-growth-assemblyai-browser-streaming.ts",
     "test:growth-openai-realtime-browser-streaming": "tsx scripts/test-growth-openai-realtime-browser-streaming.ts",

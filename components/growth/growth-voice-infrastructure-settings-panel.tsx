@@ -18,6 +18,8 @@ import { GrowthAiReceptionistReadinessSection } from "@/components/growth/growth
 import { GrowthMissedCallRecoveryReadinessSection } from "@/components/growth/growth-missed-call-recovery-readiness-section"
 import { GrowthVoiceDropReadinessSection } from "@/components/growth/growth-voice-drop-readiness-section"
 import { GrowthComplianceOrchestrationReadinessSection } from "@/components/growth/growth-compliance-orchestration-readiness-section"
+import { GrowthAiOutboundReadinessSection } from "@/components/growth/growth-ai-outbound-readiness-section"
+import { GrowthAiOutboundApprovalPanel } from "@/components/growth/growth-ai-outbound-approval-panel"
 import { GrowthComplianceManualReviewPanel } from "@/components/growth/growth-compliance-manual-review-panel"
 import { VOICE_CONVERSATION_INTELLIGENCE_QA_MARKER } from "@/lib/voice/intelligence/types"
 import {
@@ -721,6 +723,8 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
             <GrowthMissedCallRecoveryReadinessSection />
             <GrowthVoiceDropReadinessSection />
             <GrowthComplianceOrchestrationReadinessSection />
+            <GrowthAiOutboundReadinessSection />
+            <GrowthAiOutboundApprovalPanel />
             <GrowthComplianceManualReviewPanel />
 
             <section className={GROWTH_SETTINGS_SECTION_GAP}>

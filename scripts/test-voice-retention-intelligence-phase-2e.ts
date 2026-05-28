@@ -29,8 +29,8 @@ import {
 import { VOICE_SCHEMA_MIGRATION_ID, VOICE_SCHEMA_PROBE_VERSION } from "../lib/voice/schema-health"
 
 assert.equal(VOICE_RETENTION_INTELLIGENCE_QA_MARKER, "voice-retention-intelligence-v1")
-assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v16")
-assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270616120000_voice_compliance_orchestration_phase_4c")
+assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v17")
+assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270617120000_voice_ai_outbound_phase_5a")
 assert.equal(VOICE_RETENTION_INTELLIGENCE_PASSIVE_MODE_ENABLED, true)
 assert.equal(VOICE_RETENTION_INTELLIGENCE_AUTONOMOUS_ACTIONS_DISABLED, true)
 assert.equal(VOICE_RETENTION_INTELLIGENCE_EVIDENCE_REQUIRED, true)
@@ -184,7 +184,7 @@ assert.match(migration, /source_revenue_event_id/)
 
 const schemaHealth = fs.readFileSync(path.join(process.cwd(), "lib/voice/schema-health.ts"), "utf8")
 assert.match(schemaHealth, /voice_retention_intelligence_events/)
-assert.match(schemaHealth, /"v16"/)
+assert.match(schemaHealth, /"v17"/)
 assert.match(schemaHealth, /voice_ai_copilot_suggestions/)
 
 const bridge = fs.readFileSync(path.join(process.cwd(), "lib/voice/browser-calling/workspace-bridge.ts"), "utf8")

@@ -11,6 +11,27 @@ import {
   GROWTH_CALL_COPILOT_COMMITMENT_SIGNAL_LABELS,
 } from "@/lib/growth/call-copilot-types"
 import { commandLeadFocusHref } from "@/lib/growth/command/command-action-catalog"
+import { logGrowthCallsRuntimeIssue } from "@/lib/growth/navigation/growth-workspace-consolidation"
+
+function normalizeDashboard(raw: GrowthCallCopilotDashboard | null | undefined): GrowthCallCopilotDashboard | null {
+  if (!raw || typeof raw !== "object") return null
+  return {
+    ...raw,
+    stats: raw.stats ?? {
+      activeCount: 0,
+      completed7d: 0,
+      highRiskActive: 0,
+      avgOutcomeConfidence: 0,
+    },
+    activeSessions: Array.isArray(raw.activeSessions) ? raw.activeSessions : [],
+    objectionTrendShift: Array.isArray(raw.objectionTrendShift) ? raw.objectionTrendShift : [],
+    topObjections: Array.isArray(raw.topObjections) ? raw.topObjections : [],
+    recentSummaries: Array.isArray(raw.recentSummaries) ? raw.recentSummaries : [],
+    buyingSignalCounts: Array.isArray(raw.buyingSignalCounts) ? raw.buyingSignalCounts : [],
+    commitmentSignalCounts: Array.isArray(raw.commitmentSignalCounts) ? raw.commitmentSignalCounts : [],
+    followUpNeeded: Array.isArray(raw.followUpNeeded) ? raw.followUpNeeded : [],
+  }
+}
 
 export function GrowthCallCopilotDashboard({ embedded = false }: { embedded?: boolean }) {
   const [dashboard, setDashboard] = useState<GrowthCallCopilotDashboard | null>(null)
@@ -26,17 +47,23 @@ export function GrowthCallCopilotDashboard({ embedded = false }: { embedded?: bo
         ok?: boolean
         dashboard?: GrowthCallCopilotDashboard
         message?: string
+        error?: string
       }
-      if (!res.ok || !data.ok || !data.dashboard) {
-        throw new Error(data.message ?? "Could not load calls dashboard.")
+      if (!res.ok) {
+        throw new Error(data.message ?? data.error ?? "Could not load calls dashboard.")
       }
-      setDashboard(data.dashboard)
+      const normalized = normalizeDashboard(data.dashboard)
+      if (!normalized) {
+        logGrowthCallsRuntimeIssue("copilot_dashboard_missing", { embedded: embedded ? "true" : "false" })
+        throw new Error("Call intelligence overview is temporarily unavailable.")
+      }
+      setDashboard(normalized)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [embedded])
 
   useEffect(() => {
     void load()

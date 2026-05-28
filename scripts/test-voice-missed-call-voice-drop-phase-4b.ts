@@ -38,8 +38,8 @@ import { VOICE_SCHEMA_MIGRATION_ID, VOICE_SCHEMA_PROBE_VERSION } from "../lib/vo
 
 assert.equal(VOICE_MISSED_CALL_RECOVERY_QA_MARKER, "voice-missed-call-recovery-v1")
 assert.equal(VOICE_DROP_INFRASTRUCTURE_QA_MARKER, "voice-drop-infrastructure-v1")
-assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v16")
-assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270616120000_voice_compliance_orchestration_phase_4c")
+assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v17")
+assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270617120000_voice_ai_outbound_phase_5a")
 assert.equal(VOICE_MISSED_CALL_RECOVERY_AUTONOMOUS_OUTBOUND_DISABLED, true)
 assert.equal(VOICE_DROP_AUTONOMOUS_OUTBOUND_DISABLED, true)
 assert.equal(VOICE_DROP_APPROVAL_REQUIRED, true)
@@ -156,7 +156,7 @@ async function main() {
   const schemaHealth = fs.readFileSync(path.join(process.cwd(), "lib/voice/schema-health.ts"), "utf8")
   assert.match(schemaHealth, /voice_missed_call_recovery_events/)
   assert.match(schemaHealth, /voice_drop_campaigns/)
-  assert.match(schemaHealth, /"v16"/)
+  assert.match(schemaHealth, /"v17"/)
 
   const migration = fs.readFileSync(
     path.join(process.cwd(), "supabase/migrations/20270615120000_voice_missed_call_voice_drop_phase_4b.sql"),
