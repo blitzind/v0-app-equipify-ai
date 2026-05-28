@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { LeadIntelligenceExamplePresets } from "@/components/growth/lead-intelligence-inspector/lead-intelligence-example-presets"
+import { LeadIntelligenceOperatorSummaryCard } from "@/components/growth/lead-intelligence-inspector/lead-intelligence-operator-summary-card"
 import { LeadIntelligencePipelineHeader } from "@/components/growth/lead-intelligence-inspector/lead-intelligence-pipeline-header"
 import {
   LeadIntelligenceStagePanel,
@@ -19,6 +20,7 @@ import { LeadIntelligenceWorkflowCard } from "@/components/growth/lead-intellige
 import { LEAD_INTELLIGENCE_INSPECTOR_DEFAULT_INPUT } from "@/lib/growth/lead-engine/lead-intelligence-inspector-fixtures"
 import { GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER } from "@/lib/growth/lead-engine/lead-intelligence-inspector-types"
 import { LEAD_ENGINE_STAGE_UI } from "@/lib/growth/lead-engine/lead-engine-stage-ui"
+import type { LeadIntelligenceStageDisplayContext } from "@/lib/growth/lead-engine/lead-intelligence-stage-display"
 import {
   type GrowthLeadEngineOrchestratorStageResult,
   type GrowthLeadEnginePipelineRun,
@@ -85,6 +87,15 @@ export function GrowthLeadEngineWorkspace() {
     setInput(next)
     setActivePresetId(id)
     setError(null)
+  }
+
+  const stageDisplayContext: LeadIntelligenceStageDisplayContext = {
+    hasRun: Boolean(run),
+    loading,
+    runStatus: run?.pipeline_status ?? null,
+    completedStageIds: run?.completed_stages ?? [],
+    currentStageId: run?.current_stage ?? null,
+    isSampleMode: run?.mode === "fixture_dry_run" || !run,
   }
 
   return (
@@ -223,6 +234,9 @@ export function GrowthLeadEngineWorkspace() {
       </section>
 
       {run ? (
+        <>
+          <LeadIntelligenceOperatorSummaryCard run={run} />
+
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <h3 className="font-semibold">Execution summary</h3>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -313,10 +327,16 @@ export function GrowthLeadEngineWorkspace() {
             </div>
           </LeadIntelligenceTechnicalDetails>
         </section>
+        </>
       ) : null}
 
       <section className="flex flex-col gap-4">
-        <h3 className="font-semibold">Stage intelligence</h3>
+        <div>
+          <h3 className="font-semibold">Stage intelligence</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Evidence-backed operator panels for each pipeline stage — expand structured output only when needed.
+          </p>
+        </div>
         {LEAD_ENGINE_STAGE_UI.map((def) => {
           const stage =
             run?.stage_results.find((s) => s.stage_id === def.stageKey) ??
@@ -339,7 +359,14 @@ export function GrowthLeadEngineWorkspace() {
               fatal: false,
               warnings: [],
             } satisfies GrowthLeadEngineOrchestratorStageResult)
-          return <LeadIntelligenceStagePanel key={def.stageKey} stage={stage} />
+          return (
+            <LeadIntelligenceStagePanel
+              key={def.stageKey}
+              stage={stage}
+              stageDef={def}
+              displayContext={stageDisplayContext}
+            />
+          )
         })}
       </section>
     </div>
