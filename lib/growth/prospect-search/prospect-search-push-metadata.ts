@@ -159,6 +159,51 @@ export function buildProspectSearchPushMetadata(
           },
         }
       : {}),
+    ...(company.contact_intelligence?.org_intelligence
+      ? {
+          org_intelligence: {
+            structure_label: company.contact_intelligence.org_intelligence.structure_label,
+            structure_summary: company.contact_intelligence.org_intelligence.structure_summary,
+            operational_structure_confidence:
+              company.contact_intelligence.org_intelligence.operational_structure_confidence,
+            likely_communication_flow:
+              company.contact_intelligence.org_intelligence.likely_communication_flow,
+            missing_department_warnings:
+              company.contact_intelligence.org_intelligence.missing_department_warnings,
+          },
+        }
+      : {}),
+    ...(company.contact_intelligence?.outreach_sequence
+      ? {
+          outreach_sequence: {
+            sequence_summary: company.contact_intelligence.outreach_sequence.sequence_summary,
+            likely_gatekeepers: company.contact_intelligence.outreach_sequence.likely_gatekeepers,
+            likely_approvers: company.contact_intelligence.outreach_sequence.likely_approvers,
+            operational_influencers:
+              company.contact_intelligence.outreach_sequence.operational_influencers,
+            steps: company.contact_intelligence.outreach_sequence.steps.map((step) => ({
+              contact_id: step.contact_id,
+              full_name: step.full_name,
+              persona_label: step.persona_label,
+              sequence_order: step.sequence_order,
+              role: step.role,
+              reasoning: step.reasoning,
+            })),
+          },
+        }
+      : {}),
+    ...(company.contact_intelligence?.contact_influences?.length
+      ? {
+          contact_influences: company.contact_intelligence.contact_influences.map((influence) => ({
+            contact_id: influence.contact_id,
+            influence_score: influence.influence_score,
+            influence_tier: influence.influence_tier,
+            likely_department: influence.likely_department,
+            sequencing_role: influence.sequencing_role,
+            influence_reasons: influence.influence_reasons,
+          })),
+        }
+      : {}),
   }
 }
 

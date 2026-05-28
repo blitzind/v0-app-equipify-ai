@@ -32,6 +32,11 @@ import {
 } from "@/components/growth/prospect-search/prospect-search-active-filter-pills"
 import { TerritoryIntelligencePanel } from "@/components/growth/prospect-search/territory-intelligence-panel"
 import { TerritoryOpportunityHeatmapPanel } from "@/components/growth/prospect-search/territory-opportunity-heatmap-panel"
+import { ProspectSearchTerritoryPrioritizationPanel } from "@/components/growth/prospect-search/prospect-search-territory-prioritization-panel"
+import {
+  aggregateProspectSearchTerritoryPrioritization,
+  applyTerritoryOpportunityBoostToCompanies,
+} from "@/lib/growth/prospect-search/prospect-search-territory-prioritization"
 import { PersonResultCard } from "@/components/growth/prospect-search/person-result-card"
 import { SearchEmptyState } from "@/components/growth/prospect-search/search-empty-state"
 import { SearchRecommendations } from "@/components/growth/prospect-search/search-recommendations"
@@ -123,8 +128,12 @@ import {
   GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER,
   GROWTH_ACCOUNT_CONTACT_STRATEGY_QA_MARKER,
   GROWTH_MULTI_CONTACT_ORCHESTRATION_QA_MARKER,
+  GROWTH_ORG_INTELLIGENCE_QA_MARKER,
+  GROWTH_CONTACT_INFLUENCE_QA_MARKER,
+  GROWTH_TERRITORY_PRIORITIZATION_QA_MARKER,
   logProspectSearchContactDiscoveryIssue,
   attachProspectSearchCompanyCoverageIntelligence,
+  enrichPeopleRowsWithContactInfluence,
   mergeProspectSearchPeopleResults,
   resolveDefaultProspectSearchResultMode,
   type GrowthProspectSearchPeopleResultRow,
@@ -291,9 +300,25 @@ function ProspectSearchShellInner() {
     () => mergeProspectSearchPeopleResults(people, companies),
     [people, companies],
   )
-  const companiesWithContactCoverage = useMemo(
+  const companiesEnriched = useMemo(
     () => attachProspectSearchCompanyCoverageIntelligence(companies, peopleRows),
     [companies, peopleRows],
+  )
+  const territoryPrioritization = useMemo(
+    () =>
+      aggregateProspectSearchTerritoryPrioritization({
+        companies: companiesEnriched,
+        peopleRows,
+      }),
+    [companiesEnriched, peopleRows],
+  )
+  const companiesWithContactCoverage = useMemo(
+    () => applyTerritoryOpportunityBoostToCompanies(companiesEnriched, territoryPrioritization),
+    [companiesEnriched, territoryPrioritization],
+  )
+  const peopleRowsWithInfluence = useMemo(
+    () => enrichPeopleRowsWithContactInfluence(peopleRows, companiesWithContactCoverage),
+    [peopleRows, companiesWithContactCoverage],
   )
   const resolveEnrichedCompany = useCallback(
     (companyId: string, fallback: GrowthProspectSearchCompanyResult) =>
@@ -305,9 +330,9 @@ function ProspectSearchShellInner() {
       selectedProspectSearchPeopleRows({
         keys: selectedPeopleKeys,
         store: selectedPeopleStore,
-        fallbackRows: peopleRows,
+        fallbackRows: peopleRowsWithInfluence,
       }),
-    [selectedPeopleKeys, selectedPeopleStore, peopleRows],
+    [selectedPeopleKeys, selectedPeopleStore, peopleRowsWithInfluence],
   )
   const rawProviderCount = resolveRawProviderCount(result)
   const discoverPhase = resolveProspectSearchDiscoverResultsPhase({
@@ -420,10 +445,10 @@ function ProspectSearchShellInner() {
       mergeProspectSearchPeopleSelectionStore({
         store: prev,
         keys: selectedPeopleKeys,
-        visibleRows: peopleRows,
+        visibleRows: peopleRowsWithInfluence,
       }),
     )
-  }, [peopleRows, selectedPeopleKeys])
+  }, [peopleRowsWithInfluence, selectedPeopleKeys])
 
   useEffect(() => {
     if (lastSearchedCriteriaKey === null) return
@@ -970,10 +995,12 @@ function ProspectSearchShellInner() {
   )
 
   const selectAllVisiblePeople = useCallback(() => {
-    const keys = new Set(peopleRows.map((row) => prospectSearchPeopleSelectionKey(row)))
+    const keys = new Set(peopleRowsWithInfluence.map((row) => prospectSearchPeopleSelectionKey(row)))
     setSelectedPeopleKeys(keys)
-    setSelectedPeopleStore(new Map(peopleRows.map((row) => [prospectSearchPeopleSelectionKey(row), row])))
-  }, [peopleRows])
+    setSelectedPeopleStore(
+      new Map(peopleRowsWithInfluence.map((row) => [prospectSearchPeopleSelectionKey(row), row])),
+    )
+  }, [peopleRowsWithInfluence])
 
   const clearPeopleSelection = useCallback(() => {
     setSelectedPeopleKeys(new Set())
@@ -1156,7 +1183,7 @@ function ProspectSearchShellInner() {
       if (actionId === "refresh_stale_contacts") {
         await runPeopleAction(
           "refresh_stale_contacts",
-          peopleRows.filter((row) => row.company_id === companyId),
+          peopleRowsWithInfluence.filter((row) => row.company_id === companyId),
         )
         return
       }
@@ -1169,7 +1196,7 @@ function ProspectSearchShellInner() {
         setContactDiscoveryBusy(false)
       }
     },
-    [companiesWithContactCoverage, peopleRows, refreshContactDiscoveryResults, runPeopleAction],
+    [companiesWithContactCoverage, peopleRowsWithInfluence, refreshContactDiscoveryResults, runPeopleAction],
   )
 
   const handleSavePeopleToList = useCallback(async () => {
@@ -1357,6 +1384,9 @@ function ProspectSearchShellInner() {
       data-revenue-persona-marker={GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER}
       data-account-strategy-marker={GROWTH_ACCOUNT_CONTACT_STRATEGY_QA_MARKER}
       data-multi-contact-orchestration-marker={GROWTH_MULTI_CONTACT_ORCHESTRATION_QA_MARKER}
+      data-org-intelligence-marker={GROWTH_ORG_INTELLIGENCE_QA_MARKER}
+      data-contact-influence-marker={GROWTH_CONTACT_INFLUENCE_QA_MARKER}
+      data-territory-prioritization-marker={GROWTH_TERRITORY_PRIORITIZATION_QA_MARKER}
       data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
       data-contact-discovery-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}
       data-website-contact-provider-marker={GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER}
@@ -1511,6 +1541,10 @@ function ProspectSearchShellInner() {
                 />
               ) : null}
 
+              {searchCompleted && territoryPrioritization.length > 0 ? (
+                <ProspectSearchTerritoryPrioritizationPanel territories={territoryPrioritization} />
+              ) : null}
+
               {showDiscoverReady ? <ProspectSearchDiscoverReadyPanel /> : null}
 
               {loading && discoveryMode === "discover_external" && !searchCompleted ? (
@@ -1629,7 +1663,7 @@ function ProspectSearchShellInner() {
               resultMode === "people" ? (
                 <ProspectSearchPeopleBulkActionBar
                   selectedCount={selectedPeopleKeys.size}
-                  visibleCount={peopleRows.length}
+                  visibleCount={peopleRowsWithInfluence.length}
                   selectedRows={selectedPeopleRows}
                   busy={peopleBulkBusy || contactDiscoveryBusy}
                   onClear={clearPeopleSelection}
@@ -1645,7 +1679,7 @@ function ProspectSearchShellInner() {
                     void runPeopleAction("refresh_people_verification", selectedPeopleRows)
                   }
                   onRefreshVisible={() =>
-                    void runPeopleAction("refresh_visible_contacts", peopleRows)
+                    void runPeopleAction("refresh_visible_contacts", peopleRowsWithInfluence)
                   }
                   onRefreshStale={() =>
                     void runPeopleAction("refresh_stale_contacts", selectedPeopleRows)
@@ -1712,7 +1746,7 @@ function ProspectSearchShellInner() {
                 />
               ) : searchCompleted && view === "card" && resultMode === "people" ? (
                 <ProspectSearchPeopleResultsPanel
-                  rows={peopleRows}
+                  rows={peopleRowsWithInfluence}
                   selectedKeys={selectedPeopleKeys}
                   onToggleSelection={togglePeopleSelection}
                   onSelectAllVisible={selectAllVisiblePeople}
@@ -1754,7 +1788,7 @@ function ProspectSearchShellInner() {
                   <ProspectSearchDiscoverResultsTable
                     mode={resultMode}
                     rows={discoverFilteredResults}
-                    peopleRows={peopleRows}
+                    peopleRows={peopleRowsWithInfluence}
                     selectedId={selectedCompany?.id ?? null}
                     selectedKeys={selectedKeys}
                     selectedPeopleKeys={selectedPeopleKeys}

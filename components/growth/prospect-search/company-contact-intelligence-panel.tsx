@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
 import { GROWTH_CONTACT_RANKING_QA_MARKER, GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import { ProspectSearchAccountStrategyPanel } from "@/components/growth/prospect-search/prospect-search-account-strategy-panel"
+import { ProspectSearchOrgIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-org-intelligence-panel"
 import { ProspectSearchSchemaHealthNotice } from "@/components/growth/prospect-search/prospect-search-schema-health-notice"
 
 export function CompanyContactIntelligencePanel({
@@ -44,6 +45,15 @@ export function CompanyContactIntelligencePanel({
           <ProspectSearchAccountStrategyPanel
             strategy={intelligence.account_contact_strategy}
             onResearchAction={onResearchAction}
+          />
+        </div>
+      ) : null}
+
+      {intelligence.org_intelligence ? (
+        <div className="mt-3">
+          <ProspectSearchOrgIntelligencePanel
+            orgIntelligence={intelligence.org_intelligence}
+            outreachSequence={intelligence.outreach_sequence}
           />
         </div>
       ) : null}

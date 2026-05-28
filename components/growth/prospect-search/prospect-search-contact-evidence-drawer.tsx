@@ -15,6 +15,9 @@ import {
   type GrowthProspectSearchPeopleResultRow,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import { ProspectSearchAccountStrategyPanel } from "@/components/growth/prospect-search/prospect-search-account-strategy-panel"
+import { ProspectSearchOrgIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-org-intelligence-panel"
+import { GROWTH_CONTACT_INFLUENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-influence"
+import { GROWTH_ORG_INTELLIGENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-org-intelligence"
 import { formatProspectSearchFreshnessLabel } from "@/lib/growth/prospect-search/prospect-search-contact-freshness"
 
 function eligibilityBadgeVariant(state: string): "default" | "outline" | "destructive" | "secondary" {
@@ -48,6 +51,8 @@ export function ProspectSearchContactEvidenceDrawer({
       data-account-strategy-marker={GROWTH_ACCOUNT_CONTACT_STRATEGY_QA_MARKER}
       data-multi-contact-orchestration-marker={GROWTH_MULTI_CONTACT_ORCHESTRATION_QA_MARKER}
       data-contact-verification-depth-marker={GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER}
+      data-contact-influence-marker={GROWTH_CONTACT_INFLUENCE_QA_MARKER}
+      data-org-intelligence-marker={GROWTH_ORG_INTELLIGENCE_QA_MARKER}
       onClick={onClose}
     >
       <div
@@ -109,6 +114,49 @@ export function ProspectSearchContactEvidenceDrawer({
               ))}
             </ul>
           </section>
+
+          <section>
+            <h4 className="font-medium text-foreground">Contact influence</h4>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Badge variant="outline">{row.influence_tier.replace(/_/g, " ")}</Badge>
+              {row.likely_department ? (
+                <Badge variant="secondary">{row.likely_department.replace(/_/g, " ")}</Badge>
+              ) : null}
+              {row.sequencing_role ? (
+                <Badge variant="outline">{row.sequencing_role.replace(/_/g, " ")}</Badge>
+              ) : null}
+            </div>
+            {row.influence_score > 0 ? (
+              <p className="mt-2 text-muted-foreground">
+                Influence score {Math.round(row.influence_score * 100)}%
+                {row.outreach_sequence_position != null
+                  ? ` · Sequence position ${row.outreach_sequence_position}`
+                  : ""}
+              </p>
+            ) : null}
+            {row.sequencing_note ? (
+              <p className="mt-1 text-muted-foreground">{row.sequencing_note}</p>
+            ) : null}
+            {row.influence_reasons.length > 0 ? (
+              <ul className="mt-2 list-disc space-y-0.5 pl-4 text-muted-foreground">
+                {row.influence_reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+
+          {row.company.contact_intelligence?.org_intelligence ? (
+            <section>
+              <h4 className="font-medium text-foreground">Org intelligence</h4>
+              <div className="mt-2">
+                <ProspectSearchOrgIntelligencePanel
+                  orgIntelligence={row.company.contact_intelligence.org_intelligence}
+                  outreachSequence={row.company.contact_intelligence.outreach_sequence}
+                />
+              </div>
+            </section>
+          ) : null}
 
           {row.company.contact_intelligence?.account_contact_strategy ? (
             <section>

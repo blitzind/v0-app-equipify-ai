@@ -82,6 +82,9 @@ export type GrowthProspectSearchContactIntelligence = {
   schema_health?: GrowthSchemaHealthSummary | null
   company_contact_coverage?: import("@/lib/growth/prospect-search/prospect-search-company-contact-coverage-intelligence").ProspectSearchCompanyContactCoverageIntelligence | null
   account_contact_strategy?: import("@/lib/growth/prospect-search/prospect-search-account-contact-strategy").ProspectSearchAccountContactStrategy | null
+  org_intelligence?: import("@/lib/growth/prospect-search/prospect-search-org-intelligence").ProspectSearchOrgIntelligence | null
+  outreach_sequence?: import("@/lib/growth/prospect-search/prospect-search-contact-influence").ProspectSearchAccountOutreachSequence | null
+  contact_influences?: import("@/lib/growth/prospect-search/prospect-search-contact-influence").ProspectSearchContactInfluenceResult[]
 }
 
 export type ProspectSearchLeadEngineContactHandoffContext = {

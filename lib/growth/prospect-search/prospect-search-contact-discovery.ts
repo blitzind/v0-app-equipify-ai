@@ -34,6 +34,18 @@ import {
   GROWTH_MULTI_CONTACT_ORCHESTRATION_QA_MARKER,
 } from "@/lib/growth/prospect-search/prospect-search-account-contact-strategy"
 import {
+  applyInfluenceSequencingToContacts,
+  buildProspectSearchAccountOutreachSequence,
+  computeContactInfluenceScore,
+  GROWTH_CONTACT_INFLUENCE_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-contact-influence"
+import {
+  buildProspectSearchOrgIntelligence,
+  GROWTH_ORG_INTELLIGENCE_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-org-intelligence"
+import type { ProspectSearchTerritoryOpportunityScore } from "@/lib/growth/prospect-search/prospect-search-territory-prioritization"
+import { resolveCompanyTerritoryOpportunityBoost } from "@/lib/growth/prospect-search/prospect-search-territory-prioritization"
+import {
   resolveProspectSearchRevenuePersona,
   type ProspectSearchRevenuePersonaIntelligence,
 } from "@/lib/growth/prospect-search/prospect-search-revenue-persona-intelligence"
@@ -63,6 +75,9 @@ export {
   GROWTH_ACCOUNT_CONTACT_STRATEGY_QA_MARKER,
   GROWTH_MULTI_CONTACT_ORCHESTRATION_QA_MARKER,
 } from "@/lib/growth/prospect-search/prospect-search-account-contact-strategy"
+export { GROWTH_ORG_INTELLIGENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-org-intelligence"
+export { GROWTH_CONTACT_INFLUENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-influence"
+export { GROWTH_TERRITORY_PRIORITIZATION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-territory-prioritization"
 
 export type ProspectSearchResultMode = "companies" | "people"
 
@@ -132,6 +147,13 @@ export type GrowthProspectSearchPeopleResultRow = GrowthProspectSearchPersonResu
   recommended_next_action: string
   is_recommended_contact: boolean
   is_secondary_contact: boolean
+  influence_score: number
+  influence_tier: string
+  influence_reasons: string[]
+  likely_department: string
+  sequencing_role: string | null
+  sequencing_note: string | null
+  outreach_sequence_position: number | null
 }
 
 export type ProspectSearchPeopleTimelineEvent = {
@@ -498,9 +520,52 @@ export function enrichProspectSearchPeopleRowsWithRanking(
   }))
 }
 
+export function enrichPeopleRowsWithContactInfluence(
+  peopleRows: GrowthProspectSearchPeopleResultRow[],
+  companies: GrowthProspectSearchCompanyResult[],
+): GrowthProspectSearchPeopleResultRow[] {
+  const influenceByCompany = new Map<string, Map<string, import("@/lib/growth/prospect-search/prospect-search-contact-influence").ProspectSearchContactInfluenceResult>>()
+  for (const company of companies) {
+    const map = new Map<string, import("@/lib/growth/prospect-search/prospect-search-contact-influence").ProspectSearchContactInfluenceResult>()
+    for (const influence of company.contact_intelligence?.contact_influences ?? []) {
+      map.set(influence.contact_id, influence)
+    }
+    if (map.size > 0) influenceByCompany.set(company.id, map)
+  }
+
+  return peopleRows.map((row) => {
+    const influence = influenceByCompany.get(row.company_id)?.get(row.contact_id)
+    if (!influence) {
+      return {
+        ...row,
+        influence_score: 0,
+        influence_tier: "unknown",
+        influence_reasons: [],
+        likely_department: "general",
+        sequencing_role: null,
+        sequencing_note: null,
+        outreach_sequence_position: null,
+      }
+    }
+    return {
+      ...row,
+      influence_score: influence.influence_score,
+      influence_tier: influence.influence_tier,
+      influence_reasons: influence.influence_reasons,
+      likely_department: influence.likely_department,
+      sequencing_role: influence.sequencing_role,
+      sequencing_note: influence.sequencing_note,
+      outreach_sequence_position: influence.outreach_sequence_position,
+    }
+  })
+}
+
 export function attachProspectSearchCompanyCoverageIntelligence(
   companies: GrowthProspectSearchCompanyResult[],
   peopleRows: GrowthProspectSearchPeopleResultRow[],
+  options?: {
+    territoryPrioritization?: ProspectSearchTerritoryOpportunityScore[]
+  },
 ): GrowthProspectSearchCompanyResult[] {
   const rowsByCompany = new Map<string, GrowthProspectSearchPeopleResultRow[]>()
   for (const row of peopleRows) {
@@ -558,6 +623,74 @@ export function attachProspectSearchCompanyCoverageIntelligence(
       ranking_risks: row.ranking_risks,
     }))
 
+    const orgContacts = contacts.map((row) => ({
+      contact_id: row.contact_id,
+      full_name: row.full_name,
+      title: row.title,
+      persona_type: row.persona_type,
+      persona_label: row.persona_label,
+      source_page_url: row.source_page_url,
+      source_label: row.source_label,
+      persona_evidence: row.persona_evidence,
+    }))
+
+    const org_intelligence = buildProspectSearchOrgIntelligence({
+      company_name: company.company_name,
+      contacts: orgContacts,
+    })
+
+    const influenceByContact = new Map(
+      contacts.map((row) => {
+        const influence = computeContactInfluenceScore({
+          contact: {
+            contact_id: row.contact_id,
+            full_name: row.full_name,
+            title: row.title,
+            persona_type: row.persona_type,
+            persona_label: row.persona_label,
+            persona_icp_relevance: row.persona_icp_relevance,
+            persona_buying_influence: row.persona_buying_influence,
+            persona_outreach_suitability: row.persona_outreach_suitability,
+            operational_authority: row.persona.outreach_suitability,
+            outreach_rank_score: row.outreach_rank_score,
+            priority_tier: row.priority_tier,
+            source_page_url: row.source_page_url,
+            source_label: row.source_label,
+            is_recommended_contact: row.is_recommended_contact,
+            in_lead_inbox: company.in_lead_inbox,
+            existing_prospect: company.existing_prospect,
+          },
+          relationship_graph: org_intelligence.relationship_graph,
+        })
+        return [row.contact_id, influence] as const
+      }),
+    )
+
+    const sequencedInfluence = applyInfluenceSequencingToContacts([...influenceByContact.values()])
+    for (const item of sequencedInfluence) {
+      influenceByContact.set(item.contact_id, item)
+    }
+
+    const outreach_sequence = buildProspectSearchAccountOutreachSequence({
+      contacts: contacts.map((row) => ({
+        contact_id: row.contact_id,
+        full_name: row.full_name,
+        title: row.title,
+        persona_type: row.persona_type,
+        persona_label: row.persona_label,
+        persona_icp_relevance: row.persona_icp_relevance,
+        persona_buying_influence: row.persona_buying_influence,
+        persona_outreach_suitability: row.persona_outreach_suitability,
+        outreach_rank_score: row.outreach_rank_score,
+        priority_tier: row.priority_tier,
+        is_recommended_contact: row.is_recommended_contact,
+        influence: influenceByContact.get(row.contact_id)!,
+      })),
+      blocked_contact_ids: contacts
+        .filter((row) => row.priority_tier === "blocked")
+        .map((row) => row.contact_id),
+    })
+
     const accountStrategy = buildProspectSearchAccountContactStrategy({
       company_id: company.id,
       company_name: company.company_name,
@@ -570,6 +703,36 @@ export function attachProspectSearchCompanyCoverageIntelligence(
       coverage,
     })
 
+    const territoryBoost = resolveCompanyTerritoryOpportunityBoost(
+      company,
+      options?.territoryPrioritization ?? [],
+    )
+    if (territoryBoost > 0) {
+      accountStrategy.queue_priority_score = Math.round(
+        Math.min(100, accountStrategy.queue_priority_score + territoryBoost),
+      )
+      accountStrategy.strategy_reasons.push(
+        `Territory opportunity boost +${Math.round(territoryBoost)}`,
+      )
+    }
+
+    const topInfluence = [...influenceByContact.values()].sort(
+      (a, b) => b.influence_score - a.influence_score,
+    )[0]
+    if (
+      topInfluence &&
+      topInfluence.influence_score >= 0.7 &&
+      accountStrategy.primary_contact?.contact_id !== topInfluence.contact_id
+    ) {
+      accountStrategy.strategy_reasons.push(
+        `Highest influence: ${topInfluence.influence_tier.replace(/_/g, " ")} contact in org graph`,
+      )
+    }
+    if (outreach_sequence.sequence_summary) {
+      accountStrategy.strategy_summary =
+        outreach_sequence.sequence_summary ?? accountStrategy.strategy_summary
+    }
+
     const intelligence = company.contact_intelligence
     if (!intelligence) return company
 
@@ -579,6 +742,9 @@ export function attachProspectSearchCompanyCoverageIntelligence(
         ...intelligence,
         company_contact_coverage: coverage,
         account_contact_strategy: accountStrategy,
+        org_intelligence,
+        outreach_sequence,
+        contact_influences: [...influenceByContact.values()],
         outreach_recommendation:
           accountStrategy.strategy_summary ??
           coverage.ranking_summary ??
@@ -674,6 +840,13 @@ function buildProspectSearchPeopleRowDraft(input: {
     recommended_next_action: "Pending ranking",
     is_recommended_contact: false,
     is_secondary_contact: false,
+    influence_score: 0,
+    influence_tier: "unknown",
+    influence_reasons: [],
+    likely_department: "general",
+    sequencing_role: null,
+    sequencing_note: null,
+    outreach_sequence_position: null,
     timeline_events: buildProspectSearchPeopleTimelineEvents({
       contact,
       company,
@@ -900,6 +1073,13 @@ export function mergeProspectSearchPeopleResults(
       recommended_next_action: "Review contact evidence",
       is_recommended_contact: false,
       is_secondary_contact: false,
+      influence_score: 0,
+      influence_tier: "unknown",
+      influence_reasons: [],
+      likely_department: "general",
+      sequencing_role: null,
+      sequencing_note: null,
+      outreach_sequence_position: null,
       timeline_events: [
         {
           id: "discovered-server",

@@ -4123,6 +4123,252 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   assert.match(accountPanelSource, /data-multi-contact-orchestration-marker/)
   assert.match(shellSource, /data-account-strategy-marker/)
   assert.match(drawerSource, /Account outreach strategy/)
+
+  const {
+    computeTerritoryOpportunityScore,
+    aggregateProspectSearchTerritoryPrioritization,
+    applyTerritoryOpportunityBoostToCompanies,
+    GROWTH_TERRITORY_PRIORITIZATION_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-territory-prioritization")
+
+  assert.equal(GROWTH_TERRITORY_PRIORITIZATION_QA_MARKER, "growth-territory-prioritization-v1")
+
+  const territoryCompany = {
+    id: "co-nash",
+    company_name: "Nashville HVAC",
+    source_type: "discover_candidate" as const,
+    city: "Nashville",
+    state: "TN",
+    contact_intelligence: {
+      account_contact_strategy: {
+        account_outreach_readiness: "ready" as const,
+        account_outreach_readiness_score: 82,
+        queue_priority_score: 60,
+        strategy_reasons: [] as string[],
+        recommended_channel: "call" as const,
+        strategy_summary: null,
+        safest_next_action: "Call operations manager",
+        contact_research_next_step: null,
+        queue_prioritization_reason: null,
+        primary_contact: null,
+        secondary_contacts: [],
+        fallback_contacts: [],
+        blocked_contacts: [],
+        missing_personas: [],
+        risks: [],
+        research_actions: [],
+      },
+      company_contact_coverage: {
+        persona_completeness: 72,
+        outreach_readiness_score: 80,
+        coverage_label: "Strong",
+        ranking_summary: "Ready",
+        persona_gap_suggestions: [],
+        primary_recommended_contact_id: "c-ops",
+      },
+    },
+  }
+
+  const territoryScore = computeTerritoryOpportunityScore({
+    territory: { label: "Nashville, TN", state: "TN", city: "Nashville", metro: null, postal_code: null },
+    companies: [territoryCompany],
+    peopleByCompany: new Map([
+      [
+        "co-nash",
+        [
+          {
+            company_id: "co-nash",
+            contact_id: "c-ops",
+            call_ready: true,
+            verification_status: "email_verified",
+            freshness_status: "fresh",
+            priority_tier: "high_priority",
+            compliance_status: "active",
+          },
+        ],
+      ],
+    ]),
+  })
+  assert.ok(territoryScore.territory_score > 0)
+  assert.equal(territoryScore.qa_marker, "growth-territory-prioritization-v1")
+  assert.ok(territoryScore.opportunity_reasons.length > 0)
+
+  const territoryRanking = aggregateProspectSearchTerritoryPrioritization({
+    companies: [territoryCompany],
+    peopleRows: [
+      {
+        company_id: "co-nash",
+        contact_id: "c-ops",
+        call_ready: true,
+        verification_status: "email_verified",
+        freshness_status: "fresh",
+        priority_tier: "high_priority",
+        compliance_status: "active",
+      },
+    ] as never,
+  })
+  assert.equal(territoryRanking.length, 1)
+
+  const boosted = applyTerritoryOpportunityBoostToCompanies([territoryCompany], territoryRanking)
+  assert.ok(
+    (boosted[0]!.contact_intelligence?.account_contact_strategy?.queue_priority_score ?? 0) > 60,
+  )
+
+  const {
+    buildProspectSearchRelationshipGraph,
+    buildProspectSearchOrgIntelligence,
+    GROWTH_ORG_INTELLIGENCE_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-org-intelligence")
+
+  assert.equal(GROWTH_ORG_INTELLIGENCE_QA_MARKER, "growth-org-intelligence-v1")
+
+  const orgContacts = [
+    {
+      contact_id: "c-owner",
+      full_name: "Pat Owner",
+      title: "Owner",
+      persona_type: "owner" as const,
+      persona_label: "Owner",
+      source_page_url: "https://acme.example/about",
+    },
+    {
+      contact_id: "c-ops",
+      full_name: "Jamie Ops",
+      title: "Operations Manager",
+      persona_type: "operations_manager" as const,
+      persona_label: "Operations Manager",
+      source_page_url: "https://acme.example/about",
+    },
+  ]
+
+  const graph = buildProspectSearchRelationshipGraph(orgContacts)
+  assert.ok(graph.nodes.some((node) => node.kind === "contact"))
+  assert.ok(graph.edges.some((edge) => edge.edge_type === "same_page_evidence"))
+  const graphEvidence = graph.edges.map((edge) => edge.evidence.join(" ")).join(" ")
+  assert.doesNotMatch(graphEvidence, /\breports to\b|\borg chart\b/i)
+  assert.match(graphEvidence, /not reporting line|not confirmed hierarchy/i)
+
+  const orgIntel = buildProspectSearchOrgIntelligence({
+    company_name: "Acme HVAC",
+    contacts: orgContacts,
+  })
+  assert.ok(orgIntel.operations_coverage)
+  assert.ok(orgIntel.leadership_coverage)
+  assert.ok(orgIntel.uncertainty_notes.length >= 0)
+
+  const {
+    computeContactInfluenceScore,
+    buildProspectSearchAccountOutreachSequence,
+    GROWTH_CONTACT_INFLUENCE_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-contact-influence")
+
+  assert.equal(GROWTH_CONTACT_INFLUENCE_QA_MARKER, "growth-contact-influence-v1")
+
+  const opsInfluence = computeContactInfluenceScore({
+    contact: {
+      contact_id: "c-ops",
+      full_name: "Jamie Ops",
+      persona_type: "operations_manager",
+      persona_label: "Operations Manager",
+      persona_icp_relevance: 0.9,
+      persona_buying_influence: 0.85,
+      persona_outreach_suitability: 0.88,
+      outreach_rank_score: 0.86,
+      priority_tier: "high_priority",
+      is_recommended_contact: true,
+    },
+    relationship_graph: graph,
+  })
+  assert.ok(opsInfluence.influence_score > 0.5)
+  assert.ok(["operational_authority", "high_influence"].includes(opsInfluence.influence_tier))
+
+  const ownerInfluence = computeContactInfluenceScore({
+    contact: {
+      contact_id: "c-owner",
+      full_name: "Pat Owner",
+      persona_type: "owner",
+      persona_label: "Owner",
+      persona_icp_relevance: 0.85,
+      persona_buying_influence: 0.9,
+      persona_outreach_suitability: 0.7,
+      outreach_rank_score: 0.8,
+      priority_tier: "recommended",
+    },
+    relationship_graph: graph,
+  })
+  assert.ok(ownerInfluence.influence_score > 0.4)
+
+  const outreachSequence = buildProspectSearchAccountOutreachSequence({
+    contacts: [
+      {
+        contact_id: "c-ops",
+        full_name: "Jamie Ops",
+        persona_type: "operations_manager",
+        persona_label: "Operations Manager",
+        persona_icp_relevance: 0.9,
+        persona_buying_influence: 0.85,
+        persona_outreach_suitability: 0.88,
+        outreach_rank_score: 0.86,
+        priority_tier: "high_priority",
+        is_recommended_contact: true,
+        influence: opsInfluence,
+      },
+      {
+        contact_id: "c-owner",
+        full_name: "Pat Owner",
+        persona_type: "owner",
+        persona_label: "Owner",
+        persona_icp_relevance: 0.85,
+        persona_buying_influence: 0.9,
+        persona_outreach_suitability: 0.7,
+        outreach_rank_score: 0.8,
+        priority_tier: "recommended",
+        influence: ownerInfluence,
+      },
+    ],
+  })
+  assert.ok(outreachSequence.steps.length >= 1)
+  assert.equal(outreachSequence.qa_marker, "growth-contact-influence-v1")
+
+  const territoryPanelSource = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "components/growth/prospect-search/prospect-search-territory-prioritization-panel.tsx",
+    ),
+    "utf8",
+  )
+  const orgPanelSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-org-intelligence-panel.tsx"),
+    "utf8",
+  )
+  const peopleTableInfluenceSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-discover-people-table.tsx"),
+    "utf8",
+  )
+  const drawerSourceInfluence = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-contact-evidence-drawer.tsx"),
+    "utf8",
+  )
+  const pushMetadataSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-push-metadata.ts"),
+    "utf8",
+  )
+
+  assert.match(territoryPanelSource, /data-territory-prioritization-marker/)
+  assert.match(orgPanelSource, /data-org-intelligence-marker/)
+  assert.match(orgPanelSource, /data-contact-influence-marker/)
+  assert.match(peopleTableInfluenceSource, /data-contact-influence-marker/)
+  assert.match(peopleTableInfluenceSource, /Influence/)
+  assert.match(drawerSourceInfluence, /Contact influence/)
+  assert.match(drawerSourceInfluence, /Org intelligence/)
+  assert.match(shellSource, /ProspectSearchTerritoryPrioritizationPanel/)
+  assert.match(shellSource, /data-territory-prioritization-marker/)
+  assert.match(shellSource, /data-org-intelligence-marker/)
+  assert.match(shellSource, /data-contact-influence-marker/)
+  assert.match(shellSource, /peopleRowsWithInfluence/)
+  assert.match(pushMetadataSource, /org_intelligence/)
+  assert.match(pushMetadataSource, /outreach_sequence/)
+  assert.match(pushMetadataSource, /contact_influences/)
 }
 
 void main()

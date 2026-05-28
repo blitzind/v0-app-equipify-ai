@@ -15,6 +15,7 @@ import {
   GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER,
   type GrowthProspectSearchPeopleResultRow,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
+import { GROWTH_CONTACT_INFLUENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-influence"
 import { formatProspectSearchFreshnessLabel } from "@/lib/growth/prospect-search/prospect-search-contact-freshness"
 import { prospectSearchPeopleSelectionKey } from "@/lib/growth/prospect-search/prospect-search-people-selection"
 import { cn } from "@/lib/utils"
@@ -36,6 +37,19 @@ function priorityTierBadgeVariant(
 }
 
 function formatPriorityTierLabel(tier: string): string {
+  return tier.replace(/_/g, " ")
+}
+
+function influenceBadgeVariant(
+  tier: string,
+): "default" | "outline" | "destructive" | "secondary" {
+  if (tier === "high_influence" || tier === "operational_authority") return "default"
+  if (tier === "gatekeeper") return "secondary"
+  if (tier === "low_influence" || tier === "unknown") return "outline"
+  return "outline"
+}
+
+function formatInfluenceTierLabel(tier: string): string {
   return tier.replace(/_/g, " ")
 }
 
@@ -106,6 +120,7 @@ export function ProspectSearchDiscoverPeopleTable({
       data-contact-ranking-marker={GROWTH_CONTACT_RANKING_QA_MARKER}
       data-revenue-persona-marker={GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER}
       data-contact-verification-depth-marker={GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER}
+      data-contact-influence-marker={GROWTH_CONTACT_INFLUENCE_QA_MARKER}
       data-result-mode="people"
     >
       <table className="w-full min-w-[1280px] text-left text-xs">
@@ -130,6 +145,7 @@ export function ProspectSearchDiscoverPeopleTable({
             <th className="px-3 py-2">Phone</th>
             <th className="px-3 py-2">Source</th>
             <th className="px-3 py-2">Priority</th>
+            <th className="px-3 py-2">Influence</th>
             <th className="px-3 py-2">Freshness</th>
             <th className="px-3 py-2">Eligibility</th>
             <th className="px-3 py-2">Actions</th>
@@ -206,6 +222,28 @@ export function ProspectSearchDiscoverPeopleTable({
                   >
                     {row.recommended_next_action}
                   </p>
+                </td>
+                <td className="px-3 py-2">
+                  <Badge variant={influenceBadgeVariant(row.influence_tier)} className="text-[10px]">
+                    {formatInfluenceTierLabel(row.influence_tier)}
+                  </Badge>
+                  {row.influence_score > 0 ? (
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      Score {Math.round(row.influence_score * 100)}%
+                    </p>
+                  ) : null}
+                  {row.sequencing_note ? (
+                    <p className="mt-1 text-[10px] text-violet-900" title={row.sequencing_note}>
+                      {row.sequencing_note}
+                    </p>
+                  ) : row.influence_reasons.length > 0 ? (
+                    <p
+                      className="mt-1 text-[10px] text-muted-foreground"
+                      title={row.influence_reasons.join(" · ")}
+                    >
+                      {row.influence_reasons[0]}
+                    </p>
+                  ) : null}
                 </td>
                 <td className="px-3 py-2">
                   <Badge variant={freshnessBadgeVariant(row.freshness_status)} className="text-[10px]">
