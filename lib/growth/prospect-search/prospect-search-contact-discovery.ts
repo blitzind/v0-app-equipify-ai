@@ -29,6 +29,11 @@ import {
   type ProspectSearchCompanyContactCoverageIntelligence,
 } from "@/lib/growth/prospect-search/prospect-search-company-contact-coverage-intelligence"
 import {
+  buildProspectSearchAccountContactStrategy,
+  GROWTH_ACCOUNT_CONTACT_STRATEGY_QA_MARKER,
+  GROWTH_MULTI_CONTACT_ORCHESTRATION_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-account-contact-strategy"
+import {
   resolveProspectSearchRevenuePersona,
   type ProspectSearchRevenuePersonaIntelligence,
 } from "@/lib/growth/prospect-search/prospect-search-revenue-persona-intelligence"
@@ -54,6 +59,10 @@ export { GROWTH_CONTACT_FRESHNESS_QA_MARKER } from "@/lib/growth/prospect-search
 export { GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-verification-depth"
 export { GROWTH_CONTACT_RANKING_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-ranking"
 export { GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-revenue-persona-intelligence"
+export {
+  GROWTH_ACCOUNT_CONTACT_STRATEGY_QA_MARKER,
+  GROWTH_MULTI_CONTACT_ORCHESTRATION_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-account-contact-strategy"
 
 export type ProspectSearchResultMode = "companies" | "people"
 
@@ -522,6 +531,45 @@ export function attachProspectSearchCompanyCoverageIntelligence(
       })),
     })
 
+    const strategyContacts = contacts.map((row) => ({
+      contact_id: row.contact_id,
+      full_name: row.full_name,
+      title: row.title,
+      persona_label: row.persona_label,
+      persona_type: row.persona_type,
+      outreach_rank_score: row.outreach_rank_score,
+      priority_tier: row.priority_tier,
+      freshness_status: row.freshness_status,
+      email_available: row.email_available,
+      phone_available: row.phone_available,
+      call_ready: row.call_ready,
+      sms_ready: row.sms_ready,
+      email_eligibility: row.email_eligibility,
+      call_eligibility: row.call_eligibility,
+      sms_eligibility: row.sms_eligibility,
+      call_block_reason: row.call_block_reason,
+      sms_block_reason: row.sms_block_reason,
+      phone_on_dnc: row.phone_on_dnc,
+      email_verification_depth: row.email_verification_depth,
+      phone_verification_depth: row.phone_verification_depth,
+      is_recommended_contact: row.is_recommended_contact,
+      is_secondary_contact: row.is_secondary_contact,
+      ranking_reasons: row.ranking_reasons,
+      ranking_risks: row.ranking_risks,
+    }))
+
+    const accountStrategy = buildProspectSearchAccountContactStrategy({
+      company_id: company.id,
+      company_name: company.company_name,
+      company_suppressed: company.is_suppressed,
+      company_match_confidence: company.company_match_confidence,
+      lead_engine_score: company.lead_engine_score ?? company.lead_score,
+      in_lead_inbox: company.in_lead_inbox,
+      existing_customer: company.existing_customer,
+      contacts: strategyContacts,
+      coverage,
+    })
+
     const intelligence = company.contact_intelligence
     if (!intelligence) return company
 
@@ -530,14 +578,20 @@ export function attachProspectSearchCompanyCoverageIntelligence(
       contact_intelligence: {
         ...intelligence,
         company_contact_coverage: coverage,
+        account_contact_strategy: accountStrategy,
         outreach_recommendation:
+          accountStrategy.strategy_summary ??
           coverage.ranking_summary ??
           intelligence.outreach_recommendation ??
           coverage.coverage_label,
         primary_contact_id:
-          coverage.primary_recommended_contact_id ?? intelligence.primary_contact_id,
+          accountStrategy.primary_contact?.contact_id ??
+          coverage.primary_recommended_contact_id ??
+          intelligence.primary_contact_id,
         recommended_contact_id:
-          coverage.primary_recommended_contact_id ?? intelligence.recommended_contact_id,
+          accountStrategy.primary_contact?.contact_id ??
+          coverage.primary_recommended_contact_id ??
+          intelligence.recommended_contact_id,
       },
     }
   })

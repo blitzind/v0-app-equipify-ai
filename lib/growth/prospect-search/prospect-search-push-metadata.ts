@@ -95,6 +95,54 @@ export function buildProspectSearchPushMetadata(
           },
         }
       : {}),
+    ...(company.contact_intelligence?.account_contact_strategy
+      ? {
+          account_contact_strategy: {
+            readiness_tier:
+              company.contact_intelligence.account_contact_strategy.account_outreach_readiness,
+            readiness_score:
+              company.contact_intelligence.account_contact_strategy
+                .account_outreach_readiness_score,
+            recommended_channel:
+              company.contact_intelligence.account_contact_strategy.recommended_channel,
+            strategy_summary:
+              company.contact_intelligence.account_contact_strategy.strategy_summary,
+            safest_next_action:
+              company.contact_intelligence.account_contact_strategy.safest_next_action,
+            contact_research_next_step:
+              company.contact_intelligence.account_contact_strategy.contact_research_next_step,
+            queue_priority_score:
+              company.contact_intelligence.account_contact_strategy.queue_priority_score,
+            queue_prioritization_reason:
+              company.contact_intelligence.account_contact_strategy.queue_prioritization_reason,
+            primary_contact_id:
+              company.contact_intelligence.account_contact_strategy.primary_contact?.contact_id ??
+              null,
+            primary_contact_name:
+              company.contact_intelligence.account_contact_strategy.primary_contact?.full_name ??
+              null,
+            secondary_contact_ids:
+              company.contact_intelligence.account_contact_strategy.secondary_contacts.map(
+                (c) => c.contact_id,
+              ),
+            fallback_contact_ids:
+              company.contact_intelligence.account_contact_strategy.fallback_contacts.map(
+                (c) => c.contact_id,
+              ),
+            blocked_contacts:
+              company.contact_intelligence.account_contact_strategy.blocked_contacts.map((c) => ({
+                contact_id: c.contact_id,
+                full_name: c.full_name,
+                reason: c.block_reason,
+              })),
+            missing_personas:
+              company.contact_intelligence.account_contact_strategy.missing_personas,
+            strategy_reasons:
+              company.contact_intelligence.account_contact_strategy.strategy_reasons,
+            risks: company.contact_intelligence.account_contact_strategy.risks,
+          },
+        }
+      : {}),
     ...(company.contact_intelligence?.company_contact_coverage
       ? {
           contact_ranking: {

@@ -121,6 +121,8 @@ import {
   GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER,
   GROWTH_CONTACT_RANKING_QA_MARKER,
   GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER,
+  GROWTH_ACCOUNT_CONTACT_STRATEGY_QA_MARKER,
+  GROWTH_MULTI_CONTACT_ORCHESTRATION_QA_MARKER,
   logProspectSearchContactDiscoveryIssue,
   attachProspectSearchCompanyCoverageIntelligence,
   mergeProspectSearchPeopleResults,
@@ -292,6 +294,11 @@ function ProspectSearchShellInner() {
   const companiesWithContactCoverage = useMemo(
     () => attachProspectSearchCompanyCoverageIntelligence(companies, peopleRows),
     [companies, peopleRows],
+  )
+  const resolveEnrichedCompany = useCallback(
+    (companyId: string, fallback: GrowthProspectSearchCompanyResult) =>
+      companiesWithContactCoverage.find((row) => row.id === companyId) ?? fallback,
+    [companiesWithContactCoverage],
   )
   const selectedPeopleRows = useMemo(
     () =>
@@ -927,18 +934,20 @@ function ProspectSearchShellInner() {
 
   const handleAddPersonToQueue = useCallback(
     (row: GrowthProspectSearchPeopleResultRow) => {
-      setSelectedCompany(row.company)
-      void runAction("push_to_lead_inbox", { company: row.company })
+      const company = resolveEnrichedCompany(row.company_id, row.company)
+      setSelectedCompany(company)
+      void runAction("push_to_lead_inbox", { company })
     },
-    [runAction],
+    [resolveEnrichedCompany, runAction],
   )
 
   const handleAddPersonToLeadPipeline = useCallback(
     (row: GrowthProspectSearchPeopleResultRow) => {
-      setSelectedCompany(row.company)
-      void runAction("run_lead_engine", { company: row.company })
+      const company = resolveEnrichedCompany(row.company_id, row.company)
+      setSelectedCompany(company)
+      void runAction("run_lead_engine", { company })
     },
-    [runAction],
+    [resolveEnrichedCompany, runAction],
   )
 
   const togglePeopleSelection = useCallback(
@@ -1050,19 +1059,25 @@ function ProspectSearchShellInner() {
       }
     }
     const companiesToPush = [...companiesById.values()].sort((a, b) => {
-      const rankA = Math.max(
-        ...selectedPeopleRows
-          .filter((row) => row.company_id === a.id)
-          .map((row) => row.outreach_rank_score ?? 0),
-        0,
-      )
-      const rankB = Math.max(
-        ...selectedPeopleRows
-          .filter((row) => row.company_id === b.id)
-          .map((row) => row.outreach_rank_score ?? 0),
-        0,
-      )
-      return rankB - rankA
+      const enrichedA = resolveEnrichedCompany(a.id, a)
+      const enrichedB = resolveEnrichedCompany(b.id, b)
+      const scoreA =
+        enrichedA.contact_intelligence?.account_contact_strategy?.queue_priority_score ??
+        Math.max(
+          ...selectedPeopleRows
+            .filter((row) => row.company_id === a.id)
+            .map((row) => row.outreach_rank_score ?? 0),
+          0,
+        )
+      const scoreB =
+        enrichedB.contact_intelligence?.account_contact_strategy?.queue_priority_score ??
+        Math.max(
+          ...selectedPeopleRows
+            .filter((row) => row.company_id === b.id)
+            .map((row) => row.outreach_rank_score ?? 0),
+          0,
+        )
+      return scoreB - scoreA
     })
     if (companiesToPush.length === 0) return
     setPeopleBulkBusy(true)
@@ -1096,7 +1111,7 @@ function ProspectSearchShellInner() {
     } finally {
       setPeopleBulkBusy(false)
     }
-  }, [clearPeopleSelection, discoveryMode, filters, query, selectedPeopleRows])
+  }, [clearPeopleSelection, discoveryMode, filters, query, resolveEnrichedCompany, selectedPeopleRows])
 
   const runBulkPeopleLeadPipeline = useCallback(async () => {
     if (selectedPeopleRows.length === 0) return
@@ -1131,6 +1146,30 @@ function ProspectSearchShellInner() {
       }
     },
     [refreshContactDiscoveryResults],
+  )
+
+  const handleAccountResearchAction = useCallback(
+    async (companyId: string, actionId: string) => {
+      const company = companiesWithContactCoverage.find((row) => row.id === companyId)
+      if (!company) return
+      setSelectedCompany(company)
+      if (actionId === "refresh_stale_contacts") {
+        await runPeopleAction(
+          "refresh_stale_contacts",
+          peopleRows.filter((row) => row.company_id === companyId),
+        )
+        return
+      }
+      setContactDiscoveryBusy(true)
+      try {
+        const params = new URLSearchParams({ company_candidate_id: companyId, run: "1" })
+        await fetch(`/api/platform/growth/contact-discovery?${params}`, { cache: "no-store" })
+        await refreshContactDiscoveryResults()
+      } finally {
+        setContactDiscoveryBusy(false)
+      }
+    },
+    [companiesWithContactCoverage, peopleRows, refreshContactDiscoveryResults, runPeopleAction],
   )
 
   const handleSavePeopleToList = useCallback(async () => {
@@ -1316,6 +1355,8 @@ function ProspectSearchShellInner() {
       data-contact-verification-depth-marker={GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER}
       data-contact-ranking-marker={GROWTH_CONTACT_RANKING_QA_MARKER}
       data-revenue-persona-marker={GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER}
+      data-account-strategy-marker={GROWTH_ACCOUNT_CONTACT_STRATEGY_QA_MARKER}
+      data-multi-contact-orchestration-marker={GROWTH_MULTI_CONTACT_ORCHESTRATION_QA_MARKER}
       data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
       data-contact-discovery-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}
       data-website-contact-provider-marker={GROWTH_WEBSITE_CONTACT_PROVIDER_QA_MARKER}
@@ -1696,6 +1737,7 @@ function ProspectSearchShellInner() {
                       checked={selectedKeys.has(prospectSearchSelectionKey(row))}
                       onSelect={() => setSelectedCompany(row)}
                       onCheckedChange={(checked) => toggleCompanySelection(row, checked)}
+                      onResearchAction={(actionId) => void handleAccountResearchAction(row.id, actionId)}
                       onAction={(action, extra) => {
                         setSelectedCompany(row)
                         void runAction(action, { ...extra, company: row })
@@ -1743,6 +1785,9 @@ function ProspectSearchShellInner() {
                         onSelect={() => setSelectedCompany(selectedCompany)}
                         onCheckedChange={(checked) =>
                           toggleCompanySelection(selectedCompany, checked === true)
+                        }
+                        onResearchAction={(actionId) =>
+                          void handleAccountResearchAction(selectedCompany.id, actionId)
                         }
                         onAction={(action, extra) => {
                           void runAction(action, { ...extra, company: selectedCompany })

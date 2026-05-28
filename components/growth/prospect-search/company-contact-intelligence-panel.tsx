@@ -4,14 +4,17 @@ import { Target, UserRound, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
 import { GROWTH_CONTACT_RANKING_QA_MARKER, GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
+import { ProspectSearchAccountStrategyPanel } from "@/components/growth/prospect-search/prospect-search-account-strategy-panel"
 import { ProspectSearchSchemaHealthNotice } from "@/components/growth/prospect-search/prospect-search-schema-health-notice"
 
 export function CompanyContactIntelligencePanel({
   companyName,
   intelligence,
+  onResearchAction,
 }: {
   companyName: string
   intelligence: GrowthProspectSearchContactIntelligence | null | undefined
+  onResearchAction?: (actionId: string) => void
 }) {
   if (!intelligence) return null
 
@@ -35,6 +38,15 @@ export function CompanyContactIntelligencePanel({
       </div>
 
       <ProspectSearchSchemaHealthNotice health={intelligence.schema_health} />
+
+      {intelligence.account_contact_strategy ? (
+        <div className="mt-3">
+          <ProspectSearchAccountStrategyPanel
+            strategy={intelligence.account_contact_strategy}
+            onResearchAction={onResearchAction}
+          />
+        </div>
+      ) : null}
 
       {intelligence.company_contact_coverage ? (
         <div className="mt-3 rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs">

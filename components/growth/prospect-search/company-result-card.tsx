@@ -38,6 +38,7 @@ export function CompanyResultCard({
   workflowBusy = false,
   searchQuery,
   savedSearchId,
+  onResearchAction,
 }: {
   row: GrowthProspectSearchCompanyResult
   selected: boolean
@@ -45,6 +46,7 @@ export function CompanyResultCard({
   onSelect: () => void
   onCheckedChange: (checked: boolean) => void
   onAction: (action: string, extra?: Record<string, unknown>) => void
+  onResearchAction?: (actionId: string) => void
   onWorkflowLaunch?: (input: {
     actionId: string
     launchUrl?: string | null
@@ -132,6 +134,12 @@ export function CompanyResultCard({
       </div>
 
       <CompanyStatusBadges row={row} />
+      {row.contact_intelligence?.account_contact_strategy ? (
+        <p className="text-xs font-medium text-cyan-900">
+          {row.contact_intelligence.account_contact_strategy.strategy_summary ??
+            row.contact_intelligence.account_contact_strategy.safest_next_action}
+        </p>
+      ) : null}
       <ResultSignalBadges row={row} />
       <CompanySignalMomentumPanel row={row} className="mt-1" />
       <CompanySignalAiInsightPanel row={row} />
@@ -179,6 +187,7 @@ export function CompanyResultCard({
           <CompanyContactIntelligencePanel
             companyName={row.company_name}
             intelligence={row.contact_intelligence}
+            onResearchAction={onResearchAction}
           />
           {row.contact_intelligence?.company_contact_coverage?.ranking_summary ? (
             <p className="text-xs font-medium text-violet-900">

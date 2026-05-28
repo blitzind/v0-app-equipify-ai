@@ -485,13 +485,32 @@ export function buildLeadEngineContactHandoffContext(
       ? `${staleCount} contact${staleCount === 1 ? "" : "s"} stale or expired — refresh before outreach`
       : null
 
+  const accountStrategy = intelligence?.account_contact_strategy
+  const strategySummary = accountStrategy
+    ? [
+        accountStrategy.strategy_summary,
+        accountStrategy.primary_contact
+          ? `Primary: ${accountStrategy.primary_contact.full_name ?? "Contact"} (${accountStrategy.primary_contact.persona_label}) via ${accountStrategy.recommended_channel}`
+          : null,
+        accountStrategy.secondary_contacts.length > 0
+          ? `Backup: ${accountStrategy.secondary_contacts.map((c) => c.full_name ?? c.persona_label).join(", ")}`
+          : null,
+        accountStrategy.blocked_contacts.length > 0
+          ? `Blocked: ${accountStrategy.blocked_contacts.map((c) => `${c.full_name ?? "Contact"} (${c.block_reason ?? "compliance"})`).join("; ")}`
+          : null,
+        accountStrategy.contact_research_next_step,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : null
+
   return {
     first_contact_role: intelligence?.first_contact?.role ?? null,
     first_contact_name: intelligence?.first_contact?.name ?? null,
     first_contact_confidence: intelligence?.first_contact?.confidence ?? null,
     committee_completeness_pct: intelligence?.committee_completeness_pct ?? null,
     contact_count: contactCount,
-    summary: [intelligence?.outreach_recommendation ?? null, freshnessNote]
+    summary: [strategySummary, intelligence?.outreach_recommendation ?? null, freshnessNote]
       .filter(Boolean)
       .join(" · ") || null,
     email_available: emailAvailable,
@@ -509,6 +528,23 @@ export function buildLeadEngineContactHandoffContext(
       contacts.find((c) => c.id === firstContact?.contact_id)?.freshness_status ?? null,
     confidence_reason: firstContact
       ? `${Math.round(firstContact.confidence * 100)}% confidence from evidence-backed sources`
+      : null,
+    account_strategy: accountStrategy
+      ? {
+          readiness_tier: accountStrategy.account_outreach_readiness,
+          recommended_channel: accountStrategy.recommended_channel,
+          strategy_summary: accountStrategy.strategy_summary,
+          primary_contact_id: accountStrategy.primary_contact?.contact_id ?? null,
+          primary_contact_name: accountStrategy.primary_contact?.full_name ?? null,
+          secondary_contact_ids: accountStrategy.secondary_contacts.map((c) => c.contact_id),
+          blocked_contact_ids: accountStrategy.blocked_contacts.map((c) => c.contact_id),
+          blocked_reasons: accountStrategy.blocked_contacts.map(
+            (c) => c.block_reason ?? "compliance blocked",
+          ),
+          missing_personas: accountStrategy.missing_personas,
+          safest_next_action: accountStrategy.safest_next_action,
+          contact_research_next_step: accountStrategy.contact_research_next_step,
+        }
       : null,
   }
 }

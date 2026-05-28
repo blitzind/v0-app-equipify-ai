@@ -81,6 +81,7 @@ export type GrowthProspectSearchContactIntelligence = {
   recommended_contact_id?: string | null
   schema_health?: GrowthSchemaHealthSummary | null
   company_contact_coverage?: import("@/lib/growth/prospect-search/prospect-search-company-contact-coverage-intelligence").ProspectSearchCompanyContactCoverageIntelligence | null
+  account_contact_strategy?: import("@/lib/growth/prospect-search/prospect-search-account-contact-strategy").ProspectSearchAccountContactStrategy | null
 }
 
 export type ProspectSearchLeadEngineContactHandoffContext = {
@@ -98,4 +99,17 @@ export type ProspectSearchLeadEngineContactHandoffContext = {
   contact_research_required_message: string | null
   freshness_status?: string | null
   confidence_reason?: string | null
+  account_strategy?: {
+    readiness_tier: string
+    recommended_channel: string
+    strategy_summary: string | null
+    primary_contact_id: string | null
+    primary_contact_name: string | null
+    secondary_contact_ids: string[]
+    blocked_contact_ids: string[]
+    blocked_reasons: string[]
+    missing_personas: string[]
+    safest_next_action: string
+    contact_research_next_step: string | null
+  } | null
 }

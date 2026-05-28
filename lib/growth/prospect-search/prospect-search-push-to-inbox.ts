@@ -69,7 +69,12 @@ export async function pushProspectSearchCompanyToLeadInbox(
     : "normal"
 
   const coverage = company.contact_intelligence?.company_contact_coverage
+  const accountStrategy = company.contact_intelligence?.account_contact_strategy
   const rankingReasons = [
+    ...(accountStrategy?.queue_prioritization_reason
+      ? [accountStrategy.queue_prioritization_reason]
+      : []),
+    ...(accountStrategy?.strategy_summary ? [accountStrategy.strategy_summary] : []),
     ...(coverage?.ranking_summary ? [coverage.ranking_summary] : []),
     ...(coverage?.coverage_label ? [`Contact coverage: ${coverage.coverage_label}`] : []),
     ...(coverage?.persona_gap_suggestions?.slice(0, 2) ?? []),
@@ -206,9 +211,13 @@ export async function executeBulkPushToLeadInbox(
     const companyA = resolved.get(prospectSearchSelectionKey(a))
     const companyB = resolved.get(prospectSearchSelectionKey(b))
     const scoreA =
-      companyA?.contact_intelligence?.company_contact_coverage?.outreach_readiness_score ?? 0
+      companyA?.contact_intelligence?.account_contact_strategy?.queue_priority_score ??
+      companyA?.contact_intelligence?.company_contact_coverage?.outreach_readiness_score ??
+      0
     const scoreB =
-      companyB?.contact_intelligence?.company_contact_coverage?.outreach_readiness_score ?? 0
+      companyB?.contact_intelligence?.account_contact_strategy?.queue_priority_score ??
+      companyB?.contact_intelligence?.company_contact_coverage?.outreach_readiness_score ??
+      0
     return scoreB - scoreA
   })
 

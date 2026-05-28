@@ -246,11 +246,30 @@ export async function executeProspectSearchAction(
           row.call_eligibility !== "blocked",
       )
       .sort((a, b) => (b.outreach_rank_score ?? 0) - (a.outreach_rank_score ?? 0))
-    const blocked = people.length - callReady.length
+    const blockedRows = people.filter(
+      (row) =>
+        !row.call_ready ||
+        row.call_eligibility === "suppressed" ||
+        row.call_eligibility === "blocked" ||
+        row.priority_tier === "blocked",
+    )
+    const blocked = blockedRows.length
     const companiesById = new Map<string, GrowthProspectSearchCompanyResult>()
     for (const row of callReady) {
       if (row.company) companiesById.set(row.company_id, row.company)
     }
+
+    const sortedCompanies = [...companiesById.values()].sort((a, b) => {
+      const scoreA =
+        a.contact_intelligence?.account_contact_strategy?.queue_priority_score ??
+        a.contact_intelligence?.company_contact_coverage?.outreach_readiness_score ??
+        0
+      const scoreB =
+        b.contact_intelligence?.account_contact_strategy?.queue_priority_score ??
+        b.contact_intelligence?.company_contact_coverage?.outreach_readiness_score ??
+        0
+      return scoreB - scoreA
+    })
 
     if (companiesById.size === 0) {
       return {
@@ -267,22 +286,39 @@ export async function executeProspectSearchAction(
       query: input.query ?? "",
       filters: input.filters,
       discovery_mode: input.discovery_mode,
-      selected: [...companiesById.values()].map((company) => ({
+      selected: sortedCompanies.map((company) => ({
         source_type: company.source_type,
         id: company.id,
         company_name: company.company_name,
       })),
     })
 
+    const blockedSummary =
+      blockedRows.length > 0
+        ? blockedRows
+            .slice(0, 3)
+            .map(
+              (row) =>
+                `${row.full_name ?? "Contact"}: ${row.call_block_reason ?? row.call_eligibility}`,
+            )
+            .join("; ")
+        : null
+
     return {
       ok: bulkResult.ok,
       action,
-      message: `${callReady.length} contact${callReady.length === 1 ? "" : "s"} routed to call queue review${blocked > 0 ? ` (${blocked} blocked by compliance)` : ""}.`,
+      message: `${callReady.length} contact${callReady.length === 1 ? "" : "s"} routed to call queue review${blocked > 0 ? ` (${blocked} skipped — ${blockedSummary ?? "compliance blocked"})` : ""}.`,
       workspace_url: "/admin/growth/leads/queue",
       selected_total: callReady.length,
       pushed: bulkResult.pushed,
       suppressed: blocked + (bulkResult.suppressed ?? 0),
       failed: bulkResult.failed,
+      skipped_blocked_contacts: blockedRows.map((row) => ({
+        contact_id: row.contact_id,
+        full_name: row.full_name ?? null,
+        company_name: row.company_name,
+        reason: row.call_block_reason ?? row.call_eligibility ?? "blocked",
+      })),
     }
   }
 

@@ -9,9 +9,12 @@ import {
   GROWTH_CONTACT_RANKING_QA_MARKER,
   GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER,
   GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER,
+  GROWTH_ACCOUNT_CONTACT_STRATEGY_QA_MARKER,
+  GROWTH_MULTI_CONTACT_ORCHESTRATION_QA_MARKER,
   GROWTH_PEOPLE_WORKFLOWS_QA_MARKER,
   type GrowthProspectSearchPeopleResultRow,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
+import { ProspectSearchAccountStrategyPanel } from "@/components/growth/prospect-search/prospect-search-account-strategy-panel"
 import { formatProspectSearchFreshnessLabel } from "@/lib/growth/prospect-search/prospect-search-contact-freshness"
 
 function eligibilityBadgeVariant(state: string): "default" | "outline" | "destructive" | "secondary" {
@@ -42,6 +45,8 @@ export function ProspectSearchContactEvidenceDrawer({
       data-contact-freshness-marker={GROWTH_CONTACT_FRESHNESS_QA_MARKER}
       data-contact-ranking-marker={GROWTH_CONTACT_RANKING_QA_MARKER}
       data-revenue-persona-marker={GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER}
+      data-account-strategy-marker={GROWTH_ACCOUNT_CONTACT_STRATEGY_QA_MARKER}
+      data-multi-contact-orchestration-marker={GROWTH_MULTI_CONTACT_ORCHESTRATION_QA_MARKER}
       data-contact-verification-depth-marker={GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER}
       onClick={onClose}
     >
@@ -104,6 +109,27 @@ export function ProspectSearchContactEvidenceDrawer({
               ))}
             </ul>
           </section>
+
+          {row.company.contact_intelligence?.account_contact_strategy ? (
+            <section>
+              <h4 className="font-medium text-foreground">Account outreach strategy</h4>
+              <div className="mt-2">
+                <ProspectSearchAccountStrategyPanel
+                  strategy={row.company.contact_intelligence.account_contact_strategy}
+                  compact
+                />
+              </div>
+              {row.is_recommended_contact ? (
+                <p className="mt-2 text-muted-foreground">
+                  This contact is the recommended primary for {row.company_name}.
+                </p>
+              ) : row.is_secondary_contact ? (
+                <p className="mt-2 text-muted-foreground">
+                  This contact is a backup outreach target for {row.company_name}.
+                </p>
+              ) : null}
+            </section>
+          ) : null}
 
           <section>
             <h4 className="font-medium text-foreground">Freshness</h4>

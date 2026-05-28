@@ -4030,6 +4030,99 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   )
   assert.match(pushSource, /outreach_readiness_score/)
   assert.match(pushSource, /sortedSelected/)
+  assert.match(pushSource, /account_contact_strategy/)
+
+  const {
+    buildProspectSearchAccountContactStrategy,
+    resolveRecommendedChannelForContact,
+    prioritizeProspectSearchAccountsForQueue,
+    GROWTH_ACCOUNT_CONTACT_STRATEGY_QA_MARKER,
+    GROWTH_MULTI_CONTACT_ORCHESTRATION_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-account-contact-strategy")
+
+  assert.equal(GROWTH_ACCOUNT_CONTACT_STRATEGY_QA_MARKER, "growth-account-contact-strategy-v1")
+  assert.equal(
+    GROWTH_MULTI_CONTACT_ORCHESTRATION_QA_MARKER,
+    "growth-multi-contact-orchestration-v1",
+  )
+
+  const emailChannel = resolveRecommendedChannelForContact({
+    contact_id: "c1",
+    persona_label: "Operations Manager",
+    persona_type: "operations_manager",
+    outreach_rank_score: 0.85,
+    priority_tier: "high_priority",
+    freshness_status: "fresh",
+    email_available: true,
+    phone_available: false,
+    call_ready: false,
+    sms_ready: false,
+    email_eligibility: "eligible",
+    call_eligibility: "unsupported",
+    sms_eligibility: "unsupported",
+    email_verification_depth: "published_on_website",
+  })
+  assert.equal(emailChannel.channel, "email")
+
+  const strategy = buildProspectSearchAccountContactStrategy({
+    company_id: "co1",
+    company_name: "Acme HVAC",
+    contacts: [
+      {
+        contact_id: "c1",
+        full_name: "Jamie Smith",
+        title: "Operations Manager",
+        persona_label: "Operations Manager",
+        persona_type: "operations_manager",
+        outreach_rank_score: 0.88,
+        priority_tier: "high_priority",
+        freshness_status: "fresh",
+        email_available: true,
+        phone_available: true,
+        call_ready: true,
+        sms_ready: false,
+        email_eligibility: "eligible",
+        call_eligibility: "eligible",
+        sms_eligibility: "unsupported",
+        is_recommended_contact: true,
+        ranking_reasons: ["Strong Operations Manager persona match"],
+      },
+      {
+        contact_id: "c2",
+        full_name: "Blocked User",
+        title: "Owner",
+        persona_label: "Owner",
+        persona_type: "owner",
+        outreach_rank_score: 0.9,
+        priority_tier: "blocked",
+        freshness_status: "fresh",
+        email_available: true,
+        phone_available: true,
+        call_ready: false,
+        sms_ready: false,
+        email_eligibility: "blocked",
+        call_eligibility: "blocked",
+        sms_eligibility: "blocked",
+        phone_on_dnc: true,
+        call_block_reason: "DNC blocked",
+      },
+    ],
+    coverage: coverage,
+  })
+  assert.equal(strategy.primary_contact?.contact_id, "c1")
+  assert.equal(strategy.account_outreach_readiness, "ready")
+  assert.ok(strategy.strategy_summary?.includes("Jamie Smith"))
+  assert.equal(strategy.blocked_contacts.length, 1)
+  assert.ok(strategy.research_actions.length >= 0)
+
+  const accountPanelSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-account-strategy-panel.tsx"),
+    "utf8",
+  )
+  assert.match(accountPanelSource, /data-account-strategy-marker/)
+  assert.match(accountPanelSource, /data-multi-contact-orchestration-marker/)
+  assert.match(shellSource, /data-account-strategy-marker/)
+  assert.match(drawerSource, /Account outreach strategy/)
 }
 
 void main()

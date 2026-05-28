@@ -59,6 +59,8 @@ export function buildProspectSearchLeadEngineHandoffInput(
     company.lead_engine_score != null ? `Lead Engine score: ${company.lead_engine_score}` : null,
     company.lead_engine_score_explanation,
     intelligence?.outreach_recommendation ?? null,
+    intelligence?.account_contact_strategy?.strategy_summary ?? null,
+    intelligence?.account_contact_strategy?.safest_next_action ?? null,
     intelligence?.company_contact_coverage?.ranking_summary ?? null,
     intelligence?.company_contact_coverage?.coverage_label
       ? `Coverage: ${intelligence.company_contact_coverage.coverage_label}`
@@ -141,6 +143,7 @@ function decodeContactHandoffContext(
       contact_research_required_message: parsed.contact_research_required_message ?? null,
       freshness_status: parsed.freshness_status ?? null,
       confidence_reason: parsed.confidence_reason ?? null,
+      account_strategy: parsed.account_strategy ?? null,
     }
   } catch {
     return null
