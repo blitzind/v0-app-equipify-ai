@@ -154,14 +154,14 @@ const navDestinations = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts"),
   "utf8",
 )
-assert.match(navDestinations, /\/admin\/growth\/calls\/workspace/)
-assert.match(navDestinations, /Call Workspace/)
+assert.match(navDestinations, /GROWTH_CALLS_PRIMARY_HREF/)
+assert.match(navDestinations, /growthCallsNavMatch/)
 
 const callActionSheet = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-action-sheet.tsx"),
   "utf8",
 )
-assert.match(callActionSheet, /Open in Call Workspace/)
+assert.match(callActionSheet, /Open in Calls/)
 
 const commandCenter = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-lead-command-center.tsx"),

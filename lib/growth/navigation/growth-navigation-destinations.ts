@@ -6,6 +6,13 @@ import {
   GROWTH_PROSPECT_SEARCH_DISCOVER_HREF,
 } from "@/lib/growth/navigation/growth-command-registry"
 import type { GrowthCommandPaletteEntry } from "@/lib/growth/navigation/growth-navigation-ranking"
+import {
+  GROWTH_CALLS_PRIMARY_HREF,
+  GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER,
+  GROWTH_WORKSPACE_GROUP_DESCRIPTION,
+} from "@/lib/growth/navigation/growth-workspace-consolidation"
+
+export { GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER, GROWTH_WORKSPACE_GROUP_DESCRIPTION }
 
 export const GROWTH_NAVIGATION_IA_QA_MARKER = "growth-navigation-ia-v2" as const
 export const GROWTH_DELIVERY_OPS_NAV_QA_MARKER = "growth-delivery-ops-nav-v1" as const
@@ -62,6 +69,14 @@ function prefixMatch(prefix: string, exclude: string[] = []) {
     if (!path.startsWith(prefix)) return false
     return !exclude.some((ex) => path.startsWith(ex))
   }
+}
+
+function growthCallsNavMatch(path: string): boolean {
+  if (path.startsWith("/admin/growth/calls/providers")) return false
+  if (path.startsWith("/admin/growth/calls/voice-drops")) return false
+  if (path.startsWith("/admin/growth/leads/queue")) return true
+  if (path.startsWith("/admin/growth/calls")) return true
+  return false
 }
 
 function exactMatch(route: string) {
@@ -179,17 +194,17 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["lead engine", "inspector", "pipeline", "lead intelligence", "pipeline inspector"],
   },
   {
-    id: "call-workspace",
-    label: "Call Workspace",
-    href: "/admin/growth/calls/workspace",
-    keywords: ["dial", "call", "live", "dialer", "phone", "live calls"],
+    id: "calls",
+    label: "Calls",
+    href: GROWTH_CALLS_PRIMARY_HREF,
+    keywords: ["call", "dial", "phone", "live call", "workspace", "copilot", "coaching"],
     consoleKey: "calls_workspace",
   },
   {
     id: "calls-live",
-    label: "Live Calls",
+    label: "Calls — Live monitor",
     href: "/admin/growth/calls/live",
-    keywords: ["live calls", "active calls", "phone"],
+    keywords: ["live calls", "active calls", "phone", "live monitor"],
     consoleKey: "calls_live",
   },
   {
@@ -377,7 +392,7 @@ export const GROWTH_COMMAND_PALETTE_ENTRIES: GrowthCommandPaletteEntry[] = [
     href: dest.href,
     keywords: dest.keywords,
     aliases: dest.keywords,
-    coreWorkflow: ["command", "inbox", "search", "intent-pixel", "call-workspace", "unified-inbox"].includes(dest.id),
+    coreWorkflow: ["command", "inbox", "search", "intent-pixel", "calls", "unified-inbox"].includes(dest.id),
     group: "navigate" as const,
   })),
   ...GROWTH_NAV_QUICK_ACTIONS_SECONDARY.map((action) => ({
@@ -425,19 +440,11 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
       },
       {
         id: "calls",
-        href: "/admin/growth/calls",
+        href: GROWTH_CALLS_PRIMARY_HREF,
         label: "Calls",
-        consoleKey: "calls",
+        consoleKey: "calls_workspace",
         shortcutKey: "c",
-        match: (path) => {
-          if (path.startsWith("/admin/growth/calls/workspace")) return false
-          if (path.startsWith("/admin/growth/calls/providers")) return false
-          if (path.startsWith("/admin/growth/calls/live-coaching")) return false
-          if (path.startsWith("/admin/growth/leads/queue")) return true
-          if (path === "/admin/growth/calls") return true
-          if (path.startsWith("/admin/growth/calls/live")) return true
-          return false
-        },
+        match: growthCallsNavMatch,
       },
       {
         id: "meetings",
@@ -656,13 +663,6 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
           path.startsWith("/admin/growth/sequences") && !path.startsWith("/admin/growth/sequences/execution"),
       },
       {
-        id: "call-workspace",
-        href: "/admin/growth/calls/workspace",
-        label: "Call Workspace",
-        consoleKey: "calls_workspace",
-        match: prefixMatch("/admin/growth/calls/workspace"),
-      },
-      {
         id: "outreach-approval",
         href: "/admin/growth/outreach/approval",
         label: "Outreach Approval",
@@ -687,20 +687,6 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         href: "/admin/growth/multichannel",
         label: "Multi-Channel",
         match: prefixMatch("/admin/growth/multichannel"),
-      },
-      {
-        id: "live-coaching",
-        href: "/admin/growth/calls/live-coaching",
-        label: "Live Coaching",
-        consoleKey: "calls_live_coaching",
-        match: prefixMatch("/admin/growth/calls/live-coaching"),
-      },
-      {
-        id: "call-providers",
-        href: "/admin/growth/calls/providers",
-        label: "Call Providers",
-        consoleKey: "calls_providers",
-        match: prefixMatch("/admin/growth/calls/providers"),
       },
       {
         id: "human-execution",

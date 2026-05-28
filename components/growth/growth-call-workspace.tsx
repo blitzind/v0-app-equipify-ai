@@ -53,7 +53,7 @@ import { VOICE_AI_RECEPTIONIST_QA_MARKER } from "@/lib/voice/ai-receptionist/typ
 import { VOICE_MISSED_CALL_RECOVERY_QA_MARKER } from "@/lib/voice/missed-call-recovery/types"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
-export function GrowthCallWorkspace() {
+export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader?: boolean }) {
   const { toast } = useToast()
   const searchParams = useSearchParams()
   const initialLeadId = searchParams.get("leadId")
@@ -442,6 +442,7 @@ export function GrowthCallWorkspace() {
         </p>
       ) : null}
 
+      {hidePageHeader ? null : (
       <section className="rounded-2xl border border-border/70 bg-card/90 p-5 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-slate-950/70">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -449,9 +450,9 @@ export function GrowthCallWorkspace() {
               <Headphones size={18} />
             </span>
             <div>
-              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Call Workspace</h1>
+              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Calls</h1>
               <p className="text-sm text-muted-foreground">
-                Native dialer with unified operator assist, prospect intelligence, and operator wrap-up.
+                Native dialer with embedded intelligence, coaching, and operator wrap-up.
               </p>
             </div>
           </div>
@@ -461,6 +462,7 @@ export function GrowthCallWorkspace() {
           </Button>
         </div>
       </section>
+      )}
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 

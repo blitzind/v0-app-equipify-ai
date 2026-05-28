@@ -30,11 +30,10 @@ export const GROWTH_COMMAND_QUERY_BOOSTS: Record<string, Record<string, number>>
     search: 60,
   },
   call: {
-    "call-workspace": 120,
+    calls: 120,
     "calls-live": 110,
     "call-queue": 105,
-    calls: 90,
-    "live-coaching": 70,
+    "start-live-call": 95,
   },
   prospect: {
     search: 120,
@@ -43,13 +42,11 @@ export const GROWTH_COMMAND_QUERY_BOOSTS: Record<string, Record<string, number>>
     "lead-engine-inspector": 75,
   },
   coach: {
-    "live-coaching": 120,
-    "call-providers": 100,
-    "call-workspace": 70,
+    calls: 110,
+    "calls-live": 100,
   },
   provider: {
     providers: 120,
-    "call-providers": 110,
     "provider-settings": 80,
   },
   discover: {
@@ -65,7 +62,8 @@ const CORE_WORKFLOW_IDS = new Set([
   "search",
   "prospect-search",
   "intent-pixel",
-  "call-workspace",
+  "calls",
+  "start-live-call",
   "open-inbox",
   "unified-inbox",
 ])

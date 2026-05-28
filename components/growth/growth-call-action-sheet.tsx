@@ -276,7 +276,7 @@ export function GrowthCallActionSheet({
         <DialogHeader className="shrink-0 border-b px-6 py-5 text-left">
           <DialogTitle>Call {contactLabel ?? "contact"}</DialogTitle>
           <DialogDescription>
-            Dial via your configured channel, then start Realtime Coaching or Call Copilot in the lead drawer.
+            Dial via your configured channel, then use embedded coaching and call assistance from the lead drawer or Calls workspace.
           </DialogDescription>
         </DialogHeader>
 
@@ -336,7 +336,7 @@ export function GrowthCallActionSheet({
                       <Button asChild className="min-h-11 w-full justify-start" variant="secondary">
                         <Link href={nativeCallWorkspaceHref({ leadId, phone })}>
                           <Headphones className="mr-2 size-4 shrink-0" />
-                          Open in Call Workspace
+                          Open in Calls
                         </Link>
                       </Button>
                     </div>

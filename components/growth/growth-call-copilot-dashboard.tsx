@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import { Loader2, Phone, RefreshCw, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -9,8 +10,9 @@ import {
   GROWTH_CALL_COPILOT_BUYING_SIGNAL_LABELS,
   GROWTH_CALL_COPILOT_COMMITMENT_SIGNAL_LABELS,
 } from "@/lib/growth/call-copilot-types"
+import { commandLeadFocusHref } from "@/lib/growth/command/command-action-catalog"
 
-export function GrowthCallCopilotDashboard() {
+export function GrowthCallCopilotDashboard({ embedded = false }: { embedded?: boolean }) {
   const [dashboard, setDashboard] = useState<GrowthCallCopilotDashboard | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -70,7 +72,7 @@ export function GrowthCallCopilotDashboard() {
         <StatTile label="Avg outcome confidence" value={dashboard.stats.avgOutcomeConfidence} />
       </div>
 
-      <GrowthEngineCard title="Active Call Copilot Sessions">
+      <GrowthEngineCard title={embedded ? "Active call sessions" : "Active Call Copilot Sessions"}>
         {dashboard.activeSessions.length === 0 ? (
           <p className="text-sm text-muted-foreground">No active sessions.</p>
         ) : (
@@ -84,6 +86,13 @@ export function GrowthCallCopilotDashboard() {
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   {session.highRiskCall ? <GrowthBadge label="High risk" tone="attention" /> : null}
                   <GrowthBadge label={`confidence ${session.callOutcomeConfidence}`} tone="neutral" />
+                  {session.leadId ? (
+                    <Button type="button" size="sm" variant="outline" asChild>
+                      <Link href={commandLeadFocusHref(session.leadId, "call-copilot", session.id)}>
+                        Open lead
+                      </Link>
+                    </Button>
+                  ) : null}
                 </div>
               </li>
             ))}

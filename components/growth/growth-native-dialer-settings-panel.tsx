@@ -72,7 +72,7 @@ export function GrowthNativeDialerSettingsPanel() {
     <GrowthSettingsCard title="Native Dialer providers" icon={<Phone className="size-4" />}>
       <div className={GROWTH_SETTINGS_SECTION_GAP} data-qa-marker={GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER}>
         <p className="text-sm text-muted-foreground">
-          Operator-controlled telephony adapters for the Call Workspace. Google Voice Bridge opens Google Voice
+          Operator-controlled telephony adapters for Calls. Google Voice Bridge opens Google Voice
           externally — no stored credentials or autonomous dialing.
         </p>
         <p className="text-sm text-muted-foreground">

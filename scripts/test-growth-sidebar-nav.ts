@@ -16,6 +16,7 @@ import {
   GROWTH_DELIVERY_OPS_NAV_SECTIONS,
   GROWTH_NAVIGATION_IA_QA_MARKER,
   GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER,
+  GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER,
   resolveGrowthNavigationEntryFromPathname,
 } from "../lib/growth/navigation/growth-navigation-destinations"
 import { GROWTH_COMMAND_REGISTRY } from "../lib/growth/navigation/growth-command-registry"
@@ -85,7 +86,9 @@ assert.match(source, /data-qa=\{GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARK
 assert.match(source, /GrowthNavGroupedLinks/)
 assert.match(source, /GrowthNavSubsectionHeader/)
 assert.match(source, /GROWTH_DELIVERY_OPS_NAV_QA_MARKER/)
-assert.match(source, /pipeline: Funnel/)
+assert.equal(GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER, "growth-workspace-consolidation-v2")
+assert.match(source, /data-workspace-consolidation-marker/)
+assert.match(source, /GROWTH_WORKSPACE_GROUP_DESCRIPTION/)
 
 const coreGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "core")
 assert.equal(coreGroup?.label, "Workspace")
@@ -120,11 +123,17 @@ const executionGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "execution")
 assert.equal(executionGroup?.label, "Execution")
 assert.ok(executionGroup?.items.some((i) => i.label === "Outreach"))
 assert.ok(executionGroup?.items.some((i) => i.label === "Sequences"))
-assert.ok(executionGroup?.items.some((i) => i.label === "Call Workspace"))
+assert.ok(!executionGroup?.items.some((i) => i.label === "Call Workspace"))
 assert.ok(executionGroup?.items.some((i) => i.label === "Outreach Approval"))
 assert.ok(executionGroup?.items.some((i) => i.label === "Sequence Execution"))
-assert.ok(executionGroup?.items.some((i) => i.label === "Live Coaching"))
-assert.ok(executionGroup?.items.some((i) => i.label === "Call Providers"))
+assert.ok(!executionGroup?.items.some((i) => i.label === "Live Coaching"))
+assert.ok(!executionGroup?.items.some((i) => i.label === "Call Providers"))
+
+const callsItem = coreGroup?.items.find((i) => i.id === "calls")
+assert.equal(callsItem?.href, "/admin/growth/calls/workspace")
+assert.equal(callsItem?.match("/admin/growth/calls/workspace"), true)
+assert.equal(callsItem?.match("/admin/growth/calls/live"), true)
+assert.equal(callsItem?.match("/admin/growth/calls/providers"), false)
 
 const providersGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "providers-nav")
 assert.equal(providersGroup?.label, "Delivery Ops")

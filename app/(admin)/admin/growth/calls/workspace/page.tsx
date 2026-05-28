@@ -1,7 +1,7 @@
 "use client"
 
 import { Suspense } from "react"
-import { GrowthCallWorkspace } from "@/components/growth/growth-call-workspace"
+import { GrowthCallsOperatingShell } from "@/components/growth/growth-calls-operating-shell"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -11,7 +11,7 @@ import {
 import { useAdmin } from "@/lib/admin-store"
 
 function WorkspaceFallback() {
-  return <p className="text-sm text-muted-foreground">Loading call workspace…</p>
+  return <p className="text-sm text-muted-foreground">Loading calls…</p>
 }
 
 export default function AdminGrowthCallWorkspacePage() {
@@ -29,7 +29,7 @@ export default function AdminGrowthCallWorkspacePage() {
 
         <GrowthSectionLayout>
           <Suspense fallback={<WorkspaceFallback />}>
-            <GrowthCallWorkspace />
+            <GrowthCallsOperatingShell />
           </Suspense>
         </GrowthSectionLayout>
       </div>

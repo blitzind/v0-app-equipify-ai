@@ -52,7 +52,7 @@ export const GROWTH_COMMAND_REGISTRY: GrowthCommandRegistryEntry[] = [
     label: "Start Live Call",
     href: "/admin/growth/calls/workspace",
     keywords: ["call", "dial", "phone", "live call", "workspace"],
-    aliases: ["dialer", "call workspace"],
+    aliases: ["dialer", "calls", "call workspace"],
     coreWorkflow: true,
     paletteEnabled: true,
   },

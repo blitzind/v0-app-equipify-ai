@@ -56,11 +56,9 @@ const requiredIds = [
   "intent-pixel",
   "lead-intelligence",
   "outreach-approval",
-  "call-workspace",
+  "calls",
   "calls-live",
   "call-queue",
-  "live-coaching",
-  "call-providers",
   "providers",
   "settings",
 ]

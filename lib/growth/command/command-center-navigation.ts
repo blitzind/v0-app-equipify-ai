@@ -1,5 +1,7 @@
 /** Client-safe Growth Command Center navigation destinations and section anchors. */
 
+import { GROWTH_CALLS_PRIMARY_HREF } from "@/lib/growth/navigation/growth-workspace-consolidation"
+
 export type GrowthCommandNavLink = {
   label: string
   href: string
@@ -40,10 +42,10 @@ export const GROWTH_COMMAND_SECTION_TABS: readonly GrowthCommandSectionTab[] = [
 
 export const GROWTH_COMMAND_COMM_SECTION_LINKS: readonly GrowthCommandNavLink[] = [
   { label: "Inbox", href: "/admin/growth/leads" },
-  { label: "Calls", href: "/admin/growth/calls" },
+  { label: "Calls", href: GROWTH_CALLS_PRIMARY_HREF },
   { label: "Meetings", href: "/admin/growth/meetings" },
   { label: "Cadence", href: "/admin/growth/sequences/execution" },
-  { label: "Coaching", href: "/admin/growth/calls/live-coaching" },
+  { label: "Live monitor", href: "/admin/growth/calls/live" },
 ] as const
 
 export const GROWTH_COMMAND_PIPELINE_SECTION_LINKS: readonly GrowthCommandNavLink[] = [

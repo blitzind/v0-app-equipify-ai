@@ -78,6 +78,8 @@ import {
   GROWTH_DELIVERY_OPS_NAV_QA_MARKER,
   GROWTH_NAVIGATION_IA_QA_MARKER,
   GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER,
+  GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER,
+  GROWTH_WORKSPACE_GROUP_DESCRIPTION,
   growthNavigationShortcutLabel,
   normalizeGrowthPathname,
   safeMatchGrowthNavItem,
@@ -122,7 +124,7 @@ const GROWTH_NAV_ICONS: Record<string, LucideIcon> = {
   "reply-inbox": Mail,
   meetings: CalendarClock,
   "call-queue": Phone,
-  "call-workspace": Headphones,
+  calls: Headphones,
   "sequence-execution": PlayCircle,
   engagement: Activity,
   conversations: MessageSquare,
@@ -132,7 +134,6 @@ const GROWTH_NAV_ICONS: Record<string, LucideIcon> = {
   revenue: TrendingUp,
   executive: Crown,
   capacity: Gauge,
-  calls: Phone,
   "calls-live": Radio,
   "live-coaching": Sparkles,
   "call-providers": Plug,
@@ -987,8 +988,18 @@ function GrowthNavGroups({
               </button>
             ) : null}
             {!showHeader && !compact && !collapsed ? (
-              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {group.label}
+              <div className="mb-1.5 px-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
+                {group.id === "core" ? (
+                  <p className="mt-0.5 text-[10px] normal-case leading-snug text-muted-foreground/90">
+                    {GROWTH_WORKSPACE_GROUP_DESCRIPTION}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            {showHeader && group.id === "core" && !groupCollapsed ? (
+              <p className="mb-1.5 px-3 text-[10px] normal-case leading-snug text-muted-foreground/90">
+                {GROWTH_WORKSPACE_GROUP_DESCRIPTION}
               </p>
             ) : null}
             <div
@@ -1232,6 +1243,7 @@ function GrowthSectionSidebarNavInner() {
         data-flyout-marker={GROWTH_SIDEBAR_FLYOUT_QA_MARKER}
         data-navigation-ia-marker={GROWTH_NAVIGATION_IA_QA_MARKER}
         data-navigation-polish-marker={GROWTH_NAVIGATION_POLISH_QA_MARKER}
+        data-workspace-consolidation-marker={GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER}
         data-qa={GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER}
         className={cn("hidden shrink-0 overflow-visible lg:block", collapsed ? "w-[4.5rem]" : "w-60")}
       >
@@ -1281,6 +1293,7 @@ function GrowthSectionSidebarNavInner() {
         data-flyout-marker={GROWTH_SIDEBAR_FLYOUT_QA_MARKER}
         data-navigation-ia-marker={GROWTH_NAVIGATION_IA_QA_MARKER}
         data-navigation-polish-marker={GROWTH_NAVIGATION_POLISH_QA_MARKER}
+        data-workspace-consolidation-marker={GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER}
         data-qa={GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER}
         className="lg:hidden"
       >

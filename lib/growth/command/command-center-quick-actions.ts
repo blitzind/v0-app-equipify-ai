@@ -1,5 +1,6 @@
 /** Growth Command Center quick action rail (strategy-aligned v3). */
 
+import { GROWTH_CALLS_PRIMARY_HREF } from "@/lib/growth/navigation/growth-workspace-consolidation"
 import type { LucideIcon } from "lucide-react"
 import {
   CheckCircle2,
@@ -25,7 +26,7 @@ export const GROWTH_COMMAND_CENTER_QUICK_ACTIONS: readonly GrowthCommandCenterQu
   { href: "/admin/growth/intent-pixel", label: "View Intent Activity", icon: Radar },
   { href: "/admin/growth/leads?focus=research", label: "Run Research", icon: Sparkles },
   { href: "/admin/growth/leads?focus=ai-copilot", label: "Generate Copilot Draft", icon: Sparkles },
-  { href: "/admin/growth/calls/live-coaching", label: "Start Live Call", icon: Headphones },
+  { href: GROWTH_CALLS_PRIMARY_HREF, label: "Open Calls", icon: Headphones },
   { href: "/admin/growth/meetings", label: "Join Meeting", icon: Video },
   { href: "/admin/growth/sequences", label: "Launch Sequence", icon: GitBranch },
   { href: "/admin/growth/outreach/approval", label: "Open Approval Queue", icon: CheckCircle2 },

@@ -170,7 +170,7 @@ export function GrowthMultichannelDashboardView() {
                     <div className="mt-2 flex flex-wrap gap-2">
                       {task.callWorkspaceHref ? (
                         <Button type="button" size="sm" variant="outline" asChild>
-                          <Link href={task.callWorkspaceHref}>Call Workspace</Link>
+                          <Link href={task.callWorkspaceHref}>Calls</Link>
                         </Button>
                       ) : null}
                       {task.bookingIntelligenceHref ? (

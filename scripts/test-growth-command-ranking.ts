@@ -67,7 +67,7 @@ assert.equal(intentRanked[0]?.id, "intent-pixel")
 assert.ok(intentRanked.slice(0, 3).some((entry) => entry.id === "inbox"))
 
 const callRanked = topRanked("call")
-assert.equal(callRanked[0]?.id, "call-workspace")
+assert.equal(callRanked[0]?.id, "calls")
 assert.ok(callRanked.slice(0, 4).some((entry) => entry.id === "calls-live"))
 assert.ok(callRanked.slice(0, 5).some((entry) => entry.id === "call-queue"))
 
@@ -76,12 +76,11 @@ assert.equal(prospectRanked[0]?.id, "search")
 assert.ok(prospectRanked.slice(0, 3).some((entry) => entry.id === "inbox"))
 
 const coachRanked = topRanked("coach")
-assert.equal(coachRanked[0]?.id, "live-coaching")
-assert.ok(coachRanked.slice(0, 3).some((entry) => entry.id === "call-providers"))
+assert.equal(coachRanked[0]?.id, "calls")
+assert.ok(coachRanked.slice(0, 3).some((entry) => entry.id === "calls-live"))
 
 const providerRanked = topRanked("provider")
 assert.equal(providerRanked[0]?.id, "providers")
-assert.ok(providerRanked.slice(0, 3).some((entry) => entry.id === "call-providers"))
 
 const discoverRanked = topRanked("discover")
 assert.equal(discoverRanked[0]?.id, "search")
@@ -111,6 +110,7 @@ assert.equal(boostedSearch[0]?.id, "search")
 const coreGroup = GROWTH_NAV_GROUP_DEFS.find((group) => group.id === "core")
 assert.equal(coreGroup?.label, "Workspace")
 assert.ok(coreGroup?.items.some((item) => item.label === "Revenue Inbox"))
+assert.ok(coreGroup?.items.some((item) => item.id === "calls" && item.href === "/admin/growth/calls/workspace"))
 assert.ok(!coreGroup?.items.some((item) => item.label === "Imports"))
 assert.ok(!coreGroup?.items.some((item) => item.label === "Prospect Search"))
 
@@ -128,8 +128,8 @@ const executionGroup = GROWTH_NAV_GROUP_DEFS.find((group) => group.id === "execu
 assert.equal(executionGroup?.label, "Execution")
 assert.ok(executionGroup?.items.some((item) => item.label === "Outreach"))
 assert.ok(executionGroup?.items.some((item) => item.label === "Sequences"))
-assert.ok(executionGroup?.items.some((item) => item.label === "Live Coaching"))
-assert.ok(executionGroup?.items.some((item) => item.label === "Call Providers"))
+assert.ok(!executionGroup?.items.some((item) => item.label === "Live Coaching"))
+assert.ok(!executionGroup?.items.some((item) => item.label === "Call Providers"))
 assert.ok(executionGroup?.items.some((item) => item.label === "Outreach Approval"))
 
 const aiGroup = GROWTH_NAV_GROUP_DEFS.find((group) => group.id === "ai")
