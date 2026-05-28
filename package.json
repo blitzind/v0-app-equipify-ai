@@ -232,6 +232,7 @@
     "test:voice-ai-outbound-phase-5a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-ai-outbound-phase-5a.ts",
     "test:voice-observability-phase-5b": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-observability-phase-5b.ts",
     "test:voice-workflow-orchestration-phase-5c": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-workflow-orchestration-phase-5c.ts",
+    "test:voice-multichannel-intelligence-phase-6a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-multichannel-intelligence-phase-6a.ts",
     "test:growth-browser-audio-streaming": "tsx scripts/test-growth-browser-audio-streaming.ts",
     "test:growth-assemblyai-browser-streaming": "tsx scripts/test-growth-assemblyai-browser-streaming.ts",
     "test:growth-openai-realtime-browser-streaming": "tsx scripts/test-growth-openai-realtime-browser-streaming.ts",

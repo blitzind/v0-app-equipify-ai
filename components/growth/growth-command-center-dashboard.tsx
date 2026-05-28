@@ -20,6 +20,7 @@ import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/gro
 import { GrowthCommandCommunicationOpsSection } from "@/components/growth/growth-command-communication-ops-section"
 import { GrowthCommandMissedCallRecoverySection } from "@/components/growth/growth-command-missed-call-recovery-section"
 import { GrowthCommandWorkflowOrchestrationSection } from "@/components/growth/growth-command-workflow-orchestration-section"
+import { GrowthCommandMultichannelIntelligenceSection } from "@/components/growth/growth-command-multichannel-intelligence-section"
 import { GrowthCommandDogfoodCompactSection } from "@/components/growth/growth-command-dogfood-compact-section"
 import { GrowthCommandLifecycleCompactSection } from "@/components/growth/growth-command-lifecycle-compact-section"
 import { GrowthCommandResearchCoverageSection } from "@/components/growth/growth-command-research-coverage-section"
@@ -489,6 +490,7 @@ export function GrowthCommandCenterDashboard() {
           <GrowthCommandCommunicationOpsSection />
           <GrowthCommandMissedCallRecoverySection />
           <GrowthCommandWorkflowOrchestrationSection />
+          <GrowthCommandMultichannelIntelligenceSection />
           </div>
 
           {/* 4. Pipeline + Revenue */}

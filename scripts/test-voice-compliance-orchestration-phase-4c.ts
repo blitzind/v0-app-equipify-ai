@@ -25,8 +25,8 @@ import {
 import { VOICE_SCHEMA_MIGRATION_ID, VOICE_SCHEMA_PROBE_VERSION } from "../lib/voice/schema-health"
 
 assert.equal(VOICE_COMPLIANCE_ORCHESTRATION_QA_MARKER, "voice-compliance-orchestration-v1")
-assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v19")
-assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270619120000_voice_workflow_orchestration_phase_5c")
+assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v20")
+assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270620120000_voice_multichannel_intelligence_phase_6a")
 assert.equal(VOICE_COMPLIANCE_AUTONOMOUS_OUTBOUND_DISABLED, true)
 assert.equal(VOICE_COMPLIANCE_CONSERVATIVE_DEFAULT, true)
 assert.equal(VOICE_COMPLIANCE_BATCH_PREVIEW_LIMIT, 500)
@@ -144,7 +144,7 @@ assert.match(migrationSql, /voice_compliance_audit_events/)
 assert.match(migrationSql, /compliance_decision/)
 
 const schemaHealth = fs.readFileSync(path.join(process.cwd(), "lib/voice/schema-health.ts"), "utf8")
-assert.match(schemaHealth, /"v19"/)
+assert.match(schemaHealth, /"v20"/)
 assert.match(schemaHealth, /voice_consent_records/)
 assert.match(schemaHealth, /voice_observability_events/)
 assert.match(schemaHealth, /voice_ai_outbound_sessions/)

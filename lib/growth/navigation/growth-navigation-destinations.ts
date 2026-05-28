@@ -16,8 +16,14 @@ export { GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER, GROWTH_WORKSPACE_GROUP_DESCRI
 
 export const GROWTH_NAVIGATION_IA_QA_MARKER = "growth-navigation-ia-v2" as const
 export const GROWTH_DELIVERY_OPS_NAV_QA_MARKER = "growth-delivery-ops-nav-v1" as const
+export const GROWTH_WORKSPACE_QUEUE_QA_MARKER = "growth-workspace-queue-v1" as const
+export const GROWTH_INTELLIGENCE_NAV_CLEANUP_QA_MARKER = "growth-intelligence-nav-cleanup-v1" as const
 export const GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER =
   "growth-nav-lead-intelligence-single-home-v1" as const
+
+export const GROWTH_REVENUE_QUEUE_HREF = "/admin/growth/queue" as const
+/** Legacy alias — redirects to {@link GROWTH_REVENUE_QUEUE_HREF}. */
+export const GROWTH_REVENUE_QUEUE_LEGACY_HREF = "/admin/growth/leads" as const
 
 export const GROWTH_DELIVERY_OPS_NAV_SECTIONS = {
   configuration: "Configuration",
@@ -92,10 +98,10 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     consoleKey: "command",
   },
   {
-    id: "inbox",
-    label: "Revenue Inbox",
-    href: "/admin/growth/leads",
-    keywords: ["revenue", "inbox", "leads", "pipeline", "prospects"],
+    id: "queue",
+    label: "Queue",
+    href: GROWTH_REVENUE_QUEUE_HREF,
+    keywords: ["queue", "revenue queue", "leads", "pipeline", "prospects", "revenue inbox", "operator triage"],
     consoleKey: "inbox",
   },
   {

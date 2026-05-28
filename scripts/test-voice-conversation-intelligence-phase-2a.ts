@@ -26,8 +26,8 @@ import {
 import { VOICE_SCHEMA_MIGRATION_ID, VOICE_SCHEMA_PROBE_VERSION } from "../lib/voice/schema-health"
 
 assert.equal(VOICE_CONVERSATION_INTELLIGENCE_QA_MARKER, "voice-conversation-intelligence-v1")
-assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v19")
-assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270619120000_voice_workflow_orchestration_phase_5c")
+assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v20")
+assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270620120000_voice_multichannel_intelligence_phase_6a")
 assert.equal(VOICE_INTELLIGENCE_PASSIVE_MODE_ENABLED, true)
 assert.equal(VOICE_INTELLIGENCE_AUTONOMOUS_ACTIONS_DISABLED, true)
 assert.equal(voiceIntelligenceAllowsAutonomousAction(), false)
@@ -124,7 +124,7 @@ for (const object of [
 const schemaHealth = fs.readFileSync(path.join(process.cwd(), "lib/voice/schema-health.ts"), "utf8")
 assert.match(schemaHealth, /voice_conversation_intelligence_events/)
 assert.match(schemaHealth, /voice_conversation_memory_drafts/)
-assert.match(schemaHealth, /"v19"/)
+assert.match(schemaHealth, /"v20"/)
 assert.match(schemaHealth, /voice_ai_copilot_suggestions/)
 
 const serviceSource = fs.readFileSync(

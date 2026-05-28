@@ -24,6 +24,8 @@ import { GrowthVoiceObservabilityDashboard } from "@/components/growth/growth-vo
 import { GrowthVoiceObservabilityReadinessSection } from "@/components/growth/growth-voice-observability-readiness-section"
 import { GrowthWorkflowOrchestrationReadinessSection } from "@/components/growth/growth-workflow-orchestration-readiness-section"
 import { GrowthWorkflowOrchestrationWorkspace } from "@/components/growth/growth-workflow-orchestration-workspace"
+import { GrowthMultichannelIntelligenceReadinessSection } from "@/components/growth/growth-multichannel-intelligence-readiness-section"
+import { GrowthMultichannelIntelligenceWorkspace } from "@/components/growth/growth-multichannel-intelligence-workspace"
 import { GrowthComplianceManualReviewPanel } from "@/components/growth/growth-compliance-manual-review-panel"
 import { VOICE_CONVERSATION_INTELLIGENCE_QA_MARKER } from "@/lib/voice/intelligence/types"
 import {
@@ -733,6 +735,10 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
             <GrowthWorkflowOrchestrationReadinessSection />
             <section className={GROWTH_SETTINGS_SECTION_GAP}>
               <GrowthWorkflowOrchestrationWorkspace />
+            </section>
+            <GrowthMultichannelIntelligenceReadinessSection />
+            <section className={GROWTH_SETTINGS_SECTION_GAP}>
+              <GrowthMultichannelIntelligenceWorkspace />
             </section>
             <section className={GROWTH_SETTINGS_SECTION_GAP}>
               <GrowthVoiceObservabilityDashboard />

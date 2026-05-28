@@ -20,8 +20,8 @@ import {
 import { VOICE_SCHEMA_MIGRATION_ID, VOICE_SCHEMA_PROBE_VERSION } from "../lib/voice/schema-health"
 
 assert.equal(VOICE_RELATIONSHIP_MEMORY_QA_MARKER, "voice-relationship-memory-v1")
-assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v19")
-assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270619120000_voice_workflow_orchestration_phase_5c")
+assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v20")
+assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270620120000_voice_multichannel_intelligence_phase_6a")
 assert.equal(VOICE_RELATIONSHIP_MEMORY_PASSIVE_MODE_ENABLED, true)
 assert.equal(VOICE_RELATIONSHIP_MEMORY_AUTONOMOUS_ACTIONS_DISABLED, true)
 
@@ -108,7 +108,7 @@ assert.match(migration, /operator_notes/)
 
 const schemaHealth = fs.readFileSync(path.join(process.cwd(), "lib/voice/schema-health.ts"), "utf8")
 assert.match(schemaHealth, /voice_relationship_memory_profiles/)
-assert.match(schemaHealth, /"v19"/)
+assert.match(schemaHealth, /"v20"/)
 assert.match(schemaHealth, /voice_ai_copilot_suggestions/)
 
 const bridge = fs.readFileSync(path.join(process.cwd(), "lib/voice/browser-calling/workspace-bridge.ts"), "utf8")

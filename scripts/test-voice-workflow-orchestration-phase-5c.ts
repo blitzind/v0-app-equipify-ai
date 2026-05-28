@@ -41,8 +41,8 @@ import {
 import { VOICE_SCHEMA_MIGRATION_ID, VOICE_SCHEMA_PROBE_VERSION } from "../lib/voice/schema-health"
 
 assert.equal(VOICE_WORKFLOW_ORCHESTRATION_QA_MARKER, "voice-workflow-orchestration-v1")
-assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v19")
-assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270619120000_voice_workflow_orchestration_phase_5c")
+assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v20")
+assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270620120000_voice_multichannel_intelligence_phase_6a")
 assert.equal(VOICE_WORKFLOW_AUTONOMOUS_EXECUTION_DISABLED, true)
 assert.equal(VOICE_WORKFLOW_AUTO_CRM_MUTATION_DISABLED, true)
 assert.equal(VOICE_WORKFLOW_AUTO_OPERATOR_REASSIGNMENT_DISABLED, true)
