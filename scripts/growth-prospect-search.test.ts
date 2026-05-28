@@ -5,6 +5,7 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
+import { sanitizeGrowthAdminUiError } from "../lib/growth/admin-route-runtime-types"
 import {
   applyProspectSearchFilters,
   explainProspectSearchFilterDrop,
@@ -3332,6 +3333,35 @@ async function testProspectSearchPresearchMarketEstimation(): Promise<void> {
   assert.match(shellSource, /shouldFetchProspectSearchResults/)
   assert.doesNotMatch(shellSource, /<ProspectSearchLiveEstimation/)
   assert.match(shellSource, /data-staged-search-pending="v1"/)
+  assert.match(shellSource, /GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER/)
+  assert.match(shellSource, /sanitizeGrowthAdminUiError/)
+
+  const prospectSearchAdminSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/growth-prospect-search-admin.tsx"),
+    "utf8",
+  )
+  assert.match(prospectSearchAdminSource, /GrowthAdminWidgetErrorBoundary/)
+  assert.match(prospectSearchAdminSource, /GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER/)
+
+  const prospectSearchPageSource = fs.readFileSync(
+    path.join(process.cwd(), "app/(admin)/admin/growth/search/page.tsx"),
+    "utf8",
+  )
+  assert.match(prospectSearchPageSource, /Suspense/)
+  assert.match(prospectSearchPageSource, /GROWTH_ADMIN_ROUTE_RUNTIME_STABLE_QA_MARKER/)
+  assert.match(prospectSearchPageSource, /GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER/)
+
+  const adminRuntimeSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/admin-route-runtime-types.ts"),
+    "utf8",
+  )
+  assert.match(adminRuntimeSource, /growth-admin-route-runtime-stable-v1/)
+  assert.match(adminRuntimeSource, /growth-prospect-search-runtime-stable-v2/)
+  assert.match(adminRuntimeSource, /growth-provider-delivery-runtime-stable-v1/)
+  assert.equal(
+    sanitizeGrowthAdminUiError("ReferenceError: webhookDashboard is not defined").includes("configuration issue"),
+    true,
+  )
 
   const stagedLifecycleSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-staged-lifecycle.ts"),

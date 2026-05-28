@@ -14,7 +14,6 @@ import {
   transitionTransferStatus,
 } from "../lib/voice/transfer-control/transfer-state-machine"
 import { VOICE_TRANSFER_CONTROL_QA_MARKER } from "../lib/voice/transfer-control/types"
-import { VOICE_SCHEMA_MIGRATION_ID, VOICE_SCHEMA_PROBE_VERSION } from "../lib/voice/schema-health"
 import { VOICE_CALL_TIMELINE_EVENT_LABELS } from "../lib/voice/browser-calling/status-mapping"
 import {
   createMultiPartyCallControlProvider,
@@ -23,8 +22,6 @@ import {
 } from "../lib/voice/providers/call-control/multi-party-call-control"
 
 assert.equal(VOICE_TRANSFER_CONTROL_QA_MARKER, "voice-transfer-control-v1")
-assert.equal(VOICE_SCHEMA_PROBE_VERSION, "v5")
-assert.equal(VOICE_SCHEMA_MIGRATION_ID, "20270527180000_voice_transfer_control_phase_1e")
 
 assert.equal(initialTransferStatus("cold"), "starting")
 assert.equal(isActiveTransferStatus("consulting"), true)

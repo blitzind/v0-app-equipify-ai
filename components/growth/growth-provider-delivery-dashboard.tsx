@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { Loader2, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -62,6 +62,11 @@ import {
   type GrowthProviderWebhookDashboard,
 } from "@/lib/growth/webhooks/webhook-types"
 import { supportsTrackingSimulation, trackingHealthLabel } from "@/lib/growth/tracking/tracking-health"
+import { GrowthAdminWidgetErrorBoundary } from "@/components/growth/growth-admin-widget-error-boundary"
+import {
+  GROWTH_PROVIDER_DELIVERY_RUNTIME_STABLE_QA_MARKER,
+  sanitizeGrowthAdminUiError,
+} from "@/lib/growth/admin-route-runtime-types"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
   draft: "neutral",
@@ -111,7 +116,7 @@ type DashboardPayload = {
 
 const REGISTRY = listDeliveryProviderRegistry()
 
-export function GrowthProviderDeliveryDashboardPanel() {
+function GrowthProviderDeliveryDashboardContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dashboard, setDashboard] = useState<GrowthDeliveryDashboard | null>(null)
@@ -135,6 +140,7 @@ export function GrowthProviderDeliveryDashboardPanel() {
   const [trackingHealth, setTrackingHealth] = useState<GrowthTrackingHealthSnapshot | null>(null)
   const [complianceDashboard, setComplianceDashboard] = useState<GrowthComplianceDashboard | null>(null)
   const [complianceHealth, setComplianceHealth] = useState<GrowthSuppressionHealthSnapshot | null>(null)
+  const [webhookDashboard, setWebhookDashboard] = useState<GrowthProviderWebhookDashboard | null>(null)
   const [testSendOpen, setTestSendOpen] = useState(false)
   const [testSendTo, setTestSendTo] = useState("")
   const [testSendConfirmed, setTestSendConfirmed] = useState(false)
@@ -172,6 +178,11 @@ export function GrowthProviderDeliveryDashboardPanel() {
       const compliancePayload = (await complianceResponse.json()) as {
         dashboard?: GrowthComplianceDashboard
       }
+      const webhooksPayload = (await webhooksResponse.json().catch(() => ({}))) as {
+        ok?: boolean
+        dashboard?: GrowthProviderWebhookDashboard
+        message?: string
+      }
       if (!listResponse.ok) throw new Error(listPayload.message ?? "Could not load delivery providers.")
       if (!dashboardResponse.ok) throw new Error(dashboardPayload.message ?? "Could not load delivery dashboard.")
 
@@ -196,7 +207,9 @@ export function GrowthProviderDeliveryDashboardPanel() {
       })
       setTrackingHealth(engagementPayload.dashboard?.trackingHealth ?? null)
       setComplianceDashboard(compliancePayload.dashboard ?? null)
-      setWebhookDashboard(webhooksPayload.dashboard ?? null)
+      setWebhookDashboard(
+        webhooksResponse.ok && webhooksPayload.ok !== false ? (webhooksPayload.dashboard ?? null) : null,
+      )
       setComplianceHealth(
         compliancePayload.dashboard
           ? {
@@ -224,7 +237,11 @@ export function GrowthProviderDeliveryDashboardPanel() {
         setSimSenderId(listPayload.senders![0].id)
       }
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Could not load provider delivery layer.")
+      setError(
+        sanitizeGrowthAdminUiError(
+          loadError instanceof Error ? loadError.message : "Could not load provider delivery layer.",
+        ),
+      )
     } finally {
       setLoading(false)
     }
@@ -241,7 +258,11 @@ export function GrowthProviderDeliveryDashboardPanel() {
       await action()
       await load()
     } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Delivery action failed.")
+      setError(
+        sanitizeGrowthAdminUiError(
+          actionError instanceof Error ? actionError.message : "Delivery action failed.",
+        ),
+      )
     } finally {
       setActionLoading(null)
     }
@@ -368,11 +389,15 @@ export function GrowthProviderDeliveryDashboardPanel() {
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className="space-y-6"
+      data-qa-marker={GROWTH_PROVIDER_DELIVERY_RUNTIME_STABLE_QA_MARKER}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
           {GROWTH_PROVIDER_DELIVERY_FOUNDATION_QA_MARKER} · {GROWTH_LIVE_PROVIDER_TRANSPORT_QA_MARKER} ·{" "}
-          {GROWTH_ENGAGEMENT_ATTRIBUTION_QA_MARKER} · {GROWTH_COMPLIANCE_SUPPRESSION_QA_MARKER} · {GROWTH_LIVE_PROVIDER_TRANSPORT_PRIVACY_NOTE}
+          {GROWTH_ENGAGEMENT_ATTRIBUTION_QA_MARKER} · {GROWTH_COMPLIANCE_SUPPRESSION_QA_MARKER} ·{" "}
+          {GROWTH_PROVIDER_WEBHOOK_INGESTION_QA_MARKER} · {GROWTH_LIVE_PROVIDER_TRANSPORT_PRIVACY_NOTE}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
@@ -901,4 +926,22 @@ export function GrowthProviderDeliveryDashboardPanel() {
       </AlertDialog>
     </div>
   )
+}
+
+export function GrowthProviderDeliveryDashboardPanel() {
+  const [retryKey, setRetryKey] = useState(0)
+
+  return (
+    <GrowthAdminWidgetErrorBoundary
+      label="Provider delivery"
+      qaMarker={GROWTH_PROVIDER_DELIVERY_RUNTIME_STABLE_QA_MARKER}
+      onRetry={() => setRetryKey((value) => value + 1)}
+    >
+      <GrowthProviderDeliveryDashboardBoundaryContent retryKey={retryKey} />
+    </GrowthAdminWidgetErrorBoundary>
+  )
+}
+
+function GrowthProviderDeliveryDashboardBoundaryContent({ retryKey }: { retryKey: number }): ReactNode {
+  return <GrowthProviderDeliveryDashboardContent key={retryKey} />
 }

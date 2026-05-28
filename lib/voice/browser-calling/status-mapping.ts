@@ -118,4 +118,9 @@ export const VOICE_CALL_TIMELINE_EVENT_LABELS: Record<string, string> = {
   participant_muted: "Participant muted",
   participant_unmuted: "Participant unmuted",
   supervisor_joined: "Supervisor joined",
+  stream_start: "Media stream started",
+  stream_stop: "Media stream stopped",
+  stream_reconnect: "Media stream reconnected",
+  transcript_segment_append: "Transcript segment appended",
+  media_interruption_mark: "Media interruption marker",
 }

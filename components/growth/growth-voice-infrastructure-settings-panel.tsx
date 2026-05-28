@@ -19,6 +19,7 @@ import {
   VOICE_RECORDING_POLICY_LABELS,
   VOICE_ROUTING_MODE_LABELS,
   VOICE_TRANSFER_CONTROL_QA_MARKER,
+  VOICE_MEDIA_STREAMING_QA_MARKER,
   type InboundCallControlDecision,
   type VoiceBusinessHoursRecord,
   type VoiceNumberListItem,
@@ -137,6 +138,7 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
 
   const callControl = readiness?.callControlReadiness
   const transferControl = readiness?.transferControlReadiness
+  const mediaStreaming = readiness?.mediaStreamingReadiness
 
   const loadOperations = useCallback(async () => {
     const [numbersRes, profilesRes, hoursRes, boxesRes] = await Promise.all([
@@ -303,7 +305,7 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
     <GrowthSettingsCard title="Voice Infrastructure" icon={<PhoneCall className="size-4" />}>
       <div
         className={GROWTH_SETTINGS_SECTION_GAP}
-        data-qa-marker={`${VOICE_FOUNDATION_QA_MARKER} ${VOICE_OPERATIONS_QA_MARKER} ${VOICE_CALL_CONTROL_QA_MARKER} ${VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER} ${VOICE_TRANSFER_CONTROL_QA_MARKER}`}
+        data-qa-marker={`${VOICE_FOUNDATION_QA_MARKER} ${VOICE_OPERATIONS_QA_MARKER} ${VOICE_CALL_CONTROL_QA_MARKER} ${VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER} ${VOICE_TRANSFER_CONTROL_QA_MARKER} ${VOICE_MEDIA_STREAMING_QA_MARKER}`}
       >
         <p className="text-sm text-muted-foreground">
           Voice operations layer — number inventory, routing profiles, business hours, and voicemail scaffolding.
@@ -568,6 +570,50 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
                 {transferControl?.warnings.map((warning) => (
                   <p key={warning}>{warning}</p>
                 ))}
+              </div>
+            </section>
+
+            <section className={GROWTH_SETTINGS_SECTION_GAP}>
+              <p className="flex items-center gap-2 text-sm font-medium">
+                <Radio className="size-4" />
+                Media streaming readiness
+              </p>
+              <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                <p>Media streaming ready: {mediaStreaming?.mediaStreamingReady ? "yes" : "not yet"}</p>
+                <p>Twilio Media Streams: {mediaStreaming?.twilioMediaStreamsReadiness ?? "unknown"}</p>
+                <p>Websocket readiness: {mediaStreaming?.websocketReadiness ?? "unknown"}</p>
+                <p>Transcript provider readiness: {mediaStreaming?.transcriptProviderReadiness ?? "unknown"}</p>
+                <p>Stream health: {mediaStreaming?.streamHealth ?? "unknown"}</p>
+                <p>Reconnect health: {mediaStreaming?.reconnectHealth ?? "unknown"}</p>
+                <p>Media stream URL: {mediaStreaming?.mediaStreamUrl ?? "—"}</p>
+                <p>{mediaStreaming?.message}</p>
+                {mediaStreaming?.warnings.map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
+              </div>
+            </section>
+
+            <section className={GROWTH_SETTINGS_SECTION_GAP}>
+              <p className="text-sm font-medium">Transcript infrastructure</p>
+              <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                <p>Active transcript sessions: {mediaStreaming?.activeTranscriptSessions ?? 0}</p>
+                <p>Transcript provider status: {mediaStreaming?.transcriptProviderStatus ?? "unknown"}</p>
+                <p>
+                  Transcript latency:{" "}
+                  {mediaStreaming?.transcriptLatencyMs != null
+                    ? `${mediaStreaming.transcriptLatencyMs}ms`
+                    : "not measured yet"}
+                </p>
+              </div>
+            </section>
+
+            <section className={GROWTH_SETTINGS_SECTION_GAP}>
+              <p className="text-sm font-medium">Stream diagnostics</p>
+              <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                <p>Active streams: {mediaStreaming?.diagnostics.activeStreamCount ?? 0}</p>
+                <p>Participant count: {mediaStreaming?.diagnostics.participantCount ?? 0}</p>
+                <p>Reconnect count: {mediaStreaming?.diagnostics.reconnectCount ?? 0}</p>
+                <p>Stale streams cleaned: {mediaStreaming?.diagnostics.staleStreamsCleaned ?? 0}</p>
               </div>
             </section>
 

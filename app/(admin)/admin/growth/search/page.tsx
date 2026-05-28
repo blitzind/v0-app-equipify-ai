@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { Search } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthProspectSearchAdmin } from "@/components/growth/prospect-search/growth-prospect-search-admin"
@@ -10,6 +11,14 @@ import {
   usePlatformAdminHeaderIdentity,
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
+import {
+  GROWTH_ADMIN_ROUTE_RUNTIME_STABLE_QA_MARKER,
+  GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER,
+} from "@/lib/growth/admin-route-runtime-types"
+
+function ProspectSearchFallback() {
+  return <p className="text-sm text-muted-foreground">Loading prospect search…</p>
+}
 
 export default function AdminGrowthProspectSearchPage() {
   const { sessionIdentity } = useAdmin()
@@ -21,7 +30,11 @@ export default function AdminGrowthProspectSearchPage() {
 
   return (
     <PlatformAdminPageShell header={header}>
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
+      <div
+        className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8"
+        data-qa={GROWTH_ADMIN_ROUTE_RUNTIME_STABLE_QA_MARKER}
+        data-qa-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER}
+      >
         <PlatformAdminTabNav activeKey="growth_leads" />
 
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -39,7 +52,9 @@ export default function AdminGrowthProspectSearchPage() {
         </section>
 
         <GrowthSectionLayout>
-          <GrowthProspectSearchAdmin />
+          <Suspense fallback={<ProspectSearchFallback />}>
+            <GrowthProspectSearchAdmin />
+          </Suspense>
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>

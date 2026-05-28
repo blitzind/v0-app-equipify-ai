@@ -101,6 +101,10 @@ import {
   isTerritoryQualifiedProspect,
   type GrowthTerritoryOpportunityRecommendedAction,
 } from "@/lib/growth/prospect-search/territory-opportunity-heatmap"
+import {
+  GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER,
+  sanitizeGrowthAdminUiError,
+} from "@/lib/growth/admin-route-runtime-types"
 import { cn } from "@/lib/utils"
 
 const EMPTY_FILTERS: GrowthProspectSearchFilters = {}
@@ -895,6 +899,7 @@ export function ProspectSearchShell() {
       data-truthful-lifecycle-marker={GROWTH_PROSPECT_SEARCH_TRUTHFUL_LIFECYCLE_QA_MARKER}
       data-no-presearch-counts-marker={GROWTH_PROSPECT_SEARCH_NO_PRESEARCH_COUNTS_QA_MARKER}
       data-staged-search-marker={GROWTH_PROSPECT_SEARCH_STAGED_SEARCH_QA_MARKER}
+      data-runtime-stable-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER}
       data-current-criteria-key={currentCriteriaKey}
       data-last-searched-criteria-key={lastSearchedCriteriaKey ?? ""}
       data-criteria-stale={criteriaStale ? "true" : "false"}
@@ -973,7 +978,7 @@ export function ProspectSearchShell() {
       ) : null}
       {error ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
+          {sanitizeGrowthAdminUiError(error)}
         </p>
       ) : null}
       {actionMessage ? (

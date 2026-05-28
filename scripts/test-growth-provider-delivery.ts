@@ -226,6 +226,10 @@ async function main(): Promise<void> {
   assert.match(uiSource, /GROWTH_PROVIDER_DELIVERY_FOUNDATION_QA_MARKER/)
   assert.doesNotMatch(uiSource, /encrypted_access_token|smtp_password|apiKey/)
   assert.doesNotMatch(uiSource, /adapter-registry/)
+  assert.match(uiSource, /GROWTH_PROVIDER_DELIVERY_RUNTIME_STABLE_QA_MARKER/)
+  assert.match(uiSource, /\[webhookDashboard,\s*setWebhookDashboard\]/)
+  assert.match(uiSource, /sanitizeGrowthAdminUiError/)
+  assert.match(uiSource, /GrowthAdminWidgetErrorBoundary/)
 
   const navSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts"),
@@ -233,6 +237,13 @@ async function main(): Promise<void> {
   )
   assert.match(navSource, /\/admin\/growth\/providers\/delivery/)
   assert.match(navSource, /provider-delivery/)
+
+  const deliveryPageSource = fs.readFileSync(
+    path.join(process.cwd(), "app/(admin)/admin/growth/providers/delivery/page.tsx"),
+    "utf8",
+  )
+  assert.match(deliveryPageSource, /GROWTH_ADMIN_ROUTE_RUNTIME_STABLE_QA_MARKER/)
+  assert.match(deliveryPageSource, /GROWTH_PROVIDER_DELIVERY_RUNTIME_STABLE_QA_MARKER/)
 
   console.log("growth-provider-delivery: all checks passed")
 }

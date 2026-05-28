@@ -13,6 +13,10 @@ import {
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import { Button } from "@/components/ui/button"
+import {
+  GROWTH_ADMIN_ROUTE_RUNTIME_STABLE_QA_MARKER,
+  GROWTH_PROVIDER_DELIVERY_RUNTIME_STABLE_QA_MARKER,
+} from "@/lib/growth/admin-route-runtime-types"
 
 export default function AdminGrowthProviderDeliveryPage() {
   const { sessionIdentity } = useAdmin()
@@ -24,7 +28,11 @@ export default function AdminGrowthProviderDeliveryPage() {
 
   return (
     <PlatformAdminPageShell header={header}>
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
+      <div
+        className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8"
+        data-qa={GROWTH_ADMIN_ROUTE_RUNTIME_STABLE_QA_MARKER}
+        data-qa-marker={GROWTH_PROVIDER_DELIVERY_RUNTIME_STABLE_QA_MARKER}
+      >
         <PlatformAdminTabNav activeKey="growth_leads" />
 
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">

@@ -1,6 +1,7 @@
 /** Voice Infrastructure Foundation — Phase 1A shared types (client-safe). */
 
 import type { VoiceCallControlReadinessSnapshot, VoiceRecordingPolicy } from "@/lib/voice/call-control/types"
+import type { VoiceMediaStreamingReadinessSnapshot } from "@/lib/voice/media-streaming/types"
 import type { VoiceTransferControlReadinessSnapshot } from "@/lib/voice/transfer-control/types"
 
 export const VOICE_FOUNDATION_QA_MARKER = "voice-foundation-v1" as const
@@ -24,6 +25,13 @@ export {
   type VoiceConferenceParticipantPublicView,
   type VoiceCallTransferPublicView,
 } from "@/lib/voice/transfer-control/types"
+
+export {
+  VOICE_MEDIA_STREAMING_QA_MARKER,
+  type VoiceMediaStreamingReadinessSnapshot,
+  type VoiceCallTranscriptSnapshot,
+  type VoiceTranscriptSegmentPublicView,
+} from "@/lib/voice/media-streaming/types"
 
 export const VOICE_PROVIDER_IDS = ["twilio", "telnyx", "plivo", "sip", "stub"] as const
 export type VoiceProviderId = (typeof VOICE_PROVIDER_IDS)[number]
@@ -274,4 +282,5 @@ export type VoiceOperationsReadinessSnapshot = VoiceInfrastructureReadinessSnaps
   complianceReadinessExtended: VoiceComplianceReadinessSnapshot
   callControlReadiness?: VoiceCallControlReadinessSnapshot
   transferControlReadiness?: VoiceTransferControlReadinessSnapshot
+  mediaStreamingReadiness?: VoiceMediaStreamingReadinessSnapshot
 }
