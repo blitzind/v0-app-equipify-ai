@@ -8,6 +8,15 @@ import type {
 export const GROWTH_DISCOVER_READY_TO_SEARCH_QA_MARKER =
   "growth-discover-ready-to-search-v1" as const
 
+export {
+  GROWTH_DISCOVER_LIVE_ESTIMATE_QA_MARKER,
+  GROWTH_DISCOVER_NO_CREDITS_ESTIMATE_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-estimation-types"
+
+export { GROWTH_DISCOVER_RESULTS_TABLE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-discover-results"
+export { GROWTH_DISCOVER_CONTACT_ROW_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-discover-results"
+export { GROWTH_DISCOVER_COMPANY_INTELLIGENCE_PANEL_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-discover-results"
+
 export type ProspectSearchDiscoverResultsPhase =
   | "ready_to_search"
   | "searching"

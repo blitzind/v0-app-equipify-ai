@@ -13,14 +13,96 @@ import type {
   GrowthProspectSearchProviderReadiness,
 } from "@/lib/growth/prospect-search/prospect-search-estimation-types"
 
-const RANGE_FLOORS = [10, 50, 250, 1000] as const
+const RANGE_FLOORS = [10, 50, 250, 1000, 2500, 10000] as const
 
 export const PROSPECT_SEARCH_ESTIMATE_UNAVAILABLE_LABEL =
   "Estimate unavailable — click Search to run discovery" as const
 
+export const PROSPECT_SEARCH_NO_CREDITS_ESTIMATE_NOTE =
+  "No credits used for estimate — internal index and cached metadata only." as const
+
 /** Same numeric formatting as pagination (`totalCount.toLocaleString()`). */
 export function formatProspectSearchMatchingCount(count: number): string {
   return count.toLocaleString()
+}
+
+export function tierEstimateFloor(tier: GrowthMarketEstimationTier | null | undefined): number {
+  switch (tier) {
+    case "massive":
+      return 10000
+    case "large":
+      return 2500
+    case "moderate":
+      return 250
+    case "small":
+      return 50
+    case "tiny":
+      return 10
+    default:
+      return 0
+  }
+}
+
+export function buildProspectSearchNumericalEstimateDisplay(input: {
+  company_count: number
+  contact_count: number | null
+  decision_maker_count: number | null
+  tier: GrowthMarketEstimationTier | null
+  broad_market_category: boolean
+  discovery_mode: GrowthProspectSearchDiscoveryMode
+  unavailable_filter_reasons: string[]
+}): {
+  numerical_headline: string
+  display_label: string
+  market_helper: string
+  exact_count: number | null
+  range_floor: number | null
+} {
+  const tierFloor = tierEstimateFloor(input.tier)
+  const useTierFloor =
+    input.company_count <= 0 && input.broad_market_category && tierFloor > 0
+  const effectiveCount = input.company_count > 0 ? input.company_count : useTierFloor ? tierFloor : 0
+
+  let exact_count: number | null = input.company_count > 0 ? input.company_count : null
+  let range_floor: number | null = null
+  let companyLabel: string
+
+  if (input.company_count > 0) {
+    companyLabel = `${formatProspectSearchMatchingCount(input.company_count)} matching companies`
+  } else if (useTierFloor) {
+    const ranged = floorEstimateToRange(tierFloor)
+    range_floor = ranged.floor
+    companyLabel = `${ranged.label} matching companies`
+    exact_count = null
+  } else if (effectiveCount > 0) {
+    companyLabel = `${formatProspectSearchMatchingCount(effectiveCount)} matching companies`
+  } else {
+    companyLabel = "0 matching companies in internal index"
+  }
+
+  const helperLines = [PROSPECT_SEARCH_NO_CREDITS_ESTIMATE_NOTE]
+  if (input.contact_count != null && input.contact_count > 0) {
+    helperLines.unshift(`${formatProspectSearchMatchingCount(input.contact_count)} likely contacts`)
+  }
+  if (input.decision_maker_count != null && input.decision_maker_count > 0) {
+    helperLines.unshift(`${formatProspectSearchMatchingCount(input.decision_maker_count)} decision makers`)
+  }
+  if (input.unavailable_filter_reasons.length > 0) {
+    helperLines.push("Estimate excludes filters not available in the internal index.")
+  }
+  if (input.discovery_mode === "discover_external") {
+    helperLines.push("Click Search market to run external discovery — that action may use provider credits.")
+  } else {
+    helperLines.push("Based on indexed CRM and Growth Engine coverage.")
+  }
+
+  return {
+    numerical_headline: companyLabel,
+    display_label: companyLabel,
+    market_helper: helperLines.join(" · "),
+    exact_count,
+    range_floor,
+  }
 }
 
 export function floorEstimateToRange(count: number): { floor: number; label: string } {
@@ -29,7 +111,7 @@ export function floorEstimateToRange(count: number): { floor: number; label: str
   for (let i = RANGE_FLOORS.length - 1; i >= 0; i -= 1) {
     const floor = RANGE_FLOORS[i]!
     if (count >= floor) {
-      return { floor, label: floor >= 1000 ? "~1k+" : `~${floor}+` }
+      return { floor, label: floor >= 10000 ? "~10k+" : floor >= 1000 ? "~1k+" : `~${floor}+` }
     }
   }
   return { floor: 10, label: "~10+" }

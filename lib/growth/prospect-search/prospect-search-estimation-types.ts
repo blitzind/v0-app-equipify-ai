@@ -23,6 +23,12 @@ export const GROWTH_SEARCH_RESULT_PREVIEW_QA_MARKER =
 export const GROWTH_PROVIDER_HEALTH_DASHBOARD_QA_MARKER =
   "growth-provider-health-dashboard-v1" as const
 
+export const GROWTH_DISCOVER_LIVE_ESTIMATE_QA_MARKER = "growth-discover-live-estimate-v1" as const
+export const GROWTH_DISCOVER_NO_CREDITS_ESTIMATE_QA_MARKER =
+  "growth-discover-no-credits-estimate-v1" as const
+
+export type GrowthProspectSearchEstimateFromSource = "internal_index" | "cached_metadata" | "mixed"
+
 export type GrowthProspectSearchEstimateConfidence = "high" | "medium" | "low" | "broad" | "heuristic"
 
 export type GrowthProspectSearchEstimateState =
@@ -66,7 +72,14 @@ export type GrowthProspectSearchLiveEstimate = {
   confidence_label: string
   discovery_mode: GrowthProspectSearchDiscoveryMode
   exact_count: number | null
+  company_count: number | null
+  contact_count: number | null
+  decision_maker_count: number | null
   indexed_count_hint: number | null
+  estimated_from: GrowthProspectSearchEstimateFromSource | null
+  credits_used: false
+  unavailable_filter_reasons: string[]
+  numerical_headline: string
   market_tier: GrowthMarketEstimationTier | null
   broad_market_category: boolean
   display_label: string

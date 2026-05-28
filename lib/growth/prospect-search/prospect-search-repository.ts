@@ -25,6 +25,7 @@ import {
   rankProspectSearchPeople,
 } from "@/lib/growth/prospect-search/prospect-search-ranking"
 import { enrichProspectSearchExternalCompanies } from "@/lib/growth/prospect-search/prospect-search-external-enrichment"
+import { mapProspectSearchCompaniesToDiscoverResults } from "@/lib/growth/prospect-search/prospect-search-discover-results"
 import { applyProspectSearchContactIntelligenceOverlay } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-loader"
 import { applyProspectSearchIntelligenceOverlays } from "@/lib/growth/market-intelligence/integrations/prospect-search-bridge"
 import {
@@ -187,6 +188,7 @@ export async function runProspectSearch(
     )
 
     const source_counts = buildSourceCounts(companiesWithSignals)
+    const rawProviderCompanies = externalEnrichment.raw_companies
 
     return attachTerritoryIntelligenceToSearchResult(
       admin,
@@ -199,6 +201,9 @@ export async function runProspectSearch(
       parsed_query: parsed,
       filters: mergedFilters,
       companies: companiesWithSignals,
+      raw_provider_companies: rawProviderCompanies,
+      discover_results: mapProspectSearchCompaniesToDiscoverResults(rawProviderCompanies),
+      filtered_discover_results: mapProspectSearchCompaniesToDiscoverResults(companiesWithSignals),
       people: [],
       total_companies: companiesWithSignals.length,
       total_people: 0,

@@ -378,6 +378,37 @@ export type GrowthProspectSearchPersonResult = {
   rank_score: number
 }
 
+/** Normalized Discover search row — company + optional primary contact fields. */
+export type GrowthProspectSearchDiscoverResult = {
+  company_id: string
+  provider_company_id?: string | null
+  company_name: string
+  domain?: string | null
+  website?: string | null
+  industry?: string | null
+  location?: string | null
+  employee_count?: string | null
+  company_size?: string | null
+  revenue?: string | null
+  contact_id?: string | null
+  provider_contact_id?: string | null
+  contact_name?: string | null
+  contact_title?: string | null
+  contact_email?: string | null
+  contact_email_status?: string | null
+  contact_phone?: string | null
+  contact_phone_status?: string | null
+  source_provider?: string | null
+  confidence?: number | null
+  evidence?: string | null
+  lead_score?: number | null
+  icp_fit?: number | null
+  buying_stage?: string | null
+  buying_signals?: string[]
+  /** Full company payload for intelligence panels. */
+  company: GrowthProspectSearchCompanyResult
+}
+
 export type GrowthProspectSearchProviderDiagnostic = {
   provider_type: string
   provider_name: string
@@ -410,6 +441,10 @@ export type GrowthProspectSearchResult = {
   filters: GrowthProspectSearchFilters
   companies: GrowthProspectSearchCompanyResult[]
   people: GrowthProspectSearchPersonResult[]
+  /** Discover mode: provider rows before post-search filters. */
+  raw_provider_companies?: GrowthProspectSearchCompanyResult[]
+  discover_results?: GrowthProspectSearchDiscoverResult[]
+  filtered_discover_results?: GrowthProspectSearchDiscoverResult[]
   total_companies: number
   total_people: number
   page?: number

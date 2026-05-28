@@ -3,10 +3,13 @@
 import { Loader2, Users } from "lucide-react"
 import type { GrowthProspectSearchLiveEstimate } from "@/lib/growth/prospect-search/prospect-search-estimation-types"
 import {
+  GROWTH_DISCOVER_LIVE_ESTIMATE_QA_MARKER,
+  GROWTH_DISCOVER_NO_CREDITS_ESTIMATE_QA_MARKER,
   GROWTH_FILTER_ESTIMATION_STATE_QA_MARKER,
   GROWTH_LIVE_ESTIMATED_RESULTS_QA_MARKER,
   GROWTH_SEARCH_RESULT_PREVIEW_QA_MARKER,
 } from "@/lib/growth/prospect-search/prospect-search-estimation-types"
+import { PROSPECT_SEARCH_NO_CREDITS_ESTIMATE_NOTE } from "@/lib/growth/prospect-search/prospect-search-estimation-format"
 import { cn } from "@/lib/utils"
 
 function stateLabel(state: string): string {
@@ -26,6 +29,25 @@ function stateLabel(state: string): string {
   }
 }
 
+function EstimateCountLines({ estimate }: { estimate: GrowthProspectSearchLiveEstimate }) {
+  const lines: string[] = [estimate.numerical_headline || estimate.display_label]
+  if (estimate.contact_count != null && estimate.contact_count > 0) {
+    lines.push(`${estimate.contact_count.toLocaleString()} likely contacts`)
+  }
+  if (estimate.decision_maker_count != null && estimate.decision_maker_count > 0) {
+    lines.push(`${estimate.decision_maker_count.toLocaleString()} decision makers`)
+  }
+  return (
+    <div className="space-y-0.5">
+      {lines.map((line) => (
+        <p key={line} className="text-lg font-semibold leading-tight text-foreground sm:text-xl">
+          {line}
+        </p>
+      ))}
+    </div>
+  )
+}
+
 export function ProspectSearchLiveEstimation({
   estimate,
   loading,
@@ -43,10 +65,10 @@ export function ProspectSearchLiveEstimation({
 }) {
   const stateText = stateLabel(displayState)
   const showSpinner = loading || displayState === "estimating"
-  const headline = estimate?.display_label ?? stateText ?? "Sizing market…"
+  const headline = estimate?.numerical_headline ?? estimate?.display_label ?? stateText ?? "Sizing market…"
   const helper =
     estimate?.market_helper ??
-    "Broad pre-search estimate — run Search for actual results and provider status."
+    "Live internal estimate — run Search market for external discovery results."
 
   if (prominent) {
     return (
@@ -56,8 +78,10 @@ export function ProspectSearchLiveEstimation({
           className,
         )}
         data-qa-marker={GROWTH_LIVE_ESTIMATED_RESULTS_QA_MARKER}
+        data-qa={GROWTH_DISCOVER_LIVE_ESTIMATE_QA_MARKER}
         data-estimation-state-marker={GROWTH_FILTER_ESTIMATION_STATE_QA_MARKER}
         data-search-preview-marker={GROWTH_SEARCH_RESULT_PREVIEW_QA_MARKER}
+        data-no-credits-estimate-qa={GROWTH_DISCOVER_NO_CREDITS_ESTIMATE_QA_MARKER}
         data-presearch-vs-results-marker={estimate?.presearch_vs_results_qa_marker}
         data-market-estimation-tier-marker={estimate?.presearch_market_qa_marker}
         data-no-false-negative-estimates-marker={estimate?.no_false_negative_qa_marker}
@@ -71,15 +95,34 @@ export function ProspectSearchLiveEstimation({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
-              Market estimate
+              Live market estimate
             </p>
-            <p className="mt-0.5 text-lg font-semibold leading-tight text-foreground sm:text-xl">
-              {showSpinner && !estimate ? "Sizing your market…" : headline}
-            </p>
+            {showSpinner && !estimate ? (
+              <p className="mt-0.5 text-lg font-semibold leading-tight text-foreground sm:text-xl">
+                Sizing your market…
+              </p>
+            ) : estimate ? (
+              <div className="mt-0.5">
+                <EstimateCountLines estimate={estimate} />
+              </div>
+            ) : (
+              <p className="mt-0.5 text-lg font-semibold leading-tight text-foreground sm:text-xl">
+                {headline}
+              </p>
+            )}
             <p className="mt-1 text-xs text-muted-foreground break-words">{helper}</p>
+            <p
+              className="mt-1 text-[11px] font-medium text-emerald-800 dark:text-emerald-300"
+              data-qa={GROWTH_DISCOVER_NO_CREDITS_ESTIMATE_QA_MARKER}
+            >
+              {PROSPECT_SEARCH_NO_CREDITS_ESTIMATE_NOTE}
+            </p>
+            {estimate?.confidence_label ? (
+              <p className="mt-1 text-[11px] text-muted-foreground">{estimate.confidence_label}</p>
+            ) : null}
             {estimate?.market_tier ? (
-              <p className="mt-1 text-[11px] font-medium text-violet-900 dark:text-violet-200">
-                Tier: {estimate.market_tier.replace(/_/g, " ")}
+              <p className="mt-0.5 text-[11px] font-medium text-violet-900 dark:text-violet-200">
+                Coverage tier: {estimate.market_tier.replace(/_/g, " ")}
               </p>
             ) : null}
           </div>
@@ -96,8 +139,10 @@ export function ProspectSearchLiveEstimation({
         className,
       )}
       data-qa-marker={GROWTH_LIVE_ESTIMATED_RESULTS_QA_MARKER}
+      data-qa={GROWTH_DISCOVER_LIVE_ESTIMATE_QA_MARKER}
       data-estimation-state-marker={GROWTH_FILTER_ESTIMATION_STATE_QA_MARKER}
       data-search-preview-marker={GROWTH_SEARCH_RESULT_PREVIEW_QA_MARKER}
+      data-no-credits-estimate-qa={GROWTH_DISCOVER_NO_CREDITS_ESTIMATE_QA_MARKER}
       data-presearch-vs-results-marker={estimate?.presearch_vs_results_qa_marker}
       data-market-estimation-tier-marker={estimate?.presearch_market_qa_marker}
       data-no-false-negative-estimates-marker={estimate?.no_false_negative_qa_marker}

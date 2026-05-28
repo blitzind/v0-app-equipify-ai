@@ -1,13 +1,13 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { countProspectSearchMatchesInternal } from "@/lib/growth/prospect-search/prospect-search-count"
+import { countProspectSearchMatchesInternalDetailed } from "@/lib/growth/prospect-search/prospect-search-count"
 import {
   listDiscoveryProviderRuntimeControls,
 } from "@/lib/growth/prospect-search/prospect-search-discovery-provider-controls"
 import {
   buildProspectSearchButtonLabel,
-  countActiveProspectSearchFilters,
+  buildProspectSearchNumericalEstimateDisplay,
 } from "@/lib/growth/prospect-search/prospect-search-estimation-format"
 import {
   buildProspectSearchEstimateCacheKey,
@@ -109,11 +109,13 @@ function resolvePresearchEstimateState(input: {
 }
 
 function mapPresearchConfidence(
-  discovery_mode: GrowthProspectSearchDiscoveryMode,
+  internal: { confidence: GrowthProspectSearchEstimateConfidence },
   broad_market_category: boolean,
 ): GrowthProspectSearchEstimateConfidence {
-  if (broad_market_category || discovery_mode === "discover_external") return "broad"
-  return "heuristic"
+  if (internal.confidence === "high") return "high"
+  if (internal.confidence === "medium") return "medium"
+  if (broad_market_category) return "broad"
+  return internal.confidence
 }
 
 export async function estimateProspectSearchMatches(
@@ -138,20 +140,44 @@ export async function estimateProspectSearchMatches(
   }
 
   const provider_readiness = buildProviderReadiness()
-  let indexed_count_hint: number | null = null
+  let internalEstimate = {
+    company_count: 0,
+    contact_count: null as number | null,
+    decision_maker_count: null as number | null,
+    confidence: "heuristic" as GrowthProspectSearchEstimateConfidence,
+    unavailable_filter_reasons: [] as string[],
+    estimated_from: null as import("@/lib/growth/prospect-search/prospect-search-estimation-types").GrowthProspectSearchEstimateFromSource | null,
+    credits_used: false as const,
+    cached_metadata_count: 0,
+    internal_index_count: 0,
+  }
   const indexSources: GrowthProspectSearchEstimateSource[] = []
 
-  if (input.discovery_mode === "internal") {
-    try {
-      indexed_count_hint = await countProspectSearchMatchesInternal(admin, {
-        query: input.query,
-        filters,
-      })
-      indexSources.push("indexed_hint")
-    } catch {
-      indexed_count_hint = null
+  try {
+    const detailed = await countProspectSearchMatchesInternalDetailed(admin, {
+      query: input.query,
+      filters,
+    })
+    internalEstimate = {
+      company_count: detailed.company_count,
+      contact_count: detailed.contact_count,
+      decision_maker_count: detailed.decision_maker_count,
+      confidence: detailed.confidence,
+      unavailable_filter_reasons: detailed.unavailable_filter_reasons,
+      estimated_from: detailed.estimated_from,
+      credits_used: false,
+      cached_metadata_count: detailed.cached_metadata_count,
+      internal_index_count: detailed.internal_index_count,
     }
+    indexSources.push("indexed_hint")
+    if (detailed.estimated_from === "cached_metadata" || detailed.estimated_from === "mixed") {
+      indexSources.push("provider_cache")
+    }
+  } catch {
+    /* keep defaults */
   }
+
+  const indexed_count_hint = internalEstimate.internal_index_count
 
   const presearch = computePresearchMarketEstimate({
     query: input.query,
@@ -163,7 +189,16 @@ export async function estimateProspectSearchMatches(
 
   const marketCopy = formatPresearchMarketHeadline(presearch)
   const broad_market_category = isBroadMarketCategory(input.query, filters) || presearch.broad_market_category
-  const confidence = mapPresearchConfidence(input.discovery_mode, broad_market_category)
+  const numerical = buildProspectSearchNumericalEstimateDisplay({
+    company_count: internalEstimate.company_count,
+    contact_count: internalEstimate.contact_count,
+    decision_maker_count: internalEstimate.decision_maker_count,
+    tier: presearch.tier,
+    broad_market_category,
+    discovery_mode: input.discovery_mode,
+    unavailable_filter_reasons: internalEstimate.unavailable_filter_reasons,
+  })
+  const confidence = mapPresearchConfidence({ confidence: internalEstimate.confidence }, broad_market_category)
   const state = resolvePresearchEstimateState({
     discovery_mode: input.discovery_mode,
     provider_readiness,
@@ -180,12 +215,12 @@ export async function estimateProspectSearchMatches(
   const relax_suggestions = buildProspectSearchRelaxSuggestions({
     filters,
     discovery_mode: input.discovery_mode,
-    estimated_count: indexed_count_hint,
+    estimated_count: numerical.exact_count ?? internalEstimate.company_count,
   })
   const button = buildProspectSearchButtonLabel({
     state,
     discovery_mode: input.discovery_mode,
-    exact_count: null,
+    exact_count: numerical.exact_count,
     confidence,
     provider_readiness,
     broad_market_category,
@@ -204,13 +239,20 @@ export async function estimateProspectSearchMatches(
     confidence,
     confidence_label: marketCopy.confidence_label,
     discovery_mode: input.discovery_mode,
-    exact_count: null,
+    exact_count: numerical.exact_count,
+    company_count: internalEstimate.company_count,
+    contact_count: internalEstimate.contact_count,
+    decision_maker_count: internalEstimate.decision_maker_count,
     indexed_count_hint,
+    estimated_from: internalEstimate.estimated_from,
+    credits_used: false,
+    unavailable_filter_reasons: internalEstimate.unavailable_filter_reasons,
+    numerical_headline: numerical.numerical_headline,
     market_tier: presearch.tier,
     broad_market_category,
-    display_label: marketCopy.headline,
-    market_helper: marketCopy.helper,
-    range_floor: null,
+    display_label: numerical.display_label,
+    market_helper: numerical.market_helper,
+    range_floor: numerical.range_floor,
     provider_readiness,
     sources,
     cached: false,

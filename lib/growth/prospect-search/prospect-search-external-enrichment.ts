@@ -31,6 +31,7 @@ const EXTERNAL_SAFETY_DEFAULTS = {
 
 export type EnrichProspectSearchExternalCompaniesResult = {
   companies: GrowthProspectSearchCompanyResult[]
+  raw_companies: GrowthProspectSearchCompanyResult[]
   filter_diagnostics: GrowthProspectSearchExternalFilterDiagnostics
   used_relaxed_filters: boolean
 }
@@ -63,6 +64,7 @@ export async function enrichProspectSearchExternalCompanies(
   if (filtered.companies.length > 0 || enriched.length === 0) {
     return {
       companies: filtered.companies,
+      raw_companies: enriched,
       filter_diagnostics: filtered.diagnostics,
       used_relaxed_filters: false,
     }
@@ -85,6 +87,7 @@ export async function enrichProspectSearchExternalCompanies(
 
   return {
     companies: relaxedFiltered.companies,
+    raw_companies: enriched,
     filter_diagnostics: {
       ...filtered.diagnostics,
       normalized_result_count: relaxedFiltered.companies.length,

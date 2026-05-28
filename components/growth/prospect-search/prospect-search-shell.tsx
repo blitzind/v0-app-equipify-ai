@@ -22,6 +22,7 @@ import { IcpTemplatesDrawer } from "@/components/growth/prospect-search/icp-temp
 import { ProspectSearchFilterRail } from "@/components/growth/prospect-search/prospect-search-filter-rail"
 import { ProspectSearchCleanStartPanel } from "@/components/growth/prospect-search/prospect-search-clean-start-panel"
 import { ProspectSearchDiscoverReadyPanel } from "@/components/growth/prospect-search/prospect-search-discover-ready-panel"
+import { ProspectSearchDiscoverResultsTable } from "@/components/growth/prospect-search/prospect-search-discover-results-table"
 import { ProspectSearchDiagnosticsDisclosure } from "@/components/growth/prospect-search/prospect-search-diagnostics-disclosure"
 import {
   ProspectSearchActiveFilterPills,
@@ -73,6 +74,7 @@ import {
 import { buildProspectSearchGetRequestParams } from "@/lib/growth/prospect-search/prospect-search-client-request"
 import {
   formatProspectSearchResultsCountLabel,
+  GROWTH_DISCOVER_COMPANY_INTELLIGENCE_PANEL_QA_MARKER,
   GROWTH_DISCOVER_READY_TO_SEARCH_QA_MARKER,
   resolveProspectSearchDiscoverResultsPhase,
   resolveRawProviderCount,
@@ -189,6 +191,7 @@ export function ProspectSearchShell() {
 
   const companies = result?.companies ?? []
   const people = result?.people ?? []
+  const discoverFilteredResults = result?.filtered_discover_results ?? []
   const rawProviderCount = resolveRawProviderCount(result)
   const discoverPhase = resolveProspectSearchDiscoverResultsPhase({
     discoveryMode,
@@ -1169,7 +1172,9 @@ export function ProspectSearchShell() {
 
               {showDiscoverFiltersHiding ? (
                 <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/50 px-6 py-10 text-center">
-                  <h3 className="text-lg font-semibold">Filters are hiding all discovered companies</h3>
+                  <h3 className="text-lg font-semibold">
+                    Filters are hiding all discovered companies/prospects
+                  </h3>
                   <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
                     External discovery returned {rawProviderCount?.toLocaleString() ?? "some"} companies, but
                     your current filters removed every match. Broaden firmographic filters or clear enrichment
@@ -1217,6 +1222,44 @@ export function ProspectSearchShell() {
                     />
                   ))}
                 </div>
+              ) : searchCompleted && discoveryMode === "discover_external" ? (
+                <>
+                  <ProspectSearchDiscoverResultsTable
+                    rows={discoverFilteredResults}
+                    selectedId={selectedCompany?.id ?? null}
+                    selectedKeys={selectedKeys}
+                    onSelect={setSelectedCompany}
+                    onToggleSelection={toggleCompanySelection}
+                    onSelectAllVisible={selectAllVisible}
+                    onClearSelection={clearSelection}
+                  />
+                  {selectedCompany ? (
+                    <div
+                      className="rounded-xl border border-border bg-card p-2"
+                      data-qa={GROWTH_DISCOVER_COMPANY_INTELLIGENCE_PANEL_QA_MARKER}
+                      data-qa-marker={GROWTH_DISCOVER_COMPANY_INTELLIGENCE_PANEL_QA_MARKER}
+                    >
+                      <CompanyResultCard
+                        row={selectedCompany}
+                        selected
+                        checked={selectedKeys.has(prospectSearchSelectionKey(selectedCompany))}
+                        onSelect={() => setSelectedCompany(selectedCompany)}
+                        onCheckedChange={(checked) =>
+                          toggleCompanySelection(selectedCompany, checked === true)
+                        }
+                        onAction={(action, extra) => {
+                          void runAction(action, { ...extra, company: selectedCompany })
+                        }}
+                        onWorkflowLaunch={(launchInput) =>
+                          void handleWorkflowLaunch(selectedCompany, launchInput)
+                        }
+                        workflowBusy={workflowLaunchBusy}
+                        searchQuery={query}
+                        savedSearchId={activeSavedSearchId}
+                      />
+                    </div>
+                  ) : null}
+                </>
               ) : searchCompleted ? (
                 <>
                 <CompanyResultsTable

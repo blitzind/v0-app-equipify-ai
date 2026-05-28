@@ -2103,11 +2103,12 @@ async function main(): Promise<void> {
   assert.match(savedSearchWorkflowSource, /growth-saved-search-workflows-v1/)
 
   const countSource = fs.readFileSync(
-    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-count.ts"),
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-internal-estimate.ts"),
     "utf8",
   )
-  assert.match(countSource, /countProspectSearchMatchesInternal/)
+  assert.match(countSource, /countProspectSearchMatchesInternalDetailed/)
   assert.match(countSource, /loadProspectSearchMaterializedCompanies/)
+  assert.match(countSource, /real_world_company_candidates/)
   assert.doesNotMatch(countSource, /discover_external/)
 
   const savedWorkflowShellSource = fs.readFileSync(
@@ -2333,11 +2334,24 @@ async function main(): Promise<void> {
   assert.equal(GROWTH_SEARCH_RESULT_PREVIEW_QA_MARKER, "growth-search-result-preview-v1")
   assert.equal(GROWTH_PROVIDER_HEALTH_DASHBOARD_QA_MARKER, "growth-provider-health-dashboard-v1")
 
-  const { floorEstimateToRange, buildProspectSearchButtonLabel, formatProspectSearchMatchingCount } =
+  const { floorEstimateToRange, buildProspectSearchButtonLabel, formatProspectSearchMatchingCount, buildProspectSearchNumericalEstimateDisplay } =
     await import("../lib/growth/prospect-search/prospect-search-estimation-format")
   assert.equal(floorEstimateToRange(260).label, "~250+")
   assert.equal(floorEstimateToRange(1200).label, "~1k+")
   assert.equal(formatProspectSearchMatchingCount(29000), "29,000")
+  const numerical = buildProspectSearchNumericalEstimateDisplay({
+    company_count: 29000,
+    contact_count: 8400,
+    decision_maker_count: 1250,
+    tier: "large",
+    broad_market_category: true,
+    discovery_mode: "discover_external",
+    unavailable_filter_reasons: [],
+  })
+  assert.match(numerical.numerical_headline, /29,000 matching companies/)
+  assert.match(numerical.market_helper, /8,400 likely contacts/)
+  assert.match(numerical.market_helper, /1,250 decision makers/)
+  assert.match(numerical.market_helper, /No credits used for estimate/)
   assert.match(
     buildProspectSearchButtonLabel({
       state: "ready",
@@ -3264,24 +3278,29 @@ async function testProspectSearchPresearchMarketEstimation(): Promise<void> {
     path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-estimation.ts"),
     "utf8",
   )
-  assert.match(estimationSource, /computePresearchMarketEstimate/)
-  assert.match(estimationSource, /exact_count: null/)
-  assert.match(estimationSource, /indexed_count_hint/)
+  assert.match(estimationSource, /countProspectSearchMatchesInternalDetailed/)
+  assert.match(estimationSource, /numerical_headline/)
+  assert.match(estimationSource, /credits_used: false/)
+  assert.match(estimationSource, /company_count/)
 
   const liveEstimationSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/prospect-search-live-estimation.tsx"),
     "utf8",
   )
   assert.match(liveEstimationSource, /data-estimation-phase="presearch"/)
-  assert.match(liveEstimationSource, /data-market-estimation-tier-marker/)
-  assert.match(liveEstimationSource, /data-no-false-negative-estimates-marker/)
+  assert.match(liveEstimationSource, /GROWTH_DISCOVER_LIVE_ESTIMATE_QA_MARKER/)
+  assert.match(liveEstimationSource, /GROWTH_DISCOVER_NO_CREDITS_ESTIMATE_QA_MARKER/)
+  assert.match(liveEstimationSource, /numerical_headline/)
+  assert.match(liveEstimationSource, /likely contacts/)
+  assert.doesNotMatch(liveEstimationSource, /Large market/)
   assert.doesNotMatch(liveEstimationSource, /No likely matches/)
 
   const shellSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/prospect-search-shell.tsx"),
     "utf8",
   )
-  assert.match(shellSource, /totalCount={result.total_companies}/)
+  assert.match(shellSource, /ProspectSearchDiscoverResultsTable/)
+  assert.match(shellSource, /GROWTH_DISCOVER_COMPANY_INTELLIGENCE_PANEL_QA_MARKER/)
   assert.match(shellSource, /shouldFetchProspectSearchResults/)
 }
 
