@@ -104,6 +104,11 @@ export {
   GROWTH_WEBSITE_EXTRACTION_QUALITY_QA_MARKER,
 } from "@/lib/growth/contact-discovery/website-acquisition-metadata-bridge"
 export {
+  GROWTH_CONTACT_IDENTITY_RESOLUTION_QA_MARKER,
+  GROWTH_EVIDENCE_FUSION_QA_MARKER,
+  GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-contact-identity-fusion"
+export {
   enrichPeopleRowsWithRelationshipMemory,
 } from "@/lib/growth/prospect-search/prospect-search-relationship-intelligence"
 
@@ -201,6 +206,13 @@ export type GrowthProspectSearchPeopleResultRow = GrowthProspectSearchPersonResu
   location_confidence: number | null
   linkedin_company_url: string | null
   linkedin_reference_label: string | null
+  contact_identity_key: string | null
+  identity_confidence: number | null
+  merge_confidence: number | null
+  conflict_status: string | null
+  source_count: number | null
+  operator_confirmed: boolean
+  identity_resolution: import("@/lib/growth/prospect-search/prospect-search-contact-identity-types").ProspectSearchContactIdentityResolution | null
 }
 
 export type ProspectSearchPeopleTimelineEvent = {
@@ -557,6 +569,11 @@ export function enrichProspectSearchPeopleRowsWithRanking(
       branch_name: row.branch_name,
       branch_city: row.branch_city,
       branch_state: row.branch_state,
+      identity_confidence: row.identity_confidence,
+      merge_confidence: row.merge_confidence,
+      conflict_status: row.conflict_status,
+      operator_confirmed: row.operator_confirmed,
+      source_count: row.source_count,
     }
   })
 
@@ -1016,6 +1033,13 @@ function buildProspectSearchPeopleRowDraft(input: {
     location_confidence: contact.location_confidence ?? null,
     linkedin_company_url: contact.linkedin_company_url ?? null,
     linkedin_reference_label: contact.linkedin_reference_label ?? null,
+    contact_identity_key: contact.contact_identity_key ?? null,
+    identity_confidence: contact.identity_confidence ?? null,
+    merge_confidence: contact.merge_confidence ?? null,
+    conflict_status: contact.conflict_status ?? null,
+    source_count: contact.source_count ?? null,
+    operator_confirmed: contact.operator_confirmed === true,
+    identity_resolution: contact.identity_resolution ?? null,
     timeline_events: buildProspectSearchPeopleTimelineEvents({
       contact,
       company,
@@ -1268,6 +1292,13 @@ export function mergeProspectSearchPeopleResults(
       location_confidence: null,
       linkedin_company_url: null,
       linkedin_reference_label: null,
+      contact_identity_key: null,
+      identity_confidence: null,
+      merge_confidence: null,
+      conflict_status: null,
+      source_count: null,
+      operator_confirmed: false,
+      identity_resolution: null,
       timeline_events: [
         {
           id: "discovered-server",

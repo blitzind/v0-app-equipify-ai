@@ -51,6 +51,11 @@ export type ProspectSearchContactRankingInput = {
   branch_name?: string | null
   branch_city?: string | null
   branch_state?: string | null
+  identity_confidence?: number | null
+  merge_confidence?: number | null
+  conflict_status?: string | null
+  operator_confirmed?: boolean
+  source_count?: number | null
 }
 
 export type ProspectSearchContactRankingResult = {
@@ -198,6 +203,36 @@ export function rankProspectSearchContactsForOutreach(
   if (input.branch_name || input.branch_city) {
     score += 0.03
     ranking_reasons.push("Branch or location mapping from website")
+  }
+
+  if (input.operator_confirmed) {
+    score += 0.1
+    ranking_reasons.push("Operator-confirmed contact identity")
+  } else if ((input.identity_confidence ?? 0) >= 0.75) {
+    score += 0.05
+    ranking_reasons.push("Strong fused identity confidence")
+  } else if ((input.identity_confidence ?? 0) > 0 && (input.identity_confidence ?? 0) < 0.55) {
+    score -= 0.06
+    ranking_risks.push("Low identity confidence from multi-source fusion")
+  }
+
+  if ((input.source_count ?? 0) >= 2) {
+    score += 0.03
+    ranking_reasons.push("Multiple independent source records fused")
+  }
+
+  if (input.conflict_status === "channel_conflict") {
+    score -= 0.12
+    ranking_risks.push("Channel conflict — review before outreach")
+  } else if (input.conflict_status === "branch_conflict") {
+    score -= 0.05
+    ranking_risks.push("Branch/location conflict across sources")
+  } else if (input.conflict_status === "needs_review") {
+    score -= 0.08
+    ranking_risks.push("Identity merge needs operator review")
+  } else if (input.conflict_status === "likely_different_people") {
+    score -= 0.15
+    ranking_risks.push("Sources likely represent different people")
   }
 
   if (input.company_match_confidence != null && input.company_match_confidence >= 0.7) {

@@ -15,10 +15,13 @@ import {
   GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER,
   GROWTH_DEEP_CONTACT_ACQUISITION_QA_MARKER,
   GROWTH_WEBSITE_EXTRACTION_QUALITY_QA_MARKER,
-  GROWTH_PUBLIC_PROFILE_REFERENCE_QA_MARKER,
+  GROWTH_CONTACT_IDENTITY_RESOLUTION_QA_MARKER,
+  GROWTH_EVIDENCE_FUSION_QA_MARKER,
+  GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER,
   type GrowthProspectSearchPeopleResultRow,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import { formatWebsiteEvidenceQualityLabel } from "@/lib/growth/contact-discovery/website-acquisition-metadata-bridge"
+import { formatProspectSearchContactConflictLabel } from "@/lib/growth/prospect-search/prospect-search-contact-identity-operator-review"
 import { GROWTH_CONTACT_INFLUENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-influence"
 import {
   GROWTH_RELATIONSHIP_MEMORY_QA_MARKER,
@@ -138,6 +141,9 @@ export function ProspectSearchDiscoverPeopleTable({
       data-deep-contact-acquisition-marker={GROWTH_DEEP_CONTACT_ACQUISITION_QA_MARKER}
       data-website-extraction-quality-marker={GROWTH_WEBSITE_EXTRACTION_QUALITY_QA_MARKER}
       data-public-profile-reference-marker={GROWTH_PUBLIC_PROFILE_REFERENCE_QA_MARKER}
+      data-contact-identity-resolution-marker={GROWTH_CONTACT_IDENTITY_RESOLUTION_QA_MARKER}
+      data-evidence-fusion-marker={GROWTH_EVIDENCE_FUSION_QA_MARKER}
+      data-contact-conflict-review-marker={GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER}
       data-result-mode="people"
     >
       <table className="w-full min-w-[1280px] text-left text-xs">
@@ -233,6 +239,19 @@ export function ProspectSearchDiscoverPeopleTable({
                   ) : null}
                   {row.linkedin_reference_label ? (
                     <p className="mt-1 text-[10px] text-muted-foreground">{row.linkedin_reference_label}</p>
+                  ) : null}
+                  {row.source_count != null && row.source_count > 1 ? (
+                    <Badge variant="outline" className="mt-1 text-[10px]">
+                      {row.source_count} fused sources
+                    </Badge>
+                  ) : null}
+                  {row.conflict_status && row.conflict_status !== "no_conflict" ? (
+                    <Badge variant="secondary" className="mt-1 text-[10px]">
+                      {formatProspectSearchContactConflictLabel(row.conflict_status)}
+                    </Badge>
+                  ) : null}
+                  {row.operator_confirmed ? (
+                    <Badge className="mt-1 text-[10px]">Confirmed</Badge>
                   ) : null}
                 </td>
                 <td className="px-3 py-2">

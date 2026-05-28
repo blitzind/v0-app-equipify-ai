@@ -9,6 +9,11 @@ import {
   GROWTH_PUBLIC_PROFILE_REFERENCE_QA_MARKER,
   GROWTH_WEBSITE_EXTRACTION_QUALITY_QA_MARKER,
 } from "@/lib/growth/contact-discovery/website-acquisition-metadata-bridge"
+import {
+  GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER,
+  GROWTH_CONTACT_IDENTITY_RESOLUTION_QA_MARKER,
+  GROWTH_EVIDENCE_FUSION_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-contact-identity-fusion"
 import type { WebsiteExtractionDiagnosticsSnapshot } from "@/lib/growth/contact-discovery/website-extraction-acquisition-types"
 
 function evidenceBadgeVariant(
@@ -47,6 +52,9 @@ export function ProspectSearchContactAcquisitionPanel({
     | "location_confidence"
     | "linkedin_company_url"
     | "linkedin_reference_label"
+    | "source_count"
+    | "conflict_status"
+    | "identity_confidence"
   >
   diagnostics?: WebsiteExtractionDiagnosticsSnapshot | null
   compact?: boolean
@@ -68,8 +76,19 @@ export function ProspectSearchContactAcquisitionPanel({
       data-qa-marker={GROWTH_DEEP_CONTACT_ACQUISITION_QA_MARKER}
       data-website-extraction-quality-marker={GROWTH_WEBSITE_EXTRACTION_QUALITY_QA_MARKER}
       data-public-profile-reference-marker={GROWTH_PUBLIC_PROFILE_REFERENCE_QA_MARKER}
+      data-contact-identity-resolution-marker={GROWTH_CONTACT_IDENTITY_RESOLUTION_QA_MARKER}
+      data-evidence-fusion-marker={GROWTH_EVIDENCE_FUSION_QA_MARKER}
+      data-contact-conflict-review-marker={GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER}
     >
       <div className="flex flex-wrap gap-2">
+        {row.source_count != null && row.source_count > 1 ? (
+          <Badge variant="outline">{row.source_count} fused sources</Badge>
+        ) : null}
+        {row.conflict_status && row.conflict_status !== "no_conflict" ? (
+          <Badge variant="secondary">
+            Identity: {row.conflict_status.replace(/_/g, " ")}
+          </Badge>
+        ) : null}
         {row.evidence_quality_label ? (
           <Badge variant={evidenceBadgeVariant(row.evidence_quality_label)}>
             {formatWebsiteEvidenceQualityLabel(row.evidence_quality_label)}

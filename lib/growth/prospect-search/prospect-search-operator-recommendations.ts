@@ -28,6 +28,7 @@ export const PROSPECT_SEARCH_OPERATOR_RECOMMENDATION_TYPES = [
   "sequence_review",
   "follow_up_recommended",
   "research_before_outreach",
+  "identity_conflict_review",
 ] as const
 
 export type ProspectSearchOperatorRecommendationType =
@@ -121,6 +122,12 @@ export function buildProspectSearchOperatorRecommendations(input: {
     (row) => row.freshness_status === "stale" || row.freshness_status === "expired",
   ).length
   const callReady = peopleRows.filter((row) => row.call_ready && row.call_eligibility === "eligible")
+  const identityConflictRows = peopleRows.filter(
+    (row) =>
+      row.conflict_status &&
+      row.conflict_status !== "no_conflict" &&
+      row.conflict_status !== "likely_same_person",
+  )
   const topInfluence = [...(contactInfluences ?? [])].sort(
     (a, b) => b.influence_score - a.influence_score,
   )[0]
@@ -208,6 +215,36 @@ export function buildProspectSearchOperatorRecommendations(input: {
       contributing_signals: ["coverage_gaps"],
       uncertainty_notes: [],
       blocker_explanations: sequenceReadiness?.missing_requirements ?? [],
+    })
+  }
+
+  if (identityConflictRows.length > 0) {
+    pushRecommendation(recommendations, {
+      recommendation_type: "identity_conflict_review",
+      title: "Contact identity conflict needs review",
+      confidence: Math.min(0.92, 0.6 + identityConflictRows.length * 0.08),
+      urgency: identityConflictRows.some((row) => row.conflict_status === "channel_conflict")
+        ? "high"
+        : "moderate",
+      evidence: identityConflictRows.slice(0, 3).map((row) => {
+        const label = row.full_name?.trim() || "Contact"
+        return `${label}: ${row.conflict_status?.replace(/_/g, " ") ?? "conflict"}`
+      }),
+      reasoning: [
+        "Unresolved identity conflicts may attach channels to the wrong person",
+        "Review merged evidence before outreach or queue handoff",
+      ],
+      recommended_operator_action:
+        "Open evidence drawer and confirm same person, keep separate, or mark channel as role/shared",
+      recommended_timing: "Before outreach, queue push, or Lead Pipeline handoff",
+      risk_notes: ["Outreach on conflicted contacts may reach the wrong person or shared inbox"],
+      contributing_signals: ["identity_resolution", "conflict_status"],
+      uncertainty_notes: identityConflictRows
+        .filter((row) => !row.operator_confirmed)
+        .slice(0, 2)
+        .map((row) => `${row.full_name ?? "Contact"} not operator-confirmed`),
+      blocker_explanations: [],
+      priority_score: 60 + identityConflictRows.length * 8,
     })
   }
 

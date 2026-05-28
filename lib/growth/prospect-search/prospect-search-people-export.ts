@@ -51,6 +51,13 @@ export function buildProspectSearchPeopleCsv(
     "recommended_next_action",
     "is_recommended_contact",
     "is_secondary_contact",
+    "contact_identity_key",
+    "identity_confidence",
+    "merge_confidence",
+    "conflict_status",
+    "source_count",
+    "operator_confirmed",
+    "conflict_warnings",
   ]
 
   const lines = [headers.join(",")]
@@ -97,6 +104,13 @@ export function buildProspectSearchPeopleCsv(
         csvEscape(row.recommended_next_action ?? ""),
         csvEscape(row.is_recommended_contact ? "true" : "false"),
         csvEscape(row.is_secondary_contact ? "true" : "false"),
+        csvEscape(row.contact_identity_key),
+        csvEscape(row.identity_confidence != null ? String(Math.round(row.identity_confidence * 100)) : null),
+        csvEscape(row.merge_confidence != null ? String(Math.round(row.merge_confidence * 100)) : null),
+        csvEscape(row.conflict_status),
+        csvEscape(row.source_count != null ? String(row.source_count) : null),
+        csvEscape(row.operator_confirmed ? "true" : "false"),
+        csvEscape((row.identity_resolution?.conflict_flags ?? []).join("; ")),
       ].join(","),
     )
   }

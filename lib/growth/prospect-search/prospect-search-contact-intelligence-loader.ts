@@ -68,6 +68,16 @@ async function loadLeadMetadataByIds(
   return map
 }
 
+function resolveCompanyDomain(website: string | null | undefined): string | null {
+  try {
+    const raw = website?.trim()
+    if (!raw) return null
+    return new URL(raw.startsWith("http") ? raw : `https://${raw}`).hostname.replace(/^www\./, "")
+  } catch {
+    return null
+  }
+}
+
 async function buildContactIntelligenceForCompany(
   admin: SupabaseClient,
   input: {
@@ -75,6 +85,7 @@ async function buildContactIntelligenceForCompany(
     source_type: GrowthProspectSearchSourceType
     growth_lead_id: string | null
     company_name: string
+    website?: string | null
     is_suppressed?: boolean
   },
   context: {
@@ -197,6 +208,8 @@ async function buildContactIntelligenceForCompany(
 
   return buildProspectSearchContactIntelligence({
     contacts,
+    company_id: input.id,
+    company_domain: resolveCompanyDomain(input.website),
     decision_maker_hypothesis,
     committee_completeness,
     schema_ready: context.schema_ready,
@@ -219,6 +232,8 @@ export async function loadProspectSearchContactIntelligenceBatch(
     source_type: GrowthProspectSearchSourceType
     growth_lead_id: string | null
     company_name: string
+    website?: string | null
+    is_suppressed?: boolean
   }>,
 ): Promise<Map<string, GrowthProspectSearchContactIntelligence>> {
   const map = new Map<string, GrowthProspectSearchContactIntelligence>()
@@ -403,6 +418,7 @@ export async function applyProspectSearchContactIntelligenceOverlay(
       source_type: company.source_type,
       growth_lead_id: company.growth_lead_id,
       company_name: company.company_name,
+      website: company.website,
       is_suppressed: company.is_suppressed,
     })),
   )

@@ -4944,6 +4944,94 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   )
   assert.match(routeSource, /Promise.allSettled/)
   assert.match(routeSource, /prospect_search_failed/)
+
+  const {
+    resolveProspectSearchContactIdentities,
+    GROWTH_CONTACT_IDENTITY_RESOLUTION_QA_MARKER,
+    GROWTH_EVIDENCE_FUSION_QA_MARKER,
+    GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER,
+  } = await import("../lib/growth/prospect-search/prospect-search-contact-identity-fusion")
+  assert.equal(GROWTH_CONTACT_IDENTITY_RESOLUTION_QA_MARKER, "growth-contact-identity-resolution-v1")
+  assert.equal(GROWTH_EVIDENCE_FUSION_QA_MARKER, "growth-evidence-fusion-v1")
+  assert.equal(GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER, "growth-contact-conflict-review-v1")
+
+  const fusion = resolveProspectSearchContactIdentities({
+    company_id: "co1",
+    company_domain: "acme.com",
+    contacts: [
+      {
+        id: "c1",
+        full_name: "Jane Owner",
+        title: "President",
+        email: "jane@acme.com",
+        phone: "(512) 555-0100",
+        confidence: 0.82,
+        source_evidence: [{ claim: "Team", evidence: "President", source: "website_public_extract" }],
+        discovery_sources: ["website_public_extract"],
+        evidence_quality_label: "strong_public_evidence",
+        evidence_quality_score: 85,
+      },
+      {
+        id: "c2",
+        full_name: "Jane Owner",
+        title: "Owner",
+        email: "jane@acme.com",
+        confidence: 0.78,
+        source_evidence: [{ claim: "Lead Engine", evidence: "Owner", source: "lead_engine_contact_research" }],
+        discovery_sources: ["lead_engine_contact_research"],
+      },
+    ],
+  })
+  assert.equal(fusion.merged_contacts.length, 1)
+  assert.equal(fusion.resolutions[0]?.source_count, 2)
+  assert.equal(fusion.resolutions[0]?.canonical.best_email.value, "jane@acme.com")
+
+  const conflictFusion = resolveProspectSearchContactIdentities({
+    company_id: "co2",
+    contacts: [
+      {
+        id: "a",
+        full_name: "Jane Owner",
+        email: "info@acme.com",
+        confidence: 0.7,
+        source_evidence: [{ claim: "Contact page", evidence: "info@", source: "website_public_extract" }],
+      },
+      {
+        id: "b",
+        full_name: "John Smith",
+        email: "info@acme.com",
+        confidence: 0.65,
+        source_evidence: [{ claim: "Footer", evidence: "info@", source: "website_public_extract" }],
+      },
+    ],
+  })
+  assert.ok(conflictFusion.resolutions[0]?.conflicts.length > 0)
+
+  const { applyProspectSearchContactIdentityOperatorReview } = await import(
+    "../lib/growth/prospect-search/prospect-search-contact-identity-operator-review"
+  )
+  const confirmed = applyProspectSearchContactIdentityOperatorReview({
+    resolution: fusion.resolutions[0]!,
+    action: "mark_contact_confirmed",
+  })
+  assert.equal(confirmed.operator_confirmed, true)
+
+  const identityPanelSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-contact-identity-panel.tsx"),
+    "utf8",
+  )
+  assert.match(identityPanelSource, /GROWTH_CONTACT_IDENTITY_RESOLUTION_QA_MARKER/)
+  assert.match(identityPanelSource, /GROWTH_EVIDENCE_FUSION_QA_MARKER/)
+  assert.match(identityPanelSource, /GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER/)
+  assert.match(drawerSource, /ProspectSearchContactIdentityPanel/)
+  assert.match(shellSource, /data-contact-identity-resolution-marker/)
+  const contactIdentityIntelSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-contact-intelligence.ts"),
+    "utf8",
+  )
+  assert.match(contactIdentityIntelSource, /resolveProspectSearchContactIdentities/)
+  assert.match(peopleTableSource, /data-contact-identity-resolution-marker/)
+  assert.match(pushMetadataSource, /contact_identities/)
 }
 
 void main()

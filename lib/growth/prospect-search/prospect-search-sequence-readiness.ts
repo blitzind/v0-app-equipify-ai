@@ -95,6 +95,12 @@ export function resolveAccountSequenceReadiness(input: {
   const staleContacts = peopleRows.filter(
     (row) => row.freshness_status === "stale" || row.freshness_status === "expired",
   ).length
+  const identityConflictRows = peopleRows.filter(
+    (row) =>
+      row.conflict_status &&
+      row.conflict_status !== "no_conflict" &&
+      row.conflict_status !== "likely_same_person",
+  )
   const primary = accountStrategy.primary_contact
 
   let readiness_state: ProspectSearchSequenceReadinessState = "insufficient_coverage"
@@ -143,6 +149,21 @@ export function resolveAccountSequenceReadiness(input: {
     score -= 10
   }
 
+  if (identityConflictRows.length > 0) {
+    if (readiness_state === "ready") {
+      readiness_state = "ready_with_review"
+    } else if (readiness_state === "ready_with_review") {
+      // keep review state
+    } else if (readiness_state !== "blocked") {
+      readiness_state = "verification_required"
+    }
+    blockers.push(
+      `${identityConflictRows.length} contact identity conflict(s) require operator review`,
+    )
+    missing_requirements.push("Resolve identity conflicts before confident sequencing")
+    score -= Math.min(15, identityConflictRows.length * 5)
+  }
+
   if (relationshipMemory?.relationship_status === "stalled") {
     sequence_suitability = "relationship_nurture"
     readiness_reasons.push("Stalled relationship — nurture before hard sequence")
@@ -168,6 +189,14 @@ export function resolveAccountSequenceReadiness(input: {
     sequence_suitability = "call_first"
   } else if (readiness_state === "ready" && emailReady) {
     sequence_suitability = "email_first"
+  }
+
+  if (
+    identityConflictRows.length > 0 &&
+    (sequence_suitability === "call_first" || sequence_suitability === "email_first")
+  ) {
+    sequence_suitability = "manual_review"
+    readiness_reasons.push("Identity conflicts require manual review before sequencing")
   }
 
   if (accountStrategy.missing_personas.length > 0) {

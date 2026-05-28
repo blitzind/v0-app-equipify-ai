@@ -192,6 +192,22 @@ export function buildProspectSearchPushMetadata(
           },
         }
       : {}),
+    ...(company.contact_intelligence?.contact_identities?.length
+      ? {
+          contact_identities: company.contact_intelligence.contact_identities.map((identity) => ({
+            identity_key: identity.identity_key,
+            identity_confidence: identity.identity_confidence,
+            merge_confidence: identity.merge_confidence,
+            conflict_status: identity.conflict_status,
+            source_count: identity.source_count,
+            operator_confirmed: identity.operator_confirmed,
+            canonical_email: identity.canonical.best_email.value,
+            canonical_phone: identity.canonical.best_phone.value,
+            canonical_title: identity.canonical.best_title,
+            conflict_warnings: identity.conflict_flags,
+          })),
+        }
+      : {}),
     ...(company.contact_intelligence?.contact_influences?.length
       ? {
           contact_influences: company.contact_intelligence.contact_influences.map((influence) => ({

@@ -28,12 +28,16 @@ import { GROWTH_ORG_INTELLIGENCE_QA_MARKER } from "@/lib/growth/prospect-search/
 import { ProspectSearchOperationalIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-operational-intelligence-panel"
 import { ProspectSearchOperatorAssistPanel } from "@/components/growth/prospect-search/prospect-search-operator-assist-panel"
 import { ProspectSearchContactAcquisitionPanel } from "@/components/growth/prospect-search/prospect-search-contact-acquisition-panel"
+import { ProspectSearchContactIdentityPanel } from "@/components/growth/prospect-search/prospect-search-contact-identity-panel"
 import { GROWTH_REVENUE_OPERATING_ALERTS_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-revenue-operating-alerts"
 import {
   GROWTH_DEEP_CONTACT_ACQUISITION_QA_MARKER,
   GROWTH_PUBLIC_PROFILE_REFERENCE_QA_MARKER,
   GROWTH_WEBSITE_EXTRACTION_QUALITY_QA_MARKER,
-} from "@/lib/growth/contact-discovery/website-acquisition-metadata-bridge"
+  GROWTH_CONTACT_IDENTITY_RESOLUTION_QA_MARKER,
+  GROWTH_EVIDENCE_FUSION_QA_MARKER,
+  GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import { formatProspectSearchFreshnessLabel } from "@/lib/growth/prospect-search/prospect-search-contact-freshness"
 
 function eligibilityBadgeVariant(state: string): "default" | "outline" | "destructive" | "secondary" {
@@ -48,11 +52,16 @@ export function ProspectSearchContactEvidenceDrawer({
   open,
   onClose,
   onRerunDiscovery,
+  onIdentityReview,
 }: {
   row: GrowthProspectSearchPeopleResultRow | null
   open: boolean
   onClose: () => void
   onRerunDiscovery?: (row: GrowthProspectSearchPeopleResultRow) => void
+  onIdentityReview?: (
+    row: GrowthProspectSearchPeopleResultRow,
+    action: import("@/lib/growth/prospect-search/prospect-search-contact-identity-types").ProspectSearchContactIdentityOperatorAction,
+  ) => void
 }) {
   if (!open || !row) return null
 
@@ -78,6 +87,9 @@ export function ProspectSearchContactEvidenceDrawer({
       data-deep-contact-acquisition-marker={GROWTH_DEEP_CONTACT_ACQUISITION_QA_MARKER}
       data-website-extraction-quality-marker={GROWTH_WEBSITE_EXTRACTION_QUALITY_QA_MARKER}
       data-public-profile-reference-marker={GROWTH_PUBLIC_PROFILE_REFERENCE_QA_MARKER}
+      data-contact-identity-resolution-marker={GROWTH_CONTACT_IDENTITY_RESOLUTION_QA_MARKER}
+      data-evidence-fusion-marker={GROWTH_EVIDENCE_FUSION_QA_MARKER}
+      data-contact-conflict-review-marker={GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER}
       onClick={onClose}
     >
       <div
@@ -311,6 +323,20 @@ export function ProspectSearchContactEvidenceDrawer({
               {row.sms_block_reason ? <li>SMS block: {row.sms_block_reason}</li> : null}
               {row.phone_on_dnc === true ? <li className="text-red-700">Matched voice DNC registry</li> : null}
             </ul>
+          </section>
+
+          <section>
+            <h4 className="font-medium text-foreground">Identity resolution</h4>
+            <div className="mt-2">
+              <ProspectSearchContactIdentityPanel
+                row={row}
+                onOperatorReview={
+                  onIdentityReview
+                    ? (action) => onIdentityReview(row, action)
+                    : undefined
+                }
+              />
+            </div>
           </section>
 
           <section>

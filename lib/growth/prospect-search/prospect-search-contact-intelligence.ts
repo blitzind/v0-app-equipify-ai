@@ -18,6 +18,8 @@ import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-se
 import { mergeProspectSearchContactInputs } from "@/lib/growth/prospect-search/prospect-search-contact-merge"
 import { computeProspectSearchContactOutreachReadiness } from "@/lib/growth/prospect-search/prospect-search-contact-readiness"
 import { parseWebsiteContactAcquisitionFromMetadata } from "@/lib/growth/contact-discovery/website-acquisition-metadata-bridge"
+import { resolveProspectSearchContactIdentities } from "@/lib/growth/prospect-search/prospect-search-contact-identity-fusion"
+import type { ProspectSearchContactIdentityResolution } from "@/lib/growth/prospect-search/prospect-search-contact-identity-types"
 
 export const MAX_CONTACT_CONFIDENCE_RANK_BOOST = 0.05
 
@@ -241,13 +243,21 @@ function toOverlay(
   contact: ProspectSearchContactIntelligenceInputContact,
   recommended_priority: number,
   companySuppressed: boolean,
+  identity?: ProspectSearchContactIdentityResolution | null,
 ): ProspectSearchContactOverlay {
-  const role_type = inferRoleType(contact.title, contact.role_type)
+  const canonical = identity?.canonical
+  const displayEmail = canonical?.best_email.value ?? contact.email ?? null
+  const displayPhone = canonical?.best_phone.value ?? contact.phone ?? null
+  const displayTitle = canonical?.best_title ?? contact.title ?? null
+  const displayLinkedIn = canonical?.best_linkedin.value ?? contact.linkedin_url ?? null
+  const displayConfidence = identity?.identity_confidence ?? contact.confidence
+
+  const role_type = inferRoleType(displayTitle, contact.role_type)
   const readiness = computeProspectSearchContactOutreachReadiness({
-    email: contact.email,
-    phone: contact.phone,
+    email: displayEmail,
+    phone: displayPhone,
     verification_status: contact.verification_status,
-    confidence: contact.confidence,
+    confidence: displayConfidence,
     suppressed: companySuppressed,
   })
   const source_label =
@@ -256,10 +266,10 @@ function toOverlay(
     null
   const overlay: ProspectSearchContactOverlay = {
     id: contact.id,
-    name: contact.full_name,
-    title: contact.title ?? null,
-    confidence: Number(Math.min(1, Math.max(0, contact.confidence)).toFixed(3)),
-    source_evidence: contact.source_evidence,
+    name: identity?.primary_name ?? contact.full_name,
+    title: displayTitle,
+    confidence: Number(Math.min(1, Math.max(0, displayConfidence)).toFixed(3)),
+    source_evidence: identity?.source_evidence ?? contact.source_evidence,
     role_type,
     recommended_priority,
     source_page_url: contact.source_page_url ?? contact.source_evidence[0]?.page_url ?? null,
@@ -268,9 +278,9 @@ function toOverlay(
     outreach_ready: readiness.outreach_ready,
     source_label,
   }
-  if (contact.linkedin_url) overlay.linkedin_url = contact.linkedin_url
-  if (contact.phone) overlay.phone = contact.phone
-  if (contact.email) overlay.email = contact.email
+  if (displayLinkedIn) overlay.linkedin_url = displayLinkedIn
+  if (displayPhone) overlay.phone = displayPhone
+  if (displayEmail) overlay.email = displayEmail
   if (contact.discovered_at) overlay.discovered_at = contact.discovered_at
   if (contact.last_verified_at) overlay.last_verified_at = contact.last_verified_at
   if (contact.last_checked_at) overlay.source_last_seen_at = contact.last_checked_at
@@ -292,6 +302,15 @@ function toOverlay(
   if (contact.location_confidence != null) overlay.location_confidence = contact.location_confidence
   if (contact.linkedin_company_url) overlay.linkedin_company_url = contact.linkedin_company_url
   if (contact.linkedin_reference_label) overlay.linkedin_reference_label = contact.linkedin_reference_label
+  if (identity) {
+    overlay.contact_identity_key = identity.identity_key
+    overlay.identity_confidence = identity.identity_confidence
+    overlay.merge_confidence = identity.merge_confidence
+    overlay.conflict_status = identity.conflict_status
+    overlay.source_count = identity.source_count
+    overlay.operator_confirmed = identity.operator_confirmed
+    overlay.identity_resolution = identity
+  }
   return overlay
 }
 
@@ -405,6 +424,8 @@ export function buildContactConfidenceExplanation(input: {
 
 export function buildProspectSearchContactIntelligence(input: {
   contacts: ProspectSearchContactIntelligenceInputContact[]
+  company_id?: string | null
+  company_domain?: string | null
   decision_maker_hypothesis?: GrowthLeadEngineDecisionMakerHypothesisOutput | null
   committee_completeness?: number | null
   schema_ready?: boolean
@@ -420,14 +441,38 @@ export function buildProspectSearchContactIntelligence(input: {
   website_extraction_diagnostics?: import("@/lib/growth/contact-discovery/website-extraction-acquisition-types").WebsiteExtractionDiagnosticsSnapshot | null
 }): GrowthProspectSearchContactIntelligence {
   const schema_ready = input.schema_ready ?? true
-  const evidenceBacked = dedupeContacts(input.contacts.filter(hasEvidence))
+  const filtered = input.contacts.filter(hasEvidence)
+  let evidenceBacked = filtered
+  let contact_identities: ProspectSearchContactIdentityResolution[] = []
+  let resolutionsByContactId = new Map<string, ProspectSearchContactIdentityResolution>()
+
+  if (input.company_id && filtered.length > 0) {
+    const fusion = resolveProspectSearchContactIdentities({
+      company_id: input.company_id,
+      company_domain: input.company_domain,
+      contacts: filtered,
+    })
+    evidenceBacked = fusion.merged_contacts
+    contact_identities = fusion.resolutions
+    resolutionsByContactId = fusion.resolutions_by_contact_id
+  } else if (filtered.length > 0) {
+    evidenceBacked = dedupeContacts(filtered)
+  }
+
   const overlays = evidenceBacked
     .sort((a, b) => {
       const scoreA = a.confidence + authorityScore(a.title) * 0.04 + (a.is_primary ? 0.15 : 0)
       const scoreB = b.confidence + authorityScore(b.title) * 0.04 + (b.is_primary ? 0.15 : 0)
       return scoreB - scoreA
     })
-    .map((contact, index) => toOverlay(contact, index + 1, input.company_suppressed === true))
+    .map((contact, index) =>
+      toOverlay(
+        contact,
+        index + 1,
+        input.company_suppressed === true,
+        resolutionsByContactId.get(contact.id) ?? null,
+      ),
+    )
 
   const committee_roles = buildCommitteeRolesFromHypothesis(input.decision_maker_hypothesis, overlays)
   const first_contact = recommendFirstContact(overlays)
@@ -482,6 +527,7 @@ export function buildProspectSearchContactIntelligence(input: {
     recommended_contact_id: input.recommended_contact_id ?? null,
     schema_health: input.schema_health ?? null,
     website_extraction_diagnostics: input.website_extraction_diagnostics ?? null,
+    contact_identities,
   }
 }
 

@@ -51,6 +51,13 @@ export type ProspectSearchContactOverlay = {
   location_confidence?: number | null
   linkedin_company_url?: string | null
   linkedin_reference_label?: string | null
+  contact_identity_key?: string | null
+  identity_confidence?: number | null
+  merge_confidence?: number | null
+  conflict_status?: import("@/lib/growth/prospect-search/prospect-search-contact-identity-types").ProspectSearchContactConflictStatus | null
+  source_count?: number | null
+  operator_confirmed?: boolean
+  identity_resolution?: import("@/lib/growth/prospect-search/prospect-search-contact-identity-types").ProspectSearchContactIdentityResolution | null
 }
 
 export type ProspectSearchCommitteeRoleMapping = {
@@ -109,6 +116,7 @@ export type GrowthProspectSearchContactIntelligence = {
   operator_assist?: import("@/lib/growth/prospect-search/prospect-search-operator-assist-intelligence").ProspectSearchOperatorAssistBundle | null
   command_overlays?: import("@/lib/growth/prospect-search/prospect-search-command-overlays").ProspectSearchCommandOverlaysSnapshot | null
   website_extraction_diagnostics?: import("@/lib/growth/contact-discovery/website-extraction-acquisition-types").WebsiteExtractionDiagnosticsSnapshot | null
+  contact_identities?: import("@/lib/growth/prospect-search/prospect-search-contact-identity-types").ProspectSearchContactIdentityResolution[]
 }
 
 export type ProspectSearchLeadEngineContactHandoffContext = {

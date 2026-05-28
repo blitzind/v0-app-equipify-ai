@@ -141,6 +141,9 @@ import {
   GROWTH_OPPORTUNITY_EMERGENCE_QA_MARKER,
   GROWTH_SEQUENCE_READINESS_QA_MARKER,
   GROWTH_REVENUE_OPERATING_ALERTS_QA_MARKER,
+  GROWTH_CONTACT_IDENTITY_RESOLUTION_QA_MARKER,
+  GROWTH_EVIDENCE_FUSION_QA_MARKER,
+  GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER,
   logProspectSearchContactDiscoveryIssue,
   attachProspectSearchCompanyCoverageIntelligence,
   enrichPeopleRowsWithContactInfluence,
@@ -168,6 +171,9 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-safe-fetch-json"
 import { ProspectSearchPeopleBulkActionBar } from "@/components/growth/prospect-search/prospect-search-people-bulk-action-bar"
 import { ProspectSearchContactEvidenceDrawer } from "@/components/growth/prospect-search/prospect-search-contact-evidence-drawer"
+import { enrichPeopleRowWithIdentityReview } from "@/components/growth/prospect-search/prospect-search-contact-identity-panel"
+import { applyProspectSearchContactIdentityOperatorReview } from "@/lib/growth/prospect-search/prospect-search-contact-identity-operator-review"
+import type { ProspectSearchContactIdentityOperatorAction } from "@/lib/growth/prospect-search/prospect-search-contact-identity-types"
 import {
   mergeProspectSearchPeopleSelectionStore,
   prospectSearchPeopleSelectionKey,
@@ -289,6 +295,9 @@ function ProspectSearchShellInner() {
   const [evidenceDrawerRow, setEvidenceDrawerRow] = useState<GrowthProspectSearchPeopleResultRow | null>(
     null,
   )
+  const [identityReviewByKey, setIdentityReviewByKey] = useState<
+    Map<string, NonNullable<GrowthProspectSearchPeopleResultRow["identity_resolution"]>>
+  >(new Map())
   const [commandWorkViewFilter, setCommandWorkViewFilter] = useState<string>("all")
 
   const queryRef = useRef(query)
@@ -372,9 +381,19 @@ function ProspectSearchShellInner() {
       })),
     [peopleRows, companiesWithContactCoverage],
   )
+  const peopleRowsWithOperatorIdentity = useMemo(
+    () =>
+      peopleRowsWithCompanies.map((row) => {
+        const key = row.contact_identity_key ?? row.id
+        const reviewed = identityReviewByKey.get(key)
+        if (!reviewed) return row
+        return enrichPeopleRowWithIdentityReview(row, reviewed)
+      }),
+    [peopleRowsWithCompanies, identityReviewByKey],
+  )
   const peopleRowsRanked = useMemo(
-    () => enrichProspectSearchPeopleRowsWithRanking(peopleRowsWithCompanies),
-    [peopleRowsWithCompanies],
+    () => enrichProspectSearchPeopleRowsWithRanking(peopleRowsWithOperatorIdentity),
+    [peopleRowsWithOperatorIdentity],
   )
   const peopleRowsWithInfluence = useMemo(
     () => enrichPeopleRowsWithContactInfluence(peopleRowsRanked, companiesWithContactCoverage),
@@ -1263,6 +1282,31 @@ function ProspectSearchShellInner() {
     [refreshContactDiscoveryResults],
   )
 
+  const handleIdentityReview = useCallback(
+    (row: GrowthProspectSearchPeopleResultRow, action: ProspectSearchContactIdentityOperatorAction) => {
+      if (!row.identity_resolution) return
+      const updated = applyProspectSearchContactIdentityOperatorReview({
+        resolution: row.identity_resolution,
+        action,
+      })
+      setIdentityReviewByKey((current) => {
+        const next = new Map(current)
+        next.set(updated.identity_key, updated)
+        return next
+      })
+      setEvidenceDrawerRow((current) => {
+        if (!current) return current
+        if ((current.contact_identity_key ?? current.id) !== updated.identity_key) return current
+        return enrichPeopleRowWithIdentityReview(current, updated)
+      })
+      setActionMessage({
+        message: `Identity review recorded: ${action.replace(/_/g, " ")}.`,
+        tone: "success",
+      })
+    },
+    [],
+  )
+
   const handleAccountResearchAction = useCallback(
     async (companyId: string, actionId: string) => {
       const company = companiesWithContactCoverage.find((row) => row.id === companyId)
@@ -1488,6 +1532,9 @@ function ProspectSearchShellInner() {
       data-discovery-runtime-hardening-marker={GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER}
       data-safe-provider-parsing-marker={GROWTH_SAFE_PROVIDER_PARSING_QA_MARKER}
       data-runtime-regression-fix-marker={GROWTH_RUNTIME_REGRESSION_FIX_QA_MARKER}
+      data-contact-identity-resolution-marker={GROWTH_CONTACT_IDENTITY_RESOLUTION_QA_MARKER}
+      data-evidence-fusion-marker={GROWTH_EVIDENCE_FUSION_QA_MARKER}
+      data-contact-conflict-review-marker={GROWTH_CONTACT_CONFLICT_REVIEW_QA_MARKER}
       data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
       data-prospect-search-render-loop-fix-marker={GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER}
       data-contact-discovery-marker={GROWTH_PROSPECT_CONTACT_DISCOVERY_QA_MARKER}
@@ -2079,6 +2126,7 @@ function ProspectSearchShellInner() {
         open={evidenceDrawerRow != null}
         onClose={() => setEvidenceDrawerRow(null)}
         onRerunDiscovery={handleRerunPersonDiscovery}
+        onIdentityReview={handleIdentityReview}
       />
     </div>
   )
