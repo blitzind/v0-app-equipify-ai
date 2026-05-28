@@ -116,6 +116,7 @@ type GrowthNavGroup = {
 const GROWTH_NAV_ICONS: Record<string, LucideIcon> = {
   command: LayoutDashboard,
   queue: ListOrdered,
+  search: Search,
   "prospect-search": Search,
   "intent-pixel": Radar,
   "unified-inbox": Mail,

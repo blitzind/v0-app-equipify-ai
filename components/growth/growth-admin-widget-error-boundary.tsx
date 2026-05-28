@@ -15,13 +15,16 @@ type Props = {
   onRetry?: () => void
 }
 
-type State = { hasError: boolean }
+type State = { hasError: boolean; errorMessage: string | null }
 
 export class GrowthAdminWidgetErrorBoundary extends React.Component<Props, State> {
-  state: State = { hasError: false }
+  state: State = { hasError: false, errorMessage: null }
 
-  static getDerivedStateFromError(): State {
-    return { hasError: true }
+  static getDerivedStateFromError(error: Error): State {
+    return {
+      hasError: true,
+      errorMessage: error?.message?.trim() || "Unknown render error",
+    }
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
@@ -29,7 +32,7 @@ export class GrowthAdminWidgetErrorBoundary extends React.Component<Props, State
   }
 
   private handleRetry = (): void => {
-    this.setState({ hasError: false })
+    this.setState({ hasError: false, errorMessage: null })
     this.props.onRetry?.()
   }
 
@@ -43,7 +46,7 @@ export class GrowthAdminWidgetErrorBoundary extends React.Component<Props, State
         >
           <p className="font-semibold">{this.props.label} unavailable</p>
           <p className="mt-1 text-xs opacity-90">
-            {sanitizeGrowthAdminUiError("ReferenceError: panel render failed")}
+            {sanitizeGrowthAdminUiError(this.state.errorMessage)}
           </p>
           <Button type="button" variant="outline" size="sm" className="mt-3" onClick={this.handleRetry}>
             <RefreshCw className="mr-2 size-3.5" />

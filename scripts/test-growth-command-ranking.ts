@@ -164,4 +164,8 @@ assert.equal(resolvedInbox?.id, "queue")
 const resolvedLeadEngine = resolveGrowthNavigationEntryFromPathname("/admin/growth/leads/lead-engine")
 assert.equal(resolvedLeadEngine?.id, "lead-engine-inspector")
 
+const resolvedProspectSearch = resolveGrowthNavigationEntryFromPathname("/admin/growth/search")
+assert.equal(resolvedProspectSearch?.id, "prospect-search")
+assert.equal(resolvedProspectSearch?.label, "Prospect Search")
+
 console.log("growth-command-ranking: all checks passed")

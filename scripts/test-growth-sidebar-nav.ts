@@ -112,6 +112,7 @@ assert.match(source, /data-workspace-consolidation-marker/)
 assert.match(source, /GROWTH_WORKSPACE_GROUP_DESCRIPTION/)
 assert.match(source, /GROWTH_INTELLIGENCE_NAV_CLEANUP_QA_MARKER/)
 assert.match(source, /data-intelligence-nav-cleanup-marker/)
+assert.match(source, /search: Search/)
 
 const coreGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "core")
 assert.equal(coreGroup?.label, "Workspace")
@@ -201,6 +202,9 @@ const leadEnginePath = "/admin/growth/leads/lead-engine"
 const resolvedLeadEngine = resolveGrowthNavigationEntryFromPathname(leadEnginePath)
 assert.equal(resolvedLeadEngine?.id, "lead-engine-inspector")
 assert.equal(resolvedLeadEngine?.label, "Lead Intelligence Inspector")
+
+const resolvedProspectSearch = resolveGrowthNavigationEntryFromPathname("/admin/growth/search")
+assert.equal(resolvedProspectSearch?.id, "prospect-search")
 
 const intelligenceActive = intelligenceGroup?.items.some(
   (item) => !item.futurePlaceholder && item.match(leadEnginePath),

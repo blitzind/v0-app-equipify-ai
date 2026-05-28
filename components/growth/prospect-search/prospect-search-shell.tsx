@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense, type SetStateAction } from "react"
 import { useSearchParams } from "next/navigation"
 import { Bookmark, LayoutTemplate, Loader2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -102,6 +102,10 @@ import {
   type GrowthTerritoryOpportunityRecommendedAction,
 } from "@/lib/growth/prospect-search/territory-opportunity-heatmap"
 import {
+  GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER,
+  resolveProspectSearchDiscoveryMode,
+} from "@/lib/growth/prospect-search/prospect-search-runtime"
+import {
   GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER,
   sanitizeGrowthAdminUiError,
 } from "@/lib/growth/admin-route-runtime-types"
@@ -116,22 +120,17 @@ type ProspectSearchRunInput = {
   trigger?: ProspectSearchFetchTrigger
 }
 
-function resolveDiscoveryModeFromParams(
-  searchParams: ReturnType<typeof useSearchParams>,
-): GrowthProspectSearchDiscoveryMode {
-  const mode = searchParams.get("mode")
-  if (mode === "internal") return "internal"
-  if (mode === "discover" || mode === "discover_external") return "discover_external"
-  return "discover_external"
-}
-
 type ActionFeedback = {
   message: string
   tone: "success" | "warning" | "error"
   workspaceUrl?: string | null
 }
 
-export function ProspectSearchShell() {
+function ProspectSearchShellFallback() {
+  return <p className="text-sm text-muted-foreground">Loading prospect search…</p>
+}
+
+function ProspectSearchShellInner() {
   const searchParams = useSearchParams()
   const [query, setQuery] = useState("")
   const [filters, setFilters] = useState<GrowthProspectSearchFilters>(EMPTY_FILTERS)
@@ -159,7 +158,7 @@ export function ProspectSearchShell() {
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
   const [icpTemplatesOpen, setIcpTemplatesOpen] = useState(false)
   const [discoveryMode, setDiscoveryMode] = useState<GrowthProspectSearchDiscoveryMode>(() =>
-    resolveDiscoveryModeFromParams(searchParams),
+    resolveProspectSearchDiscoveryMode(searchParams.get("mode")),
   )
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
@@ -294,11 +293,7 @@ export function ProspectSearchShell() {
 
   useEffect(() => {
     const mode = searchParams.get("mode")
-    if (mode === "internal") {
-      setDiscoveryMode("internal")
-    } else if (mode === "discover" || mode === "discover_external") {
-      setDiscoveryMode("discover_external")
-    }
+    setDiscoveryMode(resolveProspectSearchDiscoveryMode(mode))
   }, [searchParams])
 
   useEffect(() => {
@@ -900,6 +895,7 @@ export function ProspectSearchShell() {
       data-no-presearch-counts-marker={GROWTH_PROSPECT_SEARCH_NO_PRESEARCH_COUNTS_QA_MARKER}
       data-staged-search-marker={GROWTH_PROSPECT_SEARCH_STAGED_SEARCH_QA_MARKER}
       data-runtime-stable-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER}
+      data-prospect-search-runtime-fix-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER}
       data-current-criteria-key={currentCriteriaKey}
       data-last-searched-criteria-key={lastSearchedCriteriaKey ?? ""}
       data-criteria-stale={criteriaStale ? "true" : "false"}
@@ -1377,6 +1373,14 @@ export function ProspectSearchShell() {
         </div>
       ) : null}
     </div>
+  )
+}
+
+export function ProspectSearchShell() {
+  return (
+    <Suspense fallback={<ProspectSearchShellFallback />}>
+      <ProspectSearchShellInner />
+    </Suspense>
   )
 }
 

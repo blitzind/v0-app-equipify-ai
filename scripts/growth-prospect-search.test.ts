@@ -7,6 +7,10 @@ import fs from "node:fs"
 import path from "node:path"
 import { sanitizeGrowthAdminUiError } from "../lib/growth/admin-route-runtime-types"
 import {
+  GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER,
+  resolveProspectSearchDiscoveryMode,
+} from "../lib/growth/prospect-search/prospect-search-runtime"
+import {
   applyProspectSearchFilters,
   explainProspectSearchFilterDrop,
   filterProspectPeopleByTitle,
@@ -179,7 +183,9 @@ async function main(): Promise<void> {
   assert.match(shellSource, /DiscoveryModeToggle/)
   assert.match(shellSource, /mode.*discover_external|discover_external/)
   assert.match(shellSource, /useSearchParams/)
-  assert.match(shellSource, /mode === "discover"/)
+  assert.match(shellSource, /resolveProspectSearchDiscoveryMode/)
+  assert.match(shellSource, /ProspectSearchShellInner/)
+  assert.match(shellSource, /Suspense/)
   assert.match(shellSource, /ProspectSearchDiagnosticsDisclosure/)
   const companyCardSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/company-result-card.tsx"),
@@ -3334,6 +3340,10 @@ async function testProspectSearchPresearchMarketEstimation(): Promise<void> {
   assert.doesNotMatch(shellSource, /<ProspectSearchLiveEstimation/)
   assert.match(shellSource, /data-staged-search-pending="v1"/)
   assert.match(shellSource, /GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER/)
+  assert.match(shellSource, /GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER/)
+  assert.match(shellSource, /resolveProspectSearchDiscoveryMode/)
+  assert.match(shellSource, /ProspectSearchShellInner/)
+  assert.match(shellSource, /Suspense/)
   assert.match(shellSource, /sanitizeGrowthAdminUiError/)
 
   const prospectSearchAdminSource = fs.readFileSync(
@@ -3342,6 +3352,8 @@ async function testProspectSearchPresearchMarketEstimation(): Promise<void> {
   )
   assert.match(prospectSearchAdminSource, /GrowthAdminWidgetErrorBoundary/)
   assert.match(prospectSearchAdminSource, /GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER/)
+  assert.match(prospectSearchAdminSource, /GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER/)
+  assert.match(prospectSearchAdminSource, /Suspense/)
 
   const prospectSearchPageSource = fs.readFileSync(
     path.join(process.cwd(), "app/(admin)/admin/growth/search/page.tsx"),
@@ -3350,6 +3362,7 @@ async function testProspectSearchPresearchMarketEstimation(): Promise<void> {
   assert.match(prospectSearchPageSource, /Suspense/)
   assert.match(prospectSearchPageSource, /GROWTH_ADMIN_ROUTE_RUNTIME_STABLE_QA_MARKER/)
   assert.match(prospectSearchPageSource, /GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER/)
+  assert.match(prospectSearchPageSource, /GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER/)
 
   const adminRuntimeSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/admin-route-runtime-types.ts"),
@@ -3378,5 +3391,26 @@ async function testProspectSearchPresearchMarketEstimation(): Promise<void> {
   assert.match(filterHealthSource, /title_contains: null/)
   assert.doesNotMatch(filterHealthSource, /title_keywords/)
 }
+
+assert.equal(GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER, "growth-prospect-search-runtime-fix-v1")
+assert.equal(resolveProspectSearchDiscoveryMode("discover"), "discover_external")
+assert.equal(resolveProspectSearchDiscoveryMode("discover_external"), "discover_external")
+assert.equal(resolveProspectSearchDiscoveryMode("internal"), "internal")
+assert.equal(resolveProspectSearchDiscoveryMode(null), "discover_external")
+assert.equal(resolveProspectSearchDiscoveryMode("bogus"), "discover_external")
+
+const runtimeSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-runtime.ts"),
+  "utf8",
+)
+assert.match(runtimeSource, /logProspectSearchRuntimeIssue/)
+assert.match(runtimeSource, /invalid_mode_param/)
+
+const errorBoundarySource = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-admin-widget-error-boundary.tsx"),
+  "utf8",
+)
+assert.match(errorBoundarySource, /errorMessage/)
+assert.doesNotMatch(errorBoundarySource, /ReferenceError: panel render failed/)
 
 void main()

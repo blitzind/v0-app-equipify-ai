@@ -58,6 +58,7 @@ export const GROWTH_COMMAND_QUERY_BOOSTS: Record<string, Record<string, number>>
 
 const CORE_WORKFLOW_IDS = new Set([
   "command",
+  "queue",
   "inbox",
   "search",
   "prospect-search",

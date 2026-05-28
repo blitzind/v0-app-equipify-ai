@@ -905,6 +905,15 @@ export function growthNavigationShortcutLabel(): string {
   return "Ctrl+K"
 }
 
+/** Client-safe nav diagnostics — no secrets, console warnings only. */
+export function logGrowthNavigationRuntimeIssue(
+  code: string,
+  context: Record<string, string | null | undefined> = {},
+): void {
+  if (typeof console === "undefined" || typeof console.warn !== "function") return
+  console.warn("[GrowthNavigation]", code, context)
+}
+
 /** Coerce pathname for nav matching — usePathname() may be null during hydration. */
 export function normalizeGrowthPathname(pathname: string | null | undefined): string {
   return typeof pathname === "string" ? pathname : ""
@@ -916,9 +925,7 @@ export function safeMatchGrowthNavItem(item: GrowthNavItemDef, pathname: string 
   try {
     return item.match(normalized)
   } catch {
-    if (process.env.NODE_ENV === "development") {
-      console.warn("[GrowthNavigation] GrowthNavigationResolution failed", { id: item.id })
-    }
+    logGrowthNavigationRuntimeIssue("GrowthNavigationResolution failed", { id: item.id })
     return false
   }
 }
@@ -957,11 +964,22 @@ export function resolveGrowthNavigationEntryFromPathname(
         }
       }
     }
-  } catch {
-    if (process.env.NODE_ENV === "development") {
-      console.warn("[GrowthNavigation] GrowthNavigationResolution failed")
+  } catch (error) {
+    logGrowthNavigationRuntimeIssue("GrowthNavigationResolution failed", {
+      pathname: normalized,
+      message: error instanceof Error ? error.message : "unknown",
+    })
+  }
+
+  if (normalized.startsWith("/admin/growth/search")) {
+    logGrowthNavigationRuntimeIssue("prospect_search_nav_miss", { pathname: normalized })
+    return {
+      id: "prospect-search",
+      label: "Prospect Search",
+      href: GROWTH_PROSPECT_SEARCH_DISCOVER_HREF,
     }
   }
+
   return null
 }
 
