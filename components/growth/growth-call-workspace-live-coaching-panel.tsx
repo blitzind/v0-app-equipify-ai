@@ -89,35 +89,9 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
     }
   }, [nativeSessionId, phase])
 
-  const refreshCoaching = useCallback(async () => {
-    if (!nativeSessionId || (phase !== "active" && phase !== "bridge_pending")) return
-    try {
-      const res = await fetch(`/api/platform/growth/calls/sessions/${nativeSessionId}/live-coaching`, {
-        cache: "no-store",
-      })
-      const data = (await res.json().catch(() => ({}))) as {
-        ok?: boolean
-        coaching?: WorkspaceCoachingPayload
-      }
-      if (res.ok && data.ok && data.coaching) {
-        setCoachingPayload(data.coaching)
-      }
-    } catch {
-      /* silent refresh */
-    }
-  }, [nativeSessionId, phase])
-
   useEffect(() => {
     void loadCoaching()
   }, [loadCoaching, sessionLeadId, coachingMode, leadLinked])
-
-  useEffect(() => {
-    if (!coachingActive || !coachingListening) return
-    const interval = window.setInterval(() => {
-      void refreshCoaching()
-    }, 4000)
-    return () => window.clearInterval(interval)
-  }, [coachingActive, coachingListening, refreshCoaching])
 
   async function startCoaching() {
     if (!nativeSessionId) return

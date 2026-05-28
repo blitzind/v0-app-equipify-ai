@@ -82,13 +82,13 @@ const workspacePage = fs.readFileSync(
 )
 assert.match(workspacePage, /GrowthCallWorkspace/)
 assert.match(workspacePage, /max-w-\[1700px\]/)
-assert.match(workspacePage, /GROWTH_NATIVE_DIALER_QA_MARKER/)
-assert.match(workspacePage, /operator controlled/)
 
 const workspaceComponent = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-workspace.tsx"),
   "utf8",
 )
+assert.match(workspaceComponent, /GROWTH_NATIVE_DIALER_QA_MARKER/)
+assert.match(workspaceComponent, /operator wrap-up/)
 assert.match(workspaceComponent, /GrowthCallWorkspaceCenterPanel/)
 assert.match(workspaceComponent, /GrowthCallWorkspaceDialerCard/)
 assert.match(workspaceComponent, /GrowthCallWorkspaceIntelligenceRail/)
@@ -105,17 +105,17 @@ const centerPanel = fs.readFileSync(
   "utf8",
 )
 assert.match(centerPanel, /Ready to call/)
-assert.match(centerPanel, /GrowthCallWorkspaceLiveCoachingPanel/)
+assert.match(centerPanel, /GrowthCallWorkspaceUnifiedAssistPanel/)
 assert.match(centerPanel, /GROWTH_CALL_WORKSPACE_GLASS_DOCK/)
 
-const liveCoachingPanel = fs.readFileSync(
-  path.join(process.cwd(), "components/growth/growth-call-workspace-live-coaching-panel.tsx"),
+const unifiedAssistPanel = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace-unified-assist-panel.tsx"),
   "utf8",
 )
-assert.match(liveCoachingPanel, /GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER/)
-assert.match(liveCoachingPanel, /Live Coaching Ready/)
-assert.match(liveCoachingPanel, /Start Coaching/)
-assert.match(liveCoachingPanel, /No guidance yet/)
+assert.match(unifiedAssistPanel, /GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER/)
+assert.match(unifiedAssistPanel, /Operator Assist Ready/)
+assert.match(unifiedAssistPanel, /Start Coaching/)
+assert.match(unifiedAssistPanel, /No assist cards yet/)
 
 const dialerComponent = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-native-dialer.tsx"),
@@ -150,9 +150,12 @@ const intelligenceRail = fs.readFileSync(
 assert.match(intelligenceRail, /Prospect Intelligence/)
 assert.match(intelligenceRail, /max-w-\[320px\]/)
 
-const sidebar = fs.readFileSync(path.join(process.cwd(), "components/growth/growth-section-sidebar-nav.tsx"), "utf8")
-assert.match(sidebar, /\/admin\/growth\/calls\/workspace/)
-assert.match(sidebar, /Call Workspace/)
+const navDestinations = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts"),
+  "utf8",
+)
+assert.match(navDestinations, /\/admin\/growth\/calls\/workspace/)
+assert.match(navDestinations, /Call Workspace/)
 
 const callActionSheet = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-action-sheet.tsx"),

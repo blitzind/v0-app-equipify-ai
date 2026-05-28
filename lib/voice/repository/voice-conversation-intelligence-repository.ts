@@ -232,3 +232,43 @@ export async function listVoiceConversationIntelligenceForCall(
     memoryDrafts: (memoryDraftRows.data ?? []).map((row) => mapMemoryDraft(row as Record<string, unknown>)),
   }
 }
+
+const VOICE_EVENT_TABLES = [
+  "voice_conversation_intelligence_events",
+  "voice_objection_events",
+  "voice_buying_signal_events",
+  "voice_risk_events",
+  "voice_operator_guidance_events",
+] as const
+
+export async function updateVoiceIntelligenceEventStatus(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    voiceCallId: string
+    eventId: string
+    status: VoiceIntelligenceEventStatus
+  },
+): Promise<VoiceIntelligenceEventPublicView | null> {
+  for (const table of VOICE_EVENT_TABLES) {
+    const { data, error } = await admin
+      .schema("voice")
+      .from(table)
+      .update({ status: input.status })
+      .eq("organization_id", input.organizationId)
+      .eq("voice_call_id", input.voiceCallId)
+      .eq("id", input.eventId)
+      .select("*")
+      .maybeSingle()
+    if (error) throw new Error(error.message)
+    if (data) {
+      return mapEvent({
+        ...(data as Record<string, unknown>),
+        sequence_number:
+          ((data as Record<string, unknown>).metadata_json as Record<string, unknown> | undefined)?.sequenceNumber ??
+          null,
+      })
+    }
+  }
+  return null
+}

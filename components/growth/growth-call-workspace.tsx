@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Loader2, RefreshCw } from "lucide-react"
+import { Headphones, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthCallWorkspaceCenterPanel } from "@/components/growth/growth-call-workspace-center-panel"
 import { GrowthCallWorkspaceDialerCard } from "@/components/growth/growth-call-workspace-dialer-card"
@@ -44,6 +44,8 @@ import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-c
 import { VOICE_TRANSFER_CONTROL_QA_MARKER } from "@/lib/voice/transfer-control/types"
 import { VOICE_MEDIA_STREAMING_QA_MARKER } from "@/lib/voice/media-streaming/types"
 import { VOICE_CONVERSATION_INTELLIGENCE_QA_MARKER } from "@/lib/voice/intelligence/types"
+import { VOICE_UNIFIED_OPERATOR_ASSIST_QA_MARKER } from "@/lib/growth/operator-assist/types"
+import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
 export function GrowthCallWorkspace() {
   const { toast } = useToast()
@@ -419,18 +421,33 @@ export function GrowthCallWorkspace() {
       data-voice-transfer-control-qa-marker={VOICE_TRANSFER_CONTROL_QA_MARKER}
       data-voice-media-streaming-qa-marker={VOICE_MEDIA_STREAMING_QA_MARKER}
       data-voice-conversation-intelligence-qa-marker={VOICE_CONVERSATION_INTELLIGENCE_QA_MARKER}
+      data-voice-unified-operator-assist-qa-marker={VOICE_UNIFIED_OPERATOR_ASSIST_QA_MARKER}
     >
       {voiceBrowser.registrationState === "error" && voiceBrowser.error ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
           Browser calling: {voiceBrowser.error}
         </p>
       ) : null}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button type="button" size="sm" variant="outline" onClick={() => void load()}>
-          <RefreshCw className="mr-2 size-4" />
-          Refresh
-        </Button>
-      </div>
+
+      <section className="rounded-2xl border border-border/70 bg-card/90 p-5 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-slate-950/70">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex size-10 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+              <Headphones size={18} />
+            </span>
+            <div>
+              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Call Workspace</h1>
+              <p className="text-sm text-muted-foreground">
+                Native dialer with unified operator assist, prospect intelligence, and operator wrap-up.
+              </p>
+            </div>
+          </div>
+          <Button type="button" size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
+            <RefreshCw className="mr-2 size-4" />
+            Refresh
+          </Button>
+        </div>
+      </section>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
@@ -495,7 +512,8 @@ export function GrowthCallWorkspace() {
           voiceParticipants={voiceBrowser.snapshot?.participants ?? []}
           voiceActiveTransfer={voiceBrowser.snapshot?.activeTransfer ?? null}
           voiceLiveTranscript={voiceBrowser.snapshot?.liveTranscript ?? null}
-          voiceConversationIntelligence={voiceBrowser.snapshot?.conversationIntelligence ?? null}
+          operatorAssist={voiceBrowser.snapshot?.operatorAssist ?? null}
+          onOperatorAssistRefresh={voiceBrowser.refresh}
           muted={sessionMuted}
           onHold={sessionOnHold}
           transferTarget={transferTarget}
@@ -524,6 +542,7 @@ export function GrowthCallWorkspace() {
           leadContext={leadContext}
           nativeSessionId={activeSession?.id ?? null}
           sessionPhone={activeSession?.phoneNumber ?? phone}
+          operatorAssist={voiceBrowser.snapshot?.operatorAssist ?? null}
           onLeadAttached={(leadId, session) => {
             void loadLeadContext(leadId)
             setLeadLinked(true)

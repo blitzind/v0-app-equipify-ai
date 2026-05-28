@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { GrowthIncomingCallPanel } from "@/components/growth/growth-incoming-call-panel"
 import { GrowthCallWorkspaceGoogleVoiceBridgePanel } from "@/components/growth/growth-call-workspace-google-voice-bridge-panel"
-import { GrowthCallWorkspaceLiveCoachingPanel } from "@/components/growth/growth-call-workspace-live-coaching-panel"
+import { GrowthCallWorkspaceUnifiedAssistPanel } from "@/components/growth/growth-call-workspace-unified-assist-panel"
 import { GrowthPostCallWrapup } from "@/components/growth/growth-post-call-wrapup"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { isExternalBridgeSession } from "@/lib/growth/native-dialer/native-dialer-bridge"
@@ -43,10 +43,9 @@ import type {
   VoiceConferenceParticipantPublicView,
 } from "@/lib/voice/transfer-control/types"
 import type { VoiceCallTranscriptSnapshot } from "@/lib/voice/media-streaming/types"
-import type { VoiceCallConversationIntelligenceSnapshot } from "@/lib/voice/intelligence/types"
+import type { UnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/types"
 import type { CallWorkspaceCoachingMode } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import { GrowthCallWorkspaceLiveTranscriptPanel } from "@/components/growth/growth-call-workspace-live-transcript-panel"
-import { GrowthCallWorkspaceConversationIntelligencePanel } from "@/components/growth/growth-call-workspace-conversation-intelligence-panel"
 import { NATIVE_DIALER_PROVIDER_LABELS } from "@/lib/growth/native-dialer/native-dialer-types"
 import { cn } from "@/lib/utils"
 
@@ -222,7 +221,8 @@ export function GrowthCallWorkspaceCenterPanel({
   voiceParticipants = [],
   voiceActiveTransfer = null,
   voiceLiveTranscript = null,
-  voiceConversationIntelligence = null,
+  operatorAssist = null,
+  onOperatorAssistRefresh,
   muted = false,
   onHold = false,
   transferTarget = "",
@@ -255,7 +255,8 @@ export function GrowthCallWorkspaceCenterPanel({
   voiceParticipants?: VoiceConferenceParticipantPublicView[]
   voiceActiveTransfer?: VoiceCallTransferPublicView | null
   voiceLiveTranscript?: VoiceCallTranscriptSnapshot | null
-  voiceConversationIntelligence?: VoiceCallConversationIntelligenceSnapshot | null
+  operatorAssist?: UnifiedOperatorAssistSnapshot | null
+  onOperatorAssistRefresh?: () => Promise<void>
   muted?: boolean
   onHold?: boolean
   transferTarget?: string
@@ -341,12 +342,13 @@ export function GrowthCallWorkspaceCenterPanel({
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         {phase === "idle" ? (
           <>
-            <GrowthCallWorkspaceLiveCoachingPanel
+            <GrowthCallWorkspaceUnifiedAssistPanel
               phase="idle"
               nativeSessionId={null}
               sessionLeadId={null}
               coachingMode="transcript_only"
               leadLinked={false}
+              operatorAssist={null}
             />
             <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-border/60 px-4 py-3 text-center text-sm text-muted-foreground dark:border-white/10">
               <Headphones className="size-4 shrink-0" />
@@ -365,12 +367,14 @@ export function GrowthCallWorkspaceCenterPanel({
               declining={declining}
               embedded
             />
-            <GrowthCallWorkspaceLiveCoachingPanel
+            <GrowthCallWorkspaceUnifiedAssistPanel
               phase="incoming"
               nativeSessionId={activeSession.id}
               sessionLeadId={activeSession.leadId}
               coachingMode={coachingMode}
               leadLinked={leadLinked}
+              operatorAssist={operatorAssist}
+              onSnapshotRefresh={onOperatorAssistRefresh}
             />
             <VoiceCallTimelinePanel
               timeline={voiceTimeline}
@@ -391,13 +395,15 @@ export function GrowthCallWorkspaceCenterPanel({
               onStartLiveCoaching={onStartLiveCoaching}
               onEndCall={onEndCall}
             />
-            <GrowthCallWorkspaceLiveCoachingPanel
+            <GrowthCallWorkspaceUnifiedAssistPanel
               phase="bridge_pending"
               nativeSessionId={activeSession.id}
               sessionLeadId={activeSession.leadId}
               coachingMode={coachingMode}
               leadLinked={leadLinked}
               startSignal={coachingStartSignal}
+              operatorAssist={operatorAssist}
+              onSnapshotRefresh={onOperatorAssistRefresh}
             />
           </>
         ) : null}
@@ -405,13 +411,15 @@ export function GrowthCallWorkspaceCenterPanel({
         {phase === "active" && activeSession ? (
           <>
             <ActiveCallHeader session={activeSession} elapsed={elapsed} externalBridge={externalBridge} />
-            <GrowthCallWorkspaceLiveCoachingPanel
+            <GrowthCallWorkspaceUnifiedAssistPanel
               phase="active"
               nativeSessionId={activeSession.id}
               sessionLeadId={activeSession.leadId}
               coachingMode={coachingMode}
               leadLinked={leadLinked}
               startSignal={coachingStartSignal}
+              operatorAssist={operatorAssist}
+              onSnapshotRefresh={onOperatorAssistRefresh}
             />
             <Textarea
               placeholder="Call notes (operator)"
@@ -426,7 +434,6 @@ export function GrowthCallWorkspaceCenterPanel({
               browserCallStateLabel={voiceBrowserCallStateLabel ?? null}
             />
             <GrowthCallWorkspaceLiveTranscriptPanel transcript={voiceLiveTranscript} />
-            <GrowthCallWorkspaceConversationIntelligencePanel intelligence={voiceConversationIntelligence} />
             <ActiveParticipantsPanel participants={voiceParticipants} activeTransfer={voiceActiveTransfer} />
             {controlsEnabled ? (
               <div className="flex flex-col gap-2 rounded-xl border border-border/60 bg-muted/10 px-3 py-2 dark:border-white/5">
@@ -447,12 +454,13 @@ export function GrowthCallWorkspaceCenterPanel({
 
         {phase === "wrapup" && activeSession ? (
           <>
-            <GrowthCallWorkspaceLiveCoachingPanel
+            <GrowthCallWorkspaceUnifiedAssistPanel
               phase="wrapup"
               nativeSessionId={activeSession.id}
               sessionLeadId={activeSession.leadId}
               coachingMode={coachingMode}
               leadLinked={leadLinked}
+              operatorAssist={operatorAssist}
             />
             <GrowthPostCallWrapup session={activeSession} submitting={submittingWrapup} onSubmit={onSubmitWrapup} embedded />
           </>

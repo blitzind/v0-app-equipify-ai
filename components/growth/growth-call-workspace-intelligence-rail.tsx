@@ -27,6 +27,8 @@ import {
 } from "@/lib/growth/native-dialer/native-dialer-workspace-ui"
 import { GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER } from "@/lib/growth/native-dialer/call-workspace-lead-search-types"
 import { GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
+import { commandLeadFocusHref } from "@/lib/growth/command/command-action-catalog"
+import type { UnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/types"
 import type {
   NativeCallWorkspaceSessionPublicView,
   NativeDialerLeadContext,
@@ -59,11 +61,13 @@ export function GrowthCallWorkspaceIntelligenceRail({
   leadContext,
   nativeSessionId,
   sessionPhone,
+  operatorAssist = null,
   onLeadAttached,
 }: {
   leadContext: NativeDialerLeadContext | null
   nativeSessionId?: string | null
   sessionPhone?: string | null
+  operatorAssist?: UnifiedOperatorAssistSnapshot | null
   onLeadAttached?: (leadId: string, session?: NativeCallWorkspaceSessionPublicView) => void
 }) {
   const {
@@ -83,6 +87,17 @@ export function GrowthCallWorkspaceIntelligenceRail({
     leadContextAttached: Boolean(leadContext),
     onLeadAttached,
   })
+
+  const buyingSignalCount =
+    operatorAssist?.feed.filter((event) => event.category === "buying_signal").length ??
+    operatorAssist?.conversationIntelligence?.buyingSignals.length ??
+    0
+  const buyingSignalsLabel =
+    buyingSignalCount > 0 ? `${buyingSignalCount} live` : "None detected this call"
+  const recommendedAction =
+    operatorAssist?.nextBestAction.primary?.prompt ??
+    leadContext?.recommendedNextAction ??
+    "No recommendation yet — review lead command center."
 
   return (
     <section
@@ -190,8 +205,13 @@ export function GrowthCallWorkspaceIntelligenceRail({
               value={String(leadContext.openTaskCount)}
               badgeTone={leadContext.openTaskCount > 0 ? "attention" : "neutral"}
             />
-            <IntelligenceRow icon={MessageSquare} label="Previous Conversations" value="—" />
-            <IntelligenceRow icon={Sparkles} label="Buying Signals" value="—" />
+            <IntelligenceRow icon={MessageSquare} label="Previous Conversations" value="Not linked" />
+            <IntelligenceRow
+              icon={Sparkles}
+              label="Buying Signals"
+              value={buyingSignalsLabel}
+              badgeTone={buyingSignalCount > 0 ? "healthy" : "neutral"}
+            />
           </div>
 
           <div className="rounded-xl border border-border/50 p-3 dark:border-white/5">
@@ -201,9 +221,7 @@ export function GrowthCallWorkspaceIntelligenceRail({
                 Recommended Next Action
               </p>
             </div>
-            <p className="text-sm leading-snug">
-              {leadContext.recommendedNextAction ?? "No recommendation yet — review lead command center."}
-            </p>
+            <p className="text-sm leading-snug">{recommendedAction}</p>
           </div>
         </div>
       )}

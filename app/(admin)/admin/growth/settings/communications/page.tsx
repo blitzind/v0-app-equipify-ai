@@ -8,6 +8,7 @@ import { GrowthNativeDialerSettingsPanel } from "@/components/growth/growth-nati
 import { GrowthVoiceInfrastructureSettingsPanel } from "@/components/growth/growth-voice-infrastructure-settings-panel"
 import { GrowthAiCopilotSettingsPanel } from "@/components/growth/growth-ai-copilot-settings"
 import { GrowthLiveCoachingSettingsPanel } from "@/components/growth/growth-live-coaching-settings"
+import { GrowthOperatorAssistPreferencesPanel } from "@/components/growth/growth-operator-assist-preferences"
 import { GrowthGoogleCalendarSettingsPanel } from "@/components/growth/growth-google-calendar-settings-panel"
 import { GrowthBookingPagesPanel } from "@/components/growth/growth-booking-pages-panel"
 import { GrowthMeetingLocationSettingsPanel } from "@/components/growth/growth-meeting-location-settings-panel"
@@ -61,6 +62,7 @@ export default function AdminGrowthCommunicationsSettingsPage() {
           <GrowthNativeDialerSettingsPanel />
           <GrowthAiCopilotSettingsPanel />
           <GrowthLiveCoachingSettingsPanel />
+          <GrowthOperatorAssistPreferencesPanel />
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>

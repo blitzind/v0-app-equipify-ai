@@ -5,7 +5,14 @@ export const VOICE_CONVERSATION_INTELLIGENCE_QA_MARKER = "voice-conversation-int
 export const VOICE_INTELLIGENCE_ANALYSIS_PROVIDERS = ["deterministic_rules", "openai", "stub"] as const
 export type VoiceIntelligenceAnalysisProvider = (typeof VOICE_INTELLIGENCE_ANALYSIS_PROVIDERS)[number]
 
-export const VOICE_INTELLIGENCE_EVENT_STATUSES = ["detected", "operator_acknowledged", "dismissed"] as const
+export const VOICE_INTELLIGENCE_EVENT_STATUSES = [
+  "detected",
+  "operator_acknowledged",
+  "dismissed",
+  "resolved",
+  "expired",
+  "escalated",
+] as const
 export type VoiceIntelligenceEventStatus = (typeof VOICE_INTELLIGENCE_EVENT_STATUSES)[number]
 
 export const VOICE_MEMORY_DRAFT_STATUSES = ["pending_review", "accepted", "rejected"] as const
