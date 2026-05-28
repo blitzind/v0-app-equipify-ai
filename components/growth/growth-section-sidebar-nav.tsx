@@ -74,6 +74,7 @@ import {
   type GrowthSidebarConsoleKey,
   type GrowthSidebarPreviewLine,
 } from "@/hooks/use-growth-sidebar-console"
+import { GROWTH_LEAD_PIPELINE_IA_QA_MARKER } from "@/lib/growth/lead-engine/lead-intelligence-inspector-types"
 import {
   GROWTH_NAV_GROUP_DEFS,
   GROWTH_DELIVERY_OPS_NAV_QA_MARKER,
@@ -1014,6 +1015,9 @@ function GrowthNavGroups({
               }
               data-intelligence-nav-cleanup-marker={
                 group.id === "intelligence" ? GROWTH_INTELLIGENCE_NAV_CLEANUP_QA_MARKER : undefined
+              }
+              data-lead-pipeline-ia-marker={
+                group.id === "lead-engine" ? GROWTH_LEAD_PIPELINE_IA_QA_MARKER : undefined
               }
             >
               <GrowthNavGroupedLinks

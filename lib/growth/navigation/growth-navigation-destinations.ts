@@ -195,9 +195,19 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
   },
   {
     id: "lead-intelligence",
-    label: "Lead Intelligence Inspector",
+    label: "Lead Pipeline",
     href: GROWTH_LEAD_INTELLIGENCE_INSPECTOR_HREF,
-    keywords: ["lead engine", "inspector", "pipeline", "lead intelligence", "pipeline inspector"],
+    keywords: [
+      "lead pipeline",
+      "lead engine",
+      "qualification",
+      "enrichment",
+      "inspector",
+      "pipeline",
+      "lead intelligence inspector",
+      "lead inspector",
+      "lead-engine",
+    ],
   },
   {
     id: "calls",
@@ -487,7 +497,7 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
       {
         id: "lead-engine-inspector",
         href: GROWTH_LEAD_INTELLIGENCE_INSPECTOR_HREF,
-        label: "Lead Intelligence Inspector",
+        label: "Lead Pipeline",
         match: prefixMatch(GROWTH_LEAD_INTELLIGENCE_INSPECTOR_HREF),
       },
       {

@@ -49,13 +49,13 @@ export function LeadIntelligencePipelineHeader({
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="font-semibold text-violet-950">Lead Engine pipeline</h3>
+          <h3 className="font-semibold text-violet-950">Lead Pipeline</h3>
           <p className="mt-1 text-sm text-violet-900/80">
             {run
               ? `${completedCount}/${LEAD_ENGINE_STAGE_UI.length} stages · ${run.pipeline_status} · ${totalEvidence} evidence items`
               : loading
                 ? "Running pipeline…"
-                : "Run an example account to inspect evidence-backed stage intelligence."}
+                : "Run an example account to review evidence-backed stage output."}
           </p>
         </div>
         {run ? (

@@ -163,6 +163,7 @@ assert.equal(resolvedInbox?.id, "queue")
 
 const resolvedLeadEngine = resolveGrowthNavigationEntryFromPathname("/admin/growth/leads/lead-engine")
 assert.equal(resolvedLeadEngine?.id, "lead-engine-inspector")
+assert.equal(resolvedLeadEngine?.label, "Lead Pipeline")
 
 const resolvedProspectSearch = resolveGrowthNavigationEntryFromPathname("/admin/growth/search")
 assert.equal(resolvedProspectSearch?.id, "prospect-search")

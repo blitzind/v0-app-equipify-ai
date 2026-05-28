@@ -20,7 +20,7 @@ export function LeadIntelligenceStageEmptyState({
     >
       {isSamplePreview ? (
         <p className="mb-3 inline-flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-100/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-900">
-          Sample preview — run pipeline for account-specific intelligence
+          Sample preview — run pipeline for account-specific stage output
         </p>
       ) : null}
 

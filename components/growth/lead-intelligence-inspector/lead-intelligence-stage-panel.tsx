@@ -74,7 +74,7 @@ function OperatorSummarySection({
     <div className="space-y-4 px-4 py-4" data-qa-marker={LEAD_STAGE_SUMMARY_QA_MARKER}>
       {isSampleMode ? (
         <p className="rounded-md border border-amber-200 bg-amber-50/80 px-2.5 py-1.5 text-xs text-amber-950">
-          Sample pipeline — intelligence is deterministic fixture data, clearly labeled for operator training.
+          Sample pipeline — output is deterministic fixture data, clearly labeled for operator training.
         </p>
       ) : null}
 

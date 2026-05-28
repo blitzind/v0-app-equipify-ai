@@ -32,7 +32,7 @@ export function LeadIntelligenceOperatorSummaryCard({ run }: { run: GrowthLeadEn
         <div>
           <div className="flex items-center gap-2">
             <Sparkles className="size-5 text-emerald-700" />
-            <h3 className="font-semibold text-emerald-950">Operator intelligence summary</h3>
+            <h3 className="font-semibold text-emerald-950">Operator review summary</h3>
           </div>
           <p className="mt-1 text-sm text-emerald-900/80">
             Explainable pipeline output — what happened, why, and what to do next.

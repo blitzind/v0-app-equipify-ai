@@ -81,7 +81,13 @@ assert.ok(
   ),
 )
 assert.ok(GROWTH_COMMAND_PALETTE_DESTINATIONS.some((d) => d.id === "search" && d.href.includes("mode=discover")))
-assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.label === "Run Lead Research"))
+assert.ok(GROWTH_COMMAND_PALETTE_DESTINATIONS.some((d) => d.label === "Lead Pipeline"))
+assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.label === "Lead Pipeline"))
+assert.ok(
+  GROWTH_COMMAND_REGISTRY.some((a) =>
+    a.id === "run-lead-research" && a.aliases?.includes("Lead Intelligence Inspector"),
+  ),
+)
 assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.label === "Open Inbox"))
 assert.equal(GROWTH_COMMAND_REGISTRY.length, 7)
 

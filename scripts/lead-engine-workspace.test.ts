@@ -9,7 +9,10 @@ import {
   LEAD_ENGINE_STAGE_UI,
   GROWTH_LEAD_ENGINE_WORKSPACE_QA_MARKER,
 } from "../lib/growth/lead-engine/lead-engine-stage-ui"
-import { GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER } from "../lib/growth/lead-engine/lead-intelligence-inspector-types"
+import {
+  GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER,
+  GROWTH_LEAD_PIPELINE_IA_QA_MARKER,
+} from "../lib/growth/lead-engine/lead-intelligence-inspector-types"
 import {
   LEAD_HUMAN_APPROVAL_QA_MARKER,
   LEAD_STAGE_CONFIDENCE_QA_MARKER,
@@ -67,7 +70,8 @@ assert.ok(rejectRun.completed_stages.includes("verification_triage"))
 
 const navDefsPath = path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts")
 assert.match(fs.readFileSync(navDefsPath, "utf8"), /\/admin\/growth\/leads\/lead-engine/)
-assert.match(fs.readFileSync(navDefsPath, "utf8"), /Lead Intelligence Inspector/)
+assert.match(fs.readFileSync(navDefsPath, "utf8"), /Lead Pipeline/)
+assert.match(fs.readFileSync(navDefsPath, "utf8"), /lead intelligence inspector/i)
 
 const orchestratorPath = path.join(
   process.cwd(),
@@ -85,6 +89,7 @@ assert.doesNotMatch(workspaceSource, /lead-engine-orchestrator/)
 assert.match(workspaceSource, /lead-engine-stage-ui/)
 assert.match(workspaceSource, /\/api\/platform\/growth\/lead-engine\/sandbox/)
 assert.match(workspaceSource, /GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER/)
+assert.match(workspaceSource, /GROWTH_LEAD_PIPELINE_IA_QA_MARKER/)
 assert.match(workspaceSource, /LeadIntelligenceWorkflowCard/)
 assert.match(workspaceSource, /LeadIntelligenceExamplePresets/)
 assert.match(workspaceSource, /LeadIntelligencePipelineHeader/)
@@ -147,11 +152,14 @@ assert.doesNotMatch(workspaceSource, /North Star/)
 
 const pagePath = path.join(process.cwd(), "app/(admin)/admin/growth/leads/lead-engine/page.tsx")
 const pageSource = fs.readFileSync(pagePath, "utf8")
-assert.match(pageSource, /Lead Intelligence Inspector/)
+assert.match(pageSource, /GROWTH_LEAD_PIPELINE_LABEL/)
+assert.match(pageSource, /GROWTH_LEAD_PIPELINE_SUBTITLE/)
+assert.match(pageSource, /data-lead-pipeline-ia-marker=\{GROWTH_LEAD_PIPELINE_IA_QA_MARKER\}/)
 assert.match(pageSource, /data-qa-marker=\{GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER\}/)
 assert.doesNotMatch(pageSource, /lead-engine-workspace-v1/)
 
 assert.equal(GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER, "growth-lead-intelligence-inspector-v2")
+assert.equal(GROWTH_LEAD_PIPELINE_IA_QA_MARKER, "growth-lead-pipeline-ia-v1")
 assert.equal(LEAD_INTELLIGENCE_INSPECTOR_FIXTURES.length, 4)
 assert.ok(LEAD_INTELLIGENCE_INSPECTOR_FIXTURES.some((f) => f.label === "Medical Equipment"))
 assert.ok(LEAD_INTELLIGENCE_INSPECTOR_FIXTURES.some((f) => f.label === "HVAC"))

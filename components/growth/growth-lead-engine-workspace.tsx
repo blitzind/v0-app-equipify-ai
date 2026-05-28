@@ -18,7 +18,10 @@ import {
 import { LeadIntelligenceSystemStatusPanel } from "@/components/growth/lead-intelligence-inspector/lead-intelligence-system-status-panel"
 import { LeadIntelligenceWorkflowCard } from "@/components/growth/lead-intelligence-inspector/lead-intelligence-workflow-card"
 import { LEAD_INTELLIGENCE_INSPECTOR_DEFAULT_INPUT } from "@/lib/growth/lead-engine/lead-intelligence-inspector-fixtures"
-import { GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER } from "@/lib/growth/lead-engine/lead-intelligence-inspector-types"
+import {
+  GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER,
+  GROWTH_LEAD_PIPELINE_IA_QA_MARKER,
+} from "@/lib/growth/lead-engine/lead-intelligence-inspector-types"
 import { LEAD_ENGINE_STAGE_UI } from "@/lib/growth/lead-engine/lead-engine-stage-ui"
 import type { LeadIntelligenceStageDisplayContext } from "@/lib/growth/lead-engine/lead-intelligence-stage-display"
 import {
@@ -99,7 +102,11 @@ export function GrowthLeadEngineWorkspace() {
   }
 
   return (
-    <div className="flex flex-col gap-6" data-qa-marker={GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER}>
+    <div
+      className="flex flex-col gap-6"
+      data-qa-marker={GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER}
+      data-lead-pipeline-ia-marker={GROWTH_LEAD_PIPELINE_IA_QA_MARKER}
+    >
       <LeadIntelligenceWorkflowCard />
 
       <LeadIntelligencePipelineHeader run={run} loading={loading} />
@@ -332,7 +339,7 @@ export function GrowthLeadEngineWorkspace() {
 
       <section className="flex flex-col gap-4">
         <div>
-          <h3 className="font-semibold">Stage intelligence</h3>
+          <h3 className="font-semibold">Stage output</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Evidence-backed operator panels for each pipeline stage — expand structured output only when needed.
           </p>
