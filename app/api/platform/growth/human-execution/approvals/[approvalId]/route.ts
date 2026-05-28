@@ -10,8 +10,8 @@ import {
   HUMAN_EXECUTION_APPROVAL_STATUSES,
 } from "@/lib/growth/human-execution/human-execution-types"
 import {
-  GROWTH_HUMAN_EXECUTION_SCHEMA_SETUP_MESSAGE,
-  isGrowthHumanExecutionSchemaReady,
+  growthHumanExecutionSchemaResponseMeta,
+  probeGrowthHumanExecutionSchemaHealth,
 } from "@/lib/growth/human-execution/human-execution-schema-health"
 
 export const runtime = "nodejs"
@@ -29,9 +29,11 @@ export async function GET(_request: Request, context: { params: Promise<{ approv
     return NextResponse.json({ error: "invalid_id", message: "Invalid approval id." }, { status: 400 })
   }
 
-  if (!(await isGrowthHumanExecutionSchemaReady(access.admin))) {
+  const schemaProbe = await probeGrowthHumanExecutionSchemaHealth(access.admin)
+  if (!schemaProbe.schemaReady) {
+    const meta = growthHumanExecutionSchemaResponseMeta(schemaProbe)
     return NextResponse.json(
-      { error: "schema_not_ready", message: GROWTH_HUMAN_EXECUTION_SCHEMA_SETUP_MESSAGE },
+      { error: "schema_not_ready", message: meta.setupMessage ?? "Human execution schema is not ready." },
       { status: 503 },
     )
   }
@@ -55,9 +57,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ appro
     return NextResponse.json({ error: "invalid_id", message: "Invalid approval id." }, { status: 400 })
   }
 
-  if (!(await isGrowthHumanExecutionSchemaReady(access.admin))) {
+  const schemaProbe = await probeGrowthHumanExecutionSchemaHealth(access.admin)
+  if (!schemaProbe.schemaReady) {
+    const meta = growthHumanExecutionSchemaResponseMeta(schemaProbe)
     return NextResponse.json(
-      { error: "schema_not_ready", message: GROWTH_HUMAN_EXECUTION_SCHEMA_SETUP_MESSAGE },
+      { error: "schema_not_ready", message: meta.setupMessage ?? "Human execution schema is not ready." },
       { status: 503 },
     )
   }

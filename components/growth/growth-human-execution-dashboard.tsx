@@ -7,12 +7,16 @@ import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import type { GrowthHumanExecutionDashboard, HumanExecutionApprovalItem } from "@/lib/growth/human-execution/human-execution-types"
 import { humanExecutionReadinessBandTone } from "@/lib/growth/human-execution/human-execution-readiness-score"
+import {
+  GrowthHumanExecutionSchemaNotice,
+  type GrowthHumanExecutionSchemaMeta,
+} from "@/components/growth/growth-human-execution-schema-notice"
 
 export function GrowthHumanExecutionDashboardPanel() {
   const [dashboard, setDashboard] = useState<GrowthHumanExecutionDashboard | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [setupMessage, setSetupMessage] = useState<string | null>(null)
+  const [setupMeta, setSetupMeta] = useState<GrowthHumanExecutionSchemaMeta | null>(null)
   const [actionId, setActionId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -22,17 +26,17 @@ export function GrowthHumanExecutionDashboardPanel() {
       const res = await fetch("/api/platform/growth/human-execution/dashboard", { cache: "no-store" })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
-        meta?: { schemaReady?: boolean; setupMessage?: string }
+        meta?: GrowthHumanExecutionSchemaMeta
         dashboard?: GrowthHumanExecutionDashboard | null
         message?: string
       }
       if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not load execution dashboard.")
       if (data.meta?.schemaReady === false) {
-        setSetupMessage(data.meta.setupMessage ?? null)
+        setSetupMeta(data.meta)
         setDashboard(null)
         return
       }
-      setSetupMessage(null)
+      setSetupMeta(data.meta?.probeUncertain ? data.meta : null)
       setDashboard(data.dashboard ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
@@ -76,8 +80,8 @@ export function GrowthHumanExecutionDashboardPanel() {
     )
   }
 
-  if (setupMessage) {
-    return <p className="text-sm text-muted-foreground">{setupMessage}</p>
+  if (setupMeta?.schemaReady === false) {
+    return <GrowthHumanExecutionSchemaNotice meta={setupMeta} />
   }
 
   if (error) {
@@ -92,6 +96,7 @@ export function GrowthHumanExecutionDashboardPanel() {
 
   return (
     <div className="space-y-6">
+      {setupMeta ? <GrowthHumanExecutionSchemaNotice meta={setupMeta} /> : null}
       <GrowthEngineCard
         title="Human-Approved Execution"
         subtitle="Draft → Review → Approved → Executed → Complete — operator controlled"

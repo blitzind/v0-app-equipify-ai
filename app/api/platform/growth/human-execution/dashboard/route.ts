@@ -5,8 +5,8 @@ import {
   GROWTH_HUMAN_APPROVED_EXECUTION_QA_MARKER,
 } from "@/lib/growth/human-execution/human-execution-types"
 import {
-  GROWTH_HUMAN_EXECUTION_SCHEMA_SETUP_MESSAGE,
-  isGrowthHumanExecutionSchemaReady,
+  growthHumanExecutionSchemaResponseMeta,
+  probeGrowthHumanExecutionSchemaHealth,
 } from "@/lib/growth/human-execution/human-execution-schema-health"
 
 export const runtime = "nodejs"
@@ -15,11 +15,12 @@ export async function GET() {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 
-  if (!(await isGrowthHumanExecutionSchemaReady(access.admin))) {
+  const schemaProbe = await probeGrowthHumanExecutionSchemaHealth(access.admin)
+  if (!schemaProbe.schemaReady) {
     return NextResponse.json({
       ok: true,
       qaMarker: GROWTH_HUMAN_APPROVED_EXECUTION_QA_MARKER,
-      meta: { schemaReady: false, setupMessage: GROWTH_HUMAN_EXECUTION_SCHEMA_SETUP_MESSAGE },
+      meta: growthHumanExecutionSchemaResponseMeta(schemaProbe),
       dashboard: null,
     })
   }
@@ -29,7 +30,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       qaMarker: GROWTH_HUMAN_APPROVED_EXECUTION_QA_MARKER,
-      meta: { schemaReady: true },
+      meta: growthHumanExecutionSchemaResponseMeta(schemaProbe),
       dashboard,
     })
   } catch (e) {

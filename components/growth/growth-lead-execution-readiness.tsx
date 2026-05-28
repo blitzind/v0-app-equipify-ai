@@ -9,6 +9,10 @@ import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-
 import type { HumanExecutionLeadView } from "@/lib/growth/human-execution/human-execution-types"
 import { GROWTH_HUMAN_APPROVED_EXECUTION_QA_MARKER } from "@/lib/growth/human-execution/human-execution-types"
 import { humanExecutionReadinessBandTone } from "@/lib/growth/human-execution/human-execution-readiness-score"
+import {
+  GrowthHumanExecutionSchemaNotice,
+  type GrowthHumanExecutionSchemaMeta,
+} from "@/components/growth/growth-human-execution-schema-notice"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthLeadExecutionReadinessProps = {
@@ -24,7 +28,7 @@ export function GrowthLeadExecutionReadiness({ lead }: GrowthLeadExecutionReadin
   const [view, setView] = useState<HumanExecutionLeadView | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [setupMessage, setSetupMessage] = useState<string | null>(null)
+  const [setupMeta, setSetupMeta] = useState<GrowthHumanExecutionSchemaMeta | null>(null)
   const [actionId, setActionId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -34,17 +38,17 @@ export function GrowthLeadExecutionReadiness({ lead }: GrowthLeadExecutionReadin
       const res = await fetch(`/api/platform/growth/human-execution/leads/${lead.id}`, { cache: "no-store" })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
-        meta?: { schemaReady?: boolean; setupMessage?: string }
+        meta?: GrowthHumanExecutionSchemaMeta
         leadView?: HumanExecutionLeadView | null
         message?: string
       }
       if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not load execution readiness.")
       if (data.meta?.schemaReady === false) {
-        setSetupMessage(data.meta.setupMessage ?? null)
+        setSetupMeta(data.meta)
         setView(null)
         return
       }
-      setSetupMessage(null)
+      setSetupMeta(null)
       setView(data.leadView ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
@@ -93,8 +97,8 @@ export function GrowthLeadExecutionReadiness({ lead }: GrowthLeadExecutionReadin
           <Loader2 className="size-4 animate-spin" />
           Loading execution readiness…
         </div>
-      ) : setupMessage ? (
-        <p className="text-sm text-muted-foreground">{setupMessage}</p>
+      ) : setupMeta?.schemaReady === false ? (
+        <GrowthHumanExecutionSchemaNotice meta={setupMeta} />
       ) : error ? (
         <p className="text-sm text-destructive">{error}</p>
       ) : !view ? (

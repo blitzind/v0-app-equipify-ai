@@ -89,12 +89,41 @@ assert.match(migration, /human_execution_approvals/)
 assert.match(migration, /approval_status/)
 assert.match(migration, /executed/)
 
+const grantsMigration = fs.readFileSync(
+  path.join(process.cwd(), "supabase/migrations/20270313123000_growth_engine_human_approved_execution_service_role_grants.sql"),
+  "utf8",
+)
+assert.match(grantsMigration, /human_execution_plans/)
+assert.match(grantsMigration, /human_execution_plan_steps/)
+assert.match(grantsMigration, /human_execution_approvals/)
+assert.match(grantsMigration, /grant select, insert, update, delete/)
+
+const schemaHealthSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/human-execution/human-execution-schema-health.ts"),
+  "utf8",
+)
+assert.match(schemaHealthSource, /human-execution-schema-health-v2/)
+assert.match(schemaHealthSource, /probeGrowthHumanExecutionSchemaHealth/)
+assert.match(schemaHealthSource, /fetchGrowthHumanExecutionSchemaAdminDiagnostics/)
+assert.match(schemaHealthSource, /permission_blocked/)
+assert.match(schemaHealthSource, /20270313123000_growth_engine_human_approved_execution_service_role_grants/)
+assert.match(schemaHealthSource, /Required table missing/)
+assert.match(schemaHealthSource, /Readiness check blocked by permissions/)
+
+const schemaHealthRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/human-execution/schema-health/route.ts"),
+  "utf8",
+)
+assert.match(schemaHealthRoute, /fetchGrowthHumanExecutionSchemaAdminDiagnostics/)
+
 const dashboardRoute = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/human-execution/dashboard/route.ts"),
   "utf8",
 )
 assert.match(dashboardRoute, /requireGrowthEnginePlatformAccess/)
 assert.match(dashboardRoute, /GROWTH_HUMAN_APPROVED_EXECUTION_QA_MARKER/)
+assert.match(dashboardRoute, /probeGrowthHumanExecutionSchemaHealth/)
+assert.match(dashboardRoute, /growthHumanExecutionSchemaResponseMeta/)
 
 const approvalRoute = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/human-execution/approvals/[approvalId]/route.ts"),
@@ -107,7 +136,18 @@ const commandSection = fs.readFileSync(
   "utf8",
 )
 assert.match(commandSection, /Execution Queue/)
-assert.match(commandSection, /GROWTH_HUMAN_APPROVED_EXECUTION_QA_MARKER/)
+
+const schemaNotice = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-human-execution-schema-notice.tsx"),
+  "utf8",
+)
+assert.match(schemaNotice, /GrowthHumanExecutionSchemaNotice/)
+
+const executionDashboard = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-human-execution-dashboard.tsx"),
+  "utf8",
+)
+assert.match(executionDashboard, /GrowthHumanExecutionSchemaNotice/)
 
 const leadCard = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-lead-execution-readiness.tsx"),
