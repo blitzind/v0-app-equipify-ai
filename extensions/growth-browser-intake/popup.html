@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Equipify Growth Intake</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="header">
+      <h1>Equipify Growth</h1>
+      <p class="subtitle">Send captured contact info to Growth Engine</p>
+    </header>
+
+    <section id="context" class="context" hidden>
+      <div class="context-row">
+        <span class="label">Source</span>
+        <span id="source-platform" class="badge">website</span>
+      </div>
+      <div class="context-row">
+        <span class="label">Page</span>
+        <a id="source-url-link" href="#" target="_blank" rel="noopener noreferrer"></a>
+      </div>
+    </section>
+
+    <p id="context-warning" class="message message-warning" hidden></p>
+
+    <form id="intake-form" class="form">
+      <label>
+        Company name <span class="required">*</span>
+        <input id="company-name" name="company_name" type="text" required autocomplete="organization" />
+      </label>
+
+      <label>
+        Contact name
+        <input id="contact-name" name="contact_name" type="text" autocomplete="name" />
+      </label>
+
+      <label>
+        Title
+        <input id="title" name="title" type="text" autocomplete="organization-title" />
+      </label>
+
+      <label>
+        Email
+        <input id="email" name="email" type="email" autocomplete="email" />
+      </label>
+
+      <label>
+        Phone
+        <input id="phone" name="phone" type="tel" autocomplete="tel" />
+      </label>
+
+      <label>
+        Website
+        <input id="website" name="website" type="url" inputmode="url" placeholder="https://example.com" />
+      </label>
+
+      <label>
+        LinkedIn URL
+        <input id="linkedin-url" name="linkedin_url" type="url" inputmode="url" placeholder="https://linkedin.com/in/..." />
+      </label>
+
+      <label>
+        Notes
+        <textarea id="notes" name="notes" rows="3" placeholder="Optional context from this page"></textarea>
+      </label>
+
+      <input id="source-url" name="source_url" type="hidden" />
+      <input id="source-platform-input" name="source_platform" type="hidden" />
+
+      <p id="form-hint" class="hint">
+        Enter what you see on the page. At least one contact field (name, email, phone, or LinkedIn) is required.
+      </p>
+
+      <button id="submit-btn" type="submit">Send to Equipify</button>
+    </form>
+
+    <p id="status" class="message" hidden role="status" aria-live="polite"></p>
+    <p id="lead-link-wrap" class="lead-link-wrap" hidden>
+      <a id="lead-link" href="#" target="_blank" rel="noopener noreferrer">Open lead in Equipify</a>
+    </p>
+
+    <footer class="footer">
+      <a id="login-link" href="https://app.equipify.ai/admin/growth/browser-intake-test" target="_blank" rel="noopener noreferrer">
+        Sign in to Equipify
+      </a>
+    </footer>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

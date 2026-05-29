@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Equipify Growth Intake",
+  "version": "1.0.0",
+  "description": "Send operator-captured company and contact info to Equipify Growth Engine.",
+  "permissions": ["activeTab"],
+  "host_permissions": ["https://app.equipify.ai/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Send to Equipify Growth"
+  }
+}
