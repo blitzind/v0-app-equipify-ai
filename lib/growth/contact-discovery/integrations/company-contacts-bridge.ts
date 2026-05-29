@@ -9,6 +9,7 @@ function resolveCompanyContactVerificationStatus(
   contact: GrowthCompanyContact,
 ): string {
   if (contact.contact_status === "suppressed") return "suppressed"
+  if (contact.email_status === "blocked") return "blocked"
   if (contact.email_status === "verified" && contact.phone_status !== "invalid") return "verified_channels"
   if (contact.email_status === "verified") return "email_verified"
   if (contact.phone_status === "business" || contact.phone_status === "mobile") return "phone_verified"

@@ -286,7 +286,7 @@ export async function refreshCompanyContactVerification(
   const { data, error } = await admin.schema("growth").from("company_contacts").select("*").eq("id", contactId).maybeSingle()
   if (error || !data) return null
   const contact = rowToCompanyContact(data as Record<string, unknown>)
-  const verification = await verifyCompanyContact(contact)
+  const verification = await verifyCompanyContact(contact, { admin })
   const { data: updated, error: updateError } = await admin
     .schema("growth")
     .from("company_contacts")
@@ -298,6 +298,7 @@ export async function refreshCompanyContactVerification(
       updated_at: new Date().toISOString(),
       metadata: {
         ...contact.metadata,
+        ...verification.email_verification_metadata,
         verification_reasons: verification.verification_reasons,
       },
     })

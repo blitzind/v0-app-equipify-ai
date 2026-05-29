@@ -10,6 +10,7 @@ export const GROWTH_COMPANY_CONTACT_EMAIL_STATUSES = [
   "verified",
   "risky",
   "invalid",
+  "blocked",
 ] as const
 export type GrowthCompanyContactEmailStatus = (typeof GROWTH_COMPANY_CONTACT_EMAIL_STATUSES)[number]
 

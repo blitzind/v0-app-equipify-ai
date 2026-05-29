@@ -2,12 +2,17 @@
 
 import "server-only"
 
+import type { SupabaseClient } from "@supabase/supabase-js"
 import type {
   GrowthCompanyContactEmailStatus,
   GrowthCompanyContactPhoneStatus,
 } from "@/lib/growth/contact-discovery/company-contact-types"
 import type { GrowthCompanyContact } from "@/lib/growth/contact-discovery/company-contact-types"
-import { verifyEmailAddress } from "@/lib/growth/contact-verification/verify-email"
+import {
+  buildEmailVerificationMetadata,
+  verifyEmailWithProvider,
+} from "@/lib/growth/contact-verification/email-verification-service"
+import type { EmailVerificationProviderResult } from "@/lib/growth/contact-verification/email-verification-types"
 import { verifyPhoneNumber } from "@/lib/growth/contact-verification/verify-phone"
 
 export type ContactVerificationBundle = {
@@ -16,6 +21,8 @@ export type ContactVerificationBundle = {
   confidence_score: number
   verification_reasons: string[]
   last_verified_at: string
+  email_verification: EmailVerificationProviderResult | null
+  email_verification_metadata: Record<string, unknown>
 }
 
 const STALE_MS = 90 * 24 * 60 * 60 * 1000
@@ -30,11 +37,18 @@ export async function verifyCompanyContact(
     GrowthCompanyContact,
     "email" | "phone" | "title" | "source_evidence" | "confidence_score" | "contact_status"
   >,
+  options?: {
+    admin?: SupabaseClient
+    leadId?: string | null
+  },
 ): Promise<ContactVerificationBundle> {
   const verification_reasons: string[] = []
   const context = contact.source_evidence.map((item) => item.evidence).join(" ")
 
-  const emailResult = await verifyEmailAddress(contact.email)
+  const emailResult = await verifyEmailWithProvider(contact.email, {
+    admin: options?.admin,
+    leadId: options?.leadId,
+  })
   const phoneResult = verifyPhoneNumber(contact.phone, `${contact.title ?? ""} ${context}`)
 
   let email_status: GrowthCompanyContactEmailStatus = "unknown"
@@ -65,5 +79,7 @@ export async function verifyCompanyContact(
     confidence_score,
     verification_reasons,
     last_verified_at: new Date().toISOString(),
+    email_verification: emailResult,
+    email_verification_metadata: emailResult ? buildEmailVerificationMetadata(emailResult) : {},
   }
 }

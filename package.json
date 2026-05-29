@@ -210,6 +210,8 @@
     "test:growth-provider-webhooks": "tsx scripts/test-growth-provider-webhooks.ts",
     "test:schedule-work-order-flow": "tsx scripts/test-schedule-work-order-flow.ts",
     "test:growth-contact-discovery": "tsx scripts/test-growth-contact-discovery.ts",
+    "test:growth-bulk-acquisition": "tsx scripts/test-growth-bulk-acquisition.ts",
+    "test:growth-email-verification-provider": "tsx scripts/test-growth-email-verification-provider.ts",
     "test:growth-verification-enrichment": "tsx scripts/test-growth-verification-enrichment.ts",
     "test:growth-native-dialer": "tsx scripts/test-growth-native-dialer.ts",
     "test:growth-native-dialer-schema-health": "tsx scripts/test-growth-native-dialer-schema-health.ts",
