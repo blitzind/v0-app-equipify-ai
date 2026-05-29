@@ -291,7 +291,12 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.0.0"/)
+assert.match(manifestSource, /"version": "4.1.1"/)
+assert.match(manifestSource, /assets\/icon-16\.png/)
+assert.match(manifestSource, /assets\/icon-32\.png/)
+assert.match(manifestSource, /assets\/icon-48\.png/)
+assert.match(manifestSource, /assets\/icon-128\.png/)
+assert.match(manifestSource, /linkedin-floating-dock\.js/)
 assert.match(manifestSource, /extension-lookup-cache.js/)
 assert.match(manifestSource, /content_scripts/)
 assert.match(manifestSource, /linkedin-crm-overlay.js/)
@@ -358,8 +363,9 @@ const linkedinStatusJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-status-shared.js"),
   "utf8",
 )
-assert.match(linkedinStatusJs, /Not in Equipify/)
-assert.match(linkedinStatusJs, /resolveStatusFromLookup/)
+assert.match(linkedinStatusJs, /Not In Equipify/)
+assert.match(linkedinStatusJs, /resolveProspectDisplayBadge/)
+assert.match(linkedinStatusJs, /existing_opportunity/)
 
 const linkedinCrmOverlayJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-crm-overlay.js"),
@@ -367,10 +373,32 @@ const linkedinCrmOverlayJs = fs.readFileSync(
 )
 assert.match(linkedinCrmOverlayJs, /CRM_CONTEXT_PATH/)
 assert.match(linkedinCrmOverlayJs, /EquipifyGrowthExtensionLookupCache/)
-assert.match(linkedinCrmOverlayJs, /requestIdleCallback/)
-assert.match(linkedinCrmOverlayJs, /equipify-growth-crm-overlay--collapsed/)
-assert.match(linkedinCrmOverlayJs, /lastRenderKey/)
+assert.match(linkedinCrmOverlayJs, /equipify-sales-linkedin-badge/)
+assert.match(linkedinCrmOverlayJs, /equipify-open-side-panel/)
+assert.match(linkedinCrmOverlayJs, /prospectingMode/)
 assert.doesNotMatch(linkedinCrmOverlayJs, /sendEmail|enroll|auto.?message/i)
+
+const linkedinFloatingDockJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-floating-dock.js"),
+  "utf8",
+)
+assert.match(linkedinFloatingDockJs, /equipify-sales-floating-dock/)
+assert.match(linkedinFloatingDockJs, /loadLinkedInFloatingDockPrefs/)
+assert.match(linkedinFloatingDockJs, /saveLinkedInFloatingDockPrefs/)
+assert.match(linkedinFloatingDockJs, /equipify-open-side-panel/)
+assert.match(linkedinFloatingDockJs, /startDrag/)
+assert.match(linkedinFloatingDockJs, /hideDock/)
+assert.match(linkedinFloatingDockJs, /topPx/)
+assert.doesNotMatch(linkedinFloatingDockJs, /sendEmail|enroll|auto.?message/i)
+
+for (const iconSize of [16, 32, 48, 128]) {
+  assert.ok(
+    fs.existsSync(
+      path.join(process.cwd(), `extensions/growth-browser-intake/assets/icon-${iconSize}.png`),
+    ),
+    `missing icon-${iconSize}.png`,
+  )
+}
 
 const extensionConfigJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/extension-config.js"),
@@ -387,6 +415,10 @@ const extensionStorageJs = fs.readFileSync(
   "utf8",
 )
 assert.match(extensionStorageJs, /MAX_RECENT_CAPTURES = 5/)
+assert.match(extensionStorageJs, /prospectingMode/)
+assert.match(extensionStorageJs, /loadLinkedInFloatingDockPrefs/)
+assert.match(extensionStorageJs, /saveLinkedInFloatingDockPrefs/)
+assert.match(extensionStorageJs, /equipifySalesLinkedInFloatingDock/)
 assert.match(extensionStorageJs, /chrome.storage/)
 
 const pageMetadataJs = fs.readFileSync(
@@ -649,10 +681,15 @@ const sidepanelHtml = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/sidepanel.html"),
   "utf8",
 )
-assert.match(sidepanelHtml, /es-rail/)
-assert.match(sidepanelHtml, /data-copilot-tab-btn="analytics"/)
-assert.match(sidepanelHtml, /equipify-logo.png/)
-assert.match(sidepanelHtml, /es-rail-nav/)
+assert.match(sidepanelHtml, /es-sales-workspace/)
+assert.match(sidepanelHtml, /Lead Intelligence Workspace/)
+assert.match(sidepanelHtml, /equipify-lightning.png/)
+assert.match(sidepanelHtml, /extension-workspace.js/)
+assert.match(sidepanelHtml, /sales-workspace.css/)
+assert.match(sidepanelHtml, /workspace-refresh-btn/)
+assert.match(sidepanelHtml, /prospecting-mode/)
+assert.match(sidepanelHtml, /linkedin-floating-dock/)
+assert.match(sidepanelHtml, /es-ws-add-btn/)
 assert.match(sidepanelHtml, /analytics-today/)
 assert.match(sidepanelHtml, /extension-version-banner/)
 assert.match(sidepanelHtml, /bootstrap-loading/)
@@ -664,7 +701,9 @@ const popupHtml = fs.readFileSync(
 assert.match(popupHtml, /Equipify Sales/)
 assert.match(popupHtml, /data-popup-tab-btn/)
 assert.match(popupHtml, /extension-ui.js/)
-assert.match(popupHtml, /equipify-logo.png/)
+assert.match(popupHtml, /equipify-lightning.png/)
+assert.match(popupHtml, /prospecting-mode/)
+assert.match(popupHtml, /linkedin-floating-dock/)
 assert.match(popupHtml, /extension-version-banner/)
 assert.match(popupHtml, /bootstrap-loading/)
 assert.match(popupHtml, /Capture page/)

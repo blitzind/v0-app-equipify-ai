@@ -1,6 +1,6 @@
 # Equipify Sales (Chrome Extension)
 
-Manifest V3 Chrome extension for **Equipify Sales** — a compact sales workspace with dark navigation rail, card-based CRM views, and operator-initiated capture tools for Growth Engine.
+Manifest V3 Chrome extension for **Equipify Sales** — a LinkedIn prospecting workspace with profile status badges, a Prospeo-style side panel, and operator-initiated capture tools for Growth Engine.
 
 ## Install from Growth Engine UI
 

@@ -453,6 +453,20 @@ body.surface-sidepanel {
   border-color: #93c5fd;
 }
 
+.linkedin-status-badge.badge-customer,
+.es-lead-badge.badge-customer {
+  background: #eff6ff;
+  color: #1e3a8a;
+  border-color: #60a5fa;
+}
+
+.linkedin-status-badge.badge-opportunity,
+.es-lead-badge.badge-opportunity {
+  background: #f5f3ff;
+  color: #5b21b6;
+  border-color: #c4b5fd;
+}
+
 /* ── Buttons ── */
 .btn-primary,
 #submit-btn {

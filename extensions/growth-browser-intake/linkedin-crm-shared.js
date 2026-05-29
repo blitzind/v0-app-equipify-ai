@@ -52,6 +52,8 @@ function badgeToneFromStatus(badge) {
   if (badge === "verified" || badge === "already_added") return "good"
   if (badge === "needs_review") return "warn"
   if (badge === "company_captured_only") return "info"
+  if (badge === "existing_customer") return "customer"
+  if (badge === "existing_opportunity") return "opportunity"
   return "neutral"
 }
 

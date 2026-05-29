@@ -5,6 +5,10 @@ const STORAGE_KEYS = {
   recentCaptures: "equipifyGrowthRecentCaptures",
 }
 
+const LOCAL_STORAGE_KEYS = {
+  linkedInFloatingDock: "equipifySalesLinkedInFloatingDock",
+}
+
 const MAX_RECENT_CAPTURES = 5
 
 const DEFAULT_SETTINGS = {
@@ -12,6 +16,12 @@ const DEFAULT_SETTINGS = {
   apiBaseUrl: "https://app.equipify.ai",
   verifyEmailBeforeSave: false,
   queueContactDiscovery: false,
+  prospectingMode: false,
+}
+
+const DEFAULT_LINKEDIN_FLOATING_DOCK = {
+  enabled: true,
+  topPx: null,
 }
 
 async function loadExtensionSettings() {
@@ -35,6 +45,31 @@ async function saveExtensionSettings(settings) {
   })
 }
 
+async function loadLinkedInFloatingDockPrefs() {
+  const stored = await chrome.storage.local.get(LOCAL_STORAGE_KEYS.linkedInFloatingDock)
+  const prefs = stored[LOCAL_STORAGE_KEYS.linkedInFloatingDock]
+  if (!prefs || typeof prefs !== "object") {
+    return { ...DEFAULT_LINKEDIN_FLOATING_DOCK }
+  }
+  return {
+    ...DEFAULT_LINKEDIN_FLOATING_DOCK,
+    ...prefs,
+    enabled: prefs.enabled !== false,
+    topPx: typeof prefs.topPx === "number" && Number.isFinite(prefs.topPx) ? prefs.topPx : null,
+  }
+}
+
+async function saveLinkedInFloatingDockPrefs(prefs) {
+  await chrome.storage.local.set({
+    [LOCAL_STORAGE_KEYS.linkedInFloatingDock]: {
+      ...DEFAULT_LINKEDIN_FLOATING_DOCK,
+      ...prefs,
+      enabled: prefs.enabled !== false,
+      topPx: typeof prefs.topPx === "number" && Number.isFinite(prefs.topPx) ? prefs.topPx : null,
+    },
+  })
+}
+
 async function loadRecentCaptures() {
   const stored = await chrome.storage.local.get(STORAGE_KEYS.recentCaptures)
   const list = stored[STORAGE_KEYS.recentCaptures]
@@ -53,10 +88,14 @@ async function addRecentCapture(capture) {
 
 window.EquipifyGrowthExtensionStorage = {
   STORAGE_KEYS,
+  LOCAL_STORAGE_KEYS,
   MAX_RECENT_CAPTURES,
   DEFAULT_SETTINGS,
+  DEFAULT_LINKEDIN_FLOATING_DOCK,
   loadExtensionSettings,
   saveExtensionSettings,
+  loadLinkedInFloatingDockPrefs,
+  saveLinkedInFloatingDockPrefs,
   loadRecentCaptures,
   addRecentCapture,
 }

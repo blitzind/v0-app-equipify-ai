@@ -9,11 +9,23 @@ const EXTENSION_STATUS_BADGE_LABELS = {
 }
 
 const PAGE_STATUS_BADGE_LABELS = {
-  not_added: "Not in Equipify",
-  already_added: "Added to Equipify",
-  needs_review: "Needs review",
-  verified: "Verified lead",
-  company_captured_only: "Company captured only",
+  not_added: "Not In Equipify",
+  already_added: "In Equipify",
+  needs_review: "Needs Review",
+  verified: "Verified Lead",
+  company_captured_only: "Company Only",
+  existing_customer: "Existing Customer",
+  existing_opportunity: "Existing Opportunity",
+}
+
+const PROSPECT_DISPLAY_BADGES = {
+  not_added: { label: "Not In Equipify", emoji: "⚪", tone: "neutral" },
+  already_added: { label: "In Equipify", emoji: "🟢", tone: "good" },
+  needs_review: { label: "Needs Review", emoji: "🟡", tone: "warn" },
+  verified: { label: "Verified Lead", emoji: "🟢", tone: "good" },
+  company_captured_only: { label: "Company Only", emoji: "🔵", tone: "info" },
+  existing_customer: { label: "Existing Customer", emoji: "🔵", tone: "customer" },
+  existing_opportunity: { label: "Existing Opportunity", emoji: "🟣", tone: "opportunity" },
 }
 
 function resolveLinkedInLeadStatusBadge(input) {
@@ -35,7 +47,44 @@ function linkedInLeadStatusBadgeTone(badge) {
   if (badge === "verified" || badge === "already_added") return "good"
   if (badge === "needs_review") return "warn"
   if (badge === "company_captured_only") return "info"
+  if (badge === "existing_customer") return "customer"
+  if (badge === "existing_opportunity") return "opportunity"
   return "neutral"
+}
+
+function isCustomerLeadStatus(status) {
+  const key = (status ?? "").toLowerCase()
+  return key.includes("customer") && !key.includes("former")
+}
+
+function isFormerCustomerLeadStatus(status) {
+  const key = (status ?? "").toLowerCase()
+  return key.includes("former") && key.includes("customer")
+}
+
+function deriveProspectBadgeKey(crmPayload) {
+  const context = crmPayload?.context ?? null
+  const baseBadge = crmPayload?.status_badge ?? context?.status_badge ?? "not_added"
+
+  if (context?.opportunity?.id) return "existing_opportunity"
+  if (isCustomerLeadStatus(context?.lead_status)) return "existing_customer"
+
+  return baseBadge
+}
+
+function resolveProspectDisplayBadge(crmPayload) {
+  const key = deriveProspectBadgeKey(crmPayload)
+  const preset = PROSPECT_DISPLAY_BADGES[key] ?? PROSPECT_DISPLAY_BADGES.not_added
+  const context = crmPayload?.context ?? null
+
+  return {
+    key,
+    label: crmPayload?.status_badge_label ?? context?.status_badge_label ?? preset.label,
+    displayLabel: preset.label,
+    emoji: preset.emoji,
+    tone: linkedInLeadStatusBadgeTone(key),
+    matchSummary: context?.match_summary ?? null,
+  }
 }
 
 function resolveStatusFromLookup(lookup) {
@@ -77,11 +126,27 @@ function resolveStatusFromLookup(lookup) {
   }
 }
 
+function formatCompanyRelationshipStatus(crmPayload) {
+  const context = crmPayload?.context ?? null
+  if (!context) return "Not Added"
+  if (isFormerCustomerLeadStatus(context.lead_status)) return "Former Customer"
+  if (isCustomerLeadStatus(context.lead_status)) return "Customer"
+  if (context.opportunity?.id) return "Opportunity"
+  if (context.lead_id) return "Lead"
+  return "Not Added"
+}
+
 window.EquipifyGrowthLinkedInStatus = {
   EXTENSION_STATUS_BADGE_LABELS,
   PAGE_STATUS_BADGE_LABELS,
+  PROSPECT_DISPLAY_BADGES,
   resolveLinkedInLeadStatusBadge,
   formatLinkedInLeadMatchSummary,
   linkedInLeadStatusBadgeTone,
+  deriveProspectBadgeKey,
+  resolveProspectDisplayBadge,
   resolveStatusFromLookup,
+  formatCompanyRelationshipStatus,
+  isCustomerLeadStatus,
+  isFormerCustomerLeadStatus,
 }

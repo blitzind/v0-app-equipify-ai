@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
-import { Chrome, ChevronDown, ChevronUp, Download, FileText } from "lucide-react"
+import { ChevronDown, ChevronUp, Download, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   GROWTH_BROWSER_EXTENSION_DIR,
@@ -71,15 +72,21 @@ export function GrowthBrowserExtensionInstallCard({
       data-qa-marker={GROWTH_BROWSER_EXTENSION_QA_MARKER}
     >
       <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300">
-          <Chrome size={17} />
+        <span className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black">
+          <Image
+            src="/brand/equipify-lightning.png"
+            alt="Equipify Sales"
+            width={36}
+            height={36}
+            className="object-contain p-1"
+          />
         </span>
         <div className="min-w-0 flex-1 space-y-3">
           <div>
             <h2 className="text-sm font-semibold tracking-tight text-foreground">Equipify Sales</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Chrome extension for capturing contacts from websites and LinkedIn into Growth Engine using visible page
-              metadata only. Uses your existing Equipify admin session — no API keys stored in the extension.
+              LinkedIn prospecting workspace — see CRM status on profiles, capture contacts, and open leads without
+              leaving LinkedIn. Uses visible page metadata only and your existing Equipify admin session.
             </p>
           </div>
 

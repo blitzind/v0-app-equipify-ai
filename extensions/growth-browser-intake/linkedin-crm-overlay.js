@@ -1,41 +1,49 @@
 /**
- * LinkedIn CRM context overlay — visible metadata + Growth Engine lookup/context only.
+ * Equipify Sales LinkedIn status badge — visible metadata + Growth Engine lookup only.
+ * Injects a profile-header badge within ~1–2s; click opens the side panel workspace.
  */
-;(function initEquipifyLinkedInCrmOverlay() {
+;(function initEquipifyLinkedInProfileBadge() {
   const storage = window.EquipifyGrowthExtensionStorage
   const config = window.EquipifyGrowthExtensionConfig
   const linkedinContext = window.EquipifyGrowthLinkedInContext
-  const crmContextUi = window.EquipifyGrowthCrmContext
+  const linkedinStatus = window.EquipifyGrowthLinkedInStatus
   const lookupCache = window.EquipifyGrowthExtensionLookupCache
 
-  if (!storage || !config || !linkedinContext || !crmContextUi) return
+  if (!storage || !config || !linkedinContext || !linkedinStatus) return
 
-  const OVERLAY_ID = "equipify-growth-linkedin-crm-overlay"
-  const REFRESH_DEBOUNCE_MS = 800
-  const NAV_THROTTLE_MS = 1000
+  const BADGE_ROOT_ID = "equipify-sales-linkedin-badge-root"
+  const REFRESH_DEBOUNCE_MS = 300
+  const NAV_THROTTLE_MS = 500
+  const LOGO_URL = chrome.runtime.getURL("assets/equipify-lightning.png")
+
   let refreshTimer = null
   let lastUrl = null
   let lastNavCheck = 0
-  let noteOpen = false
-  let collapsed = true
   let lastRenderKey = null
-  let overlayNode = null
+  let badgeRoot = null
+  let prospectingMode = false
+  let latestPayload = null
 
-  async function apiBaseUrl() {
+  async function loadSettings() {
     const settings = await storage.loadExtensionSettings()
-    return settings.apiBaseUrl || config.EXTENSION_API_PRESETS.production
+    prospectingMode = settings.prospectingMode === true
+    return settings
+  }
+
+  function pageKind() {
+    return linkedinContext.detectLinkedInPageKind(window.location.href)
   }
 
   function pageKindSupported() {
-    const kind = linkedinContext.detectLinkedInPageKind(window.location.href)
+    const kind = pageKind()
     return kind === "profile" || kind === "company"
   }
 
-  function removeOverlay() {
-    document.getElementById(OVERLAY_ID)?.remove()
-    overlayNode = null
-    noteOpen = false
+  function removeBadge() {
+    document.getElementById(BADGE_ROOT_ID)?.remove()
+    badgeRoot = null
     lastRenderKey = null
+    latestPayload = null
   }
 
   function buildLookupParams() {
@@ -62,13 +70,16 @@
     const params = buildLookupParams()
     if ([...params.keys()].length === 0) return null
 
+    const settings = await loadSettings()
+    const baseUrl = settings.apiBaseUrl || config.EXTENSION_API_PRESETS.production
     const cacheKey = lookupCache?.buildKey?.(lookupCache.PREFIX.crmContext, params)
+
     if (!options.bypassCache && cacheKey) {
       const cached = lookupCache.read(cacheKey)
       if (cached !== null) return cached
     }
 
-    const response = await fetch(`${await apiBaseUrl()}${config.CRM_CONTEXT_PATH}?${params.toString()}`, {
+    const response = await fetch(`${baseUrl}${config.CRM_CONTEXT_PATH}?${params.toString()}`, {
       method: "GET",
       credentials: "include",
     })
@@ -78,247 +89,172 @@
     return body
   }
 
-  async function markReviewed(leadId) {
-    const response = await fetch(config.capturedLeadActionUrl(await apiBaseUrl(), leadId), {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "mark_reviewed" }),
-    })
-    const body = await response.json().catch(() => null)
-    if (!response.ok || !body?.ok) {
-      throw new Error(body?.result?.message ?? body?.message ?? "Could not mark reviewed.")
+  function findProfileBadgeAnchor() {
+    const selectors = [
+      "main section.artdeco-card div.ph5",
+      "main .pv-text-details__left-panel",
+      "main section.artdeco-card h1",
+      "h1.text-heading-xlarge",
+      "main h1",
+      ".org-top-card-primary-content",
+    ]
+
+    for (const selector of selectors) {
+      const el = document.querySelector(selector)
+      if (el?.offsetParent !== null) return el
     }
+    return null
   }
 
-  async function appendLeadNote(leadId, existingNotes, noteText) {
-    const stamp = new Date().toLocaleString()
-    const nextNote = existingNotes?.trim()
-      ? `${existingNotes.trim()}\n\n[Extension ${stamp}]\n${noteText.trim()}`
-      : `[Extension ${stamp}]\n${noteText.trim()}`
-
-    const response = await fetch(`${await apiBaseUrl()}${config.LEAD_PATH}/${leadId}`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ notes: nextNote }),
-    })
-    const body = await response.json().catch(() => null)
-    if (!response.ok || !body?.ok) {
-      throw new Error(body?.message ?? "Could not save note.")
-    }
+  function openSidePanel() {
+    chrome.runtime.sendMessage({ type: "equipify-open-side-panel" }).catch(() => {})
   }
 
   function buildRenderKey(payload) {
-    const matched = payload?.matched === true && payload?.context
-    const context = payload?.context ?? null
+    const display = linkedinStatus.resolveProspectDisplayBadge(payload)
     return [
-      payload?.status_badge ?? "not_added",
-      matched ? context?.lead_id ?? "matched" : "unmatched",
-      context?.status_badge ?? "",
-      collapsed ? "collapsed" : "expanded",
-      noteOpen ? "note" : "no-note",
+      display.key,
+      payload?.matched ? "matched" : "unmatched",
+      prospectingMode ? "scan" : "default",
+      pageKind(),
     ].join("|")
   }
 
-  function setCollapsed(nextCollapsed) {
-    collapsed = nextCollapsed
-    if (!overlayNode) return
-    overlayNode.classList.toggle("equipify-growth-crm-overlay--collapsed", collapsed)
-    const toggle = overlayNode.querySelector(".equipify-growth-crm-overlay__toggle")
-    if (toggle) {
-      toggle.textContent = collapsed ? "Show details" : "Hide details"
-      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true")
-    }
+  function createBadgeButton(display) {
+    const btn = document.createElement("button")
+    btn.type = "button"
+    btn.className = "equipify-sales-linkedin-badge"
+    btn.dataset.tone = display.tone
+    btn.dataset.scan = prospectingMode ? "true" : "false"
+    btn.title = display.matchSummary
+      ? `${display.displayLabel} — ${display.matchSummary}. Click to open Equipify Sales.`
+      : `${display.displayLabel}. Click to open Equipify Sales.`
+
+    const dot = document.createElement("span")
+    dot.className = "equipify-sales-linkedin-badge__dot"
+    dot.textContent = display.emoji
+    dot.setAttribute("aria-hidden", "true")
+
+    const logo = document.createElement("img")
+    logo.className = "equipify-sales-linkedin-badge__logo"
+    logo.src = LOGO_URL
+    logo.alt = ""
+    logo.width = 14
+    logo.height = 14
+
+    const label = document.createElement("span")
+    label.className = "equipify-sales-linkedin-badge__label"
+    label.textContent = display.displayLabel
+
+    btn.appendChild(dot)
+    btn.appendChild(logo)
+    btn.appendChild(label)
+    btn.addEventListener("click", (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      openSidePanel()
+    })
+
+    return btn
   }
 
-  function renderOverlay(payload) {
+  function ensureBadgeRoot() {
+    let root = document.getElementById(BADGE_ROOT_ID)
+    if (root?.isConnected) {
+      badgeRoot = root
+      return root
+    }
+
+    removeBadge()
+    root = document.createElement("div")
+    root.id = BADGE_ROOT_ID
+    root.className = "equipify-sales-linkedin-badge-root"
+
+    const anchor = findProfileBadgeAnchor()
+    if (anchor?.parentElement) {
+      anchor.parentElement.insertBefore(root, anchor.nextSibling)
+    } else {
+      root.classList.add("equipify-sales-linkedin-badge-root--floating")
+      document.body.appendChild(root)
+    }
+
+    badgeRoot = root
+    return root
+  }
+
+  function renderBadge(payload) {
+    latestPayload = payload
     const renderKey = buildRenderKey(payload)
-    if (renderKey === lastRenderKey && overlayNode?.isConnected) return
+    if (renderKey === lastRenderKey && badgeRoot?.isConnected) return
 
-    if (noteOpen) collapsed = false
+    const display = linkedinStatus.resolveProspectDisplayBadge(payload)
+    const root = ensureBadgeRoot()
+    root.replaceChildren()
 
-    const matched = payload?.matched === true && payload?.context
-    const context = payload?.context ?? null
-    const badge = payload?.status_badge ?? "not_added"
-    const badgeLabel = payload?.status_badge_label ?? "Not in Equipify"
-    const tone = crmContextUi.badgeToneFromStatus(badge)
+    root.appendChild(createBadgeButton(display))
 
-    let wrap = overlayNode
-    if (!wrap?.isConnected) {
-      removeOverlay()
-      wrap = document.createElement("div")
-      wrap.id = OVERLAY_ID
-      wrap.className = "equipify-growth-crm-overlay equipify-growth-crm-overlay--collapsed"
-      document.body.appendChild(wrap)
-      overlayNode = wrap
-    } else {
-      wrap.replaceChildren()
-      wrap.classList.toggle("equipify-growth-crm-overlay--collapsed", collapsed)
+    if (prospectingMode && display.key === "not_added") {
+      const hint = document.createElement("span")
+      hint.className = "equipify-sales-linkedin-badge__hint"
+      hint.textContent = "Prospecting — not in CRM yet"
+      root.appendChild(hint)
     }
 
-    const header = document.createElement("div")
-    header.className = "equipify-growth-crm-overlay__header"
-
-    const badgeEl = document.createElement("span")
-    badgeEl.className = "equipify-growth-crm-overlay__badge"
-    badgeEl.dataset.tone = tone
-    badgeEl.textContent = badgeLabel
-    badgeEl.title = matched && context?.match_summary ? context.match_summary : badgeLabel
-    badgeEl.style.cursor = collapsed ? "pointer" : "default"
-    badgeEl.addEventListener("click", () => {
-      if (!collapsed) return
-      setCollapsed(false)
-      lastRenderKey = null
-      renderOverlay(payload)
-    })
-
-    const title = document.createElement("strong")
-    title.className = "equipify-growth-crm-overlay__title"
-    title.textContent = matched ? context.company_name : "Equipify Sales"
-
-    const toggle = document.createElement("button")
-    toggle.type = "button"
-    toggle.className = "equipify-growth-crm-overlay__toggle"
-    toggle.textContent = collapsed ? "Show details" : "Hide details"
-    toggle.setAttribute("aria-expanded", collapsed ? "false" : "true")
-    toggle.title = "Expand or collapse Equipify CRM context on this page"
-    toggle.addEventListener("click", () => {
-      setCollapsed(!collapsed)
-      lastRenderKey = null
-      renderOverlay(payload)
-    })
-
-    header.appendChild(badgeEl)
-    header.appendChild(title)
-    header.appendChild(toggle)
-    wrap.appendChild(header)
-
-    const body = document.createElement("div")
-    body.className = "equipify-growth-crm-overlay__body"
-
-    if (matched) {
-      const grid = document.createElement("div")
-      grid.className = "equipify-growth-crm-overlay__grid"
-      for (const row of crmContextUi.crmContextRows(context)) {
-        const item = document.createElement("div")
-        item.className = "equipify-growth-crm-overlay__row"
-        item.innerHTML = `<span class="equipify-growth-crm-overlay__label">${row.label}</span><span class="equipify-growth-crm-overlay__value">${row.value}</span>`
-        grid.appendChild(item)
-      }
-      body.appendChild(grid)
-
-      if (context.match_summary) {
-        const match = document.createElement("div")
-        match.className = "equipify-growth-crm-overlay__match"
-        match.textContent = context.match_summary
-        body.appendChild(match)
-      }
-
-      const actions = document.createElement("div")
-      actions.className = "equipify-growth-crm-overlay__actions"
-
-      const mkBtn = (label, title, href, onClick) => {
-        const btn = document.createElement(href ? "a" : "button")
-        btn.className = "equipify-growth-crm-overlay__btn"
-        btn.textContent = label
-        btn.title = title
-        if (href) {
-          btn.href = href
-          btn.target = "_blank"
-          btn.rel = "noopener noreferrer"
-        } else {
-          btn.type = "button"
-          btn.addEventListener("click", onClick)
-        }
-        return btn
-      }
-
-      actions.appendChild(mkBtn("Open lead", "Open this lead in Equipify admin", context.links.lead))
-      actions.appendChild(mkBtn("Open company", "Open the matched company record", context.links.company))
-      actions.appendChild(
-        mkBtn("Open opportunity", "Open the related opportunity if one exists", context.links.opportunity),
-      )
-      actions.appendChild(
-        mkBtn("Mark reviewed", "Mark this lead as reviewed in Growth Engine", null, async () => {
-          try {
-            lookupCache?.invalidate?.(lookupCache.PREFIX?.crmContext)
-            await markReviewed(context.lead_id)
-            scheduleRefresh(true)
-          } catch {
-            // no-op
-          }
-        }),
-      )
-      actions.appendChild(
-        mkBtn("Add note", "Append a note to this lead from the extension", null, () => {
-          if (noteOpen) return
-          noteOpen = true
-          lastRenderKey = null
-          renderOverlay(payload)
-        }),
-      )
-      body.appendChild(actions)
-
-      if (noteOpen) {
-        const noteWrap = document.createElement("div")
-        noteWrap.className = "equipify-growth-crm-overlay__note"
-        const textarea = document.createElement("textarea")
-        textarea.rows = 3
-        textarea.placeholder = "Add a note to this lead..."
-        const saveBtn = document.createElement("button")
-        saveBtn.type = "button"
-        saveBtn.className = "equipify-growth-crm-overlay__btn equipify-growth-crm-overlay__btn-primary"
-        saveBtn.textContent = "Save note"
-        saveBtn.title = "Save this note to the lead in Equipify"
-        saveBtn.addEventListener("click", async () => {
-          const text = textarea.value.trim()
-          if (!text) return
-          try {
-            lookupCache?.invalidate?.(lookupCache.PREFIX?.crmContext)
-            await appendLeadNote(context.lead_id, context.lead_notes, text)
-            noteOpen = false
-            scheduleRefresh(true)
-          } catch {
-            // no-op
-          }
-        })
-        noteWrap.appendChild(textarea)
-        noteWrap.appendChild(saveBtn)
-        body.appendChild(noteWrap)
-      }
-    } else {
-      const empty = document.createElement("p")
-      empty.className = "equipify-growth-crm-overlay__empty"
-      empty.textContent = "No matching Growth Engine lead yet. Capture from the extension popup or side panel."
-      body.appendChild(empty)
-    }
-
-    wrap.appendChild(body)
     lastRenderKey = renderKey
   }
 
-  async function refreshOverlay(options = {}) {
+  function renderLoadingBadge() {
+    const root = ensureBadgeRoot()
+    if (root.querySelector(".equipify-sales-linkedin-badge--loading")) return
+
+    root.replaceChildren()
+    const btn = document.createElement("button")
+    btn.type = "button"
+    btn.className = "equipify-sales-linkedin-badge equipify-sales-linkedin-badge--loading"
+    btn.dataset.tone = "neutral"
+    btn.title = "Checking Equipify status…"
+
+    const logo = document.createElement("img")
+    logo.className = "equipify-sales-linkedin-badge__logo"
+    logo.src = LOGO_URL
+    logo.alt = ""
+    logo.width = 14
+    logo.height = 14
+
+    const label = document.createElement("span")
+    label.className = "equipify-sales-linkedin-badge__label"
+    label.textContent = "Checking Equipify…"
+
+    btn.appendChild(logo)
+    btn.appendChild(label)
+    btn.addEventListener("click", openSidePanel)
+    root.appendChild(btn)
+  }
+
+  async function refreshBadge(options = {}) {
     if (!pageKindSupported()) {
-      removeOverlay()
+      removeBadge()
       return
     }
+
+    if (!options.skipLoading) renderLoadingBadge()
+
     try {
       const payload = await fetchCrmContext(options)
       if (!payload) {
-        removeOverlay()
+        removeBadge()
         return
       }
-      renderOverlay(payload)
+      renderBadge(payload)
     } catch {
-      removeOverlay()
+      removeBadge()
     }
   }
 
   function scheduleRefresh(bypassCache = false) {
     if (refreshTimer) window.clearTimeout(refreshTimer)
     refreshTimer = window.setTimeout(() => {
-      refreshOverlay({ bypassCache }).catch(() => removeOverlay())
+      refreshBadge({ bypassCache }).catch(() => removeBadge())
     }, REFRESH_DEBOUNCE_MS)
   }
 
@@ -331,21 +267,28 @@
     if (current !== lastUrl) {
       lastUrl = current
       lastRenderKey = null
-      noteOpen = false
       scheduleRefresh()
     }
   }
 
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "sync" || !changes[storage.STORAGE_KEYS.settings]) return
+    const next = changes[storage.STORAGE_KEYS.settings].newValue
+    const nextMode = next?.prospectingMode === true
+    if (nextMode !== prospectingMode) {
+      prospectingMode = nextMode
+      lastRenderKey = null
+      if (latestPayload) renderBadge(latestPayload)
+    }
+  })
+
   const observer = new MutationObserver(() => watchNavigation())
   observer.observe(document.documentElement, { subtree: true, childList: true })
-  window.addEventListener("popstate", scheduleRefresh)
-  window.addEventListener("hashchange", scheduleRefresh)
+  window.addEventListener("popstate", () => scheduleRefresh())
+  window.addEventListener("hashchange", () => scheduleRefresh())
 
   lastUrl = window.location.href
-  const start = () => scheduleRefresh()
-  if (window.requestIdleCallback) {
-    window.requestIdleCallback(start, { timeout: 2000 })
-  } else {
-    window.setTimeout(start, 0)
-  }
+  loadSettings().finally(() => {
+    refreshBadge({ skipLoading: false }).catch(() => removeBadge())
+  })
 })()

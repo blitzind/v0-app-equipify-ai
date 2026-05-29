@@ -1,8 +1,78 @@
-.equipify-growth-crm-overlay {
-  position: fixed;
-  right: 20px;
-  bottom: 20px;
+.equipify-sales-linkedin-badge-root {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
   z-index: 9999;
+  position: relative;
+}
+
+.equipify-sales-linkedin-badge-root--floating {
+  position: fixed;
+  top: 72px;
+  right: 24px;
+  margin: 0;
+  max-width: calc(100vw - 48px);
+}
+
+.equipify-sales-linkedin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px 7px 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 4px 20px rgba(11, 22, 41, 0.12);
+  color: #0f172a;
+  font:
+    700 12px/1.2 -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.equipify-sales-linkedin-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(11, 22, 41, 0.16);
+}
+
+.equipify-sales-linkedin-badge:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.equipify-sales-linkedin-badge--loading {
+  opacity: 0.92;
+  cursor: wait;
+}
+
+.equipify-sales-linkedin-badge__dot {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.equipify-sales-linkedin-badge__logo {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.equipify-sales-linkedin-badge__label {
+  white-space: nowrap;
+}
+
+.equipify-sales-linkedin-badge__hint {
   font:
     600 11px/1.3 -apple-system,
     BlinkMacSystemFont,
@@ -11,202 +81,41 @@
     Helvetica,
     Arial,
     sans-serif;
-  color: #0f172a;
+  color: #64748b;
 }
 
-.equipify-growth-crm-overlay--collapsed {
-  max-width: none;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.equipify-growth-crm-overlay--collapsed .equipify-growth-crm-overlay__header {
-  margin: 0;
-  padding: 0;
-  gap: 0;
-}
-
-.equipify-growth-crm-overlay--collapsed .equipify-growth-crm-overlay__title,
-.equipify-growth-crm-overlay--collapsed .equipify-growth-crm-overlay__toggle {
-  display: none;
-}
-
-.equipify-growth-crm-overlay--collapsed .equipify-growth-crm-overlay__badge {
-  padding: 6px 12px;
-  font-size: 11px;
-  box-shadow: 0 4px 16px rgba(11, 22, 41, 0.15);
-  cursor: pointer;
-}
-
-.equipify-growth-crm-overlay:not(.equipify-growth-crm-overlay--collapsed) {
-  max-width: 280px;
-  padding: 10px 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 8px 28px rgba(11, 22, 41, 0.14);
-  backdrop-filter: blur(8px);
-}
-
-.equipify-growth-crm-overlay__header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.equipify-growth-crm-overlay__badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  border: 1px solid transparent;
-  white-space: nowrap;
-}
-
-.equipify-growth-crm-overlay__badge::before {
-  content: "⚡";
-  font-size: 10px;
-}
-
-.equipify-growth-crm-overlay__badge[data-tone="neutral"] {
-  background: #f8fafc;
-  color: #475569;
+.equipify-sales-linkedin-badge[data-tone="neutral"] {
   border-color: #cbd5e1;
+  background: #f8fafc;
 }
 
-.equipify-growth-crm-overlay__badge[data-tone="good"] {
-  background: #ecfdf5;
-  color: #065f46;
+.equipify-sales-linkedin-badge[data-tone="good"] {
   border-color: #6ee7b7;
+  background: #ecfdf5;
 }
 
-.equipify-growth-crm-overlay__badge[data-tone="warn"] {
-  background: #fffbeb;
-  color: #92400e;
+.equipify-sales-linkedin-badge[data-tone="warn"] {
   border-color: #fcd34d;
+  background: #fffbeb;
 }
 
-.equipify-growth-crm-overlay__badge[data-tone="info"] {
-  background: #eff6ff;
-  color: #1d4ed8;
+.equipify-sales-linkedin-badge[data-tone="info"] {
   border-color: #93c5fd;
+  background: #eff6ff;
 }
 
-.equipify-growth-crm-overlay__title {
-  font-size: 12px;
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  min-width: 0;
+.equipify-sales-linkedin-badge[data-tone="customer"] {
+  border-color: #60a5fa;
+  background: #eff6ff;
+  color: #1e3a8a;
 }
 
-.equipify-growth-crm-overlay__toggle {
-  margin-left: auto;
-  border: 0;
-  background: transparent;
-  color: #2563eb;
-  font: inherit;
-  font-size: 10px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-  flex-shrink: 0;
+.equipify-sales-linkedin-badge[data-tone="opportunity"] {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+  color: #5b21b6;
 }
 
-.equipify-growth-crm-overlay__body {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #f1f5f9;
-}
-
-.equipify-growth-crm-overlay--collapsed .equipify-growth-crm-overlay__body {
-  display: none;
-}
-
-.equipify-growth-crm-overlay__grid {
-  display: grid;
-  gap: 6px;
-}
-
-.equipify-growth-crm-overlay__row {
-  display: grid;
-  grid-template-columns: 88px 1fr;
-  gap: 8px;
-}
-
-.equipify-growth-crm-overlay__label {
-  color: #64748b;
-  font-size: 10px;
-  font-weight: 500;
-}
-
-.equipify-growth-crm-overlay__value {
-  color: #0f172a;
-  font-size: 10px;
-  font-weight: 600;
-  word-break: break-word;
-}
-
-.equipify-growth-crm-overlay__match {
-  margin-top: 6px;
-  color: #64748b;
-  font-size: 10px;
-}
-
-.equipify-growth-crm-overlay__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.equipify-growth-crm-overlay__btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 8px;
-  border: 1px solid #e5e7eb;
-  border-radius: 999px;
-  background: #fff;
-  color: #334155;
-  font: inherit;
-  font-size: 10px;
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.equipify-growth-crm-overlay__btn-primary {
-  background: #2563eb;
-  border-color: #2563eb;
-  color: #fff;
-}
-
-.equipify-growth-crm-overlay__note {
-  display: grid;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.equipify-growth-crm-overlay__note textarea {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font: inherit;
-  resize: vertical;
-}
-
-.equipify-growth-crm-overlay__empty {
-  margin: 0;
-  color: #64748b;
-  font-size: 10px;
+.equipify-sales-linkedin-badge[data-scan="true"] {
+  padding-right: 16px;
 }

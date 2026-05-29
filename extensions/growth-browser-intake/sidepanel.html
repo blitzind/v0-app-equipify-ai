@@ -5,88 +5,163 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Equipify Sales</title>
     <link rel="stylesheet" href="popup.css" />
+    <link rel="stylesheet" href="sales-workspace.css" />
   </head>
-  <body class="surface-sidepanel">
-    <div class="es-app">
-      <aside class="es-rail" aria-label="Equipify Sales navigation">
-        <div class="es-rail-brand">
-          <img src="assets/equipify-logo.png" alt="Equipify" width="32" height="32" />
+  <body class="surface-sidepanel es-sales-workspace">
+    <div class="es-ws-app">
+      <header class="es-ws-header">
+        <div class="es-ws-brand">
+          <img src="assets/equipify-lightning.png" alt="Equipify" width="36" height="36" />
+          <div>
+            <h1 class="es-ws-brand-title">Equipify Sales</h1>
+            <p class="es-ws-brand-subtitle">Lead Intelligence Workspace</p>
+          </div>
         </div>
-        <nav class="es-rail-nav">
-          <button type="button" class="es-rail-btn active" data-copilot-tab-btn="crm" title="CRM"><span class="es-rail-icon">◉</span><span>CRM</span></button>
-          <button type="button" class="es-rail-btn" data-copilot-tab-btn="research" title="Research"><span class="es-rail-icon">🔍</span><span>Research</span></button>
-          <button type="button" class="es-rail-btn" data-copilot-tab-btn="call_prep" title="Call Prep"><span class="es-rail-icon">📞</span><span>Call</span></button>
-          <button type="button" class="es-rail-btn" data-copilot-tab-btn="similar" title="Similar"><span class="es-rail-icon">◎</span><span>Similar</span></button>
-          <button type="button" class="es-rail-btn" data-copilot-tab-btn="relationship" title="Relationship"><span class="es-rail-icon">🔗</span><span>Relate</span></button>
-          <button type="button" class="es-rail-btn" data-copilot-tab-btn="timeline" title="Timeline"><span class="es-rail-icon">🕐</span><span>Timeline</span></button>
-          <button type="button" class="es-rail-btn" data-copilot-tab-btn="notes" title="Notes"><span class="es-rail-icon">📝</span><span>Notes</span></button>
-          <button type="button" class="es-rail-btn" data-copilot-tab-btn="queue" title="Queue"><span class="es-rail-icon">📋</span><span>Queue</span></button>
-          <button type="button" class="es-rail-btn" data-copilot-tab-btn="analytics" title="Analytics"><span class="es-rail-icon">📊</span><span>Stats</span></button>
-          <button type="button" class="es-rail-btn" data-copilot-tab-btn="committee" hidden title="Committee"><span class="es-rail-icon">👥</span><span>Comm.</span></button>
-        </nav>
-        <div class="es-rail-footer">
-          <button type="button" id="settings-toggle-btn" class="es-rail-btn" title="Settings"><span class="es-rail-icon">⚙</span><span>Setup</span></button>
+        <div class="es-ws-header-actions">
+          <button type="button" id="workspace-refresh-btn" class="es-ws-icon-btn" title="Refresh page context">↻</button>
+          <button type="button" id="settings-toggle-btn" class="es-ws-icon-btn" title="Settings">⚙</button>
+          <a id="sign-in-link" class="es-ws-open-app" href="https://app.equipify.ai/admin/growth/leads" target="_blank" rel="noopener noreferrer">Open in Equipify</a>
         </div>
-      </aside>
+      </header>
 
-      <main class="es-main">
-        <header class="es-main-header">
-          <h1 class="es-main-title" id="es-section-title">CRM</h1>
+      <div class="es-ws-scroll">
+        <div id="bootstrap-loading" class="bootstrap-loading" hidden aria-live="polite">
+          <span class="loading-spinner" aria-hidden="true"></span>
+          <span>Loading page context…</span>
+        </div>
+        <p id="context-warning" class="message message-warning" hidden></p>
+
+        <section id="linkedin-status-panel" class="es-ws-card es-ws-card-accent es-ws-profile">
+          <div class="es-ws-profile-head">
+            <div id="es-ws-profile-photo-wrap"></div>
+            <div>
+              <h2 id="es-ws-profile-name" class="es-ws-profile-name">Current page</h2>
+              <p id="es-ws-profile-title" class="es-ws-profile-title"></p>
+              <p id="es-ws-profile-company" class="es-ws-profile-company"></p>
+              <p id="es-ws-profile-location" class="es-ws-profile-location"></p>
+            </div>
+          </div>
+          <div class="es-ws-profile-meta">
+            <span id="es-ws-status-badge" class="es-ws-status-badge" data-tone="neutral"><span aria-hidden="true">⚪</span><span>Not In Equipify</span></span>
+            <span id="es-ws-match-confidence" class="es-ws-match-confidence" hidden></span>
+          </div>
+          <span id="linkedin-status-badge" class="es-ws-hidden-compat">Not added</span>
+          <p id="linkedin-status-context" class="es-ws-hidden-compat"></p>
+          <div id="linkedin-status-match" class="es-ws-hidden-compat" hidden></div>
+          <div id="linkedin-crm-context" class="es-ws-hidden-compat"></div>
+          <h2 id="sidepanel-profile-name" class="es-ws-hidden-compat">Current page</h2>
+        </section>
+
+        <section class="es-ws-card">
+          <p class="es-ws-card-label">Primary actions</p>
+          <div class="es-ws-actions">
+            <button type="button" id="es-ws-add-btn" class="es-ws-action-primary">Add to Equipify</button>
+            <button type="button" id="es-ws-open-lead-btn" class="es-ws-action-secondary" hidden>Open Lead</button>
+            <button type="button" id="es-ws-update-lead-btn" class="es-ws-action-secondary" hidden>Update Existing</button>
+            <button type="button" id="es-ws-mark-reviewed-btn" class="es-ws-action-secondary" hidden>Mark Reviewed</button>
+          </div>
+          <div class="es-ws-hidden-compat">
+            <button type="button" id="linkedin-add-btn">Capture</button>
+            <button type="button" id="linkedin-open-lead-btn" hidden>Open lead</button>
+            <button type="button" id="linkedin-update-lead-btn" hidden>Update</button>
+            <button type="button" id="linkedin-mark-reviewed-btn" hidden>Mark reviewed</button>
+            <button type="button" id="linkedin-open-company-btn" hidden>Company</button>
+            <button type="button" id="linkedin-open-opportunity-btn" hidden>Opportunity</button>
+            <button type="button" id="linkedin-add-note-btn" hidden>Note</button>
+          </div>
+        </section>
+
+        <section class="es-ws-card">
+          <p class="es-ws-card-label">Contact data</p>
+          <div id="es-ws-contact-rows" class="es-ws-kv-list"></div>
+          <button type="button" id="es-ws-verify-email-btn" class="es-ws-inline-btn" hidden>Verify Email</button>
+        </section>
+
+        <section class="es-ws-card">
+          <p class="es-ws-card-label">Company</p>
+          <div id="es-ws-company-rows" class="es-ws-kv-list"></div>
+          <div class="es-ws-company-stats">
+            <div class="es-ws-company-stat">
+              <span id="es-ws-company-contacts-count" class="es-ws-company-stat-value">0</span>
+              <span class="es-ws-company-stat-label">Contacts</span>
+            </div>
+            <div class="es-ws-company-stat">
+              <span id="es-ws-company-opportunities-count" class="es-ws-company-stat-value">0</span>
+              <span class="es-ws-company-stat-label">Opportunities</span>
+            </div>
+            <div class="es-ws-company-stat">
+              <span id="es-ws-company-customers-count" class="es-ws-company-stat-value">0</span>
+              <span class="es-ws-company-stat-label">Customers</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="es-ws-card es-ws-nba">
+          <p class="es-ws-card-label">Next best action</p>
+          <p id="es-ws-nba-label" class="es-ws-nba-text">Add Contact</p>
+          <p id="es-ws-nba-reason" class="es-ws-nba-reason">This prospect is not in Equipify yet.</p>
+          <button type="button" id="es-ws-nba-cta" class="es-ws-nba-cta" data-action="add_contact">Add to Equipify</button>
+        </section>
+
+        <section class="es-ws-card">
+          <p class="es-ws-card-label">Research snapshot</p>
+          <p id="es-ws-research-summary" class="es-ws-research-summary">Capture this page to build a research snapshot in Equipify.</p>
+          <div id="es-ws-research-signals" class="es-ws-signals"></div>
+          <div class="button-row" style="margin-top: 10px">
+            <button type="button" id="copilot-generate-research-btn-inline" class="btn-secondary">Generate AI brief</button>
+          </div>
+        </section>
+
+        <section class="es-ws-card">
+          <p class="es-ws-card-label">Activity</p>
+          <div id="es-ws-activity-list" class="es-ws-timeline">
+            <p class="es-ws-empty">No recent activity yet.</p>
+          </div>
+        </section>
+
+        <section class="es-ws-card">
+          <p class="es-ws-card-label">Queue</p>
+          <div class="es-ws-queue-grid">
+            <button type="button" id="es-ws-queue-recent" class="es-ws-queue-chip">
+              <span class="es-ws-queue-chip-label">Recently Captured</span>
+              <span id="es-ws-queue-recent-count" class="es-ws-queue-chip-count">0</span>
+            </button>
+            <button type="button" id="es-ws-queue-needs-review" class="es-ws-queue-chip">
+              <span class="es-ws-queue-chip-label">Needs Review</span>
+              <span class="es-ws-queue-chip-count">→</span>
+            </button>
+            <button type="button" id="es-ws-queue-verification" class="es-ws-queue-chip">
+              <span class="es-ws-queue-chip-label">Verification Queue</span>
+              <span class="es-ws-queue-chip-count">→</span>
+            </button>
+            <button type="button" id="es-ws-queue-discovery" class="es-ws-queue-chip">
+              <span class="es-ws-queue-chip-label">Contact Discovery</span>
+              <span class="es-ws-queue-chip-count">→</span>
+            </button>
+          </div>
+        </section>
+
+        <section id="existing-lead-panel" class="es-ws-card panel-warning" hidden>
+          <div class="panel-label">Existing lead</div>
+          <div id="existing-lead-match-label" class="match-label"></div>
+          <div id="existing-lead-summary" class="detected-value"></div>
           <div class="button-row">
-            <span id="capture-status" class="status-pill status-ready">Ready</span>
-            <a id="sign-in-link" class="btn-secondary link-btn" href="https://app.equipify.ai/admin/growth/browser-intake-test" target="_blank" rel="noopener noreferrer">Open in Equipify</a>
+            <button type="button" id="open-lead-btn" class="btn-secondary">Open lead</button>
+            <button type="button" id="update-lead-btn" class="btn-secondary">Update</button>
+            <button type="button" id="create-anyway-btn" class="btn-link">Create new</button>
           </div>
-        </header>
+        </section>
 
-        <div class="es-main-scroll">
-          <div id="bootstrap-loading" class="bootstrap-loading" hidden aria-live="polite">
-            <span class="loading-spinner" aria-hidden="true"></span>
-            <span>Loading page context…</span>
-          </div>
-          <p id="context-warning" class="message message-warning" hidden></p>
+        <section id="detected-panel" class="es-ws-card" hidden>
+          <div class="panel-label">Detected company</div>
+          <div id="detected-company" class="detected-value">—</div>
+          <div class="detected-meta"><span id="detected-platform" class="badge">website</span> <span id="detected-domain" class="muted"></span></div>
+        </section>
 
-          <section data-copilot-tab-panel="crm" class="copilot-panel">
-            <section id="linkedin-status-panel" class="es-card es-card-accent linkedin-status-panel">
-              <div class="es-card-header">
-                <div>
-                  <p id="linkedin-status-context" class="es-profile-meta"></p>
-                  <h2 id="sidepanel-profile-name" class="es-profile-name">Current page</h2>
-                </div>
-                <span id="linkedin-status-badge" class="linkedin-status-badge badge-neutral">Not added</span>
-              </div>
-              <div id="linkedin-status-match" class="linkedin-status-match" hidden></div>
-              <div id="linkedin-crm-context" class="linkedin-crm-context-grid"></div>
-              <div class="button-row linkedin-status-actions" style="margin-top: 12px">
-                <button type="button" id="linkedin-open-lead-btn" class="btn-primary" hidden>Open lead</button>
-                <button type="button" id="linkedin-mark-reviewed-btn" class="btn-secondary" hidden>Mark reviewed</button>
-                <button type="button" id="linkedin-add-note-btn" class="btn-secondary" hidden>Add note</button>
-                <button type="button" id="copilot-generate-research-btn-inline" class="btn-secondary">Research brief</button>
-                <button type="button" id="linkedin-open-company-btn" class="btn-secondary" hidden>View company</button>
-                <button type="button" id="linkedin-open-opportunity-btn" class="btn-secondary" hidden>Open opportunity</button>
-                <button type="button" id="linkedin-update-lead-btn" class="btn-link" hidden>Update existing</button>
-                <button type="button" id="linkedin-add-btn" class="btn-link">Capture page</button>
-              </div>
-            </section>
-
-            <section id="existing-lead-panel" class="es-card panel-warning" hidden>
-              <div class="panel-label">Existing lead</div>
-              <div id="existing-lead-match-label" class="match-label"></div>
-              <div id="existing-lead-summary" class="detected-value"></div>
-              <div class="button-row">
-                <button type="button" id="open-lead-btn" class="btn-secondary">Open lead</button>
-                <button type="button" id="update-lead-btn" class="btn-secondary">Update</button>
-                <button type="button" id="create-anyway-btn" class="btn-link">Create new</button>
-              </div>
-            </section>
-
-            <section id="detected-panel" class="es-card" hidden>
-              <div class="panel-label">Detected company</div>
-              <div id="detected-company" class="detected-value">—</div>
-              <div class="detected-meta"><span id="detected-platform" class="badge">website</span> <span id="detected-domain" class="muted"></span></div>
-            </section>
-
-            <section class="es-card">
-              <div class="panel-label">Capture</div>
+        <section class="es-ws-card es-ws-capture">
+          <details>
+            <summary>Capture details</summary>
+            <div class="es-ws-capture-body">
               <div class="mode-toggle">
                 <button type="button" id="quick-mode-btn" class="mode-btn active">Quick</button>
                 <button type="button" id="full-mode-btn" class="mode-btn">Full</button>
@@ -111,122 +186,98 @@
                 <input id="target-lead-id-input" type="hidden" />
                 <button id="submit-btn" type="submit">Save to Equipify</button>
               </form>
-            </section>
-
-            <section id="recent-captures-panel" class="es-card">
-              <div class="panel-label">Recent captures</div>
-              <div id="recent-captures-list" class="recent-list"></div>
-            </section>
-          </section>
-
-          <section data-copilot-tab-panel="research" class="copilot-panel" hidden>
-            <div class="es-card">
-              <div class="panel-label">Research brief</div>
-              <p class="muted phase2-help">AI summary from existing Growth Engine data — operator initiated.</p>
-              <button type="button" id="copilot-generate-research-btn" class="btn-primary">Generate research brief</button>
-              <p id="copilot-research-status" class="message" hidden role="status"></p>
-              <div id="copilot-research-content" class="phase2-artifact es-brief-grid" hidden></div>
             </div>
-          </section>
+          </details>
+        </section>
 
-          <section data-copilot-tab-panel="call_prep" class="copilot-panel" hidden>
-            <div class="es-card">
-              <div class="panel-label">Call prep</div>
-              <button type="button" id="copilot-generate-call-prep-btn" class="btn-primary">Generate call prep</button>
-              <p id="copilot-call-prep-status" class="message" hidden role="status"></p>
-              <div id="copilot-call-prep-content" class="phase2-artifact" hidden></div>
+        <section id="recent-captures-panel" class="es-ws-card">
+          <div class="panel-label">Recently captured</div>
+          <div id="recent-captures-list" class="recent-list"></div>
+        </section>
+
+        <section class="es-ws-advanced">
+          <details>
+            <summary>Advanced tools</summary>
+            <div class="es-ws-advanced-body">
+              <button type="button" data-copilot-tab-btn="research" class="btn-secondary">Research brief</button>
+              <button type="button" data-copilot-tab-btn="call_prep" class="btn-secondary">Call prep</button>
+              <button type="button" data-copilot-tab-btn="similar" class="btn-secondary">Similar companies</button>
+              <button type="button" data-copilot-tab-btn="committee" class="btn-secondary">Buying committee</button>
+              <button type="button" data-copilot-tab-btn="analytics" class="btn-secondary">Analytics</button>
+
+              <section data-copilot-tab-panel="research" class="copilot-panel" hidden>
+                <button type="button" id="copilot-generate-research-btn" class="btn-primary">Generate research brief</button>
+                <p id="copilot-research-status" class="message" hidden role="status"></p>
+                <div id="copilot-research-content" class="phase2-artifact es-brief-grid" hidden></div>
+              </section>
+              <section data-copilot-tab-panel="call_prep" class="copilot-panel" hidden>
+                <button type="button" id="copilot-generate-call-prep-btn" class="btn-primary">Generate call prep</button>
+                <p id="copilot-call-prep-status" class="message" hidden role="status"></p>
+                <div id="copilot-call-prep-content" class="phase2-artifact" hidden></div>
+              </section>
+              <section data-copilot-tab-panel="similar" class="copilot-panel" hidden>
+                <button type="button" id="copilot-find-similar-btn" class="btn-primary">Find similar companies</button>
+                <p id="copilot-similar-status" class="message" hidden role="status"></p>
+                <div id="copilot-similar-list" class="phase2-similar-list"></div>
+              </section>
+              <section data-copilot-tab-panel="relationship" class="copilot-panel" hidden>
+                <div id="copilot-relationship-content" class="copilot-scroll"></div>
+              </section>
+              <section data-copilot-tab-panel="timeline" class="copilot-panel" hidden>
+                <div id="copilot-timeline-content" class="es-timeline"></div>
+              </section>
+              <section data-copilot-tab-panel="notes" class="copilot-panel" hidden>
+                <textarea id="copilot-notes-input" rows="4" placeholder="Add operator notes…"></textarea>
+                <button type="button" id="copilot-notes-save-btn" class="btn-secondary">Save note</button>
+                <p id="copilot-notes-status" class="message" hidden role="status"></p>
+              </section>
+              <section data-copilot-tab-panel="queue" class="copilot-panel" hidden>
+                <div class="button-row">
+                  <button type="button" id="copilot-add-to-queue-btn" class="btn-secondary">Add current page</button>
+                  <button type="button" id="copilot-process-queue-btn" class="btn-secondary">Process queue</button>
+                </div>
+                <div id="copilot-queue-list" class="phase2-queue-list"></div>
+              </section>
+              <section data-copilot-tab-panel="analytics" class="copilot-panel" hidden>
+                <div class="analytics-period">
+                  <div class="analytics-block"><div class="panel-label">Today</div><div id="analytics-today"></div></div>
+                  <div class="analytics-block"><div class="panel-label">Week</div><div id="analytics-week"></div></div>
+                  <div class="analytics-block"><div class="panel-label">Month</div><div id="analytics-month"></div></div>
+                </div>
+              </section>
+              <section data-copilot-tab-panel="committee" class="copilot-panel" hidden id="copilot-committee-panel">
+                <div class="button-row">
+                  <button type="button" id="copilot-discover-committee-btn" class="btn-secondary">Discover</button>
+                  <button type="button" id="copilot-import-committee-btn" class="btn-primary">Import selected</button>
+                </div>
+                <p id="copilot-committee-status" class="message" hidden role="status"></p>
+                <div id="copilot-committee-list" class="committee-list"></div>
+              </section>
             </div>
-          </section>
+          </details>
+        </section>
 
-          <section data-copilot-tab-panel="similar" class="copilot-panel" hidden>
-            <div class="es-card">
-              <div class="panel-label">Similar companies</div>
-              <button type="button" id="copilot-find-similar-btn" class="btn-primary">Find similar companies</button>
-              <p id="copilot-similar-status" class="message" hidden role="status"></p>
-              <div id="copilot-similar-list" class="phase2-similar-list"></div>
-            </div>
-          </section>
+        <section id="success-panel" class="es-ws-card panel-success" hidden>
+          <div class="panel-label">Saved</div>
+          <div id="success-summary" class="detected-value"></div>
+          <div class="success-meta">
+            <div><span class="meta-key">Email:</span> <span id="success-email-status"></span></div>
+            <div><span class="meta-key">Discovery:</span> <span id="success-discovery-status"></span></div>
+          </div>
+          <div class="button-row">
+            <button type="button" id="success-open-lead-btn" class="btn-secondary">Open lead</button>
+            <a id="success-captured-link" class="btn-secondary link-btn" href="#" target="_blank" rel="noopener noreferrer">Recently captured</a>
+            <button type="button" id="success-dismiss-btn" class="btn-link">Dismiss</button>
+          </div>
+        </section>
 
-          <section data-copilot-tab-panel="relationship" class="copilot-panel" hidden>
-            <div class="es-card">
-              <div class="panel-label">Relationship map</div>
-              <div id="copilot-relationship-content" class="copilot-scroll"></div>
-            </div>
-          </section>
+        <p id="status" class="message" hidden role="status" aria-live="polite"></p>
+      </div>
 
-          <section data-copilot-tab-panel="timeline" class="copilot-panel" hidden>
-            <div class="es-card">
-              <div class="panel-label">Activity timeline</div>
-              <div id="copilot-timeline-content" class="es-timeline"></div>
-            </div>
-          </section>
-
-          <section data-copilot-tab-panel="notes" class="copilot-panel" hidden>
-            <div class="es-card">
-              <div class="panel-label">Lead notes</div>
-              <label>Notes <textarea id="copilot-notes-input" rows="6" placeholder="Add operator notes…"></textarea></label>
-              <button type="button" id="copilot-notes-save-btn" class="btn-primary">Save note</button>
-              <p id="copilot-notes-status" class="message" hidden role="status"></p>
-            </div>
-          </section>
-
-          <section data-copilot-tab-panel="queue" class="copilot-panel" hidden>
-            <div class="es-card">
-              <div class="panel-label">Prospect queue</div>
-              <div class="button-row">
-                <button type="button" id="copilot-add-to-queue-btn" class="btn-primary">Add current page</button>
-                <button type="button" id="copilot-process-queue-btn" class="btn-secondary">Process queue</button>
-              </div>
-              <div id="copilot-queue-list" class="phase2-queue-list"></div>
-            </div>
-          </section>
-
-          <section data-copilot-tab-panel="analytics" class="copilot-panel" hidden>
-            <div class="es-card">
-              <div class="panel-label">Operator analytics</div>
-              <p class="muted phase2-help">Capture actions only — not browsing history.</p>
-              <div class="analytics-period">
-                <div class="analytics-block"><div class="panel-label">Today</div><div id="analytics-today"></div></div>
-                <div class="analytics-block"><div class="panel-label">This week</div><div id="analytics-week"></div></div>
-                <div class="analytics-block"><div class="panel-label">This month</div><div id="analytics-month"></div></div>
-              </div>
-            </div>
-          </section>
-
-          <section data-copilot-tab-panel="committee" class="copilot-panel" hidden id="copilot-committee-panel">
-            <div class="es-card">
-              <div class="panel-label">Buying committee</div>
-              <p class="muted phase2-help">LinkedIn company pages only. Select contacts to import.</p>
-              <div class="button-row">
-                <button type="button" id="copilot-discover-committee-btn" class="btn-secondary">Discover</button>
-                <button type="button" id="copilot-import-committee-btn" class="btn-primary">Import selected</button>
-              </div>
-              <p id="copilot-committee-status" class="message" hidden role="status"></p>
-              <div id="copilot-committee-list" class="committee-list"></div>
-            </div>
-          </section>
-
-          <section id="success-panel" class="es-card panel-success" hidden>
-            <div class="panel-label">Saved</div>
-            <div id="success-summary" class="detected-value"></div>
-            <div class="success-meta">
-              <div><span class="meta-key">Email:</span> <span id="success-email-status"></span></div>
-              <div><span class="meta-key">Discovery:</span> <span id="success-discovery-status"></span></div>
-            </div>
-            <div class="button-row">
-              <button type="button" id="success-open-lead-btn" class="btn-secondary">Open lead</button>
-              <a id="success-captured-link" class="btn-secondary link-btn" href="#" target="_blank" rel="noopener noreferrer">Recently captured</a>
-              <button type="button" id="success-dismiss-btn" class="btn-link">Dismiss</button>
-            </div>
-          </section>
-
-          <p id="status" class="message" hidden role="status" aria-live="polite"></p>
-        </div>
-
-        <footer class="es-popup-footer">
-          <span id="extension-build-meta" class="footer-meta">Equipify Sales</span>
-        </footer>
-      </main>
+      <footer class="es-popup-footer">
+        <span id="extension-build-meta" class="footer-meta">Equipify Sales</span>
+        <span id="capture-status" class="status-pill status-ready">Ready</span>
+      </footer>
     </div>
 
     <div id="settings-drawer" class="es-settings-drawer" hidden>
@@ -250,6 +301,8 @@
               <option value="local">Local dev</option>
             </select>
           </label>
+          <label class="checkbox-row"><input id="prospecting-mode" type="checkbox" /><span>Prospecting Mode — show scan badges while browsing LinkedIn</span></label>
+          <label class="checkbox-row"><input id="linkedin-floating-dock" type="checkbox" checked /><span>Show LinkedIn floating button</span></label>
           <label class="checkbox-row"><input id="verify-email" type="checkbox" /><span>Verify email before save</span></label>
           <label class="checkbox-row"><input id="queue-discovery" type="checkbox" /><span>Queue contact discovery</span></label>
           <button type="button" id="save-settings-btn" class="btn-secondary">Save settings</button>
@@ -268,6 +321,7 @@
     <script src="linkedin-context.js"></script>
     <script src="linkedin-status-shared.js"></script>
     <script src="linkedin-crm-shared.js"></script>
+    <script src="extension-workspace.js"></script>
     <script src="extension-copilot.js"></script>
     <script src="extension-phase2.js"></script>
     <script src="intake-app.js"></script>

@@ -140,6 +140,10 @@ function extractVisiblePageMetadata() {
     'meta[property="og:title"]',
     'meta[name="og:title"]',
   ])
+  const ogImage = readMetaContent(document, [
+    'meta[property="og:image"]',
+    'meta[name="og:image"]',
+  ])
   const canonicalUrl = readCanonicalUrl(document)
   const jsonLdCompany = readJsonLdOrganizationName(document)
 
@@ -166,6 +170,7 @@ function extractVisiblePageMetadata() {
     source_platform: sourcePlatform === "linkedin" ? "linkedin" : "website",
     og_site_name: ogSiteName,
     canonical_url: canonicalUrl,
+    profile_photo_url: sourcePlatform === "linkedin" ? trimOrNull(ogImage) : null,
   }
 }
 

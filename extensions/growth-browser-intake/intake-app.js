@@ -58,6 +58,8 @@ function initIntakeApp(options) {
     apiPresetSelect: document.getElementById("api-preset-select"),
     verifyEmailCheckbox: document.getElementById("verify-email"),
     queueDiscoveryCheckbox: document.getElementById("queue-discovery"),
+    prospectingModeCheckbox: document.getElementById("prospecting-mode"),
+    linkedInFloatingDockCheckbox: document.getElementById("linkedin-floating-dock"),
     saveSettingsBtn: document.getElementById("save-settings-btn"),
     settingsStatus: document.getElementById("settings-status"),
     recentCapturesPanel: document.getElementById("recent-captures-panel"),
@@ -277,6 +279,31 @@ function initIntakeApp(options) {
     return body
   }
 
+  function renderSalesWorkspace(crmPayload, tabUrl) {
+    const workspace = window.EquipifySalesWorkspace
+    if (!workspace?.render) return
+
+    workspace.render({
+      crmPayload,
+      detected: state.detected,
+      formValues: readFormValues(),
+      existingLead: state.existingLead,
+      recentCaptures: null,
+      profilePhotoUrl: state.detected?.profile_photo_url ?? null,
+    })
+
+    storage.loadRecentCaptures().then((captures) => {
+      workspace.render({
+        crmPayload,
+        detected: state.detected,
+        formValues: readFormValues(),
+        existingLead: state.existingLead,
+        recentCaptures: captures,
+        profilePhotoUrl: state.detected?.profile_photo_url ?? null,
+      })
+    })
+  }
+
   function renderLinkedInCrmContextGrid(context) {
     if (!els.linkedinCrmContext || !crmContextUi) return
     els.linkedinCrmContext.innerHTML = ""
@@ -303,9 +330,16 @@ function initIntakeApp(options) {
       crmPayload?.linkedin_page_kind ?? linkedinContext?.detectLinkedInPageKind(tabUrl) ?? null
 
     const matched = crmPayload?.matched === true && state.crmContext
-    const badge = crmPayload?.status_badge ?? "not_added"
-    const badgeLabel = crmPayload?.status_badge_label ?? "Not added"
-    const tone = crmContextUi?.badgeToneFromStatus(badge) ?? linkedinStatus?.linkedInLeadStatusBadgeTone?.(badge) ?? "neutral"
+    const display =
+      linkedinStatus?.resolveProspectDisplayBadge?.(crmPayload) ?? {
+        displayLabel: crmPayload?.status_badge_label ?? "Not In Equipify",
+        emoji: "⚪",
+        tone: "neutral",
+        matchSummary: state.crmContext?.match_summary ?? null,
+      }
+    const badge = display.key ?? crmPayload?.status_badge ?? "not_added"
+    const badgeLabel = `${display.emoji} ${display.displayLabel}`
+    const tone = display.tone ?? crmContextUi?.badgeToneFromStatus(badge) ?? "neutral"
 
     if (els.linkedinStatusBadge) {
       els.linkedinStatusBadge.textContent = badgeLabel
@@ -369,6 +403,10 @@ function initIntakeApp(options) {
       state.existingLead = null
       state.linkedinLookup = crmPayload
       if (els.existingLeadPanel) els.existingLeadPanel.hidden = true
+    }
+
+    if (surface === "sidepanel") {
+      renderSalesWorkspace(crmPayload, tabUrl)
     }
   }
 
@@ -560,6 +598,13 @@ function initIntakeApp(options) {
     if (els.queueDiscoveryCheckbox) {
       els.queueDiscoveryCheckbox.checked = state.settings.queueContactDiscovery
     }
+    if (els.prospectingModeCheckbox) {
+      els.prospectingModeCheckbox.checked = state.settings.prospectingMode === true
+    }
+    if (els.linkedInFloatingDockCheckbox) {
+      const dockPrefs = await storage.loadLinkedInFloatingDockPrefs()
+      els.linkedInFloatingDockCheckbox.checked = dockPrefs.enabled !== false
+    }
     if (els.signInLink) {
       els.signInLink.href = signInUrl()
     }
@@ -572,9 +617,15 @@ function initIntakeApp(options) {
       apiBaseUrl: config.EXTENSION_API_PRESETS[preset],
       verifyEmailBeforeSave: els.verifyEmailCheckbox?.checked === true,
       queueContactDiscovery: els.queueDiscoveryCheckbox?.checked === true,
+      prospectingMode: els.prospectingModeCheckbox?.checked === true,
     }
     await storage.saveExtensionSettings(nextSettings)
     state.settings = nextSettings
+    if (els.linkedInFloatingDockCheckbox) {
+      await storage.saveLinkedInFloatingDockPrefs({
+        enabled: els.linkedInFloatingDockCheckbox.checked === true,
+      })
+    }
     if (els.settingsStatus) {
       els.settingsStatus.hidden = false
       els.settingsStatus.textContent = "Settings saved."
@@ -1049,6 +1100,13 @@ function initIntakeApp(options) {
         refreshAnalytics: () => copilot?.refreshAnalytics?.(),
         switchTab: (tabId) => copilot?.switchTab?.(tabId),
       }
+
+      window.EquipifySalesWorkspace?.wireActions?.({
+        refresh: async () => {
+          invalidateLookupCache()
+          await bootstrap()
+        },
+      })
     }
 
     await bootstrap()
