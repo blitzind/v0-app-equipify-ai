@@ -263,7 +263,7 @@ export async function runContactDiscoveryForCompany(
           : "failed"
         : "completed",
       candidate_count: 0,
-      error_message: runError ? runError.message : null,
+      error_message: null,
       metadata: { qa_marker: GROWTH_CONTACT_DISCOVERY_QA_MARKER },
     })
     .select("*")
