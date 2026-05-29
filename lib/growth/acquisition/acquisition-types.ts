@@ -32,6 +32,16 @@ export const GROWTH_BULK_ACQUISITION_PROMOTE_PER_TICK = 100
 
 export const GROWTH_BULK_ACQUISITION_DEFAULT_QUERY_LIMIT = 50
 
+/** Stop discovery after this many consecutive zero-result queries across geo tiles. */
+export const GROWTH_BULK_ACQUISITION_ZERO_DISCOVERY_STOP = 5
+
+export const GROWTH_BULK_ACQUISITION_COMPANY_SCAN_BATCH = 100
+
+export type GrowthBulkAcquisitionKeysetCursor = {
+  created_at: string
+  id: string
+}
+
 export type GrowthBulkAcquisitionStats = {
   companies_discovered: number
   companies_contacts_processed: number
@@ -43,6 +53,17 @@ export type GrowthBulkAcquisitionStats = {
   leads_suppressed: number
   leads_skipped: number
   leads_error: number
+}
+
+export type GrowthBulkAcquisitionThroughputMetrics = {
+  ticks_completed: number
+  last_tick_duration_ms: number
+  total_tick_duration_ms: number
+  provider_errors: number
+  verification_failures: number
+  emails_verification_attempted: number
+  contacts_discovered: number
+  emails_verified: number
 }
 
 export type GrowthBulkAcquisitionRunState = {
@@ -58,6 +79,17 @@ export type GrowthBulkAcquisitionRunState = {
   child_run_ids: string[]
   limit_per_query: number
   stats: GrowthBulkAcquisitionStats
+  metrics: GrowthBulkAcquisitionThroughputMetrics
+  geo_tiles: string[]
+  geo_tile_index: number
+  executed_query_keys: string[]
+  consecutive_zero_discovery: number
+  target_company_count: number | null
+  discovery_exhausted: boolean
+  contact_discovery_cursor: GrowthBulkAcquisitionKeysetCursor | null
+  contact_discovery_exhausted: boolean
+  verify_company_scan_cursor: GrowthBulkAcquisitionKeysetCursor | null
+  promote_company_scan_cursor: GrowthBulkAcquisitionKeysetCursor | null
   last_tick_at: string | null
   last_error: string | null
 }
@@ -79,6 +111,7 @@ export type GrowthBulkAcquisitionTickResult = {
   phase: GrowthBulkAcquisitionPhase
   tick_actions: string[]
   done: boolean
+  tick_duration_ms: number
 }
 
 export type PromoteVerifiedContactOutcome =
@@ -100,5 +133,50 @@ export function emptyAcquisitionStats(): GrowthBulkAcquisitionStats {
     leads_suppressed: 0,
     leads_skipped: 0,
     leads_error: 0,
+  }
+}
+
+export function emptyAcquisitionThroughputMetrics(): GrowthBulkAcquisitionThroughputMetrics {
+  return {
+    ticks_completed: 0,
+    last_tick_duration_ms: 0,
+    total_tick_duration_ms: 0,
+    provider_errors: 0,
+    verification_failures: 0,
+    emails_verification_attempted: 0,
+    contacts_discovered: 0,
+    emails_verified: 0,
+  }
+}
+
+export function emptyAcquisitionRunState(
+  input: Pick<
+    GrowthBulkAcquisitionRunState,
+    "search_inputs" | "query_plan" | "limit_per_query" | "geo_tiles" | "target_company_count"
+  >,
+): GrowthBulkAcquisitionRunState {
+  return {
+    qa_marker: GROWTH_BULK_ACQUISITION_QA_MARKER,
+    phase: "discover_companies",
+    search_inputs: input.search_inputs,
+    query_plan: input.query_plan,
+    query_index: 0,
+    use_fallback_queries: false,
+    child_run_ids: [],
+    limit_per_query: input.limit_per_query,
+    stats: emptyAcquisitionStats(),
+    metrics: emptyAcquisitionThroughputMetrics(),
+    geo_tiles: input.geo_tiles,
+    geo_tile_index: 0,
+    executed_query_keys: [],
+    consecutive_zero_discovery: 0,
+    target_company_count: input.target_company_count,
+    discovery_exhausted: false,
+    contact_discovery_cursor: null,
+    contact_discovery_exhausted: false,
+    verify_company_scan_cursor: null,
+    promote_company_scan_cursor: null,
+    last_tick_at: null,
+    last_error: null,
   }
 }
