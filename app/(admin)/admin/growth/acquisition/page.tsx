@@ -3,6 +3,7 @@
 import { Radar } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthAcquisitionRunsDashboard } from "@/components/growth/growth-acquisition-runs-dashboard"
+import { GrowthBrowserExtensionInstallCard } from "@/components/growth/growth-browser-extension-install-card"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -37,6 +38,8 @@ export default function AdminGrowthAcquisitionPage() {
             </div>
           </div>
         </section>
+
+        <GrowthBrowserExtensionInstallCard compact />
 
         <GrowthSectionLayout>
           <GrowthAcquisitionRunsDashboard />

@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { GrowthBrowserExtensionInstallCard } from "@/components/growth/growth-browser-extension-install-card"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -145,6 +146,8 @@ export default function AdminGrowthBrowserIntakeTestPage() {
             </div>
           </div>
         </section>
+
+        <GrowthBrowserExtensionInstallCard />
 
         <form
           onSubmit={handleSubmit}

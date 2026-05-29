@@ -1,6 +1,7 @@
 "use client"
 
 import { Bot, ShieldCheck, SlidersHorizontal, Sparkles, Workflow } from "lucide-react"
+import { GrowthBrowserExtensionInstallCard } from "@/components/growth/growth-browser-extension-install-card"
 import {
   GROWTH_SETTINGS_INNER_GAP,
   GROWTH_SETTINGS_SECTION_GAP,
@@ -53,6 +54,8 @@ export function GrowthEngineSettingsPanel() {
         Global Growth Engine settings live here. Channel, calendar, voice, and Copilot connection settings are under{" "}
         <span className="font-medium text-foreground">Communications</span> in Settings.
       </p>
+
+      <GrowthBrowserExtensionInstallCard compact />
 
       {COMING_SOON_SECTIONS.map((section) => (
         <GrowthSettingsCard
