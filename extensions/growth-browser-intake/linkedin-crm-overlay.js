@@ -106,8 +106,9 @@
     return null
   }
 
-  function openSidePanel() {
-    chrome.runtime.sendMessage({ type: "equipify-open-side-panel" }).catch(() => {})
+  function openSidebar() {
+    if (window.EquipifySalesInpageSidebar?.open?.()) return
+    chrome.runtime.sendMessage({ type: "equipify-open-inpage-sidebar" }).catch(() => {})
   }
 
   function buildRenderKey(payload) {
@@ -152,7 +153,7 @@
     btn.addEventListener("click", (event) => {
       event.preventDefault()
       event.stopPropagation()
-      openSidePanel()
+      openSidebar()
     })
 
     return btn
@@ -227,7 +228,7 @@
 
     btn.appendChild(logo)
     btn.appendChild(label)
-    btn.addEventListener("click", openSidePanel)
+    btn.addEventListener("click", openSidebar)
     root.appendChild(btn)
   }
 

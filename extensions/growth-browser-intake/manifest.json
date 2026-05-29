@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Equipify Sales",
-  "version": "4.1.1",
-  "description": "Equipify Sales — LinkedIn prospecting workspace with CRM context, capture, call prep, and queue tools. Visible metadata only.",
+  "version": "4.2.0",
+  "description": "Equipify Sales — LinkedIn prospecting sidebar with CRM context, capture, call prep, and queue tools. Visible metadata only.",
   "permissions": ["activeTab", "scripting", "storage", "sidePanel"],
   "host_permissions": ["https://app.equipify.ai/*", "http://localhost:3000/*", "https://*/*", "http://*/*"],
   "background": {
@@ -30,7 +30,11 @@
   "web_accessible_resources": [
     {
       "resources": [
+        "inpage-sidebar.html",
+        "popup.css",
+        "sales-workspace.css",
         "assets/equipify-lightning.png",
+        "assets/equipify-sales-logo.png",
         "assets/icon-16.png",
         "assets/icon-32.png",
         "assets/icon-48.png",
@@ -55,10 +59,15 @@
         "linkedin-status-shared.js",
         "linkedin-crm-shared.js",
         "page-metadata.js",
+        "linkedin-inpage-sidebar.js",
         "linkedin-crm-overlay.js",
         "linkedin-floating-dock.js"
       ],
-      "css": ["linkedin-crm-overlay.css", "linkedin-floating-dock.css"],
+      "css": [
+        "linkedin-inpage-sidebar.css",
+        "linkedin-crm-overlay.css",
+        "linkedin-floating-dock.css"
+      ],
       "run_at": "document_idle"
     }
   ]

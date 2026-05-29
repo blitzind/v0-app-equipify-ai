@@ -1065,6 +1065,118 @@ body.surface-sidepanel {
   border-radius: var(--es-radius-sm);
 }
 
+/* Compact popup launcher */
+body.es-launcher.surface-popup {
+  width: 320px;
+  max-height: none;
+  overflow: visible;
+}
+
+.es-launcher-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.es-launcher-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, #050c1a 0%, #0b1629 100%);
+}
+
+.es-launcher-logo {
+  height: 24px;
+  width: auto;
+  max-width: 200px;
+  object-fit: contain;
+}
+
+.es-launcher-body {
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  background: #f4f6fb;
+}
+
+.es-launcher-status {
+  margin: 0;
+}
+
+.es-launcher-meta {
+  margin: 0 0 6px;
+  font-size: 11px;
+  color: var(--es-muted);
+}
+
+.es-launcher-status-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.es-launcher-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.es-launcher-match {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--es-muted);
+}
+
+.es-launcher-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+}
+
+.es-launcher-primary:hover {
+  filter: brightness(1.05);
+}
+
+.es-launcher-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  border: 1px solid var(--es-border);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.es-launcher-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--es-border);
+  background: #fff;
+}
+
+.es-launcher-compat {
+  display: none !important;
+}
+
 /* Hide legacy headers in sidepanel workspace */
 body.surface-sidepanel > .header,
 body.surface-sidepanel > .copilot-tabs,

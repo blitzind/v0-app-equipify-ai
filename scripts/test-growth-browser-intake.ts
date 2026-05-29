@@ -291,7 +291,10 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.1.1"/)
+assert.match(manifestSource, /"version": "4.2.0"/)
+assert.match(manifestSource, /linkedin-inpage-sidebar\.js/)
+assert.match(manifestSource, /inpage-sidebar\.html/)
+assert.match(manifestSource, /assets\/equipify-sales-logo\.png/)
 assert.match(manifestSource, /assets\/icon-16\.png/)
 assert.match(manifestSource, /assets\/icon-32\.png/)
 assert.match(manifestSource, /assets\/icon-48\.png/)
@@ -374,7 +377,7 @@ const linkedinCrmOverlayJs = fs.readFileSync(
 assert.match(linkedinCrmOverlayJs, /CRM_CONTEXT_PATH/)
 assert.match(linkedinCrmOverlayJs, /EquipifyGrowthExtensionLookupCache/)
 assert.match(linkedinCrmOverlayJs, /equipify-sales-linkedin-badge/)
-assert.match(linkedinCrmOverlayJs, /equipify-open-side-panel/)
+assert.match(linkedinCrmOverlayJs, /EquipifySalesInpageSidebar/)
 assert.match(linkedinCrmOverlayJs, /prospectingMode/)
 assert.doesNotMatch(linkedinCrmOverlayJs, /sendEmail|enroll|auto.?message/i)
 
@@ -385,11 +388,30 @@ const linkedinFloatingDockJs = fs.readFileSync(
 assert.match(linkedinFloatingDockJs, /equipify-sales-floating-dock/)
 assert.match(linkedinFloatingDockJs, /loadLinkedInFloatingDockPrefs/)
 assert.match(linkedinFloatingDockJs, /saveLinkedInFloatingDockPrefs/)
-assert.match(linkedinFloatingDockJs, /equipify-open-side-panel/)
+assert.match(linkedinFloatingDockJs, /EquipifySalesInpageSidebar/)
+assert.match(linkedinFloatingDockJs, /equipify-open-inpage-sidebar/)
 assert.match(linkedinFloatingDockJs, /startDrag/)
 assert.match(linkedinFloatingDockJs, /hideDock/)
 assert.match(linkedinFloatingDockJs, /topPx/)
 assert.doesNotMatch(linkedinFloatingDockJs, /sendEmail|enroll|auto.?message/i)
+
+const linkedinInpageSidebarJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-inpage-sidebar.js"),
+  "utf8",
+)
+assert.match(linkedinInpageSidebarJs, /equipify-sales-inpage-sidebar/)
+assert.match(linkedinInpageSidebarJs, /equipify-open-inpage-sidebar/)
+assert.match(linkedinInpageSidebarJs, /420/)
+assert.match(linkedinInpageSidebarJs, /EquipifySalesInpageSidebar/)
+
+const inpageSidebarHtml = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/inpage-sidebar.html"),
+  "utf8",
+)
+assert.match(inpageSidebarHtml, /equipify-sales-logo\.png/)
+assert.doesNotMatch(inpageSidebarHtml, /equipify-lightning\.png/)
+assert.match(inpageSidebarHtml, /inpage-sidebar-close-btn/)
+assert.match(inpageSidebarHtml, /surface-inpage/)
 
 for (const iconSize of [16, 32, 48, 128]) {
   assert.ok(
@@ -399,6 +421,13 @@ for (const iconSize of [16, 32, 48, 128]) {
     `missing icon-${iconSize}.png`,
   )
 }
+
+assert.ok(
+  fs.existsSync(
+    path.join(process.cwd(), "extensions/growth-browser-intake/assets/equipify-sales-logo.png"),
+  ),
+  "missing equipify-sales-logo.png",
+)
 
 const extensionConfigJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/extension-config.js"),
@@ -682,8 +711,8 @@ const sidepanelHtml = fs.readFileSync(
   "utf8",
 )
 assert.match(sidepanelHtml, /es-sales-workspace/)
-assert.match(sidepanelHtml, /Lead Intelligence Workspace/)
-assert.match(sidepanelHtml, /equipify-lightning.png/)
+assert.match(sidepanelHtml, /equipify-sales-logo\.png/)
+assert.doesNotMatch(sidepanelHtml, /equipify-lightning\.png/)
 assert.match(sidepanelHtml, /extension-workspace.js/)
 assert.match(sidepanelHtml, /sales-workspace.css/)
 assert.match(sidepanelHtml, /workspace-refresh-btn/)
@@ -699,16 +728,18 @@ const popupHtml = fs.readFileSync(
   "utf8",
 )
 assert.match(popupHtml, /Equipify Sales/)
-assert.match(popupHtml, /data-popup-tab-btn/)
 assert.match(popupHtml, /extension-ui.js/)
-assert.match(popupHtml, /equipify-lightning.png/)
+assert.match(popupHtml, /equipify-sales-logo\.png/)
+assert.match(popupHtml, /es-launcher/)
+assert.match(popupHtml, /open-side-panel-btn/)
+assert.doesNotMatch(popupHtml, /equipify-lightning\.png/)
 assert.match(popupHtml, /prospecting-mode/)
 assert.match(popupHtml, /linkedin-floating-dock/)
 assert.match(popupHtml, /extension-version-banner/)
 assert.match(popupHtml, /bootstrap-loading/)
-assert.match(popupHtml, /Capture page/)
+assert.match(popupHtml, /Open sidebar on LinkedIn/)
 assert.match(popupHtml, /extension-version.js/)
-assert.match(popupHtml, /extension-analytics.js/)
+assert.doesNotMatch(popupHtml, /data-popup-tab-btn/)
 
 const versionJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/extension-version.js"),

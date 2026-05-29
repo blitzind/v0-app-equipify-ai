@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="popup.css" />
     <link rel="stylesheet" href="sales-workspace.css" />
   </head>
-  <body class="surface-sidepanel es-sales-workspace">
+  <body class="surface-inpage es-sales-workspace">
     <div class="es-ws-app">
       <header class="es-ws-header">
         <div class="es-ws-brand es-ws-brand-logo">
@@ -16,7 +16,7 @@
         <div class="es-ws-header-actions">
           <button type="button" id="workspace-refresh-btn" class="es-ws-icon-btn" title="Refresh page context">↻</button>
           <button type="button" id="settings-toggle-btn" class="es-ws-icon-btn" title="Settings">⚙</button>
-          <a id="sign-in-link" class="es-ws-open-app" href="https://app.equipify.ai/admin/growth/leads" target="_blank" rel="noopener noreferrer">Open in Equipify</a>
+          <button type="button" id="inpage-sidebar-close-btn" class="es-ws-icon-btn" title="Close sidebar">✕</button>
         </div>
       </header>
 
@@ -273,6 +273,7 @@
       <footer class="es-popup-footer">
         <span id="extension-build-meta" class="footer-meta">Equipify Sales</span>
         <span id="capture-status" class="status-pill status-ready">Ready</span>
+        <a id="sign-in-link" class="es-ws-hidden-compat" href="https://app.equipify.ai/admin/growth/leads" target="_blank" rel="noopener noreferrer">Open in Equipify</a>
       </footer>
     </div>
 
@@ -321,6 +322,6 @@
     <script src="extension-copilot.js"></script>
     <script src="extension-phase2.js"></script>
     <script src="intake-app.js"></script>
-    <script src="sidepanel.js"></script>
+    <script src="inpage-sidebar.js"></script>
   </body>
 </html>

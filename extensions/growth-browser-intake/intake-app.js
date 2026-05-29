@@ -4,7 +4,9 @@
  */
 
 function initIntakeApp(options) {
-  const surface = options?.surface === "sidepanel" ? "sidepanel" : "popup"
+  const surfaceOption = options?.surface ?? "popup"
+  const surface =
+    surfaceOption === "inpage" ? "inpage" : surfaceOption === "sidepanel" ? "sidepanel" : "popup"
   const config = window.EquipifyGrowthExtensionConfig
   const storage = window.EquipifyGrowthExtensionStorage
   const linkedinContext = window.EquipifyGrowthLinkedInContext
@@ -405,7 +407,7 @@ function initIntakeApp(options) {
       if (els.existingLeadPanel) els.existingLeadPanel.hidden = true
     }
 
-    if (surface === "sidepanel") {
+    if (surface === "sidepanel" || surface === "inpage") {
       renderSalesWorkspace(crmPayload, tabUrl)
     }
   }
@@ -937,12 +939,31 @@ function initIntakeApp(options) {
       })
     })
 
+    document.getElementById("inpage-sidebar-close-btn")?.addEventListener("click", () => {
+      window.parent.postMessage({ type: "equipify-inpage-sidebar-close" }, "*")
+    })
+
+    window.addEventListener("message", (event) => {
+      if (event.data?.type === "equipify-inpage-sidebar-opened") {
+        bootstrap().catch(() => {})
+      }
+      if (event.data?.type === "equipify-inpage-sidebar-refresh") {
+        invalidateLookupCache()
+        bootstrap().catch(() => {})
+      }
+    })
+
     els.openSidePanelBtn?.addEventListener("click", async () => {
-      if (!chrome.sidePanel?.open) return
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
-      const windowId = tabs[0]?.windowId
-      if (windowId != null) {
-        await chrome.sidePanel.open({ windowId })
+      const tab = tabs[0]
+      if (!tab?.id) return
+
+      try {
+        await chrome.tabs.sendMessage(tab.id, { type: "equipify-open-inpage-sidebar" })
+      } catch {
+        if (chrome.sidePanel?.open && tab.windowId != null) {
+          await chrome.sidePanel.open({ windowId: tab.windowId })
+        }
       }
     })
 
@@ -1052,6 +1073,8 @@ function initIntakeApp(options) {
     document.body.dataset.surface = surface
     if (surface === "sidepanel") {
       document.body.classList.add("surface-sidepanel")
+    } else if (surface === "inpage") {
+      document.body.classList.add("surface-inpage")
     } else {
       document.body.classList.add("surface-popup")
     }
@@ -1063,7 +1086,7 @@ function initIntakeApp(options) {
     await refreshRecentCaptures()
     await refreshOperatorAnalytics()
 
-    if (surface !== "sidepanel" && typeof window.initExtensionPhase2 === "function") {
+    if (surface !== "sidepanel" && surface !== "inpage" && typeof window.initExtensionPhase2 === "function") {
       window.initExtensionPhase2({
         apiBaseUrl,
         readFormValues,
@@ -1074,7 +1097,7 @@ function initIntakeApp(options) {
       })
     }
 
-    if (surface === "sidepanel" && typeof window.initExtensionCopilot === "function") {
+    if ((surface === "sidepanel" || surface === "inpage") && typeof window.initExtensionCopilot === "function") {
       const copilot = window.initExtensionCopilot({
         apiBaseUrl,
         readFormValues,

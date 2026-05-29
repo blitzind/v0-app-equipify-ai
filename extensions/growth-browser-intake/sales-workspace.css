@@ -1,3 +1,24 @@
+body.surface-inpage.es-sales-workspace {
+  width: 100%;
+  min-width: 380px;
+  max-width: 460px;
+  margin: 0;
+  background: #f4f6fb;
+}
+
+.es-ws-brand-logo {
+  flex: 1;
+  min-width: 0;
+}
+
+.es-ws-brand-logo-img {
+  display: block;
+  height: 28px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+
 /* Equipify Sales — prospecting workspace (side panel) */
 body.surface-sidepanel.es-sales-workspace {
   width: 100%;

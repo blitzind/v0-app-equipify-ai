@@ -1,0 +1,57 @@
+.equipify-sales-inpage-sidebar-root {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 2147483646;
+  pointer-events: none;
+}
+
+.equipify-sales-inpage-sidebar-root[hidden] {
+  display: none !important;
+}
+
+.equipify-sales-inpage-sidebar-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  height: 100dvh;
+  pointer-events: auto;
+  background: #f4f6fb;
+  border-left: 1px solid #dbeafe;
+  box-shadow: -8px 0 32px rgba(11, 22, 41, 0.14);
+  display: flex;
+  flex-direction: column;
+}
+
+.equipify-sales-inpage-sidebar-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #f4f6fb;
+}
+
+html.equipify-sales-inpage-sidebar-open,
+body.equipify-sales-inpage-sidebar-open {
+  margin-right: 420px !important;
+  transition: margin-right 0.2s ease;
+}
+
+.equipify-sales-floating-dock--sidebar-open {
+  right: 420px !important;
+  transition: right 0.2s ease;
+}
+
+@media (max-width: 900px) {
+  html.equipify-sales-inpage-sidebar-open,
+  body.equipify-sales-inpage-sidebar-open {
+    margin-right: 0 !important;
+  }
+
+  .equipify-sales-inpage-sidebar-panel {
+    width: min(100vw, 420px) !important;
+  }
+
+  .equipify-sales-floating-dock--sidebar-open {
+    right: 0 !important;
+  }
+}

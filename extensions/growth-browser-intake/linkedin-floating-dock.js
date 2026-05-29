@@ -96,8 +96,9 @@
     return body
   }
 
-  function openSidePanel() {
-    chrome.runtime.sendMessage({ type: "equipify-open-side-panel" }).catch(() => {})
+  function openSidebar() {
+    if (window.EquipifySalesInpageSidebar?.open?.()) return
+    chrome.runtime.sendMessage({ type: "equipify-open-inpage-sidebar" }).catch(() => {})
   }
 
   function clampTopPx(topPx) {
@@ -197,7 +198,7 @@
     mainBtn.addEventListener("click", (event) => {
       event.preventDefault()
       event.stopPropagation()
-      openSidePanel()
+      openSidebar()
     })
 
     const dragHandle = document.createElement("button")
