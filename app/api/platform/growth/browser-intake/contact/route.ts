@@ -3,6 +3,8 @@ import { z } from "zod"
 import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { createBrowserIntakeContact } from "@/lib/growth/browser-intake/create-browser-intake-contact"
 import {
+  GROWTH_BROWSER_INTAKE_CAPTURE_METHODS,
+  GROWTH_BROWSER_INTAKE_MODES,
   GROWTH_BROWSER_INTAKE_QA_MARKER,
   GROWTH_BROWSER_INTAKE_SOURCE_PLATFORMS,
 } from "@/lib/growth/browser-intake/browser-intake-types"
@@ -25,6 +27,12 @@ const CreateBrowserIntakeContactSchema = z.object({
   city: optionalText,
   state: optionalText,
   notes: z.string().trim().max(2000).optional().nullable(),
+  page_title: z.string().trim().max(500).optional().nullable(),
+  capture_method: z.enum(GROWTH_BROWSER_INTAKE_CAPTURE_METHODS).optional().nullable(),
+  company_only: z.boolean().optional(),
+  queue_contact_discovery: z.boolean().optional(),
+  intake_mode: z.enum(GROWTH_BROWSER_INTAKE_MODES).optional(),
+  target_lead_id: z.string().uuid().optional().nullable(),
 })
 
 export async function POST(request: Request) {
@@ -57,6 +65,12 @@ export async function POST(request: Request) {
       city: body.city,
       state: body.state,
       notes: body.notes,
+      page_title: body.page_title,
+      capture_method: body.capture_method ?? "chrome_extension",
+      company_only: body.company_only === true,
+      queue_contact_discovery: body.queue_contact_discovery === true,
+      intake_mode: body.intake_mode,
+      target_lead_id: body.target_lead_id,
       created_by: access.userId,
       actor_email: access.userEmail,
     })
@@ -64,6 +78,9 @@ export async function POST(request: Request) {
     logGrowthEngine("browser_intake_api", {
       status: result.status,
       actorEmail: access.userEmail,
+      captureType: "capture_type" in result ? result.capture_type : null,
+      contactDiscoveryQueued:
+        "contact_discovery_queued" in result ? result.contact_discovery_queued : false,
     })
 
     const statusCode =

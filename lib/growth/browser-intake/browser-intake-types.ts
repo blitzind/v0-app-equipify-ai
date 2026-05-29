@@ -9,7 +9,15 @@ import {
   trimOrNull,
 } from "@/lib/growth/import/normalize"
 
-export const GROWTH_BROWSER_INTAKE_QA_MARKER = "growth-browser-intake-v1" as const
+export const GROWTH_BROWSER_INTAKE_QA_MARKER = "growth-browser-intake-v2" as const
+
+export const GROWTH_BROWSER_INTAKE_CAPTURE_METHODS = ["chrome_extension"] as const
+
+export type GrowthBrowserIntakeCaptureMethod = (typeof GROWTH_BROWSER_INTAKE_CAPTURE_METHODS)[number]
+
+export const GROWTH_BROWSER_INTAKE_MODES = ["default", "update_existing", "create_new"] as const
+
+export type GrowthBrowserIntakeMode = (typeof GROWTH_BROWSER_INTAKE_MODES)[number]
 
 export const GROWTH_BROWSER_INTAKE_SOURCE_PLATFORMS = [
   "linkedin",
@@ -33,6 +41,17 @@ export type GrowthBrowserIntakeContactInput = {
   city?: string | null
   state?: string | null
   notes?: string | null
+  page_title?: string | null
+  capture_method?: GrowthBrowserIntakeCaptureMethod | string | null
+  company_only?: boolean
+  queue_contact_discovery?: boolean
+  intake_mode?: GrowthBrowserIntakeMode
+  target_lead_id?: string | null
+}
+
+export type GrowthBrowserIntakeServiceInput = GrowthBrowserIntakeContactInput & {
+  created_by?: string | null
+  actor_email?: string | null
 }
 
 export type GrowthBrowserIntakeWarning = {
@@ -44,37 +63,44 @@ export type GrowthBrowserIntakeCaptureMeta = {
   source_kind: "browser_extension"
   source_url: string | null
   source_platform: GrowthBrowserIntakeSourcePlatform
+  page_title: string | null
   captured_at: string
+  capture_method: GrowthBrowserIntakeCaptureMethod
   external_ref: string
   notes: string | null
+  linkedin_url?: string | null
+  capture_type?: "company_only" | "contact"
+}
+
+export type GrowthBrowserIntakeResultBase = {
+  warnings: GrowthBrowserIntakeWarning[]
+  contact_discovery_queued?: boolean
+  company_candidate_id?: string | null
+  capture_type?: "company_only" | "contact"
 }
 
 export type GrowthBrowserIntakeResult =
-  | {
+  | ({
       status: "created"
       lead_id: string
       decision_maker_id: string | null
-      warnings: GrowthBrowserIntakeWarning[]
-    }
-  | {
+    } & GrowthBrowserIntakeResultBase)
+  | ({
       status: "updated"
       lead_id: string
       decision_maker_id: string | null
       rule: string
       confidence: number
-      warnings: GrowthBrowserIntakeWarning[]
-    }
-  | {
+    } & GrowthBrowserIntakeResultBase)
+  | ({
       status: "suppressed"
       reason: string
       block_layer?: string | null
-      warnings: GrowthBrowserIntakeWarning[]
-    }
-  | {
+    } & GrowthBrowserIntakeResultBase)
+  | ({
       status: "error"
       message: string
-      warnings: GrowthBrowserIntakeWarning[]
-    }
+    } & GrowthBrowserIntakeResultBase)
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -146,4 +172,15 @@ export function resolveBrowserIntakeContactName(input: GrowthBrowserIntakeContac
   if (normalizeLinkedIn(input.linkedin_url)) return "LinkedIn contact"
   if (normalizePhone(input.phone)) return "Phone contact"
   return null
+}
+
+export function browserIntakeIsCompanyOnlyCapture(input: GrowthBrowserIntakeContactInput): boolean {
+  if (input.company_only === true) return true
+  return !browserIntakeHasContactData(input)
+}
+
+export function normalizeBrowserIntakeCaptureMethod(
+  value: unknown,
+): GrowthBrowserIntakeCaptureMethod {
+  return asString(value) === "chrome_extension" ? "chrome_extension" : "chrome_extension"
 }

@@ -8,72 +8,89 @@
   </head>
   <body>
     <header class="header">
-      <h1>Equipify Growth</h1>
-      <p class="subtitle">Send captured contact info to Growth Engine</p>
+      <div class="header-row">
+        <h1>Growth Capture</h1>
+        <span id="capture-status" class="status-pill">Ready</span>
+      </div>
     </header>
 
-    <section id="context" class="context" hidden>
-      <div class="context-row">
-        <span class="label">Source</span>
-        <span id="source-platform" class="badge">website</span>
+    <section id="detected-panel" class="panel" hidden>
+      <div class="panel-label">Company detected</div>
+      <div id="detected-company" class="detected-value">—</div>
+      <div class="detected-meta">
+        <span id="detected-platform" class="badge">website</span>
+        <span id="detected-domain" class="muted"></span>
       </div>
-      <div class="context-row">
-        <span class="label">Page</span>
-        <a id="source-url-link" href="#" target="_blank" rel="noopener noreferrer"></a>
+    </section>
+
+    <section id="existing-lead-panel" class="panel panel-warning" hidden>
+      <div class="panel-label">Existing lead found</div>
+      <div id="existing-lead-summary" class="detected-value"></div>
+      <div class="button-row">
+        <button type="button" id="open-lead-btn" class="btn-secondary">Open Lead</button>
+        <button type="button" id="update-lead-btn" class="btn-secondary">Update Existing</button>
+        <button type="button" id="create-anyway-btn" class="btn-link">Create New Anyway</button>
       </div>
     </section>
 
     <p id="context-warning" class="message message-warning" hidden></p>
 
+    <div class="mode-toggle">
+      <button type="button" id="quick-mode-btn" class="mode-btn active">Quick Save</button>
+      <button type="button" id="full-mode-btn" class="mode-btn">Full</button>
+    </div>
+
     <form id="intake-form" class="form">
-      <label>
-        Company name <span class="required">*</span>
-        <input id="company-name" name="company_name" type="text" required autocomplete="organization" />
+      <div id="quick-fields">
+        <label>
+          Contact name
+          <input id="contact-name" type="text" autocomplete="name" />
+        </label>
+        <label>
+          Email
+          <input id="email" type="email" autocomplete="email" />
+        </label>
+        <label>
+          Phone
+          <input id="phone" type="tel" autocomplete="tel" />
+        </label>
+        <label>
+          Title
+          <input id="title" type="text" autocomplete="organization-title" />
+        </label>
+      </div>
+
+      <div id="full-fields" hidden>
+        <label>
+          Company name <span class="required">*</span>
+          <input id="company-name" type="text" autocomplete="organization" />
+        </label>
+        <label>
+          Website
+          <input id="website" type="url" inputmode="url" />
+        </label>
+        <label>
+          LinkedIn URL
+          <input id="linkedin-url" type="url" inputmode="url" />
+        </label>
+        <label>
+          Notes
+          <textarea id="notes" rows="2"></textarea>
+        </label>
+      </div>
+
+      <label class="checkbox-row">
+        <input id="queue-discovery" type="checkbox" />
+        <span>Queue for contact discovery</span>
       </label>
 
-      <label>
-        Contact name
-        <input id="contact-name" name="contact_name" type="text" autocomplete="name" />
-      </label>
+      <input id="source-url" type="hidden" />
+      <input id="source-platform-input" type="hidden" />
+      <input id="page-title-input" type="hidden" />
+      <input id="intake-mode-input" type="hidden" value="default" />
+      <input id="target-lead-id-input" type="hidden" />
 
-      <label>
-        Title
-        <input id="title" name="title" type="text" autocomplete="organization-title" />
-      </label>
-
-      <label>
-        Email
-        <input id="email" name="email" type="email" autocomplete="email" />
-      </label>
-
-      <label>
-        Phone
-        <input id="phone" name="phone" type="tel" autocomplete="tel" />
-      </label>
-
-      <label>
-        Website
-        <input id="website" name="website" type="url" inputmode="url" placeholder="https://example.com" />
-      </label>
-
-      <label>
-        LinkedIn URL
-        <input id="linkedin-url" name="linkedin_url" type="url" inputmode="url" placeholder="https://linkedin.com/in/..." />
-      </label>
-
-      <label>
-        Notes
-        <textarea id="notes" name="notes" rows="3" placeholder="Optional context from this page"></textarea>
-      </label>
-
-      <input id="source-url" name="source_url" type="hidden" />
-      <input id="source-platform-input" name="source_platform" type="hidden" />
-
-      <p id="form-hint" class="hint">
-        Enter what you see on the page. At least one contact field (name, email, phone, or LinkedIn) is required.
-      </p>
-
-      <button id="submit-btn" type="submit">Send to Equipify</button>
+      <button id="submit-btn" type="submit">Save to Equipify</button>
     </form>
 
     <p id="status" class="message" hidden role="status" aria-live="polite"></p>
@@ -82,7 +99,7 @@
     </p>
 
     <footer class="footer">
-      <a id="login-link" href="https://app.equipify.ai/admin/growth/browser-intake-test" target="_blank" rel="noopener noreferrer">
+      <a href="https://app.equipify.ai/admin/growth/browser-intake-test" target="_blank" rel="noopener noreferrer">
         Sign in to Equipify
       </a>
     </footer>
