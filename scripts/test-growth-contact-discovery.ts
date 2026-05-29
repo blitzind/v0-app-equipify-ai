@@ -665,6 +665,79 @@ async function main(): Promise<void> {
   )
   assert.match(providerHealthPageSource, /GrowthPdlProviderHealthDashboard/)
 
+  const grantsMigration = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "supabase/migrations/20270629120000_growth_contact_discovery_service_role_grants.sql",
+    ),
+    "utf8",
+  )
+  assert.match(grantsMigration, /contact_discovery_runs to service_role/)
+  assert.match(grantsMigration, /contact_candidates to service_role/)
+
+  const { resolveReadyLeadWebsiteUrl } = await import("../lib/growth/research-website-url")
+  assert.equal(resolveReadyLeadWebsiteUrl("https://example.com"), "https://example.com/")
+  assert.equal(resolveReadyLeadWebsiteUrl(""), null)
+
+  const websiteDiscoverySource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/contact-discovery/website-contact-discovery.ts"),
+    "utf8",
+  )
+  assert.match(websiteDiscoverySource, /resolveReadyLeadWebsiteUrl/)
+  assert.doesNotMatch(websiteDiscoverySource, /fetchLeadWebsite\(normalized\)/)
+
+  const {
+    buildContactDiscoveryProviderOutcomes,
+    formatProviderOutcomeSummary,
+  } = await import("../lib/growth/contact-discovery/contact-discovery-provider-outcomes")
+  const outcomes = buildContactDiscoveryProviderOutcomes({
+    provider_results: [
+      {
+        provider_name: "people_data_labs",
+        provider_type: "future_people_data_labs",
+        status: "success",
+        message: "3 person(s)",
+        contacts: [{}, {}, {}] as never[],
+      },
+      {
+        provider_name: "internal_growth",
+        provider_type: "internal_growth",
+        status: "skipped",
+        message: "No matched Growth lead",
+        contacts: [],
+      },
+    ],
+    persisted_by_provider: { people_data_labs: 3, internal_growth: 0 },
+  })
+  assert.equal(outcomes.length, 2)
+  assert.equal(outcomes[0]!.contacts_returned, 3)
+  assert.equal(outcomes[0]!.contacts_persisted, 3)
+  assert.match(
+    formatProviderOutcomeSummary(outcomes[0]!),
+    /PDL: 3 returned, 3 persisted/,
+  )
+
+  const contactRepoSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/contact-discovery/contact-repository.ts"),
+    "utf8",
+  )
+  assert.match(contactRepoSource, /provider_outcomes/)
+  assert.match(contactRepoSource, /buildContactDiscoveryProviderOutcomes/)
+
+  const acquisitionRepoSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/acquisition/acquisition-repository.ts"),
+    "utf8",
+  )
+  assert.match(acquisitionRepoSource, /provider_outcomes/)
+  assert.match(acquisitionRepoSource, /contact_discovery_persistence_error/)
+
+  const runDetailSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/growth-acquisition-run-detail.tsx"),
+    "utf8",
+  )
+  assert.match(runDetailSource, /CompaniesArtifactTable/)
+  assert.match(runDetailSource, /formatProviderOutcomeSummary/)
+
   console.log("growth-contact-discovery-v1 checks passed")
 }
 

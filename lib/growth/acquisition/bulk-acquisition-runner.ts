@@ -354,6 +354,9 @@ async function tickDiscoverContacts(
         markCompanyContactsProcessed(admin, {
           company_candidate_id: company.id,
           acquisition_run_id: run.id,
+          provider_outcomes: snapshot.provider_outcomes,
+          persistence_error: snapshot.persistence_error,
+          discovery_run_id: snapshot.run?.id ?? null,
         }),
     )
     state.stats.companies_contacts_processed += 1

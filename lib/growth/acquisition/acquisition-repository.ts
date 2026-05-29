@@ -19,6 +19,8 @@ import {
   type GrowthBulkAcquisitionRunStatus,
   type GrowthBulkAcquisitionTickLogEntry,
 } from "@/lib/growth/acquisition/acquisition-types"
+import { parseContactDiscoveryProviderOutcomes } from "@/lib/growth/contact-discovery/contact-discovery-provider-outcomes"
+import type { GrowthContactDiscoveryProviderOutcome } from "@/lib/growth/contact-discovery/contact-discovery-provider-outcomes"
 import type { GrowthRealWorldDiscoverySearchInputs } from "@/lib/growth/real-world-discovery/real-world-discovery-query-builder"
 import { isGrowthRealWorldDiscoverySchemaReady } from "@/lib/growth/real-world-discovery/real-world-discovery-schema-health"
 
@@ -177,12 +179,28 @@ function rowToAcquisitionRun(row: Record<string, unknown>): GrowthBulkAcquisitio
   }
 }
 
+function acquisitionMetadata(metadata: Record<string, unknown>): Record<string, unknown> {
+  return metadata.acquisition && typeof metadata.acquisition === "object"
+    ? (metadata.acquisition as Record<string, unknown>)
+    : {}
+}
+
 function companyContactsProcessed(metadata: Record<string, unknown>): boolean {
-  const acquisition =
-    metadata.acquisition && typeof metadata.acquisition === "object"
-      ? (metadata.acquisition as Record<string, unknown>)
-      : {}
-  return Boolean(asString(acquisition.contacts_processed_at))
+  return Boolean(asString(acquisitionMetadata(metadata).contacts_processed_at))
+}
+
+function companyContactDiscoveryFields(metadata: Record<string, unknown>): {
+  contacts_processed_at: string | null
+  provider_outcomes: GrowthContactDiscoveryProviderOutcome[]
+  contact_discovery_persistence_error: string | null
+} {
+  const acquisition = acquisitionMetadata(metadata)
+  return {
+    contacts_processed_at: asString(acquisition.contacts_processed_at) || null,
+    provider_outcomes: parseContactDiscoveryProviderOutcomes(acquisition.provider_outcomes),
+    contact_discovery_persistence_error:
+      asString(acquisition.contact_discovery_persistence_error) || null,
+  }
 }
 
 function applyKeysetCursor<T extends { order: (col: string, opts: { ascending: boolean }) => T }>(
@@ -507,6 +525,9 @@ export async function markCompanyContactsProcessed(
   input: {
     company_candidate_id: string
     acquisition_run_id: string
+    provider_outcomes?: GrowthContactDiscoveryProviderOutcome[]
+    persistence_error?: string | null
+    discovery_run_id?: string | null
   },
 ): Promise<void> {
   const { data } = await admin
@@ -518,6 +539,7 @@ export async function markCompanyContactsProcessed(
 
   const metadata =
     data?.metadata && typeof data.metadata === "object" ? (data.metadata as Record<string, unknown>) : {}
+  const priorAcquisition = acquisitionMetadata(metadata)
 
   await admin
     .schema("growth")
@@ -526,11 +548,12 @@ export async function markCompanyContactsProcessed(
       metadata: {
         ...metadata,
         acquisition: {
-          ...(metadata.acquisition && typeof metadata.acquisition === "object"
-            ? (metadata.acquisition as Record<string, unknown>)
-            : {}),
+          ...priorAcquisition,
           run_id: input.acquisition_run_id,
           contacts_processed_at: new Date().toISOString(),
+          provider_outcomes: input.provider_outcomes ?? [],
+          contact_discovery_persistence_error: input.persistence_error ?? null,
+          contact_discovery_run_id: input.discovery_run_id ?? null,
         },
       },
       updated_at: new Date().toISOString(),
@@ -600,6 +623,7 @@ export async function listAcquisitionRunArtifacts(
       const r = row as Record<string, unknown>
       const metadata =
         r.metadata && typeof r.metadata === "object" ? (r.metadata as Record<string, unknown>) : {}
+      const discovery = companyContactDiscoveryFields(metadata)
       return {
         id: asString(r.id),
         company_name: asString(r.company_name),
@@ -610,6 +634,9 @@ export async function listAcquisitionRunArtifacts(
         location: asString(r.location) || null,
         query: asString(r.query) || null,
         contacts_processed: companyContactsProcessed(metadata),
+        contacts_processed_at: discovery.contacts_processed_at,
+        provider_outcomes: discovery.provider_outcomes,
+        contact_discovery_persistence_error: discovery.contact_discovery_persistence_error,
         created_at: asString(r.created_at),
       }
     })

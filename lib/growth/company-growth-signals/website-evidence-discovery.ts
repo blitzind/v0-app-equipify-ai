@@ -4,7 +4,7 @@ import "server-only"
 
 import { createHash } from "node:crypto"
 import { fetchLeadWebsite } from "@/lib/growth/research-website-fetch"
-import { normalizeLeadWebsite } from "@/lib/growth/research-website-url"
+import { resolveReadyLeadWebsiteUrl } from "@/lib/growth/research-website-url"
 import { CAREERS_CRAWL_PATHS, detectCareersPageEvidence } from "@/lib/growth/company-growth-signals/detectors/careers-hiring-detector"
 import { detectTechStackSignals } from "@/lib/growth/company-growth-signals/detectors/tech-stack-signal-detector"
 import type {
@@ -24,10 +24,10 @@ export type MultiSourceEvidenceDiscoveryResult = {
 const BASE_PATHS = ["/", ...CAREERS_CRAWL_PATHS, "/team", "/about", "/contact"]
 
 function buildPaths(website: string): string[] {
-  const normalized = normalizeLeadWebsite(website)
-  if (!normalized) return []
-  const origin = new URL(normalized).origin
-  return [...new Set([normalized, ...BASE_PATHS.map((path) => `${origin}${path}`)])]
+  const websiteUrl = resolveReadyLeadWebsiteUrl(website)
+  if (!websiteUrl) return []
+  const origin = new URL(websiteUrl).origin
+  return [...new Set([websiteUrl, ...BASE_PATHS.map((path) => `${origin}${path}`)])]
 }
 
 function dedupeEvidence(items: RawEvidenceSourceCandidate[]): RawEvidenceSourceCandidate[] {

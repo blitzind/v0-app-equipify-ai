@@ -1,5 +1,6 @@
 /** Growth Engine — Contact Discovery + Buying Committee types (Prompt 27). Client-safe. */
 
+import type { GrowthContactDiscoveryProviderOutcome } from "@/lib/growth/contact-discovery/contact-discovery-provider-outcomes"
 import type { GrowthSchemaHealthSummary } from "@/lib/growth/schema-health/growth-schema-health-types"
 
 export const GROWTH_CONTACT_DISCOVERY_QA_MARKER = "growth-contact-discovery-v1" as const
@@ -125,6 +126,8 @@ export type GrowthBuyingCommitteeAssessment = {
   missing_roles: GrowthBuyingCommitteeRole[]
 }
 
+export type { GrowthContactDiscoveryProviderOutcome } from "@/lib/growth/contact-discovery/contact-discovery-provider-outcomes"
+
 export type GrowthContactDiscoverySnapshot = {
   qa_marker: typeof GROWTH_CONTACT_DISCOVERY_QA_MARKER
   schema_ready: boolean
@@ -134,6 +137,8 @@ export type GrowthContactDiscoverySnapshot = {
   contacts: GrowthContactCandidate[]
   buying_committee: GrowthBuyingCommitteeAssessment | null
   provider_messages: string[]
+  provider_outcomes: GrowthContactDiscoveryProviderOutcome[]
+  persistence_error: string | null
   privacy_note: string
 }
 

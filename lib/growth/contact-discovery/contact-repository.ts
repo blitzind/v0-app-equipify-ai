@@ -18,6 +18,7 @@ import {
   dedupeNormalizedContacts,
   normalizeContactCandidate,
 } from "@/lib/growth/contact-discovery/contact-normalizer"
+import { buildContactDiscoveryProviderOutcomes } from "@/lib/growth/contact-discovery/contact-discovery-provider-outcomes"
 import { probeGrowthContactDiscoverySchema } from "@/lib/growth/contact-discovery/contact-schema-health"
 
 function asString(value: unknown): string {
@@ -174,6 +175,8 @@ export async function runContactDiscoveryForCompany(
     contacts: [],
     buying_committee: null,
     provider_messages: [],
+    provider_outcomes: [],
+    persistence_error: null,
     privacy_note: GROWTH_CONTACT_DISCOVERY_PRIVACY_NOTE,
   }
 
@@ -187,6 +190,7 @@ export async function runContactDiscoveryForCompany(
       ...base,
       schema_ready: true,
       provider_messages: ["Company candidate not found."],
+      provider_outcomes: [],
     }
   }
 
@@ -270,7 +274,23 @@ export async function runContactDiscoveryForCompany(
     .single()
 
   if (runError || !runRow) {
-    return { ...base, schema_ready: true, provider_messages }
+    const runPersistenceError = runError?.message ?? "Failed to insert contact_discovery_runs."
+    const provider_outcomes = buildContactDiscoveryProviderOutcomes({
+      provider_results: providerResults,
+      persisted_by_provider: {},
+      run_persistence_error: runPersistenceError,
+    })
+    logAcquisitionStep("runContactDiscoveryForCompany_persistence_failed", {
+      companyId: ctx.company_candidate_id,
+      error: runPersistenceError,
+    })
+    return {
+      ...base,
+      schema_ready: true,
+      provider_messages,
+      provider_outcomes,
+      persistence_error: runPersistenceError,
+    }
   }
 
   const runId = asString((runRow as Record<string, unknown>).id)
@@ -300,6 +320,7 @@ export async function runContactDiscoveryForCompany(
   })
 
   let stored: GrowthContactCandidate[] = []
+  let candidatesPersistenceError: string | null = null
 
   if (inserts.length) {
     const { data: inserted, error: insertError } = await admin
@@ -309,10 +330,24 @@ export async function runContactDiscoveryForCompany(
       .select(
         "id, created_at, updated_at, company_candidate_id, provider_name, provider_type, full_name, first_name, last_name, job_title, department, seniority, linkedin_url, email, phone, verification_state, confidence, source_attribution, evidence, dedupe_hash, metadata",
       )
-    if (!insertError && inserted?.length) {
+    if (insertError) {
+      candidatesPersistenceError = insertError.message
+    } else if (inserted?.length) {
       stored = inserted.map((r) => rowToContact(r as Record<string, unknown>))
     }
   }
+
+  const persistedByProvider: Record<string, number> = {}
+  for (const contact of stored) {
+    persistedByProvider[contact.provider_name] =
+      (persistedByProvider[contact.provider_name] ?? 0) + 1
+  }
+
+  const provider_outcomes = buildContactDiscoveryProviderOutcomes({
+    provider_results: providerResults,
+    persisted_by_provider: persistedByProvider,
+    candidates_persistence_error: candidatesPersistenceError,
+  })
 
   const { data: prior } = await admin
     .schema("growth")
@@ -344,6 +379,10 @@ export async function runContactDiscoveryForCompany(
     .update({
       candidate_count: allContacts.length,
       updated_at: new Date().toISOString(),
+      metadata: {
+        qa_marker: GROWTH_CONTACT_DISCOVERY_QA_MARKER,
+        provider_outcomes,
+      },
     })
     .eq("id", runId)
 
@@ -351,6 +390,7 @@ export async function runContactDiscoveryForCompany(
   logAcquisitionStep("runContactDiscoveryForCompany_done", {
     companyId: ctx.company_candidate_id,
     contact_count: allContacts.length,
+    provider_outcomes,
   })
   return {
     qa_marker: GROWTH_CONTACT_DISCOVERY_QA_MARKER,
@@ -376,6 +416,8 @@ export async function runContactDiscoveryForCompany(
     contacts: allContacts,
     buying_committee,
     provider_messages,
+    provider_outcomes,
+    persistence_error: candidatesPersistenceError,
     privacy_note: GROWTH_CONTACT_DISCOVERY_PRIVACY_NOTE,
   }
 }
@@ -396,6 +438,8 @@ export async function loadContactDiscoverySnapshot(
       contacts: [],
       buying_committee: null,
       provider_messages: [],
+      provider_outcomes: [],
+      persistence_error: null,
       privacy_note: GROWTH_CONTACT_DISCOVERY_PRIVACY_NOTE,
     }
   }
@@ -428,6 +472,8 @@ export async function loadContactDiscoverySnapshot(
     contacts: mapped,
     buying_committee,
     provider_messages: [],
+    provider_outcomes: [],
+    persistence_error: null,
     privacy_note: GROWTH_CONTACT_DISCOVERY_PRIVACY_NOTE,
   }
 }

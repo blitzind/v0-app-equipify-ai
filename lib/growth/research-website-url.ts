@@ -33,6 +33,12 @@ function decodeBasicEntities(value: string): string {
     .replace(/&#39;/gi, "'")
 }
 
+/** Returns the crawl-ready URL string, or null when skipped/invalid. */
+export function resolveReadyLeadWebsiteUrl(raw: string | null | undefined): string | null {
+  const normalized = normalizeLeadWebsite(raw)
+  return normalized.status === "ready" ? normalized.url : null
+}
+
 export function normalizeLeadWebsite(raw: string | null | undefined): NormalizeLeadWebsiteResult {
   const trimmed = raw?.trim()
   if (!trimmed) return { status: "skipped", url: null }

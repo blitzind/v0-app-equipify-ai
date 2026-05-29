@@ -1,5 +1,6 @@
 /** Bulk contact acquisition — types and constants. Client-safe. */
 
+import type { GrowthContactDiscoveryProviderOutcome } from "@/lib/growth/contact-discovery/contact-discovery-provider-outcomes"
 import type { GrowthRealWorldDiscoverySearchInputs } from "@/lib/growth/real-world-discovery/real-world-discovery-query-builder"
 
 export const GROWTH_BULK_ACQUISITION_QA_MARKER = "growth-bulk-acquisition-v1" as const
@@ -154,6 +155,9 @@ export type GrowthBulkAcquisitionCompanyArtifact = {
   location: string | null
   query: string | null
   contacts_processed: boolean
+  contacts_processed_at: string | null
+  provider_outcomes: GrowthContactDiscoveryProviderOutcome[]
+  contact_discovery_persistence_error: string | null
   created_at: string
 }
 

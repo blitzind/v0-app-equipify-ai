@@ -4,7 +4,7 @@ import "server-only"
 
 import { createHash } from "node:crypto"
 import { fetchLeadWebsite } from "@/lib/growth/research-website-fetch"
-import { normalizeLeadWebsite } from "@/lib/growth/research-website-url"
+import { resolveReadyLeadWebsiteUrl } from "@/lib/growth/research-website-url"
 import { extractAboutPageContacts } from "@/lib/growth/contact-discovery/extract/extract-about-page"
 import { extractContactPageContacts } from "@/lib/growth/contact-discovery/extract/extract-contact-page"
 import { extractFooterContacts } from "@/lib/growth/contact-discovery/extract/extract-footer"
@@ -106,8 +106,8 @@ function buildDiagnostics(input: {
 }
 
 export async function discoverWebsiteContacts(rawWebsite: string | null | undefined): Promise<WebsiteContactDiscoveryResult> {
-  const normalized = normalizeLeadWebsite(rawWebsite ?? "")
-  if (!normalized) {
+  const websiteUrl = resolveReadyLeadWebsiteUrl(rawWebsite ?? "")
+  if (!websiteUrl) {
     const diagnostics = buildDiagnostics({
       pages_crawled: [],
       pages_skipped: [],
@@ -140,21 +140,21 @@ export async function discoverWebsiteContacts(rawWebsite: string | null | undefi
   let companyDomain: string | null = null
 
   try {
-    companyDomain = new URL(normalized).hostname.replace(/^www\./, "")
+    companyDomain = new URL(websiteUrl).hostname.replace(/^www\./, "")
   } catch {
     companyDomain = null
   }
 
-  const homepageFetch = await fetchLeadWebsite(normalized)
+  const homepageFetch = await fetchLeadWebsite(websiteUrl)
   if (homepageFetch.status === "ok" && homepageFetch.excerpt) {
     homepageHtml = homepageFetch.excerpt
     linkedinCompanyUrls = extractLinkedInCompanyReferences(homepageHtml)
   } else {
-    messages.push(`${normalized}: homepage fetch ${homepageFetch.status}`)
+    messages.push(`${websiteUrl}: homepage fetch ${homepageFetch.status}`)
   }
 
   try {
-    const origin = new URL(normalized).origin
+    const origin = new URL(websiteUrl).origin
     const sitemapFetch = await fetchLeadWebsite(`${origin}/sitemap.xml`)
     if (sitemapFetch.status === "ok" && sitemapFetch.excerpt) {
       sitemapXml = sitemapFetch.excerpt
@@ -164,11 +164,13 @@ export async function discoverWebsiteContacts(rawWebsite: string | null | undefi
   }
 
   const crawlPlan = planWebsiteCrawlUrls({
-    websiteUrl: normalized,
+    websiteUrl,
     homepageHtml,
     sitemapXml,
     maxPages: DEFAULT_WEBSITE_CRAWL_MAX_PAGES,
   })
+
+  const websiteUrlNoTrailingSlash = websiteUrl.replace(/\/$/, "")
 
   for (const entry of crawlPlan) {
     if (entry.depth > 0 && pages_crawled.length >= DEFAULT_WEBSITE_CRAWL_MAX_PAGES) {
@@ -176,7 +178,8 @@ export async function discoverWebsiteContacts(rawWebsite: string | null | undefi
       continue
     }
 
-    let html = entry.url === normalized.replace(/\/$/, "") || entry.url === normalized ? homepageHtml : null
+    let html =
+      entry.url === websiteUrlNoTrailingSlash || entry.url === websiteUrl ? homepageHtml : null
     if (!html) {
       try {
         const fetch = await fetchLeadWebsite(entry.url)
@@ -232,7 +235,7 @@ export async function discoverWebsiteContacts(rawWebsite: string | null | undefi
   })
 
   return {
-    website_url: normalized,
+    website_url: websiteUrl,
     pages_crawled,
     contacts: enriched,
     messages: [

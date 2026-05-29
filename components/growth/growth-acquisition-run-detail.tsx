@@ -16,6 +16,7 @@ import type {
   GrowthBulkAcquisitionRun,
   GrowthBulkAcquisitionTickLogEntry,
 } from "@/lib/growth/acquisition/acquisition-types"
+import { formatProviderOutcomeSummary } from "@/lib/growth/contact-discovery/contact-discovery-provider-outcomes"
 import { phaseLabel, statusLabel } from "@/lib/growth/acquisition/acquisition-types"
 
 const ARTIFACT_TABS: Array<{ id: GrowthBulkAcquisitionArtifactView; label: string }> = [
@@ -302,16 +303,7 @@ export function GrowthAcquisitionRunDetail({ runId }: { runId: string }) {
             Loading {artifactView}…
           </div>
         ) : artifactView === "companies" ? (
-          <ArtifactTable
-            empty="No companies discovered yet."
-            rows={companies.map((row) => ({
-              key: row.id,
-              primary: row.company_name,
-              secondary: [row.city, row.state].filter(Boolean).join(", ") || row.location || "—",
-              meta: row.contacts_processed ? "Contacts processed" : "Pending contact discovery",
-              href: row.website ?? undefined,
-            }))}
-          />
+          <CompaniesArtifactTable companies={companies} />
         ) : artifactView === "contacts" ? (
           <ArtifactTable
             empty="No contacts discovered yet."
@@ -345,6 +337,73 @@ export function GrowthAcquisitionRunDetail({ runId }: { runId: string }) {
           />
         )}
       </GrowthEngineCard>
+    </div>
+  )
+}
+
+function CompaniesArtifactTable({
+  companies,
+}: {
+  companies: GrowthBulkAcquisitionCompanyArtifact[]
+}) {
+  if (companies.length === 0) {
+    return <p className="text-sm text-muted-foreground">No companies discovered yet.</p>
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-sm">
+        <thead>
+          <tr className="border-b border-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <th className="px-2 py-2">Company</th>
+            <th className="px-2 py-2">Location</th>
+            <th className="px-2 py-2">Contact discovery</th>
+          </tr>
+        </thead>
+        <tbody>
+          {companies.map((row) => (
+            <tr key={row.id} className="border-b border-border/40 align-top">
+              <td className="px-2 py-2 font-medium text-foreground">
+                {row.website ? (
+                  <a href={row.website} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                    {row.company_name}
+                  </a>
+                ) : (
+                  row.company_name
+                )}
+                <p className="mt-0.5 text-xs font-normal text-muted-foreground">
+                  {row.contacts_processed
+                    ? `Processed ${formatWhen(row.contacts_processed_at)}`
+                    : "Pending contact discovery"}
+                </p>
+              </td>
+              <td className="px-2 py-2 text-muted-foreground">
+                {[row.city, row.state].filter(Boolean).join(", ") || row.location || "—"}
+              </td>
+              <td className="px-2 py-2 text-muted-foreground">
+                {!row.contacts_processed ? (
+                  "—"
+                ) : row.provider_outcomes.length > 0 ? (
+                  <ul className="space-y-1">
+                    {row.provider_outcomes.map((outcome) => (
+                      <li key={`${row.id}-${outcome.provider}`} className="text-xs text-foreground">
+                        {formatProviderOutcomeSummary(outcome)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span className="text-xs">Processed — no provider outcome recorded</span>
+                )}
+                {row.contact_discovery_persistence_error ? (
+                  <p className="mt-1 text-xs text-destructive">
+                    Persistence: {row.contact_discovery_persistence_error}
+                  </p>
+                ) : null}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
