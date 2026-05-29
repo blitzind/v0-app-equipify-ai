@@ -8,11 +8,16 @@ import {
   GROWTH_BULK_ACQUISITION_COMPANY_SCAN_BATCH,
   GROWTH_BULK_ACQUISITION_DEFAULT_QUERY_LIMIT,
   GROWTH_BULK_ACQUISITION_QA_MARKER,
+  type GrowthBulkAcquisitionArtifactView,
+  type GrowthBulkAcquisitionCompanyArtifact,
+  type GrowthBulkAcquisitionContactArtifact,
   type GrowthBulkAcquisitionKeysetCursor,
+  type GrowthBulkAcquisitionLeadArtifact,
   type GrowthBulkAcquisitionPhase,
   type GrowthBulkAcquisitionRun,
   type GrowthBulkAcquisitionRunState,
   type GrowthBulkAcquisitionRunStatus,
+  type GrowthBulkAcquisitionTickLogEntry,
 } from "@/lib/growth/acquisition/acquisition-types"
 import type { GrowthRealWorldDiscoverySearchInputs } from "@/lib/growth/real-world-discovery/real-world-discovery-query-builder"
 import { isGrowthRealWorldDiscoverySchemaReady } from "@/lib/growth/real-world-discovery/real-world-discovery-schema-health"
@@ -28,6 +33,21 @@ function parseKeysetCursor(value: unknown): GrowthBulkAcquisitionKeysetCursor | 
   const id = asString(row.id)
   if (!created_at || !id) return null
   return { created_at, id }
+}
+
+function parseTickLogEntry(value: unknown): GrowthBulkAcquisitionTickLogEntry | null {
+  if (!value || typeof value !== "object") return null
+  const row = value as Record<string, unknown>
+  const at = asString(row.at)
+  const phase = asString(row.phase) as GrowthBulkAcquisitionPhase
+  if (!at || !phase) return null
+  return {
+    at,
+    phase,
+    actions: Array.isArray(row.actions) ? row.actions.map(String) : [],
+    duration_ms: Number(row.duration_ms ?? 0),
+    done: Boolean(row.done),
+  }
 }
 
 function parseAcquisitionState(metadata: Record<string, unknown>): GrowthBulkAcquisitionRunState | null {
@@ -98,6 +118,14 @@ function parseAcquisitionState(metadata: Record<string, unknown>): GrowthBulkAcq
     contact_discovery_exhausted: Boolean(state.contact_discovery_exhausted),
     verify_company_scan_cursor: parseKeysetCursor(state.verify_company_scan_cursor),
     promote_company_scan_cursor: parseKeysetCursor(state.promote_company_scan_cursor),
+    paused: Boolean(state.paused),
+    paused_at: asString(state.paused_at) || null,
+    last_tick: parseTickLogEntry(state.last_tick),
+    recent_ticks: Array.isArray(state.recent_ticks)
+      ? state.recent_ticks
+          .map((entry) => parseTickLogEntry(entry))
+          .filter((entry): entry is GrowthBulkAcquisitionTickLogEntry => entry !== null)
+      : [],
     last_tick_at: asString(state.last_tick_at) || null,
     last_error: asString(state.last_error) || null,
   }
@@ -239,7 +267,7 @@ export async function listRunnableBulkAcquisitionRuns(
   return (data ?? [])
     .map((row) => rowToAcquisitionRun(row as Record<string, unknown>))
     .filter((run): run is GrowthBulkAcquisitionRun => run !== null)
-    .filter((run) => run.state.phase !== "done" && run.status !== "completed")
+    .filter((run) => run.state.phase !== "done" && run.status !== "completed" && !run.state.paused)
     .slice(0, limit)
 }
 
@@ -481,4 +509,251 @@ export async function markCompanyContactsProcessed(
       updated_at: new Date().toISOString(),
     })
     .eq("id", input.company_candidate_id)
+}
+
+export async function setBulkAcquisitionRunPaused(
+  admin: SupabaseClient,
+  runId: string,
+  paused: boolean,
+): Promise<GrowthBulkAcquisitionRun | null> {
+  const run = await loadBulkAcquisitionRun(admin, runId)
+  if (!run) return null
+  if (run.state.phase === "done" || run.status === "completed") return run
+
+  const state: GrowthBulkAcquisitionRunState = {
+    ...run.state,
+    paused,
+    paused_at: paused ? new Date().toISOString() : null,
+  }
+
+  return saveBulkAcquisitionRunState(admin, runId, {
+    state,
+    status: paused ? run.status : run.status === "partial" ? "running" : run.status,
+  })
+}
+
+export async function listAcquisitionRunArtifacts(
+  admin: SupabaseClient,
+  input: {
+    child_run_ids: string[]
+    view: GrowthBulkAcquisitionArtifactView
+    cursor?: GrowthBulkAcquisitionKeysetCursor | null
+    limit?: number
+  },
+): Promise<{
+  view: GrowthBulkAcquisitionArtifactView
+  items: GrowthBulkAcquisitionCompanyArtifact[] | GrowthBulkAcquisitionContactArtifact[] | GrowthBulkAcquisitionLeadArtifact[]
+  cursor: GrowthBulkAcquisitionKeysetCursor | null
+  exhausted: boolean
+}> {
+  const limit = Math.min(Math.max(input.limit ?? 25, 1), 100)
+  if (input.child_run_ids.length === 0) {
+    return { view: input.view, items: [], cursor: input.cursor ?? null, exhausted: true }
+  }
+
+  if (input.view === "companies") {
+    let query = admin
+      .schema("growth")
+      .from("real_world_company_candidates")
+      .select("id, company_name, website, domain, city, state, location, query, metadata, created_at")
+      .in("run_id", input.child_run_ids)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(limit)
+
+    if (input.cursor) {
+      query = query.or(
+        `created_at.lt.${input.cursor.created_at},and(created_at.eq.${input.cursor.created_at},id.lt.${input.cursor.id})`,
+      )
+    }
+
+    const { data } = await query
+    const rows = data ?? []
+    const items: GrowthBulkAcquisitionCompanyArtifact[] = rows.map((row) => {
+      const r = row as Record<string, unknown>
+      const metadata =
+        r.metadata && typeof r.metadata === "object" ? (r.metadata as Record<string, unknown>) : {}
+      return {
+        id: asString(r.id),
+        company_name: asString(r.company_name),
+        website: asString(r.website) || null,
+        domain: asString(r.domain) || null,
+        city: asString(r.city) || null,
+        state: asString(r.state) || null,
+        location: asString(r.location) || null,
+        query: asString(r.query) || null,
+        contacts_processed: companyContactsProcessed(metadata),
+        created_at: asString(r.created_at),
+      }
+    })
+
+    const last = rows[rows.length - 1] as Record<string, unknown> | undefined
+    return {
+      view: input.view,
+      items,
+      cursor: last
+        ? { created_at: asString(last.created_at), id: asString(last.id) }
+        : input.cursor ?? null,
+      exhausted: rows.length < limit,
+    }
+  }
+
+  const contactRows = await loadAcquisitionContactArtifactPage(admin, {
+    child_run_ids: input.child_run_ids,
+    cursor: input.cursor,
+    limit,
+    verified_only: input.view === "verified",
+    leads_only: input.view === "leads",
+  })
+
+  if (input.view === "leads") {
+    return {
+      view: input.view,
+      items: contactRows.items.filter(
+        (item): item is GrowthBulkAcquisitionLeadArtifact => "lead_id" in item,
+      ),
+      cursor: contactRows.cursor,
+      exhausted: contactRows.exhausted,
+    }
+  }
+
+  return {
+    view: input.view,
+    items: contactRows.items.filter(
+      (item): item is GrowthBulkAcquisitionContactArtifact => "email_status" in item,
+    ),
+    cursor: contactRows.cursor,
+    exhausted: contactRows.exhausted,
+  }
+}
+
+async function loadAcquisitionContactArtifactPage(
+  admin: SupabaseClient,
+  input: {
+    child_run_ids: string[]
+    cursor?: GrowthBulkAcquisitionKeysetCursor | null
+    limit: number
+    verified_only: boolean
+    leads_only: boolean
+  },
+): Promise<{
+  items: Array<GrowthBulkAcquisitionContactArtifact | GrowthBulkAcquisitionLeadArtifact>
+  cursor: GrowthBulkAcquisitionKeysetCursor | null
+  exhausted: boolean
+}> {
+  const items: Array<GrowthBulkAcquisitionContactArtifact | GrowthBulkAcquisitionLeadArtifact> = []
+  let cursor = input.cursor ?? null
+  let exhausted = false
+  const companyNameById = new Map<string, string>()
+
+  while (items.length < input.limit) {
+    let companyQuery = admin
+      .schema("growth")
+      .from("real_world_company_candidates")
+      .select("id, company_name, created_at")
+      .in("run_id", input.child_run_ids)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(GROWTH_BULK_ACQUISITION_COMPANY_SCAN_BATCH)
+
+    if (cursor) {
+      companyQuery = companyQuery.or(
+        `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,
+      )
+    }
+
+    const { data: companyRows } = await companyQuery
+    const companies = companyRows ?? []
+    if (companies.length === 0) {
+      exhausted = true
+      break
+    }
+
+    for (const company of companies) {
+      const row = company as Record<string, unknown>
+      companyNameById.set(asString(row.id), asString(row.company_name))
+    }
+
+    const companyIds = companies
+      .map((row) => asString((row as Record<string, unknown>).id))
+      .filter(Boolean)
+
+    let contactQuery = admin
+      .schema("growth")
+      .from("company_contacts")
+      .select(
+        "id, company_id, full_name, title, email, email_status, growth_lead_id, metadata, created_at",
+      )
+      .in("company_id", companyIds)
+      .neq("contact_status", "archived")
+      .neq("contact_status", "suppressed")
+      .order("created_at", { ascending: false })
+      .limit(input.limit - items.length)
+
+    if (input.leads_only) {
+      contactQuery = contactQuery.not("growth_lead_id", "is", null)
+    } else if (input.verified_only) {
+      contactQuery = contactQuery.eq("email_status", "verified")
+    }
+
+    const { data: contactData } = await contactQuery
+    for (const contactRow of contactData ?? []) {
+      const contact = contactRow as Record<string, unknown>
+      const metadata =
+        contact.metadata && typeof contact.metadata === "object"
+          ? (contact.metadata as Record<string, unknown>)
+          : {}
+      const emailVerification =
+        metadata.email_verification && typeof metadata.email_verification === "object"
+          ? (metadata.email_verification as Record<string, unknown>)
+          : {}
+      const verifiedByProvider = emailVerification.verified_by_provider === true
+      if (input.verified_only && !verifiedByProvider) continue
+
+      const companyId = asString(contact.company_id)
+      const companyName = companyNameById.get(companyId) ?? "Unknown company"
+      const growthLeadId = asString(contact.growth_lead_id) || null
+
+      if (input.leads_only && growthLeadId) {
+        items.push({
+          contact_id: asString(contact.id),
+          lead_id: growthLeadId,
+          company_name: companyName,
+          full_name: asString(contact.full_name),
+          email: asString(contact.email) || null,
+          title: asString(contact.title) || null,
+          created_at: asString(contact.created_at),
+        })
+      } else if (!input.leads_only) {
+        items.push({
+          id: asString(contact.id),
+          company_id: companyId,
+          company_name: companyName,
+          full_name: asString(contact.full_name),
+          title: asString(contact.title) || null,
+          email: asString(contact.email) || null,
+          email_status: asString(contact.email_status),
+          verified_by_provider: verifiedByProvider,
+          growth_lead_id: growthLeadId,
+          created_at: asString(contact.created_at),
+        })
+      }
+
+      if (items.length >= input.limit) break
+    }
+
+    const lastCompany = companies[companies.length - 1] as Record<string, unknown>
+    cursor = {
+      created_at: asString(lastCompany.created_at),
+      id: asString(lastCompany.id),
+    }
+
+    if (companies.length < GROWTH_BULK_ACQUISITION_COMPANY_SCAN_BATCH) {
+      exhausted = true
+      break
+    }
+    if (items.length >= input.limit) break
+  }
+
+  return { items, cursor, exhausted }
 }

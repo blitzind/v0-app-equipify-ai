@@ -19,11 +19,13 @@ import {
   GROWTH_BULK_ACQUISITION_COMPANIES_PER_TICK,
   GROWTH_BULK_ACQUISITION_PROMOTE_PER_TICK,
   GROWTH_BULK_ACQUISITION_QA_MARKER,
+  GROWTH_BULK_ACQUISITION_TICK_LOG_MAX,
   GROWTH_BULK_ACQUISITION_VERIFY_PER_TICK,
   GROWTH_BULK_ACQUISITION_ZERO_DISCOVERY_STOP,
   type GrowthBulkAcquisitionPhase,
   type GrowthBulkAcquisitionRun,
   type GrowthBulkAcquisitionTickResult,
+  type GrowthBulkAcquisitionTickLogEntry,
 } from "@/lib/growth/acquisition/acquisition-types"
 import { promoteVerifiedContactsBatch } from "@/lib/growth/acquisition/promote-verified-contact-to-lead"
 import {
@@ -110,6 +112,17 @@ function markDiscoveryExhausted(state: GrowthBulkAcquisitionRun["state"]): Growt
     ...state,
     discovery_exhausted: true,
     phase: "discover_contacts",
+  }
+}
+
+function appendTickLog(
+  state: GrowthBulkAcquisitionRun["state"],
+  entry: GrowthBulkAcquisitionTickLogEntry,
+): GrowthBulkAcquisitionRun["state"] {
+  return {
+    ...state,
+    last_tick: entry,
+    recent_ticks: [entry, ...(state.recent_ticks ?? [])].slice(0, GROWTH_BULK_ACQUISITION_TICK_LOG_MAX),
   }
 }
 
@@ -534,6 +547,15 @@ export async function tickBulkAcquisitionRun(
       tick_duration_ms: 0,
     }
   }
+  if (run.state.paused) {
+    return {
+      run,
+      phase: run.state.phase,
+      tick_actions: ["paused"],
+      done: false,
+      tick_duration_ms: 0,
+    }
+  }
 
   const tickStartedMs = Date.now()
 
@@ -559,16 +581,26 @@ export async function tickBulkAcquisitionRun(
     }
 
     const tickDurationMs = Date.now() - tickStartedMs
-    const state = {
-      ...result.run.state,
-      metrics: {
-        ...result.run.state.metrics,
-        ticks_completed: result.run.state.metrics.ticks_completed + 1,
-        last_tick_duration_ms: tickDurationMs,
-        total_tick_duration_ms: result.run.state.metrics.total_tick_duration_ms + tickDurationMs,
-      },
-      last_tick_at: new Date().toISOString(),
+    const tickEntry: GrowthBulkAcquisitionTickLogEntry = {
+      at: new Date().toISOString(),
+      phase: result.run.state.phase,
+      actions: result.actions,
+      duration_ms: tickDurationMs,
+      done: result.done ?? result.run.state.phase === "done",
     }
+    const state = appendTickLog(
+      {
+        ...result.run.state,
+        metrics: {
+          ...result.run.state.metrics,
+          ticks_completed: result.run.state.metrics.ticks_completed + 1,
+          last_tick_duration_ms: tickDurationMs,
+          total_tick_duration_ms: result.run.state.metrics.total_tick_duration_ms + tickDurationMs,
+        },
+        last_tick_at: new Date().toISOString(),
+      },
+      tickEntry,
+    )
 
     const saved =
       (await saveBulkAcquisitionRunState(admin, runId, {
@@ -587,16 +619,26 @@ export async function tickBulkAcquisitionRun(
   } catch (error) {
     const message = error instanceof Error ? error.message : "tick_failed"
     const tickDurationMs = Date.now() - tickStartedMs
-    const state = {
-      ...run.state,
-      last_error: message,
-      metrics: {
-        ...run.state.metrics,
-        ticks_completed: run.state.metrics.ticks_completed + 1,
-        last_tick_duration_ms: tickDurationMs,
-        total_tick_duration_ms: run.state.metrics.total_tick_duration_ms + tickDurationMs,
-      },
+    const tickEntry: GrowthBulkAcquisitionTickLogEntry = {
+      at: new Date().toISOString(),
+      phase: run.state.phase,
+      actions: [`error:${message}`],
+      duration_ms: tickDurationMs,
+      done: false,
     }
+    const state = appendTickLog(
+      {
+        ...run.state,
+        last_error: message,
+        metrics: {
+          ...run.state.metrics,
+          ticks_completed: run.state.metrics.ticks_completed + 1,
+          last_tick_duration_ms: tickDurationMs,
+          total_tick_duration_ms: run.state.metrics.total_tick_duration_ms + tickDurationMs,
+        },
+      },
+      tickEntry,
+    )
     const saved = await saveBulkAcquisitionRunState(admin, runId, { state, status: "partial" })
     logGrowthEngine("acquisition_tick_failed", { runId, message })
     return {

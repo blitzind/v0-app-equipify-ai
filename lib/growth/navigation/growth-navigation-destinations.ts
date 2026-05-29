@@ -111,6 +111,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["discover", "prospect", "icp", "search", "companies", "apollo", "seamless"],
   },
   {
+    id: "acquisition-runs",
+    label: "Acquisition Runs",
+    href: "/admin/growth/acquisition",
+    keywords: ["bulk acquisition", "discovery", "contacts", "verification", "leads"],
+  },
+  {
     id: "intent-pixel",
     label: "Intent Signals",
     href: "/admin/growth/intent-pixel",
@@ -390,6 +396,12 @@ export const GROWTH_NAV_QUICK_ACTIONS_SECONDARY: GrowthNavigationQuickAction[] =
     href: "/admin/growth/imports",
     keywords: ["csv", "upload", "imports"],
   },
+  {
+    id: "acquisition-runs",
+    label: "Acquisition Runs",
+    href: "/admin/growth/acquisition",
+    keywords: ["bulk acquisition", "discovery", "contacts"],
+  },
 ]
 
 export const GROWTH_COMMAND_PALETTE_ENTRIES: GrowthCommandPaletteEntry[] = [
@@ -506,6 +518,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         label: "Imports",
         consoleKey: "imports",
         match: prefixMatch("/admin/growth/imports"),
+      },
+      {
+        id: "acquisition-runs",
+        href: "/admin/growth/acquisition",
+        label: "Acquisition Runs",
+        match: prefixMatch("/admin/growth/acquisition"),
       },
       {
         id: "committee-mapping",

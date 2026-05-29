@@ -76,4 +76,17 @@ assert.match(routeSource, /requireGrowthEnginePlatformAccess/)
 const vercelSource = fs.readFileSync(path.join(root, "vercel.json"), "utf8")
 assert.match(vercelSource, /growth-acquisition-worker/)
 
+const adminPageSource = fs.readFileSync(
+  path.join(root, "app/(admin)/admin/growth/acquisition/page.tsx"),
+  "utf8",
+)
+assert.match(adminPageSource, /GrowthAcquisitionRunsDashboard/)
+assert.match(adminPageSource, /Acquisition Runs/)
+
+const detailPageSource = fs.readFileSync(
+  path.join(root, "app/(admin)/admin/growth/acquisition/[runId]/page.tsx"),
+  "utf8",
+)
+assert.match(detailPageSource, /GrowthAcquisitionRunDetail/)
+
 console.log("growth-bulk-acquisition regression checks passed")

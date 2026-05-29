@@ -90,6 +90,10 @@ export type GrowthBulkAcquisitionRunState = {
   contact_discovery_exhausted: boolean
   verify_company_scan_cursor: GrowthBulkAcquisitionKeysetCursor | null
   promote_company_scan_cursor: GrowthBulkAcquisitionKeysetCursor | null
+  paused: boolean
+  paused_at: string | null
+  last_tick: GrowthBulkAcquisitionTickLogEntry | null
+  recent_ticks: GrowthBulkAcquisitionTickLogEntry[]
   last_tick_at: string | null
   last_error: string | null
 }
@@ -113,6 +117,61 @@ export type GrowthBulkAcquisitionTickResult = {
   done: boolean
   tick_duration_ms: number
 }
+
+export type GrowthBulkAcquisitionTickLogEntry = {
+  at: string
+  phase: GrowthBulkAcquisitionPhase
+  actions: string[]
+  duration_ms: number
+  done: boolean
+}
+
+export const GROWTH_BULK_ACQUISITION_TICK_LOG_MAX = 30
+
+export type GrowthBulkAcquisitionCompanyArtifact = {
+  id: string
+  company_name: string
+  website: string | null
+  domain: string | null
+  city: string | null
+  state: string | null
+  location: string | null
+  query: string | null
+  contacts_processed: boolean
+  created_at: string
+}
+
+export type GrowthBulkAcquisitionContactArtifact = {
+  id: string
+  company_id: string
+  company_name: string
+  full_name: string
+  title: string | null
+  email: string | null
+  email_status: string
+  verified_by_provider: boolean
+  growth_lead_id: string | null
+  created_at: string
+}
+
+export type GrowthBulkAcquisitionLeadArtifact = {
+  contact_id: string
+  lead_id: string
+  company_name: string
+  full_name: string
+  email: string | null
+  title: string | null
+  created_at: string
+}
+
+export type GrowthBulkAcquisitionArtifactView = "companies" | "contacts" | "verified" | "leads"
+
+export const GROWTH_BULK_ACQUISITION_ARTIFACT_VIEWS = [
+  "companies",
+  "contacts",
+  "verified",
+  "leads",
+] as const satisfies readonly GrowthBulkAcquisitionArtifactView[]
 
 export type PromoteVerifiedContactOutcome =
   | { status: "created"; leadId: string; decisionMakerId: string; companyContactId: string }
@@ -176,7 +235,43 @@ export function emptyAcquisitionRunState(
     contact_discovery_exhausted: false,
     verify_company_scan_cursor: null,
     promote_company_scan_cursor: null,
+    paused: false,
+    paused_at: null,
+    last_tick: null,
+    recent_ticks: [],
     last_tick_at: null,
     last_error: null,
+  }
+}
+
+export function phaseLabel(phase: GrowthBulkAcquisitionPhase): string {
+  switch (phase) {
+    case "discover_companies":
+      return "Discover companies"
+    case "discover_contacts":
+      return "Discover contacts"
+    case "verify_contacts":
+      return "Verify contacts"
+    case "promote_leads":
+      return "Promote leads"
+    case "done":
+      return "Done"
+    default:
+      return phase
+  }
+}
+
+export function statusLabel(status: GrowthBulkAcquisitionRunStatus): string {
+  switch (status) {
+    case "running":
+      return "Running"
+    case "completed":
+      return "Completed"
+    case "partial":
+      return "Partial"
+    case "failed":
+      return "Failed"
+    default:
+      return status
   }
 }
