@@ -231,8 +231,8 @@ export function buildLiveProviderFallbackQueries(
 
   const primaryKeys = new Set(primaryQueries.map((q) => q.toLowerCase()))
   const withLocation = uniqueQueries(phrases.map((p) => appendLocation(stripCompaniesSuffix(p), location)))
-  const fallback = withLocation.filter((q) => !primaryKeys.has(q.toLowerCase()))
-  return fallback.slice(0, LIVE_PROVIDER_FALLBACK_QUERY_MAX)
+  const dedupedFallbackQueries = withLocation.filter((q) => !primaryKeys.has(q.toLowerCase()))
+  return dedupedFallbackQueries.slice(0, LIVE_PROVIDER_FALLBACK_QUERY_MAX)
 }
 
 export function planLiveProviderQueryBatches(

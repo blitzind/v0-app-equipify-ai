@@ -8,6 +8,13 @@ import {
   currentAcquisitionGeoTile,
 } from "@/lib/growth/acquisition/acquisition-geographic-expansion"
 import {
+  allQueriesExhaustedForTile,
+  currentAcquisitionQuery,
+  discoveryComplete,
+  repairAcquisitionRunPhase,
+  resolveNextPhase,
+} from "@/lib/growth/acquisition/acquisition-query-phase"
+import {
   createBulkAcquisitionRun,
   listCompaniesPendingContactDiscovery,
   loadAcquisitionDedupeHashes,
@@ -22,7 +29,6 @@ import {
   GROWTH_BULK_ACQUISITION_TICK_LOG_MAX,
   GROWTH_BULK_ACQUISITION_VERIFY_PER_TICK,
   GROWTH_BULK_ACQUISITION_ZERO_DISCOVERY_STOP,
-  type GrowthBulkAcquisitionPhase,
   type GrowthBulkAcquisitionRun,
   type GrowthBulkAcquisitionTickResult,
   type GrowthBulkAcquisitionTickLogEntry,
@@ -45,38 +51,6 @@ import {
 } from "@/lib/growth/real-world-discovery/live-provider-query-expansion"
 import type { GrowthRealWorldDiscoverySearchInputs } from "@/lib/growth/real-world-discovery/real-world-discovery-query-builder"
 import { runRealWorldCompanyDiscovery } from "@/lib/growth/real-world-discovery/real-world-discovery-repository"
-
-function resolveNextPhase(state: GrowthBulkAcquisitionRun["state"]): GrowthBulkAcquisitionPhase {
-  const queries = state.use_fallback_queries ? state.query_plan.fallback : state.query_plan.primary
-  if (state.query_index < queries.length) return "discover_companies"
-  return state.phase === "discover_companies" ? "discover_contacts" : state.phase
-}
-
-function allQueriesExhaustedForTile(state: GrowthBulkAcquisitionRun["state"]): boolean {
-  const primaryDone = state.query_index >= state.query_plan.primary.length
-  if (!primaryDone) return false
-  if (state.query_plan.fallback.length === 0) return true
-  if (!state.use_fallback_queries) return false
-  return state.query_index >= state.query_plan.primary.length + state.query_plan.fallback.length
-}
-
-function discoveryComplete(state: GrowthBulkAcquisitionRun["state"]): boolean {
-  if (state.discovery_exhausted) return true
-  if (
-    state.target_company_count != null &&
-    state.stats.companies_discovered >= state.target_company_count
-  ) {
-    return true
-  }
-  return state.geo_tile_index >= state.geo_tiles.length && allQueriesExhaustedForTile(state)
-}
-
-function currentQuery(state: GrowthBulkAcquisitionRun["state"]): string | null {
-  const combined = state.use_fallback_queries
-    ? [...state.query_plan.primary, ...state.query_plan.fallback]
-    : state.query_plan.primary
-  return combined[state.query_index] ?? null
-}
 
 function rebuildQueryPlanForCurrentTile(
   state: GrowthBulkAcquisitionRun["state"],
@@ -161,14 +135,14 @@ async function tickDiscoverCompanies(
     actions.push(`geo_tiles_initialized:${state.geo_tiles.length}`)
   }
 
-  let query = currentQuery(state)
+  let query = currentAcquisitionQuery(state)
   const tileLabel = currentAcquisitionGeoTile(state.geo_tiles, state.geo_tile_index) ?? ""
 
   while (query) {
     const dedupeKey = acquisitionQueryDedupeKey(tileLabel, query)
     if (state.executed_query_keys.includes(dedupeKey)) {
       state.query_index += 1
-      query = currentQuery(state)
+      query = currentAcquisitionQuery(state)
       continue
     }
     break
@@ -179,7 +153,7 @@ async function tickDiscoverCompanies(
       if (!state.use_fallback_queries && state.query_plan.fallback.length > 0) {
         state.use_fallback_queries = true
         actions.push("switched_to_fallback_queries")
-        query = currentQuery(state)
+        query = currentAcquisitionQuery(state)
       }
     }
   }
@@ -536,8 +510,18 @@ export async function tickBulkAcquisitionRun(
   runId: string,
   input?: { created_by?: string | null },
 ): Promise<GrowthBulkAcquisitionTickResult | null> {
-  const run = await loadBulkAcquisitionRun(admin, runId)
-  if (!run) return null
+  const loaded = await loadBulkAcquisitionRun(admin, runId)
+  if (!loaded) return null
+
+  const repairedState = repairAcquisitionRunPhase(loaded.state)
+  const run =
+    repairedState.phase !== loaded.state.phase
+      ? (await saveBulkAcquisitionRunState(admin, runId, {
+          state: repairedState,
+          status: loaded.status === "partial" ? "running" : loaded.status,
+        })) ?? { ...loaded, state: repairedState }
+      : loaded
+
   if (run.state.phase === "done" || run.status === "completed") {
     return {
       run,

@@ -5,8 +5,71 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
+import { planLiveProviderQueryBatches } from "../lib/growth/real-world-discovery/live-provider-query-expansion"
+import {
+  allQueriesExhaustedForTile,
+  companyDiscoveryQueriesRemain,
+  currentAcquisitionQuery,
+  repairAcquisitionRunPhase,
+  resolveNextPhase,
+} from "../lib/growth/acquisition/acquisition-query-phase"
+import { emptyAcquisitionRunState } from "../lib/growth/acquisition/acquisition-types"
 
 const root = process.cwd()
+
+const hvacTennesseeBatches = planLiveProviderQueryBatches({
+  industry: "commercial hvac",
+  location: "Tennessee",
+})
+
+function hvacDiscoveryStateAfterFivePrimaryTicks() {
+  return emptyAcquisitionRunState({
+    search_inputs: { industry: "commercial hvac", location: "Tennessee" },
+    query_plan: hvacTennesseeBatches,
+    limit_per_query: 50,
+    geo_tiles: ["Tennessee"],
+    target_company_count: 100,
+  })
+}
+
+// Regression: 6th discovery tick must run fallback queries, not flip to discover_contacts early.
+{
+  const state = hvacDiscoveryStateAfterFivePrimaryTicks()
+  state.stats.companies_discovered = 50
+  state.query_index = 5
+  state.executed_query_keys = hvacTennesseeBatches.primary.map((q, i) => `tennessee|${q}|${i}`).slice(0, 5)
+
+  assert.equal(currentAcquisitionQuery(state), null)
+  assert.equal(allQueriesExhaustedForTile(state), false)
+  assert.equal(companyDiscoveryQueriesRemain(state), true)
+  assert.equal(resolveNextPhase(state), "discover_companies")
+
+  state.use_fallback_queries = true
+  const sixthQuery = currentAcquisitionQuery(state)
+  assert.ok(sixthQuery)
+  assert.match(sixthQuery, /Tennessee/i)
+  assert.equal(resolveNextPhase({ ...state, query_index: 5, use_fallback_queries: true }), "discover_companies")
+}
+
+// Regression: rewind premature discover_contacts so partial runs resume company discovery.
+{
+  const stuck = hvacDiscoveryStateAfterFivePrimaryTicks()
+  stuck.phase = "discover_contacts"
+  stuck.query_index = 5
+  stuck.stats.companies_discovered = 50
+  const repaired = repairAcquisitionRunPhase(stuck)
+  assert.equal(repaired.phase, "discover_companies")
+}
+
+// Regression: fallback query builder must not throw TDZ (minified "Cannot access 'f' before initialization").
+{
+  for (let i = 0; i < 50; i++) {
+    const batches = planLiveProviderQueryBatches({ industry: "commercial hvac", location: "Tennessee" })
+    assert.equal(batches.primary.length, 5)
+    assert.ok(batches.fallback.length > 0)
+    assert.ok(batches.fallback[0]?.length > 0)
+  }
+}
 
 const typesSource = fs.readFileSync(path.join(root, "lib/growth/acquisition/acquisition-types.ts"), "utf8")
 assert.match(typesSource, /growth-bulk-acquisition-v1/)
@@ -29,6 +92,10 @@ assert.match(repoSource, /applyKeysetCursor/)
 assert.match(repoSource, /listRunnableBulkAcquisitionRuns/)
 
 const runnerSource = fs.readFileSync(path.join(root, "lib/growth/acquisition/bulk-acquisition-runner.ts"), "utf8")
+assert.match(runnerSource, /acquisition-query-phase/)
+assert.match(runnerSource, /repairAcquisitionRunPhase/)
+assert.match(runnerSource, /currentAcquisitionQuery/)
+assert.doesNotMatch(runnerSource, /function resolveNextPhase\(/)
 assert.match(runnerSource, /runRealWorldCompanyDiscovery/)
 assert.match(runnerSource, /runContactDiscoveryForCompany/)
 assert.match(runnerSource, /syncContactCandidatesToCompanyContacts/)
@@ -53,6 +120,13 @@ const cronRouteSource = fs.readFileSync(
 )
 assert.match(cronRouteSource, /growth-acquisition-worker/)
 assert.match(cronRouteSource, /runGrowthCronJob/)
+
+const expansionSource = fs.readFileSync(
+  path.join(root, "lib/growth/real-world-discovery/live-provider-query-expansion.ts"),
+  "utf8",
+)
+assert.match(expansionSource, /dedupedFallbackQueries/)
+assert.doesNotMatch(expansionSource, /const fallback = withLocation/)
 
 const promoteSource = fs.readFileSync(
   path.join(root, "lib/growth/acquisition/promote-verified-contact-to-lead.ts"),
