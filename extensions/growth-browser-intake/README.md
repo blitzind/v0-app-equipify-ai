@@ -1,6 +1,6 @@
-# Equipify Growth Browser Intake (Chrome Extension)
+# Equipify Sales (Chrome Extension)
 
-Manifest V3 extension with **V3 Side Panel + Capture History** for Equipify Growth Engine.
+Manifest V3 Chrome extension for **Equipify Sales** — a compact sales workspace with dark navigation rail, card-based CRM views, and operator-initiated capture tools for Growth Engine.
 
 ## Install from Growth Engine UI
 
@@ -10,14 +10,14 @@ Platform admins can find install instructions in Growth Engine:
 - `/admin/growth/acquisition`
 - `/admin/growth/settings/growth`
 
-The **Chrome Extension** card shows the local repo path and a ZIP download when packaged.
+The **Equipify Sales** install card shows the local repo path and a ZIP download when packaged.
 
 ## Install (unpacked from repo)
 
 1. Sign in to [app.equipify.ai](https://app.equipify.ai) as a platform admin in Chrome.
 2. Open `chrome://extensions` → enable **Developer mode**.
 3. **Load unpacked** → select `extensions/growth-browser-intake` from this repo.
-4. Pin the extension. Use the toolbar popup or open the **side panel** from Chrome’s extension menu for prospecting.
+4. Pin **Equipify Sales**. Use the toolbar popup or open the **side panel** from Chrome’s extension menu.
 
 ## Install (ZIP download)
 
@@ -27,23 +27,24 @@ Package the extension for admin download:
 pnpm package:growth-extension
 ```
 
-This writes `public/downloads/growth-browser-intake.zip` and `public/downloads/growth-browser-intake-package-metadata.json`, served at:
+This writes `public/downloads/equipify-sales.zip` and `public/downloads/equipify-sales-package-metadata.json`, served at:
 
-- `/downloads/growth-browser-intake.zip`
-- `/downloads/growth-browser-intake-package-metadata.json`
+- `/downloads/equipify-sales.zip`
+- `/downloads/equipify-sales-package-metadata.json`
 
 Each packaged ZIP also includes `package-metadata.json` with extension version, generated timestamp, and git SHA when available.
 
 After download:
 
-1. Unzip the archive (contains a `growth-browser-intake/` folder).
+1. Unzip the archive (contains an `equipify-sales/` folder).
 2. In Chrome, open `chrome://extensions` → **Developer mode** → **Load unpacked**.
-3. Select the unzipped `growth-browser-intake` folder.
+3. Select the unzipped `equipify-sales` folder.
 
-## V3 features
+## Features
 
 - **Chrome Side Panel** stays open while browsing (popup remains as fallback).
-- **LinkedIn status badges** in the extension and on LinkedIn profile/company pages (lookup-based, visible metadata only).
+- **LinkedIn CRM context overlay** on profile/company pages — lead status, owner, last activity, next action, score, opportunity, and company contact count.
+- **LinkedIn status badges** in the extension popup/side panel (lookup-based, visible metadata only).
 - **Recent captures** — last 5 saved leads in the side panel.
 - **Post-save next steps** — open lead, view in Recently Captured, email verification status, contact discovery queue status.
 - **Extension settings** — production vs local dev API base URL; optional verify-email and queue-discovery defaults.

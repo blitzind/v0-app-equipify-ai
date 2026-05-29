@@ -76,17 +76,26 @@ export function GrowthBrowserExtensionInstallCard({
         </span>
         <div className="min-w-0 flex-1 space-y-3">
           <div>
-            <h2 className="text-sm font-semibold tracking-tight text-foreground">Chrome Extension</h2>
+            <h2 className="text-sm font-semibold tracking-tight text-foreground">Equipify Sales</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Capture contacts from websites and LinkedIn into Growth Engine using visible page metadata only.
-              Uses your existing Equipify admin session — no API keys stored in the extension.
+              Chrome extension for capturing contacts from websites and LinkedIn into Growth Engine using visible page
+              metadata only. Uses your existing Equipify admin session — no API keys stored in the extension.
             </p>
           </div>
 
           {packageMetadata ? (
-            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">Download package:</span>{" "}
-              {formatGrowthBrowserExtensionPackageMetadata(packageMetadata)}
+            <div className="space-y-2">
+              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Latest available:</span>{" "}
+                v{packageMetadata.extension_version}
+              </div>
+              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Download package:</span>{" "}
+                {formatGrowthBrowserExtensionPackageMetadata(packageMetadata)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                After installing Equipify Sales, open extension Settings to compare installed, ZIP, and latest versions.
+              </p>
             </div>
           ) : null}
 
@@ -119,7 +128,7 @@ export function GrowthBrowserExtensionInstallCard({
               <Button asChild size="sm">
                 <a href={GROWTH_BROWSER_EXTENSION_DOWNLOAD_PATH} download>
                   <Download className="mr-2 size-4" />
-                  Download ZIP
+                  Download Equipify Sales ZIP
                 </a>
               </Button>
             ) : (
@@ -130,14 +139,14 @@ export function GrowthBrowserExtensionInstallCard({
             )}
 
             <Button asChild size="sm" variant="ghost">
-              <Link href="/admin/growth/browser-intake-test">Open intake test</Link>
+              <Link href="/admin/growth/browser-intake-test">Open Equipify Sales test</Link>
             </Button>
           </div>
 
           {zipAvailable === false ? (
             <p className="text-xs text-muted-foreground">
               Run <code className="rounded bg-muted px-1 py-0.5 font-mono">pnpm package:growth-extension</code> to
-              create <code className="rounded bg-muted px-1 py-0.5 font-mono">public/downloads/growth-browser-intake.zip</code>.
+              create <code className="rounded bg-muted px-1 py-0.5 font-mono">public/downloads/equipify-sales.zip</code>.
             </p>
           ) : null}
 

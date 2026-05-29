@@ -1,5 +1,5 @@
 /**
- * Package the Growth Browser Intake Chrome extension for admin download.
+ * Package the Equipify Sales Chrome extension for admin download.
  * Run: pnpm package:growth-extension
  */
 import path from "node:path"
@@ -12,5 +12,5 @@ import {
 const metadata = packageGrowthBrowserExtension()
 const zipPath = getGrowthExtensionZipPath()
 
-console.log(`Packaged Growth Browser Intake extension → ${path.relative(process.cwd(), zipPath)}`)
+console.log(`Packaged Equipify Sales extension → ${path.relative(process.cwd(), zipPath)}`)
 console.log(formatGrowthBrowserExtensionPackageMetadata(metadata))

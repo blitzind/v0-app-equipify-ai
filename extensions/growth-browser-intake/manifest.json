@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Equipify Growth Intake",
-  "version": "3.1.0",
-  "description": "Smart capture for Equipify Growth Engine — LinkedIn status badges, side panel, visible metadata only.",
+  "name": "Equipify Sales",
+  "version": "4.0.0",
+  "description": "Equipify Sales — capture prospects, CRM context, call prep, prospect queue, and buying committee tools. Visible metadata only.",
   "permissions": ["activeTab", "scripting", "storage", "sidePanel"],
   "host_permissions": ["https://app.equipify.ai/*", "http://localhost:3000/*", "https://*/*", "http://*/*"],
   "background": {
@@ -10,7 +10,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Capture to Equipify Growth"
+    "default_title": "Equipify Sales"
   },
   "side_panel": {
     "default_path": "sidepanel.html"
@@ -26,12 +26,14 @@
       "js": [
         "extension-storage.js",
         "extension-config.js",
+        "extension-lookup-cache.js",
         "linkedin-context.js",
         "linkedin-status-shared.js",
+        "linkedin-crm-shared.js",
         "page-metadata.js",
-        "linkedin-page-badge.js"
+        "linkedin-crm-overlay.js"
       ],
-      "css": ["linkedin-page-badge.css"],
+      "css": ["linkedin-crm-overlay.css"],
       "run_at": "document_idle"
     }
   ]

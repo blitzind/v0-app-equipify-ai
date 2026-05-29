@@ -6,6 +6,7 @@ import {
   GROWTH_BROWSER_EXTENSION_DIR,
   GROWTH_BROWSER_EXTENSION_DOWNLOAD_PATH,
   GROWTH_BROWSER_EXTENSION_PACKAGE_FILES,
+  GROWTH_BROWSER_EXTENSION_PACKAGE_FOLDER,
 } from "../../lib/growth/browser-intake/extension-install-types"
 import {
   GROWTH_BROWSER_EXTENSION_PACKAGE_METADATA_FILENAME,
@@ -94,7 +95,7 @@ function writeMetadataFiles(metadata: GrowthBrowserExtensionPackageMetadata, sta
 function createZipFromStaging(stagingDir: string): void {
   if (fs.existsSync(outputZip)) fs.unlinkSync(outputZip)
 
-  execSync(`zip -r "${outputZip}" growth-browser-intake -x "*.DS_Store"`, {
+  execSync(`zip -r "${outputZip}" ${GROWTH_BROWSER_EXTENSION_PACKAGE_FOLDER} -x "*.DS_Store"`, {
     cwd: path.dirname(stagingDir),
     stdio: "inherit",
   })
@@ -169,9 +170,9 @@ export function assertGrowthExtensionZipContainsRequiredFiles(): void {
   const required = [...GROWTH_BROWSER_EXTENSION_PACKAGE_FILES, GROWTH_BROWSER_EXTENSION_PACKAGE_METADATA_FILENAME]
 
   for (const file of required) {
-    const pattern = new RegExp(`growth-browser-intake/${file.replace(".", "\\.")}`)
+    const pattern = new RegExp(`${GROWTH_BROWSER_EXTENSION_PACKAGE_FOLDER}/${file.replace(".", "\\.")}`)
     if (!pattern.test(zipListing)) {
-      throw new Error(`ZIP is missing growth-browser-intake/${file}`)
+      throw new Error(`ZIP is missing ${GROWTH_BROWSER_EXTENSION_PACKAGE_FOLDER}/${file}`)
     }
   }
 }
@@ -180,7 +181,7 @@ export function packageGrowthBrowserExtension(): GrowthBrowserExtensionPackageMe
   assertRequiredSourceFiles()
   const metadata = buildGrowthExtensionPackageMetadata()
   const stagingRoot = fs.mkdtempSync(path.join(os.tmpdir(), "equipify-growth-extension-"))
-  const stagingDir = path.join(stagingRoot, "growth-browser-intake")
+  const stagingDir = path.join(stagingRoot, GROWTH_BROWSER_EXTENSION_PACKAGE_FOLDER)
 
   try {
     copyExtensionSourceTo(stagingDir)

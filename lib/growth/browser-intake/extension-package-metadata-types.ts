@@ -3,7 +3,7 @@
 export const GROWTH_BROWSER_EXTENSION_PACKAGE_METADATA_FILENAME = "package-metadata.json" as const
 
 export const GROWTH_BROWSER_EXTENSION_PACKAGE_METADATA_PUBLIC_FILENAME =
-  "growth-browser-intake-package-metadata.json" as const
+  "equipify-sales-package-metadata.json" as const
 
 export const GROWTH_BROWSER_EXTENSION_PACKAGE_METADATA_DOWNLOAD_PATH =
   `/downloads/${GROWTH_BROWSER_EXTENSION_PACKAGE_METADATA_PUBLIC_FILENAME}` as const

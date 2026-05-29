@@ -9,6 +9,12 @@ function initIntakeApp(options) {
   const storage = window.EquipifyGrowthExtensionStorage
   const linkedinContext = window.EquipifyGrowthLinkedInContext
   const linkedinStatus = window.EquipifyGrowthLinkedInStatus
+  const crmContextUi = window.EquipifyGrowthCrmContext
+  const lookupCache = window.EquipifyGrowthExtensionLookupCache
+  const extensionVersion = window.EquipifyGrowthExtensionVersion
+
+  let bootstrapTimer = null
+  let bootstrapSeq = 0
 
   const state = {
     mode: "quick",
@@ -20,6 +26,7 @@ function initIntakeApp(options) {
     lastSave: null,
     linkedinLookup: null,
     linkedinPageKind: null,
+    crmContext: null,
   }
 
   const els = {
@@ -58,6 +65,14 @@ function initIntakeApp(options) {
     openSidePanelBtn: document.getElementById("open-side-panel-btn"),
     signInLink: document.getElementById("sign-in-link"),
     extensionBuildMeta: document.getElementById("extension-build-meta"),
+    extensionVersionBanner: document.getElementById("extension-version-banner"),
+    versionInstalled: document.getElementById("version-installed"),
+    versionPackaged: document.getElementById("version-packaged"),
+    versionLatest: document.getElementById("version-latest"),
+    versionGitSha: document.getElementById("version-git-sha"),
+    versionBuildTimestamp: document.getElementById("version-build-timestamp"),
+    extensionVersionWarning: document.getElementById("extension-version-warning"),
+    bootstrapLoading: document.getElementById("bootstrap-loading"),
     linkedinStatusPanel: document.getElementById("linkedin-status-panel"),
     linkedinStatusBadge: document.getElementById("linkedin-status-badge"),
     linkedinStatusContext: document.getElementById("linkedin-status-context"),
@@ -66,6 +81,13 @@ function initIntakeApp(options) {
     linkedinOpenLeadBtn: document.getElementById("linkedin-open-lead-btn"),
     linkedinUpdateLeadBtn: document.getElementById("linkedin-update-lead-btn"),
     linkedinMarkReviewedBtn: document.getElementById("linkedin-mark-reviewed-btn"),
+    linkedinCrmContext: document.getElementById("linkedin-crm-context"),
+    linkedinOpenCompanyBtn: document.getElementById("linkedin-open-company-btn"),
+    linkedinOpenOpportunityBtn: document.getElementById("linkedin-open-opportunity-btn"),
+    linkedinAddNoteBtn: document.getElementById("linkedin-add-note-btn"),
+    linkedinNotePanel: document.getElementById("linkedin-note-panel"),
+    linkedinNoteInput: document.getElementById("linkedin-note-input"),
+    linkedinSaveNoteBtn: document.getElementById("linkedin-save-note-btn"),
   }
 
   function trimOrNull(value) {
@@ -188,7 +210,7 @@ function initIntakeApp(options) {
     }
   }
 
-  async function lookupExistingLead(payload, tabUrl) {
+  function buildLookupParams(payload, tabUrl) {
     const query =
       linkedinContext?.buildLinkedInLookupQuery({
         url: tabUrl ?? payload.source_url,
@@ -205,8 +227,23 @@ function initIntakeApp(options) {
     if (query.linkedin_url) params.set("linkedin_url", query.linkedin_url)
     if (query.email) params.set("email", query.email)
     if (tabUrl) params.set("source_url", tabUrl)
+    return params
+  }
 
+  function invalidateLookupCache() {
+    lookupCache?.invalidate?.(lookupCache.PREFIX?.crmContext)
+    lookupCache?.invalidate?.(lookupCache.PREFIX?.lookup)
+  }
+
+  async function lookupExistingLead(payload, tabUrl, options = {}) {
+    const params = buildLookupParams(payload, tabUrl)
     if ([...params.keys()].length === 0) return null
+
+    const cacheKey = lookupCache?.buildKey?.(lookupCache.PREFIX.lookup, params)
+    if (!options.bypassCache && cacheKey) {
+      const cached = lookupCache.read(cacheKey)
+      if (cached !== null) return cached
+    }
 
     const response = await fetch(`${apiBaseUrl()}${config.LOOKUP_PATH}?${params.toString()}`, {
       method: "GET",
@@ -215,43 +252,143 @@ function initIntakeApp(options) {
 
     const body = await response.json().catch(() => null)
     if (!response.ok || !body?.ok) return null
+    if (cacheKey) lookupCache?.write?.(cacheKey, body)
     return body
   }
 
-  function renderLinkedInStatusPanel(lookup, tabUrl) {
-    if (!els.linkedinStatusPanel || !linkedinStatus) return
+  async function fetchCrmContext(payload, tabUrl, options = {}) {
+    const params = buildLookupParams(payload, tabUrl)
+    if ([...params.keys()].length === 0) return null
 
-    state.linkedinLookup = lookup
+    const cacheKey = lookupCache?.buildKey?.(lookupCache.PREFIX.crmContext, params)
+    if (!options.bypassCache && cacheKey) {
+      const cached = lookupCache.read(cacheKey)
+      if (cached !== null) return cached
+    }
+
+    const response = await fetch(`${apiBaseUrl()}${config.CRM_CONTEXT_PATH}?${params.toString()}`, {
+      method: "GET",
+      credentials: "include",
+    })
+
+    const body = await response.json().catch(() => null)
+    if (!response.ok || !body?.ok) return null
+    if (cacheKey) lookupCache?.write?.(cacheKey, body)
+    return body
+  }
+
+  function renderLinkedInCrmContextGrid(context) {
+    if (!els.linkedinCrmContext || !crmContextUi) return
+    els.linkedinCrmContext.innerHTML = ""
+
+    if (!context) {
+      els.linkedinCrmContext.hidden = true
+      return
+    }
+
+    els.linkedinCrmContext.hidden = false
+    for (const row of crmContextUi.crmContextRows(context)) {
+      const item = document.createElement("div")
+      item.className = "linkedin-crm-context-row"
+      item.innerHTML = `<span class="linkedin-crm-context-label">${row.label}</span><span class="linkedin-crm-context-value">${row.value}</span>`
+      els.linkedinCrmContext.appendChild(item)
+    }
+  }
+
+  function renderLinkedInStatusPanel(crmPayload, tabUrl) {
+    if (!els.linkedinStatusPanel) return
+
+    state.crmContext = crmPayload?.context ?? null
     state.linkedinPageKind =
-      lookup?.linkedin_page_kind ?? linkedinContext?.detectLinkedInPageKind(tabUrl) ?? null
+      crmPayload?.linkedin_page_kind ?? linkedinContext?.detectLinkedInPageKind(tabUrl) ?? null
 
-    const status = linkedinStatus.resolveStatusFromLookup(lookup)
-    const matched = status.match
+    const matched = crmPayload?.matched === true && state.crmContext
+    const badge = crmPayload?.status_badge ?? "not_added"
+    const badgeLabel = crmPayload?.status_badge_label ?? "Not added"
+    const tone = crmContextUi?.badgeToneFromStatus(badge) ?? linkedinStatus?.linkedInLeadStatusBadgeTone?.(badge) ?? "neutral"
 
-    els.linkedinStatusBadge.textContent = status.extensionLabel
-    els.linkedinStatusBadge.className = `linkedin-status-badge badge-${status.tone}`
+    if (els.linkedinStatusBadge) {
+      els.linkedinStatusBadge.textContent = badgeLabel
+      els.linkedinStatusBadge.className = `linkedin-status-badge badge-${tone}`
+    }
 
     const contextParts = []
     if (state.linkedinPageKind === "profile") contextParts.push("LinkedIn profile")
     if (state.linkedinPageKind === "company") contextParts.push("LinkedIn company")
-    if (matched?.company_name) contextParts.push(matched.company_name)
-    els.linkedinStatusContext.textContent = contextParts.join(" · ")
+    if (state.crmContext?.company_name) contextParts.push(state.crmContext.company_name)
+    if (els.linkedinStatusContext) els.linkedinStatusContext.textContent = contextParts.join(" · ")
 
-    els.linkedinStatusMatch.textContent = status.matchSummary ?? ""
-    els.linkedinStatusMatch.hidden = !status.matchSummary
+    const profileName =
+      state.crmContext?.contact_name ||
+      trimOrNull(document.getElementById("contact-name")?.value) ||
+      state.detected?.company_name ||
+      "Current page"
+    const titleText =
+      state.crmContext?.company_name && state.crmContext?.contact_name
+        ? `${state.crmContext.contact_name}`
+        : profileName
+    document.getElementById("popup-profile-name")?.replaceChildren(document.createTextNode(titleText))
+    document.getElementById("sidepanel-profile-name")?.replaceChildren(document.createTextNode(titleText))
 
-    const hasMatch = Boolean(matched?.lead_id)
-    els.linkedinOpenLeadBtn.hidden = !hasMatch
-    els.linkedinUpdateLeadBtn.hidden = !hasMatch
-    els.linkedinMarkReviewedBtn.hidden = !hasMatch || matched?.review_status === "reviewed"
+    const matchSummary = state.crmContext?.match_summary ?? null
+    if (els.linkedinStatusMatch) {
+      els.linkedinStatusMatch.textContent = matchSummary ?? ""
+      els.linkedinStatusMatch.hidden = !matchSummary
+    }
+
+    renderLinkedInCrmContextGrid(state.crmContext)
+
+    const hasMatch = Boolean(state.crmContext?.lead_id)
+    if (els.linkedinOpenLeadBtn) els.linkedinOpenLeadBtn.hidden = !hasMatch
+    if (els.linkedinOpenCompanyBtn) els.linkedinOpenCompanyBtn.hidden = !hasMatch
+    if (els.linkedinOpenOpportunityBtn) els.linkedinOpenOpportunityBtn.hidden = !hasMatch
+    if (els.linkedinUpdateLeadBtn) els.linkedinUpdateLeadBtn.hidden = !hasMatch
+    if (els.linkedinMarkReviewedBtn) {
+      els.linkedinMarkReviewedBtn.hidden =
+        !hasMatch || state.crmContext?.status_badge !== "needs_review"
+    }
+    if (els.linkedinAddNoteBtn) els.linkedinAddNoteBtn.hidden = !hasMatch
+    if (els.linkedinNotePanel && !hasMatch) els.linkedinNotePanel.hidden = true
+
+    window.__equipifyCopilotHooks?.onCrmContextUpdated?.(state.crmContext, state.linkedinPageKind)
 
     if (hasMatch) {
-      state.existingLead = matched
-      showExistingLead(matched)
+      const pseudoMatch = {
+        lead_id: state.crmContext.lead_id,
+        company_name: state.crmContext.company_name,
+        website: null,
+        confidence: 1,
+        rule: "explicit",
+        match_label: matchSummary,
+        review_status: state.crmContext.status_badge === "needs_review" ? "needs_review" : "reviewed",
+      }
+      state.existingLead = pseudoMatch
+      state.linkedinLookup = crmPayload
+      showExistingLead(pseudoMatch)
     } else {
       state.existingLead = null
+      state.linkedinLookup = crmPayload
       if (els.existingLeadPanel) els.existingLeadPanel.hidden = true
     }
+  }
+
+  async function appendLeadNote(leadId, existingNotes, noteText) {
+    const stamp = new Date().toLocaleString()
+    const nextNote = existingNotes?.trim()
+      ? `${existingNotes.trim()}\n\n[Extension ${stamp}]\n${noteText.trim()}`
+      : `[Extension ${stamp}]\n${noteText.trim()}`
+
+    const response = await fetch(`${apiBaseUrl()}${config.LEAD_PATH}/${leadId}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes: nextNote }),
+    })
+    const body = await response.json().catch(() => null)
+    if (!response.ok || !body?.ok) {
+      throw new Error(body?.message ?? "Could not save note.")
+    }
+    return body
   }
 
   async function markLeadReviewed(leadId) {
@@ -444,14 +581,52 @@ function initIntakeApp(options) {
       els.settingsStatus.className = "message message-success"
     }
     if (els.signInLink) els.signInLink.href = signInUrl()
+    await loadVersionInfo()
+  }
+
+  function setLoadingState(isLoading) {
+    if (els.bootstrapLoading) els.bootstrapLoading.hidden = !isLoading
+    if (els.linkedinStatusPanel) {
+      els.linkedinStatusPanel.classList.toggle("panel-loading", isLoading)
+    }
+  }
+
+  async function refreshOperatorAnalytics() {
+    const analytics = window.EquipifyGrowthExtensionAnalytics
+    if (!analytics?.getAnalyticsSummary || !analytics?.renderAnalyticsHtml) return
+
+    const todayEl = document.getElementById("analytics-today")
+    const weekEl = document.getElementById("analytics-week")
+    const monthEl = document.getElementById("analytics-month")
+    if (!todayEl && !weekEl && !monthEl) return
+
+    const [today, week, month] = await Promise.all([
+      analytics.getAnalyticsSummary("today"),
+      analytics.getAnalyticsSummary("week"),
+      analytics.getAnalyticsSummary("month"),
+    ])
+
+    if (todayEl) todayEl.innerHTML = analytics.renderAnalyticsHtml(today)
+    if (weekEl) weekEl.innerHTML = analytics.renderAnalyticsHtml(week)
+    if (monthEl) monthEl.innerHTML = analytics.renderAnalyticsHtml(month)
+  }
+
+  function scheduleBootstrap() {
+    if (bootstrapTimer) window.clearTimeout(bootstrapTimer)
+    bootstrapTimer = window.setTimeout(() => {
+      bootstrap().catch(() => {})
+    }, 800)
   }
 
   async function bootstrap() {
+    const seq = ++bootstrapSeq
     setCaptureStatus("Detecting", "status-detecting")
+    setLoadingState(true)
     clearStatus()
 
     try {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+      if (seq !== bootstrapSeq) return
       const tab = tabs[0]
 
       if (isRestrictedTabUrl(tab?.url)) {
@@ -463,6 +638,7 @@ function initIntakeApp(options) {
 
       els.contextWarning.hidden = true
       const metadata = await extractTabMetadata(tab)
+      if (seq !== bootstrapSeq) return
       applyDetectedMetadata(metadata, tab?.url)
 
       const linkedinQuery = linkedinContext?.buildLinkedInLookupQuery({
@@ -481,14 +657,18 @@ function initIntakeApp(options) {
 
       const formValues = readFormValues()
       formValues.page_title = metadata?.page_title ?? formValues.page_title
-      const lookup = await lookupExistingLead(formValues, tab?.url)
-      renderLinkedInStatusPanel(lookup, tab?.url)
+      const crmPayload = await fetchCrmContext(formValues, tab?.url)
+      if (seq !== bootstrapSeq) return
+      renderLinkedInStatusPanel(crmPayload, tab?.url)
 
       setCaptureStatus("Ready", "status-ready")
     } catch {
+      if (seq !== bootstrapSeq) return
       setCaptureStatus("Error", "status-error")
       els.contextWarning.hidden = false
       els.contextWarning.textContent = "Could not detect page metadata."
+    } finally {
+      if (seq === bootstrapSeq) setLoadingState(false)
     }
   }
 
@@ -562,8 +742,31 @@ function initIntakeApp(options) {
       await refreshRecentCaptures()
       showSuccessPanel(saveRecord)
 
-      const refreshLookup = await lookupExistingLead(readFormValues(), trimOrNull(document.getElementById("source-url")?.value))
-      renderLinkedInStatusPanel(refreshLookup, trimOrNull(document.getElementById("source-url")?.value))
+      const extensionAnalytics = window.EquipifyGrowthExtensionAnalytics
+      if (extensionAnalytics) {
+        await extensionAnalytics.recordAnalyticsEvent("captures_created")
+        if (result.capture_type === "company_only") {
+          await extensionAnalytics.recordAnalyticsEvent("companies_captured")
+        } else {
+          await extensionAnalytics.recordAnalyticsEvent("contacts_captured")
+        }
+        if (result.status === "updated") {
+          await extensionAnalytics.recordAnalyticsEvent("duplicates_prevented")
+        }
+        window.__equipifyCopilotHooks?.refreshAnalytics?.()
+        if (surface === "popup") await refreshOperatorAnalytics()
+      }
+
+      invalidateLookupCache()
+      const refreshLookup = await fetchCrmContext(
+        readFormValues(),
+        trimOrNull(document.getElementById("source-url")?.value),
+        { bypassCache: true },
+      )
+      renderLinkedInStatusPanel(
+        refreshLookup,
+        trimOrNull(document.getElementById("source-url")?.value),
+      )
     } catch (error) {
       const message = error instanceof Error ? error.message : "Network error"
       setStatus(`Could not reach Equipify (${message}).`, "error")
@@ -573,39 +776,61 @@ function initIntakeApp(options) {
     }
   }
 
-  function formatBuildMetadata(metadata) {
-    const parts = [`v${metadata.extension_version}`]
-    if (metadata.generated_at) {
-      const when = new Date(metadata.generated_at)
-      if (!Number.isNaN(when.getTime())) {
-        parts.push(`packaged ${when.toLocaleString()}`)
+  function renderVersionSnapshot(snapshot) {
+    if (els.versionInstalled) els.versionInstalled.textContent = `v${snapshot.installed_version}`
+    if (els.versionPackaged) {
+      els.versionPackaged.textContent = snapshot.packaged_version ? `v${snapshot.packaged_version}` : "—"
+    }
+    if (els.versionLatest) {
+      els.versionLatest.textContent = snapshot.latest_available_version
+        ? `v${snapshot.latest_available_version}`
+        : "—"
+    }
+    if (els.versionGitSha) els.versionGitSha.textContent = snapshot.git_sha ?? "—"
+    if (els.versionBuildTimestamp) {
+      if (snapshot.build_timestamp) {
+        const when = new Date(snapshot.build_timestamp)
+        els.versionBuildTimestamp.textContent = Number.isNaN(when.getTime())
+          ? snapshot.build_timestamp
+          : when.toLocaleString()
+      } else {
+        els.versionBuildTimestamp.textContent = "—"
       }
     }
-    if (metadata.git_sha) parts.push(metadata.git_sha)
-    return parts.join(" · ")
+
+    if (els.extensionVersionBanner) els.extensionVersionBanner.hidden = false
+    if (els.extensionBuildMeta) {
+      els.extensionBuildMeta.textContent = extensionVersion?.formatSnapshot?.(snapshot) ?? ""
+    }
+    if (els.extensionVersionWarning) {
+      if (snapshot.is_outdated && snapshot.latest_available_version) {
+        els.extensionVersionWarning.hidden = false
+        els.extensionVersionWarning.textContent = `Update available: v${snapshot.latest_available_version} is ready. Download the latest Equipify Sales ZIP from Growth Engine settings.`
+      } else {
+        els.extensionVersionWarning.hidden = true
+        els.extensionVersionWarning.textContent = ""
+      }
+    }
   }
 
-  async function loadBuildMetadata() {
-    if (!els.extensionBuildMeta) return
-
-    try {
-      const response = await fetch(chrome.runtime.getURL("package-metadata.json"))
-      if (response.ok) {
-        const metadata = await response.json()
-        if (metadata?.extension_version) {
-          els.extensionBuildMeta.textContent = formatBuildMetadata(metadata)
-          return
+  async function loadVersionInfo() {
+    if (!extensionVersion?.resolveVersionSnapshot) {
+      if (els.extensionBuildMeta) {
+        try {
+          const manifest = chrome.runtime.getManifest()
+          els.extensionBuildMeta.textContent = manifest?.version ? `v${manifest.version} · local unpackaged` : ""
+        } catch {
+          els.extensionBuildMeta.textContent = ""
         }
       }
-    } catch {
-      // Fall back to manifest version for unpacked local installs.
+      return
     }
 
     try {
-      const manifest = chrome.runtime.getManifest()
-      els.extensionBuildMeta.textContent = manifest?.version ? `v${manifest.version} · local unpackaged` : ""
+      const snapshot = await extensionVersion.resolveVersionSnapshot(apiBaseUrl())
+      renderVersionSnapshot(snapshot)
     } catch {
-      els.extensionBuildMeta.textContent = ""
+      if (els.extensionBuildMeta) els.extensionBuildMeta.textContent = ""
     }
   }
 
@@ -623,6 +848,10 @@ function initIntakeApp(options) {
       if (!state.existingLead?.lead_id) return
       setIntakeMode("update_existing", state.existingLead.lead_id)
       setStatus("Will update the existing lead on save.", "success")
+      window.EquipifyGrowthExtensionAnalytics?.recordAnalyticsEvent?.("duplicates_prevented").then(() => {
+        window.__equipifyCopilotHooks?.refreshAnalytics?.()
+        if (surface === "popup") refreshOperatorAnalytics().catch(() => {})
+      })
     })
 
     document.getElementById("create-anyway-btn")?.addEventListener("click", () => {
@@ -634,9 +863,18 @@ function initIntakeApp(options) {
     els.successDismissBtn?.addEventListener("click", hideSuccessPanel)
 
     els.settingsToggleBtn?.addEventListener("click", () => {
+      const drawer = document.getElementById("settings-drawer")
+      if (drawer) {
+        drawer.hidden = false
+        refreshOperatorAnalytics().catch(() => {})
+        return
+      }
       if (!els.settingsPanel) return
       els.settingsPanel.hidden = !els.settingsPanel.hidden
+      if (!els.settingsPanel.hidden) refreshOperatorAnalytics().catch(() => {})
     })
+
+    window.__equipifyRefreshSettingsAnalytics = () => refreshOperatorAnalytics().catch(() => {})
 
     els.saveSettingsBtn?.addEventListener("click", () => {
       saveSettingsFromUi().catch(() => {
@@ -664,13 +902,30 @@ function initIntakeApp(options) {
     })
 
     els.linkedinOpenLeadBtn?.addEventListener("click", () => {
-      const leadId = state.existingLead?.lead_id ?? state.linkedinLookup?.best_match?.lead_id
+      const leadId = state.crmContext?.lead_id ?? state.existingLead?.lead_id
+      const link = state.crmContext?.links?.lead
+      if (link) {
+        chrome.tabs.create({ url: link })
+        return
+      }
       if (!leadId) return
       chrome.tabs.create({ url: leadAdminUrl(leadId) })
     })
 
+    els.linkedinOpenCompanyBtn?.addEventListener("click", () => {
+      const link = state.crmContext?.links?.company
+      if (!link) return
+      chrome.tabs.create({ url: link })
+    })
+
+    els.linkedinOpenOpportunityBtn?.addEventListener("click", () => {
+      const link = state.crmContext?.links?.opportunity
+      if (!link) return
+      chrome.tabs.create({ url: link })
+    })
+
     els.linkedinUpdateLeadBtn?.addEventListener("click", () => {
-      const leadId = state.existingLead?.lead_id ?? state.linkedinLookup?.best_match?.lead_id
+      const leadId = state.crmContext?.lead_id ?? state.existingLead?.lead_id
       if (!leadId) return
       setIntakeMode("update_existing", leadId)
       setStatus("Will update the existing lead on save.", "success")
@@ -678,15 +933,16 @@ function initIntakeApp(options) {
     })
 
     els.linkedinMarkReviewedBtn?.addEventListener("click", () => {
-      const leadId = state.existingLead?.lead_id ?? state.linkedinLookup?.best_match?.lead_id
+      const leadId = state.crmContext?.lead_id ?? state.existingLead?.lead_id
       if (!leadId) return
       els.linkedinMarkReviewedBtn.disabled = true
       markLeadReviewed(leadId)
         .then(async () => {
           setStatus("Lead marked reviewed.", "success")
+          invalidateLookupCache()
           const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
-          const lookup = await lookupExistingLead(readFormValues(), tabs[0]?.url)
-          renderLinkedInStatusPanel(lookup, tabs[0]?.url)
+          const crmPayload = await fetchCrmContext(readFormValues(), tabs[0]?.url, { bypassCache: true })
+          renderLinkedInStatusPanel(crmPayload, tabs[0]?.url)
         })
         .catch((error) => {
           const message = error instanceof Error ? error.message : "Could not mark reviewed."
@@ -697,14 +953,44 @@ function initIntakeApp(options) {
         })
     })
 
+    els.linkedinAddNoteBtn?.addEventListener("click", () => {
+      if (!els.linkedinNotePanel) return
+      els.linkedinNotePanel.hidden = !els.linkedinNotePanel.hidden
+      if (!els.linkedinNotePanel.hidden) els.linkedinNoteInput?.focus()
+    })
+
+    els.linkedinSaveNoteBtn?.addEventListener("click", () => {
+      const leadId = state.crmContext?.lead_id
+      const noteText = trimOrNull(els.linkedinNoteInput?.value)
+      if (!leadId || !noteText) return
+      els.linkedinSaveNoteBtn.disabled = true
+      appendLeadNote(leadId, state.crmContext?.lead_notes, noteText)
+        .then(async () => {
+          if (els.linkedinNoteInput) els.linkedinNoteInput.value = ""
+          if (els.linkedinNotePanel) els.linkedinNotePanel.hidden = true
+          setStatus("Note saved.", "success")
+          invalidateLookupCache()
+          const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+          const crmPayload = await fetchCrmContext(readFormValues(), tabs[0]?.url, { bypassCache: true })
+          renderLinkedInStatusPanel(crmPayload, tabs[0]?.url)
+        })
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : "Could not save note."
+          setStatus(message, "error")
+        })
+        .finally(() => {
+          els.linkedinSaveNoteBtn.disabled = false
+        })
+    })
+
     if (surface === "sidepanel") {
       chrome.tabs.onActivated.addListener(() => {
-        bootstrap().catch(() => {})
+        scheduleBootstrap()
       })
       chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
         if (changeInfo.status === "complete") {
           chrome.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
-            if (tabs[0]?.id === tabId) bootstrap().catch(() => {})
+            if (tabs[0]?.id === tabId) scheduleBootstrap()
           })
         }
       })
@@ -722,8 +1008,49 @@ function initIntakeApp(options) {
     wireEvents()
     setMode("quick")
     await applySettingsToUi()
-    await loadBuildMetadata()
+    await loadVersionInfo()
     await refreshRecentCaptures()
+    await refreshOperatorAnalytics()
+
+    if (surface !== "sidepanel" && typeof window.initExtensionPhase2 === "function") {
+      window.initExtensionPhase2({
+        apiBaseUrl,
+        readFormValues,
+        getDetected: () => state.detected,
+        getCrmContext: () => state.crmContext,
+        getExistingLeadId: () => state.existingLead?.lead_id ?? null,
+        setStatus,
+      })
+    }
+
+    if (surface === "sidepanel" && typeof window.initExtensionCopilot === "function") {
+      const copilot = window.initExtensionCopilot({
+        apiBaseUrl,
+        readFormValues,
+        getDetected: () => state.detected,
+        getCrmContext: () => state.crmContext,
+        getExistingLeadId: () => state.existingLead?.lead_id ?? state.crmContext?.lead_id ?? null,
+        getLinkedInPageKind: () => state.linkedinPageKind,
+        setStatus,
+        appendLeadNote,
+        refreshCrmContext: async () => {
+          invalidateLookupCache()
+          const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+          const crmPayload = await fetchCrmContext(readFormValues(), tabs[0]?.url, { bypassCache: true })
+          renderLinkedInStatusPanel(crmPayload, tabs[0]?.url)
+        },
+      })
+      window.__equipifyCopilotHooks = {
+        onCrmContextUpdated: () => {
+          copilot?.updateCommitteeTabVisibility?.()
+          copilot?.renderRelationshipMap?.()
+          copilot?.renderTimeline?.()
+        },
+        refreshAnalytics: () => copilot?.refreshAnalytics?.(),
+        switchTab: (tabId) => copilot?.switchTab?.(tabId),
+      }
+    }
+
     await bootstrap()
   }
 

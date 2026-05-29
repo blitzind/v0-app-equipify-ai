@@ -1,10 +1,47 @@
 /**
- * Regression checks for Growth Engine browser extension intake V3.
+ * Regression checks for Growth Engine browser extension intake V4.
  * Run: pnpm test:growth-browser-intake
  */
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
+import { assembleBrowserIntakeCallPrep } from "../lib/growth/browser-intake/assemble-browser-intake-call-prep"
+import { GROWTH_BROWSER_INTAKE_CALL_PREP_QA_MARKER } from "../lib/growth/browser-intake/browser-intake-call-prep-types"
+import {
+  formatBrowserIntakeSimilarCompanyLocation,
+  GROWTH_BROWSER_INTAKE_SIMILAR_COMPANIES_QA_MARKER,
+  mapBrowserIntakeRelationshipToSimilarCompany,
+} from "../lib/growth/browser-intake/browser-intake-similar-companies-types"
+import {
+  aggregateBrowserExtensionAnalytics,
+  GROWTH_BROWSER_EXTENSION_ANALYTICS_QA_MARKER,
+} from "../lib/growth/browser-intake/extension-analytics-types"
+import {
+  buildGrowthBrowserExtensionLookupCacheKey,
+  GROWTH_BROWSER_EXTENSION_LOOKUP_CACHE_TTL_MS,
+  readGrowthBrowserExtensionLookupCache,
+  writeGrowthBrowserExtensionLookupCache,
+} from "../lib/growth/browser-intake/extension-lookup-cache-types"
+import {
+  compareSemver,
+  formatGrowthBrowserExtensionVersionSnapshot,
+  isGrowthBrowserExtensionOutdated,
+} from "../lib/growth/browser-intake/extension-version-types"
+import { assembleBrowserIntakeResearchBrief } from "../lib/growth/browser-intake/assemble-browser-intake-research-brief"
+import { GROWTH_BROWSER_INTAKE_RESEARCH_BRIEF_QA_MARKER } from "../lib/growth/browser-intake/browser-intake-research-brief-types"
+import {
+  GROWTH_BROWSER_INTAKE_BUYING_COMMITTEE_QA_MARKER,
+  GROWTH_BROWSER_INTAKE_BUYING_COMMITTEE_TARGET_ROLES,
+} from "../lib/growth/browser-intake/browser-intake-buying-committee-types"
+import {
+  matchBrowserIntakeBuyingCommitteeTargetRole,
+  scoreBrowserIntakeBuyingCommitteeCandidate,
+} from "../lib/growth/browser-intake/match-browser-intake-buying-committee-role"
+import {
+  GROWTH_BROWSER_INTAKE_PROSPECT_QUEUE_ACTIONS,
+  GROWTH_BROWSER_INTAKE_PROSPECT_QUEUE_QA_MARKER,
+  inferBrowserIntakeProspectQueueItemKind,
+} from "../lib/growth/browser-intake/prospect-queue-types"
 import {
   browserIntakeHasContactData,
   browserIntakeInputToImportRow,
@@ -28,6 +65,10 @@ import {
   inferLinkedInProfileNameFromTitle,
   normalizeLinkedInLookupUrl,
 } from "../lib/growth/browser-intake/linkedin-context-detect"
+import {
+  formatGrowthBrowserIntakeActivityWhen,
+  formatGrowthLeadStatusLabel,
+} from "../lib/growth/browser-intake/browser-intake-crm-context-types"
 import {
   formatLinkedInLeadMatchSummary,
   GROWTH_LINKEDIN_EXTENSION_STATUS_BADGE_LABELS,
@@ -113,6 +154,7 @@ assert.equal(
   "Matched by LinkedIn URL · 88% confidence",
 )
 assert.equal(GROWTH_LINKEDIN_EXTENSION_STATUS_BADGE_LABELS.verified, "Verified")
+assert.equal(formatGrowthLeadStatusLabel("in_outreach"), "In Outreach")
 
 const prioritized = pickBestBrowserIntakeLeadMatchByPriority([
   {
@@ -248,14 +290,33 @@ const manifestSource = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/manifest.json"),
   "utf8",
 )
-assert.match(manifestSource, /"version": "3.1.0"/)
+assert.match(manifestSource, /"name": "Equipify Sales"/)
+assert.match(manifestSource, /"version": "4.0.0"/)
+assert.match(manifestSource, /extension-lookup-cache.js/)
 assert.match(manifestSource, /content_scripts/)
-assert.match(manifestSource, /linkedin-page-badge.js/)
+assert.match(manifestSource, /linkedin-crm-overlay.js/)
 assert.match(manifestSource, /scripting/)
 assert.match(manifestSource, /sidePanel/)
 assert.match(manifestSource, /side_panel/)
 assert.match(manifestSource, /storage/)
 assert.match(manifestSource, /background.js/)
+
+const contextRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/browser-intake/context/route.ts"),
+  "utf8",
+)
+assert.match(contextRoute, /resolveBrowserIntakeCrmContextFromLookup/)
+assert.match(contextRoute, /GROWTH_BROWSER_INTAKE_CRM_CONTEXT_QA_MARKER/)
+
+const crmContextBuilder = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/browser-intake/build-browser-intake-crm-context.ts"),
+  "utf8",
+)
+assert.match(crmContextBuilder, /fetchGrowthOpportunityByLeadId/)
+assert.match(crmContextBuilder, /listGrowthLeadTimelineEvents/)
+assert.match(crmContextBuilder, /company_contacts_count/)
+assert.match(crmContextBuilder, /fetchGrowthRepByUserId/)
+assert.doesNotMatch(crmContextBuilder, /sendEmail|enroll|auto.?message/i)
 
 const intakeAppJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/intake-app.js"),
@@ -273,11 +334,17 @@ assert.match(intakeAppJs, /recent-captures/)
 assert.match(intakeAppJs, /success-panel/)
 assert.match(intakeAppJs, /match_label|formatMatchRuleLabel/)
 assert.match(intakeAppJs, /loadExtensionSettings/)
+assert.match(intakeAppJs, /loadVersionInfo/)
+assert.match(intakeAppJs, /EquipifyGrowthExtensionLookupCache/)
+assert.match(intakeAppJs, /EquipifyGrowthExtensionVersion/)
+assert.match(intakeAppJs, /scheduleBootstrap/)
+assert.match(intakeAppJs, /refreshOperatorAnalytics/)
+assert.match(intakeAppJs, /extension-version-warning/)
 assert.doesNotMatch(intakeAppJs, /api[_-]?key|secret|password|token/i)
-assert.match(intakeAppJs, /linkedin-status-panel/)
-assert.match(intakeAppJs, /renderLinkedInStatusPanel/)
-assert.match(intakeAppJs, /markLeadReviewed/)
-assert.match(intakeAppJs, /buildLinkedInLookupQuery/)
+assert.match(intakeAppJs, /CRM_CONTEXT_PATH/)
+assert.match(intakeAppJs, /fetchCrmContext/)
+assert.match(intakeAppJs, /linkedin-crm-context/)
+assert.match(intakeAppJs, /appendLeadNote/)
 assert.doesNotMatch(intakeAppJs, /sendEmail|enroll|auto.?message/i)
 
 const linkedinContextJs = fs.readFileSync(
@@ -294,12 +361,16 @@ const linkedinStatusJs = fs.readFileSync(
 assert.match(linkedinStatusJs, /Not in Equipify/)
 assert.match(linkedinStatusJs, /resolveStatusFromLookup/)
 
-const linkedinPageBadgeJs = fs.readFileSync(
-  path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-page-badge.js"),
+const linkedinCrmOverlayJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-crm-overlay.js"),
   "utf8",
 )
-assert.match(linkedinPageBadgeJs, /LOOKUP_PATH/)
-assert.doesNotMatch(linkedinPageBadgeJs, /sendEmail|enroll|auto.?message|XMLHttpRequest/i)
+assert.match(linkedinCrmOverlayJs, /CRM_CONTEXT_PATH/)
+assert.match(linkedinCrmOverlayJs, /EquipifyGrowthExtensionLookupCache/)
+assert.match(linkedinCrmOverlayJs, /requestIdleCallback/)
+assert.match(linkedinCrmOverlayJs, /equipify-growth-crm-overlay--collapsed/)
+assert.match(linkedinCrmOverlayJs, /lastRenderKey/)
+assert.doesNotMatch(linkedinCrmOverlayJs, /sendEmail|enroll|auto.?message/i)
 
 const extensionConfigJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/extension-config.js"),
@@ -308,7 +379,8 @@ const extensionConfigJs = fs.readFileSync(
 assert.match(extensionConfigJs, /Matched by domain/)
 assert.match(extensionConfigJs, /Matched by LinkedIn URL/)
 assert.match(extensionConfigJs, /Matched by company name/)
-assert.match(extensionConfigJs, /localhost:3000/)
+assert.match(extensionConfigJs, /CRM_CONTEXT_PATH/)
+assert.match(extensionConfigJs, /PACKAGE_METADATA_DOWNLOAD_PATH/)
 
 const extensionStorageJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/extension-storage.js"),
@@ -326,4 +398,317 @@ assert.match(pageMetadataJs, /application\/ld\+json/)
 assert.match(pageMetadataJs, /canonical/)
 assert.doesNotMatch(pageMetadataJs, /fetch\(|XMLHttpRequest|linkedin.*api/i)
 
-console.log("growth-browser-intake v3.1 linkedin status checks passed")
+assert.equal(GROWTH_BROWSER_INTAKE_CALL_PREP_QA_MARKER, "growth-browser-intake-call-prep-v1")
+assert.equal(
+  GROWTH_BROWSER_INTAKE_SIMILAR_COMPANIES_QA_MARKER,
+  "growth-browser-intake-similar-companies-v1",
+)
+assert.equal(
+  GROWTH_BROWSER_INTAKE_PROSPECT_QUEUE_QA_MARKER,
+  "growth-browser-intake-prospect-queue-v1",
+)
+assert.deepEqual(GROWTH_BROWSER_INTAKE_PROSPECT_QUEUE_ACTIONS, [
+  "process_queue",
+  "run_contact_discovery",
+  "verify_emails",
+  "create_leads",
+])
+
+assert.equal(formatBrowserIntakeSimilarCompanyLocation({ city: "Austin", state: "TX" }), "Austin, TX")
+assert.equal(
+  mapBrowserIntakeRelationshipToSimilarCompany({
+    related_company_name: "Beta HVAC",
+    relationship_strength: 82,
+    evidence_excerpt: "Same industry: HVAC",
+    relationship_type: "same_industry",
+    website: "https://beta.example",
+    city: "Dallas",
+    state: "TX",
+    lead_id: "lead-1",
+  }).confidence,
+  82,
+)
+
+assert.equal(
+  inferBrowserIntakeProspectQueueItemKind({
+    linkedin_url: "https://www.linkedin.com/company/acme/",
+  }),
+  "linkedin_page",
+)
+assert.equal(
+  inferBrowserIntakeProspectQueueItemKind({
+    company_name: "Acme",
+    contact_name: "Jane Doe",
+  }),
+  "contact",
+)
+assert.equal(inferBrowserIntakeProspectQueueItemKind({ company_name: "Acme" }), "company")
+
+const callPrepArtifact = assembleBrowserIntakeCallPrep({
+  lead: {
+    id: "lead-1",
+    companyName: "Acme Medical",
+    contactName: "Jane Doe",
+    title: "Operations Director",
+    website: "https://acme.example",
+    city: "Austin",
+    state: "TX",
+    status: "qualified",
+    score: 78,
+    notes: null,
+    nextBestAction: "call_now",
+    nextBestActionReason: "High intent signal",
+  },
+  researchRun: {
+    id: "run-1",
+    leadId: "lead-1",
+    status: "completed",
+    websiteUrl: "https://acme.example",
+    companyName: "Acme Medical",
+    industryGuess: "Medical Equipment",
+    employeeSizeGuess: "26-100",
+    revenueSizeGuess: null,
+    websiteMaturityScore: 55,
+    socialPresenceScore: null,
+    reputationScore: null,
+    technologyScore: null,
+    detectedTechnologies: ["WordPress"],
+    signals: { painSignals: ["missing_online_booking"] },
+    competitors: [],
+    researchSummary: "Acme Medical operates in medical equipment with moderate website maturity.",
+    suggestedPitchAngle: "Improve customer scheduling",
+    suggestedSequence: null,
+    suggestedCallOpening: "Hi Jane — I noticed Acme Medical and wanted to learn how you handle scheduling.",
+    recommendedNextAction: "Call Prospect",
+    researchConfidence: 72,
+    completedAt: new Date().toISOString(),
+    failedReason: null,
+    createdAt: new Date().toISOString(),
+  },
+  accountBrief: null,
+  companyDiscovery: null,
+  decisionMakerHypothesis: null,
+  verificationTriage: null,
+  decisionMakers: [],
+  timelineSummaries: ["Lead created from browser extension"],
+})
+
+assert.match(callPrepArtifact.who_they_are, /Jane Doe/)
+assert.match(callPrepArtifact.company_overview, /Acme Medical/)
+assert.match(callPrepArtifact.suggested_opener, /Hi Jane/)
+assert.ok(callPrepArtifact.discovery_questions.length >= 2)
+assert.ok(callPrepArtifact.likely_objections.length >= 1)
+assert.ok(callPrepArtifact.relevant_signals.some((signal) => signal.includes("missing online booking")))
+assert.match(callPrepArtifact.recommended_next_step, /Call now/)
+
+const callPrepRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/browser-intake/call-prep/route.ts"),
+  "utf8",
+)
+assert.match(callPrepRoute, /buildBrowserIntakeCallPrep/)
+assert.match(callPrepRoute, /GROWTH_BROWSER_INTAKE_CALL_PREP_QA_MARKER/)
+
+const similarRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/browser-intake/similar-companies/route.ts"),
+  "utf8",
+)
+assert.match(similarRoute, /discoverBrowserIntakeSimilarCompanies/)
+
+const queueRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/browser-intake/prospect-queue/route.ts"),
+  "utf8",
+)
+assert.match(queueRoute, /processBrowserIntakeProspectQueue/)
+assert.match(queueRoute, /GROWTH_BROWSER_INTAKE_PROSPECT_QUEUE_ACTIONS/)
+
+const queueProcessor = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/browser-intake/process-browser-intake-prospect-queue.ts"),
+  "utf8",
+)
+assert.match(queueProcessor, /createBrowserIntakeContact/)
+assert.match(queueProcessor, /queueBrowserIntakeContactDiscovery/)
+assert.match(queueProcessor, /verifyEmailWithProvider/)
+assert.doesNotMatch(queueProcessor, /sendEmail|enroll|auto.?message/i)
+
+const phase2Js = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/extension-phase2.js"),
+  "utf8",
+)
+assert.match(phase2Js, /CALL_PREP_PATH/)
+assert.match(phase2Js, /SIMILAR_COMPANIES_PATH/)
+assert.match(phase2Js, /PROSPECT_QUEUE_PATH/)
+assert.match(phase2Js, /process_queue/)
+assert.match(phase2Js, /verify_emails/)
+assert.doesNotMatch(phase2Js, /auto.?message|enroll|sendEmail/i)
+
+const prospectQueueJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/extension-prospect-queue.js"),
+  "utf8",
+)
+assert.match(prospectQueueJs, /chrome.storage.local/)
+assert.match(prospectQueueJs, /MAX_QUEUE_ITEMS/)
+
+assert.match(crmContextBuilder, /timeline_preview/)
+assert.match(crmContextBuilder, /company_relationship_map/)
+
+assert.equal(GROWTH_BROWSER_EXTENSION_ANALYTICS_QA_MARKER, "growth-browser-extension-analytics-v1")
+assert.equal(GROWTH_BROWSER_INTAKE_RESEARCH_BRIEF_QA_MARKER, "growth-browser-intake-research-brief-v1")
+assert.equal(GROWTH_BROWSER_INTAKE_BUYING_COMMITTEE_QA_MARKER, "growth-browser-intake-buying-committee-v1")
+assert.equal(GROWTH_BROWSER_INTAKE_BUYING_COMMITTEE_TARGET_ROLES.length, 8)
+
+assert.equal(matchBrowserIntakeBuyingCommitteeTargetRole({ job_title: "VP Operations" })?.role, "VP Operations")
+assert.equal(
+  scoreBrowserIntakeBuyingCommitteeCandidate({ job_title: "Service Manager", sourceConfidence: 0.8 })
+    .matched_target_role,
+  "Service Manager",
+)
+
+const researchBrief = assembleBrowserIntakeResearchBrief({
+  lead: { id: "lead-1", companyName: "Acme", nextBestActionReason: "High intent" },
+  researchRun: {
+    id: "run-1",
+    leadId: "lead-1",
+    status: "completed",
+    websiteUrl: "https://acme.example",
+    companyName: "Acme",
+    industryGuess: "HVAC",
+    employeeSizeGuess: null,
+    revenueSizeGuess: null,
+    websiteMaturityScore: 50,
+    socialPresenceScore: null,
+    reputationScore: null,
+    technologyScore: null,
+    detectedTechnologies: [],
+    signals: { painSignals: [] },
+    competitors: [],
+    researchSummary: "Acme summary",
+    suggestedPitchAngle: "Angle",
+    suggestedSequence: null,
+    suggestedCallOpening: null,
+    recommendedNextAction: "Call Prospect",
+    researchConfidence: 70,
+    completedAt: new Date().toISOString(),
+    failedReason: null,
+    createdAt: new Date().toISOString(),
+  },
+  accountBrief: null,
+  companyDiscovery: null,
+})
+assert.match(researchBrief.company_summary, /Acme/)
+
+const analyticsSummary = aggregateBrowserExtensionAnalytics(
+  [
+    { type: "captures_created", at: new Date().toISOString() },
+    { type: "queue_saves", at: new Date().toISOString() },
+  ],
+  "today",
+)
+assert.equal(analyticsSummary.counts.captures_created, 1)
+assert.equal(analyticsSummary.counts.queue_saves, 1)
+
+const committeeDiscoverRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/browser-intake/buying-committee/discover/route.ts"),
+  "utf8",
+)
+assert.match(committeeDiscoverRoute, /discoverBrowserIntakeBuyingCommittee/)
+
+const committeeImportRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/browser-intake/buying-committee/import/route.ts"),
+  "utf8",
+)
+assert.match(committeeImportRoute, /importBrowserIntakeBuyingCommitteeSelections/)
+
+const researchBriefRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/browser-intake/research-brief/route.ts"),
+  "utf8",
+)
+assert.match(researchBriefRoute, /buildBrowserIntakeResearchBrief/)
+
+const copilotJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/extension-copilot.js"),
+  "utf8",
+)
+assert.match(copilotJs, /data-copilot-tab-btn/)
+assert.match(copilotJs, /"analytics"/)
+assert.match(copilotJs, /es-timeline-item/)
+assert.match(copilotJs, /RESEARCH_BRIEF_PATH/)
+assert.match(copilotJs, /BUYING_COMMITTEE_DISCOVER_PATH/)
+assert.match(copilotJs, /BUYING_COMMITTEE_IMPORT_PATH/)
+assert.match(copilotJs, /importSelectedCommittee/)
+assert.doesNotMatch(copilotJs, /auto.?import|enroll|sendEmail/i)
+
+const analyticsJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/extension-analytics.js"),
+  "utf8",
+)
+assert.match(analyticsJs, /research_briefs_generated/)
+assert.match(analyticsJs, /call_preps_generated/)
+assert.match(analyticsJs, /duplicates_prevented/)
+
+const sidepanelHtml = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/sidepanel.html"),
+  "utf8",
+)
+assert.match(sidepanelHtml, /es-rail/)
+assert.match(sidepanelHtml, /data-copilot-tab-btn="analytics"/)
+assert.match(sidepanelHtml, /equipify-logo.png/)
+assert.match(sidepanelHtml, /es-rail-nav/)
+assert.match(sidepanelHtml, /analytics-today/)
+assert.match(sidepanelHtml, /extension-version-banner/)
+assert.match(sidepanelHtml, /bootstrap-loading/)
+
+const popupHtml = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/popup.html"),
+  "utf8",
+)
+assert.match(popupHtml, /Equipify Sales/)
+assert.match(popupHtml, /data-popup-tab-btn/)
+assert.match(popupHtml, /extension-ui.js/)
+assert.match(popupHtml, /equipify-logo.png/)
+assert.match(popupHtml, /extension-version-banner/)
+assert.match(popupHtml, /bootstrap-loading/)
+assert.match(popupHtml, /Capture page/)
+assert.match(popupHtml, /extension-version.js/)
+assert.match(popupHtml, /extension-analytics.js/)
+
+const versionJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/extension-version.js"),
+  "utf8",
+)
+assert.match(versionJs, /resolveVersionSnapshot/)
+assert.match(versionJs, /isOutdated/)
+
+const lookupCacheJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/extension-lookup-cache.js"),
+  "utf8",
+)
+assert.match(lookupCacheJs, /TTL_MS/)
+assert.match(lookupCacheJs, /invalidate/)
+
+assert.equal(compareSemver("4.0.0", "3.2.0"), 1)
+assert.equal(compareSemver("3.2.0", "4.0.0"), -1)
+assert.equal(isGrowthBrowserExtensionOutdated("3.2.0", "4.0.0"), true)
+assert.equal(isGrowthBrowserExtensionOutdated("4.0.0", "4.0.0"), false)
+
+const lookupCache = new Map()
+const cacheKey = buildGrowthBrowserExtensionLookupCacheKey("crm_context", "company_name=Acme")
+writeGrowthBrowserExtensionLookupCache(lookupCache, cacheKey, { ok: true }, GROWTH_BROWSER_EXTENSION_LOOKUP_CACHE_TTL_MS, 1_000)
+assert.deepEqual(readGrowthBrowserExtensionLookupCache(lookupCache, cacheKey, 1_050), { ok: true })
+assert.equal(readGrowthBrowserExtensionLookupCache(lookupCache, cacheKey, 50_000), null)
+
+assert.match(
+  formatGrowthBrowserExtensionVersionSnapshot({
+    installed_version: "3.2.0",
+    packaged_version: "4.0.0",
+    latest_available_version: "4.0.0",
+    git_sha: "abc1234",
+    build_timestamp: "2026-05-28T12:00:00.000Z",
+    is_outdated: true,
+  }),
+  /Installed v3.2.0/,
+)
+
+assert.match(intakeAppJs, /initExtensionCopilot/)
+assert.match(extensionConfigJs, /RESEARCH_BRIEF_PATH/)
+
+console.log("growth-browser-intake v4 checks passed")

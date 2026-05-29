@@ -138,10 +138,10 @@ export default function AdminGrowthBrowserIntakeTestPage() {
               <Globe size={17} />
             </span>
             <div>
-              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Browser Intake Test</h1>
+              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Equipify Sales Test</h1>
               <p className="text-sm text-muted-foreground">
-                Debug form for the future Chrome extension intake API. Submits operator-captured
-                company and contact data into Growth Engine without outreach or sequence enrollment.
+                Debug form for the Equipify Sales Chrome extension intake API. Submits operator-captured company and
+                contact data into Growth Engine without outreach or sequence enrollment.
               </p>
             </div>
           </div>
@@ -323,7 +323,7 @@ export default function AdminGrowthBrowserIntakeTestPage() {
 
           <div className="flex flex-wrap gap-2">
             <Button type="submit" disabled={saving}>
-              {saving ? "Submitting…" : "Submit browser intake"}
+              {saving ? "Submitting…" : "Submit capture"}
             </Button>
             <Button type="button" variant="outline" onClick={handleReset} disabled={saving}>
               Reset

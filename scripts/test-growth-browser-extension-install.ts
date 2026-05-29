@@ -9,6 +9,7 @@ import { execSync } from "node:child_process"
 import {
   GROWTH_BROWSER_EXTENSION_DOWNLOAD_PATH,
   GROWTH_BROWSER_EXTENSION_PACKAGE_FILES,
+  GROWTH_BROWSER_EXTENSION_PACKAGE_FOLDER,
   GROWTH_BROWSER_EXTENSION_QA_MARKER,
 } from "../lib/growth/browser-intake/extension-install-types"
 import {
@@ -21,10 +22,10 @@ import {
 } from "./lib/growth-extension-package"
 
 assert.equal(GROWTH_BROWSER_EXTENSION_QA_MARKER, "growth-browser-extension-install-v1")
-assert.equal(GROWTH_BROWSER_EXTENSION_DOWNLOAD_PATH, "/downloads/growth-browser-intake.zip")
+assert.equal(GROWTH_BROWSER_EXTENSION_DOWNLOAD_PATH, "/downloads/equipify-sales.zip")
 assert.equal(
   GROWTH_BROWSER_EXTENSION_PACKAGE_METADATA_DOWNLOAD_PATH,
-  "/downloads/growth-browser-intake-package-metadata.json",
+  "/downloads/equipify-sales-package-metadata.json",
 )
 
 const packageScript = fs.readFileSync(
@@ -49,10 +50,11 @@ const cardSource = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-browser-extension-install-card.tsx"),
   "utf8",
 )
-assert.match(cardSource, /Chrome Extension/)
+assert.match(cardSource, /Equipify Sales/)
 assert.match(cardSource, /View install instructions/)
-assert.match(cardSource, /Download ZIP/)
+assert.match(cardSource, /Download Equipify Sales ZIP/)
 assert.match(cardSource, /GROWTH_BROWSER_EXTENSION_DIR/)
+assert.match(cardSource, /Latest available/)
 assert.match(cardSource, /formatGrowthBrowserExtensionPackageMetadata/)
 assert.match(cardSource, /GROWTH_BROWSER_EXTENSION_PACKAGE_METADATA_DOWNLOAD_PATH/)
 assert.doesNotMatch(cardSource, /api[_-]?key|secret|password|token/i)
@@ -61,13 +63,14 @@ const intakeAppJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/intake-app.js"),
   "utf8",
 )
-assert.match(intakeAppJs, /package-metadata\.json/)
-assert.match(intakeAppJs, /extension-build-meta/)
+assert.match(intakeAppJs, /EquipifyGrowthExtensionVersion/)
+assert.match(intakeAppJs, /loadVersionInfo/)
+assert.match(intakeAppJs, /extension-version-warning/)
 
 execSync("pnpm package:growth-extension", { stdio: "inherit" })
 
-const zipPath = path.join(process.cwd(), "public/downloads/growth-browser-intake.zip")
-const metadataPath = path.join(process.cwd(), "public/downloads/growth-browser-intake-package-metadata.json")
+const zipPath = path.join(process.cwd(), "public/downloads/equipify-sales.zip")
+const metadataPath = path.join(process.cwd(), "public/downloads/equipify-sales-package-metadata.json")
 assert.ok(fs.existsSync(zipPath), "Expected packaged ZIP to exist after package script.")
 assert.ok(fs.existsSync(metadataPath), "Expected package metadata JSON beside ZIP.")
 
@@ -81,11 +84,11 @@ assert.ok(metadata.generated_at)
 
 const zipListing = execSync(`unzip -l "${zipPath}"`, { encoding: "utf8" })
 for (const file of GROWTH_BROWSER_EXTENSION_PACKAGE_FILES) {
-  assert.match(zipListing, new RegExp(`growth-browser-intake/${file.replace(".", "\\.")}`))
+  assert.match(zipListing, new RegExp(`${GROWTH_BROWSER_EXTENSION_PACKAGE_FOLDER}/${file.replace(".", "\\.")}`))
 }
 assert.match(
   zipListing,
-  new RegExp(`growth-browser-intake/${GROWTH_BROWSER_EXTENSION_PACKAGE_METADATA_FILENAME.replace(".", "\\.")}`),
+  new RegExp(`${GROWTH_BROWSER_EXTENSION_PACKAGE_FOLDER}/${GROWTH_BROWSER_EXTENSION_PACKAGE_METADATA_FILENAME.replace(".", "\\.")}`),
 )
 
 execSync("pnpm check:growth-extension-package", { stdio: "inherit" })
