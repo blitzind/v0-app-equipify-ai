@@ -31,6 +31,7 @@ const CreateBrowserIntakeContactSchema = z.object({
   capture_method: z.enum(GROWTH_BROWSER_INTAKE_CAPTURE_METHODS).optional().nullable(),
   company_only: z.boolean().optional(),
   queue_contact_discovery: z.boolean().optional(),
+  verify_email: z.boolean().optional(),
   intake_mode: z.enum(GROWTH_BROWSER_INTAKE_MODES).optional(),
   target_lead_id: z.string().uuid().optional().nullable(),
 })
@@ -69,6 +70,7 @@ export async function POST(request: Request) {
       capture_method: body.capture_method ?? "chrome_extension",
       company_only: body.company_only === true,
       queue_contact_discovery: body.queue_contact_discovery === true,
+      verify_email: body.verify_email === true,
       intake_mode: body.intake_mode,
       target_lead_id: body.target_lead_id,
       created_by: access.userId,

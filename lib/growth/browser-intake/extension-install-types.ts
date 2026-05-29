@@ -8,9 +8,15 @@ export const GROWTH_BROWSER_EXTENSION_DOWNLOAD_PATH = "/downloads/growth-browser
 
 export const GROWTH_BROWSER_EXTENSION_PACKAGE_FILES = [
   "manifest.json",
+  "background.js",
   "popup.html",
   "popup.js",
   "popup.css",
+  "sidepanel.html",
+  "sidepanel.js",
+  "intake-app.js",
+  "extension-config.js",
+  "extension-storage.js",
   "page-metadata.js",
 ] as const
 
@@ -19,5 +25,5 @@ export const GROWTH_BROWSER_EXTENSION_INSTALL_STEPS = [
   "Open chrome://extensions and enable Developer mode.",
   "Choose Load unpacked and select the extensions/growth-browser-intake folder from this repo.",
   "Or download the ZIP, unzip it, and load the extracted growth-browser-intake folder.",
-  "Pin the extension, open a website or LinkedIn page, and capture contacts into Growth Engine.",
+  "Pin the extension. Use the toolbar popup or Chrome side panel to capture contacts into Growth Engine.",
 ] as const

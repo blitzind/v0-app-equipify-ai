@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
-import { z } from "zod"
 import {
   findBrowserIntakeExistingLeads,
   GROWTH_BROWSER_INTAKE_LOOKUP_QA_MARKER,
   logBrowserIntakeLeadLookup,
   pickBestBrowserIntakeLeadMatch,
 } from "@/lib/growth/browser-intake/browser-intake-lead-lookup"
+import { formatBrowserIntakeMatchRuleLabel } from "@/lib/growth/browser-intake/browser-intake-match-labels"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 
 export const runtime = "nodejs"
@@ -33,6 +33,13 @@ export async function GET(request: Request) {
     limit: 5,
   })
   const bestMatch = pickBestBrowserIntakeLeadMatch(matches)
+  const enrichedMatches = matches.map((match) => ({
+    ...match,
+    match_label: formatBrowserIntakeMatchRuleLabel(match.rule),
+  }))
+  const enrichedBestMatch = bestMatch
+    ? { ...bestMatch, match_label: formatBrowserIntakeMatchRuleLabel(bestMatch.rule) }
+    : null
 
   logBrowserIntakeLeadLookup({
     matchCount: matches.length,
@@ -44,7 +51,7 @@ export async function GET(request: Request) {
     ok: true,
     qa_marker: GROWTH_BROWSER_INTAKE_LOOKUP_QA_MARKER,
     existing_lead_found: Boolean(bestMatch && bestMatch.confidence >= 0.7),
-    best_match: bestMatch,
-    matches,
+    best_match: enrichedBestMatch,
+    matches: enrichedMatches,
   })
 }

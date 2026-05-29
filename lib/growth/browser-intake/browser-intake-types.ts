@@ -45,6 +45,7 @@ export type GrowthBrowserIntakeContactInput = {
   capture_method?: GrowthBrowserIntakeCaptureMethod | string | null
   company_only?: boolean
   queue_contact_discovery?: boolean
+  verify_email?: boolean
   intake_mode?: GrowthBrowserIntakeMode
   target_lead_id?: string | null
 }
@@ -77,6 +78,8 @@ export type GrowthBrowserIntakeResultBase = {
   contact_discovery_queued?: boolean
   company_candidate_id?: string | null
   capture_type?: "company_only" | "contact"
+  email_status?: string | null
+  verified_by_provider?: boolean
 }
 
 export type GrowthBrowserIntakeResult =

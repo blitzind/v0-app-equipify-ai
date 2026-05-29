@@ -12,13 +12,13 @@
         <h1>Growth Capture</h1>
         <span id="capture-status" class="status-pill">Ready</span>
       </div>
+      <p class="header-subtitle">Side panel stays open while you browse.</p>
       <div class="header-actions">
-        <button type="button" id="open-side-panel-btn" class="btn-link">Open side panel</button>
         <button type="button" id="settings-toggle-btn" class="btn-link">Settings</button>
       </div>
     </header>
 
-    <section id="settings-panel" class="panel panel-settings" hidden>
+    <section id="settings-panel" class="panel panel-settings">
       <div class="panel-label">Extension settings</div>
       <label>
         API environment
@@ -37,6 +37,11 @@
       </label>
       <button type="button" id="save-settings-btn" class="btn-secondary">Save settings</button>
       <p id="settings-status" class="message" hidden role="status"></p>
+    </section>
+
+    <section id="recent-captures-panel" class="panel">
+      <div class="panel-label">Recent captures</div>
+      <div id="recent-captures-list" class="recent-list"></div>
     </section>
 
     <section id="detected-panel" class="panel" hidden>
@@ -141,6 +146,6 @@
     <script src="extension-config.js"></script>
     <script src="extension-storage.js"></script>
     <script src="intake-app.js"></script>
-    <script src="popup.js"></script>
+    <script src="sidepanel.js"></script>
   </body>
 </html>

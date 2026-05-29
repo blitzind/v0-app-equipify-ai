@@ -24,6 +24,10 @@ import {
   updateGrowthLeadFromImportMerge,
 } from "@/lib/growth/lead-repository"
 import { queueBrowserIntakeContactDiscovery } from "@/lib/growth/browser-intake/queue-browser-intake-contact-discovery"
+import {
+  buildEmailVerificationMetadata,
+  verifyEmailWithProvider,
+} from "@/lib/growth/contact-verification/email-verification-service"
 import { assertEmailSendAllowed } from "@/lib/growth/outbound/suppression-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { emitGrowthLeadCreatedTimeline } from "@/lib/growth/timeline-emitter"
@@ -157,6 +161,80 @@ async function maybeQueueContactDiscovery(
   return { queued: true, company_candidate_id: queued.company_candidate_id }
 }
 
+type BrowserIntakeEmailVerification = {
+  emailStatus: string | null
+  verifiedByProvider: boolean
+  metadata: Record<string, unknown>
+  warnings: GrowthBrowserIntakeWarning[]
+  suppressed?: {
+    reason: string
+    block_layer?: string | null
+  }
+}
+
+async function maybeVerifyBrowserIntakeEmail(
+  admin: SupabaseClient,
+  input: {
+    email: string | null
+    verifyEmail: boolean
+    leadId?: string | null
+  },
+): Promise<BrowserIntakeEmailVerification> {
+  const warnings: GrowthBrowserIntakeWarning[] = []
+  if (!input.email) {
+    return { emailStatus: null, verifiedByProvider: false, metadata: {}, warnings }
+  }
+
+  if (!input.verifyEmail) {
+    warnings.push({
+      code: "email_unverified",
+      message: "Email saved without provider verification. Status is unknown until verified.",
+    })
+    return { emailStatus: "unknown", verifiedByProvider: false, metadata: {}, warnings }
+  }
+
+  const verification = await verifyEmailWithProvider(input.email, {
+    admin,
+    leadId: input.leadId ?? null,
+  })
+  if (!verification) {
+    return { emailStatus: "unknown", verifiedByProvider: false, metadata: {}, warnings }
+  }
+
+  const metadata = buildEmailVerificationMetadata(verification)
+  if (verification.email_status === "blocked" || verification.blocked_by_suppression) {
+    return {
+      emailStatus: verification.email_status,
+      verifiedByProvider: verification.verified_by_provider,
+      metadata,
+      warnings: [
+        {
+          code: "verification_blocked",
+          message: verification.reasons.join(" · ") || "Email failed verification or suppression.",
+        },
+      ],
+      suppressed: {
+        reason: verification.reasons[0] ?? "email_blocked",
+        block_layer: verification.provider_sub_status,
+      },
+    }
+  }
+
+  if (verification.email_status === "invalid") {
+    warnings.push({
+      code: "email_invalid",
+      message: `Email marked invalid by verification (${verification.provider_name ?? "provider"}). Lead was still saved.`,
+    })
+  }
+
+  return {
+    emailStatus: verification.email_status,
+    verifiedByProvider: verification.verified_by_provider,
+    metadata,
+    warnings,
+  }
+}
+
 async function finalizeBrowserIntakeLead(
   admin: SupabaseClient,
   input: {
@@ -234,6 +312,7 @@ export async function createBrowserIntakeContact(
     : "contact"
   const intakeMode = input.intake_mode ?? "default"
   const queueContactDiscovery = input.queue_contact_discovery === true
+  const verifyEmail = input.verify_email === true
 
   if (!companyName) {
     return { status: "error", message: "company_name_required", warnings }
@@ -271,6 +350,23 @@ export async function createBrowserIntakeContact(
     }
   }
 
+  const emailVerification = await maybeVerifyBrowserIntakeEmail(admin, {
+    email,
+    verifyEmail,
+  })
+  warnings.push(...emailVerification.warnings)
+  if (emailVerification.suppressed) {
+    return {
+      status: "suppressed",
+      reason: emailVerification.suppressed.reason,
+      block_layer: emailVerification.suppressed.block_layer ?? null,
+      warnings,
+      capture_type: captureType,
+      email_status: emailVerification.emailStatus,
+      verified_by_provider: emailVerification.verifiedByProvider,
+    }
+  }
+
   if (intakeMode === "update_existing" && input.target_lead_id) {
     const existingLead = await fetchGrowthLeadById(admin, input.target_lead_id)
     if (!existingLead) {
@@ -278,6 +374,12 @@ export async function createBrowserIntakeContact(
     }
 
     const patch = buildBrowserIntakeMergePatch(existingLead, normalized, capture)
+    if (Object.keys(emailVerification.metadata).length > 0) {
+      patch.metadata = {
+        ...(patch.metadata as Record<string, unknown>),
+        ...emailVerification.metadata,
+      }
+    }
     const lead = await updateGrowthLeadFromImportMerge(admin, existingLead.id, patch)
     if (!lead) {
       return { status: "error", message: "merge_failed", warnings, capture_type: captureType }
@@ -313,6 +415,8 @@ export async function createBrowserIntakeContact(
       contact_discovery_queued: finalized.contactDiscoveryQueued,
       company_candidate_id: finalized.companyCandidateId,
       capture_type: captureType,
+      email_status: emailVerification.emailStatus,
+      verified_by_provider: emailVerification.verifiedByProvider,
     }
   }
 
@@ -336,6 +440,12 @@ export async function createBrowserIntakeContact(
     }
 
     const patch = buildBrowserIntakeMergePatch(existingLead, normalized, capture)
+    if (Object.keys(emailVerification.metadata).length > 0) {
+      patch.metadata = {
+        ...(patch.metadata as Record<string, unknown>),
+        ...emailVerification.metadata,
+      }
+    }
     const lead = await updateGrowthLeadFromImportMerge(admin, dedupe.leadId, patch)
     if (!lead) {
       return { status: "error", message: "merge_failed", warnings, capture_type: captureType }
@@ -373,6 +483,8 @@ export async function createBrowserIntakeContact(
       contact_discovery_queued: finalized.contactDiscoveryQueued,
       company_candidate_id: finalized.companyCandidateId,
       capture_type: captureType,
+      email_status: emailVerification.emailStatus,
+      verified_by_provider: emailVerification.verifiedByProvider,
     }
   }
 
@@ -387,6 +499,7 @@ export async function createBrowserIntakeContact(
     browser_extension: capture,
     browser_extension_captures: [capture],
     ...buildDefaultCapturedLeadReviewMetadata(),
+    ...emailVerification.metadata,
     ...(captureType === "company_only"
       ? {
           company_prospect: {
@@ -452,6 +565,8 @@ export async function createBrowserIntakeContact(
       contact_discovery_queued: finalized.contactDiscoveryQueued,
       company_candidate_id: finalized.companyCandidateId,
       capture_type: captureType,
+      email_status: emailVerification.emailStatus,
+      verified_by_provider: emailVerification.verifiedByProvider,
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "create_failed"

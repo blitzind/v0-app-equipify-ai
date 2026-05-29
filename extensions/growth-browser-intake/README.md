@@ -1,6 +1,6 @@
 # Equipify Growth Browser Intake (Chrome Extension)
 
-Manifest V3 extension with **V2 Smart Capture** for Equipify Growth Engine.
+Manifest V3 extension with **V3 Side Panel + Capture History** for Equipify Growth Engine.
 
 ## Install from Growth Engine UI
 
@@ -17,7 +17,7 @@ The **Chrome Extension** card shows the local repo path and a ZIP download when 
 1. Sign in to [app.equipify.ai](https://app.equipify.ai) as a platform admin in Chrome.
 2. Open `chrome://extensions` → enable **Developer mode**.
 3. **Load unpacked** → select `extensions/growth-browser-intake` from this repo.
-4. Pin the extension and open it on a website or LinkedIn page.
+4. Pin the extension. Use the toolbar popup or open the **side panel** from Chrome’s extension menu for prospecting.
 
 ## Install (ZIP download)
 
@@ -37,14 +37,15 @@ After download:
 2. In Chrome, open `chrome://extensions` → **Developer mode** → **Load unpacked**.
 3. Select the unzipped `growth-browser-intake` folder.
 
-## V2 features
+## V3 features
 
+- **Chrome Side Panel** stays open while browsing (popup remains as fallback).
+- **Recent captures** — last 5 saved leads in the side panel.
+- **Post-save next steps** — open lead, view in Recently Captured, email verification status, contact discovery queue status.
+- **Extension settings** — production vs local dev API base URL; optional verify-email and queue-discovery defaults.
+- **Duplicate match labels** — matched by domain, LinkedIn URL, or company name.
 - **Smart company detection** from visible page metadata only (`document.title`, Open Graph, canonical URL, JSON-LD).
-- **Existing lead detection** via Growth Engine lookup (domain, LinkedIn URL, company name).
-- **Quick Save** mode for fast contact entry (name, email, phone, title).
-- **Company-only capture** when no contact fields are provided.
-- **Optional contact discovery queue** (non-blocking background enrichment).
-- **No hidden scraping**, no LinkedIn API bypass, no secrets stored.
+- **No hidden scraping**, no LinkedIn API bypass, no secrets stored, no auto-messaging or outreach enrollment.
 
 ## API endpoints used
 

@@ -1,0 +1,1 @@
+window.initEquipifyGrowthIntakeApp({ surface: "sidepanel" })

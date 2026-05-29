@@ -1,12 +1,18 @@
 {
   "manifest_version": 3,
   "name": "Equipify Growth Intake",
-  "version": "2.0.0",
-  "description": "Smart capture for Equipify Growth Engine — visible page metadata only.",
-  "permissions": ["activeTab", "scripting"],
-  "host_permissions": ["https://app.equipify.ai/*", "https://*/*", "http://*/*"],
+  "version": "3.0.0",
+  "description": "Smart capture for Equipify Growth Engine — side panel, capture history, visible metadata only.",
+  "permissions": ["activeTab", "scripting", "storage", "sidePanel"],
+  "host_permissions": ["https://app.equipify.ai/*", "http://localhost:3000/*", "https://*/*", "http://*/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "Capture to Equipify Growth"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
   }
 }

@@ -19,6 +19,95 @@ body {
   padding: 12px;
 }
 
+body.surface-sidepanel {
+  width: 100%;
+  min-width: 320px;
+  max-width: 420px;
+  max-height: none;
+  min-height: 100vh;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.header-subtitle {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.match-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #92400e;
+  margin-bottom: 4px;
+}
+
+.panel-settings select {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font: inherit;
+  background: #fff;
+}
+
+.panel-success {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.success-meta {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #334155;
+  display: grid;
+  gap: 4px;
+}
+
+.meta-key {
+  font-weight: 600;
+  color: #64748b;
+}
+
+.recent-list {
+  display: grid;
+  gap: 8px;
+}
+
+.recent-item {
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.recent-item-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.recent-item-meta {
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+.recent-empty {
+  margin: 0;
+  font-size: 12px;
+}
+
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: #334155;
+}
+
 .header-row {
   display: flex;
   align-items: center;
