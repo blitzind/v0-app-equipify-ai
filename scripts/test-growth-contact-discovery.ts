@@ -645,6 +645,26 @@ async function main(): Promise<void> {
   assert.match(orchestrationSource, /augmentProspectSearchCompaniesWithPdl/)
   assert.match(orchestrationSource, /pdl_augmentation/)
 
+  const pdlHealthDashboardSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/growth-pdl-provider-health-dashboard.tsx"),
+    "utf8",
+  )
+  assert.match(pdlHealthDashboardSource, /GROWTH_PDL_PROVIDER_HEALTH_QA_MARKER/)
+  assert.match(pdlHealthDashboardSource, /Run PDL test lookup/)
+
+  const pdlHealthRouteSource = fs.readFileSync(
+    path.join(process.cwd(), "app/api/platform/growth/contact-discovery/provider-health/route.ts"),
+    "utf8",
+  )
+  assert.match(pdlHealthRouteSource, /test_pdl_lookup/)
+  assert.match(pdlHealthRouteSource, /loadGrowthPdlProviderHealth/)
+
+  const providerHealthPageSource = fs.readFileSync(
+    path.join(process.cwd(), "app/(admin)/admin/growth/settings/provider-health/page.tsx"),
+    "utf8",
+  )
+  assert.match(providerHealthPageSource, /GrowthPdlProviderHealthDashboard/)
+
   console.log("growth-contact-discovery-v1 checks passed")
 }
 

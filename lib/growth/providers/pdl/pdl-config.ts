@@ -24,8 +24,8 @@ export function isPdlSandboxEnabled(): boolean {
   return true
 }
 
-export function resolvePdlPersonSearchBaseUrl(): string {
-  return isPdlSandboxEnabled()
+export function resolvePdlPersonSearchBaseUrl(sandbox = isPdlSandboxEnabled()): string {
+  return sandbox
     ? "https://sandbox.api.peopledatalabs.com/v5/person/search"
     : "https://api.peopledatalabs.com/v5/person/search"
 }

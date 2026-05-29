@@ -13,6 +13,7 @@ import {
   searchPdlPeopleByCompany,
 } from "@/lib/growth/providers/pdl/pdl-client"
 import { GROWTH_PDL_PROVIDER_QA_MARKER } from "@/lib/growth/providers/pdl/pdl-types"
+import { recordPdlProviderPersistedContacts } from "@/lib/growth/providers/pdl/pdl-provider-diagnostics"
 
 export { GROWTH_PDL_PROVIDER_QA_MARKER }
 
@@ -74,13 +75,14 @@ export function createPeopleDataLabsContactDiscoveryProvider(
       })
 
       if (contacts.length > 0) {
-        await upsertProviderCompanyContacts(admin, {
+        const persisted = await upsertProviderCompanyContacts(admin, {
           company_id: input.company_candidate_id,
           growth_lead_id: input.growth_lead_id,
           provider_type: "future_people_data_labs",
           provider_name: "people_data_labs",
           contacts,
         })
+        recordPdlProviderPersistedContacts({ contacts_persisted: persisted })
       }
 
       return {

@@ -10,6 +10,13 @@ import {
 } from "@/lib/growth/providers/pdl/pdl-config"
 import { buildPdlPersonSearchQuery } from "@/lib/growth/providers/pdl/pdl-query-builder"
 import {
+  isPdlRateLimitError,
+  recordPdlProviderCalled,
+  recordPdlProviderFailed,
+  recordPdlProviderReturnedContacts,
+  recordPdlProviderSkipped,
+} from "@/lib/growth/providers/pdl/pdl-provider-diagnostics"
+import {
   GROWTH_PDL_PROVIDER_QA_MARKER,
   type PdlPersonSearchInput,
   type PdlPersonSearchResponse,
@@ -20,15 +27,23 @@ export { getPdlApiKey, isPdlApiConfigured, isPdlDiscoveryDisabled, isPdlSandboxE
 
 export async function searchPdlPeopleByCompany(
   input: PdlPersonSearchInput,
-  options?: { apiKey?: string },
+  options?: { apiKey?: string; sandbox?: boolean },
 ): Promise<PdlPersonSearchResult> {
-  const sandbox = isPdlSandboxEnabled()
+  const sandbox = options?.sandbox ?? isPdlSandboxEnabled()
+  const started = performance.now()
+  const finishLatency = () => Math.round(performance.now() - started)
 
   if (isPdlDiscoveryDisabled()) {
+    const message = "PDL discovery disabled via GROWTH_DISCOVERY_DISABLE_PDL."
+    recordPdlProviderSkipped({
+      reason: message,
+      sandbox,
+      latency_ms: finishLatency(),
+    })
     return {
       qa_marker: GROWTH_PDL_PROVIDER_QA_MARKER,
       status: "skipped",
-      message: "PDL discovery disabled via GROWTH_DISCOVERY_DISABLE_PDL.",
+      message,
       people: [],
       total: 0,
       sandbox,
@@ -38,10 +53,16 @@ export async function searchPdlPeopleByCompany(
 
   const apiKey = options?.apiKey ?? getPdlApiKey()
   if (!apiKey) {
+    const message = "PEOPLE_DATA_LABS_API_KEY not configured."
+    recordPdlProviderSkipped({
+      reason: message,
+      sandbox,
+      latency_ms: finishLatency(),
+    })
     return {
       qa_marker: GROWTH_PDL_PROVIDER_QA_MARKER,
       status: "skipped",
-      message: "PEOPLE_DATA_LABS_API_KEY not configured.",
+      message,
       people: [],
       total: 0,
       sandbox,
@@ -52,10 +73,16 @@ export async function searchPdlPeopleByCompany(
   const domain = input.domain?.trim()
   const companyName = input.company_name.trim()
   if (!domain && !companyName) {
+    const message = "Company domain or name required for PDL person search."
+    recordPdlProviderSkipped({
+      reason: message,
+      sandbox,
+      latency_ms: finishLatency(),
+    })
     return {
       qa_marker: GROWTH_PDL_PROVIDER_QA_MARKER,
       status: "skipped",
-      message: "Company domain or name required for PDL person search.",
+      message,
       people: [],
       total: 0,
       sandbox,
@@ -66,8 +93,10 @@ export async function searchPdlPeopleByCompany(
   const { query, summary } = buildPdlPersonSearchQuery(input)
   const limit = Math.min(Math.max(input.limit ?? 20, 1), 100)
 
+  recordPdlProviderCalled({ query_summary: summary, sandbox })
+
   try {
-    const res = await fetch(resolvePdlPersonSearchBaseUrl(), {
+    const res = await fetch(resolvePdlPersonSearchBaseUrl(sandbox), {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -82,11 +111,21 @@ export async function searchPdlPeopleByCompany(
     })
 
     const parsed = await safeDiscoveryProviderResponse<PdlPersonSearchResponse>(res)
+    const latency_ms = finishLatency()
+
     if (!parsed.ok) {
+      const message = parsed.error ?? "PDL person search request failed."
+      recordPdlProviderFailed({
+        reason: message,
+        query_summary: summary,
+        sandbox,
+        latency_ms,
+        rate_limited: isPdlRateLimitError(message),
+      })
       return {
         qa_marker: GROWTH_PDL_PROVIDER_QA_MARKER,
         status: "failed",
-        message: parsed.error ?? "PDL person search request failed.",
+        message,
         people: [],
         total: 0,
         sandbox,
@@ -102,6 +141,13 @@ export async function searchPdlPeopleByCompany(
         typeof payload.error === "string"
           ? payload.error
           : payload.error?.message ?? `PDL person search failed (${status}).`
+      recordPdlProviderFailed({
+        reason: errorMessage,
+        query_summary: summary,
+        sandbox,
+        latency_ms,
+        rate_limited: isPdlRateLimitError(errorMessage),
+      })
       return {
         qa_marker: GROWTH_PDL_PROVIDER_QA_MARKER,
         status: "failed",
@@ -115,6 +161,14 @@ export async function searchPdlPeopleByCompany(
     }
 
     const people = Array.isArray(payload.data) ? payload.data : []
+    recordPdlProviderReturnedContacts({
+      contacts_returned: people.length,
+      total_available: typeof payload.total === "number" ? payload.total : people.length,
+      query_summary: summary,
+      sandbox,
+      latency_ms,
+    })
+
     return {
       qa_marker: GROWTH_PDL_PROVIDER_QA_MARKER,
       status: "success",
@@ -129,6 +183,14 @@ export async function searchPdlPeopleByCompany(
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "PDL person search failed."
+    const latency_ms = finishLatency()
+    recordPdlProviderFailed({
+      reason: message,
+      query_summary: summary,
+      sandbox,
+      latency_ms,
+      rate_limited: isPdlRateLimitError(message),
+    })
     return {
       qa_marker: GROWTH_PDL_PROVIDER_QA_MARKER,
       status: "failed",

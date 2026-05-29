@@ -3,6 +3,7 @@
 import { Activity } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthProspectSearchProviderHealthDashboard } from "@/components/growth/growth-prospect-search-provider-health-dashboard"
+import { GrowthPdlProviderHealthDashboard } from "@/components/growth/growth-pdl-provider-health-dashboard"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -39,7 +40,10 @@ export default function AdminGrowthProviderHealthPage() {
         </section>
 
         <GrowthSectionLayout>
-          <GrowthProspectSearchProviderHealthDashboard />
+          <div className="space-y-8">
+            <GrowthProspectSearchProviderHealthDashboard />
+            <GrowthPdlProviderHealthDashboard />
+          </div>
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>
