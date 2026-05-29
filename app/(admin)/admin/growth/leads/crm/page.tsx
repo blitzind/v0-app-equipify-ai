@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation"
 import { useAdmin } from "@/lib/admin-store"
 import { Button } from "@/components/ui/button"
 import { GrowthLeadFormDialog, type GrowthLeadFormValues } from "@/components/growth/growth-lead-form-dialog"
+import { GrowthManualContactFormDialog } from "@/components/growth/growth-manual-contact-form-dialog"
 import { GrowthLeadDrawer } from "@/components/growth/growth-lead-drawer"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import { GrowthLeadsTable } from "@/components/growth/growth-leads-table"
@@ -36,6 +37,7 @@ export default function AdminGrowthLeadsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [manualContactOpen, setManualContactOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [archivingLeadId, setArchivingLeadId] = useState<string | null>(null)
   const [bulkArchiving, setBulkArchiving] = useState(false)
@@ -284,6 +286,10 @@ export default function AdminGrowthLeadsPage() {
                 {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}
                 Refresh
               </Button>
+              <Button size="sm" variant="outline" onClick={() => setManualContactOpen(true)}>
+                <Plus className="mr-2 size-4" />
+                Add contact manually
+              </Button>
               <Button size="sm" onClick={() => setCreateOpen(true)}>
                 <Plus className="mr-2 size-4" />
                 Add lead
@@ -351,6 +357,19 @@ export default function AdminGrowthLeadsPage() {
       />
 
       <GrowthLeadFormDialog open={createOpen} onOpenChange={setCreateOpen} onSubmit={createLead} saving={saving} />
+
+      <GrowthManualContactFormDialog
+        open={manualContactOpen}
+        onOpenChange={setManualContactOpen}
+        onSuccess={(entry) => {
+          if (entry.status === "created") {
+            void load()
+            setSuccessMessage("Manual contact added and linked to a new growth lead.")
+          } else if (entry.status === "linked_duplicate") {
+            setSuccessMessage("Matched an existing lead — no duplicate was created.")
+          }
+        }}
+      />
     </PlatformAdminPageShell>
   )
 }

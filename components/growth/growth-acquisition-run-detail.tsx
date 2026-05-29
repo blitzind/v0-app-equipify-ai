@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Loader2, RefreshCw, Zap } from "lucide-react"
+import { ArrowLeft, Loader2, Plus, RefreshCw, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import {
   GrowthAcquisitionRunPauseButton,
 } from "@/components/growth/growth-acquisition-runs-dashboard"
+import { GrowthManualContactFormDialog } from "@/components/growth/growth-manual-contact-form-dialog"
 import type {
   GrowthBulkAcquisitionArtifactView,
   GrowthBulkAcquisitionCompanyArtifact,
@@ -49,6 +50,7 @@ export function GrowthAcquisitionRunDetail({ runId }: { runId: string }) {
   const [contacts, setContacts] = useState<GrowthBulkAcquisitionContactArtifact[]>([])
   const [verified, setVerified] = useState<GrowthBulkAcquisitionContactArtifact[]>([])
   const [leads, setLeads] = useState<GrowthBulkAcquisitionLeadArtifact[]>([])
+  const [manualContactOpen, setManualContactOpen] = useState(false)
 
   const loadRun = useCallback(async () => {
     setLoading(true)
@@ -176,6 +178,10 @@ export function GrowthAcquisitionRunDetail({ runId }: { runId: string }) {
           </Link>
         </Button>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => setManualContactOpen(true)}>
+            <Plus className="mr-2 size-4" />
+            Add contact manually
+          </Button>
           <GrowthAcquisitionRunPauseButton run={run} onUpdated={setRun} />
           <Button variant="outline" onClick={() => void loadRun()} disabled={loading}>
             <RefreshCw className="mr-2 size-4" />
@@ -337,6 +343,15 @@ export function GrowthAcquisitionRunDetail({ runId }: { runId: string }) {
           />
         )}
       </GrowthEngineCard>
+
+      <GrowthManualContactFormDialog
+        open={manualContactOpen}
+        onOpenChange={setManualContactOpen}
+        acquisitionRunId={runId}
+        onSuccess={() => {
+          void loadArtifacts("leads")
+        }}
+      />
     </div>
   )
 }
