@@ -49,6 +49,25 @@
     return rootNode
   }
 
+  function buildPageContext() {
+    return {
+      metadata: window.__equipifyGrowthExtract?.() ?? null,
+      visiblePeople: window.__equipifyGrowthLinkedInCompanyPeople?.() ?? [],
+      tabUrl: window.location.href,
+    }
+  }
+
+  function sendContextToIframe() {
+    if (!iframeNode?.contentWindow) return
+    iframeNode.contentWindow.postMessage(
+      {
+        type: "equipify-inpage-context",
+        ...buildPageContext(),
+      },
+      "*",
+    )
+  }
+
   function setDockOffset(open) {
     document
       .getElementById("equipify-sales-linkedin-floating-dock")
@@ -65,7 +84,7 @@
     setDockOffset(open)
 
     if (open && iframeNode?.contentWindow) {
-      iframeNode.contentWindow.postMessage({ type: "equipify-inpage-sidebar-opened" }, "*")
+      sendContextToIframe()
     }
   }
 
@@ -102,7 +121,10 @@
     if (event.source !== iframeNode?.contentWindow) return
     if (event.data?.type === "equipify-inpage-sidebar-close") close()
     if (event.data?.type === "equipify-inpage-sidebar-refresh") {
-      iframeNode?.contentWindow?.postMessage({ type: "equipify-inpage-sidebar-refresh" }, "*")
+      sendContextToIframe()
+    }
+    if (event.data?.type === "equipify-inpage-sidebar-ready") {
+      sendContextToIframe()
     }
   })
 

@@ -30,6 +30,9 @@ function initIntakeApp(options) {
     linkedinLookup: null,
     linkedinPageKind: null,
     crmContext: null,
+    visibleLinkedInPeople: [],
+    inpageTabUrl: null,
+    inpageContextReceived: false,
   }
 
   const els = {
@@ -144,7 +147,7 @@ function initIntakeApp(options) {
     }
   }
 
-  async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+  async function fetchWithTimeout(url, options = {}, timeoutMs = 4000) {
     const controller = new AbortController()
     const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
     try {
@@ -204,6 +207,7 @@ function initIntakeApp(options) {
       source_url: trimOrNull(document.getElementById("source-url")?.value),
       source_platform: document.getElementById("source-platform-input")?.value || "website",
       page_title: trimOrNull(document.getElementById("page-title-input")?.value),
+      location: trimOrNull(document.getElementById("location-input")?.value),
       notes: trimOrNull(document.getElementById("notes")?.value),
       queue_contact_discovery: state.settings.queueContactDiscovery,
       verify_email: state.settings.verifyEmailBeforeSave,
@@ -214,13 +218,18 @@ function initIntakeApp(options) {
   }
 
   function applyDetectedMetadata(metadata, tabUrl) {
+    if (!metadata) return
     state.detected = metadata
     const companyName = trimOrNull(metadata?.company_name)
     const website = trimOrNull(metadata?.website)
     const linkedinUrl = trimOrNull(metadata?.linkedin_url)
+    const linkedinCompanyUrl = trimOrNull(metadata?.linkedin_company_url)
     const sourceUrl = trimOrNull(metadata?.source_url) || trimOrNull(tabUrl)
     const platform = metadata?.source_platform || "website"
     const pageTitle = trimOrNull(metadata?.page_title)
+    const contactName = trimOrNull(metadata?.contact_name)
+    const headline = trimOrNull(metadata?.headline)
+    const location = trimOrNull(metadata?.location)
 
     const sourceUrlInput = document.getElementById("source-url")
     const platformInput = document.getElementById("source-platform-input")
@@ -228,6 +237,9 @@ function initIntakeApp(options) {
     const companyInput = document.getElementById("company-name")
     const websiteInput = document.getElementById("website")
     const linkedinInput = document.getElementById("linkedin-url")
+    const contactInput = document.getElementById("contact-name")
+    const titleInput = document.getElementById("title")
+    const locationInput = document.getElementById("location-input")
 
     if (sourceUrlInput) sourceUrlInput.value = sourceUrl ?? ""
     if (platformInput) platformInput.value = platform
@@ -235,32 +247,60 @@ function initIntakeApp(options) {
     if (companyName && companyInput) companyInput.value = companyName
     if (website && websiteInput) websiteInput.value = website
     if (linkedinUrl && linkedinInput) linkedinInput.value = linkedinUrl
+    if (contactName && contactInput && !trimOrNull(contactInput.value)) contactInput.value = contactName
+    if (headline && titleInput && !trimOrNull(titleInput.value)) titleInput.value = headline
+    if (location && locationInput) locationInput.value = location
 
-    if (companyName) {
+    if (linkedinCompanyUrl && linkedinInput && !trimOrNull(linkedinInput.value) && platform === "linkedin") {
+      // keep profile URL on profile pages; company URL stays on detected metadata
+    }
+
+    if (companyName || contactName) {
       if (els.detectedPanel) els.detectedPanel.hidden = false
-      if (els.detectedCompany) els.detectedCompany.textContent = companyName
+      if (els.detectedCompany) els.detectedCompany.textContent = companyName || contactName || "—"
       if (els.detectedPlatform) els.detectedPlatform.textContent = platform
-      if (els.detectedDomain) els.detectedDomain.textContent = website || linkedinUrl || sourceUrl || ""
+      if (els.detectedDomain) {
+        els.detectedDomain.textContent =
+          website || linkedinUrl || linkedinCompanyUrl || sourceUrl || location || ""
+      }
     } else if (els.detectedPanel) {
       els.detectedPanel.hidden = true
     }
   }
 
-  async function extractTabMetadata(tab) {
+  async function extractTabMetadataInner(tab) {
     if (!tab?.id || isRestrictedTabUrl(tab.url)) return null
 
-    try {
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ["page-metadata.js"],
-      })
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["page-metadata.js", "linkedin-company-people.js"],
+    })
 
-      const [{ result }] = await chrome.scripting.executeScript({
+    const [metaResult, peopleResult] = await Promise.all([
+      chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: () => window.__equipifyGrowthExtract?.() ?? null,
-      })
+      }),
+      chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => window.__equipifyGrowthLinkedInCompanyPeople?.() ?? [],
+      }),
+    ])
 
-      return result ?? null
+    const metadata = metaResult?.[0]?.result ?? null
+    const visiblePeople = peopleResult?.[0]?.result ?? []
+    if (Array.isArray(visiblePeople) && visiblePeople.length) {
+      state.visibleLinkedInPeople = visiblePeople
+    }
+    return metadata
+  }
+
+  async function extractTabMetadata(tab) {
+    try {
+      return await Promise.race([
+        extractTabMetadataInner(tab),
+        new Promise((resolve) => window.setTimeout(() => resolve(null), 3500)),
+      ])
     } catch (error) {
       logError("extract_tab_metadata_failed", error, { tabUrl: tab?.url })
       return null
@@ -360,6 +400,7 @@ function initIntakeApp(options) {
       existingLead: state.existingLead,
       recentCaptures: null,
       profilePhotoUrl: state.detected?.profile_photo_url ?? null,
+      visibleLinkedInPeople: state.visibleLinkedInPeople ?? [],
     })
 
     storage.loadRecentCaptures().then((captures) => {
@@ -370,6 +411,7 @@ function initIntakeApp(options) {
         existingLead: state.existingLead,
         recentCaptures: captures,
         profilePhotoUrl: state.detected?.profile_photo_url ?? null,
+        visibleLinkedInPeople: state.visibleLinkedInPeople ?? [],
       })
     })
   }
@@ -754,13 +796,22 @@ function initIntakeApp(options) {
 
   async function bootstrap() {
     const seq = ++bootstrapSeq
+    let finished = false
+    const finishLoading = () => {
+      if (finished) return
+      finished = true
+      window.clearTimeout(timeoutId)
+      if (seq === bootstrapSeq) setLoadingState(false)
+    }
+
     const timeoutId = window.setTimeout(() => {
       if (seq !== bootstrapSeq) return
       logError("bootstrap_timeout", "Loading page context timed out")
-      setLoadingState(false)
-      renderLinkedInStatusPanel(defaultCrmPayload(), null)
+      renderLinkedInStatusPanel(defaultCrmPayload(), state.inpageTabUrl ?? state.detected?.source_url ?? null)
       showFallbackError("No page context found. Reload LinkedIn or re-open Equipify Sales.")
-    }, 8000)
+      finishLoading()
+    }, 5000)
+
     setCaptureStatus("Detecting", "status-detecting")
     setLoadingState(true)
     clearStatus()
@@ -769,28 +820,33 @@ function initIntakeApp(options) {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
       if (seq !== bootstrapSeq) return
       const tab = tabs[0]
+      const tabUrl = tab?.url ?? state.inpageTabUrl ?? state.detected?.source_url ?? null
 
-      if (isRestrictedTabUrl(tab?.url)) {
+      if (isRestrictedTabUrl(tabUrl)) {
         if (els.contextWarning) {
           els.contextWarning.hidden = false
           els.contextWarning.textContent = "Open a website or LinkedIn page, then reopen the extension."
         }
         setCaptureStatus("No page", "status-error")
-        renderLinkedInStatusPanel(defaultCrmPayload(), tab?.url ?? null)
+        renderLinkedInStatusPanel(defaultCrmPayload(), tabUrl)
         return
       }
 
       if (els.contextWarning) els.contextWarning.hidden = true
-      const metadata = await extractTabMetadata(tab)
+
+      let metadata = state.inpageContextReceived ? state.detected : null
+      if (!metadata && tab?.id) {
+        metadata = await extractTabMetadata(tab)
+      }
       if (seq !== bootstrapSeq) return
-      applyDetectedMetadata(metadata, tab?.url)
+      applyDetectedMetadata(metadata ?? state.detected, tabUrl)
 
       const linkedinQuery = linkedinContext?.buildLinkedInLookupQuery({
-        url: tab?.url,
-        page_title: metadata?.page_title ?? document.title,
-        company_name: metadata?.company_name,
-        website: metadata?.website,
-        linkedin_url: metadata?.linkedin_url,
+        url: tabUrl,
+        page_title: metadata?.page_title ?? state.detected?.page_title ?? document.title,
+        company_name: metadata?.company_name ?? state.detected?.company_name,
+        website: metadata?.website ?? state.detected?.website,
+        linkedin_url: metadata?.linkedin_url ?? state.detected?.linkedin_url,
       })
       if (linkedinQuery?.contact_name) {
         const contactInput = document.getElementById("contact-name")
@@ -800,21 +856,30 @@ function initIntakeApp(options) {
       }
 
       const formValues = readFormValues()
-      formValues.page_title = metadata?.page_title ?? formValues.page_title
-      const crmPayload = (await fetchCrmContext(formValues, tab?.url)) ?? defaultCrmPayload()
+      formValues.page_title = metadata?.page_title ?? state.detected?.page_title ?? formValues.page_title
+      if (tabUrl) formValues.source_url = formValues.source_url || tabUrl
+
+      const crmPayload = (await fetchCrmContext(formValues, tabUrl)) ?? defaultCrmPayload()
       if (seq !== bootstrapSeq) return
-      renderLinkedInStatusPanel(crmPayload, tab?.url)
+      renderLinkedInStatusPanel(crmPayload, tabUrl)
 
       setCaptureStatus("Ready", "status-ready")
     } catch (error) {
       if (seq !== bootstrapSeq) return
       logError("bootstrap_failed", error)
-      renderLinkedInStatusPanel(defaultCrmPayload(), null)
+      renderLinkedInStatusPanel(defaultCrmPayload(), state.inpageTabUrl ?? null)
       showFallbackError()
     } finally {
-      window.clearTimeout(timeoutId)
-      if (seq === bootstrapSeq) setLoadingState(false)
+      finishLoading()
     }
+  }
+
+  function applyInpageContext(payload) {
+    if (!payload) return
+    state.inpageContextReceived = true
+    if (payload.tabUrl) state.inpageTabUrl = payload.tabUrl
+    if (Array.isArray(payload.visiblePeople)) state.visibleLinkedInPeople = payload.visiblePeople
+    if (payload.metadata) applyDetectedMetadata(payload.metadata, payload.tabUrl ?? payload.metadata?.source_url)
   }
 
   async function submitIntake(event) {
@@ -1163,7 +1228,8 @@ function initIntakeApp(options) {
     if (surface === "inpage") {
       window.addEventListener("message", (event) => {
         const type = event.data?.type
-        if (type === "equipify-inpage-sidebar-opened" || type === "equipify-inpage-sidebar-refresh") {
+        if (type === "equipify-inpage-context") {
+          applyInpageContext(event.data)
           scheduleBootstrap()
         }
       })
@@ -1233,7 +1299,12 @@ function initIntakeApp(options) {
       })
     }
 
-    await bootstrap()
+    if (surface === "inpage") {
+      window.parent.postMessage({ type: "equipify-inpage-sidebar-ready" }, "*")
+      scheduleBootstrap()
+    } else {
+      await bootstrap()
+    }
   }
 
   init().catch((error) => {

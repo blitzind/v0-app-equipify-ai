@@ -123,7 +123,7 @@
   }
 
   const ENRICHMENT_SETUP_MESSAGE =
-    "Connect an enrichment provider to find email/phone. Configure People Data Labs or website contact discovery in Equipify Growth settings."
+    "Connect an enrichment provider such as People Data Labs, Prospeo, Apollo, Hunter, or website discovery to find email/phone."
 
   function setEnrichmentStatus(message, kind = "empty") {
     const statusEl = document.getElementById("es-ws-enrichment-status")
@@ -251,12 +251,12 @@
     if (recentEl) recentEl.textContent = String(recentCaptures?.length ?? 0)
   }
 
-  function renderEmployees(context) {
+  function renderEmployees(context, visiblePeople = []) {
     const list = document.getElementById("es-ws-employees-list")
     if (!list) return
 
     const relationshipMap = context?.company_relationship_map ?? {}
-    lastEmployeeRows = [
+    const crmRows = [
       ...(relationshipMap.contacts ?? []),
       ...(relationshipMap.related_leads ?? []),
     ].map((contact) => ({
@@ -264,7 +264,31 @@
       department: contact.department ?? inferDepartment(contact.title),
       seniority: contact.seniority ?? inferSeniority(contact.title),
       crm_status: contact.status ? contact.status.replace(/_/g, " ") : "Not In CRM",
+      source: "crm",
     }))
+
+    const visibleRows = (visiblePeople ?? []).map((person) => ({
+      name: person.full_name ?? person.name,
+      title: person.job_title ?? person.title,
+      linkedin_url: person.linkedin_url ?? null,
+      profile_photo_url: person.profile_photo_url ?? null,
+      department: inferDepartment(person.job_title ?? person.title),
+      seniority: inferSeniority(person.job_title ?? person.title),
+      crm_status: "Not In CRM",
+      lead_id: null,
+      source: "linkedin_visible",
+    }))
+
+    const merged = [...crmRows]
+    for (const row of visibleRows) {
+      const key = `${(row.name ?? "").toLowerCase()}|${(row.linkedin_url ?? "").toLowerCase()}`
+      if (merged.some((existing) => `${(existing.name ?? "").toLowerCase()}|${(existing.linkedin_url ?? "").toLowerCase()}` === key)) {
+        continue
+      }
+      merged.push(row)
+    }
+
+    lastEmployeeRows = merged
 
     populateEmployeeFilters(lastEmployeeRows)
     renderFilteredEmployees()
@@ -397,12 +421,19 @@
     const name =
       context?.contact_name ||
       trimOrNull(formValues.contact_name) ||
+      trimOrNull(detected?.contact_name) ||
       trimOrNull(detected?.page_title?.split("|")[0]) ||
       "Current page"
 
-    const title = trimOrNull(formValues.title) || "—"
-    const company = context?.company_name || trimOrNull(formValues.company_name) || detected?.company_name || "—"
-    const location = trimOrNull(formValues.location) || "—"
+    const title =
+      trimOrNull(formValues.title) || trimOrNull(detected?.headline) || trimOrNull(detected?.title) || "—"
+    const company =
+      context?.company_name ||
+      trimOrNull(formValues.company_name) ||
+      detected?.company_name ||
+      "—"
+    const location =
+      trimOrNull(formValues.location) || trimOrNull(detected?.location) || "—"
     const email = trimOrNull(formValues.email) || "—"
     const phone = trimOrNull(formValues.phone) || "—"
     const website = trimOrNull(formValues.website) || detected?.website || "—"
@@ -518,7 +549,7 @@
     renderResearchSnapshot(context, detected)
     renderTimeline(context)
     renderQueueShortcuts(recentCaptures)
-    renderEmployees(context)
+    renderEmployees(context, input?.visibleLinkedInPeople ?? [])
     renderTechnologies(detected, context)
     renderSignals(detected, context)
     renderCrmRelationship(context, relationship, contactsCount, oppCount, customerCount)

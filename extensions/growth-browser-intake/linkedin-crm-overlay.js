@@ -109,10 +109,11 @@
 
   function findProfileNameElement() {
     const selectors = [
-      "h1.text-heading-xlarge",
-      "main section.artdeco-card h1",
-      "main h1.break-words",
-      "main h1",
+    "h1.text-heading-xlarge",
+    "main section.artdeco-card h1",
+    "main h1.break-words",
+    "h1.org-top-card-summary__title",
+    "main h1",
       ".org-top-card-primary-content__title",
       ".org-top-card-summary__title",
     ]
