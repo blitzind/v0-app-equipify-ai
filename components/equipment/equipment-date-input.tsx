@@ -2,7 +2,7 @@
 
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { EQUIPMENT_DATE_PLACEHOLDER } from "@/lib/equipment/equipment-date-fields"
+import { normalizeOptionalEquipmentDateInput } from "@/lib/equipment/equipment-date-fields"
 
 type EquipmentDateInputProps = {
   value: string
@@ -14,7 +14,7 @@ type EquipmentDateInputProps = {
   onBlur?: () => void
 }
 
-/** Text date field — faster keyboard entry than calendar-only pickers; accepts YYYY-MM-DD. */
+/** Native date field — calendar picker + manual entry; stored as YYYY-MM-DD for Postgres. */
 export function EquipmentDateInput({
   value,
   onChange,
@@ -24,20 +24,19 @@ export function EquipmentDateInput({
   "aria-invalid": ariaInvalid,
   onBlur,
 }: EquipmentDateInputProps) {
+  const normalized = value.trim() ? normalizeOptionalEquipmentDateInput(value) ?? "" : ""
+
   return (
     <Input
       id={id}
-      type="text"
-      inputMode="numeric"
+      type="date"
       autoComplete="off"
-      spellCheck={false}
-      placeholder={EQUIPMENT_DATE_PLACEHOLDER}
-      value={value}
+      value={normalized}
       disabled={disabled}
       aria-invalid={ariaInvalid}
       onChange={(e) => onChange(e.target.value)}
       onBlur={onBlur}
-      className={cn("font-mono text-sm tabular-nums", className)}
+      className={cn("text-sm tabular-nums", className)}
     />
   )
 }

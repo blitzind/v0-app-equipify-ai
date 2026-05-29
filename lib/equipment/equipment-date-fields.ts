@@ -53,9 +53,7 @@ function isValidCalendarYmd(ymd: string): boolean {
 export function optionalEquipmentDateFieldError(raw: string): string | undefined {
   const s = raw.trim()
   if (!s) return undefined
-  return normalizeOptionalEquipmentDateInput(s) === null
-    ? "Use a valid date (YYYY-MM-DD)."
-    : undefined
+  return normalizeOptionalEquipmentDateInput(s) === null ? "Use a valid date." : undefined
 }
 
 export function parseCalibrationIntervalMonths(raw: string): number | null {

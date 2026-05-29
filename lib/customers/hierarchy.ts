@@ -41,6 +41,10 @@ export type ServiceAddress = {
 
 export type BillingAddress = {
   billingName: string | null
+  /** True when invoice bill-to is resolved from a linked parent account. */
+  inheritedFromParent: boolean
+  /** Parent company name when `inheritedFromParent` (for display only). */
+  parentBillingSourceName: string | null
   /** True when the operational billing address is inherited from the default service location. */
   inheritsFromDefaultLocation: boolean
   /**
@@ -209,13 +213,63 @@ function locationToService(loc: DefaultLocationRow | null): ServiceAddress | nul
   }
 }
 
+async function loadDefaultServiceAddressForCustomer(
+  supabase: SupabaseClient,
+  organizationId: string,
+  customerId: string,
+): Promise<ServiceAddress | null> {
+  const defaultLocRes = await supabase
+    .from("customer_locations")
+    .select(DEFAULT_LOCATION_SELECT)
+    .eq("organization_id", organizationId)
+    .eq("customer_id", customerId)
+    .eq("is_default", true)
+    .is("archived_at", null)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  let service = locationToService((defaultLocRes.data as DefaultLocationRow | null) ?? null)
+  if (service) return service
+
+  const anyLocRes = await supabase
+    .from("customer_locations")
+    .select(DEFAULT_LOCATION_SELECT)
+    .eq("organization_id", organizationId)
+    .eq("customer_id", customerId)
+    .is("archived_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  return locationToService((anyLocRes.data as DefaultLocationRow | null) ?? null)
+}
+
+async function loadBillingLocationServiceForCustomer(
+  supabase: SupabaseClient,
+  organizationId: string,
+  customerId: string,
+  billingLocId: string | null,
+): Promise<ServiceAddress | null> {
+  if (!billingLocId) return null
+  const billLocRes = await supabase
+    .from("customer_locations")
+    .select(DEFAULT_LOCATION_SELECT)
+    .eq("organization_id", organizationId)
+    .eq("customer_id", customerId)
+    .eq("id", billingLocId)
+    .is("archived_at", null)
+    .maybeSingle()
+  return locationToService((billLocRes.data as DefaultLocationRow | null) ?? null)
+}
+
 /**
  * Pure: derive an operational `BillingAddress` from a customer row + resolved
  * service locations. When `billing_address_same_as_service` is true (or null /
  * undefined), street lines mirror a location: optional `billing_location_id`
  * row, otherwise the default service location.
  */
-function deriveBillingAddress(
+export function deriveBillingAddress(
   row: Partial<CustomerHierarchyRow> | null,
   defaultService: ServiceAddress | null,
   billingLocationService: ServiceAddress | null,
@@ -235,6 +289,8 @@ function deriveBillingAddress(
     return {
       address: {
         billingName: row?.billing_name?.trim() || null,
+        inheritedFromParent: false,
+        parentBillingSourceName: null,
         inheritsFromDefaultLocation: !usesSecondary,
         usesSecondaryBillingLocation: usesSecondary,
         billingLocationName: usesSecondary ? billingLocationService?.name ?? null : null,
@@ -274,6 +330,8 @@ function deriveBillingAddress(
   return {
     address: {
       billingName: row?.billing_name?.trim() || null,
+      inheritedFromParent: false,
+      parentBillingSourceName: null,
       inheritsFromDefaultLocation: false,
       usesSecondaryBillingLocation: false,
       billingLocationName: null,
@@ -384,55 +442,66 @@ export async function loadCustomerHierarchy(
 
   if (!row) return null
 
-  // 2. Default service location (single primary row).
-  const defaultLocRes = await supabase
-    .from("customer_locations")
-    .select(DEFAULT_LOCATION_SELECT)
-    .eq("organization_id", organizationId)
-    .eq("customer_id", customerId)
-    .eq("is_default", true)
-    .is("archived_at", null)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle()
-
-  let defaultService: ServiceAddress | null = locationToService(
-    (defaultLocRes.data as DefaultLocationRow | null) ?? null,
+  // 2. Default service location for this customer (never the parent's).
+  const defaultService = await loadDefaultServiceAddressForCustomer(
+    supabase,
+    organizationId,
+    customerId,
   )
 
   let billingLocationService: ServiceAddress | null = null
   const billingLocId = row.billing_location_id?.trim() || null
   if (billingLocId && row.billing_address_same_as_service !== false) {
-    const billLocRes = await supabase
-      .from("customer_locations")
-      .select(DEFAULT_LOCATION_SELECT)
-      .eq("organization_id", organizationId)
-      .eq("customer_id", customerId)
-      .eq("id", billingLocId)
-      .is("archived_at", null)
-      .maybeSingle()
-    billingLocationService = locationToService(
-      (billLocRes.data as DefaultLocationRow | null) ?? null,
+    billingLocationService = await loadBillingLocationServiceForCustomer(
+      supabase,
+      organizationId,
+      customerId,
+      billingLocId,
     )
   }
 
-  // Fallback: if no row marked default, take the most recent active location.
-  if (!defaultService) {
-    const anyLocRes = await supabase
-      .from("customer_locations")
-      .select(DEFAULT_LOCATION_SELECT)
+  // 3. Resolve billing source — when parent_billing, use the parent's bill-to profile.
+  let billingSourceRow: CustomerHierarchyRow = row
+  let billingDefaultService = defaultService
+  let billingLocationServiceForSource = billingLocationService
+  let inheritedFromParent = false
+  let parentBillingSourceName: string | null = null
+
+  if (row.billing_behavior === "parent_billing" && row.parent_customer_id) {
+    const parentFullRes = await supabase
+      .from("customers")
+      .select(CUSTOMER_HIERARCHY_SELECT)
       .eq("organization_id", organizationId)
-      .eq("customer_id", customerId)
-      .is("archived_at", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
+      .eq("id", row.parent_customer_id)
       .maybeSingle()
-    defaultService = locationToService(
-      (anyLocRes.data as DefaultLocationRow | null) ?? null,
-    )
+
+    if (parentFullRes.data) {
+      const parentRow = parentFullRes.data as CustomerHierarchyRow
+      billingSourceRow = parentRow
+      inheritedFromParent = true
+      parentBillingSourceName = parentRow.company_name?.trim() || null
+      billingDefaultService = await loadDefaultServiceAddressForCustomer(
+        supabase,
+        organizationId,
+        parentRow.id,
+      )
+      const parentBillingLocId = parentRow.billing_location_id?.trim() || null
+      billingLocationServiceForSource =
+        parentBillingLocId && parentRow.billing_address_same_as_service !== false
+          ? await loadBillingLocationServiceForCustomer(
+              supabase,
+              organizationId,
+              parentRow.id,
+              parentBillingLocId,
+            )
+          : null
+    } else {
+      inheritedFromParent = true
+      parentBillingSourceName = null
+    }
   }
 
-  // 3. Parent + children + location count (parallel; cheap).
+  // 4. Parent + children + location count (parallel; cheap).
   const [parentRes, childrenRes, locCountRes] = await Promise.all([
     row.parent_customer_id
       ? supabase
@@ -464,7 +533,17 @@ export async function loadCustomerHierarchy(
   const children = ((childrenRes.data ?? []) as LegacyCustomerRow[]).map(rowToLite)
   const locationCount = typeof locCountRes.count === "number" ? locCountRes.count : 0
 
-  const billing = deriveBillingAddress(row, defaultService, billingLocationService)
+  const billing = deriveBillingAddress(
+    billingSourceRow,
+    billingDefaultService,
+    billingLocationServiceForSource,
+  )
+  if (inheritedFromParent) {
+    billing.address.inheritedFromParent = true
+    billing.address.parentBillingSourceName =
+      parentBillingSourceName ?? parent?.companyName ?? null
+    billing.address.behavior = "parent_billing"
+  }
   const billingAddressSameAsService = row.billing_address_same_as_service !== false
 
   return {

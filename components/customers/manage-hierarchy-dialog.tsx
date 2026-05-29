@@ -181,6 +181,7 @@ export function ManageHierarchyDialog({
   const applyBillingFieldsFromParentRow = useCallback(
     (row: {
       billing_address_same_as_service: boolean | null
+      billing_location_id: string | null
       billing_name: string | null
       billing_attention: string | null
       billing_contact_name: string | null
@@ -204,7 +205,7 @@ export function ManageHierarchyDialog({
       setNotes(row.billing_notes ?? "")
       setSameAsService(same)
       if (same) {
-        setBillingLocationId(billingLocationSnapshotOnOpen.current)
+        setBillingLocationId(row.billing_location_id?.trim() || null)
         setLine1("")
         setLine2("")
         setCity("")
@@ -241,6 +242,7 @@ export function ManageHierarchyDialog({
         .select(
           [
             "billing_address_same_as_service",
+            "billing_location_id",
             "billing_name",
             "billing_attention",
             "billing_contact_name",
@@ -263,6 +265,7 @@ export function ManageHierarchyDialog({
       applyBillingFieldsFromParentRow(
         data as {
           billing_address_same_as_service: boolean | null
+          billing_location_id: string | null
           billing_name: string | null
           billing_attention: string | null
           billing_contact_name: string | null
@@ -325,6 +328,8 @@ export function ManageHierarchyDialog({
 
   if (!open) return null
 
+  const usesParentBilling = billingBehavior === "parent_billing"
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -334,51 +339,64 @@ export function ManageHierarchyDialog({
       const updates: Record<string, unknown> = {
         parent_customer_id: parentId.trim() ? parentId : null,
         billing_behavior: billingBehavior,
-        billing_name: billingName.trim() || null,
-        billing_address_same_as_service: sameAsService,
-        billing_location_id: sameAsService ? billingLocationId || null : null,
-        billing_attention: attention.trim() || null,
-        billing_contact_name: contactName.trim() || null,
-        billing_email: email.trim() || null,
-        billing_contact_phone: phone.trim() || null,
-        billing_country: country.trim() || null,
-        po_required: poRequired,
-        po_number_required_before_service: poBeforeService,
-        po_number_required_before_invoice: poBeforeInvoice,
-        default_po_number: defaultPoNumber.trim() || null,
-        default_invoice_terms_code: paymentTermsKey || null,
-        default_payment_terms_key: paymentTermsKey || null,
-        default_payment_terms_days: paymentTermsKey ? netDaysForTermsCode(paymentTermsKey, paymentTermsDays) : null,
-        default_payment_terms_label: paymentTermsKey
-          ? paymentTermsKey === "custom"
-            ? `Custom ${paymentTermsDays} days`
-            : invoiceTermsCodeLabel(paymentTermsKey)
-          : null,
-        invoice_delivery_preference: invoiceDeliveryPreference.trim() || null,
-        invoice_instructions: invoiceInstructions.trim() || null,
-        tax_exempt: taxExempt,
-        tax_exemption_id: taxExemptionId.trim() || null,
-        tax_exemption_notes: taxExemptionNotes.trim() || null,
-        default_tax_basis: defaultTaxBasis.trim() || null,
-        default_tax_category: defaultTaxCategory.trim() || null,
       }
-      if (sameAsService) {
-        // When inheriting, clear explicit billing fields so the read remains
-        // unambiguous. Notes are preserved (they may be billing instructions).
+
+      if (usesParentBilling) {
+        // Invoice bill-to resolves from the parent profile; do not persist child street lines.
+        updates.billing_address_same_as_service = true
+        updates.billing_location_id = null
         updates.billing_address_line1 = null
         updates.billing_address_line2 = null
         updates.billing_city = null
         updates.billing_state = null
         updates.billing_postal_code = null
-        updates.billing_notes = notes.trim() || null
       } else {
-        updates.billing_address_line1 = line1.trim() || null
-        updates.billing_address_line2 = line2.trim() || null
-        updates.billing_city = city.trim() || null
-        updates.billing_state = state.trim() || null
-        updates.billing_postal_code = postalCode.trim() || null
-        updates.billing_notes = notes.trim() || null
+        updates.billing_name = billingName.trim() || null
+        updates.billing_address_same_as_service = sameAsService
+        updates.billing_location_id = sameAsService ? billingLocationId || null : null
+        updates.billing_attention = attention.trim() || null
+        updates.billing_contact_name = contactName.trim() || null
+        updates.billing_email = email.trim() || null
+        updates.billing_contact_phone = phone.trim() || null
+        updates.billing_country = country.trim() || null
+        if (sameAsService) {
+          updates.billing_address_line1 = null
+          updates.billing_address_line2 = null
+          updates.billing_city = null
+          updates.billing_state = null
+          updates.billing_postal_code = null
+          updates.billing_notes = notes.trim() || null
+        } else {
+          updates.billing_address_line1 = line1.trim() || null
+          updates.billing_address_line2 = line2.trim() || null
+          updates.billing_city = city.trim() || null
+          updates.billing_state = state.trim() || null
+          updates.billing_postal_code = postalCode.trim() || null
+          updates.billing_notes = notes.trim() || null
+        }
       }
+
+      updates.po_required = poRequired
+      updates.po_number_required_before_service = poBeforeService
+      updates.po_number_required_before_invoice = poBeforeInvoice
+      updates.default_po_number = defaultPoNumber.trim() || null
+      updates.default_invoice_terms_code = paymentTermsKey || null
+      updates.default_payment_terms_key = paymentTermsKey || null
+      updates.default_payment_terms_days = paymentTermsKey
+        ? netDaysForTermsCode(paymentTermsKey, paymentTermsDays)
+        : null
+      updates.default_payment_terms_label = paymentTermsKey
+        ? paymentTermsKey === "custom"
+          ? `Custom ${paymentTermsDays} days`
+          : invoiceTermsCodeLabel(paymentTermsKey)
+        : null
+      updates.invoice_delivery_preference = invoiceDeliveryPreference.trim() || null
+      updates.invoice_instructions = invoiceInstructions.trim() || null
+      updates.tax_exempt = taxExempt
+      updates.tax_exemption_id = taxExemptionId.trim() || null
+      updates.tax_exemption_notes = taxExemptionNotes.trim() || null
+      updates.default_tax_basis = defaultTaxBasis.trim() || null
+      updates.default_tax_category = defaultTaxCategory.trim() || null
 
       const { error: updErr } = await supabase
         .from("customers")
@@ -533,34 +551,51 @@ export function ManageHierarchyDialog({
 
           {/* Billing address */}
           <section className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <span className={SECTION_HEADER}>Billing address</span>
-              <label className="flex items-center gap-2 text-xs text-foreground">
-                <input
-                  type="checkbox"
-                  checked={sameAsService}
-                  onChange={(e) => {
-                    const v = e.target.checked
-                    setSameAsService(v)
-                    if (!v) {
-                      setBillingLocationId(null)
-                    } else {
-                      setBillingLocationId(billingLocationSnapshotOnOpen.current)
-                    }
-                  }}
-                  className="h-3.5 w-3.5 rounded border-border"
-                />
-                Use service location for street address
-              </label>
+              {!usesParentBilling ? (
+                <label className="flex items-start gap-2 text-xs text-foreground sm:max-w-[16rem]">
+                  <input
+                    type="checkbox"
+                    checked={sameAsService}
+                    onChange={(e) => {
+                      const v = e.target.checked
+                      setSameAsService(v)
+                      if (!v) {
+                        setBillingLocationId(null)
+                      } else {
+                        setBillingLocationId(billingLocationSnapshotOnOpen.current)
+                      }
+                    }}
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border"
+                  />
+                  <span>
+                    Use this customer&apos;s service address as the billing street address
+                  </span>
+                </label>
+              ) : null}
             </div>
-            {sameAsService && billingLocationId ? (
+            {usesParentBilling ? (
+              <p className="rounded-md border border-[color:var(--status-info)]/30 bg-[color:var(--status-info)]/10 px-3 py-2 text-[11px] text-muted-foreground">
+                Invoice bill-to will use the linked parent account&apos;s billing address. Edit
+                billing on the parent account to change it — this location&apos;s service address
+                is not affected.
+              </p>
+            ) : sameAsService ? (
               <p className="text-[11px] text-muted-foreground">
-                A specific billing site is selected on the customer Overview (multi-location
-                cards). Clear it there to fall back to the primary service location.
+                When enabled, billing street/city/state/ZIP copy from the default service address.
+                This does not change the service address.
+                {billingLocationId ? (
+                  <>
+                    {" "}
+                    A specific billing site is selected on the customer Overview (multi-location
+                    cards). Clear it there to fall back to the primary service location.
+                  </>
+                ) : null}
               </p>
             ) : null}
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className={cn("grid grid-cols-1 gap-3 sm:grid-cols-2", usesParentBilling && "opacity-50 pointer-events-none")}>
               <div className="sm:col-span-2">
                 <label className="mb-1 block text-[11px] font-medium text-foreground">
                   Bill-to name (optional)

@@ -9,6 +9,10 @@ import { getAidenActionMembership } from "@/lib/permissions/aiden-actions"
 import { isTrialActive, type OrganizationSubscription } from "@/lib/billing/subscriptions"
 import { fetchWorkOrderLineItems, type DbWorkOrderLineItemRow } from "@/lib/work-orders/work-order-tab-data"
 import { parseRepairLog } from "@/lib/work-orders/parse-repair-log"
+import {
+  resolveCustomerBillingProfile,
+  type CustomerBillingProfile,
+} from "@/lib/customers/billing-profile"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -187,6 +191,29 @@ export function mapCustomerRow(r: CustomerRow): CreateInvoicePreviewCustomer {
     taxExempt: r.tax_exempt,
     defaultTaxBasis: r.default_tax_basis,
     defaultTaxCategory: r.default_tax_category,
+  }
+}
+
+export function mapBillingProfileToPreviewCustomer(
+  r: CustomerRow,
+  profile: CustomerBillingProfile,
+): CreateInvoicePreviewCustomer {
+  return {
+    id: r.id,
+    companyName: r.company_name,
+    billingName: profile.billingName,
+    billingContactName: profile.billingContactName,
+    billingEmail: profile.billingContactEmail,
+    billingContactPhone: profile.billingContactPhone,
+    billingAddressLine1: profile.addressLine1 || null,
+    billingAddressLine2: profile.addressLine2,
+    billingCity: profile.city || null,
+    billingState: profile.state || null,
+    billingPostalCode: profile.postalCode || null,
+    billingCountry: profile.country,
+    taxExempt: profile.taxExempt,
+    defaultTaxBasis: profile.defaultTaxBasis,
+    defaultTaxCategory: profile.defaultTaxCategory,
   }
 }
 
@@ -437,10 +464,12 @@ function computeTotalsAndTax(args: {
 export function buildCreateInvoiceFromWorkOrderPreviewFromWorkOrder(args: {
   workOrder: WorkOrderRow
   customerRow: CustomerRow
+  /** When set, overrides raw customer row billing columns (e.g. parent billing profile). */
+  customer?: CreateInvoicePreviewCustomer
   partsRows: DbWorkOrderLineItemRow[]
 }): CreateInvoiceFromWorkOrderPreviewPayload {
   const { workOrder, customerRow, partsRows } = args
-  const customer = mapCustomerRow(customerRow)
+  const customer = args.customer ?? mapCustomerRow(customerRow)
   const lineItems = buildLineItems(workOrder, partsRows)
   const notesParts = [workOrder.notes, workOrder.problem_reported].filter(Boolean) as string[]
   const notes = notesParts.join("\n\n").trim()
@@ -597,7 +626,20 @@ export async function resolveCreateInvoiceFromWorkOrderPreview(
     partsRows = []
   }
 
-  const preview = buildCreateInvoiceFromWorkOrderPreviewFromWorkOrder({ workOrder, customerRow, partsRows })
+  const billingProfile = await resolveCustomerBillingProfile(supabase, {
+    organizationId: input.organizationId,
+    customerId: customerRow.id,
+  })
+  const customer = billingProfile
+    ? mapBillingProfileToPreviewCustomer(customerRow, billingProfile)
+    : mapCustomerRow(customerRow)
+
+  const preview = buildCreateInvoiceFromWorkOrderPreviewFromWorkOrder({
+    workOrder,
+    customerRow,
+    customer,
+    partsRows,
+  })
 
   return { status: "prepared", preview }
 }

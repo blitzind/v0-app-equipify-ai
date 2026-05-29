@@ -11,7 +11,7 @@ assert.equal(normalizeOptionalEquipmentDateInput("2026-05-18"), "2026-05-18")
 assert.equal(normalizeOptionalEquipmentDateInput("5/18/2026"), "2026-05-18")
 assert.equal(normalizeOptionalEquipmentDateInput("not-a-date"), null)
 assert.equal(optionalEquipmentDateFieldError(""), undefined)
-assert.equal(optionalEquipmentDateFieldError("bad"), "Use a valid date (YYYY-MM-DD).")
+assert.equal(optionalEquipmentDateFieldError("bad"), "Use a valid date.")
 
 assert.equal(addMonthsToDateYmd("2026-01-31", 1), "2026-02-28")
 assert.equal(addMonthsToDateYmd("2025-06-15", 12), "2026-06-15")

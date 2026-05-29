@@ -213,11 +213,13 @@ export function CustomerHierarchyCard({
             value={
               billingAddressMissing
                 ? "Missing"
-                : billingAddress.inheritsFromDefaultLocation
-                  ? "Primary site"
-                  : billingAddress.usesSecondaryBillingLocation
-                    ? "Billing site"
-                    : "Custom"
+                : billingAddress.inheritedFromParent
+                  ? "From parent"
+                  : billingAddress.inheritsFromDefaultLocation
+                    ? "Primary site"
+                    : billingAddress.usesSecondaryBillingLocation
+                      ? "Billing site"
+                      : "Custom"
             }
             tone={billingAddressMissing ? "warning" : "default"}
           />
@@ -323,19 +325,35 @@ export function CustomerHierarchyCard({
             <span
               className={cn(
                 "rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
-                billingAddress.inheritsFromDefaultLocation || billingAddress.usesSecondaryBillingLocation
-                  ? "bg-muted text-muted-foreground"
-                  : "bg-primary/10 text-primary",
+                billingAddress.inheritedFromParent
+                  ? "bg-[color:var(--status-info)]/10 text-[color:var(--status-info)]"
+                  : billingAddress.inheritsFromDefaultLocation || billingAddress.usesSecondaryBillingLocation
+                    ? "bg-muted text-muted-foreground"
+                    : "bg-primary/10 text-primary",
               )}
             >
-              {billingAddress.inheritsFromDefaultLocation
-                ? "Same as primary"
-                : billingAddress.usesSecondaryBillingLocation
-                  ? "Saved location"
-                  : "Custom"}
+              {billingAddress.inheritedFromParent
+                ? "From parent"
+                : billingAddress.inheritsFromDefaultLocation
+                  ? "Same as service"
+                  : billingAddress.usesSecondaryBillingLocation
+                    ? "Saved location"
+                    : "Custom"}
             </span>
           </div>
-          {billingAddress.behavior === "parent_billing" ? (
+          {billingAddress.inheritedFromParent ? (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Invoice bill-to uses{" "}
+              {billingAddress.parentBillingSourceName ? (
+                <span className="font-medium text-foreground">
+                  {billingAddress.parentBillingSourceName}
+                </span>
+              ) : (
+                "the linked parent account"
+              )}
+              &apos;s billing address — not this location&apos;s service address.
+            </p>
+          ) : billingAddress.behavior === "parent_billing" ? (
             <p className="mt-1 text-[11px] text-muted-foreground">
               Use parent address
               {parent ? (
@@ -344,7 +362,7 @@ export function CustomerHierarchyCard({
                   (<span className="font-medium text-foreground">{parent.companyName}</span>)
                 </>
               ) : null}
-              .
+              , but the parent billing address could not be loaded.
             </p>
           ) : null}
           {billingAddress.attention ? (
@@ -416,8 +434,9 @@ export function CustomerHierarchyCard({
             <div className="mt-2 flex items-start gap-1.5 rounded-md border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-2 py-1.5 text-[11px] text-[color:var(--status-warning)]">
               <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
               <span>
-                No billing address yet. Invoices and POs need a bill-to street/city — add a
-                primary service location, pick a billing site, or set a custom bill-to address.
+                {billingAddress.inheritedFromParent || billingAddress.behavior === "parent_billing"
+                  ? "Parent billing address is missing. Add a bill-to address on the parent account, or switch this location to custom billing."
+                  : "No billing address yet. Invoices and POs need a bill-to street/city — add a primary service location, pick a billing site, or set a custom bill-to address."}
               </span>
             </div>
           ) : null}
