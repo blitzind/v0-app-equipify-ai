@@ -27,9 +27,12 @@ Package the extension for admin download:
 pnpm package:growth-extension
 ```
 
-This writes `public/downloads/growth-browser-intake.zip`, served at:
+This writes `public/downloads/growth-browser-intake.zip` and `public/downloads/growth-browser-intake-package-metadata.json`, served at:
 
-`/downloads/growth-browser-intake.zip`
+- `/downloads/growth-browser-intake.zip`
+- `/downloads/growth-browser-intake-package-metadata.json`
+
+Each packaged ZIP also includes `package-metadata.json` with extension version, generated timestamp, and git SHA when available.
 
 After download:
 
@@ -67,6 +70,7 @@ Both require an active platform admin session (`credentials: include`).
 ## Tests
 
 ```bash
+pnpm check:growth-extension-package
 pnpm test:growth-browser-extension-install
 pnpm test:growth-browser-intake
 ```

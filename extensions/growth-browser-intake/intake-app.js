@@ -53,6 +53,7 @@ function initIntakeApp(options) {
     recentCapturesList: document.getElementById("recent-captures-list"),
     openSidePanelBtn: document.getElementById("open-side-panel-btn"),
     signInLink: document.getElementById("sign-in-link"),
+    extensionBuildMeta: document.getElementById("extension-build-meta"),
   }
 
   function trimOrNull(value) {
@@ -480,6 +481,42 @@ function initIntakeApp(options) {
     }
   }
 
+  function formatBuildMetadata(metadata) {
+    const parts = [`v${metadata.extension_version}`]
+    if (metadata.generated_at) {
+      const when = new Date(metadata.generated_at)
+      if (!Number.isNaN(when.getTime())) {
+        parts.push(`packaged ${when.toLocaleString()}`)
+      }
+    }
+    if (metadata.git_sha) parts.push(metadata.git_sha)
+    return parts.join(" · ")
+  }
+
+  async function loadBuildMetadata() {
+    if (!els.extensionBuildMeta) return
+
+    try {
+      const response = await fetch(chrome.runtime.getURL("package-metadata.json"))
+      if (response.ok) {
+        const metadata = await response.json()
+        if (metadata?.extension_version) {
+          els.extensionBuildMeta.textContent = formatBuildMetadata(metadata)
+          return
+        }
+      }
+    } catch {
+      // Fall back to manifest version for unpacked local installs.
+    }
+
+    try {
+      const manifest = chrome.runtime.getManifest()
+      els.extensionBuildMeta.textContent = manifest?.version ? `v${manifest.version} · local unpackaged` : ""
+    } catch {
+      els.extensionBuildMeta.textContent = ""
+    }
+  }
+
   function wireEvents() {
     els.quickModeBtn?.addEventListener("click", () => setMode("quick"))
     els.fullModeBtn?.addEventListener("click", () => setMode("full"))
@@ -553,6 +590,7 @@ function initIntakeApp(options) {
     wireEvents()
     setMode("quick")
     await applySettingsToUi()
+    await loadBuildMetadata()
     await refreshRecentCaptures()
     await bootstrap()
   }

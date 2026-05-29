@@ -10,6 +10,11 @@ import {
   GROWTH_BROWSER_EXTENSION_INSTALL_STEPS,
   GROWTH_BROWSER_EXTENSION_QA_MARKER,
 } from "@/lib/growth/browser-intake/extension-install-types"
+import {
+  formatGrowthBrowserExtensionPackageMetadata,
+  GROWTH_BROWSER_EXTENSION_PACKAGE_METADATA_DOWNLOAD_PATH,
+  type GrowthBrowserExtensionPackageMetadata,
+} from "@/lib/growth/browser-intake/extension-package-metadata-types"
 import { cn } from "@/lib/utils"
 
 type GrowthBrowserExtensionInstallCardProps = {
@@ -23,9 +28,13 @@ export function GrowthBrowserExtensionInstallCard({
 }: GrowthBrowserExtensionInstallCardProps) {
   const [instructionsOpen, setInstructionsOpen] = useState(false)
   const [zipAvailable, setZipAvailable] = useState<boolean | null>(null)
+  const [packageMetadata, setPackageMetadata] = useState<GrowthBrowserExtensionPackageMetadata | null>(
+    null,
+  )
 
   useEffect(() => {
     let cancelled = false
+
     void fetch(GROWTH_BROWSER_EXTENSION_DOWNLOAD_PATH, { method: "HEAD" })
       .then((res) => {
         if (!cancelled) setZipAvailable(res.ok)
@@ -33,6 +42,21 @@ export function GrowthBrowserExtensionInstallCard({
       .catch(() => {
         if (!cancelled) setZipAvailable(false)
       })
+
+    void fetch(GROWTH_BROWSER_EXTENSION_PACKAGE_METADATA_DOWNLOAD_PATH)
+      .then(async (res) => {
+        if (!res.ok) return null
+        return (await res.json()) as GrowthBrowserExtensionPackageMetadata
+      })
+      .then((metadata) => {
+        if (!cancelled && metadata?.extension_version && metadata.generated_at) {
+          setPackageMetadata(metadata)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPackageMetadata(null)
+      })
+
     return () => {
       cancelled = true
     }
@@ -58,6 +82,13 @@ export function GrowthBrowserExtensionInstallCard({
               Uses your existing Equipify admin session — no API keys stored in the extension.
             </p>
           </div>
+
+          {packageMetadata ? (
+            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Download package:</span>{" "}
+              {formatGrowthBrowserExtensionPackageMetadata(packageMetadata)}
+            </div>
+          ) : null}
 
           {!compact ? (
             <div className="rounded-lg border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
