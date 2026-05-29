@@ -2,9 +2,13 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
+  emptyAcquisitionRunState,
   emptyAcquisitionStats,
+  emptyAcquisitionThroughputMetrics,
+  GROWTH_BULK_ACQUISITION_COMPANY_SCAN_BATCH,
   GROWTH_BULK_ACQUISITION_DEFAULT_QUERY_LIMIT,
   GROWTH_BULK_ACQUISITION_QA_MARKER,
+  type GrowthBulkAcquisitionKeysetCursor,
   type GrowthBulkAcquisitionPhase,
   type GrowthBulkAcquisitionRun,
   type GrowthBulkAcquisitionRunState,
@@ -17,6 +21,15 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
+function parseKeysetCursor(value: unknown): GrowthBulkAcquisitionKeysetCursor | null {
+  if (!value || typeof value !== "object") return null
+  const row = value as Record<string, unknown>
+  const created_at = asString(row.created_at)
+  const id = asString(row.id)
+  if (!created_at || !id) return null
+  return { created_at, id }
+}
+
 function parseAcquisitionState(metadata: Record<string, unknown>): GrowthBulkAcquisitionRunState | null {
   const acquisition = metadata.acquisition
   if (!acquisition || typeof acquisition !== "object") return null
@@ -24,6 +37,8 @@ function parseAcquisitionState(metadata: Record<string, unknown>): GrowthBulkAcq
   if (asString(state.qa_marker) !== GROWTH_BULK_ACQUISITION_QA_MARKER) return null
 
   const statsRaw = state.stats && typeof state.stats === "object" ? (state.stats as Record<string, unknown>) : {}
+  const metricsRaw =
+    state.metrics && typeof state.metrics === "object" ? (state.metrics as Record<string, unknown>) : {}
   const queryPlanRaw =
     state.query_plan && typeof state.query_plan === "object" ? (state.query_plan as Record<string, unknown>) : {}
   const searchInputsRaw =
@@ -31,18 +46,24 @@ function parseAcquisitionState(metadata: Record<string, unknown>): GrowthBulkAcq
       ? (state.search_inputs as GrowthRealWorldDiscoverySearchInputs)
       : {}
 
-  return {
-    qa_marker: GROWTH_BULK_ACQUISITION_QA_MARKER,
-    phase: (asString(state.phase) || "discover_companies") as GrowthBulkAcquisitionPhase,
+  const base = emptyAcquisitionRunState({
     search_inputs: searchInputsRaw,
     query_plan: {
       primary: Array.isArray(queryPlanRaw.primary) ? queryPlanRaw.primary.map(String) : [],
       fallback: Array.isArray(queryPlanRaw.fallback) ? queryPlanRaw.fallback.map(String) : [],
     },
+    limit_per_query: Number(state.limit_per_query ?? GROWTH_BULK_ACQUISITION_DEFAULT_QUERY_LIMIT),
+    geo_tiles: Array.isArray(state.geo_tiles) ? state.geo_tiles.map(String) : [],
+    target_company_count:
+      state.target_company_count == null ? null : Number(state.target_company_count),
+  })
+
+  return {
+    ...base,
+    phase: (asString(state.phase) || "discover_companies") as GrowthBulkAcquisitionPhase,
     query_index: Number(state.query_index ?? 0),
     use_fallback_queries: Boolean(state.use_fallback_queries),
     child_run_ids: Array.isArray(state.child_run_ids) ? state.child_run_ids.map(String) : [],
-    limit_per_query: Number(state.limit_per_query ?? GROWTH_BULK_ACQUISITION_DEFAULT_QUERY_LIMIT),
     stats: {
       ...emptyAcquisitionStats(),
       companies_discovered: Number(statsRaw.companies_discovered ?? 0),
@@ -56,6 +77,27 @@ function parseAcquisitionState(metadata: Record<string, unknown>): GrowthBulkAcq
       leads_skipped: Number(statsRaw.leads_skipped ?? 0),
       leads_error: Number(statsRaw.leads_error ?? 0),
     },
+    metrics: {
+      ...emptyAcquisitionThroughputMetrics(),
+      ticks_completed: Number(metricsRaw.ticks_completed ?? 0),
+      last_tick_duration_ms: Number(metricsRaw.last_tick_duration_ms ?? 0),
+      total_tick_duration_ms: Number(metricsRaw.total_tick_duration_ms ?? 0),
+      provider_errors: Number(metricsRaw.provider_errors ?? 0),
+      verification_failures: Number(metricsRaw.verification_failures ?? 0),
+      emails_verification_attempted: Number(metricsRaw.emails_verification_attempted ?? 0),
+      contacts_discovered: Number(metricsRaw.contacts_discovered ?? statsRaw.contact_candidates_stored ?? 0),
+      emails_verified: Number(metricsRaw.emails_verified ?? statsRaw.contacts_verified ?? 0),
+    },
+    geo_tile_index: Number(state.geo_tile_index ?? 0),
+    executed_query_keys: Array.isArray(state.executed_query_keys)
+      ? state.executed_query_keys.map(String)
+      : [],
+    consecutive_zero_discovery: Number(state.consecutive_zero_discovery ?? 0),
+    discovery_exhausted: Boolean(state.discovery_exhausted),
+    contact_discovery_cursor: parseKeysetCursor(state.contact_discovery_cursor),
+    contact_discovery_exhausted: Boolean(state.contact_discovery_exhausted),
+    verify_company_scan_cursor: parseKeysetCursor(state.verify_company_scan_cursor),
+    promote_company_scan_cursor: parseKeysetCursor(state.promote_company_scan_cursor),
     last_tick_at: asString(state.last_tick_at) || null,
     last_error: asString(state.last_error) || null,
   }
@@ -80,6 +122,24 @@ function rowToAcquisitionRun(row: Record<string, unknown>): GrowthBulkAcquisitio
   }
 }
 
+function companyContactsProcessed(metadata: Record<string, unknown>): boolean {
+  const acquisition =
+    metadata.acquisition && typeof metadata.acquisition === "object"
+      ? (metadata.acquisition as Record<string, unknown>)
+      : {}
+  return Boolean(asString(acquisition.contacts_processed_at))
+}
+
+function applyKeysetCursor<T extends { order: (col: string, opts: { ascending: boolean }) => T }>(
+  query: T,
+  cursor: GrowthBulkAcquisitionKeysetCursor | null | undefined,
+): T {
+  if (!cursor) return query
+  return query.or(
+    `created_at.gt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.gt.${cursor.id})`,
+  ) as T
+}
+
 export async function isGrowthBulkAcquisitionSchemaReady(admin: SupabaseClient): Promise<boolean> {
   return isGrowthRealWorldDiscoverySchemaReady(admin)
 }
@@ -92,23 +152,19 @@ export async function createBulkAcquisitionRun(
     primary_query: string
     created_by?: string | null
     limit_per_query?: number
+    geo_tiles?: string[]
+    target_company_count?: number | null
   },
 ): Promise<GrowthBulkAcquisitionRun | null> {
   if (!(await isGrowthBulkAcquisitionSchemaReady(admin))) return null
 
-  const state: GrowthBulkAcquisitionRunState = {
-    qa_marker: GROWTH_BULK_ACQUISITION_QA_MARKER,
-    phase: "discover_companies",
+  const state = emptyAcquisitionRunState({
     search_inputs: input.search_inputs,
     query_plan: input.query_plan,
-    query_index: 0,
-    use_fallback_queries: false,
-    child_run_ids: [],
     limit_per_query: input.limit_per_query ?? GROWTH_BULK_ACQUISITION_DEFAULT_QUERY_LIMIT,
-    stats: emptyAcquisitionStats(),
-    last_tick_at: null,
-    last_error: null,
-  }
+    geo_tiles: input.geo_tiles ?? [],
+    target_company_count: input.target_company_count ?? null,
+  })
 
   const industry = input.search_inputs.industry?.trim() || null
   const location = input.search_inputs.location?.trim() || null
@@ -167,6 +223,26 @@ export async function listBulkAcquisitionRuns(
     .filter((run): run is GrowthBulkAcquisitionRun => run !== null)
 }
 
+export async function listRunnableBulkAcquisitionRuns(
+  admin: SupabaseClient,
+  limit = 5,
+): Promise<GrowthBulkAcquisitionRun[]> {
+  const { data } = await admin
+    .schema("growth")
+    .from("real_world_discovery_runs")
+    .select("*")
+    .contains("metadata", { qa_marker: GROWTH_BULK_ACQUISITION_QA_MARKER })
+    .in("status", ["running", "partial"])
+    .order("updated_at", { ascending: true })
+    .limit(Math.max(limit * 3, limit))
+
+  return (data ?? [])
+    .map((row) => rowToAcquisitionRun(row as Record<string, unknown>))
+    .filter((run): run is GrowthBulkAcquisitionRun => run !== null)
+    .filter((run) => run.state.phase !== "done" && run.status !== "completed")
+    .slice(0, limit)
+}
+
 export async function saveBulkAcquisitionRunState(
   admin: SupabaseClient,
   runId: string,
@@ -211,21 +287,93 @@ export async function saveBulkAcquisitionRunState(
   return rowToAcquisitionRun(data as Record<string, unknown>)
 }
 
-export async function listAcquisitionCompanyCandidateIds(
+export async function loadAcquisitionDedupeHashes(
   admin: SupabaseClient,
   childRunIds: string[],
-): Promise<string[]> {
-  if (childRunIds.length === 0) return []
+): Promise<Set<string>> {
+  const hashes = new Set<string>()
+  if (childRunIds.length === 0) return hashes
 
-  const { data } = await admin
+  let cursor: GrowthBulkAcquisitionKeysetCursor | null = null
+  const pageSize = 500
+
+  while (true) {
+    let query = admin
+      .schema("growth")
+      .from("real_world_company_candidates")
+      .select("id, created_at, dedupe_hash")
+      .in("run_id", childRunIds)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(pageSize)
+
+    query = applyKeysetCursor(query, cursor)
+
+    const { data } = await query
+    const rows = data ?? []
+    if (rows.length === 0) break
+
+    for (const row of rows) {
+      const hash = asString((row as Record<string, unknown>).dedupe_hash)
+      if (hash) hashes.add(hash)
+    }
+
+    const last = rows[rows.length - 1] as Record<string, unknown>
+    cursor = {
+      created_at: asString(last.created_at),
+      id: asString(last.id),
+    }
+    if (rows.length < pageSize) break
+  }
+
+  return hashes
+}
+
+export async function scanAcquisitionCompanyCandidateBatch(
+  admin: SupabaseClient,
+  input: {
+    child_run_ids: string[]
+    cursor?: GrowthBulkAcquisitionKeysetCursor | null
+    batch_size?: number
+  },
+): Promise<{
+  company_ids: string[]
+  cursor: GrowthBulkAcquisitionKeysetCursor | null
+  exhausted: boolean
+}> {
+  if (input.child_run_ids.length === 0) {
+    return { company_ids: [], cursor: input.cursor ?? null, exhausted: true }
+  }
+
+  const batchSize = input.batch_size ?? GROWTH_BULK_ACQUISITION_COMPANY_SCAN_BATCH
+  let query = admin
     .schema("growth")
     .from("real_world_company_candidates")
-    .select("id")
-    .in("run_id", childRunIds)
+    .select("id, created_at")
+    .in("run_id", input.child_run_ids)
     .order("created_at", { ascending: true })
-    .limit(5000)
+    .order("id", { ascending: true })
+    .limit(batchSize)
 
-  return (data ?? []).map((row) => asString((row as Record<string, unknown>).id)).filter(Boolean)
+  query = applyKeysetCursor(query, input.cursor)
+
+  const { data } = await query
+  const rows = data ?? []
+  if (rows.length === 0) {
+    return { company_ids: [], cursor: input.cursor ?? null, exhausted: true }
+  }
+
+  const last = rows[rows.length - 1] as Record<string, unknown>
+  const nextCursor = {
+    created_at: asString(last.created_at),
+    id: asString(last.id),
+  }
+
+  return {
+    company_ids: rows.map((row) => asString((row as Record<string, unknown>).id)).filter(Boolean),
+    cursor: nextCursor,
+    exhausted: rows.length < batchSize,
+  }
 }
 
 export async function listCompaniesPendingContactDiscovery(
@@ -234,36 +382,69 @@ export async function listCompaniesPendingContactDiscovery(
     acquisition_run_id: string
     child_run_ids: string[]
     limit?: number
+    cursor?: GrowthBulkAcquisitionKeysetCursor | null
   },
-): Promise<Array<{ id: string; company_name: string; website: string | null }>> {
-  if (input.child_run_ids.length === 0) return []
-
-  const { data } = await admin
-    .schema("growth")
-    .from("real_world_company_candidates")
-    .select("id, company_name, website, metadata")
-    .in("run_id", input.child_run_ids)
-    .order("created_at", { ascending: true })
-    .limit(500)
-
-  const pending: Array<{ id: string; company_name: string; website: string | null }> = []
-  for (const row of data ?? []) {
-    const r = row as Record<string, unknown>
-    const metadata =
-      r.metadata && typeof r.metadata === "object" ? (r.metadata as Record<string, unknown>) : {}
-    const acquisition =
-      metadata.acquisition && typeof metadata.acquisition === "object"
-        ? (metadata.acquisition as Record<string, unknown>)
-        : {}
-    if (asString(acquisition.contacts_processed_at)) continue
-    pending.push({
-      id: asString(r.id),
-      company_name: asString(r.company_name),
-      website: asString(r.website) || null,
-    })
-    if (pending.length >= (input.limit ?? 3)) break
+): Promise<{
+  companies: Array<{ id: string; company_name: string; website: string | null }>
+  cursor: GrowthBulkAcquisitionKeysetCursor | null
+  exhausted: boolean
+}> {
+  if (input.child_run_ids.length === 0) {
+    return { companies: [], cursor: input.cursor ?? null, exhausted: true }
   }
-  return pending
+
+  const target = input.limit ?? 3
+  const pending: Array<{ id: string; company_name: string; website: string | null }> = []
+  let cursor = input.cursor ?? null
+  let exhausted = false
+  const scanBatch = GROWTH_BULK_ACQUISITION_COMPANY_SCAN_BATCH
+
+  while (pending.length < target) {
+    let query = admin
+      .schema("growth")
+      .from("real_world_company_candidates")
+      .select("id, company_name, website, metadata, created_at")
+      .in("run_id", input.child_run_ids)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(scanBatch)
+
+    query = applyKeysetCursor(query, cursor)
+
+    const { data } = await query
+    const rows = data ?? []
+    if (rows.length === 0) {
+      exhausted = true
+      break
+    }
+
+    for (const row of rows) {
+      const r = row as Record<string, unknown>
+      const metadata =
+        r.metadata && typeof r.metadata === "object" ? (r.metadata as Record<string, unknown>) : {}
+      if (companyContactsProcessed(metadata)) continue
+
+      pending.push({
+        id: asString(r.id),
+        company_name: asString(r.company_name),
+        website: asString(r.website) || null,
+      })
+      if (pending.length >= target) break
+    }
+
+    const last = rows[rows.length - 1] as Record<string, unknown>
+    cursor = {
+      created_at: asString(last.created_at),
+      id: asString(last.id),
+    }
+
+    if (rows.length < scanBatch) {
+      exhausted = true
+      break
+    }
+  }
+
+  return { companies: pending, cursor, exhausted }
 }
 
 export async function markCompanyContactsProcessed(

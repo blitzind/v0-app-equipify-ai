@@ -45,6 +45,10 @@
       "schedule": "0 3 * * *"
     },
     {
+      "path": "/api/cron/growth-acquisition-worker",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/growth-company-signal-refresh",
       "schedule": "0 4 * * *"
     },

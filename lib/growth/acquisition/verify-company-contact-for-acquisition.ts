@@ -1,6 +1,8 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { scanAcquisitionCompanyCandidateBatch } from "@/lib/growth/acquisition/acquisition-repository"
+import type { GrowthBulkAcquisitionKeysetCursor } from "@/lib/growth/acquisition/acquisition-types"
 import type { GrowthCompanyContact } from "@/lib/growth/contact-discovery/company-contact-types"
 import { isEmailReadyForLeadPromotion } from "@/lib/growth/contact-verification/email-verification-types"
 import { verifyCompanyContact } from "@/lib/growth/contact-verification/verify-contact"
@@ -87,39 +89,32 @@ export async function verifyCompanyContactForAcquisition(
   return rowToCompanyContact(updated as Record<string, unknown>)
 }
 
-export async function listCompanyContactsPendingAcquisitionVerification(
+async function listCompanyContactsForCompanyIds(
   admin: SupabaseClient,
   input: {
     company_ids: string[]
-    limit?: number
+    mode: "pending_verification" | "ready_for_promotion"
+    limit: number
   },
 ): Promise<GrowthCompanyContact[]> {
-  if (input.company_ids.length === 0) return []
+  if (input.company_ids.length === 0 || input.limit <= 0) return []
 
-  const { data } = await admin
-    .schema("growth")
-    .from("company_contacts")
-    .select("*")
-    .in("company_id", input.company_ids)
-    .is("growth_lead_id", null)
-    .neq("contact_status", "archived")
-    .neq("contact_status", "suppressed")
-    .not("email", "is", null)
-    .in("email_status", ["discovered", "unknown"])
-    .order("updated_at", { ascending: true })
-    .limit(input.limit ?? 25)
+  if (input.mode === "pending_verification") {
+    const { data } = await admin
+      .schema("growth")
+      .from("company_contacts")
+      .select("*")
+      .in("company_id", input.company_ids)
+      .is("growth_lead_id", null)
+      .neq("contact_status", "archived")
+      .neq("contact_status", "suppressed")
+      .not("email", "is", null)
+      .in("email_status", ["discovered", "unknown"])
+      .order("updated_at", { ascending: true })
+      .limit(input.limit)
 
-  return (data ?? []).map((row) => rowToCompanyContact(row as Record<string, unknown>))
-}
-
-export async function listVerifiedCompanyContactsReadyForPromotion(
-  admin: SupabaseClient,
-  input: {
-    company_ids: string[]
-    limit?: number
-  },
-): Promise<GrowthCompanyContact[]> {
-  if (input.company_ids.length === 0) return []
+    return (data ?? []).map((row) => rowToCompanyContact(row as Record<string, unknown>))
+  }
 
   const { data } = await admin
     .schema("growth")
@@ -132,7 +127,7 @@ export async function listVerifiedCompanyContactsReadyForPromotion(
     .neq("contact_status", "suppressed")
     .order("decision_maker_score", { ascending: false })
     .order("confidence_score", { ascending: false })
-    .limit(input.limit ?? 100)
+    .limit(input.limit)
 
   return (data ?? [])
     .map((row) => rowToCompanyContact(row as Record<string, unknown>))
@@ -144,4 +139,93 @@ export async function listVerifiedCompanyContactsReadyForPromotion(
           : null
       return meta?.verified_by_provider === true
     })
+}
+
+async function scanCompanyContactsForAcquisitionRun(
+  admin: SupabaseClient,
+  input: {
+    child_run_ids: string[]
+    mode: "pending_verification" | "ready_for_promotion"
+    limit?: number
+    company_scan_cursor?: GrowthBulkAcquisitionKeysetCursor | null
+  },
+): Promise<{
+  contacts: GrowthCompanyContact[]
+  company_scan_cursor: GrowthBulkAcquisitionKeysetCursor | null
+  exhausted: boolean
+}> {
+  const target = input.limit ?? 25
+  const contacts: GrowthCompanyContact[] = []
+  let cursor = input.company_scan_cursor ?? null
+  let exhausted = false
+
+  while (contacts.length < target) {
+    const batch = await scanAcquisitionCompanyCandidateBatch(admin, {
+      child_run_ids: input.child_run_ids,
+      cursor,
+    })
+    cursor = batch.cursor
+    exhausted = batch.exhausted
+
+    if (batch.company_ids.length === 0) break
+
+    const found = await listCompanyContactsForCompanyIds(admin, {
+      company_ids: batch.company_ids,
+      mode: input.mode,
+      limit: target - contacts.length,
+    })
+    contacts.push(...found)
+
+    if (batch.exhausted) break
+  }
+
+  return { contacts, company_scan_cursor: cursor, exhausted }
+}
+
+export async function listCompanyContactsPendingAcquisitionVerification(
+  admin: SupabaseClient,
+  input: {
+    child_run_ids: string[]
+    limit?: number
+    company_scan_cursor?: GrowthBulkAcquisitionKeysetCursor | null
+  },
+): Promise<{
+  contacts: GrowthCompanyContact[]
+  company_scan_cursor: GrowthBulkAcquisitionKeysetCursor | null
+  exhausted: boolean
+}> {
+  if (input.child_run_ids.length === 0) {
+    return { contacts: [], company_scan_cursor: input.company_scan_cursor ?? null, exhausted: true }
+  }
+
+  return scanCompanyContactsForAcquisitionRun(admin, {
+    child_run_ids: input.child_run_ids,
+    mode: "pending_verification",
+    limit: input.limit,
+    company_scan_cursor: input.company_scan_cursor,
+  })
+}
+
+export async function listVerifiedCompanyContactsReadyForPromotion(
+  admin: SupabaseClient,
+  input: {
+    child_run_ids: string[]
+    limit?: number
+    company_scan_cursor?: GrowthBulkAcquisitionKeysetCursor | null
+  },
+): Promise<{
+  contacts: GrowthCompanyContact[]
+  company_scan_cursor: GrowthBulkAcquisitionKeysetCursor | null
+  exhausted: boolean
+}> {
+  if (input.child_run_ids.length === 0) {
+    return { contacts: [], company_scan_cursor: input.company_scan_cursor ?? null, exhausted: true }
+  }
+
+  return scanCompanyContactsForAcquisitionRun(admin, {
+    child_run_ids: input.child_run_ids,
+    mode: "ready_for_promotion",
+    limit: input.limit,
+    company_scan_cursor: input.company_scan_cursor,
+  })
 }

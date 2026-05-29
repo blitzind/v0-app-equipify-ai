@@ -3,9 +3,14 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
 import {
+  acquisitionQueryDedupeKey,
+  buildAcquisitionGeoTiles,
+  currentAcquisitionGeoTile,
+} from "@/lib/growth/acquisition/acquisition-geographic-expansion"
+import {
   createBulkAcquisitionRun,
-  listAcquisitionCompanyCandidateIds,
   listCompaniesPendingContactDiscovery,
+  loadAcquisitionDedupeHashes,
   loadBulkAcquisitionRun,
   markCompanyContactsProcessed,
   saveBulkAcquisitionRunState,
@@ -15,6 +20,7 @@ import {
   GROWTH_BULK_ACQUISITION_PROMOTE_PER_TICK,
   GROWTH_BULK_ACQUISITION_QA_MARKER,
   GROWTH_BULK_ACQUISITION_VERIFY_PER_TICK,
+  GROWTH_BULK_ACQUISITION_ZERO_DISCOVERY_STOP,
   type GrowthBulkAcquisitionPhase,
   type GrowthBulkAcquisitionRun,
   type GrowthBulkAcquisitionTickResult,
@@ -44,12 +50,23 @@ function resolveNextPhase(state: GrowthBulkAcquisitionRun["state"]): GrowthBulkA
   return state.phase === "discover_companies" ? "discover_contacts" : state.phase
 }
 
-function allQueriesExhausted(state: GrowthBulkAcquisitionRun["state"]): boolean {
+function allQueriesExhaustedForTile(state: GrowthBulkAcquisitionRun["state"]): boolean {
   const primaryDone = state.query_index >= state.query_plan.primary.length
   if (!primaryDone) return false
   if (state.query_plan.fallback.length === 0) return true
   if (!state.use_fallback_queries) return false
   return state.query_index >= state.query_plan.primary.length + state.query_plan.fallback.length
+}
+
+function discoveryComplete(state: GrowthBulkAcquisitionRun["state"]): boolean {
+  if (state.discovery_exhausted) return true
+  if (
+    state.target_company_count != null &&
+    state.stats.companies_discovered >= state.target_company_count
+  ) {
+    return true
+  }
+  return state.geo_tile_index >= state.geo_tiles.length && allQueriesExhaustedForTile(state)
 }
 
 function currentQuery(state: GrowthBulkAcquisitionRun["state"]): string | null {
@@ -59,26 +76,117 @@ function currentQuery(state: GrowthBulkAcquisitionRun["state"]): string | null {
   return combined[state.query_index] ?? null
 }
 
+function rebuildQueryPlanForCurrentTile(
+  state: GrowthBulkAcquisitionRun["state"],
+): GrowthBulkAcquisitionRun["state"] {
+  const tile = currentAcquisitionGeoTile(state.geo_tiles, state.geo_tile_index)
+  if (!tile) return state
+
+  const searchInputs: GrowthRealWorldDiscoverySearchInputs = {
+    ...state.search_inputs,
+    location: tile,
+  }
+  const batches = planLiveProviderQueryBatches(searchInputs)
+
+  return {
+    ...state,
+    search_inputs: searchInputs,
+    query_plan: batches,
+    query_index: 0,
+    use_fallback_queries: false,
+  }
+}
+
+function advanceGeoTile(state: GrowthBulkAcquisitionRun["state"]): GrowthBulkAcquisitionRun["state"] {
+  const nextIndex = state.geo_tile_index + 1
+  if (nextIndex >= state.geo_tiles.length) {
+    return { ...state, geo_tile_index: nextIndex, discovery_exhausted: true }
+  }
+  return rebuildQueryPlanForCurrentTile({ ...state, geo_tile_index: nextIndex })
+}
+
+function markDiscoveryExhausted(state: GrowthBulkAcquisitionRun["state"]): GrowthBulkAcquisitionRun["state"] {
+  return {
+    ...state,
+    discovery_exhausted: true,
+    phase: "discover_contacts",
+  }
+}
+
+function countNetNewCompanies(
+  candidates: Array<{ dedupe_hash?: string }>,
+  knownHashes: Set<string>,
+): number {
+  let netNew = 0
+  for (const candidate of candidates) {
+    const hash = typeof candidate.dedupe_hash === "string" ? candidate.dedupe_hash.trim() : ""
+    if (!hash || knownHashes.has(hash)) continue
+    knownHashes.add(hash)
+    netNew += 1
+  }
+  return netNew
+}
+
 async function tickDiscoverCompanies(
   admin: SupabaseClient,
   run: GrowthBulkAcquisitionRun,
   createdBy?: string | null,
 ): Promise<{ run: GrowthBulkAcquisitionRun; actions: string[] }> {
   const actions: string[] = []
-  const state = { ...run.state }
-  const query = currentQuery(state)
+  let state = { ...run.state }
 
-  if (!query) {
-    if (!state.use_fallback_queries && state.query_plan.fallback.length > 0) {
-      state.use_fallback_queries = true
-      actions.push("switched_to_fallback_queries")
-    } else {
-      state.phase = "discover_contacts"
-      actions.push("company_discovery_complete")
-    }
+  if (discoveryComplete(state)) {
+    state.phase = "discover_contacts"
+    actions.push("company_discovery_complete")
     const saved = await saveBulkAcquisitionRunState(admin, run.id, { state, status: "running" })
     return { run: saved ?? run, actions }
   }
+
+  if (state.geo_tiles.length === 0) {
+    state.geo_tiles = buildAcquisitionGeoTiles(state.search_inputs.location).map((tile) => tile.label)
+    state = rebuildQueryPlanForCurrentTile(state)
+    actions.push(`geo_tiles_initialized:${state.geo_tiles.length}`)
+  }
+
+  let query = currentQuery(state)
+  const tileLabel = currentAcquisitionGeoTile(state.geo_tiles, state.geo_tile_index) ?? ""
+
+  while (query) {
+    const dedupeKey = acquisitionQueryDedupeKey(tileLabel, query)
+    if (state.executed_query_keys.includes(dedupeKey)) {
+      state.query_index += 1
+      query = currentQuery(state)
+      continue
+    }
+    break
+  }
+
+  if (!query) {
+    if (!allQueriesExhaustedForTile(state)) {
+      if (!state.use_fallback_queries && state.query_plan.fallback.length > 0) {
+        state.use_fallback_queries = true
+        actions.push("switched_to_fallback_queries")
+        query = currentQuery(state)
+      }
+    }
+  }
+
+  if (!query) {
+    if (state.geo_tile_index + 1 < state.geo_tiles.length) {
+      state = advanceGeoTile(state)
+      actions.push(`advanced_geo_tile:${state.geo_tile_index}`)
+      const saved = await saveBulkAcquisitionRunState(admin, run.id, { state, status: "running" })
+      return { run: saved ?? run, actions }
+    }
+
+    state = markDiscoveryExhausted(state)
+    actions.push("company_discovery_complete")
+    const saved = await saveBulkAcquisitionRunState(admin, run.id, { state, status: "running" })
+    return { run: saved ?? run, actions }
+  }
+
+  const dedupeKey = acquisitionQueryDedupeKey(tileLabel, query)
+  const knownHashes = await loadAcquisitionDedupeHashes(admin, state.child_run_ids)
 
   const discovery = await runRealWorldCompanyDiscovery(admin, {
     query,
@@ -87,26 +195,56 @@ async function tickDiscoverCompanies(
     created_by: createdBy,
   })
 
+  if (discovery.provider_status?.label === "provider_quota_rate_limited") {
+    state.metrics.provider_errors += 1
+  } else if (
+    discovery.provider_status?.provider_diagnostics?.some(
+      (diag) => diag.provider_executed && diag.provider_result_count === 0,
+    )
+  ) {
+    state.metrics.provider_errors += 1
+  }
+
   if (discovery.run?.id && !state.child_run_ids.includes(discovery.run.id)) {
     state.child_run_ids.push(discovery.run.id)
   }
 
-  state.stats.companies_discovered += discovery.candidates.length
+  const netNew = countNetNewCompanies(discovery.candidates, knownHashes)
+  state.stats.companies_discovered += netNew
+  state.executed_query_keys = [...state.executed_query_keys, dedupeKey]
   state.query_index += 1
 
-  if (discovery.candidates.length === 0 && !state.use_fallback_queries && state.query_index >= state.query_plan.primary.length) {
-    state.use_fallback_queries = true
-    actions.push("zero_results_switching_to_fallback")
+  if (netNew === 0) {
+    state.consecutive_zero_discovery += 1
+  } else {
+    state.consecutive_zero_discovery = 0
   }
 
-  if (allQueriesExhausted(state)) {
-    state.phase = "discover_contacts"
-    actions.push("company_discovery_complete")
+  if (
+    state.target_company_count != null &&
+    state.stats.companies_discovered >= state.target_company_count
+  ) {
+    state = markDiscoveryExhausted(state)
+    actions.push("target_company_count_reached")
+  } else if (state.consecutive_zero_discovery >= GROWTH_BULK_ACQUISITION_ZERO_DISCOVERY_STOP) {
+    state = markDiscoveryExhausted(state)
+    actions.push("provider_exhaustion_reached")
+  } else if (netNew === 0 && !state.use_fallback_queries && state.query_index >= state.query_plan.primary.length) {
+    state.use_fallback_queries = true
+    actions.push("zero_results_switching_to_fallback")
+  } else if (allQueriesExhaustedForTile(state)) {
+    if (state.geo_tile_index + 1 < state.geo_tiles.length) {
+      state = advanceGeoTile(state)
+      actions.push(`advanced_geo_tile:${state.geo_tile_index}`)
+    } else {
+      state = markDiscoveryExhausted(state)
+      actions.push("company_discovery_complete")
+    }
   } else {
     state.phase = resolveNextPhase(state)
   }
 
-  actions.push(`discovered_companies:${discovery.candidates.length}`)
+  actions.push(`discovered_companies:${netNew}`)
   state.last_tick_at = new Date().toISOString()
   state.last_error = null
 
@@ -119,7 +257,8 @@ async function tickDiscoverCompanies(
   logGrowthEngine("acquisition_tick_discover_companies", {
     runId: run.id,
     query,
-    discovered: discovery.candidates.length,
+    tile: tileLabel,
+    discovered: netNew,
   })
 
   return { run: saved ?? run, actions }
@@ -133,26 +272,36 @@ async function tickDiscoverContacts(
   const actions: string[] = []
   const state = { ...run.state }
 
-  const pending = await listCompaniesPendingContactDiscovery(admin, {
+  const scan = await listCompaniesPendingContactDiscovery(admin, {
     acquisition_run_id: run.id,
     child_run_ids: state.child_run_ids,
     limit: GROWTH_BULK_ACQUISITION_COMPANIES_PER_TICK,
+    cursor: state.contact_discovery_cursor,
   })
 
-  if (pending.length === 0) {
-    state.phase = "verify_contacts"
-    actions.push("contact_discovery_complete")
+  state.contact_discovery_cursor = scan.cursor
+  state.contact_discovery_exhausted = scan.exhausted
+
+  if (scan.companies.length === 0) {
+    if (scan.exhausted) {
+      state.phase = "verify_contacts"
+      actions.push("contact_discovery_complete")
+    } else {
+      state.phase = "discover_contacts"
+      actions.push("contact_discovery_scan_continue")
+    }
     const saved = await saveBulkAcquisitionRunState(admin, run.id, { state, status: "running" })
     return { run: saved ?? run, actions }
   }
 
-  for (const company of pending) {
+  for (const company of scan.companies) {
     const snapshot = await runContactDiscoveryForCompany(admin, {
       company_candidate_id: company.id,
       created_by: createdBy,
     })
 
     state.stats.contact_candidates_stored += snapshot.contacts.length
+    state.metrics.contacts_discovered += snapshot.contacts.length
 
     const candidates =
       snapshot.contacts.length > 0
@@ -187,24 +336,35 @@ async function tickVerifyContacts(
 ): Promise<{ run: GrowthBulkAcquisitionRun; actions: string[] }> {
   const actions: string[] = []
   const state = { ...run.state }
-  const companyIds = await listAcquisitionCompanyCandidateIds(admin, state.child_run_ids)
 
-  const pending = await listCompanyContactsPendingAcquisitionVerification(admin, {
-    company_ids: companyIds,
+  const scan = await listCompanyContactsPendingAcquisitionVerification(admin, {
+    child_run_ids: state.child_run_ids,
     limit: GROWTH_BULK_ACQUISITION_VERIFY_PER_TICK,
+    company_scan_cursor: state.verify_company_scan_cursor,
   })
 
-  if (pending.length === 0) {
-    state.phase = "promote_leads"
-    actions.push("verification_complete")
+  state.verify_company_scan_cursor = scan.company_scan_cursor
+
+  if (scan.contacts.length === 0) {
+    if (scan.exhausted) {
+      state.phase = "promote_leads"
+      actions.push("verification_complete")
+    } else {
+      state.phase = "verify_contacts"
+      actions.push("verification_scan_continue")
+    }
     const saved = await saveBulkAcquisitionRunState(admin, run.id, { state, status: "running" })
     return { run: saved ?? run, actions }
   }
 
   let verified = 0
-  for (const contact of pending) {
+  for (const contact of scan.contacts) {
+    state.metrics.emails_verification_attempted += 1
     const updated = await verifyCompanyContactForAcquisition(admin, contact.id)
-    if (!updated) continue
+    if (!updated) {
+      state.metrics.verification_failures += 1
+      continue
+    }
     const emailVerification =
       updated.metadata.email_verification &&
       typeof updated.metadata.email_verification === "object"
@@ -221,6 +381,9 @@ async function tickVerifyContacts(
       })
     ) {
       verified += 1
+      state.metrics.emails_verified += 1
+    } else {
+      state.metrics.verification_failures += 1
     }
   }
 
@@ -239,26 +402,43 @@ async function tickPromoteLeads(
 ): Promise<{ run: GrowthBulkAcquisitionRun; actions: string[]; done: boolean }> {
   const actions: string[] = []
   const state = { ...run.state }
-  const companyIds = await listAcquisitionCompanyCandidateIds(admin, state.child_run_ids)
 
-  const ready = await listVerifiedCompanyContactsReadyForPromotion(admin, {
-    company_ids: companyIds,
+  const scan = await listVerifiedCompanyContactsReadyForPromotion(admin, {
+    child_run_ids: state.child_run_ids,
     limit: GROWTH_BULK_ACQUISITION_PROMOTE_PER_TICK,
+    company_scan_cursor: state.promote_company_scan_cursor,
   })
 
-  if (ready.length === 0) {
-    const queriesDone = allQueriesExhausted(state)
+  state.promote_company_scan_cursor = scan.company_scan_cursor
+
+  if (scan.contacts.length === 0) {
+    if (!scan.exhausted) {
+      state.phase = "promote_leads"
+      actions.push("promotion_scan_continue")
+      const saved = await saveBulkAcquisitionRunState(admin, run.id, { state, status: "running" })
+      return { run: saved ?? run, actions, done: false }
+    }
+
+    const queriesDone = discoveryComplete(state)
     const pendingCompanies = await listCompaniesPendingContactDiscovery(admin, {
       acquisition_run_id: run.id,
       child_run_ids: state.child_run_ids,
       limit: 1,
+      cursor: state.contact_discovery_cursor,
     })
     const pendingVerify = await listCompanyContactsPendingAcquisitionVerification(admin, {
-      company_ids: companyIds,
+      child_run_ids: state.child_run_ids,
       limit: 1,
+      company_scan_cursor: state.verify_company_scan_cursor,
     })
 
-    if (queriesDone && pendingCompanies.length === 0 && pendingVerify.length === 0) {
+    if (
+      queriesDone &&
+      pendingCompanies.companies.length === 0 &&
+      pendingCompanies.exhausted &&
+      pendingVerify.contacts.length === 0 &&
+      pendingVerify.exhausted
+    ) {
       state.phase = "done"
       actions.push("acquisition_complete")
       const saved = await saveBulkAcquisitionRunState(admin, run.id, { state, status: "completed" })
@@ -268,23 +448,26 @@ async function tickPromoteLeads(
     if (!queriesDone) {
       state.phase = "discover_companies"
       actions.push("resume_company_discovery")
-    } else if (pendingCompanies.length > 0) {
+    } else if (pendingCompanies.companies.length > 0) {
       state.phase = "discover_contacts"
       actions.push("resume_contact_discovery")
-    } else if (pendingVerify.length > 0) {
+    } else if (pendingVerify.contacts.length > 0) {
       state.phase = "verify_contacts"
       actions.push("resume_verification")
     }
 
     const saved = await saveBulkAcquisitionRunState(admin, run.id, {
       state,
-      status: pendingCompanies.length || pendingVerify.length || !queriesDone ? "running" : "completed",
+      status:
+        pendingCompanies.companies.length || pendingVerify.contacts.length || !queriesDone
+          ? "running"
+          : "completed",
     })
     return { run: saved ?? run, actions, done: state.phase === "done" }
   }
 
   const outcomes = await promoteVerifiedContactsBatch(admin, {
-    contacts: ready,
+    contacts: scan.contacts,
     acquisitionRunId: run.id,
     createdBy,
   })
@@ -311,17 +494,27 @@ export async function startBulkAcquisitionRun(
     search_inputs: GrowthRealWorldDiscoverySearchInputs
     created_by?: string | null
     limit_per_query?: number
+    target_company_count?: number | null
   },
 ): Promise<GrowthBulkAcquisitionRun | null> {
-  const plan = buildLiveProviderDiscoveryQueries(input.search_inputs)
-  const batches = planLiveProviderQueryBatches(input.search_inputs)
+  const geoTiles = buildAcquisitionGeoTiles(input.search_inputs.location).map((tile) => tile.label)
+  const firstTile = geoTiles[0] ?? input.search_inputs.location ?? "United States"
+  const tileInputs: GrowthRealWorldDiscoverySearchInputs = {
+    ...input.search_inputs,
+    location: firstTile,
+  }
+
+  const plan = buildLiveProviderDiscoveryQueries(tileInputs)
+  const batches = planLiveProviderQueryBatches(tileInputs)
 
   return createBulkAcquisitionRun(admin, {
-    search_inputs: input.search_inputs,
+    search_inputs: tileInputs,
     query_plan: batches,
     primary_query: plan.primary_query,
     created_by: input.created_by,
     limit_per_query: input.limit_per_query,
+    geo_tiles: geoTiles,
+    target_company_count: input.target_company_count ?? null,
   })
 }
 
@@ -333,8 +526,16 @@ export async function tickBulkAcquisitionRun(
   const run = await loadBulkAcquisitionRun(admin, runId)
   if (!run) return null
   if (run.state.phase === "done" || run.status === "completed") {
-    return { run, phase: "done", tick_actions: ["already_complete"], done: true }
+    return {
+      run,
+      phase: "done",
+      tick_actions: ["already_complete"],
+      done: true,
+      tick_duration_ms: 0,
+    }
   }
+
+  const tickStartedMs = Date.now()
 
   try {
     let result: { run: GrowthBulkAcquisitionRun; actions: string[]; done?: boolean }
@@ -348,18 +549,54 @@ export async function tickBulkAcquisitionRun(
     } else if (run.state.phase === "promote_leads") {
       result = await tickPromoteLeads(admin, run, input?.created_by)
     } else {
-      return { run, phase: run.state.phase, tick_actions: ["unknown_phase"], done: true }
+      return {
+        run,
+        phase: run.state.phase,
+        tick_actions: ["unknown_phase"],
+        done: true,
+        tick_duration_ms: 0,
+      }
     }
 
+    const tickDurationMs = Date.now() - tickStartedMs
+    const state = {
+      ...result.run.state,
+      metrics: {
+        ...result.run.state.metrics,
+        ticks_completed: result.run.state.metrics.ticks_completed + 1,
+        last_tick_duration_ms: tickDurationMs,
+        total_tick_duration_ms: result.run.state.metrics.total_tick_duration_ms + tickDurationMs,
+      },
+      last_tick_at: new Date().toISOString(),
+    }
+
+    const saved =
+      (await saveBulkAcquisitionRunState(admin, runId, {
+        state,
+        status: result.run.status,
+        candidate_count: state.stats.companies_discovered,
+      })) ?? { ...result.run, state }
+
     return {
-      run: result.run,
-      phase: result.run.state.phase,
+      run: saved,
+      phase: saved.state.phase,
       tick_actions: result.actions,
-      done: result.done ?? result.run.state.phase === "done",
+      done: result.done ?? saved.state.phase === "done",
+      tick_duration_ms: tickDurationMs,
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "tick_failed"
-    const state = { ...run.state, last_error: message }
+    const tickDurationMs = Date.now() - tickStartedMs
+    const state = {
+      ...run.state,
+      last_error: message,
+      metrics: {
+        ...run.state.metrics,
+        ticks_completed: run.state.metrics.ticks_completed + 1,
+        last_tick_duration_ms: tickDurationMs,
+        total_tick_duration_ms: run.state.metrics.total_tick_duration_ms + tickDurationMs,
+      },
+    }
     const saved = await saveBulkAcquisitionRunState(admin, runId, { state, status: "partial" })
     logGrowthEngine("acquisition_tick_failed", { runId, message })
     return {
@@ -367,6 +604,7 @@ export async function tickBulkAcquisitionRun(
       phase: state.phase,
       tick_actions: [`error:${message}`],
       done: false,
+      tick_duration_ms: tickDurationMs,
     }
   }
 }

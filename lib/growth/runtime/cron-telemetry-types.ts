@@ -9,6 +9,7 @@ export const GROWTH_CRON_ROUTE_IDS = [
   "growth-inbox-sync",
   "growth-signal-ingest",
   "growth-discovery-worker",
+  "growth-acquisition-worker",
   "growth-company-signal-refresh",
   "growth-contact-refresh",
   "growth-territory-refresh",

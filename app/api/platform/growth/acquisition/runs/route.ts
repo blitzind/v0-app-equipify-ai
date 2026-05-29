@@ -41,6 +41,7 @@ const startBodySchema = z.object({
   limit_per_query: z.number().int().min(10).max(100).optional(),
   auto_tick: z.boolean().optional(),
   tick_count: z.number().int().min(1).max(20).optional(),
+  target_company_count: z.number().int().min(1).max(100_000).optional(),
 })
 
 export async function GET() {
@@ -97,6 +98,7 @@ export async function POST(request: Request) {
     search_inputs: searchInputs,
     created_by: access.userId,
     limit_per_query: parsed.data.limit_per_query,
+    target_company_count: parsed.data.target_company_count ?? null,
   })
 
   if (!run) {
