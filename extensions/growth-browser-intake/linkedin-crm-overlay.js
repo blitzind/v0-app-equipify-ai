@@ -107,21 +107,38 @@
     return body
   }
 
-  function findProfileBadgeAnchor() {
+  function findProfileNameElement() {
     const selectors = [
-      "main section.artdeco-card div.ph5",
-      "main .pv-text-details__left-panel",
-      "main section.artdeco-card h1",
       "h1.text-heading-xlarge",
+      "main section.artdeco-card h1",
+      "main h1.break-words",
       "main h1",
-      ".org-top-card-primary-content",
+      ".org-top-card-primary-content__title",
+      ".org-top-card-summary__title",
     ]
 
     for (const selector of selectors) {
       const el = document.querySelector(selector)
-      if (el?.offsetParent !== null) return el
+      if (el?.isConnected && el.textContent?.trim() && el.offsetParent !== null) return el
     }
     return null
+  }
+
+  function mountBadgeBesideName(root) {
+    const nameEl = findProfileNameElement()
+    if (!nameEl?.parentElement) return false
+
+    let host = nameEl.parentElement.querySelector(":scope > .equipify-sales-linkedin-badge-host")
+    if (!host) {
+      host = document.createElement("div")
+      host.className = "equipify-sales-linkedin-badge-host"
+      nameEl.parentElement.insertBefore(host, nameEl)
+      host.appendChild(nameEl)
+    }
+
+    if (root.parentElement !== host) host.appendChild(root)
+    root.classList.remove("equipify-sales-linkedin-badge-root--floating")
+    return true
   }
 
   function openSidebar() {
@@ -189,10 +206,7 @@
     root.id = BADGE_ROOT_ID
     root.className = "equipify-sales-linkedin-badge-root"
 
-    const anchor = findProfileBadgeAnchor()
-    if (anchor?.parentElement) {
-      anchor.parentElement.insertBefore(root, anchor.nextSibling)
-    } else {
+    if (!mountBadgeBesideName(root)) {
       root.classList.add("equipify-sales-linkedin-badge-root--floating")
       document.body.appendChild(root)
     }

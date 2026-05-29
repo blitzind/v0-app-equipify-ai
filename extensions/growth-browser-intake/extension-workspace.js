@@ -122,9 +122,14 @@
     return config?.EXTENSION_API_PRESETS?.[preset] ?? "https://app.equipify.ai"
   }
 
-  function copyText(value) {
-    if (!value || value === "—") return
-    navigator.clipboard?.writeText(value).catch(() => {})
+  const ENRICHMENT_SETUP_MESSAGE =
+    "Connect an enrichment provider to find email/phone. Configure People Data Labs or website contact discovery in Equipify Growth settings."
+
+  function setEnrichmentStatus(message, kind = "empty") {
+    const statusEl = document.getElementById("es-ws-enrichment-status")
+    if (!statusEl) return
+    statusEl.className = kind === "error" ? "es-ws-enrichment-status es-ws-enrichment-status--error" : "es-ws-enrichment-status"
+    statusEl.textContent = message
   }
 
   function uniqueValues(values) {
@@ -435,7 +440,7 @@
     const legacyBadge = document.getElementById("linkedin-status-badge")
     if (legacyBadge) {
       legacyBadge.textContent = `${display.emoji} ${display.displayLabel}`
-      legacyBadge.className = `linkedin-status-badge badge-${display.tone}`
+      legacyBadge.className = "es-ws-hidden-compat"
     }
 
     setHtml("es-ws-contact-rows", `
@@ -486,6 +491,7 @@
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Location</span><span class="es-ws-kv-value">${escapeHtml(location)}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Offices</span><span class="es-ws-kv-value">${escapeHtml(Array.isArray(detected?.office_locations) ? detected.office_locations.join(", ") : "—")}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Industry</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.industry) ?? "—")}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Keywords</span><span class="es-ws-kv-value">${escapeHtml(Array.isArray(detected?.keywords) ? detected.keywords.join(", ") : trimOrNull(detected?.keywords) ?? "—")}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Sub-industry</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.subindustry) ?? "—")}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Employees</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.employee_count) ?? "—")}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Employee range</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.employee_range) ?? "—")}</span></div>
@@ -720,11 +726,15 @@
           throw new Error(body?.message ?? "Contact enrichment failed.")
         }
         if (!body.configured) {
-          if (statusEl) statusEl.textContent = "Contact enrichment provider not configured."
+          setEnrichmentStatus(ENRICHMENT_SETUP_MESSAGE, "error")
+          if (copyBtn) copyBtn.hidden = true
+          if (saveBtn) saveBtn.hidden = true
           return
         }
         if (!body.result) {
-          if (statusEl) statusEl.textContent = body.message ?? "No contact details found."
+          setEnrichmentStatus(body.message ?? "No contact details found from approved providers.")
+          if (copyBtn) copyBtn.hidden = true
+          if (saveBtn) saveBtn.hidden = true
           return
         }
         lastEnrichmentResult = body.result
@@ -751,12 +761,14 @@
         if (copyBtn) copyBtn.hidden = false
         if (saveBtn) saveBtn.hidden = false
       } catch (error) {
-        if (statusEl) {
-          statusEl.textContent =
-            error instanceof Error ? error.message : "Could not find contact details."
-        }
+        setEnrichmentStatus(
+          error instanceof Error ? error.message : "Could not find contact details.",
+          "error",
+        )
       }
     }
+
+    setEnrichmentStatus(ENRICHMENT_SETUP_MESSAGE)
 
     document.getElementById("workspace-refresh-btn")?.addEventListener("click", () => {
       deps?.refresh?.()

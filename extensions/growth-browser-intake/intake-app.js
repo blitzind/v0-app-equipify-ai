@@ -134,6 +134,26 @@ function initIntakeApp(options) {
     return state.settings.apiBaseUrl || config.EXTENSION_API_PRESETS.production
   }
 
+  function defaultCrmPayload() {
+    return {
+      ok: true,
+      matched: false,
+      context: null,
+      status_badge: "not_added",
+      status_badge_label: "Not In Equipify",
+    }
+  }
+
+  async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
+    try {
+      return await fetch(url, { ...options, signal: controller.signal })
+    } finally {
+      window.clearTimeout(timeoutId)
+    }
+  }
+
   function setCaptureStatus(text, className) {
     if (!els.captureStatus) return
     els.captureStatus.textContent = text
@@ -303,10 +323,13 @@ function initIntakeApp(options) {
       if (cached !== null) return cached
     }
 
-    const response = await fetch(`${apiBaseUrl()}${config.CRM_CONTEXT_PATH}?${params.toString()}`, {
-      method: "GET",
-      credentials: "include",
-    })
+    const response = await fetchWithTimeout(
+      `${apiBaseUrl()}${config.CRM_CONTEXT_PATH}?${params.toString()}`,
+      {
+        method: "GET",
+        credentials: "include",
+      },
+    )
 
     const body = await response.json().catch(() => null)
     if (!response.ok || !body?.ok) {
@@ -390,7 +413,11 @@ function initIntakeApp(options) {
 
     if (els.linkedinStatusBadge) {
       els.linkedinStatusBadge.textContent = badgeLabel
-      els.linkedinStatusBadge.className = `linkedin-status-badge badge-${tone}`
+      if (surface === "sidepanel" || surface === "inpage") {
+        els.linkedinStatusBadge.className = "es-ws-hidden-compat"
+      } else {
+        els.linkedinStatusBadge.className = `linkedin-status-badge badge-${tone}`
+      }
     }
 
     const contextParts = []
@@ -731,8 +758,9 @@ function initIntakeApp(options) {
       if (seq !== bootstrapSeq) return
       logError("bootstrap_timeout", "Loading page context timed out")
       setLoadingState(false)
+      renderLinkedInStatusPanel(defaultCrmPayload(), null)
       showFallbackError("No page context found. Reload LinkedIn or re-open Equipify Sales.")
-    }, 12_000)
+    }, 8000)
     setCaptureStatus("Detecting", "status-detecting")
     setLoadingState(true)
     clearStatus()
@@ -748,6 +776,7 @@ function initIntakeApp(options) {
           els.contextWarning.textContent = "Open a website or LinkedIn page, then reopen the extension."
         }
         setCaptureStatus("No page", "status-error")
+        renderLinkedInStatusPanel(defaultCrmPayload(), tab?.url ?? null)
         return
       }
 
@@ -772,7 +801,7 @@ function initIntakeApp(options) {
 
       const formValues = readFormValues()
       formValues.page_title = metadata?.page_title ?? formValues.page_title
-      const crmPayload = await fetchCrmContext(formValues, tab?.url)
+      const crmPayload = (await fetchCrmContext(formValues, tab?.url)) ?? defaultCrmPayload()
       if (seq !== bootstrapSeq) return
       renderLinkedInStatusPanel(crmPayload, tab?.url)
 
@@ -780,6 +809,7 @@ function initIntakeApp(options) {
     } catch (error) {
       if (seq !== bootstrapSeq) return
       logError("bootstrap_failed", error)
+      renderLinkedInStatusPanel(defaultCrmPayload(), null)
       showFallbackError()
     } finally {
       window.clearTimeout(timeoutId)
@@ -1126,6 +1156,15 @@ function initIntakeApp(options) {
           chrome.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
             if (tabs[0]?.id === tabId) scheduleBootstrap()
           })
+        }
+      })
+    }
+
+    if (surface === "inpage") {
+      window.addEventListener("message", (event) => {
+        const type = event.data?.type
+        if (type === "equipify-inpage-sidebar-opened" || type === "equipify-inpage-sidebar-refresh") {
+          scheduleBootstrap()
         }
       })
     }
