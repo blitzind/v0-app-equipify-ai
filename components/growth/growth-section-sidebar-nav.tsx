@@ -143,6 +143,7 @@ const GROWTH_NAV_ICONS: Record<string, LucideIcon> = {
   "call-providers": Plug,
   "lead-engine-inspector": Workflow,
   "crm-leads": Users,
+  "recently-captured": Inbox,
   "discover-companies": Search,
   "outbound-operations": Gauge,
   "provider-setup": Plug,

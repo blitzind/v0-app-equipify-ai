@@ -27,6 +27,7 @@ import { queueBrowserIntakeContactDiscovery } from "@/lib/growth/browser-intake/
 import { assertEmailSendAllowed } from "@/lib/growth/outbound/suppression-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { emitGrowthLeadCreatedTimeline } from "@/lib/growth/timeline-emitter"
+import { buildDefaultCapturedLeadReviewMetadata } from "@/lib/growth/captured-leads/captured-lead-actions"
 import type { GrowthLead } from "@/lib/growth/types"
 
 function asString(value: unknown): string {
@@ -385,6 +386,7 @@ export async function createBrowserIntakeContact(
   const leadMetadata: Record<string, unknown> = {
     browser_extension: capture,
     browser_extension_captures: [capture],
+    ...buildDefaultCapturedLeadReviewMetadata(),
     ...(captureType === "company_only"
       ? {
           company_prospect: {

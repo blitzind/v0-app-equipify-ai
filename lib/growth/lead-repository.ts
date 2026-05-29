@@ -447,6 +447,10 @@ export async function listGrowthLeads(
     query = query.eq("assignment_source", input.assignmentSource)
   }
 
+  if (input.sourceKinds?.length) {
+    query = query.in("source_kind", input.sourceKinds)
+  }
+
   if (!input.includeArchived) {
     if (archiveReady) {
       query = query.is("archived_at", null)

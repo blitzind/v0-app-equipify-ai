@@ -337,6 +337,7 @@ export type ListGrowthLeadsInput = {
   assignedTo?: string
   unassigned?: boolean
   assignmentSource?: GrowthLeadAssignmentSource
+  sourceKinds?: GrowthLeadSourceKind[]
   limit?: number
   offset?: number
 }

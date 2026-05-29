@@ -507,6 +507,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: prefixMatch("/admin/growth/leads/crm"),
       },
       {
+        id: "recently-captured",
+        href: "/admin/growth/leads/captured",
+        label: "Recently Captured",
+        match: prefixMatch("/admin/growth/leads/captured"),
+      },
+      {
         id: "lead-engine-inspector",
         href: GROWTH_LEAD_INTELLIGENCE_INSPECTOR_HREF,
         label: "Lead Pipeline",

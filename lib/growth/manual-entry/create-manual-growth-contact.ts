@@ -19,6 +19,7 @@ import {
 import { assertEmailSendAllowed } from "@/lib/growth/outbound/suppression-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { emitGrowthLeadCreatedTimeline } from "@/lib/growth/timeline-emitter"
+import { buildDefaultCapturedLeadReviewMetadata } from "@/lib/growth/captured-leads/captured-lead-actions"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -100,6 +101,7 @@ export async function createManualGrowthContact(
       entered_at: new Date().toISOString(),
       external_ref: externalRef,
     },
+    ...buildDefaultCapturedLeadReviewMetadata(),
   }
 
   if (email && input.verify_email) {
