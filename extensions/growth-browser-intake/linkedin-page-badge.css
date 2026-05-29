@@ -1,0 +1,63 @@
+.equipify-growth-linkedin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font:
+    600 12px/1.2 -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  border: 1px solid transparent;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  z-index: 9999;
+}
+
+.equipify-growth-linkedin-badge[data-tone="neutral"] {
+  background: #f8fafc;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.equipify-growth-linkedin-badge[data-tone="good"] {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #6ee7b7;
+}
+
+.equipify-growth-linkedin-badge[data-tone="warn"] {
+  background: #fffbeb;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+
+.equipify-growth-linkedin-badge[data-tone="info"] {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+}
+
+.equipify-growth-linkedin-badge__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.8;
+}
+
+.equipify-growth-linkedin-badge__meta {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.equipify-growth-linkedin-badge-wrap {
+  margin-top: 8px;
+}

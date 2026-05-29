@@ -17,6 +17,10 @@ export const GROWTH_BROWSER_EXTENSION_PACKAGE_FILES = [
   "intake-app.js",
   "extension-config.js",
   "extension-storage.js",
+  "linkedin-context.js",
+  "linkedin-status-shared.js",
+  "linkedin-page-badge.js",
+  "linkedin-page-badge.css",
   "page-metadata.js",
 ] as const
 

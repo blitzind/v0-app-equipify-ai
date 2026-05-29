@@ -108,6 +108,61 @@ body.surface-sidepanel {
   color: #334155;
 }
 
+.linkedin-status-panel {
+  margin-top: 10px;
+}
+
+.linkedin-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.linkedin-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+}
+
+.linkedin-status-badge.badge-neutral {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.linkedin-status-badge.badge-good {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #6ee7b7;
+}
+
+.linkedin-status-badge.badge-warn {
+  background: #fffbeb;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+
+.linkedin-status-badge.badge-info {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+}
+
+.linkedin-status-match {
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.linkedin-status-actions {
+  margin-top: 8px;
+}
+
 .header-row {
   display: flex;
   align-items: center;

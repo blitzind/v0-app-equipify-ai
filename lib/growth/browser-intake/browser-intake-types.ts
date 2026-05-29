@@ -60,6 +60,28 @@ export type GrowthBrowserIntakeWarning = {
   message: string
 }
 
+export type BrowserIntakeLeadLookupMatch = {
+  lead_id: string
+  company_name: string
+  website: string | null
+  contact_name: string | null
+  contact_email: string | null
+  status: string
+  rule: string
+  confidence: number
+  dedupe_key: string
+}
+
+export type BrowserIntakeLeadLookupEnrichedMatch = BrowserIntakeLeadLookupMatch & {
+  match_label: string
+  review_status: "needs_review" | "reviewed"
+  verification_status: "none" | "unknown" | "verified" | "invalid" | "blocked"
+  capture_type: "company_only" | "contact"
+  status_badge: "not_added" | "already_added" | "needs_review" | "verified" | "company_captured_only"
+  status_badge_label: string
+  match_summary: string
+}
+
 export type GrowthBrowserIntakeCaptureMeta = {
   source_kind: "browser_extension"
   source_url: string | null

@@ -18,6 +18,21 @@
       </div>
     </header>
 
+    <section id="linkedin-status-panel" class="panel linkedin-status-panel">
+      <div class="panel-label">Growth Engine status</div>
+      <div class="linkedin-status-row">
+        <span id="linkedin-status-badge" class="linkedin-status-badge badge-neutral">Not added</span>
+        <span id="linkedin-status-context" class="muted"></span>
+      </div>
+      <div id="linkedin-status-match" class="linkedin-status-match muted"></div>
+      <div class="button-row linkedin-status-actions">
+        <button type="button" id="linkedin-add-btn" class="btn-secondary">Add to Equipify</button>
+        <button type="button" id="linkedin-open-lead-btn" class="btn-secondary" hidden>Open existing lead</button>
+        <button type="button" id="linkedin-update-lead-btn" class="btn-secondary" hidden>Update existing lead</button>
+        <button type="button" id="linkedin-mark-reviewed-btn" class="btn-link" hidden>Mark reviewed</button>
+      </div>
+    </section>
+
     <section id="settings-panel" class="panel panel-settings">
       <div class="panel-label">Extension settings</div>
       <label>
@@ -146,6 +161,8 @@
 
     <script src="extension-config.js"></script>
     <script src="extension-storage.js"></script>
+    <script src="linkedin-context.js"></script>
+    <script src="linkedin-status-shared.js"></script>
     <script src="intake-app.js"></script>
     <script src="sidepanel.js"></script>
   </body>

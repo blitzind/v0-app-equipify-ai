@@ -43,6 +43,7 @@ After download:
 ## V3 features
 
 - **Chrome Side Panel** stays open while browsing (popup remains as fallback).
+- **LinkedIn status badges** in the extension and on LinkedIn profile/company pages (lookup-based, visible metadata only).
 - **Recent captures** — last 5 saved leads in the side panel.
 - **Post-save next steps** — open lead, view in Recently Captured, email verification status, contact discovery queue status.
 - **Extension settings** — production vs local dev API base URL; optional verify-email and queue-discovery defaults.

@@ -7,6 +7,8 @@ function initIntakeApp(options) {
   const surface = options?.surface === "sidepanel" ? "sidepanel" : "popup"
   const config = window.EquipifyGrowthExtensionConfig
   const storage = window.EquipifyGrowthExtensionStorage
+  const linkedinContext = window.EquipifyGrowthLinkedInContext
+  const linkedinStatus = window.EquipifyGrowthLinkedInStatus
 
   const state = {
     mode: "quick",
@@ -16,6 +18,8 @@ function initIntakeApp(options) {
     detected: null,
     settings: { ...storage.DEFAULT_SETTINGS },
     lastSave: null,
+    linkedinLookup: null,
+    linkedinPageKind: null,
   }
 
   const els = {
@@ -54,6 +58,14 @@ function initIntakeApp(options) {
     openSidePanelBtn: document.getElementById("open-side-panel-btn"),
     signInLink: document.getElementById("sign-in-link"),
     extensionBuildMeta: document.getElementById("extension-build-meta"),
+    linkedinStatusPanel: document.getElementById("linkedin-status-panel"),
+    linkedinStatusBadge: document.getElementById("linkedin-status-badge"),
+    linkedinStatusContext: document.getElementById("linkedin-status-context"),
+    linkedinStatusMatch: document.getElementById("linkedin-status-match"),
+    linkedinAddBtn: document.getElementById("linkedin-add-btn"),
+    linkedinOpenLeadBtn: document.getElementById("linkedin-open-lead-btn"),
+    linkedinUpdateLeadBtn: document.getElementById("linkedin-update-lead-btn"),
+    linkedinMarkReviewedBtn: document.getElementById("linkedin-mark-reviewed-btn"),
   }
 
   function trimOrNull(value) {
@@ -176,11 +188,23 @@ function initIntakeApp(options) {
     }
   }
 
-  async function lookupExistingLead(payload) {
+  async function lookupExistingLead(payload, tabUrl) {
+    const query =
+      linkedinContext?.buildLinkedInLookupQuery({
+        url: tabUrl ?? payload.source_url,
+        page_title: payload.page_title,
+        company_name: payload.company_name,
+        website: payload.website,
+        linkedin_url: payload.linkedin_url,
+        email: payload.email,
+      }) ?? payload
+
     const params = new URLSearchParams()
-    if (payload.company_name) params.set("company_name", payload.company_name)
-    if (payload.website) params.set("website", payload.website)
-    if (payload.linkedin_url) params.set("linkedin_url", payload.linkedin_url)
+    if (query.company_name) params.set("company_name", query.company_name)
+    if (query.website) params.set("website", query.website)
+    if (query.linkedin_url) params.set("linkedin_url", query.linkedin_url)
+    if (query.email) params.set("email", query.email)
+    if (tabUrl) params.set("source_url", tabUrl)
 
     if ([...params.keys()].length === 0) return null
 
@@ -191,6 +215,56 @@ function initIntakeApp(options) {
 
     const body = await response.json().catch(() => null)
     if (!response.ok || !body?.ok) return null
+    return body
+  }
+
+  function renderLinkedInStatusPanel(lookup, tabUrl) {
+    if (!els.linkedinStatusPanel || !linkedinStatus) return
+
+    state.linkedinLookup = lookup
+    state.linkedinPageKind =
+      lookup?.linkedin_page_kind ?? linkedinContext?.detectLinkedInPageKind(tabUrl) ?? null
+
+    const status = linkedinStatus.resolveStatusFromLookup(lookup)
+    const matched = status.match
+
+    els.linkedinStatusBadge.textContent = status.extensionLabel
+    els.linkedinStatusBadge.className = `linkedin-status-badge badge-${status.tone}`
+
+    const contextParts = []
+    if (state.linkedinPageKind === "profile") contextParts.push("LinkedIn profile")
+    if (state.linkedinPageKind === "company") contextParts.push("LinkedIn company")
+    if (matched?.company_name) contextParts.push(matched.company_name)
+    els.linkedinStatusContext.textContent = contextParts.join(" · ")
+
+    els.linkedinStatusMatch.textContent = status.matchSummary ?? ""
+    els.linkedinStatusMatch.hidden = !status.matchSummary
+
+    const hasMatch = Boolean(matched?.lead_id)
+    els.linkedinOpenLeadBtn.hidden = !hasMatch
+    els.linkedinUpdateLeadBtn.hidden = !hasMatch
+    els.linkedinMarkReviewedBtn.hidden = !hasMatch || matched?.review_status === "reviewed"
+
+    if (hasMatch) {
+      state.existingLead = matched
+      showExistingLead(matched)
+    } else {
+      state.existingLead = null
+      if (els.existingLeadPanel) els.existingLeadPanel.hidden = true
+    }
+  }
+
+  async function markLeadReviewed(leadId) {
+    const response = await fetch(config.capturedLeadActionUrl(apiBaseUrl(), leadId), {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "mark_reviewed" }),
+    })
+    const body = await response.json().catch(() => null)
+    if (!response.ok || !body?.ok) {
+      throw new Error(body?.result?.message ?? body?.message ?? "Could not mark reviewed.")
+    }
     return body
   }
 
@@ -391,9 +465,24 @@ function initIntakeApp(options) {
       const metadata = await extractTabMetadata(tab)
       applyDetectedMetadata(metadata, tab?.url)
 
+      const linkedinQuery = linkedinContext?.buildLinkedInLookupQuery({
+        url: tab?.url,
+        page_title: metadata?.page_title ?? document.title,
+        company_name: metadata?.company_name,
+        website: metadata?.website,
+        linkedin_url: metadata?.linkedin_url,
+      })
+      if (linkedinQuery?.contact_name) {
+        const contactInput = document.getElementById("contact-name")
+        if (contactInput && !trimOrNull(contactInput.value)) {
+          contactInput.value = linkedinQuery.contact_name
+        }
+      }
+
       const formValues = readFormValues()
-      const lookup = await lookupExistingLead(formValues)
-      showExistingLead(lookup?.best_match ?? null)
+      formValues.page_title = metadata?.page_title ?? formValues.page_title
+      const lookup = await lookupExistingLead(formValues, tab?.url)
+      renderLinkedInStatusPanel(lookup, tab?.url)
 
       setCaptureStatus("Ready", "status-ready")
     } catch {
@@ -472,6 +561,9 @@ function initIntakeApp(options) {
       await storage.addRecentCapture(saveRecord)
       await refreshRecentCaptures()
       showSuccessPanel(saveRecord)
+
+      const refreshLookup = await lookupExistingLead(readFormValues(), trimOrNull(document.getElementById("source-url")?.value))
+      renderLinkedInStatusPanel(refreshLookup, trimOrNull(document.getElementById("source-url")?.value))
     } catch (error) {
       const message = error instanceof Error ? error.message : "Network error"
       setStatus(`Could not reach Equipify (${message}).`, "error")
@@ -563,6 +655,46 @@ function initIntakeApp(options) {
       if (windowId != null) {
         await chrome.sidePanel.open({ windowId })
       }
+    })
+
+    els.linkedinAddBtn?.addEventListener("click", () => {
+      els.form?.scrollIntoView({ behavior: "smooth", block: "start" })
+      els.submitBtn?.focus()
+      setStatus("Review the capture form, then save to Equipify.", "success")
+    })
+
+    els.linkedinOpenLeadBtn?.addEventListener("click", () => {
+      const leadId = state.existingLead?.lead_id ?? state.linkedinLookup?.best_match?.lead_id
+      if (!leadId) return
+      chrome.tabs.create({ url: leadAdminUrl(leadId) })
+    })
+
+    els.linkedinUpdateLeadBtn?.addEventListener("click", () => {
+      const leadId = state.existingLead?.lead_id ?? state.linkedinLookup?.best_match?.lead_id
+      if (!leadId) return
+      setIntakeMode("update_existing", leadId)
+      setStatus("Will update the existing lead on save.", "success")
+      els.form?.scrollIntoView({ behavior: "smooth", block: "start" })
+    })
+
+    els.linkedinMarkReviewedBtn?.addEventListener("click", () => {
+      const leadId = state.existingLead?.lead_id ?? state.linkedinLookup?.best_match?.lead_id
+      if (!leadId) return
+      els.linkedinMarkReviewedBtn.disabled = true
+      markLeadReviewed(leadId)
+        .then(async () => {
+          setStatus("Lead marked reviewed.", "success")
+          const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+          const lookup = await lookupExistingLead(readFormValues(), tabs[0]?.url)
+          renderLinkedInStatusPanel(lookup, tabs[0]?.url)
+        })
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : "Could not mark reviewed."
+          setStatus(message, "error")
+        })
+        .finally(() => {
+          els.linkedinMarkReviewedBtn.disabled = false
+        })
     })
 
     if (surface === "sidepanel") {

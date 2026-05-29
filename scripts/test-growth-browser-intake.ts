@@ -19,6 +19,21 @@ import {
   GROWTH_BROWSER_INTAKE_MATCH_RULE_LABELS,
 } from "../lib/growth/browser-intake/browser-intake-match-labels"
 import {
+  compareBrowserIntakeLeadMatches,
+  pickBestBrowserIntakeLeadMatchByPriority,
+} from "../lib/growth/browser-intake/browser-intake-lookup-priority"
+import {
+  buildLinkedInLookupQuery,
+  detectLinkedInPageKind,
+  inferLinkedInProfileNameFromTitle,
+  normalizeLinkedInLookupUrl,
+} from "../lib/growth/browser-intake/linkedin-context-detect"
+import {
+  formatLinkedInLeadMatchSummary,
+  GROWTH_LINKEDIN_EXTENSION_STATUS_BADGE_LABELS,
+  resolveLinkedInLeadStatusBadge,
+} from "../lib/growth/browser-intake/linkedin-lead-status-badge"
+import {
   detectBrowserIntakeSourcePlatform,
   inferCompanyNameFromLinkedInTitle,
   inferCompanyNameFromPageTitle,
@@ -38,6 +53,96 @@ assert.equal(formatBrowserIntakeMatchRuleLabel("website_domain"), "Matched by do
 assert.equal(formatBrowserIntakeMatchRuleLabel("linkedin"), "Matched by LinkedIn URL")
 assert.equal(formatBrowserIntakeMatchRuleLabel("company_name"), "Matched by company name")
 assert.equal(GROWTH_BROWSER_INTAKE_MATCH_RULE_LABELS.linkedin_metadata, "Matched by LinkedIn URL")
+
+assert.equal(detectLinkedInPageKind("https://www.linkedin.com/in/jane-doe/"), "profile")
+assert.equal(detectLinkedInPageKind("https://www.linkedin.com/company/acme-medical/"), "company")
+assert.equal(
+  normalizeLinkedInLookupUrl("https://www.linkedin.com/in/jane-doe/details/experience"),
+  "https://www.linkedin.com/in/jane-doe/",
+)
+assert.equal(
+  inferLinkedInProfileNameFromTitle("Jane Doe - CEO - Acme Medical | LinkedIn"),
+  "Jane Doe",
+)
+
+const linkedinQuery = buildLinkedInLookupQuery({
+  url: "https://www.linkedin.com/in/jane-doe/",
+  page_title: "Jane Doe - CEO - Acme Medical | LinkedIn",
+  company_name: "Acme Medical",
+})
+assert.equal(linkedinQuery.linkedin_page_kind, "profile")
+assert.equal(linkedinQuery.contact_name, "Jane Doe")
+assert.equal(linkedinQuery.linkedin_url, "https://www.linkedin.com/in/jane-doe/")
+
+assert.equal(
+  resolveLinkedInLeadStatusBadge({ matched: false, confidence: 0 }),
+  "not_added",
+)
+assert.equal(
+  resolveLinkedInLeadStatusBadge({
+    matched: true,
+    confidence: 0.9,
+    capture_type: "contact",
+    review_status: "reviewed",
+    verification_status: "none",
+  }),
+  "already_added",
+)
+assert.equal(
+  resolveLinkedInLeadStatusBadge({
+    matched: true,
+    confidence: 0.9,
+    capture_type: "contact",
+    review_status: "needs_review",
+    verification_status: "verified",
+  }),
+  "needs_review",
+)
+assert.equal(
+  resolveLinkedInLeadStatusBadge({
+    matched: true,
+    confidence: 0.9,
+    capture_type: "company_only",
+    review_status: "needs_review",
+    verification_status: "verified",
+  }),
+  "company_captured_only",
+)
+assert.equal(
+  formatLinkedInLeadMatchSummary({ match_label: "Matched by LinkedIn URL", confidence: 0.88 }),
+  "Matched by LinkedIn URL · 88% confidence",
+)
+assert.equal(GROWTH_LINKEDIN_EXTENSION_STATUS_BADGE_LABELS.verified, "Verified")
+
+const prioritized = pickBestBrowserIntakeLeadMatchByPriority([
+  {
+    lead_id: "a",
+    company_name: "Acme",
+    website: null,
+    contact_name: null,
+    contact_email: null,
+    status: "new",
+    rule: "company_name",
+    confidence: 0.95,
+    dedupe_key: "acme",
+  },
+  {
+    lead_id: "b",
+    company_name: "Acme",
+    website: null,
+    contact_name: "Jane",
+    contact_email: null,
+    status: "new",
+    rule: "linkedin",
+    confidence: 0.88,
+    dedupe_key: "linkedin:jane",
+  },
+])
+assert.equal(prioritized?.lead_id, "b")
+assert.ok(compareBrowserIntakeLeadMatches(
+  { rule: "linkedin", confidence: 0.8 } as never,
+  { rule: "company_name", confidence: 0.99 } as never,
+) < 0)
 
 // Company detection
 assert.equal(detectBrowserIntakeSourcePlatform("https://www.linkedin.com/company/acme"), "linkedin")
@@ -107,6 +212,8 @@ const lookupSource = fs.readFileSync(
 assert.match(lookupSource, /findBrowserIntakeExistingLeads/)
 assert.match(lookupSource, /website_domain/)
 assert.match(lookupSource, /company_name/)
+assert.match(lookupSource, /email/)
+assert.match(lookupSource, /sortBrowserIntakeLeadMatches/)
 
 const queueSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/browser-intake/queue-browser-intake-contact-discovery.ts"),
@@ -123,8 +230,9 @@ const lookupRoute = fs.readFileSync(
 )
 assert.match(lookupRoute, /findBrowserIntakeExistingLeads/)
 assert.match(lookupRoute, /existing_lead_found/)
-assert.match(lookupRoute, /formatBrowserIntakeMatchRuleLabel/)
-assert.match(lookupRoute, /match_label/)
+assert.match(lookupRoute, /enrichBrowserIntakeLookupMatches/)
+assert.match(lookupRoute, /status_badge/)
+assert.match(lookupRoute, /email/)
 
 const apiSource = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/browser-intake/contact/route.ts"),
@@ -140,7 +248,9 @@ const manifestSource = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/manifest.json"),
   "utf8",
 )
-assert.match(manifestSource, /"version": "3.0.0"/)
+assert.match(manifestSource, /"version": "3.1.0"/)
+assert.match(manifestSource, /content_scripts/)
+assert.match(manifestSource, /linkedin-page-badge.js/)
 assert.match(manifestSource, /scripting/)
 assert.match(manifestSource, /sidePanel/)
 assert.match(manifestSource, /side_panel/)
@@ -164,7 +274,32 @@ assert.match(intakeAppJs, /success-panel/)
 assert.match(intakeAppJs, /match_label|formatMatchRuleLabel/)
 assert.match(intakeAppJs, /loadExtensionSettings/)
 assert.doesNotMatch(intakeAppJs, /api[_-]?key|secret|password|token/i)
+assert.match(intakeAppJs, /linkedin-status-panel/)
+assert.match(intakeAppJs, /renderLinkedInStatusPanel/)
+assert.match(intakeAppJs, /markLeadReviewed/)
+assert.match(intakeAppJs, /buildLinkedInLookupQuery/)
 assert.doesNotMatch(intakeAppJs, /sendEmail|enroll|auto.?message/i)
+
+const linkedinContextJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-context.js"),
+  "utf8",
+)
+assert.match(linkedinContextJs, /detectLinkedInPageKind/)
+assert.match(linkedinContextJs, /normalizeLinkedInLookupUrl/)
+
+const linkedinStatusJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-status-shared.js"),
+  "utf8",
+)
+assert.match(linkedinStatusJs, /Not in Equipify/)
+assert.match(linkedinStatusJs, /resolveStatusFromLookup/)
+
+const linkedinPageBadgeJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-page-badge.js"),
+  "utf8",
+)
+assert.match(linkedinPageBadgeJs, /LOOKUP_PATH/)
+assert.doesNotMatch(linkedinPageBadgeJs, /sendEmail|enroll|auto.?message|XMLHttpRequest/i)
 
 const extensionConfigJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/extension-config.js"),
@@ -191,4 +326,4 @@ assert.match(pageMetadataJs, /application\/ld\+json/)
 assert.match(pageMetadataJs, /canonical/)
 assert.doesNotMatch(pageMetadataJs, /fetch\(|XMLHttpRequest|linkedin.*api/i)
 
-console.log("growth-browser-intake v3 checks passed")
+console.log("growth-browser-intake v3.1 linkedin status checks passed")

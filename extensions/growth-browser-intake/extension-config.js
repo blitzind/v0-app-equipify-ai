@@ -9,6 +9,7 @@ const INTAKE_PATH = "/api/platform/growth/browser-intake/contact"
 const LOOKUP_PATH = "/api/platform/growth/browser-intake/lookup"
 const CAPTURED_LEADS_PATH = "/admin/growth/leads/captured"
 const SIGN_IN_PATH = "/admin/growth/browser-intake-test"
+const CAPTURED_LEAD_ACTIONS_PATH = "/api/platform/growth/captured-leads"
 
 const MATCH_RULE_LABELS = {
   website_domain: "Matched by domain",
@@ -39,12 +40,18 @@ function formatDiscoveryStatus(queued) {
   return queued ? "Queued for contact discovery" : "Not queued"
 }
 
+function capturedLeadActionUrl(apiBase, leadId) {
+  return `${apiBase}${CAPTURED_LEAD_ACTIONS_PATH}/${leadId}/actions`
+}
+
 window.EquipifyGrowthExtensionConfig = {
   EXTENSION_API_PRESETS,
   INTAKE_PATH,
   LOOKUP_PATH,
   CAPTURED_LEADS_PATH,
+  CAPTURED_LEAD_ACTIONS_PATH,
   SIGN_IN_PATH,
+  capturedLeadActionUrl,
   formatMatchRuleLabel,
   formatEmailStatus,
   formatDiscoveryStatus,

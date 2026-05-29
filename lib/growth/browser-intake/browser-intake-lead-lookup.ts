@@ -8,21 +8,13 @@ import {
   normalizeLinkedIn,
   normalizeWebsiteDomain,
 } from "@/lib/growth/import/normalize"
+import type { BrowserIntakeLeadLookupMatch } from "@/lib/growth/browser-intake/browser-intake-types"
+import { sortBrowserIntakeLeadMatches } from "@/lib/growth/browser-intake/browser-intake-lookup-priority"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 
 export const GROWTH_BROWSER_INTAKE_LOOKUP_QA_MARKER = "growth-browser-intake-lookup-v1" as const
 
-export type BrowserIntakeLeadLookupMatch = {
-  lead_id: string
-  company_name: string
-  website: string | null
-  contact_name: string | null
-  contact_email: string | null
-  status: string
-  rule: string
-  confidence: number
-  dedupe_key: string
-}
+export type { BrowserIntakeLeadLookupMatch } from "@/lib/growth/browser-intake/browser-intake-types"
 
 type LeadLookupRow = {
   id: string
@@ -93,6 +85,7 @@ export async function findBrowserIntakeExistingLeads(
     company_name?: string | null
     website?: string | null
     linkedin_url?: string | null
+    email?: string | null
     limit?: number
   },
 ): Promise<BrowserIntakeLeadLookupMatch[]> {
@@ -102,6 +95,18 @@ export async function findBrowserIntakeExistingLeads(
   const linkedin = normalizeLinkedIn(input.linkedin_url)
   const domain = normalizeWebsiteDomain(input.website)
   const company = normalizeCompanyName(input.company_name)
+  const email = normalizeEmail(input.email)
+
+  if (email) {
+    const { data } = await growthLeadsTable(admin)
+      .select("id, company_name, contact_name, contact_email, website, status, metadata")
+      .eq("contact_email", email)
+      .limit(5)
+
+    for (const row of (data ?? []) as LeadLookupRow[]) {
+      matches.set(row.id, mapLeadToMatch(row, "email", 0.92, email))
+    }
+  }
 
   if (domain) {
     const { data } = await growthLeadsTable(admin)
@@ -151,9 +156,7 @@ export async function findBrowserIntakeExistingLeads(
     }
   }
 
-  return [...matches.values()]
-    .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, limit)
+  return sortBrowserIntakeLeadMatches([...matches.values()]).slice(0, limit)
 }
 
 export async function fetchBrowserIntakeLeadSummary(
@@ -178,7 +181,7 @@ export async function fetchBrowserIntakeLeadSummary(
 export function pickBestBrowserIntakeLeadMatch(
   matches: BrowserIntakeLeadLookupMatch[],
 ): BrowserIntakeLeadLookupMatch | null {
-  return matches[0] ?? null
+  return sortBrowserIntakeLeadMatches(matches)[0] ?? null
 }
 
 export function logBrowserIntakeLeadLookup(input: {
