@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { logAcquisitionStep } from "@/lib/growth/acquisition/acquisition-diagnostics"
 import {
   GROWTH_COMPANY_CONTACTS_QA_MARKER,
   type GrowthCompanyContact,
@@ -118,6 +119,11 @@ export async function syncContactCandidatesToCompanyContacts(
     candidates: GrowthContactCandidate[]
   },
 ): Promise<number> {
+  logAcquisitionStep("syncContactCandidatesToCompanyContacts", {
+    companyId: input.company_id,
+    candidate_count: input.candidates.length,
+  })
+
   if (!(await isGrowthCompanyContactsSchemaReady(admin))) return 0
   if (input.candidates.length === 0) return 0
 
@@ -175,6 +181,11 @@ export async function syncContactCandidatesToCompanyContacts(
     })
     if (!error) synced += 1
   }
+
+  logAcquisitionStep("syncContactCandidatesToCompanyContacts_done", {
+    companyId: input.company_id,
+    synced,
+  })
 
   return synced
 }

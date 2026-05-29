@@ -47,6 +47,31 @@ function parseTickLogEntry(value: unknown): GrowthBulkAcquisitionTickLogEntry | 
     actions: Array.isArray(row.actions) ? row.actions.map(String) : [],
     duration_ms: Number(row.duration_ms ?? 0),
     done: Boolean(row.done),
+    error_message: asString(row.error_message) || null,
+    error_stack: asString(row.error_stack) || null,
+    error_action: asString(row.error_action) || null,
+  }
+}
+
+function parseLastErrorDiagnostics(
+  value: unknown,
+): GrowthBulkAcquisitionRunState["last_error_diagnostics"] {
+  if (!value || typeof value !== "object") return null
+  const row = value as Record<string, unknown>
+  const runId = asString(row.runId)
+  const phase = asString(row.phase) as GrowthBulkAcquisitionPhase
+  const message = asString(row.message)
+  const at = asString(row.at)
+  if (!runId || !phase || !message || !at) return null
+  return {
+    at,
+    message,
+    stack: asString(row.stack) || null,
+    runId,
+    phase,
+    action: asString(row.action) || null,
+    companyId: asString(row.companyId) || null,
+    contactId: asString(row.contactId) || null,
   }
 }
 
@@ -128,6 +153,8 @@ function parseAcquisitionState(metadata: Record<string, unknown>): GrowthBulkAcq
       : [],
     last_tick_at: asString(state.last_tick_at) || null,
     last_error: asString(state.last_error) || null,
+    last_error_stack: asString(state.last_error_stack) || null,
+    last_error_diagnostics: parseLastErrorDiagnostics(state.last_error_diagnostics),
   }
 }
 

@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { logAcquisitionStep } from "@/lib/growth/acquisition/acquisition-diagnostics"
 import { scanAcquisitionCompanyCandidateBatch } from "@/lib/growth/acquisition/acquisition-repository"
 import type { GrowthBulkAcquisitionKeysetCursor } from "@/lib/growth/acquisition/acquisition-types"
 import type { GrowthCompanyContact } from "@/lib/growth/contact-discovery/company-contact-types"
@@ -52,6 +53,10 @@ export async function verifyCompanyContactForAcquisition(
   admin: SupabaseClient,
   contactId: string,
 ): Promise<GrowthCompanyContact | null> {
+  logAcquisitionStep("verifyCompanyContactForAcquisition", {
+    contactId,
+  })
+
   const { data, error } = await admin
     .schema("growth")
     .from("company_contacts")

@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { logAcquisitionStep } from "@/lib/growth/acquisition/acquisition-diagnostics"
 import type {
   GrowthContactDiscoveryProvider,
   GrowthContactDiscoveryProviderResult,
@@ -43,9 +44,20 @@ export async function runContactDiscoveryProviders(
     ? all.filter((p) => options.provider_types!.includes(p.provider_type))
     : all
 
+  logAcquisitionStep("runContactDiscoveryProviders", {
+    companyId: input.company_candidate_id,
+    provider_count: requested.length,
+  })
+
   const results: GrowthContactDiscoveryProviderResult[] = []
 
   for (const provider of requested) {
+    logAcquisitionStep("runContactDiscoveryProviders.provider", {
+      companyId: input.company_candidate_id,
+      provider_name: provider.provider_name,
+      provider_type: provider.provider_type,
+    })
+
     if (!provider.isConfigured() && provider.provider_type !== "manual_fixture") {
       results.push({
         provider_name: provider.provider_name,

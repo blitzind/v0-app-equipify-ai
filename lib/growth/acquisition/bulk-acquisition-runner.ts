@@ -3,6 +3,15 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
 import {
+  applyAcquisitionTickFailureToState,
+  buildFailedAcquisitionTickLogEntry,
+  clearAcquisitionDiagnosticsFields,
+  getAcquisitionDiagnosticContext,
+  logAcquisitionStep,
+  logAcquisitionTickFailure,
+  withAcquisitionDiagnosticContext,
+} from "@/lib/growth/acquisition/acquisition-diagnostics"
+import {
   acquisitionQueryDedupeKey,
   buildAcquisitionGeoTiles,
   currentAcquisitionGeoTile,
@@ -233,7 +242,7 @@ async function tickDiscoverCompanies(
 
   actions.push(`discovered_companies:${netNew}`)
   state.last_tick_at = new Date().toISOString()
-  state.last_error = null
+  Object.assign(state, clearAcquisitionDiagnosticsFields())
 
   const saved = await saveBulkAcquisitionRunState(admin, run.id, {
     state,
@@ -259,6 +268,13 @@ async function tickDiscoverContacts(
   const actions: string[] = []
   const state = { ...run.state }
 
+  logAcquisitionStep("tickDiscoverContacts", {
+    runId: run.id,
+    phase: run.state.phase,
+    child_run_ids: state.child_run_ids.length,
+    contact_discovery_cursor: state.contact_discovery_cursor,
+  })
+
   const scan = await listCompaniesPendingContactDiscovery(admin, {
     acquisition_run_id: run.id,
     child_run_ids: state.child_run_ids,
@@ -282,10 +298,19 @@ async function tickDiscoverContacts(
   }
 
   for (const company of scan.companies) {
-    const snapshot = await runContactDiscoveryForCompany(admin, {
-      company_candidate_id: company.id,
-      created_by: createdBy,
-    })
+    const snapshot = await withAcquisitionDiagnosticContext(
+      {
+        runId: run.id,
+        phase: run.state.phase,
+        action: "runContactDiscoveryForCompany",
+        companyId: company.id,
+      },
+      () =>
+        runContactDiscoveryForCompany(admin, {
+          company_candidate_id: company.id,
+          created_by: createdBy,
+        }),
+    )
 
     state.stats.contact_candidates_stored += snapshot.contacts.length
     state.metrics.contacts_discovered += snapshot.contacts.length
@@ -293,25 +318,51 @@ async function tickDiscoverContacts(
     const candidates =
       snapshot.contacts.length > 0
         ? snapshot.contacts
-        : await listContactCandidatesForCompany(admin, company.id)
+        : await withAcquisitionDiagnosticContext(
+            {
+              runId: run.id,
+              phase: run.state.phase,
+              action: "listContactCandidatesForCompany",
+              companyId: company.id,
+            },
+            () => listContactCandidatesForCompany(admin, company.id),
+          )
 
-    const synced = await syncContactCandidatesToCompanyContacts(admin, {
-      company_id: company.id,
-      candidates,
-    })
+    const synced = await withAcquisitionDiagnosticContext(
+      {
+        runId: run.id,
+        phase: run.state.phase,
+        action: "syncContactCandidatesToCompanyContacts",
+        companyId: company.id,
+      },
+      () =>
+        syncContactCandidatesToCompanyContacts(admin, {
+          company_id: company.id,
+          candidates,
+        }),
+    )
     state.stats.company_contacts_synced += synced
 
-    await markCompanyContactsProcessed(admin, {
-      company_candidate_id: company.id,
-      acquisition_run_id: run.id,
-    })
+    await withAcquisitionDiagnosticContext(
+      {
+        runId: run.id,
+        phase: run.state.phase,
+        action: "markCompanyContactsProcessed",
+        companyId: company.id,
+      },
+      () =>
+        markCompanyContactsProcessed(admin, {
+          company_candidate_id: company.id,
+          acquisition_run_id: run.id,
+        }),
+    )
     state.stats.companies_contacts_processed += 1
     actions.push(`contacts:${company.id}:${snapshot.contacts.length}`)
   }
 
   state.phase = "discover_contacts"
   state.last_tick_at = new Date().toISOString()
-  state.last_error = null
+  Object.assign(state, clearAcquisitionDiagnosticsFields())
 
   const saved = await saveBulkAcquisitionRunState(admin, run.id, { state, status: "running" })
   return { run: saved ?? run, actions }
@@ -347,7 +398,16 @@ async function tickVerifyContacts(
   let verified = 0
   for (const contact of scan.contacts) {
     state.metrics.emails_verification_attempted += 1
-    const updated = await verifyCompanyContactForAcquisition(admin, contact.id)
+    const updated = await withAcquisitionDiagnosticContext(
+      {
+        runId: run.id,
+        phase: run.state.phase,
+        action: "verifyCompanyContactForAcquisition",
+        contactId: contact.id,
+        companyId: contact.company_id,
+      },
+      () => verifyCompanyContactForAcquisition(admin, contact.id),
+    )
     if (!updated) {
       state.metrics.verification_failures += 1
       continue
@@ -453,11 +513,19 @@ async function tickPromoteLeads(
     return { run: saved ?? run, actions, done: state.phase === "done" }
   }
 
-  const outcomes = await promoteVerifiedContactsBatch(admin, {
-    contacts: scan.contacts,
-    acquisitionRunId: run.id,
-    createdBy,
-  })
+  const outcomes = await withAcquisitionDiagnosticContext(
+    {
+      runId: run.id,
+      phase: run.state.phase,
+      action: "promoteVerifiedContactsBatch",
+    },
+    () =>
+      promoteVerifiedContactsBatch(admin, {
+        contacts: scan.contacts,
+        acquisitionRunId: run.id,
+        createdBy,
+      }),
+  )
 
   for (const outcome of outcomes) {
     if (outcome.status === "created") state.stats.leads_created += 1
@@ -514,6 +582,16 @@ export async function tickBulkAcquisitionRun(
   if (!loaded) return null
 
   const repairedState = repairAcquisitionRunPhase(loaded.state)
+  if (repairedState.phase !== loaded.state.phase) {
+    logGrowthEngine("acquisition_run_phase_repaired", {
+      runId,
+      from: loaded.state.phase,
+      to: repairedState.phase,
+      query_index: repairedState.query_index,
+      use_fallback_queries: repairedState.use_fallback_queries,
+      fallback_queries: repairedState.query_plan.fallback.length,
+    })
+  }
   const run =
     repairedState.phase !== loaded.state.phase
       ? (await saveBulkAcquisitionRunState(admin, runId, {
@@ -544,17 +622,12 @@ export async function tickBulkAcquisitionRun(
   const tickStartedMs = Date.now()
 
   try {
-    let result: { run: GrowthBulkAcquisitionRun; actions: string[]; done?: boolean }
-
-    if (run.state.phase === "discover_companies") {
-      result = await tickDiscoverCompanies(admin, run, input?.created_by)
-    } else if (run.state.phase === "discover_contacts") {
-      result = await tickDiscoverContacts(admin, run, input?.created_by)
-    } else if (run.state.phase === "verify_contacts") {
-      result = await tickVerifyContacts(admin, run)
-    } else if (run.state.phase === "promote_leads") {
-      result = await tickPromoteLeads(admin, run, input?.created_by)
-    } else {
+    if (
+      run.state.phase !== "discover_companies" &&
+      run.state.phase !== "discover_contacts" &&
+      run.state.phase !== "verify_contacts" &&
+      run.state.phase !== "promote_leads"
+    ) {
       return {
         run,
         phase: run.state.phase,
@@ -563,6 +636,22 @@ export async function tickBulkAcquisitionRun(
         tick_duration_ms: 0,
       }
     }
+
+    const result = await withAcquisitionDiagnosticContext(
+      { runId, phase: run.state.phase, action: `tick:${run.state.phase}` },
+      async () => {
+        if (run.state.phase === "discover_companies") {
+          return await tickDiscoverCompanies(admin, run, input?.created_by)
+        }
+        if (run.state.phase === "discover_contacts") {
+          return await tickDiscoverContacts(admin, run, input?.created_by)
+        }
+        if (run.state.phase === "verify_contacts") {
+          return await tickVerifyContacts(admin, run)
+        }
+        return await tickPromoteLeads(admin, run, input?.created_by)
+      },
+    )
 
     const tickDurationMs = Date.now() - tickStartedMs
     const tickEntry: GrowthBulkAcquisitionTickLogEntry = {
@@ -601,30 +690,45 @@ export async function tickBulkAcquisitionRun(
       tick_duration_ms: tickDurationMs,
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : "tick_failed"
     const tickDurationMs = Date.now() - tickStartedMs
-    const tickEntry: GrowthBulkAcquisitionTickLogEntry = {
-      at: new Date().toISOString(),
+    const ctx = getAcquisitionDiagnosticContext()
+    const action = ctx?.action ?? `tick:${run.state.phase}`
+    logAcquisitionTickFailure({
+      error,
+      runId,
       phase: run.state.phase,
-      actions: [`error:${message}`],
+      action,
+      companyId: ctx?.companyId ?? null,
+      contactId: ctx?.contactId ?? null,
+    })
+    const tickEntry = buildFailedAcquisitionTickLogEntry({
+      phase: run.state.phase,
+      error,
       duration_ms: tickDurationMs,
-      done: false,
-    }
+      action,
+    })
     const state = appendTickLog(
-      {
-        ...run.state,
-        last_error: message,
-        metrics: {
-          ...run.state.metrics,
-          ticks_completed: run.state.metrics.ticks_completed + 1,
-          last_tick_duration_ms: tickDurationMs,
-          total_tick_duration_ms: run.state.metrics.total_tick_duration_ms + tickDurationMs,
+      applyAcquisitionTickFailureToState({
+        state: {
+          ...run.state,
+          metrics: {
+            ...run.state.metrics,
+            ticks_completed: run.state.metrics.ticks_completed + 1,
+            last_tick_duration_ms: tickDurationMs,
+            total_tick_duration_ms: run.state.metrics.total_tick_duration_ms + tickDurationMs,
+          },
         },
-      },
+        error,
+        runId,
+        phase: run.state.phase,
+        action,
+        companyId: ctx?.companyId ?? null,
+        contactId: ctx?.contactId ?? null,
+      }),
       tickEntry,
     )
+    const message = tickEntry.error_message ?? "tick_failed"
     const saved = await saveBulkAcquisitionRunState(admin, runId, { state, status: "partial" })
-    logGrowthEngine("acquisition_tick_failed", { runId, message })
     return {
       run: saved ?? run,
       phase: state.phase,

@@ -96,6 +96,19 @@ export type GrowthBulkAcquisitionRunState = {
   recent_ticks: GrowthBulkAcquisitionTickLogEntry[]
   last_tick_at: string | null
   last_error: string | null
+  last_error_stack: string | null
+  last_error_diagnostics: GrowthBulkAcquisitionLastErrorDiagnostics | null
+}
+
+export type GrowthBulkAcquisitionLastErrorDiagnostics = {
+  at: string
+  message: string
+  stack: string | null
+  runId: string
+  phase: GrowthBulkAcquisitionPhase
+  action: string | null
+  companyId: string | null
+  contactId: string | null
 }
 
 export type GrowthBulkAcquisitionRun = {
@@ -124,6 +137,9 @@ export type GrowthBulkAcquisitionTickLogEntry = {
   actions: string[]
   duration_ms: number
   done: boolean
+  error_message?: string | null
+  error_stack?: string | null
+  error_action?: string | null
 }
 
 export const GROWTH_BULK_ACQUISITION_TICK_LOG_MAX = 30
@@ -241,6 +257,8 @@ export function emptyAcquisitionRunState(
     recent_ticks: [],
     last_tick_at: null,
     last_error: null,
+    last_error_stack: null,
+    last_error_diagnostics: null,
   }
 }
 

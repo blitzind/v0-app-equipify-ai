@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { logAcquisitionStep } from "@/lib/growth/acquisition/acquisition-diagnostics"
 import { buildBuyingCommitteeAssessment } from "@/lib/growth/contact-discovery/buying-committee-builder"
 import { runContactDiscoveryProviders } from "@/lib/growth/contact-discovery/contact-discovery-registry"
 import { OPERATOR_CONTACT_DISCOVERY_PROVIDER_TYPES } from "@/lib/growth/contact-discovery/contact-discovery-operator-providers"
@@ -161,6 +162,10 @@ export async function runContactDiscoveryForCompany(
     limit?: number
   },
 ): Promise<GrowthContactDiscoverySnapshot> {
+  logAcquisitionStep("runContactDiscoveryForCompany", {
+    companyId: input.company_candidate_id,
+  })
+
   const base: GrowthContactDiscoverySnapshot = {
     qa_marker: GROWTH_CONTACT_DISCOVERY_QA_MARKER,
     schema_ready: false,
@@ -184,6 +189,11 @@ export async function runContactDiscoveryForCompany(
       provider_messages: ["Company candidate not found."],
     }
   }
+
+  logAcquisitionStep("runContactDiscoveryProviders", {
+    companyId: ctx.company_candidate_id,
+    provider_types: OPERATOR_CONTACT_DISCOVERY_PROVIDER_TYPES,
+  })
 
   const providerResults = await runContactDiscoveryProviders(
     admin,
@@ -338,6 +348,10 @@ export async function runContactDiscoveryForCompany(
     .eq("id", runId)
 
   const r = runRow as Record<string, unknown>
+  logAcquisitionStep("runContactDiscoveryForCompany_done", {
+    companyId: ctx.company_candidate_id,
+    contact_count: allContacts.length,
+  })
   return {
     qa_marker: GROWTH_CONTACT_DISCOVERY_QA_MARKER,
     schema_ready: true,

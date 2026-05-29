@@ -204,9 +204,25 @@ export function GrowthAcquisitionRunDetail({ runId }: { runId: string }) {
           <p>Queries executed: {state.executed_query_keys.length}</p>
         </div>
         {state.last_error ? (
-          <p className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-            Last error: {state.last_error}
-          </p>
+          <div className="mt-3 space-y-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            <p>Last error: {state.last_error}</p>
+            {state.last_error_diagnostics ? (
+              <p className="text-xs text-destructive/90">
+                Action: {state.last_error_diagnostics.action ?? "—"}
+                {state.last_error_diagnostics.companyId
+                  ? ` · Company: ${state.last_error_diagnostics.companyId}`
+                  : ""}
+                {state.last_error_diagnostics.contactId
+                  ? ` · Contact: ${state.last_error_diagnostics.contactId}`
+                  : ""}
+              </p>
+            ) : null}
+            {state.last_error_stack ? (
+              <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded border border-destructive/20 bg-background/80 p-2 text-xs text-foreground">
+                {state.last_error_stack}
+              </pre>
+            ) : null}
+          </div>
         ) : null}
       </GrowthEngineCard>
 
@@ -248,6 +264,12 @@ export function GrowthAcquisitionRunDetail({ runId }: { runId: string }) {
                 <p className="mt-1 text-sm text-foreground">
                   {entry.actions.length > 0 ? entry.actions.join(" · ") : "No actions recorded"}
                 </p>
+                {entry.error_stack ? (
+                  <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap break-all rounded border border-destructive/20 bg-destructive/5 p-2 text-xs text-destructive">
+                    {entry.error_action ? `${entry.error_action}\n` : ""}
+                    {entry.error_stack}
+                  </pre>
+                ) : null}
               </div>
             ))}
           </div>

@@ -128,6 +128,27 @@ const expansionSource = fs.readFileSync(
 assert.match(expansionSource, /dedupedFallbackQueries/)
 assert.doesNotMatch(expansionSource, /const fallback = withLocation/)
 
+const diagnosticsSource = fs.readFileSync(
+  path.join(root, "lib/growth/acquisition/acquisition-diagnostics.ts"),
+  "utf8",
+)
+assert.match(diagnosticsSource, /GROWTH_BULK_ACQUISITION_DIAGNOSTICS_QA_MARKER/)
+assert.match(diagnosticsSource, /last_error_stack/)
+assert.match(diagnosticsSource, /logAcquisitionTickFailure/)
+assert.match(diagnosticsSource, /acquisition_tick_failed/)
+
+assert.match(typesSource, /last_error_stack/)
+assert.match(typesSource, /last_error_diagnostics/)
+assert.match(typesSource, /error_stack/)
+
+assert.match(runnerSource, /acquisition-diagnostics/)
+assert.match(runnerSource, /applyAcquisitionTickFailureToState/)
+assert.match(runnerSource, /buildFailedAcquisitionTickLogEntry/)
+assert.match(runnerSource, /withAcquisitionDiagnosticContext/)
+
+assert.match(repoSource, /last_error_stack/)
+assert.match(repoSource, /parseLastErrorDiagnostics/)
+
 const promoteSource = fs.readFileSync(
   path.join(root, "lib/growth/acquisition/promote-verified-contact-to-lead.ts"),
   "utf8",

@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { logAcquisitionStep } from "@/lib/growth/acquisition/acquisition-diagnostics"
 import { logGrowthEngine } from "@/lib/growth/access"
 import type { PromoteVerifiedContactOutcome } from "@/lib/growth/acquisition/acquisition-types"
 import type { GrowthCompanyContact } from "@/lib/growth/contact-discovery/company-contact-types"
@@ -150,6 +151,12 @@ export async function promoteVerifiedContactToGrowthLead(
     createdBy?: string | null
   },
 ): Promise<PromoteVerifiedContactOutcome> {
+  logAcquisitionStep("promoteVerifiedContactToGrowthLead", {
+    contactId: input.companyContact.id,
+    companyId: input.companyContact.company_id,
+    acquisitionRunId: input.acquisitionRunId ?? null,
+  })
+
   const contact = input.companyContact
 
   if (contact.growth_lead_id) {
