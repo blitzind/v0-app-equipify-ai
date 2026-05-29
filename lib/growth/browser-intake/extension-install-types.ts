@@ -55,5 +55,5 @@ export const GROWTH_BROWSER_EXTENSION_INSTALL_STEPS = [
   "Open chrome://extensions and enable Developer mode.",
   "Choose Load unpacked and select the extensions/growth-browser-intake folder from this repo.",
   "Or download the Equipify Sales ZIP, unzip it, and load the extracted equipify-sales folder.",
-  "Pin Equipify Sales. Use the toolbar popup or Chrome side panel to capture contacts into Growth Engine.",
+  "Pin Equipify Sales. On LinkedIn profiles and company pages, click the toolbar icon or floating dock to open the in-page prospecting sidebar.",
 ] as const

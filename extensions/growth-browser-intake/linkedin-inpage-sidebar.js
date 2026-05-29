@@ -19,6 +19,11 @@
     return kind === "profile" || kind === "company"
   }
 
+  function logError(scope, error, details = {}) {
+    const message = error instanceof Error ? error.message : String(error ?? "unknown")
+    console.error("[Equipify Sales:inpage-sidebar]", scope, message, details, error)
+  }
+
   function ensureRoot() {
     if (rootNode?.isConnected) return rootNode
 
@@ -65,7 +70,10 @@
   }
 
   function open() {
-    if (!pageKindSupported()) return false
+    if (!pageKindSupported()) {
+      logError("unsupported_page", "Not a LinkedIn profile/company page", { url: window.location.href })
+      return false
+    }
     applyOpenState(true)
     return true
   }

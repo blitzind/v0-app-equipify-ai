@@ -377,6 +377,25 @@ body.surface-sidepanel.es-sales-workspace {
   cursor: pointer;
 }
 
+.es-ws-enrichment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.es-ws-copy-btn {
+  margin-left: 6px;
+  padding: 2px 7px;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .es-ws-company-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

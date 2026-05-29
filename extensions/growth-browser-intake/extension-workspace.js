@@ -4,6 +4,9 @@
 ;(function initEquipifySalesWorkspace() {
   const linkedinStatus = window.EquipifyGrowthLinkedInStatus
   const crmContextUi = window.EquipifyGrowthCrmContext
+  const config = window.EquipifyGrowthExtensionConfig
+  let lastRenderInput = null
+  let lastEnrichmentResult = null
 
   function trimOrNull(value) {
     const trimmed = (value ?? "").trim()
@@ -112,6 +115,16 @@
     el.innerHTML = html
   }
 
+  function apiBaseUrl() {
+    const preset = document.getElementById("api-preset-select")?.value === "local" ? "local" : "production"
+    return config?.EXTENSION_API_PRESETS?.[preset] ?? "https://app.equipify.ai"
+  }
+
+  function copyText(value) {
+    if (!value || value === "—") return
+    navigator.clipboard?.writeText(value).catch(() => {})
+  }
+
   function renderProfilePhoto(name, photoUrl) {
     const wrap = document.getElementById("es-ws-profile-photo-wrap")
     if (!wrap) return
@@ -192,6 +205,7 @@
   }
 
   function render(input) {
+    lastRenderInput = input
     const crmPayload = input?.crmPayload ?? null
     const detected = input?.detected ?? null
     const formValues = input?.formValues ?? {}
@@ -249,12 +263,16 @@
     }
 
     setHtml("es-ws-contact-rows", `
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Email</span><span class="es-ws-kv-value">${escapeHtml(email)}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Phone</span><span class="es-ws-kv-value">${escapeHtml(phone)}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Email</span><span class="es-ws-kv-value">${escapeHtml(email)} <button type="button" class="es-ws-copy-btn" data-copy-value="${escapeHtml(email)}" ${email === "—" ? "hidden" : ""}>Copy</button></span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Phone</span><span class="es-ws-kv-value">${escapeHtml(phone)} <button type="button" class="es-ws-copy-btn" data-copy-value="${escapeHtml(phone)}" ${phone === "—" ? "hidden" : ""}>Copy</button></span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">LinkedIn</span><span class="es-ws-kv-value">${linkedinUrl !== "—" ? `<a href="${escapeHtml(linkedinUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(linkedinUrl)}</a>` : "—"}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Website</span><span class="es-ws-kv-value">${website !== "—" ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">${escapeHtml(website)}</a>` : "—"}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Verification</span><span class="es-ws-kv-value"><span class="es-ws-verify-pill" data-status="${verification}">${verificationLabel(verification)}</span></span></div>
     `)
+
+    document.querySelectorAll(".es-ws-copy-btn").forEach((btn) => {
+      btn.addEventListener("click", () => copyText(btn.dataset.copyValue))
+    })
 
     const verifyBtn = document.getElementById("es-ws-verify-email-btn")
     if (verifyBtn) {
@@ -269,7 +287,11 @@
     setHtml("es-ws-company-rows", `
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Company</span><span class="es-ws-kv-value">${escapeHtml(company)}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Website</span><span class="es-ws-kv-value">${website !== "—" ? escapeHtml(website) : "—"}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Location</span><span class="es-ws-kv-value">${escapeHtml(location)}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Industry</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.industry) ?? "—")}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Employees</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.employee_count) ?? "—")}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Revenue</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.revenue) ?? "—")}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Founded</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.founded) ?? "—")}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Relationship</span><span class="es-ws-kv-value">${escapeHtml(relationship)}</span></div>
     `)
 
@@ -320,6 +342,77 @@
   }
 
   function wireActions(deps) {
+    async function runContactEnrichment(kind) {
+      const input = lastRenderInput ?? {}
+      const form = input.formValues ?? {}
+      const detected = input.detected ?? {}
+      const statusEl = document.getElementById("es-ws-enrichment-status")
+      const resultsEl = document.getElementById("es-ws-enrichment-results")
+      const copyBtn = document.getElementById("es-ws-enrichment-copy-btn")
+      const saveBtn = document.getElementById("es-ws-enrichment-save-btn")
+      if (statusEl) statusEl.textContent = `Finding ${kind} through approved providers...`
+      if (resultsEl) {
+        resultsEl.hidden = true
+        resultsEl.innerHTML = ""
+      }
+
+      try {
+        const response = await fetch(`${apiBaseUrl()}${config.CONTACT_ENRICHMENT_PATH}`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contact_name: form.contact_name,
+            title: form.title,
+            company_name: form.company_name ?? detected.company_name,
+            location: form.location,
+            linkedin_url: form.linkedin_url ?? detected.linkedin_url,
+            website: form.website ?? detected.website,
+          }),
+        })
+        const body = await response.json().catch(() => null)
+        if (!response.ok || !body?.ok) {
+          throw new Error(body?.message ?? "Contact enrichment failed.")
+        }
+        if (!body.configured) {
+          if (statusEl) statusEl.textContent = "Contact enrichment provider not configured."
+          return
+        }
+        if (!body.result) {
+          if (statusEl) statusEl.textContent = body.message ?? "No contact details found."
+          return
+        }
+        lastEnrichmentResult = body.result
+        if (statusEl) statusEl.textContent = `${body.result.provider_source} · ${body.result.confidence}% confidence`
+        if (resultsEl) {
+          const email = body.result.work_email ?? "—"
+          const phone = body.result.phone ?? "—"
+          resultsEl.hidden = false
+          resultsEl.innerHTML = `
+            <div class="es-ws-kv-row"><span class="es-ws-kv-label">Work email</span><span class="es-ws-kv-value">${escapeHtml(email)}</span></div>
+            <div class="es-ws-kv-row"><span class="es-ws-kv-label">Phone</span><span class="es-ws-kv-value">${escapeHtml(phone)}</span></div>
+            <div class="es-ws-kv-row"><span class="es-ws-kv-label">Source</span><span class="es-ws-kv-value">${escapeHtml(body.result.provider_source ?? "approved_provider")}</span></div>
+            <div class="es-ws-kv-row"><span class="es-ws-kv-label">Verification</span><span class="es-ws-kv-value">${escapeHtml(body.result.verification_status ?? "unknown")}</span></div>
+          `
+        }
+        if (body.result.work_email) {
+          const emailInput = document.getElementById("email")
+          if (emailInput && !emailInput.value) emailInput.value = body.result.work_email
+        }
+        if (body.result.phone) {
+          const phoneInput = document.getElementById("phone")
+          if (phoneInput && !phoneInput.value) phoneInput.value = body.result.phone
+        }
+        if (copyBtn) copyBtn.hidden = false
+        if (saveBtn) saveBtn.hidden = false
+      } catch (error) {
+        if (statusEl) {
+          statusEl.textContent =
+            error instanceof Error ? error.message : "Could not find contact details."
+        }
+      }
+    }
+
     document.getElementById("workspace-refresh-btn")?.addEventListener("click", () => {
       deps?.refresh?.()
     })
@@ -343,6 +436,23 @@
     document.getElementById("es-ws-verify-email-btn")?.addEventListener("click", () => {
       const verifyCheckbox = document.getElementById("verify-email")
       if (verifyCheckbox) verifyCheckbox.checked = true
+      document.getElementById("submit-btn")?.click()
+    })
+
+    document.getElementById("es-ws-find-email-btn")?.addEventListener("click", () => {
+      runContactEnrichment("email")
+    })
+
+    document.getElementById("es-ws-find-phone-btn")?.addEventListener("click", () => {
+      runContactEnrichment("phone")
+    })
+
+    document.getElementById("es-ws-enrichment-copy-btn")?.addEventListener("click", () => {
+      const value = lastEnrichmentResult?.work_email || lastEnrichmentResult?.phone
+      copyText(value)
+    })
+
+    document.getElementById("es-ws-enrichment-save-btn")?.addEventListener("click", () => {
       document.getElementById("submit-btn")?.click()
     })
 

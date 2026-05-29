@@ -291,7 +291,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.2.0"/)
+assert.match(manifestSource, /"version": "4.3.0"/)
 assert.match(manifestSource, /linkedin-inpage-sidebar\.js/)
 assert.match(manifestSource, /inpage-sidebar\.html/)
 assert.match(manifestSource, /assets\/equipify-sales-logo\.png/)
@@ -307,6 +307,8 @@ assert.match(manifestSource, /scripting/)
 assert.match(manifestSource, /sidePanel/)
 assert.match(manifestSource, /side_panel/)
 assert.match(manifestSource, /storage/)
+assert.match(manifestSource, /tabs/)
+assert.doesNotMatch(manifestSource, /default_popup/)
 assert.match(manifestSource, /background.js/)
 
 const contextRoute = fs.readFileSync(
@@ -346,6 +348,8 @@ assert.match(intakeAppJs, /loadVersionInfo/)
 assert.match(intakeAppJs, /EquipifyGrowthExtensionLookupCache/)
 assert.match(intakeAppJs, /EquipifyGrowthExtensionVersion/)
 assert.match(intakeAppJs, /scheduleBootstrap/)
+assert.match(intakeAppJs, /showFallbackError/)
+assert.match(intakeAppJs, /logError/)
 assert.match(intakeAppJs, /refreshOperatorAnalytics/)
 assert.match(intakeAppJs, /extension-version-warning/)
 assert.doesNotMatch(intakeAppJs, /api[_-]?key|secret|password|token/i)
@@ -412,6 +416,7 @@ assert.match(inpageSidebarHtml, /equipify-sales-logo\.png/)
 assert.doesNotMatch(inpageSidebarHtml, /equipify-lightning\.png/)
 assert.match(inpageSidebarHtml, /inpage-sidebar-close-btn/)
 assert.match(inpageSidebarHtml, /surface-inpage/)
+assert.match(inpageSidebarHtml, /Find contact details/)
 
 for (const iconSize of [16, 32, 48, 128]) {
   assert.ok(
@@ -429,6 +434,16 @@ assert.ok(
   "missing equipify-sales-logo.png",
 )
 
+
+const contactEnrichmentRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/browser-intake/contact-enrichment/route.ts"),
+  "utf8",
+)
+assert.match(contactEnrichmentRoute, /discoverWebsiteContacts/)
+assert.match(contactEnrichmentRoute, /website_public_extract/)
+assert.match(contactEnrichmentRoute, /Contact enrichment provider not configured/)
+assert.doesNotMatch(contactEnrichmentRoute, /linkedin.*scrap|hidden LinkedIn/i)
+
 const extensionConfigJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/extension-config.js"),
   "utf8",
@@ -437,6 +452,7 @@ assert.match(extensionConfigJs, /Matched by domain/)
 assert.match(extensionConfigJs, /Matched by LinkedIn URL/)
 assert.match(extensionConfigJs, /Matched by company name/)
 assert.match(extensionConfigJs, /CRM_CONTEXT_PATH/)
+assert.match(extensionConfigJs, /CONTACT_ENRICHMENT_PATH/)
 assert.match(extensionConfigJs, /PACKAGE_METADATA_DOWNLOAD_PATH/)
 
 const extensionStorageJs = fs.readFileSync(
@@ -738,6 +754,7 @@ assert.match(popupHtml, /linkedin-floating-dock/)
 assert.match(popupHtml, /extension-version-banner/)
 assert.match(popupHtml, /bootstrap-loading/)
 assert.match(popupHtml, /Open sidebar on LinkedIn/)
+assert.match(popupHtml, /Could not read this page|context-warning/)
 assert.match(popupHtml, /extension-version.js/)
 assert.doesNotMatch(popupHtml, /data-popup-tab-btn/)
 

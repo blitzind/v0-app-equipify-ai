@@ -8,6 +8,7 @@ const EXTENSION_API_PRESETS = {
 const INTAKE_PATH = "/api/platform/growth/browser-intake/contact"
 const LOOKUP_PATH = "/api/platform/growth/browser-intake/lookup"
 const CRM_CONTEXT_PATH = "/api/platform/growth/browser-intake/context"
+const CONTACT_ENRICHMENT_PATH = "/api/platform/growth/browser-intake/contact-enrichment"
 const CALL_PREP_PATH = "/api/platform/growth/browser-intake/call-prep"
 const SIMILAR_COMPANIES_PATH = "/api/platform/growth/browser-intake/similar-companies"
 const PROSPECT_QUEUE_PATH = "/api/platform/growth/browser-intake/prospect-queue"
@@ -59,6 +60,7 @@ window.EquipifyGrowthExtensionConfig = {
   INTAKE_PATH,
   LOOKUP_PATH,
   CRM_CONTEXT_PATH,
+  CONTACT_ENRICHMENT_PATH,
   CALL_PREP_PATH,
   SIMILAR_COMPANIES_PATH,
   PROSPECT_QUEUE_PATH,

@@ -1,15 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Equipify Sales",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "description": "Equipify Sales — LinkedIn prospecting sidebar with CRM context, capture, call prep, and queue tools. Visible metadata only.",
-  "permissions": ["activeTab", "scripting", "storage", "sidePanel"],
+  "permissions": ["activeTab", "scripting", "storage", "sidePanel", "tabs"],
   "host_permissions": ["https://app.equipify.ai/*", "http://localhost:3000/*", "https://*/*", "http://*/*"],
   "background": {
     "service_worker": "background.js"
   },
   "action": {
-    "default_popup": "popup.html",
     "default_title": "Equipify Sales",
     "default_icon": {
       "16": "assets/icon-16.png",

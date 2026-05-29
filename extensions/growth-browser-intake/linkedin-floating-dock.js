@@ -9,7 +9,10 @@
   const linkedinStatus = window.EquipifyGrowthLinkedInStatus
   const lookupCache = window.EquipifyGrowthExtensionLookupCache
 
-  if (!storage || !config || !linkedinContext || !linkedinStatus) return
+  if (!storage || !config || !linkedinContext || !linkedinStatus) {
+    console.error("[Equipify Sales:dock] missing content-script dependencies")
+    return
+  }
 
   const DOCK_ID = "equipify-sales-linkedin-floating-dock"
   const LOGO_URL = chrome.runtime.getURL("assets/equipify-lightning.png")
@@ -28,6 +31,21 @@
   let dockPrefs = { ...storage.DEFAULT_LINKEDIN_FLOATING_DOCK }
   let dragging = false
   let dragOffsetY = 0
+
+  function defaultPayload() {
+    return {
+      ok: true,
+      matched: false,
+      context: null,
+      status_badge: "not_added",
+      status_badge_label: "Not In Equipify",
+    }
+  }
+
+  function logError(scope, error, details = {}) {
+    const message = error instanceof Error ? error.message : String(error ?? "unknown")
+    console.error("[Equipify Sales:dock]", scope, message, details, error)
+  }
 
   function pageKindSupported() {
     const kind = linkedinContext.detectLinkedInPageKind(window.location.href)
@@ -269,15 +287,14 @@
       return
     }
 
+    if (!dockNode) renderDock(defaultPayload())
+
     try {
       const payload = await fetchCrmContext(options)
-      if (!payload) {
-        removeDock()
-        return
-      }
-      renderDock(payload)
-    } catch {
-      removeDock()
+      renderDock(payload ?? defaultPayload())
+    } catch (error) {
+      logError("refresh_dock_failed", error)
+      renderDock(defaultPayload())
     }
   }
 

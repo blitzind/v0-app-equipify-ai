@@ -14,6 +14,7 @@ function initIntakeApp(options) {
   const crmContextUi = window.EquipifyGrowthCrmContext
   const lookupCache = window.EquipifyGrowthExtensionLookupCache
   const extensionVersion = window.EquipifyGrowthExtensionVersion
+  const logPrefix = `[Equipify Sales:${surface}]`
 
   let bootstrapTimer = null
   let bootstrapSeq = 0
@@ -99,11 +100,42 @@ function initIntakeApp(options) {
     return trimmed ? trimmed : null
   }
 
+  function logError(scope, error, details = {}) {
+    const message = error instanceof Error ? error.message : String(error ?? "unknown")
+    console.error(logPrefix, scope, message, details, error)
+  }
+
+  function showFallbackError(message = "Could not read this page. Reload LinkedIn or re-open Equipify Sales.") {
+    setCaptureStatus("Error", "status-error")
+    if (els.contextWarning) {
+      els.contextWarning.hidden = false
+      els.contextWarning.innerHTML = ""
+      const text = document.createElement("span")
+      text.textContent = message
+      const retry = document.createElement("button")
+      retry.type = "button"
+      retry.className = "btn-link"
+      retry.textContent = "Retry"
+      retry.addEventListener("click", () => {
+        clearStatus()
+        bootstrap().catch((error) => {
+          logError("retry_bootstrap_failed", error)
+          showFallbackError()
+        })
+      })
+      els.contextWarning.appendChild(text)
+      els.contextWarning.appendChild(document.createTextNode(" "))
+      els.contextWarning.appendChild(retry)
+    }
+    setStatus(message, "error")
+  }
+
   function apiBaseUrl() {
     return state.settings.apiBaseUrl || config.EXTENSION_API_PRESETS.production
   }
 
   function setCaptureStatus(text, className) {
+    if (!els.captureStatus) return
     els.captureStatus.textContent = text
     els.captureStatus.className = `status-pill ${className}`
   }
@@ -185,10 +217,10 @@ function initIntakeApp(options) {
     if (linkedinUrl && linkedinInput) linkedinInput.value = linkedinUrl
 
     if (companyName) {
-      els.detectedPanel.hidden = false
-      els.detectedCompany.textContent = companyName
-      els.detectedPlatform.textContent = platform
-      els.detectedDomain.textContent = website || linkedinUrl || sourceUrl || ""
+      if (els.detectedPanel) els.detectedPanel.hidden = false
+      if (els.detectedCompany) els.detectedCompany.textContent = companyName
+      if (els.detectedPlatform) els.detectedPlatform.textContent = platform
+      if (els.detectedDomain) els.detectedDomain.textContent = website || linkedinUrl || sourceUrl || ""
     } else if (els.detectedPanel) {
       els.detectedPanel.hidden = true
     }
@@ -209,7 +241,8 @@ function initIntakeApp(options) {
       })
 
       return result ?? null
-    } catch {
+    } catch (error) {
+      logError("extract_tab_metadata_failed", error, { tabUrl: tab?.url })
       return null
     }
   }
@@ -276,7 +309,19 @@ function initIntakeApp(options) {
     })
 
     const body = await response.json().catch(() => null)
-    if (!response.ok || !body?.ok) return null
+    if (!response.ok || !body?.ok) {
+      return {
+        ok: false,
+        matched: false,
+        context: null,
+        status_badge: response.status === 403 ? "needs_review" : "not_added",
+        status_badge_label:
+          response.status === 403 ? "Not authorized" : "Not In Equipify",
+        error_status: response.status,
+        error: body?.error ?? "crm_context_failed",
+        message: body?.message ?? "Could not load CRM context.",
+      }
+    }
     if (cacheKey) lookupCache?.write?.(cacheKey, body)
     return body
   }
@@ -353,6 +398,12 @@ function initIntakeApp(options) {
     if (state.linkedinPageKind === "company") contextParts.push("LinkedIn company")
     if (state.crmContext?.company_name) contextParts.push(state.crmContext.company_name)
     if (els.linkedinStatusContext) els.linkedinStatusContext.textContent = contextParts.join(" · ")
+
+    if (crmPayload?.error_status === 403) {
+      showFallbackError("Not authorized. Sign in to Equipify as a platform admin, then retry.")
+    } else if (crmPayload?.error_status) {
+      showFallbackError("Could not read this page. Reload LinkedIn or re-open Equipify Sales.")
+    }
 
     const profileName =
       state.crmContext?.contact_name ||
@@ -447,14 +498,17 @@ function initIntakeApp(options) {
 
   function showExistingLead(match) {
     if (!match || match.confidence < 0.7) {
-      els.existingLeadPanel.hidden = true
+      if (els.existingLeadPanel) els.existingLeadPanel.hidden = true
       state.existingLead = null
       return
     }
 
     state.existingLead = match
+    if (!els.existingLeadPanel) return
     els.existingLeadPanel.hidden = false
-    els.existingLeadSummary.textContent = `${match.company_name}${match.website ? ` · ${match.website}` : ""}`
+    if (els.existingLeadSummary) {
+      els.existingLeadSummary.textContent = `${match.company_name}${match.website ? ` · ${match.website}` : ""}`
+    }
     if (els.existingLeadMatchLabel) {
       const label =
         match.match_label || config.formatMatchRuleLabel(match.rule)
@@ -474,10 +528,10 @@ function initIntakeApp(options) {
   function setMode(mode) {
     state.mode = mode
     const quick = mode === "quick"
-    els.quickModeBtn.classList.toggle("active", quick)
-    els.fullModeBtn.classList.toggle("active", !quick)
-    els.quickFields.hidden = !quick
-    els.fullFields.hidden = quick
+    els.quickModeBtn?.classList.toggle("active", quick)
+    els.fullModeBtn?.classList.toggle("active", !quick)
+    if (els.quickFields) els.quickFields.hidden = !quick
+    if (els.fullFields) els.fullFields.hidden = quick
   }
 
   function setStatus(message, type) {
@@ -519,17 +573,17 @@ function initIntakeApp(options) {
 
     const company = saveRecord.company_name || "Lead"
     const contact = saveRecord.contact_name ? ` · ${saveRecord.contact_name}` : ""
-    els.successSummary.textContent = `${company}${contact}`
+    if (els.successSummary) els.successSummary.textContent = `${company}${contact}`
 
-    els.successOpenLeadBtn.onclick = () => {
+    if (els.successOpenLeadBtn) els.successOpenLeadBtn.onclick = () => {
       chrome.tabs.create({ url: leadAdminUrl(saveRecord.lead_id) })
     }
-    els.successCapturedLink.href = capturedLeadsUrl()
-    els.successEmailStatus.textContent = config.formatEmailStatus(
+    if (els.successCapturedLink) els.successCapturedLink.href = capturedLeadsUrl()
+    if (els.successEmailStatus) els.successEmailStatus.textContent = config.formatEmailStatus(
       saveRecord.email_status,
       saveRecord.verified_by_provider,
     )
-    els.successDiscoveryStatus.textContent = config.formatDiscoveryStatus(
+    if (els.successDiscoveryStatus) els.successDiscoveryStatus.textContent = config.formatDiscoveryStatus(
       saveRecord.contact_discovery_queued,
     )
   }
@@ -683,13 +737,15 @@ function initIntakeApp(options) {
       const tab = tabs[0]
 
       if (isRestrictedTabUrl(tab?.url)) {
-        els.contextWarning.hidden = false
-        els.contextWarning.textContent = "Open a website or LinkedIn page, then reopen the extension."
+        if (els.contextWarning) {
+          els.contextWarning.hidden = false
+          els.contextWarning.textContent = "Open a website or LinkedIn page, then reopen the extension."
+        }
         setCaptureStatus("No page", "status-error")
         return
       }
 
-      els.contextWarning.hidden = true
+      if (els.contextWarning) els.contextWarning.hidden = true
       const metadata = await extractTabMetadata(tab)
       if (seq !== bootstrapSeq) return
       applyDetectedMetadata(metadata, tab?.url)
@@ -715,11 +771,10 @@ function initIntakeApp(options) {
       renderLinkedInStatusPanel(crmPayload, tab?.url)
 
       setCaptureStatus("Ready", "status-ready")
-    } catch {
+    } catch (error) {
       if (seq !== bootstrapSeq) return
-      setCaptureStatus("Error", "status-error")
-      els.contextWarning.hidden = false
-      els.contextWarning.textContent = "Could not detect page metadata."
+      logError("bootstrap_failed", error)
+      showFallbackError()
     } finally {
       if (seq === bootstrapSeq) setLoadingState(false)
     }
@@ -750,7 +805,7 @@ function initIntakeApp(options) {
       payload.company_only = true
     }
 
-    els.submitBtn.disabled = true
+    if (els.submitBtn) els.submitBtn.disabled = true
     setCaptureStatus("Saving", "status-saving")
 
     try {
@@ -825,7 +880,7 @@ function initIntakeApp(options) {
       setStatus(`Could not reach Equipify (${message}).`, "error")
       setCaptureStatus("Error", "status-error")
     } finally {
-      els.submitBtn.disabled = false
+      if (els.submitBtn) els.submitBtn.disabled = false
     }
   }
 
@@ -1135,9 +1190,10 @@ function initIntakeApp(options) {
     await bootstrap()
   }
 
-  init().catch(() => {
-    setCaptureStatus("Error", "status-error")
-    setStatus("Extension failed to initialize.", "error")
+  init().catch((error) => {
+    logError("init_failed", error)
+    setLoadingState(false)
+    showFallbackError("Could not read this page. Reload LinkedIn or re-open Equipify Sales.")
   })
 }
 

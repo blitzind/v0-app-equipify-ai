@@ -9,7 +9,10 @@
   const linkedinStatus = window.EquipifyGrowthLinkedInStatus
   const lookupCache = window.EquipifyGrowthExtensionLookupCache
 
-  if (!storage || !config || !linkedinContext || !linkedinStatus) return
+  if (!storage || !config || !linkedinContext || !linkedinStatus) {
+    console.error("[Equipify Sales:header-badge] missing content-script dependencies")
+    return
+  }
 
   const BADGE_ROOT_ID = "equipify-sales-linkedin-badge-root"
   const REFRESH_DEBOUNCE_MS = 300
@@ -23,6 +26,21 @@
   let badgeRoot = null
   let prospectingMode = false
   let latestPayload = null
+
+  function defaultPayload() {
+    return {
+      ok: true,
+      matched: false,
+      context: null,
+      status_badge: "not_added",
+      status_badge_label: "Not In Equipify",
+    }
+  }
+
+  function logError(scope, error, details = {}) {
+    const message = error instanceof Error ? error.message : String(error ?? "unknown")
+    console.error("[Equipify Sales:header-badge]", scope, message, details, error)
+  }
 
   async function loadSettings() {
     const settings = await storage.loadExtensionSettings()
@@ -242,13 +260,10 @@
 
     try {
       const payload = await fetchCrmContext(options)
-      if (!payload) {
-        removeBadge()
-        return
-      }
-      renderBadge(payload)
-    } catch {
-      removeBadge()
+      renderBadge(payload ?? defaultPayload())
+    } catch (error) {
+      logError("refresh_badge_failed", error)
+      renderBadge(defaultPayload())
     }
   }
 
