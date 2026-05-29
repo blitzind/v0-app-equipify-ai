@@ -85,21 +85,89 @@
           </div>
         </section>
 
-        <section class="es-ws-card">
-          <p class="es-ws-card-label">Company</p>
-          <div id="es-ws-company-rows" class="es-ws-kv-list"></div>
-          <div class="es-ws-company-stats">
-            <div class="es-ws-company-stat">
-              <span id="es-ws-company-contacts-count" class="es-ws-company-stat-value">0</span>
-              <span class="es-ws-company-stat-label">Contacts</span>
+        <section class="es-ws-card es-ws-company-intel">
+          <div class="es-ws-card-title-row">
+            <p class="es-ws-card-label">Company intelligence</p>
+            <button type="button" id="es-ws-run-research-btn" class="es-ws-mini-action">Run Research</button>
+          </div>
+          <div class="es-ws-company-header">
+            <div id="es-ws-company-logo" class="es-ws-company-logo">?</div>
+            <div>
+              <div id="es-ws-company-name" class="es-ws-company-name">Company</div>
+              <div id="es-ws-company-subtitle" class="es-ws-company-subtitle">Evidence-backed company profile</div>
             </div>
-            <div class="es-ws-company-stat">
-              <span id="es-ws-company-opportunities-count" class="es-ws-company-stat-value">0</span>
-              <span class="es-ws-company-stat-label">Opportunities</span>
+          </div>
+          <nav class="es-ws-company-tabs" aria-label="Company intelligence tabs">
+            <button type="button" class="es-ws-company-tab active" data-company-tab="overview">Overview</button>
+            <button type="button" class="es-ws-company-tab" data-company-tab="employees">Employees</button>
+            <button type="button" class="es-ws-company-tab" data-company-tab="technologies">Tech</button>
+            <button type="button" class="es-ws-company-tab" data-company-tab="signals">Signals</button>
+            <button type="button" class="es-ws-company-tab" data-company-tab="similar">Similar</button>
+            <button type="button" class="es-ws-company-tab" data-company-tab="crm">CRM</button>
+            <button type="button" class="es-ws-company-tab" data-company-tab="activity">Activity</button>
+          </nav>
+
+          <div id="es-ws-company-tab-overview" class="es-ws-company-panel" data-company-panel="overview">
+            <div id="es-ws-company-rows" class="es-ws-kv-list"></div>
+            <div class="es-ws-company-stats">
+              <div class="es-ws-company-stat">
+                <span id="es-ws-company-contacts-count" class="es-ws-company-stat-value">0</span>
+                <span class="es-ws-company-stat-label">Contacts</span>
+              </div>
+              <div class="es-ws-company-stat">
+                <span id="es-ws-company-opportunities-count" class="es-ws-company-stat-value">0</span>
+                <span class="es-ws-company-stat-label">Opportunities</span>
+              </div>
+              <div class="es-ws-company-stat">
+                <span id="es-ws-company-customers-count" class="es-ws-company-stat-value">0</span>
+                <span class="es-ws-company-stat-label">Customers</span>
+              </div>
             </div>
-            <div class="es-ws-company-stat">
-              <span id="es-ws-company-customers-count" class="es-ws-company-stat-value">0</span>
-              <span class="es-ws-company-stat-label">Customers</span>
+          </div>
+
+          <div id="es-ws-company-tab-employees" class="es-ws-company-panel" data-company-panel="employees" hidden>
+            <div class="es-ws-filter-grid">
+              <input id="es-ws-employee-search" type="search" placeholder="Search employees" />
+              <select id="es-ws-employee-department-filter"><option value="">Department</option></select>
+              <select id="es-ws-employee-seniority-filter"><option value="">Seniority</option></select>
+              <select id="es-ws-employee-crm-filter"><option value="">CRM status</option></select>
+            </div>
+            <div id="es-ws-employees-list" class="es-ws-employees-list">
+              <p class="es-ws-empty">Run contact discovery to find people at this company.</p>
+            </div>
+            <button type="button" id="es-ws-run-discovery-btn" class="es-ws-inline-btn">Discover Employees</button>
+          </div>
+
+          <div id="es-ws-company-tab-technologies" class="es-ws-company-panel" data-company-panel="technologies" hidden>
+            <div id="es-ws-technologies-list" class="es-ws-chip-list"></div>
+          </div>
+
+          <div id="es-ws-company-tab-signals" class="es-ws-company-panel" data-company-panel="signals" hidden>
+            <div id="es-ws-signals-list" class="es-ws-signal-list"></div>
+          </div>
+
+          <div id="es-ws-company-tab-similar" class="es-ws-company-panel" data-company-panel="similar" hidden>
+            <div class="es-ws-filter-row">
+              <label><input type="checkbox" data-similar-filter="industry" checked /> Same Industry</label>
+              <label><input type="checkbox" data-similar-filter="region" /> Same Region</label>
+              <label><input type="checkbox" data-similar-filter="size" /> Similar Size</label>
+              <label><input type="checkbox" data-similar-filter="signals" /> Intent Signals</label>
+            </div>
+            <p id="es-ws-similar-insight" class="es-ws-empty">Discover evidence-backed similar companies.</p>
+            <div id="es-ws-similar-list" class="es-ws-similar-list"></div>
+            <div class="button-row" style="margin-top: 8px">
+              <button type="button" id="es-ws-discover-similar-btn" class="es-ws-inline-btn">Discover Similar Companies</button>
+              <button type="button" id="es-ws-similar-bulk-queue-btn" class="es-ws-inline-btn">Add Selected</button>
+            </div>
+          </div>
+
+          <div id="es-ws-company-tab-crm" class="es-ws-company-panel" data-company-panel="crm" hidden>
+            <div id="es-ws-crm-relationship-list" class="es-ws-kv-list"></div>
+          </div>
+
+          <div id="es-ws-company-tab-activity" class="es-ws-company-panel" data-company-panel="activity" hidden>
+            <div id="es-ws-activity-list" class="es-ws-timeline">
+              <p class="es-ws-empty">No recent activity yet.</p>
             </div>
           </div>
         </section>
@@ -117,13 +185,6 @@
           <div id="es-ws-research-signals" class="es-ws-signals"></div>
           <div class="button-row" style="margin-top: 10px">
             <button type="button" id="copilot-generate-research-btn-inline" class="btn-secondary">Generate AI brief</button>
-          </div>
-        </section>
-
-        <section class="es-ws-card">
-          <p class="es-ws-card-label">Activity</p>
-          <div id="es-ws-activity-list" class="es-ws-timeline">
-            <p class="es-ws-empty">No recent activity yet.</p>
           </div>
         </section>
 

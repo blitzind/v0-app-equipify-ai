@@ -727,6 +727,12 @@ function initIntakeApp(options) {
 
   async function bootstrap() {
     const seq = ++bootstrapSeq
+    const timeoutId = window.setTimeout(() => {
+      if (seq !== bootstrapSeq) return
+      logError("bootstrap_timeout", "Loading page context timed out")
+      setLoadingState(false)
+      showFallbackError("No page context found. Reload LinkedIn or re-open Equipify Sales.")
+    }, 12_000)
     setCaptureStatus("Detecting", "status-detecting")
     setLoadingState(true)
     clearStatus()
@@ -776,6 +782,7 @@ function initIntakeApp(options) {
       logError("bootstrap_failed", error)
       showFallbackError()
     } finally {
+      window.clearTimeout(timeoutId)
       if (seq === bootstrapSeq) setLoadingState(false)
     }
   }

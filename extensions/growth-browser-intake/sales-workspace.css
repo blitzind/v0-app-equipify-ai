@@ -13,10 +13,15 @@ body.surface-inpage.es-sales-workspace {
 
 .es-ws-brand-logo-img {
   display: block;
-  height: 28px;
-  width: auto;
+  height: auto !important;
+  max-height: 34px;
+  width: min(220px, 100%) !important;
   max-width: 100%;
   object-fit: contain;
+  border-radius: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+  flex-shrink: 1 !important;
 }
 
 /* Equipify Sales — prospecting workspace (side panel) */
@@ -55,7 +60,7 @@ body.surface-sidepanel.es-sales-workspace {
   min-width: 0;
 }
 
-.es-ws-brand img {
+.es-ws-brand:not(.es-ws-brand-logo) img {
   width: 36px;
   height: 36px;
   border-radius: 8px;
@@ -403,6 +408,202 @@ body.surface-sidepanel.es-sales-workspace {
   margin-top: 10px;
 }
 
+.es-ws-card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.es-ws-mini-action {
+  padding: 5px 8px;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.es-ws-company-header {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+}
+
+.es-ws-company-logo {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #0b1629;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  overflow: hidden;
+}
+
+.es-ws-company-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.es-ws-company-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.es-ws-company-subtitle {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.es-ws-company-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 10px 0;
+}
+
+.es-ws-company-tab {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.es-ws-company-tab.active {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.es-ws-company-panel[hidden] {
+  display: none !important;
+}
+
+.es-ws-filter-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.es-ws-filter-grid input,
+.es-ws-filter-grid select {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 11px;
+  color: #0f172a;
+}
+
+.es-ws-chip-list,
+.es-ws-signal-list,
+.es-ws-similar-list {
+  display: grid;
+  gap: 8px;
+}
+
+.es-ws-signal-row {
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 11px;
+  color: #334155;
+}
+
+.es-ws-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.es-ws-similar-card {
+  position: relative;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+.es-ws-similar-select {
+  float: right;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.es-ws-similar-score {
+  display: inline-flex;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.es-ws-similar-name {
+  margin-top: 7px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.es-ws-similar-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.es-ws-similar-meta a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.es-ws-similar-badge {
+  display: inline-flex;
+  margin-top: 7px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.es-ws-similar-reasons {
+  margin: 7px 0 0;
+  padding-left: 16px;
+  color: #334155;
+  font-size: 11px;
+}
+
 .es-ws-company-stat {
   text-align: center;
   padding: 8px 6px;
@@ -424,6 +625,49 @@ body.surface-sidepanel.es-sales-workspace {
   font-size: 10px;
   color: #64748b;
   font-weight: 600;
+}
+
+.es-ws-employees-list {
+  display: grid;
+  gap: 8px;
+}
+
+.es-ws-employee-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 0;
+  border-top: 1px solid #f1f5f9;
+}
+
+.es-ws-employee-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.es-ws-employee-name {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.es-ws-employee-title,
+.es-ws-employee-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.es-ws-employee-action {
+  padding: 5px 8px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .es-ws-nba {

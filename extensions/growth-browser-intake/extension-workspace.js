@@ -7,6 +7,8 @@
   const config = window.EquipifyGrowthExtensionConfig
   let lastRenderInput = null
   let lastEnrichmentResult = null
+  let lastEmployeeRows = []
+  let similarState = { seedKey: null, loading: false, matches: [] }
 
   function trimOrNull(value) {
     const trimmed = (value ?? "").trim()
@@ -125,6 +127,46 @@
     navigator.clipboard?.writeText(value).catch(() => {})
   }
 
+  function uniqueValues(values) {
+    return [...new Set(values.map((value) => trimOrNull(value)).filter(Boolean))].sort()
+  }
+
+  function inferDepartment(title) {
+    const raw = (title ?? "").toLowerCase()
+    if (/sales|revenue|business development|account/.test(raw)) return "Sales"
+    if (/operation|coo|service|field/.test(raw)) return "Operations"
+    if (/engineer|technical|biomed|technician/.test(raw)) return "Technical"
+    if (/marketing|growth/.test(raw)) return "Marketing"
+    if (/finance|accounting|cfo/.test(raw)) return "Finance"
+    if (/owner|founder|chief|president|ceo|executive/.test(raw)) return "Executive"
+    return "Unknown"
+  }
+
+  function inferSeniority(title) {
+    const raw = (title ?? "").toLowerCase()
+    if (/owner|founder|chief|ceo|coo|cfo|president/.test(raw)) return "Executive"
+    if (/vp|vice president|director|head/.test(raw)) return "Leadership"
+    if (/manager|lead|supervisor/.test(raw)) return "Manager"
+    if (/engineer|technician|specialist|coordinator|rep/.test(raw)) return "Individual Contributor"
+    return "Unknown"
+  }
+
+  function buildCompanySeed(input = lastRenderInput) {
+    const context = input?.crmPayload?.context ?? null
+    const detected = input?.detected ?? {}
+    const form = input?.formValues ?? {}
+    return {
+      lead_id: context?.lead_id ?? null,
+      company_name: context?.company_name || form.company_name || detected.company_name || null,
+      website: form.website || detected.website || null,
+      linkedin_url: form.linkedin_url || detected.linkedin_url || null,
+      email: form.email || null,
+      industry: detected.industry ?? null,
+      state: detected.state ?? null,
+      city: detected.city ?? null,
+    }
+  }
+
   function renderProfilePhoto(name, photoUrl) {
     const wrap = document.getElementById("es-ws-profile-photo-wrap")
     if (!wrap) return
@@ -204,6 +246,134 @@
     if (recentEl) recentEl.textContent = String(recentCaptures?.length ?? 0)
   }
 
+  function renderEmployees(context) {
+    const list = document.getElementById("es-ws-employees-list")
+    if (!list) return
+
+    const relationshipMap = context?.company_relationship_map ?? {}
+    lastEmployeeRows = [
+      ...(relationshipMap.contacts ?? []),
+      ...(relationshipMap.related_leads ?? []),
+    ].map((contact) => ({
+      ...contact,
+      department: contact.department ?? inferDepartment(contact.title),
+      seniority: contact.seniority ?? inferSeniority(contact.title),
+      crm_status: contact.status ? contact.status.replace(/_/g, " ") : "Not In CRM",
+    }))
+
+    populateEmployeeFilters(lastEmployeeRows)
+    renderFilteredEmployees()
+  }
+
+  function populateSelect(id, values, fallbackLabel) {
+    const select = document.getElementById(id)
+    if (!select) return
+    const current = select.value
+    select.innerHTML = `<option value="">${fallbackLabel}</option>${values
+      .map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`)
+      .join("")}`
+    select.value = values.includes(current) ? current : ""
+  }
+
+  function populateEmployeeFilters(rows) {
+    populateSelect("es-ws-employee-department-filter", uniqueValues(rows.map((row) => row.department)), "Department")
+    populateSelect("es-ws-employee-seniority-filter", uniqueValues(rows.map((row) => row.seniority)), "Seniority")
+    populateSelect("es-ws-employee-crm-filter", uniqueValues(rows.map((row) => row.crm_status)), "CRM status")
+  }
+
+  function renderFilteredEmployees() {
+    const list = document.getElementById("es-ws-employees-list")
+    if (!list) return
+
+    const query = (document.getElementById("es-ws-employee-search")?.value ?? "").trim().toLowerCase()
+    const department = document.getElementById("es-ws-employee-department-filter")?.value ?? ""
+    const seniority = document.getElementById("es-ws-employee-seniority-filter")?.value ?? ""
+    const crmStatus = document.getElementById("es-ws-employee-crm-filter")?.value ?? ""
+    const contacts = lastEmployeeRows.filter((contact) => {
+      const haystack = `${contact.name ?? ""} ${contact.title ?? ""}`.toLowerCase()
+      if (query && !haystack.includes(query)) return false
+      if (department && contact.department !== department) return false
+      if (seniority && contact.seniority !== seniority) return false
+      if (crmStatus && contact.crm_status !== crmStatus) return false
+      return true
+    })
+
+    if (!contacts.length) {
+      list.innerHTML = '<p class="es-ws-empty">Run contact discovery to find people at this company.</p>'
+      return
+    }
+
+    list.innerHTML = contacts
+      .slice(0, 6)
+      .map((contact) => {
+        return `
+          <div class="es-ws-employee-row">
+            <div>
+              <div class="es-ws-employee-name">${escapeHtml(contact.name ?? "Company contact")}</div>
+              <div class="es-ws-employee-title">${escapeHtml(contact.title ?? "Title unknown")}</div>
+              <div class="es-ws-employee-meta">${escapeHtml(contact.department)} · ${escapeHtml(contact.seniority)} · ${escapeHtml(contact.crm_status)}</div>
+            </div>
+            <button type="button" class="es-ws-employee-action" data-lead-id="${escapeHtml(contact.lead_id ?? "")}">
+              ${contact.lead_id ? "Open" : "Add"}
+            </button>
+          </div>
+        `
+      })
+      .join("")
+
+    list.querySelectorAll(".es-ws-employee-action").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const leadId = btn.dataset.leadId
+        if (leadId) document.getElementById("linkedin-open-lead-btn")?.click()
+        else document.getElementById("linkedin-add-btn")?.click()
+      })
+    })
+  }
+
+  function renderTechnologies(detected, context) {
+    const list = document.getElementById("es-ws-technologies-list")
+    if (!list) return
+    const tech = [
+      ...(Array.isArray(detected?.technologies) ? detected.technologies : []),
+      ...(Array.isArray(detected?.software_stack) ? detected.software_stack : []),
+      ...(Array.isArray(detected?.marketing_tools) ? detected.marketing_tools : []),
+      ...(Array.isArray(detected?.analytics_tools) ? detected.analytics_tools : []),
+      ...(Array.isArray(detected?.security_technologies) ? detected.security_technologies : []),
+      ...(Array.isArray(context?.technology_signals) ? context.technology_signals : []),
+    ]
+    const values = uniqueValues(tech)
+    list.innerHTML = values.length
+      ? values.map((value) => `<span class="es-ws-signal">${escapeHtml(value)}</span>`).join("")
+      : '<p class="es-ws-empty">No evidence-backed technologies yet. Run Research to enrich this account.</p>'
+  }
+
+  function renderSignals(detected, context) {
+    const list = document.getElementById("es-ws-signals-list")
+    if (!list) return
+    const signals = [
+      ...(Array.isArray(detected?.growth_signals) ? detected.growth_signals : []),
+      ...(Array.isArray(detected?.hiring_signals) ? detected.hiring_signals : []),
+      ...(Array.isArray(detected?.news_references) ? detected.news_references : []),
+      context?.next_action?.reason,
+      context?.opportunity?.status_summary,
+    ].filter(Boolean)
+    list.innerHTML = signals.length
+      ? signals.map((signal) => `<div class="es-ws-signal-row">${escapeHtml(signal)}</div>`).join("")
+      : '<p class="es-ws-empty">No Growth Engine signals yet. Run Research to look for public signals.</p>'
+  }
+
+  function renderCrmRelationship(context, relationship, contactsCount, oppCount, customerCount) {
+    setHtml("es-ws-crm-relationship-list", `
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">CRM status</span><span class="es-ws-kv-value">${escapeHtml(relationship)}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Owner</span><span class="es-ws-kv-value">${escapeHtml(context?.owner?.display_name || context?.owner?.email || "Unassigned")}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Lead score</span><span class="es-ws-kv-value">${escapeHtml(context?.lead_score ?? "—")}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Review</span><span class="es-ws-kv-value">${escapeHtml(context?.status_badge_label ?? "—")}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Opportunity</span><span class="es-ws-kv-value">${escapeHtml(context?.opportunity?.stage_label ?? (oppCount ? "Existing opportunity" : "—"))}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Contacts</span><span class="es-ws-kv-value">${contactsCount}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Customers</span><span class="es-ws-kv-value">${customerCount}</span></div>
+    `)
+  }
+
   function render(input) {
     lastRenderInput = input
     const crmPayload = input?.crmPayload ?? null
@@ -232,6 +402,12 @@
     const phone = trimOrNull(formValues.phone) || "—"
     const website = trimOrNull(formValues.website) || detected?.website || "—"
     const linkedinUrl = trimOrNull(formValues.linkedin_url) || detected?.linkedin_url || "—"
+    const companyLinkedInUrl = detected?.linkedin_company_url ?? detected?.company_linkedin_url ?? "—"
+    const seedKey = JSON.stringify(buildCompanySeed(input))
+    if (similarState.seedKey !== seedKey) {
+      similarState = { seedKey, loading: false, matches: [] }
+      renderSimilarCompanies([])
+    }
 
     const verification = inferVerificationStatus({
       verification_status: input?.existingLead?.verification_status,
@@ -284,14 +460,39 @@
     const oppCount = context?.opportunity?.id ? 1 : 0
     const customerCount = linkedinStatus?.isCustomerLeadStatus?.(context?.lead_status) ? 1 : 0
 
+    const companyNameEl = document.getElementById("es-ws-company-name")
+    if (companyNameEl) companyNameEl.textContent = company
+    const companySubtitle = document.getElementById("es-ws-company-subtitle")
+    if (companySubtitle) {
+      companySubtitle.textContent = [detected?.industry, location !== "—" ? location : null]
+        .filter(Boolean)
+        .join(" · ") || "Evidence-backed company profile"
+    }
+    const companyLogo = document.getElementById("es-ws-company-logo")
+    if (companyLogo) {
+      const logoUrl = trimOrNull(detected?.company_logo_url)
+      if (logoUrl) {
+        companyLogo.innerHTML = `<img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(company)} logo" />`
+      } else {
+        companyLogo.textContent = initials(company)
+      }
+    }
+
     setHtml("es-ws-company-rows", `
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Company</span><span class="es-ws-kv-value">${escapeHtml(company)}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Website</span><span class="es-ws-kv-value">${website !== "—" ? escapeHtml(website) : "—"}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Website</span><span class="es-ws-kv-value">${website !== "—" ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">${escapeHtml(website)}</a>` : "—"}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">LinkedIn</span><span class="es-ws-kv-value">${companyLinkedInUrl !== "—" ? `<a href="${escapeHtml(companyLinkedInUrl)}" target="_blank" rel="noopener noreferrer">Company page</a>` : "—"}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">About</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.company_description) ?? "—")}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Location</span><span class="es-ws-kv-value">${escapeHtml(location)}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Offices</span><span class="es-ws-kv-value">${escapeHtml(Array.isArray(detected?.office_locations) ? detected.office_locations.join(", ") : "—")}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Industry</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.industry) ?? "—")}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Sub-industry</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.subindustry) ?? "—")}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Employees</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.employee_count) ?? "—")}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Employee range</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.employee_range) ?? "—")}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Revenue</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.revenue) ?? "—")}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Founded</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.founded) ?? "—")}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Company type</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.company_type) ?? "—")}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Ownership</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.ownership_type) ?? "—")}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Relationship</span><span class="es-ws-kv-value">${escapeHtml(relationship)}</span></div>
     `)
 
@@ -311,6 +512,10 @@
     renderResearchSnapshot(context, detected)
     renderTimeline(context)
     renderQueueShortcuts(recentCaptures)
+    renderEmployees(context)
+    renderTechnologies(detected, context)
+    renderSignals(detected, context)
+    renderCrmRelationship(context, relationship, contactsCount, oppCount, customerCount)
 
     const addBtn = document.getElementById("es-ws-add-btn")
     const openLeadBtn = document.getElementById("es-ws-open-lead-btn")
@@ -341,7 +546,147 @@
     }
   }
 
+  function similarityReasons(match) {
+    const text = match.why_matched ?? ""
+    const reasons = text
+      .split(/[.;]\s*/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 3)
+    if (reasons.length) return reasons
+    if (match.relationship_type) return [match.relationship_type.replace(/_/g, " ")]
+    return ["Evidence-backed Growth Engine similarity"]
+  }
+
+  function crmBadgeForSimilar(match) {
+    if (match.relationship_type?.includes("customer")) return "Existing Customer"
+    if (match.relationship_type?.includes("opportunity")) return "Existing Opportunity"
+    if (match.lead_id) return "Existing Prospect"
+    return "Not In CRM"
+  }
+
+  function applySimilarFilters(matches) {
+    const active = [...document.querySelectorAll("[data-similar-filter]:checked")].map(
+      (input) => input.dataset.similarFilter,
+    )
+    if (!active.length) return matches
+    const seed = buildCompanySeed()
+    return matches.filter((match) => {
+      const why = `${match.why_matched ?? ""} ${match.relationship_type ?? ""}`.toLowerCase()
+      return active.every((filter) => {
+        if (filter === "industry") return /industry|sic|naics|category/.test(why)
+        if (filter === "region") {
+          const location = (match.location ?? "").toLowerCase()
+          return Boolean(seed.city && location.includes(seed.city.toLowerCase())) ||
+            Boolean(seed.state && location.includes(seed.state.toLowerCase())) ||
+            /region|geograph|market/.test(why)
+        }
+        if (filter === "size") return /employee|size|headcount/.test(why)
+        if (filter === "signals") return /signal|intent|hiring|growth|funding|news/.test(why)
+        return true
+      })
+    })
+  }
+
+  function renderSimilarCompanies(matches = similarState.matches) {
+    const list = document.getElementById("es-ws-similar-list")
+    const insight = document.getElementById("es-ws-similar-insight")
+    if (!list) return
+    const visibleMatches = applySimilarFilters(matches)
+    if (!matches.length) {
+      list.innerHTML = '<p class="es-ws-empty">No similar companies yet. Run research or expand the search radius.</p>'
+      if (insight) insight.textContent = "No evidence-backed similar companies are loaded yet."
+      return
+    }
+    if (!visibleMatches.length) {
+      list.innerHTML = '<p class="es-ws-empty">No similar companies match the selected filters. Expand the search radius or clear filters.</p>'
+      if (insight) insight.textContent = "No evidence-backed matches for the active filters."
+      return
+    }
+    const seed = buildCompanySeed()
+    if (insight) {
+      insight.textContent = seed.company_name
+        ? `Companies similar to ${seed.company_name} based on Growth Engine evidence.`
+        : "Evidence-backed similar companies."
+    }
+    list.innerHTML = visibleMatches
+      .map((match, index) => {
+        const reasons = similarityReasons(match)
+        return `
+          <article class="es-ws-similar-card">
+            <label class="es-ws-similar-select"><input type="checkbox" data-similar-index="${index}" /> Select</label>
+            <div class="es-ws-similar-score">${Math.round(match.confidence ?? 0)}% Similar</div>
+            <div class="es-ws-similar-name">${escapeHtml(match.company_name)}</div>
+            <div class="es-ws-similar-meta">${escapeHtml(match.relationship_type?.replace(/_/g, " ") ?? "Similar company")} · ${escapeHtml(match.location ?? "Location unknown")}</div>
+            <div class="es-ws-similar-meta">${match.website ? `<a href="${escapeHtml(match.website)}" target="_blank" rel="noopener noreferrer">${escapeHtml(match.website)}</a>` : "Website unknown"}</div>
+            <div class="es-ws-similar-badge">${escapeHtml(crmBadgeForSimilar(match))}</div>
+            <ul class="es-ws-similar-reasons">${reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>
+            <div class="button-row">
+              <button type="button" class="es-ws-inline-btn" data-similar-action="open" data-lead-id="${escapeHtml(match.lead_id ?? "")}" data-website="${escapeHtml(match.website ?? "")}">Open Company</button>
+              <button type="button" class="es-ws-inline-btn" data-similar-action="queue" data-company="${escapeHtml(match.company_name)}">Add to Queue</button>
+            </div>
+          </article>
+        `
+      })
+      .join("")
+
+    list.querySelectorAll("[data-similar-action='open']").forEach((button) => {
+      button.addEventListener("click", () => {
+        const website = button.dataset.website
+        if (website) window.open(website, "_blank", "noopener,noreferrer")
+      })
+    })
+    list.querySelectorAll("[data-similar-action='queue']").forEach((button) => {
+      button.addEventListener("click", () => {
+        window.__equipifyCopilotHooks?.switchTab?.("queue")
+        document.getElementById("copilot-add-to-queue-btn")?.click()
+      })
+    })
+  }
+
+  async function discoverSimilarCompanies() {
+    const seed = buildCompanySeed()
+    const statusEl = document.getElementById("es-ws-similar-insight")
+    const list = document.getElementById("es-ws-similar-list")
+    if (!seed.lead_id && !seed.company_name) {
+      if (statusEl) statusEl.textContent = "No company context available. Open a LinkedIn company or profile first."
+      return
+    }
+    similarState.loading = true
+    if (statusEl) statusEl.textContent = "Discovering similar companies from Growth Engine evidence..."
+    if (list) list.innerHTML = ""
+    try {
+      const response = await fetch(`${apiBaseUrl()}${config.SIMILAR_COMPANIES_PATH}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...seed, limit: 10 }),
+      })
+      const body = await response.json().catch(() => null)
+      if (!response.ok || !body?.ok) throw new Error(body?.message ?? "Similar company discovery failed.")
+      similarState.matches = body.matches ?? []
+      renderSimilarCompanies(similarState.matches)
+    } catch (error) {
+      if (statusEl) statusEl.textContent = error instanceof Error ? error.message : "Could not discover similar companies."
+      renderSimilarCompanies([])
+    } finally {
+      similarState.loading = false
+    }
+  }
+
   function wireActions(deps) {
+    function switchCompanyTab(tabId) {
+      document.querySelectorAll("[data-company-tab]").forEach((button) => {
+        button.classList.toggle("active", button.dataset.companyTab === tabId)
+      })
+      document.querySelectorAll("[data-company-panel]").forEach((panel) => {
+        panel.hidden = panel.dataset.companyPanel !== tabId
+      })
+      if (tabId === "similar" && !similarState.matches.length && !similarState.loading) {
+        discoverSimilarCompanies()
+      }
+    }
+
     async function runContactEnrichment(kind) {
       const input = lastRenderInput ?? {}
       const form = input.formValues ?? {}
@@ -417,6 +762,20 @@
       deps?.refresh?.()
     })
 
+    document.querySelectorAll("[data-company-tab]").forEach((button) => {
+      button.addEventListener("click", () => switchCompanyTab(button.dataset.companyTab))
+    })
+
+    ;[
+      "es-ws-employee-search",
+      "es-ws-employee-department-filter",
+      "es-ws-employee-seniority-filter",
+      "es-ws-employee-crm-filter",
+    ].forEach((id) => {
+      document.getElementById(id)?.addEventListener("input", renderFilteredEmployees)
+      document.getElementById(id)?.addEventListener("change", renderFilteredEmployees)
+    })
+
     document.getElementById("es-ws-add-btn")?.addEventListener("click", () => {
       document.getElementById("linkedin-add-btn")?.click()
     })
@@ -475,6 +834,30 @@
 
     document.getElementById("es-ws-queue-discovery")?.addEventListener("click", () => {
       window.__equipifyCopilotHooks?.switchTab?.("queue")
+    })
+
+    document.getElementById("es-ws-run-discovery-btn")?.addEventListener("click", () => {
+      const discoveryCheckbox = document.getElementById("queue-discovery")
+      if (discoveryCheckbox) discoveryCheckbox.checked = true
+      window.__equipifyCopilotHooks?.switchTab?.("queue")
+      document.getElementById("copilot-add-to-queue-btn")?.click()
+    })
+
+    document.getElementById("es-ws-run-research-btn")?.addEventListener("click", () => {
+      document.getElementById("copilot-generate-research-btn-inline")?.click()
+    })
+
+    document.getElementById("es-ws-discover-similar-btn")?.addEventListener("click", () => {
+      discoverSimilarCompanies()
+    })
+
+    document.querySelectorAll("[data-similar-filter]").forEach((input) => {
+      input.addEventListener("change", () => renderSimilarCompanies())
+    })
+
+    document.getElementById("es-ws-similar-bulk-queue-btn")?.addEventListener("click", () => {
+      window.__equipifyCopilotHooks?.switchTab?.("queue")
+      document.getElementById("copilot-add-to-queue-btn")?.click()
     })
 
     document.getElementById("es-ws-queue-recent")?.addEventListener("click", () => {

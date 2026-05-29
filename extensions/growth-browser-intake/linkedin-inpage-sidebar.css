@@ -37,8 +37,7 @@ body.equipify-sales-inpage-sidebar-open {
 }
 
 .equipify-sales-floating-dock--sidebar-open {
-  right: 420px !important;
-  transition: right 0.2s ease;
+  display: none !important;
 }
 
 @media (max-width: 900px) {
@@ -52,6 +51,6 @@ body.equipify-sales-inpage-sidebar-open {
   }
 
   .equipify-sales-floating-dock--sidebar-open {
-    right: 0 !important;
+    display: none !important;
   }
 }

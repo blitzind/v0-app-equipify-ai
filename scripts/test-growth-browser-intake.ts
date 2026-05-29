@@ -291,7 +291,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.0"/)
+assert.match(manifestSource, /"version": "4.3.1"/)
 assert.match(manifestSource, /linkedin-inpage-sidebar\.js/)
 assert.match(manifestSource, /inpage-sidebar\.html/)
 assert.match(manifestSource, /assets\/equipify-sales-logo\.png/)
@@ -349,6 +349,8 @@ assert.match(intakeAppJs, /EquipifyGrowthExtensionLookupCache/)
 assert.match(intakeAppJs, /EquipifyGrowthExtensionVersion/)
 assert.match(intakeAppJs, /scheduleBootstrap/)
 assert.match(intakeAppJs, /showFallbackError/)
+assert.match(intakeAppJs, /bootstrap_timeout/)
+assert.match(intakeAppJs, /12_000/)
 assert.match(intakeAppJs, /logError/)
 assert.match(intakeAppJs, /refreshOperatorAnalytics/)
 assert.match(intakeAppJs, /extension-version-warning/)
@@ -397,6 +399,7 @@ assert.match(linkedinFloatingDockJs, /equipify-open-inpage-sidebar/)
 assert.match(linkedinFloatingDockJs, /startDrag/)
 assert.match(linkedinFloatingDockJs, /hideDock/)
 assert.match(linkedinFloatingDockJs, /topPx/)
+assert.match(linkedinFloatingDockJs, /defaultPayload/)
 assert.doesNotMatch(linkedinFloatingDockJs, /sendEmail|enroll|auto.?message/i)
 
 const linkedinInpageSidebarJs = fs.readFileSync(
@@ -407,6 +410,7 @@ assert.match(linkedinInpageSidebarJs, /equipify-sales-inpage-sidebar/)
 assert.match(linkedinInpageSidebarJs, /equipify-open-inpage-sidebar/)
 assert.match(linkedinInpageSidebarJs, /420/)
 assert.match(linkedinInpageSidebarJs, /EquipifySalesInpageSidebar/)
+assert.match(linkedinInpageSidebarJs, /equipify-sales-floating-dock--sidebar-open/)
 
 const inpageSidebarHtml = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/inpage-sidebar.html"),
@@ -417,6 +421,13 @@ assert.doesNotMatch(inpageSidebarHtml, /equipify-lightning\.png/)
 assert.match(inpageSidebarHtml, /inpage-sidebar-close-btn/)
 assert.match(inpageSidebarHtml, /surface-inpage/)
 assert.match(inpageSidebarHtml, /Find contact details/)
+assert.match(inpageSidebarHtml, /Employees/)
+assert.match(inpageSidebarHtml, /Company intelligence/)
+assert.match(inpageSidebarHtml, /data-company-tab="overview"/)
+assert.match(inpageSidebarHtml, /data-company-tab="similar"/)
+assert.match(inpageSidebarHtml, /Discover Employees/)
+assert.match(inpageSidebarHtml, /Discover Similar Companies/)
+assert.match(inpageSidebarHtml, /Same Industry/)
 
 for (const iconSize of [16, 32, 48, 128]) {
   assert.ok(
@@ -444,6 +455,38 @@ assert.match(contactEnrichmentRoute, /website_public_extract/)
 assert.match(contactEnrichmentRoute, /Contact enrichment provider not configured/)
 assert.doesNotMatch(contactEnrichmentRoute, /linkedin.*scrap|hidden LinkedIn/i)
 
+
+const linkedinFloatingDockCss = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-floating-dock.css"),
+  "utf8",
+)
+assert.match(linkedinFloatingDockCss, /#040210/)
+assert.match(linkedinFloatingDockCss, /:hover \.equipify-sales-floating-dock__drag/)
+assert.match(linkedinFloatingDockCss, /:hover \.equipify-sales-floating-dock__hide/)
+assert.match(linkedinFloatingDockCss, /display: none !important/)
+
+const salesWorkspaceCss = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/sales-workspace.css"),
+  "utf8",
+)
+assert.match(salesWorkspaceCss, /es-ws-brand-logo-img/)
+assert.match(salesWorkspaceCss, /background: transparent !important/)
+assert.match(salesWorkspaceCss, /es-ws-employees-list/)
+assert.match(salesWorkspaceCss, /es-ws-company-tabs/)
+assert.match(salesWorkspaceCss, /es-ws-similar-card/)
+
+const extensionWorkspaceJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/extension-workspace.js"),
+  "utf8",
+)
+assert.match(extensionWorkspaceJs, /SIMILAR_COMPANIES_PATH/)
+assert.match(extensionWorkspaceJs, /discoverSimilarCompanies/)
+assert.match(extensionWorkspaceJs, /renderTechnologies/)
+assert.match(extensionWorkspaceJs, /renderSignals/)
+assert.match(extensionWorkspaceJs, /renderCrmRelationship/)
+assert.match(extensionWorkspaceJs, /renderFilteredEmployees/)
+assert.doesNotMatch(extensionWorkspaceJs, /hidden LinkedIn scraping|linkedin.*scrap/i)
+
 const extensionConfigJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/extension-config.js"),
   "utf8",
@@ -453,6 +496,7 @@ assert.match(extensionConfigJs, /Matched by LinkedIn URL/)
 assert.match(extensionConfigJs, /Matched by company name/)
 assert.match(extensionConfigJs, /CRM_CONTEXT_PATH/)
 assert.match(extensionConfigJs, /CONTACT_ENRICHMENT_PATH/)
+assert.match(extensionConfigJs, /SIMILAR_COMPANIES_PATH/)
 assert.match(extensionConfigJs, /PACKAGE_METADATA_DOWNLOAD_PATH/)
 
 const extensionStorageJs = fs.readFileSync(
@@ -738,6 +782,8 @@ assert.match(sidepanelHtml, /es-ws-add-btn/)
 assert.match(sidepanelHtml, /analytics-today/)
 assert.match(sidepanelHtml, /extension-version-banner/)
 assert.match(sidepanelHtml, /bootstrap-loading/)
+assert.match(sidepanelHtml, /Employees/)
+assert.match(sidepanelHtml, /Run contact discovery/)
 
 const popupHtml = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/popup.html"),
