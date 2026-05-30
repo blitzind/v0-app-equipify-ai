@@ -4,44 +4,23 @@
 ;(function initEquipifySalesInpageSidebar() {
   const SIDEBAR_ROOT_ID = "equipify-sales-inpage-sidebar-root"
   const SIDEBAR_WIDTH_PX = 420
-  const PANEL_WIDTH_VAR = "--equipify-sales-panel-width"
-  const BODY_CLASS = "equipify-sales-panel-open"
+  const BODY_CLASS = "equipify-sales-inpage-sidebar-open"
   const DOCK_OFFSET_CLASS = "equipify-sales-floating-dock--sidebar-open"
   const LAYOUT_RESERVE_SELECTORS = [
-    "body",
-    "#voyager-feed",
-    ".application-outlet",
-    ".authentication-outlet",
-    ".scaffold-layout",
     ".scaffold-layout__inner",
     ".scaffold-layout__main",
     "main.scaffold-layout__main",
-    "#main-content",
-    "main",
-    ".global-nav + main",
-    "[data-view-name='profile-page']",
-    "[data-view-name='organization-page']",
-    ".authentication-outlet > div",
-    ".application-outlet > div",
-  ]
-  const TRANSFORM_SELECTORS = [
-    ".scaffold-layout__inner",
-    ".scaffold-layout__main",
-    "main.scaffold-layout__main",
-    "#main-content",
-    "main",
     ".application-outlet",
+    "#main-content",
   ]
   const IFRAME_URL = chrome.runtime.getURL("inpage-sidebar.html")
   const CONTEXT_DEBOUNCE_MS = 250
-  const LAYOUT_LOG_PREFIX = "[Equipify Sales:layout]"
 
   let rootNode = null
   let iframeNode = null
   let isOpen = false
   let contextDebounceTimer = null
   let lastPostedContextKey = null
-  let lastShiftedNodes = []
 
   function pageKindSupported() {
     const ctx = window.EquipifyGrowthLinkedInContext
@@ -54,21 +33,9 @@
     console.log("[Equipify Sales:inpage]", scope, details)
   }
 
-  function logLayout(scope, details = {}) {
-    console.log(LAYOUT_LOG_PREFIX, scope, details)
-  }
-
   function logError(scope, error, details = {}) {
     const message = error instanceof Error ? error.message : String(error ?? "unknown")
     console.error("[Equipify Sales:inpage]", scope, message, details, error)
-  }
-
-  function isDesktopPushLayout() {
-    return window.matchMedia("(min-width: 901px)").matches
-  }
-
-  function readInlineStyle(node, prop) {
-    return node instanceof HTMLElement ? node.style.getPropertyValue(prop) || null : null
   }
 
   function ensureRoot() {
@@ -82,6 +49,7 @@
 
     const panel = document.createElement("div")
     panel.className = "equipify-sales-inpage-sidebar-panel"
+    panel.style.width = `${SIDEBAR_WIDTH_PX}px`
 
     iframeNode = document.createElement("iframe")
     iframeNode.className = "equipify-sales-inpage-sidebar-frame"
@@ -142,12 +110,14 @@
       "*",
     )
     lastPostedContextKey = contextCacheKey(context)
-    logInfo("context_posted", {
+    console.log("[Equipify Sales:inpage]", "sidebar_context_posted", {
       tabUrl: context.tabUrl,
       hasMetadata: Boolean(context.metadata),
       contact: context.metadata?.contact_name ?? null,
       company: context.metadata?.company_name ?? null,
+      profilePhoto: Boolean(context.metadata?.profile_photo_url),
     })
+    logInfo("context_posted", { tabUrl: context.tabUrl, hasMetadata: Boolean(context.metadata) })
     return true
   }
 
@@ -169,110 +139,21 @@
     document.dispatchEvent(new CustomEvent("equipify-sidebar-state", { detail: { open } }))
   }
 
-  function restoreShiftedNode(entry) {
-    const node = entry.node
-    if (!(node instanceof HTMLElement)) return
-    node.style.marginRight = entry.prev.marginRight ?? ""
-    node.style.maxWidth = entry.prev.maxWidth ?? ""
-    node.style.width = entry.prev.width ?? ""
-    node.style.transform = entry.prev.transform ?? ""
-    delete node.dataset.equipifySidebarReserve
-  }
-
-  function clearLayoutReserve() {
-    for (const entry of lastShiftedNodes) restoreShiftedNode(entry)
-    lastShiftedNodes = []
-    document.documentElement.style.marginRight = ""
-    document.body.style.marginRight = ""
-    document.documentElement.style.removeProperty(PANEL_WIDTH_VAR)
-  }
-
-  function snapshotNodeStyles(node) {
-    return {
-      marginRight: readInlineStyle(node, "margin-right"),
-      maxWidth: readInlineStyle(node, "max-width"),
-      width: readInlineStyle(node, "width"),
-      transform: readInlineStyle(node, "transform"),
-    }
-  }
-
-  function describeShiftedNode(node, selector, strategy) {
-    const computed = window.getComputedStyle(node)
-    return {
-      strategy,
-      selector,
-      tag: node.tagName.toLowerCase(),
-      id: node.id || null,
-      className: node.className?.toString?.().slice(0, 120) ?? null,
-      computedWidth: computed.width,
-      computedMarginRight: computed.marginRight,
-      computedTransform: computed.transform,
-    }
-  }
-
   function applyLayoutReserve(open) {
-    clearLayoutReserve()
-
-    if (!open || !isDesktopPushLayout()) {
-      logLayout("reserve_cleared", { open, desktop: isDesktopPushLayout(), shifted: [] })
-      return
-    }
-
-    const shifted = []
-    const seen = new Set()
-    const width = `${SIDEBAR_WIDTH_PX}px`
-    const widthCalc = `calc(100vw - ${width})`
-
-    document.documentElement.style.setProperty(PANEL_WIDTH_VAR, width)
-    document.documentElement.style.marginRight = width
-    if (document.body) document.body.style.marginRight = width
-
     for (const selector of LAYOUT_RESERVE_SELECTORS) {
       document.querySelectorAll(selector).forEach((node) => {
         if (!(node instanceof HTMLElement)) return
-        if (seen.has(node)) return
-        if (node.closest(`#${SIDEBAR_ROOT_ID}`)) return
-
-        seen.add(node)
-        const prev = snapshotNodeStyles(node)
-        node.dataset.equipifySidebarReserve = "true"
-        node.style.marginRight = width
-        node.style.maxWidth = widthCalc
-        shifted.push({
-          node,
-          prev,
-          meta: describeShiftedNode(node, selector, "margin"),
-        })
+        if (open) {
+          node.dataset.equipifySidebarReserve = "true"
+          node.style.marginRight = `${SIDEBAR_WIDTH_PX}px`
+          node.style.maxWidth = `calc(100% - ${SIDEBAR_WIDTH_PX}px)`
+        } else if (node.dataset.equipifySidebarReserve === "true") {
+          node.style.marginRight = ""
+          node.style.maxWidth = ""
+          delete node.dataset.equipifySidebarReserve
+        }
       })
     }
-
-    for (const selector of TRANSFORM_SELECTORS) {
-      document.querySelectorAll(selector).forEach((node) => {
-        if (!(node instanceof HTMLElement)) return
-        if (seen.has(node)) return
-        if (node.closest(`#${SIDEBAR_ROOT_ID}`)) return
-
-        seen.add(node)
-        const prev = snapshotNodeStyles(node)
-        node.dataset.equipifySidebarReserve = "true"
-        node.style.transform = `translateX(calc(-1 * ${width}))`
-        node.style.maxWidth = widthCalc
-        shifted.push({
-          node,
-          prev,
-          meta: describeShiftedNode(node, selector, "transform"),
-        })
-      })
-    }
-
-    lastShiftedNodes = shifted
-    logLayout("reserve_applied", {
-      width,
-      panelWidthVar: width,
-      htmlMarginRight: document.documentElement.style.marginRight,
-      bodyMarginRight: document.body?.style.marginRight ?? null,
-      shifted: shifted.map((entry) => entry.meta),
-    })
   }
 
   function applyOpenState(open) {
@@ -280,20 +161,12 @@
     ensureRoot()
     rootNode.hidden = !open
     rootNode.setAttribute("aria-hidden", open ? "false" : "true")
-
     document.documentElement.classList.toggle(BODY_CLASS, open)
     document.body?.classList.toggle(BODY_CLASS, open)
-
-    if (!open) {
-      document.documentElement.classList.remove(BODY_CLASS)
-      document.body?.classList.remove(BODY_CLASS)
-    }
-
     applyLayoutReserve(open)
     setDockOffset(open)
 
     if (open) queueContextPost({ force: true })
-    else clearLayoutReserve()
   }
 
   function open() {
@@ -323,11 +196,6 @@
     toggle,
     isOpen: () => isOpen,
     SIDEBAR_WIDTH_PX,
-    BODY_CLASS,
-    LAYOUT_RESERVE_SELECTORS,
-    TRANSFORM_SELECTORS,
-    applyLayoutReserve,
-    clearLayoutReserve,
   }
 
   window.addEventListener("message", (event) => {
@@ -349,10 +217,6 @@
   window.addEventListener("hashchange", () => {
     lastPostedContextKey = null
     if (isOpen) queueContextPost({ force: true })
-  })
-
-  window.addEventListener("resize", () => {
-    if (isOpen) applyLayoutReserve(true)
   })
 
   let lastContextUrl = window.location.href

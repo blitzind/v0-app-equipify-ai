@@ -8,16 +8,11 @@
   const INTELLIGENCE_LOG_PREFIX = "[Equipify Sales:intelligence]"
   const PUBLIC_NOT_FOUND = "Not found on public profile"
   const COMPANY_NOT_FOUND = "Not found on public company page"
-  const COMPANY_NOT_DETECTED = "Company not detected"
-  const ENRICHMENT_NOT_FOUND = "Not found yet"
-  const ENRICHMENT_REQUIRES_SETUP = "Requires enrichment"
-  const EMPLOYEE_INITIAL_LIMIT = 5
+  const PROFILE_CONTEXT_FAILED = "Profile context failed to load"
   let lastRenderInput = null
   let lastEnrichmentResult = null
   let lastCompanyEnrichment = null
-  let lastResearchArtifact = null
   let lastEmployeeRows = []
-  let employeesExpanded = false
   let similarState = { seedKey: null, loading: false, matches: [] }
 
   function trimOrNull(value) {
@@ -56,17 +51,14 @@
     )
   }
 
-  function resolveProfileCompany(detected, context, formValues, personName) {
-    const candidates = [
-      trimOrNull(context?.company_name),
-      trimOrNull(formValues?.company_name),
-      trimOrNull(detected?.company_name),
-      parseHeadlineParts(detected?.headline).company,
-    ].filter(Boolean)
-    for (const candidate of candidates) {
-      if (isValidCompanyName(candidate, personName)) return candidate
-    }
-    return PUBLIC_NOT_FOUND
+  function resolveProfileCompany(detected, context, formValues) {
+    return (
+      trimOrNull(context?.company_name) ||
+      trimOrNull(formValues?.company_name) ||
+      trimOrNull(detected?.company_name) ||
+      parseHeadlineParts(detected?.headline).company ||
+      PUBLIC_NOT_FOUND
+    )
   }
 
   function inferProfileNameFromPageTitle(pageTitle) {
@@ -78,144 +70,36 @@
     return trimOrNull(firstSegment.split(/\s+-\s+/)[0]?.trim() ?? firstSegment)
   }
 
-  function resolveProfileName(detected, context, formValues) {
+  function resolveProfileDisplayName(detected, context, formValues) {
     const direct =
       trimOrNull(context?.contact_name) ||
       trimOrNull(formValues?.contact_name) ||
       trimOrNull(detected?.contact_name)
     if (direct) return direct
-    if (detected?.linkedin_page_kind === "company") return trimOrNull(detected?.company_name)
+    if (detected?.linkedin_page_kind === "company") return trimOrNull(detected?.company_name) ?? PROFILE_CONTEXT_FAILED
     if (detected?.linkedin_page_kind === "profile") {
-      return inferProfileNameFromPageTitle(detected?.page_title) ?? "LinkedIn profile"
+      return inferProfileNameFromPageTitle(detected?.page_title) ?? PROFILE_CONTEXT_FAILED
     }
-    return "Current page"
+    return trimOrNull(detected?.page_title?.split("|")[0]) ?? PROFILE_CONTEXT_FAILED
   }
 
-  function isValidCompanyName(name, personName) {
-    if (typeof window.__equipifyGrowthIsValidCompanyName === "function") {
-      return window.__equipifyGrowthIsValidCompanyName(name, { personName })
-    }
-    const raw = trimOrNull(name)
-    if (!raw) return false
-    if (/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?\s+\d{4}\b/i.test(raw)) return false
-    if (/\bpresent\b/i.test(raw)) return false
-    if (/\b\d+\s*(yrs?|mos?)\b/i.test(raw)) return false
-    return true
+  function resolveCompanyIntelDisplayName(detected, context, formValues, enrichment) {
+    const resolved = resolveCompanyIntelName(detected, context, formValues, enrichment)
+    if (resolved !== COMPANY_NOT_FOUND) return resolved
+    const headlineCompany = parseHeadlineParts(detected?.headline).company
+    if (trimOrNull(headlineCompany)) return headlineCompany
+    return COMPANY_NOT_FOUND
   }
 
-  function resolveCompanyIntelName(detected, context, formValues, enrichment, personName) {
-    const person = trimOrNull(personName)?.toLowerCase() ?? null
-    const candidates = [
-      trimOrNull(enrichment?.company_name),
-      trimOrNull(detected?.company_name),
-      parseHeadlineParts(detected?.headline).company,
-      trimOrNull(formValues?.company_name),
-      trimOrNull(context?.company_name),
-    ].filter(Boolean)
-
-    for (const candidate of candidates) {
-      if (person && candidate.toLowerCase() === person) continue
-      if (!isValidCompanyName(candidate, personName)) continue
-      return candidate
-    }
-    return COMPANY_NOT_DETECTED
-  }
-
-  function formatProviderSource(source) {
-    const raw = trimOrNull(source)
-    if (!raw) return "Approved provider"
-    const labels = {
-      website_public_extract: "Website discovery",
-      pdl: "People Data Labs",
-      prospeo: "Prospeo",
-      apollo: "Apollo",
-      hunter: "Hunter",
-    }
-    return labels[raw.toLowerCase()] ?? raw.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
-  }
-
-  function formatVerificationDetail(value) {
-    const raw = trimOrNull(value)
-    if (!raw) return "Unknown"
-    const normalized = raw.toLowerCase().replace(/_/g, " ")
-    if (normalized.includes("verified") || normalized === "valid") return "Verified"
-    if (normalized.includes("risk") || normalized.includes("invalid")) return "Risky"
-    if (normalized.includes("unknown")) return "Unknown"
-    if (normalized.includes("not verified")) return "Not verified"
-    return normalized.charAt(0).toUpperCase() + normalized.slice(1)
-  }
-
-  function formatEnrichmentVerification(result) {
-    if (!result || typeof result !== "object") return "Unknown"
-    const emailStatus = formatVerificationDetail(result.verification_status)
-    const phoneStatus = formatVerificationDetail(result.phone_verification_status)
-    if (emailStatus !== "Unknown" && phoneStatus !== "Unknown" && emailStatus !== phoneStatus) {
-      return `Email: ${emailStatus} · Phone: ${phoneStatus}`
-    }
-    return emailStatus !== "Unknown" ? emailStatus : phoneStatus
-  }
-
-  function renderContactValue(kind, value) {
-    const resolved = trimOrNull(value)
-    if (!resolved || resolved === PUBLIC_NOT_FOUND) {
-      return `<span class="es-ws-muted">${escapeHtml(ENRICHMENT_NOT_FOUND)}</span>`
-    }
-    if (kind === "email") {
-      return `<a href="mailto:${escapeHtml(resolved)}">${escapeHtml(resolved)}</a>`
-    }
-    if (kind === "phone") {
-      return `<a href="tel:${escapeHtml(resolved.replace(/[^\d+]/g, ""))}">${escapeHtml(resolved)}</a>`
-    }
-    if (kind === "url") {
-      return `<a href="${escapeHtml(resolved)}" target="_blank" rel="noopener noreferrer">${escapeHtml(resolved)}</a>`
-    }
-    return escapeHtml(resolved)
-  }
-
-  async function copyText(value) {
-    const text = trimOrNull(value)
-    if (!text) return
-    try {
-      await navigator.clipboard.writeText(text)
-    } catch {
-      // ignore clipboard failures
-    }
-  }
-
-  function dedupeEmployeeRows(rows) {
-    const seen = new Set()
-    const deduped = []
-    for (const row of rows) {
-      const key = `${(row.linkedin_url ?? "").toLowerCase()}|${(row.name ?? "").toLowerCase()}`
-      if (!row.name && !row.linkedin_url) continue
-      if (seen.has(key)) continue
-      seen.add(key)
-      deduped.push(row)
-    }
-    return deduped
-  }
-
-  function employeeSourceLabel(source) {
-    if (source === "crm") return "CRM contact"
-    if (source === "linkedin_visible") return "Visible on LinkedIn"
-    if (source === "suggested") return "Suggested"
-    return "LinkedIn"
-  }
-
-  function employeeGroupLabel(groupKey) {
-    if (groupKey === "crm") return "Current company contacts"
-    if (groupKey === "visible") return "Visible employees"
-    if (groupKey === "suggested") return "Suggested people"
-    return "People"
-  }
-
-  function formatFollowerMetric(value) {
-    const raw = trimOrNull(value)
-    if (!raw) return null
-    const match = raw.match(/([\d,]+)\+?/)
-    if (match?.[1]) return `${match[1].replace(/,/g, "")} followers`
-    if (/^\d[\d,]*\+?$/.test(raw)) return `${raw} followers`
-    return raw.length <= 24 ? raw : null
+  function resolveCompanyIntelName(detected, context, formValues, enrichment) {
+    return (
+      trimOrNull(enrichment?.company_name) ||
+      trimOrNull(context?.company_name) ||
+      trimOrNull(formValues?.company_name) ||
+      trimOrNull(detected?.company_name) ||
+      parseHeadlineParts(detected?.headline).company ||
+      COMPANY_NOT_FOUND
+    )
   }
 
   function mergeCompanyIntel(detected, enrichment) {
@@ -328,7 +212,7 @@
     return {
       label: "Call Prospect",
       reason: context?.last_activity?.summary ?? "Continue outreach on this lead.",
-      cta: "Open in Equipify",
+      cta: "Open Lead",
       action: "open_lead",
     }
   }
@@ -481,26 +365,15 @@
     const signalsEl = document.getElementById("es-ws-research-signals")
     if (!summaryEl || !signalsEl) return
 
-    const artifact = lastResearchArtifact
     const parts = []
-    if (artifact?.company_summary) parts.push(artifact.company_summary)
-    if (artifact?.recommended_next_step) parts.push(`Next step: ${artifact.recommended_next_step}.`)
     if (context?.lead_status_label) parts.push(`Status: ${context.lead_status_label}.`)
     if (context?.next_action?.label) parts.push(`Suggested: ${context.next_action.label}.`)
     if (context?.lead_score != null) parts.push(`Lead score ${context.lead_score}.`)
 
-    const companyLabel = resolveCompanyIntelName(
-      detected,
-      context,
-      lastRenderInput?.formValues ?? {},
-      lastCompanyEnrichment,
-      context?.contact_name ?? detected?.contact_name ?? null,
-    )
-
     const summary =
       parts.slice(0, 3).join(" ") ||
-      (companyLabel !== COMPANY_NOT_DETECTED
-        ? `${companyLabel} detected from visible page metadata. Capture to enrich in Equipify.`
+      (detected?.company_name
+        ? `${detected.company_name} detected from visible page metadata. Capture to enrich in Equipify.`
         : "Capture this page to build a research snapshot in Equipify.")
 
     summaryEl.textContent = summary
@@ -510,8 +383,6 @@
     if (context?.company_contacts_count) signals.push(`${context.company_contacts_count} contacts`)
     if (context?.related_leads_count) signals.push(`${context.related_leads_count} related leads`)
     if (context?.opportunity?.stage_label) signals.push(context.opportunity.stage_label)
-    for (const signal of artifact?.growth_signals ?? []) signals.push(String(signal))
-    for (const signal of artifact?.buying_signals ?? []) signals.push(String(signal))
 
     signalsEl.innerHTML = signals.length
       ? signals.map((signal) => `<span class="es-ws-signal">${escapeHtml(signal)}</span>`).join("")
@@ -560,16 +431,15 @@
       merged.push(row)
     }
 
-    lastEmployeeRows = dedupeEmployeeRows(merged)
-    employeesExpanded = false
+    lastEmployeeRows = merged
     intelLog("employees", {
       crmCount: crmRows.length,
       visibleCount: visibleRows.length,
-      total: lastEmployeeRows.length,
+      total: merged.length,
     })
 
     populateEmployeeFilters(lastEmployeeRows)
-    renderFilteredEmployees(detected)
+    renderFilteredEmployees()
   }
 
   function populateSelect(id, values, fallbackLabel) {
@@ -588,26 +458,7 @@
     populateSelect("es-ws-employee-crm-filter", uniqueValues(rows.map((row) => row.crm_status)), "CRM status")
   }
 
-  function renderEmployeeRow(contact) {
-    const linkedinLink = trimOrNull(contact.linkedin_url)
-    const nameHtml = linkedinLink
-      ? `<a href="${escapeHtml(linkedinLink)}" target="_blank" rel="noopener noreferrer">${escapeHtml(contact.name ?? "Company contact")}</a>`
-      : escapeHtml(contact.name ?? "Company contact")
-    return `
-      <div class="es-ws-employee-row">
-        <div>
-          <div class="es-ws-employee-name">${nameHtml}</div>
-          <div class="es-ws-employee-title">${escapeHtml(contact.title ?? "Title unknown")}</div>
-          <div class="es-ws-employee-meta">${escapeHtml(employeeSourceLabel(contact.source))}${contact.crm_status && contact.source === "crm" ? ` · ${escapeHtml(contact.crm_status)}` : ""}</div>
-        </div>
-        <button type="button" class="es-ws-employee-action" data-lead-id="${escapeHtml(contact.lead_id ?? "")}">
-          ${contact.lead_id ? "Open" : "Add"}
-        </button>
-      </div>
-    `
-  }
-
-  function renderFilteredEmployees(detected = lastRenderInput?.detected ?? null) {
+  function renderFilteredEmployees() {
     const list = document.getElementById("es-ws-employees-list")
     if (!list) return
 
@@ -624,65 +475,34 @@
       return true
     })
 
-    const companyIntel = mergeCompanyIntel(detected ?? {}, lastCompanyEnrichment)
-    const followerMetric = formatFollowerMetric(companyIntel.followers_count ?? detected?.followers_count)
-
     if (!contacts.length) {
       const hasCrm = lastEmployeeRows.some((row) => row.source === "crm")
       const hasVisible = lastEmployeeRows.some((row) => row.source === "linkedin_visible")
-      list.innerHTML = followerMetric
-        ? `<p class="es-ws-employee-metric">${escapeHtml(followerMetric)}</p><p class="es-ws-empty">No named employees loaded yet. Run Discover Employees or open the company page.</p>`
-        : hasCrm
-          ? '<p class="es-ws-empty">No employees match the active filters.</p>'
-          : hasVisible
-            ? '<p class="es-ws-empty">No visible employees match the active filters.</p>'
-            : '<p class="es-ws-empty">No visible employees or CRM contacts for this company yet. Open a LinkedIn company page or run Discover Employees.</p>'
+      list.innerHTML = hasCrm
+        ? '<p class="es-ws-empty">No employees match the active filters.</p>'
+        : hasVisible
+          ? '<p class="es-ws-empty">No visible employees match the active filters.</p>'
+          : '<p class="es-ws-empty">No visible employees or CRM contacts for this company yet. Open a LinkedIn company page or run Discover Employees.</p>'
       return
     }
 
-    const groups = {
-      crm: contacts.filter((row) => row.source === "crm"),
-      visible: contacts.filter((row) => row.source === "linkedin_visible"),
-      suggested: contacts.filter((row) => row.source === "suggested"),
-    }
-
-    const flatRows = [...groups.crm, ...groups.visible, ...groups.suggested]
-    const visibleLimit = employeesExpanded ? flatRows.length : Math.min(EMPLOYEE_INITIAL_LIMIT, flatRows.length)
-    let rendered = 0
-    const sections = []
-
-    if (followerMetric) {
-      sections.push(`<p class="es-ws-employee-metric">${escapeHtml(followerMetric)} · ${flatRows.length} people loaded</p>`)
-    } else if (flatRows.length) {
-      sections.push(`<p class="es-ws-employee-metric">${flatRows.length} people loaded</p>`)
-    }
-
-    for (const [groupKey, rows] of Object.entries(groups)) {
-      if (!rows.length || rendered >= visibleLimit) continue
-      const slice = rows.slice(0, Math.max(0, visibleLimit - rendered))
-      rendered += slice.length
-      sections.push(`
-        <div class="es-ws-employee-group">
-          <div class="es-ws-employee-group-label">${escapeHtml(employeeGroupLabel(groupKey))} (${rows.length})</div>
-          ${slice.map((contact) => renderEmployeeRow(contact)).join("")}
-        </div>
-      `)
-    }
-
-    if (flatRows.length > EMPLOYEE_INITIAL_LIMIT) {
-      sections.push(`
-        <button type="button" id="es-ws-employees-toggle-btn" class="es-ws-inline-btn">
-          ${employeesExpanded ? "Show less" : `Show more (${flatRows.length - EMPLOYEE_INITIAL_LIMIT} more)`}
-        </button>
-      `)
-    }
-
-    list.innerHTML = sections.join("")
-
-    document.getElementById("es-ws-employees-toggle-btn")?.addEventListener("click", () => {
-      employeesExpanded = !employeesExpanded
-      renderFilteredEmployees(detected)
-    })
+    list.innerHTML = contacts
+      .slice(0, 6)
+      .map((contact) => {
+        return `
+          <div class="es-ws-employee-row">
+            <div>
+              <div class="es-ws-employee-name">${escapeHtml(contact.name ?? "Company contact")}</div>
+              <div class="es-ws-employee-title">${escapeHtml(contact.title ?? "Title unknown")}</div>
+              <div class="es-ws-employee-meta">${escapeHtml(contact.department)} · ${escapeHtml(contact.seniority)} · ${escapeHtml(contact.crm_status)}</div>
+            </div>
+            <button type="button" class="es-ws-employee-action" data-lead-id="${escapeHtml(contact.lead_id ?? "")}">
+              ${contact.lead_id ? "Open" : "Add"}
+            </button>
+          </div>
+        `
+      })
+      .join("")
 
     list.querySelectorAll(".es-ws-employee-action").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -765,18 +585,12 @@
       matchSummary: null,
     }
 
-    const name = resolveProfileName(detected, context, formValues)
+    const name = resolveProfileDisplayName(detected, context, formValues)
 
     const title = resolveProfileTitle(detected, formValues)
-    const company = resolveProfileCompany(detected, context, formValues, name)
+    const company = resolveProfileCompany(detected, context, formValues)
     const companyIntel = mergeCompanyIntel(detected, lastCompanyEnrichment)
-    const companyName = resolveCompanyIntelName(
-      detected,
-      context,
-      formValues,
-      lastCompanyEnrichment,
-      name,
-    )
+    const companyName = resolveCompanyIntelDisplayName(detected, context, formValues, lastCompanyEnrichment)
     const profileLocation =
       trimOrNull(formValues.location) || trimOrNull(detected?.location) || PUBLIC_NOT_FOUND
     const companyLocation = companyValue(companyIntel.location)
@@ -801,6 +615,31 @@
     setText("es-ws-profile-title", title)
     setText("es-ws-profile-company", company)
     setText("es-ws-profile-location", profileLocation !== PUBLIC_NOT_FOUND ? profileLocation : PUBLIC_NOT_FOUND)
+
+    console.log("[Equipify Sales:workspace]", "render_input_payload", {
+      person: {
+        name,
+        title,
+        company,
+        location: profileLocation,
+        profilePhotoUrl: input?.profilePhotoUrl ?? detected?.profile_photo_url ?? null,
+        linkedinUrl,
+      },
+      company: {
+        name: companyName,
+        logoUrl: companyIntel.company_logo_url ?? null,
+        linkedinCompanyUrl: companyLinkedInUrl,
+      },
+      detected: detected
+        ? {
+            contact_name: detected.contact_name ?? null,
+            company_name: detected.company_name ?? null,
+            headline: detected.headline ?? null,
+            linkedin_page_kind: detected.linkedin_page_kind ?? null,
+          }
+        : null,
+      hasMatch,
+    })
 
     intelLog("overview", {
       name,
@@ -831,10 +670,10 @@
     }
 
     setHtml("es-ws-contact-rows", `
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Email</span><span class="es-ws-kv-value">${renderContactValue("email", email)}${email !== PUBLIC_NOT_FOUND ? ` <button type="button" class="es-ws-copy-btn" data-copy-value="${escapeHtml(email)}">Copy</button>` : ""}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Phone</span><span class="es-ws-kv-value">${renderContactValue("phone", phone)}${phone !== PUBLIC_NOT_FOUND ? ` <button type="button" class="es-ws-copy-btn" data-copy-value="${escapeHtml(phone)}">Copy</button>` : ""}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">LinkedIn</span><span class="es-ws-kv-value">${linkedinUrl !== PUBLIC_NOT_FOUND ? renderContactValue("url", linkedinUrl) : escapeHtml(PUBLIC_NOT_FOUND)}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Website</span><span class="es-ws-kv-value">${website !== PUBLIC_NOT_FOUND ? renderContactValue("url", website) : escapeHtml(PUBLIC_NOT_FOUND)}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Email</span><span class="es-ws-kv-value">${escapeHtml(email)} <button type="button" class="es-ws-copy-btn" data-copy-value="${escapeHtml(email)}" ${email === PUBLIC_NOT_FOUND ? "hidden" : ""}>Copy</button></span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Phone</span><span class="es-ws-kv-value">${escapeHtml(phone)} <button type="button" class="es-ws-copy-btn" data-copy-value="${escapeHtml(phone)}" ${phone === PUBLIC_NOT_FOUND ? "hidden" : ""}>Copy</button></span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">LinkedIn</span><span class="es-ws-kv-value">${linkedinUrl !== PUBLIC_NOT_FOUND ? `<a href="${escapeHtml(linkedinUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(linkedinUrl)}</a>` : escapeHtml(PUBLIC_NOT_FOUND)}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Website</span><span class="es-ws-kv-value">${website !== PUBLIC_NOT_FOUND ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">${escapeHtml(website)}</a>` : escapeHtml(PUBLIC_NOT_FOUND)}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Verification</span><span class="es-ws-kv-value"><span class="es-ws-verify-pill" data-status="${verification}">${verificationLabel(verification)}</span></span></div>
     `)
 
@@ -867,7 +706,7 @@
       if (logoUrl) {
         companyLogo.innerHTML = `<img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(companyName)} logo" />`
       } else {
-        companyLogo.textContent = companyName === COMPANY_NOT_DETECTED ? "?" : initials(companyName)
+        companyLogo.textContent = initials(companyName)
       }
     }
 
@@ -887,9 +726,9 @@
         value: website !== PUBLIC_NOT_FOUND ? website : companyValue(companyIntel.website),
         html:
           website !== PUBLIC_NOT_FOUND
-            ? renderContactValue("url", website)
+            ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">${escapeHtml(website)}</a>`
             : companyIntel.website
-              ? renderContactValue("url", companyIntel.website)
+              ? `<a href="${escapeHtml(companyIntel.website)}" target="_blank" rel="noopener noreferrer">${escapeHtml(companyIntel.website)}</a>`
               : null,
       },
       {
@@ -920,7 +759,7 @@
       { label: "Employees", value: companyValue(companyIntel.employee_count) },
       { label: "Employee range", value: companyValue(companyIntel.employee_range) },
       { label: "Founded", value: companyValue(companyIntel.founded) },
-      { label: "Followers", value: formatFollowerMetric(companyIntel.followers_count) ?? companyValue(companyIntel.followers_count) },
+      { label: "Followers", value: companyValue(companyIntel.followers_count) },
       { label: "Company type", value: companyValue(companyIntel.company_type) },
     ])
 
@@ -950,14 +789,8 @@
     const updateBtn = document.getElementById("es-ws-update-lead-btn")
     const reviewedBtn = document.getElementById("es-ws-mark-reviewed-btn")
 
-    if (addBtn) {
-      addBtn.hidden = hasMatch
-      addBtn.textContent = "Add to Equipify"
-    }
-    if (openLeadBtn) {
-      openLeadBtn.hidden = !hasMatch
-      openLeadBtn.textContent = "Open in Equipify"
-    }
+    if (addBtn) addBtn.hidden = hasMatch
+    if (openLeadBtn) openLeadBtn.hidden = !hasMatch
     if (updateBtn) updateBtn.hidden = !hasMatch
     if (reviewedBtn) {
       reviewedBtn.hidden = !hasMatch || context?.status_badge !== "needs_review"
@@ -1115,37 +948,7 @@
     }
   }
 
-  function buildCrmPayloadFromContactSaved(detail) {
-    return {
-      ok: true,
-      matched: true,
-      status_badge: "already_added",
-      status_badge_label: "Already in Equipify",
-      context: {
-        lead_id: detail.lead_id,
-        company_name: detail.company_name,
-        contact_name: detail.contact_name,
-        status_badge: "already_added",
-        status_badge_label: "Already in Equipify",
-        links: detail.crm_url ? { lead: detail.crm_url } : {},
-      },
-    }
-  }
-
-  function applyContactSavedState(detail) {
-    if (!detail?.matched || !detail?.lead_id) return
-    lastRenderInput = {
-      ...(lastRenderInput ?? {}),
-      crmPayload: buildCrmPayloadFromContactSaved(detail),
-    }
-    render(lastRenderInput)
-  }
-
-  function wireContactSavedListener() {
-    window.EquipifySalesContactSaved?.onEquipifyContactSaved?.((detail) => {
-      applyContactSavedState(detail)
-    })
-  }
+  function wireActions(deps) {
     function switchCompanyTab(tabId) {
       document.querySelectorAll("[data-company-tab]").forEach((button) => {
         button.classList.toggle("active", button.dataset.companyTab === tabId)
@@ -1191,32 +994,28 @@
           throw new Error(body?.message ?? "Contact enrichment failed.")
         }
         if (!body.configured) {
-          setEnrichmentStatus(ENRICHMENT_REQUIRES_SETUP, "error")
+          setEnrichmentStatus(ENRICHMENT_SETUP_MESSAGE, "error")
           if (copyBtn) copyBtn.hidden = true
           if (saveBtn) saveBtn.hidden = true
           return
         }
         if (!body.result) {
-          setEnrichmentStatus(body.message ?? ENRICHMENT_NOT_FOUND)
+          setEnrichmentStatus(body.message ?? "No contact details found from approved providers.")
           if (copyBtn) copyBtn.hidden = true
           if (saveBtn) saveBtn.hidden = true
           return
         }
         lastEnrichmentResult = body.result
-        const sourceLabel = formatProviderSource(body.result.provider_source)
-        const confidence = body.result.confidence != null ? `${body.result.confidence}% confidence` : null
-        if (statusEl) {
-          statusEl.textContent = [sourceLabel, confidence].filter(Boolean).join(" · ")
-        }
+        if (statusEl) statusEl.textContent = `${body.result.provider_source} · ${body.result.confidence}% confidence`
         if (resultsEl) {
-          const email = trimOrNull(body.result.work_email)
-          const phone = trimOrNull(body.result.phone)
+          const email = body.result.work_email ?? "—"
+          const phone = body.result.phone ?? "—"
           resultsEl.hidden = false
           resultsEl.innerHTML = `
-            <div class="es-ws-kv-row"><span class="es-ws-kv-label">Email</span><span class="es-ws-kv-value">${email ? renderContactValue("email", email) : `<span class="es-ws-muted">${escapeHtml(ENRICHMENT_NOT_FOUND)}</span>`}</span></div>
-            <div class="es-ws-kv-row"><span class="es-ws-kv-label">Phone</span><span class="es-ws-kv-value">${phone ? renderContactValue("phone", phone) : `<span class="es-ws-muted">${escapeHtml(ENRICHMENT_NOT_FOUND)}</span>`}</span></div>
-            <div class="es-ws-kv-row"><span class="es-ws-kv-label">Source</span><span class="es-ws-kv-value">${escapeHtml(sourceLabel)}</span></div>
-            <div class="es-ws-kv-row"><span class="es-ws-kv-label">Verification</span><span class="es-ws-kv-value">${escapeHtml(formatEnrichmentVerification(body.result))}</span></div>
+            <div class="es-ws-kv-row"><span class="es-ws-kv-label">Work email</span><span class="es-ws-kv-value">${escapeHtml(email)}</span></div>
+            <div class="es-ws-kv-row"><span class="es-ws-kv-label">Phone</span><span class="es-ws-kv-value">${escapeHtml(phone)}</span></div>
+            <div class="es-ws-kv-row"><span class="es-ws-kv-label">Source</span><span class="es-ws-kv-value">${escapeHtml(body.result.provider_source ?? "approved_provider")}</span></div>
+            <div class="es-ws-kv-row"><span class="es-ws-kv-label">Verification</span><span class="es-ws-kv-value">${escapeHtml(body.result.verification_status ?? "unknown")}</span></div>
           `
         }
         if (body.result.work_email) {
@@ -1239,25 +1038,21 @@
 
     setEnrichmentStatus(ENRICHMENT_SETUP_MESSAGE)
 
-    async function runCompanyPageEnrichment(options = {}) {
+    async function runCompanyPageEnrichment() {
       const detected = lastRenderInput?.detected ?? {}
       const companyUrl = trimOrNull(detected?.linkedin_company_url)
       if (!companyUrl) {
-        const message = "No LinkedIn company page URL detected on this profile."
-        if (!options.silent) setCompanyEnrichmentStatus(message)
-        return { ok: false, message }
+        setCompanyEnrichmentStatus("No LinkedIn company page URL detected on this profile.")
+        return
       }
-      if (!options.silent) {
-        setCompanyEnrichmentStatus("Fetching public company metadata from LinkedIn (operator-triggered)…")
-      }
+      setCompanyEnrichmentStatus("Fetching public company metadata from LinkedIn (operator-triggered)…")
       try {
         const response = await new Promise((resolve) => {
           chrome.runtime.sendMessage({ type: "equipify-enrich-company-page", url: companyUrl }, resolve)
         })
         if (!response?.ok || !response.metadata) {
-          const message = response?.message ?? "Could not enrich company page."
-          if (!options.silent) setCompanyEnrichmentStatus(message)
-          return { ok: false, message }
+          setCompanyEnrichmentStatus(response?.message ?? "Could not enrich company page.")
+          return
         }
         lastCompanyEnrichment = response.metadata
         if (Array.isArray(response.visiblePeople) && response.visiblePeople.length) {
@@ -1266,72 +1061,12 @@
             visibleLinkedInPeople: response.visiblePeople,
           }
         }
-        const message = `Enriched from public company page · ${response.metadata.company_name ?? "company metadata loaded"}`
-        if (!options.silent) setCompanyEnrichmentStatus(message)
-        render(lastRenderInput ?? {})
-        return { ok: true, message, metadata: response.metadata }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Company enrichment failed."
-        if (!options.silent) setCompanyEnrichmentStatus(message)
-        return { ok: false, message }
-      }
-    }
-
-    async function runCompanyResearch() {
-      const btn = document.getElementById("es-ws-run-research-btn")
-      const input = lastRenderInput ?? {}
-      const context = input.crmPayload?.context ?? null
-      const form = input.formValues ?? {}
-      const detected = input.detected ?? {}
-      const seed = buildCompanySeed(input)
-      const leadId = seed.lead_id ?? context?.lead_id ?? null
-
-      if (btn) {
-        btn.disabled = true
-        btn.textContent = "Running…"
-      }
-      setCompanyEnrichmentStatus("Running research…")
-
-      try {
-        if (leadId) {
-          const response = await fetch(`${apiBaseUrl()}${config.RESEARCH_BRIEF_PATH}`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              lead_id: leadId,
-              company_name: seed.company_name,
-              website: seed.website,
-              linkedin_url: seed.linkedin_url,
-              email: seed.email,
-            }),
-          })
-          const body = await response.json().catch(() => null)
-          if (!response.ok || !body?.matched || !body?.artifact) {
-            throw new Error(body?.message ?? "Could not generate research brief.")
-          }
-          lastResearchArtifact = body.artifact
-          setCompanyEnrichmentStatus("Research brief ready.")
-        } else {
-          const enrichment = await runCompanyPageEnrichment({ silent: true })
-          if (enrichment.ok) {
-            setCompanyEnrichmentStatus("Local enrichment complete. Add to Equipify to save research.")
-          } else if (seed.company_name || trimOrNull(detected?.linkedin_company_url)) {
-            setCompanyEnrichmentStatus(
-              enrichment.message ?? "Local enrichment unavailable. Add to Equipify to save research.",
-            )
-          } else {
-            setCompanyEnrichmentStatus("Add to Equipify to save research. No CRM record matched yet.")
-          }
-        }
+        setCompanyEnrichmentStatus(
+          `Enriched from public company page · ${response.metadata.company_name ?? "company metadata loaded"}`,
+        )
         render(lastRenderInput ?? {})
       } catch (error) {
-        setCompanyEnrichmentStatus(error instanceof Error ? error.message : "Research failed.")
-      } finally {
-        if (btn) {
-          btn.disabled = false
-          btn.textContent = "Run Research"
-        }
+        setCompanyEnrichmentStatus(error instanceof Error ? error.message : "Company enrichment failed.")
       }
     }
 
@@ -1425,7 +1160,7 @@
     })
 
     document.getElementById("es-ws-run-research-btn")?.addEventListener("click", () => {
-      void runCompanyResearch()
+      document.getElementById("copilot-generate-research-btn-inline")?.click()
     })
 
     document.getElementById("es-ws-enrich-company-btn")?.addEventListener("click", () => {
@@ -1458,8 +1193,5 @@
   window.EquipifySalesWorkspace = {
     render,
     wireActions,
-    resolveCompanyIntelName,
-    formatProviderSource,
-    formatEnrichmentVerification,
   }
 })()

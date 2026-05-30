@@ -291,7 +291,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.9"/)
+assert.match(manifestSource, /"version": "4.3.10"/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
 assert.match(manifestSource, /linkedin-inpage-sidebar\.js/)
@@ -473,15 +473,9 @@ assert.match(linkedinInpageSidebarJs, /queueContextPost/)
 assert.match(linkedinInpageSidebarJs, /applyLayoutReserve/)
 assert.match(linkedinInpageSidebarJs, /LAYOUT_RESERVE_SELECTORS/)
 assert.match(linkedinInpageSidebarJs, /equipify-sales-floating-dock--sidebar-open/)
-assert.match(linkedinInpageSidebarJs, /equipify-sales-panel-open/)
-assert.match(linkedinInpageSidebarJs, /--equipify-sales-panel-width/)
-assert.match(linkedinInpageSidebarJs, /#voyager-feed/)
-assert.match(linkedinInpageSidebarJs, /\.authentication-outlet/)
-assert.match(linkedinInpageSidebarJs, /TRANSFORM_SELECTORS/)
-assert.match(linkedinInpageSidebarJs, /translateX/)
-assert.match(linkedinInpageSidebarJs, /computedWidth/)
-assert.match(linkedinInpageSidebarJs, /document\.documentElement\.style\.marginRight/)
-assert.match(linkedinInpageSidebarJs, /document\.body\.style\.marginRight/)
+assert.match(linkedinInpageSidebarJs, /equipify-sales-inpage-sidebar-open/)
+assert.match(linkedinInpageSidebarJs, /sidebar_context_posted/)
+assert.match(linkedinInpageSidebarJs, /marginRight/)
 
 const contactSavedJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/extension-contact-saved.js"),
@@ -490,11 +484,6 @@ const contactSavedJs = fs.readFileSync(
 assert.match(contactSavedJs, /equipify-sales-contact-saved/)
 assert.match(contactSavedJs, /dispatchEquipifyContactSaved/)
 assert.match(contactSavedJs, /onEquipifyContactSaved/)
-
-assert.match(intakeAppJs, /dispatchEquipifyContactSaved/)
-assert.match(intakeAppJs, /buildOptimisticCrmPayload/)
-assert.match(intakeAppJs, /invalidateLookupCache\(\[/)
-assert.match(intakeAppJs, /refreshLookup\?\.matched \? refreshLookup : optimisticPayload/)
 
 assert.match(linkedinCrmOverlayJs, /EquipifySalesContactSaved/)
 assert.match(linkedinCrmOverlayJs, /scheduleRefresh\(true\)/)
@@ -533,21 +522,17 @@ const linkedinInpageSidebarCss = fs.readFileSync(
   "utf8",
 )
 assert.match(linkedinInpageSidebarCss, /scaffold-layout__inner/)
-assert.match(linkedinInpageSidebarCss, /--equipify-sales-panel-width/)
-assert.match(linkedinInpageSidebarCss, /equipify-sales-panel-open/)
-assert.match(linkedinInpageSidebarCss, /#voyager-feed/)
-assert.match(linkedinInpageSidebarCss, /\.authentication-outlet/)
+assert.match(linkedinInpageSidebarCss, /equipify-sales-inpage-sidebar-open/)
+assert.match(linkedinInpageSidebarCss, /margin-right/)
 
 function simulateLayoutReserve(open: boolean) {
   const shifted: Array<{ selector: string; marginRight: string; maxWidth: string }> = []
   const selectors = [
-    "body",
-    "#voyager-feed",
-    ".application-outlet",
-    ".authentication-outlet",
-    ".scaffold-layout",
     ".scaffold-layout__inner",
-    "main",
+    ".scaffold-layout__main",
+    "main.scaffold-layout__main",
+    ".application-outlet",
+    "#main-content",
   ]
   const width = "420px"
   if (open) {
@@ -563,7 +548,7 @@ function simulateLayoutReserve(open: boolean) {
 }
 
 const openShift = simulateLayoutReserve(true)
-assert.equal(openShift.length, 7, "open should reserve all layout selectors")
+assert.equal(openShift.length, 5, "open should reserve layout selectors")
 assert.ok(openShift.every((row) => row.marginRight === "420px"))
 const closedShift = simulateLayoutReserve(false)
 assert.equal(closedShift.length, 0, "close should clear layout reserve")
@@ -680,34 +665,20 @@ assert.match(extensionWorkspaceJs, /renderSignals/)
 assert.match(extensionWorkspaceJs, /\[Equipify Sales:intelligence\]/)
 assert.match(extensionWorkspaceJs, /Not found on public profile/)
 assert.match(extensionWorkspaceJs, /resolveCompanyIntelName/)
-assert.match(extensionWorkspaceJs, /Company not detected/)
-assert.match(extensionWorkspaceJs, /formatProviderSource/)
-assert.match(extensionWorkspaceJs, /formatEnrichmentVerification/)
-assert.match(extensionWorkspaceJs, /runCompanyResearch/)
-assert.match(extensionWorkspaceJs, /RESEARCH_BRIEF_PATH/)
-assert.match(extensionWorkspaceJs, /mailto:/)
-assert.match(extensionWorkspaceJs, /tel:/)
-assert.match(extensionWorkspaceJs, /es-ws-employees-toggle-btn/)
-assert.match(extensionWorkspaceJs, /EMPLOYEE_INITIAL_LIMIT/)
-assert.match(extensionWorkspaceJs, /dedupeEmployeeRows/)
+assert.match(extensionWorkspaceJs, /resolveCompanyIntelDisplayName/)
+assert.match(extensionWorkspaceJs, /PROFILE_CONTEXT_FAILED/)
+assert.match(extensionWorkspaceJs, /Profile context failed to load/)
 assert.match(extensionWorkspaceJs, /resolveProfileTitle/)
 assert.match(extensionWorkspaceJs, /Not found on public company page/)
 assert.match(extensionWorkspaceJs, /equipify-enrich-company-page/)
 assert.match(extensionWorkspaceJs, /es-ws-enrich-company-btn/)
 assert.match(extensionWorkspaceJs, /profile_photo_url/)
-assert.match(extensionWorkspaceJs, /No public company website detected/)
 assert.match(extensionWorkspaceJs, /renderCrmRelationship/)
 assert.match(extensionWorkspaceJs, /People Data Labs, Prospeo, Apollo, Hunter/)
-assert.match(extensionWorkspaceJs, /es-ws-hidden-compat/)
-assert.match(extensionWorkspaceJs, /submitCapture/)
 assert.match(extensionWorkspaceJs, /Run Similar Company Discovery/)
-assert.match(extensionWorkspaceJs, /isValidCompanyName/)
-assert.match(extensionWorkspaceJs, /applyContactSavedState/)
-assert.match(extensionWorkspaceJs, /wireContactSavedListener/)
-assert.match(extensionWorkspaceJs, /Open in Equipify/)
-assert.match(extensionWorkspaceJs, /resolveProfileName/)
+assert.match(extensionWorkspaceJs, /resolveProfileDisplayName/)
 assert.match(extensionWorkspaceJs, /inferProfileNameFromPageTitle/)
-assert.match(extensionWorkspaceJs, /LinkedIn profile/)
+assert.match(extensionWorkspaceJs, /render_input_payload/)
 assert.doesNotMatch(extensionWorkspaceJs, /hidden LinkedIn scraping|linkedin.*scrap/i)
 
 const extensionConfigJs = fs.readFileSync(
@@ -748,16 +719,10 @@ assert.match(pageMetadataJs, /parseLinkedInHeadline/)
 assert.match(pageMetadataJs, /cleanLinkedInProfileName/)
 assert.match(pageMetadataJs, /normalizeVisibleText/)
 assert.match(pageMetadataJs, /inferLinkedInProfileNameFromTitle/)
-assert.match(pageMetadataJs, /extractProfilePhotoFromTopCard/)
-assert.match(pageMetadataJs, /looksLikeProfilePhotoImage/)
-assert.match(pageMetadataJs, /PROFILE_PHOTO_REJECT_ANCESTORS/)
-assert.match(pageMetadataJs, /profileCompanyOnly/)
-assert.doesNotMatch(pageMetadataJs, /img\[alt\*="profile"\]/)
-assert.match(pageMetadataJs, /isValidLinkedInCompanyName/)
-assert.match(pageMetadataJs, /sanitizeLinkedInCompanyName/)
+assert.match(pageMetadataJs, /raw_profile_extract/)
+assert.match(pageMetadataJs, /normalized_profile_payload/)
 assert.match(pageMetadataJs, /headlineParts\.company/)
-assert.match(pageMetadataJs, /findProfileTopCompanyAnchor/)
-assert.match(pageMetadataJs, /resolveProfileCompanyName/)
+assert.match(pageMetadataJs, /img\[alt\*="profile"\]/)
 
 const PROFILE_PHOTO_FIXTURE = `<main>
   <nav class="global-nav"><img src="https://media.licdn.com/nav-avatar.jpg" alt="Me menu" /></nav>
@@ -813,7 +778,8 @@ assert.notEqual(resolveCompanyFromKristenFixture(KRISTEN_KELLER_FIXTURE, "Kriste
 
 assert.match(intakeAppJs, /sidebar_context_received/)
 assert.match(intakeAppJs, /renderSalesWorkspace\(defaultCrmPayload/)
-assert.match(pageMetadataJs, /extracted_profile_payload/)
+assert.match(pageMetadataJs, /normalized_profile_payload/)
+assert.match(extensionWorkspaceJs, /render_input_payload/)
 
 const SAMANTHA_DUTTON_FIXTURE = `<main>
   <nav class="global-nav"><img src="https://media.licdn.com/nav-me.jpg" alt="Me" /></nav>
@@ -887,9 +853,9 @@ function resolveSidebarProfileName(input: {
   if (input.contact_name) return input.contact_name
   if (input.linkedin_page_kind === "profile" && input.page_title) {
     const fromTitle = input.page_title.replace(/\s*[|\-–—]\s*LinkedIn\s*$/i, "").split(/\s*[|\-–—]\s*/)[0]?.trim()
-    return fromTitle?.split(/\s+-\s+/)[0]?.trim() ?? "LinkedIn profile"
+    return fromTitle?.split(/\s+-\s+/)[0]?.trim() ?? "Profile context failed to load"
   }
-  return "Current page"
+  return "Profile context failed to load"
 }
 
 assert.equal(
@@ -906,11 +872,11 @@ assert.notEqual(
     linkedin_page_kind: "profile",
     page_title: "Samantha Dutton | LinkedIn",
   }),
-  "Current page",
+  "Profile context failed to load",
 )
 
 function resolveCompanyIntelHeader(companyName: string | null) {
-  return companyName && companyName !== "Company not detected" ? companyName : "Company not detected"
+  return companyName && companyName !== "Not found on public company page" ? companyName : "Not found on public company page"
 }
 
 assert.equal(resolveCompanyIntelHeader("Medical Equipment Doctor"), "Medical Equipment Doctor")
@@ -921,7 +887,38 @@ assert.equal(
       ? "Executive Vice PresidentSep 2023 - Present · 2 yrs 9 mos."
       : null,
   ),
-  "Company not detected",
+  "Not found on public company page",
+)
+
+const RICARDO_SANCHEZ_FIXTURE = `<main>
+  <section class="artdeco-card">
+    <img class="pv-top-card-profile-picture__image" src="https://media.licdn.com/ricardo-sanchez.jpg" alt="Ricardo Sanchez Villanueva" />
+    <h1 class="text-heading-xlarge">Ricardo Sanchez Villanueva</h1>
+    <div class="text-body-medium break-words">Field Service Engineer at MedTech Solutions</div>
+    <span class="text-body-small inline t-black--light break-words">San Diego, California, United States</span>
+    <a href="https://www.linkedin.com/company/medtech-solutions/">
+      <img src="https://media.licdn.com/medtech-logo.jpg" alt="MedTech Solutions logo" />
+      MedTech Solutions
+    </a>
+  </section>
+  <section id="education">
+    <a href="https://www.linkedin.com/company/miracosta-college/">MiraCosta College</a>
+  </section>
+</main>`
+
+function extractTopCardCompanyFromFixture(html: string) {
+  const topCardMatch = html.match(/artdeco-card[\s\S]*?<\/section>/)
+  const topCard = topCardMatch?.[0] ?? html
+  const anchorMatch = topCard.match(/href="[^"]*\/company\/[^"]+">\s*(?:<img[^>]+>\s*)?([^<]+)\s*<\/a>/)
+  return anchorMatch?.[1]?.trim() ?? null
+}
+
+const ricardoCompany = extractTopCardCompanyFromFixture(RICARDO_SANCHEZ_FIXTURE)
+assert.equal(ricardoCompany, "MedTech Solutions")
+assert.notEqual(ricardoCompany, "MiraCosta College")
+assert.equal(
+  extractLinkedInFixtureField(RICARDO_SANCHEZ_FIXTURE, /text-heading-xlarge">([^<]+)/),
+  "Ricardo Sanchez Villanueva",
 )
 
 const LINKEDIN_PROFILE_FIXTURE = `<main>
