@@ -2001,6 +2001,8 @@ function extractCompanyEmployeeMetric(doc) {
 }
 
 function extractLinkedInProfile(doc) {
+  logLinkedInHydrationStateAudit(doc)
+
   const legacyTopCard = findProfileTopCardLegacy(doc)
   const discovered = discoverProfileTopCard(doc)
   const topCard = legacyTopCard ?? discovered.topCard
@@ -2390,6 +2392,472 @@ function emitStartupDiagnostic() {
   })
 }
 
+function isTimelineNodeVisible(el) {
+  if (!(el instanceof HTMLElement)) return false
+  if (typeof window.getComputedStyle === "function") {
+    const style = window.getComputedStyle(el)
+    if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) {
+      return false
+    }
+  }
+  const rect = el.getBoundingClientRect()
+  return rect.width > 0 && rect.height > 0
+}
+
+function resolveMainProfileArea(doc) {
+  return doc.querySelector("main") ?? doc.querySelector("[role='main']") ?? null
+}
+
+function collectMainProfileVisibleTextCandidates(doc, maxNodes = 48) {
+  const main = resolveMainProfileArea(doc)
+  if (!main) return []
+
+  const candidates = []
+  const seen = new Set()
+  const walker = doc.createTreeWalker(main, NodeFilter.SHOW_TEXT)
+  let node = walker.nextNode()
+
+  while (node && candidates.length < maxNodes) {
+    const parent = node.parentElement
+    const text = trimOrNull(node.textContent)?.replace(/\s+/g, " ")
+    if (
+      text &&
+      text.length >= 2 &&
+      parent &&
+      main.contains(parent) &&
+      isTimelineNodeVisible(parent) &&
+      !isInsideForbiddenProfileRegion(parent)
+    ) {
+      const key = `${describeElementForAudit(parent)}|${text.slice(0, 120)}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        candidates.push({
+          text: text.slice(0, 160),
+          parent_selector: describeElementForAudit(parent),
+        })
+      }
+    }
+    node = walker.nextNode()
+  }
+
+  return candidates
+}
+
+function snapshotTimelineAudit(doc, elapsedMs) {
+  const h1Nodes = [...doc.querySelectorAll("h1")]
+  const visibleH1Text = h1Nodes
+    .map((h1) => ({
+      text: trimOrNull(h1.textContent)?.replace(/\s+/g, " ").slice(0, 160) ?? null,
+      visible: isTimelineNodeVisible(h1),
+      forbidden: isInsideForbiddenProfileRegion(h1),
+      selector: describeElementForAudit(h1),
+    }))
+    .filter((entry) => entry.visible && !entry.forbidden && entry.text)
+
+  const legacyTopCard = findProfileTopCardLegacy(doc)
+  const discovered = discoverProfileTopCard(doc)
+  const topCard = legacyTopCard ?? discovered.topCard
+  const nameNode = discovered.nameNode ?? topCard?.querySelector("h1") ?? null
+  const heroContainer = findProfileHeroContainer(nameNode, topCard)
+
+  return {
+    elapsed_ms: elapsedMs,
+    h1_count: h1Nodes.length,
+    visible_h1_text: visibleH1Text,
+    profile_header_candidates: collectMainProfileVisibleTextCandidates(doc),
+    top_card_found: Boolean(topCard),
+    hero_container_found: Boolean(heroContainer),
+  }
+}
+
+function inferTimelineAuditConclusion(samples) {
+  const firstWithHero =
+    samples.find((sample) => sample.top_card_found && sample.hero_container_found) ?? null
+  const firstWithH1 = samples.find((sample) => sample.visible_h1_text.length > 0) ?? null
+  const firstWithMainText = samples.find((sample) => sample.profile_header_candidates.length > 0) ?? null
+  const last = samples[samples.length - 1] ?? null
+
+  if (!last) return "insufficient-samples"
+  if (!firstWithH1 && !firstWithMainText && last.h1_count === 0) {
+    return "hero-never-appeared-in-main-light-dom"
+  }
+  if (!firstWithHero && last.top_card_found && last.hero_container_found) {
+    return "hero-appeared-after-initial-extract-window"
+  }
+  if (firstWithHero && firstWithHero.elapsed_ms <= 250) {
+    return "hero-present-early-binding-logic-missed"
+  }
+  if (firstWithH1 && firstWithH1.elapsed_ms > 250 && !samples[0]?.visible_h1_text?.length) {
+    return "hero-absent-at-250ms-appeared-later"
+  }
+  if (last.top_card_found || last.visible_h1_text.length > 0) {
+    return "hero-present-by-5000ms-binding-still-failing"
+  }
+  return "inconclusive-review-raw-samples"
+}
+
+function scheduleTimelineAudit() {
+  if (typeof window === "undefined" || window.__equipifyGrowthTimelineAuditScheduled) return
+  if (resolveLinkedInPageKindForStartup(window.location.href) !== "profile") return
+
+  window.__equipifyGrowthTimelineAuditScheduled = true
+  const delays = [250, 1000, 3000, 5000]
+  const samples = []
+
+  for (const delay of delays) {
+    window.setTimeout(() => {
+      const sample = snapshotTimelineAudit(document, delay)
+      samples.push(sample)
+      console.log("[Equipify Sales:timeline-audit]", sample)
+
+      if (delay === 5000) {
+        console.log("[Equipify Sales:timeline-audit]", {
+          kind: "summary",
+          elapsed_ms_samples: delays,
+          samples,
+          conclusion: inferTimelineAuditConclusion(samples),
+        })
+      }
+    }, delay)
+  }
+}
+
+const HYDRATION_FIELD_SPECS = {
+  profile_name: {
+    keys: ["firstName", "lastName", "fullName", "publicIdentifier", "maidenName"],
+    patterns: [/"firstName"\s*:/i, /"lastName"\s*:/i, /"publicIdentifier"\s*:/i],
+  },
+  headline: {
+    keys: ["headline", "occupation", "tagline", "multiLocaleHeadline"],
+    patterns: [/"headline"\s*:/i, /"occupation"\s*:/i],
+  },
+  company: {
+    keys: ["companyName", "company", "currentCompany", "positions", "experience", "companyUrn"],
+    patterns: [/"companyName"\s*:/i, /"positions"\s*:/i, /\/company\//i],
+  },
+  profile_image: {
+    keys: [
+      "profilePicture",
+      "displayPictureUrl",
+      "picture",
+      "profilePictureDisplayImage",
+      "photoFilterPicture",
+      "vectorImage",
+    ],
+    patterns: [
+      /"profilePicture"\s*:/i,
+      /"displayPictureUrl"\s*:/i,
+      /"profilePictureDisplayImage"\s*:/i,
+      /profile-displayphoto/i,
+      /profile-framedphoto/i,
+    ],
+  },
+}
+
+function safeParseJson(raw) {
+  if (!raw) return null
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+function summarizeObjectKeys(value, maxDepth = 2, depth = 0) {
+  if (!value || typeof value !== "object") return typeof value
+  if (depth >= maxDepth) return Array.isArray(value) ? `array(${value.length})` : "object"
+  if (Array.isArray(value)) return value.slice(0, 5).map((entry) => summarizeObjectKeys(entry, maxDepth, depth + 1))
+  const keys = Object.keys(value)
+  const summary = {}
+  for (const key of keys.slice(0, 20)) {
+    summary[key] = summarizeObjectKeys(value[key], maxDepth, depth + 1)
+  }
+  if (keys.length > 20) summary["…"] = `${keys.length - 20} more keys`
+  return summary
+}
+
+function collectHydrationFieldHits(value, path = "root", hits = [], depth = 0) {
+  if (!value || depth > 14 || hits.length > 80) return hits
+  if (typeof value === "string") {
+    if (/^https?:\/\/.+licdn\.com/i.test(value) && /profile|displayphoto|shrink_/i.test(value)) {
+      hits.push({ field: "profile_image", path, preview: value.slice(0, 160) })
+    }
+    return hits
+  }
+  if (typeof value !== "object") return hits
+
+  if (Array.isArray(value)) {
+    for (let index = 0; index < Math.min(value.length, 12); index += 1) {
+      collectHydrationFieldHits(value[index], `${path}[${index}]`, hits, depth + 1)
+    }
+    return hits
+  }
+
+  for (const [field, spec] of Object.entries(HYDRATION_FIELD_SPECS)) {
+    for (const key of spec.keys) {
+      if (!(key in value)) continue
+      const entryValue = value[key]
+      if (entryValue == null) continue
+      hits.push({
+        field,
+        path: `${path}.${key}`,
+        preview:
+          typeof entryValue === "string"
+            ? entryValue.slice(0, 160)
+            : Array.isArray(entryValue)
+              ? `array(${entryValue.length})`
+              : typeof entryValue === "object"
+                ? summarizeObjectKeys(entryValue, 1)
+                : String(entryValue),
+      })
+    }
+  }
+
+  for (const [key, entryValue] of Object.entries(value)) {
+    if (typeof entryValue !== "object" || entryValue === null) continue
+    collectHydrationFieldHits(entryValue, `${path}.${key}`, hits, depth + 1)
+  }
+  return hits
+}
+
+function noteHydrationFieldAvailability(result, field, source, preview = null) {
+  const bucket = result.field_availability[field]
+  if (!bucket.sources.some((entry) => entry.source === source)) {
+    bucket.sources.push({ source, preview })
+  }
+  bucket.found = true
+}
+
+function scanTextForHydrationPatterns(text, source, result) {
+  if (!text || text.length < 8) return
+  for (const [field, spec] of Object.entries(HYDRATION_FIELD_SPECS)) {
+    if (!spec.patterns.some((pattern) => pattern.test(text))) continue
+    noteHydrationFieldAvailability(result, field, `${source}:pattern`)
+  }
+}
+
+function auditLinkedInHydrationState(doc) {
+  const result = {
+    window_globals: {},
+    meta_tags: {},
+    json_ld_scripts: [],
+    application_json_scripts: [],
+    code_elements: [],
+    script_profile_signals: [],
+    voyager_bootstrap_blocks: [],
+    parsed_field_hits: [],
+    field_availability: {
+      profile_name: { found: false, sources: [] },
+      headline: { found: false, sources: [] },
+      company: { found: false, sources: [] },
+      profile_image: { found: false, sources: [] },
+    },
+    notes: [],
+  }
+
+  const globalNames = [
+    "__INITIAL_STATE__",
+    "__APOLLO_STATE__",
+    "__PRELOADED_STATE__",
+    "__NUXT__",
+    "__REDUX_STATE__",
+    "__data",
+  ]
+  for (const name of globalNames) {
+    try {
+      if (!(name in window)) continue
+      const value = window[name]
+      result.window_globals[name] = {
+        present: true,
+        type: Array.isArray(value) ? "array" : typeof value,
+        summary: summarizeObjectKeys(value, 2),
+      }
+      for (const hit of collectHydrationFieldHits(value, name)) {
+        result.parsed_field_hits.push(hit)
+        noteHydrationFieldAvailability(result, hit.field, hit.path, hit.preview)
+      }
+    } catch {
+      result.window_globals[name] = { present: true, readable: false }
+    }
+  }
+
+  const linkedinWindowKeys = []
+  for (const key of [
+    "require",
+    "Ember",
+    "__como_module_cache__",
+    "__webpack_chunk_load__",
+    "webpackChunklinkedin_web",
+    "webpackChunk_ember_auto_import_",
+  ]) {
+    try {
+      if (key in window) linkedinWindowKeys.push(key)
+    } catch {
+      // ignore inaccessible window probes
+    }
+  }
+  result.window_globals.linkedin_like_keys = linkedinWindowKeys
+
+  result.meta_tags = {
+    og_title: readMetaContent(doc, ['meta[property="og:title"]', 'meta[name="og:title"]']),
+    og_image: readMetaContent(doc, ['meta[property="og:image"]', 'meta[name="og:image"]']),
+    og_description: readMetaContent(doc, [
+      'meta[property="og:description"]',
+      'meta[name="og:description"]',
+    ]),
+  }
+  if (result.meta_tags.og_title) {
+    noteHydrationFieldAvailability(result, "profile_name", "meta:og:title", result.meta_tags.og_title)
+  }
+  if (result.meta_tags.og_image) {
+    noteHydrationFieldAvailability(result, "profile_image", "meta:og:image", result.meta_tags.og_image)
+  }
+  if (result.meta_tags.og_description) {
+    noteHydrationFieldAvailability(result, "headline", "meta:og:description", result.meta_tags.og_description)
+  }
+
+  for (const script of doc.querySelectorAll('script[type="application/ld+json"]')) {
+    const raw = trimOrNull(script.textContent)
+    const parsed = safeParseJson(raw)
+    const entry = {
+      id: describeElementForAudit(script),
+      parse_ok: Boolean(parsed),
+      keys: parsed && typeof parsed === "object" ? Object.keys(parsed).slice(0, 12) : [],
+      preview: raw?.slice(0, 240) ?? null,
+    }
+    result.json_ld_scripts.push(entry)
+    if (parsed) {
+      scanTextForHydrationPatterns(raw, "json-ld", result)
+      for (const hit of collectHydrationFieldHits(parsed, "json-ld")) {
+        result.parsed_field_hits.push(hit)
+        noteHydrationFieldAvailability(result, hit.field, hit.path, hit.preview)
+      }
+    }
+  }
+
+  for (const script of doc.querySelectorAll('script[type="application/json"]')) {
+    const raw = trimOrNull(script.textContent)
+    const parsed = safeParseJson(raw)
+    const entry = {
+      id: describeElementForAudit(script),
+      parse_ok: Boolean(parsed),
+      byte_length: raw?.length ?? 0,
+      keys: parsed && typeof parsed === "object" ? Object.keys(parsed).slice(0, 12) : [],
+      preview: raw?.slice(0, 240) ?? null,
+    }
+    result.application_json_scripts.push(entry)
+    if (parsed) {
+      scanTextForHydrationPatterns(raw, "application/json", result)
+      for (const hit of collectHydrationFieldHits(parsed, "application/json")) {
+        result.parsed_field_hits.push(hit)
+        noteHydrationFieldAvailability(result, hit.field, hit.path, hit.preview)
+      }
+    }
+    if (result.application_json_scripts.length >= 12) break
+  }
+
+  for (const code of doc.querySelectorAll("code")) {
+    const raw = trimOrNull(code.textContent)
+    if (!raw || raw.length < 12) continue
+    const parsed = safeParseJson(raw)
+    const hasVoyagerRequest = /\/voyager\/api\//i.test(raw)
+    const hasBprGuid = /bpr-guid-/i.test(raw) || /datalet-bpr-guid/i.test(code.id ?? "")
+    const entry = {
+      id: code.id || describeElementForAudit(code),
+      parse_ok: Boolean(parsed),
+      byte_length: raw.length,
+      has_voyager_request: hasVoyagerRequest,
+      has_bpr_guid: hasBprGuid,
+      preview: raw.slice(0, 240),
+    }
+    result.code_elements.push(entry)
+    if (hasVoyagerRequest || hasBprGuid) result.voyager_bootstrap_blocks.push(entry)
+
+    if (parsed) {
+      scanTextForHydrationPatterns(raw, `code:${entry.id}`, result)
+      for (const hit of collectHydrationFieldHits(parsed, `code:${entry.id}`)) {
+        result.parsed_field_hits.push(hit)
+        noteHydrationFieldAvailability(result, hit.field, hit.path, hit.preview)
+      }
+    } else {
+      scanTextForHydrationPatterns(raw, `code:${entry.id}`, result)
+    }
+    if (result.code_elements.length >= 24) break
+  }
+
+  let scriptScanCount = 0
+  for (const script of doc.querySelectorAll("script:not([src])")) {
+    const raw = trimOrNull(script.textContent)
+    if (!raw || raw.length < 40) continue
+    scriptScanCount += 1
+    const signals = []
+    if (/"firstName"\s*:/.test(raw)) signals.push("firstName")
+    if (/"headline"\s*:/.test(raw)) signals.push("headline")
+    if (/"companyName"\s*:/.test(raw)) signals.push("companyName")
+    if (/"profilePicture"\s*:/.test(raw)) signals.push("profilePicture")
+    if (/\/voyager\/api\//.test(raw)) signals.push("voyager-api")
+    if (/"included"\s*:\s*\[/.test(raw)) signals.push("included-array")
+    if (!signals.length) continue
+
+    result.script_profile_signals.push({
+      index: scriptScanCount,
+      id: script.id || describeElementForAudit(script),
+      byte_length: raw.length,
+      signals,
+      preview: raw.slice(0, 240),
+    })
+    for (const signal of signals) {
+      if (signal === "firstName") noteHydrationFieldAvailability(result, "profile_name", `script:${scriptScanCount}`)
+      if (signal === "headline") noteHydrationFieldAvailability(result, "headline", `script:${scriptScanCount}`)
+      if (signal === "companyName" || signal === "voyager-api") {
+        noteHydrationFieldAvailability(result, "company", `script:${scriptScanCount}`)
+      }
+      if (signal === "profilePicture") {
+        noteHydrationFieldAvailability(result, "profile_image", `script:${scriptScanCount}`)
+      }
+    }
+    if (result.script_profile_signals.length >= 16) break
+  }
+
+  if (!result.window_globals.__INITIAL_STATE__?.present) {
+    result.notes.push("window.__INITIAL_STATE__ not present (expected on LinkedIn; LinkedIn is Ember/Voyager, not React SSR)")
+  }
+  if (!result.window_globals.__APOLLO_STATE__?.present) {
+    result.notes.push("window.__APOLLO_STATE__ not present (LinkedIn does not expose Apollo cache on window)")
+  }
+  if (result.voyager_bootstrap_blocks.length) {
+    result.notes.push(
+      "Found Voyager bootstrap code blocks (bpr-guid / voyager request metadata). Full payloads may be in adjacent code siblings or fetched after JS boot.",
+    )
+  } else {
+    result.notes.push(
+      "No Voyager bpr-guid bootstrap blocks in static DOM — modern profile pages often hydrate via runtime /voyager/api fetch only.",
+    )
+  }
+  if (result.field_availability.company.found && !result.field_availability.profile_name.found) {
+    result.notes.push("Company-like keys found without explicit profile name keys in scanned static payloads.")
+  }
+
+  result.summary = {
+    static_dom_has_profile_name: result.field_availability.profile_name.found,
+    static_dom_has_headline: result.field_availability.headline.found,
+    static_dom_has_company: result.field_availability.company.found,
+    static_dom_has_profile_image: result.field_availability.profile_image.found,
+    voyager_bootstrap_block_count: result.voyager_bootstrap_blocks.length,
+    application_json_script_count: result.application_json_scripts.length,
+    code_element_count: result.code_elements.length,
+    script_signal_count: result.script_profile_signals.length,
+  }
+
+  console.log("[Equipify Sales:state-audit]", result)
+  return result
+}
+
+function logLinkedInHydrationStateAudit(doc) {
+  if (detectLinkedInPageKind(cleanPageUrl(window.location.href)) !== "profile") return null
+  return auditLinkedInHydrationState(doc)
+}
+
 function scheduleDiagnosticProfileExtract() {
   const pageKind = resolveLinkedInPageKindForStartup(window.location.href)
   if (pageKind !== "profile") return
@@ -2414,6 +2882,9 @@ if (typeof window !== "undefined") {
   window.__equipifyGrowthDiscoverMainContentContainer = discoverMainContentContainer
   window.__equipifyGrowthDescribeElement = describeElementForAudit
   window.__equipifyGrowthResolveProfileTitleExtraction = resolveProfileTitleExtraction
+  window.__equipifyGrowthAuditHydrationState = () => auditLinkedInHydrationState(document)
+  window.__equipifyGrowthTimelineAuditSnapshot = (doc = document) => snapshotTimelineAudit(doc, 0)
   emitStartupDiagnostic()
+  scheduleTimelineAudit()
   scheduleDiagnosticProfileExtract()
 }

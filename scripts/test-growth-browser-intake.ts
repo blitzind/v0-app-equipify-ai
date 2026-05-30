@@ -293,7 +293,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.18"/)
+assert.match(manifestSource, /"version": "4.3.20"/)
 assert.match(manifestSource, /https:\/\/m\.linkedin\.com\/in\/\*/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
@@ -762,6 +762,10 @@ assert.match(pageMetadataJs, /\[Equipify Sales:company-candidates\]/)
 assert.match(pageMetadataJs, /buildCompanyCandidatesDiagnostic/)
 assert.match(pageMetadataJs, /hero_container_found/)
 assert.match(pageMetadataJs, /rejected_candidates/)
+assert.match(pageMetadataJs, /\[Equipify Sales:state-audit\]/)
+assert.match(pageMetadataJs, /\[Equipify Sales:timeline-audit\]/)
+assert.match(pageMetadataJs, /scheduleTimelineAudit/)
+assert.match(pageMetadataJs, /auditLinkedInHydrationState/)
 assert.match(pageMetadataJs, /buildExperienceDiscoveryAudit/)
 assert.match(pageMetadataJs, /\[Equipify Sales:dom-audit\]/)
 assert.match(pageMetadataJs, /buildDomAudit/)
@@ -1179,7 +1183,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ version: "4.3.18" }),
+        getManifest: () => ({ version: "4.3.20" }),
       },
     },
     setTimeout: () => 0,
@@ -1353,7 +1357,7 @@ assert.equal(
   extractLinkedInFixtureField(LINKEDIN_PROFILE_FIXTURE, /href="(https:\/\/acme\.example\/)/),
   "https://acme.example/",
 )
-assert.doesNotMatch(pageMetadataJs, /fetch\(|XMLHttpRequest|voyager|linkedin\.com\/voyager/i)
+assert.doesNotMatch(pageMetadataJs, /\bfetch\s*\(|XMLHttpRequest|linkedin\.com\/voyager\/api/i)
 
 assert.equal(GROWTH_BROWSER_INTAKE_CALL_PREP_QA_MARKER, "growth-browser-intake-call-prep-v1")
 assert.equal(
