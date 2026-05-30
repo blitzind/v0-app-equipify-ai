@@ -15,7 +15,9 @@
   }
 
   const DOCK_ID = "equipify-sales-linkedin-floating-dock"
-  const LOGO_URL = chrome.runtime.getURL("assets/equipify-sales-logo.png")
+  const LOGO_URL =
+    window.EquipifyGrowthExtensionBrand?.dockLogoUrl?.() ??
+    chrome.runtime.getURL("assets/equipify-lightning.png")
   const REFRESH_DEBOUNCE_MS = 300
   const NAV_THROTTLE_MS = 500
   const DEFAULT_TOP_PX = 180

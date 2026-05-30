@@ -5,6 +5,8 @@
   const linkedinStatus = window.EquipifyGrowthLinkedInStatus
   const crmContextUi = window.EquipifyGrowthCrmContext
   const config = window.EquipifyGrowthExtensionConfig
+  const INTELLIGENCE_LOG_PREFIX = "[Equipify Sales:intelligence]"
+  const PUBLIC_NOT_FOUND = "Not found on public profile"
   let lastRenderInput = null
   let lastEnrichmentResult = null
   let lastEmployeeRows = []
@@ -13,6 +15,14 @@
   function trimOrNull(value) {
     const trimmed = (value ?? "").trim()
     return trimmed ? trimmed : null
+  }
+
+  function intelLog(scope, details = {}) {
+    console.log(INTELLIGENCE_LOG_PREFIX, scope, details)
+  }
+
+  function publicValue(value) {
+    return trimOrNull(value) ?? PUBLIC_NOT_FOUND
   }
 
   function escapeHtml(value) {
@@ -215,9 +225,14 @@
 
     const events = context?.timeline_preview ?? []
     if (!events.length) {
-      container.innerHTML = '<p class="es-ws-empty">No recent activity yet.</p>'
+      container.innerHTML = context?.lead_id
+        ? '<p class="es-ws-empty">No recent CRM or Growth activity loaded for this record.</p>'
+        : '<p class="es-ws-empty">No recent activity yet. Capture this page to start tracking activity in Equipify.</p>'
+      intelLog("activity", { count: 0, hasMatch: Boolean(context?.lead_id) })
       return
     }
+
+    intelLog("activity", { count: events.length })
 
     container.innerHTML = events
       .slice(0, 5)
@@ -306,6 +321,11 @@
     }
 
     lastEmployeeRows = merged
+    intelLog("employees", {
+      crmCount: crmRows.length,
+      visibleCount: visibleRows.length,
+      total: merged.length,
+    })
 
     populateEmployeeFilters(lastEmployeeRows)
     renderFilteredEmployees()
@@ -345,7 +365,13 @@
     })
 
     if (!contacts.length) {
-      list.innerHTML = '<p class="es-ws-empty">Run contact discovery to find people at this company.</p>'
+      const hasCrm = lastEmployeeRows.some((row) => row.source === "crm")
+      const hasVisible = lastEmployeeRows.some((row) => row.source === "linkedin_visible")
+      list.innerHTML = hasCrm
+        ? '<p class="es-ws-empty">No employees match the active filters.</p>'
+        : hasVisible
+          ? '<p class="es-ws-empty">No visible employees match the active filters.</p>'
+          : '<p class="es-ws-empty">No visible employees or CRM contacts for this company yet. Open a LinkedIn company page or run Discover Employees.</p>'
       return
     }
 
@@ -379,6 +405,7 @@
   function renderTechnologies(detected, context) {
     const list = document.getElementById("es-ws-technologies-list")
     if (!list) return
+    const website = trimOrNull(detected?.website)
     const tech = [
       ...(Array.isArray(detected?.technologies) ? detected.technologies : []),
       ...(Array.isArray(detected?.software_stack) ? detected.software_stack : []),
@@ -388,9 +415,15 @@
       ...(Array.isArray(context?.technology_signals) ? context.technology_signals : []),
     ]
     const values = uniqueValues(tech)
+    intelLog("technologies", { website, detectedCount: values.length })
+    if (!website) {
+      list.innerHTML =
+        '<p class="es-ws-empty">No public website detected on this profile or company page. Tech stack detection is unavailable until a website is visible.</p>'
+      return
+    }
     list.innerHTML = values.length
       ? values.map((value) => `<span class="es-ws-signal">${escapeHtml(value)}</span>`).join("")
-      : '<p class="es-ws-empty">No evidence-backed technologies yet. Run Research to enrich this account.</p>'
+      : `<p class="es-ws-empty">Website ${escapeHtml(website)} is visible, but no public tech stack signals are loaded. Run Research to enrich this account.</p>`
   }
 
   function renderSignals(detected, context) {
@@ -400,15 +433,29 @@
       ...(Array.isArray(detected?.growth_signals) ? detected.growth_signals : []),
       ...(Array.isArray(detected?.hiring_signals) ? detected.hiring_signals : []),
       ...(Array.isArray(detected?.news_references) ? detected.news_references : []),
+      ...(Array.isArray(context?.research_signals) ? context.research_signals : []),
       context?.next_action?.reason,
       context?.opportunity?.status_summary,
+      context?.last_activity?.summary,
     ].filter(Boolean)
+    intelLog("signals", { count: signals.length, hasCrmContext: Boolean(context?.lead_id) })
     list.innerHTML = signals.length
       ? signals.map((signal) => `<div class="es-ws-signal-row">${escapeHtml(signal)}</div>`).join("")
-      : '<p class="es-ws-empty">No Growth Engine signals yet. Run Research to look for public signals.</p>'
+      : context?.lead_id
+        ? '<p class="es-ws-empty">No Growth Engine signals loaded for this CRM record yet. Run Research to look for public signals.</p>'
+        : '<p class="es-ws-empty">No CRM or Growth signals yet. Capture this page, then run Research to look for public signals.</p>'
   }
 
-  function renderCrmRelationship(context, relationship, contactsCount, oppCount, customerCount) {
+  function renderCrmRelationship(context, relationship, contactsCount, oppCount, customerCount, hasMatch) {
+    if (!hasMatch) {
+      setHtml(
+        "es-ws-crm-relationship-list",
+        '<p class="es-ws-empty">This profile or company is not matched in Equipify CRM yet. Capture to create or match a lead.</p>',
+      )
+      intelLog("crm", { matched: false })
+      return
+    }
+    intelLog("crm", { matched: true, relationship, contactsCount, oppCount, customerCount })
     setHtml("es-ws-crm-relationship-list", `
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">CRM status</span><span class="es-ws-kv-value">${escapeHtml(relationship)}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Owner</span><span class="es-ws-kv-value">${escapeHtml(context?.owner?.display_name || context?.owner?.email || "Unassigned")}</span></div>
@@ -443,18 +490,18 @@
       "Current page"
 
     const title =
-      trimOrNull(formValues.title) || trimOrNull(detected?.headline) || trimOrNull(detected?.title) || "—"
+      trimOrNull(formValues.title) || trimOrNull(detected?.headline) || trimOrNull(detected?.title) || PUBLIC_NOT_FOUND
     const company =
       context?.company_name ||
       trimOrNull(formValues.company_name) ||
       detected?.company_name ||
-      "—"
+      PUBLIC_NOT_FOUND
     const location =
-      trimOrNull(formValues.location) || trimOrNull(detected?.location) || "—"
-    const email = trimOrNull(formValues.email) || "—"
-    const phone = trimOrNull(formValues.phone) || "—"
-    const website = trimOrNull(formValues.website) || detected?.website || "—"
-    const linkedinUrl = trimOrNull(formValues.linkedin_url) || detected?.linkedin_url || "—"
+      trimOrNull(formValues.location) || trimOrNull(detected?.location) || PUBLIC_NOT_FOUND
+    const email = trimOrNull(formValues.email) || PUBLIC_NOT_FOUND
+    const phone = trimOrNull(formValues.phone) || PUBLIC_NOT_FOUND
+    const website = trimOrNull(formValues.website) || detected?.website || PUBLIC_NOT_FOUND
+    const linkedinUrl = trimOrNull(formValues.linkedin_url) || detected?.linkedin_url || PUBLIC_NOT_FOUND
     const companyLinkedInUrl = detected?.linkedin_company_url ?? detected?.company_linkedin_url ?? "—"
     const seedKey = JSON.stringify(buildCompanySeed(input))
     if (similarState.seedKey !== seedKey) {
@@ -471,7 +518,15 @@
     setText("es-ws-profile-name", name)
     setText("es-ws-profile-title", title)
     setText("es-ws-profile-company", company)
-    setText("es-ws-profile-location", location !== "—" ? location : "")
+    setText("es-ws-profile-location", location !== PUBLIC_NOT_FOUND ? location : PUBLIC_NOT_FOUND)
+
+    intelLog("overview", {
+      name,
+      company,
+      hasWebsite: website !== PUBLIC_NOT_FOUND,
+      hasMatch,
+      pageKind: detected?.linkedin_page_kind ?? null,
+    })
 
     const badgeEl = document.getElementById("es-ws-status-badge")
     if (badgeEl) {
@@ -492,10 +547,10 @@
     }
 
     setHtml("es-ws-contact-rows", `
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Email</span><span class="es-ws-kv-value">${escapeHtml(email)} <button type="button" class="es-ws-copy-btn" data-copy-value="${escapeHtml(email)}" ${email === "—" ? "hidden" : ""}>Copy</button></span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Phone</span><span class="es-ws-kv-value">${escapeHtml(phone)} <button type="button" class="es-ws-copy-btn" data-copy-value="${escapeHtml(phone)}" ${phone === "—" ? "hidden" : ""}>Copy</button></span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">LinkedIn</span><span class="es-ws-kv-value">${linkedinUrl !== "—" ? `<a href="${escapeHtml(linkedinUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(linkedinUrl)}</a>` : "—"}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Website</span><span class="es-ws-kv-value">${website !== "—" ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">${escapeHtml(website)}</a>` : "—"}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Email</span><span class="es-ws-kv-value">${escapeHtml(email)} <button type="button" class="es-ws-copy-btn" data-copy-value="${escapeHtml(email)}" ${email === PUBLIC_NOT_FOUND ? "hidden" : ""}>Copy</button></span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Phone</span><span class="es-ws-kv-value">${escapeHtml(phone)} <button type="button" class="es-ws-copy-btn" data-copy-value="${escapeHtml(phone)}" ${phone === PUBLIC_NOT_FOUND ? "hidden" : ""}>Copy</button></span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">LinkedIn</span><span class="es-ws-kv-value">${linkedinUrl !== PUBLIC_NOT_FOUND ? `<a href="${escapeHtml(linkedinUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(linkedinUrl)}</a>` : escapeHtml(PUBLIC_NOT_FOUND)}</span></div>
+      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Website</span><span class="es-ws-kv-value">${website !== PUBLIC_NOT_FOUND ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">${escapeHtml(website)}</a>` : escapeHtml(PUBLIC_NOT_FOUND)}</span></div>
       <div class="es-ws-kv-row"><span class="es-ws-kv-label">Verification</span><span class="es-ws-kv-value"><span class="es-ws-verify-pill" data-status="${verification}">${verificationLabel(verification)}</span></span></div>
     `)
 
@@ -505,7 +560,7 @@
 
     const verifyBtn = document.getElementById("es-ws-verify-email-btn")
     if (verifyBtn) {
-      verifyBtn.hidden = email === "—" || verification === "verified"
+      verifyBtn.hidden = email === PUBLIC_NOT_FOUND || verification === "verified"
     }
 
     const relationship = linkedinStatus?.formatCompanyRelationshipStatus?.(crmPayload) ?? "Not Added"
@@ -517,7 +572,7 @@
     if (companyNameEl) companyNameEl.textContent = company
     const companySubtitle = document.getElementById("es-ws-company-subtitle")
     if (companySubtitle) {
-      companySubtitle.textContent = [detected?.industry, location !== "—" ? location : null]
+      companySubtitle.textContent = [detected?.industry, location !== PUBLIC_NOT_FOUND ? location : null]
         .filter(Boolean)
         .join(" · ") || "Evidence-backed company profile"
     }
@@ -537,7 +592,7 @@
         label: "Website",
         value: website,
         html:
-          website !== "—"
+          website !== PUBLIC_NOT_FOUND
             ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">${escapeHtml(website)}</a>`
             : null,
       },
@@ -550,7 +605,7 @@
             : null,
       },
       { label: "About", value: trimOrNull(detected?.company_description) ?? null },
-      { label: "Location", value: location !== "—" ? location : null },
+      { label: "Location", value: location !== PUBLIC_NOT_FOUND ? location : null },
       {
         label: "Offices",
         value: Array.isArray(detected?.office_locations) && detected.office_locations.length
@@ -623,7 +678,7 @@
     renderEmployees(context, input?.visibleLinkedInPeople ?? [])
     renderTechnologies(detected, context)
     renderSignals(detected, context)
-    renderCrmRelationship(context, relationship, contactsCount, oppCount, customerCount)
+    renderCrmRelationship(context, relationship, contactsCount, oppCount, customerCount, hasMatch)
 
     const addBtn = document.getElementById("es-ws-add-btn")
     const openLeadBtn = document.getElementById("es-ws-open-lead-btn")
@@ -710,7 +765,7 @@
       document.getElementById("es-ws-similar-empty-action")?.addEventListener("click", () => {
         discoverSimilarCompanies()
       })
-      if (insight) insight.textContent = "No Growth Engine similar companies loaded for this account yet."
+      if (insight) insight.textContent = "Similar company discovery requires a matched CRM lead or captured company context."
       return
     }
     if (!visibleMatches.length) {

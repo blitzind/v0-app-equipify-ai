@@ -10,15 +10,17 @@
   const lookupCache = window.EquipifyGrowthExtensionLookupCache
 
   if (!storage || !config || !linkedinContext || !linkedinStatus) {
-    console.error("[Equipify Sales:header-badge] missing content-script dependencies")
+    console.error("[Equipify Sales:linkedin-badge] missing content-script dependencies")
     return
   }
 
   const BADGE_ROOT_ID = "equipify-sales-linkedin-badge-root"
   const REFRESH_DEBOUNCE_MS = 300
   const NAV_THROTTLE_MS = 500
-  const MOUNT_RETRY_MS = 2500
-  const LOGO_URL = chrome.runtime.getURL("assets/equipify-sales-logo.png")
+  const MOUNT_RETRY_MS = 6000
+  const LOGO_URL =
+    window.EquipifyGrowthExtensionBrand?.dockLogoUrl?.() ??
+    chrome.runtime.getURL("assets/equipify-lightning.png")
 
   let refreshTimer = null
   let lastUrl = null
@@ -43,11 +45,11 @@
 
   function logError(scope, error, details = {}) {
     const message = error instanceof Error ? error.message : String(error ?? "unknown")
-    console.error("[Equipify Sales:header-badge]", scope, message, details, error)
+    console.error("[Equipify Sales:linkedin-badge]", scope, message, details, error)
   }
 
   function logInfo(scope, details = {}) {
-    console.log("[Equipify Sales:header-badge]", scope, details)
+    console.log("[Equipify Sales:linkedin-badge]", scope, details)
   }
 
   async function loadSettings() {
@@ -136,8 +138,8 @@
       "h1.org-top-card-summary__title",
       "h1[class*='org-top-card']",
       ".org-top-card-primary-content__title",
-      "main h1",
       "[data-view-name='profile-card'] h1",
+      "main h1",
     ]
 
     for (const selector of selectors) {
@@ -154,13 +156,38 @@
     return null
   }
 
+  function findProfileHeaderRow(nameEl) {
+    if (!nameEl) return null
+    let node = nameEl.parentElement
+    for (let depth = 0; depth < 6 && node; depth += 1) {
+      const style = window.getComputedStyle(node)
+      if (style.display.includes("flex") || node.classList.contains("ph5") || node.dataset?.viewName) {
+        return node
+      }
+      node = node.parentElement
+    }
+    return nameEl.parentElement
+  }
+
   function mountBadgeBesideName(root) {
     const nameEl = findProfileNameElement()
-    if (!nameEl?.parentElement) return false
+    if (!nameEl) return false
 
     root.classList.remove("equipify-sales-linkedin-badge-root--floating")
 
+    const headerRow = findProfileHeaderRow(nameEl)
+    if (headerRow) {
+      if (root.parentElement !== headerRow) {
+        root.remove()
+        headerRow.appendChild(root)
+      }
+      mountMode = "inline"
+      logInfo("mount_inline_header_row", { name: nameEl.textContent?.trim()?.slice(0, 80) ?? null })
+      return true
+    }
+
     if (root.parentElement === nameEl.parentElement && root.previousElementSibling === nameEl) {
+      mountMode = "inline"
       return true
     }
 
@@ -170,8 +197,30 @@
 
     nameEl.insertAdjacentElement("afterend", root)
     mountMode = "inline"
-    logInfo("mount_inline", { name: nameEl.textContent?.trim()?.slice(0, 80) ?? null })
+    logInfo("mount_inline_after_name", { name: nameEl.textContent?.trim()?.slice(0, 80) ?? null })
     return true
+  }
+
+  function mountBadgeNearTopCard(root, reason) {
+    const topCard =
+      document.querySelector("main section.artdeco-card") ??
+      document.querySelector('[data-view-name="profile-card"]') ??
+      document.querySelector(".org-top-card")
+
+    root.classList.remove("equipify-sales-linkedin-badge-root--floating")
+    if (topCard) {
+      const host = topCard.querySelector(".ph5") ?? topCard
+      if (root.parentElement !== host) {
+        root.remove()
+        host.appendChild(root)
+      }
+      mountMode = "inline"
+      logInfo("mount_top_card", { reason })
+      return true
+    }
+
+    mountBadgeFloating(root, reason)
+    return false
   }
 
   function mountBadgeFloating(root, reason) {
@@ -199,10 +248,15 @@
     if (mountRetryTimer) window.clearTimeout(mountRetryTimer)
     mountRetryTimer = window.setTimeout(() => {
       if (mountMode === "inline") return
-      if (!findProfileNameElement()) {
-        mountBadgeFloating(root, "no_profile_h1_after_retry")
-      } else if (!mountBadgeBesideName(root)) {
-        mountBadgeFloating(root, "mount_failed_after_retry")
+      if (mountBadgeBesideName(root)) {
+        mountObserver?.disconnect()
+        mountObserver = null
+        return
+      }
+      if (findProfileNameElement()) {
+        mountBadgeNearTopCard(root, "mount_failed_after_retry")
+      } else {
+        mountBadgeNearTopCard(root, "no_profile_h1_after_retry")
       }
       mountObserver?.disconnect()
       mountObserver = null
@@ -214,8 +268,7 @@
     chrome.runtime.sendMessage({ type: "equipify-open-inpage-sidebar" }).catch(() => {})
   }
 
-  function buildRenderKey(payload) {
-    const display = linkedinStatus.resolveProspectDisplayBadge(payload)
+  function buildRenderKey(payload, display) {
     return [
       display.key,
       payload?.matched ? "matched" : "unmatched",
@@ -223,6 +276,13 @@
       pageKind(),
       mountMode,
     ].join("|")
+  }
+
+  function resolveBadgeDisplay(payload, hasProfileContext) {
+    if (linkedinStatus.resolveLinkedInPageBadgeDisplay) {
+      return linkedinStatus.resolveLinkedInPageBadgeDisplay(payload, { hasProfileContext })
+    }
+    return linkedinStatus.resolveProspectDisplayBadge(payload)
   }
 
   function createBadgeButton(display) {
@@ -283,16 +343,17 @@
     return root
   }
 
-  function renderBadge(payload) {
+  function renderBadge(payload, hasProfileContext = true) {
     latestPayload = payload
-    const renderKey = buildRenderKey(payload)
+    const display = resolveBadgeDisplay(payload, hasProfileContext)
+    const renderKey = buildRenderKey(payload, display)
     if (renderKey === lastRenderKey && badgeRoot?.isConnected) return
 
-    const display = linkedinStatus.resolveProspectDisplayBadge(payload)
     const root = ensureBadgeRoot()
     root.replaceChildren()
     root.appendChild(createBadgeButton(display))
     lastRenderKey = renderKey
+    logInfo("render_badge", { label: display.displayLabel, mountMode })
   }
 
   function renderLoadingBadge() {
@@ -329,14 +390,42 @@
       return
     }
 
+    const params = buildLookupParams()
+    const hasProfileContext = [...params.keys()].length > 0
+
     if (!options.skipLoading) renderLoadingBadge()
+
+    if (!hasProfileContext) {
+      renderBadge(defaultPayload(), false)
+      return
+    }
 
     try {
       const payload = await fetchCrmContext(options)
-      renderBadge(payload ?? defaultPayload())
+      if (!payload) {
+        renderBadge(
+          {
+            ...defaultPayload(),
+            error_status: 0,
+            error: "crm_context_empty",
+            message: "CRM lookup returned no data.",
+          },
+          true,
+        )
+        return
+      }
+      renderBadge(payload, true)
     } catch (error) {
       logError("refresh_badge_failed", error)
-      renderBadge(defaultPayload())
+      renderBadge(
+        {
+          ...defaultPayload(),
+          error_status: 0,
+          error: "crm_context_failed",
+          message: "CRM lookup failed. Click to retry.",
+        },
+        true,
+      )
     }
   }
 

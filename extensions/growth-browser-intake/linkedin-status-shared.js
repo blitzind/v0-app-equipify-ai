@@ -19,13 +19,16 @@ const PAGE_STATUS_BADGE_LABELS = {
 }
 
 const PROSPECT_DISPLAY_BADGES = {
-  not_added: { label: "Not In Equipify", emoji: "⚪", tone: "neutral" },
-  already_added: { label: "In Equipify", emoji: "🟢", tone: "good" },
+  not_added: { label: "Not in Equipify", emoji: "⚪", tone: "neutral" },
+  already_added: { label: "Already in Equipify", emoji: "🟢", tone: "good" },
   needs_review: { label: "Needs Review", emoji: "🟡", tone: "warn" },
   verified: { label: "Verified Lead", emoji: "🟢", tone: "good" },
   company_captured_only: { label: "Company Only", emoji: "🔵", tone: "info" },
   existing_customer: { label: "Existing Customer", emoji: "🔵", tone: "customer" },
   existing_opportunity: { label: "Existing Opportunity", emoji: "🟣", tone: "opportunity" },
+  not_authorized: { label: "Not authorized", emoji: "🔒", tone: "warn" },
+  no_profile_context: { label: "No profile context", emoji: "⚪", tone: "neutral" },
+  lookup_error: { label: "Error · Retry", emoji: "⚠️", tone: "warn" },
 }
 
 function resolveLinkedInLeadStatusBadge(input) {
@@ -87,6 +90,51 @@ function resolveProspectDisplayBadge(crmPayload) {
   }
 }
 
+function resolveLinkedInPageBadgeDisplay(crmPayload, options = {}) {
+  const hasProfileContext = options.hasProfileContext !== false
+  if (!hasProfileContext) {
+    return {
+      key: "no_profile_context",
+      displayLabel: PROSPECT_DISPLAY_BADGES.no_profile_context.label,
+      emoji: PROSPECT_DISPLAY_BADGES.no_profile_context.emoji,
+      tone: PROSPECT_DISPLAY_BADGES.no_profile_context.tone,
+      matchSummary: null,
+    }
+  }
+
+  if (crmPayload?.error_status === 403) {
+    return {
+      key: "not_authorized",
+      displayLabel: PROSPECT_DISPLAY_BADGES.not_authorized.label,
+      emoji: PROSPECT_DISPLAY_BADGES.not_authorized.emoji,
+      tone: PROSPECT_DISPLAY_BADGES.not_authorized.tone,
+      matchSummary: crmPayload?.message ?? null,
+    }
+  }
+
+  if (crmPayload?.error_status || crmPayload?.error === "crm_context_timeout") {
+    return {
+      key: "lookup_error",
+      displayLabel: PROSPECT_DISPLAY_BADGES.lookup_error.label,
+      emoji: PROSPECT_DISPLAY_BADGES.lookup_error.emoji,
+      tone: PROSPECT_DISPLAY_BADGES.lookup_error.tone,
+      matchSummary: crmPayload?.message ?? "CRM lookup failed. Click to retry.",
+    }
+  }
+
+  if (crmPayload?.matched === true) {
+    return resolveProspectDisplayBadge(crmPayload)
+  }
+
+  return {
+    key: "not_added",
+    displayLabel: PROSPECT_DISPLAY_BADGES.not_added.label,
+    emoji: PROSPECT_DISPLAY_BADGES.not_added.emoji,
+    tone: PROSPECT_DISPLAY_BADGES.not_added.tone,
+    matchSummary: null,
+  }
+}
+
 function resolveStatusFromLookup(lookup) {
   const best = lookup?.best_match ?? null
   if (!best || best.confidence < 0.7) {
@@ -145,6 +193,7 @@ window.EquipifyGrowthLinkedInStatus = {
   linkedInLeadStatusBadgeTone,
   deriveProspectBadgeKey,
   resolveProspectDisplayBadge,
+  resolveLinkedInPageBadgeDisplay,
   resolveStatusFromLookup,
   formatCompanyRelationshipStatus,
   isCustomerLeadStatus,

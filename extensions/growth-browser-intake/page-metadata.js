@@ -194,8 +194,8 @@ function websiteOriginFromUrl(url) {
   }
 }
 
-function findExternalWebsite(doc) {
-  const anchors = doc.querySelectorAll('a[href^="http"]')
+function findExternalWebsite(doc, scope = doc) {
+  const anchors = (scope ?? doc).querySelectorAll('a[href^="http"]')
   for (const anchor of anchors) {
     const href = trimOrNull(anchor.getAttribute("href"))
     if (!href) continue
@@ -203,10 +203,63 @@ function findExternalWebsite(doc) {
       const parsed = new URL(href)
       const host = parsed.hostname.toLowerCase()
       if (host.includes("linkedin.com")) continue
-      if (/facebook|twitter|x\.com|instagram|youtube|tiktok|google/.test(host)) continue
+      if (/facebook|twitter|x\.com|instagram|youtube|tiktok|google|lnkd\.in/.test(host)) continue
       return `${parsed.protocol}//${parsed.host}`
     } catch {
       // ignore
+    }
+  }
+  return null
+}
+
+function extractProfileWebsite(doc) {
+  const contactSection =
+    doc.querySelector("#top-card-text-contact-info") ??
+    doc.querySelector('[data-view-name="profile-contact-info"]') ??
+    doc.querySelector('[data-view-name="contact-info"]')
+
+  if (contactSection) {
+    const fromContact = findExternalWebsite(doc, contactSection)
+    if (fromContact) return fromContact
+  }
+
+  const defs = extractDefinitionMap(doc)
+  const websiteLabel = defs.website ?? defs["company website"]
+  if (websiteLabel) {
+    const normalized = websiteLabel.startsWith("http") ? websiteLabel : `https://${websiteLabel}`
+    return websiteOriginFromUrl(normalized) ?? trimOrNull(normalized)
+  }
+
+  const aboutSection =
+    doc.querySelector("#about")?.closest("section") ??
+    doc.querySelector('[data-view-name="profile-about"]')
+  if (aboutSection) {
+    const fromAbout = findExternalWebsite(doc, aboutSection)
+    if (fromAbout) return fromAbout
+  }
+
+  const topCard = doc.querySelector("main section.artdeco-card") ?? doc.querySelector("main")
+  return findExternalWebsite(doc, topCard ?? doc)
+}
+
+function extractProfileLocation(doc) {
+  const selectors = [
+    ".pv-text-details__left-panel span.text-body-small.inline",
+    "span.text-body-small.inline.t-black--light.break-words",
+    ".text-body-small.inline.t-black--light",
+    "[data-view-name='profile-card'] span.text-body-small",
+    "main span.text-body-small",
+  ]
+
+  for (const selector of selectors) {
+    const nodes = doc.querySelectorAll(selector)
+    for (const node of nodes) {
+      const text = trimOrNull(node.textContent)
+      if (!text) continue
+      if (/\d[\d,]*\+?\s+(connections|followers)/i.test(text)) continue
+      if (/contact info|message|follow|connect/i.test(text)) continue
+      if (text.length > 120) continue
+      return text
     }
   }
   return null
@@ -330,15 +383,10 @@ function extractLinkedInProfile(doc) {
     "main .text-body-medium",
     "[data-view-name='profile-card'] .text-body-medium",
     ".top-card-layout__headline",
+    "[data-view-name='profile-header'] .text-body-medium",
   ])
 
-  const location = queryText(doc, [
-    ".pv-text-details__left-panel span.text-body-small.inline",
-    "span.text-body-small.inline.t-black--light.break-words",
-    ".text-body-small.inline.t-black--light",
-    "main span.text-body-small",
-    "[data-view-name='profile-card'] span.text-body-small",
-  ])
+  const location = extractProfileLocation(doc)
 
   const profile_photo_url = queryImageSrc(doc, [
     "img.pv-top-card-profile-picture__image",
@@ -357,13 +405,24 @@ function extractLinkedInProfile(doc) {
     doc.querySelector("a[href*='/company/']")
 
   let current_company = trimOrNull(topCompanyAnchor?.textContent)
+  const experienceEntries = extractExperienceEntries(doc)
+  if (!current_company && experienceEntries[0]?.company_name) {
+    current_company = experienceEntries[0].company_name
+  }
   if (!current_company && headline) {
     const atMatch = headline.match(/\bat\s+(.+?)(?:\s*[|·]|$)/i)
     if (atMatch?.[1]) current_company = trimOrNull(atMatch[1])
   }
 
+  const current_title =
+    experienceEntries[0]?.title ??
+    (headline && current_company
+      ? trimOrNull(headline.replace(new RegExp(`\\s*at\\s+${current_company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}.*$`, "i"), ""))
+      : headline)
+
   const linkedin_company_url = normalizeLinkedInCompanyUrl(topCompanyAnchor?.getAttribute("href"))
   const company_logo_url = queryImageSrc(doc, ["a[href*='/company/'] img"])
+  const website = extractProfileWebsite(doc)
 
   const locationParts = parseLocationParts(location)
   const connections = extractVisibleMetric(doc, /\d[\d,]*\+?\s+connections/i)
@@ -373,17 +432,19 @@ function extractLinkedInProfile(doc) {
     linkedin_page_kind: "profile",
     contact_name,
     headline,
+    title: current_title,
     location: locationParts.location,
     city: locationParts.city,
     state: locationParts.state,
     profile_photo_url,
     company_name: current_company,
+    website,
     linkedin_company_url,
     company_logo_url,
     company_description: extractAboutText(doc),
     connections_count: connections,
     followers_count: followers,
-    experience_companies: extractExperienceEntries(doc),
+    experience_companies: experienceEntries,
     education_entries: extractEducationEntries(doc),
   }
 }
@@ -505,7 +566,7 @@ function extractVisiblePageMetadata() {
     websiteOriginFromUrl(canonicalUrl) ??
     websiteOriginFromUrl(sourceUrl)
 
-  return {
+  const metadata = {
     page_title: pageTitle,
     company_name: linkedinExtract.company_name ?? fallbackCompanyName,
     website,
@@ -522,6 +583,7 @@ function extractVisiblePageMetadata() {
     company_logo_url: linkedinExtract.company_logo_url ?? null,
     contact_name: linkedinExtract.contact_name ?? null,
     headline: linkedinExtract.headline ?? null,
+    title: linkedinExtract.title ?? linkedinExtract.headline ?? null,
     location: linkedinExtract.location ?? null,
     city: linkedinExtract.city ?? null,
     state: linkedinExtract.state ?? null,
@@ -538,6 +600,18 @@ function extractVisiblePageMetadata() {
     experience_companies: linkedinExtract.experience_companies ?? [],
     education_entries: linkedinExtract.education_entries ?? [],
   }
+
+  console.log("[Equipify Sales:context]", "extract_visible_metadata", {
+    platform: metadata.source_platform,
+    kind: metadata.linkedin_page_kind,
+    contact: metadata.contact_name,
+    headline: metadata.headline,
+    company: metadata.company_name,
+    website: metadata.website,
+    location: metadata.location,
+  })
+
+  return metadata
 }
 
 if (typeof window !== "undefined") {

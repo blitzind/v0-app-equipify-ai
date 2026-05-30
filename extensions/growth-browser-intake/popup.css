@@ -893,6 +893,16 @@ body.surface-sidepanel {
   font-weight: 600;
 }
 
+.bootstrap-loading[hidden] {
+  display: none !important;
+}
+
+.bootstrap-loading--done .loading-spinner {
+  animation: none;
+  border-top-color: #bfdbfe;
+  opacity: 0.35;
+}
+
 .loading-spinner {
   width: 14px;
   height: 14px;

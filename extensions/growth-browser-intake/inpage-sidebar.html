@@ -238,14 +238,17 @@
               <form id="intake-form" class="form" style="margin-top: 10px">
                 <div id="quick-fields">
                   <label>Contact name <input id="contact-name" type="text" autocomplete="name" /></label>
+                  <label>Title / headline <input id="title" type="text" autocomplete="organization-title" data-autofill-empty="true" /></label>
+                  <label>Company <input id="quick-company-name" type="text" readonly data-autofill-empty="true" /></label>
+                  <label>Location <input id="quick-location" type="text" readonly data-autofill-empty="true" /></label>
+                  <label>LinkedIn profile <input id="quick-linkedin-url" type="url" readonly data-autofill-empty="true" /></label>
                   <label>Email <input id="email" type="email" autocomplete="email" /></label>
                   <label>Phone <input id="phone" type="tel" autocomplete="tel" /></label>
-                  <label>Title <input id="title" type="text" autocomplete="organization-title" /></label>
                 </div>
                 <div id="full-fields" hidden>
-                  <label>Company name <span class="required">*</span> <input id="company-name" type="text" /></label>
-                  <label>Website <input id="website" type="url" /></label>
-                  <label>LinkedIn <input id="linkedin-url" type="url" /></label>
+                  <label>Company name <span class="required">*</span> <input id="company-name" type="text" data-autofill-empty="true" /></label>
+                  <label>Website <input id="website" type="url" data-autofill-empty="true" /></label>
+                  <label>LinkedIn <input id="linkedin-url" type="url" data-autofill-empty="true" /></label>
                   <label>Notes <textarea id="notes" rows="2"></textarea></label>
                 </div>
                 <input id="source-url" type="hidden" />
@@ -383,6 +386,7 @@
     </div>
 
     <script src="extension-config.js"></script>
+    <script src="extension-brand.js"></script>
     <script src="extension-storage.js"></script>
     <script src="extension-lookup-cache.js"></script>
     <script src="extension-version.js"></script>

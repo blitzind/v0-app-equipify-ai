@@ -33,6 +33,8 @@ function initIntakeApp(options) {
     visibleLinkedInPeople: [],
     inpageTabUrl: null,
     inpageContextReceived: false,
+    lastAppliedContextUrl: null,
+    bootstrapTerminal: false,
   }
 
   const els = {
@@ -255,8 +257,11 @@ function initIntakeApp(options) {
     const platform = metadata?.source_platform || "website"
     const pageTitle = trimOrNull(metadata?.page_title)
     const contactName = trimOrNull(metadata?.contact_name)
-    const headline = trimOrNull(metadata?.headline)
+    const headline = trimOrNull(metadata?.headline) || trimOrNull(metadata?.title)
     const location = trimOrNull(metadata?.location)
+    const contextKey = sourceUrl ?? trimOrNull(tabUrl)
+    const isNewContext = Boolean(contextKey && contextKey !== state.lastAppliedContextUrl)
+    if (isNewContext) state.lastAppliedContextUrl = contextKey
 
     const sourceUrlInput = document.getElementById("source-url")
     const platformInput = document.getElementById("source-platform-input")
@@ -267,16 +272,34 @@ function initIntakeApp(options) {
     const contactInput = document.getElementById("contact-name")
     const titleInput = document.getElementById("title")
     const locationInput = document.getElementById("location-input")
+    const quickCompanyInput = document.getElementById("quick-company-name")
+    const quickLocationInput = document.getElementById("quick-location")
+    const quickLinkedinInput = document.getElementById("quick-linkedin-url")
+
+    const fillField = (input, value) => {
+      if (!input) return
+      if (value) {
+        if (isNewContext || !trimOrNull(input.value)) input.value = value
+        return
+      }
+      if (isNewContext && input.dataset?.autofillEmpty === "true") {
+        input.value = ""
+        input.placeholder = "Not found on public profile"
+      }
+    }
 
     if (sourceUrlInput) sourceUrlInput.value = sourceUrl ?? ""
     if (platformInput) platformInput.value = platform
     if (pageTitleInput) pageTitleInput.value = pageTitle ?? ""
-    if (companyName && companyInput) companyInput.value = companyName
-    if (website && websiteInput) websiteInput.value = website
-    if (linkedinUrl && linkedinInput) linkedinInput.value = linkedinUrl
-    if (contactName && contactInput && !trimOrNull(contactInput.value)) contactInput.value = contactName
-    if (headline && titleInput && !trimOrNull(titleInput.value)) titleInput.value = headline
-    if (location && locationInput) locationInput.value = location
+    fillField(companyInput, companyName)
+    fillField(websiteInput, website)
+    fillField(linkedinInput, linkedinUrl)
+    fillField(contactInput, contactName)
+    fillField(titleInput, headline)
+    fillField(locationInput, location)
+    fillField(quickCompanyInput, companyName)
+    fillField(quickLocationInput, location)
+    fillField(quickLinkedinInput, linkedinUrl)
 
     if (linkedinCompanyUrl && linkedinInput && !trimOrNull(linkedinInput.value) && platform === "linkedin") {
       // keep profile URL on profile pages; company URL stays on detected metadata
@@ -390,13 +413,29 @@ function initIntakeApp(options) {
       if (cached !== null) return cached
     }
 
-    const response = await fetchWithTimeout(
-      `${apiBaseUrl()}${config.CRM_CONTEXT_PATH}?${params.toString()}`,
-      {
-        method: "GET",
-        credentials: "include",
-      },
-    )
+    let response
+    try {
+      response = await fetchWithTimeout(
+        `${apiBaseUrl()}${config.CRM_CONTEXT_PATH}?${params.toString()}`,
+        {
+          method: "GET",
+          credentials: "include",
+        },
+        4500,
+      )
+    } catch (error) {
+      logError("fetch_crm_context_timeout", error)
+      return {
+        ok: false,
+        matched: false,
+        context: null,
+        status_badge: "not_added",
+        status_badge_label: "Not In Equipify",
+        error_status: 0,
+        error: "crm_context_timeout",
+        message: "CRM lookup timed out.",
+      }
+    }
 
     const body = await response.json().catch(() => null)
     if (!response.ok || !body?.ok) {
@@ -791,6 +830,7 @@ function initIntakeApp(options) {
     if (els.bootstrapLoading) {
       els.bootstrapLoading.hidden = !isLoading
       if (isLoading) {
+        els.bootstrapLoading.classList.remove("bootstrap-loading--done")
         const span = els.bootstrapLoading.querySelector("span:last-child")
         if (span) span.textContent = "Loading page context…"
       }
@@ -800,11 +840,11 @@ function initIntakeApp(options) {
     }
   }
 
-  async function waitForInpageContext(maxMs = 1200) {
-    if (state.inpageContextReceived && state.detected) return state.detected
+  async function waitForInpageContext(maxMs = 1800) {
+    if (state.inpageContextReceived) return state.detected
     const started = Date.now()
     while (Date.now() - started < maxMs) {
-      if (state.inpageContextReceived && state.detected) return state.detected
+      if (state.inpageContextReceived) return state.detected
       await new Promise((resolve) => window.setTimeout(resolve, 80))
     }
     return state.detected
@@ -830,11 +870,16 @@ function initIntakeApp(options) {
     if (monthEl) monthEl.innerHTML = analytics.renderAnalyticsHtml(month)
   }
 
-  function scheduleBootstrap() {
+  function scheduleBootstrap(options = {}) {
+    const force = options.force === true
+    if (!force && surface === "inpage" && state.bootstrapTerminal && !state.inpageContextReceived) {
+      return
+    }
     if (bootstrapTimer) window.clearTimeout(bootstrapTimer)
+    const delay = surface === "inpage" && state.inpageContextReceived ? 120 : 400
     bootstrapTimer = window.setTimeout(() => {
       bootstrap().catch(() => {})
-    }, 800)
+    }, delay)
   }
 
   async function bootstrap() {
@@ -938,14 +983,26 @@ function initIntakeApp(options) {
 
   function applyInpageContext(payload) {
     if (!payload) return
+    const nextUrl = payload.tabUrl ?? payload.metadata?.source_url ?? null
+    const urlChanged = Boolean(nextUrl && nextUrl !== state.inpageTabUrl)
     logInfo("inpage_context_received", {
       hasMetadata: Boolean(payload.metadata),
       peopleCount: Array.isArray(payload.visiblePeople) ? payload.visiblePeople.length : 0,
+      urlChanged,
     })
     state.inpageContextReceived = true
-    if (payload.tabUrl) state.inpageTabUrl = payload.tabUrl
+    if (nextUrl) state.inpageTabUrl = nextUrl
+    if (urlChanged) {
+      state.bootstrapTerminal = false
+      state.lastAppliedContextUrl = null
+    }
     if (Array.isArray(payload.visiblePeople)) state.visibleLinkedInPeople = payload.visiblePeople
-    if (payload.metadata) applyDetectedMetadata(payload.metadata, payload.tabUrl ?? payload.metadata?.source_url)
+    if (payload.metadata) {
+      applyDetectedMetadata(payload.metadata, payload.tabUrl ?? payload.metadata?.source_url)
+    } else if (urlChanged) {
+      state.detected = null
+    }
+    scheduleBootstrap({ force: urlChanged })
   }
 
   async function saveIntake() {
@@ -1324,7 +1381,6 @@ function initIntakeApp(options) {
         const type = event.data?.type
         if (type === "equipify-inpage-context") {
           applyInpageContext(event.data)
-          scheduleBootstrap()
         }
       })
     }
@@ -1387,6 +1443,11 @@ function initIntakeApp(options) {
 
       window.EquipifySalesWorkspace?.wireActions?.({
         refresh: async () => {
+          if (surface === "inpage") {
+            state.bootstrapTerminal = false
+            window.parent.postMessage({ type: "equipify-inpage-sidebar-refresh" }, "*")
+            await waitForInpageContext(2000)
+          }
           invalidateLookupCache()
           await bootstrap()
         },

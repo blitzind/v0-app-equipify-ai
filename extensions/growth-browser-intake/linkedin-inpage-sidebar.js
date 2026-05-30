@@ -7,10 +7,13 @@
   const BODY_CLASS = "equipify-sales-inpage-sidebar-open"
   const DOCK_OFFSET_CLASS = "equipify-sales-floating-dock--sidebar-open"
   const IFRAME_URL = chrome.runtime.getURL("inpage-sidebar.html")
+  const CONTEXT_DEBOUNCE_MS = 250
 
   let rootNode = null
   let iframeNode = null
   let isOpen = false
+  let contextDebounceTimer = null
+  let lastPostedContextKey = null
 
   function pageKindSupported() {
     const ctx = window.EquipifyGrowthLinkedInContext
@@ -19,9 +22,13 @@
     return kind === "profile" || kind === "company"
   }
 
+  function logInfo(scope, details = {}) {
+    console.log("[Equipify Sales:inpage]", scope, details)
+  }
+
   function logError(scope, error, details = {}) {
     const message = error instanceof Error ? error.message : String(error ?? "unknown")
-    console.error("[Equipify Sales:inpage-sidebar]", scope, message, details, error)
+    console.error("[Equipify Sales:inpage]", scope, message, details, error)
   }
 
   function ensureRoot() {
@@ -42,6 +49,10 @@
     iframeNode.src = IFRAME_URL
     iframeNode.title = "Equipify Sales"
     iframeNode.setAttribute("allow", "clipboard-write")
+    iframeNode.addEventListener("load", () => {
+      logInfo("iframe_load")
+      queueContextPost({ force: true })
+    })
 
     panel.appendChild(iframeNode)
     rootNode.appendChild(panel)
@@ -50,22 +61,61 @@
   }
 
   function buildPageContext() {
+    let metadata = null
+    try {
+      metadata = window.__equipifyGrowthExtract?.() ?? null
+      logInfo("context_extract", {
+        hasMetadata: Boolean(metadata),
+        contact: metadata?.contact_name ?? null,
+        headline: metadata?.headline ?? null,
+        company: metadata?.company_name ?? null,
+      })
+    } catch (error) {
+      logError("context_extract_failed", error)
+    }
+
     return {
-      metadata: window.__equipifyGrowthExtract?.() ?? null,
+      metadata,
       visiblePeople: window.__equipifyGrowthLinkedInCompanyPeople?.() ?? [],
       tabUrl: window.location.href,
     }
   }
 
-  function sendContextToIframe() {
-    if (!iframeNode?.contentWindow) return
+  function contextCacheKey(context) {
+    const meta = context?.metadata ?? {}
+    return [
+      context?.tabUrl ?? "",
+      meta.contact_name ?? "",
+      meta.headline ?? "",
+      meta.company_name ?? "",
+      meta.website ?? "",
+      Array.isArray(context?.visiblePeople) ? context.visiblePeople.length : 0,
+    ].join("|")
+  }
+
+  function postContextToIframe(context) {
+    if (!iframeNode?.contentWindow) return false
     iframeNode.contentWindow.postMessage(
       {
         type: "equipify-inpage-context",
-        ...buildPageContext(),
+        ...context,
       },
       "*",
     )
+    lastPostedContextKey = contextCacheKey(context)
+    logInfo("context_posted", { tabUrl: context.tabUrl, hasMetadata: Boolean(context.metadata) })
+    return true
+  }
+
+  function queueContextPost(options = {}) {
+    if (contextDebounceTimer) window.clearTimeout(contextDebounceTimer)
+    contextDebounceTimer = window.setTimeout(() => {
+      contextDebounceTimer = null
+      const context = buildPageContext()
+      const key = contextCacheKey(context)
+      if (!options.force && key === lastPostedContextKey) return
+      postContextToIframe(context)
+    }, options.force ? 0 : CONTEXT_DEBOUNCE_MS)
   }
 
   function setDockOffset(open) {
@@ -84,9 +134,7 @@
     document.body?.classList.toggle(BODY_CLASS, open)
     setDockOffset(open)
 
-    if (open && iframeNode?.contentWindow) {
-      sendContextToIframe()
-    }
+    if (open) queueContextPost({ force: true })
   }
 
   function open() {
@@ -122,27 +170,30 @@
     if (event.source !== iframeNode?.contentWindow) return
     if (event.data?.type === "equipify-inpage-sidebar-close") close()
     if (event.data?.type === "equipify-inpage-sidebar-refresh") {
-      sendContextToIframe()
+      lastPostedContextKey = null
+      queueContextPost({ force: true })
     }
     if (event.data?.type === "equipify-inpage-sidebar-ready") {
-      sendContextToIframe()
+      queueContextPost({ force: true })
     }
   })
 
   window.addEventListener("popstate", () => {
-    if (isOpen) sendContextToIframe()
+    lastPostedContextKey = null
+    if (isOpen) queueContextPost({ force: true })
   })
   window.addEventListener("hashchange", () => {
-    if (isOpen) sendContextToIframe()
+    lastPostedContextKey = null
+    if (isOpen) queueContextPost({ force: true })
   })
 
-  let lastContextUrl = null
+  let lastContextUrl = window.location.href
   const contextObserver = new MutationObserver(() => {
     const current = window.location.href
-    if (current !== lastContextUrl) {
-      lastContextUrl = current
-      if (isOpen) sendContextToIframe()
-    }
+    if (current === lastContextUrl) return
+    lastContextUrl = current
+    lastPostedContextKey = null
+    if (isOpen) queueContextPost({ force: true })
   })
   contextObserver.observe(document.documentElement, { subtree: true, childList: true })
 
