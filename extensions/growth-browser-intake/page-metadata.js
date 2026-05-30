@@ -437,17 +437,6 @@ function trimHtmlSnapshot(el, maxLen = 5000) {
   return `${html.slice(0, maxLen)}…[truncated ${html.length - maxLen} chars]`
 }
 
-function describeElementForAudit(el) {
-  if (!el || !(el instanceof Element)) return null
-  const parts = [el.tagName.toLowerCase()]
-  if (el.id) parts.push(`#${el.id}`)
-  const viewName = el.getAttribute("data-view-name")
-  if (viewName) parts.push(`[data-view-name="${viewName}"]`)
-  const classes = [...(el.classList ?? [])].slice(0, 3)
-  if (classes.length) parts.push(`.${classes.join(".")}`)
-  return parts.join("")
-}
-
 function auditTopCardDiscovery(doc, topCard, nameNode) {
   const attempted = []
   for (const section of [
@@ -507,6 +496,259 @@ function logDomSnapshot(doc, topCard, experienceSection) {
 
 function logExtractionAudit(payload) {
   console.log("[Equipify Sales:extraction-audit]", payload)
+}
+
+function logHeroDiscovery(topCard) {
+  console.log("[Equipify Sales:hero-discovery]", {
+    selected_container: describeElementForAudit(topCard),
+    visible_text_preview: trimOrNull(topCard?.textContent)?.replace(/\s+/g, " ").slice(0, 300) ?? null,
+  })
+}
+
+function logCompanySelection(extractionAudit, companySelection) {
+  console.log("[Equipify Sales:company-selection]", {
+    company_candidates: extractionAudit.company_candidates ?? [],
+    selected_company: companySelection.company_name ?? null,
+    source: companySelection.source_selector ?? null,
+  })
+}
+
+function logExperienceDiscovery(audit) {
+  console.log("[Equipify Sales:experience-discovery]", audit)
+}
+
+function logProfileImageAudit(payload) {
+  console.log("[Equipify Sales:profile-image]", payload)
+}
+
+function buildExperienceDiscoveryAudit(doc, experienceSection, experienceHeading) {
+  const target = "experience"
+  const headingCandidates = []
+
+  for (const el of doc.querySelectorAll("h1, h2, h3, h4, span, div, p, button, a")) {
+    const textPreview = trimOrNull(el.textContent)?.replace(/\s+/g, " ").slice(0, 120)
+    const ariaLabel = trimOrNull(el.getAttribute?.("aria-label"))
+    const mentionsExperience =
+      /experience/i.test(textPreview ?? "") || /experience/i.test(ariaLabel ?? "")
+    if (!mentionsExperience) continue
+
+    const label = elementHeadingText(el) ?? trimOrNull(ariaLabel)
+    let reject_reason = null
+    if (isInsideForbiddenProfileRegion(el)) reject_reason = "forbidden-region"
+    else if (el.closest("aside, #activity, .feed-shared-update-v2")) reject_reason = "aside-or-activity"
+    else if (!label) reject_reason = "heading-text-unreadable"
+    else if (label.toLowerCase() !== target) reject_reason = `heading-text-mismatch:${label}`
+
+    let resolved_container = null
+    let container_reject = null
+    if (!reject_reason) {
+      resolved_container = findMeaningfulSectionContainer(el)
+      if (!resolved_container) container_reject = "no-container"
+      else if (isInsideForbiddenProfileRegion(resolved_container)) container_reject = "container-forbidden"
+      else {
+        const hasRows =
+          Boolean(resolved_container.querySelector('li, [role="listitem"], a[href*="/company/"]')) ||
+          (/\bpresent\b/i.test(resolved_container.textContent ?? "") &&
+            /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{4})/i.test(
+              resolved_container.textContent ?? "",
+            ))
+        if (!hasRows) container_reject = "container-missing-rows"
+      }
+    }
+
+    headingCandidates.push({
+      selector: describeElementForAudit(el),
+      label,
+      aria_label: ariaLabel,
+      text_preview: textPreview,
+      exact_match: label?.toLowerCase() === target,
+      reject_reason: reject_reason ?? container_reject,
+      resolved_container: describeElementForAudit(resolved_container),
+    })
+  }
+
+  const rowCount = experienceSection ? collectExperienceRowCandidates(experienceSection).length : 0
+
+  return {
+    experience_heading_candidates: headingCandidates.slice(0, 25),
+    selected_heading: describeElementForAudit(experienceHeading),
+    selected_container: describeElementForAudit(experienceSection),
+    parent_chain: describeElementChain(experienceSection ?? experienceHeading),
+    visible_text_preview:
+      trimOrNull(experienceSection?.textContent)?.replace(/\s+/g, " ").slice(0, 300) ?? null,
+    row_count: rowCount,
+    experience_id_present: Boolean(doc.querySelector("#experience")),
+    experience_view_present: Boolean(doc.querySelector('[data-view-name="profile-card-experience"]')),
+    experience_anchor_only: Boolean(
+      doc.querySelector("#experience") &&
+        !trimOrNull(doc.querySelector("#experience")?.textContent)?.replace(/\s+/g, " "),
+    ),
+  }
+}
+
+function isProfileImageForbidden(img) {
+  if (isInsideForbiddenProfileRegion(img)) return true
+  if (img.closest("nav, header, aside, #activity, .feed-shared-update-v2, #education, .scaffold-layout__aside"))
+    return true
+  if (img.closest('a[href*="/company/"], a[href*="/school/"]')) return true
+  return false
+}
+
+function readProfileImageSrc(img) {
+  return (
+    trimOrNull(img.getAttribute("src")) ??
+    trimOrNull(img.getAttribute("data-delayed-url")) ??
+    trimOrNull(img.getAttribute("data-ghost-url"))
+  )
+}
+
+function readProfileImageDimensions(img) {
+  const width = Math.round(
+    Number(img.getAttribute("width") ?? 0) || (img instanceof HTMLElement ? img.offsetWidth : 0) || 0,
+  )
+  const height = Math.round(
+    Number(img.getAttribute("height") ?? 0) || (img instanceof HTMLElement ? img.offsetHeight : 0) || 0,
+  )
+  return { width, height }
+}
+
+function readProfileImageRect(img) {
+  if (!(img instanceof HTMLElement) || typeof img.getBoundingClientRect !== "function") {
+    return null
+  }
+  const rect = img.getBoundingClientRect()
+  return {
+    x: Math.round(rect.x),
+    y: Math.round(rect.y),
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+  }
+}
+
+function isCoverOrBannerProfileImage(img, width, height) {
+  if (width > 0 && height > 0) {
+    const ratio = width / height
+    if (ratio > 2.2 || ratio < 0.35) return true
+    if (width >= 400 && height <= 180) return true
+  }
+  const classHint = `${img.className ?? ""} ${img.closest("[class]")?.className ?? ""}`.toLowerCase()
+  return /cover|background|banner|hero-background|profile-background|top-card-background/.test(classHint)
+}
+
+function scoreProfileImageCandidate(img, nameNode, topCard) {
+  let score = 0
+  if (topCard?.contains(img)) score += 4
+  if (nameNode?.parentElement?.contains(img)) score += 2
+  if (
+    img.matches?.(
+      ".pv-top-card-profile-picture__image, .profile-photo-edit__preview, img[data-anonymize='headshot-photo'], .pv-top-card-member-photo",
+    )
+  ) {
+    score += 6
+  }
+  const { width, height } = readProfileImageDimensions(img)
+  if (width >= 80 && height >= 80) score += 3
+  if (width > 0 && height > 0) {
+    const ratio = width / height
+    if (ratio >= 0.75 && ratio <= 1.33) score += 4
+    else if (ratio > 2.2 || ratio < 0.35) score -= 6
+  }
+  if (nameNode && img.compareDocumentPosition?.(nameNode) & 4) score += 1
+  return score
+}
+
+function findProfilePhotoUrl(doc, topCard, nameNode) {
+  const candidates = []
+  const scopes = []
+  if (topCard) scopes.push({ scope: topCard, source: "top-card" })
+  if (nameNode?.parentElement) scopes.push({ scope: nameNode.parentElement, source: "name-parent" })
+
+  let selectedSrc = null
+  let selectedEntry = null
+  let bestScore = Number.NEGATIVE_INFINITY
+
+  for (const { scope, source } of scopes) {
+    for (const img of scope.querySelectorAll("img")) {
+      const src = readProfileImageSrc(img)
+      const alt = trimOrNull(img.getAttribute("alt"))
+      const { width, height } = readProfileImageDimensions(img)
+      const rect = readProfileImageRect(img)
+      const entry = {
+        src,
+        alt,
+        width,
+        height,
+        rect,
+        source_selector: `${source}.${describeElementForAudit(img)}`,
+        accepted: false,
+        reject_reason: null,
+        score: 0,
+      }
+
+      if (!src || src.startsWith("data:")) {
+        entry.reject_reason = "missing-src"
+        candidates.push(entry)
+        continue
+      }
+      if (isProfileImageForbidden(img)) {
+        entry.reject_reason = "forbidden-region"
+        candidates.push(entry)
+        continue
+      }
+      if (isCoverOrBannerProfileImage(img, width, height)) {
+        entry.reject_reason = "cover-or-banner"
+        candidates.push(entry)
+        continue
+      }
+      if ((width > 0 && width < 80) || (height > 0 && height < 80)) {
+        entry.reject_reason = "too-small"
+        candidates.push(entry)
+        continue
+      }
+
+      const score = scoreProfileImageCandidate(img, nameNode, topCard)
+      entry.score = score
+      candidates.push(entry)
+      if (score > bestScore) {
+        bestScore = score
+        selectedSrc = src
+        selectedEntry = entry
+      }
+    }
+  }
+
+  if (selectedEntry) selectedEntry.accepted = true
+
+  if (!selectedSrc) {
+    selectedSrc = queryImageSrc(doc, [
+      "img.pv-top-card-profile-picture__image",
+      "img.profile-photo-edit__preview",
+      "button.pv-top-card-profile-picture img",
+      "img.pv-top-card-profile-picture__image--show",
+      "img.pv-top-card-member-photo",
+      "img[data-anonymize='headshot-photo']",
+    ])
+    if (selectedSrc) {
+      candidates.push({
+        src: selectedSrc,
+        alt: null,
+        width: null,
+        height: null,
+        rect: null,
+        source_selector: "legacy-selector-fallback",
+        accepted: true,
+        reject_reason: null,
+        score: 0,
+      })
+    }
+  }
+
+  logProfileImageAudit({
+    candidates,
+    selected_src: selectedSrc,
+  })
+
+  return selectedSrc
 }
 
 function findCompanyAnchorsInContainer(container) {
@@ -1203,35 +1445,6 @@ function extractCompanyEmployeeMetric(doc) {
   ])
 }
 
-function findProfilePhotoUrl(doc, topCard, nameNode) {
-  const scopes = [topCard, nameNode?.closest("div, section, main"), doc.querySelector("main")].filter(Boolean)
-  for (const scope of scopes) {
-    for (const img of scope.querySelectorAll("img")) {
-      if (isInsideForbiddenProfileRegion(img)) continue
-      const src =
-        trimOrNull(img.getAttribute("src")) ??
-        trimOrNull(img.getAttribute("data-delayed-url")) ??
-        trimOrNull(img.getAttribute("data-ghost-url"))
-      if (!src || src.startsWith("data:")) continue
-      const width = Number(img.getAttribute("width") ?? img.width ?? 0)
-      const height = Number(img.getAttribute("height") ?? img.height ?? 0)
-      if (width > 0 && width < 40) continue
-      if (height > 0 && height < 40) continue
-      return src
-    }
-  }
-
-  return queryImageSrc(doc, [
-    "img.pv-top-card-profile-picture__image",
-    "img.profile-photo-edit__preview",
-    "button.pv-top-card-profile-picture img",
-    "img.pv-top-card-profile-picture__image--show",
-    "img.pv-top-card-member-photo",
-    "img[data-anonymize='headshot-photo']",
-    'img[alt*="profile"]',
-  ])
-}
-
 function extractLinkedInProfile(doc) {
   const legacyTopCard = findProfileTopCardLegacy(doc)
   const discovered = discoverProfileTopCard(doc)
@@ -1308,6 +1521,12 @@ function extractLinkedInProfile(doc) {
     experience_companies: experienceEntries,
     education_entries: educationEntries,
   }
+
+  logHeroDiscovery(topCard)
+  logExperienceDiscovery(
+    buildExperienceDiscoveryAudit(doc, experienceSection, experienceHeading),
+  )
+  logCompanySelection(extractionAudit, companySelection)
 
   logExtractionAudit({
     profile_url: cleanPageUrl(window.location.href),

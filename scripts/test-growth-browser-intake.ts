@@ -293,7 +293,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.15"/)
+assert.match(manifestSource, /"version": "4.3.16"/)
 assert.match(manifestSource, /https:\/\/m\.linkedin\.com\/in\/\*/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
@@ -754,6 +754,12 @@ assert.match(pageMetadataJs, /discoverProfileTopCard/)
 assert.match(pageMetadataJs, /findSectionHeadingElement/)
 assert.match(pageMetadataJs, /discoverMainContentContainer/)
 assert.match(pageMetadataJs, /\[Equipify Sales:dom-map\]/)
+assert.match(pageMetadataJs, /\[Equipify Sales:experience-discovery\]/)
+assert.match(pageMetadataJs, /\[Equipify Sales:hero-discovery\]/)
+assert.match(pageMetadataJs, /\[Equipify Sales:company-selection\]/)
+assert.match(pageMetadataJs, /\[Equipify Sales:profile-image\]/)
+assert.match(pageMetadataJs, /buildExperienceDiscoveryAudit/)
+assert.match(pageMetadataJs, /isCoverOrBannerProfileImage/)
 assert.match(linkedinInpageSidebarJs, /discoverLayoutContainer/)
 assert.match(linkedinInpageSidebarJs, /scheduleStartupLayoutProbe/)
 
@@ -1053,14 +1059,21 @@ const RICARDO_MODERN_DESKTOP_FIXTURE = `<!DOCTYPE html><html><body>
 <div style="width: 1280px" class="profile-page-layout">
   <div class="profile-content-column" style="width: 720px">
     <div class="profile-hero-module">
-      <img src="https://media.licdn.com/ricardo-sanchez.jpg" width="200" height="200" alt="Ricardo Sanchez Villanueva" />
+      <img class="profile-background-image" src="https://media.licdn.com/ricardo-cover.jpg" width="800" height="200" alt="" />
+      <img class="profile-headshot pv-top-card-profile-picture__image" src="https://media.licdn.com/ricardo-headshot.jpg" width="200" height="200" alt="Ricardo Sanchez Villanueva" />
       <h1>Ricardo Sanchez Villanueva</h1>
       <div>Biomedical Equipment Technician | Lean Six Sigma Yellow Belt | OSHA-10 | Certified Associate Biomedical Technology</div>
       <span>San Diego, California, United States</span>
       <div class="entity-line">
-        <a href="https://www.linkedin.com/school/miracosta-college/">MiraCosta College</a>
+        <a href="https://www.linkedin.com/school/miracosta-college/">
+          <img src="https://media.licdn.com/miracosta-logo.jpg" width="32" height="32" alt="MiraCosta College" />
+          MiraCosta College
+        </a>
         ·
-        <a href="https://www.linkedin.com/company/sharp-memorial-hospital/">SHARP MEMORIAL HOSPITAL</a>
+        <a href="https://www.linkedin.com/company/sharp-memorial-hospital/">
+          <img src="https://media.licdn.com/sharp-logo.jpg" width="32" height="32" alt="SHARP MEMORIAL HOSPITAL" />
+          SHARP MEMORIAL HOSPITAL
+        </a>
       </div>
     </div>
     <div class="profile-detail-section">
@@ -1073,6 +1086,7 @@ const RICARDO_MODERN_DESKTOP_FIXTURE = `<!DOCTYPE html><html><body>
     </div>
   </div>
   <aside class="scaffold-layout__aside">
+    <img src="https://media.licdn.com/right-rail-person.jpg" width="48" height="48" alt="Suggested person" />
     <a href="https://www.linkedin.com/company/pm-biomedical/">PM Biomedical suggested</a>
   </aside>
   <section id="activity" class="feed-shared-update-v2">
@@ -1086,6 +1100,8 @@ type PageMetadataHarness = {
   metadata: Record<string, unknown> | null | undefined
   audit: Record<string, unknown> | null | undefined
   domMap: Record<string, unknown> | null | undefined
+  experienceDiscovery: Record<string, unknown> | null | undefined
+  profileImageAudit: Record<string, unknown> | null | undefined
   findProfileTopCard: (doc: Document) => Element | null
   findExperienceSection: (doc: Document) => Element | null
   discoverMainContentContainer: (doc: Document, topCard: Element | null) => Element | null
@@ -1098,6 +1114,8 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
 
   const auditLogs: Record<string, unknown>[] = []
   const domMapLogs: Record<string, unknown>[] = []
+  const experienceDiscoveryLogs: Record<string, unknown>[] = []
+  const profileImageLogs: Record<string, unknown>[] = []
   const pageMetadataPath = path.join(process.cwd(), "extensions/growth-browser-intake/page-metadata.js")
   const pageMetadataSource = fs.readFileSync(pageMetadataPath, "utf8")
 
@@ -1107,12 +1125,16 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
         const label = String(args[0] ?? "")
         if (label === "[Equipify Sales:extraction-audit]") auditLogs.push(args[1] as Record<string, unknown>)
         if (label === "[Equipify Sales:dom-map]") domMapLogs.push(args[1] as Record<string, unknown>)
+        if (label === "[Equipify Sales:experience-discovery]") {
+          experienceDiscoveryLogs.push(args[1] as Record<string, unknown>)
+        }
+        if (label === "[Equipify Sales:profile-image]") profileImageLogs.push(args[1] as Record<string, unknown>)
       },
       error: () => {},
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ version: "4.3.15" }),
+        getManifest: () => ({ version: "4.3.16" }),
       },
     },
     setTimeout: () => 0,
@@ -1146,6 +1168,8 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     metadata: win.__equipifyGrowthExtract?.() ?? null,
     audit: auditLogs[0] ?? null,
     domMap: domMapLogs[0] ?? null,
+    experienceDiscovery: experienceDiscoveryLogs[0] ?? null,
+    profileImageAudit: profileImageLogs[0] ?? null,
     findProfileTopCard: (doc) => win.__equipifyGrowthFindProfileTopCard?.(doc) ?? null,
     findExperienceSection: (doc) => win.__equipifyGrowthFindExperienceSection?.(doc) ?? null,
     discoverMainContentContainer: (doc, topCard) =>
@@ -1187,6 +1211,17 @@ assert.match(ricardoModernLayout.mainContainerClass ?? "", /profile-content-colu
 assert.ok(ricardoModernHarness.domMap?.selected_top_card)
 assert.ok(ricardoModernHarness.domMap?.selected_experience_container)
 assert.ok(Array.isArray(ricardoModernHarness.domMap?.profile_name_parent_chain))
+assert.ok(ricardoModernHarness.experienceDiscovery?.selected_container)
+assert.equal(ricardoModernHarness.experienceDiscovery?.row_count, 1)
+assert.equal(
+  ricardoModernHarness.profileImageAudit?.selected_src,
+  "https://media.licdn.com/ricardo-headshot.jpg",
+)
+assert.notEqual(
+  ricardoModernHarness.profileImageAudit?.selected_src,
+  "https://media.licdn.com/ricardo-cover.jpg",
+)
+assert.equal(ricardoModernHarness.metadata?.profile_photo_url, "https://media.licdn.com/ricardo-headshot.jpg")
 assert.match(linkedinInpageSidebarJs, /discovered-main-content/)
 
 const LINKEDIN_PROFILE_FIXTURE = `<main>
