@@ -1,4 +1,5 @@
 /** chrome.storage helpers for settings and recent capture history. */
+console.log("[Equipify Sales] content script loaded")
 
 const STORAGE_KEYS = {
   settings: "equipifyGrowthExtensionSettings",

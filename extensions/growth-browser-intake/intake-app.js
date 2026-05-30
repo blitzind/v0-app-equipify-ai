@@ -306,9 +306,9 @@ function initIntakeApp(options) {
       // keep profile URL on profile pages; company URL stays on detected metadata
     }
 
-    if (companyName || contactName) {
+    if (contactName || companyName) {
       if (els.detectedPanel) els.detectedPanel.hidden = false
-      if (els.detectedCompany) els.detectedCompany.textContent = companyName || contactName || "—"
+      if (els.detectedCompany) els.detectedCompany.textContent = companyName || "Company not detected"
       if (els.detectedPlatform) els.detectedPlatform.textContent = platform
       if (els.detectedDomain) {
         els.detectedDomain.textContent =
@@ -1042,7 +1042,7 @@ function initIntakeApp(options) {
     const companyName =
       payload.company_name ||
       state.detected?.company_name ||
-      trimOrNull(state.detected?.contact_name)
+      null
 
     if (!companyName) {
       setStatus("Company name is required. Open a LinkedIn profile or company page first.", "error")

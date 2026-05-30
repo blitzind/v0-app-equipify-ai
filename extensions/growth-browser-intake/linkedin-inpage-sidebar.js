@@ -1,6 +1,7 @@
 /**
  * Equipify Sales in-page LinkedIn sidebar — Prospeo-style docked panel via content script.
  */
+console.log("[Equipify Sales] linkedin-inpage-sidebar start")
 ;(function initEquipifySalesInpageSidebar() {
   const SIDEBAR_ROOT_ID = "equipify-sales-inpage-sidebar-root"
   const SIDEBAR_WIDTH_PX = 420
@@ -154,6 +155,51 @@
         }
       })
     }
+    logLayoutAudit(open)
+  }
+
+  function readNodeLayoutSnapshot(node, selector) {
+    if (!(node instanceof HTMLElement)) return null
+    const style = window.getComputedStyle(node)
+    return {
+      selector,
+      before_width: node.offsetWidth,
+      after_width: node.offsetWidth,
+      before_transform: style.transform,
+      after_transform: style.transform,
+      margin_right: style.marginRight,
+      max_width: style.maxWidth,
+    }
+  }
+
+  function logLayoutAudit(open) {
+    const selectors_found = []
+    const selectors_shifted = []
+    for (const selector of LAYOUT_RESERVE_SELECTORS) {
+      const nodes = document.querySelectorAll(selector)
+      if (nodes.length) selectors_found.push({ selector, count: nodes.length })
+      nodes.forEach((node) => {
+        if (!(node instanceof HTMLElement)) return
+        if (open && node.dataset.equipifySidebarReserve === "true") {
+          selectors_shifted.push(readNodeLayoutSnapshot(node, selector))
+        }
+      })
+    }
+
+    const bodyStyle = document.body ? window.getComputedStyle(document.body) : null
+    const htmlStyle = window.getComputedStyle(document.documentElement)
+
+    console.log("[Equipify Sales:layout-audit]", {
+      viewport_width: window.innerWidth,
+      panel_width: SIDEBAR_WIDTH_PX,
+      body_margin_right: bodyStyle?.marginRight ?? null,
+      html_margin_right: htmlStyle.marginRight ?? null,
+      body_class_open: document.body?.classList.contains(BODY_CLASS) ?? false,
+      html_class_open: document.documentElement.classList.contains(BODY_CLASS),
+      sidebar_open: open,
+      selectors_found,
+      selectors_shifted,
+    })
   }
 
   function applyOpenState(open) {
@@ -247,4 +293,14 @@
     }
     return undefined
   })
+
+  function scheduleStartupLayoutProbe() {
+    const ctx = window.EquipifyGrowthLinkedInContext
+    if (!ctx) return
+    const kind = ctx.detectLinkedInPageKind(window.location.href)
+    if (kind !== "profile" && kind !== "company") return
+    window.setTimeout(() => logLayoutAudit(false), 1000)
+  }
+
+  scheduleStartupLayoutProbe()
 })()

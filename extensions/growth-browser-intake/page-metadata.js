@@ -2,6 +2,8 @@
  * Visible page metadata extraction for injected scripts.
  * Visible DOM / public metadata only — no hidden LinkedIn scraping or private endpoints.
  */
+console.log("[Equipify Sales] page-metadata start")
+
 function trimOrNull(value) {
   const trimmed = typeof value === "string" ? value.trim() : ""
   return trimmed ? trimmed : null
@@ -173,6 +175,81 @@ function findExperienceSection(doc) {
     doc.querySelector('[data-view-name="profile-card-experience"]')
   if (!section || isInsideForbiddenProfileRegion(section)) return null
   return section
+}
+
+function trimHtmlSnapshot(el, maxLen = 5000) {
+  if (!el) return null
+  const html = el.outerHTML ?? ""
+  if (html.length <= maxLen) return html
+  return `${html.slice(0, maxLen)}…[truncated ${html.length - maxLen} chars]`
+}
+
+function describeElementForAudit(el) {
+  if (!el || !(el instanceof Element)) return null
+  const parts = [el.tagName.toLowerCase()]
+  if (el.id) parts.push(`#${el.id}`)
+  const viewName = el.getAttribute("data-view-name")
+  if (viewName) parts.push(`[data-view-name="${viewName}"]`)
+  const classes = [...(el.classList ?? [])].slice(0, 3)
+  if (classes.length) parts.push(`.${classes.join(".")}`)
+  return parts.join("")
+}
+
+function auditTopCardDiscovery(doc, topCard) {
+  const attempted = []
+  for (const section of [
+    ...doc.querySelectorAll("main section.artdeco-card"),
+    ...doc.querySelectorAll("[data-view-name='profile-card']"),
+  ]) {
+    attempted.push({
+      selector: describeElementForAudit(section),
+      rejected: isInsideForbiddenProfileRegion(section)
+        ? "forbidden-region"
+        : section.closest("#activity, #education, #about, aside")
+          ? "non-top-card-section"
+          : !section.querySelector("h1.text-heading-xlarge, h1.break-words, h1")
+            ? "missing-h1"
+            : null,
+    })
+  }
+  return {
+    found: Boolean(topCard),
+    selector: describeElementForAudit(topCard),
+    text_preview: trimOrNull(topCard?.textContent)?.replace(/\s+/g, " ").slice(0, 200) ?? null,
+    attempted_candidates: attempted.slice(0, 10),
+  }
+}
+
+function auditExperienceDiscovery(doc, experienceSection) {
+  return {
+    found: Boolean(experienceSection),
+    selector: describeElementForAudit(experienceSection),
+    experience_id_present: Boolean(doc.querySelector("#experience")),
+    experience_view_present: Boolean(doc.querySelector('[data-view-name="profile-card-experience"]')),
+    text_preview: trimOrNull(experienceSection?.textContent)?.replace(/\s+/g, " ").slice(0, 200) ?? null,
+  }
+}
+
+function findCompanyBlockForSnapshot(doc, topCard) {
+  return (
+    topCard?.querySelector(".pv-text-details__right-panel") ??
+    topCard?.querySelector(".pv-top-card--experience-list-item") ??
+    doc.querySelector(".pv-text-details__right-panel") ??
+    doc.querySelector("[data-view-name='profile-top-card']")
+  )
+}
+
+function logDomSnapshot(doc, topCard, experienceSection) {
+  const companyBlock = findCompanyBlockForSnapshot(doc, topCard)
+  console.log("[Equipify Sales:dom-snapshot]", {
+    top_card_html: trimHtmlSnapshot(topCard),
+    experience_html: trimHtmlSnapshot(experienceSection),
+    company_block_html: trimHtmlSnapshot(companyBlock),
+  })
+}
+
+function logExtractionAudit(payload) {
+  console.log("[Equipify Sales:extraction-audit]", payload)
 }
 
 function findCompanyAnchorsInContainer(container) {
@@ -478,8 +555,9 @@ function pushCompanyCandidate(candidates, input) {
   })
 }
 
-function resolveProfileCompanyExtraction(topCard, _experienceSection, personName, experienceEntries) {
+function resolveProfileCompanyExtraction(topCard, _experienceSection, personName, experienceEntries, auditBag) {
   const candidates = []
+  const company_candidates = []
   const topCompanyAnchor = findTopCardCompanyAnchor(topCard)
   const topCardCompany = readCompanyFromAnchor(topCompanyAnchor)
   const currentExperience =
@@ -543,17 +621,31 @@ function resolveProfileCompanyExtraction(topCard, _experienceSection, personName
   let selected = null
   for (const candidate of candidates) {
     const sanitized = rejectCompanyIfPersonName(candidate.name, personName)
-    if (!sanitized) continue
-    selected = {
-      company_name: sanitized,
-      linkedin_company_url: candidate.url ?? null,
-      source_container: candidate.source_container,
-      source_selector: candidate.source_selector,
-      raw_value: candidate.raw_value,
-      anchor: candidate.anchor,
+    const auditEntry = {
+      source: candidate.source_container,
+      selector: candidate.source_selector,
+      value: candidate.raw_value ?? candidate.name,
+      accepted: false,
+      reject_reason: sanitized ? null : "person-name-match",
     }
-    break
+    if (sanitized && !selected) {
+      auditEntry.accepted = true
+      selected = {
+        company_name: sanitized,
+        linkedin_company_url: candidate.url ?? null,
+        source_container: candidate.source_container,
+        source_selector: candidate.source_selector,
+        raw_value: candidate.raw_value,
+        anchor: candidate.anchor,
+      }
+    }
+    const auditKey = `${auditEntry.source}|${auditEntry.selector}|${auditEntry.value}`
+    if (!company_candidates.some((entry) => `${entry.source}|${entry.selector}|${entry.value}` === auditKey)) {
+      company_candidates.push(auditEntry)
+    }
   }
+
+  if (auditBag) auditBag.company_candidates = company_candidates
 
   console.log("[Equipify Sales:company]", {
     person_name: personName ?? null,
@@ -576,8 +668,9 @@ function resolveProfileCompanyExtraction(topCard, _experienceSection, personName
   )
 }
 
-function resolveProfileTitleExtraction(topCard, experienceEntries, headlineParts) {
+function resolveProfileTitleExtraction(topCard, experienceEntries, headlineParts, auditBag) {
   const candidates = []
+  const title_candidates = []
   const currentExperience =
     experienceEntries.find((entry) => /\bpresent\b/i.test(entry.date_range ?? "")) ?? experienceEntries[0]
 
@@ -612,15 +705,28 @@ function resolveProfileTitleExtraction(topCard, experienceEntries, headlineParts
   let selected = null
   for (const candidate of candidates) {
     const normalized = normalizeVisibleText(candidate.title)
-    if (!normalized) continue
-    selected = {
-      title: normalized,
-      source_container: candidate.source_container,
-      source_selector: candidate.source_selector,
-      raw_value: candidate.raw_value,
+    const auditEntry = {
+      source: candidate.source_container,
+      selector: candidate.source_selector,
+      value: candidate.raw_value ?? candidate.title,
+      accepted: false,
     }
-    break
+    if (normalized && !selected) {
+      auditEntry.accepted = true
+      selected = {
+        title: normalized,
+        source_container: candidate.source_container,
+        source_selector: candidate.source_selector,
+        raw_value: candidate.raw_value,
+      }
+    }
+    const auditKey = `${auditEntry.source}|${auditEntry.selector}|${auditEntry.value}`
+    if (!title_candidates.some((entry) => `${entry.source}|${entry.selector}|${entry.value}` === auditKey)) {
+      title_candidates.push(auditEntry)
+    }
   }
+
+  if (auditBag) auditBag.title_candidates = title_candidates
 
   console.log("[Equipify Sales:title]", {
     source_container: selected?.source_container ?? null,
@@ -772,14 +878,17 @@ function extractLinkedInProfile(doc) {
 
   const headlineParts = parseLinkedInHeadline(headline)
   const experienceEntries = extractExperienceEntries(doc)
+  const educationEntries = extractEducationEntries(doc)
+  const extractionAudit = {}
   const companySelection = resolveProfileCompanyExtraction(
     topCard,
     experienceSection,
     contact_name,
     experienceEntries,
+    extractionAudit,
   )
   const current_company = companySelection.company_name
-  const current_title = resolveProfileTitleExtraction(topCard, experienceEntries, headlineParts)
+  const current_title = resolveProfileTitleExtraction(topCard, experienceEntries, headlineParts, extractionAudit)
 
   const linkedin_company_url = companySelection.linkedin_company_url
   const companyAnchor = companySelection.anchor ?? findTopCardCompanyAnchor(topCard)
@@ -811,8 +920,32 @@ function extractLinkedInProfile(doc) {
     connections_count: connections,
     followers_count: followers,
     experience_companies: experienceEntries,
-    education_entries: extractEducationEntries(doc),
+    education_entries: educationEntries,
   }
+
+  logExtractionAudit({
+    profile_url: cleanPageUrl(window.location.href),
+    profile_name: contact_name,
+    top_card: auditTopCardDiscovery(doc, topCard),
+    experience_section: auditExperienceDiscovery(doc, experienceSection),
+    company_candidates: extractionAudit.company_candidates ?? [],
+    title_candidates: extractionAudit.title_candidates ?? [],
+    experience_entries: experienceEntries.map((entry) => ({
+      title: entry.title ?? null,
+      company: entry.company_name ?? null,
+      date_range: entry.date_range ?? null,
+      current_role: /\bpresent\b/i.test(entry.date_range ?? ""),
+    })),
+    education_entries: educationEntries.map((entry) => ({
+      school: entry.school_name ?? null,
+    })),
+    selected: {
+      title: current_title,
+      company: current_company,
+      source: companySelection.source_selector,
+    },
+  })
+  logDomSnapshot(doc, topCard, experienceSection)
 
   console.log("[Equipify Sales:context]", "raw_profile_extract", rawProfileExtract)
 
@@ -889,6 +1022,7 @@ function extractLinkedInCompany(doc) {
 }
 
 function extractVisiblePageMetadata() {
+  console.log("[Equipify Sales] extractVisiblePageMetadata invoked")
   const sourceUrl = cleanPageUrl(window.location.href)
   const sourcePlatform = detectSourcePlatform(sourceUrl)
   const pageTitle = trimOrNull(document.title)
@@ -1011,6 +1145,45 @@ function extractVisiblePageMetadata() {
   return metadata
 }
 
+function readManifestVersion() {
+  try {
+    return chrome.runtime.getManifest()?.version ?? null
+  } catch {
+    return null
+  }
+}
+
+function resolveLinkedInPageKindForStartup(url) {
+  return (
+    window.EquipifyGrowthLinkedInContext?.detectLinkedInPageKind?.(url) ??
+    detectLinkedInPageKind(url)
+  )
+}
+
+function emitStartupDiagnostic() {
+  const url = window.location.href
+  console.log("[Equipify Sales:startup]", {
+    url,
+    pageKind: resolveLinkedInPageKindForStartup(url),
+    manifestVersion: readManifestVersion(),
+    contentScriptLoaded: true,
+    metadataExtractorLoaded: typeof extractVisiblePageMetadata === "function",
+  })
+}
+
+function scheduleDiagnosticProfileExtract() {
+  const pageKind = resolveLinkedInPageKindForStartup(window.location.href)
+  if (pageKind !== "profile") return
+
+  window.setTimeout(() => {
+    try {
+      extractVisiblePageMetadata()
+    } catch (error) {
+      console.error("[Equipify Sales:startup]", "diagnostic_profile_extract_failed", error)
+    }
+  }, 750)
+}
+
 if (typeof window !== "undefined") {
   window.__equipifyGrowthExtract = extractVisiblePageMetadata
   window.__equipifyGrowthParseLinkedInHeadline = parseLinkedInHeadline
@@ -1020,4 +1193,6 @@ if (typeof window !== "undefined") {
   window.__equipifyGrowthFindProfileTopCard = findProfileTopCard
   window.__equipifyGrowthFindExperienceSection = findExperienceSection
   window.__equipifyGrowthResolveProfileTitleExtraction = resolveProfileTitleExtraction
+  emitStartupDiagnostic()
+  scheduleDiagnosticProfileExtract()
 }

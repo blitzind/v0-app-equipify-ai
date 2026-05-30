@@ -9,6 +9,7 @@
   const PUBLIC_NOT_FOUND = "Not found on public profile"
   const COMPANY_NOT_FOUND = "Not found on public company page"
   const COMPANY_NOT_DETECTED = "Company not detected"
+  const COMPANY_INTEL_UNAVAILABLE = "Unable to identify current company from LinkedIn profile."
   const FOLLOWERS_NOT_AVAILABLE = "Not available"
   const PROFILE_CONTEXT_FAILED = "Profile context failed to load"
   let lastRenderInput = null
@@ -62,6 +63,39 @@
       if (sanitized) return sanitized
     }
     return null
+  }
+
+  function hasResolvedCompanyName(companyName) {
+    const raw = trimOrNull(companyName)
+    if (!raw) return false
+    if (raw === COMPANY_NOT_DETECTED) return false
+    if (raw === COMPANY_INTEL_UNAVAILABLE) return false
+    return true
+  }
+
+  function setCompanyIntelAvailability(hasCompany) {
+    const section = document.querySelector(".es-ws-company-intel")
+    if (!section) return
+
+    section.querySelectorAll(".es-ws-company-tab, .es-ws-company-panel, .es-ws-company-stats").forEach((el) => {
+      el.hidden = !hasCompany
+    })
+
+    const actions = section.querySelector(".es-ws-card-title-actions")
+    if (actions) actions.hidden = !hasCompany
+
+    const statusEl = document.getElementById("es-ws-company-enrichment-status")
+    if (statusEl) {
+      statusEl.textContent = hasCompany ? "" : COMPANY_INTEL_UNAVAILABLE
+    }
+
+    const subtitle = document.getElementById("es-ws-company-subtitle")
+    if (subtitle && !hasCompany) {
+      subtitle.textContent = COMPANY_INTEL_UNAVAILABLE
+    }
+
+    const logo = document.getElementById("es-ws-company-logo")
+    if (logo && !hasCompany) logo.textContent = "?"
   }
 
   function followersValue(value) {
@@ -638,6 +672,8 @@
     const company = resolveProfileCompany(detected, context, formValues)
     const companyIntel = mergeCompanyIntel(detected, lastCompanyEnrichment)
     const companyName = resolveCompanyIntelDisplayName(detected, context, formValues, lastCompanyEnrichment)
+    const hasCompany = hasResolvedCompanyName(companyName)
+    setCompanyIntelAvailability(hasCompany)
     const profileLocation =
       trimOrNull(formValues.location) || trimOrNull(detected?.location) || PUBLIC_NOT_FOUND
     const companyLocation = companyValue(companyIntel.location)
@@ -739,9 +775,9 @@
     const customerCount = linkedinStatus?.isCustomerLeadStatus?.(context?.lead_status) ? 1 : 0
 
     const companyNameEl = document.getElementById("es-ws-company-name")
-    if (companyNameEl) companyNameEl.textContent = companyName
+    if (companyNameEl) companyNameEl.textContent = hasCompany ? companyName : COMPANY_NOT_DETECTED
     const companySubtitle = document.getElementById("es-ws-company-subtitle")
-    if (companySubtitle) {
+    if (companySubtitle && hasCompany) {
       companySubtitle.textContent =
         [companyIntel.industry, companyLocation !== COMPANY_NOT_FOUND ? companyLocation : null]
           .filter(Boolean)
@@ -759,14 +795,22 @@
 
     const enrichBtn = document.getElementById("es-ws-enrich-company-btn")
     if (enrichBtn) {
-      enrichBtn.hidden = !trimOrNull(detected?.linkedin_company_url ?? companyIntel.linkedin_company_url)
+      enrichBtn.hidden =
+        !hasCompany || !trimOrNull(detected?.linkedin_company_url ?? companyIntel.linkedin_company_url)
     }
     const visitCompanyBtn = document.getElementById("es-ws-visit-company-btn")
     if (visitCompanyBtn) {
-      visitCompanyBtn.hidden = !trimOrNull(detected?.linkedin_company_url ?? companyIntel.linkedin_company_url)
+      visitCompanyBtn.hidden =
+        !hasCompany || !trimOrNull(detected?.linkedin_company_url ?? companyIntel.linkedin_company_url)
     }
 
-    renderKvList("es-ws-company-rows", [
+    if (!hasCompany) {
+      renderKvList("es-ws-company-rows", [])
+      setText("es-ws-company-contacts-count", "0")
+      setText("es-ws-company-opportunities-count", "0")
+      setText("es-ws-company-customers-count", "0")
+    } else {
+      renderKvList("es-ws-company-rows", [
       { label: "Company", value: companyName },
       {
         label: "Website",
@@ -810,9 +854,10 @@
       { label: "Company type", value: companyValue(companyIntel.company_type) },
     ])
 
-    setText("es-ws-company-contacts-count", String(contactsCount))
-    setText("es-ws-company-opportunities-count", String(oppCount))
-    setText("es-ws-company-customers-count", String(customerCount))
+      setText("es-ws-company-contacts-count", String(contactsCount))
+      setText("es-ws-company-opportunities-count", String(oppCount))
+      setText("es-ws-company-customers-count", String(customerCount))
+    }
 
     const nba = resolveNextBestAction(context, crmPayload, hasMatch)
     setText("es-ws-nba-label", nba.label)
