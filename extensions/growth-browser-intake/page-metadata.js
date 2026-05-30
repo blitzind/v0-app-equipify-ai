@@ -105,6 +105,86 @@ function readCanonicalUrl(doc) {
   }
 }
 
+const PROFILE_EXTRACTION_FORBIDDEN_SELECTORS = [
+  "#activity",
+  "[data-view-name='profile-activity']",
+  "[data-view-name='feed-full-update']",
+  "[data-view-name='feed-commentary']",
+  ".feed-shared-update-v2",
+  ".feed-shared-actor",
+  ".feed-shared-update",
+  ".update-components-actor",
+  ".comments-comments-list",
+  ".scaffold-layout__aside",
+  "aside.scaffold-layout__aside",
+  ".scaffold-layout__aside",
+  ".right-rail",
+  ".discovery-entity-type-card",
+  "[data-view-name='people-you-may-know']",
+  "[data-view-name='profile-component-discovery']",
+  "#about",
+  "[data-view-name='profile-about']",
+  "#education",
+  "[data-view-name='profile-card-education']",
+]
+
+function isInsideForbiddenProfileRegion(el) {
+  if (!el || !(el instanceof Element)) return true
+  let node = el
+  while (node && node !== document.documentElement) {
+    if (!(node instanceof Element)) break
+    for (const selector of PROFILE_EXTRACTION_FORBIDDEN_SELECTORS) {
+      if (node.matches?.(selector)) return true
+    }
+    node = node.parentElement
+  }
+  return false
+}
+
+function queryTextInContainer(container, selectors) {
+  if (!container) return null
+  for (const selector of selectors) {
+    for (const el of container.querySelectorAll(selector)) {
+      if (isInsideForbiddenProfileRegion(el)) continue
+      const text = trimOrNull(el.textContent)
+      if (text) return text
+    }
+  }
+  return null
+}
+
+function findProfileTopCard(doc) {
+  const candidates = [
+    ...doc.querySelectorAll("main section.artdeco-card"),
+    ...doc.querySelectorAll("[data-view-name='profile-card']"),
+  ]
+  for (const section of candidates) {
+    if (isInsideForbiddenProfileRegion(section)) continue
+    if (section.closest("#activity, #education, #about, aside")) continue
+    if (!section.querySelector("h1.text-heading-xlarge, h1.break-words, h1")) continue
+    return section
+  }
+  return null
+}
+
+function findExperienceSection(doc) {
+  const section =
+    doc.querySelector("#experience")?.closest("section") ??
+    doc.querySelector('[data-view-name="profile-card-experience"]')
+  if (!section || isInsideForbiddenProfileRegion(section)) return null
+  return section
+}
+
+function findCompanyAnchorsInContainer(container) {
+  if (!container) return []
+  const anchors = []
+  for (const anchor of container.querySelectorAll("a[href*='/company/']")) {
+    if (isInsideForbiddenProfileRegion(anchor)) continue
+    anchors.push(anchor)
+  }
+  return anchors
+}
+
 function queryText(doc, selectors) {
   for (const selector of selectors) {
     const el = doc.querySelector(selector)
@@ -290,18 +370,18 @@ function extractProfileWebsite(doc) {
   return findExternalWebsite(doc, topCard ?? doc)
 }
 
-function extractProfileLocation(doc) {
+function extractProfileLocation(topCard) {
+  if (!topCard) return null
   const selectors = [
     ".pv-text-details__left-panel span.text-body-small.inline",
     "span.text-body-small.inline.t-black--light.break-words",
     ".text-body-small.inline.t-black--light",
-    "[data-view-name='profile-card'] span.text-body-small",
-    "main span.text-body-small",
+    "span.text-body-small.inline",
   ]
 
   for (const selector of selectors) {
-    const nodes = doc.querySelectorAll(selector)
-    for (const node of nodes) {
+    for (const node of topCard.querySelectorAll(selector)) {
+      if (isInsideForbiddenProfileRegion(node)) continue
       const text = trimOrNull(node.textContent)
       if (!text) continue
       if (/\d[\d,]*\+?\s+(connections|followers)/i.test(text)) continue
@@ -368,79 +448,108 @@ function companyNameFromLinkedInCompanyUrl(url) {
   return normalizeVisibleText(slug)
 }
 
-function findTopCardCompanyAnchor(topCard, doc) {
-  const topCardRoot = topCard ?? doc
-  return (
-    topCardRoot.querySelector(".pv-text-details__right-panel a[href*='/company/']") ??
-    topCardRoot.querySelector(".pv-text-details__left-panel a[href*='/company/']") ??
-    topCardRoot.querySelector("a[href*='/company/']") ??
-    doc.querySelector("[data-view-name='profile-card'] a[href*='/company/']")
-  )
+function findTopCardCompanyAnchor(topCard) {
+  if (!topCard) return null
+  const selectors = [
+    ".pv-text-details__right-panel a[href*='/company/']",
+    ".pv-text-details__left-panel a[href*='/company/']",
+    "a[href*='/company/']",
+  ]
+  for (const selector of selectors) {
+    for (const anchor of topCard.querySelectorAll(selector)) {
+      if (isInsideForbiddenProfileRegion(anchor)) continue
+      return anchor
+    }
+  }
+  return null
 }
 
-function resolveProfileCompanyExtraction(doc, topCard, personName, experienceEntries) {
+function pushCompanyCandidate(candidates, input) {
+  const rawValue = trimOrNull(input.raw_value ?? input.name)
+  const name = normalizeVisibleText(input.name ?? rawValue)
+  if (!name) return
+  candidates.push({
+    name,
+    source_container: input.source_container,
+    source_selector: input.source_selector,
+    raw_value: rawValue ?? name,
+    url: input.url ?? null,
+    anchor: input.anchor ?? null,
+  })
+}
+
+function resolveProfileCompanyExtraction(topCard, _experienceSection, personName, experienceEntries) {
   const candidates = []
-  const topCompanyAnchor = findTopCardCompanyAnchor(topCard, doc)
+  const topCompanyAnchor = findTopCardCompanyAnchor(topCard)
   const topCardCompany = readCompanyFromAnchor(topCompanyAnchor)
   const currentExperience =
     experienceEntries.find((entry) => /\bpresent\b/i.test(entry.date_range ?? "")) ?? experienceEntries[0]
 
+  if (topCardCompany.name) {
+    pushCompanyCandidate(candidates, {
+      name: topCardCompany.name,
+      source_container: "top-card",
+      source_selector: "top-card.company-anchor",
+      raw_value: trimOrNull(topCompanyAnchor?.textContent),
+      url: topCardCompany.url,
+      anchor: topCompanyAnchor,
+    })
+  } else if (topCompanyAnchor) {
+    const slug = companyNameFromLinkedInCompanyUrl(topCardCompany.url ?? topCompanyAnchor.getAttribute("href"))
+    if (slug) {
+      pushCompanyCandidate(candidates, {
+        name: slug,
+        source_container: "top-card",
+        source_selector: "top-card.company-url.slug",
+        raw_value: slug,
+        url: normalizeLinkedInCompanyUrl(topCompanyAnchor.getAttribute("href")),
+        anchor: topCompanyAnchor,
+      })
+    }
+  }
+
   if (currentExperience?.company_name) {
-    candidates.push({
+    pushCompanyCandidate(candidates, {
       name: currentExperience.company_name,
-      source: "experience.current",
+      source_container: "experience",
+      source_selector: "experience.current.company",
+      raw_value: currentExperience.company_name,
       url: currentExperience.linkedin_company_url ?? null,
       anchor: null,
     })
   }
 
-  if (topCardCompany.name) {
-    candidates.push({
-      name: topCardCompany.name,
-      source: "top-card.company-anchor",
-      url: topCardCompany.url,
-      anchor: topCompanyAnchor,
-    })
-  }
-
   for (const entry of experienceEntries) {
     if (!entry.company_name) continue
-    candidates.push({
+    pushCompanyCandidate(candidates, {
       name: entry.company_name,
-      source: "experience.section",
+      source_container: "experience",
+      source_selector: "experience.section.company",
+      raw_value: entry.company_name,
       url: entry.linkedin_company_url ?? null,
       anchor: null,
     })
   }
 
-  const urlCandidates = [
-    currentExperience?.linkedin_company_url,
-    topCardCompany.url,
-    ...experienceEntries.map((entry) => entry.linkedin_company_url),
-  ].filter(Boolean)
-
-  for (const url of urlCandidates) {
-    const fromUrl = companyNameFromLinkedInCompanyUrl(url)
-    if (fromUrl) {
-      candidates.push({
-        name: fromUrl,
-        source: "company-url.slug",
-        url,
-        anchor: null,
-      })
-    }
+  const candidateNames = []
+  const seenNames = new Set()
+  for (const candidate of candidates) {
+    const key = `${candidate.source_container}|${candidate.source_selector}|${candidate.name}`
+    if (seenNames.has(key)) continue
+    seenNames.add(key)
+    candidateNames.push(candidate.name)
   }
 
-  const candidateNames = candidates.map((candidate) => candidate.name).filter(Boolean)
   let selected = null
-
   for (const candidate of candidates) {
     const sanitized = rejectCompanyIfPersonName(candidate.name, personName)
     if (!sanitized) continue
     selected = {
       company_name: sanitized,
       linkedin_company_url: candidate.url ?? null,
-      source_selector: candidate.source,
+      source_container: candidate.source_container,
+      source_selector: candidate.source_selector,
+      raw_value: candidate.raw_value,
       anchor: candidate.anchor,
     }
     break
@@ -450,24 +559,88 @@ function resolveProfileCompanyExtraction(doc, topCard, personName, experienceEnt
     person_name: personName ?? null,
     candidate_company_names: candidateNames,
     selected_company_name: selected?.company_name ?? null,
+    source_container: selected?.source_container ?? null,
     source_selector: selected?.source_selector ?? null,
+    raw_value: selected?.raw_value ?? null,
   })
 
-  return selected ?? { company_name: null, linkedin_company_url: null, source_selector: null, anchor: null }
+  return (
+    selected ?? {
+      company_name: null,
+      linkedin_company_url: null,
+      source_container: null,
+      source_selector: null,
+      raw_value: null,
+      anchor: null,
+    }
+  )
+}
+
+function resolveProfileTitleExtraction(topCard, experienceEntries, headlineParts) {
+  const candidates = []
+  const currentExperience =
+    experienceEntries.find((entry) => /\bpresent\b/i.test(entry.date_range ?? "")) ?? experienceEntries[0]
+
+  if (currentExperience?.title) {
+    candidates.push({
+      title: currentExperience.title,
+      source_container: "experience",
+      source_selector: "experience.current.title",
+      raw_value: currentExperience.title,
+    })
+  }
+
+  if (headlineParts.title) {
+    candidates.push({
+      title: headlineParts.title,
+      source_container: "top-card",
+      source_selector: "top-card.headline",
+      raw_value: headlineParts.title,
+    })
+  }
+
+  for (const entry of experienceEntries) {
+    if (!entry.title) continue
+    candidates.push({
+      title: entry.title,
+      source_container: "experience",
+      source_selector: "experience.section.title",
+      raw_value: entry.title,
+    })
+  }
+
+  let selected = null
+  for (const candidate of candidates) {
+    const normalized = normalizeVisibleText(candidate.title)
+    if (!normalized) continue
+    selected = {
+      title: normalized,
+      source_container: candidate.source_container,
+      source_selector: candidate.source_selector,
+      raw_value: candidate.raw_value,
+    }
+    break
+  }
+
+  console.log("[Equipify Sales:title]", {
+    source_container: selected?.source_container ?? null,
+    source_selector: selected?.source_selector ?? null,
+    raw_value: selected?.raw_value ?? null,
+  })
+
+  return selected?.title ?? null
 }
 
 function extractExperienceEntries(doc) {
   const entries = []
   const seen = new Set()
-
-  const section =
-    doc.querySelector("#experience")?.closest("section") ??
-    doc.querySelector('[data-view-name="profile-card-experience"]')
-
+  const section = findExperienceSection(doc)
   if (!section) return []
 
   section.querySelectorAll('li, div.pvs-list__paged-list-item, [data-view-name="profile-component-entity"]').forEach((item) => {
+    if (isInsideForbiddenProfileRegion(item)) return
     const companyAnchor = item.querySelector('a[href*="/company/"]')
+    if (companyAnchor && isInsideForbiddenProfileRegion(companyAnchor)) return
     const companyName = normalizeVisibleText(trimOrNull(companyAnchor?.textContent))
     const companyUrl = normalizeLinkedInCompanyUrl(companyAnchor?.getAttribute("href"))
     const titleEl =
@@ -562,36 +735,30 @@ function extractCompanyEmployeeMetric(doc) {
 }
 
 function extractLinkedInProfile(doc) {
-  const topCard =
-    doc.querySelector("main section.artdeco-card") ??
-    doc.querySelector("[data-view-name='profile-card']") ??
-    doc.querySelector("main")
+  const topCard = findProfileTopCard(doc)
+  const experienceSection = findExperienceSection(doc)
 
   const contact_name =
     cleanLinkedInProfileName(
-      queryText(topCard ?? doc, [
+      queryTextInContainer(topCard, [
         "h1.text-heading-xlarge",
-        "main h1.text-heading-xlarge",
-        "h1.text-heading-xlarge",
-        "main section.artdeco-card h1",
-        "main h1.break-words",
-        "[data-view-name='profile-card'] h1",
-        "main h1",
+        "h1.break-words",
+        "h1",
       ]),
     ) ?? inferLinkedInProfileNameFromTitle(doc.title)
 
   const headline = normalizeVisibleText(
-    queryText(topCard ?? doc, [
+    queryTextInContainer(topCard, [
       "div.text-body-medium.break-words",
       ".pv-text-details__left-panel .text-body-medium",
       ".ph5.pb5 .text-body-medium",
-      "[data-view-name='profile-card'] .text-body-medium:not(.t-black--light)",
+      ".text-body-medium:not(.t-black--light)",
       ".top-card-layout__headline",
       "[data-view-name='profile-header'] .text-body-medium",
     ]),
   )
 
-  const location = extractProfileLocation(doc)
+  const location = extractProfileLocation(topCard)
 
   const profile_photo_url = queryImageSrc(doc, [
     "img.pv-top-card-profile-picture__image",
@@ -605,22 +772,22 @@ function extractLinkedInProfile(doc) {
 
   const headlineParts = parseLinkedInHeadline(headline)
   const experienceEntries = extractExperienceEntries(doc)
-  const companySelection = resolveProfileCompanyExtraction(doc, topCard, contact_name, experienceEntries)
+  const companySelection = resolveProfileCompanyExtraction(
+    topCard,
+    experienceSection,
+    contact_name,
+    experienceEntries,
+  )
   const current_company = companySelection.company_name
-  const currentExperience =
-    experienceEntries.find((entry) => /\bpresent\b/i.test(entry.date_range ?? "")) ?? experienceEntries[0]
-
-  let current_title = normalizeVisibleText(currentExperience?.title) ?? headlineParts.title
-  if (current_title && current_company && current_title.includes(current_company)) {
-    current_title = headlineParts.title ?? normalizeVisibleText(currentExperience?.title)
-  }
+  const current_title = resolveProfileTitleExtraction(topCard, experienceEntries, headlineParts)
 
   const linkedin_company_url = companySelection.linkedin_company_url
-  const companyAnchor = companySelection.anchor ?? findTopCardCompanyAnchor(topCard, doc)
-  const company_logo_url = companyAnchor
-    ? trimOrNull(companyAnchor.querySelector("img")?.getAttribute("src")) ??
-      trimOrNull(companyAnchor.querySelector("img")?.getAttribute("data-delayed-url"))
-    : null
+  const companyAnchor = companySelection.anchor ?? findTopCardCompanyAnchor(topCard)
+  const company_logo_url =
+    companyAnchor && topCard?.contains(companyAnchor)
+      ? trimOrNull(companyAnchor.querySelector("img")?.getAttribute("src")) ??
+        trimOrNull(companyAnchor.querySelector("img")?.getAttribute("data-delayed-url"))
+      : null
   const website = extractProfileWebsite(doc)
 
   const locationParts = parseLocationParts(location)
@@ -850,4 +1017,7 @@ if (typeof window !== "undefined") {
   window.__equipifyGrowthNormalizeVisibleText = normalizeVisibleText
   window.__equipifyGrowthRejectCompanyIfPersonName = rejectCompanyIfPersonName
   window.__equipifyGrowthResolveProfileCompanyExtraction = resolveProfileCompanyExtraction
+  window.__equipifyGrowthFindProfileTopCard = findProfileTopCard
+  window.__equipifyGrowthFindExperienceSection = findExperienceSection
+  window.__equipifyGrowthResolveProfileTitleExtraction = resolveProfileTitleExtraction
 }

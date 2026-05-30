@@ -291,7 +291,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.11"/)
+assert.match(manifestSource, /"version": "4.3.12"/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
 assert.match(manifestSource, /linkedin-inpage-sidebar\.js/)
@@ -727,8 +727,13 @@ assert.match(pageMetadataJs, /normalized_profile_payload/)
 assert.match(pageMetadataJs, /rejectCompanyIfPersonName/)
 assert.match(pageMetadataJs, /resolveProfileCompanyExtraction/)
 assert.match(pageMetadataJs, /\[Equipify Sales:company\]/)
-assert.match(pageMetadataJs, /isPlausibleMetricText/)
-assert.match(pageMetadataJs, /extractScopedMetric/)
+assert.match(pageMetadataJs, /\[Equipify Sales:title\]/)
+assert.match(pageMetadataJs, /findProfileTopCard/)
+assert.match(pageMetadataJs, /findExperienceSection/)
+assert.match(pageMetadataJs, /PROFILE_EXTRACTION_FORBIDDEN_SELECTORS/)
+assert.match(pageMetadataJs, /queryTextInContainer/)
+assert.match(pageMetadataJs, /isInsideForbiddenProfileRegion/)
+assert.match(pageMetadataJs, /resolveProfileTitleExtraction/)
 
 const PROFILE_PHOTO_FIXTURE = `<main>
   <nav class="global-nav"><img src="https://media.licdn.com/nav-avatar.jpg" alt="Me menu" /></nav>
@@ -918,7 +923,26 @@ const RICARDO_SANCHEZ_FIXTURE = `<main>
   <section id="education">
     <a href="https://www.linkedin.com/company/miracosta-college/">MiraCosta College</a>
   </section>
+  <section id="activity" class="feed-shared-update-v2">
+    <div class="feed-shared-update-v2">
+      <a href="https://www.linkedin.com/company/pm-biomedical/">PM Biomedical</a>
+      <div class="text-body-medium break-words">PM Biomedical reposted a hiring update</div>
+      <span aria-hidden="true">PM Biomedical</span>
+    </div>
+  </section>
 </main>`
+
+function extractTopCardBlock(html: string) {
+  return html.match(/<section class="artdeco-card">[\s\S]*?<\/section>/)?.[0] ?? ""
+}
+
+function extractExperienceBlock(html: string) {
+  return html.match(/<section id="experience"[\s\S]*?<\/section>/)?.[0] ?? ""
+}
+
+function extractActivityBlock(html: string) {
+  return html.match(/<section id="activity"[\s\S]*?<\/section>/)?.[0] ?? ""
+}
 
 function rejectCompanyIfPersonNameFixture(companyName: string | null, personName: string | null) {
   const company = companyName?.trim() ?? null
@@ -928,23 +952,39 @@ function rejectCompanyIfPersonNameFixture(companyName: string | null, personName
 }
 
 function resolveCompanyFromRicardoFixture(html: string, personName: string) {
-  const experienceBlock = html.match(/id="experience"[\s\S]*?<\/section>/)?.[0] ?? ""
+  const experienceBlock = extractExperienceBlock(html)
+  const topCardBlock = extractTopCardBlock(html)
   let presentCompany: string | null = null
   for (const item of experienceBlock.match(/<li>[\s\S]*?<\/li>/g) ?? []) {
     if (!/present/i.test(item)) continue
     presentCompany = item.match(/href="[^"]*\/company\/[^"]+">\s*([^<]+)/)?.[1]?.trim() ?? null
     if (presentCompany) break
   }
-  const topCardCompany = html.match(/artdeco-card[\s\S]*?href="[^"]*\/company\/[^"]+">\s*([^<]+)/)?.[1]?.trim()
+  const topCardCompany = topCardBlock.match(/href="[^"]*\/company\/[^"]+">\s*([^<]+)/)?.[1]?.trim() ?? null
   const experienceCompanies = [...experienceBlock.matchAll(/href="[^"]*\/company\/[^"]+">\s*([^<]+)/g)].map(
     (match) => match[1]?.trim(),
   )
-  const candidates = [presentCompany, topCardCompany, ...experienceCompanies]
+  const candidates = [topCardCompany, presentCompany, ...experienceCompanies]
   for (const candidate of candidates) {
     const sanitized = rejectCompanyIfPersonNameFixture(candidate ?? null, personName)
     if (sanitized) return sanitized
   }
   return null
+}
+
+function resolveTitleFromRicardoFixture(html: string) {
+  const topCardBlock = extractTopCardBlock(html)
+  const experienceBlock = extractExperienceBlock(html)
+  const presentTitle = (experienceBlock.match(/<li>[\s\S]*?Present[\s\S]*?<\/li>/i)?.[0] ?? "").match(
+    /aria-hidden="true">([^<]+)/,
+  )?.[1]?.trim()
+  const topCardTitle = topCardBlock.match(/text-body-medium break-words">([^<]+)/)?.[1]?.trim()
+  return presentTitle ?? topCardTitle ?? null
+}
+
+function extractActivityCompanyNames(html: string) {
+  const activityBlock = extractActivityBlock(html)
+  return [...activityBlock.matchAll(/href="[^"]*\/company\/[^"]+">\s*([^<]+)/g)].map((match) => match[1]?.trim())
 }
 
 function inferCompanyFromLinkedInPageTitle(title: string) {
@@ -957,13 +997,21 @@ function inferCompanyFromLinkedInPageTitle(title: string) {
 
 const ricardoPersonName = "Ricardo Sanchez Villanueva"
 const ricardoCompany = resolveCompanyFromRicardoFixture(RICARDO_SANCHEZ_FIXTURE, ricardoPersonName)
+const ricardoTitle = resolveTitleFromRicardoFixture(RICARDO_SANCHEZ_FIXTURE)
+const ricardoActivityCompanies = extractActivityCompanyNames(RICARDO_SANCHEZ_FIXTURE)
 assert.equal(
   extractLinkedInFixtureField(RICARDO_SANCHEZ_FIXTURE, /text-heading-xlarge">([^<]+)/),
   ricardoPersonName,
 )
 assert.notEqual(ricardoCompany, ricardoPersonName)
-assert.ok(ricardoCompany === "SHARP MEMORIAL HOSPITAL" || ricardoCompany === null)
+assert.equal(ricardoCompany, "SHARP MEMORIAL HOSPITAL")
 assert.notEqual(ricardoCompany, "MiraCosta College")
+assert.notEqual(ricardoCompany, "PM Biomedical")
+assert.notEqual(ricardoCompany?.toLowerCase(), "pm biomedical")
+assert.ok(ricardoActivityCompanies.includes("PM Biomedical"))
+assert.notEqual(ricardoTitle, "PM Biomedical")
+assert.notEqual(ricardoTitle?.toLowerCase(), "pm biomedical")
+assert.match(ricardoTitle ?? "", /Biomedical Equipment Technician/)
 assert.equal(rejectCompanyIfPersonNameFixture(ricardoPersonName, ricardoPersonName), null)
 assert.equal(
   rejectCompanyIfPersonNameFixture(
