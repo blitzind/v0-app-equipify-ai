@@ -239,14 +239,68 @@ function extractDefinitionMap(doc) {
 
 function extractExperienceEntries(doc) {
   const entries = []
-  doc.querySelectorAll('a[href*="/company/"]').forEach((anchor) => {
-    const companyName = trimOrNull(anchor.textContent)
-    const companyUrl = normalizeLinkedInCompanyUrl(anchor.getAttribute("href"))
-    if (!companyName || companyName.length > 120) return
-    if (entries.some((entry) => entry.company_name === companyName)) return
-    entries.push({ company_name: companyName, linkedin_company_url: companyUrl })
+  const seen = new Set()
+
+  const section =
+    doc.querySelector("#experience")?.closest("section") ??
+    doc.querySelector('[data-view-name="profile-card-experience"]') ??
+    doc.querySelector("section.pv-profile-card")
+
+  const scope = section ?? doc
+  scope.querySelectorAll('li, div.pvs-list__paged-list-item, [data-view-name="profile-component-entity"]').forEach((item) => {
+    const companyAnchor = item.querySelector('a[href*="/company/"]')
+    const companyName = trimOrNull(companyAnchor?.textContent)
+    const companyUrl = normalizeLinkedInCompanyUrl(companyAnchor?.getAttribute("href"))
+    const titleEl =
+      item.querySelector(".t-bold span[aria-hidden='true']") ??
+      item.querySelector(".mr1.hoverable-link-text span") ??
+      item.querySelector("span[aria-hidden='true']")
+    const title = trimOrNull(titleEl?.textContent)
+    const dateText = trimOrNull(item.querySelector(".pvs-entity__caption-wrapper")?.textContent)
+    const key = `${companyName ?? ""}|${title ?? ""}`
+    if (!companyName && !title) return
+    if (seen.has(key)) return
+    seen.add(key)
+    entries.push({
+      company_name: companyName,
+      title,
+      linkedin_company_url: companyUrl,
+      date_range: dateText,
+    })
   })
+
+  if (!entries.length) {
+    doc.querySelectorAll('a[href*="/company/"]').forEach((anchor) => {
+      const companyName = trimOrNull(anchor.textContent)
+      const companyUrl = normalizeLinkedInCompanyUrl(anchor.getAttribute("href"))
+      if (!companyName || companyName.length > 120) return
+      if (seen.has(companyName)) return
+      seen.add(companyName)
+      entries.push({ company_name: companyName, linkedin_company_url: companyUrl })
+    })
+  }
+
   return entries.slice(0, 8)
+}
+
+function extractEducationEntries(doc) {
+  const entries = []
+  const seen = new Set()
+  const section =
+    doc.querySelector("#education")?.closest("section") ??
+    doc.querySelector('[data-view-name="profile-card-education"]')
+
+  const scope = section ?? doc
+  scope.querySelectorAll('li, div.pvs-list__paged-list-item, [data-view-name="profile-component-entity"]').forEach((item) => {
+    const schoolAnchor = item.querySelector('a[href*="/school/"], a[href*="/company/"]')
+    const schoolName = trimOrNull(schoolAnchor?.textContent)
+    const degree = trimOrNull(item.querySelector(".t-14.t-normal")?.textContent)
+    const key = schoolName ?? ""
+    if (!schoolName || seen.has(key)) return
+    seen.add(key)
+    entries.push({ school_name: schoolName, degree })
+  })
+  return entries.slice(0, 6)
 }
 
 function extractVisibleMetric(doc, pattern) {
@@ -261,9 +315,11 @@ function extractVisibleMetric(doc, pattern) {
 function extractLinkedInProfile(doc) {
   const contact_name =
     queryText(doc, [
+      "main h1.text-heading-xlarge",
       "h1.text-heading-xlarge",
       "main section.artdeco-card h1",
       "main h1.break-words",
+      "[data-view-name='profile-card'] h1",
       "main h1",
     ]) ?? inferCompanyNameFromLinkedInTitle(doc.title)
 
@@ -272,6 +328,8 @@ function extractLinkedInProfile(doc) {
     ".pv-text-details__left-panel .text-body-medium",
     ".ph5.pb5 .text-body-medium",
     "main .text-body-medium",
+    "[data-view-name='profile-card'] .text-body-medium",
+    ".top-card-layout__headline",
   ])
 
   const location = queryText(doc, [
@@ -279,6 +337,7 @@ function extractLinkedInProfile(doc) {
     "span.text-body-small.inline.t-black--light.break-words",
     ".text-body-small.inline.t-black--light",
     "main span.text-body-small",
+    "[data-view-name='profile-card'] span.text-body-small",
   ])
 
   const profile_photo_url = queryImageSrc(doc, [
@@ -286,15 +345,23 @@ function extractLinkedInProfile(doc) {
     "img.profile-photo-edit__preview",
     "button.pv-top-card-profile-picture img",
     "img.pv-top-card-profile-picture__image--show",
+    "img.pv-top-card-member-photo",
+    "img[data-anonymize='headshot-photo']",
     'img[alt*="profile"]',
   ])
 
   const topCompanyAnchor =
     doc.querySelector(".pv-text-details__right-panel a[href*='/company/']") ??
     doc.querySelector(".pv-text-details__left-panel a[href*='/company/']") ??
+    doc.querySelector("[data-view-name='profile-card'] a[href*='/company/']") ??
     doc.querySelector("a[href*='/company/']")
 
-  const current_company = trimOrNull(topCompanyAnchor?.textContent)
+  let current_company = trimOrNull(topCompanyAnchor?.textContent)
+  if (!current_company && headline) {
+    const atMatch = headline.match(/\bat\s+(.+?)(?:\s*[|·]|$)/i)
+    if (atMatch?.[1]) current_company = trimOrNull(atMatch[1])
+  }
+
   const linkedin_company_url = normalizeLinkedInCompanyUrl(topCompanyAnchor?.getAttribute("href"))
   const company_logo_url = queryImageSrc(doc, ["a[href*='/company/'] img"])
 
@@ -317,29 +384,30 @@ function extractLinkedInProfile(doc) {
     connections_count: connections,
     followers_count: followers,
     experience_companies: extractExperienceEntries(doc),
+    education_entries: extractEducationEntries(doc),
   }
 }
 
 function extractLinkedInCompany(doc) {
   const company_name =
     queryText(doc, [
+      "main h1.org-top-card-summary__title",
       "h1.org-top-card-summary__title",
       "h1[class*='org-top-card']",
       ".org-top-card-primary-content__title",
+      "main h1.text-heading-xlarge",
       "main h1",
     ]) ?? inferCompanyNameFromLinkedInTitle(doc.title)
 
   const company_logo_url = queryImageSrc(doc, [
     "img.org-top-card-primary-content__logo",
     ".org-top-card-primary-content img",
+    "img.org-top-card-primary-content__logo-image",
     "img[alt*='logo']",
   ])
 
   const defs = extractDefinitionMap(doc)
-  const industry =
-    defs.industry ??
-    defs["company size"] ??
-    queryText(doc, [".org-top-card-summary-info-list__info-item"])
+  const industry = defs.industry ?? queryText(doc, [".org-top-card-summary-info-list__info-item"])
   const employee_count =
     defs["company size"] ??
     extractVisibleMetric(doc, /\d[\d,]*\+?\s+employees/i) ??
@@ -352,6 +420,11 @@ function extractLinkedInCompany(doc) {
   const followers_count = extractVisibleMetric(doc, /\d[\d,]*\+?\s+followers/i)
   const locationParts = parseLocationParts(headquarters)
 
+  const websiteLink = doc.querySelector(
+    'a[href^="http"]:not([href*="linkedin.com"])',
+  )
+  const websiteFromLink = websiteLink?.getAttribute("href")
+
   const keywords = specialties
     ? specialties
         .split(",")
@@ -359,14 +432,21 @@ function extractLinkedInCompany(doc) {
         .filter(Boolean)
     : []
 
+  const office_locations = []
+  if (headquarters) office_locations.push(headquarters)
+  doc.querySelectorAll(".org-locations-module__location-card, .org-location-card").forEach((node) => {
+    const text = trimOrNull(node.textContent)
+    if (text && !office_locations.includes(text)) office_locations.push(text)
+  })
+
   return {
     linkedin_page_kind: "company",
     company_name,
     company_logo_url,
     linkedin_company_url: normalizeLinkedInCompanyUrl(window.location.href),
-    website: findExternalWebsite(doc),
+    website: trimOrNull(websiteFromLink) ?? findExternalWebsite(doc),
     company_description: extractAboutText(doc),
-    industry: defs.industry ?? industry,
+    industry,
     employee_count,
     employee_range,
     founded,
@@ -376,7 +456,7 @@ function extractLinkedInCompany(doc) {
     location: headquarters ?? locationParts.location,
     city: locationParts.city,
     state: locationParts.state,
-    office_locations: headquarters ? [headquarters] : [],
+    office_locations: office_locations.slice(0, 8),
   }
 }
 
@@ -456,6 +536,7 @@ function extractVisiblePageMetadata() {
     connections_count: linkedinExtract.connections_count ?? null,
     office_locations: linkedinExtract.office_locations ?? [],
     experience_companies: linkedinExtract.experience_companies ?? [],
+    education_entries: linkedinExtract.education_entries ?? [],
   }
 }
 

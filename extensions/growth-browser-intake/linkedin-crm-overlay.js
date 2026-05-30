@@ -1,6 +1,6 @@
 /**
  * Equipify Sales LinkedIn status badge — visible metadata + Growth Engine lookup only.
- * Injects a profile-header badge within ~1–2s; click opens the side panel workspace.
+ * Injects a profile-header badge inline beside the profile/company name when possible.
  */
 ;(function initEquipifyLinkedInProfileBadge() {
   const storage = window.EquipifyGrowthExtensionStorage
@@ -17,7 +17,8 @@
   const BADGE_ROOT_ID = "equipify-sales-linkedin-badge-root"
   const REFRESH_DEBOUNCE_MS = 300
   const NAV_THROTTLE_MS = 500
-  const LOGO_URL = chrome.runtime.getURL("assets/equipify-lightning.png")
+  const MOUNT_RETRY_MS = 2500
+  const LOGO_URL = chrome.runtime.getURL("assets/equipify-sales-logo.png")
 
   let refreshTimer = null
   let lastUrl = null
@@ -26,6 +27,9 @@
   let badgeRoot = null
   let prospectingMode = false
   let latestPayload = null
+  let mountRetryTimer = null
+  let mountObserver = null
+  let mountMode = "pending"
 
   function defaultPayload() {
     return {
@@ -40,6 +44,10 @@
   function logError(scope, error, details = {}) {
     const message = error instanceof Error ? error.message : String(error ?? "unknown")
     console.error("[Equipify Sales:header-badge]", scope, message, details, error)
+  }
+
+  function logInfo(scope, details = {}) {
+    console.log("[Equipify Sales:header-badge]", scope, details)
   }
 
   async function loadSettings() {
@@ -58,6 +66,11 @@
   }
 
   function removeBadge() {
+    if (mountRetryTimer) window.clearTimeout(mountRetryTimer)
+    mountRetryTimer = null
+    mountObserver?.disconnect()
+    mountObserver = null
+    mountMode = "pending"
     document.getElementById(BADGE_ROOT_ID)?.remove()
     badgeRoot = null
     lastRenderKey = null
@@ -97,30 +110,46 @@
       if (cached !== null) return cached
     }
 
-    const response = await fetch(`${baseUrl}${config.CRM_CONTEXT_PATH}?${params.toString()}`, {
-      method: "GET",
-      credentials: "include",
-    })
-    const body = await response.json().catch(() => null)
-    if (!response.ok || !body?.ok) return null
-    if (cacheKey) lookupCache?.write?.(cacheKey, body)
-    return body
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), 5000)
+    try {
+      const response = await fetch(`${baseUrl}${config.CRM_CONTEXT_PATH}?${params.toString()}`, {
+        method: "GET",
+        credentials: "include",
+        signal: controller.signal,
+      })
+      const body = await response.json().catch(() => null)
+      if (!response.ok || !body?.ok) return null
+      if (cacheKey) lookupCache?.write?.(cacheKey, body)
+      return body
+    } finally {
+      window.clearTimeout(timeoutId)
+    }
   }
 
   function findProfileNameElement() {
     const selectors = [
-    "h1.text-heading-xlarge",
-    "main section.artdeco-card h1",
-    "main h1.break-words",
-    "h1.org-top-card-summary__title",
-    "main h1",
+      "main h1.text-heading-xlarge",
+      "h1.text-heading-xlarge",
+      "main section.artdeco-card h1",
+      "main h1.break-words",
+      "h1.org-top-card-summary__title",
+      "h1[class*='org-top-card']",
       ".org-top-card-primary-content__title",
-      ".org-top-card-summary__title",
+      "main h1",
+      "[data-view-name='profile-card'] h1",
     ]
 
     for (const selector of selectors) {
-      const el = document.querySelector(selector)
-      if (el?.isConnected && el.textContent?.trim() && el.offsetParent !== null) return el
+      const nodes = document.querySelectorAll(selector)
+      for (const el of nodes) {
+        const text = el.textContent?.trim()
+        if (!text || text.length > 120) continue
+        if (!el.isConnected) continue
+        const rect = el.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) continue
+        return el
+      }
     }
     return null
   }
@@ -129,17 +158,55 @@
     const nameEl = findProfileNameElement()
     if (!nameEl?.parentElement) return false
 
-    let host = nameEl.parentElement.querySelector(":scope > .equipify-sales-linkedin-badge-host")
-    if (!host) {
-      host = document.createElement("div")
-      host.className = "equipify-sales-linkedin-badge-host"
-      nameEl.parentElement.insertBefore(host, nameEl)
-      host.appendChild(nameEl)
+    root.classList.remove("equipify-sales-linkedin-badge-root--floating")
+
+    if (root.parentElement === nameEl.parentElement && root.previousElementSibling === nameEl) {
+      return true
     }
 
-    if (root.parentElement !== host) host.appendChild(root)
-    root.classList.remove("equipify-sales-linkedin-badge-root--floating")
+    if (root.parentElement && root.parentElement !== nameEl.parentElement) {
+      root.remove()
+    }
+
+    nameEl.insertAdjacentElement("afterend", root)
+    mountMode = "inline"
+    logInfo("mount_inline", { name: nameEl.textContent?.trim()?.slice(0, 80) ?? null })
     return true
+  }
+
+  function mountBadgeFloating(root, reason) {
+    root.classList.add("equipify-sales-linkedin-badge-root--floating")
+    if (root.parentElement !== document.body) {
+      root.remove()
+      document.body.appendChild(root)
+    }
+    mountMode = "floating"
+    logInfo("mount_floating_fallback", { reason })
+  }
+
+  function scheduleMountRetry(root) {
+    if (mountObserver) return
+    mountObserver = new MutationObserver(() => {
+      if (mountBadgeBesideName(root)) {
+        mountObserver.disconnect()
+        mountObserver = null
+        if (mountRetryTimer) window.clearTimeout(mountRetryTimer)
+        mountRetryTimer = null
+      }
+    })
+    mountObserver.observe(document.body, { subtree: true, childList: true })
+
+    if (mountRetryTimer) window.clearTimeout(mountRetryTimer)
+    mountRetryTimer = window.setTimeout(() => {
+      if (mountMode === "inline") return
+      if (!findProfileNameElement()) {
+        mountBadgeFloating(root, "no_profile_h1_after_retry")
+      } else if (!mountBadgeBesideName(root)) {
+        mountBadgeFloating(root, "mount_failed_after_retry")
+      }
+      mountObserver?.disconnect()
+      mountObserver = null
+    }, MOUNT_RETRY_MS)
   }
 
   function openSidebar() {
@@ -154,6 +221,7 @@
       payload?.matched ? "matched" : "unmatched",
       prospectingMode ? "scan" : "default",
       pageKind(),
+      mountMode,
     ].join("|")
   }
 
@@ -197,19 +265,18 @@
 
   function ensureBadgeRoot() {
     let root = document.getElementById(BADGE_ROOT_ID)
-    if (root?.isConnected) {
-      badgeRoot = root
-      return root
+    if (!root) {
+      root = document.createElement("div")
+      root.id = BADGE_ROOT_ID
+      root.className = "equipify-sales-linkedin-badge-root"
     }
 
-    removeBadge()
-    root = document.createElement("div")
-    root.id = BADGE_ROOT_ID
-    root.className = "equipify-sales-linkedin-badge-root"
-
-    if (!mountBadgeBesideName(root)) {
-      root.classList.add("equipify-sales-linkedin-badge-root--floating")
-      document.body.appendChild(root)
+    if (mountMode !== "inline" && mountMode !== "floating") {
+      if (!mountBadgeBesideName(root)) {
+        scheduleMountRetry(root)
+      }
+    } else if (mountMode === "inline") {
+      mountBadgeBesideName(root)
     }
 
     badgeRoot = root
@@ -224,16 +291,7 @@
     const display = linkedinStatus.resolveProspectDisplayBadge(payload)
     const root = ensureBadgeRoot()
     root.replaceChildren()
-
     root.appendChild(createBadgeButton(display))
-
-    if (prospectingMode && display.key === "not_added") {
-      const hint = document.createElement("span")
-      hint.className = "equipify-sales-linkedin-badge__hint"
-      hint.textContent = "Prospecting — not in CRM yet"
-      root.appendChild(hint)
-    }
-
     lastRenderKey = renderKey
   }
 
@@ -298,6 +356,7 @@
     if (current !== lastUrl) {
       lastUrl = current
       lastRenderKey = null
+      mountMode = "pending"
       scheduleRefresh()
     }
   }
@@ -320,6 +379,7 @@
 
   lastUrl = window.location.href
   loadSettings().finally(() => {
+    logInfo("init")
     refreshBadge({ skipLoading: false }).catch(() => removeBadge())
   })
 })()

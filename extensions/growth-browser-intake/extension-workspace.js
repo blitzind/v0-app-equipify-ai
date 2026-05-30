@@ -172,6 +172,23 @@
     }
   }
 
+  function renderKvList(containerId, rows) {
+    const populated = rows.filter((row) => (row.value && row.value !== "—") || row.html)
+    if (!populated.length) {
+      setHtml(containerId, '<p class="es-ws-empty">No visible details on this page yet. Capture or run Research to enrich.</p>')
+      return
+    }
+    setHtml(
+      containerId,
+      populated
+        .map(
+          (row) =>
+            `<div class="es-ws-kv-row"><span class="es-ws-kv-label">${escapeHtml(row.label)}</span><span class="es-ws-kv-value">${row.html ?? escapeHtml(row.value)}</span></div>`,
+        )
+        .join(""),
+    )
+  }
+
   function renderProfilePhoto(name, photoUrl) {
     const wrap = document.getElementById("es-ws-profile-photo-wrap")
     if (!wrap) return
@@ -514,24 +531,78 @@
       }
     }
 
-    setHtml("es-ws-company-rows", `
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Company</span><span class="es-ws-kv-value">${escapeHtml(company)}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Website</span><span class="es-ws-kv-value">${website !== "—" ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">${escapeHtml(website)}</a>` : "—"}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">LinkedIn</span><span class="es-ws-kv-value">${companyLinkedInUrl !== "—" ? `<a href="${escapeHtml(companyLinkedInUrl)}" target="_blank" rel="noopener noreferrer">Company page</a>` : "—"}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">About</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.company_description) ?? "—")}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Location</span><span class="es-ws-kv-value">${escapeHtml(location)}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Offices</span><span class="es-ws-kv-value">${escapeHtml(Array.isArray(detected?.office_locations) ? detected.office_locations.join(", ") : "—")}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Industry</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.industry) ?? "—")}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Keywords</span><span class="es-ws-kv-value">${escapeHtml(Array.isArray(detected?.keywords) ? detected.keywords.join(", ") : trimOrNull(detected?.keywords) ?? "—")}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Sub-industry</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.subindustry) ?? "—")}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Employees</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.employee_count) ?? "—")}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Employee range</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.employee_range) ?? "—")}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Revenue</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.revenue) ?? "—")}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Founded</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.founded) ?? "—")}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Company type</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.company_type) ?? "—")}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Ownership</span><span class="es-ws-kv-value">${escapeHtml(trimOrNull(detected?.ownership_type) ?? "—")}</span></div>
-      <div class="es-ws-kv-row"><span class="es-ws-kv-label">Relationship</span><span class="es-ws-kv-value">${escapeHtml(relationship)}</span></div>
-    `)
+    renderKvList("es-ws-company-rows", [
+      { label: "Company", value: company },
+      {
+        label: "Website",
+        value: website,
+        html:
+          website !== "—"
+            ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">${escapeHtml(website)}</a>`
+            : null,
+      },
+      {
+        label: "LinkedIn",
+        value: companyLinkedInUrl,
+        html:
+          companyLinkedInUrl !== "—"
+            ? `<a href="${escapeHtml(companyLinkedInUrl)}" target="_blank" rel="noopener noreferrer">Company page</a>`
+            : null,
+      },
+      { label: "About", value: trimOrNull(detected?.company_description) ?? null },
+      { label: "Location", value: location !== "—" ? location : null },
+      {
+        label: "Offices",
+        value: Array.isArray(detected?.office_locations) && detected.office_locations.length
+          ? detected.office_locations.join(", ")
+          : null,
+      },
+      { label: "Industry", value: trimOrNull(detected?.industry) ?? null },
+      {
+        label: "Keywords",
+        value: Array.isArray(detected?.keywords) && detected.keywords.length
+          ? detected.keywords.join(", ")
+          : trimOrNull(detected?.keywords),
+      },
+      { label: "Employees", value: trimOrNull(detected?.employee_count) ?? null },
+      { label: "Employee range", value: trimOrNull(detected?.employee_range) ?? null },
+      { label: "Founded", value: trimOrNull(detected?.founded) ?? null },
+      { label: "Followers", value: trimOrNull(detected?.followers_count) ?? null },
+      { label: "Company type", value: trimOrNull(detected?.company_type) ?? null },
+      { label: "CRM relationship", value: relationship },
+    ])
+
+    if (Array.isArray(detected?.experience_companies) && detected.experience_companies.length) {
+      const container = document.getElementById("es-ws-company-rows")
+      if (container) {
+        const expHtml = detected.experience_companies
+          .slice(0, 4)
+          .map((entry) => {
+            const name = entry.company_name ?? entry.name ?? "Company"
+            const title = entry.title ? ` · ${entry.title}` : ""
+            return `<div>${escapeHtml(name)}${escapeHtml(title)}</div>`
+          })
+          .join("")
+        container.insertAdjacentHTML(
+          "beforeend",
+          `<div class="es-ws-kv-row"><span class="es-ws-kv-label">Experience</span><span class="es-ws-kv-value">${expHtml}</span></div>`,
+        )
+      }
+    }
+
+    if (Array.isArray(detected?.education_entries) && detected.education_entries.length) {
+      const container = document.getElementById("es-ws-company-rows")
+      if (container) {
+        const eduHtml = detected.education_entries
+          .slice(0, 3)
+          .map((entry) => `<div>${escapeHtml(entry.school_name ?? entry.name ?? "School")}</div>`)
+          .join("")
+        container.insertAdjacentHTML(
+          "beforeend",
+          `<div class="es-ws-kv-row"><span class="es-ws-kv-label">Education</span><span class="es-ws-kv-value">${eduHtml}</span></div>`,
+        )
+      }
+    }
 
     setText("es-ws-company-contacts-count", String(contactsCount))
     setText("es-ws-company-opportunities-count", String(oppCount))
@@ -631,8 +702,15 @@
     if (!list) return
     const visibleMatches = applySimilarFilters(matches)
     if (!matches.length) {
-      list.innerHTML = '<p class="es-ws-empty">No similar companies yet. Run research or expand the search radius.</p>'
-      if (insight) insight.textContent = "No evidence-backed similar companies are loaded yet."
+      list.innerHTML = `
+        <div class="es-ws-empty-state">
+          <p>No similar companies found. Run Similar Company Discovery.</p>
+          <button type="button" class="es-ws-inline-btn" id="es-ws-similar-empty-action">Run Similar Company Discovery</button>
+        </div>`
+      document.getElementById("es-ws-similar-empty-action")?.addEventListener("click", () => {
+        discoverSimilarCompanies()
+      })
+      if (insight) insight.textContent = "No Growth Engine similar companies loaded for this account yet."
       return
     }
     if (!visibleMatches.length) {
@@ -820,6 +898,10 @@
     })
 
     document.getElementById("es-ws-add-btn")?.addEventListener("click", () => {
+      if (typeof deps?.submitCapture === "function") {
+        deps.submitCapture().catch(() => {})
+        return
+      }
       document.getElementById("linkedin-add-btn")?.click()
     })
 

@@ -72,6 +72,7 @@
     document
       .getElementById("equipify-sales-linkedin-floating-dock")
       ?.classList.toggle(DOCK_OFFSET_CLASS, open)
+    document.dispatchEvent(new CustomEvent("equipify-sidebar-state", { detail: { open } }))
   }
 
   function applyOpenState(open) {
@@ -127,6 +128,23 @@
       sendContextToIframe()
     }
   })
+
+  window.addEventListener("popstate", () => {
+    if (isOpen) sendContextToIframe()
+  })
+  window.addEventListener("hashchange", () => {
+    if (isOpen) sendContextToIframe()
+  })
+
+  let lastContextUrl = null
+  const contextObserver = new MutationObserver(() => {
+    const current = window.location.href
+    if (current !== lastContextUrl) {
+      lastContextUrl = current
+      if (isOpen) sendContextToIframe()
+    }
+  })
+  contextObserver.observe(document.documentElement, { subtree: true, childList: true })
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === "equipify-open-inpage-sidebar") {

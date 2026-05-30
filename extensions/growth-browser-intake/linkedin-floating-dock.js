@@ -15,7 +15,7 @@
   }
 
   const DOCK_ID = "equipify-sales-linkedin-floating-dock"
-  const LOGO_URL = chrome.runtime.getURL("assets/equipify-lightning.png")
+  const LOGO_URL = chrome.runtime.getURL("assets/equipify-sales-logo.png")
   const REFRESH_DEBOUNCE_MS = 300
   const NAV_THROTTLE_MS = 500
   const DEFAULT_TOP_PX = 180
@@ -356,6 +356,12 @@
   observer.observe(document.documentElement, { subtree: true, childList: true })
   window.addEventListener("popstate", () => scheduleRefresh())
   window.addEventListener("hashchange", () => scheduleRefresh())
+
+  document.addEventListener("equipify-sidebar-state", (event) => {
+    const open = event.detail?.open === true
+    const dock = document.getElementById(DOCK_ID)
+    if (dock) dock.classList.toggle("equipify-sales-floating-dock--sidebar-open", open)
+  })
 
   lastUrl = window.location.href
   loadPrefs().finally(() => {

@@ -108,8 +108,35 @@ function initIntakeApp(options) {
     console.error(logPrefix, scope, message, details, error)
   }
 
+  function logInfo(scope, details = {}) {
+    console.log(logPrefix, scope, details)
+  }
+
+  function resolveBootstrapTerminalLabel(crmPayload, metadata, tabUrl) {
+    if (isRestrictedTabUrl(tabUrl)) return { label: "No context found", tone: "status-error" }
+    if (crmPayload?.error_status === 403) return { label: "Not authorized", tone: "status-error" }
+    if (crmPayload?.error_status) return { label: "Error", tone: "status-error" }
+    if (!metadata && !state.detected) return { label: "No context found", tone: "status-error" }
+    if (crmPayload?.matched) return { label: "Loaded", tone: "status-ready" }
+    return { label: "Not in Equipify", tone: "status-ready" }
+  }
+
+  function setBootstrapTerminalState(crmPayload, metadata, tabUrl) {
+    const terminal = resolveBootstrapTerminalLabel(crmPayload, metadata, tabUrl)
+    setCaptureStatus(terminal.label, terminal.tone)
+    if (els.bootstrapLoading) {
+      const span = els.bootstrapLoading.querySelector("span:last-child")
+      if (span) span.textContent = `${terminal.label}.`
+    }
+    logInfo("bootstrap_terminal", { label: terminal.label, tabUrl, matched: crmPayload?.matched === true })
+  }
+
   function showFallbackError(message = "Could not read this page. Reload LinkedIn or re-open Equipify Sales.") {
     setCaptureStatus("Error", "status-error")
+    if (els.bootstrapLoading) {
+      const span = els.bootstrapLoading.querySelector("span:last-child")
+      if (span) span.textContent = "Error. Retry or reload LinkedIn."
+    }
     if (els.contextWarning) {
       els.contextWarning.hidden = false
       els.contextWarning.innerHTML = ""
@@ -761,10 +788,26 @@ function initIntakeApp(options) {
   }
 
   function setLoadingState(isLoading) {
-    if (els.bootstrapLoading) els.bootstrapLoading.hidden = !isLoading
+    if (els.bootstrapLoading) {
+      els.bootstrapLoading.hidden = !isLoading
+      if (isLoading) {
+        const span = els.bootstrapLoading.querySelector("span:last-child")
+        if (span) span.textContent = "Loading page context…"
+      }
+    }
     if (els.linkedinStatusPanel) {
       els.linkedinStatusPanel.classList.toggle("panel-loading", isLoading)
     }
+  }
+
+  async function waitForInpageContext(maxMs = 1200) {
+    if (state.inpageContextReceived && state.detected) return state.detected
+    const started = Date.now()
+    while (Date.now() - started < maxMs) {
+      if (state.inpageContextReceived && state.detected) return state.detected
+      await new Promise((resolve) => window.setTimeout(resolve, 80))
+    }
+    return state.detected
   }
 
   async function refreshOperatorAnalytics() {
@@ -806,37 +849,53 @@ function initIntakeApp(options) {
 
     const timeoutId = window.setTimeout(() => {
       if (seq !== bootstrapSeq) return
-      logError("bootstrap_timeout", "Loading page context timed out")
+      logError("bootstrap_timeout", "Loading page context timed out after 5s")
       renderLinkedInStatusPanel(defaultCrmPayload(), state.inpageTabUrl ?? state.detected?.source_url ?? null)
       showFallbackError("No page context found. Reload LinkedIn or re-open Equipify Sales.")
       finishLoading()
     }, 5000)
 
+    logInfo("bootstrap_start", { surface, inpageContext: state.inpageContextReceived })
     setCaptureStatus("Detecting", "status-detecting")
     setLoadingState(true)
     clearStatus()
 
     try {
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
-      if (seq !== bootstrapSeq) return
-      const tab = tabs[0]
-      const tabUrl = tab?.url ?? state.inpageTabUrl ?? state.detected?.source_url ?? null
+      let tabUrl = state.inpageTabUrl ?? state.detected?.source_url ?? null
+      let tab = null
+
+      if (surface !== "inpage") {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+        if (seq !== bootstrapSeq) return
+        tab = tabs[0]
+        tabUrl = tab?.url ?? tabUrl
+      }
 
       if (isRestrictedTabUrl(tabUrl)) {
         if (els.contextWarning) {
           els.contextWarning.hidden = false
           els.contextWarning.textContent = "Open a website or LinkedIn page, then reopen the extension."
         }
-        setCaptureStatus("No page", "status-error")
+        setBootstrapTerminalState(defaultCrmPayload(), null, tabUrl)
         renderLinkedInStatusPanel(defaultCrmPayload(), tabUrl)
         return
       }
 
       if (els.contextWarning) els.contextWarning.hidden = true
 
-      let metadata = state.inpageContextReceived ? state.detected : null
-      if (!metadata && tab?.id) {
-        metadata = await extractTabMetadata(tab)
+      let metadata = null
+      if (surface === "inpage") {
+        metadata = await waitForInpageContext()
+        logInfo("bootstrap_inpage_context", {
+          received: state.inpageContextReceived,
+          hasMetadata: Boolean(metadata),
+        })
+      } else {
+        metadata = state.inpageContextReceived ? state.detected : null
+        if (!metadata && tab?.id) {
+          logInfo("bootstrap_extract_tab_metadata", { tabId: tab.id })
+          metadata = await extractTabMetadata(tab)
+        }
       }
       if (seq !== bootstrapSeq) return
       applyDetectedMetadata(metadata ?? state.detected, tabUrl)
@@ -861,9 +920,12 @@ function initIntakeApp(options) {
 
       const crmPayload = (await fetchCrmContext(formValues, tabUrl)) ?? defaultCrmPayload()
       if (seq !== bootstrapSeq) return
+      logInfo("bootstrap_crm_context", {
+        matched: crmPayload?.matched === true,
+        errorStatus: crmPayload?.error_status ?? null,
+      })
       renderLinkedInStatusPanel(crmPayload, tabUrl)
-
-      setCaptureStatus("Ready", "status-ready")
+      setBootstrapTerminalState(crmPayload, metadata ?? state.detected, tabUrl)
     } catch (error) {
       if (seq !== bootstrapSeq) return
       logError("bootstrap_failed", error)
@@ -876,31 +938,50 @@ function initIntakeApp(options) {
 
   function applyInpageContext(payload) {
     if (!payload) return
+    logInfo("inpage_context_received", {
+      hasMetadata: Boolean(payload.metadata),
+      peopleCount: Array.isArray(payload.visiblePeople) ? payload.visiblePeople.length : 0,
+    })
     state.inpageContextReceived = true
     if (payload.tabUrl) state.inpageTabUrl = payload.tabUrl
     if (Array.isArray(payload.visiblePeople)) state.visibleLinkedInPeople = payload.visiblePeople
     if (payload.metadata) applyDetectedMetadata(payload.metadata, payload.tabUrl ?? payload.metadata?.source_url)
   }
 
-  async function submitIntake(event) {
-    event.preventDefault()
+  async function saveIntake() {
     clearStatus()
 
+    applyDetectedMetadata(state.detected, state.inpageTabUrl ?? trimOrNull(document.getElementById("source-url")?.value))
+
     const payload = readFormValues()
-    const companyName = payload.company_name || state.detected?.company_name
+    const companyName =
+      payload.company_name ||
+      state.detected?.company_name ||
+      trimOrNull(state.detected?.contact_name)
 
     if (!companyName) {
-      setStatus("Company name is required.", "error")
+      setStatus("Company name is required. Open a LinkedIn profile or company page first.", "error")
       setCaptureStatus("Error", "status-error")
-      return
+      return false
     }
 
     payload.company_name = companyName
+    if (!payload.contact_name && state.detected?.contact_name) payload.contact_name = state.detected.contact_name
+    if (!payload.title && state.detected?.headline) payload.title = state.detected.headline
+    if (!payload.linkedin_url && state.detected?.linkedin_url) payload.linkedin_url = state.detected.linkedin_url
+    if (!payload.website && state.detected?.website) payload.website = state.detected.website
+    if (!payload.location && state.detected?.location) payload.location = state.detected.location
+    if (!payload.source_url) payload.source_url = state.inpageTabUrl ?? state.detected?.source_url ?? payload.source_url
+    if (!payload.page_title && state.detected?.page_title) payload.page_title = state.detected.page_title
+    if (!payload.source_platform && state.detected?.source_platform) {
+      payload.source_platform = state.detected.source_platform
+    }
+
     const companyOnly = !hasContactPayload(payload)
 
     if (!companyOnly && !hasContactPayload(payload)) {
       setStatus("Add contact info or use company-only capture.", "error")
-      return
+      return false
     }
 
     if (companyOnly) {
@@ -908,7 +989,9 @@ function initIntakeApp(options) {
     }
 
     if (els.submitBtn) els.submitBtn.disabled = true
+    if (document.getElementById("es-ws-add-btn")) document.getElementById("es-ws-add-btn").disabled = true
     setCaptureStatus("Saving", "status-saving")
+    logInfo("submit_capture_start", { companyName, companyOnly, intakeMode: payload.intake_mode })
 
     try {
       const response = await fetch(`${apiBaseUrl()}${config.INTAKE_PATH}`, {
@@ -922,9 +1005,11 @@ function initIntakeApp(options) {
       const result = body?.result
 
       if (!response.ok || !body?.ok || !result) {
-        setStatus(formatApiError(response.status, body), "error")
+        const apiError = formatApiError(response.status, body)
+        logError("submit_capture_failed", apiError, { status: response.status, body })
+        setStatus(apiError, "error")
         setCaptureStatus("Error", "status-error")
-        return
+        return false
       }
 
       let message = "Saved to Equipify."
@@ -935,6 +1020,7 @@ function initIntakeApp(options) {
 
       setStatus(message, "success")
       setCaptureStatus("Saved", "status-success")
+      logInfo("submit_capture_success", { leadId: result.lead_id, status: result.status })
 
       const saveRecord = {
         lead_id: result.lead_id,
@@ -970,20 +1056,30 @@ function initIntakeApp(options) {
       invalidateLookupCache()
       const refreshLookup = await fetchCrmContext(
         readFormValues(),
-        trimOrNull(document.getElementById("source-url")?.value),
+        trimOrNull(document.getElementById("source-url")?.value) ?? state.inpageTabUrl,
         { bypassCache: true },
       )
       renderLinkedInStatusPanel(
         refreshLookup,
-        trimOrNull(document.getElementById("source-url")?.value),
+        trimOrNull(document.getElementById("source-url")?.value) ?? state.inpageTabUrl,
       )
+      return true
     } catch (error) {
       const message = error instanceof Error ? error.message : "Network error"
+      logError("submit_capture_network", error)
       setStatus(`Could not reach Equipify (${message}).`, "error")
       setCaptureStatus("Error", "status-error")
+      return false
     } finally {
       if (els.submitBtn) els.submitBtn.disabled = false
+      const addBtn = document.getElementById("es-ws-add-btn")
+      if (addBtn) addBtn.disabled = false
     }
+  }
+
+  async function submitIntake(event) {
+    event.preventDefault()
+    await saveIntake()
   }
 
   function renderVersionSnapshot(snapshot) {
@@ -1125,9 +1221,7 @@ function initIntakeApp(options) {
     })
 
     els.linkedinAddBtn?.addEventListener("click", () => {
-      els.form?.scrollIntoView({ behavior: "smooth", block: "start" })
-      els.submitBtn?.focus()
-      setStatus("Review the capture form, then save to Equipify.", "success")
+      saveIntake().catch((error) => logError("linkedin_add_btn_failed", error))
     })
 
     els.linkedinOpenLeadBtn?.addEventListener("click", () => {
@@ -1296,8 +1390,11 @@ function initIntakeApp(options) {
           invalidateLookupCache()
           await bootstrap()
         },
+        submitCapture: () => saveIntake(),
       })
     }
+
+    window.__equipifySaveIntake = saveIntake
 
     if (surface === "inpage") {
       window.parent.postMessage({ type: "equipify-inpage-sidebar-ready" }, "*")
