@@ -1004,8 +1004,21 @@ function initIntakeApp(options) {
     if (!payload) return
     const nextUrl = payload.tabUrl ?? payload.metadata?.source_url ?? null
     const urlChanged = Boolean(nextUrl && nextUrl !== state.inpageTabUrl)
+    const metadata = payload.metadata ?? null
+    console.log("[Equipify Sales:inpage]", "sidebar_context_received", {
+      hasMetadata: Boolean(metadata),
+      contact: metadata?.contact_name ?? null,
+      title: metadata?.title ?? metadata?.headline ?? null,
+      company: metadata?.company_name ?? null,
+      location: metadata?.location ?? null,
+      profilePhoto: Boolean(metadata?.profile_photo_url),
+      companyLogo: Boolean(metadata?.company_logo_url),
+      linkedinUrl: metadata?.linkedin_url ?? null,
+      peopleCount: Array.isArray(payload.visiblePeople) ? payload.visiblePeople.length : 0,
+      urlChanged,
+    })
     logInfo("inpage_context_received", {
-      hasMetadata: Boolean(payload.metadata),
+      hasMetadata: Boolean(metadata),
       peopleCount: Array.isArray(payload.visiblePeople) ? payload.visiblePeople.length : 0,
       urlChanged,
     })
@@ -1016,12 +1029,15 @@ function initIntakeApp(options) {
       state.lastAppliedContextUrl = null
     }
     if (Array.isArray(payload.visiblePeople)) state.visibleLinkedInPeople = payload.visiblePeople
-    if (payload.metadata) {
-      applyDetectedMetadata(payload.metadata, payload.tabUrl ?? payload.metadata?.source_url)
+    if (metadata) {
+      applyDetectedMetadata(metadata, payload.tabUrl ?? metadata?.source_url)
+      if (surface === "inpage") {
+        renderSalesWorkspace(defaultCrmPayload(), nextUrl ?? state.inpageTabUrl)
+      }
     } else if (urlChanged) {
       state.detected = null
     }
-    scheduleBootstrap({ force: urlChanged })
+    scheduleBootstrap({ force: Boolean(metadata) || urlChanged })
   }
 
   async function saveIntake() {

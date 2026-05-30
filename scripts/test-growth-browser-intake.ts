@@ -291,7 +291,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.8"/)
+assert.match(manifestSource, /"version": "4.3.9"/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
 assert.match(manifestSource, /linkedin-inpage-sidebar\.js/)
@@ -705,6 +705,9 @@ assert.match(extensionWorkspaceJs, /isValidCompanyName/)
 assert.match(extensionWorkspaceJs, /applyContactSavedState/)
 assert.match(extensionWorkspaceJs, /wireContactSavedListener/)
 assert.match(extensionWorkspaceJs, /Open in Equipify/)
+assert.match(extensionWorkspaceJs, /resolveProfileName/)
+assert.match(extensionWorkspaceJs, /inferProfileNameFromPageTitle/)
+assert.match(extensionWorkspaceJs, /LinkedIn profile/)
 assert.doesNotMatch(extensionWorkspaceJs, /hidden LinkedIn scraping|linkedin.*scrap/i)
 
 const extensionConfigJs = fs.readFileSync(
@@ -752,7 +755,9 @@ assert.match(pageMetadataJs, /profileCompanyOnly/)
 assert.doesNotMatch(pageMetadataJs, /img\[alt\*="profile"\]/)
 assert.match(pageMetadataJs, /isValidLinkedInCompanyName/)
 assert.match(pageMetadataJs, /sanitizeLinkedInCompanyName/)
-assert.doesNotMatch(pageMetadataJs, /headlineParts\.company/)
+assert.match(pageMetadataJs, /headlineParts\.company/)
+assert.match(pageMetadataJs, /findProfileTopCompanyAnchor/)
+assert.match(pageMetadataJs, /resolveProfileCompanyName/)
 
 const PROFILE_PHOTO_FIXTURE = `<main>
   <nav class="global-nav"><img src="https://media.licdn.com/nav-avatar.jpg" alt="Me menu" /></nav>
@@ -805,6 +810,119 @@ function resolveCompanyFromKristenFixture(html: string, personName: string) {
 
 assert.equal(resolveCompanyFromKristenFixture(KRISTEN_KELLER_FIXTURE, "Kristen Keller"), "BioMed Techs Inc.")
 assert.notEqual(resolveCompanyFromKristenFixture(KRISTEN_KELLER_FIXTURE, "Kristen Keller"), "Kristen Keller")
+
+assert.match(intakeAppJs, /sidebar_context_received/)
+assert.match(intakeAppJs, /renderSalesWorkspace\(defaultCrmPayload/)
+assert.match(pageMetadataJs, /extracted_profile_payload/)
+
+const SAMANTHA_DUTTON_FIXTURE = `<main>
+  <nav class="global-nav"><img src="https://media.licdn.com/nav-me.jpg" alt="Me" /></nav>
+  <section class="artdeco-card">
+    <img class="pv-top-card-profile-picture__image" src="https://media.licdn.com/samantha-dutton.jpg" alt="Samantha Dutton" />
+    <h1 class="text-heading-xlarge">Samantha Dutton</h1>
+    <div class="text-body-medium break-words">Customer Service Representative at Medical Equipment Doctor</div>
+    <span class="text-body-small inline t-black--light break-words">Tustin, California, United States</span>
+    <a href="https://www.linkedin.com/company/medical-equipment-doctor/">
+      <img src="https://media.licdn.com/med-logo.jpg" alt="Medical Equipment Doctor logo" />
+      Medical Equipment Doctor
+    </a>
+  </section>
+  <aside class="scaffold-layout__aside">
+    <img src="https://media.licdn.com/suggested-person.jpg" alt="People you may know" />
+  </aside>
+</main>`
+
+function parseHeadlineAtCompany(headline: string | null) {
+  if (!headline) return { title: null, company: null }
+  const match = headline.match(/^(.+?)\s+at\s+(.+?)(?:\s*[|·].*)?$/i)
+  if (!match) return { title: headline, company: null }
+  return { title: match[1]?.trim() ?? null, company: match[2]?.trim() ?? null }
+}
+
+function extractSamanthaProfileFixture(html: string) {
+  const name = html.match(/text-heading-xlarge">([^<]+)/)?.[1]?.trim() ?? null
+  const headline = html.match(/text-body-medium break-words">([^<]+)/)?.[1]?.trim() ?? null
+  const location = html.match(/text-body-small inline t-black--light break-words">([^<]+)/)?.[1]?.trim() ?? null
+  const profileImage = html.match(/pv-top-card-profile-picture__image[^>]+src="([^"]+)"/)?.[1] ?? null
+  const navImage = html.match(/global-nav[\s\S]*?src="([^"]+)"/)?.[1] ?? null
+  const suggestedImage = html.match(/scaffold-layout__aside[\s\S]*?src="([^"]+)"/)?.[1] ?? null
+  const topCardCompany = html.match(
+    /artdeco-card[\s\S]*?href="[^"]*\/company\/[^"]+">\s*(?:<img[^>]+>\s*)?([^<]+)\s*<\/a>/,
+  )?.[1]?.trim()
+  const companyLogo = html.match(/med-logo\.jpg/)?.[0] ?? null
+  const parsed = parseHeadlineAtCompany(headline)
+  return {
+    person: {
+      name,
+      title: parsed.title,
+      company: topCardCompany ?? parsed.company,
+      location,
+      profileImage,
+    },
+    company: {
+      name: topCardCompany ?? parsed.company,
+      logo: companyLogo,
+    },
+    navImage,
+    suggestedImage,
+  }
+}
+
+const samantha = extractSamanthaProfileFixture(SAMANTHA_DUTTON_FIXTURE)
+assert.equal(samantha.person.name, "Samantha Dutton")
+assert.match(samantha.person.title ?? "", /Customer Service Representative/)
+assert.equal(samantha.person.company, "Medical Equipment Doctor")
+assert.equal(samantha.company.name, "Medical Equipment Doctor")
+assert.equal(samantha.person.location, "Tustin, California, United States")
+assert.equal(samantha.person.profileImage, "https://media.licdn.com/samantha-dutton.jpg")
+assert.notEqual(samantha.person.profileImage, samantha.navImage)
+assert.notEqual(samantha.person.profileImage, samantha.suggestedImage)
+assert.ok(samantha.company.logo)
+
+function resolveSidebarProfileName(input: {
+  contact_name?: string | null
+  page_title?: string | null
+  linkedin_page_kind?: string | null
+}) {
+  if (input.contact_name) return input.contact_name
+  if (input.linkedin_page_kind === "profile" && input.page_title) {
+    const fromTitle = input.page_title.replace(/\s*[|\-–—]\s*LinkedIn\s*$/i, "").split(/\s*[|\-–—]\s*/)[0]?.trim()
+    return fromTitle?.split(/\s+-\s+/)[0]?.trim() ?? "LinkedIn profile"
+  }
+  return "Current page"
+}
+
+assert.equal(
+  resolveSidebarProfileName({
+    contact_name: "Samantha Dutton",
+    linkedin_page_kind: "profile",
+    page_title: "Samantha Dutton | LinkedIn",
+  }),
+  "Samantha Dutton",
+)
+assert.notEqual(
+  resolveSidebarProfileName({
+    contact_name: "Samantha Dutton",
+    linkedin_page_kind: "profile",
+    page_title: "Samantha Dutton | LinkedIn",
+  }),
+  "Current page",
+)
+
+function resolveCompanyIntelHeader(companyName: string | null) {
+  return companyName && companyName !== "Company not detected" ? companyName : "Company not detected"
+}
+
+assert.equal(resolveCompanyIntelHeader("Medical Equipment Doctor"), "Medical Equipment Doctor")
+assert.notEqual(resolveCompanyIntelHeader("Medical Equipment Doctor"), "Company")
+assert.equal(
+  resolveCompanyIntelHeader(
+    isValidCompanyNameFixture("Executive Vice PresidentSep 2023 - Present · 2 yrs 9 mos.")
+      ? "Executive Vice PresidentSep 2023 - Present · 2 yrs 9 mos."
+      : null,
+  ),
+  "Company not detected",
+)
 
 const LINKEDIN_PROFILE_FIXTURE = `<main>
   <h1 class="text-heading-xlarge">Jane Doe</h1>

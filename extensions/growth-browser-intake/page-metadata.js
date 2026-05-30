@@ -203,7 +203,7 @@ function looksLikeProfilePhotoImage(el, profileName) {
   if (isRejectedProfilePhotoContext(el)) return false
 
   const alt = trimOrNull(el.getAttribute("alt"))?.toLowerCase() ?? ""
-  if (/company logo|sponsored|promoted|advertisement/.test(alt)) return false
+  if (/company logo|sponsored|promoted|advertisement|people you may know|suggested/.test(alt)) return false
 
   const src = readImageElementSrc(el) ?? ""
   if (/company-logo|ghost-person|static\.licdn\.com\/scds\/common\/u\/img\/icon/.test(src)) return false
@@ -219,8 +219,40 @@ function looksLikeProfilePhotoImage(el, profileName) {
       el.classList.contains("profile-photo-edit__preview") ||
       el.closest(".pv-top-card-profile-picture") ||
       el.closest("button.pv-top-card-profile-picture") ||
-      el.getAttribute("data-anonymize") === "headshot-photo",
+      el.getAttribute("data-anonymize") === "headshot-photo" ||
+      el.closest("[data-view-name='profile-photo']"),
   )
+}
+
+function findProfileTopCompanyAnchor(topCard, doc) {
+  const roots = [topCard, doc.querySelector("[data-view-name='profile-card']"), doc.querySelector("main")].filter(
+    Boolean,
+  )
+  for (const root of roots) {
+    for (const anchor of root.querySelectorAll("a[href*='/company/']")) {
+      if (anchor.closest("#experience, [data-view-name='profile-card-experience'], aside, .scaffold-layout__aside")) {
+        continue
+      }
+      return anchor
+    }
+  }
+  return null
+}
+
+function resolveProfileCompanyName(topCard, doc, contactName, headline, experienceEntries) {
+  const topCompanyAnchor = findProfileTopCompanyAnchor(topCard, doc)
+  const headlineParts = parseLinkedInHeadline(headline)
+  const candidates = [
+    trimOrNull(topCompanyAnchor?.textContent),
+    ...experienceEntries.map((entry) => entry.company_name).filter(Boolean),
+    headlineParts.company,
+  ]
+
+  for (const candidate of candidates) {
+    const sanitized = sanitizeLinkedInCompanyName(candidate, { personName: contactName })
+    if (sanitized) return { company_name: sanitized, topCompanyAnchor }
+  }
+  return { company_name: null, topCompanyAnchor }
 }
 
 function extractProfilePhotoFromTopCard(doc, topCard, profileName) {
@@ -253,13 +285,19 @@ function extractProfilePhotoFromTopCard(doc, topCard, profileName) {
 
   if (proximityRoot) {
     for (const img of proximityRoot.querySelectorAll("img")) {
-      if (!looksLikeProfilePhotoImage(img, profileName)) continue
+      if (isRejectedProfilePhotoContext(img)) continue
+      if (img.closest('a[href*="/company/"]')) continue
       const src = readImageElementSrc(img)
       if (src) return src
     }
   }
 
-  return null
+  return queryImageSrc(topCard, [
+    "img.pv-top-card-profile-picture__image",
+    "button.pv-top-card-profile-picture img",
+    "img.profile-photo-edit__preview",
+    "[data-view-name='profile-photo'] img",
+  ])
 }
 
 function normalizeLinkedInCompanyUrl(href) {
@@ -581,29 +619,20 @@ function extractLinkedInProfile(doc) {
 
   const location = extractProfileLocation(doc)
 
-  const profile_photo_url = extractProfilePhotoFromTopCard(doc, topCard, contact_name)
+  const profile_photo_url =
+    extractProfilePhotoFromTopCard(doc, topCard, contact_name) ??
+    (trimOrNull(readMetaContent(doc, ['meta[property="og:image"]', 'meta[name="og:image"]'])) || null)
 
   const experienceEntries = extractExperienceEntries(doc)
-
-  const topCompanyAnchor =
-    topCard?.querySelector(".pv-text-details__right-panel a[href*='/company/']") ??
-    topCard?.querySelector(".pv-text-details__left-panel a[href*='/company/']") ??
-    topCard?.querySelector("[data-view-name='profile-card'] a[href*='/company/']") ??
-    null
+  const { company_name: current_company, topCompanyAnchor } = resolveProfileCompanyName(
+    topCard,
+    doc,
+    contact_name,
+    headline,
+    experienceEntries,
+  )
 
   const headlineParts = parseLinkedInHeadline(headline)
-  let current_company = sanitizeLinkedInCompanyName(trimOrNull(topCompanyAnchor?.textContent), {
-    personName: contact_name,
-  })
-  if (!current_company) {
-    for (const entry of experienceEntries) {
-      const candidate = sanitizeLinkedInCompanyName(entry.company_name, { personName: contact_name })
-      if (candidate) {
-        current_company = candidate
-        break
-      }
-    }
-  }
 
   let current_title = normalizeVisibleText(experienceEntries[0]?.title) ?? headlineParts.title
   if (current_title && current_company && current_title.includes(current_company)) {
@@ -614,8 +643,9 @@ function extractLinkedInProfile(doc) {
     normalizeLinkedInCompanyUrl(topCompanyAnchor?.getAttribute("href")) ??
     normalizeLinkedInCompanyUrl(experienceEntries.find((entry) => entry.linkedin_company_url)?.linkedin_company_url)
   const company_logo_url = topCompanyAnchor
-    ? queryImageSrc(topCard ?? doc, ["a[href*='/company/'] img"])
-    : null
+    ? readImageElementSrc(topCompanyAnchor.querySelector("img")) ??
+      queryImageSrc(topCard ?? doc, ["a[href*='/company/'] img"])
+    : queryImageSrc(topCard ?? doc, ["a[href*='/company/'] img"])
   const website = extractProfileWebsite(doc)
 
   const locationParts = parseLocationParts(location)
@@ -811,6 +841,24 @@ function extractVisiblePageMetadata() {
     website: metadata.website,
     location: metadata.location,
   })
+
+  if (metadata.linkedin_page_kind === "profile") {
+    console.log("[Equipify Sales:context]", "extracted_profile_payload", {
+      person: {
+        name: metadata.contact_name,
+        title: metadata.title,
+        headline: metadata.headline,
+        location: metadata.location,
+        linkedin_url: metadata.linkedin_url,
+        profile_image_url: metadata.profile_photo_url,
+      },
+      company: {
+        name: metadata.company_name,
+        linkedin_company_url: metadata.linkedin_company_url,
+        logo_url: metadata.company_logo_url,
+      },
+    })
+  }
 
   return metadata
 }

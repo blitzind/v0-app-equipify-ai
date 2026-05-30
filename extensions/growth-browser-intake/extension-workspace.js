@@ -56,14 +56,39 @@
     )
   }
 
-  function resolveProfileCompany(detected, context, formValues) {
-    return (
-      trimOrNull(context?.company_name) ||
-      trimOrNull(formValues?.company_name) ||
-      trimOrNull(detected?.company_name) ||
-      parseHeadlineParts(detected?.headline).company ||
-      PUBLIC_NOT_FOUND
-    )
+  function resolveProfileCompany(detected, context, formValues, personName) {
+    const candidates = [
+      trimOrNull(context?.company_name),
+      trimOrNull(formValues?.company_name),
+      trimOrNull(detected?.company_name),
+      parseHeadlineParts(detected?.headline).company,
+    ].filter(Boolean)
+    for (const candidate of candidates) {
+      if (isValidCompanyName(candidate, personName)) return candidate
+    }
+    return PUBLIC_NOT_FOUND
+  }
+
+  function inferProfileNameFromPageTitle(pageTitle) {
+    const raw = trimOrNull(pageTitle)
+    if (!raw) return null
+    const withoutLinkedIn = raw.replace(/\s*[|\-–—]\s*LinkedIn\s*$/i, "").trim()
+    const firstSegment = withoutLinkedIn.split(/\s*[|\-–—]\s*/)[0]?.trim()
+    if (!firstSegment) return null
+    return trimOrNull(firstSegment.split(/\s+-\s+/)[0]?.trim() ?? firstSegment)
+  }
+
+  function resolveProfileName(detected, context, formValues) {
+    const direct =
+      trimOrNull(context?.contact_name) ||
+      trimOrNull(formValues?.contact_name) ||
+      trimOrNull(detected?.contact_name)
+    if (direct) return direct
+    if (detected?.linkedin_page_kind === "company") return trimOrNull(detected?.company_name)
+    if (detected?.linkedin_page_kind === "profile") {
+      return inferProfileNameFromPageTitle(detected?.page_title) ?? "LinkedIn profile"
+    }
+    return "Current page"
   }
 
   function isValidCompanyName(name, personName) {
@@ -83,6 +108,7 @@
     const candidates = [
       trimOrNull(enrichment?.company_name),
       trimOrNull(detected?.company_name),
+      parseHeadlineParts(detected?.headline).company,
       trimOrNull(formValues?.company_name),
       trimOrNull(context?.company_name),
     ].filter(Boolean)
@@ -739,15 +765,10 @@
       matchSummary: null,
     }
 
-    const name =
-      context?.contact_name ||
-      trimOrNull(formValues.contact_name) ||
-      trimOrNull(detected?.contact_name) ||
-      trimOrNull(detected?.page_title?.split("|")[0]) ||
-      "Current page"
+    const name = resolveProfileName(detected, context, formValues)
 
     const title = resolveProfileTitle(detected, formValues)
-    const company = resolveProfileCompany(detected, context, formValues)
+    const company = resolveProfileCompany(detected, context, formValues, name)
     const companyIntel = mergeCompanyIntel(detected, lastCompanyEnrichment)
     const companyName = resolveCompanyIntelName(
       detected,

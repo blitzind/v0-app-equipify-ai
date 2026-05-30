@@ -142,7 +142,12 @@
       "*",
     )
     lastPostedContextKey = contextCacheKey(context)
-    logInfo("context_posted", { tabUrl: context.tabUrl, hasMetadata: Boolean(context.metadata) })
+    logInfo("context_posted", {
+      tabUrl: context.tabUrl,
+      hasMetadata: Boolean(context.metadata),
+      contact: context.metadata?.contact_name ?? null,
+      company: context.metadata?.company_name ?? null,
+    })
     return true
   }
 
