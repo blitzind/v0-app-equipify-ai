@@ -6,6 +6,7 @@ export const GROWTH_LEAD_SOURCE_KINDS = [
   "partner",
   "other",
   "browser_extension",
+  "acquisition",
 ] as const
 
 import type { GrowthLeadAssignmentSource } from "@/lib/growth/assignment/assignment-types"

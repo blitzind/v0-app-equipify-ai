@@ -213,6 +213,7 @@
     "test:growth-bulk-acquisition": "tsx scripts/test-growth-bulk-acquisition.ts",
     "test:growth-manual-contact-entry": "tsx scripts/test-growth-manual-contact-entry.ts",
     "test:growth-browser-intake": "tsx scripts/test-growth-browser-intake.ts",
+    "test:growth-leads-source-kind": "tsx scripts/test-growth-leads-source-kind.ts",
     "test:growth-captured-leads": "tsx scripts/test-growth-captured-leads.ts",
     "package:growth-extension": "tsx scripts/package-growth-browser-intake-extension.ts",
     "check:growth-extension-package": "tsx scripts/check-growth-extension-package.ts",
