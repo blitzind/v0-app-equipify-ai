@@ -189,7 +189,23 @@ function elementHeadingText(el) {
   return text
 }
 
+function findExactHeadingLeaf(doc, headingText) {
+  const target = headingText.trim().toLowerCase()
+  for (const el of doc.querySelectorAll("h1, h2, h3, h4, h5, h6, span, p, button, a")) {
+    if (isInsideForbiddenProfileRegion(el)) continue
+    if (el.closest("aside, #activity, .feed-shared-update-v2")) continue
+    const aria = trimOrNull(el.getAttribute("aria-label"))
+    const label = elementHeadingText(el) ?? aria
+    if (label?.toLowerCase() !== target) continue
+    return el
+  }
+  return null
+}
+
 function findSectionHeadingElement(doc, headingText) {
+  const exact = findExactHeadingLeaf(doc, headingText)
+  if (exact) return exact
+
   const target = headingText.trim().toLowerCase()
   for (const el of doc.querySelectorAll("h1, h2, h3, h4, span, div, p, button")) {
     if (isInsideForbiddenProfileRegion(el)) continue
@@ -199,6 +215,15 @@ function findSectionHeadingElement(doc, headingText) {
     return el
   }
   return null
+}
+
+function isExperienceContainerValid(container) {
+  if (!container || isInsideForbiddenProfileRegion(container)) return false
+  return (
+    Boolean(container.querySelector('li, [role="listitem"], a[href*="/company/"]')) ||
+    (/\bpresent\b/i.test(container.textContent ?? "") &&
+      /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{4})/i.test(container.textContent ?? ""))
+  )
 }
 
 function findMeaningfulSectionContainer(headingEl) {
@@ -343,7 +368,7 @@ function findExperienceSectionLegacy(doc) {
 
 function findExperienceSection(doc) {
   const legacy = findExperienceSectionLegacy(doc)
-  if (legacy) return legacy
+  if (legacy && isExperienceContainerValid(legacy)) return legacy
 
   const experienceId = doc.querySelector("#experience")
   if (experienceId && !isInsideForbiddenProfileRegion(experienceId)) {
@@ -351,16 +376,99 @@ function findExperienceSection(doc) {
       experienceId.closest("section, article, div") ??
       findMeaningfulSectionContainer(experienceId) ??
       experienceId.parentElement
-    if (container && !isInsideForbiddenProfileRegion(container)) return container
+    if (container && isExperienceContainerValid(container)) return container
   }
 
   const heading = findSectionHeadingElement(doc, "Experience")
   if (heading) {
     const container = findMeaningfulSectionContainer(heading)
-    if (container && !isInsideForbiddenProfileRegion(container)) return container
+    if (container && isExperienceContainerValid(container)) return container
   }
 
   return null
+}
+
+function findProfileHeroContainer(nameNode, topCard) {
+  const roots = [nameNode, topCard, nameNode?.parentElement].filter(Boolean)
+  for (const root of roots) {
+    let node = root instanceof Element ? root : null
+    for (let depth = 0; depth < 14 && node; depth += 1) {
+      if (isInsideForbiddenProfileRegion(node)) {
+        node = node.parentElement
+        continue
+      }
+      if (nameNode && node.contains(nameNode) && node.querySelector("img")) return node
+      node = node.parentElement
+    }
+  }
+  return topCard ?? nameNode?.closest("div, section, main") ?? null
+}
+
+function parseConcatenatedHeadlineTitleCompany(text) {
+  const raw = normalizeVisibleText(text)
+  if (!raw) return { title: null, company: null }
+  const match = raw.match(/^(.+?[a-z0-9)\]])\s*([A-Z][A-Z][\w\s&.,'/-]+)$/)
+  if (!match) return { title: raw, company: null }
+  return {
+    title: trimOrNull(match[1]),
+    company: trimOrNull(match[2]),
+  }
+}
+
+function collectEntityLinePlainTextCompanies(topCard) {
+  const names = []
+  if (!topCard) return names
+  for (const el of topCard.querySelectorAll("div, span, p, li")) {
+    const text = trimOrNull(el.textContent)
+    if (!text || !text.includes("·")) continue
+    for (const part of text.split("·")) {
+      const name = normalizeVisibleText(part)
+      if (name && name.length >= 3 && name.length <= 120) names.push(name)
+    }
+  }
+  return [...new Set(names)]
+}
+
+function collectRawCompanyCandidates(doc, topCard, experienceSection, headline, personName) {
+  const raw = []
+  const scopes = [
+    { scope: topCard, source: "top-card-company-anchor" },
+    { scope: experienceSection, source: "experience-company-anchor" },
+  ]
+  for (const { scope, source } of scopes) {
+    if (!scope) continue
+    for (const anchor of scope.querySelectorAll('a[href*="/company/"]')) {
+      raw.push({
+        name: normalizeVisibleText(anchor.textContent),
+        href: trimOrNull(anchor.getAttribute("href")),
+        source,
+        forbidden: isInsideForbiddenProfileRegion(anchor),
+        is_person_name:
+          Boolean(personName) &&
+          normalizeComparisonName(anchor.textContent) === normalizeComparisonName(personName),
+      })
+    }
+  }
+  const parsedHeadline = parseConcatenatedHeadlineTitleCompany(headline)
+  if (parsedHeadline.company) {
+    raw.push({
+      name: parsedHeadline.company,
+      href: null,
+      source: "headline-concatenated-parse",
+      forbidden: false,
+      is_person_name: false,
+    })
+  }
+  for (const name of collectEntityLinePlainTextCompanies(topCard)) {
+    raw.push({
+      name,
+      href: null,
+      source: "entity-line-plain-text",
+      forbidden: false,
+      is_person_name: Boolean(personName) && normalizeComparisonName(name) === normalizeComparisonName(personName),
+    })
+  }
+  return raw.filter((entry) => entry.name)
 }
 
 function discoverMainContentContainer(doc, topCard) {
@@ -521,6 +629,110 @@ function logProfileImageAudit(payload) {
   console.log("[Equipify Sales:profile-image]", payload)
 }
 
+function logDomAudit(payload) {
+  console.log("[Equipify Sales:dom-audit]", payload)
+}
+
+function buildDomAudit(doc, context) {
+  const {
+    nameNode,
+    topCard,
+    experienceSection,
+    experienceHeading,
+    profilePhotoUrl,
+    headline,
+    personName,
+  } = context
+
+  const h1s = []
+  for (const h1 of doc.querySelectorAll("h1")) {
+    h1s.push({
+      text: trimOrNull(h1.textContent)?.replace(/\s+/g, " ").slice(0, 120) ?? null,
+      selector: describeElementForAudit(h1),
+      forbidden: isInsideForbiddenProfileRegion(h1),
+      parent_chain: describeElementChain(h1),
+    })
+  }
+
+  const heroContainer = findProfileHeroContainer(nameNode, topCard)
+  const profileImagesSeen = new Set()
+  const profile_images = []
+  for (const scope of [heroContainer, topCard, nameNode?.parentElement].filter(Boolean)) {
+    for (const img of scope.querySelectorAll("img")) {
+      const src = readProfileImageSrc(img)
+      const key = src ?? describeElementForAudit(img)
+      if (profileImagesSeen.has(key)) continue
+      profileImagesSeen.add(key)
+      const dims = readProfileImageDimensions(img)
+      profile_images.push({
+        src,
+        alt: trimOrNull(img.getAttribute("alt")),
+        width: dims.width,
+        height: dims.height,
+        rect: readProfileImageRect(img),
+        source_selector: describeElementForAudit(img),
+        forbidden: isProfileImageForbidden(img),
+        cover_or_banner: isCoverOrBannerProfileImage(img, dims.width, dims.height),
+        in_top_card: topCard?.contains(img) ?? false,
+        in_hero_container: heroContainer?.contains(img) ?? false,
+      })
+    }
+  }
+
+  const experience_headings = []
+  for (const keyword of ["Experience", "Education", "Activity"]) {
+    for (const el of doc.querySelectorAll("h1, h2, h3, h4, h5, h6, span, div, p, button, a")) {
+      const textPreview = trimOrNull(el.textContent)?.replace(/\s+/g, " ").slice(0, 120)
+      if (!textPreview || !new RegExp(`\\b${keyword}\\b`, "i").test(textPreview)) continue
+      experience_headings.push({
+        keyword,
+        selector: describeElementForAudit(el),
+        label: elementHeadingText(el),
+        aria_label: trimOrNull(el.getAttribute("aria-label")),
+        text_preview: textPreview,
+        forbidden: isInsideForbiddenProfileRegion(el),
+        parent_chain: describeElementChain(el),
+      })
+    }
+  }
+
+  const experience_container_nodes = []
+  if (experienceSection) {
+    for (const node of experienceSection.querySelectorAll("a, span, div, li, p")) {
+      if (experience_container_nodes.length >= 10) break
+      const text = trimOrNull(node.textContent)?.replace(/\s+/g, " ").slice(0, 120)
+      if (!text || text.length < 2) continue
+      experience_container_nodes.push({
+        tag: node.tagName.toLowerCase(),
+        text,
+        selector: describeElementForAudit(node),
+        href: trimOrNull(node.getAttribute?.("href")),
+      })
+    }
+  }
+
+  return {
+    h1s,
+    selected_h1_parent_chain: describeElementChain(nameNode),
+    experience_headings: experience_headings.slice(0, 40),
+    experience_heading_parent_chain: describeElementChain(experienceHeading ?? experienceSection),
+    profile_images,
+    hero_container: describeElementForAudit(heroContainer),
+    top_card: describeElementForAudit(topCard),
+    experience_container_html_preview: trimHtmlSnapshot(experienceSection, 2000),
+    experience_container_nodes,
+    company_candidates_raw: collectRawCompanyCandidates(
+      doc,
+      topCard,
+      experienceSection,
+      headline,
+      personName,
+    ),
+    selected_profile_image: profilePhotoUrl ?? null,
+    experience_section_found: Boolean(experienceSection),
+  }
+}
+
 function buildExperienceDiscoveryAudit(doc, experienceSection, experienceHeading) {
   const target = "experience"
   const headingCandidates = []
@@ -595,8 +807,17 @@ function isProfileImageForbidden(img) {
 }
 
 function readProfileImageSrc(img) {
+  const srcset = trimOrNull(img.getAttribute("srcset"))
+  const srcsetUrl = srcset
+    ?.split(",")
+    .map((part) => part.trim().split(/\s+/)[0])
+    .find(Boolean)
+  const currentSrc =
+    typeof img.currentSrc === "string" && trimOrNull(img.currentSrc) ? trimOrNull(img.currentSrc) : null
   return (
+    currentSrc ??
     trimOrNull(img.getAttribute("src")) ??
+    srcsetUrl ??
     trimOrNull(img.getAttribute("data-delayed-url")) ??
     trimOrNull(img.getAttribute("data-ghost-url"))
   )
@@ -659,8 +880,10 @@ function scoreProfileImageCandidate(img, nameNode, topCard) {
 
 function findProfilePhotoUrl(doc, topCard, nameNode) {
   const candidates = []
+  const heroContainer = findProfileHeroContainer(nameNode, topCard)
   const scopes = []
-  if (topCard) scopes.push({ scope: topCard, source: "top-card" })
+  if (heroContainer) scopes.push({ scope: heroContainer, source: "hero-container" })
+  if (topCard && topCard !== heroContainer) scopes.push({ scope: topCard, source: "top-card" })
   if (nameNode?.parentElement) scopes.push({ scope: nameNode.parentElement, source: "name-parent" })
 
   let selectedSrc = null
@@ -673,11 +896,13 @@ function findProfilePhotoUrl(doc, topCard, nameNode) {
       const alt = trimOrNull(img.getAttribute("alt"))
       const { width, height } = readProfileImageDimensions(img)
       const rect = readProfileImageRect(img)
+      const effectiveWidth = width || rect?.width || 0
+      const effectiveHeight = height || rect?.height || 0
       const entry = {
         src,
         alt,
-        width,
-        height,
+        width: effectiveWidth,
+        height: effectiveHeight,
         rect,
         source_selector: `${source}.${describeElementForAudit(img)}`,
         accepted: false,
@@ -695,18 +920,22 @@ function findProfilePhotoUrl(doc, topCard, nameNode) {
         candidates.push(entry)
         continue
       }
-      if (isCoverOrBannerProfileImage(img, width, height)) {
+      if (isCoverOrBannerProfileImage(img, effectiveWidth, effectiveHeight)) {
         entry.reject_reason = "cover-or-banner"
         candidates.push(entry)
         continue
       }
-      if ((width > 0 && width < 80) || (height > 0 && height < 80)) {
+      if (
+        effectiveWidth > 0 &&
+        effectiveHeight > 0 &&
+        (effectiveWidth < 80 || effectiveHeight < 80)
+      ) {
         entry.reject_reason = "too-small"
         candidates.push(entry)
         continue
       }
 
-      const score = scoreProfileImageCandidate(img, nameNode, topCard)
+      const score = scoreProfileImageCandidate(img, nameNode, heroContainer ?? topCard)
       entry.score = score
       candidates.push(entry)
       if (score > bestScore) {
@@ -1055,7 +1284,14 @@ function pushCompanyCandidate(candidates, input) {
   })
 }
 
-function resolveProfileCompanyExtraction(topCard, _experienceSection, personName, experienceEntries, auditBag) {
+function resolveProfileCompanyExtraction(
+  topCard,
+  _experienceSection,
+  personName,
+  experienceEntries,
+  auditBag,
+  headlineText,
+) {
   const candidates = []
   const company_candidates = []
   const topCompanyAnchor = findTopCardCompanyAnchor(topCard)
@@ -1064,6 +1300,7 @@ function resolveProfileCompanyExtraction(topCard, _experienceSection, personName
   const currentExperience =
     experienceEntries.find((entry) => /\bpresent\b/i.test(entry.date_range ?? "")) ?? experienceEntries[0]
   const currentExperienceCompany = trimOrNull(currentExperience?.company_name)
+  const parsedHeadline = parseConcatenatedHeadlineTitleCompany(headlineText)
 
   if (currentExperience?.company_name) {
     pushCompanyCandidate(candidates, {
@@ -1085,6 +1322,29 @@ function resolveProfileCompanyExtraction(topCard, _experienceSection, personName
       raw_value: entity.name,
       url: entity.url ?? null,
       anchor: entity.anchor,
+    })
+  }
+
+  if (parsedHeadline.company) {
+    pushCompanyCandidate(candidates, {
+      name: parsedHeadline.company,
+      source_container: "top-card",
+      source_selector: "top-card.headline-plain-text",
+      raw_value: parsedHeadline.company,
+      url: null,
+      anchor: null,
+    })
+  }
+
+  for (const entityName of collectEntityLinePlainTextCompanies(topCard)) {
+    if (currentExperienceCompany && /college|university|school/i.test(entityName)) continue
+    pushCompanyCandidate(candidates, {
+      name: entityName,
+      source_container: "top-card",
+      source_selector: "top-card.entity-line-plain-text",
+      raw_value: entityName,
+      url: null,
+      anchor: null,
     })
   }
 
@@ -1485,9 +1745,13 @@ function extractLinkedInProfile(doc) {
     contact_name,
     experienceEntries,
     extractionAudit,
+    headline,
   )
+  const parsedHeadline = parseConcatenatedHeadlineTitleCompany(headline)
   const current_company = companySelection.company_name
-  const current_title = resolveProfileTitleExtraction(topCard, experienceEntries, headlineParts, extractionAudit)
+  const current_title =
+    resolveProfileTitleExtraction(topCard, experienceEntries, headlineParts, extractionAudit) ??
+    parsedHeadline.title
 
   const linkedin_company_url = companySelection.linkedin_company_url
   const companyAnchor = companySelection.anchor ?? findTopCardCompanyAnchor(topCard)
@@ -1527,6 +1791,19 @@ function extractLinkedInProfile(doc) {
     buildExperienceDiscoveryAudit(doc, experienceSection, experienceHeading),
   )
   logCompanySelection(extractionAudit, companySelection)
+  logDomAudit(
+    buildDomAudit(document, {
+      nameNode,
+      topCard,
+      experienceSection,
+      experienceHeading,
+      profilePhotoUrl: profile_photo_url,
+      headline,
+      personName: contact_name,
+    }),
+  )
+
+  if (!experienceSection) scheduleExperienceRetryExtract()
 
   logExtractionAudit({
     profile_url: cleanPageUrl(window.location.href),
@@ -1698,9 +1975,7 @@ function extractVisiblePageMetadata() {
     linkedin_page_kind: linkedinKind,
     og_site_name: ogSiteName,
     canonical_url: canonicalUrl,
-    profile_photo_url:
-      linkedinExtract.profile_photo_url ??
-      (sourcePlatform === "linkedin" && linkedinKind === "profile" ? trimOrNull(ogImage) : null),
+    profile_photo_url: linkedinExtract.profile_photo_url ?? null,
     company_logo_url: linkedinExtract.company_logo_url ?? null,
     contact_name: linkedinExtract.contact_name ?? null,
     headline: linkedinExtract.headline ?? null,
@@ -1770,6 +2045,32 @@ function resolveLinkedInPageKindForStartup(url) {
     window.EquipifyGrowthLinkedInContext?.detectLinkedInPageKind?.(url) ??
     detectLinkedInPageKind(url)
   )
+}
+
+function scheduleExperienceRetryExtract() {
+  if (typeof window === "undefined" || window.__equipifyGrowthExperienceRetryScheduled) return
+  window.__equipifyGrowthExperienceRetryScheduled = true
+
+  let attempts = 0
+  const maxAttempts = 20
+  const timer = window.setInterval(() => {
+    attempts += 1
+    const section = findExperienceSection(document)
+    if (section && isExperienceContainerValid(section)) {
+      window.clearInterval(timer)
+      delete window.__equipifyGrowthExperienceRetryScheduled
+      try {
+        extractVisiblePageMetadata()
+      } catch (error) {
+        console.error("[Equipify Sales:startup]", "experience_retry_extract_failed", error)
+      }
+      return
+    }
+    if (attempts >= maxAttempts) {
+      window.clearInterval(timer)
+      delete window.__equipifyGrowthExperienceRetryScheduled
+    }
+  }, 500)
 }
 
 function emitStartupDiagnostic() {
