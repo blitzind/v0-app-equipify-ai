@@ -117,12 +117,114 @@ function queryText(doc, selectors) {
 function queryImageSrc(doc, selectors) {
   for (const selector of selectors) {
     const el = doc.querySelector(selector)
-    const src =
-      trimOrNull(el?.getAttribute("src")) ??
-      trimOrNull(el?.getAttribute("data-delayed-url")) ??
-      trimOrNull(el?.getAttribute("data-ghost-url"))
-    if (src && !src.startsWith("data:")) return src
+    const src = readImageElementSrc(el)
+    if (src) return src
   }
+  return null
+}
+
+function readImageElementSrc(el) {
+  if (!el) return null
+  const src =
+    trimOrNull(el.getAttribute("src")) ??
+    trimOrNull(el.getAttribute("data-delayed-url")) ??
+    trimOrNull(el.getAttribute("data-ghost-url"))
+  if (!src || src.startsWith("data:")) return null
+  return src
+}
+
+const PROFILE_PHOTO_REJECT_ANCESTORS = [
+  ".global-nav",
+  "nav.global-nav",
+  ".global-nav__me",
+  ".feed-shared-update-v2",
+  ".ad-banner-container",
+  ".right-rail",
+  "aside.scaffold-layout__aside",
+  ".scaffold-layout__aside",
+  ".pvs-list",
+  ".discovery-entity-type-card",
+  '[data-view-name="profile-component-discovery"]',
+  '[data-view-name="people-you-may-know"]',
+  ".artdeco-carousel",
+  ".msg-overlay-list-bubble",
+]
+
+function isRejectedProfilePhotoContext(el) {
+  let node = el
+  while (node && node !== document.documentElement) {
+    if (!(node instanceof Element)) break
+    for (const selector of PROFILE_PHOTO_REJECT_ANCESTORS) {
+      if (node.matches?.(selector)) return true
+    }
+    if (node.classList?.contains("global-nav")) return true
+    node = node.parentElement
+  }
+  return false
+}
+
+function looksLikeProfilePhotoImage(el, profileName) {
+  if (!(el instanceof HTMLImageElement)) return false
+  if (el.closest('a[href*="/company/"]')) return false
+  if (isRejectedProfilePhotoContext(el)) return false
+
+  const alt = trimOrNull(el.getAttribute("alt"))?.toLowerCase() ?? ""
+  if (/company logo|sponsored|promoted|advertisement/.test(alt)) return false
+
+  const src = readImageElementSrc(el) ?? ""
+  if (/company-logo|ghost-person|static\.licdn\.com\/scds\/common\/u\/img\/icon/.test(src)) return false
+
+  if (profileName) {
+    const normalizedName = profileName.toLowerCase()
+    const first = normalizedName.split(/\s+/)[0]
+    if (first && alt.includes(first)) return true
+  }
+
+  return Boolean(
+    el.classList.contains("pv-top-card-profile-picture__image") ||
+      el.classList.contains("profile-photo-edit__preview") ||
+      el.closest(".pv-top-card-profile-picture") ||
+      el.closest("button.pv-top-card-profile-picture") ||
+      el.getAttribute("data-anonymize") === "headshot-photo",
+  )
+}
+
+function extractProfilePhotoFromTopCard(doc, topCard, profileName) {
+  if (!topCard) return null
+
+  const prioritySelectors = [
+    "img.pv-top-card-profile-picture__image",
+    "img.profile-photo-edit__preview",
+    "button.pv-top-card-profile-picture img",
+    "img.pv-top-card-profile-picture__image--show",
+    "img.pv-top-card-member-photo",
+    'img[data-anonymize="headshot-photo"]',
+    ".pv-top-card-profile-picture img",
+    "[data-view-name='profile-photo'] img",
+  ]
+
+  for (const selector of prioritySelectors) {
+    const el = topCard.querySelector(selector)
+    if (!looksLikeProfilePhotoImage(el, profileName)) continue
+    const src = readImageElementSrc(el)
+    if (src) return src
+  }
+
+  const h1 = topCard.querySelector("h1.text-heading-xlarge, h1.break-words, h1")
+  const proximityRoot =
+    h1?.closest("section") ??
+    h1?.closest(".ph5") ??
+    h1?.parentElement?.parentElement ??
+    topCard
+
+  if (proximityRoot) {
+    for (const img of proximityRoot.querySelectorAll("img")) {
+      if (!looksLikeProfilePhotoImage(img, profileName)) continue
+      const src = readImageElementSrc(img)
+      if (src) return src
+    }
+  }
+
   return null
 }
 
@@ -445,15 +547,7 @@ function extractLinkedInProfile(doc) {
 
   const location = extractProfileLocation(doc)
 
-  const profile_photo_url = queryImageSrc(doc, [
-    "img.pv-top-card-profile-picture__image",
-    "img.profile-photo-edit__preview",
-    "button.pv-top-card-profile-picture img",
-    "img.pv-top-card-profile-picture__image--show",
-    "img.pv-top-card-member-photo",
-    "img[data-anonymize='headshot-photo']",
-    'img[alt*="profile"]',
-  ])
+  const profile_photo_url = extractProfilePhotoFromTopCard(doc, topCard, contact_name)
 
   const topCompanyAnchor =
     doc.querySelector(".pv-text-details__right-panel a[href*='/company/']") ??
@@ -622,9 +716,14 @@ function extractVisiblePageMetadata() {
     websiteOriginFromUrl(canonicalUrl) ??
     websiteOriginFromUrl(sourceUrl)
 
+  const profileCompanyOnly =
+    linkedinKind === "profile"
+      ? trimOrNull(linkedinExtract.company_name)
+      : trimOrNull(linkedinExtract.company_name) ?? fallbackCompanyName
+
   const metadata = {
     page_title: pageTitle,
-    company_name: linkedinExtract.company_name ?? fallbackCompanyName,
+    company_name: profileCompanyOnly,
     website,
     linkedin_url: linkedinKind === "profile" ? linkedinUrl : linkedinExtract.linkedin_company_url ?? linkedinUrl,
     linkedin_company_url: linkedinExtract.linkedin_company_url ?? null,
@@ -633,9 +732,7 @@ function extractVisiblePageMetadata() {
     linkedin_page_kind: linkedinKind,
     og_site_name: ogSiteName,
     canonical_url: canonicalUrl,
-    profile_photo_url:
-      linkedinExtract.profile_photo_url ??
-      (sourcePlatform === "linkedin" && linkedinKind === "profile" ? trimOrNull(ogImage) : null),
+    profile_photo_url: linkedinExtract.profile_photo_url ?? null,
     company_logo_url: linkedinExtract.company_logo_url ?? null,
     contact_name: linkedinExtract.contact_name ?? null,
     headline: linkedinExtract.headline ?? null,
@@ -678,4 +775,6 @@ if (typeof window !== "undefined") {
   window.__equipifyGrowthExtract = extractVisiblePageMetadata
   window.__equipifyGrowthParseLinkedInHeadline = parseLinkedInHeadline
   window.__equipifyGrowthNormalizeVisibleText = normalizeVisibleText
+  window.__equipifyGrowthExtractProfilePhotoFromTopCard = extractProfilePhotoFromTopCard
+  window.__equipifyGrowthLooksLikeProfilePhotoImage = looksLikeProfilePhotoImage
 }

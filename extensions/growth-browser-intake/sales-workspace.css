@@ -671,6 +671,31 @@ body.surface-sidepanel.es-sales-workspace {
   gap: 8px;
 }
 
+.es-ws-employee-metric {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.es-ws-employee-group {
+  display: grid;
+  gap: 0;
+}
+
+.es-ws-employee-group-label {
+  margin: 8px 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.es-ws-muted {
+  color: #94a3b8;
+}
+
 .es-ws-employee-row {
   display: grid;
   grid-template-columns: 1fr auto;
