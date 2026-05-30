@@ -8,6 +8,8 @@
   const INTELLIGENCE_LOG_PREFIX = "[Equipify Sales:intelligence]"
   const PUBLIC_NOT_FOUND = "Not found on public profile"
   const COMPANY_NOT_FOUND = "Not found on public company page"
+  const COMPANY_NOT_DETECTED = "Company not detected"
+  const FOLLOWERS_NOT_AVAILABLE = "Not available"
   const PROFILE_CONTEXT_FAILED = "Profile context failed to load"
   let lastRenderInput = null
   let lastEnrichmentResult = null
@@ -32,6 +34,44 @@
     return trimOrNull(value) ?? COMPANY_NOT_FOUND
   }
 
+  function normalizeComparisonName(value) {
+    return trimOrNull(value)?.toLowerCase().replace(/\s+/g, " ") ?? ""
+  }
+
+  function rejectCompanyIfPersonName(companyName, personName) {
+    if (typeof window.__equipifyGrowthRejectCompanyIfPersonName === "function") {
+      return window.__equipifyGrowthRejectCompanyIfPersonName(companyName, personName)
+    }
+    const raw = trimOrNull(companyName)
+    if (!raw) return null
+    if (personName && normalizeComparisonName(raw) === normalizeComparisonName(personName)) return null
+    return raw
+  }
+
+  function resolvePersonName(detected, context, formValues) {
+    return (
+      trimOrNull(detected?.contact_name) ||
+      trimOrNull(context?.contact_name) ||
+      trimOrNull(formValues?.contact_name)
+    )
+  }
+
+  function pickCompanyCandidate(candidates, personName) {
+    for (const candidate of candidates) {
+      const sanitized = rejectCompanyIfPersonName(candidate, personName)
+      if (sanitized) return sanitized
+    }
+    return null
+  }
+
+  function followersValue(value) {
+    const raw = trimOrNull(value)
+    if (!raw) return FOLLOWERS_NOT_AVAILABLE
+    if (raw.length > 80 || /skip to|main content|keyboard shortcut/i.test(raw)) return FOLLOWERS_NOT_AVAILABLE
+    if (!/\d[\d,]*\+?\s+followers/i.test(raw)) return FOLLOWERS_NOT_AVAILABLE
+    return raw
+  }
+
   function parseHeadlineParts(headline) {
     if (!headline) return { title: null, company: null }
     if (typeof window.__equipifyGrowthParseLinkedInHeadline === "function") {
@@ -52,13 +92,18 @@
   }
 
   function resolveProfileCompany(detected, context, formValues) {
-    return (
-      trimOrNull(context?.company_name) ||
-      trimOrNull(formValues?.company_name) ||
-      trimOrNull(detected?.company_name) ||
-      parseHeadlineParts(detected?.headline).company ||
-      PUBLIC_NOT_FOUND
+    const personName = resolvePersonName(detected, context, formValues)
+    const resolved = pickCompanyCandidate(
+      [
+        trimOrNull(context?.company_name),
+        trimOrNull(formValues?.company_name),
+        trimOrNull(detected?.company_name),
+        parseHeadlineParts(detected?.headline).company,
+      ],
+      personName,
     )
+    if (resolved) return resolved
+    return detected?.linkedin_page_kind === "profile" ? COMPANY_NOT_DETECTED : PUBLIC_NOT_FOUND
   }
 
   function inferProfileNameFromPageTitle(pageTitle) {
@@ -85,21 +130,23 @@
 
   function resolveCompanyIntelDisplayName(detected, context, formValues, enrichment) {
     const resolved = resolveCompanyIntelName(detected, context, formValues, enrichment)
-    if (resolved !== COMPANY_NOT_FOUND) return resolved
-    const headlineCompany = parseHeadlineParts(detected?.headline).company
-    if (trimOrNull(headlineCompany)) return headlineCompany
-    return COMPANY_NOT_FOUND
+    if (resolved !== COMPANY_NOT_DETECTED) return resolved
+    return COMPANY_NOT_DETECTED
   }
 
   function resolveCompanyIntelName(detected, context, formValues, enrichment) {
-    return (
-      trimOrNull(enrichment?.company_name) ||
-      trimOrNull(context?.company_name) ||
-      trimOrNull(formValues?.company_name) ||
-      trimOrNull(detected?.company_name) ||
-      parseHeadlineParts(detected?.headline).company ||
-      COMPANY_NOT_FOUND
+    const personName = resolvePersonName(detected, context, formValues)
+    const resolved = pickCompanyCandidate(
+      [
+        trimOrNull(enrichment?.company_name),
+        trimOrNull(context?.company_name),
+        trimOrNull(formValues?.company_name),
+        trimOrNull(detected?.company_name),
+        parseHeadlineParts(detected?.headline).company,
+      ],
+      personName,
     )
+    return resolved ?? COMPANY_NOT_DETECTED
   }
 
   function mergeCompanyIntel(detected, enrichment) {
@@ -759,7 +806,7 @@
       { label: "Employees", value: companyValue(companyIntel.employee_count) },
       { label: "Employee range", value: companyValue(companyIntel.employee_range) },
       { label: "Founded", value: companyValue(companyIntel.founded) },
-      { label: "Followers", value: companyValue(companyIntel.followers_count) },
+      { label: "Followers", value: followersValue(companyIntel.followers_count) },
       { label: "Company type", value: companyValue(companyIntel.company_type) },
     ])
 

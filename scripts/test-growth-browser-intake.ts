@@ -291,7 +291,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.10"/)
+assert.match(manifestSource, /"version": "4.3.11"/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
 assert.match(manifestSource, /linkedin-inpage-sidebar\.js/)
@@ -666,8 +666,11 @@ assert.match(extensionWorkspaceJs, /\[Equipify Sales:intelligence\]/)
 assert.match(extensionWorkspaceJs, /Not found on public profile/)
 assert.match(extensionWorkspaceJs, /resolveCompanyIntelName/)
 assert.match(extensionWorkspaceJs, /resolveCompanyIntelDisplayName/)
-assert.match(extensionWorkspaceJs, /PROFILE_CONTEXT_FAILED/)
-assert.match(extensionWorkspaceJs, /Profile context failed to load/)
+assert.match(extensionWorkspaceJs, /COMPANY_NOT_DETECTED/)
+assert.match(extensionWorkspaceJs, /Company not detected/)
+assert.match(extensionWorkspaceJs, /rejectCompanyIfPersonName/)
+assert.match(extensionWorkspaceJs, /followersValue/)
+assert.match(extensionWorkspaceJs, /Not available/)
 assert.match(extensionWorkspaceJs, /resolveProfileTitle/)
 assert.match(extensionWorkspaceJs, /Not found on public company page/)
 assert.match(extensionWorkspaceJs, /equipify-enrich-company-page/)
@@ -721,8 +724,11 @@ assert.match(pageMetadataJs, /normalizeVisibleText/)
 assert.match(pageMetadataJs, /inferLinkedInProfileNameFromTitle/)
 assert.match(pageMetadataJs, /raw_profile_extract/)
 assert.match(pageMetadataJs, /normalized_profile_payload/)
-assert.match(pageMetadataJs, /headlineParts\.company/)
-assert.match(pageMetadataJs, /img\[alt\*="profile"\]/)
+assert.match(pageMetadataJs, /rejectCompanyIfPersonName/)
+assert.match(pageMetadataJs, /resolveProfileCompanyExtraction/)
+assert.match(pageMetadataJs, /\[Equipify Sales:company\]/)
+assert.match(pageMetadataJs, /isPlausibleMetricText/)
+assert.match(pageMetadataJs, /extractScopedMetric/)
 
 const PROFILE_PHOTO_FIXTURE = `<main>
   <nav class="global-nav"><img src="https://media.licdn.com/nav-avatar.jpg" alt="Me menu" /></nav>
@@ -876,7 +882,7 @@ assert.notEqual(
 )
 
 function resolveCompanyIntelHeader(companyName: string | null) {
-  return companyName && companyName !== "Not found on public company page" ? companyName : "Not found on public company page"
+  return companyName && companyName !== "Company not detected" ? companyName : "Company not detected"
 }
 
 assert.equal(resolveCompanyIntelHeader("Medical Equipment Doctor"), "Medical Equipment Doctor")
@@ -887,38 +893,90 @@ assert.equal(
       ? "Executive Vice PresidentSep 2023 - Present · 2 yrs 9 mos."
       : null,
   ),
-  "Not found on public company page",
+  "Company not detected",
 )
 
 const RICARDO_SANCHEZ_FIXTURE = `<main>
   <section class="artdeco-card">
     <img class="pv-top-card-profile-picture__image" src="https://media.licdn.com/ricardo-sanchez.jpg" alt="Ricardo Sanchez Villanueva" />
     <h1 class="text-heading-xlarge">Ricardo Sanchez Villanueva</h1>
-    <div class="text-body-medium break-words">Field Service Engineer at MedTech Solutions</div>
+    <div class="text-body-medium break-words">Biomedical Equipment Technician</div>
     <span class="text-body-small inline t-black--light break-words">San Diego, California, United States</span>
-    <a href="https://www.linkedin.com/company/medtech-solutions/">
-      <img src="https://media.licdn.com/medtech-logo.jpg" alt="MedTech Solutions logo" />
-      MedTech Solutions
-    </a>
+  </section>
+  <section id="experience">
+    <li>
+      <a href="https://www.linkedin.com/company/sharp-memorial-hospital/">SHARP MEMORIAL HOSPITAL</a>
+      <span aria-hidden="true">Biomedical Equipment Technician</span>
+      <span class="pvs-entity__caption-wrapper">Jan 2022 - Present · 3 yrs</span>
+    </li>
+    <li>
+      <a href="https://www.linkedin.com/company/miracosta-college/">MiraCosta College</a>
+      <span aria-hidden="true">Student</span>
+      <span class="pvs-entity__caption-wrapper">2018 - 2020</span>
+    </li>
   </section>
   <section id="education">
     <a href="https://www.linkedin.com/company/miracosta-college/">MiraCosta College</a>
   </section>
 </main>`
 
-function extractTopCardCompanyFromFixture(html: string) {
-  const topCardMatch = html.match(/artdeco-card[\s\S]*?<\/section>/)
-  const topCard = topCardMatch?.[0] ?? html
-  const anchorMatch = topCard.match(/href="[^"]*\/company\/[^"]+">\s*(?:<img[^>]+>\s*)?([^<]+)\s*<\/a>/)
-  return anchorMatch?.[1]?.trim() ?? null
+function rejectCompanyIfPersonNameFixture(companyName: string | null, personName: string | null) {
+  const company = companyName?.trim() ?? null
+  if (!company) return null
+  if (personName && company.toLowerCase() === personName.toLowerCase()) return null
+  return company
 }
 
-const ricardoCompany = extractTopCardCompanyFromFixture(RICARDO_SANCHEZ_FIXTURE)
-assert.equal(ricardoCompany, "MedTech Solutions")
-assert.notEqual(ricardoCompany, "MiraCosta College")
+function resolveCompanyFromRicardoFixture(html: string, personName: string) {
+  const experienceBlock = html.match(/id="experience"[\s\S]*?<\/section>/)?.[0] ?? ""
+  let presentCompany: string | null = null
+  for (const item of experienceBlock.match(/<li>[\s\S]*?<\/li>/g) ?? []) {
+    if (!/present/i.test(item)) continue
+    presentCompany = item.match(/href="[^"]*\/company\/[^"]+">\s*([^<]+)/)?.[1]?.trim() ?? null
+    if (presentCompany) break
+  }
+  const topCardCompany = html.match(/artdeco-card[\s\S]*?href="[^"]*\/company\/[^"]+">\s*([^<]+)/)?.[1]?.trim()
+  const experienceCompanies = [...experienceBlock.matchAll(/href="[^"]*\/company\/[^"]+">\s*([^<]+)/g)].map(
+    (match) => match[1]?.trim(),
+  )
+  const candidates = [presentCompany, topCardCompany, ...experienceCompanies]
+  for (const candidate of candidates) {
+    const sanitized = rejectCompanyIfPersonNameFixture(candidate ?? null, personName)
+    if (sanitized) return sanitized
+  }
+  return null
+}
+
+function inferCompanyFromLinkedInPageTitle(title: string) {
+  const withoutLinkedIn = title.replace(/\s*[|\-–—]\s*LinkedIn\s*$/i, "").trim()
+  if (!withoutLinkedIn) return null
+  const parts = withoutLinkedIn.split(/\s*[|\-–—]\s*/).filter(Boolean)
+  if (parts.length === 1) return parts[0]?.trim() ?? null
+  return null
+}
+
+const ricardoPersonName = "Ricardo Sanchez Villanueva"
+const ricardoCompany = resolveCompanyFromRicardoFixture(RICARDO_SANCHEZ_FIXTURE, ricardoPersonName)
 assert.equal(
   extractLinkedInFixtureField(RICARDO_SANCHEZ_FIXTURE, /text-heading-xlarge">([^<]+)/),
-  "Ricardo Sanchez Villanueva",
+  ricardoPersonName,
+)
+assert.notEqual(ricardoCompany, ricardoPersonName)
+assert.ok(ricardoCompany === "SHARP MEMORIAL HOSPITAL" || ricardoCompany === null)
+assert.notEqual(ricardoCompany, "MiraCosta College")
+assert.equal(rejectCompanyIfPersonNameFixture(ricardoPersonName, ricardoPersonName), null)
+assert.equal(
+  rejectCompanyIfPersonNameFixture(
+    inferCompanyFromLinkedInPageTitle(`${ricardoPersonName} | LinkedIn`),
+    ricardoPersonName,
+  ),
+  null,
+)
+assert.equal(resolveCompanyIntelHeader(ricardoCompany), ricardoCompany ?? "Company not detected")
+assert.equal(resolveCompanyIntelHeader(null), "Company not detected")
+assert.equal(
+  resolveCompanyIntelHeader(rejectCompanyIfPersonNameFixture(ricardoPersonName, ricardoPersonName)),
+  "Company not detected",
 )
 
 const LINKEDIN_PROFILE_FIXTURE = `<main>

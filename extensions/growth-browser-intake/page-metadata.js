@@ -338,17 +338,135 @@ function extractDefinitionMap(doc) {
   return map
 }
 
+function normalizeComparisonName(value) {
+  return trimOrNull(value)?.toLowerCase().replace(/\s+/g, " ") ?? ""
+}
+
+function rejectCompanyIfPersonName(companyName, personName) {
+  const company = normalizeVisibleText(companyName)
+  if (!company) return null
+  if (personName && normalizeComparisonName(company) === normalizeComparisonName(personName)) {
+    return null
+  }
+  return company
+}
+
+function readCompanyFromAnchor(anchor) {
+  if (!anchor) return { name: null, url: null }
+  return {
+    name: normalizeVisibleText(trimOrNull(anchor.textContent)),
+    url: normalizeLinkedInCompanyUrl(anchor.getAttribute("href")),
+  }
+}
+
+function companyNameFromLinkedInCompanyUrl(url) {
+  const raw = trimOrNull(url)
+  if (!raw) return null
+  const match = raw.match(/\/company\/([^/?#]+)/i)
+  if (!match?.[1]) return null
+  const slug = decodeURIComponent(match[1]).replace(/-/g, " ")
+  return normalizeVisibleText(slug)
+}
+
+function findTopCardCompanyAnchor(topCard, doc) {
+  const topCardRoot = topCard ?? doc
+  return (
+    topCardRoot.querySelector(".pv-text-details__right-panel a[href*='/company/']") ??
+    topCardRoot.querySelector(".pv-text-details__left-panel a[href*='/company/']") ??
+    topCardRoot.querySelector("a[href*='/company/']") ??
+    doc.querySelector("[data-view-name='profile-card'] a[href*='/company/']")
+  )
+}
+
+function resolveProfileCompanyExtraction(doc, topCard, personName, experienceEntries) {
+  const candidates = []
+  const topCompanyAnchor = findTopCardCompanyAnchor(topCard, doc)
+  const topCardCompany = readCompanyFromAnchor(topCompanyAnchor)
+  const currentExperience =
+    experienceEntries.find((entry) => /\bpresent\b/i.test(entry.date_range ?? "")) ?? experienceEntries[0]
+
+  if (currentExperience?.company_name) {
+    candidates.push({
+      name: currentExperience.company_name,
+      source: "experience.current",
+      url: currentExperience.linkedin_company_url ?? null,
+      anchor: null,
+    })
+  }
+
+  if (topCardCompany.name) {
+    candidates.push({
+      name: topCardCompany.name,
+      source: "top-card.company-anchor",
+      url: topCardCompany.url,
+      anchor: topCompanyAnchor,
+    })
+  }
+
+  for (const entry of experienceEntries) {
+    if (!entry.company_name) continue
+    candidates.push({
+      name: entry.company_name,
+      source: "experience.section",
+      url: entry.linkedin_company_url ?? null,
+      anchor: null,
+    })
+  }
+
+  const urlCandidates = [
+    currentExperience?.linkedin_company_url,
+    topCardCompany.url,
+    ...experienceEntries.map((entry) => entry.linkedin_company_url),
+  ].filter(Boolean)
+
+  for (const url of urlCandidates) {
+    const fromUrl = companyNameFromLinkedInCompanyUrl(url)
+    if (fromUrl) {
+      candidates.push({
+        name: fromUrl,
+        source: "company-url.slug",
+        url,
+        anchor: null,
+      })
+    }
+  }
+
+  const candidateNames = candidates.map((candidate) => candidate.name).filter(Boolean)
+  let selected = null
+
+  for (const candidate of candidates) {
+    const sanitized = rejectCompanyIfPersonName(candidate.name, personName)
+    if (!sanitized) continue
+    selected = {
+      company_name: sanitized,
+      linkedin_company_url: candidate.url ?? null,
+      source_selector: candidate.source,
+      anchor: candidate.anchor,
+    }
+    break
+  }
+
+  console.log("[Equipify Sales:company]", {
+    person_name: personName ?? null,
+    candidate_company_names: candidateNames,
+    selected_company_name: selected?.company_name ?? null,
+    source_selector: selected?.source_selector ?? null,
+  })
+
+  return selected ?? { company_name: null, linkedin_company_url: null, source_selector: null, anchor: null }
+}
+
 function extractExperienceEntries(doc) {
   const entries = []
   const seen = new Set()
 
   const section =
     doc.querySelector("#experience")?.closest("section") ??
-    doc.querySelector('[data-view-name="profile-card-experience"]') ??
-    doc.querySelector("section.pv-profile-card")
+    doc.querySelector('[data-view-name="profile-card-experience"]')
 
-  const scope = section ?? doc
-  scope.querySelectorAll('li, div.pvs-list__paged-list-item, [data-view-name="profile-component-entity"]').forEach((item) => {
+  if (!section) return []
+
+  section.querySelectorAll('li, div.pvs-list__paged-list-item, [data-view-name="profile-component-entity"]').forEach((item) => {
     const companyAnchor = item.querySelector('a[href*="/company/"]')
     const companyName = normalizeVisibleText(trimOrNull(companyAnchor?.textContent))
     const companyUrl = normalizeLinkedInCompanyUrl(companyAnchor?.getAttribute("href"))
@@ -369,17 +487,6 @@ function extractExperienceEntries(doc) {
       date_range: dateText,
     })
   })
-
-  if (!entries.length) {
-    doc.querySelectorAll('a[href*="/company/"]').forEach((anchor) => {
-      const companyName = trimOrNull(anchor.textContent)
-      const companyUrl = normalizeLinkedInCompanyUrl(anchor.getAttribute("href"))
-      if (!companyName || companyName.length > 120) return
-      if (seen.has(companyName)) return
-      seen.add(companyName)
-      entries.push({ company_name: companyName, linkedin_company_url: companyUrl })
-    })
-  }
 
   return entries.slice(0, 8)
 }
@@ -404,13 +511,54 @@ function extractEducationEntries(doc) {
   return entries.slice(0, 6)
 }
 
-function extractVisibleMetric(doc, pattern) {
-  const nodes = doc.querySelectorAll("span, li, div")
-  for (const node of nodes) {
-    const text = trimOrNull(node.textContent)
-    if (text && pattern.test(text)) return text
+function isPlausibleMetricText(text, pattern) {
+  const raw = trimOrNull(text)
+  if (!raw || raw.length > 80) return false
+  if (/skip to|main content|keyboard shortcut|sign in|linkedin/i.test(raw)) return false
+  return pattern.test(raw)
+}
+
+function extractScopedMetric(doc, pattern, scopes) {
+  const roots = scopes.filter(Boolean)
+  const seen = new Set()
+  for (const root of roots) {
+    for (const node of root.querySelectorAll("span, li, div")) {
+      const text = trimOrNull(node.textContent)
+      if (!text || seen.has(text)) continue
+      seen.add(text)
+      if (isPlausibleMetricText(text, pattern)) return text
+    }
   }
   return null
+}
+
+function extractProfileConnectionsMetric(doc, topCard) {
+  return extractScopedMetric(doc, /\d[\d,]*\+?\s+connections/i, [
+    topCard,
+    doc.querySelector("[data-view-name='profile-card']"),
+    doc.querySelector("main section.artdeco-card"),
+  ])
+}
+
+function extractCompanyFollowersMetric(doc) {
+  return extractScopedMetric(doc, /\d[\d,]*\+?\s+followers/i, [
+    doc.querySelector(".org-top-card"),
+    doc.querySelector(".org-top-card-primary-content"),
+    doc.querySelector("main section.artdeco-card"),
+    doc.querySelector("[data-view-name='profile-card']"),
+  ])
+}
+
+function extractCompanyEmployeeMetric(doc) {
+  return extractScopedMetric(doc, /\d[\d,]*\+?\s+employees/i, [
+    doc.querySelector(".org-top-card"),
+    doc.querySelector(".org-top-card-summary-info-list"),
+    doc.querySelector("main section.artdeco-card"),
+  ]) ?? extractScopedMetric(doc, /\d[\d,–-]+\s+employees/i, [
+    doc.querySelector(".org-top-card"),
+    doc.querySelector(".org-top-card-summary-info-list"),
+    doc.querySelector("main section.artdeco-card"),
+  ])
 }
 
 function extractLinkedInProfile(doc) {
@@ -455,37 +603,29 @@ function extractLinkedInProfile(doc) {
     'img[alt*="profile"]',
   ])
 
-  const topCardRoot = topCard ?? doc
-  const topCompanyAnchor =
-    topCardRoot.querySelector(".pv-text-details__right-panel a[href*='/company/']") ??
-    topCardRoot.querySelector(".pv-text-details__left-panel a[href*='/company/']") ??
-    topCardRoot.querySelector("a[href*='/company/']") ??
-    doc.querySelector("[data-view-name='profile-card'] a[href*='/company/']")
-
   const headlineParts = parseLinkedInHeadline(headline)
-  let current_company = normalizeVisibleText(trimOrNull(topCompanyAnchor?.textContent))
   const experienceEntries = extractExperienceEntries(doc)
+  const companySelection = resolveProfileCompanyExtraction(doc, topCard, contact_name, experienceEntries)
+  const current_company = companySelection.company_name
   const currentExperience =
     experienceEntries.find((entry) => /\bpresent\b/i.test(entry.date_range ?? "")) ?? experienceEntries[0]
-  if (!current_company && currentExperience?.company_name) {
-    current_company = normalizeVisibleText(currentExperience.company_name)
-  }
-  if (!current_company && headlineParts.company) {
-    current_company = headlineParts.company
-  }
 
   let current_title = normalizeVisibleText(currentExperience?.title) ?? headlineParts.title
   if (current_title && current_company && current_title.includes(current_company)) {
     current_title = headlineParts.title ?? normalizeVisibleText(currentExperience?.title)
   }
 
-  const linkedin_company_url = normalizeLinkedInCompanyUrl(topCompanyAnchor?.getAttribute("href"))
-  const company_logo_url = queryImageSrc(doc, ["a[href*='/company/'] img"])
+  const linkedin_company_url = companySelection.linkedin_company_url
+  const companyAnchor = companySelection.anchor ?? findTopCardCompanyAnchor(topCard, doc)
+  const company_logo_url = companyAnchor
+    ? trimOrNull(companyAnchor.querySelector("img")?.getAttribute("src")) ??
+      trimOrNull(companyAnchor.querySelector("img")?.getAttribute("data-delayed-url"))
+    : null
   const website = extractProfileWebsite(doc)
 
   const locationParts = parseLocationParts(location)
-  const connections = extractVisibleMetric(doc, /\d[\d,]*\+?\s+connections/i)
-  const followers = extractVisibleMetric(doc, /\d[\d,]*\+?\s+followers/i)
+  const connections = extractProfileConnectionsMetric(doc, topCard)
+  const followers = extractCompanyFollowersMetric(doc)
 
   const rawProfileExtract = {
     linkedin_page_kind: "profile",
@@ -532,16 +672,13 @@ function extractLinkedInCompany(doc) {
 
   const defs = extractDefinitionMap(doc)
   const industry = defs.industry ?? queryText(doc, [".org-top-card-summary-info-list__info-item"])
-  const employee_count =
-    defs["company size"] ??
-    extractVisibleMetric(doc, /\d[\d,]*\+?\s+employees/i) ??
-    extractVisibleMetric(doc, /\d[\d,–-]+\s+employees/i)
+  const employee_count = defs["company size"] ?? extractCompanyEmployeeMetric(doc)
   const employee_range = employee_count
   const headquarters = defs.headquarters ?? defs.location
   const founded = defs.founded ?? defs["founded year"]
   const specialties = defs.specialties
   const company_type = defs.type ?? defs["company type"]
-  const followers_count = extractVisibleMetric(doc, /\d[\d,]*\+?\s+followers/i)
+  const followers_count = extractCompanyFollowersMetric(doc)
   const locationParts = parseLocationParts(headquarters)
 
   const websiteLink = doc.querySelector(
@@ -618,11 +755,19 @@ function extractVisiblePageMetadata() {
         : {}
 
   const fallbackCompanyName =
-    trimOrNull(ogSiteName) ??
-    jsonLdCompany ??
-    (sourcePlatform === "linkedin"
-      ? inferCompanyNameFromLinkedInTitle(ogTitle ?? pageTitle)
-      : inferCompanyNameFromPageTitle(ogTitle ?? pageTitle))
+    linkedinKind === "profile"
+      ? null
+      : trimOrNull(ogSiteName) ??
+        jsonLdCompany ??
+        (sourcePlatform === "linkedin"
+          ? inferCompanyNameFromLinkedInTitle(ogTitle ?? pageTitle)
+          : inferCompanyNameFromPageTitle(ogTitle ?? pageTitle))
+
+  const profileCompanyName =
+    linkedinKind === "profile"
+      ? rejectCompanyIfPersonName(linkedinExtract.company_name, linkedinExtract.contact_name)
+      : rejectCompanyIfPersonName(linkedinExtract.company_name, linkedinExtract.contact_name) ??
+        fallbackCompanyName
 
   const website =
     trimOrNull(linkedinExtract.website) ??
@@ -631,7 +776,7 @@ function extractVisiblePageMetadata() {
 
   const metadata = {
     page_title: pageTitle,
-    company_name: linkedinExtract.company_name ?? fallbackCompanyName,
+    company_name: profileCompanyName,
     website,
     linkedin_url: linkedinKind === "profile" ? linkedinUrl : linkedinExtract.linkedin_company_url ?? linkedinUrl,
     linkedin_company_url: linkedinExtract.linkedin_company_url ?? null,
@@ -703,4 +848,6 @@ if (typeof window !== "undefined") {
   window.__equipifyGrowthExtract = extractVisiblePageMetadata
   window.__equipifyGrowthParseLinkedInHeadline = parseLinkedInHeadline
   window.__equipifyGrowthNormalizeVisibleText = normalizeVisibleText
+  window.__equipifyGrowthRejectCompanyIfPersonName = rejectCompanyIfPersonName
+  window.__equipifyGrowthResolveProfileCompanyExtraction = resolveProfileCompanyExtraction
 }
