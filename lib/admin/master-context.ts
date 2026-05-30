@@ -11,7 +11,7 @@ import {
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-30T17:54:15.018Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-30T18:01:29.382Z"
 
 function formatUtc(iso: string): string {
   try {

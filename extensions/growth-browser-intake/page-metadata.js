@@ -404,6 +404,238 @@ function findProfileHeroContainer(nameNode, topCard) {
   return topCard ?? nameNode?.closest("div, section, main") ?? null
 }
 
+function collectHeroTextSegments(nameNode, topCard, maxDepth = 8) {
+  const segments = []
+  if (!nameNode) return segments
+  let node = nameNode.parentElement
+  for (let depth = 0; depth < maxDepth && node; depth += 1) {
+    for (const el of node.querySelectorAll("div, span, p, a")) {
+      const text = trimOrNull(el.textContent)?.replace(/\s+/g, " ").slice(0, 200)
+      if (!text || text.length < 3) continue
+      segments.push({
+        selector: describeElementForAudit(el),
+        text,
+        in_top_card: topCard?.contains(el) ?? false,
+        depth_from_h1_parent: depth,
+      })
+    }
+    node = node.parentElement
+  }
+  return segments.slice(0, 40)
+}
+
+function collectHeadlineTextSources(topCard, nameNode) {
+  return {
+    from_selectors: normalizeVisibleText(
+      queryTextInContainer(topCard, [
+        "div.text-body-medium.break-words",
+        ".pv-text-details__left-panel .text-body-medium",
+        ".ph5.pb5 .text-body-medium",
+        ".text-body-medium:not(.t-black--light)",
+        ".top-card-layout__headline",
+        "[data-view-name='profile-header'] .text-body-medium",
+      ]),
+    ),
+    near_name_node: normalizeVisibleText(trimOrNull(findHeadlineNearName(nameNode)?.textContent)),
+    top_card_text_preview: trimOrNull(topCard?.textContent)?.replace(/\s+/g, " ").slice(0, 400) ?? null,
+  }
+}
+
+function collectHeroBackgroundImageAudit(scope) {
+  const results = []
+  if (!scope || typeof window.getComputedStyle !== "function") return results
+  for (const el of scope.querySelectorAll("*")) {
+    if (!(el instanceof HTMLElement)) continue
+    const style = window.getComputedStyle(el)
+    const bg = style.backgroundImage
+    if (!bg || bg === "none" || !bg.includes("url(")) continue
+    results.push({
+      selector: describeElementForAudit(el),
+      background_image: bg.slice(0, 240),
+      width: Math.round(el.offsetWidth),
+      height: Math.round(el.offsetHeight),
+    })
+  }
+  return results.slice(0, 12)
+}
+
+function buildCompanyCandidatesDiagnostic(
+  doc,
+  topCard,
+  nameNode,
+  headlineText,
+  experienceEntries,
+  personName,
+) {
+  const headlineSources = collectHeadlineTextSources(topCard, nameNode)
+  const raw_text_segments = collectHeroTextSegments(nameNode, topCard)
+  const entity_text = collectEntityLinePlainTextCompanies(topCard)
+  const parsedHeadline = parseConcatenatedHeadlineTitleCompany(headlineText)
+  const generated_candidates = []
+  const rejected_candidates = []
+
+  if (!topCard) {
+    rejected_candidates.push({
+      stage: "container-binding",
+      reason: "top-card-null",
+      detail: { name_node: describeElementForAudit(nameNode) },
+    })
+  }
+
+  if (!trimOrNull(headlineText)) {
+    rejected_candidates.push({
+      stage: "headline-binding",
+      reason: "headline-empty",
+      detail: headlineSources,
+    })
+  }
+
+  if (trimOrNull(headlineText) && !parsedHeadline.company) {
+    rejected_candidates.push({
+      stage: "headline-parse",
+      reason: "concatenated-headline-no-company",
+      detail: {
+        headline_text: headlineText,
+        normalized_headline: normalizeVisibleText(headlineText),
+        parsed: parsedHeadline,
+      },
+    })
+  }
+
+  const currentExperience =
+    experienceEntries.find((entry) => /\bpresent\b/i.test(entry.date_range ?? "")) ?? experienceEntries[0]
+  if (!currentExperience?.company_name) {
+    rejected_candidates.push({
+      stage: "experience",
+      reason: "no-present-experience-company",
+      detail: { experience_entry_count: experienceEntries.length, entries: experienceEntries.slice(0, 3) },
+    })
+  } else {
+    generated_candidates.push({
+      stage: "experience",
+      source: "experience.current.company",
+      value: currentExperience.company_name,
+    })
+  }
+
+  const topCardEntities = parseTopCardEntityAnchors(topCard)
+  if (!topCardEntities.length) {
+    rejected_candidates.push({
+      stage: "top-card-anchors",
+      reason: "no-company-or-school-anchors-in-top-card",
+      detail: {
+        top_card_selector: describeElementForAudit(topCard),
+        company_anchor_count: topCard?.querySelectorAll('a[href*="/company/"]').length ?? 0,
+        school_anchor_count: topCard?.querySelectorAll('a[href*="/school/"]').length ?? 0,
+      },
+    })
+  } else {
+    for (const entity of topCardEntities) {
+      generated_candidates.push({
+        stage: "top-card-anchors",
+        source: entity.is_school ? "top-card.school-anchor" : "top-card.entity-anchor",
+        value: entity.name,
+      })
+    }
+  }
+
+  if (!entity_text.length) {
+    rejected_candidates.push({
+      stage: "entity-line",
+      reason: "no-plain-text-entity-segments",
+      detail: { top_card_contains_middle_dot: /\u00b7|·/.test(topCard?.textContent ?? "") },
+    })
+  } else {
+    for (const name of entity_text) {
+      generated_candidates.push({
+        stage: "entity-line",
+        source: "top-card.entity-line-plain-text",
+        value: name,
+      })
+    }
+  }
+
+  const topCompanyAnchor = findTopCardCompanyAnchor(topCard)
+  if (!topCompanyAnchor) {
+    rejected_candidates.push({
+      stage: "top-card-company-anchor",
+      reason: "findTopCardCompanyAnchor-returned-null",
+      detail: { top_card_selector: describeElementForAudit(topCard) },
+    })
+  } else {
+    generated_candidates.push({
+      stage: "top-card-company-anchor",
+      source: "top-card.company-anchor",
+      value: normalizeVisibleText(topCompanyAnchor.textContent),
+      href: trimOrNull(topCompanyAnchor.getAttribute("href")),
+    })
+  }
+
+  if (parsedHeadline.company) {
+    generated_candidates.push({
+      stage: "headline-parse",
+      source: "top-card.headline-plain-text",
+      value: parsedHeadline.company,
+    })
+  }
+
+  const docCompanyAnchorsOutsideTopCard = []
+  for (const anchor of doc.querySelectorAll('a[href*="/company/"]')) {
+    if (topCard?.contains(anchor)) continue
+    if (isInsideForbiddenProfileRegion(anchor)) continue
+    if (anchor.closest("aside, #activity, .feed-shared-update-v2")) continue
+    docCompanyAnchorsOutsideTopCard.push({
+      value: normalizeVisibleText(anchor.textContent),
+      href: trimOrNull(anchor.getAttribute("href")),
+      selector: describeElementForAudit(anchor),
+    })
+    if (docCompanyAnchorsOutsideTopCard.length >= 8) break
+  }
+
+  if (docCompanyAnchorsOutsideTopCard.length) {
+    rejected_candidates.push({
+      stage: "traversal-scope",
+      reason: "company-anchors-exist-outside-bound-top-card",
+      detail: docCompanyAnchorsOutsideTopCard,
+    })
+  }
+
+  const segmentsMatchingSharp = raw_text_segments.filter((entry) => /sharp/i.test(entry.text ?? ""))
+  if (segmentsMatchingSharp.length && !generated_candidates.some((entry) => /sharp/i.test(entry.value ?? ""))) {
+    rejected_candidates.push({
+      stage: "traversal-scope",
+      reason: "visible-sharp-text-outside-candidate-generation",
+      detail: segmentsMatchingSharp,
+    })
+  }
+
+  if (personName) {
+    for (const entry of [...generated_candidates]) {
+      if (normalizeComparisonName(entry.value) === normalizeComparisonName(personName)) {
+        rejected_candidates.push({
+          stage: "person-name-filter",
+          reason: "matches-person-name",
+          detail: entry,
+        })
+      }
+    }
+  }
+
+  return {
+    raw_text_segments,
+    headline_text: headlineText ?? null,
+    headline_text_sources: headlineSources,
+    entity_text,
+    parsed_headline: parsedHeadline,
+    generated_candidates,
+    rejected_candidates,
+  }
+}
+
+function logCompanyCandidatesDiagnostic(payload) {
+  console.log("[Equipify Sales:company-candidates]", payload)
+}
+
 function parseConcatenatedHeadlineTitleCompany(text) {
   const raw = normalizeVisibleText(text)
   if (!raw) return { title: null, company: null }
@@ -886,6 +1118,51 @@ function findProfilePhotoUrl(doc, topCard, nameNode) {
   if (topCard && topCard !== heroContainer) scopes.push({ scope: topCard, source: "top-card" })
   if (nameNode?.parentElement) scopes.push({ scope: nameNode.parentElement, source: "name-parent" })
 
+  let imageCountInHero = 0
+  let imageCountInTopCard = 0
+  let imageCountNearName = 0
+  const candidate_images = []
+  const auditImagesSeen = new Set()
+
+  function auditImage(img, source, options = {}) {
+    const src = readProfileImageSrc(img)
+    const key = `${source}|${describeElementForAudit(img)}|${src ?? ""}`
+    if (auditImagesSeen.has(key)) return
+    auditImagesSeen.add(key)
+    const dims = readProfileImageDimensions(img)
+    const rect = readProfileImageRect(img)
+    candidate_images.push({
+      src,
+      src_attr: trimOrNull(img.getAttribute("src")),
+      srcset: trimOrNull(img.getAttribute("srcset"))?.slice(0, 120) ?? null,
+      current_src: typeof img.currentSrc === "string" ? trimOrNull(img.currentSrc) : null,
+      alt: trimOrNull(img.getAttribute("alt")),
+      width: dims.width || rect?.width || 0,
+      height: dims.height || rect?.height || 0,
+      rect,
+      source_selector: `${source}.${describeElementForAudit(img)}`,
+      forbidden: isProfileImageForbidden(img),
+      cover_or_banner: isCoverOrBannerProfileImage(img, dims.width || rect?.width || 0, dims.height || rect?.height || 0),
+      in_top_card: topCard?.contains(img) ?? false,
+      in_hero_container: heroContainer?.contains(img) ?? false,
+      ...options,
+    })
+  }
+
+  if (heroContainer) imageCountInHero = heroContainer.querySelectorAll("img").length
+  if (topCard) imageCountInTopCard = topCard.querySelectorAll("img").length
+  if (nameNode?.parentElement) {
+    imageCountNearName = nameNode.parentElement.querySelectorAll("img").length
+  }
+
+  let node = nameNode?.parentElement
+  for (let depth = 0; depth < 10 && node; depth += 1) {
+    for (const img of node.querySelectorAll("img")) {
+      auditImage(img, `h1-ancestor-${depth}`, { traversal_only: true })
+    }
+    node = node.parentElement
+  }
+
   let selectedSrc = null
   let selectedEntry = null
   let bestScore = Number.NEGATIVE_INFINITY
@@ -913,16 +1190,19 @@ function findProfilePhotoUrl(doc, topCard, nameNode) {
       if (!src || src.startsWith("data:")) {
         entry.reject_reason = "missing-src"
         candidates.push(entry)
+        auditImage(img, source, { reject_reason: entry.reject_reason, selection_pass: true })
         continue
       }
       if (isProfileImageForbidden(img)) {
         entry.reject_reason = "forbidden-region"
         candidates.push(entry)
+        auditImage(img, source, { reject_reason: entry.reject_reason, selection_pass: true })
         continue
       }
       if (isCoverOrBannerProfileImage(img, effectiveWidth, effectiveHeight)) {
         entry.reject_reason = "cover-or-banner"
         candidates.push(entry)
+        auditImage(img, source, { reject_reason: entry.reject_reason, selection_pass: true })
         continue
       }
       if (
@@ -932,12 +1212,14 @@ function findProfilePhotoUrl(doc, topCard, nameNode) {
       ) {
         entry.reject_reason = "too-small"
         candidates.push(entry)
+        auditImage(img, source, { reject_reason: entry.reject_reason, selection_pass: true })
         continue
       }
 
       const score = scoreProfileImageCandidate(img, nameNode, heroContainer ?? topCard)
       entry.score = score
       candidates.push(entry)
+      auditImage(img, source, { reject_reason: null, selection_pass: true, score })
       if (score > bestScore) {
         bestScore = score
         selectedSrc = src
@@ -973,7 +1255,20 @@ function findProfilePhotoUrl(doc, topCard, nameNode) {
   }
 
   logProfileImageAudit({
-    candidates,
+    hero_container_found: Boolean(heroContainer),
+    hero_container_selector: describeElementForAudit(heroContainer),
+    top_card_selector: describeElementForAudit(topCard),
+    name_node_selector: describeElementForAudit(nameNode),
+    image_count: {
+      hero_container: imageCountInHero,
+      top_card: imageCountInTopCard,
+      name_parent: imageCountNearName,
+      document: doc.querySelectorAll("img").length,
+    },
+    candidate_images,
+    background_images_in_hero: collectHeroBackgroundImageAudit(heroContainer ?? topCard),
+    selection_candidates: candidates,
+    selected_profile_image: selectedSrc,
     selected_src: selectedSrc,
   })
 
@@ -1729,6 +2024,17 @@ function extractLinkedInProfile(doc) {
       ".top-card-layout__headline",
       "[data-view-name='profile-header'] .text-body-medium",
     ]) ?? trimOrNull(findHeadlineNearName(nameNode)?.textContent),
+  )
+
+  logCompanyCandidatesDiagnostic(
+    buildCompanyCandidatesDiagnostic(
+      doc,
+      topCard,
+      nameNode,
+      headline,
+      extractExperienceEntries(doc),
+      contact_name,
+    ),
   )
 
   const location = extractProfileLocation(topCard) ?? findLocationNearName(nameNode, topCard)

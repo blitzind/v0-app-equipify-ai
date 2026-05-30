@@ -293,7 +293,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.17"/)
+assert.match(manifestSource, /"version": "4.3.18"/)
 assert.match(manifestSource, /https:\/\/m\.linkedin\.com\/in\/\*/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
@@ -758,6 +758,10 @@ assert.match(pageMetadataJs, /\[Equipify Sales:experience-discovery\]/)
 assert.match(pageMetadataJs, /\[Equipify Sales:hero-discovery\]/)
 assert.match(pageMetadataJs, /\[Equipify Sales:company-selection\]/)
 assert.match(pageMetadataJs, /\[Equipify Sales:profile-image\]/)
+assert.match(pageMetadataJs, /\[Equipify Sales:company-candidates\]/)
+assert.match(pageMetadataJs, /buildCompanyCandidatesDiagnostic/)
+assert.match(pageMetadataJs, /hero_container_found/)
+assert.match(pageMetadataJs, /rejected_candidates/)
 assert.match(pageMetadataJs, /buildExperienceDiscoveryAudit/)
 assert.match(pageMetadataJs, /\[Equipify Sales:dom-audit\]/)
 assert.match(pageMetadataJs, /buildDomAudit/)
@@ -1105,6 +1109,29 @@ const RICARDO_MODERN_DESKTOP_FIXTURE = `<!DOCTYPE html><html><body>
 </div>
 </body></html>`
 
+const RICARDO_LIVE_DOM_FIXTURE = `<!DOCTYPE html><html><body>
+<div style="width: 1280px" class="profile-page-layout">
+  <div class="photo-rail">
+    <img class="profile-headshot" src="https://media.licdn.com/ricardo-headshot.jpg" width="200" height="200" alt="Ricardo Sanchez Villanueva" />
+  </div>
+  <div class="profile-content-column" style="width: 720px">
+    <div class="profile-hero-module">
+      <img class="profile-background-image" src="https://media.licdn.com/ricardo-cover.jpg" width="720" height="200" alt="" />
+      <div class="info-col">
+        <h1>Ricardo Sanchez Villanueva</h1>
+        <div class="headline-line">Biomedical Equipment Technician</div>
+        <span class="company-plain-text">SHARP MEMORIAL HOSPITAL</span>
+        <span>San Diego, California, United States</span>
+      </div>
+    </div>
+    <div data-view-name="profile-card-experience"></div>
+  </div>
+  <aside class="scaffold-layout__aside">
+    <a href="https://www.linkedin.com/company/sharp-memorial-hospital/">SHARP MEMORIAL HOSPITAL</a>
+  </aside>
+</div>
+</body></html>`
+
 type PageMetadataHarness = {
   document: Document
   metadata: Record<string, unknown> | null | undefined
@@ -1112,6 +1139,7 @@ type PageMetadataHarness = {
   domMap: Record<string, unknown> | null | undefined
   experienceDiscovery: Record<string, unknown> | null | undefined
   profileImageAudit: Record<string, unknown> | null | undefined
+  companyCandidatesAudit: Record<string, unknown> | null | undefined
   domAudit: Record<string, unknown> | null | undefined
   findProfileTopCard: (doc: Document) => Element | null
   findExperienceSection: (doc: Document) => Element | null
@@ -1127,6 +1155,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
   const domMapLogs: Record<string, unknown>[] = []
   const experienceDiscoveryLogs: Record<string, unknown>[] = []
   const profileImageLogs: Record<string, unknown>[] = []
+  const companyCandidatesLogs: Record<string, unknown>[] = []
   const domAuditLogs: Record<string, unknown>[] = []
   const pageMetadataPath = path.join(process.cwd(), "extensions/growth-browser-intake/page-metadata.js")
   const pageMetadataSource = fs.readFileSync(pageMetadataPath, "utf8")
@@ -1141,13 +1170,16 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
           experienceDiscoveryLogs.push(args[1] as Record<string, unknown>)
         }
         if (label === "[Equipify Sales:profile-image]") profileImageLogs.push(args[1] as Record<string, unknown>)
+        if (label === "[Equipify Sales:company-candidates]") {
+          companyCandidatesLogs.push(args[1] as Record<string, unknown>)
+        }
         if (label === "[Equipify Sales:dom-audit]") domAuditLogs.push(args[1] as Record<string, unknown>)
       },
       error: () => {},
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ version: "4.3.17" }),
+        getManifest: () => ({ version: "4.3.18" }),
       },
     },
     setTimeout: () => 0,
@@ -1186,6 +1218,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     domMap: domMapLogs[0] ?? null,
     experienceDiscovery: experienceDiscoveryLogs[0] ?? null,
     profileImageAudit: profileImageLogs[0] ?? null,
+    companyCandidatesAudit: companyCandidatesLogs[0] ?? null,
     domAudit: domAuditLogs[0] ?? null,
     findProfileTopCard: (doc) => win.__equipifyGrowthFindProfileTopCard?.(doc) ?? null,
     findExperienceSection: (doc) => win.__equipifyGrowthFindExperienceSection?.(doc) ?? null,
@@ -1243,6 +1276,57 @@ assert.ok(Array.isArray(ricardoModernHarness.domAudit?.h1s))
 assert.ok(Array.isArray(ricardoModernHarness.domAudit?.profile_images))
 assert.ok(Array.isArray(ricardoModernHarness.domAudit?.company_candidates_raw))
 assert.equal(ricardoModernHarness.domAudit?.selected_profile_image, "https://media.licdn.com/ricardo-headshot.jpg")
+assert.ok(Array.isArray(ricardoModernHarness.companyCandidatesAudit?.generated_candidates))
+assert.ok(
+  (ricardoModernHarness.companyCandidatesAudit?.generated_candidates as Array<{ value?: string }>).some(
+    (entry) => entry.value === "SHARP MEMORIAL HOSPITAL",
+  ),
+)
+assert.equal(ricardoModernHarness.profileImageAudit?.hero_container_found, true)
+assert.ok(Array.isArray(ricardoModernHarness.profileImageAudit?.candidate_images))
+
+const ricardoLiveHarness = runPageMetadataHarness(RICARDO_LIVE_DOM_FIXTURE, ricardoModernUrl)
+const ricardoLiveRejected = (ricardoLiveHarness.companyCandidatesAudit?.rejected_candidates ??
+  []) as Array<{ reason?: string }>
+const ricardoLiveGenerated = (ricardoLiveHarness.companyCandidatesAudit?.generated_candidates ??
+  []) as Array<{ value?: string }>
+assert.equal(ricardoLiveHarness.metadata?.company_name, null)
+assert.ok(
+  ricardoLiveRejected.some((entry) => entry.reason === "no-present-experience-company"),
+  "live-like fixture should reject experience when section is empty",
+)
+assert.ok(
+  ricardoLiveRejected.some((entry) => entry.reason === "no-company-or-school-anchors-in-top-card"),
+  "live-like fixture should reject when company anchors are outside bound top card",
+)
+assert.ok(
+  ricardoLiveRejected.some((entry) => entry.reason === "visible-sharp-text-outside-candidate-generation"),
+  "live-like fixture should flag SHARP plain text visible but not ingested",
+)
+assert.equal(
+  ricardoLiveGenerated.some((entry) => entry.value === "SHARP MEMORIAL HOSPITAL"),
+  false,
+  "live-like fixture should not generate SHARP as a company candidate",
+)
+const ricardoLiveHeadshotAudit = (
+  (ricardoLiveHarness.profileImageAudit?.candidate_images as Array<{
+    src?: string
+    in_top_card?: boolean
+    traversal_only?: boolean
+  }>) ?? []
+).find((entry) => entry.src === "https://media.licdn.com/ricardo-headshot.jpg")
+assert.ok(ricardoLiveHeadshotAudit, "profile-image audit should discover the visible headshot in the DOM")
+assert.equal(ricardoLiveHarness.profileImageAudit?.hero_container_found, true)
+if (ricardoLiveHarness.profileImageAudit?.selected_profile_image === "https://media.licdn.com/ricardo-headshot.jpg") {
+  assert.equal(
+    ricardoLiveHeadshotAudit.in_top_card,
+    true,
+    "when headshot is selected, bound top card included the photo rail",
+  )
+} else {
+  assert.equal(ricardoLiveHarness.profileImageAudit?.selected_profile_image, null)
+  assert.equal(ricardoLiveHeadshotAudit.in_top_card, false)
+}
 assert.match(linkedinInpageSidebarJs, /discovered-main-content/)
 
 const LINKEDIN_PROFILE_FIXTURE = `<main>
