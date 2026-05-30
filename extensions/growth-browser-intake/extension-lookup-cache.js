@@ -34,6 +34,24 @@
     }
   }
 
+  function invalidateMatching(urlFragments = []) {
+    const needles = urlFragments.map((value) => trimOrNull(value)).filter(Boolean)
+    if (!needles.length) return 0
+    let removed = 0
+    for (const key of cache.keys()) {
+      if (needles.some((needle) => key.includes(encodeURIComponent(needle)) || key.includes(needle))) {
+        cache.delete(key)
+        removed += 1
+      }
+    }
+    return removed
+  }
+
+  function trimOrNull(value) {
+    const trimmed = (value ?? "").trim()
+    return trimmed ? trimmed : null
+  }
+
   window.EquipifyGrowthExtensionLookupCache = {
     TTL_MS,
     PREFIX: {
@@ -44,5 +62,6 @@
     read,
     write,
     invalidate,
+    invalidateMatching,
   }
 })()

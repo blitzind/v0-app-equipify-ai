@@ -378,9 +378,27 @@ function initIntakeApp(options) {
     return params
   }
 
-  function invalidateLookupCache() {
+  function invalidateLookupCache(urls = []) {
     lookupCache?.invalidate?.(lookupCache.PREFIX?.crmContext)
     lookupCache?.invalidate?.(lookupCache.PREFIX?.lookup)
+    if (urls.length) lookupCache?.invalidateMatching?.(urls)
+  }
+
+  function buildOptimisticCrmPayload(saveRecord, payload, crmUrl) {
+    return {
+      ok: true,
+      matched: true,
+      status_badge: "already_added",
+      status_badge_label: "Already in Equipify",
+      context: {
+        lead_id: saveRecord.lead_id,
+        company_name: saveRecord.company_name,
+        contact_name: saveRecord.contact_name,
+        status_badge: "already_added",
+        status_badge_label: "Already in Equipify",
+        links: crmUrl ? { lead: crmUrl } : {},
+      },
+    }
   }
 
   async function lookupExistingLead(payload, tabUrl, options = {}) {
@@ -1096,6 +1114,20 @@ function initIntakeApp(options) {
       await refreshRecentCaptures()
       showSuccessPanel(saveRecord)
 
+      const linkedinUrl = payload.linkedin_url ?? state.detected?.linkedin_url ?? null
+      const sourceUrl = payload.source_url ?? state.inpageTabUrl ?? null
+      const crmUrl = result.lead_id ? `${apiBaseUrl()}/admin/growth/leads/${result.lead_id}` : null
+
+      window.EquipifySalesContactSaved?.dispatchEquipifyContactSaved?.({
+        lead_id: result.lead_id,
+        linkedin_url: linkedinUrl,
+        source_url: sourceUrl,
+        crm_url: crmUrl,
+        matched: true,
+        company_name: companyName,
+        contact_name: payload.contact_name ?? null,
+      })
+
       const extensionAnalytics = window.EquipifyGrowthExtensionAnalytics
       if (extensionAnalytics) {
         await extensionAnalytics.recordAnalyticsEvent("captures_created")
@@ -1111,15 +1143,21 @@ function initIntakeApp(options) {
         if (surface === "popup") await refreshOperatorAnalytics()
       }
 
-      invalidateLookupCache()
+      invalidateLookupCache([linkedinUrl, sourceUrl])
+      const optimisticPayload = buildOptimisticCrmPayload(saveRecord, payload, crmUrl)
+      renderLinkedInStatusPanel(
+        optimisticPayload,
+        sourceUrl ?? trimOrNull(document.getElementById("source-url")?.value),
+      )
+
       const refreshLookup = await fetchCrmContext(
         readFormValues(),
-        trimOrNull(document.getElementById("source-url")?.value) ?? state.inpageTabUrl,
+        sourceUrl ?? trimOrNull(document.getElementById("source-url")?.value),
         { bypassCache: true },
       )
       renderLinkedInStatusPanel(
-        refreshLookup,
-        trimOrNull(document.getElementById("source-url")?.value) ?? state.inpageTabUrl,
+        refreshLookup?.matched ? refreshLookup : optimisticPayload,
+        sourceUrl ?? trimOrNull(document.getElementById("source-url")?.value),
       )
       return true
     } catch (error) {
@@ -1131,7 +1169,7 @@ function initIntakeApp(options) {
     } finally {
       if (els.submitBtn) els.submitBtn.disabled = false
       const addBtn = document.getElementById("es-ws-add-btn")
-      if (addBtn) addBtn.disabled = false
+      if (addBtn && !state.crmContext?.lead_id) addBtn.disabled = false
     }
   }
 

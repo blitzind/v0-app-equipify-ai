@@ -11,6 +11,7 @@ const CONTENT_SCRIPT_FILES = [
   "extension-storage.js",
   "extension-config.js",
   "extension-lookup-cache.js",
+  "extension-contact-saved.js",
   "linkedin-context.js",
   "linkedin-status-shared.js",
   "linkedin-crm-shared.js",
@@ -130,6 +131,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         logError("open_native_sidepanel_failed", error, { windowId })
         sendResponse({ ok: false })
       })
+    return true
+  }
+
+  if (message?.type === "equipify-sales-contact-saved") {
+    const tabId = sender.tab?.id
+    if (tabId) {
+      chrome.tabs.sendMessage(tabId, message).catch((error) => {
+        logError("relay_contact_saved_failed", error, { tabId })
+      })
+    }
+    sendResponse({ ok: true })
     return true
   }
 

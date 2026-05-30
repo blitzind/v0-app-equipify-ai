@@ -66,6 +66,18 @@
     )
   }
 
+  function isValidCompanyName(name, personName) {
+    if (typeof window.__equipifyGrowthIsValidCompanyName === "function") {
+      return window.__equipifyGrowthIsValidCompanyName(name, { personName })
+    }
+    const raw = trimOrNull(name)
+    if (!raw) return false
+    if (/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?\s+\d{4}\b/i.test(raw)) return false
+    if (/\bpresent\b/i.test(raw)) return false
+    if (/\b\d+\s*(yrs?|mos?)\b/i.test(raw)) return false
+    return true
+  }
+
   function resolveCompanyIntelName(detected, context, formValues, enrichment, personName) {
     const person = trimOrNull(personName)?.toLowerCase() ?? null
     const candidates = [
@@ -77,6 +89,7 @@
 
     for (const candidate of candidates) {
       if (person && candidate.toLowerCase() === person) continue
+      if (!isValidCompanyName(candidate, personName)) continue
       return candidate
     }
     return COMPANY_NOT_DETECTED
@@ -289,7 +302,7 @@
     return {
       label: "Call Prospect",
       reason: context?.last_activity?.summary ?? "Continue outreach on this lead.",
-      cta: "Open Lead",
+      cta: "Open in Equipify",
       action: "open_lead",
     }
   }
@@ -916,8 +929,14 @@
     const updateBtn = document.getElementById("es-ws-update-lead-btn")
     const reviewedBtn = document.getElementById("es-ws-mark-reviewed-btn")
 
-    if (addBtn) addBtn.hidden = hasMatch
-    if (openLeadBtn) openLeadBtn.hidden = !hasMatch
+    if (addBtn) {
+      addBtn.hidden = hasMatch
+      addBtn.textContent = "Add to Equipify"
+    }
+    if (openLeadBtn) {
+      openLeadBtn.hidden = !hasMatch
+      openLeadBtn.textContent = "Open in Equipify"
+    }
     if (updateBtn) updateBtn.hidden = !hasMatch
     if (reviewedBtn) {
       reviewedBtn.hidden = !hasMatch || context?.status_badge !== "needs_review"
@@ -1075,7 +1094,37 @@
     }
   }
 
-  function wireActions(deps) {
+  function buildCrmPayloadFromContactSaved(detail) {
+    return {
+      ok: true,
+      matched: true,
+      status_badge: "already_added",
+      status_badge_label: "Already in Equipify",
+      context: {
+        lead_id: detail.lead_id,
+        company_name: detail.company_name,
+        contact_name: detail.contact_name,
+        status_badge: "already_added",
+        status_badge_label: "Already in Equipify",
+        links: detail.crm_url ? { lead: detail.crm_url } : {},
+      },
+    }
+  }
+
+  function applyContactSavedState(detail) {
+    if (!detail?.matched || !detail?.lead_id) return
+    lastRenderInput = {
+      ...(lastRenderInput ?? {}),
+      crmPayload: buildCrmPayloadFromContactSaved(detail),
+    }
+    render(lastRenderInput)
+  }
+
+  function wireContactSavedListener() {
+    window.EquipifySalesContactSaved?.onEquipifyContactSaved?.((detail) => {
+      applyContactSavedState(detail)
+    })
+  }
     function switchCompanyTab(tabId) {
       document.querySelectorAll("[data-company-tab]").forEach((button) => {
         button.classList.toggle("active", button.dataset.companyTab === tabId)

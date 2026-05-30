@@ -291,7 +291,8 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.7"/)
+assert.match(manifestSource, /"version": "4.3.8"/)
+assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
 assert.match(manifestSource, /linkedin-inpage-sidebar\.js/)
 assert.match(manifestSource, /inpage-sidebar\.html/)
@@ -476,7 +477,56 @@ assert.match(linkedinInpageSidebarJs, /equipify-sales-panel-open/)
 assert.match(linkedinInpageSidebarJs, /--equipify-sales-panel-width/)
 assert.match(linkedinInpageSidebarJs, /#voyager-feed/)
 assert.match(linkedinInpageSidebarJs, /\.authentication-outlet/)
-assert.match(linkedinInpageSidebarJs, /\[Equipify Sales:layout\]/)
+assert.match(linkedinInpageSidebarJs, /TRANSFORM_SELECTORS/)
+assert.match(linkedinInpageSidebarJs, /translateX/)
+assert.match(linkedinInpageSidebarJs, /computedWidth/)
+assert.match(linkedinInpageSidebarJs, /document\.documentElement\.style\.marginRight/)
+assert.match(linkedinInpageSidebarJs, /document\.body\.style\.marginRight/)
+
+const contactSavedJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/extension-contact-saved.js"),
+  "utf8",
+)
+assert.match(contactSavedJs, /equipify-sales-contact-saved/)
+assert.match(contactSavedJs, /dispatchEquipifyContactSaved/)
+assert.match(contactSavedJs, /onEquipifyContactSaved/)
+
+assert.match(intakeAppJs, /dispatchEquipifyContactSaved/)
+assert.match(intakeAppJs, /buildOptimisticCrmPayload/)
+assert.match(intakeAppJs, /invalidateLookupCache\(\[/)
+assert.match(intakeAppJs, /refreshLookup\?\.matched \? refreshLookup : optimisticPayload/)
+
+assert.match(linkedinCrmOverlayJs, /EquipifySalesContactSaved/)
+assert.match(linkedinCrmOverlayJs, /scheduleRefresh\(true\)/)
+
+function isValidCompanyNameFixture(name: string, personName?: string | null) {
+  if (!name?.trim()) return false
+  if (personName && name.toLowerCase() === personName.toLowerCase()) return false
+  if (/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?\s+\d{4}\b/i.test(name)) return false
+  if (/\bpresent\b/i.test(name)) return false
+  if (/\b\d+\s*(yrs?|mos?)\b/i.test(name)) return false
+  if (/\bfull-time\b/i.test(name)) return false
+  return true
+}
+
+assert.equal(
+  isValidCompanyNameFixture("Executive Vice PresidentSep 2023 - Present · 2 yrs 9 mos."),
+  false,
+)
+assert.equal(isValidCompanyNameFixture("BioMed Techs Inc."), true)
+
+function simulatePostSaveSidebarState(hasMatch: boolean) {
+  return {
+    addHidden: hasMatch,
+    openLeadVisible: hasMatch,
+    nbaAction: hasMatch ? "open_lead" : "add_contact",
+  }
+}
+
+const postSave = simulatePostSaveSidebarState(true)
+assert.equal(postSave.addHidden, true)
+assert.equal(postSave.openLeadVisible, true)
+assert.notEqual(postSave.nbaAction, "add_contact")
 
 const linkedinInpageSidebarCss = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-inpage-sidebar.css"),
@@ -651,6 +701,10 @@ assert.match(extensionWorkspaceJs, /People Data Labs, Prospeo, Apollo, Hunter/)
 assert.match(extensionWorkspaceJs, /es-ws-hidden-compat/)
 assert.match(extensionWorkspaceJs, /submitCapture/)
 assert.match(extensionWorkspaceJs, /Run Similar Company Discovery/)
+assert.match(extensionWorkspaceJs, /isValidCompanyName/)
+assert.match(extensionWorkspaceJs, /applyContactSavedState/)
+assert.match(extensionWorkspaceJs, /wireContactSavedListener/)
+assert.match(extensionWorkspaceJs, /Open in Equipify/)
 assert.doesNotMatch(extensionWorkspaceJs, /hidden LinkedIn scraping|linkedin.*scrap/i)
 
 const extensionConfigJs = fs.readFileSync(
@@ -696,6 +750,9 @@ assert.match(pageMetadataJs, /looksLikeProfilePhotoImage/)
 assert.match(pageMetadataJs, /PROFILE_PHOTO_REJECT_ANCESTORS/)
 assert.match(pageMetadataJs, /profileCompanyOnly/)
 assert.doesNotMatch(pageMetadataJs, /img\[alt\*="profile"\]/)
+assert.match(pageMetadataJs, /isValidLinkedInCompanyName/)
+assert.match(pageMetadataJs, /sanitizeLinkedInCompanyName/)
+assert.doesNotMatch(pageMetadataJs, /headlineParts\.company/)
 
 const PROFILE_PHOTO_FIXTURE = `<main>
   <nav class="global-nav"><img src="https://media.licdn.com/nav-avatar.jpg" alt="Me menu" /></nav>
@@ -1073,6 +1130,7 @@ const lookupCacheJs = fs.readFileSync(
 )
 assert.match(lookupCacheJs, /TTL_MS/)
 assert.match(lookupCacheJs, /invalidate/)
+assert.match(lookupCacheJs, /invalidateMatching/)
 
 assert.equal(compareSemver("4.0.0", "3.2.0"), 1)
 assert.equal(compareSemver("3.2.0", "4.0.0"), -1)

@@ -531,4 +531,27 @@
     logInfo("init")
     refreshBadge({ skipLoading: false }).catch(() => removeBadge())
   })
+
+  window.EquipifySalesContactSaved?.onEquipifyContactSaved?.((detail) => {
+    lookupCache?.invalidate?.(lookupCache.PREFIX?.crmContext)
+    lookupCache?.invalidate?.(lookupCache.PREFIX?.lookup)
+    lookupCache?.invalidateMatching?.([detail.linkedin_url, detail.source_url, detail.lead_id])
+    lastRenderKey = null
+    const optimistic = {
+      ok: true,
+      matched: true,
+      status_badge: "already_added",
+      status_badge_label: "Already in Equipify",
+      context: {
+        lead_id: detail.lead_id,
+        company_name: detail.company_name,
+        contact_name: detail.contact_name,
+        status_badge: "already_added",
+        status_badge_label: "Already in Equipify",
+        links: detail.crm_url ? { lead: detail.crm_url } : {},
+      },
+    }
+    renderBadge(optimistic, true)
+    scheduleRefresh(true)
+  })
 })()

@@ -25,6 +25,40 @@ function cleanLinkedInProfileName(value) {
   )
 }
 
+function isValidLinkedInCompanyName(name, options = {}) {
+  const raw = trimOrNull(name)
+  if (!raw) return false
+  if (raw.length > 120) return false
+
+  const person = trimOrNull(options.personName)?.toLowerCase()
+  if (person && raw.toLowerCase() === person) return false
+
+  if (/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?\s+\d{4}\b/i.test(raw)) return false
+  if (/\bpresent\b/i.test(raw)) return false
+  if (/\b\d+\s*(yrs?|mos?|months?|years?)\b/i.test(raw)) return false
+  if (/\bfull-time\b|\bpart-time\b|\bself-employed\b|\bcontract\b|\binternship\b/i.test(raw)) return false
+  if (/\d{4}\s*[-–—]\s*(present|\w{3,})/i.test(raw)) return false
+  if (/\s[·•]\s*\d+\s*(yrs?|mos?)/i.test(raw)) return false
+
+  const titleLike =
+    /\b(vice president|executive|director|manager|secretary|engineer|technician|specialist|coordinator|president|ceo|cfo|coo|owner|founder|consultant|analyst)\b/i.test(
+      raw,
+    )
+  const companyLike =
+    /\b(inc\.?|llc|corp\.?|ltd\.?|company|group|technologies|techs|medical|health|systems|services|solutions|partners)\b/i.test(
+      raw,
+    )
+  if (titleLike && !companyLike && !/\bat\s+/i.test(raw)) return false
+
+  return true
+}
+
+function sanitizeLinkedInCompanyName(name, options = {}) {
+  const raw = trimOrNull(name)
+  if (!raw || !isValidLinkedInCompanyName(raw, options)) return null
+  return normalizeVisibleText(raw)
+}
+
 function parseLinkedInHeadline(headline) {
   const normalized = normalizeVisibleText(headline)
   if (!normalized) return { title: null, company: null }
@@ -452,7 +486,7 @@ function extractExperienceEntries(doc) {
   const scope = section ?? doc
   scope.querySelectorAll('li, div.pvs-list__paged-list-item, [data-view-name="profile-component-entity"]').forEach((item) => {
     const companyAnchor = item.querySelector('a[href*="/company/"]')
-    const companyName = normalizeVisibleText(trimOrNull(companyAnchor?.textContent))
+    const companyName = sanitizeLinkedInCompanyName(trimOrNull(companyAnchor?.textContent))
     const companyUrl = normalizeLinkedInCompanyUrl(companyAnchor?.getAttribute("href"))
     const titleEl =
       item.querySelector(".t-bold span[aria-hidden='true']") ??
@@ -473,10 +507,10 @@ function extractExperienceEntries(doc) {
   })
 
   if (!entries.length) {
-    doc.querySelectorAll('a[href*="/company/"]').forEach((anchor) => {
-      const companyName = trimOrNull(anchor.textContent)
+    scope.querySelectorAll('a[href*="/company/"]').forEach((anchor) => {
+      const companyName = sanitizeLinkedInCompanyName(trimOrNull(anchor.textContent))
       const companyUrl = normalizeLinkedInCompanyUrl(anchor.getAttribute("href"))
-      if (!companyName || companyName.length > 120) return
+      if (!companyName) return
       if (seen.has(companyName)) return
       seen.add(companyName)
       entries.push({ company_name: companyName, linkedin_company_url: companyUrl })
@@ -549,20 +583,26 @@ function extractLinkedInProfile(doc) {
 
   const profile_photo_url = extractProfilePhotoFromTopCard(doc, topCard, contact_name)
 
+  const experienceEntries = extractExperienceEntries(doc)
+
   const topCompanyAnchor =
-    doc.querySelector(".pv-text-details__right-panel a[href*='/company/']") ??
-    doc.querySelector(".pv-text-details__left-panel a[href*='/company/']") ??
-    doc.querySelector("[data-view-name='profile-card'] a[href*='/company/']") ??
-    doc.querySelector("a[href*='/company/']")
+    topCard?.querySelector(".pv-text-details__right-panel a[href*='/company/']") ??
+    topCard?.querySelector(".pv-text-details__left-panel a[href*='/company/']") ??
+    topCard?.querySelector("[data-view-name='profile-card'] a[href*='/company/']") ??
+    null
 
   const headlineParts = parseLinkedInHeadline(headline)
-  let current_company = normalizeVisibleText(trimOrNull(topCompanyAnchor?.textContent))
-  const experienceEntries = extractExperienceEntries(doc)
-  if (!current_company && experienceEntries[0]?.company_name) {
-    current_company = normalizeVisibleText(experienceEntries[0].company_name)
-  }
-  if (!current_company && headlineParts.company) {
-    current_company = headlineParts.company
+  let current_company = sanitizeLinkedInCompanyName(trimOrNull(topCompanyAnchor?.textContent), {
+    personName: contact_name,
+  })
+  if (!current_company) {
+    for (const entry of experienceEntries) {
+      const candidate = sanitizeLinkedInCompanyName(entry.company_name, { personName: contact_name })
+      if (candidate) {
+        current_company = candidate
+        break
+      }
+    }
   }
 
   let current_title = normalizeVisibleText(experienceEntries[0]?.title) ?? headlineParts.title
@@ -570,8 +610,12 @@ function extractLinkedInProfile(doc) {
     current_title = headlineParts.title ?? normalizeVisibleText(experienceEntries[0]?.title)
   }
 
-  const linkedin_company_url = normalizeLinkedInCompanyUrl(topCompanyAnchor?.getAttribute("href"))
-  const company_logo_url = queryImageSrc(doc, ["a[href*='/company/'] img"])
+  const linkedin_company_url =
+    normalizeLinkedInCompanyUrl(topCompanyAnchor?.getAttribute("href")) ??
+    normalizeLinkedInCompanyUrl(experienceEntries.find((entry) => entry.linkedin_company_url)?.linkedin_company_url)
+  const company_logo_url = topCompanyAnchor
+    ? queryImageSrc(topCard ?? doc, ["a[href*='/company/'] img"])
+    : null
   const website = extractProfileWebsite(doc)
 
   const locationParts = parseLocationParts(location)
@@ -777,4 +821,6 @@ if (typeof window !== "undefined") {
   window.__equipifyGrowthNormalizeVisibleText = normalizeVisibleText
   window.__equipifyGrowthExtractProfilePhotoFromTopCard = extractProfilePhotoFromTopCard
   window.__equipifyGrowthLooksLikeProfilePhotoImage = looksLikeProfilePhotoImage
+  window.__equipifyGrowthIsValidCompanyName = isValidLinkedInCompanyName
+  window.__equipifyGrowthSanitizeCompanyName = sanitizeLinkedInCompanyName
 }
