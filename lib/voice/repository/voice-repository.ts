@@ -295,27 +295,60 @@ export async function appendVoiceCallEvent(
   return { ok: true, eventId: String(data.id) }
 }
 
+export async function ensureTwilioVoiceProviderConfiguration(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<{ ok: true } | { ok: false; missingEnvVars: string[] }> {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim() ?? ""
+  const authTokenPresent = Boolean(process.env.TWILIO_AUTH_TOKEN?.trim())
+  const missingEnvVars: string[] = []
+  if (!accountSid) missingEnvVars.push("TWILIO_ACCOUNT_SID")
+  if (!authTokenPresent) missingEnvVars.push("TWILIO_AUTH_TOKEN")
+  if (missingEnvVars.length > 0) {
+    return { ok: false, missingEnvVars }
+  }
+
+  await admin.schema("voice").from("voice_provider_configurations").upsert(
+    {
+      organization_id: organizationId,
+      provider: "twilio",
+      provider_account_reference: accountSid,
+      status: "pending",
+      voice_enabled: true,
+      sms_enabled: false,
+      webhook_validated: false,
+      metadata_json: {
+        phase: "1a",
+        initialized_from_env: true,
+        initialized_at: new Date().toISOString(),
+      },
+    },
+    { onConflict: "organization_id,provider" },
+  )
+
+  return { ok: true }
+}
+
 export async function ensureDefaultVoiceProviderConfigurations(
   admin: SupabaseClient,
   organizationId: string,
 ): Promise<void> {
-  const defaults: Array<{ provider: VoiceProviderId; providerAccountReference: string }> = [
-    { provider: "twilio", providerAccountReference: process.env.TWILIO_ACCOUNT_SID?.trim() ?? "" },
-    { provider: "stub", providerAccountReference: "stub" },
-  ]
-  for (const row of defaults) {
-    await admin.schema("voice").from("voice_provider_configurations").upsert(
-      {
-        organization_id: organizationId,
-        provider: row.provider,
-        provider_account_reference: row.providerAccountReference,
-        status: row.provider === "stub" ? "ready" : row.providerAccountReference ? "pending" : "pending",
-        voice_enabled: row.provider !== "stub",
-        sms_enabled: false,
-        webhook_validated: false,
-        metadata_json: { phase: "1a", scaffold: true },
-      },
-      { onConflict: "organization_id,provider" },
-    )
+  const twilioResult = await ensureTwilioVoiceProviderConfiguration(admin, organizationId)
+  if (!twilioResult.ok) {
+    // Stub provider remains available for local/dev scaffolding without Twilio env.
   }
+
+  await admin.schema("voice").from("voice_provider_configurations").upsert(
+    {
+      organization_id: organizationId,
+      provider: "stub",
+      provider_account_reference: "stub",
+      status: "ready",
+      voice_enabled: false,
+      sms_enabled: false,
+      webhook_validated: false,
+      metadata_json: { phase: "1a", scaffold: true },
+    },
+    { onConflict: "organization_id,provider" },
+  )
 }

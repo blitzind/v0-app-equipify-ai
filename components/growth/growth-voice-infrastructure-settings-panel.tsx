@@ -58,6 +58,12 @@ type VoiceSettingsResponse = {
   operationsQaMarker?: string
   schema?: { ready?: boolean; message?: string; probeUncertain?: boolean }
   readiness?: VoiceOperationsReadinessSnapshot
+  twilioEnvPresence?: {
+    twilioAccountSid: boolean
+    twilioAuthToken: boolean
+    growthEngineAiOrgId: boolean
+    twilioCredentialsConfigured: boolean
+  }
   message?: string
 }
 
@@ -153,6 +159,7 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
   const [routingTestResult, setRoutingTestResult] = useState<InboundCallControlDecision | null>(null)
   const [browserReadiness, setBrowserReadiness] = useState<VoiceBrowserCallingReadinessSnapshot | null>(null)
   const [operatorPresence, setOperatorPresence] = useState<VoiceOperatorPresencePublicView[]>([])
+  const [twilioEnvPresence, setTwilioEnvPresence] = useState<VoiceSettingsResponse["twilioEnvPresence"]>(null)
 
   const callControl = readiness?.callControlReadiness
   const transferControl = readiness?.transferControlReadiness
@@ -184,6 +191,7 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
       const data = (await res.json().catch(() => ({}))) as VoiceSettingsResponse
       if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not load voice infrastructure settings.")
       setReadiness(data.readiness ?? null)
+      setTwilioEnvPresence(data.twilioEnvPresence ?? null)
       setSchemaReady(Boolean(data.schema?.ready))
       setSchemaMessage(data.schema?.message ?? null)
       setRecordingPolicy(data.readiness?.callControlReadiness?.defaultRecordingPolicy ?? "disabled")
@@ -212,15 +220,43 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
     void load()
   }, [load])
 
-  async function initializeProviders() {
+  async function initializeTwilioProvider() {
     setInitializing(true)
     setError(null)
     setSuccess(null)
     try {
-      const res = await fetch("/api/platform/growth/voice/settings", { method: "POST" })
+      const res = await fetch("/api/platform/growth/voice/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "initialize_twilio" }),
+      })
+      const data = (await res.json().catch(() => ({}))) as VoiceSettingsResponse
+      if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not initialize Twilio provider.")
+      setReadiness(data.readiness ?? null)
+      setTwilioEnvPresence(data.twilioEnvPresence ?? null)
+      setSuccess(data.message ?? "Twilio provider configuration initialized.")
+      await loadOperations()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Initialize failed.")
+    } finally {
+      setInitializing(false)
+    }
+  }
+
+  async function initializeProviderScaffolding() {
+    setInitializing(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const res = await fetch("/api/platform/growth/voice/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "initialize_scaffolding" }),
+      })
       const data = (await res.json().catch(() => ({}))) as VoiceSettingsResponse
       if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not initialize voice providers.")
       setReadiness(data.readiness ?? null)
+      setTwilioEnvPresence(data.twilioEnvPresence ?? null)
       setSuccess(data.message ?? "Voice provider rows initialized.")
     } catch (e) {
       setError(e instanceof Error ? e.message : "Initialize failed.")
@@ -319,6 +355,9 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
   }
 
   const compliance = readiness?.complianceReadinessExtended
+  const twilioProvider = readiness?.configuredProviders.find((provider) => provider.provider === "twilio")
+  const twilioProviderMissing = !twilioProvider
+  const twilioEnvReady = Boolean(twilioEnvPresence?.twilioCredentialsConfigured)
 
   return (
     <GrowthSettingsCard title="Voice Infrastructure" icon={<PhoneCall className="size-4" />}>
@@ -346,15 +385,57 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
                   {schemaReady ? "Voice schema probe passed." : schemaMessage ?? "Voice schema status unknown."}
                 </p>
               </div>
+              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm">
+                <p className="font-medium">Twilio environment (presence only)</p>
+                <p className="text-muted-foreground">
+                  TWILIO_ACCOUNT_SID: {twilioEnvPresence?.twilioAccountSid ? "configured" : "missing"}
+                </p>
+                <p className="text-muted-foreground">
+                  TWILIO_AUTH_TOKEN: {twilioEnvPresence?.twilioAuthToken ? "configured" : "missing"}
+                </p>
+                <p className="text-muted-foreground">
+                  GROWTH_ENGINE_AI_ORG_ID: {twilioEnvPresence?.growthEngineAiOrgId ? "configured" : "missing"}
+                </p>
+              </div>
               {(readiness?.configuredProviders.length ?? 0) === 0 ? (
                 <p className="text-sm text-muted-foreground">No provider configuration rows yet.</p>
               ) : (
                 readiness?.configuredProviders.map((provider) => <ProviderRow key={provider.id} provider={provider} />)
               )}
-              <Button type="button" size="sm" onClick={() => void initializeProviders()} disabled={initializing}>
-                {initializing ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : null}
-                Initialize provider scaffolding
-              </Button>
+              <div className={`flex flex-wrap items-center ${GROWTH_SETTINGS_FORM_GAP}`}>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void initializeTwilioProvider()}
+                  disabled={initializing || !twilioEnvReady || !twilioProviderMissing}
+                >
+                  {initializing ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : null}
+                  Initialize Twilio Provider
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void initializeProviderScaffolding()}
+                  disabled={initializing}
+                >
+                  Initialize provider scaffolding
+                </Button>
+              </div>
+              {!twilioEnvReady ? (
+                <p className="text-xs text-muted-foreground">
+                  Twilio provider initialization requires TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in server
+                  environment. Secret values are never displayed here.
+                </p>
+              ) : twilioProvider ? (
+                <p className="text-xs text-muted-foreground">
+                  Twilio provider row already exists for this organization.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Twilio credentials detected in environment. Initialize to create the org-scoped provider row.
+                </p>
+              )}
             </section>
 
             <section className={GROWTH_SETTINGS_SECTION_GAP}>

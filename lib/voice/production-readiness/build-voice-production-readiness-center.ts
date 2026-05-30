@@ -30,7 +30,11 @@ import { fetchVoiceOperationsReadiness } from "@/lib/voice/repository/voice-oper
 import { probeVoiceSchemaHealth } from "@/lib/voice/schema-health"
 import { fetchVoiceDropReadiness } from "@/lib/voice/voice-drops/voice-drop-service"
 import { fetchWorkflowOrchestrationReadiness } from "@/lib/voice/workflow-orchestration/workflow-orchestration-service"
-import type { VoiceOperationsReadinessSnapshot } from "@/lib/voice/types"
+import {
+  evaluateTwilioConnectionReadiness,
+  evaluateTwilioWebhookReadiness,
+} from "@/lib/voice/production-readiness/evaluate-twilio-connection-readiness"
+import { readTwilioEnvPresence } from "@/lib/voice/providers/twilio-env-readiness"
 
 const SECTION_TITLES: Record<VoiceProductionReadinessSectionId, string> = {
   twilio_connection: "Twilio Connection",
@@ -93,52 +97,26 @@ function missingEnv(names: string[]): string[] {
 function buildTwilioConnectionSection(
   operations: VoiceOperationsReadinessSnapshot,
 ): VoiceProductionReadinessSection {
-  const twilio = operations.configuredProviders.find((p) => p.provider === "twilio")
-  const missingEnvVars = missingEnv(["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "GROWTH_ENGINE_AI_ORG_ID"])
-  const missingCredentials: string[] = []
-  const failingHealthChecks: string[] = []
-
-  if (!envPresent("TWILIO_ACCOUNT_SID")) missingCredentials.push("TWILIO_ACCOUNT_SID")
-  if (!envPresent("TWILIO_AUTH_TOKEN")) missingCredentials.push("TWILIO_AUTH_TOKEN")
-
-  let status: VoiceProductionReadinessStatus = "blocked"
-  if (!operations.organizationId) {
-    failingHealthChecks.push("Organization scope not configured (GROWTH_ENGINE_AI_ORG_ID).")
-  } else if (!twilio) {
-    failingHealthChecks.push("No Twilio provider configuration row for this organization.")
-  } else if (twilio.status === "disabled") {
-    failingHealthChecks.push("Twilio provider is disabled.")
-  } else if (missingCredentials.length > 0) {
-    status = "partial"
-    failingHealthChecks.push("Twilio credentials missing — telephony runs in stub mode.")
-  } else if (twilio.status === "ready" && twilio.voiceEnabled) {
-    status = "ready"
-  } else if (twilio.status === "degraded" || !twilio.voiceEnabled) {
-    status = "partial"
-    if (!twilio.voiceEnabled) failingHealthChecks.push("Voice is disabled on Twilio provider configuration.")
-    if (twilio.status === "degraded") failingHealthChecks.push("Twilio provider status is degraded.")
-  }
+  const twilio = operations.configuredProviders.find((p) => p.provider === "twilio") ?? null
+  const evaluation = evaluateTwilioConnectionReadiness({
+    organizationId: operations.organizationId,
+    twilioProvider: twilio,
+    env: readTwilioEnvPresence(),
+  })
 
   return {
     id: "twilio_connection",
     title: "Twilio Connection",
-    status,
-    statusLabel: statusLabel(status),
-    summary: twilio
-      ? `Twilio ${twilio.status} — voice ${twilio.voiceEnabled ? "enabled" : "disabled"}.`
-      : "Twilio provider not configured for this organization.",
-    missingEnvVars,
-    missingCredentials,
+    status: evaluation.status,
+    statusLabel: statusLabel(evaluation.status),
+    summary: evaluation.summary,
+    missingEnvVars: evaluation.missingEnvVars,
+    missingCredentials: evaluation.missingCredentials,
     missingWebhookUrls: [],
     phoneNumberIssues: [],
-    failingHealthChecks,
-    lastSuccessfulTest: twilio?.lastValidationAt ?? null,
-    recommendedFix:
-      missingCredentials.length > 0
-        ? "Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN, then initialize provider rows in Communications settings."
-        : !twilio
-          ? "Open Communications settings and initialize default voice provider configurations."
-          : "Confirm Twilio Console account SID matches provider_account_reference and voice is enabled.",
+    failingHealthChecks: evaluation.failingHealthChecks,
+    lastSuccessfulTest: evaluation.lastSuccessfulTest,
+    recommendedFix: evaluation.recommendedFix,
     webhookUrls: [],
     settingsHref: VOICE_PRODUCTION_READINESS_GLOBAL_SETTINGS_HREF,
     deploymentRequirementsHref: VOICE_PRODUCTION_READINESS_DEPLOYMENT_DOC,
@@ -155,10 +133,17 @@ function buildTwilioWebhooksSection(
   },
 ): VoiceProductionReadinessSection {
   const { validatedCount, pendingCount } = operations.webhookValidationSummary
-  const twilio = operations.configuredProviders.find((p) => p.provider === "twilio")
+  const twilio = operations.configuredProviders.find((p) => p.provider === "twilio") ?? null
   const publicOriginConfigured = envPresent("NEXT_PUBLIC_SITE_URL") || envPresent("NEXT_PUBLIC_APP_URL") || envPresent("APP_URL")
-  const missingEnvVars = missingEnv(["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"])
-  if (!publicOriginConfigured) missingEnvVars.push("NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_APP_URL")
+  const evaluation = evaluateTwilioWebhookReadiness({
+    organizationId: operations.organizationId,
+    configuredProviderCount: operations.configuredProviders.length,
+    webhookValidatedCount: validatedCount,
+    webhookPendingCount: pendingCount,
+    twilioProvider: twilio,
+    env: readTwilioEnvPresence(),
+    publicOriginConfigured,
+  })
 
   const webhookUrls = [
     { label: "Inbound voice", url: callControl.inboundWebhookUrl },
@@ -174,43 +159,22 @@ function buildTwilioWebhooksSection(
     missingWebhookUrls.push("Twilio cannot reach localhost — configure a public origin for production webhooks.")
   }
 
-  const failingHealthChecks: string[] = []
-  let status: VoiceProductionReadinessStatus = "blocked"
-
-  if (operations.configuredProviders.length === 0) {
-    failingHealthChecks.push("No voice providers configured.")
-  } else if (pendingCount > 0) {
-    status = validatedCount > 0 ? "partial" : "blocked"
-    failingHealthChecks.push(`${pendingCount} provider webhook(s) not validated.`)
-  } else if (validatedCount > 0 && publicOriginConfigured) {
-    status = "ready"
-  } else if (validatedCount > 0) {
-    status = "partial"
-  }
-
-  if (!envPresent("TWILIO_AUTH_TOKEN")) {
-    failingHealthChecks.push("Webhook signature validation requires TWILIO_AUTH_TOKEN.")
-  }
-
   return {
     id: "twilio_webhooks",
     title: "Twilio Webhook Validation",
-    status,
-    statusLabel: statusLabel(status),
+    status: evaluation.status,
+    statusLabel: statusLabel(evaluation.status),
     summary:
       validatedCount > 0
         ? `${validatedCount} validated · ${pendingCount} pending webhook validation.`
         : "Configure Twilio Console voice URLs and validate webhook delivery.",
-    missingEnvVars,
-    missingCredentials: !envPresent("TWILIO_AUTH_TOKEN") ? ["TWILIO_AUTH_TOKEN"] : [],
+    missingEnvVars: evaluation.missingEnvVars,
+    missingCredentials: evaluation.missingCredentials,
     missingWebhookUrls,
     phoneNumberIssues: [],
-    failingHealthChecks,
+    failingHealthChecks: evaluation.failingHealthChecks,
     lastSuccessfulTest: twilio?.lastValidationAt ?? null,
-    recommendedFix:
-      pendingCount > 0
-        ? "Copy webhook URLs into Twilio Console, send a test call, then mark validation complete in Communications settings."
-        : "Ensure NEXT_PUBLIC_SITE_URL matches your deployed host and Twilio signature validation is enabled.",
+    recommendedFix: evaluation.recommendedFix,
     webhookUrls,
     settingsHref: VOICE_PRODUCTION_READINESS_GLOBAL_SETTINGS_HREF,
     deploymentRequirementsHref: VOICE_PRODUCTION_READINESS_DEPLOYMENT_DOC,
