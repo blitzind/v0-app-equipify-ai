@@ -1143,6 +1143,7 @@ type PageMetadataHarness = {
   experienceDiscovery: Record<string, unknown> | null | undefined
   profileImageAudit: Record<string, unknown> | null | undefined
   companyCandidatesAudit: Record<string, unknown> | null | undefined
+  companyRankingAudit: Record<string, unknown> | null | undefined
   heroScoringAudit: Record<string, unknown> | null | undefined
   domAudit: Record<string, unknown> | null | undefined
   findProfileTopCard: (doc: Document) => Element | null
@@ -1160,6 +1161,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
   const experienceDiscoveryLogs: Record<string, unknown>[] = []
   const profileImageLogs: Record<string, unknown>[] = []
   const companyCandidatesLogs: Record<string, unknown>[] = []
+  const companyRankingLogs: Record<string, unknown>[] = []
   const heroScoringLogs: Record<string, unknown>[] = []
   const domAuditLogs: Record<string, unknown>[] = []
   const pageMetadataPath = path.join(process.cwd(), "extensions/growth-browser-intake/page-metadata.js")
@@ -1177,6 +1179,9 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
         if (label === "[Equipify Sales:profile-image]") profileImageLogs.push(args[1] as Record<string, unknown>)
         if (label === "[Equipify Sales:company-candidates]") {
           companyCandidatesLogs.push(args[1] as Record<string, unknown>)
+        }
+        if (label === "[Equipify Sales:company-ranking]") {
+          companyRankingLogs.push(args[1] as Record<string, unknown>)
         }
         if (label === "[Equipify Sales:hero-scoring]") heroScoringLogs.push(args[1] as Record<string, unknown>)
         if (label === "[Equipify Sales:dom-audit]") domAuditLogs.push(args[1] as Record<string, unknown>)
@@ -1225,6 +1230,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     experienceDiscovery: experienceDiscoveryLogs[0] ?? null,
     profileImageAudit: profileImageLogs[0] ?? null,
     companyCandidatesAudit: companyCandidatesLogs.find((entry) => entry.selected_container) ?? companyCandidatesLogs.at(-1) ?? null,
+    companyRankingAudit: companyRankingLogs.at(-1) ?? null,
     heroScoringAudit: heroScoringLogs.find((entry) => entry.selected_container) ?? heroScoringLogs.at(-1) ?? null,
     domAudit: domAuditLogs[0] ?? null,
     findProfileTopCard: (doc) => win.__equipifyGrowthFindProfileTopCard?.(doc) ?? null,
@@ -1292,7 +1298,58 @@ assert.ok(
 assert.equal(ricardoModernHarness.profileImageAudit?.hero_container_found, true)
 assert.ok(Array.isArray(ricardoModernHarness.profileImageAudit?.candidate_images))
 
+const ricardoClassicHarness = runPageMetadataHarness(RICARDO_SANCHEZ_FIXTURE, ricardoModernUrl)
+const ricardoClassicRanking = ricardoClassicHarness.companyRankingAudit ?? {}
+const ricardoClassicCandidates = (ricardoClassicRanking.candidates ?? []) as Array<{
+  company?: string
+  source?: string
+  source_group?: string
+  tier?: number
+  score?: number
+}>
+const ricardoClassicPm = ricardoClassicCandidates.find(
+  (entry) => entry.company?.toLowerCase() === "pm biomedical",
+)
+assert.equal(ricardoClassicRanking.selected_company, "SHARP MEMORIAL HOSPITAL")
+assert.equal(ricardoClassicRanking.selected_source, "experience.current.company")
+assert.ok(ricardoClassicPm)
+assert.equal(ricardoClassicPm?.source, "repost.company-anchor")
+assert.equal(ricardoClassicPm?.source_group, "repost")
+assert.ok(
+  ricardoClassicCandidates.some(
+    (entry) =>
+      entry.company === "SHARP MEMORIAL HOSPITAL" &&
+      entry.source === "experience.current.company" &&
+      entry.tier === 1,
+  ),
+)
+assert.ok(
+  (ricardoClassicRanking.experience_candidates as string[]).includes("SHARP MEMORIAL HOSPITAL"),
+)
+assert.ok((ricardoClassicRanking.repost_candidates as string[]).includes("PM Biomedical"))
+const ricardoClassicSharpScore =
+  ricardoClassicCandidates.find((entry) => entry.company === "SHARP MEMORIAL HOSPITAL" && entry.tier === 1)?.score ??
+  0
+const ricardoClassicPmScore = ricardoClassicPm?.score ?? 0
+assert.ok(ricardoClassicSharpScore > ricardoClassicPmScore)
+
+const ricardoModernRanking = ricardoModernHarness.companyRankingAudit ?? {}
+assert.equal(ricardoModernRanking.selected_company, "SHARP MEMORIAL HOSPITAL")
+assert.notEqual(ricardoModernRanking.selected_source, "activity-feed.company-anchor")
+assert.notEqual(ricardoModernRanking.selected_source, "repost.company-anchor")
+assert.ok(Array.isArray(ricardoModernRanking.hero_candidates))
+assert.ok((ricardoModernRanking.experience_candidates as string[]).includes("SHARP MEMORIAL HOSPITAL"))
+assert.ok((ricardoModernRanking.activity_feed_candidates as string[]).includes("PM Biomedical"))
+assert.match(pageMetadataJs, /\[Equipify Sales:company-ranking\]/)
+
 const ricardoLiveHarness = runPageMetadataHarness(RICARDO_LIVE_DOM_FIXTURE, ricardoModernUrl)
+const ricardoLiveRanking = ricardoLiveHarness.companyRankingAudit ?? {}
+assert.equal(ricardoLiveRanking.selected_company, "SHARP MEMORIAL HOSPITAL")
+assert.ok(
+  ricardoLiveRanking.selected_source === "top-card.hero-plain-text-company" ||
+    ricardoLiveRanking.selected_source === "top-card.entity-anchor" ||
+    ricardoLiveRanking.selected_source === "top-card.company-anchor",
+)
 assert.equal(ricardoLiveHarness.metadata?.contact_name, "Ricardo Sanchez Villanueva")
 assert.equal(ricardoLiveHarness.metadata?.company_name, "SHARP MEMORIAL HOSPITAL")
 assert.equal(ricardoLiveHarness.metadata?.profile_photo_url, "https://media.licdn.com/ricardo-headshot.jpg")

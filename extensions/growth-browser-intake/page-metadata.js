@@ -1007,6 +1007,288 @@ function logCompanyCandidatesDiagnostic(payload) {
   console.log("[Equipify Sales:company-candidates]", payload)
 }
 
+function logCompanyRanking(payload) {
+  console.log("[Equipify Sales:company-ranking]", payload)
+}
+
+const COMPANY_RANKING_TIER_BY_SOURCE = {
+  "experience.current.company": 1,
+  "top-card.hero-plain-text-company": 2,
+  "top-card.headline-plain-text": 2,
+  "structured.json-ld": 3,
+  "structured.linkedin-state": 3,
+  "top-card.entity-anchor": 4,
+  "top-card.school-anchor": 4,
+  "top-card.company-anchor": 4,
+  "top-card.entity-line-plain-text": 4,
+  "top-card.company-url.slug": 4,
+  "experience.section.company": 4,
+  "activity-feed.company-anchor": 5,
+  "repost.company-anchor": 6,
+}
+
+function companyRankingSourceGroup(source) {
+  if (source === "experience.current.company" || source === "experience.section.company") return "experience"
+  if (
+    source === "top-card.hero-plain-text-company" ||
+    source === "top-card.headline-plain-text"
+  ) {
+    return "hero"
+  }
+  if (source === "structured.json-ld" || source === "structured.linkedin-state") return "structured_linkedin_state"
+  if (source === "activity-feed.company-anchor") return "activity_feed"
+  if (source === "repost.company-anchor") return "repost"
+  return "company_page_link"
+}
+
+function isActivityFeedRegion(el) {
+  if (!el?.closest) return false
+  if (el.closest("#activity, [data-view-name='profile-activity']")) return true
+  return Boolean(
+    el.closest(
+      ".feed-shared-update-v2, .feed-shared-update, [data-view-name='feed-full-update'], [data-view-name='feed-commentary']",
+    ),
+  )
+}
+
+function isRepostFeedRegion(el) {
+  const scope = el?.closest?.(
+    ".feed-shared-update-v2, .feed-shared-update, [data-view-name='feed-full-update'], [data-view-name='feed-commentary']",
+  )
+  if (!scope) return false
+  return /repost(ed|s)?/i.test(scope.textContent ?? "")
+}
+
+function computeCompanyRankingScore(candidate) {
+  const tier = candidate.tier ?? COMPANY_RANKING_TIER_BY_SOURCE[candidate.source] ?? 4
+  let score = (7 - tier) * 100
+  if (candidate.source === "experience.current.company") score += 40
+  if (candidate.inside_selected_hero) score += 25
+  if (candidate.inside_experience_section) score += 30
+  if (candidate.url) score += 5
+  return score
+}
+
+function collectActivityAndRepostCompanyCandidates(doc) {
+  const results = []
+  const seen = new Set()
+  for (const anchor of doc.querySelectorAll('a[href*="/company/"]:not([href*="/school/"])')) {
+    if (!isActivityFeedRegion(anchor)) continue
+    const { name, url } = readCompanyFromAnchor(anchor)
+    if (!name) continue
+    const key = `${name}|${url ?? ""}|${describeElementForAudit(anchor)}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    const isRepost = isRepostFeedRegion(anchor)
+    results.push({
+      name,
+      url,
+      anchor,
+      source_container: isRepost ? "repost" : "activity-feed",
+      source_selector: isRepost ? "repost.company-anchor" : "activity-feed.company-anchor",
+      raw_value: trimOrNull(anchor.textContent) ?? name,
+    })
+  }
+  return results
+}
+
+function buildRankedCompanyCandidate(input) {
+  const source = input.source_selector
+  const tier = COMPANY_RANKING_TIER_BY_SOURCE[source] ?? 4
+  const anchor = input.anchor ?? null
+  const element = anchor ?? input.element ?? null
+  const candidate = {
+    company: normalizeVisibleText(input.name),
+    source,
+    source_group: companyRankingSourceGroup(source),
+    tier,
+    container_selector: describeElementForAudit(element),
+    inside_selected_hero: Boolean(input.topCard && element && input.topCard.contains(element)),
+    inside_experience_section: Boolean(
+      input.experienceSection && element && input.experienceSection.contains(element),
+    ),
+    inside_activity_feed: isActivityFeedRegion(element),
+    url: input.url ?? null,
+    anchor,
+    raw_value: input.raw_value ?? input.name,
+    source_container: input.source_container,
+  }
+  candidate.score = computeCompanyRankingScore(candidate)
+  candidate.confidence = candidate.score
+  return candidate
+}
+
+function collectProfileCompanyRankingCandidates(
+  doc,
+  topCard,
+  experienceSection,
+  personName,
+  experienceEntries,
+  headlineText,
+) {
+  const candidates = []
+  const currentExperience =
+    experienceEntries.find((entry) => /\bpresent\b/i.test(entry.date_range ?? "")) ?? experienceEntries[0]
+  const currentExperienceCompany = trimOrNull(currentExperience?.company_name)
+  const parsedHeadline = parseConcatenatedHeadlineTitleCompany(headlineText)
+  const topCompanyAnchor = findTopCardCompanyAnchor(topCard)
+  const topCardCompany = readCompanyFromAnchor(topCompanyAnchor)
+  const heroPlainTextCompany = detectCompanySignalInHeroContainer(topCard, personName, headlineText)
+  const structuredCompany = readJsonLdOrganizationName(doc)
+
+  const pushCandidate = (input) => {
+    if (!input.name) return
+    candidates.push(
+      buildRankedCompanyCandidate({
+        ...input,
+        topCard,
+        experienceSection,
+      }),
+    )
+  }
+
+  if (currentExperience?.company_name) {
+    pushCandidate({
+      name: currentExperience.company_name,
+      source_container: "experience",
+      source_selector: "experience.current.company",
+      raw_value: currentExperience.company_name,
+      url: currentExperience.linkedin_company_url ?? null,
+      anchor: null,
+    })
+  }
+
+  if (heroPlainTextCompany.text) {
+    pushCandidate({
+      name: heroPlainTextCompany.text,
+      source_container: "top-card",
+      source_selector: "top-card.hero-plain-text-company",
+      raw_value: heroPlainTextCompany.text,
+      url: null,
+      anchor: null,
+    })
+  }
+
+  if (parsedHeadline.company) {
+    pushCandidate({
+      name: parsedHeadline.company,
+      source_container: "top-card",
+      source_selector: "top-card.headline-plain-text",
+      raw_value: parsedHeadline.company,
+      url: null,
+      anchor: null,
+    })
+  }
+
+  if (structuredCompany) {
+    pushCandidate({
+      name: structuredCompany,
+      source_container: "structured",
+      source_selector: "structured.json-ld",
+      raw_value: structuredCompany,
+      url: null,
+      anchor: null,
+    })
+  }
+
+  for (const entity of parseTopCardEntityAnchors(topCard)) {
+    if (entity.is_school && currentExperienceCompany) continue
+    pushCandidate({
+      name: entity.name,
+      source_container: "top-card",
+      source_selector: entity.is_school ? "top-card.school-anchor" : "top-card.entity-anchor",
+      raw_value: entity.name,
+      url: entity.url ?? null,
+      anchor: entity.anchor,
+    })
+  }
+
+  for (const entityName of collectEntityLinePlainTextCompanies(topCard)) {
+    if (currentExperienceCompany && /college|university|school/i.test(entityName)) continue
+    pushCandidate({
+      name: entityName,
+      source_container: "top-card",
+      source_selector: "top-card.entity-line-plain-text",
+      raw_value: entityName,
+      url: null,
+      anchor: null,
+    })
+  }
+
+  if (topCardCompany.name) {
+    pushCandidate({
+      name: topCardCompany.name,
+      source_container: "top-card",
+      source_selector: "top-card.company-anchor",
+      raw_value: trimOrNull(topCompanyAnchor?.textContent),
+      url: topCardCompany.url,
+      anchor: topCompanyAnchor,
+    })
+  } else if (topCompanyAnchor) {
+    const slug = companyNameFromLinkedInCompanyUrl(topCardCompany.url ?? topCompanyAnchor.getAttribute("href"))
+    if (slug) {
+      pushCandidate({
+        name: slug,
+        source_container: "top-card",
+        source_selector: "top-card.company-url.slug",
+        raw_value: slug,
+        url: normalizeLinkedInCompanyUrl(topCompanyAnchor.getAttribute("href")),
+        anchor: topCompanyAnchor,
+      })
+    }
+  }
+
+  for (const entry of experienceEntries) {
+    if (!entry.company_name) continue
+    if (entry === currentExperience) continue
+    pushCandidate({
+      name: entry.company_name,
+      source_container: "experience",
+      source_selector: "experience.section.company",
+      raw_value: entry.company_name,
+      url: entry.linkedin_company_url ?? null,
+      anchor: null,
+    })
+  }
+
+  for (const activityCandidate of collectActivityAndRepostCompanyCandidates(doc)) {
+    pushCandidate(activityCandidate)
+  }
+
+  return candidates
+}
+
+function rankProfileCompanyCandidates(candidates, personName) {
+  const ranked = []
+  const seen = new Set()
+  for (const candidate of candidates) {
+    const sanitized = rejectCompanyIfPersonName(candidate.company, personName)
+    if (!sanitized) continue
+    const key = `${candidate.source}|${sanitized}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    ranked.push({
+      ...candidate,
+      company: sanitized,
+      score: computeCompanyRankingScore(candidate),
+      confidence: computeCompanyRankingScore(candidate),
+    })
+  }
+
+  ranked.sort((a, b) => {
+    if (a.tier !== b.tier) return a.tier - b.tier
+    if (b.score !== a.score) return b.score - a.score
+    return a.company.localeCompare(b.company)
+  })
+
+  return ranked
+}
+
+function selectRankedCompanyCandidate(rankedCandidates) {
+  return rankedCandidates[0] ?? null
+}
+
+
 function parseConcatenatedHeadlineTitleCompany(text) {
   const raw = normalizeVisibleText(text)
   if (!raw) return { title: null, company: null }
@@ -1955,146 +2237,47 @@ function pushCompanyCandidate(candidates, input) {
 }
 
 function resolveProfileCompanyExtraction(
+  doc,
   topCard,
-  _experienceSection,
+  experienceSection,
   personName,
   experienceEntries,
   auditBag,
   headlineText,
 ) {
-  const candidates = []
   const company_candidates = []
-  const topCompanyAnchor = findTopCardCompanyAnchor(topCard)
-  const topCardCompany = readCompanyFromAnchor(topCompanyAnchor)
-  const topCardEntities = parseTopCardEntityAnchors(topCard)
-  const currentExperience =
-    experienceEntries.find((entry) => /\bpresent\b/i.test(entry.date_range ?? "")) ?? experienceEntries[0]
-  const currentExperienceCompany = trimOrNull(currentExperience?.company_name)
-  const parsedHeadline = parseConcatenatedHeadlineTitleCompany(headlineText)
-
-  if (currentExperience?.company_name) {
-    pushCompanyCandidate(candidates, {
-      name: currentExperience.company_name,
-      source_container: "experience",
-      source_selector: "experience.current.company",
-      raw_value: currentExperience.company_name,
-      url: currentExperience.linkedin_company_url ?? null,
-      anchor: null,
-    })
-  }
-
-  for (const entity of topCardEntities) {
-    if (entity.is_school && currentExperienceCompany) continue
-    pushCompanyCandidate(candidates, {
-      name: entity.name,
-      source_container: "top-card",
-      source_selector: entity.is_school ? "top-card.school-anchor" : "top-card.entity-anchor",
-      raw_value: entity.name,
-      url: entity.url ?? null,
-      anchor: entity.anchor,
-    })
-  }
-
-  if (parsedHeadline.company) {
-    pushCompanyCandidate(candidates, {
-      name: parsedHeadline.company,
-      source_container: "top-card",
-      source_selector: "top-card.headline-plain-text",
-      raw_value: parsedHeadline.company,
-      url: null,
-      anchor: null,
-    })
-  }
-
-  for (const entityName of collectEntityLinePlainTextCompanies(topCard)) {
-    if (currentExperienceCompany && /college|university|school/i.test(entityName)) continue
-    pushCompanyCandidate(candidates, {
-      name: entityName,
-      source_container: "top-card",
-      source_selector: "top-card.entity-line-plain-text",
-      raw_value: entityName,
-      url: null,
-      anchor: null,
-    })
-  }
-
-  const heroPlainTextCompany = detectCompanySignalInHeroContainer(topCard, personName, headlineText)
-  if (heroPlainTextCompany.text) {
-    pushCompanyCandidate(candidates, {
-      name: heroPlainTextCompany.text,
-      source_container: "top-card",
-      source_selector: "top-card.hero-plain-text-company",
-      raw_value: heroPlainTextCompany.text,
-      url: null,
-      anchor: null,
-    })
-  }
-
-  if (topCardCompany.name) {
-    pushCompanyCandidate(candidates, {
-      name: topCardCompany.name,
-      source_container: "top-card",
-      source_selector: "top-card.company-anchor",
-      raw_value: trimOrNull(topCompanyAnchor?.textContent),
-      url: topCardCompany.url,
-      anchor: topCompanyAnchor,
-    })
-  } else if (topCompanyAnchor) {
-    const slug = companyNameFromLinkedInCompanyUrl(topCardCompany.url ?? topCompanyAnchor.getAttribute("href"))
-    if (slug) {
-      pushCompanyCandidate(candidates, {
-        name: slug,
-        source_container: "top-card",
-        source_selector: "top-card.company-url.slug",
-        raw_value: slug,
-        url: normalizeLinkedInCompanyUrl(topCompanyAnchor.getAttribute("href")),
-        anchor: topCompanyAnchor,
-      })
-    }
-  }
-
-  for (const entry of experienceEntries) {
-    if (!entry.company_name) continue
-    if (entry === currentExperience) continue
-    pushCompanyCandidate(candidates, {
-      name: entry.company_name,
-      source_container: "experience",
-      source_selector: "experience.section.company",
-      raw_value: entry.company_name,
-      url: entry.linkedin_company_url ?? null,
-      anchor: null,
-    })
-  }
-
-  const candidateNames = []
-  const seenNames = new Set()
-  for (const candidate of candidates) {
-    const key = `${candidate.source_container}|${candidate.source_selector}|${candidate.name}`
-    if (seenNames.has(key)) continue
-    seenNames.add(key)
-    candidateNames.push(candidate.name)
-  }
+  const rankingCandidates = collectProfileCompanyRankingCandidates(
+    doc,
+    topCard,
+    experienceSection,
+    personName,
+    experienceEntries,
+    headlineText,
+  )
+  const rankedCandidates = rankProfileCompanyCandidates(rankingCandidates, personName)
+  const selectedRanked = selectRankedCompanyCandidate(rankedCandidates)
 
   let selected = null
-  for (const candidate of candidates) {
-    const sanitized = rejectCompanyIfPersonName(candidate.name, personName)
+  if (selectedRanked) {
+    selected = {
+      company_name: selectedRanked.company,
+      linkedin_company_url: selectedRanked.url ?? null,
+      source_container: selectedRanked.source_container,
+      source_selector: selectedRanked.source,
+      raw_value: selectedRanked.raw_value,
+      anchor: selectedRanked.anchor ?? null,
+    }
+  }
+
+  for (const candidate of rankedCandidates) {
     const auditEntry = {
       source: candidate.source_container,
-      selector: candidate.source_selector,
-      value: candidate.raw_value ?? candidate.name,
-      accepted: false,
-      reject_reason: sanitized ? null : "person-name-match",
-    }
-    if (sanitized && !selected) {
-      auditEntry.accepted = true
-      selected = {
-        company_name: sanitized,
-        linkedin_company_url: candidate.url ?? null,
-        source_container: candidate.source_container,
-        source_selector: candidate.source_selector,
-        raw_value: candidate.raw_value,
-        anchor: candidate.anchor,
-      }
+      selector: candidate.source,
+      value: candidate.raw_value ?? candidate.company,
+      accepted: selectedRanked?.company === candidate.company && selectedRanked?.source === candidate.source,
+      reject_reason: null,
+      tier: candidate.tier,
+      score: candidate.score,
     }
     const auditKey = `${auditEntry.source}|${auditEntry.selector}|${auditEntry.value}`
     if (!company_candidates.some((entry) => `${entry.source}|${entry.selector}|${entry.value}` === auditKey)) {
@@ -2104,9 +2287,39 @@ function resolveProfileCompanyExtraction(
 
   if (auditBag) auditBag.company_candidates = company_candidates
 
+  const rankingAudit = {
+    selected_company: selected?.company_name ?? null,
+    selected_source: selected?.source_selector ?? null,
+    candidates: rankedCandidates.map((candidate) => ({
+      company: candidate.company,
+      source: candidate.source,
+      source_group: candidate.source_group,
+      score: candidate.score,
+      tier: candidate.tier,
+      container_selector: candidate.container_selector,
+      inside_selected_hero: candidate.inside_selected_hero,
+      inside_experience_section: candidate.inside_experience_section,
+      inside_activity_feed: candidate.inside_activity_feed,
+      confidence: candidate.confidence,
+    })),
+    hero_candidates: rankedCandidates
+      .filter((candidate) => candidate.source_group === "hero")
+      .map((candidate) => candidate.company),
+    experience_candidates: rankedCandidates
+      .filter((candidate) => candidate.source_group === "experience")
+      .map((candidate) => candidate.company),
+    activity_feed_candidates: rankedCandidates
+      .filter((candidate) => candidate.source_group === "activity_feed")
+      .map((candidate) => candidate.company),
+    repost_candidates: rankedCandidates
+      .filter((candidate) => candidate.source_group === "repost")
+      .map((candidate) => candidate.company),
+  }
+  logCompanyRanking(rankingAudit)
+
   console.log("[Equipify Sales:company]", {
     person_name: personName ?? null,
-    candidate_company_names: candidateNames,
+    candidate_company_names: rankedCandidates.map((candidate) => candidate.company),
     selected_company_name: selected?.company_name ?? null,
     source_container: selected?.source_container ?? null,
     source_selector: selected?.source_selector ?? null,
@@ -2438,6 +2651,7 @@ function extractLinkedInProfile(doc) {
   const educationEntries = extractEducationEntries(doc)
   const extractionAudit = {}
   const companySelection = resolveProfileCompanyExtraction(
+    doc,
     topCard,
     experienceSection,
     contact_name,
