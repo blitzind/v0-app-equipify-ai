@@ -3,6 +3,7 @@
  * Run: pnpm test:growth-browser-intake
  */
 import assert from "node:assert/strict"
+import { execSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 import vm from "node:vm"
@@ -293,13 +294,13 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.22"/)
+assert.match(manifestSource, /"version": "4.3.24"/)
 assert.match(manifestSource, /https:\/\/m\.linkedin\.com\/in\/\*/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
 assert.match(manifestSource, /linkedin-inpage-sidebar\.js/)
 assert.match(manifestSource, /inpage-sidebar\.html/)
-assert.match(manifestSource, /assets\/equipify-sales-logo\.png/)
+assert.match(manifestSource, /assets\/equipify-sales-wordmark\.png/)
 assert.match(manifestSource, /assets\/icon-16\.png/)
 assert.match(manifestSource, /assets\/icon-32\.png/)
 assert.match(manifestSource, /assets\/icon-48\.png/)
@@ -324,8 +325,13 @@ assert.match(extensionBrandJs, /DOCK_LOGO_ASSET/)
 assert.match(extensionBrandJs, /PANEL_LOGO_ASSET/)
 assert.match(extensionBrandJs, /panelLogoUrl/)
 assert.match(extensionBrandJs, /applyPanelLogo/)
+assert.match(extensionBrandJs, /PANEL_LOGO_VERSION/)
+assert.match(extensionBrandJs, /4\.3\.24/)
+assert.match(extensionBrandJs, /\?v=\$\{encodeURIComponent\(PANEL_LOGO_VERSION\)\}/)
+assert.match(extensionBrandJs, /\[Equipify Sales:logo-audit\]/)
 assert.match(extensionBrandJs, /PANEL_LOGO_INTRINSIC_WIDTH/)
-assert.match(extensionBrandJs, /assets\/equipify-sales-logo\.png/)
+assert.match(extensionBrandJs, /assets\/equipify-sales-wordmark\.png/)
+assert.match(extensionBrandJs, /\[Equipify Sales:logo-audit\]/)
 
 const popupCss = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/popup.css"),
@@ -622,10 +628,45 @@ for (const iconSize of [16, 32, 48, 128]) {
 
 assert.ok(
   fs.existsSync(
-    path.join(process.cwd(), "extensions/growth-browser-intake/assets/equipify-sales-logo.png"),
+    path.join(process.cwd(), "extensions/growth-browser-intake/assets/equipify-sales-wordmark.png"),
   ),
-  "missing equipify-sales-logo.png",
+  "missing equipify-sales-wordmark.png",
 )
+const panelLogoAlpha = execSync(
+  'sips -g hasAlpha "extensions/growth-browser-intake/assets/equipify-sales-wordmark.png"',
+  { cwd: process.cwd(), encoding: "utf8" },
+)
+assert.match(panelLogoAlpha, /hasAlpha: yes/)
+
+const panelLogoStats = JSON.parse(
+  execSync(
+    `python3 - <<'PY'
+from PIL import Image
+import json
+img = Image.open("extensions/growth-browser-intake/assets/equipify-sales-wordmark.png").convert("RGBA")
+w, h = img.size
+transparent = 0
+neutral_dark_opaque = 0
+for y in range(h):
+    for x in range(w):
+        r, g, b, a = img.getpixel((x, y))
+        if a < 10:
+            transparent += 1
+            continue
+        if a > 200 and max(r, g, b) < 90 and abs(r - g) < 20 and abs(g - b) < 20:
+            neutral_dark_opaque += 1
+corners = [img.getpixel((0, 0))[3], img.getpixel((w - 1, 0))[3], img.getpixel((0, h - 1))[3], img.getpixel((w - 1, h - 1))[3]]
+print(json.dumps({
+    "corners_transparent": all(alpha < 10 for alpha in corners),
+    "transparent_pixels": transparent,
+    "neutral_dark_opaque_pixels": neutral_dark_opaque,
+}))
+PY`,
+    { cwd: process.cwd(), encoding: "utf8" },
+  ).trim(),
+) as { corners_transparent?: boolean; neutral_dark_opaque_pixels?: number }
+assert.equal(panelLogoStats.corners_transparent, true)
+assert.ok(Number(panelLogoStats.neutral_dark_opaque_pixels ?? 9999) <= 500)
 
 
 const contactEnrichmentRoute = fs.readFileSync(
@@ -657,7 +698,10 @@ assert.match(salesWorkspaceCss, /es-ws-enrichment-status/)
 assert.match(salesWorkspaceCss, /es-ws-brand-logo-img/)
 assert.match(salesWorkspaceCss, /aspect-ratio: 1024 \/ 214/)
 assert.match(salesWorkspaceCss, /object-fit: contain/)
+assert.match(salesWorkspaceCss, /\.es-ws-brand-logo[\s\S]*background: transparent/)
+assert.match(salesWorkspaceCss, /\.es-ws-brand-logo-img[\s\S]*background-color: transparent !important/)
 assert.doesNotMatch(salesWorkspaceCss, /es-ws-brand-title/)
+assert.match(popupCss, /\.es-launcher-logo[\s\S]*background: transparent/)
 assert.match(salesWorkspaceCss, /es-ws-employees-list/)
 assert.match(salesWorkspaceCss, /es-ws-company-tabs/)
 assert.match(salesWorkspaceCss, /es-ws-similar-card/)
@@ -1170,6 +1214,8 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
   const companyRankingLogs: Record<string, unknown>[] = []
   const heroScoringLogs: Record<string, unknown>[] = []
   const heroCompanySignalsLogs: Record<string, unknown>[] = []
+  const heroCompanyCandidatesLogs: Record<string, unknown>[] = []
+  const companyFinalSelectionLogs: Record<string, unknown>[] = []
   const domAuditLogs: Record<string, unknown>[] = []
   const pageMetadataPath = path.join(process.cwd(), "extensions/growth-browser-intake/page-metadata.js")
   const pageMetadataSource = fs.readFileSync(pageMetadataPath, "utf8")
@@ -1193,6 +1239,12 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
         if (label === "[Equipify Sales:hero-company-signals]") {
           heroCompanySignalsLogs.push(args[1] as Record<string, unknown>)
         }
+        if (label === "[Equipify Sales:hero-company-candidates]") {
+          heroCompanyCandidatesLogs.push(args[1] as Record<string, unknown>)
+        }
+        if (label === "[Equipify Sales:company-final-selection]") {
+          companyFinalSelectionLogs.push(args[1] as Record<string, unknown>)
+        }
         if (label === "[Equipify Sales:hero-scoring]") heroScoringLogs.push(args[1] as Record<string, unknown>)
         if (label === "[Equipify Sales:dom-audit]") domAuditLogs.push(args[1] as Record<string, unknown>)
       },
@@ -1200,7 +1252,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ version: "4.3.21" }),
+        getManifest: () => ({ version: "4.3.24" }),
       },
     },
     setTimeout: () => 0,
@@ -1243,6 +1295,8 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     companyRankingAudit: companyRankingLogs.at(-1) ?? null,
     heroScoringAudit: heroScoringLogs.find((entry) => entry.selected_container) ?? heroScoringLogs.at(-1) ?? null,
     heroCompanySignalsAudit: heroCompanySignalsLogs.at(-1) ?? null,
+    heroCompanyCandidatesAudit: heroCompanyCandidatesLogs.at(-1) ?? null,
+    companyFinalSelectionAudit: companyFinalSelectionLogs.at(-1) ?? null,
     domAudit: domAuditLogs[0] ?? null,
     findProfileTopCard: (doc) => win.__equipifyGrowthFindProfileTopCard?.(doc) ?? null,
     findExperienceSection: (doc) => win.__equipifyGrowthFindExperienceSection?.(doc) ?? null,
@@ -1370,6 +1424,78 @@ assert.ok(
 assert.ok(
   ricardoHeroSignals.some(
     (entry) => entry.company === "SHARP MEMORIAL HOSPITAL" && entry.source?.includes("employer"),
+  ),
+)
+
+assert.match(pageMetadataJs, /\[Equipify Sales:hero-company-candidates\]/)
+assert.match(pageMetadataJs, /\[Equipify Sales:company-final-selection\]/)
+assert.match(pageMetadataJs, /assessCompanyCandidateText/)
+assert.match(pageMetadataJs, /isCleanEmployerCompanyCandidate/)
+assert.match(pageMetadataJs, /reject_reason/)
+assert.match(pageMetadataJs, /isHeroContaminatedHeadlineText/)
+assert.match(pageMetadataJs, /ui-text-contaminated/)
+assert.doesNotMatch(pageMetadataJs, /generic-plain-text/)
+
+const CONTAMINATED_HERO_FIXTURE = `<!DOCTYPE html><html><body><main><div class="profile-hero-module"><div class="text-heading-xlarge">Ricardo Sanchez Villanueva</div><div class="text-body-medium">Contact infoSHARP MEMORIAL HOSPITALMiraCosta CollegeMessageConnectMessageConnect</div><a href="https://www.linkedin.com/company/sharp-memorial-hospital/">SHARP MEMORIAL HOSPITAL</a><a href="https://www.linkedin.com/company/miracosta-college/">MiraCosta College</a></div><div data-view-name="profile-card-experience"><a href="https://www.linkedin.com/company/sharp-memorial-hospital/">SHARP MEMORIAL HOSPITAL</a></div></main></body></html>`
+
+const CONTAMINATED_HERO_WITH_LOCATION_FIXTURE = `<!DOCTYPE html><html><body><main role="main"><div class="profile-hero-module"><h1 class="text-heading-xlarge">Ricardo Sanchez Villanueva</h1><div class="text-body-medium">Contact infoSHARP MEMORIAL HOSPITALMiraCosta CollegeMessageConnectMessageConnectMission Viejo, California, United States</div><a href="https://www.linkedin.com/company/sharp-memorial-hospital/">SHARP MEMORIAL HOSPITAL</a><a href="https://www.linkedin.com/company/miracosta-college/">MiraCosta College</a></div><div data-view-name="profile-card-experience"><a href="https://www.linkedin.com/company/sharp-memorial-hospital/">SHARP MEMORIAL HOSPITAL</a> · Present</div></main></body></html>`
+
+const AAMI_ENTITY_LINE_FIXTURE = `<!DOCTYPE html><html><body><main><div class="profile-hero-module"><div class="profile-name">Ricardo Sanchez Villanueva</div><div class="entity-line"><a href="https://www.linkedin.com/company/aami/">AAMI</a> · <a href="https://www.linkedin.com/company/sharp-memorial-hospital/">SHARP MEMORIAL HOSPITAL</a></div></div><div data-view-name="profile-card-experience"></div></main></body></html>`
+
+const contaminatedHeroHarness = runPageMetadataHarness(CONTAMINATED_HERO_FIXTURE, ricardoModernUrl)
+const contaminatedHeroCandidates = (contaminatedHeroHarness.heroCompanyCandidatesAudit?.candidates ?? []) as Array<{
+  text?: string
+  source?: string
+  selected?: boolean
+  rejected?: boolean
+  reject_reason?: string
+  classification?: string | null
+}>
+const contaminatedBlob =
+  "Contact infoSHARP MEMORIAL HOSPITALMiraCosta CollegeMessageConnectMessageConnect"
+assert.notEqual(contaminatedHeroHarness.metadata?.company_name, contaminatedBlob)
+assert.equal(contaminatedHeroHarness.metadata?.company_name, "SHARP MEMORIAL HOSPITAL")
+assert.equal(contaminatedHeroHarness.companyRankingAudit?.selected_company, "SHARP MEMORIAL HOSPITAL")
+assert.equal(contaminatedHeroHarness.companyFinalSelectionAudit?.selected_company, "SHARP MEMORIAL HOSPITAL")
+assert.ok(
+  contaminatedHeroCandidates.some(
+    (entry) => entry.text === "MiraCosta College" && entry.rejected === true && entry.reject_reason === "education-signal",
+  ),
+)
+assert.ok(
+  !contaminatedHeroCandidates.some(
+    (entry) => entry.text === contaminatedBlob && entry.selected === true,
+  ),
+)
+
+const contaminatedLocationHarness = runPageMetadataHarness(
+  CONTAMINATED_HERO_WITH_LOCATION_FIXTURE,
+  ricardoModernUrl,
+)
+const contaminatedLocationBlob =
+  "Contact infoSHARP MEMORIAL HOSPITALMiraCosta CollegeMessageConnectMessageConnectMission Viejo, California, United States"
+assert.notEqual(contaminatedLocationHarness.metadata?.company_name, contaminatedLocationBlob)
+assert.equal(contaminatedLocationHarness.metadata?.company_name, "SHARP MEMORIAL HOSPITAL")
+assert.equal(contaminatedLocationHarness.companyFinalSelectionAudit?.selected_company, "SHARP MEMORIAL HOSPITAL")
+assert.ok(
+  !contaminatedLocationHarness.metadata?.headline?.includes("Contact infoSHARP"),
+)
+
+const aamiEntityHarness = runPageMetadataHarness(AAMI_ENTITY_LINE_FIXTURE, ricardoModernUrl)
+const aamiHeroSignals = (aamiEntityHarness.heroCompanySignalsAudit?.candidates ?? []) as Array<{
+  company?: string
+  source?: string
+  selected?: boolean
+}>
+assert.equal(aamiEntityHarness.companyRankingAudit?.selected_company, "SHARP MEMORIAL HOSPITAL")
+assert.ok(
+  aamiHeroSignals.some(
+    (entry) => entry.company === "AAMI" && entry.source?.includes("certification"),
+  ),
+)
+assert.ok(
+  aamiHeroSignals.some(
+    (entry) => entry.company === "SHARP MEMORIAL HOSPITAL" && entry.selected === true,
   ),
 )
 
@@ -1669,7 +1795,7 @@ const sidepanelHtml = fs.readFileSync(
   "utf8",
 )
 assert.match(sidepanelHtml, /es-sales-workspace/)
-assert.match(sidepanelHtml, /equipify-sales-logo\.png/)
+assert.match(sidepanelHtml, /equipify-sales-wordmark\.png/)
 assert.match(sidepanelHtml, /extension-brand.js/)
 assert.match(sidepanelHtml, /width="1024"/)
 assert.doesNotMatch(sidepanelHtml, /equipify-lightning\.png/)
@@ -1691,7 +1817,7 @@ const popupHtml = fs.readFileSync(
 )
 assert.match(popupHtml, /Equipify Sales/)
 assert.match(popupHtml, /extension-ui.js/)
-assert.match(popupHtml, /equipify-sales-logo\.png/)
+assert.match(popupHtml, /equipify-sales-wordmark\.png/)
 assert.match(popupHtml, /extension-brand.js/)
 assert.match(popupHtml, /id="es-launcher-logo"/)
 assert.match(popupHtml, /es-launcher/)

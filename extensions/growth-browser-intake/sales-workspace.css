@@ -11,6 +11,8 @@ body.surface-inpage.es-sales-workspace {
 .es-ws-brand-logo {
   flex: 1;
   min-width: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .es-ws-brand-logo-img {
@@ -22,8 +24,11 @@ body.surface-inpage.es-sales-workspace {
   aspect-ratio: 1024 / 214;
   object-fit: contain;
   object-position: left center;
+  border: 0;
   border-radius: 0;
-  background: transparent;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
   padding: 0;
   flex-shrink: 1;
 }
@@ -65,6 +70,8 @@ body.surface-sidepanel.es-sales-workspace {
   align-items: center;
   gap: 10px;
   min-width: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .es-ws-brand:not(.es-ws-brand-logo) img {

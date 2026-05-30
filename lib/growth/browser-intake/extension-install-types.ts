@@ -27,7 +27,7 @@ export const GROWTH_BROWSER_EXTENSION_PACKAGE_FILES = [
   "extension-ui.js",
   "extension-brand.js",
   "assets/equipify-lightning.png",
-  "assets/equipify-sales-logo.png",
+  "assets/equipify-sales-wordmark.png",
   "assets/icon-16.png",
   "assets/icon-32.png",
   "assets/icon-48.png",

@@ -1106,6 +1106,10 @@ body.es-launcher.surface-popup {
   aspect-ratio: 1024 / 214;
   object-fit: contain;
   object-position: left center;
+  border: 0;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
 }
 
 .es-launcher-body {
