@@ -30,6 +30,17 @@ assert.match(builderSource, /fetchAiReceptionistReadiness/)
 assert.match(builderSource, /fetchComplianceReadiness/)
 assert.match(builderSource, /buildTwilioConnectionSection/)
 assert.match(builderSource, /buildMultiChannelSection/)
+assert.match(builderSource, /TWILIO_API_KEY_SID/)
+assert.match(builderSource, /TWILIO_API_KEY_SECRET/)
+assert.doesNotMatch(builderSource, /"TWILIO_API_KEY"/)
+assert.doesNotMatch(builderSource, /"TWILIO_API_SECRET"/)
+
+const providerRegistrySource = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/browser-calling/provider-registry.ts"),
+  "utf8",
+)
+assert.match(providerRegistrySource, /TWILIO_API_KEY_SID/)
+assert.match(providerRegistrySource, /TWILIO_API_KEY_SECRET/)
 
 const routeSource = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/voice/readiness/route.ts"),

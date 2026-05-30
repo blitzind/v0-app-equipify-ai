@@ -272,16 +272,26 @@ function buildBrowserCallingSection(
   const missingEnvVars = missingEnv([
     "TWILIO_ACCOUNT_SID",
     "TWILIO_AUTH_TOKEN",
-    "TWILIO_API_KEY",
-    "TWILIO_API_SECRET",
     "TWILIO_TWIML_APP_SID",
   ])
   const missingCredentials: string[] = []
   if (browser.tokenReadiness === "missing_credentials") {
-    missingCredentials.push("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_API_KEY", "TWILIO_API_SECRET")
+    missingCredentials.push("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN")
   }
   if (browser.tokenReadiness === "missing_twiml_app") {
     missingCredentials.push("TWILIO_TWIML_APP_SID")
+  }
+
+  const optionalApiKeyVars = missingEnv(["TWILIO_API_KEY_SID", "TWILIO_API_KEY_SECRET"])
+  const failingHealthChecks = [...browser.warnings]
+  if (
+    optionalApiKeyVars.length === 2 &&
+    envPresent("TWILIO_ACCOUNT_SID") &&
+    envPresent("TWILIO_AUTH_TOKEN")
+  ) {
+    failingHealthChecks.push(
+      "Optional TWILIO_API_KEY_SID and TWILIO_API_KEY_SECRET unset — browser tokens fall back to account SID/auth token.",
+    )
   }
 
   let status: VoiceProductionReadinessStatus = "blocked"
@@ -302,16 +312,18 @@ function buildBrowserCallingSection(
     missingCredentials,
     missingWebhookUrls: [],
     phoneNumberIssues: [],
-    failingHealthChecks: browser.warnings,
+    failingHealthChecks,
     lastSuccessfulTest: browser.browserCallingReady ? new Date().toISOString() : null,
     recommendedFix:
       browser.tokenReadiness === "missing_twiml_app"
         ? "Create a Twilio TwiML App and set TWILIO_TWIML_APP_SID for Voice SDK access tokens."
         : browser.tokenReadiness === "missing_credentials"
-          ? "Set Twilio API key/secret and account credentials for browser token minting."
+          ? "Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN for browser token minting. For production, prefer TWILIO_API_KEY_SID and TWILIO_API_KEY_SECRET instead of auth token signing."
           : browser.browserCallingReady
             ? "Operators should grant microphone permission over HTTPS before placing calls."
-            : "Browser calling is in stub mode — configure Twilio Voice SDK credentials.",
+            : optionalApiKeyVars.length > 0
+              ? "Browser calling can use account credentials; set TWILIO_API_KEY_SID and TWILIO_API_KEY_SECRET for dedicated API key signing."
+              : "Browser calling is in stub mode — configure Twilio Voice SDK credentials.",
     webhookUrls: [],
     settingsHref: VOICE_PRODUCTION_READINESS_GLOBAL_SETTINGS_HREF,
     deploymentRequirementsHref: VOICE_PRODUCTION_READINESS_DEPLOYMENT_DOC,
