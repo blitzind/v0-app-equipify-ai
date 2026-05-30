@@ -5,6 +5,8 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
+import vm from "node:vm"
+import { parseHTML } from "linkedom"
 import { assembleBrowserIntakeCallPrep } from "../lib/growth/browser-intake/assemble-browser-intake-call-prep"
 import { GROWTH_BROWSER_INTAKE_CALL_PREP_QA_MARKER } from "../lib/growth/browser-intake/browser-intake-call-prep-types"
 import {
@@ -291,7 +293,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.14"/)
+assert.match(manifestSource, /"version": "4.3.15"/)
 assert.match(manifestSource, /https:\/\/m\.linkedin\.com\/in\/\*/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
@@ -748,6 +750,11 @@ assert.match(pageMetadataJs, /\[Equipify Sales\] page-metadata start/)
 assert.match(pageMetadataJs, /\[Equipify Sales\] extractVisiblePageMetadata invoked/)
 assert.match(pageMetadataJs, /\[Equipify Sales:startup\]/)
 assert.match(pageMetadataJs, /scheduleDiagnosticProfileExtract/)
+assert.match(pageMetadataJs, /discoverProfileTopCard/)
+assert.match(pageMetadataJs, /findSectionHeadingElement/)
+assert.match(pageMetadataJs, /discoverMainContentContainer/)
+assert.match(pageMetadataJs, /\[Equipify Sales:dom-map\]/)
+assert.match(linkedinInpageSidebarJs, /discoverLayoutContainer/)
 assert.match(linkedinInpageSidebarJs, /scheduleStartupLayoutProbe/)
 
 const PROFILE_PHOTO_FIXTURE = `<main>
@@ -1041,6 +1048,146 @@ assert.equal(
   resolveCompanyIntelHeader(rejectCompanyIfPersonNameFixture(ricardoPersonName, ricardoPersonName)),
   "Company not detected",
 )
+
+const RICARDO_MODERN_DESKTOP_FIXTURE = `<!DOCTYPE html><html><body>
+<div style="width: 1280px" class="profile-page-layout">
+  <div class="profile-content-column" style="width: 720px">
+    <div class="profile-hero-module">
+      <img src="https://media.licdn.com/ricardo-sanchez.jpg" width="200" height="200" alt="Ricardo Sanchez Villanueva" />
+      <h1>Ricardo Sanchez Villanueva</h1>
+      <div>Biomedical Equipment Technician | Lean Six Sigma Yellow Belt | OSHA-10 | Certified Associate Biomedical Technology</div>
+      <span>San Diego, California, United States</span>
+      <div class="entity-line">
+        <a href="https://www.linkedin.com/school/miracosta-college/">MiraCosta College</a>
+        ·
+        <a href="https://www.linkedin.com/company/sharp-memorial-hospital/">SHARP MEMORIAL HOSPITAL</a>
+      </div>
+    </div>
+    <div class="profile-detail-section">
+      <h2><span>Experience</span></h2>
+      <div role="listitem">
+        <span>Biomedical Equipment Technician</span>
+        <a href="https://www.linkedin.com/company/sharp-memorial-hospital/">SHARP MEMORIAL HOSPITAL</a>
+        <span>Oct 2025 - Present · 1 mo</span>
+      </div>
+    </div>
+  </div>
+  <aside class="scaffold-layout__aside">
+    <a href="https://www.linkedin.com/company/pm-biomedical/">PM Biomedical suggested</a>
+  </aside>
+  <section id="activity" class="feed-shared-update-v2">
+    <a href="https://www.linkedin.com/company/pm-biomedical/">PM Biomedical</a>
+  </section>
+</div>
+</body></html>`
+
+type PageMetadataHarness = {
+  document: Document
+  metadata: Record<string, unknown> | null | undefined
+  audit: Record<string, unknown> | null | undefined
+  domMap: Record<string, unknown> | null | undefined
+  findProfileTopCard: (doc: Document) => Element | null
+  findExperienceSection: (doc: Document) => Element | null
+  discoverMainContentContainer: (doc: Document, topCard: Element | null) => Element | null
+}
+
+function runPageMetadataHarness(html: string, url: string): PageMetadataHarness {
+  const { document, window: domWindow } = parseHTML(html)
+  Object.defineProperty(domWindow, "innerWidth", { value: 1280, configurable: true })
+  Object.defineProperty(domWindow, "innerHeight", { value: 900, configurable: true })
+
+  const auditLogs: Record<string, unknown>[] = []
+  const domMapLogs: Record<string, unknown>[] = []
+  const pageMetadataPath = path.join(process.cwd(), "extensions/growth-browser-intake/page-metadata.js")
+  const pageMetadataSource = fs.readFileSync(pageMetadataPath, "utf8")
+
+  const sandbox: Record<string, unknown> = {
+    console: {
+      log: (...args: unknown[]) => {
+        const label = String(args[0] ?? "")
+        if (label === "[Equipify Sales:extraction-audit]") auditLogs.push(args[1] as Record<string, unknown>)
+        if (label === "[Equipify Sales:dom-map]") domMapLogs.push(args[1] as Record<string, unknown>)
+      },
+      error: () => {},
+    },
+    chrome: {
+      runtime: {
+        getManifest: () => ({ version: "4.3.15" }),
+      },
+    },
+    setTimeout: () => 0,
+    clearTimeout: () => {},
+    document,
+  }
+
+  const windowObj = domWindow as unknown as Record<string, unknown>
+  windowObj.location = { href: url }
+  windowObj.EquipifyGrowthLinkedInContext = {
+    detectLinkedInPageKind,
+  }
+  sandbox.window = windowObj
+  sandbox.Element = domWindow.Element
+  sandbox.HTMLElement = domWindow.HTMLElement
+  sandbox.Node = domWindow.Node
+  sandbox.URL = URL
+
+  const context = vm.createContext(sandbox)
+  vm.runInContext(pageMetadataSource, context)
+
+  const win = context.window as {
+    __equipifyGrowthExtract?: () => Record<string, unknown>
+    __equipifyGrowthFindProfileTopCard?: (doc: Document) => Element | null
+    __equipifyGrowthFindExperienceSection?: (doc: Document) => Element | null
+    __equipifyGrowthDiscoverMainContentContainer?: (doc: Document, topCard: Element | null) => Element | null
+  }
+
+  return {
+    document,
+    metadata: win.__equipifyGrowthExtract?.() ?? null,
+    audit: auditLogs[0] ?? null,
+    domMap: domMapLogs[0] ?? null,
+    findProfileTopCard: (doc) => win.__equipifyGrowthFindProfileTopCard?.(doc) ?? null,
+    findExperienceSection: (doc) => win.__equipifyGrowthFindExperienceSection?.(doc) ?? null,
+    discoverMainContentContainer: (doc, topCard) =>
+      win.__equipifyGrowthDiscoverMainContentContainer?.(doc, topCard) ?? null,
+  }
+}
+
+function runLayoutDiscoveryHarness(html: string, url: string) {
+  const harness = runPageMetadataHarness(html, url)
+  const topCard = harness.findProfileTopCard(harness.document)
+  const mainContainer = harness.discoverMainContentContainer(harness.document, topCard)
+  return {
+    topCard,
+    mainContainer,
+    topCardFound: Boolean(topCard),
+    mainContainerFound: Boolean(mainContainer),
+    mainContainerClass: mainContainer?.getAttribute("class") ?? null,
+  }
+}
+
+const ricardoModernUrl = "https://www.linkedin.com/in/ricardo-sanchez-villanueva/"
+const ricardoModernHarness = runPageMetadataHarness(RICARDO_MODERN_DESKTOP_FIXTURE, ricardoModernUrl)
+const ricardoModernAudit = ricardoModernHarness.audit ?? {}
+const ricardoModernTopCard = (ricardoModernAudit.top_card ?? {}) as Record<string, unknown>
+const ricardoModernExperience = (ricardoModernAudit.experience_section ?? {}) as Record<string, unknown>
+const ricardoModernSelected = (ricardoModernAudit.selected ?? {}) as Record<string, unknown>
+const ricardoModernLayout = runLayoutDiscoveryHarness(RICARDO_MODERN_DESKTOP_FIXTURE, ricardoModernUrl)
+
+assert.equal(ricardoModernTopCard.found, true, "modern desktop top card should be discovered from profile name")
+assert.equal(ricardoModernExperience.found, true, "modern desktop experience section should be discovered from heading")
+assert.match(String(ricardoModernSelected.title ?? ""), /Biomedical Equipment Technician/)
+assert.equal(ricardoModernSelected.company, "SHARP MEMORIAL HOSPITAL")
+assert.notEqual(ricardoModernSelected.company, ricardoPersonName)
+assert.notEqual(ricardoModernSelected.company, "PM Biomedical")
+assert.notEqual(ricardoModernSelected.company, "MiraCosta College")
+assert.ok(ricardoModernLayout.topCardFound)
+assert.ok(ricardoModernLayout.mainContainerFound)
+assert.match(ricardoModernLayout.mainContainerClass ?? "", /profile-content-column/)
+assert.ok(ricardoModernHarness.domMap?.selected_top_card)
+assert.ok(ricardoModernHarness.domMap?.selected_experience_container)
+assert.ok(Array.isArray(ricardoModernHarness.domMap?.profile_name_parent_chain))
+assert.match(linkedinInpageSidebarJs, /discovered-main-content/)
 
 const LINKEDIN_PROFILE_FIXTURE = `<main>
   <h1 class="text-heading-xlarge">Jane Doe</h1>

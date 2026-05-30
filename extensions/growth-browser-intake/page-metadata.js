@@ -155,7 +155,134 @@ function queryTextInContainer(container, selectors) {
   return null
 }
 
-function findProfileTopCard(doc) {
+function describeElementForAudit(el) {
+  if (!el || !(el instanceof Element)) return null
+  const parts = [el.tagName.toLowerCase()]
+  if (el.id) parts.push(`#${el.id}`)
+  const viewName = el.getAttribute("data-view-name")
+  if (viewName) parts.push(`[data-view-name="${viewName}"]`)
+  const classes = [...(el.classList ?? [])].slice(0, 3)
+  if (classes.length) parts.push(`.${classes.join(".")}`)
+  return parts.join("")
+}
+
+function describeElementChain(el, maxDepth = 8) {
+  const chain = []
+  let node = el
+  for (let depth = 0; depth < maxDepth && node instanceof Element; depth += 1) {
+    chain.push(describeElementForAudit(node))
+    node = node.parentElement
+  }
+  return chain
+}
+
+function elementHeadingText(el) {
+  if (!el) return null
+  const direct = [...el.childNodes]
+    .filter((node) => node.nodeType === 3)
+    .map((node) => trimOrNull(node.textContent))
+    .filter(Boolean)
+    .join(" ")
+  if (direct) return trimOrNull(direct)
+  const text = trimOrNull(el.textContent)
+  if (!text || text.length > 60) return null
+  return text
+}
+
+function findSectionHeadingElement(doc, headingText) {
+  const target = headingText.trim().toLowerCase()
+  for (const el of doc.querySelectorAll("h1, h2, h3, h4, span, div, p, button")) {
+    if (isInsideForbiddenProfileRegion(el)) continue
+    if (el.closest("aside, #activity, .feed-shared-update-v2")) continue
+    const label = elementHeadingText(el)
+    if (!label || label.toLowerCase() !== target) continue
+    return el
+  }
+  return null
+}
+
+function findMeaningfulSectionContainer(headingEl) {
+  if (!headingEl) return null
+  let node = headingEl.parentElement
+  for (let depth = 0; depth < 10 && node; depth += 1) {
+    if (isInsideForbiddenProfileRegion(node)) break
+    const tag = node.tagName?.toLowerCase()
+    const hasRows =
+      Boolean(node.querySelector('li, [role="listitem"], a[href*="/company/"]')) ||
+      (/\bpresent\b/i.test(node.textContent ?? "") &&
+        /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{4})/i.test(node.textContent ?? ""))
+    if (hasRows && ["section", "article", "div", "main"].includes(tag ?? "")) return node
+    node = node.parentElement
+  }
+  return headingEl.closest("section, div, article") ?? headingEl.parentElement
+}
+
+function findProfileNameNode(doc) {
+  const candidates = []
+  for (const h1 of doc.querySelectorAll("main h1, [role='main'] h1, h1")) {
+    if (isInsideForbiddenProfileRegion(h1)) continue
+    if (h1.closest("aside, #activity, .feed-shared-update-v2")) continue
+    const text = cleanLinkedInProfileName(h1.textContent)
+    if (!text || text.length > 80) continue
+    candidates.push({ el: h1, inMain: Boolean(h1.closest("main, [role='main']")) })
+  }
+  const inMain = candidates.find((entry) => entry.inMain)
+  return inMain?.el ?? candidates[0]?.el ?? null
+}
+
+function findHeadlineNearName(nameNode) {
+  if (!nameNode) return null
+  let sibling = nameNode.nextElementSibling
+  for (let depth = 0; depth < 6 && sibling; depth += 1) {
+    const text = normalizeVisibleText(sibling.textContent)
+    if (text && text.length >= 8 && text.length <= 400) return sibling
+    sibling = sibling.nextElementSibling
+  }
+
+  const parent = nameNode.parentElement
+  if (!parent) return null
+  for (const el of parent.querySelectorAll("div, span, p")) {
+    if (el === nameNode || el.contains(nameNode)) continue
+    if (isInsideForbiddenProfileRegion(el)) continue
+    const text = normalizeVisibleText(el.textContent)
+    if (!text || text.length < 8 || text.length > 400) continue
+    if (/contact info|message|follow|connect/i.test(text)) continue
+    return el
+  }
+  return null
+}
+
+function findLocationNearName(nameNode, container) {
+  const scopes = [container, nameNode?.parentElement, nameNode?.closest("main, [role='main'], div")].filter(Boolean)
+  for (const scope of scopes) {
+    for (const node of scope.querySelectorAll("span, div, p")) {
+      if (isInsideForbiddenProfileRegion(node)) continue
+      if (node.contains(nameNode) && node !== nameNode.parentElement) continue
+      const text = trimOrNull(node.textContent)
+      if (!text || text.length > 120) continue
+      if (!/,/.test(text)) continue
+      if (/\d[\d,]*\+?\s+(connections|followers)/i.test(text)) continue
+      if (/contact info|message|follow|connect/i.test(text)) continue
+      return text
+    }
+  }
+  return null
+}
+
+function scoreTopCardCandidate(container, nameNode) {
+  if (!container?.contains?.(nameNode)) return 0
+  let score = 0
+  if (container.querySelector("img")) score += 1
+  if (findHeadlineNearName(nameNode)) score += 1
+  if (extractProfileLocation(container) || findLocationNearName(nameNode, container)) score += 1
+  if (container.querySelector('a[href*="/company/"], a[href*="/school/"]')) score += 1
+  const textLen = (container.textContent ?? "").length
+  if (textLen > 8000) score -= 2
+  if (textLen > 15000) score -= 3
+  return score
+}
+
+function findProfileTopCardLegacy(doc) {
   const candidates = [
     ...doc.querySelectorAll("main section.artdeco-card"),
     ...doc.querySelectorAll("[data-view-name='profile-card']"),
@@ -169,12 +296,138 @@ function findProfileTopCard(doc) {
   return null
 }
 
-function findExperienceSection(doc) {
+function discoverProfileTopCard(doc) {
+  const nameNode = findProfileNameNode(doc)
+  if (!nameNode) return { topCard: null, nameNode: null }
+
+  let node = nameNode
+  let best = null
+  let bestScore = 0
+  for (let depth = 0; depth < 15 && node; depth += 1) {
+    if (node === doc.body || node === doc.documentElement) break
+    if (isInsideForbiddenProfileRegion(node)) {
+      node = node.parentElement
+      continue
+    }
+    const score = scoreTopCardCandidate(node, nameNode)
+    if (score > bestScore) {
+      bestScore = score
+      best = node
+    }
+    node = node.parentElement
+  }
+
+  const topCard =
+    bestScore >= 2
+      ? best
+      : nameNode.closest("main > div, main > section, [role='main'] > div, [role='main'] > section") ??
+        nameNode.parentElement ??
+        nameNode
+
+  return { topCard, nameNode }
+}
+
+function findProfileTopCard(doc) {
+  const legacy = findProfileTopCardLegacy(doc)
+  if (legacy) return legacy
+  return discoverProfileTopCard(doc).topCard
+}
+
+function findExperienceSectionLegacy(doc) {
   const section =
     doc.querySelector("#experience")?.closest("section") ??
     doc.querySelector('[data-view-name="profile-card-experience"]')
   if (!section || isInsideForbiddenProfileRegion(section)) return null
   return section
+}
+
+function findExperienceSection(doc) {
+  const legacy = findExperienceSectionLegacy(doc)
+  if (legacy) return legacy
+
+  const experienceId = doc.querySelector("#experience")
+  if (experienceId && !isInsideForbiddenProfileRegion(experienceId)) {
+    const container =
+      experienceId.closest("section, article, div") ??
+      findMeaningfulSectionContainer(experienceId) ??
+      experienceId.parentElement
+    if (container && !isInsideForbiddenProfileRegion(container)) return container
+  }
+
+  const heading = findSectionHeadingElement(doc, "Experience")
+  if (heading) {
+    const container = findMeaningfulSectionContainer(heading)
+    if (container && !isInsideForbiddenProfileRegion(container)) return container
+  }
+
+  return null
+}
+
+function discoverMainContentContainer(doc, topCard) {
+  if (!topCard || !(topCard instanceof Element)) return null
+
+  const viewportWidth = doc.defaultView?.innerWidth ?? window.innerWidth ?? 1280
+  const minColumnWidth = Math.floor(viewportWidth * 0.45)
+  let node = topCard
+  let best = null
+  let bestWidth = 0
+
+  for (let depth = 0; depth < 15 && node; depth += 1) {
+    if (node === doc.documentElement) break
+    if (isInsideForbiddenProfileRegion(node)) {
+      node = node.parentElement
+      continue
+    }
+
+    const width = node instanceof HTMLElement ? node.offsetWidth : 0
+    const isMainLike =
+      node.matches?.(
+        "main, [role='main'], #main-content, .application-outlet, .scaffold-layout__main, .scaffold-layout__inner",
+      ) ?? false
+
+    if (isMainLike && width >= minColumnWidth) return node
+    if (width >= minColumnWidth && width > bestWidth) {
+      best = node
+      bestWidth = width
+    }
+    node = node.parentElement
+  }
+
+  return best ?? topCard.closest("main, [role='main']") ?? topCard.parentElement
+}
+
+function isSchoolEntityAnchor(anchor) {
+  const href = trimOrNull(anchor?.getAttribute("href"))
+  return Boolean(href && /\/school\//i.test(href))
+}
+
+function parseTopCardEntityAnchors(topCard) {
+  if (!topCard) return []
+  const entities = []
+  for (const anchor of topCard.querySelectorAll('a[href*="/company/"], a[href*="/school/"]')) {
+    if (isInsideForbiddenProfileRegion(anchor)) continue
+    const { name, url } = readCompanyFromAnchor(anchor)
+    if (!name) continue
+    entities.push({
+      name,
+      url,
+      anchor,
+      is_school: isSchoolEntityAnchor(anchor),
+    })
+  }
+  return entities
+}
+
+function logDomMap(context) {
+  console.log("[Equipify Sales:dom-map]", {
+    profile_name_node: describeElementForAudit(context.nameNode),
+    profile_name_parent_chain: describeElementChain(context.nameNode),
+    experience_heading: describeElementForAudit(context.experienceHeading),
+    experience_heading_parent_chain: describeElementChain(context.experienceHeading),
+    selected_top_card: describeElementForAudit(context.topCard),
+    selected_experience_container: describeElementForAudit(context.experienceSection),
+    selected_main_content_container: describeElementForAudit(context.mainContentContainer),
+  })
 }
 
 function trimHtmlSnapshot(el, maxLen = 5000) {
@@ -195,7 +448,7 @@ function describeElementForAudit(el) {
   return parts.join("")
 }
 
-function auditTopCardDiscovery(doc, topCard) {
+function auditTopCardDiscovery(doc, topCard, nameNode) {
   const attempted = []
   for (const section of [
     ...doc.querySelectorAll("main section.artdeco-card"),
@@ -215,17 +468,20 @@ function auditTopCardDiscovery(doc, topCard) {
   return {
     found: Boolean(topCard),
     selector: describeElementForAudit(topCard),
+    discovery_name_node: describeElementForAudit(nameNode),
     text_preview: trimOrNull(topCard?.textContent)?.replace(/\s+/g, " ").slice(0, 200) ?? null,
     attempted_candidates: attempted.slice(0, 10),
   }
 }
 
 function auditExperienceDiscovery(doc, experienceSection) {
+  const heading = findSectionHeadingElement(doc, "Experience")
   return {
     found: Boolean(experienceSection),
     selector: describeElementForAudit(experienceSection),
     experience_id_present: Boolean(doc.querySelector("#experience")),
     experience_view_present: Boolean(doc.querySelector('[data-view-name="profile-card-experience"]')),
+    experience_heading: describeElementForAudit(heading),
     text_preview: trimOrNull(experienceSection?.textContent)?.replace(/\s+/g, " ").slice(0, 200) ?? null,
   }
 }
@@ -234,6 +490,7 @@ function findCompanyBlockForSnapshot(doc, topCard) {
   return (
     topCard?.querySelector(".pv-text-details__right-panel") ??
     topCard?.querySelector(".pv-top-card--experience-list-item") ??
+    topCard?.querySelector('a[href*="/company/"], a[href*="/school/"]')?.closest("div, span, p, li") ??
     doc.querySelector(".pv-text-details__right-panel") ??
     doc.querySelector("[data-view-name='profile-top-card']")
   )
@@ -530,11 +787,12 @@ function findTopCardCompanyAnchor(topCard) {
   const selectors = [
     ".pv-text-details__right-panel a[href*='/company/']",
     ".pv-text-details__left-panel a[href*='/company/']",
-    "a[href*='/company/']",
+    "a[href*='/company/']:not([href*='/school/'])",
   ]
   for (const selector of selectors) {
     for (const anchor of topCard.querySelectorAll(selector)) {
       if (isInsideForbiddenProfileRegion(anchor)) continue
+      if (isSchoolEntityAnchor(anchor)) continue
       return anchor
     }
   }
@@ -560,8 +818,33 @@ function resolveProfileCompanyExtraction(topCard, _experienceSection, personName
   const company_candidates = []
   const topCompanyAnchor = findTopCardCompanyAnchor(topCard)
   const topCardCompany = readCompanyFromAnchor(topCompanyAnchor)
+  const topCardEntities = parseTopCardEntityAnchors(topCard)
   const currentExperience =
     experienceEntries.find((entry) => /\bpresent\b/i.test(entry.date_range ?? "")) ?? experienceEntries[0]
+  const currentExperienceCompany = trimOrNull(currentExperience?.company_name)
+
+  if (currentExperience?.company_name) {
+    pushCompanyCandidate(candidates, {
+      name: currentExperience.company_name,
+      source_container: "experience",
+      source_selector: "experience.current.company",
+      raw_value: currentExperience.company_name,
+      url: currentExperience.linkedin_company_url ?? null,
+      anchor: null,
+    })
+  }
+
+  for (const entity of topCardEntities) {
+    if (entity.is_school && currentExperienceCompany) continue
+    pushCompanyCandidate(candidates, {
+      name: entity.name,
+      source_container: "top-card",
+      source_selector: entity.is_school ? "top-card.school-anchor" : "top-card.entity-anchor",
+      raw_value: entity.name,
+      url: entity.url ?? null,
+      anchor: entity.anchor,
+    })
+  }
 
   if (topCardCompany.name) {
     pushCompanyCandidate(candidates, {
@@ -586,19 +869,9 @@ function resolveProfileCompanyExtraction(topCard, _experienceSection, personName
     }
   }
 
-  if (currentExperience?.company_name) {
-    pushCompanyCandidate(candidates, {
-      name: currentExperience.company_name,
-      source_container: "experience",
-      source_selector: "experience.current.company",
-      raw_value: currentExperience.company_name,
-      url: currentExperience.linkedin_company_url ?? null,
-      anchor: null,
-    })
-  }
-
   for (const entry of experienceEntries) {
     if (!entry.company_name) continue
+    if (entry === currentExperience) continue
     pushCompanyCandidate(candidates, {
       name: entry.company_name,
       source_container: "experience",
@@ -711,7 +984,7 @@ function resolveProfileTitleExtraction(topCard, experienceEntries, headlineParts
       value: candidate.raw_value ?? candidate.title,
       accepted: false,
     }
-    if (normalized && !selected) {
+    if (normalized && isPlausibleJobTitle(normalized) && !selected) {
       auditEntry.accepted = true
       selected = {
         title: normalized,
@@ -737,27 +1010,117 @@ function resolveProfileTitleExtraction(topCard, experienceEntries, headlineParts
   return selected?.title ?? null
 }
 
+function extractExperienceDateRange(itemText) {
+  const raw = trimOrNull(itemText)
+  if (!raw) return null
+  const patterns = [
+    /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\s*[-–—]\s*Present[^·]*/i,
+    /\d{4}\s*[-–—]\s*Present[^·]*/i,
+    /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\s*[-–—]\s*Present/i,
+  ]
+  for (const pattern of patterns) {
+    const match = raw.match(pattern)
+    if (match?.[0]) return trimOrNull(match[0])
+  }
+  if (/\bpresent\b/i.test(raw)) {
+    return trimOrNull(raw.match(/[^·]{0,80}\bpresent\b[^·]{0,20}/i)?.[0] ?? null)
+  }
+  return null
+}
+
+function collectExperienceRowCandidates(section) {
+  const rows = new Set()
+  section
+    .querySelectorAll(
+      'li, [role="listitem"], div.pvs-list__paged-list-item, [data-view-name="profile-component-entity"]',
+    )
+    .forEach((el) => rows.add(el))
+
+  if (rows.size === 0) {
+    section.querySelectorAll("div, li, article").forEach((el) => {
+      if (isInsideForbiddenProfileRegion(el)) return
+      const text = el.textContent ?? ""
+      if (!/\bpresent\b/i.test(text)) return
+      if (!/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{4})/i.test(text)) return
+      if (text.length > 600) return
+      const childMatches = [...el.querySelectorAll("div, li")].filter(
+        (child) =>
+          /\bpresent\b/i.test(child.textContent ?? "") && (child.textContent ?? "").length < 600,
+      )
+      if (childMatches.length === 0) rows.add(el)
+    })
+  }
+
+  return [...rows]
+}
+
+function isExperienceDurationOrDateText(value) {
+  const text = trimOrNull(value)
+  if (!text) return true
+  if (/^\d+\s+(mo|mos|month|months|yr|yrs|year|years)$/i.test(text)) return true
+  if (/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{4})/i.test(text)) return true
+  if (/\bpresent\b/i.test(text)) return true
+  if (/·/.test(text) && /\d+\s+(mo|yr)/i.test(text)) return true
+  return false
+}
+
+function isPlausibleJobTitle(value) {
+  const text = normalizeVisibleText(value)
+  if (!text || text.length < 3 || text.length > 120) return false
+  if (isExperienceDurationOrDateText(text)) return false
+  return true
+}
+
+function extractExperienceTitleFromRow(item, itemText, companyName) {
+  for (const el of item.querySelectorAll("span, div, p")) {
+    if (el.querySelector('a[href*="/company/"]')) continue
+    if (el.closest('a[href*="/company/"]')) continue
+    const text = normalizeVisibleText(el.textContent)
+    if (!isPlausibleJobTitle(text)) continue
+    if (text === companyName) continue
+    return text
+  }
+
+  const legacyTitle = normalizeVisibleText(
+    trimOrNull(
+      item.querySelector(".t-bold span[aria-hidden='true']")?.textContent ??
+        item.querySelector(".mr1.hoverable-link-text span")?.textContent ??
+        item.querySelector("span[aria-hidden='true']")?.textContent,
+    ),
+  )
+  if (legacyTitle && legacyTitle !== companyName && isPlausibleJobTitle(legacyTitle)) return legacyTitle
+
+  const lines = (itemText ?? "")
+    .split(/[\n·|]/)
+    .map((line) => normalizeVisibleText(line))
+    .filter(Boolean)
+
+  for (const line of lines) {
+    if (line === companyName) continue
+    if (!isPlausibleJobTitle(line)) continue
+    return line
+  }
+  return null
+}
+
 function extractExperienceEntries(doc) {
   const entries = []
   const seen = new Set()
   const section = findExperienceSection(doc)
   if (!section) return []
 
-  section.querySelectorAll('li, div.pvs-list__paged-list-item, [data-view-name="profile-component-entity"]').forEach((item) => {
-    if (isInsideForbiddenProfileRegion(item)) return
+  for (const item of collectExperienceRowCandidates(section)) {
+    if (isInsideForbiddenProfileRegion(item)) continue
     const companyAnchor = item.querySelector('a[href*="/company/"]')
-    if (companyAnchor && isInsideForbiddenProfileRegion(companyAnchor)) return
+    if (companyAnchor && isInsideForbiddenProfileRegion(companyAnchor)) continue
     const companyName = normalizeVisibleText(trimOrNull(companyAnchor?.textContent))
     const companyUrl = normalizeLinkedInCompanyUrl(companyAnchor?.getAttribute("href"))
-    const titleEl =
-      item.querySelector(".t-bold span[aria-hidden='true']") ??
-      item.querySelector(".mr1.hoverable-link-text span") ??
-      item.querySelector("span[aria-hidden='true']")
-    const title = normalizeVisibleText(trimOrNull(titleEl?.textContent))
-    const dateText = trimOrNull(item.querySelector(".pvs-entity__caption-wrapper")?.textContent)
-    const key = `${companyName ?? ""}|${title ?? ""}`
-    if (!companyName && !title) return
-    if (seen.has(key)) return
+    const itemText = normalizeVisibleText(item.textContent) ?? ""
+    const title = extractExperienceTitleFromRow(item, itemText, companyName)
+    const dateText = extractExperienceDateRange(itemText)
+    const key = `${companyName ?? ""}|${title ?? ""}|${dateText ?? ""}`
+    if (!companyName && !title) continue
+    if (seen.has(key)) continue
     seen.add(key)
     entries.push({
       company_name: companyName,
@@ -765,7 +1128,7 @@ function extractExperienceEntries(doc) {
       linkedin_company_url: companyUrl,
       date_range: dateText,
     })
-  })
+  }
 
   return entries.slice(0, 8)
 }
@@ -840,17 +1203,48 @@ function extractCompanyEmployeeMetric(doc) {
   ])
 }
 
+function findProfilePhotoUrl(doc, topCard, nameNode) {
+  const scopes = [topCard, nameNode?.closest("div, section, main"), doc.querySelector("main")].filter(Boolean)
+  for (const scope of scopes) {
+    for (const img of scope.querySelectorAll("img")) {
+      if (isInsideForbiddenProfileRegion(img)) continue
+      const src =
+        trimOrNull(img.getAttribute("src")) ??
+        trimOrNull(img.getAttribute("data-delayed-url")) ??
+        trimOrNull(img.getAttribute("data-ghost-url"))
+      if (!src || src.startsWith("data:")) continue
+      const width = Number(img.getAttribute("width") ?? img.width ?? 0)
+      const height = Number(img.getAttribute("height") ?? img.height ?? 0)
+      if (width > 0 && width < 40) continue
+      if (height > 0 && height < 40) continue
+      return src
+    }
+  }
+
+  return queryImageSrc(doc, [
+    "img.pv-top-card-profile-picture__image",
+    "img.profile-photo-edit__preview",
+    "button.pv-top-card-profile-picture img",
+    "img.pv-top-card-profile-picture__image--show",
+    "img.pv-top-card-member-photo",
+    "img[data-anonymize='headshot-photo']",
+    'img[alt*="profile"]',
+  ])
+}
+
 function extractLinkedInProfile(doc) {
-  const topCard = findProfileTopCard(doc)
+  const legacyTopCard = findProfileTopCardLegacy(doc)
+  const discovered = discoverProfileTopCard(doc)
+  const topCard = legacyTopCard ?? discovered.topCard
+  const nameNode = discovered.nameNode ?? topCard?.querySelector("h1")
   const experienceSection = findExperienceSection(doc)
+  const experienceHeading = findSectionHeadingElement(doc, "Experience")
+  const mainContentContainer = discoverMainContentContainer(doc, topCard)
 
   const contact_name =
     cleanLinkedInProfileName(
-      queryTextInContainer(topCard, [
-        "h1.text-heading-xlarge",
-        "h1.break-words",
-        "h1",
-      ]),
+      queryTextInContainer(topCard, ["h1.text-heading-xlarge", "h1.break-words", "h1"]) ??
+        trimOrNull(nameNode?.textContent),
     ) ?? inferLinkedInProfileNameFromTitle(doc.title)
 
   const headline = normalizeVisibleText(
@@ -861,20 +1255,12 @@ function extractLinkedInProfile(doc) {
       ".text-body-medium:not(.t-black--light)",
       ".top-card-layout__headline",
       "[data-view-name='profile-header'] .text-body-medium",
-    ]),
+    ]) ?? trimOrNull(findHeadlineNearName(nameNode)?.textContent),
   )
 
-  const location = extractProfileLocation(topCard)
+  const location = extractProfileLocation(topCard) ?? findLocationNearName(nameNode, topCard)
 
-  const profile_photo_url = queryImageSrc(doc, [
-    "img.pv-top-card-profile-picture__image",
-    "img.profile-photo-edit__preview",
-    "button.pv-top-card-profile-picture img",
-    "img.pv-top-card-profile-picture__image--show",
-    "img.pv-top-card-member-photo",
-    "img[data-anonymize='headshot-photo']",
-    'img[alt*="profile"]',
-  ])
+  const profile_photo_url = findProfilePhotoUrl(doc, topCard, nameNode)
 
   const headlineParts = parseLinkedInHeadline(headline)
   const experienceEntries = extractExperienceEntries(doc)
@@ -926,7 +1312,7 @@ function extractLinkedInProfile(doc) {
   logExtractionAudit({
     profile_url: cleanPageUrl(window.location.href),
     profile_name: contact_name,
-    top_card: auditTopCardDiscovery(doc, topCard),
+    top_card: auditTopCardDiscovery(doc, topCard, nameNode),
     experience_section: auditExperienceDiscovery(doc, experienceSection),
     company_candidates: extractionAudit.company_candidates ?? [],
     title_candidates: extractionAudit.title_candidates ?? [],
@@ -944,6 +1330,13 @@ function extractLinkedInProfile(doc) {
       company: current_company,
       source: companySelection.source_selector,
     },
+  })
+  logDomMap({
+    nameNode,
+    experienceHeading,
+    topCard,
+    experienceSection,
+    mainContentContainer,
   })
   logDomSnapshot(doc, topCard, experienceSection)
 
@@ -1192,6 +1585,8 @@ if (typeof window !== "undefined") {
   window.__equipifyGrowthResolveProfileCompanyExtraction = resolveProfileCompanyExtraction
   window.__equipifyGrowthFindProfileTopCard = findProfileTopCard
   window.__equipifyGrowthFindExperienceSection = findExperienceSection
+  window.__equipifyGrowthDiscoverMainContentContainer = discoverMainContentContainer
+  window.__equipifyGrowthDescribeElement = describeElementForAudit
   window.__equipifyGrowthResolveProfileTitleExtraction = resolveProfileTitleExtraction
   emitStartupDiagnostic()
   scheduleDiagnosticProfileExtract()

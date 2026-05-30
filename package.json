@@ -339,6 +339,7 @@
     "@types/ws": "^8.18.1",
     "eslint": "^9.39.4",
     "eslint-config-next": "16.2.4",
+    "linkedom": "^0.18.12",
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
     "tsx": "^4.21.0",

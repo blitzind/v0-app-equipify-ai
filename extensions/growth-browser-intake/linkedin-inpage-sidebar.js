@@ -140,39 +140,80 @@ console.log("[Equipify Sales] linkedin-inpage-sidebar start")
     document.dispatchEvent(new CustomEvent("equipify-sidebar-state", { detail: { open } }))
   }
 
-  function applyLayoutReserve(open) {
-    for (const selector of LAYOUT_RESERVE_SELECTORS) {
-      document.querySelectorAll(selector).forEach((node) => {
-        if (!(node instanceof HTMLElement)) return
-        if (open) {
-          node.dataset.equipifySidebarReserve = "true"
-          node.style.marginRight = `${SIDEBAR_WIDTH_PX}px`
-          node.style.maxWidth = `calc(100% - ${SIDEBAR_WIDTH_PX}px)`
-        } else if (node.dataset.equipifySidebarReserve === "true") {
-          node.style.marginRight = ""
-          node.style.maxWidth = ""
-          delete node.dataset.equipifySidebarReserve
-        }
-      })
-    }
-    logLayoutAudit(open)
+  function discoverLayoutContainer() {
+    const topCard = window.__equipifyGrowthFindProfileTopCard?.(document)
+    const discovered = window.__equipifyGrowthDiscoverMainContentContainer?.(document, topCard)
+    return discovered instanceof HTMLElement ? discovered : null
   }
 
-  function readNodeLayoutSnapshot(node, selector) {
+  function describeLayoutNode(node) {
+    return window.__equipifyGrowthDescribeElement?.(node) ?? node?.tagName?.toLowerCase() ?? null
+  }
+
+  function readNodeRectSnapshot(node, source) {
     if (!(node instanceof HTMLElement)) return null
+    const rect = node.getBoundingClientRect()
     const style = window.getComputedStyle(node)
     return {
-      selector,
-      before_width: node.offsetWidth,
-      after_width: node.offsetWidth,
+      source,
+      selector: describeLayoutNode(node),
+      before_width: Math.round(rect.width),
+      after_width: Math.round(rect.width),
       before_transform: style.transform,
       after_transform: style.transform,
       margin_right: style.marginRight,
       max_width: style.maxWidth,
+      rect: {
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      },
     }
   }
 
-  function logLayoutAudit(open) {
+  function applyReserveToNode(node, open, source) {
+    if (!(node instanceof HTMLElement)) return
+    if (open) {
+      if (!node.dataset.equipifySidebarReserveBeforeWidth) {
+        node.dataset.equipifySidebarReserveBeforeWidth = String(Math.round(node.getBoundingClientRect().width))
+      }
+      node.dataset.equipifySidebarReserve = source
+      node.style.marginRight = `${SIDEBAR_WIDTH_PX}px`
+      node.style.maxWidth = `calc(100% - ${SIDEBAR_WIDTH_PX}px)`
+    } else if (node.dataset.equipifySidebarReserve) {
+      node.style.marginRight = ""
+      node.style.maxWidth = ""
+      delete node.dataset.equipifySidebarReserve
+      delete node.dataset.equipifySidebarReserveBeforeWidth
+    }
+  }
+
+  function applyLayoutReserve(open) {
+    const discovered = discoverLayoutContainer()
+    const shiftedNodes = new Set()
+
+    if (discovered) {
+      applyReserveToNode(discovered, open, "discovered-main-content")
+      shiftedNodes.add(discovered)
+    }
+
+    for (const selector of LAYOUT_RESERVE_SELECTORS) {
+      document.querySelectorAll(selector).forEach((node) => {
+        if (!(node instanceof HTMLElement)) return
+        if (shiftedNodes.has(node)) return
+        applyReserveToNode(node, open, selector)
+      })
+    }
+
+    logLayoutAudit(open, discovered)
+  }
+
+  function readNodeLayoutSnapshot(node, selector) {
+    return readNodeRectSnapshot(node, selector)
+  }
+
+  function logLayoutAudit(open, discoveredNode = null) {
     const selectors_found = []
     const selectors_shifted = []
     for (const selector of LAYOUT_RESERVE_SELECTORS) {
@@ -180,10 +221,25 @@ console.log("[Equipify Sales] linkedin-inpage-sidebar start")
       if (nodes.length) selectors_found.push({ selector, count: nodes.length })
       nodes.forEach((node) => {
         if (!(node instanceof HTMLElement)) return
-        if (open && node.dataset.equipifySidebarReserve === "true") {
+        if (open && node.dataset.equipifySidebarReserve === selector) {
           selectors_shifted.push(readNodeLayoutSnapshot(node, selector))
         }
       })
+    }
+
+    if (discoveredNode instanceof HTMLElement) {
+      selectors_found.push({
+        selector: "discovered-main-content",
+        count: 1,
+        node: describeLayoutNode(discoveredNode),
+      })
+      if (open && discoveredNode.dataset.equipifySidebarReserve === "discovered-main-content") {
+        const snapshot = readNodeRectSnapshot(discoveredNode, "discovered-main-content")
+        if (snapshot && discoveredNode.dataset.equipifySidebarReserveBeforeWidth) {
+          snapshot.before_width = Number(discoveredNode.dataset.equipifySidebarReserveBeforeWidth)
+        }
+        selectors_shifted.push(snapshot)
+      }
     }
 
     const bodyStyle = document.body ? window.getComputedStyle(document.body) : null
@@ -197,6 +253,7 @@ console.log("[Equipify Sales] linkedin-inpage-sidebar start")
       body_class_open: document.body?.classList.contains(BODY_CLASS) ?? false,
       html_class_open: document.documentElement.classList.contains(BODY_CLASS),
       sidebar_open: open,
+      discovered_container: describeLayoutNode(discoveredNode),
       selectors_found,
       selectors_shifted,
     })
