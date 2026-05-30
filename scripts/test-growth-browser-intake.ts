@@ -293,7 +293,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.21"/)
+assert.match(manifestSource, /"version": "4.3.22"/)
 assert.match(manifestSource, /https:\/\/m\.linkedin\.com\/in\/\*/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
@@ -323,6 +323,8 @@ const extensionBrandJs = fs.readFileSync(
 assert.match(extensionBrandJs, /DOCK_LOGO_ASSET/)
 assert.match(extensionBrandJs, /PANEL_LOGO_ASSET/)
 assert.match(extensionBrandJs, /panelLogoUrl/)
+assert.match(extensionBrandJs, /applyPanelLogo/)
+assert.match(extensionBrandJs, /PANEL_LOGO_INTRINSIC_WIDTH/)
 assert.match(extensionBrandJs, /assets\/equipify-sales-logo\.png/)
 
 const popupCss = fs.readFileSync(
@@ -563,6 +565,7 @@ const inpageSidebarHtml = fs.readFileSync(
 assert.match(inpageSidebarHtml, /quick-company-name/)
 assert.match(inpageSidebarHtml, /quick-linkedin-url/)
 assert.match(inpageSidebarHtml, /extension-brand.js/)
+assert.match(inpageSidebarHtml, /width="1024"/)
 assert.match(inpageSidebarHtml, /inpage-sidebar-close-btn/)
 assert.match(inpageSidebarHtml, /surface-inpage/)
 assert.match(inpageSidebarHtml, /Find contact details/)
@@ -652,7 +655,9 @@ assert.match(salesWorkspaceCss, /overflow-x: hidden/)
 assert.match(salesWorkspaceCss, /max-width: 420px/)
 assert.match(salesWorkspaceCss, /es-ws-enrichment-status/)
 assert.match(salesWorkspaceCss, /es-ws-brand-logo-img/)
-assert.match(salesWorkspaceCss, /background: transparent !important/)
+assert.match(salesWorkspaceCss, /aspect-ratio: 1024 \/ 214/)
+assert.match(salesWorkspaceCss, /object-fit: contain/)
+assert.doesNotMatch(salesWorkspaceCss, /es-ws-brand-title/)
 assert.match(salesWorkspaceCss, /es-ws-employees-list/)
 assert.match(salesWorkspaceCss, /es-ws-company-tabs/)
 assert.match(salesWorkspaceCss, /es-ws-similar-card/)
@@ -1145,6 +1150,7 @@ type PageMetadataHarness = {
   companyCandidatesAudit: Record<string, unknown> | null | undefined
   companyRankingAudit: Record<string, unknown> | null | undefined
   heroScoringAudit: Record<string, unknown> | null | undefined
+  heroCompanySignalsAudit: Record<string, unknown> | null | undefined
   domAudit: Record<string, unknown> | null | undefined
   findProfileTopCard: (doc: Document) => Element | null
   findExperienceSection: (doc: Document) => Element | null
@@ -1163,6 +1169,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
   const companyCandidatesLogs: Record<string, unknown>[] = []
   const companyRankingLogs: Record<string, unknown>[] = []
   const heroScoringLogs: Record<string, unknown>[] = []
+  const heroCompanySignalsLogs: Record<string, unknown>[] = []
   const domAuditLogs: Record<string, unknown>[] = []
   const pageMetadataPath = path.join(process.cwd(), "extensions/growth-browser-intake/page-metadata.js")
   const pageMetadataSource = fs.readFileSync(pageMetadataPath, "utf8")
@@ -1182,6 +1189,9 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
         }
         if (label === "[Equipify Sales:company-ranking]") {
           companyRankingLogs.push(args[1] as Record<string, unknown>)
+        }
+        if (label === "[Equipify Sales:hero-company-signals]") {
+          heroCompanySignalsLogs.push(args[1] as Record<string, unknown>)
         }
         if (label === "[Equipify Sales:hero-scoring]") heroScoringLogs.push(args[1] as Record<string, unknown>)
         if (label === "[Equipify Sales:dom-audit]") domAuditLogs.push(args[1] as Record<string, unknown>)
@@ -1232,6 +1242,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     companyCandidatesAudit: companyCandidatesLogs.find((entry) => entry.selected_container) ?? companyCandidatesLogs.at(-1) ?? null,
     companyRankingAudit: companyRankingLogs.at(-1) ?? null,
     heroScoringAudit: heroScoringLogs.find((entry) => entry.selected_container) ?? heroScoringLogs.at(-1) ?? null,
+    heroCompanySignalsAudit: heroCompanySignalsLogs.at(-1) ?? null,
     domAudit: domAuditLogs[0] ?? null,
     findProfileTopCard: (doc) => win.__equipifyGrowthFindProfileTopCard?.(doc) ?? null,
     findExperienceSection: (doc) => win.__equipifyGrowthFindExperienceSection?.(doc) ?? null,
@@ -1341,6 +1352,26 @@ assert.ok(Array.isArray(ricardoModernRanking.hero_candidates))
 assert.ok((ricardoModernRanking.experience_candidates as string[]).includes("SHARP MEMORIAL HOSPITAL"))
 assert.ok((ricardoModernRanking.activity_feed_candidates as string[]).includes("PM Biomedical"))
 assert.match(pageMetadataJs, /\[Equipify Sales:company-ranking\]/)
+
+assert.match(pageMetadataJs, /\[Equipify Sales:hero-company-signals\]/)
+assert.match(pageMetadataJs, /collectHeroCompanySignals/)
+assert.match(pageMetadataJs, /selectPrimaryHeroEmployerSignal/)
+
+const ricardoHeroSignals = (ricardoModernHarness.heroCompanySignalsAudit?.candidates ?? []) as Array<{
+  company?: string
+  source?: string
+  selected?: boolean
+}>
+assert.ok(
+  ricardoHeroSignals.some(
+    (entry) => entry.company === "SHARP MEMORIAL HOSPITAL" && entry.selected === true,
+  ),
+)
+assert.ok(
+  ricardoHeroSignals.some(
+    (entry) => entry.company === "SHARP MEMORIAL HOSPITAL" && entry.source?.includes("employer"),
+  ),
+)
 
 const ricardoLiveHarness = runPageMetadataHarness(RICARDO_LIVE_DOM_FIXTURE, ricardoModernUrl)
 const ricardoLiveRanking = ricardoLiveHarness.companyRankingAudit ?? {}
@@ -1639,6 +1670,8 @@ const sidepanelHtml = fs.readFileSync(
 )
 assert.match(sidepanelHtml, /es-sales-workspace/)
 assert.match(sidepanelHtml, /equipify-sales-logo\.png/)
+assert.match(sidepanelHtml, /extension-brand.js/)
+assert.match(sidepanelHtml, /width="1024"/)
 assert.doesNotMatch(sidepanelHtml, /equipify-lightning\.png/)
 assert.match(sidepanelHtml, /extension-workspace.js/)
 assert.match(sidepanelHtml, /sales-workspace.css/)
@@ -1659,6 +1692,8 @@ const popupHtml = fs.readFileSync(
 assert.match(popupHtml, /Equipify Sales/)
 assert.match(popupHtml, /extension-ui.js/)
 assert.match(popupHtml, /equipify-sales-logo\.png/)
+assert.match(popupHtml, /extension-brand.js/)
+assert.match(popupHtml, /id="es-launcher-logo"/)
 assert.match(popupHtml, /es-launcher/)
 assert.match(popupHtml, /open-side-panel-btn/)
 assert.doesNotMatch(popupHtml, /equipify-lightning\.png/)

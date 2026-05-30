@@ -563,41 +563,276 @@ function findLocationTextInHeroContainer(container, personName) {
   return null
 }
 
-function detectCompanySignalInHeroContainer(container, personName, headlineText) {
-  if (!container) return { text: null, points: 0 }
+function logHeroCompanySignals(payload) {
+  console.log("[Equipify Sales:hero-company-signals]", payload)
+}
 
-  const companyAnchor = container.querySelector('a[href*="/company/"]:not([href*="/school/"])')
-  if (companyAnchor && !isInsideForbiddenProfileRegion(companyAnchor)) {
-    return {
-      text: normalizeVisibleText(companyAnchor.textContent),
-      points: 8,
-    }
+const HERO_CERTIFICATION_CONTEXT_RE =
+  /\b(certif|licen[cs]e|credential|issued by|cbet|bmet|cres|certified|registration)\b/i
+const HERO_KNOWN_CERT_ISSUER_RE =
+  /\baami\b|association for the advancement of medical instrumentation|biomedical equipment technician certification/i
+const HERO_EDUCATION_CONTEXT_RE = /\b(college|university|school|degree|studied at|education)\b/i
+const HERO_EMPLOYER_CONTEXT_RE =
+  /\b(hospital|health system|medical center|memorial|healthcare|clinic|employer|present|full-time)\b/i
+
+function getHeroSignalContextText(anchor) {
+  if (!anchor) return ""
+  const own = normalizeVisibleText(trimOrNull(anchor.textContent))
+  const parent = anchor.parentElement
+  const parentText = normalizeVisibleText(trimOrNull(parent?.textContent))
+  if (parentText && /[·•]/.test(parentText)) {
+    const segment =
+      parentText
+        .split(/[·•]/)
+        .map((part) => normalizeVisibleText(part))
+        .find((part) => part && (part === own || part.includes(own) || own.includes(part))) ?? own
+    return segment.slice(0, 200)
+  }
+  const parts = [own]
+  if (parentText && parentText !== own) parts.push(parentText)
+  return parts.join(" ").slice(0, 200)
+}
+
+function isHeroEmploymentPlainTextElement(el) {
+  if (!(el instanceof Element)) return false
+  if (el.matches?.(".company-plain-text, [class*='company-plain-text'], [class*='company-plain']")) return true
+  if (el.closest?.(".company-plain-text, [class*='company-plain-text'], [class*='company-plain']")) return true
+  if (el.closest?.(".pv-text-details__right-panel, .pv-top-card--experience-list-item")) return true
+  return false
+}
+
+function isHeroCertificationSignal(name, href, contextText) {
+  const normalized = normalizeVisibleText(name)
+  if (!normalized) return false
+  if (HERO_KNOWN_CERT_ISSUER_RE.test(normalized)) return true
+  if (/\/company\/aami\b/i.test(href ?? "")) return true
+  if (HERO_CERTIFICATION_CONTEXT_RE.test(contextText) && !HERO_EMPLOYER_CONTEXT_RE.test(normalized)) return true
+  return normalized.length <= 5 && HERO_CERTIFICATION_CONTEXT_RE.test(contextText)
+}
+
+function classifyHeroCompanySignal(input) {
+  const name = normalizeVisibleText(input.name)
+  const href = trimOrNull(input.href ?? input.anchor?.getAttribute?.("href"))
+  const contextText = getHeroSignalContextText(input.anchor)
+
+  if (input.kind === "headline") {
+    return { category: "employer", dom_location: "headline-concatenated", score: 6 }
+  }
+
+  if (input.kind === "employment-plain-text") {
+    return { category: "employer", dom_location: "employment-plain-text", score: 9 }
+  }
+
+  if (input.anchor && isSchoolEntityAnchor(input.anchor)) {
+    return { category: "education", dom_location: "education-anchor", score: 2 }
+  }
+
+  if (HERO_EDUCATION_CONTEXT_RE.test(name) || (input.kind === "entity-line" && HERO_EDUCATION_CONTEXT_RE.test(contextText))) {
+    return { category: "education", dom_location: "education-context", score: 2 }
+  }
+
+  if (isHeroCertificationSignal(name, href, contextText)) {
+    return { category: "certification", dom_location: "certification-context", score: 3 }
+  }
+
+  if (
+    isHeroEmploymentPlainTextElement(input.anchor) ||
+    HERO_EMPLOYER_CONTEXT_RE.test(name) ||
+    HERO_EMPLOYER_CONTEXT_RE.test(contextText) ||
+    input.anchor?.closest?.(".pv-text-details__right-panel, .pv-top-card--experience-list-item")
+  ) {
+    const dom_location = isHeroEmploymentPlainTextElement(input.anchor)
+      ? "employment-plain-text"
+      : input.kind === "entity-line"
+        ? "entity-line-employer"
+        : describeElementForAudit(input.anchor) ?? "employer-anchor"
+    return { category: "employer", dom_location, score: dom_location === "employment-plain-text" ? 9 : 8 }
+  }
+
+  if (input.kind === "entity-line") {
+    return { category: "employer", dom_location: "entity-line-employer", score: 7 }
+  }
+
+  return {
+    category: "employer",
+    dom_location: input.anchor ? describeElementForAudit(input.anchor) ?? "employer-anchor" : "hero-plain-text",
+    score: 5,
+  }
+}
+
+function collectHeroCompanySignals(container, personName, headlineText) {
+  const signals = []
+  const seen = new Set()
+  if (!container) return signals
+
+  const pushSignal = (signal) => {
+    const company = normalizeVisibleText(signal.company)
+    if (!company) return
+    if (personName && normalizeComparisonName(company) === normalizeComparisonName(personName)) return
+    const key = `${signal.category}|${signal.source}|${company}|${signal.dom_location}`
+    if (seen.has(key)) return
+    seen.add(key)
+    signals.push({ ...signal, company })
+  }
+
+  for (const el of container.querySelectorAll(
+    ".company-plain-text, [class*='company-plain-text'], [class*='company-plain'], span.company-plain-text",
+  )) {
+    if (!isBindingNodeVisible(el)) continue
+    if (isInsideForbiddenProfileRegion(el)) continue
+    const text = normalizeVisibleText(el.textContent)
+    if (!text || text.length < 3 || text.length > 120) continue
+    if (/technician|engineer|manager|director|specialist|coordinator|representative/i.test(text)) continue
+    const classification = classifyHeroCompanySignal({
+      name: text,
+      anchor: el,
+      kind: "employment-plain-text",
+    })
+    pushSignal({
+      company: text,
+      source: `hero.${classification.category}.employment-plain-text`,
+      dom_location: classification.dom_location,
+      score: classification.score,
+      category: classification.category,
+      anchor: el,
+      url: null,
+    })
+  }
+
+  for (const anchor of container.querySelectorAll('a[href*="/company/"], a[href*="/school/"]')) {
+    if (isInsideForbiddenProfileRegion(anchor)) continue
+    if (!isBindingNodeVisible(anchor)) continue
+    const { name, url } = readCompanyFromAnchor(anchor)
+    if (!name) continue
+    const inEntityLine = Boolean(anchor.closest("[class*='entity-line'], .pv-text-details__right-panel, .ph5"))
+    const classification = classifyHeroCompanySignal({
+      name,
+      url,
+      anchor,
+      href: url,
+      kind: inEntityLine ? "entity-line" : "anchor",
+    })
+    pushSignal({
+      company: name,
+      source: `hero.${classification.category}.${inEntityLine ? "entity-line-anchor" : "company-anchor"}`,
+      dom_location: classification.dom_location,
+      score: classification.score,
+      category: classification.category,
+      anchor,
+      url,
+    })
   }
 
   const parsedHeadline = parseConcatenatedHeadlineTitleCompany(headlineText)
   if (parsedHeadline.company) {
-    return { text: parsedHeadline.company, points: 6 }
+    const classification = classifyHeroCompanySignal({
+      name: parsedHeadline.company,
+      kind: "headline",
+    })
+    pushSignal({
+      company: parsedHeadline.company,
+      source: "hero.employer.headline-concatenated",
+      dom_location: classification.dom_location,
+      score: classification.score,
+      category: classification.category,
+      anchor: null,
+      url: null,
+    })
   }
 
   for (const name of collectEntityLinePlainTextCompanies(container)) {
-    if (personName && normalizeComparisonName(name) === normalizeComparisonName(personName)) continue
-    if (/college|university|school/i.test(name)) continue
-    return { text: name, points: 5 }
+    const classification = classifyHeroCompanySignal({
+      name,
+      kind: "entity-line",
+    })
+    pushSignal({
+      company: name,
+      source: `hero.${classification.category}.entity-line-plain-text`,
+      dom_location: classification.dom_location,
+      score: classification.score,
+      category: classification.category,
+      anchor: null,
+      url: null,
+    })
   }
 
-  for (const el of container.querySelectorAll("span, div, p, a")) {
+  for (const el of container.querySelectorAll("span, div, p")) {
     if (!isBindingNodeVisible(el)) continue
+    if (el.querySelector('a[href*="/company/"], a[href*="/school/"]')) continue
     const text = normalizeVisibleText(el.textContent)
     if (!text || text.length < 4 || text.length > 120) continue
     if (personName && normalizeComparisonName(text) === normalizeComparisonName(personName)) continue
     if (/,/.test(text) && /United States|California|Texas|Area/i.test(text)) continue
     if (/technician|engineer|manager|director|specialist|coordinator|representative/i.test(text)) continue
-    if (text.split(/\s+/).length >= 2 && text.split(/\s+/).length <= 8) {
-      return { text, points: 4 }
-    }
+    if (text.split(/\s+/).length < 2 || text.split(/\s+/).length > 8) continue
+    const classification = classifyHeroCompanySignal({
+      name: text,
+      anchor: el,
+      kind: "plain-text",
+    })
+    if (classification.category !== "employer") continue
+    pushSignal({
+      company: text,
+      source: "hero.employer.generic-plain-text",
+      dom_location: classification.dom_location,
+      score: 4,
+      category: classification.category,
+      anchor: el,
+      url: null,
+    })
   }
 
-  return { text: null, points: 0 }
+  return signals
+}
+
+function selectPrimaryHeroEmployerSignal(signals) {
+  const employers = signals.filter((signal) => signal.category === "employer")
+  if (!employers.length) return null
+
+  const domPriority = {
+    "employment-plain-text": 0,
+    "headline-concatenated": 1,
+    "entity-line-employer": 2,
+  }
+
+  employers.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score
+    const aPriority = domPriority[a.dom_location] ?? 20
+    const bPriority = domPriority[b.dom_location] ?? 20
+    if (aPriority !== bPriority) return aPriority - bPriority
+    return a.company.localeCompare(b.company)
+  })
+
+  return employers[0]
+}
+
+function buildHeroCompanySignalsAudit(signals, primary) {
+  return signals.map((signal) => ({
+    company: signal.company,
+    source: signal.source,
+    dom_location: signal.dom_location,
+    score: signal.score,
+    selected:
+      Boolean(primary) &&
+      signal.category === primary.category &&
+      signal.company === primary.company &&
+      signal.source === primary.source,
+  }))
+}
+
+function detectCompanySignalInHeroContainer(container, personName, headlineText) {
+  if (!container) {
+    return { text: null, points: 0, signals: [], primary: null, audit: [] }
+  }
+  const signals = collectHeroCompanySignals(container, personName, headlineText)
+  const primary = selectPrimaryHeroEmployerSignal(signals)
+  return {
+    text: primary?.company ?? null,
+    points: primary?.score ?? 0,
+    signals,
+    primary,
+    audit: buildHeroCompanySignalsAudit(signals, primary),
+  }
 }
 
 function scoreHeroContainerCandidate(container, doc, expectedName) {
@@ -917,7 +1152,7 @@ function buildCompanyCandidatesDiagnostic(
     }
   }
 
-  const topCompanyAnchor = findTopCardCompanyAnchor(topCard)
+  const topCompanyAnchor = findTopCardCompanyAnchor(topCard, personName, headlineText)
   if (!topCompanyAnchor) {
     rejected_candidates.push({
       stage: "top-card-company-anchor",
@@ -941,12 +1176,13 @@ function buildCompanyCandidatesDiagnostic(
     })
   }
 
-  const heroPlainTextCompany = detectCompanySignalInHeroContainer(topCard, personName, headlineText)
-  if (heroPlainTextCompany.text) {
+  const heroCompanyDetection = detectCompanySignalInHeroContainer(topCard, personName, headlineText)
+  logHeroCompanySignals({ candidates: heroCompanyDetection.audit ?? [] })
+  if (heroCompanyDetection.text) {
     generated_candidates.push({
       stage: "hero-plain-text",
       source: "top-card.hero-plain-text-company",
-      value: heroPlainTextCompany.text,
+      value: heroCompanyDetection.text,
     })
   }
 
@@ -1131,9 +1367,13 @@ function collectProfileCompanyRankingCandidates(
     experienceEntries.find((entry) => /\bpresent\b/i.test(entry.date_range ?? "")) ?? experienceEntries[0]
   const currentExperienceCompany = trimOrNull(currentExperience?.company_name)
   const parsedHeadline = parseConcatenatedHeadlineTitleCompany(headlineText)
-  const topCompanyAnchor = findTopCardCompanyAnchor(topCard)
-  const topCardCompany = readCompanyFromAnchor(topCompanyAnchor)
-  const heroPlainTextCompany = detectCompanySignalInHeroContainer(topCard, personName, headlineText)
+  const heroCompanyDetection = detectCompanySignalInHeroContainer(topCard, personName, headlineText)
+  logHeroCompanySignals({ candidates: heroCompanyDetection.audit ?? [] })
+  const topCompanyAnchor = heroCompanyDetection.primary?.anchor ?? findTopCardCompanyAnchor(topCard, personName, headlineText)
+  const topCardCompany = heroCompanyDetection.primary?.url
+    ? { name: heroCompanyDetection.text, url: heroCompanyDetection.primary.url }
+    : readCompanyFromAnchor(topCompanyAnchor)
+  const heroPlainTextCompany = heroCompanyDetection
   const structuredCompany = readJsonLdOrganizationName(doc)
 
   const pushCandidate = (input) => {
@@ -1164,8 +1404,8 @@ function collectProfileCompanyRankingCandidates(
       source_container: "top-card",
       source_selector: "top-card.hero-plain-text-company",
       raw_value: heroPlainTextCompany.text,
-      url: null,
-      anchor: null,
+      url: heroPlainTextCompany.primary?.url ?? null,
+      anchor: heroPlainTextCompany.primary?.anchor ?? null,
     })
   }
 
@@ -2205,21 +2445,10 @@ function companyNameFromLinkedInCompanyUrl(url) {
   return normalizeVisibleText(slug)
 }
 
-function findTopCardCompanyAnchor(topCard) {
+function findTopCardCompanyAnchor(topCard, personName, headlineText) {
   if (!topCard) return null
-  const selectors = [
-    ".pv-text-details__right-panel a[href*='/company/']",
-    ".pv-text-details__left-panel a[href*='/company/']",
-    "a[href*='/company/']:not([href*='/school/'])",
-  ]
-  for (const selector of selectors) {
-    for (const anchor of topCard.querySelectorAll(selector)) {
-      if (isInsideForbiddenProfileRegion(anchor)) continue
-      if (isSchoolEntityAnchor(anchor)) continue
-      return anchor
-    }
-  }
-  return null
+  const detection = detectCompanySignalInHeroContainer(topCard, personName ?? null, headlineText ?? null)
+  return detection.primary?.anchor ?? null
 }
 
 function pushCompanyCandidate(candidates, input) {
@@ -2666,7 +2895,7 @@ function extractLinkedInProfile(doc) {
     parsedHeadline.title
 
   const linkedin_company_url = companySelection.linkedin_company_url
-  const companyAnchor = companySelection.anchor ?? findTopCardCompanyAnchor(topCard)
+  const companyAnchor = companySelection.anchor ?? findTopCardCompanyAnchor(topCard, contact_name, headline)
   const company_logo_url =
     companyAnchor && topCard?.contains(companyAnchor)
       ? trimOrNull(companyAnchor.querySelector("img")?.getAttribute("src")) ??

@@ -1424,9 +1424,15 @@ function initIntakeApp(options) {
       document.body.classList.add("surface-popup")
     }
 
+    const brand = window.EquipifyGrowthExtensionBrand
     const panelLogo = document.getElementById("es-ws-panel-logo")
-    if (panelLogo && window.EquipifyGrowthExtensionBrand?.panelLogoUrl) {
-      panelLogo.src = window.EquipifyGrowthExtensionBrand.panelLogoUrl()
+    const launcherLogo = document.getElementById("es-launcher-logo")
+    if (brand?.applyPanelLogo) {
+      if (panelLogo) brand.applyPanelLogo(panelLogo)
+      if (launcherLogo) brand.applyPanelLogo(launcherLogo)
+    } else if (brand?.panelLogoUrl) {
+      if (panelLogo) panelLogo.src = brand.panelLogoUrl()
+      if (launcherLogo) launcherLogo.src = brand.panelLogoUrl()
     }
 
     wireEvents()

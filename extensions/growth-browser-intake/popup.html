@@ -9,7 +9,15 @@
   <body class="surface-popup es-launcher">
     <div class="es-launcher-shell">
       <header class="es-launcher-header">
-        <img src="assets/equipify-sales-logo.png" alt="Equipify Sales" class="es-launcher-logo" />
+        <img
+          id="es-launcher-logo"
+          src="assets/equipify-sales-logo.png"
+          alt="Equipify Sales"
+          class="es-launcher-logo"
+          width="1024"
+          height="214"
+          decoding="async"
+        />
         <button type="button" id="settings-toggle-btn" class="es-icon-btn" title="Settings">⚙</button>
       </header>
 
@@ -115,6 +123,7 @@
     </div>
 
     <script src="extension-config.js"></script>
+    <script src="extension-brand.js"></script>
     <script src="extension-storage.js"></script>
     <script src="extension-lookup-cache.js"></script>
     <script src="extension-contact-saved.js"></script>

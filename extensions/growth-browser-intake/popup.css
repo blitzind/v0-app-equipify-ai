@@ -1098,10 +1098,14 @@ body.es-launcher.surface-popup {
 }
 
 .es-launcher-logo {
-  height: 24px;
+  display: block;
+  height: auto;
+  max-height: 28px;
   width: auto;
-  max-width: 200px;
+  max-width: min(200px, calc(100% - 40px));
+  aspect-ratio: 1024 / 214;
   object-fit: contain;
+  object-position: left center;
 }
 
 .es-launcher-body {
