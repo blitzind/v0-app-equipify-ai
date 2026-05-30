@@ -353,9 +353,7 @@ function discoverProfileTopCard(doc) {
 }
 
 function findProfileTopCard(doc) {
-  const legacy = findProfileTopCardLegacy(doc)
-  if (legacy) return legacy
-  return discoverProfileTopCard(doc).topCard
+  return discoverProfileHeroBinding(doc).topCard
 }
 
 function findExperienceSectionLegacy(doc) {
@@ -402,6 +400,370 @@ function findProfileHeroContainer(nameNode, topCard) {
     }
   }
   return topCard ?? nameNode?.closest("div, section, main") ?? null
+}
+
+function isBindingNodeVisible(el) {
+  if (!(el instanceof HTMLElement)) return false
+  if (typeof window.getComputedStyle === "function") {
+    const style = window.getComputedStyle(el)
+    if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) {
+      return false
+    }
+  }
+  if (typeof el.getBoundingClientRect === "function") {
+    const rect = el.getBoundingClientRect()
+    if (rect.width > 0 && rect.height > 0) return true
+  }
+  return true
+}
+
+function resolveMainProfileArea(doc) {
+  return doc.querySelector("main") ?? doc.querySelector("[role='main']") ?? null
+}
+
+function collectHeroContainerCandidates(doc) {
+  const main = resolveMainProfileArea(doc)
+  if (!main) return []
+
+  const seen = new Set()
+  const candidates = []
+  const seeds = main.querySelectorAll("img, a, span, p, div, h1, h2, section, article")
+
+  for (const seed of seeds) {
+    if (!isBindingNodeVisible(seed)) continue
+    if (isInsideForbiddenProfileRegion(seed)) continue
+    if (seed.closest("aside, #activity, .feed-shared-update-v2, #education, #about")) continue
+
+    let node = seed
+    for (let depth = 0; depth < 10 && node; depth += 1) {
+      if (!main.contains(node)) break
+      if (isInsideForbiddenProfileRegion(node)) {
+        node = node.parentElement
+        continue
+      }
+      const tag = node.tagName?.toLowerCase()
+      if (["div", "section", "article", "main"].includes(tag ?? "") && !seen.has(node)) {
+        seen.add(node)
+        candidates.push(node)
+      }
+      if (node === main) break
+      node = node.parentElement
+    }
+  }
+
+  if (main && !seen.has(main)) candidates.push(main)
+
+  return candidates
+}
+
+function findPersonNameInContainer(container, expectedName) {
+  if (!container) return { node: null, text: null, matched: false }
+
+  const nameSelectors = "h1, h2, span, div, p, a"
+  if (expectedName) {
+    for (const el of container.querySelectorAll(nameSelectors)) {
+      if (!isBindingNodeVisible(el)) continue
+      const name = cleanLinkedInProfileName(el.textContent)
+      if (!name || name.length > 80) continue
+      if (normalizeComparisonName(name) === normalizeComparisonName(expectedName)) {
+        return { node: el, text: name, matched: true }
+      }
+    }
+
+    const parts = expectedName.split(/\s+/).filter(Boolean)
+    if (parts.length >= 2) {
+      for (const el of container.querySelectorAll(nameSelectors)) {
+        if (!isBindingNodeVisible(el)) continue
+        const raw = trimOrNull(el.textContent)?.replace(/\s+/g, " ")
+        if (!raw || raw.length > 80) continue
+        const lower = raw.toLowerCase()
+        if (parts.every((part) => lower.includes(part.toLowerCase()))) {
+          const name = cleanLinkedInProfileName(raw)
+          if (name) return { node: el, text: name, matched: true }
+        }
+      }
+    }
+  }
+
+  for (const el of container.querySelectorAll("h1, h2")) {
+    if (!isBindingNodeVisible(el)) continue
+    const name = cleanLinkedInProfileName(el.textContent)
+    if (name && name.length >= 3 && name.length <= 80) {
+      return { node: el, text: name, matched: false }
+    }
+  }
+
+  for (const el of container.querySelectorAll("span, div, p")) {
+    if (!isBindingNodeVisible(el)) continue
+    const name = cleanLinkedInProfileName(el.textContent)
+    if (!name || name.length < 6 || name.length > 80) continue
+    if (name.split(/\s+/).length < 2 || name.split(/\s+/).length > 6) continue
+    if (/contact info|message|follow|connect|\d+\+?\s+connections/i.test(name)) continue
+    return { node: el, text: name, matched: false }
+  }
+
+  return { node: null, text: null, matched: false }
+}
+
+function findHeadlineTextInHeroContainer(container, personName, nameNode) {
+  if (!container) return null
+
+  const fromSelectors = normalizeVisibleText(
+    queryTextInContainer(container, [
+      "div.text-body-medium.break-words",
+      ".pv-text-details__left-panel .text-body-medium",
+      ".ph5.pb5 .text-body-medium",
+      ".text-body-medium:not(.t-black--light)",
+      ".top-card-layout__headline",
+      "[data-view-name='profile-header'] .text-body-medium",
+    ]),
+  )
+  if (fromSelectors) return fromSelectors
+
+  if (nameNode) {
+    const near = findHeadlineNearName(nameNode)
+    if (near) return normalizeVisibleText(near.textContent)
+  }
+
+  for (const el of container.querySelectorAll("div, span, p")) {
+    if (!isBindingNodeVisible(el)) continue
+    const text = normalizeVisibleText(el.textContent)
+    if (!text || text.length < 8 || text.length > 400) continue
+    if (personName && normalizeComparisonName(text) === normalizeComparisonName(personName)) continue
+    if (/contact info|message|follow|connect|\d+\+?\s+connections/i.test(text)) continue
+    if (/,/.test(text) && /United States|Canada|Metropolitan|Area/i.test(text)) continue
+    if (
+      /\b(technician|engineer|manager|director|specialist|coordinator|analyst|developer|consultant|representative|supervisor|operator|administrator)\b/i.test(
+        text,
+      ) ||
+      /\bat\s+[A-Z]/i.test(text)
+    ) {
+      return text
+    }
+  }
+
+  return null
+}
+
+function findLocationTextInHeroContainer(container, personName) {
+  if (!container) return null
+  const fromSelectors = extractProfileLocation(container)
+  if (fromSelectors) return fromSelectors
+
+  for (const el of container.querySelectorAll("span, div, p")) {
+    if (!isBindingNodeVisible(el)) continue
+    const text = trimOrNull(el.textContent)
+    if (!text || text.length > 120 || text.length < 6) continue
+    if (!/,/.test(text)) continue
+    if (personName && text.includes(personName)) continue
+    if (/\d[\d,]*\+?\s+(connections|followers)/i.test(text)) continue
+    if (/contact info|message|follow|connect/i.test(text)) continue
+    return text
+  }
+  return null
+}
+
+function detectCompanySignalInHeroContainer(container, personName, headlineText) {
+  if (!container) return { text: null, points: 0 }
+
+  const companyAnchor = container.querySelector('a[href*="/company/"]:not([href*="/school/"])')
+  if (companyAnchor && !isInsideForbiddenProfileRegion(companyAnchor)) {
+    return {
+      text: normalizeVisibleText(companyAnchor.textContent),
+      points: 8,
+    }
+  }
+
+  const parsedHeadline = parseConcatenatedHeadlineTitleCompany(headlineText)
+  if (parsedHeadline.company) {
+    return { text: parsedHeadline.company, points: 6 }
+  }
+
+  for (const name of collectEntityLinePlainTextCompanies(container)) {
+    if (personName && normalizeComparisonName(name) === normalizeComparisonName(personName)) continue
+    if (/college|university|school/i.test(name)) continue
+    return { text: name, points: 5 }
+  }
+
+  for (const el of container.querySelectorAll("span, div, p, a")) {
+    if (!isBindingNodeVisible(el)) continue
+    const text = normalizeVisibleText(el.textContent)
+    if (!text || text.length < 4 || text.length > 120) continue
+    if (personName && normalizeComparisonName(text) === normalizeComparisonName(personName)) continue
+    if (/,/.test(text) && /United States|California|Texas|Area/i.test(text)) continue
+    if (/technician|engineer|manager|director|specialist|coordinator|representative/i.test(text)) continue
+    if (text.split(/\s+/).length >= 2 && text.split(/\s+/).length <= 8) {
+      return { text, points: 4 }
+    }
+  }
+
+  return { text: null, points: 0 }
+}
+
+function scoreHeroContainerCandidate(container, doc, expectedName) {
+  const person = findPersonNameInContainer(container, expectedName)
+  const headlineText = findHeadlineTextInHeroContainer(container, person.text ?? expectedName, person.node)
+  const locationText = findLocationTextInHeroContainer(container, person.text ?? expectedName)
+  const companySignal = detectCompanySignalInHeroContainer(container, person.text ?? expectedName, headlineText)
+
+  const breakdown = {
+    person_name: person.text ? (person.matched ? 12 : 8) : 0,
+    profile_photo: 0,
+    headline: headlineText ? 8 : 0,
+    location: locationText ? 5 : 0,
+    company: companySignal.points,
+    penalties: 0,
+    total: 0,
+  }
+
+  for (const img of container.querySelectorAll("img")) {
+    if (!isBindingNodeVisible(img)) continue
+    const src = readProfileImageSrc(img)
+    if (!src || isProfileImageForbidden(img)) continue
+    const { width, height } = readProfileImageDimensions(img)
+    const rect = readProfileImageRect(img)
+    const effectiveWidth = width || rect?.width || 0
+    const effectiveHeight = height || rect?.height || 0
+    if (isCoverOrBannerProfileImage(img, effectiveWidth, effectiveHeight)) continue
+    if (effectiveWidth >= 80 && effectiveHeight >= 80) {
+      breakdown.profile_photo = Math.max(breakdown.profile_photo, 10)
+    } else if (effectiveWidth > 0 && effectiveHeight > 0) {
+      breakdown.profile_photo = Math.max(breakdown.profile_photo, 4)
+    }
+  }
+
+  const textLen = (container.textContent ?? "").length
+  if (textLen > 12000) breakdown.penalties -= 6
+  if (textLen > 25000) breakdown.penalties -= 8
+  if (container.querySelector("#experience, [data-view-name='profile-card-experience']")) {
+    breakdown.penalties -= 4
+  }
+
+  breakdown.total =
+    breakdown.person_name +
+    breakdown.profile_photo +
+    breakdown.headline +
+    breakdown.location +
+    breakdown.company +
+    breakdown.penalties
+
+  return {
+    breakdown,
+    nameNode: person.node,
+    contactName: person.text,
+    headlineText,
+    locationText,
+    companyText: companySignal.text,
+  }
+}
+
+function describeHeroSelectionReason(entry) {
+  const parts = []
+  if (entry.scores.person_name > 0) parts.push("person-name")
+  if (entry.scores.profile_photo > 0) parts.push("profile-photo")
+  if (entry.scores.headline > 0) parts.push("headline")
+  if (entry.scores.location > 0) parts.push("location")
+  if (entry.scores.company > 0) parts.push("company")
+  return parts.length ? `hero-scoring:${parts.join("+")}` : "hero-scoring:low-signal"
+}
+
+function logHeroScoring(payload) {
+  console.log("[Equipify Sales:hero-scoring]", payload)
+}
+
+const MIN_HERO_CONTAINER_SCORE = 10
+
+function discoverProfileHeroByScoring(doc) {
+  const expectedName = inferLinkedInProfileNameFromTitle(doc.title)
+  const containers = collectHeroContainerCandidates(doc)
+  const scored = []
+
+  for (const container of containers) {
+    const result = scoreHeroContainerCandidate(container, doc, expectedName)
+    scored.push({
+      selector: describeElementForAudit(container),
+      scores: result.breakdown,
+      total: result.breakdown.total,
+      name_node: describeElementForAudit(result.nameNode),
+      headline_preview: result.headlineText?.slice(0, 120) ?? null,
+      location_preview: result.locationText?.slice(0, 80) ?? null,
+      company_preview: result.companyText?.slice(0, 80) ?? null,
+      container,
+      nameNode: result.nameNode,
+      headlineText: result.headlineText,
+      contactName: result.contactName,
+    })
+  }
+
+  scored.sort((a, b) => {
+    if (b.total !== a.total) return b.total - a.total
+    if (b.scores.profile_photo !== a.scores.profile_photo) {
+      return b.scores.profile_photo - a.scores.profile_photo
+    }
+    return 0
+  })
+  const best = scored[0] ?? null
+  const audit = {
+    candidate_count: scored.length,
+    candidates: scored.slice(0, 12).map(({ container, nameNode, headlineText, contactName, ...entry }) => entry),
+    selected_container: best?.selector ?? null,
+    selected_reason: best && best.total >= MIN_HERO_CONTAINER_SCORE ? describeHeroSelectionReason(best) : "none",
+  }
+
+  logHeroScoring(audit)
+
+  if (!best || best.total < MIN_HERO_CONTAINER_SCORE) {
+    return {
+      topCard: null,
+      nameNode: null,
+      heroContainer: null,
+      headlineText: null,
+      contactName: null,
+      source: "hero-scoring-none",
+      scoring_audit: audit,
+    }
+  }
+
+  return {
+    topCard: best.container,
+    nameNode: best.nameNode,
+    heroContainer: best.container,
+    headlineText: best.headlineText,
+    contactName: best.contactName ?? expectedName,
+    source: "hero-scoring",
+    scoring_audit: audit,
+  }
+}
+
+function discoverProfileHeroBinding(doc) {
+  const scored = discoverProfileHeroByScoring(doc)
+  if (scored.topCard) return scored
+
+  const legacyTopCard = findProfileTopCardLegacy(doc)
+  const discovered = discoverProfileTopCard(doc)
+  const topCard = legacyTopCard ?? discovered.topCard
+  const nameNode = discovered.nameNode ?? topCard?.querySelector("h1") ?? null
+  const fallbackAudit = {
+    candidate_count: scored.scoring_audit?.candidate_count ?? 0,
+    candidates: scored.scoring_audit?.candidates ?? [],
+    selected_container: describeElementForAudit(topCard),
+    selected_reason: legacyTopCard
+      ? "fallback-legacy-h1-top-card"
+      : discovered.topCard
+        ? "fallback-h1-discovery"
+        : "fallback-none",
+  }
+  logHeroScoring(fallbackAudit)
+
+  return {
+    topCard,
+    nameNode,
+    heroContainer: findProfileHeroContainer(nameNode, topCard),
+    headlineText: null,
+    contactName: null,
+    source: fallbackAudit.selected_reason,
+    scoring_audit: fallbackAudit,
+  }
 }
 
 function collectHeroTextSegments(nameNode, topCard, maxDepth = 8) {
@@ -576,6 +938,15 @@ function buildCompanyCandidatesDiagnostic(
       stage: "headline-parse",
       source: "top-card.headline-plain-text",
       value: parsedHeadline.company,
+    })
+  }
+
+  const heroPlainTextCompany = detectCompanySignalInHeroContainer(topCard, personName, headlineText)
+  if (heroPlainTextCompany.text) {
+    generated_candidates.push({
+      stage: "hero-plain-text",
+      source: "top-card.hero-plain-text-company",
+      value: heroPlainTextCompany.text,
     })
   }
 
@@ -1110,13 +1481,17 @@ function scoreProfileImageCandidate(img, nameNode, topCard) {
   return score
 }
 
-function findProfilePhotoUrl(doc, topCard, nameNode) {
+function findProfilePhotoUrl(doc, topCard, nameNode, heroContainerOverride = null) {
   const candidates = []
-  const heroContainer = findProfileHeroContainer(nameNode, topCard)
+  const heroContainer = heroContainerOverride ?? findProfileHeroContainer(nameNode, topCard)
   const scopes = []
   if (heroContainer) scopes.push({ scope: heroContainer, source: "hero-container" })
   if (topCard && topCard !== heroContainer) scopes.push({ scope: topCard, source: "top-card" })
   if (nameNode?.parentElement) scopes.push({ scope: nameNode.parentElement, source: "name-parent" })
+  const mainProfileArea = resolveMainProfileArea(doc)
+  if (mainProfileArea && ![heroContainer, topCard, nameNode?.parentElement].includes(mainProfileArea)) {
+    scopes.push({ scope: mainProfileArea, source: "main-profile-area" })
+  }
 
   let imageCountInHero = 0
   let imageCountInTopCard = 0
@@ -1643,6 +2018,18 @@ function resolveProfileCompanyExtraction(
     })
   }
 
+  const heroPlainTextCompany = detectCompanySignalInHeroContainer(topCard, personName, headlineText)
+  if (heroPlainTextCompany.text) {
+    pushCompanyCandidate(candidates, {
+      name: heroPlainTextCompany.text,
+      source_container: "top-card",
+      source_selector: "top-card.hero-plain-text-company",
+      raw_value: heroPlainTextCompany.text,
+      url: null,
+      anchor: null,
+    })
+  }
+
   if (topCardCompany.name) {
     pushCompanyCandidate(candidates, {
       name: topCardCompany.name,
@@ -2001,31 +2388,34 @@ function extractCompanyEmployeeMetric(doc) {
 }
 
 function extractLinkedInProfile(doc) {
-  logLinkedInHydrationStateAudit(doc)
+  const binding = discoverProfileHeroBinding(doc)
+  const topCard = binding.topCard
+  const nameNode = binding.nameNode
+  const heroContainer = binding.heroContainer
 
-  const legacyTopCard = findProfileTopCardLegacy(doc)
-  const discovered = discoverProfileTopCard(doc)
-  const topCard = legacyTopCard ?? discovered.topCard
-  const nameNode = discovered.nameNode ?? topCard?.querySelector("h1")
   const experienceSection = findExperienceSection(doc)
   const experienceHeading = findSectionHeadingElement(doc, "Experience")
   const mainContentContainer = discoverMainContentContainer(doc, topCard)
 
   const contact_name =
+    cleanLinkedInProfileName(binding.contactName) ??
     cleanLinkedInProfileName(
       queryTextInContainer(topCard, ["h1.text-heading-xlarge", "h1.break-words", "h1"]) ??
         trimOrNull(nameNode?.textContent),
-    ) ?? inferLinkedInProfileNameFromTitle(doc.title)
+    ) ??
+    inferLinkedInProfileNameFromTitle(doc.title)
 
   const headline = normalizeVisibleText(
-    queryTextInContainer(topCard, [
-      "div.text-body-medium.break-words",
-      ".pv-text-details__left-panel .text-body-medium",
-      ".ph5.pb5 .text-body-medium",
-      ".text-body-medium:not(.t-black--light)",
-      ".top-card-layout__headline",
-      "[data-view-name='profile-header'] .text-body-medium",
-    ]) ?? trimOrNull(findHeadlineNearName(nameNode)?.textContent),
+    binding.headlineText ??
+      queryTextInContainer(topCard, [
+        "div.text-body-medium.break-words",
+        ".pv-text-details__left-panel .text-body-medium",
+        ".ph5.pb5 .text-body-medium",
+        ".text-body-medium:not(.t-black--light)",
+        ".top-card-layout__headline",
+        "[data-view-name='profile-header'] .text-body-medium",
+      ]) ??
+      trimOrNull(findHeadlineNearName(nameNode)?.textContent),
   )
 
   logCompanyCandidatesDiagnostic(
@@ -2041,7 +2431,7 @@ function extractLinkedInProfile(doc) {
 
   const location = extractProfileLocation(topCard) ?? findLocationNearName(nameNode, topCard)
 
-  const profile_photo_url = findProfilePhotoUrl(doc, topCard, nameNode)
+  const profile_photo_url = findProfilePhotoUrl(doc, topCard, nameNode, heroContainer)
 
   const headlineParts = parseLinkedInHeadline(headline)
   const experienceEntries = extractExperienceEntries(doc)
@@ -2111,8 +2501,6 @@ function extractLinkedInProfile(doc) {
     }),
   )
 
-  if (!experienceSection) scheduleExperienceRetryExtract()
-
   logExtractionAudit({
     profile_url: cleanPageUrl(window.location.href),
     profile_name: contact_name,
@@ -2134,6 +2522,7 @@ function extractLinkedInProfile(doc) {
       company: current_company,
       source: companySelection.source_selector,
     },
+    hero_binding_source: binding.source,
   })
   logDomMap({
     nameNode,
@@ -2355,32 +2744,6 @@ function resolveLinkedInPageKindForStartup(url) {
   )
 }
 
-function scheduleExperienceRetryExtract() {
-  if (typeof window === "undefined" || window.__equipifyGrowthExperienceRetryScheduled) return
-  window.__equipifyGrowthExperienceRetryScheduled = true
-
-  let attempts = 0
-  const maxAttempts = 20
-  const timer = window.setInterval(() => {
-    attempts += 1
-    const section = findExperienceSection(document)
-    if (section && isExperienceContainerValid(section)) {
-      window.clearInterval(timer)
-      delete window.__equipifyGrowthExperienceRetryScheduled
-      try {
-        extractVisiblePageMetadata()
-      } catch (error) {
-        console.error("[Equipify Sales:startup]", "experience_retry_extract_failed", error)
-      }
-      return
-    }
-    if (attempts >= maxAttempts) {
-      window.clearInterval(timer)
-      delete window.__equipifyGrowthExperienceRetryScheduled
-    }
-  }, 500)
-}
-
 function emitStartupDiagnostic() {
   const url = window.location.href
   console.log("[Equipify Sales:startup]", {
@@ -2390,136 +2753,6 @@ function emitStartupDiagnostic() {
     contentScriptLoaded: true,
     metadataExtractorLoaded: typeof extractVisiblePageMetadata === "function",
   })
-}
-
-function isTimelineNodeVisible(el) {
-  if (!(el instanceof HTMLElement)) return false
-  if (typeof window.getComputedStyle === "function") {
-    const style = window.getComputedStyle(el)
-    if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) {
-      return false
-    }
-  }
-  const rect = el.getBoundingClientRect()
-  return rect.width > 0 && rect.height > 0
-}
-
-function resolveMainProfileArea(doc) {
-  return doc.querySelector("main") ?? doc.querySelector("[role='main']") ?? null
-}
-
-function collectMainProfileVisibleTextCandidates(doc, maxNodes = 48) {
-  const main = resolveMainProfileArea(doc)
-  if (!main) return []
-
-  const candidates = []
-  const seen = new Set()
-  const walker = doc.createTreeWalker(main, NodeFilter.SHOW_TEXT)
-  let node = walker.nextNode()
-
-  while (node && candidates.length < maxNodes) {
-    const parent = node.parentElement
-    const text = trimOrNull(node.textContent)?.replace(/\s+/g, " ")
-    if (
-      text &&
-      text.length >= 2 &&
-      parent &&
-      main.contains(parent) &&
-      isTimelineNodeVisible(parent) &&
-      !isInsideForbiddenProfileRegion(parent)
-    ) {
-      const key = `${describeElementForAudit(parent)}|${text.slice(0, 120)}`
-      if (!seen.has(key)) {
-        seen.add(key)
-        candidates.push({
-          text: text.slice(0, 160),
-          parent_selector: describeElementForAudit(parent),
-        })
-      }
-    }
-    node = walker.nextNode()
-  }
-
-  return candidates
-}
-
-function snapshotTimelineAudit(doc, elapsedMs) {
-  const h1Nodes = [...doc.querySelectorAll("h1")]
-  const visibleH1Text = h1Nodes
-    .map((h1) => ({
-      text: trimOrNull(h1.textContent)?.replace(/\s+/g, " ").slice(0, 160) ?? null,
-      visible: isTimelineNodeVisible(h1),
-      forbidden: isInsideForbiddenProfileRegion(h1),
-      selector: describeElementForAudit(h1),
-    }))
-    .filter((entry) => entry.visible && !entry.forbidden && entry.text)
-
-  const legacyTopCard = findProfileTopCardLegacy(doc)
-  const discovered = discoverProfileTopCard(doc)
-  const topCard = legacyTopCard ?? discovered.topCard
-  const nameNode = discovered.nameNode ?? topCard?.querySelector("h1") ?? null
-  const heroContainer = findProfileHeroContainer(nameNode, topCard)
-
-  return {
-    elapsed_ms: elapsedMs,
-    h1_count: h1Nodes.length,
-    visible_h1_text: visibleH1Text,
-    profile_header_candidates: collectMainProfileVisibleTextCandidates(doc),
-    top_card_found: Boolean(topCard),
-    hero_container_found: Boolean(heroContainer),
-  }
-}
-
-function inferTimelineAuditConclusion(samples) {
-  const firstWithHero =
-    samples.find((sample) => sample.top_card_found && sample.hero_container_found) ?? null
-  const firstWithH1 = samples.find((sample) => sample.visible_h1_text.length > 0) ?? null
-  const firstWithMainText = samples.find((sample) => sample.profile_header_candidates.length > 0) ?? null
-  const last = samples[samples.length - 1] ?? null
-
-  if (!last) return "insufficient-samples"
-  if (!firstWithH1 && !firstWithMainText && last.h1_count === 0) {
-    return "hero-never-appeared-in-main-light-dom"
-  }
-  if (!firstWithHero && last.top_card_found && last.hero_container_found) {
-    return "hero-appeared-after-initial-extract-window"
-  }
-  if (firstWithHero && firstWithHero.elapsed_ms <= 250) {
-    return "hero-present-early-binding-logic-missed"
-  }
-  if (firstWithH1 && firstWithH1.elapsed_ms > 250 && !samples[0]?.visible_h1_text?.length) {
-    return "hero-absent-at-250ms-appeared-later"
-  }
-  if (last.top_card_found || last.visible_h1_text.length > 0) {
-    return "hero-present-by-5000ms-binding-still-failing"
-  }
-  return "inconclusive-review-raw-samples"
-}
-
-function scheduleTimelineAudit() {
-  if (typeof window === "undefined" || window.__equipifyGrowthTimelineAuditScheduled) return
-  if (resolveLinkedInPageKindForStartup(window.location.href) !== "profile") return
-
-  window.__equipifyGrowthTimelineAuditScheduled = true
-  const delays = [250, 1000, 3000, 5000]
-  const samples = []
-
-  for (const delay of delays) {
-    window.setTimeout(() => {
-      const sample = snapshotTimelineAudit(document, delay)
-      samples.push(sample)
-      console.log("[Equipify Sales:timeline-audit]", sample)
-
-      if (delay === 5000) {
-        console.log("[Equipify Sales:timeline-audit]", {
-          kind: "summary",
-          elapsed_ms_samples: delays,
-          samples,
-          conclusion: inferTimelineAuditConclusion(samples),
-        })
-      }
-    }, delay)
-  }
 }
 
 const HYDRATION_FIELD_SPECS = {
@@ -2858,19 +3091,6 @@ function logLinkedInHydrationStateAudit(doc) {
   return auditLinkedInHydrationState(doc)
 }
 
-function scheduleDiagnosticProfileExtract() {
-  const pageKind = resolveLinkedInPageKindForStartup(window.location.href)
-  if (pageKind !== "profile") return
-
-  window.setTimeout(() => {
-    try {
-      extractVisiblePageMetadata()
-    } catch (error) {
-      console.error("[Equipify Sales:startup]", "diagnostic_profile_extract_failed", error)
-    }
-  }, 750)
-}
-
 if (typeof window !== "undefined") {
   window.__equipifyGrowthExtract = extractVisiblePageMetadata
   window.__equipifyGrowthParseLinkedInHeadline = parseLinkedInHeadline
@@ -2878,13 +3098,11 @@ if (typeof window !== "undefined") {
   window.__equipifyGrowthRejectCompanyIfPersonName = rejectCompanyIfPersonName
   window.__equipifyGrowthResolveProfileCompanyExtraction = resolveProfileCompanyExtraction
   window.__equipifyGrowthFindProfileTopCard = findProfileTopCard
+  window.__equipifyGrowthDiscoverProfileHeroBinding = discoverProfileHeroBinding
   window.__equipifyGrowthFindExperienceSection = findExperienceSection
   window.__equipifyGrowthDiscoverMainContentContainer = discoverMainContentContainer
   window.__equipifyGrowthDescribeElement = describeElementForAudit
   window.__equipifyGrowthResolveProfileTitleExtraction = resolveProfileTitleExtraction
   window.__equipifyGrowthAuditHydrationState = () => auditLinkedInHydrationState(document)
-  window.__equipifyGrowthTimelineAuditSnapshot = (doc = document) => snapshotTimelineAudit(doc, 0)
   emitStartupDiagnostic()
-  scheduleTimelineAudit()
-  scheduleDiagnosticProfileExtract()
 }
