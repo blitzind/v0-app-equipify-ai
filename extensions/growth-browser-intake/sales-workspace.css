@@ -438,6 +438,20 @@ body.surface-sidepanel.es-sales-workspace {
   margin-bottom: 10px;
 }
 
+.es-ws-card-title-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.es-ws-company-enrichment-status {
+  margin: 0 0 10px;
+  font-size: 11px;
+  color: #64748b;
+}
+
 .es-ws-mini-action {
   padding: 5px 8px;
   border: 1px solid #dbeafe;

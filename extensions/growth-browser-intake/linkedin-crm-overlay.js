@@ -17,12 +17,14 @@
   const BADGE_ROOT_ID = "equipify-sales-linkedin-badge-root"
   const REFRESH_DEBOUNCE_MS = 300
   const NAV_THROTTLE_MS = 500
-  const MOUNT_RETRY_MS = 6000
+  const LOOKUP_DEADLINE_MS = 5000
+  const MOUNT_RETRY_MS = 5000
   const LOGO_URL =
     window.EquipifyGrowthExtensionBrand?.dockLogoUrl?.() ??
     chrome.runtime.getURL("assets/equipify-lightning.png")
 
   let refreshTimer = null
+  let lookupDeadlineTimer = null
   let lastUrl = null
   let lastNavCheck = 0
   let lastRenderKey = null
@@ -32,6 +34,8 @@
   let mountRetryTimer = null
   let mountObserver = null
   let mountMode = "pending"
+  let refreshGeneration = 0
+  let lookupInFlight = false
 
   function defaultPayload() {
     return {
@@ -67,7 +71,13 @@
     return kind === "profile" || kind === "company"
   }
 
+  function clearLookupDeadline() {
+    if (lookupDeadlineTimer) window.clearTimeout(lookupDeadlineTimer)
+    lookupDeadlineTimer = null
+  }
+
   function removeBadge() {
+    clearLookupDeadline()
     if (mountRetryTimer) window.clearTimeout(mountRetryTimer)
     mountRetryTimer = null
     mountObserver?.disconnect()
@@ -77,6 +87,7 @@
     badgeRoot = null
     lastRenderKey = null
     latestPayload = null
+    lookupInFlight = false
   }
 
   function buildLookupParams() {
@@ -113,7 +124,7 @@
     }
 
     const controller = new AbortController()
-    const timeoutId = window.setTimeout(() => controller.abort(), 5000)
+    const timeoutId = window.setTimeout(() => controller.abort(), LOOKUP_DEADLINE_MS)
     try {
       const response = await fetch(`${baseUrl}${config.CRM_CONTEXT_PATH}?${params.toString()}`, {
         method: "GET",
@@ -121,9 +132,31 @@
         signal: controller.signal,
       })
       const body = await response.json().catch(() => null)
-      if (!response.ok || !body?.ok) return null
+      if (response.status === 403) {
+        return {
+          ...defaultPayload(),
+          error_status: 403,
+          message: body?.message ?? "Not authorized for Growth Engine CRM lookup.",
+        }
+      }
+      if (!response.ok || !body?.ok) {
+        return {
+          ...defaultPayload(),
+          error_status: response.status || 0,
+          error: body?.error ?? "crm_context_failed",
+          message: body?.message ?? "CRM lookup failed. Click to retry.",
+        }
+      }
       if (cacheKey) lookupCache?.write?.(cacheKey, body)
       return body
+    } catch (error) {
+      const timedOut = error instanceof Error && error.name === "AbortError"
+      return {
+        ...defaultPayload(),
+        error_status: timedOut ? 408 : 0,
+        error: timedOut ? "crm_context_timeout" : "crm_context_failed",
+        message: timedOut ? "CRM lookup timed out. Click to retry." : "CRM lookup failed. Click to retry.",
+      }
     } finally {
       window.clearTimeout(timeoutId)
     }
@@ -150,6 +183,7 @@
         if (!el.isConnected) continue
         const rect = el.getBoundingClientRect()
         if (rect.width <= 0 || rect.height <= 0) continue
+        if (el.closest("nav, footer, aside")) continue
         return el
       }
     }
@@ -161,7 +195,12 @@
     let node = nameEl.parentElement
     for (let depth = 0; depth < 6 && node; depth += 1) {
       const style = window.getComputedStyle(node)
-      if (style.display.includes("flex") || node.classList.contains("ph5") || node.dataset?.viewName) {
+      if (
+        style.display.includes("flex") ||
+        node.classList.contains("ph5") ||
+        node.dataset?.viewName ||
+        node.classList.contains("pv-text-details__left-panel")
+      ) {
         return node
       }
       node = node.parentElement
@@ -176,17 +215,11 @@
     root.classList.remove("equipify-sales-linkedin-badge-root--floating")
 
     const headerRow = findProfileHeaderRow(nameEl)
-    if (headerRow) {
-      if (root.parentElement !== headerRow) {
-        root.remove()
-        headerRow.appendChild(root)
-      }
-      mountMode = "inline"
-      logInfo("mount_inline_header_row", { name: nameEl.textContent?.trim()?.slice(0, 80) ?? null })
-      return true
+    if (headerRow && !headerRow.classList.contains("equipify-sales-linkedin-badge-host")) {
+      headerRow.classList.add("equipify-sales-linkedin-badge-host")
     }
 
-    if (root.parentElement === nameEl.parentElement && root.previousElementSibling === nameEl) {
+    if (root.previousElementSibling === nameEl && root.parentElement === nameEl.parentElement) {
       mountMode = "inline"
       return true
     }
@@ -256,7 +289,7 @@
       if (findProfileNameElement()) {
         mountBadgeNearTopCard(root, "mount_failed_after_retry")
       } else {
-        mountBadgeNearTopCard(root, "no_profile_h1_after_retry")
+        mountBadgeFloating(root, "no_profile_h1_after_retry")
       }
       mountObserver?.disconnect()
       mountObserver = null
@@ -285,7 +318,7 @@
     return linkedinStatus.resolveProspectDisplayBadge(payload)
   }
 
-  function createBadgeButton(display) {
+  function createBadgeButton(display, options = {}) {
     const btn = document.createElement("button")
     btn.type = "button"
     btn.className = "equipify-sales-linkedin-badge"
@@ -317,6 +350,10 @@
     btn.addEventListener("click", (event) => {
       event.preventDefault()
       event.stopPropagation()
+      if (options.onRetry) {
+        options.onRetry()
+        return
+      }
       openSidebar()
     })
 
@@ -331,12 +368,12 @@
       root.className = "equipify-sales-linkedin-badge-root"
     }
 
-    if (mountMode !== "inline" && mountMode !== "floating") {
-      if (!mountBadgeBesideName(root)) {
-        scheduleMountRetry(root)
-      }
-    } else if (mountMode === "inline") {
+    if (mountMode === "inline") {
       mountBadgeBesideName(root)
+    } else if (mountMode === "floating") {
+      mountBadgeFloating(root, "existing_floating")
+    } else if (!mountBadgeBesideName(root)) {
+      scheduleMountRetry(root)
     }
 
     badgeRoot = root
@@ -344,6 +381,8 @@
   }
 
   function renderBadge(payload, hasProfileContext = true) {
+    clearLookupDeadline()
+    lookupInFlight = false
     latestPayload = payload
     const display = resolveBadgeDisplay(payload, hasProfileContext)
     const renderKey = buildRenderKey(payload, display)
@@ -351,7 +390,11 @@
 
     const root = ensureBadgeRoot()
     root.replaceChildren()
-    root.appendChild(createBadgeButton(display))
+    const onRetry =
+      display.key === "lookup_error" || payload?.error
+        ? () => scheduleRefresh(true)
+        : undefined
+    root.appendChild(createBadgeButton(display, { onRetry }))
     lastRenderKey = renderKey
     logInfo("render_badge", { label: display.displayLabel, mountMode })
   }
@@ -380,8 +423,26 @@
 
     btn.appendChild(logo)
     btn.appendChild(label)
-    btn.addEventListener("click", openSidebar)
+    btn.addEventListener("click", () => scheduleRefresh(true))
     root.appendChild(btn)
+  }
+
+  function scheduleLookupDeadline(generation, hasProfileContext) {
+    clearLookupDeadline()
+    lookupDeadlineTimer = window.setTimeout(() => {
+      if (generation !== refreshGeneration) return
+      if (!lookupInFlight) return
+      logInfo("lookup_deadline_terminal", { ms: LOOKUP_DEADLINE_MS })
+      renderBadge(
+        {
+          ...defaultPayload(),
+          error_status: 408,
+          error: "crm_context_timeout",
+          message: "CRM lookup timed out. Click to retry.",
+        },
+        hasProfileContext,
+      )
+    }, LOOKUP_DEADLINE_MS)
   }
 
   async function refreshBadge(options = {}) {
@@ -390,6 +451,7 @@
       return
     }
 
+    const generation = ++refreshGeneration
     const params = buildLookupParams()
     const hasProfileContext = [...params.keys()].length > 0
 
@@ -400,22 +462,15 @@
       return
     }
 
+    lookupInFlight = true
+    scheduleLookupDeadline(generation, hasProfileContext)
+
     try {
       const payload = await fetchCrmContext(options)
-      if (!payload) {
-        renderBadge(
-          {
-            ...defaultPayload(),
-            error_status: 0,
-            error: "crm_context_empty",
-            message: "CRM lookup returned no data.",
-          },
-          true,
-        )
-        return
-      }
-      renderBadge(payload, true)
+      if (generation !== refreshGeneration) return
+      renderBadge(payload ?? defaultPayload(), true)
     } catch (error) {
+      if (generation !== refreshGeneration) return
       logError("refresh_badge_failed", error)
       renderBadge(
         {
@@ -447,6 +502,11 @@
       lastRenderKey = null
       mountMode = "pending"
       scheduleRefresh()
+      return
+    }
+
+    if (badgeRoot?.isConnected && mountMode !== "inline" && findProfileNameElement()) {
+      mountBadgeBesideName(badgeRoot)
     }
   }
 

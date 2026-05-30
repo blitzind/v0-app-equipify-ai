@@ -257,7 +257,8 @@ function initIntakeApp(options) {
     const platform = metadata?.source_platform || "website"
     const pageTitle = trimOrNull(metadata?.page_title)
     const contactName = trimOrNull(metadata?.contact_name)
-    const headline = trimOrNull(metadata?.headline) || trimOrNull(metadata?.title)
+    const headline = trimOrNull(metadata?.headline)
+    const title = trimOrNull(metadata?.title) || headline
     const location = trimOrNull(metadata?.location)
     const contextKey = sourceUrl ?? trimOrNull(tabUrl)
     const isNewContext = Boolean(contextKey && contextKey !== state.lastAppliedContextUrl)
@@ -295,7 +296,7 @@ function initIntakeApp(options) {
     fillField(websiteInput, website)
     fillField(linkedinInput, linkedinUrl)
     fillField(contactInput, contactName)
-    fillField(titleInput, headline)
+    fillField(titleInput, title)
     fillField(locationInput, location)
     fillField(quickCompanyInput, companyName)
     fillField(quickLocationInput, location)
@@ -1394,6 +1395,11 @@ function initIntakeApp(options) {
       document.body.classList.add("surface-inpage")
     } else {
       document.body.classList.add("surface-popup")
+    }
+
+    const panelLogo = document.getElementById("es-ws-panel-logo")
+    if (panelLogo && window.EquipifyGrowthExtensionBrand?.panelLogoUrl) {
+      panelLogo.src = window.EquipifyGrowthExtensionBrand.panelLogoUrl()
     }
 
     wireEvents()

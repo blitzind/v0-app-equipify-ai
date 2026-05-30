@@ -30,7 +30,7 @@ The voice platform is designed for **safe incremental production rollout**. Most
 4. **Never bypass signature validation or simulation flags in production** — see [Dangerous Flags](#dangerous-flags).
 5. **Autonomous outbound cannot be enabled via env** — compile-time constants enforce operator control.
 
-Readiness for each phase is visible in platform admin voice settings (`/admin/growth/voice/*`) and via readiness API routes under `app/api/platform/growth/voice/**`.
+Readiness for each phase is visible in the **Voice Production Readiness Center** (`/admin/growth/voice/readiness`) and via readiness API routes under `app/api/platform/growth/voice/**`.
 
 ---
 

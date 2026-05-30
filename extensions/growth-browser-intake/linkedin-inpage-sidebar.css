@@ -36,6 +36,22 @@ body.equipify-sales-inpage-sidebar-open {
   transition: margin-right 0.2s ease;
 }
 
+html.equipify-sales-inpage-sidebar-open .scaffold-layout__inner,
+html.equipify-sales-inpage-sidebar-open .scaffold-layout__main,
+html.equipify-sales-inpage-sidebar-open main.scaffold-layout__main,
+html.equipify-sales-inpage-sidebar-open .application-outlet,
+html.equipify-sales-inpage-sidebar-open #main-content,
+html.equipify-sales-inpage-sidebar-open .global-nav + main,
+body.equipify-sales-inpage-sidebar-open .scaffold-layout__inner,
+body.equipify-sales-inpage-sidebar-open .scaffold-layout__main,
+body.equipify-sales-inpage-sidebar-open main.scaffold-layout__main,
+body.equipify-sales-inpage-sidebar-open .application-outlet,
+body.equipify-sales-inpage-sidebar-open #main-content {
+  margin-right: 420px !important;
+  max-width: calc(100% - 420px) !important;
+  transition: margin-right 0.2s ease, max-width 0.2s ease;
+}
+
 .equipify-sales-floating-dock--sidebar-open {
   display: none !important;
 }
@@ -44,6 +60,20 @@ body.equipify-sales-inpage-sidebar-open {
   html.equipify-sales-inpage-sidebar-open,
   body.equipify-sales-inpage-sidebar-open {
     margin-right: 0 !important;
+  }
+
+  html.equipify-sales-inpage-sidebar-open .scaffold-layout__inner,
+  html.equipify-sales-inpage-sidebar-open .scaffold-layout__main,
+  html.equipify-sales-inpage-sidebar-open main.scaffold-layout__main,
+  html.equipify-sales-inpage-sidebar-open .application-outlet,
+  html.equipify-sales-inpage-sidebar-open #main-content,
+  body.equipify-sales-inpage-sidebar-open .scaffold-layout__inner,
+  body.equipify-sales-inpage-sidebar-open .scaffold-layout__main,
+  body.equipify-sales-inpage-sidebar-open main.scaffold-layout__main,
+  body.equipify-sales-inpage-sidebar-open .application-outlet,
+  body.equipify-sales-inpage-sidebar-open #main-content {
+    margin-right: 0 !important;
+    max-width: 100% !important;
   }
 
   .equipify-sales-inpage-sidebar-panel {

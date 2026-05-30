@@ -133,5 +133,71 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true
   }
 
+  if (message?.type === "equipify-enrich-company-page") {
+    const companyUrl = trimOrNull(message.url)
+    if (!companyUrl) {
+      sendResponse({ ok: false, message: "Company URL is required." })
+      return true
+    }
+
+    chrome.tabs.create({ url: companyUrl, active: false }, (tab) => {
+      const tabId = tab?.id
+      if (!tabId) {
+        sendResponse({ ok: false, message: "Could not open company page tab." })
+        return
+      }
+
+      const timeoutId = setTimeout(() => {
+        chrome.tabs.onUpdated.removeListener(onUpdated)
+        chrome.tabs.remove(tabId).catch(() => {})
+        sendResponse({ ok: false, message: "Company page enrichment timed out." })
+      }, 15000)
+
+      function onUpdated(updatedTabId, info) {
+        if (updatedTabId !== tabId || info.status !== "complete") return
+        chrome.tabs.onUpdated.removeListener(onUpdated)
+        clearTimeout(timeoutId)
+
+        chrome.scripting
+          .executeScript({ target: { tabId }, files: ["page-metadata.js", "linkedin-company-people.js"] })
+          .then(() =>
+            chrome.scripting.executeScript({
+              target: { tabId },
+              func: () => ({
+                metadata: window.__equipifyGrowthExtract?.() ?? null,
+                visiblePeople: window.__equipifyGrowthLinkedInCompanyPeople?.() ?? [],
+              }),
+            }),
+          )
+          .then((results) => {
+            chrome.tabs.remove(tabId).catch(() => {})
+            const payload = results?.[0]?.result ?? null
+            if (!payload?.metadata) {
+              sendResponse({ ok: false, message: "No public company metadata found on LinkedIn page." })
+              return
+            }
+            sendResponse({
+              ok: true,
+              metadata: payload.metadata,
+              visiblePeople: payload.visiblePeople ?? [],
+            })
+          })
+          .catch((error) => {
+            chrome.tabs.remove(tabId).catch(() => {})
+            sendResponse({ ok: false, message: error instanceof Error ? error.message : "Company enrichment failed." })
+          })
+      }
+
+      chrome.tabs.onUpdated.addListener(onUpdated)
+    })
+
+    return true
+  }
+
   return undefined
 })
+
+function trimOrNull(value) {
+  const trimmed = typeof value === "string" ? value.trim() : ""
+  return trimmed ? trimmed : null
+}

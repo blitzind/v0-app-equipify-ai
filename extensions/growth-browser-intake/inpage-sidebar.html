@@ -11,7 +11,7 @@
     <div class="es-ws-app">
       <header class="es-ws-header">
         <div class="es-ws-brand es-ws-brand-logo">
-          <img src="assets/equipify-sales-logo.png" alt="Equipify Sales" class="es-ws-brand-logo-img" />
+          <img id="es-ws-panel-logo" src="assets/equipify-sales-logo.png" alt="Equipify Sales" class="es-ws-brand-logo-img" />
         </div>
         <div class="es-ws-header-actions">
           <button type="button" id="workspace-refresh-btn" class="es-ws-icon-btn" title="Refresh page context">↻</button>
@@ -88,8 +88,13 @@
         <section class="es-ws-card es-ws-company-intel">
           <div class="es-ws-card-title-row">
             <p class="es-ws-card-label">Company intelligence</p>
-            <button type="button" id="es-ws-run-research-btn" class="es-ws-mini-action">Run Research</button>
+            <div class="es-ws-card-title-actions">
+              <button type="button" id="es-ws-visit-company-btn" class="es-ws-mini-action" hidden>Visit company page</button>
+              <button type="button" id="es-ws-enrich-company-btn" class="es-ws-mini-action" hidden>Enrich company</button>
+              <button type="button" id="es-ws-run-research-btn" class="es-ws-mini-action">Run Research</button>
+            </div>
           </div>
+          <p id="es-ws-company-enrichment-status" class="es-ws-company-enrichment-status"></p>
           <div class="es-ws-company-header">
             <div id="es-ws-company-logo" class="es-ws-company-logo">?</div>
             <div>

@@ -291,7 +291,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.5"/)
+assert.match(manifestSource, /"version": "4.3.6"/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
 assert.match(manifestSource, /linkedin-inpage-sidebar\.js/)
 assert.match(manifestSource, /inpage-sidebar\.html/)
@@ -317,7 +317,9 @@ const extensionBrandJs = fs.readFileSync(
   "utf8",
 )
 assert.match(extensionBrandJs, /DOCK_LOGO_ASSET/)
-assert.match(extensionBrandJs, /assets\/equipify-lightning\.png/)
+assert.match(extensionBrandJs, /PANEL_LOGO_ASSET/)
+assert.match(extensionBrandJs, /panelLogoUrl/)
+assert.match(extensionBrandJs, /assets\/equipify-sales-logo\.png/)
 
 const popupCss = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/popup.css"),
@@ -426,7 +428,9 @@ assert.match(linkedinCrmOverlayJs, /mountBadgeBesideName/)
 assert.match(linkedinCrmOverlayJs, /mount_floating_fallback/)
 assert.match(linkedinCrmOverlayJs, /\[Equipify Sales:linkedin-badge\]/)
 assert.match(linkedinCrmOverlayJs, /mountBadgeNearTopCard/)
-assert.match(linkedinCrmOverlayJs, /resolveLinkedInPageBadgeDisplay/)
+assert.match(linkedinCrmOverlayJs, /LOOKUP_DEADLINE_MS/)
+assert.match(linkedinCrmOverlayJs, /lookup_deadline_terminal/)
+assert.match(linkedinCrmOverlayJs, /scheduleLookupDeadline/)
 assert.match(linkedinCrmOverlayJs, /EquipifyGrowthExtensionBrand/)
 assert.match(linkedinStatusJs, /No profile context/)
 assert.match(linkedinCrmOverlayJs, /hasProfileContext/)
@@ -465,7 +469,16 @@ assert.match(linkedinInpageSidebarJs, /equipify-inpage-sidebar-ready/)
 assert.match(linkedinInpageSidebarJs, /\[Equipify Sales:inpage\]/)
 assert.match(linkedinInpageSidebarJs, /contextCacheKey/)
 assert.match(linkedinInpageSidebarJs, /queueContextPost/)
+assert.match(linkedinInpageSidebarJs, /applyLayoutReserve/)
+assert.match(linkedinInpageSidebarJs, /LAYOUT_RESERVE_SELECTORS/)
 assert.match(linkedinInpageSidebarJs, /equipify-sales-floating-dock--sidebar-open/)
+
+const linkedinInpageSidebarCss = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-inpage-sidebar.css"),
+  "utf8",
+)
+assert.match(linkedinInpageSidebarCss, /scaffold-layout__inner/)
+assert.match(linkedinInpageSidebarCss, /margin-right: 420px/)
 
 const inpageSidebarHtml = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/inpage-sidebar.html"),
@@ -479,8 +492,41 @@ assert.match(inpageSidebarHtml, /surface-inpage/)
 assert.match(inpageSidebarHtml, /Find contact details/)
 assert.match(inpageSidebarHtml, /Employees/)
 assert.match(inpageSidebarHtml, /Company intelligence/)
+assert.match(inpageSidebarHtml, /es-ws-enrich-company-btn/)
+assert.match(inpageSidebarHtml, /es-ws-panel-logo/)
+assert.match(inpageSidebarHtml, /es-ws-visit-company-btn/)
 assert.match(inpageSidebarHtml, /data-company-tab="overview"/)
 assert.match(inpageSidebarHtml, /data-company-tab="similar"/)
+
+const backgroundJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/background.js"),
+  "utf8",
+)
+assert.match(backgroundJs, /equipify-enrich-company-page/)
+
+function parseLinkedInHeadlineFixture(headline: string) {
+  const normalized = /\s/.test(headline)
+    ? headline.replace(/\s+/g, " ").trim()
+    : headline.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/\s+/g, " ").trim()
+  const atMatch = normalized.match(/^(.+?)\s+at\s+(.+?)(?:\s*[|·].*)?$/i)
+  if (atMatch) {
+    return { title: atMatch[1]?.trim() ?? null, company: atMatch[2]?.trim() ?? null }
+  }
+  const withoutEmployment = normalized.replace(
+    /\s*[|·]\s*(Full-time|Part-time|Self-employed|Contract|Freelance|Internship).*$/i,
+    "",
+  )
+  return { title: withoutEmployment, company: null }
+}
+
+assert.deepEqual(parseLinkedInHeadlineFixture("Secretary at BioMed Techs Inc."), {
+  title: "Secretary",
+  company: "BioMed Techs Inc.",
+})
+assert.deepEqual(parseLinkedInHeadlineFixture("SecretaryBioMed Techs Inc. · Full-time"), {
+  title: "SecretaryBioMed Techs Inc.",
+  company: null,
+})
 assert.match(inpageSidebarHtml, /Discover Employees/)
 assert.match(inpageSidebarHtml, /People Data Labs, Prospeo, Apollo, Hunter/)
 assert.match(inpageSidebarHtml, /Discover Similar Companies/)
@@ -545,7 +591,13 @@ assert.match(extensionWorkspaceJs, /renderTechnologies/)
 assert.match(extensionWorkspaceJs, /renderSignals/)
 assert.match(extensionWorkspaceJs, /\[Equipify Sales:intelligence\]/)
 assert.match(extensionWorkspaceJs, /Not found on public profile/)
-assert.match(extensionWorkspaceJs, /No public website detected/)
+assert.match(extensionWorkspaceJs, /resolveCompanyIntelName/)
+assert.match(extensionWorkspaceJs, /resolveProfileTitle/)
+assert.match(extensionWorkspaceJs, /Not found on public company page/)
+assert.match(extensionWorkspaceJs, /equipify-enrich-company-page/)
+assert.match(extensionWorkspaceJs, /es-ws-enrich-company-btn/)
+assert.match(extensionWorkspaceJs, /profile_photo_url/)
+assert.match(extensionWorkspaceJs, /No public company website detected/)
 assert.match(extensionWorkspaceJs, /renderCrmRelationship/)
 assert.match(extensionWorkspaceJs, /People Data Labs, Prospeo, Apollo, Hunter/)
 assert.match(extensionWorkspaceJs, /es-ws-hidden-compat/)
@@ -587,7 +639,11 @@ assert.match(pageMetadataJs, /extractEducationEntries/)
 assert.match(pageMetadataJs, /extractProfileWebsite/)
 assert.match(pageMetadataJs, /extractProfileLocation/)
 assert.match(pageMetadataJs, /\[Equipify Sales:context\]/)
-assert.match(pageMetadataJs, /div\.text-body-medium\.break-words/)
+assert.match(pageMetadataJs, /parseLinkedInHeadline/)
+assert.match(pageMetadataJs, /cleanLinkedInProfileName/)
+assert.match(pageMetadataJs, /normalizeVisibleText/)
+assert.match(pageMetadataJs, /inferLinkedInProfileNameFromTitle/)
+assert.match(pageMetadataJs, /experienceEntries\[0\]\?\.title/)
 
 const LINKEDIN_PROFILE_FIXTURE = `<main>
   <h1 class="text-heading-xlarge">Jane Doe</h1>

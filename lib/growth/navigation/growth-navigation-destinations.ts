@@ -251,6 +251,13 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     consoleKey: "calls_providers",
   },
   {
+    id: "voice-readiness",
+    label: "Voice Readiness",
+    href: "/admin/growth/voice/readiness",
+    keywords: ["voice readiness", "production readiness", "twilio", "webhook", "telephony", "deployment"],
+    consoleKey: "calls_providers",
+  },
+  {
     id: "providers",
     label: "Diagnostics",
     href: "/admin/growth/providers",
@@ -915,6 +922,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         href: "/admin/growth/calls/providers",
         label: "Providers",
         match: prefixMatch("/admin/growth/calls/providers"),
+      },
+      {
+        id: "voice-readiness",
+        href: "/admin/growth/voice/readiness",
+        label: "Voice Readiness",
+        match: prefixMatch("/admin/growth/voice/readiness"),
       },
       {
         id: "provider-health",

@@ -6,6 +6,13 @@
   const SIDEBAR_WIDTH_PX = 420
   const BODY_CLASS = "equipify-sales-inpage-sidebar-open"
   const DOCK_OFFSET_CLASS = "equipify-sales-floating-dock--sidebar-open"
+  const LAYOUT_RESERVE_SELECTORS = [
+    ".scaffold-layout__inner",
+    ".scaffold-layout__main",
+    "main.scaffold-layout__main",
+    ".application-outlet",
+    "#main-content",
+  ]
   const IFRAME_URL = chrome.runtime.getURL("inpage-sidebar.html")
   const CONTEXT_DEBOUNCE_MS = 250
 
@@ -125,6 +132,23 @@
     document.dispatchEvent(new CustomEvent("equipify-sidebar-state", { detail: { open } }))
   }
 
+  function applyLayoutReserve(open) {
+    for (const selector of LAYOUT_RESERVE_SELECTORS) {
+      document.querySelectorAll(selector).forEach((node) => {
+        if (!(node instanceof HTMLElement)) return
+        if (open) {
+          node.dataset.equipifySidebarReserve = "true"
+          node.style.marginRight = `${SIDEBAR_WIDTH_PX}px`
+          node.style.maxWidth = `calc(100% - ${SIDEBAR_WIDTH_PX}px)`
+        } else if (node.dataset.equipifySidebarReserve === "true") {
+          node.style.marginRight = ""
+          node.style.maxWidth = ""
+          delete node.dataset.equipifySidebarReserve
+        }
+      })
+    }
+  }
+
   function applyOpenState(open) {
     isOpen = open
     ensureRoot()
@@ -132,6 +156,7 @@
     rootNode.setAttribute("aria-hidden", open ? "false" : "true")
     document.documentElement.classList.toggle(BODY_CLASS, open)
     document.body?.classList.toggle(BODY_CLASS, open)
+    applyLayoutReserve(open)
     setDockOffset(open)
 
     if (open) queueContextPost({ force: true })
