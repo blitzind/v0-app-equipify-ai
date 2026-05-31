@@ -302,7 +302,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.32"/)
+assert.match(manifestSource, /"version": "4.3.33"/)
 assert.match(manifestSource, /https:\/\/m\.linkedin\.com\/in\/\*/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
@@ -334,7 +334,7 @@ assert.match(extensionBrandJs, /PANEL_LOGO_ASSET/)
 assert.match(extensionBrandJs, /panelLogoUrl/)
 assert.match(extensionBrandJs, /applyPanelLogo/)
 assert.match(extensionBrandJs, /PANEL_LOGO_VERSION/)
-assert.match(extensionBrandJs, /4\.3\.32/)
+assert.match(extensionBrandJs, /4\.3\.33/)
 assert.match(extensionBrandJs, /\?v=\$\{encodeURIComponent\(PANEL_LOGO_VERSION\)\}/)
 assert.match(extensionBrandJs, /\[Equipify Sales:logo-audit\]/)
 assert.match(extensionBrandJs, /PANEL_LOGO_INTRINSIC_WIDTH/)
@@ -506,7 +506,12 @@ assert.match(linkedinLayoutPushJs, /EquipifyGrowthLayoutPush/)
 assert.match(linkedinLayoutPushJs, /resolveLayoutMode/)
 assert.match(linkedinLayoutPushJs, /applyLayoutReserve/)
 assert.match(linkedinLayoutPushJs, /restoreAllLayoutReserve/)
-assert.match(linkedinLayoutPushJs, /equipify-sales-inpage-sidebar-push/)
+assert.match(linkedinLayoutPushJs, /describeRect/)
+assert.match(linkedinLayoutPushJs, /before_rect/)
+assert.match(linkedinLayoutPushJs, /after_rect/)
+assert.match(linkedinLayoutPushJs, /shrink-width/)
+assert.match(linkedinLayoutPushJs, /transform-fallback/)
+assert.match(linkedinLayoutPushJs, /viewport_width/)
 assert.match(manifestSource, /linkedin-layout-push\.js/)
 
 const contactSavedJs = fs.readFileSync(
@@ -555,6 +560,7 @@ const linkedinInpageSidebarCss = fs.readFileSync(
 )
 assert.match(linkedinInpageSidebarCss, /scaffold-layout__inner/)
 assert.match(linkedinInpageSidebarCss, /equipify-sales-inpage-sidebar-open/)
+assert.match(linkedinInpageSidebarCss, /width: calc\(100% - var\(--equipify-sales-sidebar-width\)\)/)
 assert.match(linkedinInpageSidebarCss, /equipify-sales-inpage-sidebar-push/)
 assert.match(linkedinInpageSidebarCss, /--equipify-sales-sidebar-width/)
 assert.match(linkedinInpageSidebarCss, /min-width: 901px/)
@@ -637,6 +643,7 @@ assert.equal(
     true,
     ".scaffold-layout__main",
     1280,
+    "margin-reserve",
   ),
   true,
 )
@@ -648,6 +655,103 @@ assert.equal(
 )
 assert.equal(mainNode.style.marginRight, "")
 assert.equal(mainNode.style.maxWidth, "")
+
+const shrinkHarness = runLayoutPushHarness(1280)
+const shrinkNode = shrinkHarness.document.querySelector(".scaffold-layout__main") as HTMLElement
+assert.equal(
+  shrinkHarness.layoutPush.applyReserveToNode(
+    shrinkNode,
+    true,
+    ".scaffold-layout__main",
+    1280,
+    "shrink-width",
+  ),
+  true,
+)
+assert.equal(shrinkNode.style.width, "calc(100% - 420px)")
+assert.equal(shrinkNode.style.maxWidth, "calc(100% - 420px)")
+assert.equal(shrinkHarness.layoutPush.restoreAllLayoutReserve().includes(".scaffold-layout__main"), true)
+assert.equal(shrinkNode.style.width, "")
+
+function runSettingsMergeHarness() {
+  const source = fs.readFileSync(
+    path.join(process.cwd(), "extensions/growth-browser-intake/extension-storage.js"),
+    "utf8",
+  )
+  const storageStub = {
+    sync: {
+      data: {} as Record<string, unknown>,
+      async get(key: string) {
+        return { [key]: this.data[key] }
+      },
+      async set(payload: Record<string, unknown>) {
+        Object.assign(this.data, payload)
+      },
+    },
+    local: {
+      data: {} as Record<string, unknown>,
+      async get(key: string) {
+        return { [key]: this.data[key] }
+      },
+      async set(payload: Record<string, unknown>) {
+        Object.assign(this.data, payload)
+      },
+    },
+  }
+  const sandbox: Record<string, unknown> = {
+    console: { log: () => {} },
+    chrome: { storage: storageStub },
+    window: {},
+  }
+  const context = vm.createContext(sandbox)
+  vm.runInContext(source.replace(/^console\.log\([^)]+\)\s*/m, ""), context)
+  return (sandbox.window as { EquipifyGrowthExtensionStorage: Record<string, unknown> })
+    .EquipifyGrowthExtensionStorage as {
+    DEFAULT_SETTINGS: Record<string, unknown>
+    mergeSettingsWithDefaults: (stored: Record<string, unknown> | null) => Record<string, unknown>
+    settingsNeedBackfill: (stored: Record<string, unknown> | null) => boolean
+    loadExtensionSettings: () => Promise<Record<string, unknown>>
+  }
+}
+
+const settingsHarness = runSettingsMergeHarness()
+assert.equal(settingsHarness.DEFAULT_SETTINGS.apiPreset, "production")
+assert.equal(settingsHarness.DEFAULT_SETTINGS.apiBaseUrl, "https://app.equipify.ai")
+assert.equal(settingsHarness.DEFAULT_SETTINGS.prospectingMode, true)
+assert.equal(settingsHarness.DEFAULT_SETTINGS.showLinkedInFloatingButton, true)
+assert.equal(settingsHarness.DEFAULT_SETTINGS.verifyEmailBeforeSave, false)
+assert.equal(settingsHarness.DEFAULT_SETTINGS.queueContactDiscovery, true)
+
+const partialLegacy = settingsHarness.mergeSettingsWithDefaults({
+  apiPreset: "local",
+  apiBaseUrl: "http://localhost:3000",
+  prospectingMode: false,
+})
+assert.equal(partialLegacy.apiPreset, "local")
+assert.equal(partialLegacy.prospectingMode, false)
+assert.equal(partialLegacy.queueContactDiscovery, true)
+assert.equal(partialLegacy.showLinkedInFloatingButton, true)
+
+const explicitSaved = settingsHarness.mergeSettingsWithDefaults({
+  queueContactDiscovery: false,
+  showLinkedInFloatingButton: false,
+})
+assert.equal(explicitSaved.queueContactDiscovery, false)
+assert.equal(explicitSaved.showLinkedInFloatingButton, false)
+assert.equal(explicitSaved.prospectingMode, true)
+
+assert.equal(settingsHarness.settingsNeedBackfill({ apiPreset: "production" }), true)
+assert.equal(
+  settingsHarness.settingsNeedBackfill({
+    apiPreset: "production",
+    apiBaseUrl: "https://app.equipify.ai",
+    prospectingMode: true,
+    showLinkedInFloatingButton: true,
+    verifyEmailBeforeSave: false,
+    queueContactDiscovery: true,
+  }),
+  false,
+)
 
 const navNode = desktopLayoutHarness.document.querySelector(".global-nav") as HTMLElement
 assert.equal(desktopLayoutHarness.layoutPush.applyReserveToNode(navNode, true, ".global-nav", 1280), false)
@@ -670,12 +774,15 @@ desktopLayoutHarness.layoutPush.applyLayoutReserve(true, {
   document: desktopLayoutHarness.document,
   root: desktopLayoutHarness.document.documentElement,
   viewportWidth: 1280,
+  discoverLayoutContainer: () =>
+    desktopLayoutHarness.document.querySelector(".scaffold-layout__main"),
   logLayoutPush: () => {},
 })
 const shiftedMain = desktopLayoutHarness.document.querySelector(
   ".scaffold-layout__main",
 ) as HTMLElement
 assert.equal(shiftedMain.style.marginRight, "420px")
+assert.equal(shiftedMain.style.width, "calc(100% - 420px)")
 
 desktopLayoutHarness.layoutPush.applyLayoutReserve(false, {
   document: desktopLayoutHarness.document,
@@ -1410,7 +1517,12 @@ const extensionStorageJs = fs.readFileSync(
   "utf8",
 )
 assert.match(extensionStorageJs, /MAX_RECENT_CAPTURES = 5/)
-assert.match(extensionStorageJs, /prospectingMode/)
+assert.match(extensionStorageJs, /prospectingMode: true/)
+assert.match(extensionStorageJs, /showLinkedInFloatingButton: true/)
+assert.match(extensionStorageJs, /queueContactDiscovery: true/)
+assert.match(extensionStorageJs, /mergeSettingsWithDefaults/)
+assert.match(extensionStorageJs, /settingsNeedBackfill/)
+assert.match(extensionStorageJs, /SETTINGS_SCHEMA_VERSION/)
 assert.match(extensionStorageJs, /loadLinkedInFloatingDockPrefs/)
 assert.match(extensionStorageJs, /saveLinkedInFloatingDockPrefs/)
 assert.match(extensionStorageJs, /equipifySalesLinkedInFloatingDock/)
@@ -1934,7 +2046,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ version: "4.3.32" }),
+        getManifest: () => ({ version: "4.3.33" }),
       },
     },
     setTimeout: () => 0,

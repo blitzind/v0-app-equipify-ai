@@ -43,13 +43,17 @@ html.equipify-sales-inpage-sidebar-open {
   html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push .application-outlet,
   html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push #main-content,
   html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push main[role="main"],
-  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push [role="main"].scaffold-layout__main {
+  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push [role="main"].scaffold-layout__main,
+  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push [data-equipify-sidebar-reserve] {
     margin-right: var(--equipify-sales-sidebar-width) !important;
     max-width: calc(100% - var(--equipify-sales-sidebar-width)) !important;
+    width: calc(100% - var(--equipify-sales-sidebar-width)) !important;
     box-sizing: border-box;
     transition:
       margin-right 0.2s ease,
-      max-width 0.2s ease;
+      max-width 0.2s ease,
+      width 0.2s ease,
+      transform 0.2s ease;
   }
 
   html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push .global-nav,

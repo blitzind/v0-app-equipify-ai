@@ -866,8 +866,11 @@ function initIntakeApp(options) {
       els.prospectingModeCheckbox.checked = state.settings.prospectingMode === true
     }
     if (els.linkedInFloatingDockCheckbox) {
-      const dockPrefs = await storage.loadLinkedInFloatingDockPrefs()
-      els.linkedInFloatingDockCheckbox.checked = dockPrefs.enabled !== false
+      const showFloating =
+        state.settings.showLinkedInFloatingButton !== undefined
+          ? state.settings.showLinkedInFloatingButton !== false
+          : (await storage.loadLinkedInFloatingDockPrefs()).enabled !== false
+      els.linkedInFloatingDockCheckbox.checked = showFloating
     }
     if (els.signInLink) {
       els.signInLink.href = signInUrl()
@@ -876,18 +879,19 @@ function initIntakeApp(options) {
 
   async function saveSettingsFromUi() {
     const preset = els.apiPresetSelect?.value === "local" ? "local" : "production"
+    const showLinkedInFloatingButton = els.linkedInFloatingDockCheckbox?.checked === true
     const nextSettings = {
       apiPreset: preset,
       apiBaseUrl: config.EXTENSION_API_PRESETS[preset],
       verifyEmailBeforeSave: els.verifyEmailCheckbox?.checked === true,
       queueContactDiscovery: els.queueDiscoveryCheckbox?.checked === true,
       prospectingMode: els.prospectingModeCheckbox?.checked === true,
+      showLinkedInFloatingButton,
     }
-    await storage.saveExtensionSettings(nextSettings)
-    state.settings = nextSettings
+    state.settings = await storage.saveExtensionSettings(nextSettings)
     if (els.linkedInFloatingDockCheckbox) {
       await storage.saveLinkedInFloatingDockPrefs({
-        enabled: els.linkedInFloatingDockCheckbox.checked === true,
+        enabled: showLinkedInFloatingButton,
       })
     }
     if (els.settingsStatus) {
