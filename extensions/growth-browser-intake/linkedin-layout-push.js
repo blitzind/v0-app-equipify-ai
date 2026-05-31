@@ -1,316 +1,246 @@
 /**
- * LinkedIn page layout push helpers for the in-page Equipify Sales sidebar.
+ * LinkedIn desktop layout push — CSS-class scaffold mode (v4.3.34).
+ * Reserves viewport space for the Equipify panel without inline style hacks.
  */
 ;(function initEquipifyGrowthLayoutPush() {
   const SIDEBAR_WIDTH_PX = 420
-  const DESKTOP_MIN_WIDTH = 901
+  const RIGHT_MARGIN_PX = 0
+  const DESKTOP_MIN_WIDTH = 1200
   const BODY_CLASS = "equipify-sales-inpage-sidebar-open"
-  const PUSH_CLASS = "equipify-sales-inpage-sidebar-push"
-  const CSS_VAR_NAME = "--equipify-sales-sidebar-width"
-  const MIN_WIDTH_DELTA_PX = 80
-  const LAYOUT_RESERVE_SELECTORS = [
+  const DESKTOP_LAYOUT_CLASS = "equipify-desktop-layout"
+  const DEBUG_LAYOUT_CLASS = "equipify-layout-debug"
+  const CSS_VAR_PANEL_WIDTH = "--equipify-panel-width"
+  const CSS_VAR_RIGHT_MARGIN = "--equipify-layout-right-margin"
+  const CSS_VAR_MAIN_WIDTH = "--equipify-linkedin-main-width"
+  const DEBUG_STORAGE_KEY = "equipify_debug_layout"
+
+  const SCAFFOLD_ROOT_SELECTORS = [
     ".scaffold-layout",
-    ".scaffold-layout__inner",
+    ".scaffold-layout-container",
+    ".application-outlet",
+  ]
+  const SCAFFOLD_MAIN_SELECTORS = [
     ".scaffold-layout__main",
     "main.scaffold-layout__main",
-    ".application-outlet",
-    "#main-content",
     'main[role="main"]',
   ]
-  const LAYOUT_EXCLUDE_SELECTORS = [".global-nav", "nav.global-nav"]
-  const LAYOUT_STYLE_PROPS = [
-    "marginRight",
-    "marginLeft",
-    "maxWidth",
-    "width",
-    "paddingRight",
-    "boxSizing",
-    "transform",
-    "transformOrigin",
+  const SCAFFOLD_CONTENT_SELECTORS = [
+    ".scaffold-layout__content",
+    ".scaffold-layout__inner",
+    "#main-content",
+  ]
+
+  const LAYOUT_MARK_ATTRS = [
+    "data-equipify-layout-root",
+    "data-equipify-layout-main",
+    "data-equipify-layout-content",
   ]
 
   function isHtmlElement(node) {
-    return Boolean(node && typeof node === "object" && node.nodeType === 1 && node.style)
+    return Boolean(node && typeof node === "object" && node.nodeType === 1)
   }
 
   function resolveLayoutMode(viewportWidth = window.innerWidth) {
     return viewportWidth >= DESKTOP_MIN_WIDTH ? "push" : "overlay"
   }
 
-  function isExcludedLayoutNode(node) {
-    if (!isHtmlElement(node)) return true
-    return LAYOUT_EXCLUDE_SELECTORS.some((selector) => node.matches?.(selector) || node.closest?.(selector))
-  }
-
-  function readStoredInlineStyles(node) {
-    const raw = node.dataset.equipifyLayoutPushStored
-    if (!raw) return null
+  function detectPageType(url = window.location.href) {
+    const linkedinKind = window.EquipifyGrowthLinkedInContext?.detectLinkedInPageKind?.(url)
+    if (linkedinKind === "profile" || linkedinKind === "company") return linkedinKind
     try {
-      return JSON.parse(raw)
+      const path = new URL(url).pathname.replace(/\/+$/, "")
+      if (/^\/search\//i.test(path)) return "search"
     } catch {
-      return null
+      // ignore
     }
+    return linkedinKind ?? "other"
   }
 
-  function storeInlineStyles(node) {
-    if (!isHtmlElement(node) || node.dataset.equipifyLayoutPushStored) return
-    const stored = {}
-    for (const prop of LAYOUT_STYLE_PROPS) {
-      stored[prop] = node.style[prop] || ""
+  function queryFirst(doc, selectors) {
+    for (const selector of selectors) {
+      const element = doc.querySelector(selector)
+      if (element) return { element, selector }
     }
-    node.dataset.equipifyLayoutPushStored = JSON.stringify(stored)
+    return { element: null, selector: null }
   }
 
-  function restoreInlineStyles(node) {
-    if (!isHtmlElement(node)) return false
-    const stored = readStoredInlineStyles(node)
-    if (!stored) return false
-    for (const prop of LAYOUT_STYLE_PROPS) {
-      node.style[prop] = stored[prop] ?? ""
-    }
-    delete node.dataset.equipifyLayoutPushStored
-    delete node.dataset.equipifyLayoutPushSource
-    delete node.dataset.equipifyLayoutPushStrategy
-    delete node.dataset.equipifySidebarReserveBeforeWidth
-    delete node.dataset.equipifySidebarReserve
-    return true
-  }
-
-  function describeRect(node) {
-    if (!isHtmlElement(node)) return null
-    const rect = node.getBoundingClientRect()
+  function locateScaffold(doc) {
+    const root = queryFirst(doc, SCAFFOLD_ROOT_SELECTORS)
+    const main = queryFirst(doc, SCAFFOLD_MAIN_SELECTORS)
+    const content = queryFirst(doc, SCAFFOLD_CONTENT_SELECTORS)
     return {
-      x: Math.round(rect.x),
-      y: Math.round(rect.y),
-      width: Math.round(rect.width),
-      height: Math.round(rect.height),
-      right: Math.round(rect.right),
+      root: root.element,
+      rootSelector: root.selector,
+      main: main.element,
+      mainSelector: main.selector,
+      content: content.element,
+      contentSelector: content.selector,
     }
   }
 
-  function applyShrinkWidthReserve(node, panelWidth) {
-    const width = `${panelWidth}px`
-    node.style.boxSizing = "border-box"
-    node.style.width = `calc(100% - ${width})`
-    node.style.maxWidth = `calc(100% - ${width})`
-    node.style.marginRight = width
+  function describeTarget(node, selector) {
+    if (!isHtmlElement(node)) return null
+    const tag = node.tagName?.toLowerCase() ?? "node"
+    const id = node.id ? `#${node.id}` : ""
+    const classes = typeof node.className === "string" && node.className.trim()
+      ? `.${node.className.trim().split(/\s+/).slice(0, 3).join(".")}`
+      : ""
+    return `${selector ?? tag}${id}${classes}`
   }
 
-  function applyTransformFallback(node, panelWidth) {
-    node.style.transformOrigin = "top center"
-    node.style.transform = `translateX(calc(-1 * ${panelWidth / 2}px))`
+  function measureWidth(node) {
+    if (!isHtmlElement(node)) return null
+    return Math.round(node.getBoundingClientRect().width)
   }
 
-  function applyReserveToNode(node, open, source, viewportWidth = window.innerWidth, strategy = "margin-reserve") {
-    if (!isHtmlElement(node) || isExcludedLayoutNode(node)) return false
-
-    if (open) {
-      if (resolveLayoutMode(viewportWidth) !== "push") return false
-      storeInlineStyles(node)
-      node.dataset.equipifyLayoutPushSource = source
-      node.dataset.equipifyLayoutPushStrategy = strategy
-      if (!node.dataset.equipifySidebarReserveBeforeWidth) {
-        node.dataset.equipifySidebarReserveBeforeWidth = String(Math.round(node.getBoundingClientRect().width))
-      }
-      node.dataset.equipifySidebarReserve = source
-
-      if (strategy === "shrink-width") {
-        applyShrinkWidthReserve(node, SIDEBAR_WIDTH_PX)
-      } else if (strategy === "transform-fallback") {
-        applyTransformFallback(node, SIDEBAR_WIDTH_PX)
-      } else {
-        const width = `${SIDEBAR_WIDTH_PX}px`
-        node.style.marginRight = width
-        node.style.maxWidth = `calc(100% - ${width})`
-        node.style.boxSizing = "border-box"
-      }
-      return true
+  function isDebugLayoutEnabled() {
+    try {
+      if (window.localStorage?.getItem(DEBUG_STORAGE_KEY) === "true") return true
+      return new URL(window.location.href).searchParams.get(DEBUG_STORAGE_KEY) === "true"
+    } catch {
+      return false
     }
-
-    return restoreInlineStyles(node)
   }
 
-  function restoreAllLayoutReserve(doc = document) {
-    const restored = []
-    doc.querySelectorAll("[data-equipify-layout-push-stored]").forEach((node) => {
-      const source = isHtmlElement(node) ? node.dataset.equipifyLayoutPushSource ?? "unknown" : "unknown"
-      if (restoreInlineStyles(node)) restored.push(source)
-    })
-    return restored
+  function clearLayoutMarks(doc = document) {
+    for (const attr of LAYOUT_MARK_ATTRS) {
+      doc.querySelectorAll(`[${attr}="true"]`).forEach((node) => {
+        node.removeAttribute(attr)
+      })
+    }
   }
 
-  function setSidebarWidthVariable(open, mode, root = document.documentElement) {
+  function markScaffold(scaffold) {
+    clearLayoutMarks(scaffold.root?.ownerDocument ?? document)
+    if (isHtmlElement(scaffold.root)) scaffold.root.setAttribute("data-equipify-layout-root", "true")
+    if (isHtmlElement(scaffold.main)) scaffold.main.setAttribute("data-equipify-layout-main", "true")
+    if (isHtmlElement(scaffold.content)) scaffold.content.setAttribute("data-equipify-layout-content", "true")
+  }
+
+  function setLayoutVariables(open, mode, root = document.documentElement) {
     if (open && mode === "push") {
-      root.style.setProperty(CSS_VAR_NAME, `${SIDEBAR_WIDTH_PX}px`)
+      root.style.setProperty(CSS_VAR_PANEL_WIDTH, `${SIDEBAR_WIDTH_PX}px`)
+      root.style.setProperty(CSS_VAR_RIGHT_MARGIN, `${RIGHT_MARGIN_PX}px`)
+      root.style.setProperty(
+        CSS_VAR_MAIN_WIDTH,
+        `calc(100vw - ${SIDEBAR_WIDTH_PX}px - ${RIGHT_MARGIN_PX}px)`,
+      )
       return
     }
-    root.style.removeProperty(CSS_VAR_NAME)
+    root.style.removeProperty(CSS_VAR_PANEL_WIDTH)
+    root.style.removeProperty(CSS_VAR_RIGHT_MARGIN)
+    root.style.removeProperty(CSS_VAR_MAIN_WIDTH)
   }
 
-  function setPushModeClass(open, mode, root = document.documentElement) {
-    root.classList.toggle(PUSH_CLASS, open && mode === "push")
+  function setDesktopLayoutClasses(open, mode, doc = document) {
+    const body = doc.body
+    const html = doc.documentElement
+    if (!body || !html) return
+
+    const pushActive = open && mode === "push"
+    body.classList.toggle(DESKTOP_LAYOUT_CLASS, pushActive)
+    body.classList.toggle(DEBUG_LAYOUT_CLASS, pushActive && isDebugLayoutEnabled())
+    html.classList.toggle(BODY_CLASS, open)
+    body.classList.toggle(BODY_CLASS, open)
   }
 
-  function describeLayoutNode(node, describeElement) {
-    return describeElement?.(node) ?? node?.tagName?.toLowerCase() ?? null
-  }
-
-  function buildShiftedSelectorEntry(node, selector, describeElement, strategy) {
-    const rect = node.getBoundingClientRect()
-    const style = window.getComputedStyle(node)
-    const entry = {
-      selector,
-      node: describeLayoutNode(node, describeElement),
-      strategy,
-      margin_right: style.marginRight,
-      max_width: style.maxWidth,
-      width: Math.round(rect.width),
-      transform: style.transform,
-    }
-    if (node.dataset.equipifySidebarReserveBeforeWidth) {
-      entry.before_width = Number(node.dataset.equipifySidebarReserveBeforeWidth)
-    }
-    return entry
-  }
-
-  function pushDiscoveredContainer(discovered, viewportWidth, shiftedNodes, shifted_selectors, describeElement) {
-    if (!discovered || !isHtmlElement(discovered) || isExcludedLayoutNode(discovered)) {
-      return { selected_container: null, before_rect: null, after_rect: null, strategy: null }
-    }
-
-    const before_rect = describeRect(discovered)
-    let strategy = "shrink-width"
-    applyReserveToNode(discovered, true, "discovered-main-content", viewportWidth, strategy)
-    shiftedNodes.add(discovered)
-    shifted_selectors.push(
-      buildShiftedSelectorEntry(discovered, "discovered-main-content", describeElement, strategy),
-    )
-
-    let after_rect = describeRect(discovered)
-    const widthDelta = (before_rect?.width ?? 0) - (after_rect?.width ?? 0)
-    if (widthDelta < MIN_WIDTH_DELTA_PX) {
-      strategy = "transform-fallback"
-      applyTransformFallback(discovered)
-      discovered.dataset.equipifyLayoutPushStrategy = strategy
-      after_rect = describeRect(discovered)
-      shifted_selectors[shifted_selectors.length - 1] = buildShiftedSelectorEntry(
-        discovered,
-        "discovered-main-content",
-        describeElement,
-        strategy,
-      )
-    }
-
+  function buildDebugPayload(input) {
     return {
-      selected_container: describeLayoutNode(discovered, describeElement),
-      before_rect,
-      after_rect,
-      strategy,
+      page_type: input.page_type,
+      viewport_width: input.viewport_width,
+      panel_width: SIDEBAR_WIDTH_PX,
+      scaffold_width_before: input.scaffold_width_before,
+      scaffold_width_after: input.scaffold_width_after,
+      content_width_before: input.content_width_before,
+      content_width_after: input.content_width_after,
+      selected_root: input.selected_root,
+      selected_main: input.selected_main,
+      selected_content: input.selected_content,
+      mode: input.mode,
+      debug_enabled: input.debug_enabled,
     }
   }
 
   function applyLayoutReserve(open, options = {}) {
     const doc = options.document ?? document
-    const root = options.root ?? doc.documentElement
     const viewportWidth = options.viewportWidth ?? window.innerWidth
+    const pageUrl = options.pageUrl ?? window.location.href
     const mode = resolveLayoutMode(viewportWidth)
-    const shifted_selectors = []
-    let restored = []
-    const discoverLayoutContainer = options.discoverLayoutContainer ?? (() => null)
-    const describeElement = options.describeElement ?? null
-    const logLayoutPush = options.logLayoutPush ?? (() => {})
+    const page_type = detectPageType(pageUrl)
+    const logLayoutDebug = options.logLayoutDebug ?? (() => {})
+    const scaffold = locateScaffold(doc)
+
+    const scaffold_width_before = measureWidth(scaffold.root)
+    const content_width_before = measureWidth(scaffold.content ?? scaffold.main)
 
     if (!open) {
-      restored = restoreAllLayoutReserve(doc)
-      setSidebarWidthVariable(false, mode, root)
-      setPushModeClass(false, mode, root)
-      logLayoutPush({
-        mode,
-        viewport_width: viewportWidth,
-        panel_width: SIDEBAR_WIDTH_PX,
-        selected_container: null,
-        before_rect: null,
-        after_rect: null,
-        shifted_selectors,
-        strategy: null,
-        restored,
-      })
-      return { mode, shifted_selectors, restored }
+      clearLayoutMarks(doc)
+      setDesktopLayoutClasses(false, mode, doc)
+      setLayoutVariables(false, mode, doc.documentElement)
+      logLayoutDebug(
+        buildDebugPayload({
+          page_type,
+          viewport_width: viewportWidth,
+          scaffold_width_before,
+          scaffold_width_after: measureWidth(scaffold.root),
+          content_width_before,
+          content_width_after: measureWidth(scaffold.content ?? scaffold.main),
+          selected_root: describeTarget(scaffold.root, scaffold.rootSelector),
+          selected_main: describeTarget(scaffold.main, scaffold.mainSelector),
+          selected_content: describeTarget(scaffold.content, scaffold.contentSelector),
+          mode: "closed",
+          debug_enabled: false,
+        }),
+      )
+      return { mode: "closed", page_type }
     }
 
-    restoreAllLayoutReserve(doc)
-    setSidebarWidthVariable(open, mode, root)
-    setPushModeClass(open, mode, root)
+    setDesktopLayoutClasses(true, mode, doc)
+    setLayoutVariables(true, mode, doc.documentElement)
 
-    if (mode !== "push") {
-      logLayoutPush({
-        mode: "overlay",
-        viewport_width: viewportWidth,
-        panel_width: SIDEBAR_WIDTH_PX,
-        selected_container: null,
-        before_rect: null,
-        after_rect: null,
-        shifted_selectors,
-        strategy: "overlay",
-        restored: [],
-      })
-      return { mode: "overlay", shifted_selectors, restored: [] }
+    if (mode === "push") {
+      markScaffold(scaffold)
+    } else {
+      clearLayoutMarks(doc)
     }
 
-    const shiftedNodes = new Set()
-    const discovered = discoverLayoutContainer()
-    const discoveredResult = pushDiscoveredContainer(
-      discovered,
-      viewportWidth,
-      shiftedNodes,
-      shifted_selectors,
-      describeElement,
-    )
-
-    for (const selector of LAYOUT_RESERVE_SELECTORS) {
-      doc.querySelectorAll(selector).forEach((node) => {
-        if (!isHtmlElement(node)) return
-        if (shiftedNodes.has(node)) return
-        if (discovered && (node === discovered || discovered.contains?.(node) || node.contains?.(discovered))) {
-          return
-        }
-        if (isExcludedLayoutNode(node)) return
-        if (applyReserveToNode(node, true, selector, viewportWidth, "margin-reserve")) {
-          shiftedNodes.add(node)
-          shifted_selectors.push(buildShiftedSelectorEntry(node, selector, describeElement, "margin-reserve"))
-        }
-      })
-    }
-
-    logLayoutPush({
-      mode: "push",
+    const payload = buildDebugPayload({
+      page_type,
       viewport_width: viewportWidth,
-      panel_width: SIDEBAR_WIDTH_PX,
-      selected_container: discoveredResult.selected_container,
-      before_rect: discoveredResult.before_rect,
-      after_rect: discoveredResult.after_rect,
-      shifted_selectors,
-      strategy: discoveredResult.strategy ?? "margin-reserve",
-      restored: [],
+      scaffold_width_before,
+      scaffold_width_after: measureWidth(scaffold.root),
+      content_width_before,
+      content_width_after: measureWidth(scaffold.content ?? scaffold.main),
+      selected_root: describeTarget(scaffold.root, scaffold.rootSelector),
+      selected_main: describeTarget(scaffold.main, scaffold.mainSelector),
+      selected_content: describeTarget(scaffold.content, scaffold.contentSelector),
+      mode,
+      debug_enabled: isDebugLayoutEnabled(),
     })
-    return { mode: "push", shifted_selectors, restored: [] }
+
+    logLayoutDebug(payload)
+    return { mode, page_type, ...payload }
   }
 
   window.EquipifyGrowthLayoutPush = {
     BODY_CLASS,
-    PUSH_CLASS,
-    CSS_VAR_NAME,
+    DESKTOP_LAYOUT_CLASS,
+    DEBUG_LAYOUT_CLASS,
+    DEBUG_STORAGE_KEY,
     SIDEBAR_WIDTH_PX,
+    RIGHT_MARGIN_PX,
     DESKTOP_MIN_WIDTH,
-    MIN_WIDTH_DELTA_PX,
-    LAYOUT_RESERVE_SELECTORS,
-    LAYOUT_EXCLUDE_SELECTORS,
+    SCAFFOLD_ROOT_SELECTORS,
+    SCAFFOLD_MAIN_SELECTORS,
+    SCAFFOLD_CONTENT_SELECTORS,
     resolveLayoutMode,
-    describeRect,
-    applyReserveToNode,
-    restoreAllLayoutReserve,
+    detectPageType,
+    locateScaffold,
+    isDebugLayoutEnabled,
     applyLayoutReserve,
-    setSidebarWidthVariable,
-    setPushModeClass,
+    setLayoutVariables,
+    setDesktopLayoutClasses,
+    clearLayoutMarks,
+    measureWidth,
   }
 })()

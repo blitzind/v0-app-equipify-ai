@@ -134,21 +134,14 @@ console.log("[Equipify Sales] linkedin-inpage-sidebar start")
     document.dispatchEvent(new CustomEvent("equipify-sidebar-state", { detail: { open } }))
   }
 
-  function discoverLayoutContainer() {
-    const topCard = window.__equipifyGrowthFindProfileTopCard?.(document)
-    const discovered = window.__equipifyGrowthDiscoverMainContentContainer?.(document, topCard)
-    return discovered instanceof Element ? discovered : null
-  }
-
-  function logLayoutPush(payload) {
-    console.log("[Equipify Sales:layout-push]", payload)
+  function logLayoutDebug(payload) {
+    console.log("[Equipify Sales:layout-debug]", payload)
   }
 
   function applyLayoutReserve(open) {
     layoutPush?.applyLayoutReserve?.(open, {
-      discoverLayoutContainer,
-      describeElement: window.__equipifyGrowthDescribeElement,
-      logLayoutPush,
+      pageUrl: window.location.href,
+      logLayoutDebug,
     })
   }
 
@@ -157,8 +150,6 @@ console.log("[Equipify Sales] linkedin-inpage-sidebar start")
     ensureRoot()
     rootNode.hidden = !open
     rootNode.setAttribute("aria-hidden", open ? "false" : "true")
-    document.documentElement.classList.toggle(BODY_CLASS, open)
-    document.body?.classList.toggle(BODY_CLASS, open)
     applyLayoutReserve(open)
     setDockOffset(open)
 

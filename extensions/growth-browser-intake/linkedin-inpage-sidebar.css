@@ -15,7 +15,7 @@
   right: 0;
   height: 100vh;
   height: 100dvh;
-  width: var(--equipify-sales-sidebar-width, 420px);
+  width: var(--equipify-panel-width, 420px);
   pointer-events: auto;
   background: #f4f6fb;
   border-left: 1px solid #dbeafe;
@@ -32,44 +32,74 @@
 }
 
 html.equipify-sales-inpage-sidebar-open {
-  --equipify-sales-sidebar-width: 420px;
+  --equipify-panel-width: 420px;
+  --equipify-layout-right-margin: 0px;
+  --equipify-linkedin-main-width: calc(
+    100vw - var(--equipify-panel-width) - var(--equipify-layout-right-margin)
+  );
 }
 
-@media (min-width: 901px) {
-  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push .scaffold-layout,
-  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push .scaffold-layout__inner,
-  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push .scaffold-layout__main,
-  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push main.scaffold-layout__main,
-  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push .application-outlet,
-  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push #main-content,
-  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push main[role="main"],
-  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push [role="main"].scaffold-layout__main,
-  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push [data-equipify-sidebar-reserve] {
-    margin-right: var(--equipify-sales-sidebar-width) !important;
-    max-width: calc(100% - var(--equipify-sales-sidebar-width)) !important;
-    width: calc(100% - var(--equipify-sales-sidebar-width)) !important;
-    box-sizing: border-box;
-    transition:
-      margin-right 0.2s ease,
-      max-width 0.2s ease,
-      width 0.2s ease,
-      transform 0.2s ease;
+@media (min-width: 1200px) {
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open .global-nav,
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open nav.global-nav {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin-right: 0 !important;
   }
 
-  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push .global-nav,
-  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push nav.global-nav {
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open [data-equipify-layout-root="true"],
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open .scaffold-layout,
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open .scaffold-layout-container {
+    width: var(--equipify-linkedin-main-width) !important;
+    max-width: var(--equipify-linkedin-main-width) !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
     margin-right: 0 !important;
-    max-width: 100% !important;
+    box-sizing: border-box !important;
+    transition: width 0.2s ease, max-width 0.2s ease;
   }
+
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open [data-equipify-layout-main="true"],
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open .scaffold-layout__main,
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open main.scaffold-layout__main,
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open main[role="main"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open [data-equipify-layout-content="true"],
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open .scaffold-layout__content,
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open .scaffold-layout__inner {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+body.equipify-layout-debug[data-equipify-layout-root="true"],
+body.equipify-layout-debug [data-equipify-layout-root="true"] {
+  outline: 2px solid #ef4444 !important;
+  outline-offset: -2px;
+}
+
+body.equipify-layout-debug [data-equipify-layout-content="true"] {
+  outline: 2px solid #f97316 !important;
+  outline-offset: -2px;
+}
+
+body.equipify-layout-debug .equipify-sales-inpage-sidebar-panel {
+  outline: 2px solid #3b82f6 !important;
+  outline-offset: -2px;
 }
 
 .equipify-sales-floating-dock--sidebar-open {
   display: none !important;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1199px) {
   .equipify-sales-inpage-sidebar-panel {
-    width: min(100vw, var(--equipify-sales-sidebar-width, 420px)) !important;
+    width: min(100vw, var(--equipify-panel-width, 420px)) !important;
   }
 
   .equipify-sales-floating-dock--sidebar-open {
