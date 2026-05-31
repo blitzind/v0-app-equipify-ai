@@ -885,28 +885,47 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
                   <Input
                     id="routing-test-number"
                     value={routingTestNumberId}
-                    onChange={(e) => setRoutingTestNumberId(e.target.value)}
-                    placeholder={numbers[0]?.id ?? "uuid"}
+                    onChange={(e) => {
+                      setRoutingTestNumberId(e.target.value)
+                      setRoutingTestError(null)
+                    }}
+                    placeholder="Select or paste a voice number uuid"
+                    list="routing-test-number-options"
                   />
+                  <datalist id="routing-test-number-options">
+                    {numbers.map((number) => (
+                      <option key={number.id} value={number.id}>
+                        {number.phoneNumber}
+                      </option>
+                    ))}
+                  </datalist>
+                  {numbers[0] ? (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Loaded numbers: {numbers.map((number) => `${number.phoneNumber} (${number.id})`).join(" · ")}
+                    </p>
+                  ) : null}
                 </div>
                 <div>
                   <Label htmlFor="routing-test-from">Simulated caller</Label>
-                  <Input id="routing-test-from" value={routingTestFrom} onChange={(e) => setRoutingTestFrom(e.target.value)} />
+                  <Input
+                    id="routing-test-from"
+                    value={routingTestFrom}
+                    onChange={(e) => setRoutingTestFrom(e.target.value)}
+                  />
                 </div>
               </div>
-              <Button type="button" size="sm" onClick={() => void runRoutingTest().catch((e) => setError(e instanceof Error ? e.message : "Test failed."))}>
-                Run routing test
-              </Button>
-              {routingTestResult ? (
-                <div className="rounded-md border border-border/60 px-3 py-2 text-xs text-muted-foreground">
-                  Action: {routingTestResult.action} · Mode: {routingTestResult.routingMode ?? "none"} · Status:{" "}
-                  {routingTestResult.routeStatus}
-                  {routingTestResult.dialNumbers.length > 0 ? ` · Dial: ${routingTestResult.dialNumbers.join(", ")}` : ""}
-                  {(routingTestResult.dialClientIdentities?.length ?? 0) > 0
-                    ? ` · Browser clients: ${routingTestResult.dialClientIdentities?.join(", ")}`
-                    : ""}
-                </div>
-              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" size="sm" disabled={routingTestLoading} onClick={() => void runRoutingTest()}>
+                  {routingTestLoading ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : null}
+                  Run routing test
+                </Button>
+                {routingTestError ? (
+                  <p className="text-sm text-destructive" role="alert">
+                    {routingTestError}
+                  </p>
+                ) : null}
+              </div>
+              {routingTestResult ? <RoutingTestResultPanel result={routingTestResult} /> : null}
             </section>
 
             <GrowthRelationshipMemoryReadinessSection />

@@ -225,6 +225,7 @@
     "test:voice-foundation-phase-1a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-foundation-phase-1a.ts",
     "test:voice-operations-phase-1b": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-operations-phase-1b.ts",
     "test:voice-call-control-phase-1c": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-call-control-phase-1c.ts",
+    "test:voice-routing-test-tool": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-routing-test-tool.ts",
     "test:voice-native-dialer-integration-phase-1d": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-native-dialer-integration-phase-1d.ts",
     "test:voice-transfer-control-phase-1e": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-transfer-control-phase-1e.ts",
     "test:voice-media-streaming-phase-1f": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-media-streaming-phase-1f.ts",
