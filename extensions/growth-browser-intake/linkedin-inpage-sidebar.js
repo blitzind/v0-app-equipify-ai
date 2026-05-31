@@ -142,11 +142,29 @@ console.log("[Equipify Sales] linkedin-inpage-sidebar start")
     console.log("[Equipify Sales:layout-dom]", payload)
   }
 
+  async function readPushLinkedInContentSetting() {
+    try {
+      const storage = window.EquipifyGrowthExtensionStorage
+      if (storage?.loadExtensionSettings) {
+        const settings = await storage.loadExtensionSettings()
+        return settings.pushLinkedInContent === true
+      }
+      const stored = await chrome.storage.sync.get("equipifyGrowthExtensionSettings")
+      const settings = stored?.equipifyGrowthExtensionSettings
+      return settings?.pushLinkedInContent === true
+    } catch {
+      return false
+    }
+  }
+
   function applyLayoutReserve(open) {
-    layoutPush?.applyLayoutReserve?.(open, {
-      pageUrl: window.location.href,
-      logLayoutPush,
-      logLayoutDom,
+    void readPushLinkedInContentSetting().then((pushEnabled) => {
+      layoutPush?.applyLayoutReserve?.(open, {
+        pageUrl: window.location.href,
+        pushEnabled,
+        logLayoutPush,
+        logLayoutDom,
+      })
     })
   }
 

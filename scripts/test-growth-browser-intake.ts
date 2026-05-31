@@ -302,7 +302,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.38"/)
+assert.match(manifestSource, /"version": "4.3.39"/)
 assert.match(manifestSource, /https:\/\/m\.linkedin\.com\/in\/\*/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
@@ -334,7 +334,7 @@ assert.match(extensionBrandJs, /PANEL_LOGO_ASSET/)
 assert.match(extensionBrandJs, /panelLogoUrl/)
 assert.match(extensionBrandJs, /applyPanelLogo/)
 assert.match(extensionBrandJs, /PANEL_LOGO_VERSION/)
-assert.match(extensionBrandJs, /4\.3\.38/)
+assert.match(extensionBrandJs, /4\.3\.39/)
 assert.match(extensionBrandJs, /\?v=\$\{encodeURIComponent\(PANEL_LOGO_VERSION\)\}/)
 assert.match(extensionBrandJs, /\[Equipify Sales:logo-audit\]/)
 assert.match(extensionBrandJs, /PANEL_LOGO_INTRINSIC_WIDTH/)
@@ -394,7 +394,11 @@ assert.match(intakeAppJs, /EquipifyGrowthExtensionVersion/)
 assert.match(intakeAppJs, /scheduleBootstrap/)
 assert.match(intakeAppJs, /showFallbackError/)
 assert.match(intakeAppJs, /bootstrap_timeout/)
-assert.match(intakeAppJs, /5000/)
+assert.match(intakeAppJs, /EquipifyGrowthPanelLoad/)
+assert.match(intakeAppJs, /renderPartialWorkspaceFromMetadata/)
+assert.match(intakeAppJs, /pushLinkedInContent/)
+assert.match(intakeAppJs, /crm_timeout/)
+assert.match(intakeAppJs, /metadata_timeout/)
 assert.match(intakeAppJs, /equipify-inpage-context/)
 assert.match(intakeAppJs, /applyInpageContext/)
 assert.match(intakeAppJs, /fetchWithTimeout/)
@@ -498,10 +502,29 @@ assert.match(linkedinInpageSidebarJs, /contextCacheKey/)
 assert.match(linkedinInpageSidebarJs, /queueContextPost/)
 assert.match(linkedinInpageSidebarJs, /equipify-sales-floating-dock--sidebar-open/)
 assert.match(linkedinInpageSidebarJs, /equipify-sales-inpage-sidebar-open/)
-assert.match(linkedinInpageSidebarJs, /EquipifyGrowthLayoutPush/)
+assert.match(linkedinInpageSidebarJs, /readPushLinkedInContentSetting/)
+assert.match(linkedinInpageSidebarJs, /pushEnabled/)
 assert.match(linkedinInpageSidebarJs, /\[Equipify Sales:layout-push]/)
-assert.match(linkedinInpageSidebarJs, /\[Equipify Sales:layout-dom]/)
 assert.match(linkedinInpageSidebarJs, /sidebar_context_posted/)
+
+const linkedinLayoutObserverJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-layout-observer.js"),
+  "utf8",
+)
+assert.match(linkedinLayoutObserverJs, /\[Equipify Sales:layout-observer]/)
+assert.match(linkedinLayoutObserverJs, /overlap_px/)
+assert.match(linkedinLayoutObserverJs, /position_strategy/)
+assert.match(manifestSource, /linkedin-layout-observer\.js/)
+
+const extensionPanelLoadJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/extension-panel-load.js"),
+  "utf8",
+)
+assert.match(extensionPanelLoadJs, /\[Equipify Sales:panel-load]/)
+assert.match(extensionPanelLoadJs, /shell_rendered_ms/)
+assert.match(extensionPanelLoadJs, /first_contentful_panel_ms/)
+assert.match(extensionPanelLoadJs, /metadata: 1500/)
+assert.match(extensionPanelLoadJs, /crm: 3000/)
 
 const linkedinLayoutPushJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-layout-push.js"),
@@ -510,16 +533,13 @@ const linkedinLayoutPushJs = fs.readFileSync(
 assert.match(linkedinLayoutPushJs, /EquipifyGrowthLayoutPush/)
 assert.match(linkedinLayoutPushJs, /resolveLayoutMode/)
 assert.match(linkedinLayoutPushJs, /applyLayoutReserve/)
-assert.match(linkedinLayoutPushJs, /equipify-desktop-layout/)
+assert.match(linkedinLayoutPushJs, /equipify-layout-push-mode/)
 assert.match(linkedinLayoutPushJs, /locateRightRails/)
-assert.match(linkedinLayoutPushJs, /locateFeed/)
-assert.match(linkedinLayoutPushJs, /inspectLayoutDom/)
-assert.match(linkedinLayoutPushJs, /logLayoutDom/)
-assert.match(linkedinLayoutPushJs, /expand-main-hide-rail-reserve-panel/)
+assert.match(linkedinLayoutPushJs, /push_body_padding_hide_rail/)
+assert.match(linkedinLayoutPushJs, /overlay_fixed_panel/)
+assert.match(linkedinLayoutPushJs, /fallback_to_overlay/)
 assert.match(linkedinLayoutPushJs, /hidden_right_rail_selectors/)
-assert.match(linkedinLayoutPushJs, /data-equipify-layout-feed/)
-assert.match(linkedinLayoutPushJs, /data-equipify-layout-inner/)
-assert.match(linkedinLayoutPushJs, /max_width/)
+assert.match(linkedinLayoutPushJs, /data-equipify-layout-rail/)
 assert.match(manifestSource, /linkedin-layout-push\.js/)
 
 const contactSavedJs = fs.readFileSync(
@@ -566,19 +586,10 @@ const linkedinInpageSidebarCss = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-inpage-sidebar.css"),
   "utf8",
 )
-assert.match(linkedinInpageSidebarCss, /equipify-desktop-layout/)
+assert.match(linkedinInpageSidebarCss, /equipify-layout-push-mode/)
 assert.match(linkedinInpageSidebarCss, /equipify-sales-inpage-sidebar-open/)
-assert.match(linkedinInpageSidebarCss, /--equipify-linkedin-main-width/)
-assert.match(linkedinInpageSidebarCss, /max-width: none/)
-assert.match(linkedinInpageSidebarCss, /flex: 1 1 auto/)
-assert.match(linkedinInpageSidebarCss, /grid-template-columns: minmax\(0, 1fr\)/)
-assert.match(linkedinInpageSidebarCss, /min-width: 1200px/)
-assert.match(linkedinInpageSidebarCss, /data-equipify-layout-feed/)
-assert.match(linkedinInpageSidebarCss, /data-equipify-layout-main/)
-assert.match(linkedinInpageSidebarCss, /#22c55e/)
+assert.match(linkedinInpageSidebarCss, /padding-right: 420px/)
 assert.match(linkedinInpageSidebarCss, /scaffold-layout__aside/)
-assert.match(linkedinInpageSidebarCss, /global-nav/)
-assert.match(linkedinInpageSidebarCss, /data-equipify-layout-root/)
 
 function runLayoutPushHarness(viewportWidth = 1280, pageUrl = "https://www.linkedin.com/in/example/") {
   const html = `<!doctype html><html><head></head><body>
@@ -623,10 +634,10 @@ function runLayoutPushHarness(viewportWidth = 1280, pageUrl = "https://www.linke
   const layoutPush = (context.window as { EquipifyGrowthLayoutPush?: Record<string, unknown> })
     .EquipifyGrowthLayoutPush as {
     BODY_CLASS: string
-    DESKTOP_LAYOUT_CLASS: string
+    PUSH_MODE_CLASS: string
     SIDEBAR_WIDTH_PX: number
     DESKTOP_MIN_WIDTH: number
-    resolveLayoutMode: (width?: number) => "push" | "overlay"
+    resolveLayoutMode: (width?: number, pushEnabled?: boolean) => "push" | "overlay"
     detectPageType: (url: string) => string
     locateScaffold: (doc: Document) => {
       root: Element | null
@@ -643,7 +654,8 @@ function runLayoutPushHarness(viewportWidth = 1280, pageUrl = "https://www.linke
 }
 
 const desktopLayoutHarness = runLayoutPushHarness(1280)
-assert.equal(desktopLayoutHarness.layoutPush.resolveLayoutMode(1280), "push")
+assert.equal(desktopLayoutHarness.layoutPush.resolveLayoutMode(1280), "overlay")
+assert.equal(desktopLayoutHarness.layoutPush.resolveLayoutMode(1280, true), "push")
 assert.equal(desktopLayoutHarness.layoutPush.detectPageType("https://www.linkedin.com/in/ricardo/"), "profile")
 assert.equal(
   desktopLayoutHarness.layoutPush.detectPageType("https://www.linkedin.com/company/acme/"),
@@ -656,6 +668,7 @@ assert.equal(
 
 const mobileLayoutHarness = runLayoutPushHarness(800)
 assert.equal(mobileLayoutHarness.layoutPush.resolveLayoutMode(800), "overlay")
+assert.equal(mobileLayoutHarness.layoutPush.resolveLayoutMode(800, true), "overlay")
 
 const scaffold = desktopLayoutHarness.layoutPush.locateScaffold(desktopLayoutHarness.document)
 assert.ok(scaffold.root?.classList.contains("scaffold-layout"))
@@ -666,11 +679,12 @@ desktopLayoutHarness.layoutPush.applyLayoutReserve(true, {
   document: desktopLayoutHarness.document,
   viewportWidth: 1280,
   pageUrl: "https://www.linkedin.com/in/example/",
+  pushEnabled: true,
   logLayoutPush: () => {},
 })
 assert.equal(
   desktopLayoutHarness.document.body.classList.contains(
-    desktopLayoutHarness.layoutPush.DESKTOP_LAYOUT_CLASS,
+    desktopLayoutHarness.layoutPush.PUSH_MODE_CLASS,
   ),
   true,
 )
@@ -680,39 +694,40 @@ assert.equal(
 )
 assert.equal(
   desktopLayoutHarness.document.querySelector(".scaffold-layout")?.getAttribute("data-equipify-layout-root"),
-  "true",
+  null,
 )
 assert.equal(
   desktopLayoutHarness.document.querySelector(".scaffold-layout__main")?.getAttribute("data-equipify-layout-main"),
-  "true",
+  null,
 )
 assert.equal(
   desktopLayoutHarness.document.querySelector(".scaffold-layout__inner")?.getAttribute("data-equipify-layout-inner"),
-  "true",
+  null,
 )
 assert.equal(
   desktopLayoutHarness.document
     .querySelector(".scaffold-finite-scroll__content")
     ?.getAttribute("data-equipify-layout-feed"),
-  "true",
+  null,
 )
 assert.equal(
   desktopLayoutHarness.document.querySelector(".scaffold-layout__aside")?.getAttribute("data-equipify-layout-rail"),
   "true",
 )
 assert.equal(
-  desktopLayoutHarness.document.documentElement.style.getPropertyValue("--equipify-linkedin-main-width"),
-  "calc(100vw - 420px - 0px)",
+  desktopLayoutHarness.document.documentElement.style.getPropertyValue("--equipify-panel-width"),
+  "420px",
 )
 
 desktopLayoutHarness.layoutPush.applyLayoutReserve(false, {
   document: desktopLayoutHarness.document,
   viewportWidth: 1280,
+  pushEnabled: true,
   logLayoutPush: () => {},
 })
 assert.equal(
   desktopLayoutHarness.document.body.classList.contains(
-    desktopLayoutHarness.layoutPush.DESKTOP_LAYOUT_CLASS,
+    desktopLayoutHarness.layoutPush.PUSH_MODE_CLASS,
   ),
   false,
 )
@@ -725,18 +740,19 @@ assert.equal(
   null,
 )
 assert.ok(
-  !desktopLayoutHarness.document.documentElement.style.getPropertyValue("--equipify-linkedin-main-width"),
+  !desktopLayoutHarness.document.documentElement.style.getPropertyValue("--equipify-panel-width"),
 )
 
 const overlayHarness = runLayoutPushHarness(800)
 overlayHarness.layoutPush.applyLayoutReserve(true, {
   document: overlayHarness.document,
   viewportWidth: 800,
+  pushEnabled: false,
   logLayoutPush: () => {},
 })
 assert.equal(overlayHarness.layoutPush.resolveLayoutMode(800), "overlay")
 assert.equal(
-  overlayHarness.document.body.classList.contains(overlayHarness.layoutPush.DESKTOP_LAYOUT_CLASS),
+  overlayHarness.document.body.classList.contains(overlayHarness.layoutPush.PUSH_MODE_CLASS),
   false,
 )
 assert.equal(
@@ -820,6 +836,7 @@ assert.equal(
     showLinkedInFloatingButton: true,
     verifyEmailBeforeSave: false,
     queueContactDiscovery: true,
+    pushLinkedInContent: false,
   }),
   false,
 )
@@ -828,6 +845,7 @@ const navHarness = runLayoutPushHarness(1280)
 navHarness.layoutPush.applyLayoutReserve(true, {
   document: navHarness.document,
   viewportWidth: 1280,
+  pushEnabled: true,
   logLayoutPush: () => {},
 })
 const navNode = navHarness.document.querySelector(".global-nav")
@@ -840,7 +858,10 @@ const inpageSidebarHtml = fs.readFileSync(
 )
 assert.match(inpageSidebarHtml, /quick-company-name/)
 assert.match(inpageSidebarHtml, /quick-linkedin-url/)
-assert.match(inpageSidebarHtml, /extension-brand.js/)
+assert.match(inpageSidebarHtml, /extension-panel-load.js/)
+assert.match(inpageSidebarHtml, /data-panel-skeleton="profile"/)
+assert.match(inpageSidebarHtml, /data-panel-content="profile"/)
+assert.match(inpageSidebarHtml, /push-linkedin-content/)
 assert.match(inpageSidebarHtml, /width="1024"/)
 assert.match(inpageSidebarHtml, /inpage-sidebar-close-btn/)
 assert.match(inpageSidebarHtml, /surface-inpage/)
@@ -1609,7 +1630,7 @@ const extensionStorageJs = fs.readFileSync(
 assert.match(extensionStorageJs, /MAX_RECENT_CAPTURES = 5/)
 assert.match(extensionStorageJs, /prospectingMode: true/)
 assert.match(extensionStorageJs, /showLinkedInFloatingButton: true/)
-assert.match(extensionStorageJs, /queueContactDiscovery: true/)
+assert.match(extensionStorageJs, /pushLinkedInContent: false/)
 assert.match(extensionStorageJs, /mergeSettingsWithDefaults/)
 assert.match(extensionStorageJs, /settingsNeedBackfill/)
 assert.match(extensionStorageJs, /SETTINGS_SCHEMA_VERSION/)
@@ -1653,7 +1674,8 @@ assert.match(intakeAppJs, /Company not detected/)
 assert.match(extensionWorkspaceJs, /COMPANY_INTEL_UNAVAILABLE/)
 assert.match(extensionWorkspaceJs, /setCompanyIntelAvailability/)
 assert.match(linkedinInpageSidebarJs, /\[Equipify Sales:layout-push]/)
-assert.match(linkedinInpageSidebarJs, /\[Equipify Sales:layout-dom]/)
+assert.match(extensionWorkspaceJs, /markProfileRendered/)
+assert.match(extensionWorkspaceJs, /markCompanyRendered/)
 assert.match(extensionStorageJs, /\[Equipify Sales\] content script loaded/)
 assert.match(pageMetadataJs, /\[Equipify Sales\] page-metadata start/)
 assert.match(pageMetadataJs, /\[Equipify Sales\] extractVisiblePageMetadata invoked/)
@@ -1737,7 +1759,7 @@ assert.equal(resolveCompanyFromKristenFixture(KRISTEN_KELLER_FIXTURE, "Kristen K
 assert.notEqual(resolveCompanyFromKristenFixture(KRISTEN_KELLER_FIXTURE, "Kristen Keller"), "Kristen Keller")
 
 assert.match(intakeAppJs, /sidebar_context_received/)
-assert.match(intakeAppJs, /renderSalesWorkspace\(defaultCrmPayload/)
+assert.match(intakeAppJs, /renderPartialWorkspaceFromMetadata/)
 assert.match(pageMetadataJs, /normalized_profile_payload/)
 assert.match(extensionWorkspaceJs, /render_input_payload/)
 
@@ -2138,7 +2160,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ version: "4.3.38" }),
+        getManifest: () => ({ version: "4.3.39" }),
       },
     },
     setTimeout: () => 0,
@@ -2503,7 +2525,7 @@ assert.equal(ricardoLiveHarness.profileImageAudit?.hero_container_found, true)
 assert.equal(ricardoLiveHarness.profileImageAudit?.selected_profile_image, "https://media.licdn.com/ricardo-headshot.jpg")
 assert.ok(Number(ricardoLiveHarness.heroScoringAudit?.candidate_count) > 0)
 assert.match(String(ricardoLiveHarness.heroScoringAudit?.selected_reason ?? ""), /hero-scoring:/)
-assert.match(linkedinLayoutPushJs, /data-equipify-layout-root/)
+assert.match(linkedinLayoutPushJs, /data-equipify-layout-rail/)
 
 const LINKEDIN_PROFILE_FIXTURE = `<main>
   <h1 class="text-heading-xlarge">Jane Doe</h1>

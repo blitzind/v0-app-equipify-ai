@@ -1396,6 +1396,9 @@
           .join("")
       }
     }
+
+    window.EquipifyGrowthPanelLoad?.markProfileRendered?.()
+    window.EquipifyGrowthPanelLoad?.markCompanyRendered?.()
   }
 
   function similarityReasons(match) {

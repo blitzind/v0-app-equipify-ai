@@ -1,66 +1,31 @@
 /**
- * LinkedIn desktop layout push — expand main column + hide right rail (v4.3.36).
+ * LinkedIn layout — overlay by default; optional body-padding push (v4.3.39).
  */
 ;(function initEquipifyGrowthLayoutPush() {
   const SIDEBAR_WIDTH_PX = 420
-  const RIGHT_MARGIN_PX = 0
   const DESKTOP_MIN_WIDTH = 1200
   const BODY_CLASS = "equipify-sales-inpage-sidebar-open"
-  const DESKTOP_LAYOUT_CLASS = "equipify-desktop-layout"
+  const PUSH_MODE_CLASS = "equipify-layout-push-mode"
   const DEBUG_LAYOUT_CLASS = "equipify-layout-debug"
   const CSS_VAR_PANEL_WIDTH = "--equipify-panel-width"
-  const CSS_VAR_RIGHT_MARGIN = "--equipify-layout-right-margin"
-  const CSS_VAR_MAIN_WIDTH = "--equipify-linkedin-main-width"
   const DEBUG_STORAGE_KEY = "equipify_debug_layout"
-  const LAYOUT_STRATEGY = "expand-main-hide-rail-reserve-panel"
+  const LAYOUT_STRATEGY_OVERLAY = "overlay_fixed_panel"
+  const LAYOUT_STRATEGY_PUSH = "push_body_padding_hide_rail"
 
-  const SCAFFOLD_ROOT_SELECTORS = [
-    ".scaffold-layout",
-    ".scaffold-layout-container",
-    ".application-outlet",
-  ]
-  const SCAFFOLD_INNER_SELECTORS = [".scaffold-layout__inner"]
-  const SCAFFOLD_MAIN_SELECTORS = [
-    ".scaffold-layout__main",
-    "main.scaffold-layout__main",
-    'main[role="main"]',
-  ]
-  const SCAFFOLD_CONTENT_SELECTORS = [
-    ".scaffold-layout__content",
-    "#main-content",
-  ]
-  const FEED_SELECTORS = [
-    '[data-view-name="feed-container"]',
-    '[data-view-name="profile-tab-aux"]',
-    ".scaffold-finite-scroll__content",
-    ".scaffold-finite-scroll",
-    "main .feed-shared-update-v2",
-  ]
   const RIGHT_RAIL_SELECTORS = [
     ".scaffold-layout__aside",
     ".scaffold-layout__sidebar",
     "aside.scaffold-layout__aside",
     ".scaffold-layout aside",
-    ".scaffold-layout-container aside",
-    'aside[aria-label*="sidebar" i]',
-    'aside[aria-label*="Right rail" i]',
     ".right-rail",
-  ]
-
-  const LAYOUT_MARK_ATTRS = [
-    "data-equipify-layout-root",
-    "data-equipify-layout-inner",
-    "data-equipify-layout-main",
-    "data-equipify-layout-content",
-    "data-equipify-layout-feed",
-    "data-equipify-layout-rail",
   ]
 
   function isHtmlElement(node) {
     return Boolean(node && typeof node === "object" && node.nodeType === 1)
   }
 
-  function resolveLayoutMode(viewportWidth = window.innerWidth) {
+  function resolveLayoutMode(viewportWidth = window.innerWidth, pushEnabled = false) {
+    if (!pushEnabled) return "overlay"
     return viewportWidth >= DESKTOP_MIN_WIDTH ? "push" : "overlay"
   }
 
@@ -85,10 +50,14 @@
   }
 
   function locateScaffold(doc) {
-    const root = queryFirst(doc, SCAFFOLD_ROOT_SELECTORS)
-    const inner = queryFirst(doc, SCAFFOLD_INNER_SELECTORS)
-    const main = queryFirst(doc, SCAFFOLD_MAIN_SELECTORS)
-    const content = queryFirst(doc, SCAFFOLD_CONTENT_SELECTORS)
+    const root = queryFirst(doc, [".scaffold-layout", ".scaffold-layout-container", ".application-outlet"])
+    const inner = queryFirst(doc, [".scaffold-layout__inner"])
+    const main = queryFirst(doc, [
+      ".scaffold-layout__main",
+      "main.scaffold-layout__main",
+      'main[role="main"]',
+    ])
+    const content = queryFirst(doc, [".scaffold-layout__content", "#main-content"])
     return {
       root: root.element,
       rootSelector: root.selector,
@@ -103,49 +72,28 @@
 
   function locateFeed(doc, scaffold) {
     const scope = scaffold.main ?? scaffold.content ?? scaffold.root ?? doc
-    for (const selector of FEED_SELECTORS) {
+    const selectors = [
+      '[data-view-name="feed-container"]',
+      ".scaffold-finite-scroll__content",
+      ".scaffold-finite-scroll",
+    ]
+    for (const selector of selectors) {
       const element = scope.querySelector?.(selector) ?? doc.querySelector(selector)
       if (element) return { element, selector }
     }
-    const viewNode = (scaffold.main ?? doc).querySelector?.('[data-view-name]')
-    if (viewNode) return { element: viewNode, selector: "[data-view-name]" }
     return { element: null, selector: null }
   }
 
-  function isEligibleRail(node) {
-    if (!isHtmlElement(node)) return false
-    if (node.closest("nav, header, footer, .global-nav")) return false
-    const rect = node.getBoundingClientRect()
-    if (rect.width > 0 && rect.height > 0) return true
-    const tag = node.tagName?.toLowerCase()
-    return (
-      tag === "aside" ||
-      node.classList.contains("scaffold-layout__aside") ||
-      node.classList.contains("scaffold-layout__sidebar") ||
-      node.classList.contains("right-rail")
-    )
-  }
-
-  function locateRightRails(doc, scaffold) {
+  function locateRightRails(doc) {
     const rails = []
     const seen = new Set()
-
     for (const selector of RIGHT_RAIL_SELECTORS) {
       doc.querySelectorAll(selector).forEach((node) => {
         if (!isHtmlElement(node) || seen.has(node)) return
-        if (
-          scaffold.root &&
-          !scaffold.root.contains(node) &&
-          !node.closest(".scaffold-layout, .scaffold-layout-container")
-        ) {
-          return
-        }
-        if (!isEligibleRail(node)) return
         seen.add(node)
         rails.push({ node, selector })
       })
     }
-
     return rails
   }
 
@@ -153,12 +101,7 @@
     if (!isHtmlElement(node)) return null
     const tag = node.tagName?.toLowerCase() ?? "node"
     const id = node.id ? `#${node.id}` : ""
-    const classes = typeof node.className === "string" && node.className.trim()
-      ? `.${node.className.trim().split(/\s+/).slice(0, 3).join(".")}`
-      : ""
-    const viewName = node.getAttribute?.("data-view-name")
-    const viewSuffix = viewName ? `[data-view-name="${viewName}"]` : ""
-    return `${selector ?? tag}${id}${classes}${viewSuffix}`
+    return `${selector ?? tag}${id}`
   }
 
   function describeRect(node) {
@@ -178,47 +121,6 @@
     return Math.round(node.getBoundingClientRect().width)
   }
 
-  function getComputedLayout(node, doc = document) {
-    if (!isHtmlElement(node)) return null
-    const view = doc.defaultView ?? window
-    const styles = view.getComputedStyle?.(node)
-    if (!styles) return null
-    return {
-      width: styles.width,
-      max_width: styles.maxWidth,
-      min_width: styles.minWidth,
-      flex: styles.flex,
-      flex_basis: styles.flexBasis,
-      display: styles.display,
-      grid_template_columns: styles.gridTemplateColumns,
-      margin_left: styles.marginLeft,
-      margin_right: styles.marginRight,
-    }
-  }
-
-  function describeLayoutNode(node, selector, doc = document) {
-    if (!isHtmlElement(node)) return null
-    return {
-      selector: describeTarget(node, selector),
-      tag: node.tagName?.toLowerCase() ?? null,
-      id: node.id || null,
-      classes: typeof node.className === "string" ? node.className : null,
-      data_view_name: node.getAttribute?.("data-view-name"),
-      rect: describeRect(node),
-      computed: getComputedLayout(node, doc),
-    }
-  }
-
-  function collectParentChain(node, doc = document) {
-    const chain = []
-    let current = node
-    for (let depth = 0; depth < 8 && isHtmlElement(current); depth += 1) {
-      chain.push(describeLayoutNode(current, null, doc))
-      current = current.parentElement
-    }
-    return chain
-  }
-
   function isDebugLayoutEnabled() {
     try {
       if (window.localStorage?.getItem(DEBUG_STORAGE_KEY) === "true") return true
@@ -229,38 +131,23 @@
   }
 
   function clearLayoutMarks(doc = document) {
-    for (const attr of LAYOUT_MARK_ATTRS) {
-      doc.querySelectorAll(`[${attr}="true"]`).forEach((node) => {
-        node.removeAttribute(attr)
-      })
-    }
+    doc.querySelectorAll('[data-equipify-layout-rail="true"]').forEach((node) => {
+      node.removeAttribute("data-equipify-layout-rail")
+    })
   }
 
-  function markScaffold(scaffold, rails, feed) {
-    clearLayoutMarks(scaffold.root?.ownerDocument ?? document)
-    if (isHtmlElement(scaffold.root)) scaffold.root.setAttribute("data-equipify-layout-root", "true")
-    if (isHtmlElement(scaffold.inner)) scaffold.inner.setAttribute("data-equipify-layout-inner", "true")
-    if (isHtmlElement(scaffold.main)) scaffold.main.setAttribute("data-equipify-layout-main", "true")
-    if (isHtmlElement(scaffold.content)) scaffold.content.setAttribute("data-equipify-layout-content", "true")
-    if (isHtmlElement(feed?.element)) feed.element.setAttribute("data-equipify-layout-feed", "true")
+  function markRightRails(rails) {
     rails.forEach(({ node }) => {
       node.setAttribute("data-equipify-layout-rail", "true")
     })
   }
 
   function setLayoutVariables(open, mode, root = document.documentElement) {
-    if (open && mode === "push") {
+    if (open) {
       root.style.setProperty(CSS_VAR_PANEL_WIDTH, `${SIDEBAR_WIDTH_PX}px`)
-      root.style.setProperty(CSS_VAR_RIGHT_MARGIN, `${RIGHT_MARGIN_PX}px`)
-      root.style.setProperty(
-        CSS_VAR_MAIN_WIDTH,
-        `calc(100vw - ${SIDEBAR_WIDTH_PX}px - ${RIGHT_MARGIN_PX}px)`,
-      )
       return
     }
     root.style.removeProperty(CSS_VAR_PANEL_WIDTH)
-    root.style.removeProperty(CSS_VAR_RIGHT_MARGIN)
-    root.style.removeProperty(CSS_VAR_MAIN_WIDTH)
   }
 
   function setDesktopLayoutClasses(open, mode, doc = document) {
@@ -269,10 +156,22 @@
     if (!body || !html) return
 
     const pushActive = open && mode === "push"
-    body.classList.toggle(DESKTOP_LAYOUT_CLASS, pushActive)
+    body.classList.toggle(PUSH_MODE_CLASS, pushActive)
     body.classList.toggle(DEBUG_LAYOUT_CLASS, pushActive && isDebugLayoutEnabled())
     html.classList.toggle(BODY_CLASS, open)
     body.classList.toggle(BODY_CLASS, open)
+  }
+
+  function measurePushOverlap(doc, panelWidth = SIDEBAR_WIDTH_PX) {
+    const main =
+      doc.querySelector(".scaffold-layout__main") ??
+      doc.querySelector('main[role="main"]') ??
+      doc.querySelector("main")
+    if (!isHtmlElement(main)) return 0
+    const rect = main.getBoundingClientRect()
+    const viewport = doc.defaultView?.innerWidth ?? window.innerWidth
+    const panelLeft = viewport - panelWidth
+    return Math.max(0, Math.round(rect.right - panelLeft))
   }
 
   function buildLayoutPushPayload(input) {
@@ -280,11 +179,14 @@
       mode: input.mode,
       viewport_width: input.viewport_width,
       panel_width: SIDEBAR_WIDTH_PX,
+      push_enabled: input.push_enabled ?? false,
       hidden_right_rail_selectors: input.hidden_right_rail_selectors ?? [],
       selected_main_container: input.selected_main_container,
       before_rect: input.before_rect,
       after_rect: input.after_rect,
-      strategy: input.strategy ?? LAYOUT_STRATEGY,
+      overlap_px: input.overlap_px ?? null,
+      strategy: input.strategy ?? LAYOUT_STRATEGY_OVERLAY,
+      fallback_to_overlay: input.fallback_to_overlay ?? false,
       restored: input.restored ?? false,
       page_type: input.page_type,
       debug_enabled: input.debug_enabled ?? false,
@@ -292,49 +194,31 @@
   }
 
   function inspectLayoutDom(doc, scaffold, feed, input = {}) {
-    const availableWidth = `calc(100vw - ${SIDEBAR_WIDTH_PX}px)`
     const anchor = scaffold.content ?? scaffold.main ?? scaffold.root
     return {
       page_type: input.page_type ?? null,
-      scaffold: describeLayoutNode(scaffold.root, scaffold.rootSelector, doc),
-      main: describeLayoutNode(scaffold.main, scaffold.mainSelector, doc),
-      content: describeLayoutNode(scaffold.content, scaffold.contentSelector, doc),
-      feed: describeLayoutNode(feed?.element, feed?.selector, doc),
-      parent_chain: collectParentChain(anchor, doc),
+      scaffold: describeRect(scaffold.root),
+      main: describeRect(scaffold.main),
+      content: describeRect(scaffold.content),
+      feed: describeRect(feed?.element),
       widths: {
         viewport: input.viewport_width ?? doc.defaultView?.innerWidth ?? null,
         reserved_panel: SIDEBAR_WIDTH_PX,
-        available: availableWidth,
         scaffold: measureWidth(scaffold.root),
         main: measureWidth(scaffold.main),
         content: measureWidth(scaffold.content),
         feed: measureWidth(feed?.element),
       },
+      anchor: describeTarget(anchor, null),
     }
-  }
-
-  function scheduleLayoutDomInspection(doc, scaffold, feed, input = {}) {
-    const logLayoutDom = input.logLayoutDom ?? (() => {})
-    const view = doc.defaultView ?? window
-    const run = () => {
-      const payload = inspectLayoutDom(doc, scaffold, feed, input)
-      logLayoutDom(payload)
-      return payload
-    }
-    if (typeof view.requestAnimationFrame === "function") {
-      view.requestAnimationFrame(() => {
-        view.requestAnimationFrame(run)
-      })
-      return
-    }
-    view.setTimeout?.(run, 0)
   }
 
   function applyLayoutReserve(open, options = {}) {
     const doc = options.document ?? document
     const viewportWidth = options.viewportWidth ?? window.innerWidth
     const pageUrl = options.pageUrl ?? window.location.href
-    const mode = resolveLayoutMode(viewportWidth)
+    const pushEnabled = options.pushEnabled === true
+    let mode = resolveLayoutMode(viewportWidth, pushEnabled)
     const page_type = detectPageType(pageUrl)
     const logLayoutPush = options.logLayoutPush ?? options.logLayoutDebug ?? (() => {})
     const logLayoutDom = options.logLayoutDom ?? (() => {})
@@ -351,38 +235,54 @@
         buildLayoutPushPayload({
           mode: "closed",
           viewport_width: viewportWidth,
+          push_enabled: pushEnabled,
           hidden_right_rail_selectors: [],
           selected_main_container: describeTarget(scaffold.main, scaffold.mainSelector),
           before_rect,
           after_rect: describeRect(mainContainer),
-          strategy: LAYOUT_STRATEGY,
+          strategy: LAYOUT_STRATEGY_OVERLAY,
           restored: true,
           page_type,
         }),
       )
-      return { mode: "closed", page_type, restored: true }
+      return { mode: "closed", page_type, restored: true, push_enabled: pushEnabled }
     }
 
-    setDesktopLayoutClasses(true, mode, doc)
     setLayoutVariables(true, mode, doc.documentElement)
 
     let hidden_right_rail_selectors = []
+    let fallback_to_overlay = false
+    let strategy = mode === "push" ? LAYOUT_STRATEGY_PUSH : LAYOUT_STRATEGY_OVERLAY
+
     if (mode === "push") {
-      const rails = locateRightRails(doc, scaffold)
-      markScaffold(scaffold, rails, feed)
+      const rails = locateRightRails(doc)
+      markRightRails(rails)
       hidden_right_rail_selectors = rails.map(({ selector }) => selector)
+      setDesktopLayoutClasses(true, mode, doc)
+      const overlap_px = measurePushOverlap(doc, SIDEBAR_WIDTH_PX)
+      if (overlap_px > 24) {
+        fallback_to_overlay = true
+        mode = "overlay"
+        strategy = LAYOUT_STRATEGY_OVERLAY
+        clearLayoutMarks(doc)
+        setDesktopLayoutClasses(true, mode, doc)
+      }
     } else {
       clearLayoutMarks(doc)
+      setDesktopLayoutClasses(true, mode, doc)
     }
 
     const payload = buildLayoutPushPayload({
       mode,
       viewport_width: viewportWidth,
+      push_enabled: pushEnabled,
       hidden_right_rail_selectors,
       selected_main_container: describeTarget(scaffold.main, scaffold.mainSelector),
       before_rect,
       after_rect: describeRect(mainContainer),
-      strategy: LAYOUT_STRATEGY,
+      overlap_px: mode === "push" ? measurePushOverlap(doc, SIDEBAR_WIDTH_PX) : null,
+      strategy,
+      fallback_to_overlay,
       restored: false,
       page_type,
       debug_enabled: isDebugLayoutEnabled(),
@@ -391,10 +291,20 @@
     logLayoutPush(payload)
 
     if (mode === "push") {
-      scheduleLayoutDomInspection(doc, scaffold, feed, {
-        page_type,
-        viewport_width: viewportWidth,
-        logLayoutDom,
+      logLayoutDom(
+        inspectLayoutDom(doc, scaffold, feed, {
+          page_type,
+          viewport_width: viewportWidth,
+        }),
+      )
+      window.EquipifyGrowthLayoutObserver?.observeLayout?.({
+        document: doc,
+        viewportWidth,
+      })
+    } else if (open) {
+      window.EquipifyGrowthLayoutObserver?.observeLayout?.({
+        document: doc,
+        viewportWidth,
       })
     }
 
@@ -403,18 +313,14 @@
 
   window.EquipifyGrowthLayoutPush = {
     BODY_CLASS,
-    DESKTOP_LAYOUT_CLASS,
+    PUSH_MODE_CLASS,
     DEBUG_LAYOUT_CLASS,
     DEBUG_STORAGE_KEY,
-    LAYOUT_STRATEGY,
+    LAYOUT_STRATEGY: LAYOUT_STRATEGY_PUSH,
+    LAYOUT_STRATEGY_OVERLAY,
+    LAYOUT_STRATEGY_PUSH,
     SIDEBAR_WIDTH_PX,
-    RIGHT_MARGIN_PX,
     DESKTOP_MIN_WIDTH,
-    SCAFFOLD_ROOT_SELECTORS,
-    SCAFFOLD_MAIN_SELECTORS,
-    SCAFFOLD_CONTENT_SELECTORS,
-    FEED_SELECTORS,
-    RIGHT_RAIL_SELECTORS,
     resolveLayoutMode,
     detectPageType,
     locateScaffold,
@@ -428,6 +334,6 @@
     clearLayoutMarks,
     measureWidth,
     describeRect,
-    getComputedLayout,
+    measurePushOverlap,
   }
 })()

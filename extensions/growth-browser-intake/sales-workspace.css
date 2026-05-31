@@ -1540,7 +1540,17 @@ body.surface-sidepanel.es-sales-workspace {
   gap: 6px;
 }
 
-/* v4.3.38 — buying committee discovery */
+/* v4.3.39 — panel load skeletons + layout overlay default */
+.es-panel-partial-retry {
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+
+.es-panel-skeleton[hidden],
+[data-panel-content][hidden] {
+  display: none !important;
+}
+
 .es-ws-buying-committee {
   margin-bottom: 8px;
   padding: 8px;

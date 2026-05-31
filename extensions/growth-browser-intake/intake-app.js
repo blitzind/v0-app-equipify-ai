@@ -14,6 +14,7 @@ function initIntakeApp(options) {
   const crmContextUi = window.EquipifyGrowthCrmContext
   const lookupCache = window.EquipifyGrowthExtensionLookupCache
   const extensionVersion = window.EquipifyGrowthExtensionVersion
+  const panelLoad = window.EquipifyGrowthPanelLoad
   const logPrefix = `[Equipify Sales:${surface}]`
 
   window.__equipifyOpenLeadAdmin = (leadId) => {
@@ -72,6 +73,7 @@ function initIntakeApp(options) {
     verifyEmailCheckbox: document.getElementById("verify-email"),
     queueDiscoveryCheckbox: document.getElementById("queue-discovery"),
     prospectingModeCheckbox: document.getElementById("prospecting-mode"),
+    pushLinkedInContentCheckbox: document.getElementById("push-linkedin-content"),
     linkedInFloatingDockCheckbox: document.getElementById("linkedin-floating-dock"),
     saveSettingsBtn: document.getElementById("save-settings-btn"),
     settingsStatus: document.getElementById("settings-status"),
@@ -485,6 +487,15 @@ function initIntakeApp(options) {
     return body
   }
 
+  function renderPartialWorkspaceFromMetadata(tabUrl) {
+    if (surface !== "sidepanel" && surface !== "inpage") return
+    const crmPayload = defaultCrmPayload()
+    renderLinkedInStatusPanel(crmPayload, tabUrl)
+    panelLoad?.markMetadataReceived?.()
+    panelLoad?.markProfileRendered?.()
+    panelLoad?.markCompanyRendered?.()
+  }
+
   function renderSalesWorkspace(crmPayload, tabUrl) {
     const workspace = window.EquipifySalesWorkspace
     if (!workspace?.render) return
@@ -865,6 +876,9 @@ function initIntakeApp(options) {
     if (els.prospectingModeCheckbox) {
       els.prospectingModeCheckbox.checked = state.settings.prospectingMode === true
     }
+    if (els.pushLinkedInContentCheckbox) {
+      els.pushLinkedInContentCheckbox.checked = state.settings.pushLinkedInContent === true
+    }
     if (els.linkedInFloatingDockCheckbox) {
       const showFloating =
         state.settings.showLinkedInFloatingButton !== undefined
@@ -886,6 +900,7 @@ function initIntakeApp(options) {
       verifyEmailBeforeSave: els.verifyEmailCheckbox?.checked === true,
       queueContactDiscovery: els.queueDiscoveryCheckbox?.checked === true,
       prospectingMode: els.prospectingModeCheckbox?.checked === true,
+      pushLinkedInContent: els.pushLinkedInContentCheckbox?.checked === true,
       showLinkedInFloatingButton,
     }
     state.settings = await storage.saveExtensionSettings(nextSettings)
@@ -904,25 +919,30 @@ function initIntakeApp(options) {
   }
 
   function setLoadingState(isLoading) {
-    if (els.bootstrapLoading) {
-      els.bootstrapLoading.hidden = !isLoading
-      if (isLoading) {
-        els.bootstrapLoading.classList.remove("bootstrap-loading--done")
-        const span = els.bootstrapLoading.querySelector("span:last-child")
-        if (span) span.textContent = "Loading page context…"
+    if (surface !== "sidepanel" && surface !== "inpage") {
+      if (els.bootstrapLoading) {
+        els.bootstrapLoading.hidden = !isLoading
+        if (isLoading) {
+          els.bootstrapLoading.classList.remove("bootstrap-loading--done")
+          const span = els.bootstrapLoading.querySelector("span:last-child")
+          if (span) span.textContent = "Loading page context…"
+        }
       }
+      if (els.linkedinStatusPanel) {
+        els.linkedinStatusPanel.classList.toggle("panel-loading", isLoading)
+      }
+      return
     }
-    if (els.linkedinStatusPanel) {
-      els.linkedinStatusPanel.classList.toggle("panel-loading", isLoading)
-    }
+    if (els.bootstrapLoading) els.bootstrapLoading.hidden = true
+    if (els.linkedinStatusPanel) els.linkedinStatusPanel.classList.remove("panel-loading")
   }
 
-  async function waitForInpageContext(maxMs = 1800) {
+  async function waitForInpageContext(maxMs = 1500) {
     if (state.inpageContextReceived) return state.detected
     const started = Date.now()
     while (Date.now() - started < maxMs) {
       if (state.inpageContextReceived) return state.detected
-      await new Promise((resolve) => window.setTimeout(resolve, 80))
+      await new Promise((resolve) => window.setTimeout(resolve, 40))
     }
     return state.detected
   }
@@ -961,25 +981,31 @@ function initIntakeApp(options) {
 
   async function bootstrap() {
     const seq = ++bootstrapSeq
+    const metadataTimeoutMs = panelLoad?.TIMEOUTS?.metadata ?? 1500
+    const crmTimeoutMs = panelLoad?.TIMEOUTS?.crm ?? 3000
     let finished = false
     const finishLoading = () => {
       if (finished) return
       finished = true
       window.clearTimeout(timeoutId)
       if (seq === bootstrapSeq) setLoadingState(false)
+      panelLoad?.flushAudit?.()
     }
 
     const timeoutId = window.setTimeout(() => {
       if (seq !== bootstrapSeq) return
-      logError("bootstrap_timeout", "Loading page context timed out after 5s")
-      renderLinkedInStatusPanel(defaultCrmPayload(), state.inpageTabUrl ?? state.detected?.source_url ?? null)
-      showFallbackError("No page context found. Reload LinkedIn or re-open Equipify Sales.")
+      logError("bootstrap_timeout", "Loading page context timed out")
+      renderPartialWorkspaceFromMetadata(state.inpageTabUrl ?? state.detected?.source_url ?? null)
+      panelLoad?.showPartialRetry?.(
+        "profile",
+        "Some data is still loading. Retry or reload LinkedIn if sections stay empty.",
+      )
       finishLoading()
-    }, 5000)
+    }, Math.max(crmTimeoutMs + 500, 4000))
 
     logInfo("bootstrap_start", { surface, inpageContext: state.inpageContextReceived })
     setCaptureStatus("Detecting", "status-detecting")
-    setLoadingState(true)
+    setLoadingState(false)
     clearStatus()
 
     try {
@@ -1000,27 +1026,49 @@ function initIntakeApp(options) {
         }
         setBootstrapTerminalState(defaultCrmPayload(), null, tabUrl)
         renderLinkedInStatusPanel(defaultCrmPayload(), tabUrl)
+        panelLoad?.hideAllSkeletons?.()
         return
       }
 
       if (els.contextWarning) els.contextWarning.hidden = true
 
-      let metadata = null
+      let metadata = state.detected
+      panelLoad?.setBlockedOn?.("metadata")
       if (surface === "inpage") {
-        metadata = await waitForInpageContext()
+        try {
+          metadata =
+            (await (panelLoad?.withTimeout
+              ? panelLoad.withTimeout(waitForInpageContext(metadataTimeoutMs), metadataTimeoutMs, "metadata")
+              : waitForInpageContext(metadataTimeoutMs))) ?? state.detected
+        } catch (error) {
+          logError("metadata_timeout", error)
+          metadata = state.detected
+          panelLoad?.showPartialRetry?.(
+            "profile",
+            "LinkedIn metadata is slow. Showing partial profile — use refresh if details are missing.",
+          )
+        }
         logInfo("bootstrap_inpage_context", {
           received: state.inpageContextReceived,
           hasMetadata: Boolean(metadata),
         })
-      } else {
-        metadata = state.inpageContextReceived ? state.detected : null
-        if (!metadata && tab?.id) {
-          logInfo("bootstrap_extract_tab_metadata", { tabId: tab.id })
-          metadata = await extractTabMetadata(tab)
+      } else if (!metadata && tab?.id) {
+        try {
+          metadata = await (panelLoad?.withTimeout
+            ? panelLoad.withTimeout(extractTabMetadata(tab), metadataTimeoutMs, "metadata")
+            : extractTabMetadata(tab))
+        } catch (error) {
+          logError("metadata_timeout", error)
+          metadata = state.detected
         }
       }
+
       if (seq !== bootstrapSeq) return
       applyDetectedMetadata(metadata ?? state.detected, tabUrl)
+      if (metadata || state.detected) {
+        panelLoad?.markMetadataReceived?.()
+        renderPartialWorkspaceFromMetadata(tabUrl)
+      }
 
       const linkedinQuery = linkedinContext?.buildLinkedInLookupQuery({
         url: tabUrl,
@@ -1040,18 +1088,39 @@ function initIntakeApp(options) {
       formValues.page_title = metadata?.page_title ?? state.detected?.page_title ?? formValues.page_title
       if (tabUrl) formValues.source_url = formValues.source_url || tabUrl
 
-      const crmPayload = (await fetchCrmContext(formValues, tabUrl)) ?? defaultCrmPayload()
+      panelLoad?.setBlockedOn?.("crm")
+      let crmPayload = defaultCrmPayload()
+      try {
+        crmPayload =
+          (await (panelLoad?.withTimeout
+            ? panelLoad.withTimeout(fetchCrmContext(formValues, tabUrl), crmTimeoutMs, "crm")
+            : fetchCrmContext(formValues, tabUrl))) ?? defaultCrmPayload()
+      } catch (error) {
+        logError("crm_timeout", error)
+        crmPayload = defaultCrmPayload()
+        panelLoad?.showPartialRetry?.(
+          "contact-intelligence",
+          "CRM lookup timed out. Profile is shown — refresh to retry Equipify match.",
+        )
+        panelLoad?.showPartialRetry?.(
+          "opportunity-intelligence",
+          "CRM lookup timed out. Refresh to load opportunity intelligence.",
+        )
+      }
+
       if (seq !== bootstrapSeq) return
       logInfo("bootstrap_crm_context", {
         matched: crmPayload?.matched === true,
         errorStatus: crmPayload?.error_status ?? null,
       })
+      panelLoad?.markCrmLookupComplete?.()
       renderLinkedInStatusPanel(crmPayload, tabUrl)
       setBootstrapTerminalState(crmPayload, metadata ?? state.detected, tabUrl)
+      state.bootstrapTerminal = true
     } catch (error) {
       if (seq !== bootstrapSeq) return
       logError("bootstrap_failed", error)
-      renderLinkedInStatusPanel(defaultCrmPayload(), state.inpageTabUrl ?? null)
+      renderPartialWorkspaceFromMetadata(state.inpageTabUrl ?? null)
       showFallbackError()
     } finally {
       finishLoading()
@@ -1089,8 +1158,8 @@ function initIntakeApp(options) {
     if (Array.isArray(payload.visiblePeople)) state.visibleLinkedInPeople = payload.visiblePeople
     if (metadata) {
       applyDetectedMetadata(metadata, payload.tabUrl ?? payload.metadata?.source_url)
-      if (surface === "inpage") {
-        renderSalesWorkspace(defaultCrmPayload(), nextUrl ?? state.inpageTabUrl)
+      if (surface === "inpage" || surface === "sidepanel") {
+        renderPartialWorkspaceFromMetadata(nextUrl ?? state.inpageTabUrl)
       }
     } else if (urlChanged) {
       state.detected = null
@@ -1485,6 +1554,11 @@ function initIntakeApp(options) {
   }
 
   async function init() {
+    if (surface === "sidepanel" || surface === "inpage") {
+      panelLoad?.showSkeletons?.()
+      panelLoad?.markShellRendered?.()
+    }
+
     document.body.dataset.surface = surface
     if (surface === "sidepanel") {
       document.body.classList.add("surface-sidepanel")
@@ -1507,10 +1581,10 @@ function initIntakeApp(options) {
 
     wireEvents()
     setMode("quick")
-    await applySettingsToUi()
-    await loadVersionInfo()
-    await refreshRecentCaptures()
-    await refreshOperatorAnalytics()
+    void applySettingsToUi()
+    void loadVersionInfo()
+    void refreshRecentCaptures()
+    void refreshOperatorAnalytics()
 
     if (surface !== "sidepanel" && surface !== "inpage" && typeof window.initExtensionPhase2 === "function") {
       window.initExtensionPhase2({

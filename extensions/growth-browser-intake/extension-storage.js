@@ -13,7 +13,7 @@ const LOCAL_STORAGE_KEYS = {
 const MAX_RECENT_CAPTURES = 5
 
 /** Bump when default keys change — triggers backfill for undefined keys only. */
-const SETTINGS_SCHEMA_VERSION = 4333
+const SETTINGS_SCHEMA_VERSION = 4339
 
 const DEFAULT_SETTINGS = {
   apiPreset: "production",
@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS = {
   showLinkedInFloatingButton: true,
   verifyEmailBeforeSave: false,
   queueContactDiscovery: true,
+  pushLinkedInContent: false,
 }
 
 const DEFAULT_LINKEDIN_FLOATING_DOCK = {

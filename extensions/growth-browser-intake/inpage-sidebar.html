@@ -6,6 +6,62 @@
     <title>Equipify Sales</title>
     <link rel="stylesheet" href="popup.css" />
     <link rel="stylesheet" href="sales-workspace.css" />
+    <style>
+      body.surface-inpage,
+      body.surface-sidepanel {
+        background: #f4f6fb;
+        margin: 0;
+      }
+      .es-ws-app {
+        min-height: 100vh;
+      }
+      .es-panel-skeleton-line,
+      .es-panel-skeleton-avatar {
+        background: linear-gradient(90deg, #e8eef8 0%, #f5f8fd 45%, #e8eef8 90%);
+        background-size: 200% 100%;
+        animation: es-panel-shimmer 1.2s ease-in-out infinite;
+        border-radius: 8px;
+      }
+      .es-panel-skeleton-avatar {
+        width: 52px;
+        height: 52px;
+        border-radius: 999px;
+        flex-shrink: 0;
+      }
+      .es-panel-skeleton-line {
+        height: 12px;
+        margin-bottom: 8px;
+      }
+      .es-panel-skeleton-line-lg {
+        height: 16px;
+        width: 72%;
+      }
+      .es-panel-skeleton-line-sm {
+        width: 48%;
+      }
+      .es-panel-skeleton-line-badge {
+        width: 42%;
+        height: 22px;
+        margin-top: 4px;
+      }
+      .es-panel-skeleton-head {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .es-panel-skeleton-lines {
+        flex: 1;
+        min-width: 0;
+      }
+      @keyframes es-panel-shimmer {
+        0% {
+          background-position: 100% 0;
+        }
+        100% {
+          background-position: -100% 0;
+        }
+      }
+    </style>
   </head>
   <body class="surface-inpage es-sales-workspace">
     <div class="es-ws-app">
@@ -29,13 +85,51 @@
       </header>
 
       <div class="es-ws-scroll">
+        <p id="context-warning" class="message message-warning" hidden></p>
+
+        <section data-panel-skeleton="profile" class="es-ws-card es-ws-card-accent es-ws-card-compact es-panel-skeleton" aria-busy="true" aria-label="Loading profile">
+          <div class="es-panel-skeleton-head">
+            <div class="es-panel-skeleton-avatar" aria-hidden="true"></div>
+            <div class="es-panel-skeleton-lines">
+              <div class="es-panel-skeleton-line es-panel-skeleton-line-lg"></div>
+              <div class="es-panel-skeleton-line"></div>
+              <div class="es-panel-skeleton-line es-panel-skeleton-line-sm"></div>
+            </div>
+          </div>
+          <div class="es-panel-skeleton-line es-panel-skeleton-line-badge"></div>
+        </section>
+
+        <section data-panel-skeleton="contact-intelligence" class="es-ws-card es-ws-card-compact es-panel-skeleton" aria-busy="true" aria-label="Loading contact intelligence">
+          <div class="es-panel-skeleton-line es-panel-skeleton-line-sm" style="width: 38%"></div>
+          <div class="es-panel-skeleton-line"></div>
+          <div class="es-panel-skeleton-line"></div>
+        </section>
+
+        <section data-panel-skeleton="opportunity-intelligence" class="es-ws-card es-ws-card-compact es-panel-skeleton" aria-busy="true" aria-label="Loading opportunity intelligence">
+          <div class="es-panel-skeleton-line es-panel-skeleton-line-sm" style="width: 44%"></div>
+          <div class="es-panel-skeleton-line"></div>
+          <div class="es-panel-skeleton-line es-panel-skeleton-line-sm"></div>
+        </section>
+
+        <section data-panel-skeleton="company-intelligence" class="es-ws-card es-ws-card-compact es-panel-skeleton" aria-busy="true" aria-label="Loading company intelligence">
+          <div class="es-panel-skeleton-head">
+            <div class="es-panel-skeleton-avatar" aria-hidden="true"></div>
+            <div class="es-panel-skeleton-lines">
+              <div class="es-panel-skeleton-line es-panel-skeleton-line-lg"></div>
+              <div class="es-panel-skeleton-line es-panel-skeleton-line-sm"></div>
+            </div>
+          </div>
+          <div class="es-panel-skeleton-line"></div>
+          <div class="es-panel-skeleton-line"></div>
+          <div class="es-panel-skeleton-line es-panel-skeleton-line-sm"></div>
+        </section>
+
         <div id="bootstrap-loading" class="bootstrap-loading" hidden aria-live="polite">
           <span class="loading-spinner" aria-hidden="true"></span>
           <span>Loading page context…</span>
         </div>
-        <p id="context-warning" class="message message-warning" hidden></p>
 
-        <section id="linkedin-status-panel" class="es-ws-card es-ws-card-accent es-ws-profile es-ws-card-compact">
+        <section id="linkedin-status-panel" data-panel-content="profile" class="es-ws-card es-ws-card-accent es-ws-profile es-ws-card-compact" hidden>
           <div class="es-ws-profile-head">
             <div id="es-ws-profile-photo-wrap"></div>
             <div>
@@ -56,12 +150,12 @@
           <h2 id="sidepanel-profile-name" class="es-ws-hidden-compat">Loading profile…</h2>
         </section>
 
-        <section id="es-ws-contact-intelligence-panel" class="es-ws-card es-ws-contact-intelligence es-ws-card-compact" hidden>
+        <section id="es-ws-contact-intelligence-panel" data-panel-content="contact-intelligence" class="es-ws-card es-ws-contact-intelligence es-ws-card-compact" hidden>
           <p class="es-ws-card-label">Contact Intelligence</p>
           <div id="es-ws-contact-intelligence-chips" class="es-ws-ci-chips es-ws-ci-chips-compact"></div>
         </section>
 
-        <section id="es-ws-opportunity-intelligence-panel" class="es-ws-card es-ws-opportunity-intelligence es-ws-card-compact" hidden>
+        <section id="es-ws-opportunity-intelligence-panel" data-panel-content="opportunity-intelligence" class="es-ws-card es-ws-opportunity-intelligence es-ws-card-compact" hidden>
           <div class="es-ws-oi-header">
             <p class="es-ws-card-label">Opportunity Intelligence</p>
             <div class="es-ws-oi-header-badges">
@@ -101,7 +195,7 @@
           </div>
         </section>
 
-        <section class="es-ws-card es-ws-company-intel es-ws-card-compact">
+        <section data-panel-content="company-intelligence" class="es-ws-card es-ws-company-intel es-ws-card-compact" hidden>
           <div class="es-ws-card-title-row">
             <p class="es-ws-card-label">Company intelligence</p>
             <div class="es-ws-card-title-actions">
@@ -426,6 +520,7 @@
               <option value="local">Local dev</option>
             </select>
           </label>
+          <label class="checkbox-row"><input id="push-linkedin-content" type="checkbox" /><span>Push LinkedIn content left (best-effort)</span></label>
           <label class="checkbox-row"><input id="prospecting-mode" type="checkbox" /><span>Prospecting Mode — show scan badges while browsing LinkedIn</span></label>
           <label class="checkbox-row"><input id="linkedin-floating-dock" type="checkbox" checked /><span>Show LinkedIn floating button</span></label>
           <label class="checkbox-row"><input id="verify-email" type="checkbox" /><span>Verify email before save</span></label>
@@ -437,6 +532,7 @@
     </div>
 
     <script src="extension-config.js"></script>
+    <script src="extension-panel-load.js"></script>
     <script src="extension-brand.js"></script>
     <script src="extension-storage.js"></script>
     <script src="extension-lookup-cache.js"></script>
