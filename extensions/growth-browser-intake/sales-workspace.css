@@ -1289,3 +1289,253 @@ body.surface-sidepanel.es-sales-workspace {
 .es-ws-oi-motion-cta:hover {
   background: #dbeafe;
 }
+
+/* v4.3.37 — workspace compression & information density */
+.es-ws-scroll {
+  gap: 6px;
+  padding: 8px 12px 16px;
+}
+
+.es-ws-card-compact {
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+
+.es-ws-card-compact .es-ws-card-label {
+  margin-bottom: 4px;
+}
+
+.es-ws-profile.es-ws-card-compact {
+  gap: 6px;
+}
+
+.es-ws-profile.es-ws-card-compact .es-ws-profile-head {
+  gap: 8px;
+}
+
+.es-ws-profile.es-ws-card-compact .es-ws-profile-name {
+  font-size: 15px;
+}
+
+.es-ws-profile.es-ws-card-compact .es-ws-profile-title,
+.es-ws-profile.es-ws-card-compact .es-ws-profile-company,
+.es-ws-profile.es-ws-card-compact .es-ws-profile-location {
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.es-ws-ci-chips-compact {
+  gap: 4px;
+  margin-bottom: 0;
+}
+
+.es-ws-ci-chips-compact .es-ws-ci-chip {
+  padding: 2px 6px;
+  font-size: 9px;
+}
+
+.es-ws-oi-header {
+  margin-bottom: 4px;
+}
+
+.es-ws-oi-fits {
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.es-ws-oi-fit-chip {
+  padding: 2px 6px;
+  font-size: 9px;
+}
+
+.es-ws-oi-crm-context {
+  margin: 0 0 4px;
+  font-size: 10px;
+}
+
+.es-ws-oi-details {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-top: 4px;
+  background: #f8fafc;
+}
+
+.es-ws-oi-details summary {
+  padding: 5px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  list-style: none;
+}
+
+.es-ws-oi-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.es-ws-oi-details[open] summary {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.es-ws-oi-details .es-ws-oi-reasons,
+.es-ws-oi-details .es-ws-oi-motion,
+.es-ws-oi-details .es-ws-oi-motion-cta {
+  margin: 6px 8px 8px;
+}
+
+.es-ws-oi-details .es-ws-oi-reasons {
+  font-size: 10px;
+  padding-left: 18px;
+}
+
+.es-ws-company-overview-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+  margin-bottom: 8px;
+}
+
+.es-ws-overview-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.es-ws-overview-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.es-ws-overview-value {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.es-ws-overview-value a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.es-ws-mini-label {
+  margin: 0 0 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.es-ws-company-employees-preview {
+  margin-bottom: 8px;
+}
+
+.es-ws-employees-list-compact .es-ws-employee-row {
+  padding: 4px 0;
+}
+
+.es-ws-employees-list-compact .es-ws-employee-name {
+  font-size: 11px;
+}
+
+.es-ws-employees-list-compact .es-ws-employee-title,
+.es-ws-employees-list-compact .es-ws-employee-meta {
+  font-size: 10px;
+}
+
+.es-ws-company-stats-compact {
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.es-ws-company-stats-compact .es-ws-company-stat {
+  padding: 4px 6px;
+}
+
+.es-ws-company-stats-compact .es-ws-company-stat-value {
+  font-size: 14px;
+}
+
+.es-ws-company-stats-compact .es-ws-company-stat-label {
+  font-size: 9px;
+}
+
+.es-ws-company-header {
+  margin-bottom: 6px;
+}
+
+.es-ws-company-name {
+  font-size: 13px;
+}
+
+.es-ws-company-subtitle {
+  font-size: 10px;
+}
+
+.es-ws-show-more-btn {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.es-ws-show-more-btn:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.es-ws-empty-compact {
+  margin: 0;
+  font-size: 10px;
+}
+
+.es-ws-utilities details {
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.es-ws-utilities summary {
+  padding: 8px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+  cursor: pointer;
+  list-style: none;
+}
+
+.es-ws-utilities summary::-webkit-details-marker {
+  display: none;
+}
+
+.es-ws-utilities-body {
+  display: grid;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+
+.es-ws-utilities-body > .es-ws-card,
+.es-ws-utilities-body > .es-ws-advanced {
+  margin: 0;
+}
+
+.es-ws-actions {
+  gap: 6px;
+}

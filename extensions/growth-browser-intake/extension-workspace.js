@@ -18,6 +18,8 @@
   let lastEmployeeRows = []
   let lastCrmContactRows = []
   let similarState = { seedKey: null, loading: false, matches: [] }
+  const EMPLOYEE_PAGE_SIZE = 5
+  let employeeVisibleLimit = EMPLOYEE_PAGE_SIZE
 
   function trimOrNull(value) {
     const trimmed = (value ?? "").trim()
@@ -34,6 +36,73 @@
 
   function companyValue(value) {
     return trimOrNull(value) ?? COMPANY_NOT_FOUND
+  }
+
+  function hasDisplayableCompanyValue(value) {
+    const raw = trimOrNull(value)
+    if (!raw) return false
+    if (raw === COMPANY_NOT_FOUND) return false
+    if (raw === PUBLIC_NOT_FOUND) return false
+    if (raw === FOLLOWERS_NOT_AVAILABLE) return false
+    if (raw === "—") return false
+    return true
+  }
+
+  function resolveCompanySizeLabel(companyIntel) {
+    const count = trimOrNull(companyIntel?.employee_count)
+    const range = trimOrNull(companyIntel?.employee_range)
+    if (count && range && count !== range) return `${count} (${range})`
+    return count ?? range ?? null
+  }
+
+  function openWorkspaceUtilities() {
+    const details = document.getElementById("es-ws-workspace-utilities-details")
+    if (details) details.open = true
+  }
+
+  function renderCompanyOverviewGrid(companyIntel, companyLocation, website) {
+    const grid = document.getElementById("es-ws-company-overview-grid")
+    if (!grid) return
+
+    const items = []
+    if (hasDisplayableCompanyValue(companyIntel?.industry)) {
+      items.push({ label: "Industry", value: companyIntel.industry })
+    }
+    const size = resolveCompanySizeLabel(companyIntel)
+    if (hasDisplayableCompanyValue(size)) {
+      items.push({ label: "Size", value: size })
+    }
+    const hq =
+      companyLocation && companyLocation !== COMPANY_NOT_FOUND ? trimOrNull(companyLocation) : null
+    if (hasDisplayableCompanyValue(hq)) {
+      items.push({ label: "HQ", value: hq })
+    }
+    const web =
+      website && website !== PUBLIC_NOT_FOUND
+        ? trimOrNull(website)
+        : hasDisplayableCompanyValue(companyIntel?.website)
+          ? trimOrNull(companyIntel.website)
+          : null
+    if (web) {
+      items.push({
+        label: "Website",
+        value: web,
+        html: `<a href="${escapeHtml(web)}" target="_blank" rel="noopener noreferrer">${escapeHtml(web)}</a>`,
+      })
+    }
+
+    if (!items.length) {
+      grid.innerHTML =
+        '<p class="es-ws-empty es-ws-empty-compact">No company details visible on this page yet.</p>'
+      return
+    }
+
+    grid.innerHTML = items
+      .map(
+        (item) =>
+          `<div class="es-ws-overview-cell"><span class="es-ws-overview-label">${escapeHtml(item.label)}</span><span class="es-ws-overview-value">${item.html ?? escapeHtml(item.value)}</span></div>`,
+      )
+      .join("")
   }
 
   function normalizeComparisonName(value) {
@@ -395,10 +464,7 @@
   function renderContactIntelligence(input) {
     const panel = document.getElementById("es-ws-contact-intelligence-panel")
     const chipsEl = document.getElementById("es-ws-contact-intelligence-chips")
-    const anglesEl = document.getElementById("es-ws-ci-angles")
-    const nbaEl = document.getElementById("es-ws-ci-nba")
-    const nbaReasonEl = document.getElementById("es-ws-ci-nba-reason")
-    if (!panel || !chipsEl || !anglesEl || !nbaEl || !nbaReasonEl) return
+    if (!panel || !chipsEl) return
 
     const detected = input?.detected ?? null
     const formValues = input?.formValues ?? {}
@@ -450,27 +516,20 @@
       { label: "Buying Influence", value: intelligence.buying_influence, tone: chipToneForLevel(intelligence.buying_influence) },
       { label: "Relationship", value: intelligence.relationship_strength, tone: chipToneForLevel(intelligence.relationship_strength) },
       {
-        label: "Research Confidence",
+        label: "Confidence",
         value: `${intelligence.research_confidence}%`,
         tone: intelligence.research_confidence >= 75 ? "high" : intelligence.research_confidence >= 50 ? "medium" : "low",
       },
+      { label: "Angle", value: intelligence.recommended_angles[0] ?? "Operational Efficiency", tone: "medium" },
+      { label: "Next", value: intelligence.next_best_action, tone: chipToneForLevel(intelligence.decision_maker_level) },
     ]
 
     chipsEl.innerHTML = chips
       .map(
         (chip) =>
-          `<span class="es-ws-ci-chip" data-tone="${escapeHtml(chip.tone)}"><span class="es-ws-ci-chip-label">${escapeHtml(chip.label)}</span><span class="es-ws-ci-chip-value">${escapeHtml(chip.value)}</span></span>`,
+          `<span class="es-ws-ci-chip" data-tone="${escapeHtml(chip.tone)}" title="${escapeHtml(intelligence.next_best_action_reason)}"><span class="es-ws-ci-chip-label">${escapeHtml(chip.label)}</span><span class="es-ws-ci-chip-value">${escapeHtml(chip.value)}</span></span>`,
       )
       .join("")
-
-    const primaryAngle = intelligence.recommended_angles[0] ?? "Operational Efficiency"
-    const extraAngles = intelligence.recommended_angles.slice(1)
-    anglesEl.innerHTML = `
-      <strong class="es-ws-ci-angle-primary">${escapeHtml(primaryAngle)}</strong>
-      ${extraAngles.length ? `<span class="es-ws-ci-angle-secondary">${extraAngles.map((angle) => escapeHtml(angle)).join(" · ")}</span>` : ""}`
-
-    nbaEl.textContent = intelligence.next_best_action
-    nbaReasonEl.textContent = intelligence.next_best_action_reason
 
     intelLog("contact_intelligence_rendered", {
       decision_maker_level: intelligence.decision_maker_level,
@@ -820,6 +879,7 @@
     }
 
     lastEmployeeRows = merged
+    employeeVisibleLimit = EMPLOYEE_PAGE_SIZE
     intelLog("employees", {
       profileCandidate: Boolean(profileCandidate),
       visibleCount: visibleRows.length,
@@ -829,6 +889,27 @@
 
     populateEmployeeFilters(lastEmployeeRows)
     renderFilteredEmployees(detected)
+    renderEmployeePreview()
+  }
+
+  function renderEmployeePreview() {
+    const section = document.getElementById("es-ws-company-employees-preview")
+    const list = document.getElementById("es-ws-employees-preview-list")
+    if (!section || !list) return
+
+    const rows = lastEmployeeRows.slice(0, EMPLOYEE_PAGE_SIZE)
+    if (!rows.length) {
+      section.hidden = true
+      list.innerHTML = ""
+      return
+    }
+
+    section.hidden = false
+    const employeeRow = window.EquipifyGrowthEmployeeRow
+    list.innerHTML = rows
+      .map((contact) => employeeRow?.buildObjectRowHtml?.(contact, escapeHtml) ?? "")
+      .join("")
+    employeeRow?.bindObjectRowActions?.(list)
   }
 
   function buildCrmContactRows(context) {
@@ -911,9 +992,18 @@
 
     const employeeRow = window.EquipifyGrowthEmployeeRow
     list.innerHTML = contacts
-      .slice(0, 6)
+      .slice(0, employeeVisibleLimit)
       .map((contact) => employeeRow?.buildObjectRowHtml?.(contact, escapeHtml) ?? "")
       .join("")
+
+    if (contacts.length > employeeVisibleLimit) {
+      const remaining = contacts.length - employeeVisibleLimit
+      const increment = Math.min(EMPLOYEE_PAGE_SIZE, remaining)
+      list.insertAdjacentHTML(
+        "beforeend",
+        `<button type="button" id="es-ws-employees-show-more" class="es-ws-show-more-btn">Show ${increment} more</button>`,
+      )
+    }
 
     employeeRow?.bindObjectRowActions?.(list)
   }
@@ -1138,54 +1228,14 @@
     }
 
     if (!hasCompany) {
-      renderKvList("es-ws-company-rows", [])
+      renderCompanyOverviewGrid({}, "", "")
+      const previewSection = document.getElementById("es-ws-company-employees-preview")
+      if (previewSection) previewSection.hidden = true
       setText("es-ws-company-contacts-count", "0")
       setText("es-ws-company-opportunities-count", "0")
       setText("es-ws-company-customers-count", "0")
     } else {
-      renderKvList("es-ws-company-rows", [
-      { label: "Company", value: companyName },
-      {
-        label: "Website",
-        value: website !== PUBLIC_NOT_FOUND ? website : companyValue(companyIntel.website),
-        html:
-          website !== PUBLIC_NOT_FOUND
-            ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">${escapeHtml(website)}</a>`
-            : companyIntel.website
-              ? `<a href="${escapeHtml(companyIntel.website)}" target="_blank" rel="noopener noreferrer">${escapeHtml(companyIntel.website)}</a>`
-              : null,
-      },
-      {
-        label: "LinkedIn",
-        value: companyLinkedInUrl,
-        html:
-          companyLinkedInUrl !== "—"
-            ? `<a href="${escapeHtml(companyLinkedInUrl)}" target="_blank" rel="noopener noreferrer">Company page</a>`
-            : null,
-      },
-      { label: "About", value: companyValue(companyIntel.company_description) },
-      { label: "Headquarters", value: companyLocation },
-      {
-        label: "Offices",
-        value:
-          Array.isArray(companyIntel.office_locations) && companyIntel.office_locations.length
-            ? companyIntel.office_locations.join(", ")
-            : null,
-      },
-      { label: "Industry", value: companyValue(companyIntel.industry) },
-      {
-        label: "Keywords",
-        value:
-          Array.isArray(companyIntel.keywords) && companyIntel.keywords.length
-            ? companyIntel.keywords.join(", ")
-            : null,
-      },
-      { label: "Employees", value: companyValue(companyIntel.employee_count) },
-      { label: "Employee range", value: companyValue(companyIntel.employee_range) },
-      { label: "Founded", value: companyValue(companyIntel.founded) },
-      { label: "Followers", value: followersValue(companyIntel.followers_count) },
-      { label: "Company type", value: companyValue(companyIntel.company_type) },
-    ])
+      renderCompanyOverviewGrid(companyIntel, companyLocation, website)
 
       setText("es-ws-company-contacts-count", String(contactsCount))
       setText("es-ws-company-opportunities-count", String(oppCount))
@@ -1496,7 +1546,10 @@
       button.addEventListener("click", () => switchCompanyTab(button.dataset.companyTab))
     })
 
-    const refreshEmployeeFilters = () => renderFilteredEmployees(lastRenderInput?.detected ?? null)
+    const refreshEmployeeFilters = () => {
+      employeeVisibleLimit = EMPLOYEE_PAGE_SIZE
+      renderFilteredEmployees(lastRenderInput?.detected ?? null)
+    }
     ;[
       "es-ws-employee-search",
       "es-ws-employee-department-filter",
@@ -1505,6 +1558,14 @@
     ].forEach((id) => {
       document.getElementById(id)?.addEventListener("input", refreshEmployeeFilters)
       document.getElementById(id)?.addEventListener("change", refreshEmployeeFilters)
+    })
+
+    document.getElementById("es-ws-employees-list")?.addEventListener("click", (event) => {
+      const target = event.target
+      if (!(target instanceof HTMLElement)) return
+      if (target.id !== "es-ws-employees-show-more") return
+      employeeVisibleLimit += EMPLOYEE_PAGE_SIZE
+      renderFilteredEmployees(lastRenderInput?.detected ?? null)
     })
 
     document.getElementById("es-ws-add-btn")?.addEventListener("click", () => {
@@ -1559,15 +1620,18 @@
     })
 
     document.getElementById("es-ws-queue-needs-review")?.addEventListener("click", () => {
+      openWorkspaceUtilities()
       window.__equipifyCopilotHooks?.switchTab?.("queue")
     })
 
     document.getElementById("es-ws-queue-verification")?.addEventListener("click", () => {
+      openWorkspaceUtilities()
       window.__equipifyCopilotHooks?.switchTab?.("queue")
       document.getElementById("copilot-process-queue-btn")?.click()
     })
 
     document.getElementById("es-ws-queue-discovery")?.addEventListener("click", () => {
+      openWorkspaceUtilities()
       window.__equipifyCopilotHooks?.switchTab?.("queue")
     })
 
@@ -1600,6 +1664,7 @@
     })
 
     document.getElementById("es-ws-queue-recent")?.addEventListener("click", () => {
+      openWorkspaceUtilities()
       document.getElementById("recent-captures-panel")?.scrollIntoView({ behavior: "smooth" })
     })
   }

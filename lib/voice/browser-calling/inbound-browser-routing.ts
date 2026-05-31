@@ -1,9 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { logInboundRouteAudit } from "@/lib/voice/call-control/inbound-route-audit"
 import type { InboundVoiceRouteResolution } from "@/lib/voice/routing/routing-resolver"
 import type { VoiceRoutingProfileMemberRecord } from "@/lib/voice/types"
 import { normalizePhoneNumber } from "@/lib/voice/phone-normalization"
 import { buildVoiceBrowserClientIdentity } from "@/lib/voice/browser-calling/status-mapping"
-import { listOnlineVoiceBrowserDevices } from "@/lib/voice/repository/voice-browser-calling-repository"
 
 const BROWSER_ROUTING_MODES = new Set(["assigned_user", "round_robin", "simultaneous_ring"])
 
@@ -74,6 +74,16 @@ export async function resolveInboundDialTargetsWithBrowser(
   },
 ): Promise<{ clientIdentities: string[]; pstnNumbers: string[]; targetUserIds: string[] }> {
   if (!input.route.routingMode || !BROWSER_ROUTING_MODES.has(input.route.routingMode)) {
+    logInboundRouteAudit("inbound-browser-routing", {
+      branch: "resolveInboundDialTargetsWithBrowser_skipped",
+      routingMode: input.route.routingMode,
+      routeStatus: input.route.routeStatus,
+      businessHoursStatus: input.route.businessHoursStatus,
+      destinationUserIds: input.route.destinationUserIds,
+      dialNumbers: input.pstnNumbers,
+      dialClientIdentities: [],
+      reason: "routing_mode_not_browser_capable",
+    })
     return { clientIdentities: [], pstnNumbers: input.pstnNumbers, targetUserIds: [] }
   }
 
@@ -84,6 +94,9 @@ export async function resolveInboundDialTargetsWithBrowser(
     targetUserIds = targetUserIds.slice(0, 1)
   }
 
+  const { listOnlineVoiceBrowserDevices } = await import(
+    "@/lib/voice/repository/voice-browser-calling-repository"
+  )
   const onlineDevices = await listOnlineVoiceBrowserDevices(admin, input.organizationId, {
     userIds: targetUserIds,
   })
@@ -99,6 +112,21 @@ export async function resolveInboundDialTargetsWithBrowser(
       buildVoiceBrowserClientIdentity({ organizationId: input.organizationId, userId }),
     ),
   )
+
+  logInboundRouteAudit("inbound-browser-routing", {
+    branch: "resolveInboundDialTargetsWithBrowser",
+    routingMode: input.route.routingMode,
+    routeStatus: input.route.routeStatus,
+    businessHoursStatus: input.route.businessHoursStatus,
+    destinationUserIds: input.route.destinationUserIds,
+    targetUserIds,
+    roundRobinUserId: input.roundRobinUserId ?? null,
+    onlineDeviceCount: onlineDevices.length,
+    onlineClientIdentities: clientIdentities,
+    dialNumbers: merged.pstnNumbers,
+    dialClientIdentities: merged.clientIdentities,
+    preferBrowser: clientIdentities.length > 0,
+  })
 
   return {
     clientIdentities: merged.clientIdentities,

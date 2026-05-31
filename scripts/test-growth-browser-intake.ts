@@ -302,7 +302,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.36"/)
+assert.match(manifestSource, /"version": "4.3.37"/)
 assert.match(manifestSource, /https:\/\/m\.linkedin\.com\/in\/\*/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
@@ -334,7 +334,7 @@ assert.match(extensionBrandJs, /PANEL_LOGO_ASSET/)
 assert.match(extensionBrandJs, /panelLogoUrl/)
 assert.match(extensionBrandJs, /applyPanelLogo/)
 assert.match(extensionBrandJs, /PANEL_LOGO_VERSION/)
-assert.match(extensionBrandJs, /4\.3\.36/)
+assert.match(extensionBrandJs, /4\.3\.37/)
 assert.match(extensionBrandJs, /\?v=\$\{encodeURIComponent\(PANEL_LOGO_VERSION\)\}/)
 assert.match(extensionBrandJs, /\[Equipify Sales:logo-audit\]/)
 assert.match(extensionBrandJs, /PANEL_LOGO_INTRINSIC_WIDTH/)
@@ -2068,7 +2068,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ version: "4.3.36" }),
+        getManifest: () => ({ version: "4.3.37" }),
       },
     },
     setTimeout: () => 0,
@@ -2736,7 +2736,16 @@ assert.match(sidepanelHtml, /Research Snapshot/)
 assert.match(sidepanelHtml, /Discovery Actions/)
 assert.match(sidepanelHtml, /es-ws-crm-contacts-list/)
 assert.match(sidepanelHtml, /Employees/)
-assert.doesNotMatch(sidepanelHtml, /Run contact discovery to find people/)
+assert.match(sidepanelHtml, /es-ws-company-overview-grid/)
+assert.match(sidepanelHtml, /Workspace Utilities/)
+assert.match(sidepanelHtml, /es-ws-employees-preview-list/)
+assert.match(extensionWorkspaceJs, /es-ws-employees-show-more/)
+assert.match(salesWorkspaceCss, /es-ws-company-overview-grid/)
+assert.match(salesWorkspaceCss, /es-ws-utilities/)
+assert.match(extensionWorkspaceJs, /renderCompanyOverviewGrid/)
+assert.match(extensionWorkspaceJs, /EMPLOYEE_PAGE_SIZE/)
+assert.doesNotMatch(sidepanelHtml, /es-ws-company-rows/)
+assert.match(sidepanelHtml, /es-ws-oi-details/)
 
 const popupHtml = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/popup.html"),

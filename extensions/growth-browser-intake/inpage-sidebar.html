@@ -35,7 +35,7 @@
         </div>
         <p id="context-warning" class="message message-warning" hidden></p>
 
-        <section id="linkedin-status-panel" class="es-ws-card es-ws-card-accent es-ws-profile">
+        <section id="linkedin-status-panel" class="es-ws-card es-ws-card-accent es-ws-profile es-ws-card-compact">
           <div class="es-ws-profile-head">
             <div id="es-ws-profile-photo-wrap"></div>
             <div>
@@ -56,21 +56,12 @@
           <h2 id="sidepanel-profile-name" class="es-ws-hidden-compat">Loading profile…</h2>
         </section>
 
-        <section id="es-ws-contact-intelligence-panel" class="es-ws-card es-ws-contact-intelligence" hidden>
+        <section id="es-ws-contact-intelligence-panel" class="es-ws-card es-ws-contact-intelligence es-ws-card-compact" hidden>
           <p class="es-ws-card-label">Contact Intelligence</p>
-          <div id="es-ws-contact-intelligence-chips" class="es-ws-ci-chips"></div>
-          <div class="es-ws-ci-block">
-            <p class="es-ws-ci-block-label">Suggested Outreach Angle</p>
-            <div id="es-ws-ci-angles" class="es-ws-ci-angles"></div>
-          </div>
-          <div class="es-ws-ci-block">
-            <p class="es-ws-ci-block-label">Next Best Action</p>
-            <p id="es-ws-ci-nba" class="es-ws-ci-nba"></p>
-            <p id="es-ws-ci-nba-reason" class="es-ws-ci-nba-reason"></p>
-          </div>
+          <div id="es-ws-contact-intelligence-chips" class="es-ws-ci-chips es-ws-ci-chips-compact"></div>
         </section>
 
-        <section id="es-ws-opportunity-intelligence-panel" class="es-ws-card es-ws-opportunity-intelligence" hidden>
+        <section id="es-ws-opportunity-intelligence-panel" class="es-ws-card es-ws-opportunity-intelligence es-ws-card-compact" hidden>
           <div class="es-ws-oi-header">
             <p class="es-ws-card-label">Opportunity Intelligence</p>
             <div class="es-ws-oi-header-badges">
@@ -80,18 +71,18 @@
           </div>
           <div id="es-ws-oi-fits" class="es-ws-oi-fits"></div>
           <p id="es-ws-oi-crm-context" class="es-ws-oi-crm-context"></p>
-          <div class="es-ws-oi-block">
-            <p class="es-ws-oi-block-label">Why This Matters</p>
+          <details class="es-ws-oi-details">
+            <summary>Why this matters</summary>
             <ul id="es-ws-oi-reasons" class="es-ws-oi-reasons"></ul>
-          </div>
-          <div class="es-ws-oi-block">
-            <p class="es-ws-oi-block-label">Recommended Sales Motion</p>
+          </details>
+          <details class="es-ws-oi-details">
+            <summary>Recommended sales motion</summary>
             <p id="es-ws-oi-motion" class="es-ws-oi-motion"></p>
             <button type="button" id="es-ws-oi-motion-cta" class="es-ws-oi-motion-cta"></button>
-          </div>
+          </details>
         </section>
 
-        <section class="es-ws-card">
+        <section class="es-ws-card es-ws-card-compact">
           <p class="es-ws-card-label">Primary actions</p>
           <div class="es-ws-actions">
             <button type="button" id="es-ws-add-btn" class="es-ws-action-primary">Add to Equipify</button>
@@ -110,25 +101,7 @@
           </div>
         </section>
 
-        <section class="es-ws-card">
-          <p class="es-ws-card-label">Contact data</p>
-          <div id="es-ws-contact-rows" class="es-ws-kv-list"></div>
-          <button type="button" id="es-ws-verify-email-btn" class="es-ws-inline-btn" hidden>Verify Email</button>
-        </section>
-
-        <section class="es-ws-card es-ws-enrichment">
-          <p class="es-ws-card-label">Find contact details</p>
-          <p id="es-ws-enrichment-status" class="es-ws-enrichment-status">Connect an enrichment provider such as People Data Labs, Prospeo, Apollo, Hunter, or website discovery to find email/phone.</p>
-          <div id="es-ws-enrichment-results" class="es-ws-kv-list" hidden></div>
-          <div class="es-ws-enrichment-actions">
-            <button type="button" id="es-ws-find-email-btn" class="es-ws-inline-btn">Find email</button>
-            <button type="button" id="es-ws-find-phone-btn" class="es-ws-inline-btn">Find phone</button>
-            <button type="button" id="es-ws-enrichment-copy-btn" class="es-ws-inline-btn" hidden>Copy</button>
-            <button type="button" id="es-ws-enrichment-save-btn" class="es-ws-inline-btn" hidden>Save to Equipify</button>
-          </div>
-        </section>
-
-        <section class="es-ws-card es-ws-company-intel">
+        <section class="es-ws-card es-ws-company-intel es-ws-card-compact">
           <div class="es-ws-card-title-row">
             <p class="es-ws-card-label">Company intelligence</p>
             <div class="es-ws-card-title-actions">
@@ -155,8 +128,12 @@
           </nav>
 
           <div id="es-ws-company-tab-overview" class="es-ws-company-panel" data-company-panel="overview">
-            <div id="es-ws-company-rows" class="es-ws-kv-list"></div>
-            <div class="es-ws-company-stats">
+            <div id="es-ws-company-overview-grid" class="es-ws-company-overview-grid"></div>
+            <div id="es-ws-company-employees-preview" class="es-ws-company-employees-preview" hidden>
+              <p class="es-ws-mini-label">Recommended contacts</p>
+              <div id="es-ws-employees-preview-list" class="es-ws-employees-list es-ws-employees-list-compact"></div>
+            </div>
+            <div class="es-ws-company-stats es-ws-company-stats-compact">
               <div class="es-ws-company-stat">
                 <span id="es-ws-company-contacts-count" class="es-ws-company-stat-value">0</span>
                 <span class="es-ws-company-stat-label">Contacts</span>
@@ -218,33 +195,161 @@
           </div>
         </section>
 
-        <section class="es-ws-card es-ws-nba">
-          <p class="es-ws-card-label">Next best action</p>
-          <p id="es-ws-nba-label" class="es-ws-nba-text">Add Contact</p>
-          <p id="es-ws-nba-reason" class="es-ws-nba-reason">This prospect is not in Equipify yet.</p>
-          <button type="button" id="es-ws-nba-cta" class="es-ws-nba-cta" data-action="add_contact">Add to Equipify</button>
-        </section>
+        <section class="es-ws-utilities">
+          <details id="es-ws-workspace-utilities-details">
+            <summary>Workspace Utilities</summary>
+            <div class="es-ws-utilities-body">
+              <section class="es-ws-card es-ws-card-compact">
+                <p class="es-ws-card-label">Contact data</p>
+                <div id="es-ws-contact-rows" class="es-ws-kv-list"></div>
+                <button type="button" id="es-ws-verify-email-btn" class="es-ws-inline-btn" hidden>Verify Email</button>
+              </section>
 
-        <section class="es-ws-card">
-          <p class="es-ws-card-label">Queue</p>
-          <div class="es-ws-queue-grid">
-            <button type="button" id="es-ws-queue-recent" class="es-ws-queue-chip">
-              <span class="es-ws-queue-chip-label">Recently Captured</span>
-              <span id="es-ws-queue-recent-count" class="es-ws-queue-chip-count">0</span>
-            </button>
-            <button type="button" id="es-ws-queue-needs-review" class="es-ws-queue-chip">
-              <span class="es-ws-queue-chip-label">Needs Review</span>
-              <span class="es-ws-queue-chip-count">→</span>
-            </button>
-            <button type="button" id="es-ws-queue-verification" class="es-ws-queue-chip">
-              <span class="es-ws-queue-chip-label">Verification Queue</span>
-              <span class="es-ws-queue-chip-count">→</span>
-            </button>
-            <button type="button" id="es-ws-queue-discovery" class="es-ws-queue-chip">
-              <span class="es-ws-queue-chip-label">Contact Discovery</span>
-              <span class="es-ws-queue-chip-count">→</span>
-            </button>
-          </div>
+              <section class="es-ws-card es-ws-enrichment es-ws-card-compact">
+                <p class="es-ws-card-label">Find contact details</p>
+                <p id="es-ws-enrichment-status" class="es-ws-enrichment-status">Connect an enrichment provider such as People Data Labs, Prospeo, Apollo, Hunter, or website discovery to find email/phone.</p>
+                <div id="es-ws-enrichment-results" class="es-ws-kv-list" hidden></div>
+                <div class="es-ws-enrichment-actions">
+                  <button type="button" id="es-ws-find-email-btn" class="es-ws-inline-btn">Find email</button>
+                  <button type="button" id="es-ws-find-phone-btn" class="es-ws-inline-btn">Find phone</button>
+                  <button type="button" id="es-ws-enrichment-copy-btn" class="es-ws-inline-btn" hidden>Copy</button>
+                  <button type="button" id="es-ws-enrichment-save-btn" class="es-ws-inline-btn" hidden>Save to Equipify</button>
+                </div>
+              </section>
+
+              <section class="es-ws-card es-ws-nba es-ws-card-compact">
+                <p class="es-ws-card-label">Next best action</p>
+                <p id="es-ws-nba-label" class="es-ws-nba-text">Add Contact</p>
+                <p id="es-ws-nba-reason" class="es-ws-nba-reason">This prospect is not in Equipify yet.</p>
+                <button type="button" id="es-ws-nba-cta" class="es-ws-nba-cta" data-action="add_contact">Add to Equipify</button>
+              </section>
+
+              <section class="es-ws-card es-ws-card-compact">
+                <p class="es-ws-card-label">Queue</p>
+                <div class="es-ws-queue-grid">
+                  <button type="button" id="es-ws-queue-recent" class="es-ws-queue-chip">
+                    <span class="es-ws-queue-chip-label">Recently Captured</span>
+                    <span id="es-ws-queue-recent-count" class="es-ws-queue-chip-count">0</span>
+                  </button>
+                  <button type="button" id="es-ws-queue-needs-review" class="es-ws-queue-chip">
+                    <span class="es-ws-queue-chip-label">Needs Review</span>
+                    <span class="es-ws-queue-chip-count">→</span>
+                  </button>
+                  <button type="button" id="es-ws-queue-verification" class="es-ws-queue-chip">
+                    <span class="es-ws-queue-chip-label">Verification Queue</span>
+                    <span class="es-ws-queue-chip-count">→</span>
+                  </button>
+                  <button type="button" id="es-ws-queue-discovery" class="es-ws-queue-chip">
+                    <span class="es-ws-queue-chip-label">Contact Discovery</span>
+                    <span class="es-ws-queue-chip-count">→</span>
+                  </button>
+                </div>
+              </section>
+
+              <section class="es-ws-card es-ws-capture es-ws-card-compact">
+                <details>
+                  <summary>Capture details</summary>
+                  <div class="es-ws-capture-body">
+                    <div class="mode-toggle">
+                      <button type="button" id="quick-mode-btn" class="mode-btn active">Quick</button>
+                      <button type="button" id="full-mode-btn" class="mode-btn">Full</button>
+                    </div>
+                    <form id="intake-form" class="form" style="margin-top: 10px">
+                      <div id="quick-fields">
+                        <label>Contact name <input id="contact-name" type="text" autocomplete="name" /></label>
+                        <label>Title / headline <input id="title" type="text" autocomplete="organization-title" data-autofill-empty="true" /></label>
+                        <label>Company <input id="quick-company-name" type="text" readonly data-autofill-empty="true" /></label>
+                        <label>Location <input id="quick-location" type="text" readonly data-autofill-empty="true" /></label>
+                        <label>LinkedIn profile <input id="quick-linkedin-url" type="url" readonly data-autofill-empty="true" /></label>
+                        <label>Email <input id="email" type="email" autocomplete="email" /></label>
+                        <label>Phone <input id="phone" type="tel" autocomplete="tel" /></label>
+                      </div>
+                      <div id="full-fields" hidden>
+                        <label>Company name <span class="required">*</span> <input id="company-name" type="text" data-autofill-empty="true" /></label>
+                        <label>Website <input id="website" type="url" data-autofill-empty="true" /></label>
+                        <label>LinkedIn <input id="linkedin-url" type="url" data-autofill-empty="true" /></label>
+                        <label>Notes <textarea id="notes" rows="2"></textarea></label>
+                      </div>
+                      <input id="source-url" type="hidden" />
+                      <input id="source-platform-input" type="hidden" />
+                      <input id="page-title-input" type="hidden" />
+                      <input id="location-input" type="hidden" />
+                      <input id="intake-mode-input" type="hidden" value="default" />
+                      <input id="target-lead-id-input" type="hidden" />
+                      <button id="submit-btn" type="submit">Save to Equipify</button>
+                    </form>
+                  </div>
+                </details>
+              </section>
+
+              <section id="recent-captures-panel" class="es-ws-card es-ws-card-compact">
+                <div class="panel-label">Recently captured</div>
+                <div id="recent-captures-list" class="recent-list"></div>
+              </section>
+
+              <section class="es-ws-advanced">
+                <details>
+                  <summary>Advanced tools</summary>
+                  <div class="es-ws-advanced-body">
+                    <button type="button" data-copilot-tab-btn="research" class="btn-secondary">Research brief</button>
+                    <button type="button" data-copilot-tab-btn="call_prep" class="btn-secondary">Call prep</button>
+                    <button type="button" data-copilot-tab-btn="similar" class="btn-secondary">Similar companies</button>
+                    <button type="button" data-copilot-tab-btn="committee" class="btn-secondary">Buying committee</button>
+                    <button type="button" data-copilot-tab-btn="analytics" class="btn-secondary">Analytics</button>
+
+                    <section data-copilot-tab-panel="research" class="copilot-panel" hidden>
+                      <button type="button" id="copilot-generate-research-btn" class="btn-primary">Generate research brief</button>
+                      <p id="copilot-research-status" class="message" hidden role="status"></p>
+                      <div id="copilot-research-content" class="phase2-artifact es-brief-grid" hidden></div>
+                    </section>
+                    <section data-copilot-tab-panel="call_prep" class="copilot-panel" hidden>
+                      <button type="button" id="copilot-generate-call-prep-btn" class="btn-primary">Generate call prep</button>
+                      <p id="copilot-call-prep-status" class="message" hidden role="status"></p>
+                      <div id="copilot-call-prep-content" class="phase2-artifact" hidden></div>
+                    </section>
+                    <section data-copilot-tab-panel="similar" class="copilot-panel" hidden>
+                      <button type="button" id="copilot-find-similar-btn" class="btn-primary">Find similar companies</button>
+                      <p id="copilot-similar-status" class="message" hidden role="status"></p>
+                      <div id="copilot-similar-list" class="phase2-similar-list"></div>
+                    </section>
+                    <section data-copilot-tab-panel="relationship" class="copilot-panel" hidden>
+                      <div id="copilot-relationship-content" class="copilot-scroll"></div>
+                    </section>
+                    <section data-copilot-tab-panel="timeline" class="copilot-panel" hidden>
+                      <div id="copilot-timeline-content" class="es-timeline"></div>
+                    </section>
+                    <section data-copilot-tab-panel="notes" class="copilot-panel" hidden>
+                      <textarea id="copilot-notes-input" rows="4" placeholder="Add operator notes…"></textarea>
+                      <button type="button" id="copilot-notes-save-btn" class="btn-secondary">Save note</button>
+                      <p id="copilot-notes-status" class="message" hidden role="status"></p>
+                    </section>
+                    <section data-copilot-tab-panel="queue" class="copilot-panel" hidden>
+                      <div class="button-row">
+                        <button type="button" id="copilot-add-to-queue-btn" class="btn-secondary">Add current page</button>
+                        <button type="button" id="copilot-process-queue-btn" class="btn-secondary">Process queue</button>
+                      </div>
+                      <div id="copilot-queue-list" class="phase2-queue-list"></div>
+                    </section>
+                    <section data-copilot-tab-panel="analytics" class="copilot-panel" hidden>
+                      <div class="analytics-period">
+                        <div class="analytics-block"><div class="panel-label">Today</div><div id="analytics-today"></div></div>
+                        <div class="analytics-block"><div class="panel-label">Week</div><div id="analytics-week"></div></div>
+                        <div class="analytics-block"><div class="panel-label">Month</div><div id="analytics-month"></div></div>
+                      </div>
+                    </section>
+                    <section data-copilot-tab-panel="committee" class="copilot-panel" hidden id="copilot-committee-panel">
+                      <div class="button-row">
+                        <button type="button" id="copilot-discover-committee-btn" class="btn-secondary">Discover</button>
+                        <button type="button" id="copilot-import-committee-btn" class="btn-primary">Import selected</button>
+                      </div>
+                      <p id="copilot-committee-status" class="message" hidden role="status"></p>
+                      <div id="copilot-committee-list" class="committee-list"></div>
+                    </section>
+                  </div>
+                </details>
+              </section>
+            </div>
+          </details>
         </section>
 
         <section id="existing-lead-panel" class="es-ws-card panel-warning" hidden>
@@ -262,109 +367,6 @@
           <div class="panel-label">Detected company</div>
           <div id="detected-company" class="detected-value">—</div>
           <div class="detected-meta"><span id="detected-platform" class="badge">website</span> <span id="detected-domain" class="muted"></span></div>
-        </section>
-
-        <section class="es-ws-card es-ws-capture">
-          <details>
-            <summary>Capture details</summary>
-            <div class="es-ws-capture-body">
-              <div class="mode-toggle">
-                <button type="button" id="quick-mode-btn" class="mode-btn active">Quick</button>
-                <button type="button" id="full-mode-btn" class="mode-btn">Full</button>
-              </div>
-              <form id="intake-form" class="form" style="margin-top: 10px">
-                <div id="quick-fields">
-                  <label>Contact name <input id="contact-name" type="text" autocomplete="name" /></label>
-                  <label>Title / headline <input id="title" type="text" autocomplete="organization-title" data-autofill-empty="true" /></label>
-                  <label>Company <input id="quick-company-name" type="text" readonly data-autofill-empty="true" /></label>
-                  <label>Location <input id="quick-location" type="text" readonly data-autofill-empty="true" /></label>
-                  <label>LinkedIn profile <input id="quick-linkedin-url" type="url" readonly data-autofill-empty="true" /></label>
-                  <label>Email <input id="email" type="email" autocomplete="email" /></label>
-                  <label>Phone <input id="phone" type="tel" autocomplete="tel" /></label>
-                </div>
-                <div id="full-fields" hidden>
-                  <label>Company name <span class="required">*</span> <input id="company-name" type="text" data-autofill-empty="true" /></label>
-                  <label>Website <input id="website" type="url" data-autofill-empty="true" /></label>
-                  <label>LinkedIn <input id="linkedin-url" type="url" data-autofill-empty="true" /></label>
-                  <label>Notes <textarea id="notes" rows="2"></textarea></label>
-                </div>
-                <input id="source-url" type="hidden" />
-                <input id="source-platform-input" type="hidden" />
-                <input id="page-title-input" type="hidden" />
-                <input id="location-input" type="hidden" />
-                <input id="intake-mode-input" type="hidden" value="default" />
-                <input id="target-lead-id-input" type="hidden" />
-                <button id="submit-btn" type="submit">Save to Equipify</button>
-              </form>
-            </div>
-          </details>
-        </section>
-
-        <section id="recent-captures-panel" class="es-ws-card">
-          <div class="panel-label">Recently captured</div>
-          <div id="recent-captures-list" class="recent-list"></div>
-        </section>
-
-        <section class="es-ws-advanced">
-          <details>
-            <summary>Advanced tools</summary>
-            <div class="es-ws-advanced-body">
-              <button type="button" data-copilot-tab-btn="research" class="btn-secondary">Research brief</button>
-              <button type="button" data-copilot-tab-btn="call_prep" class="btn-secondary">Call prep</button>
-              <button type="button" data-copilot-tab-btn="similar" class="btn-secondary">Similar companies</button>
-              <button type="button" data-copilot-tab-btn="committee" class="btn-secondary">Buying committee</button>
-              <button type="button" data-copilot-tab-btn="analytics" class="btn-secondary">Analytics</button>
-
-              <section data-copilot-tab-panel="research" class="copilot-panel" hidden>
-                <button type="button" id="copilot-generate-research-btn" class="btn-primary">Generate research brief</button>
-                <p id="copilot-research-status" class="message" hidden role="status"></p>
-                <div id="copilot-research-content" class="phase2-artifact es-brief-grid" hidden></div>
-              </section>
-              <section data-copilot-tab-panel="call_prep" class="copilot-panel" hidden>
-                <button type="button" id="copilot-generate-call-prep-btn" class="btn-primary">Generate call prep</button>
-                <p id="copilot-call-prep-status" class="message" hidden role="status"></p>
-                <div id="copilot-call-prep-content" class="phase2-artifact" hidden></div>
-              </section>
-              <section data-copilot-tab-panel="similar" class="copilot-panel" hidden>
-                <button type="button" id="copilot-find-similar-btn" class="btn-primary">Find similar companies</button>
-                <p id="copilot-similar-status" class="message" hidden role="status"></p>
-                <div id="copilot-similar-list" class="phase2-similar-list"></div>
-              </section>
-              <section data-copilot-tab-panel="relationship" class="copilot-panel" hidden>
-                <div id="copilot-relationship-content" class="copilot-scroll"></div>
-              </section>
-              <section data-copilot-tab-panel="timeline" class="copilot-panel" hidden>
-                <div id="copilot-timeline-content" class="es-timeline"></div>
-              </section>
-              <section data-copilot-tab-panel="notes" class="copilot-panel" hidden>
-                <textarea id="copilot-notes-input" rows="4" placeholder="Add operator notes…"></textarea>
-                <button type="button" id="copilot-notes-save-btn" class="btn-secondary">Save note</button>
-                <p id="copilot-notes-status" class="message" hidden role="status"></p>
-              </section>
-              <section data-copilot-tab-panel="queue" class="copilot-panel" hidden>
-                <div class="button-row">
-                  <button type="button" id="copilot-add-to-queue-btn" class="btn-secondary">Add current page</button>
-                  <button type="button" id="copilot-process-queue-btn" class="btn-secondary">Process queue</button>
-                </div>
-                <div id="copilot-queue-list" class="phase2-queue-list"></div>
-              </section>
-              <section data-copilot-tab-panel="analytics" class="copilot-panel" hidden>
-                <div class="analytics-period">
-                  <div class="analytics-block"><div class="panel-label">Today</div><div id="analytics-today"></div></div>
-                  <div class="analytics-block"><div class="panel-label">Week</div><div id="analytics-week"></div></div>
-                  <div class="analytics-block"><div class="panel-label">Month</div><div id="analytics-month"></div></div>
-                </div>
-              </section>
-              <section data-copilot-tab-panel="committee" class="copilot-panel" hidden id="copilot-committee-panel">
-                <div class="button-row">
-                  <button type="button" id="copilot-discover-committee-btn" class="btn-secondary">Discover</button>
-                  <button type="button" id="copilot-import-committee-btn" class="btn-primary">Import selected</button>
-                </div>
-                <p id="copilot-committee-status" class="message" hidden role="status"></p>
-                <div id="copilot-committee-list" class="committee-list"></div>
-              </section>
-            </div>
-          </details>
         </section>
 
         <section id="success-panel" class="es-ws-card panel-success" hidden>
