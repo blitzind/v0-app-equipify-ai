@@ -129,6 +129,16 @@
 
           <div id="es-ws-company-tab-overview" class="es-ws-company-panel" data-company-panel="overview">
             <div id="es-ws-company-overview-grid" class="es-ws-company-overview-grid"></div>
+            <div id="es-ws-buying-committee-summary" class="es-ws-buying-committee" hidden>
+              <p class="es-ws-mini-label">Buying Committee</p>
+              <div class="es-ws-committee-counts">
+                <div class="es-ws-committee-count"><span>Decision Makers</span><strong id="es-ws-committee-dm-count">0</strong></div>
+                <div class="es-ws-committee-count"><span>Influencers</span><strong id="es-ws-committee-influencer-count">0</strong></div>
+                <div class="es-ws-committee-count"><span>Champions</span><strong id="es-ws-committee-champion-count">0</strong></div>
+                <div class="es-ws-committee-count"><span>End Users</span><strong id="es-ws-committee-end-user-count">0</strong></div>
+              </div>
+              <button type="button" id="es-ws-find-decision-makers-btn" class="es-ws-inline-btn es-ws-find-decision-makers">Find More Decision Makers</button>
+            </div>
             <div id="es-ws-company-employees-preview" class="es-ws-company-employees-preview" hidden>
               <p class="es-ws-mini-label">Recommended contacts</p>
               <div id="es-ws-employees-preview-list" class="es-ws-employees-list es-ws-employees-list-compact"></div>
@@ -160,6 +170,7 @@
           <div id="es-ws-company-tab-employees" class="es-ws-company-panel" data-company-panel="employees" hidden>
             <div class="es-ws-filter-grid">
               <input id="es-ws-employee-search" type="search" placeholder="Search employees" />
+              <select id="es-ws-employee-buying-role-filter"><option value="">Buying role</option></select>
               <select id="es-ws-employee-department-filter"><option value="">Department</option></select>
               <select id="es-ws-employee-seniority-filter"><option value="">Seniority</option></select>
               <select id="es-ws-employee-crm-filter"><option value="">Source</option></select>
@@ -189,6 +200,7 @@
             <p class="es-ws-discovery-intro">Run account expansion workflows from the current company context.</p>
             <div class="es-ws-discovery-actions">
               <button type="button" id="es-ws-run-discovery-btn" class="es-ws-inline-btn">Discover Employees</button>
+              <button type="button" id="es-ws-find-decision-makers-discovery-btn" class="es-ws-inline-btn">Find More Decision Makers</button>
               <button type="button" id="es-ws-discover-similar-btn" class="es-ws-inline-btn">Discover Similar Companies</button>
             </div>
             <p class="es-ws-discovery-note">Employees populate from the current LinkedIn profile, visible People sections on company pages, and CRM matches. Backend discovery queues contacts when company pages do not expose teammates.</p>
