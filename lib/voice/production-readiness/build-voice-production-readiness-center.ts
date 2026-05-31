@@ -237,10 +237,17 @@ function buildBrowserCallingSection(
     "TWILIO_ACCOUNT_SID",
     "TWILIO_AUTH_TOKEN",
     "TWILIO_TWIML_APP_SID",
+    "TWILIO_API_KEY_SID",
+    "TWILIO_API_KEY_SECRET",
   ])
   const missingCredentials: string[] = []
   if (browser.tokenReadiness === "missing_credentials") {
-    missingCredentials.push("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN")
+    missingCredentials.push(
+      "TWILIO_ACCOUNT_SID",
+      "TWILIO_AUTH_TOKEN",
+      "TWILIO_API_KEY_SID",
+      "TWILIO_API_KEY_SECRET",
+    )
   }
   if (browser.tokenReadiness === "missing_twiml_app") {
     missingCredentials.push("TWILIO_TWIML_APP_SID")
@@ -249,12 +256,13 @@ function buildBrowserCallingSection(
   const optionalApiKeyVars = missingEnv(["TWILIO_API_KEY_SID", "TWILIO_API_KEY_SECRET"])
   const failingHealthChecks = [...browser.warnings]
   if (
-    optionalApiKeyVars.length === 2 &&
+    optionalApiKeyVars.length > 0 &&
     envPresent("TWILIO_ACCOUNT_SID") &&
-    envPresent("TWILIO_AUTH_TOKEN")
+    envPresent("TWILIO_AUTH_TOKEN") &&
+    envPresent("TWILIO_TWIML_APP_SID")
   ) {
     failingHealthChecks.push(
-      "Optional TWILIO_API_KEY_SID and TWILIO_API_KEY_SECRET unset — browser tokens fall back to account SID/auth token.",
+      "TWILIO_API_KEY_SID and TWILIO_API_KEY_SECRET are required for browser Voice SDK tokens. Account SID/auth token signing is invalid (Twilio 31204).",
     )
   }
 
@@ -282,11 +290,11 @@ function buildBrowserCallingSection(
       browser.tokenReadiness === "missing_twiml_app"
         ? "Create a Twilio TwiML App and set TWILIO_TWIML_APP_SID for Voice SDK access tokens."
         : browser.tokenReadiness === "missing_credentials"
-          ? "Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN for browser token minting. For production, prefer TWILIO_API_KEY_SID and TWILIO_API_KEY_SECRET instead of auth token signing."
+          ? "Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_API_KEY_SID, and TWILIO_API_KEY_SECRET for browser token minting. Voice SDK JWTs must be signed with an API Key (SK...), not the account auth token."
           : browser.browserCallingReady
             ? "Operators should grant microphone permission over HTTPS before placing calls."
             : optionalApiKeyVars.length > 0
-              ? "Browser calling can use account credentials; set TWILIO_API_KEY_SID and TWILIO_API_KEY_SECRET for dedicated API key signing."
+              ? "Set TWILIO_API_KEY_SID and TWILIO_API_KEY_SECRET from the same Twilio account as TWILIO_ACCOUNT_SID."
               : "Browser calling is in stub mode — configure Twilio Voice SDK credentials.",
     webhookUrls: [],
     settingsHref: VOICE_PRODUCTION_READINESS_GLOBAL_SETTINGS_HREF,

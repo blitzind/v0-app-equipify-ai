@@ -38,6 +38,8 @@ export type VoiceTelemetryEvent =
   | "voice_deepgram_stream_closed"
   | "voice_deepgram_stream_reconnect"
   | "voice_conversation_intelligence_failed"
+  | "voice_browser_token_issued"
+  | "voice_browser_token_mint_diagnostics"
 
 export function logVoiceInfrastructure(
   event: VoiceTelemetryEvent,

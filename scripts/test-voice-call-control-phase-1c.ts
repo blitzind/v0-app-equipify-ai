@@ -188,4 +188,93 @@ assert.match(recordingRoute, /ingestVoicemailRecordingCallback/)
 assert.match(buildVoiceInboundTwilioUrl("https://app.equipify.ai"), /\/api\/voice\/inbound\/twilio/)
 assert.match(buildVoiceRecordingCallbackUrl("https://app.equipify.ai"), /\/recording/)
 
-console.log("voice-call-control-phase-1c checks passed")
+import {
+  mintTwilioVoiceBrowserAccessToken,
+  normalizeTwilioBrowserAccessTokenInput,
+  readTwilioBrowserTokenEnv,
+} from "../lib/voice/browser-calling/twilio-browser-access-token"
+import {
+  buildVoiceBrowserTokenMintDiagnostics,
+  fingerprintTrimmedApiKeySecret,
+} from "../lib/voice/browser-calling/token-diagnostics"
+import { formatBrowserRegistrationError } from "../lib/voice/browser-calling/format-browser-registration-error"
+
+const providerRegistrySource = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/browser-calling/provider-registry.ts"),
+  "utf8",
+)
+const tokenMintSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/browser-calling/twilio-browser-access-token.ts"),
+  "utf8",
+)
+assert.match(providerRegistrySource, /readTwilioBrowserTokenEnv\(\)/)
+assert.match(providerRegistrySource, /mintTwilioVoiceBrowserAccessToken\(/)
+assert.match(tokenMintSource, /normalized\.apiKeySecret/)
+assert.doesNotMatch(tokenMintSource, /apiKeySecret \|\| authToken/)
+assert.doesNotMatch(providerRegistrySource, /apiKeySecret \|\| authToken/)
+assert.doesNotMatch(providerRegistrySource, /apiKeySid \|\| accountSid/)
+assert.match(tokenMintSource, /apiKeySecret\.trim\(\)/)
+
+const tokenInput = {
+  accountSid: "ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  apiKeySid: "SKbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  apiKeySecret: "browser-api-key-secret-value",
+  twimlAppSid: "APcccccccccccccccccccccccccccccccc",
+  identity: "org_5876176a_user_f24f76d0-c093-4bb0-a982-292548ee9926",
+  ttlSeconds: 3600,
+}
+
+async function runBrowserTokenMintChecks() {
+  const trimmedSecretJwt = await mintTwilioVoiceBrowserAccessToken(tokenInput)
+  const paddedSecretJwt = await mintTwilioVoiceBrowserAccessToken({
+    ...tokenInput,
+    apiKeySecret: "  browser-api-key-secret-value  ",
+  })
+  assert.equal(trimmedSecretJwt, paddedSecretJwt)
+
+  const trimmedEnvFields = normalizeTwilioBrowserAccessTokenInput({
+    ...tokenInput,
+    accountSid: " ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+    apiKeySid: " SKbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb ",
+    apiKeySecret: " browser-api-key-secret-value ",
+    twimlAppSid: " APcccccccccccccccccccccccccccccccc ",
+    identity: " org_5876176a_user_f24f76d0-c093-4bb0-a982-292548ee9926 ",
+  })
+  const trimmedEnvJwt = await mintTwilioVoiceBrowserAccessToken(trimmedEnvFields)
+  assert.equal(trimmedEnvJwt, trimmedSecretJwt)
+
+  const diagnostics = buildVoiceBrowserTokenMintDiagnostics({
+    accountSid: tokenInput.accountSid,
+    apiKeySid: tokenInput.apiKeySid,
+    apiKeySecret: "  browser-api-key-secret-value  ",
+    twimlAppSid: tokenInput.twimlAppSid,
+    identity: tokenInput.identity,
+    jwt: trimmedSecretJwt,
+  })
+  assert.equal(diagnostics.signingCredentialSource, "TWILIO_API_KEY_SECRET")
+  assert.equal(diagnostics.tokenIssuerSid, tokenInput.apiKeySid)
+  assert.equal(diagnostics.tokenSubjectSid, tokenInput.accountSid)
+  assert.equal(diagnostics.voiceGrantOutgoingApplicationSid, tokenInput.twimlAppSid)
+  assert.equal(
+    diagnostics.apiKeySecretFingerprint,
+    fingerprintTrimmedApiKeySecret("browser-api-key-secret-value"),
+  )
+}
+
+const envSnapshot = readTwilioBrowserTokenEnv()
+assert.equal(typeof envSnapshot.accountSid, "string")
+assert.equal(typeof envSnapshot.apiKeySecret, "string")
+
+assert.match(
+  formatBrowserRegistrationError({ code: 31204, message: "JWT is invalid" }),
+  /Twilio error 31204: JWT is invalid/,
+)
+
+runBrowserTokenMintChecks()
+  .then(() => {
+    console.log("voice-call-control-phase-1c checks passed")
+  })
+  .catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })

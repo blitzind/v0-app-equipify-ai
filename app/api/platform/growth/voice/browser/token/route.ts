@@ -37,7 +37,9 @@ export async function POST(request: Request) {
     userId: ctx.userId,
     provider: tokenResult.provider,
     stubMode: tokenResult.stubMode,
+    clientIdentity,
     ttlSeconds: body.ttlSeconds ?? 3600,
+    tokenMessage: tokenResult.message,
   })
 
   return NextResponse.json({

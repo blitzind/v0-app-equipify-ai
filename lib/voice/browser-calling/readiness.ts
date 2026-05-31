@@ -22,7 +22,12 @@ export async function fetchVoiceBrowserCallingReadiness(
   let tokenReadiness: VoiceBrowserCallingReadinessSnapshot["tokenReadiness"] = "stub_only"
   if (tokenProbe.stubMode) {
     if (tokenProbe.message.includes("TWILIO_TWIML_APP_SID")) tokenReadiness = "missing_twiml_app"
-    else if (tokenProbe.message.includes("TWILIO_ACCOUNT_SID")) tokenReadiness = "missing_credentials"
+    else if (
+      tokenProbe.message.includes("TWILIO_API_KEY_SID") ||
+      tokenProbe.message.includes("31204")
+    ) {
+      tokenReadiness = "missing_credentials"
+    } else if (tokenProbe.message.includes("TWILIO_ACCOUNT_SID")) tokenReadiness = "missing_credentials"
     else tokenReadiness = "stub_only"
     warnings.push(tokenProbe.message)
   } else {

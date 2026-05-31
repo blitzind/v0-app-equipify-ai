@@ -1,7 +1,16 @@
 import "server-only"
 
 import type { VoiceBrowserCallingProvider, VoiceBrowserCallingProviderContext } from "@/lib/voice/browser-calling/provider-types"
+import {
+  mintTwilioVoiceBrowserAccessToken,
+  readTwilioBrowserTokenEnv,
+} from "@/lib/voice/browser-calling/twilio-browser-access-token"
+import {
+  buildVoiceBrowserTokenMintDiagnostics,
+  type VoiceBrowserTokenMintDiagnostics,
+} from "@/lib/voice/browser-calling/token-diagnostics"
 import type { VoiceBrowserProviderId } from "@/lib/voice/browser-calling/types"
+import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 
 class StubVoiceBrowserCallingProvider implements VoiceBrowserCallingProvider {
   readonly providerId = "stub" as const
@@ -24,12 +33,35 @@ class StubVoiceBrowserCallingProvider implements VoiceBrowserCallingProvider {
 class TwilioVoiceBrowserCallingProvider implements VoiceBrowserCallingProvider {
   readonly providerId = "twilio" as const
 
+  private logTokenMintDiagnostics(
+    input: VoiceBrowserCallingProviderContext,
+    diagnostics: VoiceBrowserTokenMintDiagnostics,
+    stubMode: boolean,
+  ): void {
+    logVoiceInfrastructure("voice_browser_token_mint_diagnostics", {
+      organizationId: input.organizationId,
+      userId: input.userId,
+      clientIdentity: input.clientIdentity,
+      provider: this.providerId,
+      stubMode,
+      accountSidMask: diagnostics.accountSidMask,
+      apiKeySidMask: diagnostics.apiKeySidMask,
+      twimlAppSidMask: diagnostics.twimlAppSidMask,
+      apiKeySecretFingerprint: diagnostics.apiKeySecretFingerprint,
+      identity: diagnostics.identity,
+      grantTypes: diagnostics.grantTypes,
+      tokenIssuerSid: diagnostics.tokenIssuerSid,
+      tokenSubjectSid: diagnostics.tokenSubjectSid,
+      voiceGrantIncomingAllow: diagnostics.voiceGrantIncomingAllow,
+      voiceGrantOutgoingApplicationSid: diagnostics.voiceGrantOutgoingApplicationSid,
+      signingKeySidPrefixValid: diagnostics.signingKeySidPrefixValid,
+      signingCredentialSource: diagnostics.signingCredentialSource,
+    })
+  }
+
   async createAccessToken(input: VoiceBrowserCallingProviderContext) {
-    const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim()
-    const authToken = process.env.TWILIO_AUTH_TOKEN?.trim()
-    const apiKeySid = process.env.TWILIO_API_KEY_SID?.trim()
-    const apiKeySecret = process.env.TWILIO_API_KEY_SECRET?.trim()
-    const twimlAppSid = process.env.TWILIO_TWIML_APP_SID?.trim()
+    const env = readTwilioBrowserTokenEnv()
+    const { accountSid, authToken, apiKeySid, apiKeySecret, twimlAppSid } = env
 
     if (!accountSid || !authToken) {
       return {
@@ -51,33 +83,83 @@ class TwilioVoiceBrowserCallingProvider implements VoiceBrowserCallingProvider {
       }
     }
 
-    try {
-      const twilio = await import("twilio")
-      const AccessToken = twilio.jwt.AccessToken
-      const VoiceGrant = AccessToken.VoiceGrant
-
-      const token = new AccessToken(
+    if (!apiKeySid || !apiKeySecret) {
+      const diagnostics = buildVoiceBrowserTokenMintDiagnostics({
         accountSid,
-        apiKeySid || accountSid,
-        apiKeySecret || authToken,
-        { identity: input.clientIdentity, ttl: 3600 },
-      )
-
-      const voiceGrant = new VoiceGrant({
-        outgoingApplicationSid: twimlAppSid,
-        incomingAllow: true,
+        apiKeySid,
+        apiKeySecret,
+        twimlAppSid,
+        identity: input.clientIdentity,
+        jwt: null,
       })
-      token.addGrant(voiceGrant)
+      this.logTokenMintDiagnostics(input, diagnostics, true)
+      return {
+        provider: this.providerId,
+        token: null,
+        expiresAt: null,
+        stubMode: true,
+        message:
+          "Set TWILIO_API_KEY_SID and TWILIO_API_KEY_SECRET for browser Voice SDK tokens. Account SID and auth token cannot sign valid access tokens (Twilio error 31204).",
+      }
+    }
+
+    if (!apiKeySid.startsWith("SK")) {
+      const diagnostics = buildVoiceBrowserTokenMintDiagnostics({
+        accountSid,
+        apiKeySid,
+        apiKeySecret,
+        twimlAppSid,
+        identity: input.clientIdentity,
+        jwt: null,
+      })
+      this.logTokenMintDiagnostics(input, diagnostics, true)
+      return {
+        provider: this.providerId,
+        token: null,
+        expiresAt: null,
+        stubMode: true,
+        message:
+          "TWILIO_API_KEY_SID must be an API Key SID (SK...) for browser Voice SDK tokens. Using Account SID as issuer causes Twilio error 31204 (JWT is invalid).",
+      }
+    }
+
+    try {
+      const jwt = await mintTwilioVoiceBrowserAccessToken({
+        accountSid,
+        apiKeySid,
+        apiKeySecret,
+        twimlAppSid,
+        identity: input.clientIdentity,
+        ttlSeconds: 3600,
+      })
+      const diagnostics = buildVoiceBrowserTokenMintDiagnostics({
+        accountSid,
+        apiKeySid,
+        apiKeySecret,
+        twimlAppSid,
+        identity: input.clientIdentity,
+        jwt,
+      })
+      this.logTokenMintDiagnostics(input, diagnostics, false)
 
       const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString()
       return {
         provider: this.providerId,
-        token: token.toJwt(),
+        token: jwt,
         expiresAt,
         stubMode: false,
         message: "Twilio Voice SDK access token issued.",
       }
     } catch (error) {
+      const diagnostics = buildVoiceBrowserTokenMintDiagnostics({
+        accountSid,
+        apiKeySid,
+        apiKeySecret,
+        twimlAppSid,
+        identity: input.clientIdentity,
+        jwt: null,
+      })
+      this.logTokenMintDiagnostics(input, diagnostics, true)
       return {
         provider: this.providerId,
         token: null,

@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { formatBrowserRegistrationError } from "@/lib/voice/browser-calling/format-browser-registration-error"
 import type { VoiceBrowserSyncSnapshot } from "@/lib/voice/browser-calling/types"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
 
@@ -108,7 +109,24 @@ export function useVoiceBrowserCalling(input?: {
           logLevel: 1,
           codecPreferences: ["opus", "pcmu"],
         })
-        await device.register()
+
+        let registrationError: unknown = null
+        const captureRegistrationError = (error: unknown) => {
+          registrationError = error
+        }
+        device.on("error", captureRegistrationError)
+        device.on("tokenWillExpire", () => undefined)
+
+        try {
+          await device.register()
+        } catch (registerError) {
+          captureRegistrationError(registerError)
+          device.destroy()
+          throw new Error(formatBrowserRegistrationError(registrationError ?? registerError))
+        } finally {
+          device.removeListener("error", captureRegistrationError)
+        }
+
         deviceRef.current = device
       }
 
@@ -116,7 +134,7 @@ export function useVoiceBrowserCalling(input?: {
       await sync()
     } catch (e) {
       setRegistrationState("error")
-      setError(e instanceof Error ? e.message : "Browser calling registration failed.")
+      setError(formatBrowserRegistrationError(e))
     }
   }, [disconnectDevice, enabled, sync])
 
