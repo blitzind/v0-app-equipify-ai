@@ -294,7 +294,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.25"/)
+assert.match(manifestSource, /"version": "4.3.26"/)
 assert.match(manifestSource, /https:\/\/m\.linkedin\.com\/in\/\*/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
@@ -326,7 +326,7 @@ assert.match(extensionBrandJs, /PANEL_LOGO_ASSET/)
 assert.match(extensionBrandJs, /panelLogoUrl/)
 assert.match(extensionBrandJs, /applyPanelLogo/)
 assert.match(extensionBrandJs, /PANEL_LOGO_VERSION/)
-assert.match(extensionBrandJs, /4\.3\.25/)
+assert.match(extensionBrandJs, /4\.3\.26/)
 assert.match(extensionBrandJs, /\?v=\$\{encodeURIComponent\(PANEL_LOGO_VERSION\)\}/)
 assert.match(extensionBrandJs, /\[Equipify Sales:logo-audit\]/)
 assert.match(extensionBrandJs, /PANEL_LOGO_INTRINSIC_WIDTH/)
@@ -1126,6 +1126,7 @@ const RICARDO_MODERN_DESKTOP_FIXTURE = `<!DOCTYPE html><html><body>
         </div>
         <div class="info-col">
           <h1>Ricardo Sanchez Villanueva</h1>
+          <div class="relationship-badge">Ricardo Sanchez Villanueva · 3rd</div>
           <div>Biomedical Equipment TechnicianSHARP MEMORIAL HOSPITAL</div>
           <span>San Diego, California, United States</span>
           <div class="entity-line">
@@ -1171,6 +1172,7 @@ const RICARDO_LIVE_DOM_FIXTURE = `<!DOCTYPE html><html><head><title>Ricardo Sanc
       <img class="profile-background-image" src="https://media.licdn.com/ricardo-cover.jpg" width="720" height="200" alt="" />
       <div class="info-col">
         <div class="profile-name">Ricardo Sanchez Villanueva</div>
+        <div class="relationship-badge">Ricardo Sanchez Villanueva · 3rd</div>
         <div class="headline-line">Biomedical Equipment Technician</div>
         <span class="company-plain-text">SHARP MEMORIAL HOSPITAL</span>
         <span>San Diego, California, United States</span>
@@ -1196,6 +1198,7 @@ type PageMetadataHarness = {
   heroScoringAudit: Record<string, unknown> | null | undefined
   heroCompanySignalsAudit: Record<string, unknown> | null | undefined
   headlineExtractionAudit: Record<string, unknown> | null | undefined
+  headlineCandidatesAudit: Record<string, unknown> | null | undefined
   domAudit: Record<string, unknown> | null | undefined
   findProfileTopCard: (doc: Document) => Element | null
   findExperienceSection: (doc: Document) => Element | null
@@ -1218,6 +1221,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
   const heroCompanyCandidatesLogs: Record<string, unknown>[] = []
   const companyFinalSelectionLogs: Record<string, unknown>[] = []
   const headlineExtractionLogs: Record<string, unknown>[] = []
+  const headlineCandidatesLogs: Record<string, unknown>[] = []
   const domAuditLogs: Record<string, unknown>[] = []
   const pageMetadataPath = path.join(process.cwd(), "extensions/growth-browser-intake/page-metadata.js")
   const pageMetadataSource = fs.readFileSync(pageMetadataPath, "utf8")
@@ -1250,6 +1254,9 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
         if (label === "[Equipify Sales:headline-extraction]") {
           headlineExtractionLogs.push(args[1] as Record<string, unknown>)
         }
+        if (label === "[Equipify Sales:headline-candidates]") {
+          headlineCandidatesLogs.push(args[1] as Record<string, unknown>)
+        }
         if (label === "[Equipify Sales:hero-scoring]") heroScoringLogs.push(args[1] as Record<string, unknown>)
         if (label === "[Equipify Sales:dom-audit]") domAuditLogs.push(args[1] as Record<string, unknown>)
       },
@@ -1257,7 +1264,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ version: "4.3.25" }),
+        getManifest: () => ({ version: "4.3.26" }),
       },
     },
     setTimeout: () => 0,
@@ -1303,6 +1310,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     heroCompanyCandidatesAudit: heroCompanyCandidatesLogs.at(-1) ?? null,
     companyFinalSelectionAudit: companyFinalSelectionLogs.at(-1) ?? null,
     headlineExtractionAudit: headlineExtractionLogs.at(-1) ?? null,
+    headlineCandidatesAudit: headlineCandidatesLogs.at(-1) ?? null,
     domAudit: domAuditLogs[0] ?? null,
     findProfileTopCard: (doc) => win.__equipifyGrowthFindProfileTopCard?.(doc) ?? null,
     findExperienceSection: (doc) => win.__equipifyGrowthFindExperienceSection?.(doc) ?? null,
@@ -1367,6 +1375,14 @@ assert.ok(
 )
 assert.equal(ricardoModernHarness.headlineExtractionAudit?.cleaned_headline, "Biomedical Equipment Technician")
 assert.equal(ricardoModernHarness.headlineExtractionAudit?.raw_headline, "Biomedical Equipment TechnicianSHARP MEMORIAL HOSPITAL")
+assert.equal(ricardoModernHarness.headlineCandidatesAudit?.selected_headline, "Biomedical Equipment TechnicianSHARP MEMORIAL HOSPITAL")
+assert.ok(
+  (ricardoModernHarness.headlineCandidatesAudit?.rejected as Array<{ text?: string; reject_reason?: string }> | undefined)?.some(
+    (entry) =>
+      entry.text === "Ricardo Sanchez Villanueva · 3rd" && entry.reject_reason === "relationship-badge",
+  ),
+)
+assert.doesNotMatch(String(ricardoModernHarness.headlineCandidatesAudit?.selected_headline ?? ""), /3rd/i)
 
 const RICARDO_SPACED_HEADLINE_FIXTURE = RICARDO_MODERN_DESKTOP_FIXTURE.replace(
   "Biomedical Equipment TechnicianSHARP MEMORIAL HOSPITAL",
@@ -1466,6 +1482,9 @@ assert.match(pageMetadataJs, /\[Equipify Sales:hero-company-candidates\]/)
 assert.match(pageMetadataJs, /\[Equipify Sales:company-final-selection\]/)
 assert.match(pageMetadataJs, /sanitizeHeadlineAfterCompanySelection/)
 assert.match(pageMetadataJs, /\[Equipify Sales:headline-extraction]/)
+assert.match(pageMetadataJs, /isValidHeadlineCandidate/)
+assert.match(pageMetadataJs, /\[Equipify Sales:headline-candidates]/)
+assert.match(pageMetadataJs, /resolveProfileHeadlineSelection/)
 assert.match(pageMetadataJs, /assessCompanyCandidateText/)
 assert.match(pageMetadataJs, /isCleanEmployerCompanyCandidate/)
 assert.match(pageMetadataJs, /reject_reason/)

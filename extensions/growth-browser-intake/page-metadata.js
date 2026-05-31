@@ -255,12 +255,12 @@ function findProfileNameNode(doc) {
   return inMain?.el ?? candidates[0]?.el ?? null
 }
 
-function findHeadlineNearName(nameNode) {
+function findHeadlineNearName(nameNode, personName) {
   if (!nameNode) return null
   let sibling = nameNode.nextElementSibling
   for (let depth = 0; depth < 6 && sibling; depth += 1) {
     const text = normalizeVisibleText(sibling.textContent)
-    if (text && text.length >= 8 && text.length <= 400) return sibling
+    if (text && isValidHeadlineCandidate(text, personName)) return sibling
     sibling = sibling.nextElementSibling
   }
 
@@ -270,8 +270,8 @@ function findHeadlineNearName(nameNode) {
     if (el === nameNode || el.contains(nameNode)) continue
     if (isInsideForbiddenProfileRegion(el)) continue
     const text = normalizeVisibleText(el.textContent)
-    if (!text || text.length < 8 || text.length > 400) continue
-    if (/contact info|message|follow|connect/i.test(text)) continue
+    if (!text || text.length > 400) continue
+    if (!isValidHeadlineCandidate(text, personName)) continue
     return el
   }
   return null
@@ -506,46 +506,8 @@ function findPersonNameInContainer(container, expectedName) {
 }
 
 function findHeadlineTextInHeroContainer(container, personName, nameNode) {
-  if (!container) return null
-
-  const fromSelectors = normalizeVisibleText(
-    queryTextInContainer(container, [
-      "div.text-body-medium.break-words",
-      ".pv-text-details__left-panel .text-body-medium",
-      ".ph5.pb5 .text-body-medium",
-      ".text-body-medium:not(.t-black--light)",
-      ".top-card-layout__headline",
-      "[data-view-name='profile-header'] .text-body-medium",
-    ]),
-  )
-  if (fromSelectors) return sanitizeHeadlineBindingText(fromSelectors)
-
-  if (nameNode) {
-    const near = findHeadlineNearName(nameNode)
-    if (near) {
-      const nearText = sanitizeHeadlineBindingText(near.textContent)
-      if (nearText) return nearText
-    }
-  }
-
-  for (const el of container.querySelectorAll("div, span, p")) {
-    if (!isBindingNodeVisible(el)) continue
-    const text = normalizeVisibleText(el.textContent)
-    if (!text || text.length < 8 || text.length > 400) continue
-    if (personName && normalizeComparisonName(text) === normalizeComparisonName(personName)) continue
-    if (/contact info|message|follow|connect|\d+\+?\s+connections/i.test(text)) continue
-    if (/,/.test(text) && /United States|Canada|Metropolitan|Area/i.test(text)) continue
-    if (
-      /\b(technician|engineer|manager|director|specialist|coordinator|analyst|developer|consultant|representative|supervisor|operator|administrator)\b/i.test(
-        text,
-      ) ||
-      /\bat\s+[A-Z]/i.test(text)
-    ) {
-      return sanitizeHeadlineBindingText(text)
-    }
-  }
-
-  return null
+  const resolved = resolveProfileHeadlineSelection(container, personName, nameNode, { logAudit: false })
+  return sanitizeHeadlineBindingText(resolved.headline, personName)
 }
 
 function findLocationTextInHeroContainer(container, personName) {
@@ -580,6 +542,250 @@ function logCompanyFinalSelection(payload) {
 
 function logHeadlineExtraction(payload) {
   console.log("[Equipify Sales:headline-extraction]", payload)
+}
+
+function logHeadlineCandidates(payload) {
+  console.log("[Equipify Sales:headline-candidates]", payload)
+}
+
+const MIN_HEADLINE_CANDIDATE_LENGTH = 8
+
+const HEADLINE_ROLE_WORDS_RE =
+  /\b(technician|manager|director|engineer|specialist|consultant|coordinator|supervisor|analyst|executive|owner|founder|president|developer|representative|operator|administrator|biomedical|equipment|technologist|nurse|physician|assistant|lead|head|chief|partner|principal|architect|designer|strategist|associate|intern|student|retired|freelance|vp|svp|evp)\b/i
+
+const HEADLINE_SEPARATOR_RE = /[|·•/*]/
+
+const CONNECTION_DEGREE_RE = /\b(1st|2nd|3rd\+?|\d+(?:st|nd|rd|th)\+?)\b/i
+
+const HEADLINE_RELATIONSHIP_ONLY_RE = /^(1st|2nd|3rd\+?|\d+(?:st|nd|rd|th)\+?)$/i
+
+const HEADLINE_NAME_DEGREE_RE = /^.+\s*[·•]\s*(1st|2nd|3rd\+?|\d+(?:st|nd|rd|th)\+?)$/i
+
+function isRelationshipBadgeHeadline(text) {
+  const normalized = normalizeVisibleText(text)
+  if (!normalized) return false
+  if (HEADLINE_RELATIONSHIP_ONLY_RE.test(normalized)) return true
+  if (HEADLINE_NAME_DEGREE_RE.test(normalized)) return true
+  if (/[·•]/.test(normalized) && CONNECTION_DEGREE_RE.test(normalized) && !HEADLINE_ROLE_WORDS_RE.test(normalized)) {
+    return true
+  }
+  if (CONNECTION_DEGREE_RE.test(normalized) && !HEADLINE_ROLE_WORDS_RE.test(normalized) && !/\bat\s+[A-Z]/i.test(normalized)) {
+    const withoutDegree = normalized.replace(CONNECTION_DEGREE_RE, "").replace(/[·•|/*]/g, " ").trim()
+    if (!withoutDegree || withoutDegree.split(/\s+/).length <= 4) return true
+  }
+  return false
+}
+
+function getHeadlineCandidateRejectReason(text, personName, options = {}) {
+  const normalized = normalizeVisibleText(text)
+  if (!normalized) return "empty"
+  const minLength = options.minLength ?? MIN_HEADLINE_CANDIDATE_LENGTH
+
+  if (personName && normalizeComparisonName(normalized) === normalizeComparisonName(personName)) {
+    return "matches-person-name"
+  }
+  if (isRelationshipBadgeHeadline(normalized)) return "relationship-badge"
+  if (HEADLINE_RELATIONSHIP_ONLY_RE.test(normalized)) return "relationship-only"
+  if (/^(\d+(st|nd|rd|th)\+?)$/i.test(normalized.replace(/\s+/g, ""))) return "connection-degree-only"
+  if (/\d[\d,]*\+?\s+(connections|followers)/i.test(normalized)) return "follower-count"
+  if (/\bmutual connection/i.test(normalized)) return "mutual-connection"
+  if (/\bverified\b/i.test(normalized) && !HEADLINE_ROLE_WORDS_RE.test(normalized)) return "verification-badge"
+  if (/^\s*[^·•|/*]+\s*[·•|/*]\s*Present\s*$/i.test(normalized)) return "employment-present-line"
+  if (/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\s*[-–—]\s*Present\b/i.test(normalized)) {
+    return "employment-date-range"
+  }
+  if (isHeroContaminatedHeadlineText(normalized)) return "hero-contaminated"
+  if (looksLikeLocationCompanyText(normalized)) return "location-text"
+  if (isHeroUiContaminatedText(normalized)) return "ui-contaminated"
+  if (normalized.length > 120) return "too-long"
+
+  const hasRoleWord = HEADLINE_ROLE_WORDS_RE.test(normalized)
+  const hasSeparator = HEADLINE_SEPARATOR_RE.test(normalized)
+  const hasAtCompany = /\bat\s+[A-Z]/i.test(normalized)
+
+  if (!hasRoleWord && !hasSeparator && !hasAtCompany) {
+    if (normalized.length < minLength) return "too-short-no-signals"
+    return "missing-occupational-signals"
+  }
+  if (normalized.length < minLength && !hasRoleWord && !hasAtCompany) return "too-short"
+  return null
+}
+
+function isValidHeadlineCandidate(text, personName, options = {}) {
+  return getHeadlineCandidateRejectReason(text, personName, options) === null
+}
+
+function scoreHeadlineCandidate(candidate, personName, nameNode) {
+  const text = normalizeVisibleText(candidate.text)
+  if (!text) return -100
+
+  let score = 0
+  if (HEADLINE_ROLE_WORDS_RE.test(text)) score += 12
+  if (HEADLINE_SEPARATOR_RE.test(text)) score += 4
+  if (/\bat\s+[A-Z]/i.test(text)) score += 6
+
+  if (candidate.source === "hero.selector.text-body-medium") score += 8
+  if (candidate.source === "hero.selector.headline-line") score += 14
+  if (candidate.source === "hero.near-name.sibling") score += 10
+  if (candidate.source === "hero.near-name.parent-scan") score += 5
+  if (candidate.source === "hero.container.role-scan") score += 4
+
+  if (nameNode && candidate.element) {
+    if (candidate.element === nameNode.nextElementSibling) score += 15
+    let sibling = nameNode.nextElementSibling
+    for (let distance = 0; distance < 4 && sibling; distance += 1) {
+      if (sibling === candidate.element || sibling.contains(candidate.element)) {
+        score += Math.max(0, 12 - distance * 3)
+        break
+      }
+      sibling = sibling.nextElementSibling
+    }
+  }
+
+  if (isRelationshipBadgeHeadline(text)) score -= 50
+  if (personName && normalizeComparisonName(text) === normalizeComparisonName(personName)) score -= 50
+
+  return score
+}
+
+function pushHeadlineCandidate(bucket, seen, input) {
+  const text = normalizeVisibleText(input.text)
+  if (!text) return
+  if (input.element?.closest?.('[data-view-name="profile-card-experience"], #experience')) return
+  const key = `${input.source}|${text.toLowerCase()}`
+  if (seen.has(key)) return
+  seen.add(key)
+  bucket.push({
+    text,
+    source: input.source,
+    element: input.element ?? null,
+  })
+}
+
+function collectHeadlineCandidates(container, personName, nameNode) {
+  const candidates = []
+  const seen = new Set()
+  if (!container) return candidates
+
+  const selectorText = normalizeVisibleText(
+    queryTextInContainer(container, [
+      "div.text-body-medium.break-words",
+      ".pv-text-details__left-panel .text-body-medium",
+      ".ph5.pb5 .text-body-medium",
+      ".text-body-medium:not(.t-black--light)",
+      ".top-card-layout__headline",
+      "[data-view-name='profile-header'] .text-body-medium",
+      ".headline-line",
+    ]),
+  )
+  if (selectorText) {
+    pushHeadlineCandidate(candidates, seen, {
+      text: selectorText,
+      source: "hero.selector.text-body-medium",
+      element: null,
+    })
+  }
+
+  for (const el of container.querySelectorAll(".headline-line, [class*='headline-line']")) {
+    pushHeadlineCandidate(candidates, seen, {
+      text: el.textContent,
+      source: "hero.selector.headline-line",
+      element: el,
+    })
+  }
+
+  if (nameNode) {
+    let sibling = nameNode.nextElementSibling
+    for (let depth = 0; depth < 6 && sibling; depth += 1) {
+      pushHeadlineCandidate(candidates, seen, {
+        text: sibling.textContent,
+        source: "hero.near-name.sibling",
+        element: sibling,
+      })
+      sibling = sibling.nextElementSibling
+    }
+
+    const parent = nameNode.parentElement
+    if (parent) {
+      for (const el of parent.querySelectorAll("div, span, p")) {
+        if (el === nameNode || el.contains(nameNode)) continue
+        if (isInsideForbiddenProfileRegion(el)) continue
+        pushHeadlineCandidate(candidates, seen, {
+          text: el.textContent,
+          source: "hero.near-name.parent-scan",
+          element: el,
+        })
+      }
+    }
+  }
+
+  for (const el of container.querySelectorAll("div, span, p")) {
+    if (!isBindingNodeVisible(el)) continue
+    if (el.closest('[data-view-name="profile-card-experience"], #experience')) continue
+    const text = normalizeVisibleText(el.textContent)
+    if (!text || text.length < 8 || text.length > 400) continue
+    if (/,/.test(text) && /United States|Canada|Metropolitan|Area/i.test(text)) continue
+    if (
+      HEADLINE_ROLE_WORDS_RE.test(text) ||
+      /\bat\s+[A-Z]/i.test(text) ||
+      (HEADLINE_SEPARATOR_RE.test(text) && text.length <= 120)
+    ) {
+      pushHeadlineCandidate(candidates, seen, {
+        text,
+        source: "hero.container.role-scan",
+        element: el,
+      })
+    }
+  }
+
+  return candidates
+}
+
+function resolveProfileHeadlineSelection(container, personName, nameNode, options = {}) {
+  const rawCandidates = collectHeadlineCandidates(container, personName, nameNode)
+  const rejected = []
+  const validCandidates = []
+
+  for (const candidate of rawCandidates) {
+    const rejectReason = getHeadlineCandidateRejectReason(candidate.text, personName, options)
+    if (rejectReason) {
+      rejected.push({
+        text: candidate.text,
+        source: candidate.source,
+        reject_reason: rejectReason,
+      })
+      continue
+    }
+    validCandidates.push({
+      ...candidate,
+      score: scoreHeadlineCandidate(candidate, personName, nameNode),
+    })
+  }
+
+  validCandidates.sort((a, b) => b.score - a.score)
+  const selected = validCandidates[0] ?? null
+
+  const audit = {
+    candidates: rawCandidates.map((candidate) => ({
+      text: candidate.text,
+      source: candidate.source,
+      valid: !getHeadlineCandidateRejectReason(candidate.text, personName, options),
+      score: scoreHeadlineCandidate(candidate, personName, nameNode),
+      reject_reason: getHeadlineCandidateRejectReason(candidate.text, personName, options),
+    })),
+    selected_headline: selected?.text ?? null,
+    selected_source: selected?.source ?? null,
+    rejected,
+  }
+  if (options.logAudit !== false) {
+    logHeadlineCandidates(audit)
+  }
+
+  return {
+    headline: selected?.text ?? null,
+    source: selected?.source ?? null,
+    audit,
+  }
 }
 
 const HERO_UI_ACTION_PHRASES = [
@@ -662,9 +868,10 @@ function isCleanEmployerCompanyCandidate(text, options = {}) {
   return !assessment.rejected && assessment.classification === "employer"
 }
 
-function sanitizeHeadlineBindingText(text) {
+function sanitizeHeadlineBindingText(text, personName) {
   const normalized = normalizeVisibleText(text)
   if (!normalized) return null
+  if (personName && !isValidHeadlineCandidate(normalized, personName)) return null
   if (isHeroContaminatedHeadlineText(normalized)) return null
   if (looksLikeLocationCompanyText(normalized)) return null
   if (isHeroUiContaminatedText(normalized)) return null
@@ -1215,7 +1422,7 @@ function discoverProfileHeroByScoring(doc) {
     topCard: best.container,
     nameNode: best.nameNode,
     heroContainer: best.container,
-    headlineText: sanitizeHeadlineBindingText(best.headlineText),
+    headlineText: sanitizeHeadlineBindingText(best.headlineText, best.contactName ?? expectedName),
     contactName: best.contactName ?? expectedName,
     source: "hero-scoring",
     scoring_audit: audit,
@@ -1285,7 +1492,7 @@ function collectHeadlineTextSources(topCard, nameNode) {
         "[data-view-name='profile-header'] .text-body-medium",
       ]),
     ),
-    near_name_node: normalizeVisibleText(trimOrNull(findHeadlineNearName(nameNode)?.textContent)),
+    near_name_node: normalizeVisibleText(trimOrNull(findHeadlineNearName(nameNode, null)?.textContent)),
     top_card_text_preview: trimOrNull(topCard?.textContent)?.replace(/\s+/g, " ").slice(0, 400) ?? null,
   }
 }
@@ -3321,8 +3528,10 @@ function extractLinkedInProfile(doc) {
     ) ??
     inferLinkedInProfileNameFromTitle(doc.title)
 
+  const headlineSelection = resolveProfileHeadlineSelection(topCard, contact_name, nameNode)
   const headline = sanitizeHeadlineBindingText(
-    binding.headlineText ??
+    headlineSelection.headline ??
+      binding.headlineText ??
       queryTextInContainer(topCard, [
         "div.text-body-medium.break-words",
         ".pv-text-details__left-panel .text-body-medium",
@@ -3330,8 +3539,10 @@ function extractLinkedInProfile(doc) {
         ".text-body-medium:not(.t-black--light)",
         ".top-card-layout__headline",
         "[data-view-name='profile-header'] .text-body-medium",
+        ".headline-line",
       ]) ??
-      trimOrNull(findHeadlineNearName(nameNode)?.textContent),
+      trimOrNull(findHeadlineNearName(nameNode, contact_name)?.textContent),
+    contact_name,
   )
 
   logCompanyCandidatesDiagnostic(
@@ -4033,6 +4244,8 @@ if (typeof window !== "undefined") {
   window.__equipifyGrowthDescribeElement = describeElementForAudit
   window.__equipifyGrowthResolveProfileTitleExtraction = resolveProfileTitleExtraction
   window.__equipifyGrowthSanitizeHeadlineAfterCompanySelection = sanitizeHeadlineAfterCompanySelection
+  window.__equipifyGrowthIsValidHeadlineCandidate = isValidHeadlineCandidate
+  window.__equipifyGrowthResolveProfileHeadlineSelection = resolveProfileHeadlineSelection
   window.__equipifyGrowthAuditHydrationState = () => auditLinkedInHydrationState(document)
   emitStartupDiagnostic()
 }
