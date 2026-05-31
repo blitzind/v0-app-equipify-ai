@@ -294,7 +294,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.24"/)
+assert.match(manifestSource, /"version": "4.3.25"/)
 assert.match(manifestSource, /https:\/\/m\.linkedin\.com\/in\/\*/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
@@ -326,7 +326,7 @@ assert.match(extensionBrandJs, /PANEL_LOGO_ASSET/)
 assert.match(extensionBrandJs, /panelLogoUrl/)
 assert.match(extensionBrandJs, /applyPanelLogo/)
 assert.match(extensionBrandJs, /PANEL_LOGO_VERSION/)
-assert.match(extensionBrandJs, /4\.3\.24/)
+assert.match(extensionBrandJs, /4\.3\.25/)
 assert.match(extensionBrandJs, /\?v=\$\{encodeURIComponent\(PANEL_LOGO_VERSION\)\}/)
 assert.match(extensionBrandJs, /\[Equipify Sales:logo-audit\]/)
 assert.match(extensionBrandJs, /PANEL_LOGO_INTRINSIC_WIDTH/)
@@ -1195,6 +1195,7 @@ type PageMetadataHarness = {
   companyRankingAudit: Record<string, unknown> | null | undefined
   heroScoringAudit: Record<string, unknown> | null | undefined
   heroCompanySignalsAudit: Record<string, unknown> | null | undefined
+  headlineExtractionAudit: Record<string, unknown> | null | undefined
   domAudit: Record<string, unknown> | null | undefined
   findProfileTopCard: (doc: Document) => Element | null
   findExperienceSection: (doc: Document) => Element | null
@@ -1216,6 +1217,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
   const heroCompanySignalsLogs: Record<string, unknown>[] = []
   const heroCompanyCandidatesLogs: Record<string, unknown>[] = []
   const companyFinalSelectionLogs: Record<string, unknown>[] = []
+  const headlineExtractionLogs: Record<string, unknown>[] = []
   const domAuditLogs: Record<string, unknown>[] = []
   const pageMetadataPath = path.join(process.cwd(), "extensions/growth-browser-intake/page-metadata.js")
   const pageMetadataSource = fs.readFileSync(pageMetadataPath, "utf8")
@@ -1245,6 +1247,9 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
         if (label === "[Equipify Sales:company-final-selection]") {
           companyFinalSelectionLogs.push(args[1] as Record<string, unknown>)
         }
+        if (label === "[Equipify Sales:headline-extraction]") {
+          headlineExtractionLogs.push(args[1] as Record<string, unknown>)
+        }
         if (label === "[Equipify Sales:hero-scoring]") heroScoringLogs.push(args[1] as Record<string, unknown>)
         if (label === "[Equipify Sales:dom-audit]") domAuditLogs.push(args[1] as Record<string, unknown>)
       },
@@ -1252,7 +1257,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ version: "4.3.24" }),
+        getManifest: () => ({ version: "4.3.25" }),
       },
     },
     setTimeout: () => 0,
@@ -1297,6 +1302,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     heroCompanySignalsAudit: heroCompanySignalsLogs.at(-1) ?? null,
     heroCompanyCandidatesAudit: heroCompanyCandidatesLogs.at(-1) ?? null,
     companyFinalSelectionAudit: companyFinalSelectionLogs.at(-1) ?? null,
+    headlineExtractionAudit: headlineExtractionLogs.at(-1) ?? null,
     domAudit: domAuditLogs[0] ?? null,
     findProfileTopCard: (doc) => win.__equipifyGrowthFindProfileTopCard?.(doc) ?? null,
     findExperienceSection: (doc) => win.__equipifyGrowthFindExperienceSection?.(doc) ?? null,
@@ -1350,6 +1356,35 @@ assert.notEqual(
   "https://media.licdn.com/ricardo-cover.jpg",
 )
 assert.equal(ricardoModernHarness.metadata?.profile_photo_url, "https://media.licdn.com/ricardo-headshot.jpg")
+assert.equal(ricardoModernHarness.metadata?.headline, "Biomedical Equipment Technician")
+assert.equal(ricardoModernHarness.metadata?.title, "Biomedical Equipment Technician")
+assert.equal(ricardoModernHarness.metadata?.company_name, "SHARP MEMORIAL HOSPITAL")
+assert.doesNotMatch(String(ricardoModernHarness.metadata?.headline ?? ""), /SHARP MEMORIAL HOSPITAL/i)
+assert.ok(
+  (ricardoModernHarness.headlineExtractionAudit?.removed_company_tokens as string[] | undefined)?.includes(
+    "SHARP MEMORIAL HOSPITAL",
+  ),
+)
+assert.equal(ricardoModernHarness.headlineExtractionAudit?.cleaned_headline, "Biomedical Equipment Technician")
+assert.equal(ricardoModernHarness.headlineExtractionAudit?.raw_headline, "Biomedical Equipment TechnicianSHARP MEMORIAL HOSPITAL")
+
+const RICARDO_SPACED_HEADLINE_FIXTURE = RICARDO_MODERN_DESKTOP_FIXTURE.replace(
+  "Biomedical Equipment TechnicianSHARP MEMORIAL HOSPITAL",
+  "Biomedical Equipment Technician SHARP MEMORIAL HOSPITAL",
+)
+const ricardoSpacedHarness = runPageMetadataHarness(RICARDO_SPACED_HEADLINE_FIXTURE, ricardoModernUrl)
+assert.equal(ricardoSpacedHarness.metadata?.headline, "Biomedical Equipment Technician")
+assert.doesNotMatch(String(ricardoSpacedHarness.metadata?.headline ?? ""), /SHARP MEMORIAL HOSPITAL/i)
+
+const RICARDO_CERT_HEADLINE_FIXTURE = RICARDO_MODERN_DESKTOP_FIXTURE.replace(
+  "Biomedical Equipment TechnicianSHARP MEMORIAL HOSPITAL",
+  "Biomedical Equipment Technician | AAMI CBET · SHARP MEMORIAL HOSPITAL",
+)
+const ricardoCertHarness = runPageMetadataHarness(RICARDO_CERT_HEADLINE_FIXTURE, ricardoModernUrl)
+assert.equal(ricardoCertHarness.metadata?.headline, "Biomedical Equipment Technician | AAMI CBET")
+assert.match(String(ricardoCertHarness.metadata?.headline ?? ""), /AAMI CBET/)
+assert.doesNotMatch(String(ricardoCertHarness.metadata?.headline ?? ""), /SHARP MEMORIAL HOSPITAL/i)
+
 assert.ok(Array.isArray(ricardoModernHarness.domAudit?.h1s))
 assert.ok(Array.isArray(ricardoModernHarness.domAudit?.profile_images))
 assert.ok(Array.isArray(ricardoModernHarness.domAudit?.company_candidates_raw))
@@ -1429,6 +1464,8 @@ assert.ok(
 
 assert.match(pageMetadataJs, /\[Equipify Sales:hero-company-candidates\]/)
 assert.match(pageMetadataJs, /\[Equipify Sales:company-final-selection\]/)
+assert.match(pageMetadataJs, /sanitizeHeadlineAfterCompanySelection/)
+assert.match(pageMetadataJs, /\[Equipify Sales:headline-extraction]/)
 assert.match(pageMetadataJs, /assessCompanyCandidateText/)
 assert.match(pageMetadataJs, /isCleanEmployerCompanyCandidate/)
 assert.match(pageMetadataJs, /reject_reason/)
@@ -1509,8 +1546,10 @@ assert.ok(
 )
 assert.equal(ricardoLiveHarness.metadata?.contact_name, "Ricardo Sanchez Villanueva")
 assert.equal(ricardoLiveHarness.metadata?.company_name, "SHARP MEMORIAL HOSPITAL")
+assert.equal(ricardoLiveHarness.metadata?.headline, "Biomedical Equipment Technician")
+assert.equal(ricardoLiveHarness.metadata?.title, "Biomedical Equipment Technician")
+assert.doesNotMatch(String(ricardoLiveHarness.metadata?.headline ?? ""), /SHARP MEMORIAL HOSPITAL/i)
 assert.equal(ricardoLiveHarness.metadata?.profile_photo_url, "https://media.licdn.com/ricardo-headshot.jpg")
-assert.match(String(ricardoLiveHarness.metadata?.headline ?? ""), /Biomedical Equipment Technician/)
 assert.equal(ricardoLiveHarness.profileImageAudit?.hero_container_found, true)
 assert.equal(ricardoLiveHarness.profileImageAudit?.selected_profile_image, "https://media.licdn.com/ricardo-headshot.jpg")
 assert.ok(Number(ricardoLiveHarness.heroScoringAudit?.candidate_count) > 0)

@@ -578,6 +578,10 @@ function logCompanyFinalSelection(payload) {
   console.log("[Equipify Sales:company-final-selection]", payload)
 }
 
+function logHeadlineExtraction(payload) {
+  console.log("[Equipify Sales:headline-extraction]", payload)
+}
+
 const HERO_UI_ACTION_PHRASES = [
   "contact info",
   "message",
@@ -1826,6 +1830,157 @@ function parseConcatenatedHeadlineTitleCompany(text) {
     title: trimOrNull(match[1]),
     company: trimOrNull(match[2]),
   }
+}
+
+function companyNamesEquivalent(left, right) {
+  const a = normalizeComparisonName(left)
+  const b = normalizeComparisonName(right)
+  return Boolean(a && b && a === b)
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function stripTrailingHeadlineSeparators(text) {
+  return normalizeVisibleText(
+    String(text ?? "")
+      .replace(/\s*[|·•]\s*$/, "")
+      .replace(/^\s*[|·•]\s*/, ""),
+  )
+}
+
+function headlineContainsCompanyName(headline, companyName) {
+  const headlineNorm = normalizeComparisonName(headline)
+  const companyNorm = normalizeComparisonName(companyName)
+  if (!headlineNorm || !companyNorm) return false
+  if (headlineNorm === companyNorm) return true
+  if (headlineNorm.endsWith(companyNorm)) return true
+  if (headlineNorm.includes(companyNorm)) return true
+  return false
+}
+
+function removeCompanySegmentsFromHeadline(headline, companyName) {
+  const raw = normalizeVisibleText(headline)
+  const company = normalizeVisibleText(companyName)
+  if (!raw || !company) return { text: raw, removed: [] }
+
+  const segments = raw.split(/\s*[|·•]\s*/).map((part) => normalizeVisibleText(part)).filter(Boolean)
+  if (segments.length <= 1) return { text: raw, removed: [] }
+
+  const removed = []
+  const kept = segments.filter((segment) => {
+    if (companyNamesEquivalent(segment, company)) {
+      removed.push(segment)
+      return false
+    }
+    return true
+  })
+
+  if (!removed.length) return { text: raw, removed: [] }
+  const joined = stripTrailingHeadlineSeparators(
+    kept
+      .join(" · ")
+      .replace(/\s*\|\s*/g, " · "),
+  )
+  return {
+    text: joined,
+    removed,
+  }
+}
+
+function sanitizeHeadlineAfterCompanySelection(rawHeadline, companyName, options = {}) {
+  const raw = normalizeVisibleText(rawHeadline)
+  const company = normalizeVisibleText(companyName)
+  const source = options.source ?? "post-company-selection"
+  const removedCompanyTokens = []
+
+  if (!raw) {
+    const payload = {
+      raw_headline: null,
+      cleaned_headline: null,
+      company_name: company,
+      removed_company_tokens: [],
+      source,
+    }
+    logHeadlineExtraction(payload)
+    return payload
+  }
+
+  if (!company) {
+    const payload = {
+      raw_headline: raw,
+      cleaned_headline: raw,
+      company_name: null,
+      removed_company_tokens: [],
+      source,
+    }
+    logHeadlineExtraction(payload)
+    return payload
+  }
+
+  let cleaned = raw
+
+  const atMatch = cleaned.match(/^(.+?)\s+at\s+(.+?)(?:\s*[|·].*)?$/i)
+  if (atMatch) {
+    const atCompany = trimOrNull(atMatch[2]?.replace(/\s*[|·]\s*(Full-time|Part-time|Self-employed|Contract|Freelance|Internship).*$/i, ""))
+    const atTitle = trimOrNull(atMatch[1])
+    if (atTitle && atCompany && companyNamesEquivalent(atCompany, company)) {
+      cleaned = atTitle
+      removedCompanyTokens.push(company)
+    }
+  }
+
+  if (headlineContainsCompanyName(cleaned, company)) {
+    const parsed = parseConcatenatedHeadlineTitleCompany(cleaned)
+    if (parsed.company && parsed.title && companyNamesEquivalent(parsed.company, company)) {
+      cleaned = parsed.title
+      if (!removedCompanyTokens.includes(parsed.company)) removedCompanyTokens.push(parsed.company)
+    } else {
+      const escaped = escapeRegExp(company)
+      const suffixPatterns = [
+        new RegExp(`^(.+?)\\s+${escaped}\\s*$`, "i"),
+        new RegExp(`^(.+?)${escaped}\\s*$`, "i"),
+      ]
+      for (const pattern of suffixPatterns) {
+        const match = cleaned.match(pattern)
+        const titlePart = trimOrNull(match?.[1])
+        if (titlePart && !companyNamesEquivalent(titlePart, company)) {
+          cleaned = titlePart
+          if (!removedCompanyTokens.includes(company)) removedCompanyTokens.push(company)
+          break
+        }
+      }
+    }
+  }
+
+  const segmented = removeCompanySegmentsFromHeadline(cleaned, company)
+  if (segmented.removed.length) {
+    cleaned = segmented.text ?? cleaned
+    for (const token of segmented.removed) {
+      if (!removedCompanyTokens.includes(token)) removedCompanyTokens.push(token)
+    }
+  }
+
+  cleaned = stripTrailingHeadlineSeparators(cleaned)
+  if (cleaned && companyNamesEquivalent(cleaned, company)) cleaned = null
+  if (cleaned && headlineContainsCompanyName(cleaned, company)) {
+    const reparsed = parseConcatenatedHeadlineTitleCompany(raw)
+    if (reparsed.title && reparsed.company && companyNamesEquivalent(reparsed.company, company)) {
+      cleaned = reparsed.title
+      if (!removedCompanyTokens.includes(reparsed.company)) removedCompanyTokens.push(reparsed.company)
+    }
+  }
+
+  const payload = {
+    raw_headline: raw,
+    cleaned_headline: cleaned,
+    company_name: company,
+    removed_company_tokens: removedCompanyTokens,
+    source,
+  }
+  logHeadlineExtraction(payload)
+  return payload
 }
 
 function collectEntityLinePlainTextCompanies(topCard) {
@@ -3194,7 +3349,6 @@ function extractLinkedInProfile(doc) {
 
   const profile_photo_url = findProfilePhotoUrl(doc, topCard, nameNode, heroContainer)
 
-  const headlineParts = parseLinkedInHeadline(headline)
   const experienceEntries = extractExperienceEntries(doc)
   const educationEntries = extractEducationEntries(doc)
   const extractionAudit = {}
@@ -3209,9 +3363,22 @@ function extractLinkedInProfile(doc) {
   )
   const parsedHeadline = parseConcatenatedHeadlineTitleCompany(headline)
   const current_company = companySelection.company_name
-  const current_title =
-    resolveProfileTitleExtraction(topCard, experienceEntries, headlineParts, extractionAudit) ??
-    parsedHeadline.title
+  const headlineExtraction = sanitizeHeadlineAfterCompanySelection(headline, current_company, {
+    source: companySelection.source_selector ?? "post-company-selection",
+  })
+  const sanitizedHeadline = headlineExtraction.cleaned_headline ?? headline
+  const sanitizedHeadlineParts = parseLinkedInHeadline(sanitizedHeadline)
+  let current_title =
+    resolveProfileTitleExtraction(topCard, experienceEntries, sanitizedHeadlineParts, extractionAudit) ??
+    parsedHeadline.title ??
+    sanitizedHeadlineParts.title
+  if (
+    current_company &&
+    current_title &&
+    headlineContainsCompanyName(current_title, current_company)
+  ) {
+    current_title = sanitizedHeadlineParts.title ?? parsedHeadline.title ?? sanitizedHeadline
+  }
 
   const linkedin_company_url = companySelection.linkedin_company_url
   const companyAnchor = companySelection.anchor ?? findTopCardCompanyAnchor(topCard, contact_name, headline)
@@ -3229,7 +3396,7 @@ function extractLinkedInProfile(doc) {
   const rawProfileExtract = {
     linkedin_page_kind: "profile",
     contact_name,
-    headline,
+    headline: sanitizedHeadline,
     title: current_title,
     location: locationParts.location,
     city: locationParts.city,
@@ -3258,7 +3425,7 @@ function extractLinkedInProfile(doc) {
       experienceSection,
       experienceHeading,
       profilePhotoUrl: profile_photo_url,
-      headline,
+      headline: sanitizedHeadline,
       personName: contact_name,
     }),
   )
@@ -3865,6 +4032,7 @@ if (typeof window !== "undefined") {
   window.__equipifyGrowthDiscoverMainContentContainer = discoverMainContentContainer
   window.__equipifyGrowthDescribeElement = describeElementForAudit
   window.__equipifyGrowthResolveProfileTitleExtraction = resolveProfileTitleExtraction
+  window.__equipifyGrowthSanitizeHeadlineAfterCompanySelection = sanitizeHeadlineAfterCompanySelection
   window.__equipifyGrowthAuditHydrationState = () => auditLinkedInHydrationState(document)
   emitStartupDiagnostic()
 }
