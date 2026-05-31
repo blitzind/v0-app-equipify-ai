@@ -1,6 +1,5 @@
 /**
- * LinkedIn desktop layout push — CSS-class scaffold mode (v4.3.34).
- * Reserves viewport space for the Equipify panel without inline style hacks.
+ * LinkedIn desktop layout push — hide right rail + reserve panel column (v4.3.35).
  */
 ;(function initEquipifyGrowthLayoutPush() {
   const SIDEBAR_WIDTH_PX = 420
@@ -13,6 +12,7 @@
   const CSS_VAR_RIGHT_MARGIN = "--equipify-layout-right-margin"
   const CSS_VAR_MAIN_WIDTH = "--equipify-linkedin-main-width"
   const DEBUG_STORAGE_KEY = "equipify_debug_layout"
+  const LAYOUT_STRATEGY = "hide-right-rail-reserve-panel"
 
   const SCAFFOLD_ROOT_SELECTORS = [
     ".scaffold-layout",
@@ -29,11 +29,22 @@
     ".scaffold-layout__inner",
     "#main-content",
   ]
+  const RIGHT_RAIL_SELECTORS = [
+    ".scaffold-layout__aside",
+    ".scaffold-layout__sidebar",
+    "aside.scaffold-layout__aside",
+    ".scaffold-layout aside",
+    ".scaffold-layout-container aside",
+    'aside[aria-label*="sidebar" i]',
+    'aside[aria-label*="Right rail" i]',
+    ".right-rail",
+  ]
 
   const LAYOUT_MARK_ATTRS = [
     "data-equipify-layout-root",
     "data-equipify-layout-main",
     "data-equipify-layout-content",
+    "data-equipify-layout-rail",
   ]
 
   function isHtmlElement(node) {
@@ -78,6 +89,39 @@
     }
   }
 
+  function isEligibleRail(node) {
+    if (!isHtmlElement(node)) return false
+    if (node.closest("nav, header, footer, .global-nav")) return false
+    const rect = node.getBoundingClientRect()
+    if (rect.width > 0 && rect.height > 0) return true
+    const tag = node.tagName?.toLowerCase()
+    return (
+      tag === "aside" ||
+      node.classList.contains("scaffold-layout__aside") ||
+      node.classList.contains("scaffold-layout__sidebar") ||
+      node.classList.contains("right-rail")
+    )
+  }
+
+  function locateRightRails(doc, scaffold) {
+    const rails = []
+    const seen = new Set()
+
+    for (const selector of RIGHT_RAIL_SELECTORS) {
+      doc.querySelectorAll(selector).forEach((node) => {
+        if (!isHtmlElement(node) || seen.has(node)) return
+        if (scaffold.root && !scaffold.root.contains(node) && !node.closest(".scaffold-layout, .scaffold-layout-container")) {
+          return
+        }
+        if (!isEligibleRail(node)) return
+        seen.add(node)
+        rails.push({ node, selector })
+      })
+    }
+
+    return rails
+  }
+
   function describeTarget(node, selector) {
     if (!isHtmlElement(node)) return null
     const tag = node.tagName?.toLowerCase() ?? "node"
@@ -86,6 +130,17 @@
       ? `.${node.className.trim().split(/\s+/).slice(0, 3).join(".")}`
       : ""
     return `${selector ?? tag}${id}${classes}`
+  }
+
+  function describeRect(node) {
+    if (!isHtmlElement(node)) return null
+    const rect = node.getBoundingClientRect()
+    return {
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+      left: Math.round(rect.left),
+      top: Math.round(rect.top),
+    }
   }
 
   function measureWidth(node) {
@@ -110,11 +165,14 @@
     }
   }
 
-  function markScaffold(scaffold) {
+  function markScaffold(scaffold, rails) {
     clearLayoutMarks(scaffold.root?.ownerDocument ?? document)
     if (isHtmlElement(scaffold.root)) scaffold.root.setAttribute("data-equipify-layout-root", "true")
     if (isHtmlElement(scaffold.main)) scaffold.main.setAttribute("data-equipify-layout-main", "true")
     if (isHtmlElement(scaffold.content)) scaffold.content.setAttribute("data-equipify-layout-content", "true")
+    rails.forEach(({ node }) => {
+      node.setAttribute("data-equipify-layout-rail", "true")
+    })
   }
 
   function setLayoutVariables(open, mode, root = document.documentElement) {
@@ -144,20 +202,19 @@
     body.classList.toggle(BODY_CLASS, open)
   }
 
-  function buildDebugPayload(input) {
+  function buildLayoutPushPayload(input) {
     return {
-      page_type: input.page_type,
+      mode: input.mode,
       viewport_width: input.viewport_width,
       panel_width: SIDEBAR_WIDTH_PX,
-      scaffold_width_before: input.scaffold_width_before,
-      scaffold_width_after: input.scaffold_width_after,
-      content_width_before: input.content_width_before,
-      content_width_after: input.content_width_after,
-      selected_root: input.selected_root,
-      selected_main: input.selected_main,
-      selected_content: input.selected_content,
-      mode: input.mode,
-      debug_enabled: input.debug_enabled,
+      hidden_right_rail_selectors: input.hidden_right_rail_selectors ?? [],
+      selected_main_container: input.selected_main_container,
+      before_rect: input.before_rect,
+      after_rect: input.after_rect,
+      strategy: input.strategy ?? LAYOUT_STRATEGY,
+      restored: input.restored ?? false,
+      page_type: input.page_type,
+      debug_enabled: input.debug_enabled ?? false,
     }
   }
 
@@ -167,59 +224,58 @@
     const pageUrl = options.pageUrl ?? window.location.href
     const mode = resolveLayoutMode(viewportWidth)
     const page_type = detectPageType(pageUrl)
-    const logLayoutDebug = options.logLayoutDebug ?? (() => {})
+    const logLayoutPush = options.logLayoutPush ?? options.logLayoutDebug ?? (() => {})
     const scaffold = locateScaffold(doc)
-
-    const scaffold_width_before = measureWidth(scaffold.root)
-    const content_width_before = measureWidth(scaffold.content ?? scaffold.main)
+    const mainContainer = scaffold.main ?? scaffold.content ?? scaffold.root
+    const before_rect = describeRect(mainContainer)
 
     if (!open) {
       clearLayoutMarks(doc)
       setDesktopLayoutClasses(false, mode, doc)
       setLayoutVariables(false, mode, doc.documentElement)
-      logLayoutDebug(
-        buildDebugPayload({
-          page_type,
-          viewport_width: viewportWidth,
-          scaffold_width_before,
-          scaffold_width_after: measureWidth(scaffold.root),
-          content_width_before,
-          content_width_after: measureWidth(scaffold.content ?? scaffold.main),
-          selected_root: describeTarget(scaffold.root, scaffold.rootSelector),
-          selected_main: describeTarget(scaffold.main, scaffold.mainSelector),
-          selected_content: describeTarget(scaffold.content, scaffold.contentSelector),
+      logLayoutPush(
+        buildLayoutPushPayload({
           mode: "closed",
-          debug_enabled: false,
+          viewport_width: viewportWidth,
+          hidden_right_rail_selectors: [],
+          selected_main_container: describeTarget(scaffold.main, scaffold.mainSelector),
+          before_rect,
+          after_rect: describeRect(mainContainer),
+          strategy: LAYOUT_STRATEGY,
+          restored: true,
+          page_type,
         }),
       )
-      return { mode: "closed", page_type }
+      return { mode: "closed", page_type, restored: true }
     }
 
     setDesktopLayoutClasses(true, mode, doc)
     setLayoutVariables(true, mode, doc.documentElement)
 
+    let hidden_right_rail_selectors = []
     if (mode === "push") {
-      markScaffold(scaffold)
+      const rails = locateRightRails(doc, scaffold)
+      markScaffold(scaffold, rails)
+      hidden_right_rail_selectors = rails.map(({ selector }) => selector)
     } else {
       clearLayoutMarks(doc)
     }
 
-    const payload = buildDebugPayload({
-      page_type,
-      viewport_width: viewportWidth,
-      scaffold_width_before,
-      scaffold_width_after: measureWidth(scaffold.root),
-      content_width_before,
-      content_width_after: measureWidth(scaffold.content ?? scaffold.main),
-      selected_root: describeTarget(scaffold.root, scaffold.rootSelector),
-      selected_main: describeTarget(scaffold.main, scaffold.mainSelector),
-      selected_content: describeTarget(scaffold.content, scaffold.contentSelector),
+    const payload = buildLayoutPushPayload({
       mode,
+      viewport_width: viewportWidth,
+      hidden_right_rail_selectors,
+      selected_main_container: describeTarget(scaffold.main, scaffold.mainSelector),
+      before_rect,
+      after_rect: describeRect(mainContainer),
+      strategy: LAYOUT_STRATEGY,
+      restored: false,
+      page_type,
       debug_enabled: isDebugLayoutEnabled(),
     })
 
-    logLayoutDebug(payload)
-    return { mode, page_type, ...payload }
+    logLayoutPush(payload)
+    return { ...payload, page_type }
   }
 
   window.EquipifyGrowthLayoutPush = {
@@ -227,20 +283,24 @@
     DESKTOP_LAYOUT_CLASS,
     DEBUG_LAYOUT_CLASS,
     DEBUG_STORAGE_KEY,
+    LAYOUT_STRATEGY,
     SIDEBAR_WIDTH_PX,
     RIGHT_MARGIN_PX,
     DESKTOP_MIN_WIDTH,
     SCAFFOLD_ROOT_SELECTORS,
     SCAFFOLD_MAIN_SELECTORS,
     SCAFFOLD_CONTENT_SELECTORS,
+    RIGHT_RAIL_SELECTORS,
     resolveLayoutMode,
     detectPageType,
     locateScaffold,
+    locateRightRails,
     isDebugLayoutEnabled,
     applyLayoutReserve,
     setLayoutVariables,
     setDesktopLayoutClasses,
     clearLayoutMarks,
     measureWidth,
+    describeRect,
   }
 })()

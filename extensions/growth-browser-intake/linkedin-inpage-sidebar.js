@@ -134,14 +134,14 @@ console.log("[Equipify Sales] linkedin-inpage-sidebar start")
     document.dispatchEvent(new CustomEvent("equipify-sidebar-state", { detail: { open } }))
   }
 
-  function logLayoutDebug(payload) {
-    console.log("[Equipify Sales:layout-debug]", payload)
+  function logLayoutPush(payload) {
+    console.log("[Equipify Sales:layout-push]", payload)
   }
 
   function applyLayoutReserve(open) {
     layoutPush?.applyLayoutReserve?.(open, {
       pageUrl: window.location.href,
-      logLayoutDebug,
+      logLayoutPush,
     })
   }
 

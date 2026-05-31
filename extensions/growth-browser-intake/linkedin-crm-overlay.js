@@ -18,6 +18,7 @@
   const REFRESH_DEBOUNCE_MS = 300
   const NAV_THROTTLE_MS = 500
   const LOOKUP_DEADLINE_MS = 5000
+  const LOADING_BADGE_DEADLINE_MS = 5000
   const MOUNT_RETRY_MS = 5000
   const LOGO_URL =
     window.EquipifyGrowthExtensionBrand?.dockLogoUrl?.() ??
@@ -36,6 +37,40 @@
   let mountMode = "pending"
   let refreshGeneration = 0
   let lookupInFlight = false
+  let loadingBadgeDeadlineTimer = null
+
+  function linkedInChromeUiAvailable() {
+    return Boolean(
+      window.EquipifySalesInpageSidebar ||
+        document.getElementById("equipify-sales-linkedin-floating-dock"),
+    )
+  }
+
+  function logStatusPillAudit(payload) {
+    console.log("[Equipify Sales:status-pill]", payload)
+  }
+
+  function clearLoadingBadgeDeadline() {
+    if (loadingBadgeDeadlineTimer) window.clearTimeout(loadingBadgeDeadlineTimer)
+    loadingBadgeDeadlineTimer = null
+  }
+
+  function scheduleLoadingBadgeDeadline() {
+    clearLoadingBadgeDeadline()
+    loadingBadgeDeadlineTimer = window.setTimeout(() => {
+      loadingBadgeDeadlineTimer = null
+      const stillLoading = badgeRoot?.querySelector(".equipify-sales-linkedin-badge--loading")
+      if (!stillLoading) return
+      logStatusPillAudit({
+        rendered: true,
+        location: mountMode,
+        state: "timed_out",
+        timed_out: true,
+        reason: "loading_badge_deadline",
+      })
+      renderBadge(defaultPayload(), true)
+    }, LOADING_BADGE_DEADLINE_MS)
+  }
 
   function defaultPayload() {
     return {
@@ -78,6 +113,7 @@
 
   function removeBadge() {
     clearLookupDeadline()
+    clearLoadingBadgeDeadline()
     if (mountRetryTimer) window.clearTimeout(mountRetryTimer)
     mountRetryTimer = null
     mountObserver?.disconnect()
@@ -257,13 +293,36 @@
   }
 
   function mountBadgeFloating(root, reason) {
+    if (linkedInChromeUiAvailable()) {
+      root.classList.remove("equipify-sales-linkedin-badge-root--floating")
+      if (root.parentElement === document.body) root.remove()
+      mountMode = "skipped_floating"
+      logStatusPillAudit({
+        rendered: false,
+        location: "floating",
+        state: "skipped",
+        timed_out: false,
+        reason: reason ?? "sidebar_or_dock_available",
+      })
+      logInfo("skip_floating_fallback", { reason })
+      return false
+    }
+
     root.classList.add("equipify-sales-linkedin-badge-root--floating")
     if (root.parentElement !== document.body) {
       root.remove()
       document.body.appendChild(root)
     }
     mountMode = "floating"
+    logStatusPillAudit({
+      rendered: true,
+      location: "floating",
+      state: "rendered",
+      timed_out: false,
+      reason: reason ?? "floating_fallback",
+    })
     logInfo("mount_floating_fallback", { reason })
+    return true
   }
 
   function scheduleMountRetry(root) {
@@ -288,8 +347,17 @@
       }
       if (findProfileNameElement()) {
         mountBadgeNearTopCard(root, "mount_failed_after_retry")
-      } else {
+      } else if (!linkedInChromeUiAvailable()) {
         mountBadgeFloating(root, "no_profile_h1_after_retry")
+      } else {
+        mountMode = "pending"
+        logStatusPillAudit({
+          rendered: false,
+          location: "inline",
+          state: "waiting_for_profile_header",
+          timed_out: false,
+          reason: "sidebar_or_dock_available",
+        })
       }
       mountObserver?.disconnect()
       mountObserver = null
@@ -371,7 +439,9 @@
     if (mountMode === "inline") {
       mountBadgeBesideName(root)
     } else if (mountMode === "floating") {
-      mountBadgeFloating(root, "existing_floating")
+      if (!mountBadgeFloating(root, "existing_floating")) {
+        mountBadgeBesideName(root)
+      }
     } else if (!mountBadgeBesideName(root)) {
       scheduleMountRetry(root)
     }
@@ -382,6 +452,7 @@
 
   function renderBadge(payload, hasProfileContext = true) {
     clearLookupDeadline()
+    clearLoadingBadgeDeadline()
     lookupInFlight = false
     latestPayload = payload
     const display = resolveBadgeDisplay(payload, hasProfileContext)
@@ -396,11 +467,50 @@
         : undefined
     root.appendChild(createBadgeButton(display, { onRetry }))
     lastRenderKey = renderKey
+    logStatusPillAudit({
+      rendered: true,
+      location: mountMode,
+      state: display.key ?? display.displayLabel ?? "resolved",
+      timed_out: false,
+      reason: "badge_rendered",
+    })
     logInfo("render_badge", { label: display.displayLabel, mountMode })
   }
 
   function renderLoadingBadge() {
+    if (linkedInChromeUiAvailable() && !findProfileNameElement()) {
+      logStatusPillAudit({
+        rendered: false,
+        location: "inline",
+        state: "checking",
+        timed_out: false,
+        reason: "deferred_until_profile_header",
+      })
+      return
+    }
+
     const root = ensureBadgeRoot()
+    if (mountMode === "skipped_floating" || mountMode === "pending") {
+      if (!mountBadgeBesideName(root)) {
+        if (linkedInChromeUiAvailable()) {
+          logStatusPillAudit({
+            rendered: false,
+            location: "inline",
+            state: "checking",
+            timed_out: false,
+            reason: "sidebar_or_dock_available",
+          })
+          return
+        }
+      }
+    }
+
+    if (root.classList.contains("equipify-sales-linkedin-badge-root--floating") && linkedInChromeUiAvailable()) {
+      root.classList.remove("equipify-sales-linkedin-badge-root--floating")
+      if (root.parentElement === document.body) root.remove()
+      if (!mountBadgeBesideName(root)) return
+    }
+
     if (root.querySelector(".equipify-sales-linkedin-badge--loading")) return
 
     root.replaceChildren()
@@ -425,6 +535,14 @@
     btn.appendChild(label)
     btn.addEventListener("click", () => scheduleRefresh(true))
     root.appendChild(btn)
+    logStatusPillAudit({
+      rendered: true,
+      location: mountMode,
+      state: "checking",
+      timed_out: false,
+      reason: "loading_badge",
+    })
+    scheduleLoadingBadgeDeadline()
   }
 
   function scheduleLookupDeadline(generation, hasProfileContext) {

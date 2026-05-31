@@ -53,10 +53,32 @@ html.equipify-sales-inpage-sidebar-open {
     width: var(--equipify-linkedin-main-width) !important;
     max-width: var(--equipify-linkedin-main-width) !important;
     min-width: 0 !important;
-    margin-left: auto !important;
+    margin-left: 0 !important;
     margin-right: 0 !important;
     box-sizing: border-box !important;
     transition: width 0.2s ease, max-width 0.2s ease;
+  }
+
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open .scaffold-layout__inner,
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open [data-equipify-layout-root="true"] .scaffold-layout__inner {
+    display: block !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    max-width: 100% !important;
+  }
+
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open [data-equipify-layout-rail="true"],
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open .scaffold-layout__aside,
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open .scaffold-layout__sidebar,
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open aside.scaffold-layout__aside,
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open .scaffold-layout aside,
+  body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open .right-rail {
+    display: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    overflow: hidden !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
   }
 
   body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open [data-equipify-layout-main="true"],
@@ -65,6 +87,7 @@ html.equipify-sales-inpage-sidebar-open {
   body.equipify-desktop-layout.equipify-sales-inpage-sidebar-open main[role="main"] {
     width: 100% !important;
     max-width: 100% !important;
+    flex: 1 1 auto !important;
     box-sizing: border-box !important;
   }
 
@@ -77,7 +100,6 @@ html.equipify-sales-inpage-sidebar-open {
   }
 }
 
-body.equipify-layout-debug[data-equipify-layout-root="true"],
 body.equipify-layout-debug [data-equipify-layout-root="true"] {
   outline: 2px solid #ef4444 !important;
   outline-offset: -2px;
@@ -85,6 +107,11 @@ body.equipify-layout-debug [data-equipify-layout-root="true"] {
 
 body.equipify-layout-debug [data-equipify-layout-content="true"] {
   outline: 2px solid #f97316 !important;
+  outline-offset: -2px;
+}
+
+body.equipify-layout-debug [data-equipify-layout-rail="true"] {
+  outline: 2px dashed #a855f7 !important;
   outline-offset: -2px;
 }
 
