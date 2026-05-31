@@ -222,6 +222,21 @@ for (const route of routes) {
 assert.ok(fs.existsSync(path.join(process.cwd(), "components/growth/growth-voice-observability-dashboard.tsx")))
 assert.ok(fs.existsSync(path.join(process.cwd(), "components/growth/growth-voice-observability-readiness-section.tsx")))
 
+const observabilityService = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/observability/observability-service.ts"),
+  "utf8",
+)
+assert.match(observabilityService, /function buildProviderHealthFromSources\(/)
+assert.doesNotMatch(observabilityService, /function buildProviderHealthFromEvents\(/)
+assert.match(observabilityService, /buildProviderHealthFromSources\(\s*sources\.observabilityEvents/)
+assert.match(observabilityService, /fetchVoiceObservabilityProviders[\s\S]*buildProviderHealthFromSources\(/)
+
+const communicationsPage = fs.readFileSync(
+  path.join(process.cwd(), "app/(admin)/admin/growth/settings/communications/page.tsx"),
+  "utf8",
+)
+assert.match(communicationsPage, /GrowthVoiceInfrastructureSettingsPanel/)
+
 const schemaHealth = fs.readFileSync(path.join(process.cwd(), "lib/voice/schema-health.ts"), "utf8")
 assert.match(schemaHealth, /"v20"/)
 assert.match(schemaHealth, /voice_observability_events/)

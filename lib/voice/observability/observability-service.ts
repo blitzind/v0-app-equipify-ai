@@ -240,7 +240,7 @@ function buildRelationshipRevenueFromSources(input: Awaited<ReturnType<typeof lo
   return buildRelationshipRevenueSnapshot(counts)
 }
 
-function buildProviderHealthFromEvents(
+function buildProviderHealthFromSources(
   events: Awaited<ReturnType<typeof listObservabilityEvents>>,
   outboundEvents: Awaited<ReturnType<typeof loadOutboundEventsSince>>,
   receptionistEvents: Awaited<ReturnType<typeof loadReceptionistEventsSince>>,
