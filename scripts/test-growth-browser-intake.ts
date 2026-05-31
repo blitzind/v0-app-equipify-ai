@@ -302,7 +302,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.31"/)
+assert.match(manifestSource, /"version": "4.3.32"/)
 assert.match(manifestSource, /https:\/\/m\.linkedin\.com\/in\/\*/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
@@ -334,7 +334,7 @@ assert.match(extensionBrandJs, /PANEL_LOGO_ASSET/)
 assert.match(extensionBrandJs, /panelLogoUrl/)
 assert.match(extensionBrandJs, /applyPanelLogo/)
 assert.match(extensionBrandJs, /PANEL_LOGO_VERSION/)
-assert.match(extensionBrandJs, /4\.3\.31/)
+assert.match(extensionBrandJs, /4\.3\.32/)
 assert.match(extensionBrandJs, /\?v=\$\{encodeURIComponent\(PANEL_LOGO_VERSION\)\}/)
 assert.match(extensionBrandJs, /\[Equipify Sales:logo-audit\]/)
 assert.match(extensionBrandJs, /PANEL_LOGO_INTRINSIC_WIDTH/)
@@ -1211,7 +1211,187 @@ assert.equal(
 )
 
 assert.match(extensionWorkspaceJs, /renderContactIntelligence/)
+assert.match(extensionWorkspaceJs, /renderOpportunityIntelligence/)
 assert.match(extensionWorkspaceJs, /es-ws-contact-intelligence/)
+assert.match(extensionWorkspaceJs, /es-ws-opportunity-intelligence/)
+
+const extensionOpportunityIntelligenceJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/extension-opportunity-intelligence.js"),
+  "utf8",
+)
+assert.match(extensionOpportunityIntelligenceJs, /\[Equipify Sales:opportunity-intelligence\]/)
+assert.match(extensionOpportunityIntelligenceJs, /analyzeOpportunityIntelligence/)
+assert.match(extensionOpportunityIntelligenceJs, /scoring_breakdown/)
+
+function runOpportunityIntelligenceHarness() {
+  const sandbox: Record<string, unknown> = { window: {}, console }
+  const context = vm.createContext(sandbox)
+  vm.runInContext(extensionOpportunityIntelligenceJs, context)
+  return (context.window as { EquipifyGrowthOpportunityIntelligence?: Record<string, unknown> })
+    .EquipifyGrowthOpportunityIntelligence as {
+    analyzeOpportunityIntelligence: (input: Record<string, unknown>) => Record<string, unknown>
+  }
+}
+
+const opportunityIntelligence = runOpportunityIntelligenceHarness()
+
+function buildOpportunityInput(title: string, company: string | null, extra: Record<string, unknown> = {}) {
+  const contact = contactIntelligence.analyzeContactIntelligence({
+    person: "Test Contact",
+    title,
+    company,
+    location: "San Diego, CA",
+    hasCrmMatch: extra.has_crm_match === true,
+  })
+  return {
+    person: "Test Contact",
+    title,
+    company,
+    location: "San Diego, CA",
+    department: contact.department,
+    seniority: contact.seniority,
+    decision_maker_level: contact.decision_maker_level,
+    buying_influence: contact.buying_influence,
+    relationship_strength: contact.relationship_strength,
+    connection_degree: extra.connection_degree ?? null,
+    mutual_connections_count: extra.mutual_connections_count ?? null,
+    has_crm_match: extra.has_crm_match === true,
+    existing_crm_contacts_count: extra.existing_crm_contacts_count ?? 0,
+    existing_opportunities_count: extra.existing_opportunities_count ?? 0,
+    existing_customers_count: extra.existing_customers_count ?? 0,
+    company_industry: extra.company_industry ?? null,
+  }
+}
+
+function assertOpportunityIntel(
+  title: string,
+  company: string | null,
+  expected: {
+    scoreMin?: number
+    scoreMax?: number
+    priority: string
+    industry_fit: string
+    role_fit: string
+    company_fit: string
+    relationship_fit?: string
+    recommended_sales_motion: string | RegExp
+    whyIncludes?: string[]
+  },
+  extra: Record<string, unknown> = {},
+) {
+  const result = opportunityIntelligence.analyzeOpportunityIntelligence(
+    buildOpportunityInput(title, company, extra),
+  )
+  if (expected.scoreMin != null) {
+    assert.ok(Number(result.target_fit_score) >= expected.scoreMin, `${title} score >= ${expected.scoreMin}`)
+  }
+  if (expected.scoreMax != null) {
+    assert.ok(Number(result.target_fit_score) <= expected.scoreMax, `${title} score <= ${expected.scoreMax}`)
+  }
+  assert.equal(result.priority, expected.priority, `${title} priority`)
+  assert.equal(result.industry_fit, expected.industry_fit, `${title} industry fit`)
+  assert.equal(result.role_fit, expected.role_fit, `${title} role fit`)
+  assert.equal(result.company_fit, expected.company_fit, `${title} company fit`)
+  if (expected.relationship_fit) {
+    assert.equal(result.relationship_fit, expected.relationship_fit, `${title} relationship fit`)
+  }
+  if (expected.recommended_sales_motion instanceof RegExp) {
+    assert.match(String(result.recommended_sales_motion), expected.recommended_sales_motion, `${title} sales motion`)
+  } else {
+    assert.equal(result.recommended_sales_motion, expected.recommended_sales_motion, `${title} sales motion`)
+  }
+  if (expected.whyIncludes) {
+    for (const snippet of expected.whyIncludes) {
+      assert.ok(
+        (result.why_this_matters as string[]).some((reason) => reason.toLowerCase().includes(snippet.toLowerCase())),
+        `${title} why includes ${snippet}`,
+      )
+    }
+  }
+  return result
+}
+
+const ricardoOpportunity = assertOpportunityIntel(
+  "Biomedical Equipment Technician",
+  "SHARP MEMORIAL HOSPITAL",
+  {
+    scoreMin: 55,
+    scoreMax: 70,
+    priority: "Medium",
+    industry_fit: "High",
+    role_fit: "Low",
+    company_fit: "High",
+    relationship_fit: "Weak",
+    recommended_sales_motion: "Find department leader or clinical engineering decision maker",
+    whyIncludes: ["Healthcare equipment service environment", "influencer, not final buyer"],
+  },
+)
+
+assertOpportunityIntel("Director Clinical Engineering", "SHARP MEMORIAL HOSPITAL", {
+  scoreMin: 70,
+  priority: "High",
+  industry_fit: "High",
+  role_fit: "High",
+  company_fit: "High",
+  recommended_sales_motion: "Run executive outreach sequence",
+})
+
+assertOpportunityIntel("Service Manager", "Acme Field Services", {
+  scoreMin: 50,
+  priority: "Medium",
+  industry_fit: "High",
+  role_fit: "Medium",
+  company_fit: "Medium",
+  recommended_sales_motion: "Capture manager and map service workflow pain points",
+})
+
+assertOpportunityIntel("VP Operations", "Regional Healthcare Group", {
+  scoreMin: 80,
+  priority: "Critical",
+  industry_fit: "High",
+  role_fit: "High",
+  company_fit: "High",
+  recommended_sales_motion: "Run executive outreach sequence",
+})
+
+assertOpportunityIntel("Owner", "Summit Contracting", {
+  scoreMin: 75,
+  priority: "High",
+  industry_fit: "High",
+  role_fit: "High",
+  company_fit: "Medium",
+  recommended_sales_motion: "Run executive outreach sequence",
+})
+
+assertOpportunityIntel("Procurement Manager", "Metro Hospital System", {
+  scoreMin: 60,
+  priority: "Medium",
+  industry_fit: "High",
+  role_fit: "High",
+  company_fit: "High",
+  recommended_sales_motion: "Position vendor value and route through procurement workflow",
+})
+
+assertOpportunityIntel("", "SHARP MEMORIAL HOSPITAL", {
+  scoreMax: 55,
+  priority: "Low",
+  industry_fit: "High",
+  role_fit: "Low",
+  company_fit: "High",
+  recommended_sales_motion: /Identify economic buyer|Capture contact/,
+})
+
+const missingCompanyOpportunity = assertOpportunityIntel("Biomedical Equipment Technician", null, {
+  scoreMax: 50,
+  priority: "Low",
+  industry_fit: "High",
+  role_fit: "Low",
+  company_fit: "Low",
+  recommended_sales_motion: "Find department leader or clinical engineering decision maker",
+})
+assert.ok(missingCompanyOpportunity.why_this_matters.length >= 1)
+
+assert.equal(ricardoOpportunity.scoring_breakdown?.industry != null, true)
 
 const extensionConfigJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/extension-config.js"),
@@ -1754,7 +1934,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ version: "4.3.31" }),
+        getManifest: () => ({ version: "4.3.32" }),
       },
     },
     setTimeout: () => 0,
@@ -2415,6 +2595,8 @@ assert.match(sidepanelHtml, /extension-version-banner/)
 assert.match(sidepanelHtml, /bootstrap-loading/)
 assert.match(sidepanelHtml, /extension-context-normalize.js/)
 assert.match(sidepanelHtml, /extension-contact-intelligence.js/)
+assert.match(sidepanelHtml, /extension-opportunity-intelligence.js/)
+assert.match(sidepanelHtml, /Opportunity Intelligence/)
 assert.match(sidepanelHtml, /Contact Intelligence/)
 assert.match(sidepanelHtml, /Research Snapshot/)
 assert.match(sidepanelHtml, /Discovery Actions/)

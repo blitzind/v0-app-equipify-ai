@@ -477,6 +477,145 @@
       department: intelligence.department,
       seniority: intelligence.seniority,
     })
+
+    return intelligence
+  }
+
+  function renderOpportunityIntelligence(input, contextMetrics = {}) {
+    const panel = document.getElementById("es-ws-opportunity-intelligence-panel")
+    const scoreEl = document.getElementById("es-ws-oi-score")
+    const priorityEl = document.getElementById("es-ws-oi-priority")
+    const fitsEl = document.getElementById("es-ws-oi-fits")
+    const crmEl = document.getElementById("es-ws-oi-crm-context")
+    const reasonsEl = document.getElementById("es-ws-oi-reasons")
+    const motionEl = document.getElementById("es-ws-oi-motion")
+    const motionBtn = document.getElementById("es-ws-oi-motion-cta")
+    if (!panel || !scoreEl || !priorityEl || !fitsEl || !reasonsEl || !motionEl) return null
+
+    const detected = input?.detected ?? null
+    const formValues = input?.formValues ?? {}
+    const context = input?.crmPayload?.context ?? null
+    const hasMatch = Boolean(context?.lead_id)
+    const contextNormalize = window.EquipifyGrowthContextNormalize
+    const normalized =
+      contextNormalize?.normalizeExtractionPayload?.({
+        detected,
+        formValues,
+        context,
+      }) ?? {}
+
+    const pageKind = detected?.linkedin_page_kind ?? null
+    const title =
+      normalized.title && normalized.title !== PUBLIC_NOT_FOUND
+        ? normalized.title
+        : trimOrNull(formValues?.title) || trimOrNull(detected?.job_title) || trimOrNull(detected?.title)
+    const person = normalized.person ?? null
+    const company =
+      normalized.company && normalized.company !== COMPANY_NOT_DETECTED
+        ? normalized.company
+        : trimOrNull(formValues?.company_name) || trimOrNull(detected?.company_name)
+
+    if (pageKind === "company" || (!person && !title)) {
+      panel.hidden = true
+      return null
+    }
+
+    const contactAnalyzer = window.EquipifyGrowthContactIntelligence
+    const opportunityAnalyzer = window.EquipifyGrowthOpportunityIntelligence
+    if (!contactAnalyzer?.analyzeContactIntelligence || !opportunityAnalyzer?.analyzeOpportunityIntelligence) {
+      panel.hidden = true
+      return null
+    }
+
+    const contactIntel = contactAnalyzer.analyzeContactIntelligence({
+      person,
+      title,
+      company,
+      location: normalized.location,
+      connection_degree: detected?.connection_degree ?? null,
+      mutual_connections_count: detected?.mutual_connections_count ?? null,
+      connections_count: detected?.connections_count ?? null,
+      hasCrmMatch: hasMatch,
+    })
+
+    const companyIntel = contextMetrics.companyIntel ?? mergeCompanyIntel(detected, lastCompanyEnrichment)
+    const opportunity = opportunityAnalyzer.analyzeOpportunityIntelligence({
+      person,
+      title,
+      company,
+      location: normalized.location,
+      department: contactIntel.department,
+      seniority: contactIntel.seniority,
+      decision_maker_level: contactIntel.decision_maker_level,
+      buying_influence: contactIntel.buying_influence,
+      relationship_strength: contactIntel.relationship_strength,
+      connection_degree: detected?.connection_degree ?? null,
+      mutual_connections_count: detected?.mutual_connections_count ?? null,
+      has_crm_match: hasMatch,
+      existing_crm_contacts_count: contextMetrics.contactsCount ?? context?.company_contacts_count ?? 0,
+      existing_opportunities_count: contextMetrics.oppCount ?? (context?.opportunity?.id ? 1 : 0),
+      existing_customers_count: contextMetrics.customerCount ?? 0,
+      company_industry: companyIntel?.industry ?? detected?.industry ?? null,
+      company_description: companyIntel?.company_description ?? detected?.company_description ?? null,
+      company_keywords: companyIntel?.keywords ?? detected?.keywords ?? [],
+      company_employee_count: companyIntel?.employee_count ?? detected?.employee_count ?? null,
+      company_employee_range: companyIntel?.employee_range ?? detected?.employee_range ?? null,
+    })
+
+    panel.hidden = false
+    scoreEl.textContent = String(opportunity.target_fit_score)
+    scoreEl.dataset.priority = opportunity.priority.toLowerCase()
+    priorityEl.textContent = opportunity.priority
+    priorityEl.dataset.tone = chipToneForLevel(
+      opportunity.priority === "Critical"
+        ? "executive"
+        : opportunity.priority === "High"
+          ? "high"
+          : opportunity.priority === "Medium"
+            ? "medium"
+            : "low",
+    )
+
+    const fits = [
+      { label: "Industry Fit", value: opportunity.industry_fit },
+      { label: "Role Fit", value: opportunity.role_fit },
+      { label: "Company Fit", value: opportunity.company_fit },
+      { label: "Relationship Fit", value: opportunity.relationship_fit },
+    ]
+    fitsEl.innerHTML = fits
+      .map(
+        (fit) =>
+          `<span class="es-ws-oi-fit-chip" data-tone="${escapeHtml(chipToneForLevel(fit.value))}"><span>${escapeHtml(fit.label)}</span><strong>${escapeHtml(fit.value)}</strong></span>`,
+      )
+      .join("")
+
+    if (crmEl) crmEl.textContent = opportunity.crm_context
+    reasonsEl.innerHTML = opportunity.why_this_matters
+      .map((reason) => `<li>${escapeHtml(reason)}</li>`)
+      .join("")
+    motionEl.textContent = opportunity.recommended_sales_motion
+
+    if (motionBtn) {
+      motionBtn.textContent = opportunity.recommended_sales_motion
+      motionBtn.onclick = () => {
+        if (hasMatch) {
+          document.getElementById("es-ws-open-lead-btn")?.click()
+          return
+        }
+        if (contactIntel.seniority === "Individual Contributor" && opportunity.role_fit === "Low") {
+          document.querySelector('[data-company-tab="discovery"]')?.click()
+          return
+        }
+        document.getElementById("es-ws-add-btn")?.click()
+      }
+    }
+
+    intelLog("opportunity_intelligence_rendered", {
+      target_fit_score: opportunity.target_fit_score,
+      priority: opportunity.priority,
+    })
+
+    return opportunity
   }
 
   function renderProfilePhoto(name, photoUrl) {
@@ -960,6 +1099,13 @@
     const contactsCount = context?.company_contacts_count ?? 0
     const oppCount = context?.opportunity?.id ? 1 : 0
     const customerCount = linkedinStatus?.isCustomerLeadStatus?.(context?.lead_status) ? 1 : 0
+
+    renderOpportunityIntelligence(input, {
+      companyIntel,
+      contactsCount,
+      oppCount,
+      customerCount,
+    })
 
     const companyNameEl = document.getElementById("es-ws-company-name")
     if (companyNameEl) companyNameEl.textContent = hasCompany ? companyName : COMPANY_NOT_DETECTED

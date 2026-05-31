@@ -70,6 +70,27 @@
           </div>
         </section>
 
+        <section id="es-ws-opportunity-intelligence-panel" class="es-ws-card es-ws-opportunity-intelligence" hidden>
+          <div class="es-ws-oi-header">
+            <p class="es-ws-card-label">Opportunity Intelligence</p>
+            <div class="es-ws-oi-header-badges">
+              <span id="es-ws-oi-score" class="es-ws-oi-score" data-priority="medium">0</span>
+              <span id="es-ws-oi-priority" class="es-ws-oi-priority" data-tone="medium">Medium</span>
+            </div>
+          </div>
+          <div id="es-ws-oi-fits" class="es-ws-oi-fits"></div>
+          <p id="es-ws-oi-crm-context" class="es-ws-oi-crm-context"></p>
+          <div class="es-ws-oi-block">
+            <p class="es-ws-oi-block-label">Why This Matters</p>
+            <ul id="es-ws-oi-reasons" class="es-ws-oi-reasons"></ul>
+          </div>
+          <div class="es-ws-oi-block">
+            <p class="es-ws-oi-block-label">Recommended Sales Motion</p>
+            <p id="es-ws-oi-motion" class="es-ws-oi-motion"></p>
+            <button type="button" id="es-ws-oi-motion-cta" class="es-ws-oi-motion-cta"></button>
+          </div>
+        </section>
+
         <section class="es-ws-card">
           <p class="es-ws-card-label">Primary actions</p>
           <div class="es-ws-actions">
@@ -415,6 +436,7 @@
     <script src="linkedin-crm-shared.js"></script>
     <script src="extension-context-normalize.js"></script>
     <script src="extension-contact-intelligence.js"></script>
+    <script src="extension-opportunity-intelligence.js"></script>
     <script src="extension-employee-row.js"></script>
     <script src="extension-workspace.js"></script>
     <script src="extension-copilot.js"></script>
