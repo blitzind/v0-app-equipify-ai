@@ -257,8 +257,9 @@ function initIntakeApp(options) {
     const platform = metadata?.source_platform || "website"
     const pageTitle = trimOrNull(metadata?.page_title)
     const contactName = trimOrNull(metadata?.contact_name)
-    const headline = trimOrNull(metadata?.headline)
-    const title = trimOrNull(metadata?.title) || headline
+    const headline = trimOrNull(metadata?.raw_headline) || trimOrNull(metadata?.headline)
+    const title =
+      trimOrNull(metadata?.job_title) || trimOrNull(metadata?.title) || headline
     const location = trimOrNull(metadata?.location)
     const contextKey = sourceUrl ?? trimOrNull(tabUrl)
     const isNewContext = Boolean(contextKey && contextKey !== state.lastAppliedContextUrl)
@@ -1001,7 +1002,7 @@ function initIntakeApp(options) {
     console.log("[Equipify Sales:inpage]", "sidebar_context_received", {
       hasMetadata: Boolean(metadata),
       contact: metadata?.contact_name ?? null,
-      title: metadata?.title ?? metadata?.headline ?? null,
+      title: metadata?.job_title ?? metadata?.title ?? metadata?.headline ?? null,
       company: metadata?.company_name ?? null,
       location: metadata?.location ?? null,
       profilePhoto: Boolean(metadata?.profile_photo_url),
@@ -1052,7 +1053,10 @@ function initIntakeApp(options) {
 
     payload.company_name = companyName
     if (!payload.contact_name && state.detected?.contact_name) payload.contact_name = state.detected.contact_name
-    if (!payload.title && state.detected?.headline) payload.title = state.detected.headline
+    if (!payload.title) {
+      payload.title =
+        state.detected?.job_title ?? state.detected?.title ?? state.detected?.headline ?? null
+    }
     if (!payload.linkedin_url && state.detected?.linkedin_url) payload.linkedin_url = state.detected.linkedin_url
     if (!payload.website && state.detected?.website) payload.website = state.detected.website
     if (!payload.location && state.detected?.location) payload.location = state.detected.location

@@ -49,6 +49,7 @@ function extractVisibleLinkedInCompanyPeople() {
       full_name: name,
       job_title: jobTitle,
       linkedin_url: linkedinUrl,
+      source_url: linkedinUrl,
       source: "linkedin_visible_page",
     })
   })

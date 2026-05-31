@@ -3,17 +3,11 @@
  */
 console.log("[Equipify Sales] linkedin-inpage-sidebar start")
 ;(function initEquipifySalesInpageSidebar() {
+  const layoutPush = window.EquipifyGrowthLayoutPush
   const SIDEBAR_ROOT_ID = "equipify-sales-inpage-sidebar-root"
-  const SIDEBAR_WIDTH_PX = 420
-  const BODY_CLASS = "equipify-sales-inpage-sidebar-open"
+  const SIDEBAR_WIDTH_PX = layoutPush?.SIDEBAR_WIDTH_PX ?? 420
+  const BODY_CLASS = layoutPush?.BODY_CLASS ?? "equipify-sales-inpage-sidebar-open"
   const DOCK_OFFSET_CLASS = "equipify-sales-floating-dock--sidebar-open"
-  const LAYOUT_RESERVE_SELECTORS = [
-    ".scaffold-layout__inner",
-    ".scaffold-layout__main",
-    "main.scaffold-layout__main",
-    ".application-outlet",
-    "#main-content",
-  ]
   const IFRAME_URL = chrome.runtime.getURL("inpage-sidebar.html")
   const CONTEXT_DEBOUNCE_MS = 250
 
@@ -143,119 +137,18 @@ console.log("[Equipify Sales] linkedin-inpage-sidebar start")
   function discoverLayoutContainer() {
     const topCard = window.__equipifyGrowthFindProfileTopCard?.(document)
     const discovered = window.__equipifyGrowthDiscoverMainContentContainer?.(document, topCard)
-    return discovered instanceof HTMLElement ? discovered : null
+    return discovered instanceof Element ? discovered : null
   }
 
-  function describeLayoutNode(node) {
-    return window.__equipifyGrowthDescribeElement?.(node) ?? node?.tagName?.toLowerCase() ?? null
-  }
-
-  function readNodeRectSnapshot(node, source) {
-    if (!(node instanceof HTMLElement)) return null
-    const rect = node.getBoundingClientRect()
-    const style = window.getComputedStyle(node)
-    return {
-      source,
-      selector: describeLayoutNode(node),
-      before_width: Math.round(rect.width),
-      after_width: Math.round(rect.width),
-      before_transform: style.transform,
-      after_transform: style.transform,
-      margin_right: style.marginRight,
-      max_width: style.maxWidth,
-      rect: {
-        x: Math.round(rect.x),
-        y: Math.round(rect.y),
-        width: Math.round(rect.width),
-        height: Math.round(rect.height),
-      },
-    }
-  }
-
-  function applyReserveToNode(node, open, source) {
-    if (!(node instanceof HTMLElement)) return
-    if (open) {
-      if (!node.dataset.equipifySidebarReserveBeforeWidth) {
-        node.dataset.equipifySidebarReserveBeforeWidth = String(Math.round(node.getBoundingClientRect().width))
-      }
-      node.dataset.equipifySidebarReserve = source
-      node.style.marginRight = `${SIDEBAR_WIDTH_PX}px`
-      node.style.maxWidth = `calc(100% - ${SIDEBAR_WIDTH_PX}px)`
-    } else if (node.dataset.equipifySidebarReserve) {
-      node.style.marginRight = ""
-      node.style.maxWidth = ""
-      delete node.dataset.equipifySidebarReserve
-      delete node.dataset.equipifySidebarReserveBeforeWidth
-    }
+  function logLayoutPush(payload) {
+    console.log("[Equipify Sales:layout-push]", payload)
   }
 
   function applyLayoutReserve(open) {
-    const discovered = discoverLayoutContainer()
-    const shiftedNodes = new Set()
-
-    if (discovered) {
-      applyReserveToNode(discovered, open, "discovered-main-content")
-      shiftedNodes.add(discovered)
-    }
-
-    for (const selector of LAYOUT_RESERVE_SELECTORS) {
-      document.querySelectorAll(selector).forEach((node) => {
-        if (!(node instanceof HTMLElement)) return
-        if (shiftedNodes.has(node)) return
-        applyReserveToNode(node, open, selector)
-      })
-    }
-
-    logLayoutAudit(open, discovered)
-  }
-
-  function readNodeLayoutSnapshot(node, selector) {
-    return readNodeRectSnapshot(node, selector)
-  }
-
-  function logLayoutAudit(open, discoveredNode = null) {
-    const selectors_found = []
-    const selectors_shifted = []
-    for (const selector of LAYOUT_RESERVE_SELECTORS) {
-      const nodes = document.querySelectorAll(selector)
-      if (nodes.length) selectors_found.push({ selector, count: nodes.length })
-      nodes.forEach((node) => {
-        if (!(node instanceof HTMLElement)) return
-        if (open && node.dataset.equipifySidebarReserve === selector) {
-          selectors_shifted.push(readNodeLayoutSnapshot(node, selector))
-        }
-      })
-    }
-
-    if (discoveredNode instanceof HTMLElement) {
-      selectors_found.push({
-        selector: "discovered-main-content",
-        count: 1,
-        node: describeLayoutNode(discoveredNode),
-      })
-      if (open && discoveredNode.dataset.equipifySidebarReserve === "discovered-main-content") {
-        const snapshot = readNodeRectSnapshot(discoveredNode, "discovered-main-content")
-        if (snapshot && discoveredNode.dataset.equipifySidebarReserveBeforeWidth) {
-          snapshot.before_width = Number(discoveredNode.dataset.equipifySidebarReserveBeforeWidth)
-        }
-        selectors_shifted.push(snapshot)
-      }
-    }
-
-    const bodyStyle = document.body ? window.getComputedStyle(document.body) : null
-    const htmlStyle = window.getComputedStyle(document.documentElement)
-
-    console.log("[Equipify Sales:layout-audit]", {
-      viewport_width: window.innerWidth,
-      panel_width: SIDEBAR_WIDTH_PX,
-      body_margin_right: bodyStyle?.marginRight ?? null,
-      html_margin_right: htmlStyle.marginRight ?? null,
-      body_class_open: document.body?.classList.contains(BODY_CLASS) ?? false,
-      html_class_open: document.documentElement.classList.contains(BODY_CLASS),
-      sidebar_open: open,
-      discovered_container: describeLayoutNode(discoveredNode),
-      selectors_found,
-      selectors_shifted,
+    layoutPush?.applyLayoutReserve?.(open, {
+      discoverLayoutContainer,
+      describeElement: window.__equipifyGrowthDescribeElement,
+      logLayoutPush,
     })
   }
 
@@ -321,6 +214,9 @@ console.log("[Equipify Sales] linkedin-inpage-sidebar start")
     lastPostedContextKey = null
     if (isOpen) queueContextPost({ force: true })
   })
+  window.addEventListener("resize", () => {
+    if (isOpen) applyLayoutReserve(true)
+  })
 
   let lastContextUrl = window.location.href
   const contextObserver = new MutationObserver(() => {
@@ -350,14 +246,4 @@ console.log("[Equipify Sales] linkedin-inpage-sidebar start")
     }
     return undefined
   })
-
-  function scheduleStartupLayoutProbe() {
-    const ctx = window.EquipifyGrowthLinkedInContext
-    if (!ctx) return
-    const kind = ctx.detectLinkedInPageKind(window.location.href)
-    if (kind !== "profile" && kind !== "company") return
-    window.setTimeout(() => logLayoutAudit(false), 1000)
-  }
-
-  scheduleStartupLayoutProbe()
 })()

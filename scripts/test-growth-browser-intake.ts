@@ -85,6 +85,14 @@ import {
   websiteOriginFromUrl,
 } from "../lib/growth/browser-intake/page-metadata-extract"
 
+function assertStringArrayEqual(actual: unknown, expected: string[]) {
+  assert.ok(Array.isArray(actual), "expected array")
+  assert.equal(actual.length, expected.length)
+  for (let index = 0; index < expected.length; index += 1) {
+    assert.equal(actual[index], expected[index])
+  }
+}
+
 assert.equal(GROWTH_BROWSER_INTAKE_QA_MARKER, "growth-browser-intake-v2")
 assert.equal("growth-browser-intake-lookup-v1", "growth-browser-intake-lookup-v1")
 assert.equal(
@@ -294,7 +302,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.26"/)
+assert.match(manifestSource, /"version": "4.3.29"/)
 assert.match(manifestSource, /https:\/\/m\.linkedin\.com\/in\/\*/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
@@ -326,7 +334,7 @@ assert.match(extensionBrandJs, /PANEL_LOGO_ASSET/)
 assert.match(extensionBrandJs, /panelLogoUrl/)
 assert.match(extensionBrandJs, /applyPanelLogo/)
 assert.match(extensionBrandJs, /PANEL_LOGO_VERSION/)
-assert.match(extensionBrandJs, /4\.3\.26/)
+assert.match(extensionBrandJs, /4\.3\.29/)
 assert.match(extensionBrandJs, /\?v=\$\{encodeURIComponent\(PANEL_LOGO_VERSION\)\}/)
 assert.match(extensionBrandJs, /\[Equipify Sales:logo-audit\]/)
 assert.match(extensionBrandJs, /PANEL_LOGO_INTRINSIC_WIDTH/)
@@ -481,12 +489,22 @@ assert.match(linkedinInpageSidebarJs, /equipify-inpage-sidebar-ready/)
 assert.match(linkedinInpageSidebarJs, /\[Equipify Sales:inpage\]/)
 assert.match(linkedinInpageSidebarJs, /contextCacheKey/)
 assert.match(linkedinInpageSidebarJs, /queueContextPost/)
-assert.match(linkedinInpageSidebarJs, /applyLayoutReserve/)
-assert.match(linkedinInpageSidebarJs, /LAYOUT_RESERVE_SELECTORS/)
 assert.match(linkedinInpageSidebarJs, /equipify-sales-floating-dock--sidebar-open/)
 assert.match(linkedinInpageSidebarJs, /equipify-sales-inpage-sidebar-open/)
+assert.match(linkedinInpageSidebarJs, /EquipifyGrowthLayoutPush/)
+assert.match(linkedinInpageSidebarJs, /\[Equipify Sales:layout-push]/)
 assert.match(linkedinInpageSidebarJs, /sidebar_context_posted/)
-assert.match(linkedinInpageSidebarJs, /marginRight/)
+
+const linkedinLayoutPushJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-layout-push.js"),
+  "utf8",
+)
+assert.match(linkedinLayoutPushJs, /EquipifyGrowthLayoutPush/)
+assert.match(linkedinLayoutPushJs, /resolveLayoutMode/)
+assert.match(linkedinLayoutPushJs, /applyLayoutReserve/)
+assert.match(linkedinLayoutPushJs, /restoreAllLayoutReserve/)
+assert.match(linkedinLayoutPushJs, /equipify-sales-inpage-sidebar-push/)
+assert.match(manifestSource, /linkedin-layout-push\.js/)
 
 const contactSavedJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/extension-contact-saved.js"),
@@ -534,35 +552,157 @@ const linkedinInpageSidebarCss = fs.readFileSync(
 )
 assert.match(linkedinInpageSidebarCss, /scaffold-layout__inner/)
 assert.match(linkedinInpageSidebarCss, /equipify-sales-inpage-sidebar-open/)
-assert.match(linkedinInpageSidebarCss, /margin-right/)
+assert.match(linkedinInpageSidebarCss, /equipify-sales-inpage-sidebar-push/)
+assert.match(linkedinInpageSidebarCss, /--equipify-sales-sidebar-width/)
+assert.match(linkedinInpageSidebarCss, /min-width: 901px/)
+assert.match(linkedinInpageSidebarCss, /global-nav/)
+assert.doesNotMatch(linkedinInpageSidebarCss, /body\.equipify-sales-inpage-sidebar-open[\s\S]*margin-right/)
 
-function simulateLayoutReserve(open: boolean) {
-  const shifted: Array<{ selector: string; marginRight: string; maxWidth: string }> = []
-  const selectors = [
-    ".scaffold-layout__inner",
-    ".scaffold-layout__main",
-    "main.scaffold-layout__main",
-    ".application-outlet",
-    "#main-content",
-  ]
-  const width = "420px"
-  if (open) {
-    for (const selector of selectors) {
-      shifted.push({
-        selector,
-        marginRight: width,
-        maxWidth: `calc(100% - ${width})`,
-      })
-    }
+function runLayoutPushHarness(viewportWidth = 1280): {
+  document: Document
+  layoutPush: {
+    BODY_CLASS: string
+    PUSH_CLASS: string
+    CSS_VAR_NAME: string
+    SIDEBAR_WIDTH_PX: number
+    DESKTOP_MIN_WIDTH: number
+    resolveLayoutMode: () => "push" | "overlay"
+    applyReserveToNode: (node: Element, open: boolean, source: string) => boolean
+    restoreAllLayoutReserve: () => string[]
+    applyLayoutReserve: (open: boolean) => void
+    setSidebarWidthVariable: (open: boolean, mode: "push" | "overlay") => void
+    setPushModeClass: (open: boolean, mode: "push" | "overlay") => void
   }
-  return shifted
+} {
+  const html = `<!doctype html><html><head></head><body>
+    <nav class="global-nav">Global nav</nav>
+    <main class="scaffold-layout__main">Main content</main>
+    <div class="scaffold-layout__inner">Inner content</div>
+  </body></html>`
+  const { document, window: domWindow } = parseHTML(html)
+  Object.defineProperty(domWindow, "innerWidth", { value: viewportWidth, configurable: true, writable: true })
+  ;(domWindow as unknown as { location: { href: string } }).location = {
+    href: "https://www.linkedin.com/in/example/",
+  }
+  const source = fs.readFileSync(
+    path.join(process.cwd(), "extensions/growth-browser-intake/linkedin-layout-push.js"),
+    "utf8",
+  )
+  const getComputedStyle =
+    domWindow.getComputedStyle?.bind(domWindow) ??
+    ((el: Element & { style?: { marginRight?: string; maxWidth?: string } }) => ({
+      marginRight: el.style?.marginRight ?? "",
+      maxWidth: el.style?.maxWidth ?? "",
+      transform: "none",
+    }))
+  domWindow.getComputedStyle = getComputedStyle as typeof domWindow.getComputedStyle
+  const sandbox: Record<string, unknown> = {
+    console: { log: () => {}, error: () => {} },
+    document,
+    window: domWindow,
+    getComputedStyle,
+  }
+  const context = vm.createContext(sandbox)
+  vm.runInContext(source, context)
+  const layoutPush = (context.window as { EquipifyGrowthLayoutPush?: Record<string, unknown> })
+    .EquipifyGrowthLayoutPush as {
+    BODY_CLASS: string
+    PUSH_CLASS: string
+    CSS_VAR_NAME: string
+    SIDEBAR_WIDTH_PX: number
+    DESKTOP_MIN_WIDTH: number
+    resolveLayoutMode: () => "push" | "overlay"
+    applyReserveToNode: (node: Element, open: boolean, source: string) => boolean
+    restoreAllLayoutReserve: () => string[]
+    applyLayoutReserve: (open: boolean) => void
+    setSidebarWidthVariable: (open: boolean, mode: "push" | "overlay") => void
+    setPushModeClass: (open: boolean, mode: "push" | "overlay") => void
+  }
+  return { document, layoutPush }
 }
 
-const openShift = simulateLayoutReserve(true)
-assert.equal(openShift.length, 5, "open should reserve layout selectors")
-assert.ok(openShift.every((row) => row.marginRight === "420px"))
-const closedShift = simulateLayoutReserve(false)
-assert.equal(closedShift.length, 0, "close should clear layout reserve")
+const desktopLayoutHarness = runLayoutPushHarness(1280)
+assert.equal(desktopLayoutHarness.layoutPush.resolveLayoutMode(), "push")
+const mobileLayoutHarness = runLayoutPushHarness(800)
+assert.equal(mobileLayoutHarness.layoutPush.resolveLayoutMode(), "overlay")
+
+const mainNode = desktopLayoutHarness.document.querySelector(".scaffold-layout__main") as HTMLElement
+assert.ok(mainNode)
+assert.equal(
+  desktopLayoutHarness.layoutPush.applyReserveToNode(
+    mainNode,
+    true,
+    ".scaffold-layout__main",
+    1280,
+  ),
+  true,
+)
+assert.equal(mainNode.style.marginRight, "420px")
+assert.equal(mainNode.style.maxWidth, "calc(100% - 420px)")
+assert.equal(
+  desktopLayoutHarness.layoutPush.restoreAllLayoutReserve().includes(".scaffold-layout__main"),
+  true,
+)
+assert.equal(mainNode.style.marginRight, "")
+assert.equal(mainNode.style.maxWidth, "")
+
+const navNode = desktopLayoutHarness.document.querySelector(".global-nav") as HTMLElement
+assert.equal(desktopLayoutHarness.layoutPush.applyReserveToNode(navNode, true, ".global-nav", 1280), false)
+
+desktopLayoutHarness.document.documentElement.classList.add(desktopLayoutHarness.layoutPush.BODY_CLASS)
+desktopLayoutHarness.layoutPush.setSidebarWidthVariable(true, "push")
+desktopLayoutHarness.layoutPush.setPushModeClass(true, "push")
+assert.equal(
+  desktopLayoutHarness.document.documentElement.style.getPropertyValue("--equipify-sales-sidebar-width"),
+  "420px",
+)
+assert.equal(
+  desktopLayoutHarness.document.documentElement.classList.contains(
+    desktopLayoutHarness.layoutPush.PUSH_CLASS,
+  ),
+  true,
+)
+
+desktopLayoutHarness.layoutPush.applyLayoutReserve(true, {
+  document: desktopLayoutHarness.document,
+  root: desktopLayoutHarness.document.documentElement,
+  viewportWidth: 1280,
+  logLayoutPush: () => {},
+})
+const shiftedMain = desktopLayoutHarness.document.querySelector(
+  ".scaffold-layout__main",
+) as HTMLElement
+assert.equal(shiftedMain.style.marginRight, "420px")
+
+desktopLayoutHarness.layoutPush.applyLayoutReserve(false, {
+  document: desktopLayoutHarness.document,
+  root: desktopLayoutHarness.document.documentElement,
+  viewportWidth: 1280,
+  logLayoutPush: () => {},
+})
+assert.equal(shiftedMain.style.marginRight, "")
+assert.ok(
+  !desktopLayoutHarness.document.documentElement.style.getPropertyValue(
+    "--equipify-sales-sidebar-width",
+  ),
+)
+assert.equal(
+  desktopLayoutHarness.document.documentElement.classList.contains(
+    desktopLayoutHarness.layoutPush.PUSH_CLASS,
+  ),
+  false,
+)
+
+const overlayHarness = runLayoutPushHarness(800)
+const overlayMain = overlayHarness.document.querySelector(".scaffold-layout__main") as HTMLElement
+overlayHarness.layoutPush.applyLayoutReserve(true, {
+  document: overlayHarness.document,
+  root: overlayHarness.document.documentElement,
+  viewportWidth: 800,
+  logLayoutPush: () => {},
+})
+assert.ok(!overlayMain.style.marginRight)
+assert.equal(overlayHarness.layoutPush.resolveLayoutMode(), "overlay")
 
 const inpageSidebarHtml = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/inpage-sidebar.html"),
@@ -703,6 +843,7 @@ assert.match(salesWorkspaceCss, /\.es-ws-brand-logo-img[\s\S]*background-color: 
 assert.doesNotMatch(salesWorkspaceCss, /es-ws-brand-title/)
 assert.match(popupCss, /\.es-launcher-logo[\s\S]*background: transparent/)
 assert.match(salesWorkspaceCss, /es-ws-employees-list/)
+assert.match(salesWorkspaceCss, /es-ws-employee-actions/)
 assert.match(salesWorkspaceCss, /es-ws-company-tabs/)
 assert.match(salesWorkspaceCss, /es-ws-similar-card/)
 
@@ -735,6 +876,156 @@ assert.match(extensionWorkspaceJs, /resolveProfileDisplayName/)
 assert.match(extensionWorkspaceJs, /inferProfileNameFromPageTitle/)
 assert.match(extensionWorkspaceJs, /render_input_payload/)
 assert.doesNotMatch(extensionWorkspaceJs, /hidden LinkedIn scraping|linkedin.*scrap/i)
+assert.match(extensionWorkspaceJs, /EquipifyGrowthEmployeeRow/)
+assert.match(extensionWorkspaceJs, /buildEmployeeRowHtml/)
+assert.match(extensionWorkspaceJs, /bindEmployeeRowActions/)
+
+const extensionEmployeeRowJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/extension-employee-row.js"),
+  "utf8",
+)
+assert.match(extensionEmployeeRowJs, /resolveEmployeeViewUrl/)
+assert.match(extensionEmployeeRowJs, /buildEmployeeRowHtml/)
+assert.match(extensionEmployeeRowJs, /bindEmployeeRowActions/)
+assert.match(extensionEmployeeRowJs, /No public profile available/)
+
+function runEmployeeRowHarness(): {
+  resolveEmployeeViewUrl: (contact: Record<string, unknown>) => string | null
+  buildEmployeeRowHtml: (contact: Record<string, unknown>) => string
+  bindEmployeeRowActions: (
+    list: Element,
+    deps?: {
+      openViewUrl?: (url: string) => void
+      triggerAdd?: () => void
+      triggerOpenLead?: (leadId: string) => void
+    },
+  ) => void
+  document: Document
+} {
+  const { document } = parseHTML("<!doctype html><html><body></body></html>")
+  const source = fs.readFileSync(
+    path.join(process.cwd(), "extensions/growth-browser-intake/extension-employee-row.js"),
+    "utf8",
+  )
+  const sandbox: Record<string, unknown> = {
+    document,
+    window: {},
+  }
+  const context = vm.createContext(sandbox)
+  vm.runInContext(source, context)
+  const employeeRow = (context.window as { EquipifyGrowthEmployeeRow?: Record<string, unknown> })
+    .EquipifyGrowthEmployeeRow as {
+    resolveEmployeeViewUrl: (contact: Record<string, unknown>) => string | null
+    buildEmployeeRowHtml: (contact: Record<string, unknown>) => string
+    bindEmployeeRowActions: (
+      list: Element,
+      deps?: {
+        openViewUrl?: (url: string) => void
+        triggerAdd?: () => void
+        triggerOpenLead?: (leadId: string) => void
+      },
+    ) => void
+  }
+  return {
+    resolveEmployeeViewUrl: employeeRow.resolveEmployeeViewUrl,
+    buildEmployeeRowHtml: employeeRow.buildEmployeeRowHtml,
+    bindEmployeeRowActions: employeeRow.bindEmployeeRowActions,
+    document,
+  }
+}
+
+const employeeRowHarness = runEmployeeRowHarness()
+assert.equal(
+  employeeRowHarness.resolveEmployeeViewUrl({
+    linkedin_url: "https://www.linkedin.com/in/jane-doe/",
+    source_url: "https://example.com/person",
+  }),
+  "https://www.linkedin.com/in/jane-doe/",
+)
+assert.equal(
+  employeeRowHarness.resolveEmployeeViewUrl({
+    profile_url: "https://example.com/profile",
+    source_url: "https://example.com/source",
+  }),
+  "https://example.com/profile",
+)
+assert.equal(employeeRowHarness.resolveEmployeeViewUrl({}), null)
+
+const linkedInEmployeeHtml = employeeRowHarness.buildEmployeeRowHtml({
+  name: "Jane Doe",
+  title: "Biomedical Engineer",
+  department: "Engineering",
+  seniority: "Individual Contributor",
+  crm_status: "Not In CRM",
+  linkedin_url: "https://www.linkedin.com/in/jane-doe/",
+  source: "linkedin_visible",
+})
+assert.match(linkedInEmployeeHtml, /es-ws-employee-view/)
+assert.match(linkedInEmployeeHtml, /es-ws-employee-add/)
+assert.match(linkedInEmployeeHtml, />View</)
+assert.match(linkedInEmployeeHtml, />Add</)
+assert.match(linkedInEmployeeHtml, /data-view-url="https:\/\/www\.linkedin\.com\/in\/jane-doe\/"/)
+assert.doesNotMatch(linkedInEmployeeHtml, /disabled/)
+
+const noUrlEmployeeHtml = employeeRowHarness.buildEmployeeRowHtml({
+  name: "John Smith",
+  title: "Technician",
+  department: "Operations",
+  seniority: "Individual Contributor",
+  crm_status: "Not In CRM",
+  source: "crm",
+})
+assert.match(noUrlEmployeeHtml, /es-ws-employee-view[^>]*disabled/)
+assert.match(noUrlEmployeeHtml, /No public profile available/)
+
+const crmEmployeeHtml = employeeRowHarness.buildEmployeeRowHtml({
+  name: "Existing Lead",
+  title: "Director",
+  department: "Leadership",
+  seniority: "Director",
+  crm_status: "qualified",
+  lead_id: "lead-123",
+  linkedin_url: "https://www.linkedin.com/in/existing-lead/",
+})
+assert.match(crmEmployeeHtml, />Open</)
+assert.match(crmEmployeeHtml, /data-lead-id="lead-123"/)
+
+const list = employeeRowHarness.document.createElement("div")
+list.innerHTML = employeeRowHarness.buildEmployeeRowHtml({
+  name: "Jane Doe",
+  title: "Biomedical Engineer",
+  department: "Engineering",
+  seniority: "Individual Contributor",
+  crm_status: "Not In CRM",
+  linkedin_url: "https://www.linkedin.com/in/jane-doe/",
+})
+const openedUrls: string[] = []
+let addTriggered = false
+let openLeadTriggered = false
+employeeRowHarness.bindEmployeeRowActions(list, {
+  openViewUrl: (url) => {
+    openedUrls.push(url)
+  },
+  triggerAdd: () => {
+    addTriggered = true
+  },
+  triggerOpenLead: () => {
+    openLeadTriggered = true
+  },
+})
+const viewButton = list.querySelector(".es-ws-employee-view") as HTMLButtonElement
+viewButton?.click()
+assert.deepEqual(openedUrls, ["https://www.linkedin.com/in/jane-doe/"])
+assert.equal(addTriggered, false)
+assert.equal(openLeadTriggered, false)
+
+addTriggered = false
+openLeadTriggered = false
+const addButton = list.querySelector(".es-ws-employee-add") as HTMLButtonElement
+addButton?.click()
+assert.equal(addTriggered, true)
+assert.equal(openLeadTriggered, false)
+assert.deepEqual(openedUrls, ["https://www.linkedin.com/in/jane-doe/"])
 
 const extensionConfigJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/extension-config.js"),
@@ -793,7 +1084,7 @@ assert.match(pageMetadataJs, /auditExperienceDiscovery/)
 assert.match(intakeAppJs, /Company not detected/)
 assert.match(extensionWorkspaceJs, /COMPANY_INTEL_UNAVAILABLE/)
 assert.match(extensionWorkspaceJs, /setCompanyIntelAvailability/)
-assert.match(linkedinInpageSidebarJs, /\[Equipify Sales:layout-audit\]/)
+assert.match(linkedinInpageSidebarJs, /\[Equipify Sales:layout-push]/)
 assert.match(extensionStorageJs, /\[Equipify Sales\] content script loaded/)
 assert.match(pageMetadataJs, /\[Equipify Sales\] page-metadata start/)
 assert.match(pageMetadataJs, /\[Equipify Sales\] extractVisiblePageMetadata invoked/)
@@ -821,7 +1112,7 @@ assert.match(pageMetadataJs, /buildDomAudit/)
 assert.match(pageMetadataJs, /findProfileHeroContainer/)
 assert.match(pageMetadataJs, /parseConcatenatedHeadlineTitleCompany/)
 assert.match(linkedinInpageSidebarJs, /discoverLayoutContainer/)
-assert.match(linkedinInpageSidebarJs, /scheduleStartupLayoutProbe/)
+assert.match(linkedinInpageSidebarJs, /addEventListener\("resize"/)
 
 const PROFILE_PHOTO_FIXTURE = `<main>
   <nav class="global-nav"><img src="https://media.licdn.com/nav-avatar.jpg" alt="Me menu" /></nav>
@@ -1186,6 +1477,13 @@ const RICARDO_LIVE_DOM_FIXTURE = `<!DOCTYPE html><html><head><title>Ricardo Sanc
 </div>
 </body></html>`
 
+type StructuredHeadlineParse = {
+  raw_headline: string | null
+  title: string | null
+  certifications: string[]
+  ignored_segments: string[]
+}
+
 type PageMetadataHarness = {
   document: Document
   metadata: Record<string, unknown> | null | undefined
@@ -1199,10 +1497,12 @@ type PageMetadataHarness = {
   heroCompanySignalsAudit: Record<string, unknown> | null | undefined
   headlineExtractionAudit: Record<string, unknown> | null | undefined
   headlineCandidatesAudit: Record<string, unknown> | null | undefined
+  titleClassificationAudit: Record<string, unknown> | null | undefined
   domAudit: Record<string, unknown> | null | undefined
   findProfileTopCard: (doc: Document) => Element | null
   findExperienceSection: (doc: Document) => Element | null
   discoverMainContentContainer: (doc: Document, topCard: Element | null) => Element | null
+  parseStructuredProfileHeadline: (headline: string) => StructuredHeadlineParse | null
 }
 
 function runPageMetadataHarness(html: string, url: string): PageMetadataHarness {
@@ -1222,6 +1522,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
   const companyFinalSelectionLogs: Record<string, unknown>[] = []
   const headlineExtractionLogs: Record<string, unknown>[] = []
   const headlineCandidatesLogs: Record<string, unknown>[] = []
+  const titleClassificationLogs: Record<string, unknown>[] = []
   const domAuditLogs: Record<string, unknown>[] = []
   const pageMetadataPath = path.join(process.cwd(), "extensions/growth-browser-intake/page-metadata.js")
   const pageMetadataSource = fs.readFileSync(pageMetadataPath, "utf8")
@@ -1257,6 +1558,9 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
         if (label === "[Equipify Sales:headline-candidates]") {
           headlineCandidatesLogs.push(args[1] as Record<string, unknown>)
         }
+        if (label === "[Equipify Sales:title-classification]") {
+          titleClassificationLogs.push(args[1] as Record<string, unknown>)
+        }
         if (label === "[Equipify Sales:hero-scoring]") heroScoringLogs.push(args[1] as Record<string, unknown>)
         if (label === "[Equipify Sales:dom-audit]") domAuditLogs.push(args[1] as Record<string, unknown>)
       },
@@ -1264,7 +1568,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ version: "4.3.26" }),
+        getManifest: () => ({ version: "4.3.29" }),
       },
     },
     setTimeout: () => 0,
@@ -1294,6 +1598,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     __equipifyGrowthFindProfileTopCard?: (doc: Document) => Element | null
     __equipifyGrowthFindExperienceSection?: (doc: Document) => Element | null
     __equipifyGrowthDiscoverMainContentContainer?: (doc: Document, topCard: Element | null) => Element | null
+    __equipifyGrowthParseStructuredProfileHeadline?: (headline: string) => StructuredHeadlineParse
   }
 
   return {
@@ -1311,11 +1616,14 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     companyFinalSelectionAudit: companyFinalSelectionLogs.at(-1) ?? null,
     headlineExtractionAudit: headlineExtractionLogs.at(-1) ?? null,
     headlineCandidatesAudit: headlineCandidatesLogs.at(-1) ?? null,
+    titleClassificationAudit: titleClassificationLogs.at(-1) ?? null,
     domAudit: domAuditLogs[0] ?? null,
     findProfileTopCard: (doc) => win.__equipifyGrowthFindProfileTopCard?.(doc) ?? null,
     findExperienceSection: (doc) => win.__equipifyGrowthFindExperienceSection?.(doc) ?? null,
     discoverMainContentContainer: (doc, topCard) =>
       win.__equipifyGrowthDiscoverMainContentContainer?.(doc, topCard) ?? null,
+    parseStructuredProfileHeadline: (headline) =>
+      win.__equipifyGrowthParseStructuredProfileHeadline?.(headline) ?? null,
   }
 }
 
@@ -1365,7 +1673,12 @@ assert.notEqual(
 )
 assert.equal(ricardoModernHarness.metadata?.profile_photo_url, "https://media.licdn.com/ricardo-headshot.jpg")
 assert.equal(ricardoModernHarness.metadata?.headline, "Biomedical Equipment Technician")
+assert.equal(ricardoModernHarness.metadata?.raw_headline, "Biomedical Equipment Technician")
+assert.equal(ricardoModernHarness.metadata?.job_title, "Biomedical Equipment Technician")
 assert.equal(ricardoModernHarness.metadata?.title, "Biomedical Equipment Technician")
+assert.ok(Array.isArray(ricardoModernHarness.metadata?.certifications))
+assert.equal((ricardoModernHarness.metadata?.certifications as unknown[] | undefined)?.length, 0)
+assert.equal(ricardoModernHarness.titleClassificationAudit?.title, "Biomedical Equipment Technician")
 assert.equal(ricardoModernHarness.metadata?.company_name, "SHARP MEMORIAL HOSPITAL")
 assert.doesNotMatch(String(ricardoModernHarness.metadata?.headline ?? ""), /SHARP MEMORIAL HOSPITAL/i)
 assert.ok(
@@ -1397,9 +1710,54 @@ const RICARDO_CERT_HEADLINE_FIXTURE = RICARDO_MODERN_DESKTOP_FIXTURE.replace(
   "Biomedical Equipment Technician | AAMI CBET · SHARP MEMORIAL HOSPITAL",
 )
 const ricardoCertHarness = runPageMetadataHarness(RICARDO_CERT_HEADLINE_FIXTURE, ricardoModernUrl)
+assert.equal(
+  ricardoCertHarness.metadata?.raw_headline,
+  "Biomedical Equipment Technician | AAMI CBET",
+)
 assert.equal(ricardoCertHarness.metadata?.headline, "Biomedical Equipment Technician | AAMI CBET")
-assert.match(String(ricardoCertHarness.metadata?.headline ?? ""), /AAMI CBET/)
-assert.doesNotMatch(String(ricardoCertHarness.metadata?.headline ?? ""), /SHARP MEMORIAL HOSPITAL/i)
+assert.equal(ricardoCertHarness.metadata?.job_title, "Biomedical Equipment Technician")
+assert.equal(ricardoCertHarness.metadata?.title, "Biomedical Equipment Technician")
+assertStringArrayEqual(ricardoCertHarness.metadata?.certifications, ["AAMI CBET"])
+assert.doesNotMatch(String(ricardoCertHarness.metadata?.job_title ?? ""), /AAMI CBET/)
+assert.doesNotMatch(String(ricardoCertHarness.metadata?.title ?? ""), /AAMI CBET/)
+assert.doesNotMatch(String(ricardoCertHarness.metadata?.raw_headline ?? ""), /SHARP MEMORIAL HOSPITAL/i)
+
+const RICARDO_MULTI_CERT_HEADLINE =
+  "Medical Equipment Technician | Lean Six Sigma Yellow Belt | OSHA-10 | Certified Associate Biomedical Technology"
+const RICARDO_MULTI_CERT_HEADLINE_FIXTURE = RICARDO_MODERN_DESKTOP_FIXTURE.replace(
+  "Biomedical Equipment TechnicianSHARP MEMORIAL HOSPITAL",
+  RICARDO_MULTI_CERT_HEADLINE,
+)
+const ricardoMultiCertHarness = runPageMetadataHarness(RICARDO_MULTI_CERT_HEADLINE_FIXTURE, ricardoModernUrl)
+assert.equal(ricardoMultiCertHarness.metadata?.raw_headline, RICARDO_MULTI_CERT_HEADLINE)
+assert.equal(ricardoMultiCertHarness.metadata?.job_title, "Medical Equipment Technician")
+assert.equal(ricardoMultiCertHarness.metadata?.title, "Medical Equipment Technician")
+assertStringArrayEqual(ricardoMultiCertHarness.metadata?.certifications, [
+  "Lean Six Sigma Yellow Belt",
+  "OSHA-10",
+  "Certified Associate Biomedical Technology",
+])
+assert.equal(ricardoMultiCertHarness.titleClassificationAudit?.title, "Medical Equipment Technician")
+assertStringArrayEqual(ricardoMultiCertHarness.titleClassificationAudit?.certifications, [
+  "Lean Six Sigma Yellow Belt",
+  "OSHA-10",
+  "Certified Associate Biomedical Technology",
+])
+assertStringArrayEqual(ricardoMultiCertHarness.titleClassificationAudit?.ignored_segments, [])
+
+assert.equal(ricardoMultiCertHarness.metadata?.company_name, "SHARP MEMORIAL HOSPITAL")
+
+const slashParsed = ricardoModernHarness.parseStructuredProfileHeadline(
+  "Biomedical Engineer / PMP / AWS Solutions Architect",
+)
+assert.equal(slashParsed?.title, "Biomedical Engineer")
+assertStringArrayEqual(slashParsed?.certifications, ["PMP", "AWS Solutions Architect"])
+
+const bulletParsed = ricardoModernHarness.parseStructuredProfileHeadline(
+  "Clinical Engineer • CompTIA A+ • ITIL Foundation",
+)
+assert.equal(bulletParsed?.title, "Clinical Engineer")
+assertStringArrayEqual(bulletParsed?.certifications, ["CompTIA A+", "ITIL Foundation"])
 
 assert.ok(Array.isArray(ricardoModernHarness.domAudit?.h1s))
 assert.ok(Array.isArray(ricardoModernHarness.domAudit?.profile_images))
@@ -1482,6 +1840,8 @@ assert.match(pageMetadataJs, /\[Equipify Sales:hero-company-candidates\]/)
 assert.match(pageMetadataJs, /\[Equipify Sales:company-final-selection\]/)
 assert.match(pageMetadataJs, /sanitizeHeadlineAfterCompanySelection/)
 assert.match(pageMetadataJs, /\[Equipify Sales:headline-extraction]/)
+assert.match(pageMetadataJs, /parseStructuredProfileHeadline/)
+assert.match(pageMetadataJs, /\[Equipify Sales:title-classification]/)
 assert.match(pageMetadataJs, /isValidHeadlineCandidate/)
 assert.match(pageMetadataJs, /\[Equipify Sales:headline-candidates]/)
 assert.match(pageMetadataJs, /resolveProfileHeadlineSelection/)
@@ -1573,7 +1933,7 @@ assert.equal(ricardoLiveHarness.profileImageAudit?.hero_container_found, true)
 assert.equal(ricardoLiveHarness.profileImageAudit?.selected_profile_image, "https://media.licdn.com/ricardo-headshot.jpg")
 assert.ok(Number(ricardoLiveHarness.heroScoringAudit?.candidate_count) > 0)
 assert.match(String(ricardoLiveHarness.heroScoringAudit?.selected_reason ?? ""), /hero-scoring:/)
-assert.match(linkedinInpageSidebarJs, /discovered-main-content/)
+assert.match(linkedinLayoutPushJs, /discovered-main-content/)
 
 const LINKEDIN_PROFILE_FIXTURE = `<main>
   <h1 class="text-heading-xlarge">Jane Doe</h1>
@@ -1857,6 +2217,7 @@ assert.match(sidepanelHtml, /equipify-sales-wordmark\.png/)
 assert.match(sidepanelHtml, /extension-brand.js/)
 assert.match(sidepanelHtml, /width="1024"/)
 assert.doesNotMatch(sidepanelHtml, /equipify-lightning\.png/)
+assert.match(sidepanelHtml, /extension-employee-row.js/)
 assert.match(sidepanelHtml, /extension-workspace.js/)
 assert.match(sidepanelHtml, /sales-workspace.css/)
 assert.match(sidepanelHtml, /workspace-refresh-btn/)

@@ -119,8 +119,9 @@
   function resolveProfileTitle(detected, formValues) {
     return (
       trimOrNull(formValues?.title) ||
+      trimOrNull(detected?.job_title) ||
       trimOrNull(detected?.title) ||
-      parseHeadlineParts(detected?.headline).title ||
+      parseHeadlineParts(detected?.raw_headline ?? detected?.headline).title ||
       PUBLIC_NOT_FOUND
     )
   }
@@ -478,6 +479,7 @@
   function renderEmployees(context, visiblePeople = []) {
     const list = document.getElementById("es-ws-employees-list")
     if (!list) return
+    const employeeRow = window.EquipifyGrowthEmployeeRow
 
     const relationshipMap = context?.company_relationship_map ?? {}
     const crmRows = [
@@ -485,6 +487,9 @@
       ...(relationshipMap.related_leads ?? []),
     ].map((contact) => ({
       ...contact,
+      linkedin_url: trimOrNull(contact.linkedin_url),
+      profile_url: trimOrNull(contact.profile_url),
+      source_url: trimOrNull(contact.source_url),
       department: contact.department ?? inferDepartment(contact.title),
       seniority: contact.seniority ?? inferSeniority(contact.title),
       crm_status: contact.status ? contact.status.replace(/_/g, " ") : "Not In CRM",
@@ -494,13 +499,15 @@
     const visibleRows = (visiblePeople ?? []).map((person) => ({
       name: person.full_name ?? person.name,
       title: person.job_title ?? person.title,
-      linkedin_url: person.linkedin_url ?? null,
+      linkedin_url: trimOrNull(person.linkedin_url),
+      profile_url: trimOrNull(person.profile_url),
+      source_url: trimOrNull(person.source_url) ?? trimOrNull(person.linkedin_url),
       profile_photo_url: person.profile_photo_url ?? null,
       department: inferDepartment(person.job_title ?? person.title),
       seniority: inferSeniority(person.job_title ?? person.title),
       crm_status: "Not In CRM",
       lead_id: null,
-      source: "linkedin_visible",
+      source: trimOrNull(person.source) ?? "linkedin_visible",
     }))
 
     const merged = [...crmRows]
@@ -569,29 +576,10 @@
 
     list.innerHTML = contacts
       .slice(0, 6)
-      .map((contact) => {
-        return `
-          <div class="es-ws-employee-row">
-            <div>
-              <div class="es-ws-employee-name">${escapeHtml(contact.name ?? "Company contact")}</div>
-              <div class="es-ws-employee-title">${escapeHtml(contact.title ?? "Title unknown")}</div>
-              <div class="es-ws-employee-meta">${escapeHtml(contact.department)} · ${escapeHtml(contact.seniority)} · ${escapeHtml(contact.crm_status)}</div>
-            </div>
-            <button type="button" class="es-ws-employee-action" data-lead-id="${escapeHtml(contact.lead_id ?? "")}">
-              ${contact.lead_id ? "Open" : "Add"}
-            </button>
-          </div>
-        `
-      })
+      .map((contact) => employeeRow?.buildEmployeeRowHtml?.(contact, escapeHtml) ?? "")
       .join("")
 
-    list.querySelectorAll(".es-ws-employee-action").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const leadId = btn.dataset.leadId
-        if (leadId) document.getElementById("linkedin-open-lead-btn")?.click()
-        else document.getElementById("linkedin-add-btn")?.click()
-      })
-    })
+    employeeRow?.bindEmployeeRowActions?.(list)
   }
 
   function renderTechnologies(detected, context) {

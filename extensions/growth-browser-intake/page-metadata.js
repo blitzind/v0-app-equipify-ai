@@ -2190,6 +2190,68 @@ function sanitizeHeadlineAfterCompanySelection(rawHeadline, companyName, options
   return payload
 }
 
+const HEADLINE_CERTIFICATION_INDICATORS_RE =
+  /\b(OSHA|Six Sigma|Yellow Belt|Green Belt|Black Belt|CBET|AAMI|Certified|Certification|Certificate|PMP|CISSP|CompTIA|AWS|Azure|ITIL|Lean Six Sigma)\b/i
+
+function splitHeadlineSegments(rawHeadline) {
+  const normalized = normalizeVisibleText(rawHeadline)
+  if (!normalized) return []
+  return normalized
+    .split(/\s*[|·•/*]\s*/)
+    .map((segment) => normalizeVisibleText(segment))
+    .filter(Boolean)
+}
+
+function classifyHeadlineSegment(segment) {
+  const text = normalizeVisibleText(segment)
+  if (!text) return { kind: "OTHER", text: null }
+
+  if (HEADLINE_CERTIFICATION_INDICATORS_RE.test(text)) {
+    return { kind: "CERTIFICATION", text }
+  }
+  if (HEADLINE_ROLE_WORDS_RE.test(text) || /\bat\s+[A-Z]/i.test(text)) {
+    return { kind: "TITLE", text }
+  }
+  return { kind: "OTHER", text }
+}
+
+function parseStructuredProfileHeadline(rawHeadline) {
+  const raw_headline = normalizeVisibleText(rawHeadline)
+  const segments = splitHeadlineSegments(raw_headline)
+  const certifications = []
+  const ignored_segments = []
+  let title = null
+
+  if (segments.length === 0) {
+    return { raw_headline: raw_headline || null, title: null, certifications, ignored_segments }
+  }
+
+  if (segments.length === 1) {
+    const classification = classifyHeadlineSegment(segments[0])
+    if (classification.kind === "TITLE") title = classification.text
+    else if (classification.kind === "CERTIFICATION") certifications.push(classification.text)
+    else if (classification.text) ignored_segments.push(classification.text)
+    return { raw_headline, title, certifications, ignored_segments }
+  }
+
+  for (const segment of segments) {
+    const classification = classifyHeadlineSegment(segment)
+    if (classification.kind === "TITLE" && !title) {
+      title = classification.text
+    } else if (classification.kind === "CERTIFICATION") {
+      certifications.push(classification.text)
+    } else if (classification.text) {
+      ignored_segments.push(classification.text)
+    }
+  }
+
+  return { raw_headline, title, certifications, ignored_segments }
+}
+
+function logTitleClassification(payload) {
+  console.log("[Equipify Sales:title-classification]", payload)
+}
+
 function collectEntityLinePlainTextCompanies(topCard) {
   const names = []
   if (!topCard) return names
@@ -3579,7 +3641,15 @@ function extractLinkedInProfile(doc) {
   })
   const sanitizedHeadline = headlineExtraction.cleaned_headline ?? headline
   const sanitizedHeadlineParts = parseLinkedInHeadline(sanitizedHeadline)
+  const structuredHeadline = parseStructuredProfileHeadline(sanitizedHeadline)
+  logTitleClassification({
+    raw_headline: structuredHeadline.raw_headline,
+    title: structuredHeadline.title,
+    certifications: structuredHeadline.certifications,
+    ignored_segments: structuredHeadline.ignored_segments,
+  })
   let current_title =
+    structuredHeadline.title ??
     resolveProfileTitleExtraction(topCard, experienceEntries, sanitizedHeadlineParts, extractionAudit) ??
     parsedHeadline.title ??
     sanitizedHeadlineParts.title
@@ -3588,8 +3658,13 @@ function extractLinkedInProfile(doc) {
     current_title &&
     headlineContainsCompanyName(current_title, current_company)
   ) {
-    current_title = sanitizedHeadlineParts.title ?? parsedHeadline.title ?? sanitizedHeadline
+    current_title =
+      structuredHeadline.title ??
+      sanitizedHeadlineParts.title ??
+      parsedHeadline.title ??
+      sanitizedHeadline
   }
+  const job_title = current_title
 
   const linkedin_company_url = companySelection.linkedin_company_url
   const companyAnchor = companySelection.anchor ?? findTopCardCompanyAnchor(topCard, contact_name, headline)
@@ -3607,8 +3682,11 @@ function extractLinkedInProfile(doc) {
   const rawProfileExtract = {
     linkedin_page_kind: "profile",
     contact_name,
-    headline: sanitizedHeadline,
-    title: current_title,
+    raw_headline: structuredHeadline.raw_headline ?? sanitizedHeadline,
+    job_title,
+    certifications: structuredHeadline.certifications,
+    headline: structuredHeadline.raw_headline ?? sanitizedHeadline,
+    title: job_title,
     location: locationParts.location,
     city: locationParts.city,
     state: locationParts.state,
@@ -3815,12 +3893,15 @@ function extractVisiblePageMetadata() {
     profile_photo_url: linkedinExtract.profile_photo_url ?? null,
     company_logo_url: linkedinExtract.company_logo_url ?? null,
     contact_name: linkedinExtract.contact_name ?? null,
+    raw_headline: linkedinExtract.raw_headline ?? linkedinExtract.headline ?? null,
+    job_title: linkedinExtract.job_title ?? linkedinExtract.title ?? null,
+    certifications: linkedinExtract.certifications ?? [],
     headline: linkedinExtract.headline ?? null,
     title:
+      linkedinExtract.job_title ??
       linkedinExtract.title ??
       parseLinkedInHeadline(linkedinExtract.headline ?? "").title ??
       null,
-    headline: linkedinExtract.headline ?? null,
     location: linkedinExtract.location ?? null,
     city: linkedinExtract.city ?? null,
     state: linkedinExtract.state ?? null,
@@ -4244,6 +4325,7 @@ if (typeof window !== "undefined") {
   window.__equipifyGrowthDescribeElement = describeElementForAudit
   window.__equipifyGrowthResolveProfileTitleExtraction = resolveProfileTitleExtraction
   window.__equipifyGrowthSanitizeHeadlineAfterCompanySelection = sanitizeHeadlineAfterCompanySelection
+  window.__equipifyGrowthParseStructuredProfileHeadline = parseStructuredProfileHeadline
   window.__equipifyGrowthIsValidHeadlineCandidate = isValidHeadlineCandidate
   window.__equipifyGrowthResolveProfileHeadlineSelection = resolveProfileHeadlineSelection
   window.__equipifyGrowthAuditHydrationState = () => auditLinkedInHydrationState(document)

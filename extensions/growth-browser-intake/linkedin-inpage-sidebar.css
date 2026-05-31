@@ -15,6 +15,7 @@
   right: 0;
   height: 100vh;
   height: 100dvh;
+  width: var(--equipify-sales-sidebar-width, 420px);
   pointer-events: auto;
   background: #f4f6fb;
   border-left: 1px solid #dbeafe;
@@ -30,26 +31,32 @@
   background: #f4f6fb;
 }
 
-html.equipify-sales-inpage-sidebar-open,
-body.equipify-sales-inpage-sidebar-open {
-  margin-right: 420px !important;
-  transition: margin-right 0.2s ease;
+html.equipify-sales-inpage-sidebar-open {
+  --equipify-sales-sidebar-width: 420px;
 }
 
-html.equipify-sales-inpage-sidebar-open .scaffold-layout__inner,
-html.equipify-sales-inpage-sidebar-open .scaffold-layout__main,
-html.equipify-sales-inpage-sidebar-open main.scaffold-layout__main,
-html.equipify-sales-inpage-sidebar-open .application-outlet,
-html.equipify-sales-inpage-sidebar-open #main-content,
-html.equipify-sales-inpage-sidebar-open .global-nav + main,
-body.equipify-sales-inpage-sidebar-open .scaffold-layout__inner,
-body.equipify-sales-inpage-sidebar-open .scaffold-layout__main,
-body.equipify-sales-inpage-sidebar-open main.scaffold-layout__main,
-body.equipify-sales-inpage-sidebar-open .application-outlet,
-body.equipify-sales-inpage-sidebar-open #main-content {
-  margin-right: 420px !important;
-  max-width: calc(100% - 420px) !important;
-  transition: margin-right 0.2s ease, max-width 0.2s ease;
+@media (min-width: 901px) {
+  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push .scaffold-layout,
+  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push .scaffold-layout__inner,
+  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push .scaffold-layout__main,
+  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push main.scaffold-layout__main,
+  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push .application-outlet,
+  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push #main-content,
+  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push main[role="main"],
+  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push [role="main"].scaffold-layout__main {
+    margin-right: var(--equipify-sales-sidebar-width) !important;
+    max-width: calc(100% - var(--equipify-sales-sidebar-width)) !important;
+    box-sizing: border-box;
+    transition:
+      margin-right 0.2s ease,
+      max-width 0.2s ease;
+  }
+
+  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push .global-nav,
+  html.equipify-sales-inpage-sidebar-open.equipify-sales-inpage-sidebar-push nav.global-nav {
+    margin-right: 0 !important;
+    max-width: 100% !important;
+  }
 }
 
 .equipify-sales-floating-dock--sidebar-open {
@@ -57,27 +64,8 @@ body.equipify-sales-inpage-sidebar-open #main-content {
 }
 
 @media (max-width: 900px) {
-  html.equipify-sales-inpage-sidebar-open,
-  body.equipify-sales-inpage-sidebar-open {
-    margin-right: 0 !important;
-  }
-
-  html.equipify-sales-inpage-sidebar-open .scaffold-layout__inner,
-  html.equipify-sales-inpage-sidebar-open .scaffold-layout__main,
-  html.equipify-sales-inpage-sidebar-open main.scaffold-layout__main,
-  html.equipify-sales-inpage-sidebar-open .application-outlet,
-  html.equipify-sales-inpage-sidebar-open #main-content,
-  body.equipify-sales-inpage-sidebar-open .scaffold-layout__inner,
-  body.equipify-sales-inpage-sidebar-open .scaffold-layout__main,
-  body.equipify-sales-inpage-sidebar-open main.scaffold-layout__main,
-  body.equipify-sales-inpage-sidebar-open .application-outlet,
-  body.equipify-sales-inpage-sidebar-open #main-content {
-    margin-right: 0 !important;
-    max-width: 100% !important;
-  }
-
   .equipify-sales-inpage-sidebar-panel {
-    width: min(100vw, 420px) !important;
+    width: min(100vw, var(--equipify-sales-sidebar-width, 420px)) !important;
   }
 
   .equipify-sales-floating-dock--sidebar-open {
