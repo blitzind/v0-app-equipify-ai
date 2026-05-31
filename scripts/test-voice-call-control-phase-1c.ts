@@ -20,6 +20,7 @@ import {
 } from "../lib/voice/call-control/twilio-twiml"
 import { VOICE_CALL_CONTROL_QA_MARKER } from "../lib/voice/call-control/types"
 import { buildVoiceInboundTwilioUrl, buildVoiceRecordingCallbackUrl } from "../lib/voice/call-control/urls"
+import { resolveTwilioWebhookValidationUrl } from "../lib/voice/webhooks/twilio-request-url"
 import {
   forwardCall,
   rejectCall,
@@ -147,7 +148,36 @@ const inboundRoute = fs.readFileSync(
   "utf8",
 )
 assert.match(inboundRoute, /handleTwilioInboundCall/)
-assert.match(inboundRoute, /application\/xml/)
+assert.match(inboundRoute, /validateTwilioIncomingWebhook/)
+assert.match(inboundRoute, /resolveTwilioWebhookValidationUrl/)
+
+const directRequest = new Request("https://app.equipify.ai/api/voice/inbound/twilio", {
+  headers: { host: "app.equipify.ai", "x-forwarded-proto": "https" },
+})
+assert.equal(
+  resolveTwilioWebhookValidationUrl(directRequest),
+  "https://app.equipify.ai/api/voice/inbound/twilio",
+)
+
+const forwardedRequest = new Request("https://equipify-app.internal/api/voice/inbound/twilio", {
+  headers: {
+    "x-forwarded-proto": "https",
+    "x-forwarded-host": "app.equipify.ai",
+  },
+})
+assert.equal(
+  resolveTwilioWebhookValidationUrl(forwardedRequest),
+  "https://app.equipify.ai/api/voice/inbound/twilio",
+)
+
+const prevSiteUrl = process.env.NEXT_PUBLIC_SITE_URL
+process.env.NEXT_PUBLIC_SITE_URL = "https://app.equipify.ai"
+const vercelRequest = new Request("https://equipify-app-abc.vercel.app/api/voice/inbound/twilio")
+assert.equal(
+  resolveTwilioWebhookValidationUrl(vercelRequest),
+  "https://app.equipify.ai/api/voice/inbound/twilio",
+)
+process.env.NEXT_PUBLIC_SITE_URL = prevSiteUrl
 
 const recordingRoute = fs.readFileSync(
   path.join(process.cwd(), "app/api/voice/webhooks/twilio/recording/route.ts"),

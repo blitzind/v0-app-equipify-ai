@@ -4,10 +4,11 @@ import { isGrowthEngineEnabledEnv } from "@/lib/growth/access"
 import { buildVoiceRecordingCallbackUrl } from "@/lib/voice/call-control/urls"
 import { handleTwilioInboundCall } from "@/lib/voice/call-control/inbound-handler"
 import { VOICE_CALL_CONTROL_QA_MARKER } from "@/lib/voice/call-control/types"
-import { createTwilioVoiceProvider } from "@/lib/voice/providers/twilio-provider"
 import { probeVoiceSchemaHealth, isVoiceWebhookSchemaReady } from "@/lib/voice/schema-health"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import { parseTwilioFormBody, twilioFormBodyToPayload } from "@/lib/voice/webhooks/normalizer"
+import { resolveTwilioWebhookValidationUrl } from "@/lib/voice/webhooks/twilio-request-url"
+import { validateTwilioIncomingWebhook } from "@/lib/voice/webhooks/twilio-incoming-webhook"
 
 export const runtime = "nodejs"
 
@@ -41,31 +42,29 @@ export async function POST(request: Request) {
   const formParams = parseTwilioFormBody(rawBody)
   const payload = twilioFormBodyToPayload(formParams)
   const signatureHeader = request.headers.get("x-twilio-signature")
-  const requestUrl = request.url
-  const skipSignatureValidation = process.env.VOICE_WEBHOOK_SKIP_SIGNATURE_VALIDATION?.trim() === "true"
+  const validationUrl = resolveTwilioWebhookValidationUrl(request)
 
-  if (!skipSignatureValidation) {
-    const twilio = createTwilioVoiceProvider()
-    const validation = await twilio.validateWebhook({
-      signatureHeader,
-      url: requestUrl,
-      rawBody,
-      params: formParams,
+  const validation = await validateTwilioIncomingWebhook({
+    signatureHeader,
+    requestUrl: validationUrl,
+    rawBody,
+    params: formParams,
+  })
+  if (!validation.ok) {
+    logVoiceInfrastructure("voice_webhook_signature_failed", {
+      qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
+      route: "inbound",
+      message: validation.message,
+      validation_url: validationUrl,
+      request_url: request.url,
     })
-    if (!validation.ok) {
-      logVoiceInfrastructure("voice_webhook_signature_failed", {
-        qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
-        route: "inbound",
-        message: validation.message,
-      })
-      return new NextResponse("<Response><Reject/></Response>", {
-        status: 401,
-        headers: { "Content-Type": "application/xml" },
-      })
-    }
+    return new NextResponse("<Response><Reject/></Response>", {
+      status: 401,
+      headers: { "Content-Type": "application/xml" },
+    })
   }
 
-  const origin = new URL(request.url).origin
+  const origin = new URL(validationUrl).origin
   const result = await handleTwilioInboundCall({
     admin,
     payload,
