@@ -1,5 +1,5 @@
 /**
- * LinkedIn desktop layout push — hide right rail + reserve panel column (v4.3.35).
+ * LinkedIn desktop layout push — expand main column + hide right rail (v4.3.36).
  */
 ;(function initEquipifyGrowthLayoutPush() {
   const SIDEBAR_WIDTH_PX = 420
@@ -12,13 +12,14 @@
   const CSS_VAR_RIGHT_MARGIN = "--equipify-layout-right-margin"
   const CSS_VAR_MAIN_WIDTH = "--equipify-linkedin-main-width"
   const DEBUG_STORAGE_KEY = "equipify_debug_layout"
-  const LAYOUT_STRATEGY = "hide-right-rail-reserve-panel"
+  const LAYOUT_STRATEGY = "expand-main-hide-rail-reserve-panel"
 
   const SCAFFOLD_ROOT_SELECTORS = [
     ".scaffold-layout",
     ".scaffold-layout-container",
     ".application-outlet",
   ]
+  const SCAFFOLD_INNER_SELECTORS = [".scaffold-layout__inner"]
   const SCAFFOLD_MAIN_SELECTORS = [
     ".scaffold-layout__main",
     "main.scaffold-layout__main",
@@ -26,8 +27,14 @@
   ]
   const SCAFFOLD_CONTENT_SELECTORS = [
     ".scaffold-layout__content",
-    ".scaffold-layout__inner",
     "#main-content",
+  ]
+  const FEED_SELECTORS = [
+    '[data-view-name="feed-container"]',
+    '[data-view-name="profile-tab-aux"]',
+    ".scaffold-finite-scroll__content",
+    ".scaffold-finite-scroll",
+    "main .feed-shared-update-v2",
   ]
   const RIGHT_RAIL_SELECTORS = [
     ".scaffold-layout__aside",
@@ -42,8 +49,10 @@
 
   const LAYOUT_MARK_ATTRS = [
     "data-equipify-layout-root",
+    "data-equipify-layout-inner",
     "data-equipify-layout-main",
     "data-equipify-layout-content",
+    "data-equipify-layout-feed",
     "data-equipify-layout-rail",
   ]
 
@@ -77,16 +86,30 @@
 
   function locateScaffold(doc) {
     const root = queryFirst(doc, SCAFFOLD_ROOT_SELECTORS)
+    const inner = queryFirst(doc, SCAFFOLD_INNER_SELECTORS)
     const main = queryFirst(doc, SCAFFOLD_MAIN_SELECTORS)
     const content = queryFirst(doc, SCAFFOLD_CONTENT_SELECTORS)
     return {
       root: root.element,
       rootSelector: root.selector,
+      inner: inner.element,
+      innerSelector: inner.selector,
       main: main.element,
       mainSelector: main.selector,
       content: content.element,
       contentSelector: content.selector,
     }
+  }
+
+  function locateFeed(doc, scaffold) {
+    const scope = scaffold.main ?? scaffold.content ?? scaffold.root ?? doc
+    for (const selector of FEED_SELECTORS) {
+      const element = scope.querySelector?.(selector) ?? doc.querySelector(selector)
+      if (element) return { element, selector }
+    }
+    const viewNode = (scaffold.main ?? doc).querySelector?.('[data-view-name]')
+    if (viewNode) return { element: viewNode, selector: "[data-view-name]" }
+    return { element: null, selector: null }
   }
 
   function isEligibleRail(node) {
@@ -110,7 +133,11 @@
     for (const selector of RIGHT_RAIL_SELECTORS) {
       doc.querySelectorAll(selector).forEach((node) => {
         if (!isHtmlElement(node) || seen.has(node)) return
-        if (scaffold.root && !scaffold.root.contains(node) && !node.closest(".scaffold-layout, .scaffold-layout-container")) {
+        if (
+          scaffold.root &&
+          !scaffold.root.contains(node) &&
+          !node.closest(".scaffold-layout, .scaffold-layout-container")
+        ) {
           return
         }
         if (!isEligibleRail(node)) return
@@ -129,7 +156,9 @@
     const classes = typeof node.className === "string" && node.className.trim()
       ? `.${node.className.trim().split(/\s+/).slice(0, 3).join(".")}`
       : ""
-    return `${selector ?? tag}${id}${classes}`
+    const viewName = node.getAttribute?.("data-view-name")
+    const viewSuffix = viewName ? `[data-view-name="${viewName}"]` : ""
+    return `${selector ?? tag}${id}${classes}${viewSuffix}`
   }
 
   function describeRect(node) {
@@ -139,6 +168,7 @@
       width: Math.round(rect.width),
       height: Math.round(rect.height),
       left: Math.round(rect.left),
+      right: Math.round(rect.right),
       top: Math.round(rect.top),
     }
   }
@@ -146,6 +176,47 @@
   function measureWidth(node) {
     if (!isHtmlElement(node)) return null
     return Math.round(node.getBoundingClientRect().width)
+  }
+
+  function getComputedLayout(node, doc = document) {
+    if (!isHtmlElement(node)) return null
+    const view = doc.defaultView ?? window
+    const styles = view.getComputedStyle?.(node)
+    if (!styles) return null
+    return {
+      width: styles.width,
+      max_width: styles.maxWidth,
+      min_width: styles.minWidth,
+      flex: styles.flex,
+      flex_basis: styles.flexBasis,
+      display: styles.display,
+      grid_template_columns: styles.gridTemplateColumns,
+      margin_left: styles.marginLeft,
+      margin_right: styles.marginRight,
+    }
+  }
+
+  function describeLayoutNode(node, selector, doc = document) {
+    if (!isHtmlElement(node)) return null
+    return {
+      selector: describeTarget(node, selector),
+      tag: node.tagName?.toLowerCase() ?? null,
+      id: node.id || null,
+      classes: typeof node.className === "string" ? node.className : null,
+      data_view_name: node.getAttribute?.("data-view-name"),
+      rect: describeRect(node),
+      computed: getComputedLayout(node, doc),
+    }
+  }
+
+  function collectParentChain(node, doc = document) {
+    const chain = []
+    let current = node
+    for (let depth = 0; depth < 8 && isHtmlElement(current); depth += 1) {
+      chain.push(describeLayoutNode(current, null, doc))
+      current = current.parentElement
+    }
+    return chain
   }
 
   function isDebugLayoutEnabled() {
@@ -165,11 +236,13 @@
     }
   }
 
-  function markScaffold(scaffold, rails) {
+  function markScaffold(scaffold, rails, feed) {
     clearLayoutMarks(scaffold.root?.ownerDocument ?? document)
     if (isHtmlElement(scaffold.root)) scaffold.root.setAttribute("data-equipify-layout-root", "true")
+    if (isHtmlElement(scaffold.inner)) scaffold.inner.setAttribute("data-equipify-layout-inner", "true")
     if (isHtmlElement(scaffold.main)) scaffold.main.setAttribute("data-equipify-layout-main", "true")
     if (isHtmlElement(scaffold.content)) scaffold.content.setAttribute("data-equipify-layout-content", "true")
+    if (isHtmlElement(feed?.element)) feed.element.setAttribute("data-equipify-layout-feed", "true")
     rails.forEach(({ node }) => {
       node.setAttribute("data-equipify-layout-rail", "true")
     })
@@ -218,6 +291,45 @@
     }
   }
 
+  function inspectLayoutDom(doc, scaffold, feed, input = {}) {
+    const availableWidth = `calc(100vw - ${SIDEBAR_WIDTH_PX}px)`
+    const anchor = scaffold.content ?? scaffold.main ?? scaffold.root
+    return {
+      page_type: input.page_type ?? null,
+      scaffold: describeLayoutNode(scaffold.root, scaffold.rootSelector, doc),
+      main: describeLayoutNode(scaffold.main, scaffold.mainSelector, doc),
+      content: describeLayoutNode(scaffold.content, scaffold.contentSelector, doc),
+      feed: describeLayoutNode(feed?.element, feed?.selector, doc),
+      parent_chain: collectParentChain(anchor, doc),
+      widths: {
+        viewport: input.viewport_width ?? doc.defaultView?.innerWidth ?? null,
+        reserved_panel: SIDEBAR_WIDTH_PX,
+        available: availableWidth,
+        scaffold: measureWidth(scaffold.root),
+        main: measureWidth(scaffold.main),
+        content: measureWidth(scaffold.content),
+        feed: measureWidth(feed?.element),
+      },
+    }
+  }
+
+  function scheduleLayoutDomInspection(doc, scaffold, feed, input = {}) {
+    const logLayoutDom = input.logLayoutDom ?? (() => {})
+    const view = doc.defaultView ?? window
+    const run = () => {
+      const payload = inspectLayoutDom(doc, scaffold, feed, input)
+      logLayoutDom(payload)
+      return payload
+    }
+    if (typeof view.requestAnimationFrame === "function") {
+      view.requestAnimationFrame(() => {
+        view.requestAnimationFrame(run)
+      })
+      return
+    }
+    view.setTimeout?.(run, 0)
+  }
+
   function applyLayoutReserve(open, options = {}) {
     const doc = options.document ?? document
     const viewportWidth = options.viewportWidth ?? window.innerWidth
@@ -225,7 +337,9 @@
     const mode = resolveLayoutMode(viewportWidth)
     const page_type = detectPageType(pageUrl)
     const logLayoutPush = options.logLayoutPush ?? options.logLayoutDebug ?? (() => {})
+    const logLayoutDom = options.logLayoutDom ?? (() => {})
     const scaffold = locateScaffold(doc)
+    const feed = locateFeed(doc, scaffold)
     const mainContainer = scaffold.main ?? scaffold.content ?? scaffold.root
     const before_rect = describeRect(mainContainer)
 
@@ -255,7 +369,7 @@
     let hidden_right_rail_selectors = []
     if (mode === "push") {
       const rails = locateRightRails(doc, scaffold)
-      markScaffold(scaffold, rails)
+      markScaffold(scaffold, rails, feed)
       hidden_right_rail_selectors = rails.map(({ selector }) => selector)
     } else {
       clearLayoutMarks(doc)
@@ -275,6 +389,15 @@
     })
 
     logLayoutPush(payload)
+
+    if (mode === "push") {
+      scheduleLayoutDomInspection(doc, scaffold, feed, {
+        page_type,
+        viewport_width: viewportWidth,
+        logLayoutDom,
+      })
+    }
+
     return { ...payload, page_type }
   }
 
@@ -290,11 +413,14 @@
     SCAFFOLD_ROOT_SELECTORS,
     SCAFFOLD_MAIN_SELECTORS,
     SCAFFOLD_CONTENT_SELECTORS,
+    FEED_SELECTORS,
     RIGHT_RAIL_SELECTORS,
     resolveLayoutMode,
     detectPageType,
     locateScaffold,
+    locateFeed,
     locateRightRails,
+    inspectLayoutDom,
     isDebugLayoutEnabled,
     applyLayoutReserve,
     setLayoutVariables,
@@ -302,5 +428,6 @@
     clearLayoutMarks,
     measureWidth,
     describeRect,
+    getComputedLayout,
   }
 })()

@@ -138,10 +138,15 @@ console.log("[Equipify Sales] linkedin-inpage-sidebar start")
     console.log("[Equipify Sales:layout-push]", payload)
   }
 
+  function logLayoutDom(payload) {
+    console.log("[Equipify Sales:layout-dom]", payload)
+  }
+
   function applyLayoutReserve(open) {
     layoutPush?.applyLayoutReserve?.(open, {
       pageUrl: window.location.href,
       logLayoutPush,
+      logLayoutDom,
     })
   }
 

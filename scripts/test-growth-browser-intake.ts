@@ -302,7 +302,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.35"/)
+assert.match(manifestSource, /"version": "4.3.36"/)
 assert.match(manifestSource, /https:\/\/m\.linkedin\.com\/in\/\*/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
@@ -334,7 +334,7 @@ assert.match(extensionBrandJs, /PANEL_LOGO_ASSET/)
 assert.match(extensionBrandJs, /panelLogoUrl/)
 assert.match(extensionBrandJs, /applyPanelLogo/)
 assert.match(extensionBrandJs, /PANEL_LOGO_VERSION/)
-assert.match(extensionBrandJs, /4\.3\.35/)
+assert.match(extensionBrandJs, /4\.3\.36/)
 assert.match(extensionBrandJs, /\?v=\$\{encodeURIComponent\(PANEL_LOGO_VERSION\)\}/)
 assert.match(extensionBrandJs, /\[Equipify Sales:logo-audit\]/)
 assert.match(extensionBrandJs, /PANEL_LOGO_INTRINSIC_WIDTH/)
@@ -500,6 +500,7 @@ assert.match(linkedinInpageSidebarJs, /equipify-sales-floating-dock--sidebar-ope
 assert.match(linkedinInpageSidebarJs, /equipify-sales-inpage-sidebar-open/)
 assert.match(linkedinInpageSidebarJs, /EquipifyGrowthLayoutPush/)
 assert.match(linkedinInpageSidebarJs, /\[Equipify Sales:layout-push]/)
+assert.match(linkedinInpageSidebarJs, /\[Equipify Sales:layout-dom]/)
 assert.match(linkedinInpageSidebarJs, /sidebar_context_posted/)
 
 const linkedinLayoutPushJs = fs.readFileSync(
@@ -511,12 +512,14 @@ assert.match(linkedinLayoutPushJs, /resolveLayoutMode/)
 assert.match(linkedinLayoutPushJs, /applyLayoutReserve/)
 assert.match(linkedinLayoutPushJs, /equipify-desktop-layout/)
 assert.match(linkedinLayoutPushJs, /locateRightRails/)
-assert.match(linkedinLayoutPushJs, /RIGHT_RAIL_SELECTORS/)
+assert.match(linkedinLayoutPushJs, /locateFeed/)
+assert.match(linkedinLayoutPushJs, /inspectLayoutDom/)
+assert.match(linkedinLayoutPushJs, /logLayoutDom/)
+assert.match(linkedinLayoutPushJs, /expand-main-hide-rail-reserve-panel/)
 assert.match(linkedinLayoutPushJs, /hidden_right_rail_selectors/)
-assert.match(linkedinLayoutPushJs, /hide-right-rail-reserve-panel/)
-assert.match(linkedinLayoutPushJs, /before_rect/)
-assert.match(linkedinLayoutPushJs, /restored/)
-assert.match(linkedinLayoutPushJs, /data-equipify-layout-rail/)
+assert.match(linkedinLayoutPushJs, /data-equipify-layout-feed/)
+assert.match(linkedinLayoutPushJs, /data-equipify-layout-inner/)
+assert.match(linkedinLayoutPushJs, /max_width/)
 assert.match(manifestSource, /linkedin-layout-push\.js/)
 
 const contactSavedJs = fs.readFileSync(
@@ -566,9 +569,13 @@ const linkedinInpageSidebarCss = fs.readFileSync(
 assert.match(linkedinInpageSidebarCss, /equipify-desktop-layout/)
 assert.match(linkedinInpageSidebarCss, /equipify-sales-inpage-sidebar-open/)
 assert.match(linkedinInpageSidebarCss, /--equipify-linkedin-main-width/)
-assert.match(linkedinInpageSidebarCss, /--equipify-panel-width/)
+assert.match(linkedinInpageSidebarCss, /max-width: none/)
+assert.match(linkedinInpageSidebarCss, /flex: 1 1 auto/)
+assert.match(linkedinInpageSidebarCss, /grid-template-columns: minmax\(0, 1fr\)/)
 assert.match(linkedinInpageSidebarCss, /min-width: 1200px/)
-assert.match(linkedinInpageSidebarCss, /data-equipify-layout-rail/)
+assert.match(linkedinInpageSidebarCss, /data-equipify-layout-feed/)
+assert.match(linkedinInpageSidebarCss, /data-equipify-layout-main/)
+assert.match(linkedinInpageSidebarCss, /#22c55e/)
 assert.match(linkedinInpageSidebarCss, /scaffold-layout__aside/)
 assert.match(linkedinInpageSidebarCss, /global-nav/)
 assert.match(linkedinInpageSidebarCss, /data-equipify-layout-root/)
@@ -577,10 +584,15 @@ function runLayoutPushHarness(viewportWidth = 1280, pageUrl = "https://www.linke
   const html = `<!doctype html><html><head></head><body>
     <nav class="global-nav">Global nav</nav>
     <div class="scaffold-layout">
-      <main class="scaffold-layout__main" role="main">
-        <div class="scaffold-layout__content">Profile content</div>
-      </main>
-      <aside class="scaffold-layout__aside">Right rail</aside>
+      <div class="scaffold-layout__inner">
+        <main class="scaffold-layout__main" role="main">
+          <div class="scaffold-layout__content">
+            <div data-view-name="profile-card">Profile card</div>
+            <div class="scaffold-finite-scroll__content">Feed</div>
+          </div>
+        </main>
+        <aside class="scaffold-layout__aside">Right rail</aside>
+      </div>
     </div>
   </body></html>`
   const { document, window: domWindow } = parseHTML(html)
@@ -675,9 +687,13 @@ assert.equal(
   "true",
 )
 assert.equal(
+  desktopLayoutHarness.document.querySelector(".scaffold-layout__inner")?.getAttribute("data-equipify-layout-inner"),
+  "true",
+)
+assert.equal(
   desktopLayoutHarness.document
-    .querySelector(".scaffold-layout__content")
-    ?.getAttribute("data-equipify-layout-content"),
+    .querySelector(".scaffold-finite-scroll__content")
+    ?.getAttribute("data-equipify-layout-feed"),
   "true",
 )
 assert.equal(
@@ -1567,6 +1583,7 @@ assert.match(intakeAppJs, /Company not detected/)
 assert.match(extensionWorkspaceJs, /COMPANY_INTEL_UNAVAILABLE/)
 assert.match(extensionWorkspaceJs, /setCompanyIntelAvailability/)
 assert.match(linkedinInpageSidebarJs, /\[Equipify Sales:layout-push]/)
+assert.match(linkedinInpageSidebarJs, /\[Equipify Sales:layout-dom]/)
 assert.match(extensionStorageJs, /\[Equipify Sales\] content script loaded/)
 assert.match(pageMetadataJs, /\[Equipify Sales\] page-metadata start/)
 assert.match(pageMetadataJs, /\[Equipify Sales\] extractVisiblePageMetadata invoked/)
@@ -1594,6 +1611,7 @@ assert.match(pageMetadataJs, /buildDomAudit/)
 assert.match(pageMetadataJs, /findProfileHeroContainer/)
 assert.match(pageMetadataJs, /parseConcatenatedHeadlineTitleCompany/)
 assert.match(linkedinInpageSidebarJs, /logLayoutPush/)
+assert.match(linkedinInpageSidebarJs, /logLayoutDom/)
 assert.match(linkedinInpageSidebarJs, /addEventListener\("resize"/)
 
 const PROFILE_PHOTO_FIXTURE = `<main>
@@ -2050,7 +2068,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ version: "4.3.35" }),
+        getManifest: () => ({ version: "4.3.36" }),
       },
     },
     setTimeout: () => 0,
