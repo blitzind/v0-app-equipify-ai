@@ -1,5 +1,5 @@
 /**
- * Employee row URL resolution and action wiring for Company Intelligence.
+ * Standard object row actions (View / Add / Open) for Equipify Sales workspace lists.
  */
 ;(function initEquipifyGrowthEmployeeRow() {
   function trimOrNull(value) {
@@ -7,22 +7,30 @@
     return trimmed ? trimmed : null
   }
 
-  function resolveEmployeeViewUrl(contact) {
-    if (!contact || typeof contact !== "object") return null
+  function resolveViewUrl(record) {
+    if (!record || typeof record !== "object") return null
     return (
-      trimOrNull(contact.linkedin_url) ||
-      trimOrNull(contact.profile_url) ||
-      trimOrNull(contact.source_url) ||
+      trimOrNull(record.linkedin_url) ||
+      trimOrNull(record.profile_url) ||
+      trimOrNull(record.source_url) ||
+      trimOrNull(record.website) ||
       null
     )
   }
 
-  function resolveEmployeeAddLabel(contact) {
-    if (trimOrNull(contact?.lead_id)) return "Open"
+  function resolveSecondaryActionLabel(record) {
+    if (trimOrNull(record?.lead_id)) return "Open"
     return "Add"
   }
 
-  function buildEmployeeRowHtml(contact, escapeHtml) {
+  function resolveSecondaryActionKind(record, options = {}) {
+    if (options.secondaryActionKind) return options.secondaryActionKind
+    if (trimOrNull(record?.lead_id)) return "open-lead"
+    if (options.secondaryActionKind === "queue") return "queue"
+    return "add"
+  }
+
+  function buildObjectRowHtml(record, escapeHtml, options = {}) {
     const safeEscape =
       typeof escapeHtml === "function"
         ? escapeHtml
@@ -33,24 +41,42 @@
               .replace(/>/g, "&gt;")
               .replace(/"/g, "&quot;")
 
-    const viewUrl = resolveEmployeeViewUrl(contact)
-    const addLabel = resolveEmployeeAddLabel(contact)
+    const name =
+      trimOrNull(record?.name) ||
+      trimOrNull(record?.company_name) ||
+      trimOrNull(record?.contact_name) ||
+      "Unknown"
+    const subtitle = trimOrNull(record?.title) || trimOrNull(record?.subtitle) || "—"
+    const meta = trimOrNull(record?.meta) || trimOrNull(record?.crm_status) || ""
+    const viewUrl = resolveViewUrl(record)
+    const secondaryLabel = options.secondaryLabel ?? resolveSecondaryActionLabel(record)
+    const secondaryKind = resolveSecondaryActionKind(record, options)
     const viewDisabled = !viewUrl
-    const viewTitle = viewUrl ? "View public profile" : "No public profile available"
+    const viewTitle = viewUrl ? "View source profile or website" : "No public URL available"
+    const rowClass = options.rowClass ?? "es-ws-employee-row"
+    const showSecondary = options.showSecondary !== false
 
     return `
-          <div class="es-ws-employee-row" data-employee-source="${safeEscape(contact.source ?? "")}">
+          <div class="${safeEscape(rowClass)}" data-row-source="${safeEscape(record?.source ?? "")}">
             <div class="es-ws-employee-copy">
-              <div class="es-ws-employee-name">${safeEscape(contact.name ?? "Company contact")}</div>
-              <div class="es-ws-employee-title">${safeEscape(contact.title ?? "Title unknown")}</div>
-              <div class="es-ws-employee-meta">${safeEscape(contact.department)} · ${safeEscape(contact.seniority)} · ${safeEscape(contact.crm_status)}</div>
+              <div class="es-ws-employee-name">${safeEscape(name)}</div>
+              <div class="es-ws-employee-title">${safeEscape(subtitle)}</div>
+              ${meta ? `<div class="es-ws-employee-meta">${safeEscape(meta)}</div>` : ""}
             </div>
             <div class="es-ws-employee-actions">
               <button type="button" class="es-ws-employee-action es-ws-employee-view" data-view-url="${safeEscape(viewUrl ?? "")}" ${viewDisabled ? "disabled" : ""} title="${safeEscape(viewTitle)}" aria-label="${safeEscape(viewTitle)}">View</button>
-              <button type="button" class="es-ws-employee-action es-ws-employee-add" data-lead-id="${safeEscape(contact.lead_id ?? "")}" aria-label="${safeEscape(addLabel)}">${safeEscape(addLabel)}</button>
+              ${
+                showSecondary
+                  ? `<button type="button" class="es-ws-employee-action es-ws-employee-add" data-secondary-action="${safeEscape(secondaryKind)}" data-lead-id="${safeEscape(record?.lead_id ?? "")}" data-queue-company="${safeEscape(record?.company_name ?? record?.name ?? "")}" aria-label="${safeEscape(secondaryLabel)}">${safeEscape(secondaryLabel)}</button>`
+                  : ""
+              }
             </div>
           </div>
         `
+  }
+
+  function buildEmployeeRowHtml(contact, escapeHtml, options) {
+    return buildObjectRowHtml(contact, escapeHtml, options)
   }
 
   function defaultOpenViewUrl(url) {
@@ -61,16 +87,29 @@
     document.getElementById("linkedin-add-btn")?.click()
   }
 
-  function defaultTriggerOpenLead() {
+  function defaultTriggerOpenLead(leadId) {
+    if (leadId && typeof window.__equipifyOpenLeadAdmin === "function") {
+      window.__equipifyOpenLeadAdmin(leadId)
+      return
+    }
     document.getElementById("linkedin-open-lead-btn")?.click()
   }
 
-  function bindEmployeeRowActions(list, deps = {}) {
+  function defaultTriggerQueue(companyName) {
+    window.__equipifyCopilotHooks?.switchTab?.("queue")
+    document.getElementById("copilot-add-to-queue-btn")?.click()
+    if (companyName) {
+      console.log("[Equipify Sales:queue]", "similar_company_queued", { companyName })
+    }
+  }
+
+  function bindObjectRowActions(list, deps = {}) {
     if (!list) return
 
     const openViewUrl = deps.openViewUrl ?? defaultOpenViewUrl
     const triggerAdd = deps.triggerAdd ?? defaultTriggerAdd
     const triggerOpenLead = deps.triggerOpenLead ?? defaultTriggerOpenLead
+    const triggerQueue = deps.triggerQueue ?? defaultTriggerQueue
 
     list.querySelectorAll(".es-ws-employee-view:not([disabled])").forEach((btn) => {
       btn.addEventListener("click", (event) => {
@@ -84,18 +123,36 @@
     list.querySelectorAll(".es-ws-employee-add").forEach((btn) => {
       btn.addEventListener("click", (event) => {
         event.preventDefault()
+        const action = trimOrNull(btn.getAttribute("data-secondary-action")) ?? "add"
         const leadId = trimOrNull(btn.getAttribute("data-lead-id"))
+        const queueCompany = trimOrNull(btn.getAttribute("data-queue-company"))
+        if (action === "open-lead" && leadId) {
+          triggerOpenLead(leadId)
+          return
+        }
+        if (action === "queue") {
+          triggerQueue(queueCompany)
+          return
+        }
         if (leadId) triggerOpenLead(leadId)
         else triggerAdd()
       })
     })
   }
 
+  function bindEmployeeRowActions(list, deps) {
+    bindObjectRowActions(list, deps)
+  }
+
   window.EquipifyGrowthEmployeeRow = {
     trimOrNull,
-    resolveEmployeeViewUrl,
-    resolveEmployeeAddLabel,
+    resolveViewUrl,
+    resolveEmployeeViewUrl: resolveViewUrl,
+    resolveEmployeeAddLabel: resolveSecondaryActionLabel,
+    resolveSecondaryActionLabel,
+    buildObjectRowHtml,
     buildEmployeeRowHtml,
+    bindObjectRowActions,
     bindEmployeeRowActions,
   }
 })()

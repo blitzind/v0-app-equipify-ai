@@ -56,6 +56,20 @@
           <h2 id="sidepanel-profile-name" class="es-ws-hidden-compat">Loading profile…</h2>
         </section>
 
+        <section id="es-ws-contact-intelligence-panel" class="es-ws-card es-ws-contact-intelligence" hidden>
+          <p class="es-ws-card-label">Contact Intelligence</p>
+          <div id="es-ws-contact-intelligence-chips" class="es-ws-ci-chips"></div>
+          <div class="es-ws-ci-block">
+            <p class="es-ws-ci-block-label">Suggested Outreach Angle</p>
+            <div id="es-ws-ci-angles" class="es-ws-ci-angles"></div>
+          </div>
+          <div class="es-ws-ci-block">
+            <p class="es-ws-ci-block-label">Next Best Action</p>
+            <p id="es-ws-ci-nba" class="es-ws-ci-nba"></p>
+            <p id="es-ws-ci-nba-reason" class="es-ws-ci-nba-reason"></p>
+          </div>
+        </section>
+
         <section class="es-ws-card">
           <p class="es-ws-card-label">Primary actions</p>
           <div class="es-ws-actions">
@@ -112,12 +126,11 @@
           </div>
           <nav class="es-ws-company-tabs" aria-label="Company intelligence tabs">
             <button type="button" class="es-ws-company-tab active" data-company-tab="overview">Overview</button>
+            <button type="button" class="es-ws-company-tab" data-company-tab="snapshot">Research Snapshot</button>
             <button type="button" class="es-ws-company-tab" data-company-tab="employees">Employees</button>
-            <button type="button" class="es-ws-company-tab" data-company-tab="technologies">Tech</button>
-            <button type="button" class="es-ws-company-tab" data-company-tab="signals">Signals</button>
-            <button type="button" class="es-ws-company-tab" data-company-tab="similar">Similar</button>
-            <button type="button" class="es-ws-company-tab" data-company-tab="crm">CRM</button>
-            <button type="button" class="es-ws-company-tab" data-company-tab="activity">Activity</button>
+            <button type="button" class="es-ws-company-tab" data-company-tab="crm">CRM Contacts</button>
+            <button type="button" class="es-ws-company-tab" data-company-tab="similar">Similar Companies</button>
+            <button type="button" class="es-ws-company-tab" data-company-tab="discovery">Discovery Actions</button>
           </nav>
 
           <div id="es-ws-company-tab-overview" class="es-ws-company-panel" data-company-panel="overview">
@@ -138,25 +151,29 @@
             </div>
           </div>
 
+          <div id="es-ws-company-tab-snapshot" class="es-ws-company-panel" data-company-panel="snapshot" hidden>
+            <div id="es-ws-research-summary" class="es-ws-research-summary">Capture this page to build a research snapshot in Equipify.</div>
+            <div id="es-ws-research-signals" class="es-ws-signals"></div>
+            <div class="button-row" style="margin-top: 10px">
+              <button type="button" id="copilot-generate-research-btn-inline" class="btn-secondary">Generate AI brief</button>
+            </div>
+          </div>
+
           <div id="es-ws-company-tab-employees" class="es-ws-company-panel" data-company-panel="employees" hidden>
             <div class="es-ws-filter-grid">
               <input id="es-ws-employee-search" type="search" placeholder="Search employees" />
               <select id="es-ws-employee-department-filter"><option value="">Department</option></select>
               <select id="es-ws-employee-seniority-filter"><option value="">Seniority</option></select>
-              <select id="es-ws-employee-crm-filter"><option value="">CRM status</option></select>
+              <select id="es-ws-employee-crm-filter"><option value="">Source</option></select>
             </div>
             <div id="es-ws-employees-list" class="es-ws-employees-list">
-              <p class="es-ws-empty">Run contact discovery to find people at this company.</p>
+              <p class="es-ws-empty">Visible employees appear on LinkedIn company pages and profile sidebar recommendations.</p>
             </div>
-            <button type="button" id="es-ws-run-discovery-btn" class="es-ws-inline-btn">Discover Employees</button>
           </div>
 
-          <div id="es-ws-company-tab-technologies" class="es-ws-company-panel" data-company-panel="technologies" hidden>
-            <div id="es-ws-technologies-list" class="es-ws-chip-list"></div>
-          </div>
-
-          <div id="es-ws-company-tab-signals" class="es-ws-company-panel" data-company-panel="signals" hidden>
-            <div id="es-ws-signals-list" class="es-ws-signal-list"></div>
+          <div id="es-ws-company-tab-crm" class="es-ws-company-panel" data-company-panel="crm" hidden>
+            <div id="es-ws-crm-relationship-list" class="es-ws-kv-list"></div>
+            <div id="es-ws-crm-contacts-list" class="es-ws-employees-list"></div>
           </div>
 
           <div id="es-ws-company-tab-similar" class="es-ws-company-panel" data-company-panel="similar" hidden>
@@ -167,21 +184,16 @@
               <label><input type="checkbox" data-similar-filter="signals" /> Intent Signals</label>
             </div>
             <p id="es-ws-similar-insight" class="es-ws-empty">Discover evidence-backed similar companies.</p>
-            <div id="es-ws-similar-list" class="es-ws-similar-list"></div>
-            <div class="button-row" style="margin-top: 8px">
+            <div id="es-ws-similar-list" class="es-ws-employees-list"></div>
+          </div>
+
+          <div id="es-ws-company-tab-discovery" class="es-ws-company-panel" data-company-panel="discovery" hidden>
+            <p class="es-ws-discovery-intro">Run account expansion workflows from the current company context.</p>
+            <div class="es-ws-discovery-actions">
+              <button type="button" id="es-ws-run-discovery-btn" class="es-ws-inline-btn">Discover Employees</button>
               <button type="button" id="es-ws-discover-similar-btn" class="es-ws-inline-btn">Discover Similar Companies</button>
-              <button type="button" id="es-ws-similar-bulk-queue-btn" class="es-ws-inline-btn">Add Selected</button>
             </div>
-          </div>
-
-          <div id="es-ws-company-tab-crm" class="es-ws-company-panel" data-company-panel="crm" hidden>
-            <div id="es-ws-crm-relationship-list" class="es-ws-kv-list"></div>
-          </div>
-
-          <div id="es-ws-company-tab-activity" class="es-ws-company-panel" data-company-panel="activity" hidden>
-            <div id="es-ws-activity-list" class="es-ws-timeline">
-              <p class="es-ws-empty">No recent activity yet.</p>
-            </div>
+            <p class="es-ws-discovery-note">Employees populate from the current LinkedIn profile, visible People sections on company pages, and CRM matches. Backend discovery queues contacts when company pages do not expose teammates.</p>
           </div>
         </section>
 
@@ -190,15 +202,6 @@
           <p id="es-ws-nba-label" class="es-ws-nba-text">Add Contact</p>
           <p id="es-ws-nba-reason" class="es-ws-nba-reason">This prospect is not in Equipify yet.</p>
           <button type="button" id="es-ws-nba-cta" class="es-ws-nba-cta" data-action="add_contact">Add to Equipify</button>
-        </section>
-
-        <section class="es-ws-card">
-          <p class="es-ws-card-label">Research snapshot</p>
-          <p id="es-ws-research-summary" class="es-ws-research-summary">Capture this page to build a research snapshot in Equipify.</p>
-          <div id="es-ws-research-signals" class="es-ws-signals"></div>
-          <div class="button-row" style="margin-top: 10px">
-            <button type="button" id="copilot-generate-research-btn-inline" class="btn-secondary">Generate AI brief</button>
-          </div>
         </section>
 
         <section class="es-ws-card">
@@ -410,6 +413,8 @@
     <script src="linkedin-context.js"></script>
     <script src="linkedin-status-shared.js"></script>
     <script src="linkedin-crm-shared.js"></script>
+    <script src="extension-context-normalize.js"></script>
+    <script src="extension-contact-intelligence.js"></script>
     <script src="extension-employee-row.js"></script>
     <script src="extension-workspace.js"></script>
     <script src="extension-copilot.js"></script>

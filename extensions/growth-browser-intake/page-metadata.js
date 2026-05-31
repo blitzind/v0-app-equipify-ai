@@ -3551,6 +3551,31 @@ function extractProfileConnectionsMetric(doc, topCard) {
   ])
 }
 
+function extractProfileConnectionDegree(topCard) {
+  if (!topCard) return null
+  const scoped = [
+    topCard.querySelector(".distance-badge"),
+    topCard.querySelector("[class*='distance-badge']"),
+    topCard,
+  ].filter(Boolean)
+  for (const node of scoped) {
+    const text = trimOrNull(node.textContent)
+    if (!text) continue
+    const degreeMatch = text.match(/\b(1st|2nd|3rd\+?)\b/i)
+    if (degreeMatch) return degreeMatch[1].replace(/\+$/, "")
+  }
+  return null
+}
+
+function extractProfileMutualConnectionsCount(topCard) {
+  if (!topCard) return null
+  const text = topCard.textContent ?? ""
+  const match = text.match(/(\d[\d,]*)\+?\s+mutual\s+connection/i)
+  if (!match) return null
+  const parsed = Number.parseInt(match[1].replace(/,/g, ""), 10)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 function extractCompanyFollowersMetric(doc) {
   return extractScopedMetric(doc, /\d[\d,]*\+?\s+followers/i, [
     doc.querySelector(".org-top-card"),
@@ -3678,6 +3703,8 @@ function extractLinkedInProfile(doc) {
   const locationParts = parseLocationParts(location)
   const connections = extractProfileConnectionsMetric(doc, topCard)
   const followers = extractCompanyFollowersMetric(doc)
+  const connection_degree = extractProfileConnectionDegree(topCard)
+  const mutual_connections_count = extractProfileMutualConnectionsCount(topCard)
 
   const rawProfileExtract = {
     linkedin_page_kind: "profile",
@@ -3697,6 +3724,8 @@ function extractLinkedInProfile(doc) {
     company_logo_url,
     company_description: extractAboutText(doc),
     connections_count: connections,
+    connection_degree,
+    mutual_connections_count,
     followers_count: followers,
     experience_companies: experienceEntries,
     education_entries: educationEntries,
@@ -3914,6 +3943,8 @@ function extractVisiblePageMetadata() {
     keywords: linkedinExtract.keywords ?? [],
     followers_count: linkedinExtract.followers_count ?? null,
     connections_count: linkedinExtract.connections_count ?? null,
+    connection_degree: linkedinExtract.connection_degree ?? null,
+    mutual_connections_count: linkedinExtract.mutual_connections_count ?? null,
     office_locations: linkedinExtract.office_locations ?? [],
     experience_companies: linkedinExtract.experience_companies ?? [],
     education_entries: linkedinExtract.education_entries ?? [],

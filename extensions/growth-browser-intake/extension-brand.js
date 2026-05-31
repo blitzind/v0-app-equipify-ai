@@ -8,7 +8,7 @@
   /** @type {string} Panel/header logo (Equipify Sales wordmark, transparent PNG). */
   const PANEL_LOGO_ASSET = "assets/equipify-sales-wordmark.png"
   /** Bump when the panel wordmark asset changes to defeat Chrome asset caching. */
-  const PANEL_LOGO_VERSION = "4.3.29"
+  const PANEL_LOGO_VERSION = "4.3.31"
   /** Native pixel dimensions of the panel wordmark asset (1024×214 @1x). */
   const PANEL_LOGO_INTRINSIC_WIDTH = 1024
   const PANEL_LOGO_INTRINSIC_HEIGHT = 214

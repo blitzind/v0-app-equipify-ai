@@ -302,7 +302,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.29"/)
+assert.match(manifestSource, /"version": "4.3.31"/)
 assert.match(manifestSource, /https:\/\/m\.linkedin\.com\/in\/\*/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
@@ -334,7 +334,7 @@ assert.match(extensionBrandJs, /PANEL_LOGO_ASSET/)
 assert.match(extensionBrandJs, /panelLogoUrl/)
 assert.match(extensionBrandJs, /applyPanelLogo/)
 assert.match(extensionBrandJs, /PANEL_LOGO_VERSION/)
-assert.match(extensionBrandJs, /4\.3\.29/)
+assert.match(extensionBrandJs, /4\.3\.31/)
 assert.match(extensionBrandJs, /\?v=\$\{encodeURIComponent\(PANEL_LOGO_VERSION\)\}/)
 assert.match(extensionBrandJs, /\[Equipify Sales:logo-audit\]/)
 assert.match(extensionBrandJs, /PANEL_LOGO_INTRINSIC_WIDTH/)
@@ -415,6 +415,9 @@ assert.match(intakeAppJs, /extension-version-warning/)
 assert.doesNotMatch(intakeAppJs, /api[_-]?key|secret|password|token/i)
 assert.match(intakeAppJs, /CRM_CONTEXT_PATH/)
 assert.match(intakeAppJs, /fetchCrmContext/)
+assert.match(intakeAppJs, /EquipifyGrowthContextNormalize/)
+assert.match(intakeAppJs, /syncContextStatusFromWorkspace/)
+assert.match(intakeAppJs, /Context Found/)
 assert.match(intakeAppJs, /linkedin-crm-context/)
 assert.match(intakeAppJs, /appendLeadNote/)
 assert.doesNotMatch(intakeAppJs, /sendEmail|enroll|auto.?message/i)
@@ -871,23 +874,27 @@ assert.match(extensionWorkspaceJs, /es-ws-enrich-company-btn/)
 assert.match(extensionWorkspaceJs, /profile_photo_url/)
 assert.match(extensionWorkspaceJs, /renderCrmRelationship/)
 assert.match(extensionWorkspaceJs, /People Data Labs, Prospeo, Apollo, Hunter/)
-assert.match(extensionWorkspaceJs, /Run Similar Company Discovery/)
+assert.match(extensionWorkspaceJs, /renderCrmContacts/)
+assert.match(extensionWorkspaceJs, /buildCurrentProfileEmployeeCandidate/)
+assert.match(extensionWorkspaceJs, /es-ws-research-grid/)
+assert.doesNotMatch(extensionWorkspaceJs, /Run Similar Company Discovery/)
 assert.match(extensionWorkspaceJs, /resolveProfileDisplayName/)
 assert.match(extensionWorkspaceJs, /inferProfileNameFromPageTitle/)
 assert.match(extensionWorkspaceJs, /render_input_payload/)
 assert.doesNotMatch(extensionWorkspaceJs, /hidden LinkedIn scraping|linkedin.*scrap/i)
 assert.match(extensionWorkspaceJs, /EquipifyGrowthEmployeeRow/)
-assert.match(extensionWorkspaceJs, /buildEmployeeRowHtml/)
-assert.match(extensionWorkspaceJs, /bindEmployeeRowActions/)
+assert.match(extensionWorkspaceJs, /buildObjectRowHtml/)
+assert.match(extensionWorkspaceJs, /bindObjectRowActions/)
 
 const extensionEmployeeRowJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/extension-employee-row.js"),
   "utf8",
 )
 assert.match(extensionEmployeeRowJs, /resolveEmployeeViewUrl/)
+assert.match(extensionEmployeeRowJs, /buildObjectRowHtml/)
 assert.match(extensionEmployeeRowJs, /buildEmployeeRowHtml/)
-assert.match(extensionEmployeeRowJs, /bindEmployeeRowActions/)
-assert.match(extensionEmployeeRowJs, /No public profile available/)
+assert.match(extensionEmployeeRowJs, /bindObjectRowActions/)
+assert.match(extensionEmployeeRowJs, /No public URL available/)
 
 function runEmployeeRowHarness(): {
   resolveEmployeeViewUrl: (contact: Record<string, unknown>) => string | null
@@ -976,7 +983,7 @@ const noUrlEmployeeHtml = employeeRowHarness.buildEmployeeRowHtml({
   source: "crm",
 })
 assert.match(noUrlEmployeeHtml, /es-ws-employee-view[^>]*disabled/)
-assert.match(noUrlEmployeeHtml, /No public profile available/)
+assert.match(noUrlEmployeeHtml, /No public URL available/)
 
 const crmEmployeeHtml = employeeRowHarness.buildEmployeeRowHtml({
   name: "Existing Lead",
@@ -988,7 +995,7 @@ const crmEmployeeHtml = employeeRowHarness.buildEmployeeRowHtml({
   linkedin_url: "https://www.linkedin.com/in/existing-lead/",
 })
 assert.match(crmEmployeeHtml, />Open</)
-assert.match(crmEmployeeHtml, /data-lead-id="lead-123"/)
+assert.match(crmEmployeeHtml, /data-secondary-action="open-lead"/)
 
 const list = employeeRowHarness.document.createElement("div")
 list.innerHTML = employeeRowHarness.buildEmployeeRowHtml({
@@ -1026,6 +1033,185 @@ addButton?.click()
 assert.equal(addTriggered, true)
 assert.equal(openLeadTriggered, false)
 assert.deepEqual(openedUrls, ["https://www.linkedin.com/in/jane-doe/"])
+
+const extensionContextNormalizeJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/extension-context-normalize.js"),
+  "utf8",
+)
+assert.match(extensionContextNormalizeJs, /\[Equipify Sales:context-status\]/)
+assert.match(extensionContextNormalizeJs, /normalizeExtractionPayload/)
+assert.match(extensionContextNormalizeJs, /Context Found/)
+
+function runContextNormalizeHarness() {
+  const sandbox: Record<string, unknown> = { window: {} }
+  const context = vm.createContext(sandbox)
+  vm.runInContext(extensionContextNormalizeJs, context)
+  return (context.window as { EquipifyGrowthContextNormalize?: Record<string, unknown> })
+    .EquipifyGrowthContextNormalize as {
+    normalizeExtractionPayload: (input: Record<string, unknown>) => Record<string, unknown>
+    resolveContextStatusLabel: (input: Record<string, unknown>) => { label: string; tone: string }
+    buildResearchSnapshotLines: (normalized: Record<string, unknown>) => Array<{ label: string; value: string | null }>
+  }
+}
+
+const contextNormalize = runContextNormalizeHarness()
+const normalized = contextNormalize.normalizeExtractionPayload({
+  detected: {
+    contact_name: "Jane Doe",
+    job_title: "Biomedical Engineer",
+    company_name: "Sharp Memorial Hospital",
+    location: "San Diego, CA",
+    linkedin_page_kind: "profile",
+  },
+})
+assert.equal(normalized.hasContext, true)
+assert.equal(normalized.person, "Jane Doe")
+assert.equal(normalized.company, "Sharp Memorial Hospital")
+
+const contextStatus = contextNormalize.resolveContextStatusLabel({
+  crmPayload: { matched: false },
+  normalized,
+  tabUrl: "https://www.linkedin.com/in/jane-doe/",
+  restricted: false,
+})
+assert.equal(contextStatus.label, "Context Found")
+
+const snapshotLines = contextNormalize.buildResearchSnapshotLines(normalized)
+assert.equal(snapshotLines.length, 4)
+assert.equal(snapshotLines[0]?.label, "Person")
+
+const extensionContactIntelligenceJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/extension-contact-intelligence.js"),
+  "utf8",
+)
+assert.match(extensionContactIntelligenceJs, /\[Equipify Sales:contact-intelligence\]/)
+assert.match(extensionContactIntelligenceJs, /analyzeContactIntelligence/)
+assert.match(extensionContactIntelligenceJs, /decision_maker_level/)
+
+function runContactIntelligenceHarness() {
+  const sandbox: Record<string, unknown> = { window: {}, console }
+  const context = vm.createContext(sandbox)
+  vm.runInContext(extensionContactIntelligenceJs, context)
+  return (context.window as { EquipifyGrowthContactIntelligence?: Record<string, unknown> })
+    .EquipifyGrowthContactIntelligence as {
+    analyzeContactIntelligence: (input: Record<string, unknown>) => Record<string, unknown>
+  }
+}
+
+const contactIntelligence = runContactIntelligenceHarness()
+
+function assertContactIntel(
+  title: string,
+  expected: {
+    departmentIncludes?: string[]
+    seniority: string
+    decision_maker_level: string
+    buying_influence: string
+    next_best_action: string
+  },
+  extra: Record<string, unknown> = {},
+) {
+  const result = contactIntelligence.analyzeContactIntelligence({
+    person: "Test Contact",
+    title,
+    company: "Sharp Memorial Hospital",
+    location: "San Diego, CA",
+    ...extra,
+  })
+  assert.equal(result.seniority, expected.seniority, `${title} seniority`)
+  assert.equal(result.decision_maker_level, expected.decision_maker_level, `${title} decision maker`)
+  assert.equal(result.buying_influence, expected.buying_influence, `${title} buying influence`)
+  assert.equal(result.next_best_action, expected.next_best_action, `${title} next best action`)
+  if (expected.departmentIncludes) {
+    for (const dept of expected.departmentIncludes) {
+      assert.match(String(result.department), new RegExp(dept, "i"), `${title} department includes ${dept}`)
+    }
+  }
+  return result
+}
+
+const ricardoIntel = assertContactIntel("Biomedical Equipment Technician", {
+  departmentIncludes: ["Clinical", "Engineering"],
+  seniority: "Individual Contributor",
+  decision_maker_level: "Low",
+  buying_influence: "Low",
+  next_best_action: "Identify Clinical Engineering Director",
+})
+assert.equal(ricardoIntel.research_confidence, 100)
+assert.match(String(ricardoIntel.recommended_angles?.[0] ?? ""), /Field Service Efficiency/i)
+
+assertContactIntel("Director Clinical Engineering", {
+  departmentIncludes: ["Clinical", "Engineering"],
+  seniority: "Director",
+  decision_maker_level: "High",
+  buying_influence: "High",
+  next_best_action: "Add to outreach sequence",
+})
+
+assertContactIntel("Service Manager", {
+  departmentIncludes: ["Service"],
+  seniority: "Manager",
+  decision_maker_level: "Medium",
+  buying_influence: "Medium",
+  next_best_action: "Capture and research manager",
+})
+
+assertContactIntel("VP Operations", {
+  departmentIncludes: ["Operations"],
+  seniority: "VP",
+  decision_maker_level: "Executive",
+  buying_influence: "High",
+  next_best_action: "Add to outreach sequence",
+})
+
+assertContactIntel("Owner", {
+  departmentIncludes: ["Executive"],
+  seniority: "Owner",
+  decision_maker_level: "Executive",
+  buying_influence: "High",
+  next_best_action: "Add to outreach sequence",
+})
+
+assertContactIntel("Founder", {
+  seniority: "Owner",
+  decision_maker_level: "Executive",
+  buying_influence: "High",
+  next_best_action: "Add to outreach sequence",
+})
+
+assertContactIntel("President", {
+  seniority: "Executive",
+  decision_maker_level: "Executive",
+  buying_influence: "High",
+  next_best_action: "Add to outreach sequence",
+})
+
+assertContactIntel("CEO", {
+  seniority: "Executive",
+  decision_maker_level: "Executive",
+  buying_influence: "High",
+  next_best_action: "Add to outreach sequence",
+})
+
+assertContactIntel("Biomedical Equipment Technician", {
+  seniority: "Individual Contributor",
+  decision_maker_level: "Low",
+  buying_influence: "Low",
+  next_best_action: "Open CRM record",
+}, { hasCrmMatch: true })
+
+assert.equal(
+  contactIntelligence.analyzeContactIntelligence({
+    person: "Jane",
+    title: "Director",
+    connection_degree: "1st",
+    mutual_connections_count: 6,
+  }).relationship_strength,
+  "Strong",
+)
+
+assert.match(extensionWorkspaceJs, /renderContactIntelligence/)
+assert.match(extensionWorkspaceJs, /es-ws-contact-intelligence/)
 
 const extensionConfigJs = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/extension-config.js"),
@@ -1568,7 +1754,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ version: "4.3.29" }),
+        getManifest: () => ({ version: "4.3.31" }),
       },
     },
     setTimeout: () => 0,
@@ -2227,8 +2413,14 @@ assert.match(sidepanelHtml, /es-ws-add-btn/)
 assert.match(sidepanelHtml, /analytics-today/)
 assert.match(sidepanelHtml, /extension-version-banner/)
 assert.match(sidepanelHtml, /bootstrap-loading/)
+assert.match(sidepanelHtml, /extension-context-normalize.js/)
+assert.match(sidepanelHtml, /extension-contact-intelligence.js/)
+assert.match(sidepanelHtml, /Contact Intelligence/)
+assert.match(sidepanelHtml, /Research Snapshot/)
+assert.match(sidepanelHtml, /Discovery Actions/)
+assert.match(sidepanelHtml, /es-ws-crm-contacts-list/)
 assert.match(sidepanelHtml, /Employees/)
-assert.match(sidepanelHtml, /Run contact discovery/)
+assert.doesNotMatch(sidepanelHtml, /Run contact discovery to find people/)
 
 const popupHtml = fs.readFileSync(
   path.join(process.cwd(), "extensions/growth-browser-intake/popup.html"),

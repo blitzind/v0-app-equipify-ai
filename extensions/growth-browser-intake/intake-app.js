@@ -16,6 +16,11 @@ function initIntakeApp(options) {
   const extensionVersion = window.EquipifyGrowthExtensionVersion
   const logPrefix = `[Equipify Sales:${surface}]`
 
+  window.__equipifyOpenLeadAdmin = (leadId) => {
+    if (!leadId) return
+    chrome.tabs.create({ url: leadAdminUrl(leadId) })
+  }
+
   let bootstrapTimer = null
   let bootstrapSeq = 0
 
@@ -115,12 +120,35 @@ function initIntakeApp(options) {
   }
 
   function resolveBootstrapTerminalLabel(crmPayload, metadata, tabUrl) {
+    const contextNormalize = window.EquipifyGrowthContextNormalize
+    if (contextNormalize?.resolveContextStatusLabel) {
+      const status = contextNormalize.resolveContextStatusLabel({
+        crmPayload,
+        detected: metadata ?? state.detected,
+        formValues: readFormValues(),
+        context: crmPayload?.context ?? null,
+        tabUrl,
+        isRestrictedTabUrl,
+      })
+      contextNormalize.logContextStatus?.(status, {
+        tabUrl,
+        matched: crmPayload?.matched === true,
+        pageKind: status.extraction?.pageKind ?? null,
+      })
+      return { label: status.label, tone: status.tone }
+    }
+
     if (isRestrictedTabUrl(tabUrl)) return { label: "No context found", tone: "status-error" }
     if (crmPayload?.error_status === 403) return { label: "Not authorized", tone: "status-error" }
     if (crmPayload?.error_status) return { label: "Error", tone: "status-error" }
     if (!metadata && !state.detected) return { label: "No context found", tone: "status-error" }
     if (crmPayload?.matched) return { label: "Loaded", tone: "status-ready" }
-    return { label: "Not in Equipify", tone: "status-ready" }
+    return { label: "Context Found", tone: "status-ready" }
+  }
+
+  function syncContextStatusFromWorkspace(crmPayload, tabUrl) {
+    const terminal = resolveBootstrapTerminalLabel(crmPayload, state.detected, tabUrl)
+    setCaptureStatus(terminal.label, terminal.tone)
   }
 
   function setBootstrapTerminalState(crmPayload, metadata, tabUrl) {
@@ -480,6 +508,7 @@ function initIntakeApp(options) {
     })
 
     workspace.render(renderInput)
+    syncContextStatusFromWorkspace(crmPayload, tabUrl)
 
     storage.loadRecentCaptures().then((captures) => {
       workspace.render({
@@ -491,6 +520,7 @@ function initIntakeApp(options) {
         profilePhotoUrl: state.detected?.profile_photo_url ?? null,
         visibleLinkedInPeople: state.visibleLinkedInPeople ?? [],
       })
+      syncContextStatusFromWorkspace(crmPayload, tabUrl)
     })
   }
 
@@ -738,6 +768,7 @@ function initIntakeApp(options) {
 
   function renderRecentCaptures(captures) {
     if (!els.recentCapturesList) return
+    const objectRow = window.EquipifyGrowthEmployeeRow
     els.recentCapturesList.innerHTML = ""
 
     if (!captures.length) {
@@ -745,6 +776,35 @@ function initIntakeApp(options) {
       empty.className = "muted recent-empty"
       empty.textContent = "No recent captures yet."
       els.recentCapturesList.appendChild(empty)
+      return
+    }
+
+    if (objectRow?.buildObjectRowHtml) {
+      els.recentCapturesList.className = "recent-list es-ws-employees-list"
+      els.recentCapturesList.innerHTML = captures
+        .map((capture) => {
+          const when = capture.saved_at ? new Date(capture.saved_at).toLocaleString() : ""
+          const meta = [when, capture.capture_type === "company_only" ? "Company-only" : "In CRM"]
+            .filter(Boolean)
+            .join(" · ")
+          return objectRow.buildObjectRowHtml(
+            {
+              name: capture.contact_name || capture.company_name || "Untitled lead",
+              title: capture.company_name && capture.contact_name ? capture.company_name : "Captured lead",
+              meta,
+              linkedin_url: capture.linkedin_url ?? null,
+              source_url: capture.source_url ?? null,
+              lead_id: capture.lead_id,
+              source: "recent_capture",
+            },
+            (value) => String(value ?? ""),
+          )
+        })
+        .join("")
+      objectRow.bindObjectRowActions?.(els.recentCapturesList, {
+        openViewUrl: (url) => chrome.tabs.create({ url }),
+        triggerOpenLead: (leadId) => chrome.tabs.create({ url: leadAdminUrl(leadId) }),
+      })
       return
     }
 
@@ -769,7 +829,7 @@ function initIntakeApp(options) {
       const openBtn = document.createElement("button")
       openBtn.type = "button"
       openBtn.className = "btn-secondary"
-      openBtn.textContent = "Open lead"
+      openBtn.textContent = "Open"
       openBtn.addEventListener("click", () => {
         chrome.tabs.create({ url: leadAdminUrl(capture.lead_id) })
       })
@@ -1115,6 +1175,8 @@ function initIntakeApp(options) {
         lead_id: result.lead_id,
         company_name: companyName,
         contact_name: payload.contact_name,
+        linkedin_url: payload.linkedin_url ?? null,
+        source_url: payload.source_url ?? null,
         saved_at: new Date().toISOString(),
         status: result.status,
         capture_type: result.capture_type ?? (companyOnly ? "company_only" : "contact"),

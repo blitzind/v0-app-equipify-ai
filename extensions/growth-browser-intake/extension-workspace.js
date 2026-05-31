@@ -16,6 +16,7 @@
   let lastEnrichmentResult = null
   let lastCompanyEnrichment = null
   let lastEmployeeRows = []
+  let lastCrmContactRows = []
   let similarState = { seedKey: null, loading: false, matches: [] }
 
   function trimOrNull(value) {
@@ -383,6 +384,101 @@
     )
   }
 
+  function chipToneForLevel(level) {
+    const normalized = String(level ?? "").toLowerCase()
+    if (normalized === "executive") return "executive"
+    if (normalized === "high" || normalized === "strong") return "high"
+    if (normalized === "medium" || normalized === "moderate") return "medium"
+    return "low"
+  }
+
+  function renderContactIntelligence(input) {
+    const panel = document.getElementById("es-ws-contact-intelligence-panel")
+    const chipsEl = document.getElementById("es-ws-contact-intelligence-chips")
+    const anglesEl = document.getElementById("es-ws-ci-angles")
+    const nbaEl = document.getElementById("es-ws-ci-nba")
+    const nbaReasonEl = document.getElementById("es-ws-ci-nba-reason")
+    if (!panel || !chipsEl || !anglesEl || !nbaEl || !nbaReasonEl) return
+
+    const detected = input?.detected ?? null
+    const formValues = input?.formValues ?? {}
+    const context = input?.crmPayload?.context ?? null
+    const hasMatch = Boolean(context?.lead_id)
+    const contextNormalize = window.EquipifyGrowthContextNormalize
+    const normalized =
+      contextNormalize?.normalizeExtractionPayload?.({
+        detected,
+        formValues,
+        context,
+      }) ?? {}
+
+    const pageKind = detected?.linkedin_page_kind ?? null
+    const title =
+      normalized.title && normalized.title !== PUBLIC_NOT_FOUND
+        ? normalized.title
+        : trimOrNull(formValues?.title) || trimOrNull(detected?.job_title) || trimOrNull(detected?.title)
+    const person = normalized.person ?? null
+
+    if (pageKind === "company" || (!person && !title)) {
+      panel.hidden = true
+      return
+    }
+
+    const analyzer = window.EquipifyGrowthContactIntelligence
+    if (!analyzer?.analyzeContactIntelligence) {
+      panel.hidden = true
+      return
+    }
+
+    const intelligence = analyzer.analyzeContactIntelligence({
+      person,
+      title,
+      company: normalized.company,
+      location: normalized.location,
+      connection_degree: detected?.connection_degree ?? null,
+      mutual_connections_count: detected?.mutual_connections_count ?? null,
+      connections_count: detected?.connections_count ?? null,
+      hasCrmMatch: hasMatch,
+    })
+
+    panel.hidden = false
+
+    const chips = [
+      { label: "Decision Maker", value: intelligence.decision_maker_level, tone: chipToneForLevel(intelligence.decision_maker_level) },
+      { label: "Department", value: intelligence.department, tone: "neutral" },
+      { label: "Seniority", value: intelligence.seniority, tone: "neutral" },
+      { label: "Buying Influence", value: intelligence.buying_influence, tone: chipToneForLevel(intelligence.buying_influence) },
+      { label: "Relationship", value: intelligence.relationship_strength, tone: chipToneForLevel(intelligence.relationship_strength) },
+      {
+        label: "Research Confidence",
+        value: `${intelligence.research_confidence}%`,
+        tone: intelligence.research_confidence >= 75 ? "high" : intelligence.research_confidence >= 50 ? "medium" : "low",
+      },
+    ]
+
+    chipsEl.innerHTML = chips
+      .map(
+        (chip) =>
+          `<span class="es-ws-ci-chip" data-tone="${escapeHtml(chip.tone)}"><span class="es-ws-ci-chip-label">${escapeHtml(chip.label)}</span><span class="es-ws-ci-chip-value">${escapeHtml(chip.value)}</span></span>`,
+      )
+      .join("")
+
+    const primaryAngle = intelligence.recommended_angles[0] ?? "Operational Efficiency"
+    const extraAngles = intelligence.recommended_angles.slice(1)
+    anglesEl.innerHTML = `
+      <strong class="es-ws-ci-angle-primary">${escapeHtml(primaryAngle)}</strong>
+      ${extraAngles.length ? `<span class="es-ws-ci-angle-secondary">${extraAngles.map((angle) => escapeHtml(angle)).join(" · ")}</span>` : ""}`
+
+    nbaEl.textContent = intelligence.next_best_action
+    nbaReasonEl.textContent = intelligence.next_best_action_reason
+
+    intelLog("contact_intelligence_rendered", {
+      decision_maker_level: intelligence.decision_maker_level,
+      department: intelligence.department,
+      seniority: intelligence.seniority,
+    })
+  }
+
   function renderProfilePhoto(name, photoUrl) {
     const wrap = document.getElementById("es-ws-profile-photo-wrap")
     if (!wrap) return
@@ -442,33 +538,106 @@
       .join("")
   }
 
-  function renderResearchSnapshot(context, detected) {
+  function renderResearchSnapshot(context, detected, formValues) {
     const summaryEl = document.getElementById("es-ws-research-summary")
     const signalsEl = document.getElementById("es-ws-research-signals")
     if (!summaryEl || !signalsEl) return
 
-    const parts = []
-    if (context?.lead_status_label) parts.push(`Status: ${context.lead_status_label}.`)
-    if (context?.next_action?.label) parts.push(`Suggested: ${context.next_action.label}.`)
-    if (context?.lead_score != null) parts.push(`Lead score ${context.lead_score}.`)
+    const contextNormalize = window.EquipifyGrowthContextNormalize
+    const normalized =
+      contextNormalize?.normalizeExtractionPayload?.({
+        detected,
+        formValues,
+        context,
+      }) ?? {
+        person: null,
+        title: null,
+        company: null,
+        location: null,
+        hasContext: false,
+      }
 
-    const summary =
-      parts.slice(0, 3).join(" ") ||
-      (detected?.company_name
-        ? `${detected.company_name} detected from visible page metadata. Capture to enrich in Equipify.`
-        : "Capture this page to build a research snapshot in Equipify.")
+    const lines = contextNormalize?.buildResearchSnapshotLines?.(normalized) ?? []
+    const hasAnyLine = lines.some((line) => trimOrNull(line.value))
 
-    summaryEl.textContent = summary
+    if (hasAnyLine) {
+      summaryEl.innerHTML = `
+        <dl class="es-ws-research-grid">
+          ${lines
+            .map(
+              (line) => `
+            <div class="es-ws-research-row">
+              <dt>${escapeHtml(line.label)}</dt>
+              <dd>${escapeHtml(trimOrNull(line.value) ?? "—")}</dd>
+            </div>`,
+            )
+            .join("")}
+        </dl>`
+    } else {
+      summaryEl.textContent = "Capture this page to build a research snapshot in Equipify."
+    }
 
     const signals = []
     if (detected?.source_platform === "linkedin") signals.push("LinkedIn")
-    if (context?.company_contacts_count) signals.push(`${context.company_contacts_count} contacts`)
+    if (context?.lead_status_label) signals.push(context.lead_status_label)
+    if (context?.next_action?.label) signals.push(context.next_action.label)
+    if (context?.lead_score != null) signals.push(`Score ${context.lead_score}`)
+    if (context?.company_contacts_count) signals.push(`${context.company_contacts_count} CRM contacts`)
     if (context?.related_leads_count) signals.push(`${context.related_leads_count} related leads`)
     if (context?.opportunity?.stage_label) signals.push(context.opportunity.stage_label)
 
     signalsEl.innerHTML = signals.length
       ? signals.map((signal) => `<span class="es-ws-signal">${escapeHtml(signal)}</span>`).join("")
-      : '<span class="es-ws-signal">Awaiting capture</span>'
+      : normalized.hasContext
+        ? '<span class="es-ws-signal">Ready to capture</span>'
+        : '<span class="es-ws-signal">Awaiting page context</span>'
+
+    intelLog("research_snapshot", {
+      hasContext: normalized.hasContext,
+      person: normalized.person,
+      company: normalized.company,
+    })
+  }
+
+  function buildCurrentProfileEmployeeCandidate(detected, context, formValues) {
+    if (detected?.linkedin_page_kind !== "profile") return null
+    const name = resolveProfileDisplayName(detected, context, formValues)
+    if (!name || name === PROFILE_CONTEXT_FAILED) return null
+    const title = resolveProfileTitle(detected, formValues)
+    const linkedinUrl = trimOrNull(formValues?.linkedin_url) || trimOrNull(detected?.linkedin_url)
+    return {
+      name,
+      title: title !== PUBLIC_NOT_FOUND ? title : null,
+      linkedin_url: linkedinUrl,
+      profile_url: linkedinUrl,
+      source_url: linkedinUrl,
+      profile_photo_url: detected?.profile_photo_url ?? null,
+      department: inferDepartment(title !== PUBLIC_NOT_FOUND ? title : null),
+      seniority: inferSeniority(title !== PUBLIC_NOT_FOUND ? title : null),
+      crm_status: context?.lead_id ? "In CRM" : "Not In CRM",
+      lead_id: context?.lead_id ?? null,
+      source: "current_profile",
+    }
+  }
+
+  function resolveEmployeeEmptyMessage(detected, rows) {
+    const pageKind = detected?.linkedin_page_kind ?? null
+    const hasCrm = rows.some((row) => row.source === "crm")
+    const hasVisible = rows.some((row) => row.source === "linkedin_visible" || row.source === "linkedin_visible_page")
+    const hasProfile = rows.some((row) => row.source === "current_profile")
+
+    if (pageKind === "profile") {
+      if (hasProfile || hasVisible) {
+        return null
+      }
+      return "LinkedIn profile pages show the current person above. Open the company page or run Discovery Actions to find teammates and CRM contacts."
+    }
+    if (pageKind === "company") {
+      if (hasVisible || hasCrm) return null
+      return "No employees are visible in the current company page section. Scroll to People or run Discovery Actions to queue contact discovery."
+    }
+    if (hasCrm || hasVisible) return null
+    return "Employee discovery works best on LinkedIn company pages. Use Discovery Actions to queue contact discovery for this account."
   }
 
   function renderQueueShortcuts(recentCaptures) {
@@ -476,25 +645,10 @@
     if (recentEl) recentEl.textContent = String(recentCaptures?.length ?? 0)
   }
 
-  function renderEmployees(context, visiblePeople = []) {
+  function renderEmployees(context, visiblePeople = [], detected = null, formValues = {}) {
     const list = document.getElementById("es-ws-employees-list")
     if (!list) return
     const employeeRow = window.EquipifyGrowthEmployeeRow
-
-    const relationshipMap = context?.company_relationship_map ?? {}
-    const crmRows = [
-      ...(relationshipMap.contacts ?? []),
-      ...(relationshipMap.related_leads ?? []),
-    ].map((contact) => ({
-      ...contact,
-      linkedin_url: trimOrNull(contact.linkedin_url),
-      profile_url: trimOrNull(contact.profile_url),
-      source_url: trimOrNull(contact.source_url),
-      department: contact.department ?? inferDepartment(contact.title),
-      seniority: contact.seniority ?? inferSeniority(contact.title),
-      crm_status: contact.status ? contact.status.replace(/_/g, " ") : "Not In CRM",
-      source: "crm",
-    }))
 
     const visibleRows = (visiblePeople ?? []).map((person) => ({
       name: person.full_name ?? person.name,
@@ -505,15 +659,22 @@
       profile_photo_url: person.profile_photo_url ?? null,
       department: inferDepartment(person.job_title ?? person.title),
       seniority: inferSeniority(person.job_title ?? person.title),
-      crm_status: "Not In CRM",
+      crm_status: "Visible on page",
       lead_id: null,
       source: trimOrNull(person.source) ?? "linkedin_visible",
     }))
 
-    const merged = [...crmRows]
+    const profileCandidate = buildCurrentProfileEmployeeCandidate(detected, context, formValues)
+    const merged = []
+    if (profileCandidate) merged.push(profileCandidate)
     for (const row of visibleRows) {
       const key = `${(row.name ?? "").toLowerCase()}|${(row.linkedin_url ?? "").toLowerCase()}`
-      if (merged.some((existing) => `${(existing.name ?? "").toLowerCase()}|${(existing.linkedin_url ?? "").toLowerCase()}` === key)) {
+      if (
+        merged.some(
+          (existing) =>
+            `${(existing.name ?? "").toLowerCase()}|${(existing.linkedin_url ?? "").toLowerCase()}` === key,
+        )
+      ) {
         continue
       }
       merged.push(row)
@@ -521,13 +682,51 @@
 
     lastEmployeeRows = merged
     intelLog("employees", {
-      crmCount: crmRows.length,
+      profileCandidate: Boolean(profileCandidate),
       visibleCount: visibleRows.length,
       total: merged.length,
+      pageKind: detected?.linkedin_page_kind ?? null,
     })
 
     populateEmployeeFilters(lastEmployeeRows)
-    renderFilteredEmployees()
+    renderFilteredEmployees(detected)
+  }
+
+  function buildCrmContactRows(context) {
+    const relationshipMap = context?.company_relationship_map ?? {}
+    return [...(relationshipMap.contacts ?? []), ...(relationshipMap.related_leads ?? [])].map((contact) => ({
+      ...contact,
+      name: contact.name ?? contact.contact_name ?? "CRM contact",
+      title: contact.title ?? contact.job_title ?? "Title unknown",
+      linkedin_url: trimOrNull(contact.linkedin_url),
+      profile_url: trimOrNull(contact.profile_url),
+      source_url: trimOrNull(contact.source_url),
+      meta: contact.status ? contact.status.replace(/_/g, " ") : "In CRM",
+      crm_status: contact.status ? contact.status.replace(/_/g, " ") : "In CRM",
+      department: contact.department ?? inferDepartment(contact.title),
+      seniority: contact.seniority ?? inferSeniority(contact.title),
+      source: "crm",
+    }))
+  }
+
+  function renderCrmContacts(context) {
+    const list = document.getElementById("es-ws-crm-contacts-list")
+    if (!list) return
+    const objectRow = window.EquipifyGrowthEmployeeRow
+    lastCrmContactRows = buildCrmContactRows(context)
+
+    if (!lastCrmContactRows.length) {
+      list.innerHTML =
+        '<p class="es-ws-empty">No CRM contacts linked to this company yet. Capture the profile or run Discovery Actions to populate contacts.</p>'
+      return
+    }
+
+    list.innerHTML = lastCrmContactRows
+      .slice(0, 8)
+      .map((contact) => objectRow?.buildObjectRowHtml?.(contact, escapeHtml) ?? "")
+      .join("")
+    objectRow?.bindObjectRowActions?.(list)
+    intelLog("crm_contacts", { count: lastCrmContactRows.length })
   }
 
   function populateSelect(id, values, fallbackLabel) {
@@ -546,7 +745,7 @@
     populateSelect("es-ws-employee-crm-filter", uniqueValues(rows.map((row) => row.crm_status)), "CRM status")
   }
 
-  function renderFilteredEmployees() {
+  function renderFilteredEmployees(detected = null) {
     const list = document.getElementById("es-ws-employees-list")
     if (!list) return
 
@@ -564,22 +763,20 @@
     })
 
     if (!contacts.length) {
-      const hasCrm = lastEmployeeRows.some((row) => row.source === "crm")
-      const hasVisible = lastEmployeeRows.some((row) => row.source === "linkedin_visible")
-      list.innerHTML = hasCrm
-        ? '<p class="es-ws-empty">No employees match the active filters.</p>'
-        : hasVisible
-          ? '<p class="es-ws-empty">No visible employees match the active filters.</p>'
-          : '<p class="es-ws-empty">No visible employees or CRM contacts for this company yet. Open a LinkedIn company page or run Discover Employees.</p>'
+      const emptyMessage = resolveEmployeeEmptyMessage(detected ?? lastRenderInput?.detected ?? null, lastEmployeeRows)
+      list.innerHTML = emptyMessage
+        ? `<p class="es-ws-empty">${escapeHtml(emptyMessage)}</p>`
+        : '<p class="es-ws-empty">No employees match the active filters.</p>'
       return
     }
 
+    const employeeRow = window.EquipifyGrowthEmployeeRow
     list.innerHTML = contacts
       .slice(0, 6)
-      .map((contact) => employeeRow?.buildEmployeeRowHtml?.(contact, escapeHtml) ?? "")
+      .map((contact) => employeeRow?.buildObjectRowHtml?.(contact, escapeHtml) ?? "")
       .join("")
 
-    employeeRow?.bindEmployeeRowActions?.(list)
+    employeeRow?.bindObjectRowActions?.(list)
   }
 
   function renderTechnologies(detected, context) {
@@ -686,6 +883,8 @@
     setText("es-ws-profile-title", title)
     setText("es-ws-profile-company", company)
     setText("es-ws-profile-location", profileLocation !== PUBLIC_NOT_FOUND ? profileLocation : PUBLIC_NOT_FOUND)
+
+    renderContactIntelligence(input)
 
     console.log("[Equipify Sales:workspace]", "render_input_payload", {
       person: {
@@ -856,10 +1055,11 @@
       nbaBtn.dataset.action = nba.action
     }
 
-    renderResearchSnapshot(context, detected)
+    renderResearchSnapshot(context, detected, formValues)
     renderTimeline(context)
     renderQueueShortcuts(recentCaptures)
-    renderEmployees(context, input?.visibleLinkedInPeople ?? [])
+    renderEmployees(context, input?.visibleLinkedInPeople ?? [], detected, formValues)
+    renderCrmContacts(context)
     renderTechnologies(detected, context)
     renderSignals(detected, context)
     renderCrmRelationship(context, relationship, contactsCount, oppCount, customerCount, hasMatch)
@@ -938,22 +1138,18 @@
   function renderSimilarCompanies(matches = similarState.matches) {
     const list = document.getElementById("es-ws-similar-list")
     const insight = document.getElementById("es-ws-similar-insight")
+    const objectRow = window.EquipifyGrowthEmployeeRow
     if (!list) return
     const visibleMatches = applySimilarFilters(matches)
     if (!matches.length) {
-      list.innerHTML = `
-        <div class="es-ws-empty-state">
-          <p>No similar companies found. Run Similar Company Discovery.</p>
-          <button type="button" class="es-ws-inline-btn" id="es-ws-similar-empty-action">Run Similar Company Discovery</button>
-        </div>`
-      document.getElementById("es-ws-similar-empty-action")?.addEventListener("click", () => {
-        discoverSimilarCompanies()
-      })
+      list.innerHTML =
+        '<p class="es-ws-empty">No similar companies loaded yet. Use Discovery Actions to run Similar Company Discovery.</p>'
       if (insight) insight.textContent = "Similar company discovery requires a matched CRM lead or captured company context."
       return
     }
     if (!visibleMatches.length) {
-      list.innerHTML = '<p class="es-ws-empty">No similar companies match the selected filters. Expand the search radius or clear filters.</p>'
+      list.innerHTML =
+        '<p class="es-ws-empty">No similar companies match the selected filters. Expand the search radius or clear filters.</p>'
       if (insight) insight.textContent = "No evidence-backed matches for the active filters."
       return
     }
@@ -964,38 +1160,31 @@
         : "Evidence-backed similar companies."
     }
     list.innerHTML = visibleMatches
-      .map((match, index) => {
-        const reasons = similarityReasons(match)
-        return `
-          <article class="es-ws-similar-card">
-            <label class="es-ws-similar-select"><input type="checkbox" data-similar-index="${index}" /> Select</label>
-            <div class="es-ws-similar-score">${Math.round(match.confidence ?? 0)}% Similar</div>
-            <div class="es-ws-similar-name">${escapeHtml(match.company_name)}</div>
-            <div class="es-ws-similar-meta">${escapeHtml(match.relationship_type?.replace(/_/g, " ") ?? "Similar company")} · ${escapeHtml(match.location ?? "Location unknown")}</div>
-            <div class="es-ws-similar-meta">${match.website ? `<a href="${escapeHtml(match.website)}" target="_blank" rel="noopener noreferrer">${escapeHtml(match.website)}</a>` : "Website unknown"}</div>
-            <div class="es-ws-similar-badge">${escapeHtml(crmBadgeForSimilar(match))}</div>
-            <ul class="es-ws-similar-reasons">${reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>
-            <div class="button-row">
-              <button type="button" class="es-ws-inline-btn" data-similar-action="open" data-lead-id="${escapeHtml(match.lead_id ?? "")}" data-website="${escapeHtml(match.website ?? "")}">Open Company</button>
-              <button type="button" class="es-ws-inline-btn" data-similar-action="queue" data-company="${escapeHtml(match.company_name)}">Add to Queue</button>
-            </div>
-          </article>
-        `
+      .slice(0, 8)
+      .map((match) => {
+        const reasons = similarityReasons(match).join(" · ")
+        const inCrm = Boolean(trimOrNull(match.lead_id))
+        return (
+          objectRow?.buildObjectRowHtml?.(
+            {
+              name: match.company_name,
+              title: match.location ?? "Location unknown",
+              meta: `${crmBadgeForSimilar(match)} · ${reasons}`,
+              website: match.website,
+              lead_id: match.lead_id ?? null,
+              company_name: match.company_name,
+              source: "similar_company",
+            },
+            escapeHtml,
+            {
+              secondaryLabel: inCrm ? "Open" : "Add",
+              secondaryActionKind: inCrm ? "open-lead" : "queue",
+            },
+          ) ?? ""
+        )
       })
       .join("")
-
-    list.querySelectorAll("[data-similar-action='open']").forEach((button) => {
-      button.addEventListener("click", () => {
-        const website = button.dataset.website
-        if (website) window.open(website, "_blank", "noopener,noreferrer")
-      })
-    })
-    list.querySelectorAll("[data-similar-action='queue']").forEach((button) => {
-      button.addEventListener("click", () => {
-        window.__equipifyCopilotHooks?.switchTab?.("queue")
-        document.getElementById("copilot-add-to-queue-btn")?.click()
-      })
-    })
+    objectRow?.bindObjectRowActions?.(list)
   }
 
   async function discoverSimilarCompanies() {
@@ -1038,6 +1227,9 @@
       })
       if (tabId === "similar" && !similarState.matches.length && !similarState.loading) {
         discoverSimilarCompanies()
+      }
+      if (tabId === "discovery") {
+        intelLog("discovery_tab", { pageKind: lastRenderInput?.detected?.linkedin_page_kind ?? null })
       }
     }
 
@@ -1158,14 +1350,15 @@
       button.addEventListener("click", () => switchCompanyTab(button.dataset.companyTab))
     })
 
+    const refreshEmployeeFilters = () => renderFilteredEmployees(lastRenderInput?.detected ?? null)
     ;[
       "es-ws-employee-search",
       "es-ws-employee-department-filter",
       "es-ws-employee-seniority-filter",
       "es-ws-employee-crm-filter",
     ].forEach((id) => {
-      document.getElementById(id)?.addEventListener("input", renderFilteredEmployees)
-      document.getElementById(id)?.addEventListener("change", renderFilteredEmployees)
+      document.getElementById(id)?.addEventListener("input", refreshEmployeeFilters)
+      document.getElementById(id)?.addEventListener("change", refreshEmployeeFilters)
     })
 
     document.getElementById("es-ws-add-btn")?.addEventListener("click", () => {
@@ -1258,11 +1451,6 @@
 
     document.querySelectorAll("[data-similar-filter]").forEach((input) => {
       input.addEventListener("change", () => renderSimilarCompanies())
-    })
-
-    document.getElementById("es-ws-similar-bulk-queue-btn")?.addEventListener("click", () => {
-      window.__equipifyCopilotHooks?.switchTab?.("queue")
-      document.getElementById("copilot-add-to-queue-btn")?.click()
     })
 
     document.getElementById("es-ws-queue-recent")?.addEventListener("click", () => {
