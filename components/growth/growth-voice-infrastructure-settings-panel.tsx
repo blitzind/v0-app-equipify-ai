@@ -51,6 +51,12 @@ import {
   type VoiceBrowserCallingReadinessSnapshot,
   type VoiceOperatorPresencePublicView,
 } from "@/lib/voice/browser-calling/types"
+import {
+  buildRoutingTestRequestBody,
+  initialRoutingTestVoiceNumberId,
+  resolveRoutingTestVoiceNumberId,
+} from "@/lib/voice/admin/routing-test-form"
+import type { InboundVoiceRouteResolution } from "@/lib/voice/routing/routing-resolver"
 
 type VoiceSettingsResponse = {
   ok?: boolean
@@ -65,6 +71,71 @@ type VoiceSettingsResponse = {
     twilioCredentialsConfigured: boolean
   }
   message?: string
+}
+
+type RoutingTestPanelResult = {
+  decision: InboundCallControlDecision
+  route: InboundVoiceRouteResolution
+  twimlPreview: string
+}
+
+function RoutingTestResultPanel({ result }: { result: RoutingTestPanelResult }) {
+  const { decision, route, twimlPreview } = result
+  return (
+    <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs">
+      <p className="font-medium text-foreground">Routing test result</p>
+      <dl className="grid gap-1 sm:grid-cols-2">
+        <div>
+          <dt className="text-muted-foreground">action</dt>
+          <dd className="font-mono text-foreground">{decision.action}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">routingMode</dt>
+          <dd className="font-mono text-foreground">{decision.routingMode ?? "none"}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">routeStatus</dt>
+          <dd className="font-mono text-foreground">{decision.routeStatus}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">businessHoursStatus</dt>
+          <dd className="font-mono text-foreground">{route.businessHoursStatus}</dd>
+        </div>
+        <div className="sm:col-span-2">
+          <dt className="text-muted-foreground">destinationUserIds</dt>
+          <dd className="font-mono break-all text-foreground">
+            {route.destinationUserIds.length ? route.destinationUserIds.join(", ") : "—"}
+          </dd>
+        </div>
+        <div className="sm:col-span-2">
+          <dt className="text-muted-foreground">dialClientIdentities</dt>
+          <dd className="font-mono break-all text-foreground">
+            {(decision.dialClientIdentities?.length ?? 0) > 0
+              ? decision.dialClientIdentities?.join(", ")
+              : "—"}
+          </dd>
+        </div>
+        {decision.dialNumbers.length > 0 ? (
+          <div className="sm:col-span-2">
+            <dt className="text-muted-foreground">dialNumbers</dt>
+            <dd className="font-mono break-all text-foreground">{decision.dialNumbers.join(", ")}</dd>
+          </div>
+        ) : null}
+        {route.fallbackReason ? (
+          <div className="sm:col-span-2">
+            <dt className="text-muted-foreground">fallbackReason</dt>
+            <dd className="text-foreground">{route.fallbackReason}</dd>
+          </div>
+        ) : null}
+      </dl>
+      <div>
+        <p className="mb-1 text-muted-foreground">twimlPreview</p>
+        <pre className="max-h-40 overflow-auto rounded border border-border/60 bg-background p-2 font-mono text-[10px] leading-relaxed text-foreground">
+          {twimlPreview}
+        </pre>
+      </div>
+    </div>
+  )
 }
 
 function ProviderRow({ provider }: { provider: VoiceProviderConfigurationRecord }) {
@@ -156,7 +227,9 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
   const [disclosureText, setDisclosureText] = useState("")
   const [routingTestNumberId, setRoutingTestNumberId] = useState("")
   const [routingTestFrom, setRoutingTestFrom] = useState("+14155550199")
-  const [routingTestResult, setRoutingTestResult] = useState<InboundCallControlDecision | null>(null)
+  const [routingTestLoading, setRoutingTestLoading] = useState(false)
+  const [routingTestError, setRoutingTestError] = useState<string | null>(null)
+  const [routingTestResult, setRoutingTestResult] = useState<RoutingTestPanelResult | null>(null)
   const [browserReadiness, setBrowserReadiness] = useState<VoiceBrowserCallingReadinessSnapshot | null>(null)
   const [operatorPresence, setOperatorPresence] = useState<VoiceOperatorPresencePublicView[]>([])
   const [twilioEnvPresence, setTwilioEnvPresence] = useState<VoiceSettingsResponse["twilioEnvPresence"]>(null)
@@ -177,7 +250,11 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
     const profilesData = (await profilesRes.json().catch(() => ({}))) as { profiles?: VoiceRoutingProfileRecord[] }
     const hoursData = (await hoursRes.json().catch(() => ({}))) as { businessHours?: VoiceBusinessHoursRecord[] }
     const boxesData = (await boxesRes.json().catch(() => ({}))) as { voicemailBoxes?: VoiceVoicemailBoxRecord[] }
-    if (numbersRes.ok) setNumbers(numbersData.numbers ?? [])
+    if (numbersRes.ok) {
+      const loaded = numbersData.numbers ?? []
+      setNumbers(loaded)
+      setRoutingTestNumberId((current) => current.trim() || initialRoutingTestVoiceNumberId(loaded))
+    }
     if (profilesRes.ok) setRoutingProfiles(profilesData.profiles ?? [])
     if (hoursRes.ok) setBusinessHours(hoursData.businessHours ?? [])
     if (boxesRes.ok) setVoicemailBoxes(boxesData.voicemailBoxes ?? [])
@@ -334,24 +411,54 @@ export function GrowthVoiceInfrastructureSettingsPanel() {
   }
 
   async function runRoutingTest() {
-    if (!routingTestNumberId.trim()) throw new Error("Enter a voice number id.")
-    const res = await fetch("/api/platform/growth/voice/routing-test", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        voiceNumberId: routingTestNumberId.trim(),
-        fromNumber: routingTestFrom,
-        skipRoundRobinAdvance: true,
-      }),
-    })
-    const data = (await res.json().catch(() => ({}))) as {
-      ok?: boolean
-      decision?: InboundCallControlDecision
-      message?: string
+    setRoutingTestError(null)
+    setRoutingTestResult(null)
+
+    const voiceNumberId = resolveRoutingTestVoiceNumberId(routingTestNumberId, numbers)
+    if (!voiceNumberId) {
+      setRoutingTestError("Enter a voice number id.")
+      return
     }
-    if (!res.ok || !data.decision) throw new Error(data.message ?? "Routing test failed.")
-    setRoutingTestResult(data.decision)
-    setSuccess("Routing test completed (planning only).")
+
+    if (voiceNumberId !== routingTestNumberId.trim()) {
+      setRoutingTestNumberId(voiceNumberId)
+    }
+
+    setRoutingTestLoading(true)
+    try {
+      const res = await fetch("/api/platform/growth/voice/routing-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          buildRoutingTestRequestBody({
+            voiceNumberId,
+            fromNumber: routingTestFrom,
+            skipRoundRobinAdvance: true,
+          }),
+        ),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        decision?: InboundCallControlDecision
+        route?: InboundVoiceRouteResolution
+        twimlPreview?: string
+        message?: string
+      }
+      if (!res.ok || !data.ok || !data.decision || !data.route) {
+        setRoutingTestError(data.message ?? "Routing test failed.")
+        return
+      }
+      setRoutingTestResult({
+        decision: data.decision,
+        route: data.route,
+        twimlPreview: data.twimlPreview ?? "",
+      })
+      setSuccess("Routing test completed (planning only).")
+    } catch (e) {
+      setRoutingTestError(e instanceof Error ? e.message : "Routing test failed.")
+    } finally {
+      setRoutingTestLoading(false)
+    }
   }
 
   const compliance = readiness?.complianceReadinessExtended

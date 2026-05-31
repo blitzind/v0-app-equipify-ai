@@ -48,6 +48,11 @@
       "Unknown"
     const subtitle = trimOrNull(record?.title) || trimOrNull(record?.subtitle) || "—"
     const meta = trimOrNull(record?.meta) || trimOrNull(record?.crm_status) || ""
+    const buyingRole = trimOrNull(record?.buying_role)
+    const buyingRoleBadge =
+      buyingRole && buyingRole !== "Unknown"
+        ? `<span class="es-ws-buying-role-badge" data-role="${safeEscape(buyingRole)}">${safeEscape(buyingRole)}</span>`
+        : ""
     const viewUrl = resolveViewUrl(record)
     const secondaryLabel = options.secondaryLabel ?? resolveSecondaryActionLabel(record)
     const secondaryKind = resolveSecondaryActionKind(record, options)
@@ -61,6 +66,7 @@
             <div class="es-ws-employee-copy">
               <div class="es-ws-employee-name">${safeEscape(name)}</div>
               <div class="es-ws-employee-title">${safeEscape(subtitle)}</div>
+              ${buyingRoleBadge ? `<div class="es-ws-employee-badges">${buyingRoleBadge}</div>` : ""}
               ${meta ? `<div class="es-ws-employee-meta">${safeEscape(meta)}</div>` : ""}
             </div>
             <div class="es-ws-employee-actions">

@@ -20,6 +20,7 @@
   let similarState = { seedKey: null, loading: false, matches: [] }
   const EMPLOYEE_PAGE_SIZE = 5
   let employeeVisibleLimit = EMPLOYEE_PAGE_SIZE
+  let leadershipFilterActive = false
 
   function trimOrNull(value) {
     const trimmed = (value ?? "").trim()
@@ -878,8 +879,9 @@
       merged.push(row)
     }
 
-    lastEmployeeRows = merged
+    lastEmployeeRows = enrichEmployeeRows(merged, context)
     employeeVisibleLimit = EMPLOYEE_PAGE_SIZE
+    leadershipFilterActive = false
     intelLog("employees", {
       profileCandidate: Boolean(profileCandidate),
       visibleCount: visibleRows.length,
@@ -889,27 +891,113 @@
 
     populateEmployeeFilters(lastEmployeeRows)
     renderFilteredEmployees(detected)
-    renderEmployeePreview()
+    renderBuyingCommitteeSummary(context)
+    renderRecommendedContacts(context)
   }
 
-  function renderEmployeePreview() {
+  function enrichEmployeeRows(rows, context = {}) {
+    const committee = window.EquipifyGrowthBuyingCommittee
+    if (!committee?.enrichEmployeeRecords) return rows ?? []
+    const company =
+      context?.company_name ||
+      lastRenderInput?.formValues?.company_name ||
+      lastRenderInput?.detected?.company_name ||
+      null
+    return committee.enrichEmployeeRecords(rows ?? [], { company, context })
+  }
+
+  function allCommitteeRecords() {
+    const seen = new Set()
+    const merged = []
+    for (const row of [...lastEmployeeRows, ...lastCrmContactRows]) {
+      const key = `${(row.name ?? "").toLowerCase()}|${(row.linkedin_url ?? row.title ?? "").toLowerCase()}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      merged.push(row)
+    }
+    return merged
+  }
+
+  function renderBuyingCommitteeSummary(context) {
+    const section = document.getElementById("es-ws-buying-committee-summary")
+    const committee = window.EquipifyGrowthBuyingCommittee
+    if (!section || !committee) return
+
+    const records = enrichEmployeeRows(allCommitteeRecords(), context)
+    if (!records.length) {
+      section.hidden = true
+      return
+    }
+
+    const summary = committee.buildCommitteeSummary(records)
+    section.hidden = false
+    setText("es-ws-committee-dm-count", String(summary["Decision Maker"] ?? 0))
+    setText("es-ws-committee-influencer-count", String(summary.Influencer ?? 0))
+    setText("es-ws-committee-champion-count", String(summary.Champion ?? 0))
+    setText("es-ws-committee-end-user-count", String(summary["End User"] ?? 0))
+
+    committee.logCommittee?.("summary_rendered", summary)
+  }
+
+  function renderRecommendedContacts(context) {
     const section = document.getElementById("es-ws-company-employees-preview")
     const list = document.getElementById("es-ws-employees-preview-list")
-    if (!section || !list) return
+    const committee = window.EquipifyGrowthBuyingCommittee
+    const employeeRow = window.EquipifyGrowthEmployeeRow
+    if (!section || !list || !committee || !employeeRow) return
 
-    const rows = lastEmployeeRows.slice(0, EMPLOYEE_PAGE_SIZE)
-    if (!rows.length) {
+    const picks = committee.buildRecommendedContacts(lastEmployeeRows, {
+      company:
+        context?.company_name ||
+        lastRenderInput?.formValues?.company_name ||
+        lastRenderInput?.detected?.company_name ||
+        null,
+      context,
+    })
+
+    if (!picks.length) {
       section.hidden = true
       list.innerHTML = ""
       return
     }
 
     section.hidden = false
-    const employeeRow = window.EquipifyGrowthEmployeeRow
-    list.innerHTML = rows
-      .map((contact) => employeeRow?.buildObjectRowHtml?.(contact, escapeHtml) ?? "")
+    list.innerHTML = picks
+      .map(
+        (pick) => `
+        <div class="es-ws-recommended-contact">
+          <div class="es-ws-recommended-slot">${escapeHtml(pick.slot)}</div>
+          <div class="es-ws-recommended-badges">${(pick.badges ?? [])
+            .map((badge) => `<span class="es-ws-committee-badge">${escapeHtml(badge)}</span>`)
+            .join("")}</div>
+          ${employeeRow.buildObjectRowHtml(pick.employee, escapeHtml) ?? ""}
+        </div>`,
+      )
       .join("")
-    employeeRow?.bindObjectRowActions?.(list)
+    employeeRow.bindObjectRowActions?.(list)
+    committee.logCommittee?.("recommended_contacts_rendered", { count: picks.length })
+  }
+
+  function runFindDecisionMakersDiscovery(switchCompanyTab) {
+    const committee = window.EquipifyGrowthBuyingCommittee
+    leadershipFilterActive = true
+    employeeVisibleLimit = EMPLOYEE_PAGE_SIZE
+
+    const roleFilter = document.getElementById("es-ws-employee-buying-role-filter")
+    if (roleFilter) roleFilter.value = "Decision Maker"
+
+    const search = document.getElementById("es-ws-employee-search")
+    if (search) search.value = ""
+
+    switchCompanyTab?.("employees")
+
+    const discoveryCheckbox = document.getElementById("queue-discovery")
+    if (discoveryCheckbox) discoveryCheckbox.checked = true
+    window.__equipifyCopilotHooks?.switchTab?.("queue")
+    document.getElementById("copilot-add-to-queue-btn")?.click()
+
+    renderFilteredEmployees(lastRenderInput?.detected ?? null)
+    committee?.logCommittee?.("find_decision_makers", { leadershipFilterActive: true })
   }
 
   function buildCrmContactRows(context) {
@@ -933,7 +1021,7 @@
     const list = document.getElementById("es-ws-crm-contacts-list")
     if (!list) return
     const objectRow = window.EquipifyGrowthEmployeeRow
-    lastCrmContactRows = buildCrmContactRows(context)
+    lastCrmContactRows = enrichEmployeeRows(buildCrmContactRows(context), context)
 
     if (!lastCrmContactRows.length) {
       list.innerHTML =
@@ -946,6 +1034,7 @@
       .map((contact) => objectRow?.buildObjectRowHtml?.(contact, escapeHtml) ?? "")
       .join("")
     objectRow?.bindObjectRowActions?.(list)
+    renderBuyingCommitteeSummary(context)
     intelLog("crm_contacts", { count: lastCrmContactRows.length })
   }
 
@@ -960,6 +1049,11 @@
   }
 
   function populateEmployeeFilters(rows) {
+    populateSelect(
+      "es-ws-employee-buying-role-filter",
+      uniqueValues(rows.map((row) => row.buying_role).filter((role) => role && role !== "Unknown")),
+      "Buying role",
+    )
     populateSelect("es-ws-employee-department-filter", uniqueValues(rows.map((row) => row.department)), "Department")
     populateSelect("es-ws-employee-seniority-filter", uniqueValues(rows.map((row) => row.seniority)), "Seniority")
     populateSelect("es-ws-employee-crm-filter", uniqueValues(rows.map((row) => row.crm_status)), "CRM status")
@@ -970,17 +1064,30 @@
     if (!list) return
 
     const query = (document.getElementById("es-ws-employee-search")?.value ?? "").trim().toLowerCase()
+    const buyingRole = document.getElementById("es-ws-employee-buying-role-filter")?.value ?? ""
     const department = document.getElementById("es-ws-employee-department-filter")?.value ?? ""
     const seniority = document.getElementById("es-ws-employee-seniority-filter")?.value ?? ""
     const crmStatus = document.getElementById("es-ws-employee-crm-filter")?.value ?? ""
-    const contacts = lastEmployeeRows.filter((contact) => {
+    const committee = window.EquipifyGrowthBuyingCommittee
+    let contacts = lastEmployeeRows.filter((contact) => {
       const haystack = `${contact.name ?? ""} ${contact.title ?? ""}`.toLowerCase()
       if (query && !haystack.includes(query)) return false
+      if (buyingRole && contact.buying_role !== buyingRole) return false
       if (department && contact.department !== department) return false
       if (seniority && contact.seniority !== seniority) return false
       if (crmStatus && contact.crm_status !== crmStatus) return false
       return true
     })
+
+    if (leadershipFilterActive && committee) {
+      contacts = contacts.filter(
+        (contact) =>
+          committee.isLeadershipTitle(contact.title) || contact.buying_role === "Decision Maker",
+      )
+      contacts.sort(
+        (a, b) => committee.leadershipPriorityScore(b.title) - committee.leadershipPriorityScore(a.title),
+      )
+    }
 
     if (!contacts.length) {
       const emptyMessage = resolveEmployeeEmptyMessage(detected ?? lastRenderInput?.detected ?? null, lastEmployeeRows)
@@ -1231,6 +1338,8 @@
       renderCompanyOverviewGrid({}, "", "")
       const previewSection = document.getElementById("es-ws-company-employees-preview")
       if (previewSection) previewSection.hidden = true
+      const committeeSection = document.getElementById("es-ws-buying-committee-summary")
+      if (committeeSection) committeeSection.hidden = true
       setText("es-ws-company-contacts-count", "0")
       setText("es-ws-company-opportunities-count", "0")
       setText("es-ws-company-customers-count", "0")
@@ -1547,11 +1656,12 @@
     })
 
     const refreshEmployeeFilters = () => {
-      employeeVisibleLimit = EMPLOYEE_PAGE_SIZE
+      if (!leadershipFilterActive) employeeVisibleLimit = EMPLOYEE_PAGE_SIZE
       renderFilteredEmployees(lastRenderInput?.detected ?? null)
     }
     ;[
       "es-ws-employee-search",
+      "es-ws-employee-buying-role-filter",
       "es-ws-employee-department-filter",
       "es-ws-employee-seniority-filter",
       "es-ws-employee-crm-filter",
@@ -1640,6 +1750,14 @@
       if (discoveryCheckbox) discoveryCheckbox.checked = true
       window.__equipifyCopilotHooks?.switchTab?.("queue")
       document.getElementById("copilot-add-to-queue-btn")?.click()
+    })
+
+    document.getElementById("es-ws-find-decision-makers-btn")?.addEventListener("click", () => {
+      runFindDecisionMakersDiscovery(switchCompanyTab)
+    })
+
+    document.getElementById("es-ws-find-decision-makers-discovery-btn")?.addEventListener("click", () => {
+      runFindDecisionMakersDiscovery(switchCompanyTab)
     })
 
     document.getElementById("es-ws-run-research-btn")?.addEventListener("click", () => {

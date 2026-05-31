@@ -104,6 +104,9 @@
         /\bproject lead\b/,
         /\blead technician\b/,
         /\blead engineer\b/,
+        /\bsenior\b[\w\s/+-]{0,24}\btechnician\b/,
+        /\bsenior\b[\w\s/+-]{0,24}\bengineer\b/,
+        /\bsenior\b[\w\s/+-]{0,24}\bspecialist\b/,
       ])
     ) {
       return { buying_role: "Champion", buying_role_confidence: 0.8 }

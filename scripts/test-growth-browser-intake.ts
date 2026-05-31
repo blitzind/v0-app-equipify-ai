@@ -302,7 +302,7 @@ const manifestSource = fs.readFileSync(
   "utf8",
 )
 assert.match(manifestSource, /"name": "Equipify Sales"/)
-assert.match(manifestSource, /"version": "4.3.37"/)
+assert.match(manifestSource, /"version": "4.3.38"/)
 assert.match(manifestSource, /https:\/\/m\.linkedin\.com\/in\/\*/)
 assert.match(manifestSource, /extension-contact-saved\.js/)
 assert.match(manifestSource, /linkedin-company-people\.js/)
@@ -334,7 +334,7 @@ assert.match(extensionBrandJs, /PANEL_LOGO_ASSET/)
 assert.match(extensionBrandJs, /panelLogoUrl/)
 assert.match(extensionBrandJs, /applyPanelLogo/)
 assert.match(extensionBrandJs, /PANEL_LOGO_VERSION/)
-assert.match(extensionBrandJs, /4\.3\.37/)
+assert.match(extensionBrandJs, /4\.3\.38/)
 assert.match(extensionBrandJs, /\?v=\$\{encodeURIComponent\(PANEL_LOGO_VERSION\)\}/)
 assert.match(extensionBrandJs, /\[Equipify Sales:logo-audit\]/)
 assert.match(extensionBrandJs, /PANEL_LOGO_INTRINSIC_WIDTH/)
@@ -1337,6 +1337,76 @@ assert.equal(
   "Strong",
 )
 
+const extensionBuyingCommitteeJs = fs.readFileSync(
+  path.join(process.cwd(), "extensions/growth-browser-intake/extension-buying-committee.js"),
+  "utf8",
+)
+assert.match(extensionBuyingCommitteeJs, /\[Equipify Sales:buying-committee\]/)
+assert.match(extensionBuyingCommitteeJs, /classifyBuyingRole/)
+assert.match(extensionBuyingCommitteeJs, /buying_role_confidence/)
+
+function runBuyingCommitteeHarness() {
+  const sandbox: Record<string, unknown> = { window: {}, console }
+  const context = vm.createContext(sandbox)
+  vm.runInContext(extensionContactIntelligenceJs, context)
+  vm.runInContext(extensionBuyingCommitteeJs, context)
+  return (context.window as { EquipifyGrowthBuyingCommittee?: Record<string, unknown> })
+    .EquipifyGrowthBuyingCommittee as {
+    classifyBuyingRole: (title: string) => { buying_role: string; buying_role_confidence: number }
+    enrichEmployeeRecord: (record: Record<string, unknown>, context?: Record<string, unknown>) => Record<string, unknown>
+    buildCommitteeSummary: (records: Record<string, unknown>[]) => Record<string, number>
+    buildRecommendedContacts: (
+      records: Record<string, unknown>[],
+      context?: Record<string, unknown>,
+    ) => Array<{ slot: string; role: string; employee: Record<string, unknown> }>
+    isLeadershipTitle: (title: string) => boolean
+  }
+}
+
+const buyingCommittee = runBuyingCommitteeHarness()
+
+assert.equal(buyingCommittee.classifyBuyingRole("VP Operations").buying_role, "Decision Maker")
+assert.equal(buyingCommittee.classifyBuyingRole("Director Clinical Engineering").buying_role, "Decision Maker")
+assert.equal(buyingCommittee.classifyBuyingRole("Service Manager").buying_role, "Influencer")
+assert.equal(buyingCommittee.classifyBuyingRole("Senior Biomedical Engineer").buying_role, "Champion")
+assert.equal(buyingCommittee.classifyBuyingRole("Biomedical Equipment Technician").buying_role, "End User")
+assert.ok(buyingCommittee.classifyBuyingRole("VP Operations").buying_role_confidence >= 0.8)
+
+const enrichedEmployee = buyingCommittee.enrichEmployeeRecord({
+  name: "Alex Owner",
+  title: "Founder & CEO",
+  department: "Executive",
+})
+assert.equal(enrichedEmployee.buying_role, "Decision Maker")
+assert.ok(Number(enrichedEmployee.committee_score) > 0)
+assert.ok(Array.isArray(enrichedEmployee.committee_badges))
+
+const committeeSummary = buyingCommittee.buildCommitteeSummary([
+  { title: "VP Operations", buying_role: "Decision Maker" },
+  { title: "Service Manager", buying_role: "Influencer" },
+  { title: "Senior Engineer", buying_role: "Champion" },
+  { title: "Technician", buying_role: "End User" },
+])
+assert.equal(committeeSummary["Decision Maker"], 1)
+assert.equal(committeeSummary.Influencer, 1)
+assert.equal(committeeSummary.Champion, 1)
+assert.equal(committeeSummary["End User"], 1)
+
+const recommended = buyingCommittee.buildRecommendedContacts(
+  [
+    { name: "Pat VP", title: "VP Operations", department: "Operations" },
+    { name: "Sam Manager", title: "Service Manager", department: "Service" },
+    { name: "Chris Senior", title: "Senior Biomedical Engineer", department: "Engineering" },
+  ],
+  { company: "Sharp Memorial Hospital" },
+)
+assert.equal(recommended.length, 3)
+assert.equal(recommended[0]?.slot, "Best Decision Maker")
+assert.equal(recommended[1]?.slot, "Best Influencer")
+assert.equal(recommended[2]?.slot, "Best Champion")
+assert.ok(buyingCommittee.isLeadershipTitle("President of Operations"))
+assert.ok(!buyingCommittee.isLeadershipTitle("Biomedical Technician"))
+
 assert.match(extensionWorkspaceJs, /renderContactIntelligence/)
 assert.match(extensionWorkspaceJs, /renderOpportunityIntelligence/)
 assert.match(extensionWorkspaceJs, /es-ws-contact-intelligence/)
@@ -2068,7 +2138,7 @@ function runPageMetadataHarness(html: string, url: string): PageMetadataHarness 
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ version: "4.3.37" }),
+        getManifest: () => ({ version: "4.3.38" }),
       },
     },
     setTimeout: () => 0,
@@ -2730,6 +2800,14 @@ assert.match(sidepanelHtml, /bootstrap-loading/)
 assert.match(sidepanelHtml, /extension-context-normalize.js/)
 assert.match(sidepanelHtml, /extension-contact-intelligence.js/)
 assert.match(sidepanelHtml, /extension-opportunity-intelligence.js/)
+assert.match(sidepanelHtml, /extension-buying-committee.js/)
+assert.match(sidepanelHtml, /Buying Committee/)
+assert.match(sidepanelHtml, /es-ws-find-decision-makers-btn/)
+assert.match(sidepanelHtml, /es-ws-employee-buying-role-filter/)
+assert.match(extensionWorkspaceJs, /renderBuyingCommitteeSummary/)
+assert.match(extensionWorkspaceJs, /renderRecommendedContacts/)
+assert.match(extensionWorkspaceJs, /runFindDecisionMakersDiscovery/)
+assert.match(extensionEmployeeRowJs, /es-ws-buying-role-badge/)
 assert.match(sidepanelHtml, /Opportunity Intelligence/)
 assert.match(sidepanelHtml, /Contact Intelligence/)
 assert.match(sidepanelHtml, /Research Snapshot/)
