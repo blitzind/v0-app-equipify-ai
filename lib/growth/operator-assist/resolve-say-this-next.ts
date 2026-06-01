@@ -1,6 +1,9 @@
 /** Resolve the single best live phrase for the operator to say next (client-safe). */
 
 import type { ConversationCoachTurn } from "@/lib/growth/live-coaching/types"
+import {
+  pickPreferredCoachTurn,
+} from "@/lib/growth/live-coaching/coach-turn-recency"
 import type { UnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/types"
 import {
   CONVERSATION_STAGE_LABELS,
@@ -40,24 +43,14 @@ export type SayThisNextSnapshot = {
   qaMarker: typeof GROWTH_LIVE_COACHING_V2_QA_MARKER
 }
 
-function coachUpdatedAt(coach: ConversationCoachTurn | null | undefined): number {
-  if (!coach?.updatedAt) return 0
-  const parsed = Date.parse(coach.updatedAt)
-  return Number.isFinite(parsed) ? parsed : 0
-}
-
 function pickPrimaryCoachTurn(input: {
   serverCoach: ConversationCoachTurn | null | undefined
   optimisticCoach: ConversationCoachTurn | null | undefined
 }): ConversationCoachTurn | null {
-  const serverCoach = input.serverCoach ?? null
-  const optimisticCoach = input.optimisticCoach ?? null
-  if (!serverCoach) return optimisticCoach
-  if (!optimisticCoach) return serverCoach
-  return coachUpdatedAt(serverCoach) >= coachUpdatedAt(optimisticCoach) ? serverCoach : optimisticCoach
+  return pickPreferredCoachTurn(input.serverCoach, input.optimisticCoach)
 }
 
-/** Keep the freshest primaryCoach when browser sync returns a stale operatorAssist shell. */
+/** Keep the best primaryCoach when browser sync returns a stale operatorAssist shell. */
 export function mergeOperatorAssistPreferringNewerCoach(
   previous: UnifiedOperatorAssistSnapshot | null,
   incoming: UnifiedOperatorAssistSnapshot,
@@ -65,21 +58,32 @@ export function mergeOperatorAssistPreferringNewerCoach(
   if (!previous?.coachingState?.primaryCoach || !incoming.coachingState?.primaryCoach) {
     return incoming
   }
-  const prevCoach = previous.coachingState.primaryCoach
-  const nextCoach = incoming.coachingState.primaryCoach
-  if (coachUpdatedAt(nextCoach) >= coachUpdatedAt(prevCoach)) {
+  const preferred = pickPreferredCoachTurn(
+    previous.coachingState.primaryCoach,
+    incoming.coachingState.primaryCoach,
+  )
+  if (!preferred || preferred === incoming.coachingState.primaryCoach) {
     return incoming
   }
   return {
     ...incoming,
     coachingState: {
       ...incoming.coachingState,
-      primaryCoach: prevCoach,
-      suggestedNextQuestion: prevCoach.primaryPhrase,
-      conversationStage: prevCoach.stage,
-      stageObjective: prevCoach.stageObjective,
+      primaryCoach: preferred,
+      suggestedNextQuestion: preferred.primaryPhrase,
+      conversationStage: preferred.stage,
+      stageObjective: preferred.stageObjective,
     },
   }
+}
+
+export function pickDisplayOperatorAssistSnapshot(
+  previous: UnifiedOperatorAssistSnapshot | null,
+  incoming: UnifiedOperatorAssistSnapshot | null,
+): UnifiedOperatorAssistSnapshot | null {
+  if (!incoming) return previous
+  if (!previous) return incoming
+  return mergeOperatorAssistPreferringNewerCoach(previous, incoming)
 }
 
 export function resolveSayThisNext(

@@ -354,34 +354,33 @@ export async function getGrowthRealtimeCallSessionDetail(
   if (!lead) return null
 
   const events = await listGrowthRealtimeTranscriptEvents(admin, sessionId)
-  const snapshot = analyzeRealtimeCallTranscript({
+  const analyzedSnapshot = analyzeRealtimeCallTranscript({
     events,
     lead: toGrowthLeadRealtimeIntelligenceInput(lead),
   })
-  let refreshed = await updateGrowthRealtimeCallSession(admin, sessionId, { liveSnapshot: snapshot })
 
   let coachingState: GrowthLiveCoachingState | null = null
-  let liveSnapshot = snapshot
-  if (refreshed.guidanceEnabled) {
+  let liveSnapshot = analyzedSnapshot
+  if (session.guidanceEnabled) {
     const organizationId = getGrowthEngineAiOrgId()
     const direction = await resolveNativeCallDirectionForRealtimeSession(admin, sessionId).catch(() => null)
     const synced = await syncLiveGuidanceForSession(admin, {
       leadId: session.leadId,
       sessionId,
-      snapshot,
+      snapshot: analyzedSnapshot,
       events,
       lead: toGrowthLeadRealtimeIntelligenceInput(lead),
       organizationId,
       direction,
-      session: refreshed,
+      session,
     })
     coachingState = synced.coachingState
     liveSnapshot = synced.liveSnapshot
   }
 
-  refreshed = await updateGrowthRealtimeCallSession(admin, sessionId, {
+  const refreshed = await updateGrowthRealtimeCallSession(admin, sessionId, {
     liveSnapshot,
-    guidanceLatencyMs: coachingState?.guidanceLatencyMs ?? refreshed.guidanceLatencyMs,
+    guidanceLatencyMs: coachingState?.guidanceLatencyMs ?? session.guidanceLatencyMs,
   })
 
   return { session: refreshed, events, coachingState }

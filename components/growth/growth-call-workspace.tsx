@@ -67,7 +67,10 @@ import { VOICE_UNIFIED_OPERATOR_WORKSPACE_UX_QA_MARKER } from "@/lib/voice/works
 import { buildWorkspaceContextInputFromVoiceSnapshot } from "@/lib/voice/workspace-context/snapshot-input-mapper"
 import { buildWorkspaceContextSnapshot } from "@/lib/voice/workspace-context/workspace-context-builder"
 import type { ConversationCoachTurn } from "@/lib/growth/live-coaching/types"
-import { mergeOperatorAssistPreferringNewerCoach } from "@/lib/growth/operator-assist/resolve-say-this-next"
+import {
+  mergeOperatorAssistPreferringNewerCoach,
+  pickDisplayOperatorAssistSnapshot,
+} from "@/lib/growth/operator-assist/resolve-say-this-next"
 import {
   buildOptimisticActiveInboundSession,
   buildOptimisticInboundAnswerCoachTurn,
@@ -480,6 +483,14 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     })
   }, [activeSession?.status, callAuthority])
 
+  const displayOperatorAssist = useMemo(() => {
+    if (workspacePhase === "idle") return null
+    return pickDisplayOperatorAssistSnapshot(
+      operatorAssistStableRef.current,
+      voiceBrowser.snapshot?.operatorAssist ?? null,
+    )
+  }, [voiceBrowser.snapshot?.operatorAssist, workspacePhase])
+
   useEffect(() => {
     if (workspacePhase !== "incoming") {
       lastRenderedIncomingSessionIdRef.current = null
@@ -625,8 +636,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
 
     idleWorkspaceContextRef.current = null
     idleWorkspaceContextKeyRef.current = null
-    const operatorAssistSnapshot =
-      operatorAssistStableRef.current ?? voiceBrowser.snapshot?.operatorAssist ?? null
+    const operatorAssistSnapshot = displayOperatorAssist
     const input = buildWorkspaceContextInputFromVoiceSnapshot({
       callPhase: workspacePhase,
       startingCall: starting,
@@ -643,7 +653,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       workflowStatusLabel: workspacePhase === "idle" ? "Ready" : workspacePhase,
     })
     return buildWorkspaceContextSnapshot(input)
-  }, [workspacePhase, starting, leadLinked, leadContext, voiceBrowser.snapshot])
+  }, [workspacePhase, starting, leadLinked, leadContext, voiceBrowser.snapshot, displayOperatorAssist])
 
   useEffect(() => {
     const nextAssist = voiceBrowser.snapshot?.operatorAssist ?? null
@@ -1274,11 +1284,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           voiceParticipants={voiceBrowser.snapshot?.participants ?? []}
           voiceActiveTransfer={voiceBrowser.snapshot?.activeTransfer ?? null}
           voiceLiveTranscript={voiceBrowser.snapshot?.liveTranscript ?? null}
-          operatorAssist={
-            workspacePhase === "idle"
-              ? null
-              : operatorAssistStableRef.current ?? voiceBrowser.snapshot?.operatorAssist ?? null
-          }
+          operatorAssist={displayOperatorAssist}
           aiCopilot={workspacePhase === "idle" ? null : voiceBrowser.snapshot?.aiCopilot ?? null}
           aiReceptionist={voiceBrowser.snapshot?.aiReceptionist ?? null}
           missedCallRecovery={voiceBrowser.snapshot?.missedCallRecovery ?? null}
@@ -1319,11 +1325,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           leadContext={leadContext}
           nativeSessionId={activeSession?.id ?? null}
           sessionPhone={activeSession?.phoneNumber ?? phone}
-          operatorAssist={
-            workspacePhase === "idle"
-              ? null
-              : operatorAssistStableRef.current ?? voiceBrowser.snapshot?.operatorAssist ?? null
-          }
+          operatorAssist={displayOperatorAssist}
           relationshipMemory={voiceBrowser.snapshot?.relationshipMemory ?? null}
           revenueIntelligence={voiceBrowser.snapshot?.revenueIntelligence ?? null}
           retentionIntelligence={voiceBrowser.snapshot?.retentionIntelligence ?? null}

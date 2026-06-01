@@ -88,7 +88,6 @@ export async function syncConversationCoach(input: {
       ...coachTurn,
       stage: stageResult.stage,
       stageObjective: stageResult.stageObjective,
-      updatedAt: new Date().toISOString(),
     }
   }
 

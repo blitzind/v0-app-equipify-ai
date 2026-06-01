@@ -21,8 +21,17 @@ import {
 } from "../lib/growth/live-coaching/prospect-turn-detection"
 import { generateLiveGuidanceCandidates } from "../lib/growth/live-guidance/live-guidance-engine"
 import { emptyRealtimeLiveSnapshot } from "../lib/growth/realtime/realtime-live-snapshot-defaults"
-import { resolveSayThisNext } from "../lib/growth/operator-assist/resolve-say-this-next"
+import {
+  compareCoachTurnRecency,
+  isBootstrapCoachTurn,
+  pickPreferredCoachTurn,
+} from "../lib/growth/live-coaching/coach-turn-recency"
+import {
+  mergeOperatorAssistPreferringNewerCoach,
+  resolveSayThisNext,
+} from "../lib/growth/operator-assist/resolve-say-this-next"
 import { resolveUnifiedNextBestAction } from "../lib/growth/operator-assist/nba-resolver"
+import { buildUnifiedOperatorAssistSnapshot } from "../lib/growth/operator-assist/orchestration"
 
 const snapshot = emptyRealtimeLiveSnapshot()
 const events = [
@@ -174,6 +183,142 @@ assert.ok(sayThisNext)
 assert.equal(sayThisNext?.phrase, bootstrap.primaryPhrase)
 assert.equal(sayThisNext?.stageObjective, bootstrap.stageObjective)
 
+const generatedCoach = generateDeterministicCoachTurn({
+  events,
+  stage: "pain",
+  snapshot,
+  inbound: true,
+  previousCoach: bootstrap,
+})
+const refreshedBootstrap = {
+  ...bootstrap,
+  updatedAt: new Date(Date.now() + 60_000).toISOString(),
+}
+assert.ok(compareCoachTurnRecency(generatedCoach, refreshedBootstrap) > 0)
+assert.equal(
+  pickPreferredCoachTurn(refreshedBootstrap, generatedCoach)?.primaryPhrase,
+  generatedCoach.primaryPhrase,
+)
+assert.equal(isBootstrapCoachTurn(bootstrap), true)
+assert.equal(isBootstrapCoachTurn(generatedCoach), false)
+
+const staleAssist = buildUnifiedOperatorAssistSnapshot({
+  coachingState: {
+    executionScore: {
+      score: 70,
+      badge: "good",
+      badgeLabel: "Good",
+      factors: {
+        talkRatio: 80,
+        discoveryCoverage: 0,
+        objectionsHandled: 100,
+        buyingSignalsCaptured: 0,
+        timelineDiscovered: false,
+        decisionMakerIdentified: false,
+        nextStepSecured: false,
+      },
+    },
+    suggestedNextQuestion: refreshedBootstrap.primaryPhrase,
+    riskLevel: "low",
+    momentum: "stable",
+    activeGuidance: [],
+    guidanceLatencyMs: 0,
+    conversationStage: refreshedBootstrap.stage,
+    stageObjective: refreshedBootstrap.stageObjective,
+    primaryCoach: refreshedBootstrap,
+  },
+  coachingMode: "transcript_only",
+  coachingLeadId: "lead-1",
+  realtimeSessionId: "session-1",
+  voiceCallId: "vc-1",
+  conversationIntelligence: null,
+  voiceTranscript: null,
+  liveSnapshot: snapshot,
+  leadContext: null,
+  participants: [],
+  preferences: {
+    quietMode: false,
+    minimumPriorityLabel: "Low",
+    enabledCategories: {
+      objection: true,
+      buying_signal: true,
+      risk: true,
+      guidance: true,
+      coaching: true,
+      interruption: true,
+      conversation: true,
+    },
+  },
+})
+
+const freshAssist = buildUnifiedOperatorAssistSnapshot({
+  coachingState: {
+    executionScore: {
+      score: 70,
+      badge: "good",
+      badgeLabel: "Good",
+      factors: {
+        talkRatio: 80,
+        discoveryCoverage: 0,
+        objectionsHandled: 100,
+        buyingSignalsCaptured: 0,
+        timelineDiscovered: false,
+        decisionMakerIdentified: false,
+        nextStepSecured: false,
+      },
+    },
+    suggestedNextQuestion: generatedCoach.primaryPhrase,
+    riskLevel: "low",
+    momentum: "stable",
+    activeGuidance: [],
+    guidanceLatencyMs: 0,
+    conversationStage: generatedCoach.stage,
+    stageObjective: generatedCoach.stageObjective,
+    primaryCoach: generatedCoach,
+  },
+  coachingMode: "transcript_only",
+  coachingLeadId: "lead-1",
+  realtimeSessionId: "session-1",
+  voiceCallId: "vc-1",
+  conversationIntelligence: null,
+  voiceTranscript: null,
+  liveSnapshot: snapshot,
+  leadContext: null,
+  participants: [],
+  preferences: {
+    quietMode: false,
+    minimumPriorityLabel: "Low",
+    enabledCategories: {
+      objection: true,
+      buying_signal: true,
+      risk: true,
+      guidance: true,
+      coaching: true,
+      interruption: true,
+      conversation: true,
+    },
+  },
+})
+
+const merged = mergeOperatorAssistPreferringNewerCoach(staleAssist, freshAssist)
+assert.equal(merged.coachingState?.primaryCoach?.primaryPhrase, generatedCoach.primaryPhrase)
+
+const regressed = mergeOperatorAssistPreferringNewerCoach(freshAssist, staleAssist)
+assert.equal(regressed.coachingState?.primaryCoach?.primaryPhrase, generatedCoach.primaryPhrase)
+
+const sessionDetail = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/realtime/run-realtime-call-session.ts"),
+  "utf8",
+)
+assert.doesNotMatch(sessionDetail, /liveSnapshot: snapshot \}\)\s*\n\s*let coachingState/s)
+assert.match(sessionDetail, /session,\s*\n\s*\}\)/)
+
+const syncCoach = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/live-coaching/sync-conversation-coach.ts"),
+  "utf8",
+)
+assert.doesNotMatch(syncCoach, /updatedAt: new Date\(\)\.toISOString\(\),\s*\n\s*\}\s*\n\s*\}/)
+
 const answerRepo = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/native-dialer/native-dialer-repository.ts"),
   "utf8",
@@ -205,7 +350,7 @@ const workspaceSource = fs.readFileSync(
 assert.match(workspaceSource, /buildOptimisticActiveInboundSession/)
 assert.match(workspaceSource, /setOptimisticCoachTurn/)
 assert.match(workspaceSource, /reconcileInboundAnswer/)
-assert.match(workspaceSource, /setAnswering\(false\)/)
+assert.match(workspaceSource, /pickDisplayOperatorAssistSnapshot/)
 
 const coachingService = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/native-dialer/call-workspace-coaching-service.ts"),
