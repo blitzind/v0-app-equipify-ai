@@ -95,12 +95,20 @@ export async function completeOrphanedActiveRealtimeCoachingSessionsForLead(
     const activeLinks = await countActiveNativeSessionsLinkedToRealtimeSession(admin, session.id)
     if (activeLinks > 0) continue
 
-    await completeGrowthRealtimeCallSession(admin, { sessionId: session.id })
-    completedIds.push(session.id)
-    logVoiceInfrastructure("voice_growth_coaching_orphan_completed", {
-      leadId,
-      realtimeSessionId: session.id,
-    })
+    try {
+      await completeGrowthRealtimeCallSession(admin, { sessionId: session.id })
+      completedIds.push(session.id)
+      logVoiceInfrastructure("voice_growth_coaching_orphan_completed", {
+        leadId,
+        realtimeSessionId: session.id,
+      })
+    } catch (error) {
+      logVoiceInfrastructure("voice_growth_coaching_orphan_complete_failed", {
+        leadId,
+        realtimeSessionId: session.id,
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
   }
 
   return completedIds

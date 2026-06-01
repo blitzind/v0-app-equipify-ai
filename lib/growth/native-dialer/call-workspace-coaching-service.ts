@@ -130,7 +130,17 @@ export async function startCallWorkspaceLiveCoaching(
   }
 
   if (!realtimeSession) {
-    await completeOrphanedActiveRealtimeCoachingSessionsForLead(admin, coachingLeadId)
+    try {
+      await completeOrphanedActiveRealtimeCoachingSessionsForLead(admin, coachingLeadId)
+    } catch (error) {
+      logVoiceInfrastructure("voice_growth_coaching_orphan_cleanup_failed", {
+        nativeSessionId: nativeSession.id,
+        coachingLeadId,
+        voiceCallId: nativeSession.voiceCallId ?? null,
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
+
     realtimeSession = await createGrowthRealtimeCallSession(admin, {
       leadId: coachingLeadId,
       createdBy: input.createdBy ?? null,
@@ -143,26 +153,53 @@ export async function startCallWorkspaceLiveCoaching(
     })
   }
 
-  if (realtimeSession.status === "preparing" || realtimeSession.status === "paused") {
-    realtimeSession = await startGrowthRealtimeCallSession(admin, {
-      sessionId: realtimeSession.id,
-      actor: { userId: input.createdBy ?? null, email: input.userEmail ?? null },
+  if (nativeSession.realtimeSessionId !== realtimeSession.id) {
+    await linkNativeCallRealtimeSession(admin, {
+      nativeSessionId: nativeSession.id,
+      realtimeSessionId: realtimeSession.id,
+    })
+    logVoiceInfrastructure("voice_growth_coaching_native_linked", {
+      nativeSessionId: nativeSession.id,
+      realtimeSessionId: realtimeSession.id,
+      voiceCallId: nativeSession.voiceCallId ?? null,
     })
   }
 
-  await linkNativeCallRealtimeSession(admin, {
-    nativeSessionId: nativeSession.id,
-    realtimeSessionId: realtimeSession.id,
-  })
+  if (realtimeSession.status === "preparing" || realtimeSession.status === "paused") {
+    try {
+      realtimeSession = await startGrowthRealtimeCallSession(admin, {
+        sessionId: realtimeSession.id,
+        actor: { userId: input.createdBy ?? null, email: input.userEmail ?? null },
+      })
+    } catch (error) {
+      logVoiceInfrastructure("voice_growth_coaching_session_start_failed", {
+        nativeSessionId: nativeSession.id,
+        realtimeSessionId: realtimeSession.id,
+        voiceCallId: nativeSession.voiceCallId ?? null,
+        message: error instanceof Error ? error.message : String(error),
+      })
+      realtimeSession =
+        (await fetchGrowthRealtimeCallSession(admin, realtimeSession.id)) ?? realtimeSession
+    }
+  }
 
   const nativeDirection = (nativeSession.direction as "inbound" | "outbound" | undefined) ?? "outbound"
   if (!realtimeSession.liveSnapshot.conversationCoach) {
-    await bootstrapConversationCoachForSession(admin, {
-      session: realtimeSession,
-      direction: nativeDirection,
-    })
-    realtimeSession =
-      (await fetchGrowthRealtimeCallSession(admin, realtimeSession.id)) ?? realtimeSession
+    try {
+      await bootstrapConversationCoachForSession(admin, {
+        session: realtimeSession,
+        direction: nativeDirection,
+      })
+      realtimeSession =
+        (await fetchGrowthRealtimeCallSession(admin, realtimeSession.id)) ?? realtimeSession
+    } catch (error) {
+      logVoiceInfrastructure("voice_growth_coaching_bootstrap_failed", {
+        nativeSessionId: nativeSession.id,
+        realtimeSessionId: realtimeSession.id,
+        voiceCallId: nativeSession.voiceCallId ?? null,
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
   }
 
   if (input.hydrateDetail === false) {
@@ -290,10 +327,28 @@ export async function autoStartCallWorkspaceLiveCoachingOnAnswer(
   if (!nativeSession || nativeSession.direction !== "inbound") return null
   if (nativeSession.status !== "active" && nativeSession.status !== "on_hold") return null
 
-  return startCallWorkspaceLiveCoaching(admin, {
+  const context = await startCallWorkspaceLiveCoaching(admin, {
     nativeSessionId: input.nativeSessionId,
     createdBy: input.createdBy ?? nativeSession.ownerUserId ?? null,
     userEmail: input.userEmail ?? null,
     hydrateDetail: false,
   })
+
+  const realtimeSessionId = context.realtimeSession?.id ?? null
+  if (realtimeSessionId) {
+    logVoiceInfrastructure("voice_growth_coaching_auto_linked", {
+      nativeSessionId: input.nativeSessionId,
+      realtimeSessionId,
+      voiceCallId: nativeSession.voiceCallId ?? null,
+      stage: "answer",
+    })
+  } else {
+    logVoiceInfrastructure("voice_growth_coaching_auto_start_failed", {
+      nativeSessionId: input.nativeSessionId,
+      voiceCallId: nativeSession.voiceCallId ?? null,
+      reason: "realtime_session_missing_after_start",
+    })
+  }
+
+  return context
 }

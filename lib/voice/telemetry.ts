@@ -47,6 +47,20 @@ export type VoiceTelemetryEvent =
   | "voice_growth_transcript_bridged"
   | "voice_growth_transcript_bridge_outcome"
   | "voice_growth_coaching_auto_linked"
+  | "voice_growth_coaching_auto_start_failed"
+  | "voice_growth_coaching_session_created"
+  | "voice_growth_coaching_native_linked"
+  | "voice_growth_coaching_orphan_cleanup_failed"
+  | "voice_growth_coaching_orphan_complete_failed"
+  | "voice_growth_coaching_session_start_failed"
+  | "voice_growth_coaching_bootstrap_failed"
+  | "voice_growth_coaching_session_completed"
+  | "voice_growth_coaching_orphan_completed"
+  | "voice_answered_inbound_media_stream_skipped"
+  | "voice_answered_inbound_media_stream_stale_stopped"
+  | "voice_answered_inbound_media_stream_create_requested"
+  | "voice_answered_inbound_media_stream_started"
+  | "voice_answered_inbound_media_stream_failed"
 
 export function logVoiceInfrastructure(
   event: VoiceTelemetryEvent,

@@ -20,6 +20,7 @@ import type {
   GrowthRealtimeTranscriptEvent,
 } from "@/lib/growth/realtime/realtime-call-types"
 import { toGrowthLeadRealtimeIntelligenceInput } from "@/lib/growth/realtime/realtime-lead-intelligence"
+import { analyzeRealtimeCallTranscript, diffRealtimeSnapshot } from "@/lib/growth/realtime/realtime-session-analyzer"
 import { reconcileVoiceTranscriptBridgeForCall } from "@/lib/growth/realtime/reconcile-voice-transcript-bridge"
 import { createRealtimeTranscriptProvider } from "@/lib/growth/realtime/realtime-transcript-provider"
 import {

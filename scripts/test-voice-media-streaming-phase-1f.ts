@@ -186,6 +186,10 @@ assert.equal(transitionVoiceStreamLifecycle(lifecycle, "connected").state, "conn
 assert.match(buildTwilioVoiceIncomingStreamTwiml({ mediaStreamWssUrl: "wss://app.equipify.ai/api/voice/media/twilio" }), /<Connect><Stream/)
 assert.match(buildVoiceMediaStreamTwilioWssUrl("https://app.equipify.ai"), /^wss:\/\//)
 
+const urlsModule = fs.readFileSync(path.join(process.cwd(), "lib/voice/call-control/urls.ts"), "utf8")
+assert.match(urlsModule, /resolveVoiceMediaStreamPublicBaseUrl/)
+assert.match(urlsModule, /VOICE_MEDIA_STREAM_PUBLIC_ORIGIN/)
+
 resetStreamTranscriptRuntimeForTests()
 
 const incomingRoute = fs.readFileSync(

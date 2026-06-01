@@ -485,14 +485,27 @@ export async function answerNativeCallSession(
       "@/lib/growth/native-dialer/call-workspace-coaching-service"
     )
     try {
-      await autoStartCallWorkspaceLiveCoachingOnAnswer(admin, {
+      const coaching = await autoStartCallWorkspaceLiveCoachingOnAnswer(admin, {
         nativeSessionId: sessionId,
         createdBy: ownerUserId ?? null,
       })
+      if (!coaching?.realtimeSession?.id) {
+        const { data: linkedRow } = await sessionsTable(admin)
+          .select("realtime_session_id")
+          .eq("id", sessionId)
+          .maybeSingle()
+        logVoiceInfrastructure("voice_growth_coaching_auto_start_failed", {
+          nativeSessionId: sessionId,
+          voiceCallId,
+          reason: "realtime_session_not_linked_after_answer",
+          persistedRealtimeSessionId: (linkedRow?.realtime_session_id as string | null) ?? null,
+        })
+      }
     } catch (error) {
       logVoiceInfrastructure("voice_growth_coaching_auto_start_failed", {
         nativeSessionId: sessionId,
         voiceCallId,
+        stage: "answer_native_call_session",
         message: error instanceof Error ? error.message : String(error),
       })
     }
@@ -509,11 +522,19 @@ export async function answerNativeCallSession(
         "@/lib/voice/media-streaming/ensure-answered-inbound-media-stream"
       )
       try {
-        await ensureAnsweredInboundCallMediaStream(admin, {
+        const mediaResult = await ensureAnsweredInboundCallMediaStream(admin, {
           organizationId: orgId,
           voiceCallId: voiceCallId!,
           providerCallId,
         })
+        if (!mediaResult.started) {
+          logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
+            voiceCallId,
+            providerCallId,
+            stage: "answer_native_call_session",
+            reason: mediaResult.reason,
+          })
+        }
       } catch (error) {
         logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
           voiceCallId,

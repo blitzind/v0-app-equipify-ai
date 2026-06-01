@@ -29,6 +29,7 @@ assert.match(lifecycleModule, /completeCallWorkspaceLiveCoachingForNativeSession
 assert.match(lifecycleModule, /completeOrphanedActiveRealtimeCoachingSessionsForLead/)
 assert.match(lifecycleModule, /voice_growth_coaching_session_completed/)
 assert.match(lifecycleModule, /voice_growth_coaching_orphan_completed/)
+assert.match(lifecycleModule, /voice_growth_coaching_orphan_complete_failed/)
 
 assert.doesNotMatch(
   coachingService,

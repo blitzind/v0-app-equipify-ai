@@ -324,7 +324,7 @@ const answerRepo = fs.readFileSync(
   "utf8",
 )
 assert.match(answerRepo, /autoStartCallWorkspaceLiveCoachingOnAnswer/)
-assert.match(answerRepo, /void autoStartCallWorkspaceLiveCoachingOnAnswer/)
+assert.match(answerRepo, /await autoStartCallWorkspaceLiveCoachingOnAnswer/)
 
 const assistPanel = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-workspace-unified-assist-panel.tsx"),

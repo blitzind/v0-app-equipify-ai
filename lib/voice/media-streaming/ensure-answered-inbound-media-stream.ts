@@ -1,7 +1,10 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { buildVoiceMediaStreamTwilioWssUrl } from "@/lib/voice/call-control/urls"
+import {
+  buildVoiceMediaStreamTwilioWssUrl,
+  describeVoiceMediaStreamWssTarget,
+} from "@/lib/voice/call-control/urls"
 import {
   findActiveMediaSessionForCall,
   updateMediaSessionStatus,
@@ -21,17 +24,35 @@ async function stopTwilioCallStream(input: {
   authToken: string
   providerCallId: string
   providerStreamSid: string
-}): Promise<void> {
+}): Promise<{ ok: boolean; status?: number; message?: string }> {
   const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${input.accountSid}/Calls/${encodeURIComponent(input.providerCallId)}/Streams/${encodeURIComponent(input.providerStreamSid)}.json`
   const auth = Buffer.from(`${input.accountSid}:${input.authToken}`).toString("base64")
-  await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${auth}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({ Status: "stopped" }),
-  }).catch(() => undefined)
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${auth}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({ Status: "stopped" }),
+    })
+    if (!response.ok) {
+      const body = await response.text().catch(() => "")
+      return { ok: false, status: response.status, message: body.slice(0, 240) }
+    }
+    return { ok: true, status: response.status }
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
+function readTwilioStreamSid(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null
+  const sid = (payload as { sid?: unknown }).sid
+  return typeof sid === "string" && sid.trim() ? sid.trim() : null
 }
 
 /**
@@ -48,9 +69,13 @@ export async function ensureAnsweredInboundCallMediaStream(
     mediaStreamOrigin?: string | null
   },
 ): Promise<{ started: boolean; reason: string }> {
+  const streamTarget = describeVoiceMediaStreamWssTarget(input.mediaStreamOrigin ?? null)
+  const wssUrl = buildVoiceMediaStreamTwilioWssUrl(input.mediaStreamOrigin ?? null)
   const baseLog = {
     voiceCallId: input.voiceCallId,
     providerCallId: input.providerCallId,
+    wssHost: streamTarget.wssHost,
+    originSource: streamTarget.originSource,
   }
 
   const { data: voiceCallRow } = await admin
@@ -90,7 +115,6 @@ export async function ensureAnsweredInboundCallMediaStream(
     return { started: false, reason: "twilio_credentials_missing" }
   }
 
-  const wssUrl = buildVoiceMediaStreamTwilioWssUrl(input.mediaStreamOrigin ?? null)
   if (!wssUrl.trim()) {
     logVoiceInfrastructure("voice_answered_inbound_media_stream_skipped", {
       ...baseLog,
@@ -100,7 +124,7 @@ export async function ensureAnsweredInboundCallMediaStream(
   }
 
   if (activeMedia && staleRingStream) {
-    await stopTwilioCallStream({
+    const stopResult = await stopTwilioCallStream({
       accountSid: credentials.accountSid,
       authToken: credentials.authToken,
       providerCallId: input.providerCallId,
@@ -120,11 +144,20 @@ export async function ensureAnsweredInboundCallMediaStream(
       ...baseLog,
       mediaSessionId: activeMedia.id,
       providerStreamSid: activeMedia.providerStreamSid,
+      twilioStopOk: stopResult.ok,
+      twilioStopStatus: stopResult.status ?? null,
+      twilioStopMessage: stopResult.message ?? null,
     })
   }
 
   const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${credentials.accountSid}/Calls/${encodeURIComponent(input.providerCallId)}/Streams.json`
   const auth = Buffer.from(`${credentials.accountSid}:${credentials.authToken}`).toString("base64")
+
+  logVoiceInfrastructure("voice_answered_inbound_media_stream_create_requested", {
+    ...baseLog,
+    restartedAfterStaleRingStream: staleRingStream,
+    staleMediaSessionId: activeMedia?.id ?? null,
+  })
 
   try {
     const response = await fetch(endpoint, {
@@ -141,21 +174,31 @@ export async function ensureAnsweredInboundCallMediaStream(
       }),
     })
 
+    const responseBody = await response.text().catch(() => "")
     if (!response.ok) {
-      const body = await response.text().catch(() => "")
       logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
         ...baseLog,
         status: response.status,
-        message: body.slice(0, 240),
+        message: responseBody.slice(0, 240),
         restartedAfterStaleRingStream: staleRingStream,
+        stage: "twilio_stream_create",
       })
       return { started: false, reason: "twilio_stream_create_failed" }
     }
 
+    let providerStreamSid: string | null = null
+    try {
+      providerStreamSid = readTwilioStreamSid(JSON.parse(responseBody))
+    } catch {
+      providerStreamSid = null
+    }
+
     logVoiceInfrastructure("voice_answered_inbound_media_stream_started", {
       ...baseLog,
-      wssUrl,
       restartedAfterStaleRingStream: staleRingStream,
+      providerStreamSid,
+      twilioCreateStatus: response.status,
+      dbMediaSessionPendingWebsocketConnect: true,
     })
     return { started: true, reason: staleRingStream ? "stream_created_after_stale_restart" : "stream_created" }
   } catch (error) {
@@ -163,6 +206,7 @@ export async function ensureAnsweredInboundCallMediaStream(
       ...baseLog,
       message: error instanceof Error ? error.message : String(error),
       restartedAfterStaleRingStream: staleRingStream,
+      stage: "twilio_stream_create",
     })
     return { started: false, reason: "twilio_stream_create_failed" }
   }

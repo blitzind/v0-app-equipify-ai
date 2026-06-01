@@ -112,6 +112,7 @@
     "test:growth-realtime-call-intelligence": "tsx scripts/test-growth-realtime-call-intelligence.ts",
     "test:growth-live-guidance": "tsx scripts/test-growth-live-guidance.ts",
     "test:live-coaching-refresh": "tsx scripts/test-live-coaching-refresh.ts",
+    "test:live-coaching-pipeline-fix": "tsx scripts/test-live-coaching-pipeline-fix.ts",
     "test:live-coaching-session-lifecycle": "tsx scripts/test-live-coaching-session-lifecycle.ts",
     "test:live-coaching-v2": "tsx scripts/test-live-coaching-v2.ts",
     "test:optimistic-inbound-answer": "tsx scripts/test-optimistic-inbound-answer.ts",

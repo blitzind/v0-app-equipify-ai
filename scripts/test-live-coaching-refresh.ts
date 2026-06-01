@@ -100,6 +100,21 @@ const answeredMediaStream = fs.readFileSync(
 assert.match(answeredMediaStream, /isStaleRingPhaseMediaSession/)
 assert.match(answeredMediaStream, /voice_answered_inbound_media_stream_skipped/)
 assert.match(answeredMediaStream, /voice_answered_inbound_media_stream_stale_stopped/)
+assert.match(answeredMediaStream, /voice_answered_inbound_media_stream_create_requested/)
+assert.match(answeredMediaStream, /wssHost/)
+
+const runRealtimeModule = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/realtime/run-realtime-call-session.ts"),
+  "utf8",
+)
+assert.match(runRealtimeModule, /analyzeRealtimeCallTranscript, diffRealtimeSnapshot/)
+
+const coachingServiceHardening = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/native-dialer/call-workspace-coaching-service.ts"),
+  "utf8",
+)
+assert.match(coachingServiceHardening, /voice_growth_coaching_native_linked/)
+assert.match(coachingServiceHardening, /voice_growth_coaching_orphan_cleanup_failed/)
 
 const nativeDialerRepo = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/native-dialer/native-dialer-repository.ts"),
