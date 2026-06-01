@@ -44,7 +44,6 @@ import { useVoiceBrowserCalling } from "@/hooks/voice/use-voice-browser-calling"
 import {
   buildInboundRingingSessionFromOffer,
   buildInboundRingingSessionPlaceholder,
-  resolveInboundWorkspacePhase,
 } from "@/lib/voice/browser-calling/browser-incoming-call"
 import {
   INBOUND_RING_DIAG_EVENTS,
@@ -73,16 +72,22 @@ import {
   buildOptimisticInboundAnswerCoachTurn,
 } from "@/lib/growth/live-coaching/optimistic-inbound-answer"
 import {
+  applyServerSessionUnderAuthority,
+  createInitialCallLifecycleAuthority,
+  mapAuthorityToWorkspacePhase,
+  shouldClearSessionOnIncomingCleared,
+  shouldHydrateInboundOfferUnderAuthority,
+  transitionCallLifecycleAuthority,
+  type CallLifecycleAuthorityState,
+} from "@/lib/voice/browser-calling/call-lifecycle-authority"
+import {
   buildOptimisticWrappingSession,
   filterInboundOfferForLifecycle,
-  isActiveSessionStatus,
   isCallLifecycleEndedLocked,
-  mergeServerSessionIntoLocal,
   registerAcceptedCallLifecycle,
   registerCompletedCallLifecycle,
   registerEndedCallLifecycle,
   shouldApplyInboundOfferToSession,
-  shouldHonorSdkIncomingForLifecycle,
   type CallLifecycleLockSnapshot,
 } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
 
@@ -127,6 +132,14 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   const completedSessionIdsRef = useRef(new Set<string>())
   const completedVoiceCallIdsRef = useRef(new Set<string>())
   const endCallInFlightRef = useRef(false)
+  const lastKnownSessionRef = useRef<NativeCallWorkspaceSessionPublicView | null>(null)
+  const operatorAssistStableRef = useRef<import("@/lib/growth/operator-assist/types").UnifiedOperatorAssistSnapshot | null>(null)
+  const [callAuthority, setCallAuthority] = useState<CallLifecycleAuthorityState>(
+    createInitialCallLifecycleAuthority,
+  )
+  const callAuthorityRef = useRef(callAuthority)
+  callAuthorityRef.current = callAuthority
+  const hasLiveSdkCallRef = useRef(false)
 
   const getLifecycleLocks = useCallback((): CallLifecycleLockSnapshot => {
     return {
@@ -140,17 +153,20 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   const applyServerSession = useCallback(
     (server: NativeCallWorkspaceSessionPublicView | null | undefined) => {
       const locks = getLifecycleLocks()
-      setActiveSession((prev) =>
-        mergeServerSessionIntoLocal({
+      setActiveSession((prev) => {
+        const next = applyServerSessionUnderAuthority({
           local: prev,
           server: server ?? null,
+          authority: callAuthorityRef.current,
           acceptedSessionIds: acceptedSessionIdsRef.current,
           endedVoiceCallIds: locks.endedVoiceCallIds,
           endedSessionIds: locks.endedSessionIds,
           completedSessionIds: locks.completedSessionIds,
           completedVoiceCallIds: locks.completedVoiceCallIds,
-        }),
-      )
+        })
+        if (next) lastKnownSessionRef.current = next
+        return next
+      })
     },
     [getLifecycleLocks],
   )
@@ -161,8 +177,40 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     setActiveSession((prev) => (prev?.status === "ringing" ? null : prev))
   }, [])
 
+  const handleSdkCallDisconnected = useCallback(
+    (event: { reason: string; callSid: string | null }) => {
+      const session = lastKnownSessionRef.current
+      registerEndedCallLifecycle({
+        endedVoiceCallIds: endedVoiceCallIdsRef.current,
+        endedSessionIds: endedSessionIdsRef.current,
+        voiceCallId: session?.voiceCallId ?? callAuthorityRef.current.voiceCallId,
+        sessionId: session?.id ?? callAuthorityRef.current.sessionId,
+      })
+      setCallAuthority((prev) => transitionCallLifecycleAuthority(prev, { type: "sdk_disconnected", reason: event.reason }))
+      setOptimisticCoachTurn(null)
+      setActiveSession((prev) => {
+        const base = prev ?? lastKnownSessionRef.current
+        if (!base) return prev
+        const endedAt = new Date().toISOString()
+        const wrapped = buildOptimisticWrappingSession(base, endedAt)
+        lastKnownSessionRef.current = wrapped
+        return wrapped
+      })
+    },
+    [],
+  )
+
   const handleIncomingCleared = useCallback(
     (reason: string) => {
+      if (
+        !shouldClearSessionOnIncomingCleared({
+          authority: callAuthorityRef.current,
+          hasLiveSdkCall: hasLiveSdkCallRef.current,
+          reason,
+        })
+      ) {
+        return
+      }
       if (lastInboundOfferVoiceCallIdRef.current) {
         suppressedInboundOfferVoiceCallIdRef.current = lastInboundOfferVoiceCallIdRef.current
       }
@@ -220,56 +268,96 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
 
   const lifecycleLocks = getLifecycleLocks()
   const syncWorkspaceSessionId =
-    activeSession &&
-    (activeSession.status === "wrapping" ||
-      activeSession.status === "completed" ||
-      isCallLifecycleEndedLocked({
-        sessionId: activeSession.id,
-        voiceCallId: activeSession.voiceCallId,
-        locks: lifecycleLocks,
-      }))
-      ? null
-      : activeSession?.id ?? null
+    callAuthority.phase === "active" ||
+    callAuthority.phase === "accepting" ||
+    callAuthority.phase === "incoming"
+      ? activeSession?.id ?? callAuthority.sessionId ?? lastKnownSessionRef.current?.id ?? null
+      : activeSession &&
+          (activeSession.status === "wrapping" ||
+            activeSession.status === "completed" ||
+            isCallLifecycleEndedLocked({
+              sessionId: activeSession.id,
+              voiceCallId: activeSession.voiceCallId,
+              locks: lifecycleLocks,
+            }))
+        ? null
+        : activeSession?.id ?? null
 
   const voiceBrowser = useVoiceBrowserCalling({
     workspaceSessionId: syncWorkspaceSessionId,
     onIncomingCleared: handleIncomingCleared,
+    onSdkCallDisconnected: handleSdkCallDisconnected,
   })
+  hasLiveSdkCallRef.current = voiceBrowser.hasLiveSdkCall
 
   const inboundOfferRaw = voiceBrowser.snapshot?.inboundRinging ?? null
-  const inboundOffer = useMemo(
-    () =>
-      filterInboundOfferForLifecycle({
-        offer: inboundOfferRaw,
-        activeSession,
-        acceptedVoiceCallIds: acceptedVoiceCallIdsRef.current,
-        acceptedSessionIds: acceptedSessionIdsRef.current,
-        endedVoiceCallIds: endedVoiceCallIdsRef.current,
-        endedSessionIds: endedSessionIdsRef.current,
-        completedSessionIds: completedSessionIdsRef.current,
-        completedVoiceCallIds: completedVoiceCallIdsRef.current,
-      }),
-    [activeSession, inboundOfferRaw],
-  )
-  const hasSdkIncoming = Boolean(voiceBrowser.incomingCall)
-  const lockedVoiceCallId =
-    activeSession?.voiceCallId ??
-    inboundOffer?.voiceCallId ??
-    voiceBrowser.snapshot?.activeVoiceCallId ??
-    null
-  const lockedSessionId =
-    activeSession?.id ?? inboundOffer?.workspaceSessionId ?? voiceBrowser.snapshot?.workspaceSessionId ?? null
-  const honorSdkIncoming = shouldHonorSdkIncomingForLifecycle({
-    sdkIncoming: hasSdkIncoming,
-    voiceCallId: lockedVoiceCallId,
-    sessionId: lockedSessionId,
-    locks: lifecycleLocks,
-  })
+  const inboundOffer = useMemo(() => {
+    if (
+      !shouldHydrateInboundOfferUnderAuthority({
+        authority: callAuthority,
+        hasLiveSdkCall: voiceBrowser.hasLiveSdkCall,
+      })
+    ) {
+      return null
+    }
+    return filterInboundOfferForLifecycle({
+      offer: inboundOfferRaw,
+      activeSession,
+      acceptedVoiceCallIds: acceptedVoiceCallIdsRef.current,
+      acceptedSessionIds: acceptedSessionIdsRef.current,
+      endedVoiceCallIds: endedVoiceCallIdsRef.current,
+      endedSessionIds: endedSessionIdsRef.current,
+      completedSessionIds: completedSessionIdsRef.current,
+      completedVoiceCallIds: completedVoiceCallIdsRef.current,
+    })
+  }, [activeSession, inboundOfferRaw, callAuthority, voiceBrowser.hasLiveSdkCall])
+
+  const hasSdkIncoming = voiceBrowser.hasSdkIncoming
+
+  useEffect(() => {
+    if (voiceBrowser.sdkCallPhase === "incoming") {
+      setCallAuthority((prev) =>
+        transitionCallLifecycleAuthority(prev, {
+          type: "sdk_incoming",
+          callSid: voiceBrowser.incomingCall?.callSid ?? null,
+          voiceCallId: inboundOffer?.voiceCallId ?? voiceBrowser.snapshot?.activeVoiceCallId ?? prev.voiceCallId,
+          sessionId: inboundOffer?.workspaceSessionId ?? voiceBrowser.snapshot?.workspaceSessionId ?? prev.sessionId,
+        }),
+      )
+    }
+  }, [
+    voiceBrowser.sdkCallPhase,
+    voiceBrowser.incomingCall?.callSid,
+    inboundOffer?.voiceCallId,
+    inboundOffer?.workspaceSessionId,
+    voiceBrowser.snapshot?.activeVoiceCallId,
+    voiceBrowser.snapshot?.workspaceSessionId,
+  ])
+
+  useEffect(() => {
+    if (voiceBrowser.sdkCallPhase === "active" && callAuthority.phase !== "active" && callAuthority.phase !== "ending" && callAuthority.phase !== "wrapup") {
+      setCallAuthority((prev) =>
+        transitionCallLifecycleAuthority(prev, {
+          type: "sdk_accept_succeeded",
+          callSid: voiceBrowser.incomingCall?.callSid ?? prev.callSid,
+          connectedAt: activeSession?.connectedAt ?? prev.connectedAt ?? new Date().toISOString(),
+        }),
+      )
+    }
+  }, [voiceBrowser.sdkCallPhase, callAuthority.phase, voiceBrowser.incomingCall?.callSid, activeSession?.connectedAt])
 
   useEffect(() => {
     const offer = inboundOffer
     if (!offer) {
-      if (!inboundOfferRaw && lastInboundOfferVoiceCallIdRef.current) {
+      if (
+        !inboundOfferRaw &&
+        lastInboundOfferVoiceCallIdRef.current &&
+        shouldClearSessionOnIncomingCleared({
+          authority: callAuthority,
+          hasLiveSdkCall: voiceBrowser.hasLiveSdkCall,
+          reason: "sync_offer_cleared",
+        })
+      ) {
         clearStaleRingingSession("sync_offer_cleared")
       }
       return
@@ -299,6 +387,13 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         })
       }
       lastInboundOfferVoiceCallIdRef.current = offer.voiceCallId
+      setCallAuthority((prev) =>
+        transitionCallLifecycleAuthority(prev, {
+          type: "bind_session",
+          voiceCallId: offer.voiceCallId,
+          sessionId: offer.workspaceSessionId,
+        }),
+      )
     }
 
     setActiveSession((prev) => {
@@ -312,6 +407,10 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           endedSessionIds: endedSessionIdsRef.current,
           completedSessionIds: completedSessionIdsRef.current,
           completedVoiceCallIds: completedVoiceCallIdsRef.current,
+        }) ||
+        !shouldHydrateInboundOfferUnderAuthority({
+          authority: callAuthority,
+          hasLiveSdkCall: voiceBrowser.hasLiveSdkCall,
         })
       ) {
         return prev
@@ -324,45 +423,43 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       ) {
         return prev
       }
+      lastKnownSessionRef.current = next
       return next
     })
-  }, [clearStaleRingingSession, inboundOffer, inboundOfferRaw])
+  }, [callAuthority, clearStaleRingingSession, inboundOffer, inboundOfferRaw, voiceBrowser.hasLiveSdkCall])
 
   const incomingSession = useMemo((): NativeCallWorkspaceSessionPublicView | null => {
+    if (callAuthority.phase !== "incoming" && callAuthority.phase !== "idle") return null
     if (activeSession?.status === "ringing") return activeSession
-    if (activeSession && (isActiveSessionStatus(activeSession.status) || activeSession.status === "wrapping")) {
-      return null
-    }
-    if (
-      isCallLifecycleEndedLocked({
-        voiceCallId:
-          inboundOffer?.voiceCallId ??
-          voiceBrowser.snapshot?.activeVoiceCallId ??
-          voiceBrowser.incomingCall?.callSid ??
-          null,
-        sessionId: inboundOffer?.workspaceSessionId ?? voiceBrowser.snapshot?.workspaceSessionId ?? null,
-        locks: lifecycleLocks,
-      })
-    ) {
-      return null
-    }
-    if (!honorSdkIncoming || !voiceBrowser.incomingCall) return null
+    if (voiceBrowser.hasLiveSdkCall) return null
+    if (!hasSdkIncoming || !voiceBrowser.incomingCall) return null
     return buildInboundRingingSessionPlaceholder({
       incomingCall: voiceBrowser.incomingCall,
       inboundOffer,
       workspaceSessionId: voiceBrowser.snapshot?.workspaceSessionId ?? null,
       voiceCallId: voiceBrowser.snapshot?.activeVoiceCallId ?? inboundOffer?.voiceCallId ?? null,
     })
-  }, [activeSession, honorSdkIncoming, inboundOffer, lifecycleLocks, voiceBrowser.incomingCall, voiceBrowser.snapshot])
+  }, [
+    activeSession,
+    callAuthority.phase,
+    hasSdkIncoming,
+    inboundOffer,
+    voiceBrowser.hasLiveSdkCall,
+    voiceBrowser.incomingCall,
+    voiceBrowser.snapshot,
+  ])
 
-  const displaySession = incomingSession ?? activeSession
+  const displaySession =
+    callAuthority.phase === "incoming"
+      ? incomingSession ?? activeSession
+      : activeSession ?? lastKnownSessionRef.current
 
   const workspacePhase = useMemo((): GrowthCallWorkspacePhase => {
-    return resolveInboundWorkspacePhase({
-      activeSessionStatus: activeSession?.status ?? incomingSession?.status,
-      sdkIncoming: honorSdkIncoming,
+    return mapAuthorityToWorkspacePhase({
+      authority: callAuthority,
+      bridgeSession: activeSession?.status === "external_bridge_pending",
     })
-  }, [incomingSession?.status, activeSession?.status, honorSdkIncoming])
+  }, [activeSession?.status, callAuthority])
 
   useEffect(() => {
     if (workspacePhase !== "incoming") {
@@ -481,11 +578,13 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   }, [initialLeadId, loadLeadContext])
 
   const workspaceContext = useMemo(() => {
+    const operatorAssistSnapshot =
+      operatorAssistStableRef.current ?? voiceBrowser.snapshot?.operatorAssist ?? null
     const input = buildWorkspaceContextInputFromVoiceSnapshot({
       callPhase: workspacePhase,
       startingCall: starting,
       leadLinked,
-      operatorAssist: voiceBrowser.snapshot?.operatorAssist ?? null,
+      operatorAssist: operatorAssistSnapshot,
       aiCopilot: voiceBrowser.snapshot?.aiCopilot ?? null,
       aiReceptionist: voiceBrowser.snapshot?.aiReceptionist ?? null,
       missedCallRecovery: voiceBrowser.snapshot?.missedCallRecovery ?? null,
@@ -498,6 +597,23 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     })
     return buildWorkspaceContextSnapshot(input)
   }, [workspacePhase, starting, leadLinked, voiceBrowser.snapshot, leadContext])
+
+  useEffect(() => {
+    const nextAssist = voiceBrowser.snapshot?.operatorAssist ?? null
+    if (
+      nextAssist &&
+      (callAuthority.phase === "active" ||
+        callAuthority.phase === "accepting" ||
+        callAuthority.phase === "wrapup" ||
+        callAuthority.phase === "ending")
+    ) {
+      operatorAssistStableRef.current = nextAssist
+      return
+    }
+    if (callAuthority.phase === "idle" || callAuthority.phase === "completed") {
+      operatorAssistStableRef.current = null
+    }
+  }, [voiceBrowser.snapshot?.operatorAssist, callAuthority.phase])
 
   useEffect(() => {
     if (workspaceContext.contextRailExpanded) {
@@ -586,37 +702,58 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   }
 
   async function endCall() {
-    const sessionToEnd = activeSession ?? incomingSession
-    if (!sessionToEnd) return
-    if (sessionToEnd.status === "wrapping" || sessionToEnd.status === "completed") return
+    const sessionToEnd = activeSession ?? incomingSession ?? lastKnownSessionRef.current
+    if (!sessionToEnd && !voiceBrowser.hasLiveSdkCall) return
+    if (sessionToEnd?.status === "wrapping" || sessionToEnd?.status === "completed") return
     if (endCallInFlightRef.current) return
 
     endCallInFlightRef.current = true
     setError(null)
     const endedAt = new Date().toISOString()
+    const endTarget = sessionToEnd ?? lastKnownSessionRef.current
     registerEndedCallLifecycle({
       endedVoiceCallIds: endedVoiceCallIdsRef.current,
       endedSessionIds: endedSessionIdsRef.current,
-      voiceCallId: sessionToEnd.voiceCallId,
-      sessionId: sessionToEnd.id,
+      voiceCallId: endTarget?.voiceCallId,
+      sessionId: endTarget?.id,
     })
+    setCallAuthority((prev) =>
+      transitionCallLifecycleAuthority(prev, {
+        type: "local_end_requested",
+        endedAt,
+        voiceCallId: endTarget?.voiceCallId ?? prev.voiceCallId,
+        sessionId: endTarget?.id ?? prev.sessionId,
+      }),
+    )
     setOptimisticCoachTurn(null)
-    setActiveSession(buildOptimisticWrappingSession(sessionToEnd, endedAt))
+    if (endTarget) {
+      const wrapped = buildOptimisticWrappingSession(endTarget, endedAt)
+      lastKnownSessionRef.current = wrapped
+      setActiveSession(wrapped)
+    }
     setEnding(false)
 
     try {
       await voiceBrowser.disconnectActiveCall().catch(() => undefined)
-      if (!sessionToEnd.id.startsWith("pending-inbound-")) {
-        const res = await fetch("/api/platform/growth/calls/end", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId: sessionToEnd.id }),
-        })
-        const data = (await res.json().catch(() => ({}))) as { session?: NativeCallWorkspaceSessionPublicView }
-        if (!res.ok || !data.session) throw new Error("Could not end call.")
-        applyServerSession(data.session)
-      } else {
-        setActiveSession(null)
+      const sessionId = endTarget?.id
+      if (sessionId && !sessionId.startsWith("pending-inbound-")) {
+        const controller = new AbortController()
+        const timeoutId = window.setTimeout(() => controller.abort(), 12_000)
+        try {
+          const res = await fetch("/api/platform/growth/calls/end", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId }),
+            signal: controller.signal,
+          })
+          const data = (await res.json().catch(() => ({}))) as { session?: NativeCallWorkspaceSessionPublicView }
+          if (!res.ok || !data.session) throw new Error("Could not end call.")
+          applyServerSession(data.session)
+        } finally {
+          window.clearTimeout(timeoutId)
+        }
+      } else if (!endTarget) {
+        setCallAuthority((prev) => transitionCallLifecycleAuthority(prev, { type: "sdk_disconnected", reason: "local_end_no_session" }))
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "End failed.")
@@ -689,6 +826,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     if (!capturedSession && !hasSdkIncoming) return
     setAnswering(true)
     setError(null)
+    setCallAuthority((prev) => transitionCallLifecycleAuthority(prev, { type: "sdk_accept_started" }))
     try {
       if (hasSdkIncoming) {
         await voiceBrowser.acceptIncomingCall()
@@ -705,8 +843,24 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         if (capturedSession.voiceCallId) {
           suppressedInboundOfferVoiceCallIdRef.current = capturedSession.voiceCallId
         }
-        setActiveSession(buildOptimisticActiveInboundSession(capturedSession, connectedAt))
+        const optimisticSession = buildOptimisticActiveInboundSession(capturedSession, connectedAt)
+        lastKnownSessionRef.current = optimisticSession
+        setActiveSession(optimisticSession)
         setOptimisticCoachTurn(buildOptimisticInboundAnswerCoachTurn())
+        setCallAuthority((prev) =>
+          transitionCallLifecycleAuthority(prev, {
+            type: "sdk_accept_succeeded",
+            callSid: voiceBrowser.incomingCall?.callSid ?? prev.callSid,
+            connectedAt,
+          }),
+        )
+        setCallAuthority((prev) =>
+          transitionCallLifecycleAuthority(prev, {
+            type: "bind_session",
+            voiceCallId: capturedSession.voiceCallId,
+            sessionId: capturedSession.id,
+          }),
+        )
       }
       setAnswering(false)
 
@@ -721,6 +875,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     } catch (e) {
       setError(e instanceof Error ? e.message : "Answer failed.")
       setAnswering(false)
+      setCallAuthority((prev) => transitionCallLifecycleAuthority(prev, { type: "decline_or_cancel" }))
     }
   }
 
@@ -748,6 +903,8 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         if (!res.ok || !data.session) throw new Error(data.message ?? "Could not decline call.")
       }
       setActiveSession(null)
+      lastKnownSessionRef.current = null
+      setCallAuthority((prev) => transitionCallLifecycleAuthority(prev, { type: "decline_or_cancel" }))
       await voiceBrowser.refresh().catch(() => undefined)
       await load({ background: true })
     } catch (e) {
@@ -779,6 +936,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       sessionId,
       voiceCallId,
     })
+    setCallAuthority((prev) => transitionCallLifecycleAuthority(prev, { type: "wrapup_confirmed" }))
     setActiveSession(null)
     setSubmittingWrapup(true)
     setError(null)
@@ -807,7 +965,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   }
 
   const showIncomingDuringLoad =
-    workspacePhase === "incoming" || honorSdkIncoming || Boolean(inboundOffer)
+    workspacePhase === "incoming" || callAuthority.phase === "incoming" || Boolean(inboundOffer)
 
   if (loading && !showIncomingDuringLoad && workspacePhase !== "wrapup" && workspacePhase !== "active") {
     return (
@@ -928,7 +1086,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         <GrowthCallWorkspaceCenterPanel
           phase={workspacePhase}
           workspaceContext={workspaceContext}
-          activeSession={workspacePhase === "incoming" ? displaySession : activeSession}
+          activeSession={workspacePhase === "incoming" ? displaySession : activeSession ?? lastKnownSessionRef.current}
           voiceBrowserCallState={voiceBrowser.snapshot?.browserCallState ?? null}
           voiceBrowserCallStateLabel={
             voiceBrowser.snapshot?.browserCallState
@@ -940,7 +1098,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           voiceParticipants={voiceBrowser.snapshot?.participants ?? []}
           voiceActiveTransfer={voiceBrowser.snapshot?.activeTransfer ?? null}
           voiceLiveTranscript={voiceBrowser.snapshot?.liveTranscript ?? null}
-          operatorAssist={voiceBrowser.snapshot?.operatorAssist ?? null}
+          operatorAssist={operatorAssistStableRef.current ?? voiceBrowser.snapshot?.operatorAssist ?? null}
           aiCopilot={voiceBrowser.snapshot?.aiCopilot ?? null}
           aiReceptionist={voiceBrowser.snapshot?.aiReceptionist ?? null}
           missedCallRecovery={voiceBrowser.snapshot?.missedCallRecovery ?? null}
@@ -981,7 +1139,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           leadContext={leadContext}
           nativeSessionId={activeSession?.id ?? null}
           sessionPhone={activeSession?.phoneNumber ?? phone}
-          operatorAssist={voiceBrowser.snapshot?.operatorAssist ?? null}
+          operatorAssist={operatorAssistStableRef.current ?? voiceBrowser.snapshot?.operatorAssist ?? null}
           relationshipMemory={voiceBrowser.snapshot?.relationshipMemory ?? null}
           revenueIntelligence={voiceBrowser.snapshot?.revenueIntelligence ?? null}
           retentionIntelligence={voiceBrowser.snapshot?.retentionIntelligence ?? null}

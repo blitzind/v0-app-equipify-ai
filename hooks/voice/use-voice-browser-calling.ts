@@ -69,16 +69,25 @@ const VOICE_BROWSER_SYNC_INTERVAL_MS = 4000
 const VOICE_BROWSER_RINGING_SYNC_INTERVAL_MS = 1000
 const VOICE_BROWSER_ACTIVE_CALL_SYNC_INTERVAL_MS = 2000
 
+export type VoiceBrowserSdkCallPhase = "idle" | "incoming" | "active"
+
+export type VoiceBrowserSdkCallDisconnectedEvent = {
+  reason: string
+  callSid: string | null
+}
+
 export function useVoiceBrowserCalling(input?: {
   workspaceSessionId?: string | null
   enabled?: boolean
   onInboundOffer?: (snapshot: VoiceBrowserSyncSnapshot) => void
   onIncomingCleared?: (reason: string) => void
+  onSdkCallDisconnected?: (event: VoiceBrowserSdkCallDisconnectedEvent) => void
 }) {
   const enabled = input?.enabled !== false
   const [snapshot, setSnapshot] = useState<VoiceBrowserSyncSnapshot | null>(null)
   const [clientIdentity, setClientIdentity] = useState<string | null>(null)
   const [incomingCall, setIncomingCall] = useState<VoiceBrowserIncomingCallView | null>(null)
+  const [sdkCallPhase, setSdkCallPhase] = useState<VoiceBrowserSdkCallPhase>("idle")
   const [registrationState, setRegistrationState] = useState<"idle" | "registering" | "registered" | "error">("idle")
   const [error, setError] = useState<string | null>(null)
   const deviceRef = useRef<TwilioVoiceDevice | null>(null)
@@ -92,10 +101,21 @@ export function useVoiceBrowserCalling(input?: {
   const workspaceSessionIdRef = useRef(input?.workspaceSessionId ?? null)
   const inboundOfferRef = useRef(input?.onInboundOffer)
   const onIncomingClearedRef = useRef(input?.onIncomingCleared)
+  const onSdkCallDisconnectedRef = useRef(input?.onSdkCallDisconnected)
   const voiceCallCreatedAtRef = useRef<string | null>(null)
   workspaceSessionIdRef.current = input?.workspaceSessionId ?? null
   inboundOfferRef.current = input?.onInboundOffer
   onIncomingClearedRef.current = input?.onIncomingCleared
+  onSdkCallDisconnectedRef.current = input?.onSdkCallDisconnected
+
+  const notifyActiveCallDisconnected = useCallback((call: TwilioVoiceSdkCall, reason: string) => {
+    const callView = extractVoiceBrowserIncomingCallView(call)
+    setSdkCallPhase((prev) => (prev === "active" ? "idle" : prev))
+    onSdkCallDisconnectedRef.current?.({
+      reason,
+      callSid: callView.callSid,
+    })
+  }, [])
 
   const clearIncomingCall = useCallback((reason: string) => {
     const call = incomingTwilioCallRef.current
@@ -110,6 +130,7 @@ export function useVoiceBrowserCalling(input?: {
     }
     incomingTwilioCallRef.current = null
     setIncomingCall(null)
+    setSdkCallPhase((prev) => (prev === "incoming" ? "idle" : prev))
     logBrowserIncomingCall("incoming_cleared", { reason })
     if (hadIncoming && (reason === "cancel" || reason === "disconnect")) {
       const callView = call ? extractVoiceBrowserIncomingCallView(call) : null
@@ -130,7 +151,10 @@ export function useVoiceBrowserCalling(input?: {
     (call: TwilioVoiceSdkCall, role: "incoming" | "active") => {
       const onEnded = (reason: string) => {
         if (incomingTwilioCallRef.current === call) clearIncomingCall(reason)
-        if (activeTwilioCallRef.current === call) activeTwilioCallRef.current = null
+        if (activeTwilioCallRef.current === call) {
+          activeTwilioCallRef.current = null
+          notifyActiveCallDisconnected(call, reason)
+        }
       }
       const cancelHandler = () => onEnded("cancel")
       const disconnectHandler = () => onEnded("disconnect")
@@ -156,7 +180,7 @@ export function useVoiceBrowserCalling(input?: {
         )
       }
     },
-    [clearIncomingCall],
+    [clearIncomingCall, notifyActiveCallDisconnected],
   )
 
   const sync = useCallback(async () => {
@@ -192,6 +216,7 @@ export function useVoiceBrowserCalling(input?: {
     (call: TwilioVoiceSdkCall) => {
       incomingTwilioCallRef.current = call
       setIncomingCall(extractVoiceBrowserIncomingCallView(call))
+      setSdkCallPhase("incoming")
       attachCallLifecycleHandlers(call, "incoming")
       void syncRef.current().catch(() => undefined)
     },
@@ -240,6 +265,9 @@ export function useVoiceBrowserCalling(input?: {
       detachDeviceLifecycleHandlers(device)
     }
     clearIncomingCall("device_disconnect")
+    if (activeTwilioCallRef.current) {
+      notifyActiveCallDisconnected(activeTwilioCallRef.current, "device_disconnect")
+    }
     activeTwilioCallRef.current?.disconnect?.()
     activeTwilioCallRef.current = null
     if (!device) return
@@ -249,7 +277,7 @@ export function useVoiceBrowserCalling(input?: {
       // ignore teardown errors
     }
     device.destroy?.()
-  }, [clearIncomingCall, clearReregisterTimeout, detachDeviceLifecycleHandlers, onDeviceIncoming])
+  }, [clearIncomingCall, clearReregisterTimeout, detachDeviceLifecycleHandlers, notifyActiveCallDisconnected, onDeviceIncoming])
 
   const registerRef = useRef<(() => Promise<void>) | null>(null)
   const scheduleReregisterRef = useRef<(() => void) | null>(null)
@@ -278,6 +306,7 @@ export function useVoiceBrowserCalling(input?: {
       activeTwilioCallRef.current = call
       incomingTwilioCallRef.current = null
       setIncomingCall(null)
+      setSdkCallPhase("active")
       attachCallLifecycleHandlers(call, "active")
       logBrowserIncomingCall("accept_succeeded", {
         callSid: extractVoiceBrowserIncomingCallView(call).callSid,
@@ -325,13 +354,18 @@ export function useVoiceBrowserCalling(input?: {
       logBrowserIncomingCall("hangup_failed", { message })
       throw new Error(message)
     } finally {
-      clearIncomingCall("operator_hangup")
-      if (activeTwilioCallRef.current === call) activeTwilioCallRef.current = null
+      if (incomingTwilioCallRef.current === call) {
+        clearIncomingCall("operator_hangup")
+      }
+      if (activeTwilioCallRef.current === call) {
+        activeTwilioCallRef.current = null
+        notifyActiveCallDisconnected(call, "operator_hangup")
+      }
       if (!sdkRegisteredRef.current) {
         scheduleReregisterRef.current?.()
       }
     }
-  }, [clearIncomingCall])
+  }, [clearIncomingCall, notifyActiveCallDisconnected])
 
   const register = useCallback(async () => {
     if (!enabled) return
@@ -485,7 +519,7 @@ export function useVoiceBrowserCalling(input?: {
     if (!enabled || registrationState !== "registered") return
 
     const intervalMs =
-      incomingCall || snapshot?.inboundRinging
+      incomingCall || sdkCallPhase !== "idle" || snapshot?.inboundRinging
         ? VOICE_BROWSER_RINGING_SYNC_INTERVAL_MS
         : snapshot?.browserCallState &&
             ["active", "held", "muted", "ringing", "connecting"].includes(snapshot.browserCallState)
@@ -497,13 +531,16 @@ export function useVoiceBrowserCalling(input?: {
     }, intervalMs)
 
     return () => window.clearInterval(intervalId)
-  }, [enabled, registrationState, incomingCall, snapshot?.inboundRinging, snapshot?.browserCallState])
+  }, [enabled, registrationState, incomingCall, sdkCallPhase, snapshot?.inboundRinging, snapshot?.browserCallState])
 
   return {
     qaMarker: VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER,
     snapshot,
     clientIdentity,
     incomingCall,
+    sdkCallPhase,
+    hasLiveSdkCall: sdkCallPhase === "active",
+    hasSdkIncoming: sdkCallPhase === "incoming" || Boolean(incomingCall),
     registrationState,
     error,
     refresh: sync,

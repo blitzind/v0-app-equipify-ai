@@ -96,7 +96,9 @@ const workspaceComponentSource = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-workspace.tsx"),
   "utf8",
 )
-assert.match(workspaceComponentSource, /shouldHonorSdkIncomingForLifecycle/)
+assert.match(workspaceComponentSource, /callAuthority/)
+assert.match(workspaceComponentSource, /applyServerSessionUnderAuthority/)
+assert.match(workspaceComponentSource, /mapAuthorityToWorkspacePhase/)
 assert.match(workspaceComponentSource, /syncWorkspaceSessionId/)
 assert.match(workspaceComponentSource, /applyServerSession/)
 
