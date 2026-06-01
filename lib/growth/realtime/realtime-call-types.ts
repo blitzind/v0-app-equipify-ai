@@ -1,5 +1,7 @@
 /** Client-safe Growth Engine Realtime Call Intelligence types. */
 
+import type { ConversationCoachTurn } from "@/lib/growth/live-coaching/types"
+
 export const GROWTH_BROWSER_AUDIO_CAPTURE_STATUSES = [
   "inactive",
   "requesting",
@@ -133,6 +135,7 @@ export type GrowthRealtimeLiveSnapshot = {
   recommendedNextQuestion: string | null
   recommendedResponse: string | null
   guidanceTips: GrowthRealtimeGuidanceTip[]
+  conversationCoach?: ConversationCoachTurn | null
   computedAt: string
 }
 

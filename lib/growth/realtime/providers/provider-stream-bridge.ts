@@ -3,6 +3,8 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { syncLiveGuidanceForSession } from "@/lib/growth/live-guidance/sync-live-guidance"
+import { resolveNativeCallDirectionForRealtimeSession } from "@/lib/growth/live-coaching/resolve-call-direction"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
 import {
   appendGrowthRealtimeTranscriptEvent,
   listGrowthRealtimeTranscriptEvents,
@@ -93,14 +95,21 @@ export async function ingestRealtimeProviderTranscriptChunk(
   })
 
   const guidanceStarted = Date.now()
-  const coachingState = await syncLiveGuidanceForSession(admin, {
+  const organizationId = getGrowthEngineAiOrgId()
+  const direction = await resolveNativeCallDirectionForRealtimeSession(admin, input.session.id).catch(() => null)
+  const synced = await syncLiveGuidanceForSession(admin, {
     leadId: input.session.leadId,
     sessionId: input.session.id,
     snapshot,
     events: nextEvents,
     lead: toGrowthLeadRealtimeIntelligenceInput(lead),
+    organizationId,
+    direction,
+    session: input.session,
     actor: input.actor,
   })
+  const coachingState = synced.coachingState
+  const enrichedSnapshot = synced.liveSnapshot
 
   const transcriptQualityScore = computeTranscriptQualityScore({
     finalChunkCount: metrics.finalChunkCount,
@@ -114,13 +123,13 @@ export async function ingestRealtimeProviderTranscriptChunk(
   await emitLiveCoachingSnapshotDiffTimeline(admin, {
     session: input.session,
     previousSnapshot,
-    nextSnapshot: snapshot,
+    nextSnapshot: enrichedSnapshot,
     events: nextEvents,
     previousExecutionScore,
   })
 
   return updateGrowthRealtimeCallSession(admin, input.session.id, {
-    liveSnapshot: snapshot,
+    liveSnapshot: enrichedSnapshot,
     transcriptQualityScore,
     guidanceLatencyMs: coachingState.guidanceLatencyMs || Date.now() - guidanceStarted,
   })

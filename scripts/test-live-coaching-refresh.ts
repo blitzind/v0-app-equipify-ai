@@ -5,6 +5,7 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
+import { classifyConversationStage } from "../lib/growth/live-coaching/conversation-stage-engine"
 import { generateLiveGuidanceCandidates } from "../lib/growth/live-guidance/live-guidance-engine"
 import { planGuidanceSync } from "../lib/growth/live-guidance/guidance-sync-logic"
 import { inferGuidanceDedupeKey } from "../lib/growth/live-guidance/infer-guidance-dedupe-key"
@@ -124,8 +125,8 @@ const staleDmCard = guidanceEvent({
 const earlySnapshot = analyzeRealtimeCallTranscript({ events: [], lead: leadInput })
 const earlyCandidates = generateLiveGuidanceCandidates({ snapshot: earlySnapshot, events: [], lead: leadInput })
 assert.ok(
-  earlyCandidates.some((candidate) => candidate.dedupeKey === "discovery_gap_guidance:dm"),
-  "empty transcript should surface decision-maker gap",
+  !earlyCandidates.some((candidate) => candidate.dedupeKey === "discovery_gap_guidance:dm"),
+  "rapport stage should gate decision-maker gap on empty transcript",
 )
 
 const dmResolvedEvents: GrowthRealtimeTranscriptEvent[] = [
@@ -250,7 +251,13 @@ let previousTop: string | null = null
 for (const stage of progression) {
   cumulative = [...cumulative, ...stage.events]
   const snapshot = analyzeRealtimeCallTranscript({ events: cumulative, lead: leadInput })
-  const candidates = generateLiveGuidanceCandidates({ snapshot, events: cumulative, lead: leadInput })
+  const conversationStage = classifyConversationStage({ events: cumulative, snapshot }).stage
+  const candidates = generateLiveGuidanceCandidates({
+    snapshot,
+    events: cumulative,
+    lead: leadInput,
+    conversationStage,
+  })
   assert.ok(candidates.length > 0, `expected guidance candidate at stage: ${stage.label}`)
 
   for (const candidate of candidates) {
@@ -264,8 +271,12 @@ for (const stage of progression) {
 }
 
 assert.ok(topChanges >= 2, `expected top card to change during call, keys: ${topKeys.join(" → ")}`)
-assert.ok(surfacedKeys.has("discovery_gap_guidance:dm"), "decision-maker gap should surface early")
-assert.ok(surfacedKeys.has("pricing_pressure") || surfacedKeys.has("objection_guidance:budget"), "budget coaching should surface")
+assert.ok(
+  surfacedKeys.has("buying_signal_detected:dm_confirmed") ||
+    surfacedKeys.has("objection_guidance:budget") ||
+    surfacedKeys.has("pricing_pressure"),
+  "conversation-aware coaching should surface from live signals, not rapport checklist gaps",
+)
 assert.ok(surfacedKeys.has("competitor_response"), "competitor coaching should surface")
 assert.ok(surfacedKeys.has("objection_guidance:implementation"), "migration coaching should surface")
 assert.equal(topKeys[topKeys.length - 1], "meeting_lock_prompt:demo", "final stage should prioritize demo opportunity")
@@ -396,7 +407,7 @@ assert.equal(inferGuidanceDedupeKey({ eventType: "discovery_gap_guidance", title
 
 const sayThisNext = resolveSayThisNext(unified)
 assert.ok(sayThisNext?.phrase, "say-this-next should resolve a live phrase")
-assert.equal(GROWTH_SAY_THIS_NEXT_QA_MARKER, "growth-say-this-next-v1")
+assert.equal(GROWTH_SAY_THIS_NEXT_QA_MARKER, "growth-say-this-next-v2")
 
 const assistPanel = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-workspace-unified-assist-panel.tsx"),

@@ -16,8 +16,10 @@ import {
   computeLiveMomentum,
   computeLiveRiskLevel,
 } from "@/lib/growth/live-guidance/live-execution-score"
+import { syncConversationCoach } from "@/lib/growth/live-coaching/sync-conversation-coach"
 import type {
   GrowthLeadRealtimeIntelligenceInput,
+  GrowthRealtimeCallSession,
   GrowthRealtimeLiveSnapshot,
   GrowthRealtimeTranscriptEvent,
 } from "@/lib/growth/realtime/realtime-call-types"
@@ -49,15 +51,33 @@ export async function syncLiveGuidanceForSession(
     events: GrowthRealtimeTranscriptEvent[]
     lead: GrowthLeadRealtimeIntelligenceInput
     organizationId?: string | null
+    direction?: "inbound" | "outbound" | null
+    session?: GrowthRealtimeCallSession | null
     actor?: Actor
   },
-): Promise<GrowthLiveCoachingState> {
+): Promise<{ coachingState: GrowthLiveCoachingState; liveSnapshot: GrowthRealtimeLiveSnapshot }> {
   const startedAt = Date.now()
+  const session =
+    input.session ?? (await fetchGrowthRealtimeCallSession(admin, input.sessionId))
+
+  const coachSync = session
+    ? await syncConversationCoach({
+        session,
+        events: input.events,
+        snapshot: input.snapshot,
+        direction: input.direction ?? null,
+        organizationId: input.organizationId ?? null,
+      })
+    : null
+
+  const snapshot = coachSync?.liveSnapshot ?? input.snapshot
   const settings = await fetchGrowthLiveCoachingSettings(admin)
+  const conversationStage = coachSync?.stage ?? snapshot.conversationCoach?.stage ?? null
   const candidates = generateLiveGuidanceCandidates({
-    snapshot: input.snapshot,
+    snapshot,
     events: input.events,
     lead: input.lead,
+    conversationStage,
   })
 
   const passesThreshold = (candidate: GrowthLiveGuidanceCandidate) =>
@@ -94,9 +114,9 @@ export async function syncLiveGuidanceForSession(
         actor: input.actor,
       })
     }
-    const session = await fetchGrowthRealtimeCallSession(admin, input.sessionId)
-    if (session) {
-      await emitLiveCoachingGuidanceGeneratedTimeline(admin, session, {
+    const latestSession = await fetchGrowthRealtimeCallSession(admin, input.sessionId)
+    if (latestSession) {
+      await emitLiveCoachingGuidanceGeneratedTimeline(admin, latestSession, {
         guidanceId: inserted.id,
         guidanceType: inserted.eventType,
         severity: inserted.severity,
@@ -107,19 +127,24 @@ export async function syncLiveGuidanceForSession(
   const activeGuidance = await listActiveLiveGuidanceEvents(admin, input.sessionId)
   const acceptedCount = await countAcceptedLiveGuidanceForSession(admin, input.sessionId)
   const executionScore = computeCallExecutionScore({
-    snapshot: input.snapshot,
+    snapshot,
     events: input.events,
     acceptedGuidanceCount: acceptedCount,
   })
 
-  return {
+  const coachingState: GrowthLiveCoachingState = {
     executionScore,
-    suggestedNextQuestion: pickSuggestedNextQuestion({ snapshot: input.snapshot, candidates }),
-    riskLevel: computeLiveRiskLevel(input.snapshot),
-    momentum: computeLiveMomentum(input.snapshot),
+    suggestedNextQuestion: pickSuggestedNextQuestion({ snapshot, candidates }),
+    riskLevel: computeLiveRiskLevel(snapshot),
+    momentum: computeLiveMomentum(snapshot),
     activeGuidance: rankActiveGuidance(activeGuidance),
     guidanceLatencyMs: Date.now() - startedAt,
+    conversationStage: coachSync?.stage ?? snapshot.conversationCoach?.stage ?? null,
+    stageObjective: coachSync?.stageObjective ?? snapshot.conversationCoach?.stageObjective ?? null,
+    primaryCoach: coachSync?.coachTurn ?? snapshot.conversationCoach ?? null,
   }
+
+  return { coachingState, liveSnapshot: snapshot }
 }
 
 export async function dismissLiveGuidanceEvent(

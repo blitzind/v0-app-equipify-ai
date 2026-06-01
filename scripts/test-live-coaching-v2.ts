@@ -1,0 +1,196 @@
+/**
+ * Growth Live Coaching V2 — conversation coach regression checks.
+ * Run: pnpm test:live-coaching-v2
+ */
+import assert from "node:assert/strict"
+import fs from "node:fs"
+import path from "node:path"
+import { classifyConversationStage } from "../lib/growth/live-coaching/conversation-stage-engine"
+import {
+  isCoachingTopicAllowed,
+  isGuidanceEventAllowedForStage,
+  phraseViolatesStagePolicy,
+} from "../lib/growth/live-coaching/stage-coaching-policy"
+import {
+  buildInboundBootstrapCoachTurn,
+  generateDeterministicCoachTurn,
+} from "../lib/growth/live-coaching/turn-coach-generator"
+import { generateLiveGuidanceCandidates } from "../lib/growth/live-guidance/live-guidance-engine"
+import { emptyRealtimeLiveSnapshot } from "../lib/growth/realtime/realtime-live-snapshot-defaults"
+import { resolveSayThisNext } from "../lib/growth/operator-assist/resolve-say-this-next"
+import { resolveUnifiedNextBestAction } from "../lib/growth/operator-assist/nba-resolver"
+
+const snapshot = emptyRealtimeLiveSnapshot()
+const events = [
+  {
+    id: "1",
+    sessionId: "s1",
+    speaker: "prospect" as const,
+    content: "We are struggling with manual follow-ups every week.",
+    sequenceNumber: 1,
+    timestampMs: Date.now(),
+    sourceVoiceSegmentId: null,
+    createdAt: new Date().toISOString(),
+  },
+]
+
+const stage = classifyConversationStage({ events, snapshot })
+assert.equal(stage.stage, "pain", "manual follow-up struggle should reach pain stage")
+
+assert.equal(isCoachingTopicAllowed("rapport", "decision_maker"), false)
+assert.equal(isCoachingTopicAllowed("discovery", "decision_maker"), true)
+assert.equal(isCoachingTopicAllowed("rapport", "budget"), false)
+assert.equal(isCoachingTopicAllowed("impact", "budget"), true)
+
+assert.equal(
+  isGuidanceEventAllowedForStage("rapport", "discovery_gap_guidance", "discovery_gap_guidance:dm"),
+  false,
+)
+assert.equal(
+  isGuidanceEventAllowedForStage("discovery", "discovery_gap_guidance", "discovery_gap_guidance:dm"),
+  true,
+)
+
+assert.equal(
+  phraseViolatesStagePolicy("rapport", "Who besides yourself would be involved in this decision?"),
+  true,
+)
+
+const bootstrap = buildInboundBootstrapCoachTurn()
+assert.match(bootstrap.primaryPhrase, /prompted you to reach out/i)
+assert.equal(bootstrap.stage, "rapport")
+
+const turn = generateDeterministicCoachTurn({
+  events,
+  stage: "pain",
+  snapshot,
+  inbound: true,
+})
+assert.match(turn.primaryPhrase, /hardest part|hardest/i)
+assert.ok(turn.rationale.length > 10)
+
+const rapportCandidates = generateLiveGuidanceCandidates({
+  snapshot: {
+    ...snapshot,
+    discovery: {
+      covered: [],
+      missing: ["decision_maker_confirmed", "timeline_asked", "budget_asked", "implementation_asked", "current_solution_identified"],
+    },
+  },
+  events: [],
+  lead: {
+    decisionMakerStatus: "missing",
+    conversationBuyingIntent: "weak",
+    conversationUrgencyLevel: "low",
+    relationshipTrend: "stable",
+    revenueTrajectory: "stable",
+    executivePriorityTier: "standard",
+    conversationCompetitorPressure: 0,
+    recommendedSequenceNextStep: null,
+  },
+  conversationStage: "rapport",
+})
+assert.equal(
+  rapportCandidates.some((candidate) => candidate.dedupeKey === "discovery_gap_guidance:dm"),
+  false,
+  "decision-maker gap card should be gated in rapport",
+)
+
+const coachingState = {
+  executionScore: {
+    score: 70,
+    badge: "good" as const,
+    badgeLabel: "Good",
+    factors: {
+      talkRatio: 80,
+      discoveryCoverage: 40,
+      objectionsHandled: 100,
+      buyingSignalsCaptured: 25,
+      timelineDiscovered: false,
+      decisionMakerIdentified: false,
+      nextStepSecured: false,
+    },
+  },
+  suggestedNextQuestion: bootstrap.primaryPhrase,
+  riskLevel: "low" as const,
+  momentum: "stable" as const,
+  activeGuidance: [],
+  guidanceLatencyMs: 12,
+  conversationStage: "rapport" as const,
+  stageObjective: bootstrap.stageObjective,
+  primaryCoach: bootstrap,
+}
+
+const sayThisNext = resolveSayThisNext({
+  qaMarker: "voice-unified-operator-assist-v1",
+  generatedAt: new Date().toISOString(),
+  passiveModeEnabled: true,
+  autonomousActionsDisabled: true,
+  canonicalTranscriptSource: "none",
+  coachingState,
+  liveSnapshot: snapshot,
+  coachingMode: "transcript_only",
+  coachingLeadId: "lead-1",
+  realtimeSessionId: "rt-1",
+  voiceCallId: "vc-1",
+  conversationIntelligence: null,
+  feed: [],
+  topPriority: [],
+  additional: [],
+  nextBestAction: resolveUnifiedNextBestAction({
+    coachingState,
+    liveSnapshot: snapshot,
+    conversationIntelligence: null,
+    leadContext: null,
+    rankedAssistEvents: [],
+  }),
+  interruptionSummary: {
+    operatorInterruptions: 0,
+    customerInterruptions: 0,
+    totalInterruptions: 0,
+    recentEvents: [],
+  },
+  supervisorVisibility: { assistFeedReadOnly: true, supervisorParticipantCount: 0 },
+  preferences: {
+    quietMode: false,
+    minimumPriorityLabel: "Low",
+    enabledCategories: {
+      objection: true,
+      buying_signal: true,
+      risk: true,
+      guidance: true,
+      coaching: true,
+      interruption: true,
+      conversation: true,
+    },
+  },
+})
+
+assert.ok(sayThisNext)
+assert.equal(sayThisNext?.phrase, bootstrap.primaryPhrase)
+assert.equal(sayThisNext?.stageObjective, bootstrap.stageObjective)
+
+const answerRepo = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/native-dialer/native-dialer-repository.ts"),
+  "utf8",
+)
+assert.match(answerRepo, /autoStartCallWorkspaceLiveCoachingOnAnswer/)
+
+const assistPanel = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace-unified-assist-panel.tsx"),
+  "utf8",
+)
+assert.match(assistPanel, /showStartCoachingButton/)
+assert.match(assistPanel, /realtimeSessionId/)
+
+const hero = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/live-coaching/say-this-next-card.tsx"),
+  "utf8",
+)
+assert.match(hero, /stageObjective/)
+assert.match(hero, /Why:/)
+
+const tasks = fs.readFileSync(path.join(process.cwd(), "lib/ai/tasks.ts"), "utf8")
+assert.match(tasks, /growth_live_turn_coach/)
+
+console.log("live-coaching-v2 checks passed")

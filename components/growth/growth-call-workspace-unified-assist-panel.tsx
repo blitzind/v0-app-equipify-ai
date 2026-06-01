@@ -242,7 +242,8 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
     )
   }
 
-  const coachingActive = coachingState != null
+  const coachingActive = coachingState != null || Boolean(operatorAssist?.realtimeSessionId)
+  const showStartCoachingButton = !coachingActive && canStartCoaching
   const nextBest = operatorAssist?.nextBestAction.primary ?? null
   const supervisor = operatorAssist?.supervisorVisibility
   const interruptionSummary = operatorAssist?.interruptionSummary
@@ -266,7 +267,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <GrowthBadge label={modeLabel} tone={leadLinked ? "healthy" : "attention"} />
-          {!coachingActive ? (
+          {!showStartCoachingButton ? null : (
             <Button
               type="button"
               size="sm"
@@ -286,7 +287,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
                 </>
               )}
             </Button>
-          ) : null}
+          )}
         </div>
       </div>
 
@@ -391,7 +392,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
           <GrowthBadge label={modeLabel} tone={leadLinked ? "healthy" : "attention"} />
           <GrowthBadge label={coachingActive ? "Coaching active" : "Coaching standby"} tone={coachingActive ? "healthy" : "neutral"} />
           <GrowthBadge label="Passive mode" tone="neutral" />
-          {!coachingActive ? (
+          {!showStartCoachingButton ? null : (
             <Button
               type="button"
               size="sm"
@@ -407,11 +408,11 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
               ) : (
                 <>
                   <Mic className="mr-2 size-4" />
-                  Start Coaching
+                  Start coaching
                 </>
               )}
             </Button>
-          ) : null}
+          )}
         </div>
       </div>
 

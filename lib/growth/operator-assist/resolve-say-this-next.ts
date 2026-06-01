@@ -1,8 +1,12 @@
 /** Resolve the single best live phrase for the operator to say next (client-safe). */
 
 import type { UnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/types"
+import {
+  CONVERSATION_STAGE_LABELS,
+  GROWTH_LIVE_COACHING_V2_QA_MARKER,
+} from "@/lib/growth/live-coaching/types"
 
-export const GROWTH_SAY_THIS_NEXT_QA_MARKER = "growth-say-this-next-v1" as const
+export const GROWTH_SAY_THIS_NEXT_QA_MARKER = "growth-say-this-next-v2" as const
 
 const MAX_SAY_THIS_NEXT_CHARS = 160
 
@@ -25,10 +29,14 @@ function preferRecommendation(event: {
 export type SayThisNextSnapshot = {
   phrase: string
   contextLabel: string
+  rationale: string | null
+  stageLabel: string | null
+  stageObjective: string | null
   source: string
   confidenceScore: number | null
   updatedAt: string
   eventId: string | null
+  qaMarker: typeof GROWTH_LIVE_COACHING_V2_QA_MARKER
 }
 
 export function resolveSayThisNext(
@@ -38,6 +46,25 @@ export function resolveSayThisNext(
 
   const coachingState = operatorAssist.coachingState
   const generatedAt = operatorAssist.generatedAt
+  const primaryCoach = coachingState?.primaryCoach
+
+  if (primaryCoach?.primaryPhrase) {
+    const phrase = trimPhrase(primaryCoach.primaryPhrase)
+    if (phrase) {
+      return {
+        phrase,
+        contextLabel: CONVERSATION_STAGE_LABELS[primaryCoach.stage],
+        rationale: primaryCoach.rationale,
+        stageLabel: CONVERSATION_STAGE_LABELS[primaryCoach.stage],
+        stageObjective: primaryCoach.stageObjective,
+        source: primaryCoach.source,
+        confidenceScore: primaryCoach.confidence,
+        updatedAt: primaryCoach.updatedAt,
+        eventId: null,
+        qaMarker: GROWTH_LIVE_COACHING_V2_QA_MARKER,
+      }
+    }
+  }
 
   const nba = operatorAssist.nextBestAction.primary
   if (nba?.prompt) {
@@ -46,10 +73,16 @@ export function resolveSayThisNext(
       return {
         phrase,
         contextLabel: nba.title,
+        rationale: nba.evidenceText,
+        stageLabel: coachingState?.conversationStage
+          ? CONVERSATION_STAGE_LABELS[coachingState.conversationStage]
+          : null,
+        stageObjective: coachingState?.stageObjective ?? null,
         source: nba.source,
         confidenceScore: nba.confidenceScore,
         updatedAt: generatedAt,
         eventId: null,
+        qaMarker: GROWTH_LIVE_COACHING_V2_QA_MARKER,
       }
     }
   }
@@ -59,11 +92,19 @@ export function resolveSayThisNext(
     if (phrase) {
       return {
         phrase,
-        contextLabel: "Discovery follow-up",
+        contextLabel: coachingState.conversationStage
+          ? CONVERSATION_STAGE_LABELS[coachingState.conversationStage]
+          : "Live coaching",
+        rationale: coachingState.stageObjective,
+        stageLabel: coachingState.conversationStage
+          ? CONVERSATION_STAGE_LABELS[coachingState.conversationStage]
+          : null,
+        stageObjective: coachingState.stageObjective,
         source: "growth_coaching",
         confidenceScore: 0.72,
         updatedAt: generatedAt,
         eventId: null,
+        qaMarker: GROWTH_LIVE_COACHING_V2_QA_MARKER,
       }
     }
   }
@@ -75,10 +116,14 @@ export function resolveSayThisNext(
       return {
         phrase,
         contextLabel: topEvent.title,
+        rationale: topEvent.evidenceText,
+        stageLabel: null,
+        stageObjective: null,
         source: topEvent.source,
         confidenceScore: topEvent.confidenceScore,
         updatedAt: topEvent.surfacedAt,
         eventId: topEvent.id,
+        qaMarker: GROWTH_LIVE_COACHING_V2_QA_MARKER,
       }
     }
   }

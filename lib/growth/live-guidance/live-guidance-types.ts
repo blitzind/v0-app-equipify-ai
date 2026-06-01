@@ -1,5 +1,7 @@
 /** Client-safe Live Guidance types (Growth Engine slice 6.10A). */
 
+import type { ConversationCoachTurn, ConversationStage } from "@/lib/growth/live-coaching/types"
+
 export const GROWTH_LIVE_GUIDANCE_EVENT_TYPES = [
   "objection_guidance",
   "discovery_gap_guidance",
@@ -92,6 +94,9 @@ export type GrowthLiveCoachingState = {
   momentum: "building" | "stable" | "slowing" | "at_risk"
   activeGuidance: GrowthLiveGuidanceEvent[]
   guidanceLatencyMs: number
+  conversationStage: ConversationStage | null
+  stageObjective: string | null
+  primaryCoach: ConversationCoachTurn | null
 }
 
 /** Guidance never triggers autonomous actions — navigation/coaching only. */

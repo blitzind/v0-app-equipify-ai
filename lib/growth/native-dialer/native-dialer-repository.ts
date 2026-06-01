@@ -478,6 +478,17 @@ export async function answerNativeCallSession(
     .single()
   if (activeError) throw new Error(activeError.message)
   await syncWorkspaceSessionFromVoiceCall(admin, { voiceCallId: voiceCallId!, organizationId: orgId })
+
+  if ((existing.direction as string) === "inbound") {
+    const { autoStartCallWorkspaceLiveCoachingOnAnswer } = await import(
+      "@/lib/growth/native-dialer/call-workspace-coaching-service"
+    )
+    await autoStartCallWorkspaceLiveCoachingOnAnswer(admin, {
+      nativeSessionId: sessionId,
+      createdBy: ownerUserId ?? null,
+    }).catch(() => undefined)
+  }
+
   return mapNativeCallSessionRow(active as SessionRow)
 }
 

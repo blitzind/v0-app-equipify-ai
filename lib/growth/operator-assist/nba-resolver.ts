@@ -38,6 +38,20 @@ export function resolveUnifiedNextBestAction(input: {
 }): UnifiedNextBestActionSnapshot {
   const candidates: UnifiedNextBestActionItem[] = []
 
+  if (input.coachingState?.primaryCoach?.primaryPhrase) {
+    const coach = input.coachingState.primaryCoach
+    candidates.push(
+      toNbaItem({
+        title: "Live coach",
+        prompt: coach.primaryPhrase,
+        evidenceText: coach.rationale,
+        confidenceScore: coach.confidence,
+        source: coach.source,
+        dedupeKey: `primary-coach:${coach.triggeredBySequenceNumber ?? "bootstrap"}`,
+      }),
+    )
+  }
+
   const voiceNba = input.conversationIntelligence?.suggestedNextBestAction
   if (voiceNba) {
     candidates.push(
@@ -52,7 +66,7 @@ export function resolveUnifiedNextBestAction(input: {
     )
   }
 
-  if (input.coachingState?.suggestedNextQuestion) {
+  if (input.coachingState?.suggestedNextQuestion && !input.coachingState.primaryCoach) {
     candidates.push(
       toNbaItem({
         title: "Suggested discovery question",

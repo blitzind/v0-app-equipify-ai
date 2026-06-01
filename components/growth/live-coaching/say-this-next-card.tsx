@@ -1,6 +1,6 @@
 "use client"
 
-import { MessageCircle } from "lucide-react"
+import { MessageCircle, Target } from "lucide-react"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import {
   GROWTH_SAY_THIS_NEXT_QA_MARKER,
@@ -36,8 +36,8 @@ export function SayThisNextCard({
         <p className="text-sm font-semibold text-foreground">Say this next</p>
         <p className="mt-1 text-sm text-muted-foreground">
           {coachingActive
-            ? "Listening for transcript — a recommended line will appear here."
-            : "Start coaching to get live phrase suggestions."}
+            ? "Listening for the conversation — your next line will appear here."
+            : "Coaching will start automatically when the call connects."}
         </p>
       </div>
     )
@@ -66,8 +66,21 @@ export function SayThisNextCard({
             Live
           </span>
         ) : null}
-        {confidence ? <GrowthBadge label={confidence} tone="healthy" /> : null}
+        {sayThisNext.stageLabel ? (
+          <GrowthBadge label={sayThisNext.stageLabel} tone="healthy" />
+        ) : null}
+        {confidence ? <GrowthBadge label={confidence} tone="neutral" /> : null}
       </div>
+
+      {sayThisNext.stageObjective ? (
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-emerald-200/60 bg-white/70 px-3 py-2 text-xs text-muted-foreground dark:border-emerald-900/40 dark:bg-emerald-950/20">
+          <Target className="mt-0.5 size-3.5 shrink-0 text-emerald-700 dark:text-emerald-300" />
+          <span>
+            <span className="font-semibold text-foreground">Objective: </span>
+            {sayThisNext.stageObjective}
+          </span>
+        </div>
+      ) : null}
 
       <p
         key={`${sayThisNext.eventId ?? sayThisNext.source}:${sayThisNext.phrase}`}
@@ -76,7 +89,14 @@ export function SayThisNextCard({
         &ldquo;{sayThisNext.phrase}&rdquo;
       </p>
 
-      <p className="mt-3 text-sm text-muted-foreground">{sayThisNext.contextLabel}</p>
+      {sayThisNext.rationale ? (
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          <span className="font-medium text-foreground">Why: </span>
+          {sayThisNext.rationale}
+        </p>
+      ) : (
+        <p className="mt-3 text-sm text-muted-foreground">{sayThisNext.contextLabel}</p>
+      )}
     </div>
   )
 }

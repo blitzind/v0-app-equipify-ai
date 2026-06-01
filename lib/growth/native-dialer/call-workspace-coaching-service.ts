@@ -10,6 +10,7 @@ import {
 import {
   fetchGrowthRealtimeCallSession,
 } from "@/lib/growth/realtime/realtime-call-repository"
+import { bootstrapConversationCoachForSession } from "@/lib/growth/live-coaching/sync-conversation-coach"
 import type { GrowthLiveCoachingState } from "@/lib/growth/live-guidance/live-guidance-types"
 import type { GrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-types"
 import {
@@ -149,6 +150,14 @@ export async function startCallWorkspaceLiveCoaching(
     realtimeSessionId: realtimeSession.id,
   })
 
+  const nativeDirection = (nativeSession.direction as "inbound" | "outbound" | undefined) ?? "outbound"
+  if (!realtimeSession.liveSnapshot.conversationCoach) {
+    await bootstrapConversationCoachForSession(admin, {
+      session: realtimeSession,
+      direction: nativeDirection,
+    })
+  }
+
   const detail = await getGrowthRealtimeCallSessionDetail(admin, realtimeSession.id)
 
   return {
@@ -225,4 +234,20 @@ export async function ensureInboundCallWorkspaceLiveCoachingLinked(
   }
 
   return realtimeSessionId
+}
+
+/** Starts coaching and seeds the opening coach line when an inbound call is answered. */
+export async function autoStartCallWorkspaceLiveCoachingOnAnswer(
+  admin: SupabaseClient,
+  input: { nativeSessionId: string; createdBy?: string | null; userEmail?: string | null },
+): Promise<CallWorkspaceCoachingContext | null> {
+  const nativeSession = await fetchNativeCallSessionById(admin, input.nativeSessionId)
+  if (!nativeSession || nativeSession.direction !== "inbound") return null
+  if (nativeSession.status !== "active" && nativeSession.status !== "on_hold") return null
+
+  return startCallWorkspaceLiveCoaching(admin, {
+    nativeSessionId: input.nativeSessionId,
+    createdBy: input.createdBy ?? nativeSession.ownerUserId ?? null,
+    userEmail: input.userEmail ?? null,
+  })
 }

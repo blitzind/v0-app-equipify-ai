@@ -1,3 +1,5 @@
+import { isGuidanceEventAllowedForStage } from "@/lib/growth/live-coaching/stage-coaching-policy"
+import type { ConversationStage } from "@/lib/growth/live-coaching/types"
 import type { GrowthLiveGuidanceCandidate } from "@/lib/growth/live-guidance/live-guidance-types"
 import type {
   GrowthLeadRealtimeIntelligenceInput,
@@ -29,8 +31,10 @@ export function generateLiveGuidanceCandidates(input: {
   snapshot: GrowthRealtimeLiveSnapshot
   events: GrowthRealtimeTranscriptEvent[]
   lead: GrowthLeadRealtimeIntelligenceInput
+  conversationStage?: ConversationStage | null
 }): GrowthLiveGuidanceCandidate[] {
   const { snapshot, events, lead } = input
+  const conversationStage = input.conversationStage ?? snapshot.conversationCoach?.stage ?? "rapport"
   const candidates: GrowthLiveGuidanceCandidate[] = []
 
   if (snapshot.objections.some((entry) => entry.key === "feature_gap")) {
@@ -296,6 +300,9 @@ export function generateLiveGuidanceCandidates(input: {
 
   const byKey = new Map<string, GrowthLiveGuidanceCandidate>()
   for (const candidate of candidates) {
+    if (!isGuidanceEventAllowedForStage(conversationStage, candidate.eventType, candidate.dedupeKey)) {
+      continue
+    }
     if (!byKey.has(candidate.dedupeKey)) byKey.set(candidate.dedupeKey, candidate)
   }
   return [...byKey.values()].sort((a, b) => b.confidenceScore - a.confidenceScore)
@@ -305,6 +312,9 @@ export function pickSuggestedNextQuestion(input: {
   snapshot: GrowthRealtimeLiveSnapshot
   candidates: GrowthLiveGuidanceCandidate[]
 }): string | null {
+  if (input.snapshot.conversationCoach?.primaryPhrase) {
+    return input.snapshot.conversationCoach.primaryPhrase
+  }
   if (input.candidates[0]?.recommendation) return input.candidates[0].recommendation
   return input.snapshot.recommendedNextQuestion
 }

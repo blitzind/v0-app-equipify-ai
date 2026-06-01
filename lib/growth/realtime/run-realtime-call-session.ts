@@ -3,7 +3,9 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { syncLiveGuidanceForSession } from "@/lib/growth/live-guidance/sync-live-guidance"
+import { resolveNativeCallDirectionForRealtimeSession } from "@/lib/growth/live-coaching/resolve-call-direction"
 import type { GrowthLiveCoachingState } from "@/lib/growth/live-guidance/live-guidance-types"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
 import {
   appendGrowthRealtimeTranscriptEvent,
   fetchGrowthRealtimeCallSession,
@@ -147,22 +149,30 @@ async function recomputeAndPersistSnapshot(
     previousExecutionScore,
   })
 
-  const updated = await updateGrowthRealtimeCallSession(admin, session.id, { liveSnapshot: snapshot })
-
   let coachingState: GrowthLiveCoachingState | null = null
-  if (updated.guidanceEnabled) {
-    coachingState = await syncLiveGuidanceForSession(admin, {
+  let liveSnapshot = snapshot
+  if (session.guidanceEnabled) {
+    const organizationId = getGrowthEngineAiOrgId()
+    const direction = await resolveNativeCallDirectionForRealtimeSession(admin, session.id).catch(() => null)
+    const synced = await syncLiveGuidanceForSession(admin, {
       leadId: session.leadId,
       sessionId: session.id,
       snapshot,
       events,
       lead: toGrowthLeadRealtimeIntelligenceInput(lead),
+      organizationId,
+      direction,
+      session,
       actor,
     })
-    await updateGrowthRealtimeCallSession(admin, session.id, {
-      guidanceLatencyMs: coachingState.guidanceLatencyMs,
-    })
+    coachingState = synced.coachingState
+    liveSnapshot = synced.liveSnapshot
   }
+
+  const updated = await updateGrowthRealtimeCallSession(admin, session.id, {
+    liveSnapshot,
+    guidanceLatencyMs: coachingState?.guidanceLatencyMs ?? session.guidanceLatencyMs,
+  })
 
   return { session: updated, coachingState }
 }
@@ -351,18 +361,28 @@ export async function getGrowthRealtimeCallSessionDetail(
   let refreshed = await updateGrowthRealtimeCallSession(admin, sessionId, { liveSnapshot: snapshot })
 
   let coachingState: GrowthLiveCoachingState | null = null
+  let liveSnapshot = snapshot
   if (refreshed.guidanceEnabled) {
-    coachingState = await syncLiveGuidanceForSession(admin, {
+    const organizationId = getGrowthEngineAiOrgId()
+    const direction = await resolveNativeCallDirectionForRealtimeSession(admin, sessionId).catch(() => null)
+    const synced = await syncLiveGuidanceForSession(admin, {
       leadId: session.leadId,
       sessionId,
       snapshot,
       events,
       lead: toGrowthLeadRealtimeIntelligenceInput(lead),
+      organizationId,
+      direction,
+      session: refreshed,
     })
-    refreshed = await updateGrowthRealtimeCallSession(admin, sessionId, {
-      guidanceLatencyMs: coachingState.guidanceLatencyMs,
-    })
+    coachingState = synced.coachingState
+    liveSnapshot = synced.liveSnapshot
   }
+
+  refreshed = await updateGrowthRealtimeCallSession(admin, sessionId, {
+    liveSnapshot,
+    guidanceLatencyMs: coachingState?.guidanceLatencyMs ?? refreshed.guidanceLatencyMs,
+  })
 
   return { session: refreshed, events, coachingState }
 }
