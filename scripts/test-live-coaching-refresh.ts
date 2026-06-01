@@ -20,6 +20,7 @@ import {
   rankUnifiedAssistEvents,
 } from "../lib/growth/operator-assist/unified-priority"
 import type { UnifiedOperatorAssistEvent } from "../lib/growth/operator-assist/types"
+import { isStaleRingPhaseMediaSession } from "../lib/voice/media-streaming/inbound-media-stream-restart-logic"
 
 const QA_MARKER = "live-coaching-refresh-v1"
 
@@ -96,13 +97,46 @@ const answeredMediaStream = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/media-streaming/ensure-answered-inbound-media-stream.ts"),
   "utf8",
 )
-assert.match(answeredMediaStream, /ensureAnsweredInboundCallMediaStream/)
+assert.match(answeredMediaStream, /isStaleRingPhaseMediaSession/)
+assert.match(answeredMediaStream, /voice_answered_inbound_media_stream_skipped/)
+assert.match(answeredMediaStream, /voice_answered_inbound_media_stream_stale_stopped/)
+
+const nativeDialerRepo = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/native-dialer/native-dialer-repository.ts"),
+  "utf8",
+)
+assert.match(nativeDialerRepo, /await autoStartCallWorkspaceLiveCoachingOnAnswer/)
+assert.match(nativeDialerRepo, /await ensureAnsweredInboundCallMediaStream/)
 
 const reconcileBridge = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/realtime/reconcile-voice-transcript-bridge.ts"),
   "utf8",
 )
 assert.match(reconcileBridge, /reconcileVoiceTranscriptBridgeForCall/)
+
+assert.equal(
+  isStaleRingPhaseMediaSession({
+    mediaSession: {
+      id: "m1",
+      organizationId: "o1",
+      voiceCallId: "v1",
+      voiceConferenceId: null,
+      voiceRecordingId: null,
+      provider: "twilio",
+      providerStreamSid: "MZ1",
+      mediaDirection: "duplex",
+      streamStatus: "active",
+      startedAt: "2026-06-01T17:06:49.767Z",
+      endedAt: null,
+      reconnectCount: 0,
+      metadataJson: {},
+      createdAt: "2026-06-01T17:06:50Z",
+      updatedAt: "2026-06-01T17:06:50Z",
+    },
+    answeredAtMs: Date.parse("2026-06-01T17:25:16.202Z"),
+  }),
+  true,
+)
 
 const telemetry = fs.readFileSync(path.join(process.cwd(), "lib/voice/telemetry.ts"), "utf8")
 assert.match(telemetry, /voice_growth_transcript_bridge_outcome/)

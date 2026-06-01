@@ -21,6 +21,7 @@ import {
   completeCallWorkspaceLiveCoachingForNativeSession,
 } from "@/lib/growth/native-dialer/call-workspace-coaching-lifecycle"
 import { appendVoiceCallEvent } from "@/lib/voice/repository/voice-repository"
+import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import {
   INBOUND_RING_DIAG_EVENTS,
   logInboundRingDiagnostic,
@@ -435,26 +436,6 @@ export async function answerNativeCallSession(
       payloadJson: { source: "call_workspace", sessionId },
       idempotencyKey: `workspace:${sessionId}:answered`,
     })
-
-    if ((existing.direction as string) === "inbound") {
-      const { data: voiceCallRow } = await admin
-        .schema("voice")
-        .from("voice_calls")
-        .select("provider_call_id")
-        .eq("id", voiceCallId)
-        .maybeSingle()
-      const providerCallId = (voiceCallRow?.provider_call_id as string | null) ?? null
-      if (providerCallId) {
-        const { ensureAnsweredInboundCallMediaStream } = await import(
-          "@/lib/voice/media-streaming/ensure-answered-inbound-media-stream"
-        )
-        void ensureAnsweredInboundCallMediaStream(admin, {
-          organizationId: orgId,
-          voiceCallId,
-          providerCallId,
-        }).catch(() => undefined)
-      }
-    }
   } else {
     const providers = await resolveNativeDialerProviders(admin)
     const routed = await routeNativeDialerProvider(providers)
@@ -503,10 +484,45 @@ export async function answerNativeCallSession(
     const { autoStartCallWorkspaceLiveCoachingOnAnswer } = await import(
       "@/lib/growth/native-dialer/call-workspace-coaching-service"
     )
-    void autoStartCallWorkspaceLiveCoachingOnAnswer(admin, {
-      nativeSessionId: sessionId,
-      createdBy: ownerUserId ?? null,
-    }).catch(() => undefined)
+    try {
+      await autoStartCallWorkspaceLiveCoachingOnAnswer(admin, {
+        nativeSessionId: sessionId,
+        createdBy: ownerUserId ?? null,
+      })
+    } catch (error) {
+      logVoiceInfrastructure("voice_growth_coaching_auto_start_failed", {
+        nativeSessionId: sessionId,
+        voiceCallId,
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
+
+    const { data: voiceCallRow } = await admin
+      .schema("voice")
+      .from("voice_calls")
+      .select("provider_call_id")
+      .eq("id", voiceCallId!)
+      .maybeSingle()
+    const providerCallId = (voiceCallRow?.provider_call_id as string | null) ?? null
+    if (providerCallId) {
+      const { ensureAnsweredInboundCallMediaStream } = await import(
+        "@/lib/voice/media-streaming/ensure-answered-inbound-media-stream"
+      )
+      try {
+        await ensureAnsweredInboundCallMediaStream(admin, {
+          organizationId: orgId,
+          voiceCallId: voiceCallId!,
+          providerCallId,
+        })
+      } catch (error) {
+        logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
+          voiceCallId,
+          providerCallId,
+          stage: "answer_native_call_session",
+          message: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
   }
 
   return mapNativeCallSessionRow(active as SessionRow)
