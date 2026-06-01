@@ -90,17 +90,23 @@ export async function probeVoiceSchemaHealth(admin: SupabaseClient): Promise<Voi
   const missingTables: string[] = []
   let probeUncertain = false
 
-  for (const table of REQUIRED_TABLES) {
-    const column = TABLE_PROBE_COLUMNS[table] ?? "id"
-    const { error } = await admin.schema("voice").from(table).select(column, { head: true, count: "exact" }).limit(1)
-    if (error) {
-      if (looksLikePostgrestMissingSchemaError(error.message, error.code)) {
-        missingTables.push(table)
-        continue
+  await Promise.all(
+    REQUIRED_TABLES.map(async (table) => {
+      const column = TABLE_PROBE_COLUMNS[table] ?? "id"
+      const { error } = await admin
+        .schema("voice")
+        .from(table)
+        .select(column, { head: true, count: "exact" })
+        .limit(1)
+      if (error) {
+        if (looksLikePostgrestMissingSchemaError(error.message, error.code)) {
+          missingTables.push(table)
+          return
+        }
+        probeUncertain = true
       }
-      probeUncertain = true
-    }
-  }
+    }),
+  )
 
   const ready = missingTables.length === 0
   logVoiceInfrastructure("voice_schema_probe", {
@@ -124,6 +130,34 @@ export async function probeVoiceSchemaHealth(admin: SupabaseClient): Promise<Voi
         ? "Voice schema probe uncertain — reload Supabase PostgREST schema cache if migration was applied."
         : `Apply migration ${VOICE_SCHEMA_MIGRATION_ID}.sql — missing: ${missingTables.join(", ")}`,
   }
+}
+
+const WEBHOOK_SCHEMA_PROBE_CACHE_TTL_MS = 5 * 60 * 1000
+let webhookSchemaProbeCache: { probe: VoiceSchemaHealthProbe; expiresAt: number } | null = null
+
+/** Cached + fast path for latency-sensitive Twilio webhooks. */
+export async function probeVoiceSchemaHealthForWebhook(
+  admin: SupabaseClient,
+): Promise<VoiceSchemaHealthProbe> {
+  const now = Date.now()
+  if (
+    webhookSchemaProbeCache &&
+    webhookSchemaProbeCache.expiresAt > now &&
+    webhookSchemaProbeCache.probe.ready
+  ) {
+    return webhookSchemaProbeCache.probe
+  }
+
+  const probe = await probeVoiceSchemaHealth(admin)
+  if (probe.ready) {
+    webhookSchemaProbeCache = {
+      probe,
+      expiresAt: now + WEBHOOK_SCHEMA_PROBE_CACHE_TTL_MS,
+    }
+  } else {
+    webhookSchemaProbeCache = null
+  }
+  return probe
 }
 
 export function isVoiceWebhookSchemaReady(probe: VoiceSchemaHealthProbe): boolean {

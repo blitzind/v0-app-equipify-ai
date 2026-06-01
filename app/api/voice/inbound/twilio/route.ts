@@ -5,7 +5,7 @@ import { buildVoiceRecordingCallbackUrl } from "@/lib/voice/call-control/urls"
 import { buildTwilioSayAndHangup } from "@/lib/voice/call-control/twilio-twiml"
 import { handleTwilioInboundCall } from "@/lib/voice/call-control/inbound-handler"
 import { VOICE_CALL_CONTROL_QA_MARKER } from "@/lib/voice/call-control/types"
-import { probeVoiceSchemaHealth, isVoiceWebhookSchemaReady } from "@/lib/voice/schema-health"
+import { probeVoiceSchemaHealthForWebhook, isVoiceWebhookSchemaReady } from "@/lib/voice/schema-health"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import { parseTwilioFormBody, twilioFormBodyToPayload } from "@/lib/voice/webhooks/normalizer"
 import { resolveTwilioWebhookValidationUrl } from "@/lib/voice/webhooks/twilio-request-url"
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       return twimlResponse(fallbackInboundTwiml("Server configuration error."))
     }
 
-    const schemaProbe = await probeVoiceSchemaHealth(admin)
+    const schemaProbe = await probeVoiceSchemaHealthForWebhook(admin)
     if (!isVoiceWebhookSchemaReady(schemaProbe)) {
       logVoiceInfrastructure("voice_inbound_schema_unavailable", {
         qaMarker: VOICE_CALL_CONTROL_QA_MARKER,

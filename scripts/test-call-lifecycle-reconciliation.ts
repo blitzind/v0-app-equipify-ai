@@ -198,7 +198,8 @@ const schemaHealthSource = fs.readFileSync(
   "utf8",
 )
 assert.match(schemaHealthSource, /ready = missingTables\.length === 0/)
-assert.match(schemaHealthSource, /missingTables\.length === 0/)
+assert.match(schemaHealthSource, /ready = missingTables\.length === 0/)
+assert.match(schemaHealthSource, /probeVoiceSchemaHealthForWebhook/)
 
 const inboundRouteSource = fs.readFileSync(
   path.join(process.cwd(), "app/api/voice/inbound/twilio/route.ts"),
@@ -206,7 +207,7 @@ const inboundRouteSource = fs.readFileSync(
 )
 assert.match(inboundRouteSource, /voice_inbound_webhook_failed/)
 assert.match(inboundRouteSource, /fallbackInboundTwiml/)
-assert.match(inboundRouteSource, /status: 200/)
+assert.match(inboundRouteSource, /probeVoiceSchemaHealthForWebhook/)
 assert.doesNotMatch(inboundRouteSource, /twimlResponse\(result\.twiml, result\.ok \? 200 : 404\)/)
 assert.equal(isNativeSessionIdServerReady("pending-inbound-CA123"), false)
 assert.equal(isNativeSessionIdServerReady("550e8400-e29b-41d4-a716-446655440000"), true)
