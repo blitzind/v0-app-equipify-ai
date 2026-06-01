@@ -45,6 +45,8 @@ export type VoiceTelemetryEvent =
   | "voice_supabase_rest_fetch_failed"
   | "voice_supabase_rest_query_failed"
   | "voice_growth_transcript_bridged"
+  | "voice_growth_transcript_bridge_outcome"
+  | "voice_growth_coaching_auto_linked"
 
 export function logVoiceInfrastructure(
   event: VoiceTelemetryEvent,

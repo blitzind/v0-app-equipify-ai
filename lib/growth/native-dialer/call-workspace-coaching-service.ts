@@ -23,6 +23,14 @@ import {
   fetchNativeCallSessionById,
   linkNativeCallRealtimeSession,
 } from "@/lib/growth/native-dialer/native-dialer-repository"
+import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
+
+const ACTIVE_NATIVE_WORKSPACE_STATUSES = [
+  "ringing",
+  "active",
+  "on_hold",
+  "external_bridge_pending",
+] as const
 
 export type CallWorkspaceCoachingContext = {
   nativeSessionId: string
@@ -155,4 +163,51 @@ export async function attachCallWorkspaceLead(
   const lead = await fetchGrowthLeadById(admin, input.leadId)
   if (!lead) throw new Error("Lead not found.")
   return attachLeadToNativeCallSession(admin, input)
+}
+
+/**
+ * Links an inbound native workspace session to a Growth realtime coaching session when
+ * the operator has an answered call in the workspace (Operator Assist context).
+ * Idempotent — no-op when already linked or session is not an active inbound call.
+ */
+export async function ensureInboundCallWorkspaceLiveCoachingLinked(
+  admin: SupabaseClient,
+  input: { voiceCallId: string; createdBy?: string | null; userEmail?: string | null },
+): Promise<string | null> {
+  const { data: sessionRow, error } = await admin
+    .schema("growth")
+    .from("native_call_workspace_sessions")
+    .select("id, direction, realtime_session_id, owner_user_id, status")
+    .eq("voice_call_id", input.voiceCallId)
+    .eq("direction", "inbound")
+    .in("status", [...ACTIVE_NATIVE_WORKSPACE_STATUSES])
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  if (!sessionRow) return null
+
+  const existingRealtimeSessionId = (sessionRow.realtime_session_id as string | null) ?? null
+  if (existingRealtimeSessionId) return existingRealtimeSessionId
+
+  if (sessionRow.status !== "active" && sessionRow.status !== "on_hold") {
+    return null
+  }
+
+  const coaching = await startCallWorkspaceLiveCoaching(admin, {
+    nativeSessionId: sessionRow.id as string,
+    createdBy: input.createdBy ?? (sessionRow.owner_user_id as string | null) ?? null,
+    userEmail: input.userEmail ?? null,
+  })
+
+  const realtimeSessionId = coaching.realtimeSession?.id ?? null
+  if (realtimeSessionId) {
+    logVoiceInfrastructure("voice_growth_coaching_auto_linked", {
+      voiceCallId: input.voiceCallId,
+      nativeSessionId: sessionRow.id,
+      realtimeSessionId,
+    })
+  }
+
+  return realtimeSessionId
 }

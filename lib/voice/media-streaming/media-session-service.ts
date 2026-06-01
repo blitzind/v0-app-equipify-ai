@@ -475,7 +475,7 @@ export async function ingestVoiceTranscriptProviderEvent(
     }
 
     try {
-      await bridgeVoiceSegmentToGrowthRealtime(admin, {
+      const bridgeResult = await bridgeVoiceSegmentToGrowthRealtime(admin, {
         voiceCallId: input.voiceCallId,
         transcriptSegmentId: segment.id,
         sequenceNumber: segment.sequenceNumber,
@@ -483,11 +483,21 @@ export async function ingestVoiceTranscriptProviderEvent(
         transcriptText: segment.transcriptText,
         startedAt: segment.startedAt,
       })
+      if (bridgeResult.reason === "insert_failed") {
+        logVoiceInfrastructure("voice_transcript_failed", {
+          organizationId: input.organizationId,
+          voiceCallId: input.voiceCallId,
+          transcriptSegmentId: segment.id,
+          stage: "growth_transcript_bridge",
+          message: bridgeResult.reason,
+        })
+      }
     } catch (bridgeError) {
       logVoiceInfrastructure("voice_transcript_failed", {
         organizationId: input.organizationId,
         voiceCallId: input.voiceCallId,
         transcriptSegmentId: segment.id,
+        stage: "growth_transcript_bridge",
         message: bridgeError instanceof Error ? bridgeError.message : String(bridgeError),
       })
     }

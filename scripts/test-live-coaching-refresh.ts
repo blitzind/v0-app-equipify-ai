@@ -57,6 +57,24 @@ const bridgeModule = fs.readFileSync(
 )
 assert.match(bridgeModule, /bridgeVoiceSegmentToGrowthRealtime/)
 assert.match(bridgeModule, /recomputeGrowthRealtimeCallSession/)
+assert.match(bridgeModule, /ensureInboundCallWorkspaceLiveCoachingLinked/)
+assert.match(bridgeModule, /voice_growth_transcript_bridge_outcome/)
+
+const coachingService = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/native-dialer/call-workspace-coaching-service.ts"),
+  "utf8",
+)
+assert.match(coachingService, /ensureInboundCallWorkspaceLiveCoachingLinked/)
+assert.match(coachingService, /voice_growth_coaching_auto_linked/)
+
+const workspaceBridge = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/browser-calling/workspace-bridge.ts"),
+  "utf8",
+)
+assert.match(workspaceBridge, /ensureInboundCallWorkspaceLiveCoachingLinked/)
+
+const telemetry = fs.readFileSync(path.join(process.cwd(), "lib/voice/telemetry.ts"), "utf8")
+assert.match(telemetry, /voice_growth_transcript_bridge_outcome/)
 
 const mediaSession = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/media-streaming/media-session-service.ts"),

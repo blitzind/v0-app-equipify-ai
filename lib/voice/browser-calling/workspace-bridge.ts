@@ -18,6 +18,7 @@ import {
 import { fetchVoiceCallControlSnapshot } from "@/lib/voice/transfer-control/call-control-service"
 import { fetchVoiceCallTranscriptSnapshot } from "@/lib/voice/media-streaming/media-session-service"
 import { fetchVoiceCallConversationIntelligenceSnapshot } from "@/lib/voice/intelligence/intelligence-service"
+import { ensureInboundCallWorkspaceLiveCoachingLinked } from "@/lib/growth/native-dialer/call-workspace-coaching-service"
 import { fetchUnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/operator-assist-service"
 import { fetchRelationshipMemoryWorkspaceSnapshot } from "@/lib/voice/relationship-memory/relationship-memory-service"
 import { fetchRevenueIntelligenceWorkspaceSnapshot } from "@/lib/voice/revenue-intelligence/revenue-intelligence-service"
@@ -137,6 +138,26 @@ export async function syncWorkspaceSessionFromVoiceCall(
   }
 
   await sessionsTable(admin).update(patch).eq("id", sessionRow.id as string)
+
+  const isAnsweredInbound =
+    sessionRow.direction === "inbound" &&
+    (nativeStatus === "active" || nativeStatus === "on_hold") &&
+    !(sessionRow.realtime_session_id as string | null)
+  if (isAnsweredInbound) {
+    try {
+      await ensureInboundCallWorkspaceLiveCoachingLinked(admin, {
+        voiceCallId: input.voiceCallId,
+        createdBy: (sessionRow.owner_user_id as string | null) ?? null,
+      })
+    } catch (error) {
+      logVoiceInfrastructure("voice_transcript_failed", {
+        organizationId: input.organizationId,
+        voiceCallId: input.voiceCallId,
+        stage: "coaching_auto_link",
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
 }
 
 export async function buildVoiceBrowserSyncSnapshot(
