@@ -39,10 +39,14 @@ type TwilioVoiceDevice = {
   destroy?: () => void
 }
 
+const VOICE_BROWSER_SYNC_INTERVAL_MS = 4000
+const VOICE_BROWSER_RINGING_SYNC_INTERVAL_MS = 1000
+
 export function useVoiceBrowserCalling(input?: {
   workspaceSessionId?: string | null
   enabled?: boolean
   onInboundOffer?: (snapshot: VoiceBrowserSyncSnapshot) => void
+  onIncomingCleared?: (reason: string) => void
 }) {
   const enabled = input?.enabled !== false
   const [snapshot, setSnapshot] = useState<VoiceBrowserSyncSnapshot | null>(null)
@@ -57,11 +61,14 @@ export function useVoiceBrowserCalling(input?: {
   const callHandlersRef = useRef(new WeakMap<TwilioVoiceSdkCall, { cancel: () => void; disconnect: () => void }>())
   const workspaceSessionIdRef = useRef(input?.workspaceSessionId ?? null)
   const inboundOfferRef = useRef(input?.onInboundOffer)
+  const onIncomingClearedRef = useRef(input?.onIncomingCleared)
   workspaceSessionIdRef.current = input?.workspaceSessionId ?? null
   inboundOfferRef.current = input?.onInboundOffer
+  onIncomingClearedRef.current = input?.onIncomingCleared
 
   const clearIncomingCall = useCallback((reason: string) => {
     const call = incomingTwilioCallRef.current
+    const hadIncoming = Boolean(call)
     if (call) {
       const handlers = callHandlersRef.current.get(call)
       if (handlers) {
@@ -73,6 +80,13 @@ export function useVoiceBrowserCalling(input?: {
     incomingTwilioCallRef.current = null
     setIncomingCall(null)
     logBrowserIncomingCall("incoming_cleared", { reason })
+    if (hadIncoming && (reason === "cancel" || reason === "disconnect")) {
+      logBrowserIncomingCall("sdk_incoming_cancelled", {
+        reason,
+        callSid: call ? extractVoiceBrowserIncomingCallView(call).callSid : null,
+      })
+      onIncomingClearedRef.current?.(reason)
+    }
   }, [])
 
   const attachCallLifecycleHandlers = useCallback(
@@ -87,9 +101,14 @@ export function useVoiceBrowserCalling(input?: {
       call.on?.("disconnect", disconnectHandler)
       callHandlersRef.current.set(call, { cancel: cancelHandler, disconnect: disconnectHandler })
       if (role === "incoming") {
+        const view = extractVoiceBrowserIncomingCallView(call)
         logBrowserIncomingCall("incoming_received", {
           role,
-          ...extractVoiceBrowserIncomingCallView(call),
+          ...view,
+        })
+        logBrowserIncomingCall("sdk_incoming_received", {
+          role,
+          ...view,
         })
       }
     },
@@ -305,11 +324,18 @@ export function useVoiceBrowserCalling(input?: {
 
   useEffect(() => {
     if (!enabled || registrationState !== "registered") return
+
+    const intervalMs =
+      incomingCall || snapshot?.inboundRinging
+        ? VOICE_BROWSER_RINGING_SYNC_INTERVAL_MS
+        : VOICE_BROWSER_SYNC_INTERVAL_MS
+
     const intervalId = window.setInterval(() => {
       void syncRef.current().catch(() => undefined)
-    }, 4000)
+    }, intervalMs)
+
     return () => window.clearInterval(intervalId)
-  }, [enabled, registrationState])
+  }, [enabled, registrationState, incomingCall, snapshot?.inboundRinging])
 
   return {
     qaMarker: VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER,

@@ -42,7 +42,9 @@ import {
 } from "@/lib/growth/native-dialer/native-dialer-workspace-ui"
 import { useVoiceBrowserCalling } from "@/hooks/voice/use-voice-browser-calling"
 import {
+  buildInboundRingingSessionFromOffer,
   buildInboundRingingSessionPlaceholder,
+  logBrowserIncomingCall,
   resolveInboundWorkspacePhase,
 } from "@/lib/voice/browser-calling/browser-incoming-call"
 import { mapBrowserCallStateLabel } from "@/lib/voice/browser-calling/status-mapping"
@@ -92,7 +94,25 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   const [callActionPending, setCallActionPending] = useState(false)
   const [contextRailExpanded, setContextRailExpanded] = useState(false)
   const [deepIntelligenceExpanded, setDeepIntelligenceExpanded] = useState(false)
-  const inboundOfferHydratedVoiceCallIdRef = useRef<string | null>(null)
+  const lastInboundOfferVoiceCallIdRef = useRef<string | null>(null)
+  const lastRenderedIncomingSessionIdRef = useRef<string | null>(null)
+  const suppressedInboundOfferVoiceCallIdRef = useRef<string | null>(null)
+
+  const clearStaleRingingSession = useCallback((reason: string) => {
+    logBrowserIncomingCall("inbound_offer_cleared", { reason })
+    lastInboundOfferVoiceCallIdRef.current = null
+    setActiveSession((prev) => (prev?.status === "ringing" ? null : prev))
+  }, [])
+
+  const handleIncomingCleared = useCallback(
+    (reason: string) => {
+      if (lastInboundOfferVoiceCallIdRef.current) {
+        suppressedInboundOfferVoiceCallIdRef.current = lastInboundOfferVoiceCallIdRef.current
+      }
+      clearStaleRingingSession(`sdk_${reason}`)
+    },
+    [clearStaleRingingSession],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -122,7 +142,13 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           dashData.meta?.probeUncertain ? dashData.meta.setupMessage ?? null : null,
         )
         setDashboard(dashData.workspaceDashboard ?? null)
-        setActiveSession(dashData.workspaceDashboard?.activeSession ?? null)
+        setActiveSession((prev) => {
+          const next = dashData.workspaceDashboard?.activeSession ?? null
+          if (prev?.status === "ringing" && (!next || (next.status !== "ringing" && next.id !== prev.id))) {
+            return prev
+          }
+          return next
+        })
       }
       setQueue(queueData.queue ?? [])
     } catch (e) {
@@ -141,51 +167,55 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     }
   }, [phone])
 
-  const refreshInboundOfferSession = useCallback(async (input: {
-    voiceCallId: string
-    workspaceSessionId: string
-  }) => {
-    if (inboundOfferHydratedVoiceCallIdRef.current === input.voiceCallId) return
-    inboundOfferHydratedVoiceCallIdRef.current = input.voiceCallId
-    try {
-      const res = await fetch("/api/platform/growth/calls/dashboard", { cache: "no-store" })
-      const dashData = (await res.json().catch(() => ({}))) as {
-        workspaceDashboard?: NativeCallWorkspaceDashboard | null
-      }
-      const session = dashData.workspaceDashboard?.activeSession ?? null
-      if (
-        session &&
-        (session.id === input.workspaceSessionId ||
-          session.voiceCallId === input.voiceCallId ||
-          session.status === "ringing")
-      ) {
-        setActiveSession(session)
-      }
-    } catch {
-      inboundOfferHydratedVoiceCallIdRef.current = null
-    }
-  }, [])
-
   const voiceBrowser = useVoiceBrowserCalling({
     workspaceSessionId: activeSession?.id ?? null,
-    onInboundOffer: (snapshot) => {
-      const offer = snapshot.inboundRinging
-      if (!offer?.workspaceSessionId || !offer.voiceCallId) return
-      void refreshInboundOfferSession({
-        voiceCallId: offer.voiceCallId,
-        workspaceSessionId: offer.workspaceSessionId,
-      })
-    },
+    onIncomingCleared: handleIncomingCleared,
   })
 
   const inboundOffer = voiceBrowser.snapshot?.inboundRinging ?? null
   const hasSdkIncoming = Boolean(voiceBrowser.incomingCall)
 
   useEffect(() => {
-    if (!hasSdkIncoming && !inboundOffer && activeSession?.status !== "ringing") {
-      inboundOfferHydratedVoiceCallIdRef.current = null
+    const offer = inboundOffer
+    if (!offer) {
+      suppressedInboundOfferVoiceCallIdRef.current = null
+      if (lastInboundOfferVoiceCallIdRef.current) {
+        clearStaleRingingSession("sync_offer_cleared")
+      }
+      return
     }
-  }, [activeSession?.status, hasSdkIncoming, inboundOffer])
+
+    if (offer.voiceCallId === suppressedInboundOfferVoiceCallIdRef.current) {
+      return
+    }
+
+    const isNewOffer = lastInboundOfferVoiceCallIdRef.current !== offer.voiceCallId
+    if (isNewOffer) {
+      const latencyMs = Math.max(0, Date.now() - Date.parse(offer.offeredAt))
+      logBrowserIncomingCall("inbound_offer_received", {
+        voiceCallId: offer.voiceCallId,
+        workspaceSessionId: offer.workspaceSessionId,
+        fromNumber: offer.fromNumber,
+      })
+      logBrowserIncomingCall("inbound_offer_latency_ms", {
+        voiceCallId: offer.voiceCallId,
+        latencyMs,
+      })
+      lastInboundOfferVoiceCallIdRef.current = offer.voiceCallId
+    }
+
+    setActiveSession((prev) => {
+      const next = buildInboundRingingSessionFromOffer(offer)
+      if (
+        prev?.id === next.id &&
+        prev.status === "ringing" &&
+        prev.voiceCallId === next.voiceCallId
+      ) {
+        return prev
+      }
+      return next
+    })
+  }, [clearStaleRingingSession, inboundOffer])
 
   const incomingSession = useMemo((): NativeCallWorkspaceSessionPublicView | null => {
     if (activeSession?.status === "ringing") return activeSession
@@ -202,10 +232,25 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
 
   const workspacePhase = useMemo((): GrowthCallWorkspacePhase => {
     return resolveInboundWorkspacePhase({
-      activeSessionStatus: activeSession?.status,
+      activeSessionStatus: incomingSession?.status ?? activeSession?.status,
       sdkIncoming: hasSdkIncoming,
     })
-  }, [activeSession?.status, hasSdkIncoming])
+  }, [incomingSession?.status, activeSession?.status, hasSdkIncoming])
+
+  useEffect(() => {
+    if (workspacePhase !== "incoming") {
+      lastRenderedIncomingSessionIdRef.current = null
+      return
+    }
+    const sessionId = displaySession?.id
+    if (!sessionId || lastRenderedIncomingSessionIdRef.current === sessionId) return
+    lastRenderedIncomingSessionIdRef.current = sessionId
+    logBrowserIncomingCall("inbound_offer_rendered", {
+      sessionId,
+      voiceCallId: displaySession?.voiceCallId ?? null,
+      source: hasSdkIncoming ? "sdk" : "sync_offer",
+    })
+  }, [displaySession?.id, displaySession?.voiceCallId, hasSdkIncoming, workspacePhase])
 
   const voiceCallId = voiceBrowser.snapshot?.activeVoiceCallId ?? null
   const operatorParticipant =
@@ -535,7 +580,10 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     }
   }
 
-  if (loading) {
+  const showIncomingDuringLoad =
+    workspacePhase === "incoming" || hasSdkIncoming || Boolean(inboundOffer)
+
+  if (loading && !showIncomingDuringLoad) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />

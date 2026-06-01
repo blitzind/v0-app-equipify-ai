@@ -21,6 +21,12 @@ export type VoiceBrowserIncomingCallView = {
 export type VoiceBrowserIncomingLogEvent =
   | "incoming_received"
   | "incoming_cleared"
+  | "inbound_offer_received"
+  | "inbound_offer_rendered"
+  | "inbound_offer_cleared"
+  | "inbound_offer_latency_ms"
+  | "sdk_incoming_received"
+  | "sdk_incoming_cancelled"
   | "answer_clicked"
   | "accept_succeeded"
   | "accept_failed"
@@ -65,6 +71,38 @@ export function resolveInboundWorkspacePhase(input: {
   if (input.sdkIncoming || input.activeSessionStatus === "ringing") return "incoming"
   if (input.activeSessionStatus && ["active", "on_hold"].includes(input.activeSessionStatus)) return "active"
   return "idle"
+}
+
+export function buildInboundRingingSessionFromOffer(
+  offer: VoiceInboundBrowserOfferView,
+): NativeCallWorkspaceSessionPublicView {
+  return {
+    id: offer.workspaceSessionId,
+    leadId: null,
+    ownerUserId: null,
+    provider: "twilio",
+    fallbackProvider: null,
+    dialMode: "inbound",
+    direction: "inbound",
+    status: "ringing",
+    phoneNumber: offer.fromNumber,
+    contactName: offer.contactLabel,
+    companyName: "Incoming caller",
+    startedAt: offer.offeredAt,
+    connectedAt: null,
+    endedAt: null,
+    durationSeconds: 0,
+    recordingState: "pending",
+    muted: false,
+    onHold: false,
+    transferTarget: null,
+    notesDraft: "",
+    realtimeSessionId: null,
+    callCopilotSessionId: null,
+    providerCallRef: null,
+    safeSummary: `Inbound browser offer from ${offer.fromNumber} to ${offer.toNumber}.`,
+    voiceCallId: offer.voiceCallId,
+  }
 }
 
 export function buildInboundRingingSessionPlaceholder(input: {

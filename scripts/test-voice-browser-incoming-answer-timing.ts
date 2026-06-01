@@ -6,6 +6,7 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import {
+  buildInboundRingingSessionFromOffer,
   buildInboundRingingSessionPlaceholder,
   resolveInboundWorkspacePhase,
   shouldShowInboundAnswerControls,
@@ -73,6 +74,19 @@ assert.equal(placeholder.direction, "inbound")
 assert.equal(placeholder.phoneNumber, "+14155550199")
 assert.match(placeholder.id, /^pending-inbound-/)
 
+const offerSession = buildInboundRingingSessionFromOffer({
+  voiceCallId: "vc-123",
+  workspaceSessionId: "sess-456",
+  fromNumber: "+14155550199",
+  toNumber: "+18333784743",
+  contactLabel: "Acme",
+  offeredAt: "2026-06-01T00:00:00.000Z",
+})
+assert.equal(offerSession.id, "sess-456")
+assert.equal(offerSession.voiceCallId, "vc-123")
+assert.equal(offerSession.status, "ringing")
+assert.equal(offerSession.contactName, "Acme")
+
 const hookSource = fs.readFileSync(
   path.join(process.cwd(), "hooks/voice/use-voice-browser-calling.ts"),
   "utf8",
@@ -81,6 +95,10 @@ assert.match(hookSource, /device\.on\("incoming"/)
 assert.match(hookSource, /call\.accept\(/)
 assert.match(hookSource, /incomingCall/)
 assert.match(hookSource, /acceptIncomingCall/)
+assert.match(hookSource, /onIncomingCleared/)
+assert.match(hookSource, /sdk_incoming_received/)
+assert.match(hookSource, /sdk_incoming_cancelled/)
+assert.match(hookSource, /VOICE_BROWSER_RINGING_SYNC_INTERVAL_MS/)
 
 const workspaceSource = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-workspace.tsx"),
@@ -89,9 +107,17 @@ const workspaceSource = fs.readFileSync(
 assert.match(workspaceSource, /acceptIncomingCall/)
 assert.match(workspaceSource, /rejectIncomingCall/)
 assert.match(workspaceSource, /resolveInboundWorkspacePhase/)
+assert.match(workspaceSource, /buildInboundRingingSessionFromOffer/)
 assert.match(workspaceSource, /buildInboundRingingSessionPlaceholder/)
-assert.match(workspaceSource, /refreshInboundOfferSession/)
-assert.match(workspaceSource, /inboundOfferHydratedVoiceCallIdRef/)
+assert.match(workspaceSource, /inbound_offer_received/)
+assert.match(workspaceSource, /inbound_offer_rendered/)
+assert.match(workspaceSource, /inbound_offer_cleared/)
+assert.match(workspaceSource, /showIncomingDuringLoad/)
+assert.doesNotMatch(
+  workspaceSource,
+  /refreshInboundOfferSession/,
+  "inbound offer should hydrate from sync snapshot, not dashboard fetch",
+)
 assert.doesNotMatch(
   workspaceSource,
   /onInboundOffer[\s\S]{0,400}void load\(\)/,
