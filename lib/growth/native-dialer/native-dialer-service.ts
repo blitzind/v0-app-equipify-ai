@@ -4,11 +4,13 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { fetchNativeCallWorkspaceDashboard } from "@/lib/growth/native-dialer/native-dialer-dashboard-repository"
 import {
   answerNativeCallSession,
+  type NativeCallAnswerResult,
   declineNativeCallSession,
   endNativeCallSession,
   fetchActiveNativeCallSession,
   listNativeDialerQueue,
   markNativeCallBridgeStarted,
+  retryAnsweredInboundMediaStreamForNativeSession,
   saveNativeCallWrapup,
   startNativeCallSession,
   fetchNativeDialerSettingsRow,
@@ -60,8 +62,15 @@ export async function answerGrowthNativeCall(
   admin: SupabaseClient,
   sessionId: string,
   ownerUserId?: string | null,
-): Promise<NativeCallWorkspaceSessionPublicView> {
+): Promise<NativeCallAnswerResult> {
   return answerNativeCallSession(admin, sessionId, ownerUserId)
+}
+
+export async function retryGrowthNativeCallMediaStream(
+  admin: SupabaseClient,
+  sessionId: string,
+): Promise<{ started: boolean; reason: string; wssHost: string | null }> {
+  return retryAnsweredInboundMediaStreamForNativeSession(admin, sessionId)
 }
 
 export async function declineGrowthNativeCall(

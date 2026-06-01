@@ -20,6 +20,11 @@ import {
 import {
   completeCallWorkspaceLiveCoachingForNativeSession,
 } from "@/lib/growth/native-dialer/call-workspace-coaching-lifecycle"
+import {
+  emptyCallWorkspaceAnswerPipelineDiagnostics,
+  type CallWorkspaceAnswerPipelineDiagnostics,
+} from "@/lib/growth/native-dialer/call-workspace-coaching-types"
+import { describeVoiceMediaStreamWssTarget } from "@/lib/voice/call-control/urls"
 import { appendVoiceCallEvent } from "@/lib/voice/repository/voice-repository"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import {
@@ -397,11 +402,17 @@ export async function updateNativeDialerSettingsRow(
   }
 }
 
+export type NativeCallAnswerResult = {
+  session: NativeCallWorkspaceSessionPublicView
+  pipeline: CallWorkspaceAnswerPipelineDiagnostics
+}
+
 export async function answerNativeCallSession(
   admin: SupabaseClient,
   sessionId: string,
   ownerUserId?: string | null,
-): Promise<NativeCallWorkspaceSessionPublicView> {
+): Promise<NativeCallAnswerResult> {
+  const pipeline = emptyCallWorkspaceAnswerPipelineDiagnostics()
   const { data: existing, error: fetchError } = await sessionsTable(admin).select(SESSION_SELECT).eq("id", sessionId).maybeSingle()
   if (fetchError) throw new Error(fetchError.message)
   if (!existing) throw new Error("Call session not found.")
@@ -462,7 +473,7 @@ export async function answerNativeCallSession(
       .select(SESSION_SELECT)
       .single()
     if (activeError) throw new Error(activeError.message)
-    return mapNativeCallSessionRow(active as SessionRow)
+    return { session: mapNativeCallSessionRow(active as SessionRow), pipeline }
   }
 
   const { data: active, error: activeError } = await sessionsTable(admin)
@@ -480,6 +491,8 @@ export async function answerNativeCallSession(
   if (activeError) throw new Error(activeError.message)
   await syncWorkspaceSessionFromVoiceCall(admin, { voiceCallId: voiceCallId!, organizationId: orgId })
 
+  pipeline.mediaStreamWssHost = describeVoiceMediaStreamWssTarget(null).wssHost
+
   if ((existing.direction as string) === "inbound") {
     const { autoStartCallWorkspaceLiveCoachingOnAnswer } = await import(
       "@/lib/growth/native-dialer/call-workspace-coaching-service"
@@ -489,24 +502,31 @@ export async function answerNativeCallSession(
         nativeSessionId: sessionId,
         createdBy: ownerUserId ?? null,
       })
-      if (!coaching?.realtimeSession?.id) {
-        const { data: linkedRow } = await sessionsTable(admin)
-          .select("realtime_session_id")
-          .eq("id", sessionId)
-          .maybeSingle()
+      const { data: linkedRow } = await sessionsTable(admin)
+        .select("realtime_session_id")
+        .eq("id", sessionId)
+        .maybeSingle()
+      const persistedRealtimeSessionId = (linkedRow?.realtime_session_id as string | null) ?? null
+      pipeline.realtimeSessionId =
+        persistedRealtimeSessionId ?? coaching?.realtimeSession?.id ?? null
+      pipeline.liveCoachingLinked = Boolean(pipeline.realtimeSessionId)
+      if (!pipeline.liveCoachingLinked) {
+        pipeline.liveCoachingError = "realtime_session_not_linked_after_answer"
         logVoiceInfrastructure("voice_growth_coaching_auto_start_failed", {
           nativeSessionId: sessionId,
           voiceCallId,
-          reason: "realtime_session_not_linked_after_answer",
-          persistedRealtimeSessionId: (linkedRow?.realtime_session_id as string | null) ?? null,
+          reason: pipeline.liveCoachingError,
+          persistedRealtimeSessionId,
         })
       }
     } catch (error) {
+      pipeline.liveCoachingError = error instanceof Error ? error.message : String(error)
       logVoiceInfrastructure("voice_growth_coaching_auto_start_failed", {
         nativeSessionId: sessionId,
         voiceCallId,
         stage: "answer_native_call_session",
-        message: error instanceof Error ? error.message : String(error),
+        message: pipeline.liveCoachingError,
+        stack: error instanceof Error ? error.stack?.slice(0, 500) ?? null : null,
       })
     }
 
@@ -527,26 +547,96 @@ export async function answerNativeCallSession(
           voiceCallId: voiceCallId!,
           providerCallId,
         })
+        pipeline.mediaStreamStarted = mediaResult.started
+        pipeline.mediaStreamReason = mediaResult.reason
         if (!mediaResult.started) {
           logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
             voiceCallId,
             providerCallId,
             stage: "answer_native_call_session",
             reason: mediaResult.reason,
+            wssHost: pipeline.mediaStreamWssHost,
           })
         }
       } catch (error) {
+        pipeline.mediaStreamReason = error instanceof Error ? error.message : String(error)
         logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
           voiceCallId,
           providerCallId,
           stage: "answer_native_call_session",
-          message: error instanceof Error ? error.message : String(error),
+          message: pipeline.mediaStreamReason,
+          stack: error instanceof Error ? error.stack?.slice(0, 500) ?? null : null,
+          wssHost: pipeline.mediaStreamWssHost,
         })
       }
     }
   }
 
-  return mapNativeCallSessionRow(active as SessionRow)
+  const { data: refreshed, error: refreshError } = await sessionsTable(admin)
+    .select(SESSION_SELECT)
+    .eq("id", sessionId)
+    .maybeSingle()
+  if (refreshError) throw new Error(refreshError.message)
+  if (!refreshed) throw new Error("Call session not found after answer.")
+
+  pipeline.realtimeSessionId =
+    (refreshed.realtime_session_id as string | null) ?? pipeline.realtimeSessionId
+  pipeline.liveCoachingLinked = Boolean(pipeline.realtimeSessionId)
+
+  return { session: mapNativeCallSessionRow(refreshed as SessionRow), pipeline }
+}
+
+export async function retryAnsweredInboundMediaStreamForNativeSession(
+  admin: SupabaseClient,
+  sessionId: string,
+): Promise<{ started: boolean; reason: string; wssHost: string | null }> {
+  const orgId = await getGrowthEngineAiOrgId(admin)
+  const { data: sessionRow, error } = await sessionsTable(admin)
+    .select("voice_call_id, direction, status")
+    .eq("id", sessionId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  if (!sessionRow) throw new Error("Call session not found.")
+  if ((sessionRow.direction as string) !== "inbound") {
+    return { started: false, reason: "not_inbound", wssHost: null }
+  }
+  if (sessionRow.status !== "active" && sessionRow.status !== "on_hold") {
+    return { started: false, reason: "call_not_active", wssHost: null }
+  }
+
+  const voiceCallId = (sessionRow.voice_call_id as string | null) ?? null
+  if (!voiceCallId) return { started: false, reason: "voice_call_missing", wssHost: null }
+
+  const { data: voiceCallRow } = await admin
+    .schema("voice")
+    .from("voice_calls")
+    .select("provider_call_id, answered_at")
+    .eq("id", voiceCallId)
+    .maybeSingle()
+  const providerCallId = (voiceCallRow?.provider_call_id as string | null) ?? null
+  if (!providerCallId || !voiceCallRow?.answered_at) {
+    return { started: false, reason: "call_not_answered", wssHost: null }
+  }
+
+  const wssHost = describeVoiceMediaStreamWssTarget(null).wssHost
+  const { ensureAnsweredInboundCallMediaStream } = await import(
+    "@/lib/voice/media-streaming/ensure-answered-inbound-media-stream"
+  )
+  const mediaResult = await ensureAnsweredInboundCallMediaStream(admin, {
+    organizationId: orgId,
+    voiceCallId,
+    providerCallId,
+  })
+  if (!mediaResult.started) {
+    logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
+      voiceCallId,
+      providerCallId,
+      stage: "media_stream_retry",
+      reason: mediaResult.reason,
+      wssHost,
+    })
+  }
+  return { ...mediaResult, wssHost }
 }
 
 export async function declineNativeCallSession(

@@ -59,6 +59,10 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   liveCoachingFocusMode = false,
   workspaceMode = null,
   optimisticCoachTurn = null,
+  answerPipelineDiagnostic = null,
+  mediaStreamDiagnostic = null,
+  onRetryMediaStream,
+  linkedRealtimeSessionId = null,
 }: {
   phase: "idle" | "incoming" | "bridge_pending" | "active" | "wrapup"
   nativeSessionId: string | null
@@ -77,6 +81,10 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   liveCoachingFocusMode?: boolean
   workspaceMode?: VoiceWorkspaceMode | null
   optimisticCoachTurn?: ConversationCoachTurn | null
+  answerPipelineDiagnostic?: string | null
+  mediaStreamDiagnostic?: string | null
+  onRetryMediaStream?: () => void
+  linkedRealtimeSessionId?: string | null
 }) {
   const [acting, setActing] = useState<string | null>(null)
   const [startingCoaching, setStartingCoaching] = useState(false)
@@ -85,7 +93,14 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
 
   const coachingState = operatorAssist?.coachingState ?? null
   const liveSnapshot = operatorAssist?.liveSnapshot ?? null
-  const canStartCoaching = (phase === "bridge_pending" || phase === "active") && Boolean(nativeSessionId)
+  const hasLinkedRealtimeSession = Boolean(
+    operatorAssist?.realtimeSessionId ?? linkedRealtimeSessionId,
+  )
+  const coachingActive = hasLinkedRealtimeSession
+  const canStartCoaching =
+    (phase === "bridge_pending" || phase === "active") &&
+    Boolean(nativeSessionId) &&
+    !hasLinkedRealtimeSession
 
   const visibleFeed = useMemo(() => {
     const feed = operatorAssist?.feed ?? []
@@ -101,8 +116,8 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   )
 
   const sayThisNext = useMemo(
-    () => resolveSayThisNext(operatorAssist, optimisticCoachTurn),
-    [operatorAssist, optimisticCoachTurn],
+    () => resolveSayThisNext(operatorAssist, hasLinkedRealtimeSession ? optimisticCoachTurn : null),
+    [hasLinkedRealtimeSession, operatorAssist, optimisticCoachTurn],
   )
   const focusMode = liveCoachingFocusMode && (phase === "active" || phase === "bridge_pending")
 
@@ -248,8 +263,6 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
     )
   }
 
-  const coachingActive =
-    coachingState != null || Boolean(operatorAssist?.realtimeSessionId) || Boolean(optimisticCoachTurn)
   const showStartCoachingButton = !coachingActive && canStartCoaching
   const nextBest = operatorAssist?.nextBestAction.primary ?? null
   const supervisor = operatorAssist?.supervisorVisibility
@@ -299,6 +312,25 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
       </div>
 
       {error ? <p className="mb-2 text-sm text-destructive">{error}</p> : null}
+
+      {answerPipelineDiagnostic ? (
+        <div className="mb-3 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          <p className="font-medium">Live Coaching not linked</p>
+          <p className="mt-0.5 text-xs">{answerPipelineDiagnostic}</p>
+        </div>
+      ) : null}
+
+      {mediaStreamDiagnostic ? (
+        <div className="mb-3 rounded-lg border border-amber-200/70 bg-amber-50/40 px-3 py-2 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
+          <p className="font-medium text-amber-900 dark:text-amber-100">Live transcript unavailable</p>
+          <p className="mt-0.5 text-xs text-amber-800/90 dark:text-amber-100/90">{mediaStreamDiagnostic}</p>
+          {onRetryMediaStream ? (
+            <Button type="button" size="sm" variant="outline" className="mt-2" onClick={onRetryMediaStream}>
+              Retry media stream
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <SayThisNextCard sayThisNext={sayThisNext} coachingActive={coachingActive} className="mb-3" />
 
@@ -448,6 +480,25 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
       ) : null}
 
       {error ? <p className="mb-2 text-sm text-destructive">{error}</p> : null}
+
+      {answerPipelineDiagnostic ? (
+        <div className="mb-3 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          <p className="font-medium">Live Coaching not linked</p>
+          <p className="mt-0.5 text-xs">{answerPipelineDiagnostic}</p>
+        </div>
+      ) : null}
+
+      {mediaStreamDiagnostic ? (
+        <div className="mb-3 rounded-lg border border-amber-200/70 bg-amber-50/40 px-3 py-2 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
+          <p className="font-medium text-amber-900 dark:text-amber-100">Live transcript unavailable</p>
+          <p className="mt-0.5 text-xs text-amber-800/90 dark:text-amber-100/90">{mediaStreamDiagnostic}</p>
+          {onRetryMediaStream ? (
+            <Button type="button" size="sm" variant="outline" className="mt-2" onClick={onRetryMediaStream}>
+              Retry media stream
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       {nextBest ? (
         <div className="mb-3 rounded-xl border border-violet-200/70 bg-violet-50/40 px-3 py-2 dark:border-violet-900/40 dark:bg-violet-950/20">

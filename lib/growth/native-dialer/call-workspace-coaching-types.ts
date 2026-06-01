@@ -11,6 +11,32 @@ export const CALL_WORKSPACE_TRANSCRIPT_ONLY_COACHING_COPY =
 export const CALL_WORKSPACE_COACHING_NO_LEAD_COPY =
   "Lead not linked. Start coaching for transcript guidance only, or attach a lead for full intelligence." as const
 
+export const CALL_WORKSPACE_COACHING_LINK_FAILED_COPY =
+  "Live Coaching could not link to this call. Transcript guidance is unavailable until coaching connects." as const
+
+export const CALL_WORKSPACE_MEDIA_STREAM_RESTART_FAILED_COPY =
+  "Live transcript stream did not restart after answer. Retry media stream or check voice infrastructure logs." as const
+
+export type CallWorkspaceAnswerPipelineDiagnostics = {
+  liveCoachingLinked: boolean
+  realtimeSessionId: string | null
+  liveCoachingError: string | null
+  mediaStreamStarted: boolean
+  mediaStreamReason: string | null
+  mediaStreamWssHost: string | null
+}
+
+export function emptyCallWorkspaceAnswerPipelineDiagnostics(): CallWorkspaceAnswerPipelineDiagnostics {
+  return {
+    liveCoachingLinked: false,
+    realtimeSessionId: null,
+    liveCoachingError: null,
+    mediaStreamStarted: false,
+    mediaStreamReason: null,
+    mediaStreamWssHost: null,
+  }
+}
+
 export const CALL_WORKSPACE_TRANSCRIPT_ANCHOR_METADATA_KEY = "call_workspace_transcript_anchor" as const
 
 export function isCallWorkspaceTranscriptAnchorLead(metadata: Record<string, unknown> | null | undefined): boolean {

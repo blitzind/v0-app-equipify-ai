@@ -73,8 +73,12 @@ import {
 } from "@/lib/growth/operator-assist/resolve-say-this-next"
 import {
   buildOptimisticActiveInboundSession,
-  buildOptimisticInboundAnswerCoachTurn,
 } from "@/lib/growth/live-coaching/optimistic-inbound-answer"
+import type { CallWorkspaceAnswerPipelineDiagnostics } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
+import {
+  CALL_WORKSPACE_COACHING_LINK_FAILED_COPY,
+  CALL_WORKSPACE_MEDIA_STREAM_RESTART_FAILED_COPY,
+} from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import {
   applyServerSessionUnderAuthority,
   createInitialCallLifecycleAuthority,
@@ -126,6 +130,8 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   const [dialingQueueId, setDialingQueueId] = useState<string | null>(null)
   const [answering, setAnswering] = useState(false)
   const [optimisticCoachTurn, setOptimisticCoachTurn] = useState<ConversationCoachTurn | null>(null)
+  const [answerPipelineDiagnostic, setAnswerPipelineDiagnostic] = useState<string | null>(null)
+  const [mediaStreamDiagnostic, setMediaStreamDiagnostic] = useState<string | null>(null)
   const [declining, setDeclining] = useState(false)
   const [markingBridgeStarted, setMarkingBridgeStarted] = useState(false)
   const [coachingStartSignal, setCoachingStartSignal] = useState(0)
@@ -956,9 +962,26 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         })
         const data = (await res.json().catch(() => ({}))) as {
           session?: NativeCallWorkspaceSessionPublicView
+          pipeline?: CallWorkspaceAnswerPipelineDiagnostics
           message?: string
         }
         if (!res.ok || !data.session) throw new Error(data.message ?? "Could not answer call.")
+        if (data.pipeline?.liveCoachingLinked) {
+          setAnswerPipelineDiagnostic(null)
+          setOptimisticCoachTurn(null)
+        } else {
+          setOptimisticCoachTurn(null)
+          setAnswerPipelineDiagnostic(
+            data.pipeline?.liveCoachingError ?? CALL_WORKSPACE_COACHING_LINK_FAILED_COPY,
+          )
+        }
+        if (data.pipeline && !data.pipeline.mediaStreamStarted) {
+          setMediaStreamDiagnostic(
+            data.pipeline.mediaStreamReason ?? CALL_WORKSPACE_MEDIA_STREAM_RESTART_FAILED_COPY,
+          )
+        } else {
+          setMediaStreamDiagnostic(null)
+        }
         registerAcceptedCallLifecycle({
           acceptedVoiceCallIds: acceptedVoiceCallIdsRef.current,
           acceptedSessionIds: acceptedSessionIdsRef.current,
@@ -981,6 +1004,31 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       void voiceBrowser.refresh().catch(() => undefined)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Answer failed.")
+    }
+  }
+
+  async function retryMediaStream() {
+    const sessionId = activeSession?.id
+    if (!sessionId) return
+    setError(null)
+    try {
+      const res = await fetch(
+        `/api/platform/growth/calls/sessions/${sessionId}/media-stream/restart`,
+        { method: "POST" },
+      )
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        started?: boolean
+        reason?: string
+        message?: string
+      }
+      if (!res.ok || !data.started) {
+        throw new Error(data.message ?? data.reason ?? "Media stream restart failed.")
+      }
+      setMediaStreamDiagnostic(null)
+      await voiceBrowser.refresh()
+    } catch (e) {
+      setMediaStreamDiagnostic(e instanceof Error ? e.message : CALL_WORKSPACE_MEDIA_STREAM_RESTART_FAILED_COPY)
     }
   }
 
@@ -1009,7 +1057,8 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         const optimisticSession = buildOptimisticActiveInboundSession(capturedSession, connectedAt)
         lastKnownSessionRef.current = optimisticSession
         setActiveSession(optimisticSession)
-        setOptimisticCoachTurn(buildOptimisticInboundAnswerCoachTurn())
+        setAnswerPipelineDiagnostic(null)
+        setMediaStreamDiagnostic(null)
         setCallAuthority((prev) =>
           transitionCallLifecycleAuthority(prev, {
             type: "sdk_accept_succeeded",
@@ -1313,6 +1362,9 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           onMarkBridgeStarted={() => void markBridgeStarted()}
           onStartLiveCoaching={() => setCoachingStartSignal((value) => value + 1)}
           optimisticCoachTurn={optimisticCoachTurn}
+          answerPipelineDiagnostic={answerPipelineDiagnostic}
+          mediaStreamDiagnostic={mediaStreamDiagnostic}
+          onRetryMediaStream={() => void retryMediaStream()}
           onSubmitWrapup={submitWrapup}
         />
 

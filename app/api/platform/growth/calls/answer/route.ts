@@ -9,6 +9,7 @@ import {
 } from "@/lib/growth/native-dialer/native-dialer-schema-health"
 
 export const runtime = "nodejs"
+export const maxDuration = 60
 
 const bodySchema = z.object({
   sessionId: z.string().uuid(),
@@ -36,8 +37,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    const session = await answerGrowthNativeCall(access.admin, parsed.data.sessionId, access.userId)
-    return NextResponse.json({ ok: true, qaMarker: GROWTH_NATIVE_DIALER_QA_MARKER, session })
+    const { session, pipeline } = await answerGrowthNativeCall(
+      access.admin,
+      parsed.data.sessionId,
+      access.userId,
+    )
+    return NextResponse.json({
+      ok: true,
+      qaMarker: GROWTH_NATIVE_DIALER_QA_MARKER,
+      session,
+      pipeline,
+    })
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not answer call."
     return NextResponse.json({ error: "answer_failed", message }, { status: 500 })

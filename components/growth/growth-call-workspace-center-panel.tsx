@@ -233,6 +233,9 @@ export function GrowthCallWorkspaceCenterPanel({
   coachingMode,
   leadLinked,
   optimisticCoachTurn = null,
+  answerPipelineDiagnostic = null,
+  mediaStreamDiagnostic = null,
+  onRetryMediaStream,
   workspaceContext = null,
   onAnswer,
   onDecline,
@@ -274,6 +277,9 @@ export function GrowthCallWorkspaceCenterPanel({
   coachingMode: CallWorkspaceCoachingMode
   leadLinked: boolean
   optimisticCoachTurn?: ConversationCoachTurn | null
+  answerPipelineDiagnostic?: string | null
+  mediaStreamDiagnostic?: string | null
+  onRetryMediaStream?: () => void
   workspaceContext?: VoiceWorkspaceContextSnapshot | null
   onAnswer: () => void
   onDecline: () => void
@@ -421,6 +427,10 @@ export function GrowthCallWorkspaceCenterPanel({
               leadLinked={leadLinked}
               startSignal={coachingStartSignal}
               operatorAssist={operatorAssist}
+              answerPipelineDiagnostic={answerPipelineDiagnostic}
+              mediaStreamDiagnostic={mediaStreamDiagnostic}
+              onRetryMediaStream={onRetryMediaStream}
+              linkedRealtimeSessionId={activeSession.realtimeSessionId}
               aiCopilot={aiCopilot}
               aiReceptionist={aiReceptionist}
               missedCallRecovery={missedCallRecovery}
@@ -446,6 +456,10 @@ export function GrowthCallWorkspaceCenterPanel({
               startSignal={coachingStartSignal}
               operatorAssist={operatorAssist}
               optimisticCoachTurn={optimisticCoachTurn}
+              answerPipelineDiagnostic={answerPipelineDiagnostic}
+              mediaStreamDiagnostic={mediaStreamDiagnostic}
+              onRetryMediaStream={onRetryMediaStream}
+              linkedRealtimeSessionId={activeSession.realtimeSessionId}
               aiCopilot={aiCopilot}
               aiReceptionist={aiReceptionist}
               missedCallRecovery={missedCallRecovery}

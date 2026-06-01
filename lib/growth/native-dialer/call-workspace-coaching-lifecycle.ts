@@ -4,8 +4,10 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   fetchGrowthRealtimeCallSession,
   listGrowthRealtimeCallSessionsForLead,
+  updateGrowthRealtimeCallSession,
 } from "@/lib/growth/realtime/realtime-call-repository"
 import { completeGrowthRealtimeCallSession } from "@/lib/growth/realtime/run-realtime-call-session"
+import { runVoiceBackgroundTask } from "@/lib/voice/performance/run-voice-background-task"
 import type { GrowthRealtimeCallSessionStatus } from "@/lib/growth/realtime/realtime-call-types"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 
@@ -77,6 +79,47 @@ export async function completeCallWorkspaceLiveCoachingForNativeSession(
   })
 
   return { completed: true, realtimeSessionId: realtimeSession.id }
+}
+
+/**
+ * Lightweight orphan close for the inbound answer hot path — marks sessions completed
+ * without recomputing snapshots, timelines, or scorecards (avoids Vercel answer timeouts).
+ */
+export async function closeOrphanedActiveRealtimeCoachingSessionsForLeadFast(
+  admin: SupabaseClient,
+  leadId: string,
+): Promise<string[]> {
+  const sessions = await listGrowthRealtimeCallSessionsForLead(admin, leadId, 25)
+  const closedIds: string[] = []
+  const now = new Date().toISOString()
+
+  for (const session of sessions) {
+    if (!OPEN_REALTIME_SESSION_STATUSES.includes(session.status)) continue
+    const activeLinks = await countActiveNativeSessionsLinkedToRealtimeSession(admin, session.id)
+    if (activeLinks > 0) continue
+
+    await updateGrowthRealtimeCallSession(admin, session.id, {
+      status: "completed",
+      endedAt: now,
+      transcriptStatus: "inactive",
+    })
+    closedIds.push(session.id)
+    logVoiceInfrastructure("voice_growth_coaching_orphan_closed_fast", {
+      leadId,
+      realtimeSessionId: session.id,
+    })
+  }
+
+  return closedIds
+}
+
+export function scheduleFullOrphanedRealtimeCoachingCleanup(
+  admin: SupabaseClient,
+  leadId: string,
+): void {
+  runVoiceBackgroundTask("growth_coaching_orphan_full_cleanup", async () => {
+    await completeOrphanedActiveRealtimeCoachingSessionsForLead(admin, leadId)
+  })
 }
 
 /**

@@ -30,8 +30,17 @@ const coachingService = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/native-dialer/call-workspace-coaching-service.ts"),
   "utf8",
 )
-assert.match(coachingService, /voice_growth_coaching_orphan_cleanup_failed/)
-assert.match(coachingService, /voice_growth_coaching_native_linked/)
+assert.match(coachingService, /priority: "answer_hot_path"/)
+assert.match(coachingService, /closeOrphanedActiveRealtimeCoachingSessionsForLeadFast/)
+
+const lifecycleModule = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/native-dialer/call-workspace-coaching-lifecycle.ts"),
+  "utf8",
+)
+assert.match(lifecycleModule, /closeOrphanedActiveRealtimeCoachingSessionsForLeadFast/)
+assert.match(lifecycleModule, /scheduleFullOrphanedRealtimeCoachingCleanup/)
+assert.match(lifecycleModule, /voice_growth_coaching_orphan_complete_failed/)
+
 assert.match(
   coachingService,
   /completeOrphanedActiveRealtimeCoachingSessionsForLead[\s\S]*catch \(error\)/,
@@ -42,12 +51,7 @@ assert.match(
   /linkNativeCallRealtimeSession[\s\S]*startGrowthRealtimeCallSession/,
   "native link must happen before optional session start hydration",
 )
-
-const lifecycleModule = fs.readFileSync(
-  path.join(process.cwd(), "lib/growth/native-dialer/call-workspace-coaching-lifecycle.ts"),
-  "utf8",
-)
-assert.match(lifecycleModule, /voice_growth_coaching_orphan_complete_failed/)
+assert.match(coachingService, /voice_growth_coaching_native_linked/)
 
 const answeredMediaStream = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/media-streaming/ensure-answered-inbound-media-stream.ts"),
@@ -66,6 +70,30 @@ const nativeDialerRepo = fs.readFileSync(
 const coachingIdx = nativeDialerRepo.indexOf("autoStartCallWorkspaceLiveCoachingOnAnswer")
 const mediaIdx = nativeDialerRepo.indexOf("ensureAnsweredInboundCallMediaStream")
 assert.ok(coachingIdx > 0 && mediaIdx > coachingIdx, "coaching auto-start must run before media restart")
+
+const unifiedAssist = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace-unified-assist-panel.tsx"),
+  "utf8",
+)
+assert.match(unifiedAssist, /hasLinkedRealtimeSession/)
+assert.match(unifiedAssist, /linkedRealtimeSessionId/)
+assert.doesNotMatch(
+  unifiedAssist,
+  /coachingActive = coachingState != null \|\| Boolean\(operatorAssist\?\.realtimeSessionId\) \|\| Boolean\(optimisticCoachTurn\)/,
+  "coaching must not treat bootstrap optimistic turn as active",
+)
+
+const workspaceUi = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace.tsx"),
+  "utf8",
+)
+assert.match(workspaceUi, /data\.pipeline\?\.liveCoachingLinked/)
+assert.match(workspaceUi, /answerPipelineDiagnostic/)
+assert.doesNotMatch(
+  workspaceUi,
+  /accept[\s\S]{0,400}setOptimisticCoachTurn\(\{/,
+  "SDK accept must not seed bootstrap before answer pipeline links coaching",
+)
 
 assert.equal(
   isStaleRingPhaseMediaSession({

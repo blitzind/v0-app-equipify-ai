@@ -19,7 +19,9 @@ import {
 } from "@/lib/growth/native-dialer/call-workspace-coaching-lead"
 import type { CallWorkspaceCoachingMode } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import {
+  closeOrphanedActiveRealtimeCoachingSessionsForLeadFast,
   completeOrphanedActiveRealtimeCoachingSessionsForLead,
+  scheduleFullOrphanedRealtimeCoachingCleanup,
 } from "@/lib/growth/native-dialer/call-workspace-coaching-lifecycle"
 import {
   attachLeadToNativeCallSession,
@@ -27,6 +29,7 @@ import {
   linkNativeCallRealtimeSession,
 } from "@/lib/growth/native-dialer/native-dialer-repository"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
+import { runVoiceBackgroundTask } from "@/lib/voice/performance/run-voice-background-task"
 
 const ACTIVE_NATIVE_WORKSPACE_STATUSES = [
   "ringing",
@@ -110,12 +113,14 @@ export async function startCallWorkspaceLiveCoaching(
     createdBy?: string | null
     userEmail?: string | null
     hydrateDetail?: boolean
+    priority?: "standard" | "answer_hot_path"
   },
 ): Promise<CallWorkspaceCoachingContext> {
   const nativeSession = await fetchNativeCallSessionById(admin, input.nativeSessionId)
   if (!nativeSession) throw new Error("Call session not found.")
 
   const { coachingLeadId, coachingMode, leadLinked } = await resolveCoachingLeadId(admin, nativeSession, input.createdBy)
+  const answerHotPath = input.priority === "answer_hot_path"
 
   let realtimeSession =
     nativeSession.realtimeSessionId
@@ -131,13 +136,19 @@ export async function startCallWorkspaceLiveCoaching(
 
   if (!realtimeSession) {
     try {
-      await completeOrphanedActiveRealtimeCoachingSessionsForLead(admin, coachingLeadId)
+      if (answerHotPath) {
+        await closeOrphanedActiveRealtimeCoachingSessionsForLeadFast(admin, coachingLeadId)
+      } else {
+        await completeOrphanedActiveRealtimeCoachingSessionsForLead(admin, coachingLeadId)
+      }
     } catch (error) {
       logVoiceInfrastructure("voice_growth_coaching_orphan_cleanup_failed", {
         nativeSessionId: nativeSession.id,
         coachingLeadId,
         voiceCallId: nativeSession.voiceCallId ?? null,
+        priority: input.priority ?? "standard",
         message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack?.slice(0, 500) ?? null : null,
       })
     }
 
@@ -150,6 +161,7 @@ export async function startCallWorkspaceLiveCoaching(
       realtimeSessionId: realtimeSession.id,
       coachingLeadId,
       voiceCallId: nativeSession.voiceCallId ?? null,
+      priority: input.priority ?? "standard",
     })
   }
 
@@ -162,10 +174,59 @@ export async function startCallWorkspaceLiveCoaching(
       nativeSessionId: nativeSession.id,
       realtimeSessionId: realtimeSession.id,
       voiceCallId: nativeSession.voiceCallId ?? null,
+      priority: input.priority ?? "standard",
     })
   }
 
-  if (realtimeSession.status === "preparing" || realtimeSession.status === "paused") {
+  const hydrateSessionStartAndBootstrap = () => {
+    runVoiceBackgroundTask("call_workspace_live_coaching_hydrate", async () => {
+      let session =
+        (await fetchGrowthRealtimeCallSession(admin, realtimeSession!.id)) ?? realtimeSession!
+      if (session.status === "preparing" || session.status === "paused") {
+        try {
+          session = await startGrowthRealtimeCallSession(admin, {
+            sessionId: session.id,
+            actor: { userId: input.createdBy ?? null, email: input.userEmail ?? null },
+          })
+        } catch (error) {
+          logVoiceInfrastructure("voice_growth_coaching_session_start_failed", {
+            nativeSessionId: nativeSession.id,
+            realtimeSessionId: session.id,
+            voiceCallId: nativeSession.voiceCallId ?? null,
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack?.slice(0, 500) ?? null : null,
+          })
+        }
+      }
+
+      if (!session.liveSnapshot.conversationCoach) {
+        try {
+          const nativeDirection =
+            (nativeSession.direction as "inbound" | "outbound" | undefined) ?? "outbound"
+          await bootstrapConversationCoachForSession(admin, {
+            session,
+            direction: nativeDirection,
+          })
+        } catch (error) {
+          logVoiceInfrastructure("voice_growth_coaching_bootstrap_failed", {
+            nativeSessionId: nativeSession.id,
+            realtimeSessionId: session.id,
+            voiceCallId: nativeSession.voiceCallId ?? null,
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack?.slice(0, 500) ?? null : null,
+          })
+        }
+      }
+
+      if (answerHotPath) {
+        scheduleFullOrphanedRealtimeCoachingCleanup(admin, coachingLeadId)
+      }
+    })
+  }
+
+  if (answerHotPath) {
+    hydrateSessionStartAndBootstrap()
+  } else if (realtimeSession.status === "preparing" || realtimeSession.status === "paused") {
     try {
       realtimeSession = await startGrowthRealtimeCallSession(admin, {
         sessionId: realtimeSession.id,
@@ -177,6 +238,7 @@ export async function startCallWorkspaceLiveCoaching(
         realtimeSessionId: realtimeSession.id,
         voiceCallId: nativeSession.voiceCallId ?? null,
         message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack?.slice(0, 500) ?? null : null,
       })
       realtimeSession =
         (await fetchGrowthRealtimeCallSession(admin, realtimeSession.id)) ?? realtimeSession
@@ -184,7 +246,7 @@ export async function startCallWorkspaceLiveCoaching(
   }
 
   const nativeDirection = (nativeSession.direction as "inbound" | "outbound" | undefined) ?? "outbound"
-  if (!realtimeSession.liveSnapshot.conversationCoach) {
+  if (!answerHotPath && !realtimeSession.liveSnapshot.conversationCoach) {
     try {
       await bootstrapConversationCoachForSession(admin, {
         session: realtimeSession,
@@ -198,6 +260,7 @@ export async function startCallWorkspaceLiveCoaching(
         realtimeSessionId: realtimeSession.id,
         voiceCallId: nativeSession.voiceCallId ?? null,
         message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack?.slice(0, 500) ?? null : null,
       })
     }
   }
@@ -332,6 +395,7 @@ export async function autoStartCallWorkspaceLiveCoachingOnAnswer(
     createdBy: input.createdBy ?? nativeSession.ownerUserId ?? null,
     userEmail: input.userEmail ?? null,
     hydrateDetail: false,
+    priority: "answer_hot_path",
   })
 
   const realtimeSessionId = context.realtimeSession?.id ?? null

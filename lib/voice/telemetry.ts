@@ -52,6 +52,7 @@ export type VoiceTelemetryEvent =
   | "voice_growth_coaching_native_linked"
   | "voice_growth_coaching_orphan_cleanup_failed"
   | "voice_growth_coaching_orphan_complete_failed"
+  | "voice_growth_coaching_orphan_closed_fast"
   | "voice_growth_coaching_session_start_failed"
   | "voice_growth_coaching_bootstrap_failed"
   | "voice_growth_coaching_session_completed"
