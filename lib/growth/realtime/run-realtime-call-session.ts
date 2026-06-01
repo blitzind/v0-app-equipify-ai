@@ -20,7 +20,7 @@ import type {
   GrowthRealtimeTranscriptEvent,
 } from "@/lib/growth/realtime/realtime-call-types"
 import { toGrowthLeadRealtimeIntelligenceInput } from "@/lib/growth/realtime/realtime-lead-intelligence"
-import { analyzeRealtimeCallTranscript, diffRealtimeSnapshot } from "@/lib/growth/realtime/realtime-session-analyzer"
+import { reconcileVoiceTranscriptBridgeForCall } from "@/lib/growth/realtime/reconcile-voice-transcript-bridge"
 import { createRealtimeTranscriptProvider } from "@/lib/growth/realtime/realtime-transcript-provider"
 import {
   attachRealtimeProviderToSession,
@@ -353,6 +353,22 @@ export async function getGrowthRealtimeCallSessionDetail(
   const lead = await fetchGrowthLeadById(admin, session.leadId)
   if (!lead) return null
 
+  const organizationId = getGrowthEngineAiOrgId()
+  const { data: nativeLink } = await admin
+    .schema("growth")
+    .from("native_call_workspace_sessions")
+    .select("voice_call_id")
+    .eq("realtime_session_id", sessionId)
+    .maybeSingle()
+  const linkedVoiceCallId = (nativeLink?.voice_call_id as string | null) ?? null
+  if (linkedVoiceCallId && session.status !== "completed" && session.status !== "discarded") {
+    await reconcileVoiceTranscriptBridgeForCall(admin, {
+      organizationId,
+      voiceCallId: linkedVoiceCallId,
+      realtimeSessionId: sessionId,
+    }).catch(() => undefined)
+  }
+
   const events = await listGrowthRealtimeTranscriptEvents(admin, sessionId)
   const analyzedSnapshot = analyzeRealtimeCallTranscript({
     events,
@@ -362,7 +378,6 @@ export async function getGrowthRealtimeCallSessionDetail(
   let coachingState: GrowthLiveCoachingState | null = null
   let liveSnapshot = analyzedSnapshot
   if (session.guidanceEnabled) {
-    const organizationId = getGrowthEngineAiOrgId()
     const direction = await resolveNativeCallDirectionForRealtimeSession(admin, sessionId).catch(() => null)
     const synced = await syncLiveGuidanceForSession(admin, {
       leadId: session.leadId,

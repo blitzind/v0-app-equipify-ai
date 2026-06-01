@@ -77,6 +77,33 @@ const workspaceBridge = fs.readFileSync(
 )
 assert.match(workspaceBridge, /ensureInboundCallWorkspaceLiveCoachingLinked/)
 
+const syncCoach = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/live-coaching/sync-conversation-coach.ts"),
+  "utf8",
+)
+assert.match(syncCoach, /coach_turn_trace/)
+assert.match(syncCoach, /coach_turn_refresh_decision/)
+assert.match(syncCoach, /coach_turn_generated/)
+assert.match(syncCoach, /coach_turn_persisted/)
+
+const operatorAssist = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/operator-assist/operator-assist-service.ts"),
+  "utf8",
+)
+assert.match(operatorAssist, /coach_turn_display_payload/)
+
+const answeredMediaStream = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/media-streaming/ensure-answered-inbound-media-stream.ts"),
+  "utf8",
+)
+assert.match(answeredMediaStream, /ensureAnsweredInboundCallMediaStream/)
+
+const reconcileBridge = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/realtime/reconcile-voice-transcript-bridge.ts"),
+  "utf8",
+)
+assert.match(reconcileBridge, /reconcileVoiceTranscriptBridgeForCall/)
+
 const telemetry = fs.readFileSync(path.join(process.cwd(), "lib/voice/telemetry.ts"), "utf8")
 assert.match(telemetry, /voice_growth_transcript_bridge_outcome/)
 

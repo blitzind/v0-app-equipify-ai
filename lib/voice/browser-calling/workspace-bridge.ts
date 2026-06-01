@@ -176,6 +176,24 @@ export async function syncWorkspaceSessionFromVoiceCall(
         message: error instanceof Error ? error.message : String(error),
       })
     }
+
+    const { data: voiceCallRow } = await admin
+      .schema("voice")
+      .from("voice_calls")
+      .select("provider_call_id, direction")
+      .eq("id", input.voiceCallId)
+      .maybeSingle()
+    const providerCallId = (voiceCallRow?.provider_call_id as string | null) ?? null
+    if (voiceCallRow?.direction === "inbound" && providerCallId) {
+      const { ensureAnsweredInboundCallMediaStream } = await import(
+        "@/lib/voice/media-streaming/ensure-answered-inbound-media-stream"
+      )
+      void ensureAnsweredInboundCallMediaStream(admin, {
+        organizationId: input.organizationId,
+        voiceCallId: input.voiceCallId,
+        providerCallId,
+      }).catch(() => undefined)
+    }
   }
 }
 

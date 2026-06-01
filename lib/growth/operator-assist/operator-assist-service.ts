@@ -6,6 +6,7 @@ import type { CallWorkspaceCoachingMode } from "@/lib/growth/native-dialer/call-
 import { buildUnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/orchestration"
 import { fetchOperatorAssistPreferences } from "@/lib/growth/operator-assist/operator-assist-preferences-repository"
 import type { UnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/types"
+import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import { fetchVoiceCallConversationIntelligenceSnapshot } from "@/lib/voice/intelligence/intelligence-service"
 import type { VoiceCallConversationIntelligenceSnapshot } from "@/lib/voice/intelligence/types"
 import type { VoiceCallTranscriptSnapshot } from "@/lib/voice/media-streaming/types"
@@ -56,7 +57,7 @@ export async function fetchUnifiedOperatorAssistSnapshot(
       ? await fetchVoiceCallConversationIntelligenceSnapshot(admin, input.organizationId, input.voiceCallId)
       : null)
 
-  return buildUnifiedOperatorAssistSnapshot({
+  const snapshot = buildUnifiedOperatorAssistSnapshot({
     coachingState,
     coachingMode,
     coachingLeadId,
@@ -72,4 +73,17 @@ export async function fetchUnifiedOperatorAssistSnapshot(
     preferences,
     generatedAt: new Date().toISOString(),
   })
+
+  logVoiceInfrastructure("coach_turn_display_payload", {
+    realtimeSessionId,
+    voiceCallId: input.voiceCallId,
+    primaryCoachPhrase: snapshot.coachingState?.primaryCoach?.primaryPhrase ?? null,
+    primaryCoachSource: snapshot.coachingState?.primaryCoach?.source ?? null,
+    primaryCoachTriggeredBySequenceNumber:
+      snapshot.coachingState?.primaryCoach?.triggeredBySequenceNumber ?? null,
+    nextBestActionTitle: snapshot.nextBestAction?.primary?.title ?? null,
+    nextBestActionSource: snapshot.nextBestAction?.primary?.source ?? null,
+  })
+
+  return snapshot
 }

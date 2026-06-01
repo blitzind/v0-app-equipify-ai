@@ -11,13 +11,18 @@ import {
   buildOutboundBootstrapCoachTurn,
   generateDeterministicCoachTurn,
 } from "@/lib/growth/live-coaching/turn-coach-generator"
-import { shouldRefreshCoachForCustomerSpeech } from "@/lib/growth/live-coaching/prospect-turn-detection"
+import {
+  lastCustomerFacingSequence,
+  lastProspectTranscriptEvent,
+  shouldRefreshCoachForCustomerSpeech,
+} from "@/lib/growth/live-coaching/prospect-turn-detection"
 import { updateGrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-repository"
 import type {
   GrowthRealtimeCallSession,
   GrowthRealtimeLiveSnapshot,
   GrowthRealtimeTranscriptEvent,
 } from "@/lib/growth/realtime/realtime-call-types"
+import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 
 export type ConversationCoachSyncResult = {
   coachTurn: ConversationCoachTurn
@@ -31,6 +36,19 @@ function shouldRefreshCoachTurn(input: {
   previousCoach: ConversationCoachTurn | null | undefined
 }): boolean {
   return shouldRefreshCoachForCustomerSpeech(input)
+}
+
+function refreshDecisionReason(input: {
+  events: GrowthRealtimeTranscriptEvent[]
+  previousCoach: ConversationCoachTurn | null | undefined
+}): string {
+  if (input.events.length === 0) return "no_events"
+  const lastCustomerSeq = lastCustomerFacingSequence(input.events, input.previousCoach)
+  if (lastCustomerSeq === null) return "no_customer_facing_sequence"
+  if (!input.previousCoach) return "no_previous_coach"
+  if (input.previousCoach.triggeredBySequenceNumber === null) return "bootstrap_active"
+  if (lastCustomerSeq > input.previousCoach.triggeredBySequenceNumber) return "new_customer_sequence"
+  return "sequence_not_advanced"
 }
 
 export async function syncConversationCoach(input: {
@@ -49,13 +67,32 @@ export async function syncConversationCoach(input: {
   })
 
   let coachTurn = previousCoach
+  const lastProspectTurn = lastProspectTranscriptEvent(input.events)
+
+  logVoiceInfrastructure("coach_turn_trace", {
+    sessionId: input.session.id,
+    eventCount: input.events.length,
+    lastProspectSequence: lastProspectTurn?.sequenceNumber ?? null,
+    lastProspectSpeaker: lastProspectTurn?.speaker ?? null,
+    previousCoachSource: previousCoach?.source ?? null,
+    previousCoachTriggeredBySequenceNumber: previousCoach?.triggeredBySequenceNumber ?? null,
+  })
 
   if (!coachTurn) {
     coachTurn =
       input.direction === "inbound" ? buildInboundBootstrapCoachTurn() : buildOutboundBootstrapCoachTurn()
   }
 
-  if (shouldRefreshCoachTurn({ events: input.events, previousCoach: coachTurn })) {
+  const shouldRefresh = shouldRefreshCoachTurn({ events: input.events, previousCoach: coachTurn })
+  logVoiceInfrastructure("coach_turn_refresh_decision", {
+    sessionId: input.session.id,
+    shouldRefreshCoachTurn: shouldRefresh,
+    reason: refreshDecisionReason({ events: input.events, previousCoach: coachTurn }),
+    lastProspectSequence: lastProspectTurn?.sequenceNumber ?? null,
+    previousCoachTriggeredBySequenceNumber: coachTurn.triggeredBySequenceNumber,
+  })
+
+  if (shouldRefresh) {
     const deterministic = generateDeterministicCoachTurn({
       events: input.events,
       stage: stageResult.stage,
@@ -65,6 +102,7 @@ export async function syncConversationCoach(input: {
     })
 
     let nextTurn = deterministic
+    let generationSource: "deterministic" | "llm" = "deterministic"
     if (input.preferLlm !== false && input.organizationId && input.events.length > 0) {
       const llmTurn = await generateLlmCoachTurn({
         organizationId: input.organizationId,
@@ -75,8 +113,19 @@ export async function syncConversationCoach(input: {
         inbound: input.direction === "inbound",
         previousCoach: coachTurn,
       }).catch(() => null)
-      if (llmTurn) nextTurn = llmTurn
+      if (llmTurn) {
+        nextTurn = llmTurn
+        generationSource = "llm"
+      }
     }
+
+    logVoiceInfrastructure("coach_turn_generated", {
+      sessionId: input.session.id,
+      generationSource,
+      primaryPhrase: nextTurn.primaryPhrase,
+      triggeredBySequenceNumber: nextTurn.triggeredBySequenceNumber,
+      stage: stageResult.stage,
+    })
 
     coachTurn = {
       ...nextTurn,
@@ -97,6 +146,14 @@ export async function syncConversationCoach(input: {
     recommendedNextQuestion: coachTurn.primaryPhrase,
     recommendedResponse: coachTurn.rationale,
   }
+
+  logVoiceInfrastructure("coach_turn_persisted", {
+    sessionId: input.session.id,
+    source: coachTurn.source,
+    primaryPhrase: coachTurn.primaryPhrase,
+    triggeredBySequenceNumber: coachTurn.triggeredBySequenceNumber,
+    updatedAt: coachTurn.updatedAt,
+  })
 
   return {
     coachTurn,

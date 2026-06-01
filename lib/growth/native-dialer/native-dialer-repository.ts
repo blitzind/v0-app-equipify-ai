@@ -435,6 +435,26 @@ export async function answerNativeCallSession(
       payloadJson: { source: "call_workspace", sessionId },
       idempotencyKey: `workspace:${sessionId}:answered`,
     })
+
+    if ((existing.direction as string) === "inbound") {
+      const { data: voiceCallRow } = await admin
+        .schema("voice")
+        .from("voice_calls")
+        .select("provider_call_id")
+        .eq("id", voiceCallId)
+        .maybeSingle()
+      const providerCallId = (voiceCallRow?.provider_call_id as string | null) ?? null
+      if (providerCallId) {
+        const { ensureAnsweredInboundCallMediaStream } = await import(
+          "@/lib/voice/media-streaming/ensure-answered-inbound-media-stream"
+        )
+        void ensureAnsweredInboundCallMediaStream(admin, {
+          organizationId: orgId,
+          voiceCallId,
+          providerCallId,
+        }).catch(() => undefined)
+      }
+    }
   } else {
     const providers = await resolveNativeDialerProviders(admin)
     const routed = await routeNativeDialerProvider(providers)
