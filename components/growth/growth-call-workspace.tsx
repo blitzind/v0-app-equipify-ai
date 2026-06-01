@@ -101,6 +101,19 @@ import {
 } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
 
 const CALLS_END_CLIENT_TIMEOUT_MS = 12_000
+const LIVE_COACHING_AUTO_START_QA_MARKER = "growth-live-coaching-auto-start-qa-v1" as const
+
+function logLiveCoachingAutoStartQa(event: string, details: Record<string, unknown>): void {
+  console.info(
+    JSON.stringify({
+      source: "growth-call-workspace",
+      qaMarker: LIVE_COACHING_AUTO_START_QA_MARKER,
+      event,
+      ts: new Date().toISOString(),
+      ...details,
+    }),
+  )
+}
 
 function isClientFetchAbortError(error: unknown): boolean {
   if (error instanceof DOMException && error.name === "AbortError") return true
@@ -177,6 +190,13 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
 
   const applyServerSession = useCallback(
     (server: NativeCallWorkspaceSessionPublicView | null | undefined) => {
+      logLiveCoachingAutoStartQa("applyServerSession", {
+        sessionId: server?.id ?? null,
+        voiceCallId: server?.voiceCallId ?? null,
+        status: server?.status ?? null,
+        direction: server?.direction ?? null,
+        realtimeSessionId: server?.realtimeSessionId ?? null,
+      })
       if (server?.id && wrapupConfirmedSessionIdsRef.current.has(server.id)) {
         return
       }
@@ -606,6 +626,24 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   }
 
   useEffect(() => {
+    logLiveCoachingAutoStartQa("final_activeSession_observed", {
+      sessionId: activeSession?.id ?? null,
+      voiceCallId: activeSession?.voiceCallId ?? null,
+      status: activeSession?.status ?? null,
+      direction: activeSession?.direction ?? null,
+      realtimeSessionId: activeSession?.realtimeSessionId ?? null,
+      workspacePhase,
+    })
+  }, [
+    activeSession?.id,
+    activeSession?.voiceCallId,
+    activeSession?.status,
+    activeSession?.direction,
+    activeSession?.realtimeSessionId,
+    workspacePhase,
+  ])
+
+  useEffect(() => {
     void load()
   }, [load])
 
@@ -935,6 +973,14 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     sessionForAnswer: NativeCallWorkspaceSessionPublicView
     hadSdkIncoming: boolean
   }) {
+    logLiveCoachingAutoStartQa("reconcileInboundAnswer_start", {
+      sessionId: input.sessionForAnswer.id,
+      voiceCallId: input.sessionForAnswer.voiceCallId,
+      status: input.sessionForAnswer.status,
+      direction: input.sessionForAnswer.direction,
+      realtimeSessionId: input.sessionForAnswer.realtimeSessionId,
+      hadSdkIncoming: input.hadSdkIncoming,
+    })
     if (
       isCallLifecycleEndedLocked({
         sessionId: input.sessionForAnswer.id,
@@ -942,12 +988,28 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         locks: getLifecycleLocks(),
       })
     ) {
+      logLiveCoachingAutoStartQa("reconcileInboundAnswer_skipped_lifecycle_locked", {
+        sessionId: input.sessionForAnswer.id,
+        voiceCallId: input.sessionForAnswer.voiceCallId,
+      })
       return
     }
     try {
       let sessionId = input.sessionForAnswer.id
       if (!sessionId || sessionId.startsWith("pending-inbound-")) {
+        logLiveCoachingAutoStartQa("operator_assist_refresh_start", {
+          reason: "resolve_pending_inbound_session",
+          sessionId,
+          voiceCallId: input.sessionForAnswer.voiceCallId,
+        })
         const synced = await voiceBrowser.refresh().catch(() => null)
+        logLiveCoachingAutoStartQa("operator_assist_refresh_success", {
+          reason: "resolve_pending_inbound_session",
+          requestedSessionId: sessionId,
+          resolvedWorkspaceSessionId: synced?.workspaceSessionId ?? null,
+          resolvedInboundRingingSessionId: synced?.inboundRinging?.workspaceSessionId ?? null,
+          activeVoiceCallId: synced?.activeVoiceCallId ?? null,
+        })
         sessionId =
           synced?.inboundRinging?.workspaceSessionId ??
           synced?.workspaceSessionId ??
@@ -955,6 +1017,10 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       }
 
       if (sessionId && !sessionId.startsWith("pending-inbound-")) {
+        logLiveCoachingAutoStartQa("answer_api_request_start", {
+          sessionId,
+          voiceCallId: input.sessionForAnswer.voiceCallId,
+        })
         const res = await fetch("/api/platform/growth/calls/answer", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -965,6 +1031,22 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           pipeline?: CallWorkspaceAnswerPipelineDiagnostics
           message?: string
         }
+        logLiveCoachingAutoStartQa("answer_api_response", {
+          sessionId,
+          httpStatus: res.status,
+          ok: res.ok,
+          responseSessionId: data.session?.id ?? null,
+          responseVoiceCallId: data.session?.voiceCallId ?? null,
+          responseStatus: data.session?.status ?? null,
+          responseDirection: data.session?.direction ?? null,
+          responseRealtimeSessionId: data.session?.realtimeSessionId ?? null,
+          liveCoachingLinked: data.pipeline?.liveCoachingLinked ?? null,
+          liveCoachingFailureReason: data.pipeline?.liveCoachingFailureReason ?? null,
+          realtimeSessionId: data.pipeline?.realtimeSessionId ?? null,
+          createdRealtimeSessionId: data.pipeline?.createdRealtimeSessionId ?? null,
+          linkResultLinked: data.pipeline?.linkResult?.linked ?? null,
+          linkResultReason: data.pipeline?.linkResult?.reason ?? null,
+        })
         if (!res.ok || !data.session) throw new Error(data.message ?? "Could not answer call.")
         if (data.pipeline?.liveCoachingLinked) {
           setAnswerPipelineDiagnostic(null)
@@ -995,14 +1077,55 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
             locks: getLifecycleLocks(),
           })
         ) {
+          logLiveCoachingAutoStartQa("reconcileInboundAnswer_skipped_response_lifecycle_locked", {
+            sessionId: data.session.id,
+            voiceCallId: data.session.voiceCallId,
+            realtimeSessionId: data.session.realtimeSessionId,
+          })
           return
         }
         applyServerSession(data.session)
+        logLiveCoachingAutoStartQa("reconcileInboundAnswer_success", {
+          sessionId: data.session.id,
+          voiceCallId: data.session.voiceCallId,
+          status: data.session.status,
+          direction: data.session.direction,
+          realtimeSessionId: data.session.realtimeSessionId,
+          liveCoachingLinked: data.pipeline?.liveCoachingLinked ?? null,
+          liveCoachingFailureReason: data.pipeline?.liveCoachingFailureReason ?? null,
+        })
       } else {
         await load({ background: true })
       }
-      void voiceBrowser.refresh().catch(() => undefined)
+      logLiveCoachingAutoStartQa("operator_assist_refresh_start", {
+        reason: "post_answer_reconcile",
+        sessionId,
+        voiceCallId: input.sessionForAnswer.voiceCallId,
+      })
+      void voiceBrowser.refresh()
+        .then((synced) => {
+          logLiveCoachingAutoStartQa("operator_assist_refresh_success", {
+            reason: "post_answer_reconcile",
+            sessionId,
+            workspaceSessionId: synced?.workspaceSessionId ?? null,
+            activeVoiceCallId: synced?.activeVoiceCallId ?? null,
+            operatorAssistHasPrimaryCoach: Boolean(synced?.operatorAssist?.coachingState?.primaryCoach),
+            activeSessionRealtimeSessionId: lastKnownSessionRef.current?.realtimeSessionId ?? null,
+          })
+        })
+        .catch((error: unknown) => {
+          logLiveCoachingAutoStartQa("operator_assist_refresh_failure", {
+            reason: "post_answer_reconcile",
+            sessionId,
+            message: error instanceof Error ? error.message : String(error),
+          })
+        })
     } catch (e) {
+      logLiveCoachingAutoStartQa("reconcileInboundAnswer_failure", {
+        sessionId: input.sessionForAnswer.id,
+        voiceCallId: input.sessionForAnswer.voiceCallId,
+        message: e instanceof Error ? e.message : "Answer failed.",
+      })
       setError(e instanceof Error ? e.message : "Answer failed.")
     }
   }
@@ -1040,7 +1163,19 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     setCallAuthority((prev) => transitionCallLifecycleAuthority(prev, { type: "sdk_accept_started" }))
     try {
       if (hasSdkIncoming) {
+        logLiveCoachingAutoStartQa("sdk_accept_start", {
+          sessionId: capturedSession?.id ?? null,
+          voiceCallId: capturedSession?.voiceCallId ?? null,
+          status: capturedSession?.status ?? null,
+          direction: capturedSession?.direction ?? null,
+          realtimeSessionId: capturedSession?.realtimeSessionId ?? null,
+        })
         await voiceBrowser.acceptIncomingCall()
+        logLiveCoachingAutoStartQa("sdk_accept_success", {
+          sessionId: capturedSession?.id ?? null,
+          voiceCallId: capturedSession?.voiceCallId ?? null,
+          callSid: voiceBrowser.incomingCall?.callSid ?? null,
+        })
       }
 
       if (capturedSession) {

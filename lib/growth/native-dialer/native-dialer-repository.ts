@@ -48,6 +48,19 @@ const SESSION_SELECT =
 type SessionRow = Record<string, unknown>
 type QueueRow = Record<string, unknown>
 type WrapupRow = Record<string, unknown>
+const LIVE_COACHING_AUTO_START_QA_MARKER = "growth-live-coaching-auto-start-qa-v1" as const
+
+function logLiveCoachingAutoStartQa(event: string, details: Record<string, unknown>): void {
+  console.info(
+    JSON.stringify({
+      source: "native-dialer-repository",
+      qaMarker: LIVE_COACHING_AUTO_START_QA_MARKER,
+      event,
+      ts: new Date().toISOString(),
+      ...details,
+    }),
+  )
+}
 
 function sessionsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("native_call_workspace_sessions")
@@ -420,6 +433,14 @@ export async function answerNativeCallSession(
   const existingStatus = existing.status as NativeCallWorkspaceSessionPublicView["status"]
   const existingDirection = existing.direction as string
   const existingRealtimeSessionId = (existing.realtime_session_id as string | null) ?? null
+  logLiveCoachingAutoStartQa("answer_native_call_session_loaded", {
+    nativeSessionId: sessionId,
+    voiceCallId: (existing.voice_call_id as string | null) ?? null,
+    ownerUserId: ownerUserId ?? (existing.owner_user_id as string | null) ?? null,
+    direction: existingDirection,
+    status: existingStatus,
+    realtimeSessionId: existingRealtimeSessionId,
+  })
   const canReconcileAlreadyAnsweredInbound =
     existingDirection === "inbound" &&
     (existingStatus === "active" || existingStatus === "on_hold") &&
@@ -533,9 +554,27 @@ export async function answerNativeCallSession(
       "@/lib/growth/native-dialer/call-workspace-coaching-service"
     )
     try {
+      logLiveCoachingAutoStartQa("autoStartCallWorkspaceLiveCoachingOnAnswer_start", {
+        nativeSessionId: sessionId,
+        voiceCallId,
+        organizationId: orgId,
+        ownerUserId: ownerUserId ?? null,
+        direction: existing.direction as string | null,
+        status: "active",
+      })
       const coaching = await autoStartCallWorkspaceLiveCoachingOnAnswer(admin, {
         nativeSessionId: sessionId,
         createdBy: ownerUserId ?? null,
+      })
+      logLiveCoachingAutoStartQa("autoStartCallWorkspaceLiveCoachingOnAnswer_result", {
+        nativeSessionId: sessionId,
+        voiceCallId,
+        organizationId: orgId,
+        ownerUserId: ownerUserId ?? null,
+        realtimeSessionId: coaching.realtimeSessionId,
+        reason: coaching.reason,
+        linkResultLinked: coaching.linkResult?.linked ?? null,
+        linkResultReason: coaching.linkResult?.reason ?? null,
       })
       pipeline.liveCoachingFailureReason = coaching.reason
       pipeline.createdRealtimeSessionId = coaching.realtimeSessionId
@@ -572,6 +611,16 @@ export async function answerNativeCallSession(
           ? "realtime_session_create_failed"
           : "auto_start_exception"
       pipeline.liveCoachingError = pipeline.liveCoachingFailureReason
+      logLiveCoachingAutoStartQa("autoStartCallWorkspaceLiveCoachingOnAnswer_failure", {
+        nativeSessionId: sessionId,
+        voiceCallId,
+        organizationId: orgId,
+        ownerUserId: ownerUserId ?? null,
+        direction: existing.direction as string | null,
+        status: "active",
+        reason: pipeline.liveCoachingFailureReason,
+        message: errorMessage,
+      })
       logVoiceInfrastructure("voice_growth_coaching_auto_start_failed", {
         nativeSessionId: sessionId,
         voiceCallId,
@@ -639,6 +688,20 @@ export async function answerNativeCallSession(
   const refreshedRealtimeSessionId = (refreshed.realtime_session_id as string | null) ?? null
   pipeline.realtimeSessionId = refreshedRealtimeSessionId
   pipeline.liveCoachingLinked = Boolean(refreshedRealtimeSessionId)
+  logLiveCoachingAutoStartQa("answer_native_call_session_refreshed", {
+    nativeSessionId: sessionId,
+    voiceCallId,
+    organizationId: orgId,
+    ownerUserId: ownerUserId ?? (refreshed.owner_user_id as string | null) ?? null,
+    direction: refreshed.direction as string | null,
+    status: refreshed.status as string | null,
+    realtimeSessionId: refreshedRealtimeSessionId,
+    liveCoachingLinked: pipeline.liveCoachingLinked,
+    liveCoachingFailureReason: pipeline.liveCoachingFailureReason,
+    createdRealtimeSessionId: pipeline.createdRealtimeSessionId,
+    linkResultLinked: pipeline.linkResult?.linked ?? null,
+    linkResultReason: pipeline.linkResult?.reason ?? null,
+  })
   if ((existing.direction as string) === "inbound" && !refreshedRealtimeSessionId) {
     if (!pipeline.liveCoachingFailureReason) {
       pipeline.liveCoachingFailureReason = "realtime_session_not_linked_after_refresh"
