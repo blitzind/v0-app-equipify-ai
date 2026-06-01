@@ -6,7 +6,7 @@ import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import { VOICE_FOUNDATION_QA_MARKER } from "@/lib/voice/types"
 
 export const VOICE_SCHEMA_PROBE_VERSION = "v20" as const
-export const VOICE_SCHEMA_MIGRATION_ID = "20270620120000_voice_multichannel_intelligence_phase_6a" as const
+export const VOICE_SCHEMA_MIGRATION_ID = "20270620120500_voice_multichannel_intelligence_phase_6a" as const
 
 const REQUIRED_TABLES = [
   "voice_numbers",

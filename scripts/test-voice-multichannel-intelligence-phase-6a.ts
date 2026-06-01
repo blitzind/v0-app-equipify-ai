@@ -257,11 +257,12 @@ assert.equal(commandSummary.activeThreadCount, 1)
 // Migration + API + UI
 const migrationPath = path.join(
   process.cwd(),
-  "supabase/migrations/20270620120000_voice_multichannel_intelligence_phase_6a.sql",
+  "supabase/migrations/20270620120500_voice_multichannel_intelligence_phase_6a.sql",
 )
 assert.ok(fs.existsSync(migrationPath))
 assert.ok(fs.readFileSync(migrationPath, "utf8").includes("voice_unified_communication_threads"))
 assert.ok(fs.readFileSync(migrationPath, "utf8").includes("voice_unified_communication_events"))
+assert.ok(fs.readFileSync(migrationPath, "utf8").includes("drop policy if exists voice_unified_comm_threads_select"))
 
 const apiRoutes = [
   "app/api/platform/growth/voice/multichannel-intelligence/readiness/route.ts",

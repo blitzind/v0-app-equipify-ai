@@ -144,10 +144,12 @@ create index if not exists idx_voice_unified_comm_events_org_created
 alter table voice.voice_unified_communication_threads enable row level security;
 alter table voice.voice_unified_communication_events enable row level security;
 
+drop policy if exists voice_unified_comm_threads_select on voice.voice_unified_communication_threads;
 create policy voice_unified_comm_threads_select on voice.voice_unified_communication_threads
   for select to authenticated
   using (organization_id in (select om.organization_id from public.organization_members om where om.user_id = auth.uid()));
 
+drop policy if exists voice_unified_comm_events_select on voice.voice_unified_communication_events;
 create policy voice_unified_comm_events_select on voice.voice_unified_communication_events
   for select to authenticated
   using (organization_id in (select om.organization_id from public.organization_members om where om.user_id = auth.uid()));

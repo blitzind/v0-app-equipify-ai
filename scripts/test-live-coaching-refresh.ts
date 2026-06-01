@@ -65,7 +65,7 @@ const mediaSession = fs.readFileSync(
 assert.match(mediaSession, /bridgeVoiceSegmentToGrowthRealtime/)
 
 const migration = fs.readFileSync(
-  path.join(process.cwd(), "supabase/migrations/20270620120000_voice_growth_live_coaching_bridge.sql"),
+  path.join(process.cwd(), "supabase/migrations/20270620121000_voice_growth_live_coaching_bridge.sql"),
   "utf8",
 )
 assert.match(migration, /source_voice_segment_id/)
