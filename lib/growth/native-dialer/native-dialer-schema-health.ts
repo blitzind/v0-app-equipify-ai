@@ -180,12 +180,26 @@ function buildProbeResult(input: {
   }
 }
 
-export async function probeGrowthNativeDialerSchemaHealth(
-  admin: SupabaseClient,
-): Promise<GrowthNativeDialerSchemaProbeResult> {
+function readCachedGrowthNativeDialerSchemaProbe(): GrowthNativeDialerSchemaProbeResult | null {
   if (cachedProbe && Date.now() < cachedProbe.expiresAt) {
     return cachedProbe.result
   }
+  return null
+}
+
+function writeCachedGrowthNativeDialerSchemaProbe(result: GrowthNativeDialerSchemaProbeResult): void {
+  cachedProbe = { expiresAt: Date.now() + CACHE_MS, result }
+}
+
+export function invalidateGrowthNativeDialerSchemaProbeCache(): void {
+  cachedProbe = null
+}
+
+export async function probeGrowthNativeDialerSchemaHealth(
+  admin: SupabaseClient,
+): Promise<GrowthNativeDialerSchemaProbeResult> {
+  const cached = readCachedGrowthNativeDialerSchemaProbe()
+  if (cached) return cached
 
   const outcomes = await Promise.all(
     GROWTH_NATIVE_DIALER_REQUIRED_TABLES.map(async (tableName) => ({
@@ -205,8 +219,43 @@ export async function probeGrowthNativeDialerSchemaHealth(
   }
 
   const result = buildProbeResult({ detectedTables, missingTables, uncertainTables })
-  cachedProbe = { expiresAt: Date.now() + CACHE_MS, result }
+  writeCachedGrowthNativeDialerSchemaProbe(result)
   return result
+}
+
+export async function probeGrowthNativeDialerSchemaHealthWithBudget(
+  admin: SupabaseClient,
+  budgetMs: number,
+): Promise<GrowthNativeDialerSchemaProbeResult> {
+  const cached = readCachedGrowthNativeDialerSchemaProbe()
+  if (cached) return cached
+
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+  try {
+    const probe = await Promise.race([
+      probeGrowthNativeDialerSchemaHealth(admin).then((result) => {
+        writeCachedGrowthNativeDialerSchemaProbe(result)
+        return result
+      }),
+      new Promise<GrowthNativeDialerSchemaProbeResult | null>((resolve) => {
+        timeoutId = setTimeout(() => resolve(null), budgetMs)
+      }),
+    ])
+
+    if (probe) return probe
+
+    return {
+      qaMarker: GROWTH_NATIVE_DIALER_SCHEMA_HEALTH_QA_MARKER,
+      schemaProbeVersion: GROWTH_NATIVE_DIALER_SCHEMA_PROBE_VERSION,
+      schemaReady: true,
+      probeUncertain: true,
+      missingTables: [],
+      detectedTables: [],
+      setupMessage: "Native dialer schema probe budget exceeded — using fast path.",
+    }
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+  }
 }
 
 export async function isGrowthNativeDialerSchemaReady(admin: SupabaseClient): Promise<boolean> {
@@ -254,6 +303,18 @@ export async function requireGrowthNativeDialerSchemaReady(
   | { ok: false; probe: GrowthNativeDialerSchemaProbeResult; status: number }
 > {
   const probe = await probeGrowthNativeDialerSchemaHealth(admin)
+  if (probe.schemaReady) return { ok: true, probe }
+  return { ok: false, probe, status: 503 }
+}
+
+export async function requireGrowthNativeDialerSchemaReadyWithBudget(
+  admin: SupabaseClient,
+  budgetMs: number,
+): Promise<
+  | { ok: true; probe: GrowthNativeDialerSchemaProbeResult }
+  | { ok: false; probe: GrowthNativeDialerSchemaProbeResult; status: number }
+> {
+  const probe = await probeGrowthNativeDialerSchemaHealthWithBudget(admin, budgetMs)
   if (probe.schemaReady) return { ok: true, probe }
   return { ok: false, probe, status: 503 }
 }

@@ -6,10 +6,12 @@ import { submitGrowthNativeCallWrapup } from "@/lib/growth/native-dialer/native-
 import { GROWTH_NATIVE_DIALER_QA_MARKER, NATIVE_CALL_WRAPUP_OUTCOMES } from "@/lib/growth/native-dialer/native-dialer-types"
 import {
   growthNativeDialerSchemaResponseMeta,
-  requireGrowthNativeDialerSchemaReady,
+  requireGrowthNativeDialerSchemaReadyWithBudget,
 } from "@/lib/growth/native-dialer/native-dialer-schema-health"
 
 export const runtime = "nodejs"
+
+const SCHEMA_PROBE_BUDGET_MS = 500
 
 const bodySchema = z.object({
   sessionId: z.string().uuid(),
@@ -34,7 +36,7 @@ export async function POST(request: Request) {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 
-  const schemaGate = await requireGrowthNativeDialerSchemaReady(access.admin)
+  const schemaGate = await requireGrowthNativeDialerSchemaReadyWithBudget(access.admin, SCHEMA_PROBE_BUDGET_MS)
   if (!schemaGate.ok) {
     return NextResponse.json(
       {

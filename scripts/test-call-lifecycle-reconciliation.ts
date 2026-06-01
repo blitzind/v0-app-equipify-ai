@@ -218,5 +218,29 @@ const wrapupRouteSource = fs.readFileSync(
   "utf8",
 )
 assert.match(wrapupRouteSource, /fetchNativeCallWrapupBySessionId/)
+assert.match(wrapupRouteSource, /requireGrowthNativeDialerSchemaReadyWithBudget/)
+
+const endRouteSource = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/calls/end/route.ts"),
+  "utf8",
+)
+assert.match(endRouteSource, /probeGrowthNativeDialerSchemaHealthWithBudget/)
+
+const workspaceSource = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace.tsx"),
+  "utf8",
+)
+assert.match(workspaceSource, /wrapupConfirmedSessionIdsRef/)
+assert.match(workspaceSource, /finalizeWrapupLocally/)
+assert.match(workspaceSource, /scheduleCallsEndBackgroundRetry/)
+assert.match(workspaceSource, /cancelCallsEndBackgroundRetry/)
+assert.doesNotMatch(workspaceSource, /wrapupSubmittedSessionIdsRef/)
+
+const repositorySource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/native-dialer/native-dialer-repository.ts"),
+  "utf8",
+)
+assert.match(repositorySource, /ensureNativeCallSessionReadyForWrapup/)
+assert.match(repositorySource, /existingStatus === "wrapping"/)
 
 console.log("call-lifecycle-reconciliation checks passed")

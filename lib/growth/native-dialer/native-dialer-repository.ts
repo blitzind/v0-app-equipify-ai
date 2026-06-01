@@ -557,6 +557,13 @@ export async function declineNativeCallSession(
   return mapNativeCallSessionRow(declined as SessionRow)
 }
 
+const PRE_WRAPUP_ENDABLE_SESSION_STATUSES = new Set([
+  "active",
+  "on_hold",
+  "external_bridge_pending",
+  "ringing",
+])
+
 export async function endNativeCallSession(
   admin: SupabaseClient,
   sessionId: string,
@@ -564,6 +571,11 @@ export async function endNativeCallSession(
   const { data: existing, error: fetchError } = await sessionsTable(admin).select(SESSION_SELECT).eq("id", sessionId).maybeSingle()
   if (fetchError) throw new Error(fetchError.message)
   if (!existing) throw new Error("Call session not found.")
+
+  const existingStatus = existing.status as NativeCallWorkspaceSessionPublicView["status"]
+  if (existingStatus === "wrapping" || existingStatus === "completed") {
+    return mapNativeCallSessionRow(existing as SessionRow)
+  }
 
   const connectedAt = existing.connected_at as string | null
   const startedAt = existing.started_at as string
@@ -626,6 +638,24 @@ export async function endNativeCallSession(
   return mapNativeCallSessionRow(data as SessionRow)
 }
 
+export async function ensureNativeCallSessionReadyForWrapup(
+  admin: SupabaseClient,
+  sessionId: string,
+): Promise<void> {
+  const { data: session, error: sessionError } = await sessionsTable(admin)
+    .select("id, status")
+    .eq("id", sessionId)
+    .maybeSingle()
+  if (sessionError) throw new Error(sessionError.message)
+  if (!session) throw new Error("Call session not found.")
+
+  const status = session.status as NativeCallWorkspaceSessionPublicView["status"]
+  if (status === "wrapping" || status === "completed") return
+  if (PRE_WRAPUP_ENDABLE_SESSION_STATUSES.has(status)) {
+    await endNativeCallSession(admin, sessionId)
+  }
+}
+
 export async function saveNativeCallWrapup(
   admin: SupabaseClient,
   input: {
@@ -634,6 +664,8 @@ export async function saveNativeCallWrapup(
     wrapup: NativeCallWrapupInput
   },
 ): Promise<NativeCallWrapupPublicView> {
+  await ensureNativeCallSessionReadyForWrapup(admin, input.sessionId)
+
   const orgId = await getGrowthEngineAiOrgId(admin)
   const { data: session, error: sessionError } = await sessionsTable(admin).select("id, lead_id").eq("id", input.sessionId).maybeSingle()
   if (sessionError) throw new Error(sessionError.message)

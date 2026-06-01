@@ -5,16 +5,18 @@ import { endGrowthNativeCall } from "@/lib/growth/native-dialer/native-dialer-se
 import { GROWTH_NATIVE_DIALER_QA_MARKER } from "@/lib/growth/native-dialer/native-dialer-types"
 import {
   growthNativeDialerSchemaResponseMeta,
-  probeGrowthNativeDialerSchemaHealth,
+  probeGrowthNativeDialerSchemaHealthWithBudget,
 } from "@/lib/growth/native-dialer/native-dialer-schema-health"
 
 export const runtime = "nodejs"
+
+const SCHEMA_PROBE_BUDGET_MS = 500
 
 export async function POST(request: Request) {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 
-  const schemaProbe = await probeGrowthNativeDialerSchemaHealth(access.admin)
+  const schemaProbe = await probeGrowthNativeDialerSchemaHealthWithBudget(access.admin, SCHEMA_PROBE_BUDGET_MS)
   if (!schemaProbe.schemaReady) {
     return NextResponse.json(
       {

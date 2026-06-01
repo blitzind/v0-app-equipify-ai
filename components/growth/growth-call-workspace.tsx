@@ -92,6 +92,14 @@ import {
   type CallLifecycleLockSnapshot,
 } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
 
+const CALLS_END_CLIENT_TIMEOUT_MS = 12_000
+
+function isClientFetchAbortError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === "AbortError") return true
+  if (error instanceof Error && /aborted/i.test(error.message)) return true
+  return false
+}
+
 export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader?: boolean }) {
   const { toast } = useToast()
   const searchParams = useSearchParams()
@@ -133,7 +141,10 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   const completedSessionIdsRef = useRef(new Set<string>())
   const completedVoiceCallIdsRef = useRef(new Set<string>())
   const endCallInFlightRef = useRef(false)
-  const wrapupSubmittedSessionIdsRef = useRef(new Set<string>())
+  const wrapupInFlightSessionIdRef = useRef<string | null>(null)
+  const wrapupConfirmedSessionIdsRef = useRef(new Set<string>())
+  const callsEndRetryEpochRef = useRef(0)
+  const callsEndBackgroundRetryRef = useRef<AbortController | null>(null)
   const lastKnownSessionRef = useRef<NativeCallWorkspaceSessionPublicView | null>(null)
   const operatorAssistStableRef = useRef<import("@/lib/growth/operator-assist/types").UnifiedOperatorAssistSnapshot | null>(null)
   const idleWorkspaceContextRef = useRef<import("@/lib/voice/workspace-context/types").VoiceWorkspaceContextSnapshot | null>(null)
@@ -156,6 +167,9 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
 
   const applyServerSession = useCallback(
     (server: NativeCallWorkspaceSessionPublicView | null | undefined) => {
+      if (server?.id && wrapupConfirmedSessionIdsRef.current.has(server.id)) {
+        return
+      }
       const locks = getLifecycleLocks()
       setActiveSession((prev) => {
         const next = applyServerSessionUnderAuthority({
@@ -735,6 +749,89 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     }
   }
 
+  function cancelCallsEndBackgroundRetry() {
+    callsEndRetryEpochRef.current += 1
+    callsEndBackgroundRetryRef.current?.abort()
+    callsEndBackgroundRetryRef.current = null
+  }
+
+  function scheduleCallsEndBackgroundRetry(sessionId: string, retryEpoch: number) {
+    callsEndBackgroundRetryRef.current?.abort()
+    const controller = new AbortController()
+    callsEndBackgroundRetryRef.current = controller
+    void fetch("/api/platform/growth/calls/end", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId }),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (retryEpoch !== callsEndRetryEpochRef.current) return
+        if (wrapupConfirmedSessionIdsRef.current.has(sessionId)) return
+        if (completedSessionIdsRef.current.has(sessionId)) return
+        if (!res.ok) return
+        const data = (await res.json().catch(() => ({}))) as { session?: NativeCallWorkspaceSessionPublicView }
+        if (data.session) applyServerSession(data.session)
+      })
+      .catch((error) => {
+        if (isClientFetchAbortError(error)) return
+        console.warn("[growth-call-workspace] POST /api/platform/growth/calls/end background retry failed", {
+          sessionId,
+          message: error instanceof Error ? error.message : String(error),
+        })
+      })
+  }
+
+  function finalizeWrapupLocally(input: { sessionId: string; voiceCallId?: string | null }) {
+    registerCompletedCallLifecycle({
+      completedSessionIds: completedSessionIdsRef.current,
+      completedVoiceCallIds: completedVoiceCallIdsRef.current,
+      sessionId: input.sessionId,
+      voiceCallId: input.voiceCallId,
+    })
+    wrapupConfirmedSessionIdsRef.current.add(input.sessionId)
+    cancelCallsEndBackgroundRetry()
+    setCallAuthority((prev) => transitionCallLifecycleAuthority(prev, { type: "wrapup_confirmed" }))
+    setActiveSession(null)
+    lastKnownSessionRef.current = null
+    operatorAssistStableRef.current = null
+    idleWorkspaceContextRef.current = null
+    idleWorkspaceContextKeyRef.current = null
+  }
+
+  async function persistWrapupWithRetry(
+    payload: Record<string, unknown>,
+    sessionId: string,
+  ): Promise<NativeCallWrapupPublicView | null> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const res = await fetch("/api/platform/growth/calls/wrapup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+        const data = (await res.json().catch(() => ({}))) as { wrapup?: NativeCallWrapupPublicView; message?: string }
+        if (res.ok && data.wrapup) return data.wrapup
+        if (attempt === 2) {
+          console.warn("[growth-call-workspace] POST /api/platform/growth/calls/wrapup failed after retries", {
+            sessionId,
+            status: res.status,
+            message: data.message ?? null,
+          })
+        }
+      } catch (error) {
+        if (attempt === 2) {
+          console.warn("[growth-call-workspace] POST /api/platform/growth/calls/wrapup request failed after retries", {
+            sessionId,
+            message: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 800 * (attempt + 1)))
+    }
+    return null
+  }
+
   async function endCall() {
     const sessionToEnd = activeSession ?? incomingSession ?? lastKnownSessionRef.current
     if (!sessionToEnd && !voiceBrowser.hasLiveSdkCall) return
@@ -769,10 +866,14 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
 
     try {
       await voiceBrowser.disconnectActiveCall().catch(() => undefined)
+      setCallAuthority((prev) =>
+        transitionCallLifecycleAuthority(prev, { type: "sdk_disconnected", reason: "operator_end" }),
+      )
       const sessionId = endTarget?.id
+      const endRetryEpoch = callsEndRetryEpochRef.current
       if (sessionId && !sessionId.startsWith("pending-inbound-")) {
         const controller = new AbortController()
-        const timeoutId = window.setTimeout(() => controller.abort(), 12_000)
+        const timeoutId = window.setTimeout(() => controller.abort(), CALLS_END_CLIENT_TIMEOUT_MS)
         try {
           const res = await fetch("/api/platform/growth/calls/end", {
             method: "POST",
@@ -782,7 +883,12 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           })
           const data = (await res.json().catch(() => ({}))) as { session?: NativeCallWorkspaceSessionPublicView }
           if (!res.ok || !data.session) throw new Error("Could not end call.")
-          applyServerSession(data.session)
+          if (
+            endRetryEpoch === callsEndRetryEpochRef.current &&
+            !wrapupConfirmedSessionIdsRef.current.has(sessionId)
+          ) {
+            applyServerSession(data.session)
+          }
         } finally {
           window.clearTimeout(timeoutId)
         }
@@ -790,7 +896,16 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         setCallAuthority((prev) => transitionCallLifecycleAuthority(prev, { type: "sdk_disconnected", reason: "local_end_no_session" }))
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "End failed.")
+      const sessionId = endTarget?.id
+      if (isClientFetchAbortError(e) && sessionId && !sessionId.startsWith("pending-inbound-")) {
+        console.warn("[growth-call-workspace] POST /api/platform/growth/calls/end aborted after client timeout", {
+          sessionId,
+          timeoutMs: CALLS_END_CLIENT_TIMEOUT_MS,
+        })
+        scheduleCallsEndBackgroundRetry(sessionId, callsEndRetryEpochRef.current)
+      } else {
+        setError(e instanceof Error ? e.message : "End failed.")
+      }
     } finally {
       endCallInFlightRef.current = false
     }
@@ -979,17 +1094,15 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       setError("Call session is still syncing. Wait a moment and try again.")
       return null
     }
-    if (wrapupSubmittedSessionIdsRef.current.has(sessionId)) return null
+    if (wrapupConfirmedSessionIdsRef.current.has(sessionId)) {
+      finalizeWrapupLocally({ sessionId, voiceCallId: sessionForWrapup.voiceCallId })
+      return null
+    }
+    if (wrapupInFlightSessionIdRef.current === sessionId) return null
 
-    wrapupSubmittedSessionIdsRef.current.add(sessionId)
+    wrapupInFlightSessionIdRef.current = sessionId
     const companyName = sessionForWrapup.companyName
     const voiceCallId = sessionForWrapup.voiceCallId
-    registerCompletedCallLifecycle({
-      completedSessionIds: completedSessionIdsRef.current,
-      completedVoiceCallIds: completedVoiceCallIdsRef.current,
-      sessionId,
-      voiceCallId,
-    })
     setSubmittingWrapup(true)
     setError(null)
 
@@ -1007,28 +1120,18 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       notes: input.notes ?? "",
     }
 
+    finalizeWrapupLocally({ sessionId, voiceCallId })
+
     try {
-      const res = await fetch("/api/platform/growth/calls/wrapup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-      const data = (await res.json().catch(() => ({}))) as { wrapup?: NativeCallWrapupPublicView; message?: string }
-      if (!res.ok || !data.wrapup) throw new Error(data.message ?? "Wrap-up failed.")
-      setCallAuthority((prev) => transitionCallLifecycleAuthority(prev, { type: "wrapup_confirmed" }))
-      setActiveSession(null)
-      lastKnownSessionRef.current = null
-      operatorAssistStableRef.current = null
-      idleWorkspaceContextRef.current = null
-      idleWorkspaceContextKeyRef.current = null
+      const wrapup = await persistWrapupWithRetry(payload, sessionId)
       void load({ background: true })
       void voiceBrowser.refresh().catch(() => undefined)
-      return data.wrapup
+      return wrapup
     } catch (e) {
-      wrapupSubmittedSessionIdsRef.current.delete(sessionId)
       setError(e instanceof Error ? e.message : "Wrap-up failed.")
       return null
     } finally {
+      wrapupInFlightSessionIdRef.current = null
       setSubmittingWrapup(false)
     }
   }
