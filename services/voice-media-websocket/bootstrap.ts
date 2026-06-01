@@ -28,8 +28,8 @@ export type VoiceMediaWebsocketHostOptions = {
 
 export type VoiceMediaWebsocketHost = {
   server: HttpServer
-  admin: SupabaseClient
-  websocket: VoiceMediaWebSocketServerHandle
+  admin: SupabaseClient | null
+  websocket: VoiceMediaWebSocketServerHandle | null
   port: number
   startedAt: string
   close: (signal?: string) => Promise<void>
@@ -44,6 +44,8 @@ type HealthSnapshot = {
   uptimeSeconds: number
   websocketPath: string
   activeConnections: number
+  startupStatus: "live" | "ready" | "degraded"
+  startupError: string | null
   checks: {
     supabaseConfigured: boolean
     growthOrgConfigured: boolean
@@ -87,6 +89,16 @@ function validateStartupEnv(mode: VoiceMediaWebsocketRuntimeMode): string[] {
   return missing
 }
 
+function buildEnvChecks() {
+  return {
+    supabaseConfigured: Boolean(
+      process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() && process.env.SUPABASE_SERVICE_ROLE_KEY?.trim(),
+    ),
+    growthOrgConfigured: Boolean(process.env.GROWTH_ENGINE_AI_ORG_ID?.trim()),
+    deepgramConfigured: Boolean(process.env.DEEPGRAM_API_KEY?.trim()),
+  }
+}
+
 async function probeSupabase(admin: SupabaseClient): Promise<boolean> {
   try {
     const { error } = await admin.schema("voice").from("voice_media_sessions").select("id").limit(1)
@@ -96,36 +108,60 @@ async function probeSupabase(admin: SupabaseClient): Promise<boolean> {
   }
 }
 
-async function buildHealthSnapshot(
-  admin: SupabaseClient,
-  websocket: VoiceMediaWebSocketServerHandle,
-  mode: VoiceMediaWebsocketRuntimeMode,
-  startedAt: number,
-  includeSupabaseProbe: boolean,
-): Promise<HealthSnapshot> {
-  const checks = {
-    supabaseConfigured: Boolean(
-      process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() && process.env.SUPABASE_SERVICE_ROLE_KEY?.trim(),
-    ),
-    growthOrgConfigured: Boolean(process.env.GROWTH_ENGINE_AI_ORG_ID?.trim()),
-    deepgramConfigured: Boolean(process.env.DEEPGRAM_API_KEY?.trim()),
-  }
-  const supabaseReachable = includeSupabaseProbe ? await probeSupabase(admin) : null
-  const configOk = checks.supabaseConfigured && checks.growthOrgConfigured
-  const readyOk = configOk && (supabaseReachable ?? true)
-
+function buildLivenessSnapshot(input: {
+  mode: VoiceMediaWebsocketRuntimeMode
+  startedAt: number
+  websocket: VoiceMediaWebSocketServerHandle | null
+  startupError: string | null
+  websocketReady: boolean
+}): HealthSnapshot {
+  const checks = buildEnvChecks()
   return {
-    ok: readyOk,
+    ok: true,
     service: VOICE_MEDIA_WEBSOCKET_SERVICE_NAME,
     version: VOICE_MEDIA_WEBSOCKET_SERVICE_VERSION,
     qaMarker: VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER,
-    mode,
-    uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
+    mode: input.mode,
+    uptimeSeconds: Math.floor((Date.now() - input.startedAt) / 1000),
     websocketPath: getTwilioMediaWebSocketPath(),
-    activeConnections: websocket.getActiveConnectionCount(),
+    activeConnections: input.websocket?.getActiveConnectionCount() ?? 0,
+    startupStatus: input.startupError ? "degraded" : input.websocketReady ? "ready" : "live",
+    startupError: input.startupError,
     checks,
+    supabaseReachable: null,
+    message: input.startupError
+      ? "Voice media websocket service is live but media ingestion is not initialized."
+      : "Voice media websocket service is live.",
+  }
+}
+
+async function buildReadinessSnapshot(input: {
+  admin: SupabaseClient | null
+  mode: VoiceMediaWebsocketRuntimeMode
+  startedAt: number
+  websocket: VoiceMediaWebSocketServerHandle | null
+  startupError: string | null
+  websocketReady: boolean
+}): Promise<HealthSnapshot> {
+  const liveness = buildLivenessSnapshot(input)
+  if (input.startupError || !input.admin || !input.websocketReady) {
+    return {
+      ...liveness,
+      ok: false,
+      startupStatus: "degraded",
+      message: input.startupError ?? "Voice media websocket service is live but not ready for media ingestion.",
+    }
+  }
+
+  const supabaseReachable = await probeSupabase(input.admin)
+  const ok = liveness.checks.supabaseConfigured && liveness.checks.growthOrgConfigured && supabaseReachable
+
+  return {
+    ...liveness,
+    ok,
+    startupStatus: ok ? "ready" : "degraded",
     supabaseReachable,
-    message: readyOk
+    message: ok
       ? "Voice media websocket service is ready for Twilio Media Streams."
       : "Voice media websocket service is running but readiness checks failed.",
   }
@@ -136,20 +172,26 @@ function writeJson(res: http.ServerResponse, status: number, body: unknown): voi
   res.end(JSON.stringify(body))
 }
 
+function listen(server: HttpServer, port: number, host: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    server.listen(port, host, () => resolve())
+    server.on("error", reject)
+  })
+}
+
 export async function createVoiceMediaWebsocketHost(
   options: VoiceMediaWebsocketHostOptions = {},
 ): Promise<VoiceMediaWebsocketHost> {
   const mode = options.mode ?? (process.env.NODE_ENV === "production" ? "production" : "development")
-  const missing = validateStartupEnv(mode)
-  if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(", ")}`)
-  }
-
   const port = resolveListenPort(options.port)
   const host = options.host ?? "0.0.0.0"
   const shutdownTimeoutMs = options.shutdownTimeoutMs ?? 30_000
   const startedAt = Date.now()
-  const admin = createServiceRoleSupabaseClient()
+
+  let admin: SupabaseClient | null = null
+  let websocket: VoiceMediaWebSocketServerHandle | null = null
+  let startupError: string | null = null
+  let websocketReady = false
 
   const server = http.createServer((req, res) => {
     void (async () => {
@@ -159,25 +201,35 @@ export async function createVoiceMediaWebsocketHost(
       }
 
       const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`)
+      const snapshotInput = {
+        admin,
+        mode,
+        startedAt,
+        websocket,
+        startupError,
+        websocketReady,
+      }
 
       if (url.pathname === "/health") {
-        const snapshot = await buildHealthSnapshot(admin, websocket, mode, startedAt, false)
-        writeJson(res, snapshot.ok ? 200 : 503, snapshot)
+        const snapshot = buildLivenessSnapshot(snapshotInput)
+        writeJson(res, 200, snapshot)
         return
       }
 
       if (url.pathname === "/ready") {
-        const snapshot = await buildHealthSnapshot(admin, websocket, mode, startedAt, true)
+        const snapshot = await buildReadinessSnapshot(snapshotInput)
         writeJson(res, snapshot.ok ? 200 : 503, snapshot)
         return
       }
 
       if (url.pathname === getTwilioMediaWebSocketPath() && req.method === "GET") {
-        const snapshot = await buildHealthSnapshot(admin, websocket, mode, startedAt, false)
+        const snapshot = buildLivenessSnapshot(snapshotInput)
         writeJson(res, 200, {
           ...snapshot,
-          ok: true,
-          message: "Twilio Media Streams websocket endpoint is reachable.",
+          ok: websocketReady,
+          message: websocketReady
+            ? "Twilio Media Streams websocket endpoint is reachable."
+            : "Twilio Media Streams websocket endpoint is live but ingestion is not initialized.",
           supportedEvents: ["connected", "start", "media", "mark", "stop"],
         })
         return
@@ -192,18 +244,21 @@ export async function createVoiceMediaWebsocketHost(
     })
   })
 
-  const websocket = attachTwilioMediaWebSocketUpgradeHandler(server, admin)
-
   const close = async (signal = "manual"): Promise<void> => {
     if (shuttingDown) return
     shuttingDown = true
-    logService("shutdown_started", { signal, activeConnections: websocket.getActiveConnectionCount() })
+    logService("shutdown_started", {
+      signal,
+      activeConnections: websocket?.getActiveConnectionCount() ?? 0,
+    })
 
     await new Promise<void>((resolve) => {
       server.close(() => resolve())
     })
 
-    await websocket.close(shutdownTimeoutMs)
+    if (websocket) {
+      await websocket.close(shutdownTimeoutMs)
+    }
     logService("shutdown_complete", { signal })
   }
 
@@ -216,18 +271,41 @@ export async function createVoiceMediaWebsocketHost(
     close,
   }
 
-  await new Promise<void>((resolve, reject) => {
-    server.listen(port, host, () => resolve())
-    server.on("error", reject)
-  })
-
-  logService("startup_complete", {
+  await listen(server, port, host)
+  logService("listening", {
     mode,
     port,
     host,
     websocketPath: getTwilioMediaWebSocketPath(),
-    publicOriginHint: process.env.VOICE_MEDIA_STREAM_PUBLIC_ORIGIN ?? null,
   })
+
+  try {
+    const missing = validateStartupEnv(mode)
+    if (missing.length > 0) {
+      throw new Error(`Missing required environment variables: ${missing.join(", ")}`)
+    }
+
+    admin = createServiceRoleSupabaseClient()
+    websocket = attachTwilioMediaWebSocketUpgradeHandler(server, admin)
+    websocketReady = true
+    hostRef.admin = admin
+    hostRef.websocket = websocket
+
+    logService("startup_complete", {
+      mode,
+      port,
+      host,
+      websocketPath: getTwilioMediaWebSocketPath(),
+      publicOriginHint: process.env.VOICE_MEDIA_STREAM_PUBLIC_ORIGIN ?? null,
+    })
+  } catch (error) {
+    startupError = error instanceof Error ? error.message : String(error)
+    logService("startup_degraded", {
+      mode,
+      port,
+      message: startupError,
+    })
+  }
 
   return hostRef
 }

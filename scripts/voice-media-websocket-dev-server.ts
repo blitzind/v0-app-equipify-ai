@@ -9,5 +9,19 @@ import {
   registerVoiceMediaWebsocketSignalHandlers,
 } from "../services/voice-media-websocket/bootstrap"
 
-const host = await createVoiceMediaWebsocketHost({ mode: "development" })
-registerVoiceMediaWebsocketSignalHandlers(host)
+async function main(): Promise<void> {
+  const host = await createVoiceMediaWebsocketHost({ mode: "development" })
+  registerVoiceMediaWebsocketSignalHandlers(host)
+}
+
+main().catch((error) => {
+  console.error(
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      service: "voice-media-websocket",
+      event: "startup_failed",
+      message: error instanceof Error ? error.message : String(error),
+    }),
+  )
+  process.exit(1)
+})

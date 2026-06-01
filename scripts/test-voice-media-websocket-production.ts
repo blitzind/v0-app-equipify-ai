@@ -6,6 +6,23 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 
+function assertNoTopLevelAwait(source: string, label: string): void {
+  const lines = source.split("\n")
+  let depth = 0
+  for (const [index, line] of lines.entries()) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("*")) continue
+
+    const openCount = (line.match(/\{/g) ?? []).length
+    const closeCount = (line.match(/\}/g) ?? []).length
+    const isTopLevelAwait = depth === 0 && /^\s*await\s+/.test(line)
+    assert.ok(!isTopLevelAwait, `${label} must not use top-level await (line ${index + 1}): ${trimmed}`)
+
+    depth += openCount - closeCount
+    if (depth < 0) depth = 0
+  }
+}
+
 const bootstrapSource = fs.readFileSync(
   path.join(process.cwd(), "services/voice-media-websocket/bootstrap.ts"),
   "utf8",
@@ -15,12 +32,20 @@ assert.match(bootstrapSource, /\/health/)
 assert.match(bootstrapSource, /\/ready/)
 assert.match(bootstrapSource, /registerVoiceMediaWebsocketSignalHandlers/)
 assert.match(bootstrapSource, /SIGTERM/)
+assert.match(bootstrapSource, /logService\("listening"/)
+assert.match(bootstrapSource, /resolveListenPort/)
+assert.match(bootstrapSource, /8080/)
+assertNoTopLevelAwait(bootstrapSource, "bootstrap.ts")
 
 const serverSource = fs.readFileSync(
   path.join(process.cwd(), "services/voice-media-websocket/server.ts"),
   "utf8",
 )
+assert.match(serverSource, /async function main\(\)/)
+assert.match(serverSource, /main\(\)\.catch/)
 assert.match(serverSource, /mode: "production"/)
+assert.doesNotMatch(serverSource, /^const host = await/m)
+assertNoTopLevelAwait(serverSource, "server.ts")
 
 const wsServerSource = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/media-streaming/twilio-media-websocket-server.ts"),
@@ -54,5 +79,7 @@ const devServer = fs.readFileSync(
   "utf8",
 )
 assert.match(devServer, /services\/voice-media-websocket\/bootstrap/)
+assert.match(devServer, /async function main\(\)/)
+assertNoTopLevelAwait(devServer, "voice-media-websocket-dev-server.ts")
 
 console.log("voice-media-websocket-production checks passed")
