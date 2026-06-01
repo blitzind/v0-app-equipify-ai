@@ -77,6 +77,15 @@ const workspaceBridge = fs.readFileSync(
   "utf8",
 )
 assert.match(workspaceBridge, /ensureInboundCallWorkspaceLiveCoachingLinked/)
+assert.match(workspaceBridge, /workspaceSessionId\?: string \| null/)
+assert.match(workspaceBridge, /sessionQuery = sessionQuery\.eq\("id", input\.workspaceSessionId\)/)
+assert.match(workspaceBridge, /sessionQuery = sessionQuery\.eq\("owner_user_id", input\.userId\)/)
+assert.match(workspaceBridge, /nativeSessionId: sessionRow\.id as string/)
+assert.doesNotMatch(
+  workspaceBridge,
+  /\.eq\("voice_call_id", input\.voiceCallId\)\s*\.maybeSingle\(\)/,
+  "inbound reconciliation must not assume one native session per voice_call_id",
+)
 
 const syncCoach = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/live-coaching/sync-conversation-coach.ts"),
@@ -115,6 +124,14 @@ const coachingServiceHardening = fs.readFileSync(
 )
 assert.match(coachingServiceHardening, /voice_growth_coaching_native_linked/)
 assert.match(coachingServiceHardening, /voice_growth_coaching_orphan_cleanup_failed/)
+assert.match(coachingServiceHardening, /nativeSessionId\?: string \| null/)
+assert.match(coachingServiceHardening, /sessionQuery = sessionQuery\s*\n\s*\.eq\("id", input\.nativeSessionId\)/)
+assert.match(coachingServiceHardening, /\.in\("status", \["active", "on_hold"\]\)/)
+assert.doesNotMatch(
+  coachingServiceHardening,
+  /\.eq\("voice_call_id", input\.voiceCallId\)\s*\.in\("status", \[\.\.\.ACTIVE_NATIVE_WORKSPACE_STATUSES\]\)/,
+  "voice_call_id fallback must not prefer ringing offer rows over the accepted active session",
+)
 
 const nativeDialerRepo = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/native-dialer/native-dialer-repository.ts"),

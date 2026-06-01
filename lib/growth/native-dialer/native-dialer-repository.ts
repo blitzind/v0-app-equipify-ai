@@ -506,7 +506,12 @@ export async function answerNativeCallSession(
     .select(SESSION_SELECT)
     .single()
   if (activeError) throw new Error(activeError.message)
-  await syncWorkspaceSessionFromVoiceCall(admin, { voiceCallId: voiceCallId!, organizationId: orgId })
+  await syncWorkspaceSessionFromVoiceCall(admin, {
+    voiceCallId: voiceCallId!,
+    organizationId: orgId,
+    workspaceSessionId: sessionId,
+    userId: ownerUserId ?? null,
+  })
 
   pipeline.mediaStreamWssHost = describeVoiceMediaStreamWssTarget(null).wssHost
 
@@ -822,7 +827,11 @@ export async function endNativeCallSession(
       payloadJson: { source: "call_workspace", sessionId },
       idempotencyKey: `workspace:${sessionId}:completed`,
     })
-    await syncWorkspaceSessionFromVoiceCall(admin, { voiceCallId, organizationId: orgId })
+    await syncWorkspaceSessionFromVoiceCall(admin, {
+      voiceCallId,
+      organizationId: orgId,
+      workspaceSessionId: sessionId,
+    })
   }
 
   const { data, error } = await sessionsTable(admin)

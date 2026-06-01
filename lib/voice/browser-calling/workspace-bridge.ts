@@ -110,7 +110,7 @@ export async function createVoiceCallForWorkspaceSession(
 
 export async function syncWorkspaceSessionFromVoiceCall(
   admin: SupabaseClient,
-  input: { voiceCallId: string; organizationId: string },
+  input: { voiceCallId: string; organizationId: string; workspaceSessionId?: string | null; userId?: string | null },
 ): Promise<void> {
   const { data: callRow, error: callError } = await admin
     .schema("voice")
@@ -122,10 +122,26 @@ export async function syncWorkspaceSessionFromVoiceCall(
   if (callError) throw new Error(callError.message)
   if (!callRow) return
 
-  const { data: sessionRow } = await sessionsTable(admin)
+  let sessionQuery = sessionsTable(admin)
     .select(SESSION_SELECT)
+    .eq("organization_id", input.organizationId)
     .eq("voice_call_id", input.voiceCallId)
+
+  if (input.workspaceSessionId) {
+    sessionQuery = sessionQuery.eq("id", input.workspaceSessionId)
+  } else if (callRow.assigned_user_id) {
+    sessionQuery = sessionQuery.eq("owner_user_id", callRow.assigned_user_id as string)
+  } else if (input.userId) {
+    sessionQuery = sessionQuery.eq("owner_user_id", input.userId)
+  }
+
+  const { data: sessionRow, error: sessionError } = await sessionQuery
+    .order("connected_at", { ascending: false, nullsFirst: false })
+    .order("updated_at", { ascending: false, nullsFirst: false })
+    .order("started_at", { ascending: false, nullsFirst: false })
+    .limit(1)
     .maybeSingle()
+  if (sessionError) throw new Error(sessionError.message)
   if (!sessionRow) return
 
   const nativeStatus = resolveInboundNativeSessionStatusFromVoiceCall({
@@ -166,6 +182,7 @@ export async function syncWorkspaceSessionFromVoiceCall(
     try {
       await ensureInboundCallWorkspaceLiveCoachingLinked(admin, {
         voiceCallId: input.voiceCallId,
+        nativeSessionId: sessionRow.id as string,
         createdBy: (sessionRow.owner_user_id as string | null) ?? null,
       })
     } catch (error) {
@@ -374,6 +391,8 @@ export async function buildVoiceBrowserSyncSnapshot(
         syncWorkspaceSessionFromVoiceCall(admin, {
           voiceCallId: activeVoiceCallId,
           organizationId: input.organizationId,
+          workspaceSessionId,
+          userId: input.userId,
         }),
       )
     }

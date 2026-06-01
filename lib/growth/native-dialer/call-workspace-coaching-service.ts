@@ -395,15 +395,32 @@ export async function attachCallWorkspaceLead(
  */
 export async function ensureInboundCallWorkspaceLiveCoachingLinked(
   admin: SupabaseClient,
-  input: { voiceCallId: string; createdBy?: string | null; userEmail?: string | null },
+  input: {
+    voiceCallId: string
+    nativeSessionId?: string | null
+    createdBy?: string | null
+    userEmail?: string | null
+  },
 ): Promise<string | null> {
-  const { data: sessionRow, error } = await admin
+  let sessionQuery = admin
     .schema("growth")
     .from("native_call_workspace_sessions")
     .select("id, direction, realtime_session_id, owner_user_id, status")
-    .eq("voice_call_id", input.voiceCallId)
     .eq("direction", "inbound")
-    .in("status", [...ACTIVE_NATIVE_WORKSPACE_STATUSES])
+
+  if (input.nativeSessionId) {
+    sessionQuery = sessionQuery
+      .eq("id", input.nativeSessionId)
+      .in("status", [...ACTIVE_NATIVE_WORKSPACE_STATUSES])
+  } else {
+    sessionQuery = sessionQuery
+      .eq("voice_call_id", input.voiceCallId)
+      .in("status", ["active", "on_hold"])
+  }
+
+  const { data: sessionRow, error } = await sessionQuery
+    .order("connected_at", { ascending: false, nullsFirst: false })
+    .order("updated_at", { ascending: false, nullsFirst: false })
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle()
