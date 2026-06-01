@@ -66,6 +66,8 @@ const coachingService = fs.readFileSync(
 )
 assert.match(coachingService, /ensureInboundCallWorkspaceLiveCoachingLinked/)
 assert.match(coachingService, /voice_growth_coaching_auto_linked/)
+assert.match(coachingService, /completeOrphanedActiveRealtimeCoachingSessionsForLead/)
+assert.match(coachingService, /voice_growth_coaching_session_created/)
 
 const workspaceBridge = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/browser-calling/workspace-bridge.ts"),

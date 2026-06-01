@@ -273,7 +273,14 @@ export async function findActiveRealtimeSessionIdForVoiceCall(
     .limit(1)
     .maybeSingle()
   if (error) throw new Error(error.message)
-  return (data?.realtime_session_id as string | null) ?? null
+  const realtimeSessionId = (data?.realtime_session_id as string | null) ?? null
+  if (!realtimeSessionId) return null
+
+  const session = await fetchGrowthRealtimeCallSession(admin, realtimeSessionId)
+  if (!session || session.status === "completed" || session.status === "discarded") {
+    return null
+  }
+  return realtimeSessionId
 }
 
 export async function appendGrowthRealtimeTranscriptEventFromVoiceSegment(

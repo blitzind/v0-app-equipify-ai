@@ -17,6 +17,9 @@ import {
   createVoiceCallForWorkspaceSession,
   syncWorkspaceSessionFromVoiceCall,
 } from "@/lib/voice/browser-calling/workspace-bridge"
+import {
+  completeCallWorkspaceLiveCoachingForNativeSession,
+} from "@/lib/growth/native-dialer/call-workspace-coaching-lifecycle"
 import { appendVoiceCallEvent } from "@/lib/voice/repository/voice-repository"
 import {
   INBOUND_RING_DIAG_EVENTS,
@@ -537,6 +540,9 @@ export async function declineNativeCallSession(
     .select(SESSION_SELECT)
     .single()
   if (error) throw new Error(error.message)
+  await completeCallWorkspaceLiveCoachingForNativeSession(admin, { nativeSessionId: sessionId }).catch(
+    () => undefined,
+  )
   return mapNativeCallSessionRow(declined as SessionRow)
 }
 
@@ -603,6 +609,9 @@ export async function endNativeCallSession(
     .select(SESSION_SELECT)
     .single()
   if (error) throw new Error(error.message)
+  await completeCallWorkspaceLiveCoachingForNativeSession(admin, { nativeSessionId: sessionId }).catch(
+    () => undefined,
+  )
   return mapNativeCallSessionRow(data as SessionRow)
 }
 
@@ -656,6 +665,10 @@ export async function saveNativeCallWrapup(
   await sessionsTable(admin)
     .update({ status: "completed", updated_at: now })
     .eq("id", input.sessionId)
+
+  await completeCallWorkspaceLiveCoachingForNativeSession(admin, { nativeSessionId: input.sessionId }).catch(
+    () => undefined,
+  )
 
   return mapWrapupRow(data as WrapupRow)
 }

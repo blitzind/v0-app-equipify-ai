@@ -9,7 +9,6 @@ import {
 } from "@/lib/growth/realtime/run-realtime-call-session"
 import {
   fetchGrowthRealtimeCallSession,
-  listGrowthRealtimeCallSessionsForLead,
 } from "@/lib/growth/realtime/realtime-call-repository"
 import type { GrowthLiveCoachingState } from "@/lib/growth/live-guidance/live-guidance-types"
 import type { GrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-types"
@@ -18,6 +17,9 @@ import {
   ensureCallWorkspaceTranscriptAnchorLead,
 } from "@/lib/growth/native-dialer/call-workspace-coaching-lead"
 import type { CallWorkspaceCoachingMode } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
+import {
+  completeOrphanedActiveRealtimeCoachingSessionsForLead,
+} from "@/lib/growth/native-dialer/call-workspace-coaching-lifecycle"
 import {
   attachLeadToNativeCallSession,
   fetchNativeCallSessionById,
@@ -80,10 +82,6 @@ export async function fetchCallWorkspaceLiveCoaching(
   let realtimeSession: GrowthRealtimeCallSession | null = null
   if (nativeSession.realtimeSessionId) {
     realtimeSession = await fetchGrowthRealtimeCallSession(admin, nativeSession.realtimeSessionId)
-  } else {
-    const sessions = await listGrowthRealtimeCallSessionsForLead(admin, coachingLeadId)
-    realtimeSession =
-      sessions.find((session) => ["preparing", "active", "paused"].includes(session.status)) ?? null
   }
 
   let coachingState: GrowthLiveCoachingState | null = null
@@ -118,16 +116,24 @@ export async function startCallWorkspaceLiveCoaching(
       ? await fetchGrowthRealtimeCallSession(admin, nativeSession.realtimeSessionId)
       : null
 
-  if (!realtimeSession) {
-    const existing = await listGrowthRealtimeCallSessionsForLead(admin, coachingLeadId)
-    realtimeSession =
-      existing.find((session) => ["preparing", "active", "paused"].includes(session.status)) ?? null
+  if (
+    realtimeSession &&
+    (realtimeSession.status === "completed" || realtimeSession.status === "discarded")
+  ) {
+    realtimeSession = null
   }
 
   if (!realtimeSession) {
+    await completeOrphanedActiveRealtimeCoachingSessionsForLead(admin, coachingLeadId)
     realtimeSession = await createGrowthRealtimeCallSession(admin, {
       leadId: coachingLeadId,
       createdBy: input.createdBy ?? null,
+    })
+    logVoiceInfrastructure("voice_growth_coaching_session_created", {
+      nativeSessionId: nativeSession.id,
+      realtimeSessionId: realtimeSession.id,
+      coachingLeadId,
+      voiceCallId: nativeSession.voiceCallId ?? null,
     })
   }
 

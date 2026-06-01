@@ -112,6 +112,7 @@
     "test:growth-realtime-call-intelligence": "tsx scripts/test-growth-realtime-call-intelligence.ts",
     "test:growth-live-guidance": "tsx scripts/test-growth-live-guidance.ts",
     "test:live-coaching-refresh": "tsx scripts/test-live-coaching-refresh.ts",
+    "test:live-coaching-session-lifecycle": "tsx scripts/test-live-coaching-session-lifecycle.ts",
     "test:growth-realtime-providers": "tsx scripts/test-growth-realtime-providers.ts",
     "test:growth-browser-audio-capture": "tsx scripts/test-growth-browser-audio-capture.ts",
     "test:growth-meeting-capture": "tsx scripts/test-growth-meeting-capture.ts",
