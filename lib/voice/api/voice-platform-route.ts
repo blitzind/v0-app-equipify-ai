@@ -37,7 +37,7 @@ export async function requireVoicePlatformRouteContext(): Promise<VoicePlatformR
   }
 
   const schemaProbe = await probeVoiceSchemaHealth(access.admin)
-  if (!schemaProbe.ready) {
+  if (schemaProbe.missingTables.length > 0) {
     return {
       ok: false,
       response: NextResponse.json(
@@ -46,6 +46,7 @@ export async function requireVoicePlatformRouteContext(): Promise<VoicePlatformR
           error: "voice_schema_incomplete",
           message: schemaProbe.message,
           qaMarker: VOICE_OPERATIONS_QA_MARKER,
+          probeUncertain: schemaProbe.probeUncertain,
         },
         { status: 503 },
       ),

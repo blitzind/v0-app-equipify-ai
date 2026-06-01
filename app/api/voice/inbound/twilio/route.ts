@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isGrowthEngineEnabledEnv } from "@/lib/growth/access"
 import { buildVoiceRecordingCallbackUrl } from "@/lib/voice/call-control/urls"
+import { buildTwilioSayAndHangup } from "@/lib/voice/call-control/twilio-twiml"
 import { handleTwilioInboundCall } from "@/lib/voice/call-control/inbound-handler"
 import { VOICE_CALL_CONTROL_QA_MARKER } from "@/lib/voice/call-control/types"
 import { probeVoiceSchemaHealth, isVoiceWebhookSchemaReady } from "@/lib/voice/schema-health"
@@ -12,72 +13,85 @@ import { validateTwilioIncomingWebhook } from "@/lib/voice/webhooks/twilio-incom
 
 export const runtime = "nodejs"
 
+function twimlResponse(body: string, status = 200): NextResponse {
+  return new NextResponse(body, {
+    status,
+    headers: {
+      "Content-Type": "application/xml",
+      "X-Voice-QA-Marker": VOICE_CALL_CONTROL_QA_MARKER,
+    },
+  })
+}
+
+function fallbackInboundTwiml(message: string): string {
+  return buildTwilioSayAndHangup(message)
+}
+
 export async function POST(request: Request) {
   if (!isGrowthEngineEnabledEnv()) {
-    return new NextResponse("<Response><Reject/></Response>", {
-      status: 403,
-      headers: { "Content-Type": "application/xml" },
-    })
+    return twimlResponse("<Response><Reject/></Response>", 403)
   }
 
   let admin
   try {
     admin = createServiceRoleSupabaseClient()
   } catch {
-    return new NextResponse("<Response><Say>Server configuration error.</Say></Response>", {
-      status: 503,
-      headers: { "Content-Type": "application/xml" },
-    })
+    return twimlResponse(fallbackInboundTwiml("Server configuration error."), 503)
   }
 
   const schemaProbe = await probeVoiceSchemaHealth(admin)
   if (!isVoiceWebhookSchemaReady(schemaProbe)) {
-    return new NextResponse("<Response><Say>Voice schema unavailable.</Say></Response>", {
-      status: 503,
-      headers: { "Content-Type": "application/xml" },
-    })
-  }
-
-  const rawBody = await request.text()
-  const formParams = parseTwilioFormBody(rawBody)
-  const payload = twilioFormBodyToPayload(formParams)
-  const signatureHeader = request.headers.get("x-twilio-signature")
-  const validationUrl = resolveTwilioWebhookValidationUrl(request)
-
-  const validation = await validateTwilioIncomingWebhook({
-    signatureHeader,
-    requestUrl: validationUrl,
-    rawBody,
-    params: formParams,
-  })
-  if (!validation.ok) {
-    logVoiceInfrastructure("voice_webhook_signature_failed", {
+    logVoiceInfrastructure("voice_inbound_schema_unavailable", {
       qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
-      route: "inbound",
-      message: validation.message,
-      validation_url: validationUrl,
-      request_url: request.url,
+      missingTables: schemaProbe.missingTables,
+      probeUncertain: schemaProbe.probeUncertain,
     })
-    return new NextResponse("<Response><Reject/></Response>", {
-      status: 401,
-      headers: { "Content-Type": "application/xml" },
-    })
+    return twimlResponse(fallbackInboundTwiml("Voice calling is temporarily unavailable."), 503)
   }
 
-  const origin = new URL(validationUrl).origin
-  const result = await handleTwilioInboundCall({
-    admin,
-    payload,
-    recordingCallbackUrl: buildVoiceRecordingCallbackUrl(origin),
-    statusCallbackUrl: `${origin}/api/voice/webhooks/twilio`,
-    mediaStreamOrigin: origin,
-  })
+  try {
+    const rawBody = await request.text()
+    const formParams = parseTwilioFormBody(rawBody)
+    const payload = twilioFormBodyToPayload(formParams)
+    const signatureHeader = request.headers.get("x-twilio-signature")
+    const validationUrl = resolveTwilioWebhookValidationUrl(request)
 
-  return new NextResponse(result.twiml, {
-    status: result.ok ? 200 : 404,
-    headers: {
-      "Content-Type": "application/xml",
-      "X-Voice-QA-Marker": VOICE_CALL_CONTROL_QA_MARKER,
-    },
-  })
+    const validation = await validateTwilioIncomingWebhook({
+      signatureHeader,
+      requestUrl: validationUrl,
+      rawBody,
+      params: formParams,
+    })
+    if (!validation.ok) {
+      logVoiceInfrastructure("voice_webhook_signature_failed", {
+        qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
+        route: "inbound",
+        message: validation.message,
+        validation_url: validationUrl,
+        request_url: request.url,
+      })
+      return twimlResponse("<Response><Reject/></Response>", 401)
+    }
+
+    const origin = new URL(validationUrl).origin
+    const result = await handleTwilioInboundCall({
+      admin,
+      payload,
+      recordingCallbackUrl: buildVoiceRecordingCallbackUrl(origin),
+      statusCallbackUrl: `${origin}/api/voice/webhooks/twilio`,
+      mediaStreamOrigin: origin,
+    })
+
+    return twimlResponse(result.twiml, result.ok ? 200 : 404)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown inbound webhook error"
+    logVoiceInfrastructure("voice_inbound_webhook_failed", {
+      qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
+      message,
+    })
+    return twimlResponse(
+      fallbackInboundTwiml("We are unable to connect your call right now."),
+      200,
+    )
+  }
 }

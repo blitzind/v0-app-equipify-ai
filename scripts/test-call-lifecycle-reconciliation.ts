@@ -3,6 +3,8 @@
  * Run: pnpm test:call-lifecycle-reconciliation
  */
 import assert from "node:assert/strict"
+import fs from "node:fs"
+import path from "node:path"
 import { resolveInboundWorkspacePhase } from "../lib/voice/browser-calling/browser-incoming-call"
 import {
   buildOptimisticWrappingSession,
@@ -62,8 +64,10 @@ const activeSession: NativeCallWorkspaceSessionPublicView = {
 const acceptedVoiceCallIds = new Set(["vc-1"])
 const acceptedSessionIds = new Set(["sess-1"])
 const endedVoiceCallIds = new Set<string>()
+const endedSessionIds = new Set<string>()
+const completedSessionIds = new Set<string>()
 
-assert.equal(CALL_LIFECYCLE_RECONCILIATION_QA_MARKER, "call-lifecycle-reconciliation-v1")
+assert.equal(CALL_LIFECYCLE_RECONCILIATION_QA_MARKER, "call-lifecycle-reconciliation-v2")
 
 assert.equal(
   shouldApplyInboundOfferToSession({
@@ -104,13 +108,42 @@ assert.equal(wrappingSession.status, "wrapping")
 assert.ok(wrappingSession.endedAt)
 assert.equal(wrappingSession.durationSeconds, 295)
 
+const staleServerActive: NativeCallWorkspaceSessionPublicView = { ...activeSession }
 const mergedAfterEnd = mergeServerSessionIntoLocal({
+  local: wrappingSession,
+  server: staleServerActive,
+  acceptedSessionIds,
+  endedVoiceCallIds: new Set(["vc-1"]),
+  endedSessionIds: new Set(["sess-1"]),
+})
+assert.equal(mergedAfterEnd?.status, "wrapping", "merge must not resurrect active after local end")
+
+const mergedAfterEndRinging = mergeServerSessionIntoLocal({
   local: wrappingSession,
   server: staleServerRinging,
   acceptedSessionIds,
   endedVoiceCallIds: new Set(["vc-1"]),
 })
-assert.equal(mergedAfterEnd?.status, "wrapping", "merge must not resurrect ringing after local end")
+assert.equal(mergedAfterEndRinging?.status, "wrapping", "merge must not resurrect ringing after local end")
+
+const rehydrateBlocked = mergeServerSessionIntoLocal({
+  local: null,
+  server: staleServerActive,
+  acceptedSessionIds,
+  endedVoiceCallIds: new Set(["vc-1"]),
+  endedSessionIds: new Set(["sess-1"]),
+})
+assert.equal(rehydrateBlocked, null, "dashboard sync must not rehydrate ended active session")
+
+const wrapupLoopBlocked = mergeServerSessionIntoLocal({
+  local: null,
+  server: wrappingSession,
+  acceptedSessionIds,
+  endedVoiceCallIds,
+  endedSessionIds,
+  completedSessionIds: new Set(["sess-1"]),
+})
+assert.equal(wrapupLoopBlocked, null, "completed wrap-up must not rehydrate wrapping session")
 
 assert.equal(
   resolveInboundWorkspacePhase({ activeSessionStatus: "active", sdkIncoming: true }),
@@ -123,5 +156,19 @@ assert.equal(
   "wrapup",
   "wrapping session must win over stale sdkIncoming",
 )
+
+const schemaHealthSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/schema-health.ts"),
+  "utf8",
+)
+assert.match(schemaHealthSource, /ready = missingTables\.length === 0/)
+assert.match(schemaHealthSource, /missingTables\.length === 0/)
+
+const inboundRouteSource = fs.readFileSync(
+  path.join(process.cwd(), "app/api/voice/inbound/twilio/route.ts"),
+  "utf8",
+)
+assert.match(inboundRouteSource, /voice_inbound_webhook_failed/)
+assert.match(inboundRouteSource, /fallbackInboundTwiml/)
 
 console.log("call-lifecycle-reconciliation checks passed")

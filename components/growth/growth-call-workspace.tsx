@@ -78,6 +78,7 @@ import {
   isActiveSessionStatus,
   mergeServerSessionIntoLocal,
   registerAcceptedCallLifecycle,
+  registerCompletedCallLifecycle,
   registerEndedCallLifecycle,
   shouldApplyInboundOfferToSession,
 } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
@@ -119,6 +120,9 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   const acceptedVoiceCallIdsRef = useRef(new Set<string>())
   const acceptedSessionIdsRef = useRef(new Set<string>())
   const endedVoiceCallIdsRef = useRef(new Set<string>())
+  const endedSessionIdsRef = useRef(new Set<string>())
+  const completedSessionIdsRef = useRef(new Set<string>())
+  const completedVoiceCallIdsRef = useRef(new Set<string>())
   const endCallInFlightRef = useRef(false)
 
   const clearStaleRingingSession = useCallback((reason: string) => {
@@ -172,6 +176,9 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
             server: next,
             acceptedSessionIds: acceptedSessionIdsRef.current,
             endedVoiceCallIds: endedVoiceCallIdsRef.current,
+            endedSessionIds: endedSessionIdsRef.current,
+            completedSessionIds: completedSessionIdsRef.current,
+            completedVoiceCallIds: completedVoiceCallIdsRef.current,
           })
         })
       }
@@ -206,6 +213,9 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         acceptedVoiceCallIds: acceptedVoiceCallIdsRef.current,
         acceptedSessionIds: acceptedSessionIdsRef.current,
         endedVoiceCallIds: endedVoiceCallIdsRef.current,
+        endedSessionIds: endedSessionIdsRef.current,
+        completedSessionIds: completedSessionIdsRef.current,
+        completedVoiceCallIds: completedVoiceCallIdsRef.current,
       }),
     [activeSession, inboundOfferRaw],
   )
@@ -254,6 +264,9 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           acceptedVoiceCallIds: acceptedVoiceCallIdsRef.current,
           acceptedSessionIds: acceptedSessionIdsRef.current,
           endedVoiceCallIds: endedVoiceCallIdsRef.current,
+          endedSessionIds: endedSessionIdsRef.current,
+          completedSessionIds: completedSessionIdsRef.current,
+          completedVoiceCallIds: completedVoiceCallIdsRef.current,
         })
       ) {
         return prev
@@ -525,7 +538,9 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     const endedAt = new Date().toISOString()
     registerEndedCallLifecycle({
       endedVoiceCallIds: endedVoiceCallIdsRef.current,
+      endedSessionIds: endedSessionIdsRef.current,
       voiceCallId: sessionToEnd.voiceCallId,
+      sessionId: sessionToEnd.id,
     })
     setOptimisticCoachTurn(null)
     setActiveSession(buildOptimisticWrappingSession(sessionToEnd, endedAt))
@@ -547,6 +562,9 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
             server: data.session ?? null,
             acceptedSessionIds: acceptedSessionIdsRef.current,
             endedVoiceCallIds: endedVoiceCallIdsRef.current,
+            endedSessionIds: endedSessionIdsRef.current,
+            completedSessionIds: completedSessionIdsRef.current,
+            completedVoiceCallIds: completedVoiceCallIdsRef.current,
           }),
         )
       } else {
@@ -597,6 +615,9 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
             server: data.session ?? null,
             acceptedSessionIds: acceptedSessionIdsRef.current,
             endedVoiceCallIds: endedVoiceCallIdsRef.current,
+            endedSessionIds: endedSessionIdsRef.current,
+            completedSessionIds: completedSessionIdsRef.current,
+            completedVoiceCallIds: completedVoiceCallIdsRef.current,
           }),
         )
       } else {
@@ -693,21 +714,34 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     notes?: string
   }): Promise<NativeCallWrapupPublicView | null> {
     if (!activeSession) return null
+    if (submittingWrapup) return null
+
+    const sessionId = activeSession.id
+    const voiceCallId = activeSession.voiceCallId
+    registerCompletedCallLifecycle({
+      completedSessionIds: completedSessionIdsRef.current,
+      completedVoiceCallIds: completedVoiceCallIdsRef.current,
+      sessionId,
+      voiceCallId,
+    })
+    setActiveSession(null)
     setSubmittingWrapup(true)
+    setError(null)
+
     try {
       const res = await fetch("/api/platform/growth/calls/wrapup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sessionId: activeSession.id,
+          sessionId,
           companyName: activeSession.companyName,
           ...input,
         }),
       })
       const data = (await res.json().catch(() => ({}))) as { wrapup?: NativeCallWrapupPublicView; message?: string }
       if (!res.ok || !data.wrapup) throw new Error(data.message ?? "Wrap-up failed.")
-      setActiveSession(null)
-      await load()
+      void load()
+      void voiceBrowser.refresh().catch(() => undefined)
       return data.wrapup
     } catch (e) {
       setError(e instanceof Error ? e.message : "Wrap-up failed.")

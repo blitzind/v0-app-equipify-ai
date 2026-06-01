@@ -426,7 +426,15 @@ export async function provisionInboundBrowserWorkspaceOffers(
     })
       .select("id")
       .single()
-    if (insertError) throw new Error(insertError.message)
+    if (insertError) {
+      logInboundRingDiagnostic(INBOUND_RING_DIAG_EVENTS.NATIVE_SESSION_CREATED, {
+        voice_call_id: input.voiceCallId,
+        owner_user_id: userId,
+        organization_id: input.organizationId,
+        provision_error: insertError.message,
+      })
+      continue
+    }
 
     const { data: callRow } = await admin
       .schema("voice")

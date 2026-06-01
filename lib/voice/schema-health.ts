@@ -102,7 +102,7 @@ export async function probeVoiceSchemaHealth(admin: SupabaseClient): Promise<Voi
     }
   }
 
-  const ready = missingTables.length === 0 && !probeUncertain
+  const ready = missingTables.length === 0
   logVoiceInfrastructure("voice_schema_probe", {
     ready,
     probeUncertain,
@@ -117,7 +117,9 @@ export async function probeVoiceSchemaHealth(admin: SupabaseClient): Promise<Voi
     probeUncertain,
     missingTables: [...missingTables],
     message: ready
-      ? "Voice infrastructure schema is ready."
+      ? probeUncertain
+        ? "Voice schema verification incomplete — reload Supabase PostgREST schema cache if migration was applied."
+        : "Voice infrastructure schema is ready."
       : probeUncertain
         ? "Voice schema probe uncertain — reload Supabase PostgREST schema cache if migration was applied."
         : `Apply migration ${VOICE_SCHEMA_MIGRATION_ID}.sql — missing: ${missingTables.join(", ")}`,
@@ -125,5 +127,5 @@ export async function probeVoiceSchemaHealth(admin: SupabaseClient): Promise<Voi
 }
 
 export function isVoiceWebhookSchemaReady(probe: VoiceSchemaHealthProbe): boolean {
-  return probe.ready
+  return probe.missingTables.length === 0
 }
