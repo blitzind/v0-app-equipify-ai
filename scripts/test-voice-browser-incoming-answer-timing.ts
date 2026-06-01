@@ -93,6 +93,15 @@ const hookSource = fs.readFileSync(
   "utf8",
 )
 assert.match(hookSource, /device\.on\("incoming"/)
+assert.match(hookSource, /device\.on\("registered"/)
+assert.match(hookSource, /device\.on\("unregistered"/)
+assert.match(hookSource, /updateToken/)
+assert.match(hookSource, /sdkRegisteredRef/)
+assert.doesNotMatch(
+  hookSource,
+  /tokenWillExpire[\s\S]{0,40}\(\)\s*=>\s*undefined/,
+  "tokenWillExpire must refresh or re-register, not no-op",
+)
 assert.match(hookSource, /call\.accept\(/)
 assert.match(hookSource, /incomingCall/)
 assert.match(hookSource, /acceptIncomingCall/)

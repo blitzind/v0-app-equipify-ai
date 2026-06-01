@@ -36,6 +36,11 @@ export type VoiceBrowserIncomingLogEvent =
   | "hangup_clicked"
   | "hangup_succeeded"
   | "hangup_failed"
+  | "sdk_registered"
+  | "sdk_unregistered"
+  | "sdk_error"
+  | "sdk_token_refreshed"
+  | "sdk_token_refresh_failed"
 
 export function logBrowserIncomingCall(
   event: VoiceBrowserIncomingLogEvent,

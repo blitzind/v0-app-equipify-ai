@@ -42,6 +42,27 @@ type TwilioVoiceDevice = {
   register: () => Promise<void>
   unregister?: () => Promise<void>
   destroy?: () => void
+  updateToken?: (token: string) => void
+}
+
+type DeviceLifecycleHandlers = {
+  registered: () => void
+  unregistered: () => void
+  error: (error: unknown) => void
+  tokenWillExpire: () => void
+}
+
+async function fetchVoiceBrowserAccessToken(): Promise<VoiceBrowserTokenResponse> {
+  const tokenRes = await fetch("/api/platform/growth/voice/browser/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ttlSeconds: 3600 }),
+  })
+  const tokenData = (await tokenRes.json().catch(() => ({}))) as VoiceBrowserTokenResponse
+  if (!tokenRes.ok || !tokenData.clientIdentity) {
+    throw new Error(tokenData.message ?? "Could not fetch browser calling token.")
+  }
+  return tokenData
 }
 
 const VOICE_BROWSER_SYNC_INTERVAL_MS = 4000
@@ -61,6 +82,9 @@ export function useVoiceBrowserCalling(input?: {
   const [registrationState, setRegistrationState] = useState<"idle" | "registering" | "registered" | "error">("idle")
   const [error, setError] = useState<string | null>(null)
   const deviceRef = useRef<TwilioVoiceDevice | null>(null)
+  const sdkRegisteredRef = useRef(false)
+  const deviceLifecycleHandlersRef = useRef<DeviceLifecycleHandlers | null>(null)
+  const reregisterTimeoutRef = useRef<number | null>(null)
   const clientIdentityRef = useRef<string | null>(null)
   const incomingTwilioCallRef = useRef<TwilioVoiceSdkCall | null>(null)
   const activeTwilioCallRef = useRef<TwilioVoiceSdkCall | null>(null)
@@ -138,7 +162,9 @@ export function useVoiceBrowserCalling(input?: {
   const sync = useCallback(async () => {
     if (!enabled) return null
     const params = new URLSearchParams()
-    if (clientIdentityRef.current) params.set("clientIdentity", clientIdentityRef.current)
+    if (sdkRegisteredRef.current && clientIdentityRef.current) {
+      params.set("clientIdentity", clientIdentityRef.current)
+    }
     if (workspaceSessionIdRef.current) params.set("workspaceSessionId", workspaceSessionIdRef.current)
     const res = await fetch(`/api/platform/growth/voice/browser/sync?${params.toString()}`, {
       cache: "no-store",
@@ -179,11 +205,39 @@ export function useVoiceBrowserCalling(input?: {
     handleDeviceIncomingRef.current(call as TwilioVoiceSdkCall)
   }, [])
 
+  const clearReregisterTimeout = useCallback(() => {
+    if (reregisterTimeoutRef.current !== null) {
+      window.clearTimeout(reregisterTimeoutRef.current)
+      reregisterTimeoutRef.current = null
+    }
+  }, [])
+
+  const detachDeviceLifecycleHandlers = useCallback((device: TwilioVoiceDevice) => {
+    const handlers = deviceLifecycleHandlersRef.current
+    if (!handlers) return
+    device.removeListener("registered", handlers.registered)
+    device.removeListener("unregistered", handlers.unregistered)
+    device.removeListener("error", handlers.error)
+    device.removeListener("tokenWillExpire", handlers.tokenWillExpire)
+    deviceLifecycleHandlersRef.current = null
+  }, [])
+
+  const markBrowserDeviceOffline = useCallback(async () => {
+    const identity = clientIdentityRef.current
+    if (!identity) return
+    await fetch(`/api/platform/growth/voice/browser/register?clientIdentity=${encodeURIComponent(identity)}`, {
+      method: "DELETE",
+    }).catch(() => undefined)
+  }, [])
+
   const disconnectDevice = useCallback(async () => {
+    clearReregisterTimeout()
+    sdkRegisteredRef.current = false
     const device = deviceRef.current
     deviceRef.current = null
     if (device) {
       device.removeListener("incoming", onDeviceIncoming)
+      detachDeviceLifecycleHandlers(device)
     }
     clearIncomingCall("device_disconnect")
     activeTwilioCallRef.current?.disconnect?.()
@@ -195,7 +249,19 @@ export function useVoiceBrowserCalling(input?: {
       // ignore teardown errors
     }
     device.destroy?.()
-  }, [clearIncomingCall, onDeviceIncoming])
+  }, [clearIncomingCall, clearReregisterTimeout, detachDeviceLifecycleHandlers, onDeviceIncoming])
+
+  const registerRef = useRef<(() => Promise<void>) | null>(null)
+  const scheduleReregisterRef = useRef<(() => void) | null>(null)
+
+  const scheduleReregister = useCallback(() => {
+    if (!enabled || reregisterTimeoutRef.current !== null) return
+    setRegistrationState("registering")
+    reregisterTimeoutRef.current = window.setTimeout(() => {
+      reregisterTimeoutRef.current = null
+      void registerRef.current?.()
+    }, 2000)
+  }, [enabled])
 
   const acceptIncomingCall = useCallback(async () => {
     const call = incomingTwilioCallRef.current
@@ -261,23 +327,20 @@ export function useVoiceBrowserCalling(input?: {
     } finally {
       clearIncomingCall("operator_hangup")
       if (activeTwilioCallRef.current === call) activeTwilioCallRef.current = null
+      if (!sdkRegisteredRef.current) {
+        scheduleReregisterRef.current?.()
+      }
     }
   }, [clearIncomingCall])
 
   const register = useCallback(async () => {
     if (!enabled) return
+    clearReregisterTimeout()
     setRegistrationState("registering")
     setError(null)
+    sdkRegisteredRef.current = false
     try {
-      const tokenRes = await fetch("/api/platform/growth/voice/browser/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ttlSeconds: 3600 }),
-      })
-      const tokenData = (await tokenRes.json().catch(() => ({}))) as VoiceBrowserTokenResponse
-      if (!tokenRes.ok || !tokenData.clientIdentity) {
-        throw new Error(tokenData.message ?? "Could not fetch browser calling token.")
-      }
+      const tokenData = await fetchVoiceBrowserAccessToken()
 
       const registerRes = await fetch("/api/platform/growth/voice/browser/register", {
         method: "POST",
@@ -307,15 +370,73 @@ export function useVoiceBrowserCalling(input?: {
         const captureRegistrationError = (error: unknown) => {
           registrationError = error
         }
+
+        const lifecycleHandlers: DeviceLifecycleHandlers = {
+          registered: () => {
+            if (deviceRef.current !== device) return
+            sdkRegisteredRef.current = true
+            setRegistrationState("registered")
+            setError(null)
+            logBrowserIncomingCall("sdk_registered", {})
+          },
+          unregistered: () => {
+            if (deviceRef.current !== device) return
+            sdkRegisteredRef.current = false
+            setRegistrationState("error")
+            setError("Browser phone disconnected. Reconnecting…")
+            logBrowserIncomingCall("sdk_unregistered", {})
+            void markBrowserDeviceOffline()
+            if (!activeTwilioCallRef.current && !incomingTwilioCallRef.current) {
+              scheduleReregister()
+            }
+          },
+          error: (deviceError: unknown) => {
+            if (deviceRef.current !== device) return
+            logBrowserIncomingCall("sdk_error", {
+              message: deviceError instanceof Error ? deviceError.message : String(deviceError),
+            })
+            if (activeTwilioCallRef.current || incomingTwilioCallRef.current) return
+            sdkRegisteredRef.current = false
+            setRegistrationState("error")
+            setError(formatBrowserRegistrationError(deviceError))
+            void markBrowserDeviceOffline()
+            scheduleReregister()
+          },
+          tokenWillExpire: () => {
+            if (deviceRef.current !== device) return
+            void (async () => {
+              try {
+                const refreshed = await fetchVoiceBrowserAccessToken()
+                if (refreshed.token) {
+                  device.updateToken?.(refreshed.token)
+                  logBrowserIncomingCall("sdk_token_refreshed", {})
+                }
+              } catch (refreshError) {
+                logBrowserIncomingCall("sdk_token_refresh_failed", {
+                  message: refreshError instanceof Error ? refreshError.message : String(refreshError),
+                })
+                sdkRegisteredRef.current = false
+                void markBrowserDeviceOffline()
+                scheduleReregister()
+              }
+            })()
+          },
+        }
+        deviceLifecycleHandlersRef.current = lifecycleHandlers
+
         device.on("error", captureRegistrationError)
         device.on("incoming", onDeviceIncoming)
-        device.on("tokenWillExpire", () => undefined)
+        device.on("registered", lifecycleHandlers.registered)
+        device.on("unregistered", lifecycleHandlers.unregistered)
+        device.on("error", lifecycleHandlers.error)
+        device.on("tokenWillExpire", lifecycleHandlers.tokenWillExpire)
 
         try {
           await device.register()
         } catch (registerError) {
           captureRegistrationError(registerError)
           device.removeListener("incoming", onDeviceIncoming)
+          detachDeviceLifecycleHandlers(device)
           device.destroy?.()
           throw new Error(formatBrowserRegistrationError(registrationError ?? registerError))
         } finally {
@@ -323,6 +444,8 @@ export function useVoiceBrowserCalling(input?: {
         }
 
         deviceRef.current = device
+      } else {
+        sdkRegisteredRef.current = true
       }
 
       setRegistrationState("registered")
@@ -331,7 +454,18 @@ export function useVoiceBrowserCalling(input?: {
       setRegistrationState("error")
       setError(formatBrowserRegistrationError(e))
     }
-  }, [disconnectDevice, enabled, onDeviceIncoming])
+  }, [
+    clearReregisterTimeout,
+    detachDeviceLifecycleHandlers,
+    disconnectDevice,
+    enabled,
+    markBrowserDeviceOffline,
+    onDeviceIncoming,
+    scheduleReregister,
+  ])
+
+  registerRef.current = register
+  scheduleReregisterRef.current = scheduleReregister
 
   useEffect(() => {
     if (!enabled) return
