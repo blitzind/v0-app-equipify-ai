@@ -4,16 +4,18 @@ FROM node:22-bookworm-slim
 
 WORKDIR /app
 
-ENV NODE_ENV=production
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+# Install devDependencies too — runtime needs `tsx` to execute TypeScript entrypoints.
+RUN pnpm install --frozen-lockfile --prod=false
 
 COPY . .
+
+ENV NODE_ENV=production
 
 EXPOSE 8080
 

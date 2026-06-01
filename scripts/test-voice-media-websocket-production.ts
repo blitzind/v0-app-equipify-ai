@@ -37,6 +37,10 @@ const dockerfile = fs.readFileSync(
 )
 assert.match(dockerfile, /HEALTHCHECK/)
 assert.match(dockerfile, /services\/voice-media-websocket\/server.ts/)
+assert.match(dockerfile, /--prod=false/)
+const productionEnvIndex = dockerfile.indexOf("ENV NODE_ENV=production")
+const installIndex = dockerfile.indexOf("pnpm install")
+assert.ok(productionEnvIndex > installIndex, "NODE_ENV=production must be set after pnpm install")
 
 const readme = fs.readFileSync(
   path.join(process.cwd(), "services/voice-media-websocket/README.md"),
