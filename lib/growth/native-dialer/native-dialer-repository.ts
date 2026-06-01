@@ -483,7 +483,7 @@ export async function answerNativeCallSession(
     const { autoStartCallWorkspaceLiveCoachingOnAnswer } = await import(
       "@/lib/growth/native-dialer/call-workspace-coaching-service"
     )
-    await autoStartCallWorkspaceLiveCoachingOnAnswer(admin, {
+    void autoStartCallWorkspaceLiveCoachingOnAnswer(admin, {
       nativeSessionId: sessionId,
       createdBy: ownerUserId ?? null,
     }).catch(() => undefined)

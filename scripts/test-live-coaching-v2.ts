@@ -175,6 +175,7 @@ const answerRepo = fs.readFileSync(
   "utf8",
 )
 assert.match(answerRepo, /autoStartCallWorkspaceLiveCoachingOnAnswer/)
+assert.match(answerRepo, /void autoStartCallWorkspaceLiveCoachingOnAnswer/)
 
 const assistPanel = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-workspace-unified-assist-panel.tsx"),
@@ -192,5 +193,20 @@ assert.match(hero, /Why:/)
 
 const tasks = fs.readFileSync(path.join(process.cwd(), "lib/ai/tasks.ts"), "utf8")
 assert.match(tasks, /growth_live_turn_coach/)
+
+const workspaceSource = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace.tsx"),
+  "utf8",
+)
+assert.match(workspaceSource, /buildOptimisticActiveInboundSession/)
+assert.match(workspaceSource, /setOptimisticCoachTurn/)
+assert.match(workspaceSource, /reconcileInboundAnswer/)
+assert.match(workspaceSource, /setAnswering\(false\)/)
+
+const coachingService = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/native-dialer/call-workspace-coaching-service.ts"),
+  "utf8",
+)
+assert.match(coachingService, /hydrateDetail/)
 
 console.log("live-coaching-v2 checks passed")

@@ -67,7 +67,11 @@ import { VOICE_MISSED_CALL_RECOVERY_QA_MARKER } from "@/lib/voice/missed-call-re
 import { VOICE_UNIFIED_OPERATOR_WORKSPACE_UX_QA_MARKER } from "@/lib/voice/workspace-context/types"
 import { buildWorkspaceContextInputFromVoiceSnapshot } from "@/lib/voice/workspace-context/snapshot-input-mapper"
 import { buildWorkspaceContextSnapshot } from "@/lib/voice/workspace-context/workspace-context-builder"
-import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
+import type { ConversationCoachTurn } from "@/lib/growth/live-coaching/types"
+import {
+  buildOptimisticActiveInboundSession,
+  buildOptimisticInboundAnswerCoachTurn,
+} from "@/lib/growth/live-coaching/optimistic-inbound-answer"
 
 export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader?: boolean }) {
   const { toast } = useToast()
@@ -90,6 +94,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   const [submittingWrapup, setSubmittingWrapup] = useState(false)
   const [dialingQueueId, setDialingQueueId] = useState<string | null>(null)
   const [answering, setAnswering] = useState(false)
+  const [optimisticCoachTurn, setOptimisticCoachTurn] = useState<ConversationCoachTurn | null>(null)
   const [declining, setDeclining] = useState(false)
   const [markingBridgeStarted, setMarkingBridgeStarted] = useState(false)
   const [coachingStartSignal, setCoachingStartSignal] = useState(0)
@@ -267,6 +272,13 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       }),
     )
   }, [displaySession?.id, displaySession?.voiceCallId, hasSdkIncoming, inboundOffer?.voiceCallCreatedAt, workspacePhase])
+
+  useEffect(() => {
+    if (!optimisticCoachTurn) return
+    if (voiceBrowser.snapshot?.operatorAssist?.coachingState?.primaryCoach) {
+      setOptimisticCoachTurn(null)
+    }
+  }, [optimisticCoachTurn, voiceBrowser.snapshot?.operatorAssist?.coachingState?.primaryCoach])
 
   const voiceCallId =
     voiceBrowser.snapshot?.activeVoiceCallId ??
@@ -489,27 +501,18 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     }
   }
 
-  async function answerCall() {
-    const sessionForAnswer = incomingSession ?? activeSession
-    if (!sessionForAnswer && !hasSdkIncoming) return
-    setAnswering(true)
-    setError(null)
+  async function reconcileInboundAnswer(input: {
+    sessionForAnswer: NativeCallWorkspaceSessionPublicView
+    hadSdkIncoming: boolean
+  }) {
     try {
-      if (hasSdkIncoming) {
-        await voiceBrowser.acceptIncomingCall()
-      }
-
-      let sessionId = sessionForAnswer?.id
+      let sessionId = input.sessionForAnswer.id
       if (!sessionId || sessionId.startsWith("pending-inbound-")) {
         const synced = await voiceBrowser.refresh().catch(() => null)
         sessionId =
           synced?.inboundRinging?.workspaceSessionId ??
           synced?.workspaceSessionId ??
           sessionId
-        if (sessionId?.startsWith("pending-inbound-")) {
-          await load()
-          sessionId = inboundOffer?.workspaceSessionId ?? activeSession?.id ?? sessionId
-        }
       }
 
       if (sessionId && !sessionId.startsWith("pending-inbound-")) {
@@ -527,10 +530,39 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       } else {
         await load()
       }
-      await voiceBrowser.refresh().catch(() => undefined)
+      void voiceBrowser.refresh().catch(() => undefined)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Answer failed.")
-    } finally {
+    }
+  }
+
+  async function answerCall() {
+    const capturedSession = incomingSession ?? activeSession
+    if (!capturedSession && !hasSdkIncoming) return
+    setAnswering(true)
+    setError(null)
+    try {
+      if (hasSdkIncoming) {
+        await voiceBrowser.acceptIncomingCall()
+      }
+
+      if (capturedSession) {
+        const connectedAt = new Date().toISOString()
+        setActiveSession(buildOptimisticActiveInboundSession(capturedSession, connectedAt))
+        setOptimisticCoachTurn(buildOptimisticInboundAnswerCoachTurn())
+      }
+      setAnswering(false)
+
+      void voiceBrowser.refresh().catch(() => undefined)
+
+      if (capturedSession) {
+        void reconcileInboundAnswer({
+          sessionForAnswer: capturedSession,
+          hadSdkIncoming: hasSdkIncoming,
+        })
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Answer failed.")
       setAnswering(false)
     }
   }
@@ -766,6 +798,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           onStartTransfer={() => void startTransfer()}
           onMarkBridgeStarted={() => void markBridgeStarted()}
           onStartLiveCoaching={() => setCoachingStartSignal((value) => value + 1)}
+          optimisticCoachTurn={optimisticCoachTurn}
           onSubmitWrapup={submitWrapup}
         />
 

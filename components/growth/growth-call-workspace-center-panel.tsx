@@ -48,6 +48,7 @@ import type { VoiceAiCopilotWorkspaceSnapshot } from "@/lib/voice/ai-copilot/typ
 import type { VoiceAiReceptionistWorkspaceSnapshot } from "@/lib/voice/ai-receptionist/types"
 import type { VoiceMissedCallRecoveryWorkspaceSnapshot } from "@/lib/voice/missed-call-recovery/types"
 import type { CallWorkspaceCoachingMode } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
+import type { ConversationCoachTurn } from "@/lib/growth/live-coaching/types"
 import { GrowthCallWorkspaceLiveTranscriptPanel } from "@/components/growth/growth-call-workspace-live-transcript-panel"
 import { GrowthCallWorkspaceCollapsiblePanel } from "@/components/growth/growth-call-workspace-collapsible-panel"
 import { GrowthCallWorkspaceSimplifiedTimeline } from "@/components/growth/growth-call-workspace-simplified-timeline"
@@ -231,6 +232,7 @@ export function GrowthCallWorkspaceCenterPanel({
   coachingStartSignal,
   coachingMode,
   leadLinked,
+  optimisticCoachTurn = null,
   workspaceContext = null,
   onAnswer,
   onDecline,
@@ -271,6 +273,7 @@ export function GrowthCallWorkspaceCenterPanel({
   coachingStartSignal?: number
   coachingMode: CallWorkspaceCoachingMode
   leadLinked: boolean
+  optimisticCoachTurn?: ConversationCoachTurn | null
   workspaceContext?: VoiceWorkspaceContextSnapshot | null
   onAnswer: () => void
   onDecline: () => void
@@ -442,6 +445,7 @@ export function GrowthCallWorkspaceCenterPanel({
               leadLinked={leadLinked}
               startSignal={coachingStartSignal}
               operatorAssist={operatorAssist}
+              optimisticCoachTurn={optimisticCoachTurn}
               aiCopilot={aiCopilot}
               aiReceptionist={aiReceptionist}
               missedCallRecovery={missedCallRecovery}

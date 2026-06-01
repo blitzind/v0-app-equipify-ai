@@ -105,7 +105,12 @@ export async function fetchCallWorkspaceLiveCoaching(
 
 export async function startCallWorkspaceLiveCoaching(
   admin: SupabaseClient,
-  input: { nativeSessionId: string; createdBy?: string | null; userEmail?: string | null },
+  input: {
+    nativeSessionId: string
+    createdBy?: string | null
+    userEmail?: string | null
+    hydrateDetail?: boolean
+  },
 ): Promise<CallWorkspaceCoachingContext> {
   const nativeSession = await fetchNativeCallSessionById(admin, input.nativeSessionId)
   if (!nativeSession) throw new Error("Call session not found.")
@@ -156,6 +161,46 @@ export async function startCallWorkspaceLiveCoaching(
       session: realtimeSession,
       direction: nativeDirection,
     })
+    realtimeSession =
+      (await fetchGrowthRealtimeCallSession(admin, realtimeSession.id)) ?? realtimeSession
+  }
+
+  if (input.hydrateDetail === false) {
+    const bootstrapCoach = realtimeSession.liveSnapshot.conversationCoach ?? null
+    return {
+      nativeSessionId: nativeSession.id,
+      coachingLeadId,
+      sessionLeadId: nativeSession.leadId,
+      coachingMode,
+      leadLinked,
+      realtimeSession,
+      coachingState: bootstrapCoach
+        ? {
+            executionScore: {
+              score: 70,
+              badge: "good",
+              badgeLabel: "Good",
+              factors: {
+                talkRatio: 80,
+                discoveryCoverage: 0,
+                objectionsHandled: 100,
+                buyingSignalsCaptured: 0,
+                timelineDiscovered: false,
+                decisionMakerIdentified: false,
+                nextStepSecured: false,
+              },
+            },
+            suggestedNextQuestion: bootstrapCoach.primaryPhrase,
+            riskLevel: "low",
+            momentum: "stable",
+            activeGuidance: [],
+            guidanceLatencyMs: 0,
+            conversationStage: bootstrapCoach.stage,
+            stageObjective: bootstrapCoach.stageObjective,
+            primaryCoach: bootstrapCoach,
+          }
+        : null,
+    }
   }
 
   const detail = await getGrowthRealtimeCallSessionDetail(admin, realtimeSession.id)
@@ -249,5 +294,6 @@ export async function autoStartCallWorkspaceLiveCoachingOnAnswer(
     nativeSessionId: input.nativeSessionId,
     createdBy: input.createdBy ?? nativeSession.ownerUserId ?? null,
     userEmail: input.userEmail ?? null,
+    hydrateDetail: false,
   })
 }

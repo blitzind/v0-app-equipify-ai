@@ -38,6 +38,7 @@ import type { VoiceAiReceptionistWorkspaceSnapshot } from "@/lib/voice/ai-recept
 import { GrowthCallWorkspaceCollapsiblePanel } from "@/components/growth/growth-call-workspace-collapsible-panel"
 import { SayThisNextCard } from "@/components/growth/live-coaching/say-this-next-card"
 import { resolveSayThisNext } from "@/lib/growth/operator-assist/resolve-say-this-next"
+import type { ConversationCoachTurn } from "@/lib/growth/live-coaching/types"
 import { cn } from "@/lib/utils"
 
 export function GrowthCallWorkspaceUnifiedAssistPanel({
@@ -57,6 +58,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   showSecondaryAssistSections = true,
   liveCoachingFocusMode = false,
   workspaceMode = null,
+  optimisticCoachTurn = null,
 }: {
   phase: "idle" | "incoming" | "bridge_pending" | "active" | "wrapup"
   nativeSessionId: string | null
@@ -74,6 +76,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   showSecondaryAssistSections?: boolean
   liveCoachingFocusMode?: boolean
   workspaceMode?: VoiceWorkspaceMode | null
+  optimisticCoachTurn?: ConversationCoachTurn | null
 }) {
   const [acting, setActing] = useState<string | null>(null)
   const [startingCoaching, setStartingCoaching] = useState(false)
@@ -97,7 +100,10 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
     [visibleFeed],
   )
 
-  const sayThisNext = useMemo(() => resolveSayThisNext(operatorAssist), [operatorAssist])
+  const sayThisNext = useMemo(
+    () => resolveSayThisNext(operatorAssist, optimisticCoachTurn),
+    [operatorAssist, optimisticCoachTurn],
+  )
   const focusMode = liveCoachingFocusMode && (phase === "active" || phase === "bridge_pending")
 
   const modeLabel = useMemo(() => {
@@ -242,7 +248,8 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
     )
   }
 
-  const coachingActive = coachingState != null || Boolean(operatorAssist?.realtimeSessionId)
+  const coachingActive =
+    coachingState != null || Boolean(operatorAssist?.realtimeSessionId) || Boolean(optimisticCoachTurn)
   const showStartCoachingButton = !coachingActive && canStartCoaching
   const nextBest = operatorAssist?.nextBestAction.primary ?? null
   const supervisor = operatorAssist?.supervisorVisibility

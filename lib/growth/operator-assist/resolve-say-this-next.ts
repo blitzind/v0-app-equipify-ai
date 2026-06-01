@@ -1,5 +1,6 @@
 /** Resolve the single best live phrase for the operator to say next (client-safe). */
 
+import type { ConversationCoachTurn } from "@/lib/growth/live-coaching/types"
 import type { UnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/types"
 import {
   CONVERSATION_STAGE_LABELS,
@@ -41,12 +42,13 @@ export type SayThisNextSnapshot = {
 
 export function resolveSayThisNext(
   operatorAssist: UnifiedOperatorAssistSnapshot | null,
+  optimisticCoach?: ConversationCoachTurn | null,
 ): SayThisNextSnapshot | null {
-  if (!operatorAssist) return null
+  if (!operatorAssist && !optimisticCoach) return null
 
-  const coachingState = operatorAssist.coachingState
-  const generatedAt = operatorAssist.generatedAt
-  const primaryCoach = coachingState?.primaryCoach
+  const generatedAt = operatorAssist?.generatedAt ?? new Date().toISOString()
+  const coachingState = operatorAssist?.coachingState ?? null
+  const primaryCoach = coachingState?.primaryCoach ?? optimisticCoach ?? null
 
   if (primaryCoach?.primaryPhrase) {
     const phrase = trimPhrase(primaryCoach.primaryPhrase)
@@ -65,6 +67,8 @@ export function resolveSayThisNext(
       }
     }
   }
+
+  if (!operatorAssist) return null
 
   const nba = operatorAssist.nextBestAction.primary
   if (nba?.prompt) {
