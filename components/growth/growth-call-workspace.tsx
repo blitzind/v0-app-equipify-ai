@@ -41,6 +41,10 @@ import {
   optionalUuid,
 } from "@/lib/growth/native-dialer/native-dialer-workspace-ui"
 import { useVoiceBrowserCalling } from "@/hooks/voice/use-voice-browser-calling"
+import {
+  buildInboundRingingSessionPlaceholder,
+  resolveInboundWorkspacePhase,
+} from "@/lib/voice/browser-calling/browser-incoming-call"
 import { mapBrowserCallStateLabel } from "@/lib/voice/browser-calling/status-mapping"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
 import { VOICE_TRANSFER_CONTROL_QA_MARKER } from "@/lib/voice/transfer-control/types"
@@ -138,10 +142,35 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
 
   const voiceBrowser = useVoiceBrowserCalling({
     workspaceSessionId: activeSession?.id ?? null,
-    onInboundOffer: () => {
-      void load()
+    onInboundOffer: (snapshot) => {
+      if (snapshot.inboundRinging?.workspaceSessionId) {
+        void load()
+      }
     },
   })
+
+  const inboundOffer = voiceBrowser.snapshot?.inboundRinging ?? null
+  const hasSdkIncoming = Boolean(voiceBrowser.incomingCall)
+
+  const incomingSession = useMemo((): NativeCallWorkspaceSessionPublicView | null => {
+    if (activeSession?.status === "ringing") return activeSession
+    if (!hasSdkIncoming || !voiceBrowser.incomingCall) return null
+    return buildInboundRingingSessionPlaceholder({
+      incomingCall: voiceBrowser.incomingCall,
+      inboundOffer,
+      workspaceSessionId: voiceBrowser.snapshot?.workspaceSessionId ?? null,
+      voiceCallId: voiceBrowser.snapshot?.activeVoiceCallId ?? inboundOffer?.voiceCallId ?? null,
+    })
+  }, [activeSession, hasSdkIncoming, inboundOffer, voiceBrowser.incomingCall, voiceBrowser.snapshot])
+
+  const displaySession = incomingSession ?? activeSession
+
+  const workspacePhase = useMemo((): GrowthCallWorkspacePhase => {
+    return resolveInboundWorkspacePhase({
+      activeSessionStatus: activeSession?.status,
+      sdkIncoming: hasSdkIncoming,
+    })
+  }, [activeSession?.status, hasSdkIncoming])
 
   const voiceCallId = voiceBrowser.snapshot?.activeVoiceCallId ?? null
   const operatorParticipant =
@@ -228,14 +257,6 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   useEffect(() => {
     if (initialLeadId) void loadLeadContext(initialLeadId)
   }, [initialLeadId, loadLeadContext])
-
-  const workspacePhase = useMemo((): GrowthCallWorkspacePhase => {
-    if (activeSession?.status === "wrapping") return "wrapup"
-    if (activeSession?.status === "external_bridge_pending") return "bridge_pending"
-    if (activeSession?.status === "ringing") return "incoming"
-    if (activeSession && ["active", "on_hold"].includes(activeSession.status)) return "active"
-    return "idle"
-  }, [activeSession])
 
   const workspaceContext = useMemo(() => {
     const input = buildWorkspaceContextInputFromVoiceSnapshot({
@@ -339,17 +360,24 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   }
 
   async function endCall() {
-    if (!activeSession) return
+    const sessionToEnd = activeSession ?? incomingSession
+    if (!sessionToEnd) return
     setEnding(true)
     try {
-      const res = await fetch("/api/platform/growth/calls/end", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: activeSession.id }),
-      })
-      const data = (await res.json().catch(() => ({}))) as { session?: NativeCallWorkspaceSessionPublicView }
-      if (!res.ok || !data.session) throw new Error("Could not end call.")
-      setActiveSession(data.session)
+      await voiceBrowser.disconnectActiveCall().catch(() => undefined)
+      if (!sessionToEnd.id.startsWith("pending-inbound-")) {
+        const res = await fetch("/api/platform/growth/calls/end", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: sessionToEnd.id }),
+        })
+        const data = (await res.json().catch(() => ({}))) as { session?: NativeCallWorkspaceSessionPublicView }
+        if (!res.ok || !data.session) throw new Error("Could not end call.")
+        setActiveSession(data.session)
+      } else {
+        setActiveSession(null)
+      }
+      await voiceBrowser.refresh().catch(() => undefined)
     } catch (e) {
       setError(e instanceof Error ? e.message : "End failed.")
     } finally {
@@ -358,18 +386,44 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   }
 
   async function answerCall() {
-    if (!activeSession) return
+    const sessionForAnswer = incomingSession ?? activeSession
+    if (!sessionForAnswer && !hasSdkIncoming) return
     setAnswering(true)
     setError(null)
     try {
-      const res = await fetch("/api/platform/growth/calls/answer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: activeSession.id }),
-      })
-      const data = (await res.json().catch(() => ({}))) as { session?: NativeCallWorkspaceSessionPublicView; message?: string }
-      if (!res.ok || !data.session) throw new Error(data.message ?? "Could not answer call.")
-      setActiveSession(data.session)
+      if (hasSdkIncoming) {
+        await voiceBrowser.acceptIncomingCall()
+      }
+
+      let sessionId = sessionForAnswer?.id
+      if (!sessionId || sessionId.startsWith("pending-inbound-")) {
+        const synced = await voiceBrowser.refresh().catch(() => null)
+        sessionId =
+          synced?.inboundRinging?.workspaceSessionId ??
+          synced?.workspaceSessionId ??
+          sessionId
+        if (sessionId?.startsWith("pending-inbound-")) {
+          await load()
+          sessionId = inboundOffer?.workspaceSessionId ?? activeSession?.id ?? sessionId
+        }
+      }
+
+      if (sessionId && !sessionId.startsWith("pending-inbound-")) {
+        const res = await fetch("/api/platform/growth/calls/answer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        })
+        const data = (await res.json().catch(() => ({}))) as {
+          session?: NativeCallWorkspaceSessionPublicView
+          message?: string
+        }
+        if (!res.ok || !data.session) throw new Error(data.message ?? "Could not answer call.")
+        setActiveSession(data.session)
+      } else {
+        await load()
+      }
+      await voiceBrowser.refresh().catch(() => undefined)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Answer failed.")
     } finally {
@@ -378,18 +432,30 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   }
 
   async function declineCall() {
-    if (!activeSession) return
+    const sessionForDecline = incomingSession ?? activeSession
+    if (!sessionForDecline && !hasSdkIncoming) return
     setDeclining(true)
     setError(null)
     try {
-      const res = await fetch("/api/platform/growth/calls/decline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: activeSession.id }),
-      })
-      const data = (await res.json().catch(() => ({}))) as { session?: NativeCallWorkspaceSessionPublicView; message?: string }
-      if (!res.ok || !data.session) throw new Error(data.message ?? "Could not decline call.")
+      if (hasSdkIncoming) {
+        await voiceBrowser.rejectIncomingCall()
+      }
+
+      const sessionId = sessionForDecline?.id
+      if (sessionId && !sessionId.startsWith("pending-inbound-")) {
+        const res = await fetch("/api/platform/growth/calls/decline", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        })
+        const data = (await res.json().catch(() => ({}))) as {
+          session?: NativeCallWorkspaceSessionPublicView
+          message?: string
+        }
+        if (!res.ok || !data.session) throw new Error(data.message ?? "Could not decline call.")
+      }
       setActiveSession(null)
+      await voiceBrowser.refresh().catch(() => undefined)
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Decline failed.")
@@ -553,7 +619,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         <GrowthCallWorkspaceCenterPanel
           phase={workspacePhase}
           workspaceContext={workspaceContext}
-          activeSession={activeSession}
+          activeSession={workspacePhase === "incoming" ? displaySession : activeSession}
           voiceBrowserCallState={voiceBrowser.snapshot?.browserCallState ?? null}
           voiceBrowserCallStateLabel={
             voiceBrowser.snapshot?.browserCallState

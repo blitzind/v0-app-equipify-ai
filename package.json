@@ -227,6 +227,7 @@
     "test:voice-call-control-phase-1c": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-call-control-phase-1c.ts",
     "test:voice-routing-test-tool": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-routing-test-tool.ts",
     "test:voice-native-dialer-integration-phase-1d": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-native-dialer-integration-phase-1d.ts",
+    "test:voice-browser-incoming-answer-timing": "tsx scripts/test-voice-browser-incoming-answer-timing.ts",
     "test:voice-transfer-control-phase-1e": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-transfer-control-phase-1e.ts",
     "test:voice-media-streaming-phase-1f": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-media-streaming-phase-1f.ts",
     "voice:media-websocket-dev": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/voice-media-websocket-dev-server.ts",

@@ -1,6 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import {
+  extractVoiceBrowserIncomingCallView,
+  logBrowserIncomingCall,
+  type TwilioVoiceSdkCall,
+  type VoiceBrowserIncomingCallView,
+} from "@/lib/voice/browser-calling/browser-incoming-call"
 import { formatBrowserRegistrationError } from "@/lib/voice/browser-calling/format-browser-registration-error"
 import type { VoiceBrowserSyncSnapshot } from "@/lib/voice/browser-calling/types"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
@@ -25,6 +31,14 @@ type VoiceBrowserSyncResponse = {
   message?: string
 }
 
+type TwilioVoiceDevice = {
+  on: (event: string, handler: (...args: unknown[]) => void) => void
+  removeListener: (event: string, handler: (...args: unknown[]) => void) => void
+  register: () => Promise<void>
+  unregister?: () => Promise<void>
+  destroy?: () => void
+}
+
 export function useVoiceBrowserCalling(input?: {
   workspaceSessionId?: string | null
   enabled?: boolean
@@ -33,30 +47,60 @@ export function useVoiceBrowserCalling(input?: {
   const enabled = input?.enabled !== false
   const [snapshot, setSnapshot] = useState<VoiceBrowserSyncSnapshot | null>(null)
   const [clientIdentity, setClientIdentity] = useState<string | null>(null)
+  const [incomingCall, setIncomingCall] = useState<VoiceBrowserIncomingCallView | null>(null)
   const [registrationState, setRegistrationState] = useState<"idle" | "registering" | "registered" | "error">("idle")
   const [error, setError] = useState<string | null>(null)
-  const deviceRef = useRef<{ destroy?: () => void; unregister?: () => Promise<void> } | null>(null)
+  const deviceRef = useRef<TwilioVoiceDevice | null>(null)
   const clientIdentityRef = useRef<string | null>(null)
+  const incomingTwilioCallRef = useRef<TwilioVoiceSdkCall | null>(null)
+  const activeTwilioCallRef = useRef<TwilioVoiceSdkCall | null>(null)
+  const callHandlersRef = useRef(new WeakMap<TwilioVoiceSdkCall, { cancel: () => void; disconnect: () => void }>())
+  const workspaceSessionIdRef = useRef(input?.workspaceSessionId ?? null)
   const inboundOfferRef = useRef(input?.onInboundOffer)
+  workspaceSessionIdRef.current = input?.workspaceSessionId ?? null
   inboundOfferRef.current = input?.onInboundOffer
 
-  const disconnectDevice = useCallback(async () => {
-    const device = deviceRef.current
-    deviceRef.current = null
-    if (!device) return
-    try {
-      await device.unregister?.()
-    } catch {
-      // ignore teardown errors
+  const clearIncomingCall = useCallback((reason: string) => {
+    const call = incomingTwilioCallRef.current
+    if (call) {
+      const handlers = callHandlersRef.current.get(call)
+      if (handlers) {
+        call.removeListener?.("cancel", handlers.cancel)
+        call.removeListener?.("disconnect", handlers.disconnect)
+        callHandlersRef.current.delete(call)
+      }
     }
-    device.destroy?.()
+    incomingTwilioCallRef.current = null
+    setIncomingCall(null)
+    logBrowserIncomingCall("incoming_cleared", { reason })
   }, [])
+
+  const attachCallLifecycleHandlers = useCallback(
+    (call: TwilioVoiceSdkCall, role: "incoming" | "active") => {
+      const onEnded = (reason: string) => {
+        if (incomingTwilioCallRef.current === call) clearIncomingCall(reason)
+        if (activeTwilioCallRef.current === call) activeTwilioCallRef.current = null
+      }
+      const cancelHandler = () => onEnded("cancel")
+      const disconnectHandler = () => onEnded("disconnect")
+      call.on?.("cancel", cancelHandler)
+      call.on?.("disconnect", disconnectHandler)
+      callHandlersRef.current.set(call, { cancel: cancelHandler, disconnect: disconnectHandler })
+      if (role === "incoming") {
+        logBrowserIncomingCall("incoming_received", {
+          role,
+          ...extractVoiceBrowserIncomingCallView(call),
+        })
+      }
+    },
+    [clearIncomingCall],
+  )
 
   const sync = useCallback(async () => {
     if (!enabled) return null
     const params = new URLSearchParams()
     if (clientIdentityRef.current) params.set("clientIdentity", clientIdentityRef.current)
-    if (input?.workspaceSessionId) params.set("workspaceSessionId", input.workspaceSessionId)
+    if (workspaceSessionIdRef.current) params.set("workspaceSessionId", workspaceSessionIdRef.current)
     const res = await fetch(`/api/platform/growth/voice/browser/sync?${params.toString()}`, {
       cache: "no-store",
     })
@@ -65,11 +109,116 @@ export function useVoiceBrowserCalling(input?: {
       throw new Error(data.message ?? "Could not sync voice browser state.")
     }
     setSnapshot(data.snapshot)
-    if (data.snapshot.inboundRinging) {
+    if (data.snapshot.inboundRinging || incomingTwilioCallRef.current) {
       inboundOfferRef.current?.(data.snapshot)
     }
     return data.snapshot
-  }, [enabled, input?.workspaceSessionId])
+  }, [enabled])
+
+  const syncRef = useRef(sync)
+  syncRef.current = sync
+
+  const handleDeviceIncoming = useCallback(
+    (call: TwilioVoiceSdkCall) => {
+      incomingTwilioCallRef.current = call
+      setIncomingCall(extractVoiceBrowserIncomingCallView(call))
+      attachCallLifecycleHandlers(call, "incoming")
+      void syncRef.current().catch(() => undefined)
+    },
+    [attachCallLifecycleHandlers],
+  )
+
+  const handleDeviceIncomingRef = useRef(handleDeviceIncoming)
+  handleDeviceIncomingRef.current = handleDeviceIncoming
+
+  const onDeviceIncoming = useCallback((call: unknown) => {
+    handleDeviceIncomingRef.current(call as TwilioVoiceSdkCall)
+  }, [])
+
+  const disconnectDevice = useCallback(async () => {
+    const device = deviceRef.current
+    deviceRef.current = null
+    if (device) {
+      device.removeListener("incoming", onDeviceIncoming)
+    }
+    clearIncomingCall("device_disconnect")
+    activeTwilioCallRef.current?.disconnect?.()
+    activeTwilioCallRef.current = null
+    if (!device) return
+    try {
+      await device.unregister?.()
+    } catch {
+      // ignore teardown errors
+    }
+    device.destroy?.()
+  }, [clearIncomingCall, onDeviceIncoming])
+
+  const acceptIncomingCall = useCallback(async () => {
+    const call = incomingTwilioCallRef.current
+    logBrowserIncomingCall("answer_clicked", {
+      callSid: call ? extractVoiceBrowserIncomingCallView(call).callSid : null,
+    })
+    if (!call?.accept) {
+      const message = "No Twilio browser call is available to answer."
+      logBrowserIncomingCall("accept_failed", { message })
+      throw new Error(message)
+    }
+    try {
+      call.accept()
+      activeTwilioCallRef.current = call
+      incomingTwilioCallRef.current = null
+      setIncomingCall(null)
+      attachCallLifecycleHandlers(call, "active")
+      logBrowserIncomingCall("accept_succeeded", {
+        callSid: extractVoiceBrowserIncomingCallView(call).callSid,
+      })
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Twilio call.accept() failed."
+      logBrowserIncomingCall("accept_failed", { message })
+      throw new Error(message)
+    }
+  }, [attachCallLifecycleHandlers])
+
+  const rejectIncomingCall = useCallback(async () => {
+    const call = incomingTwilioCallRef.current
+    logBrowserIncomingCall("reject_clicked", {
+      callSid: call ? extractVoiceBrowserIncomingCallView(call).callSid : null,
+    })
+    if (!call) return
+    try {
+      call.reject?.()
+      logBrowserIncomingCall("reject_succeeded", {
+        callSid: extractVoiceBrowserIncomingCallView(call).callSid,
+      })
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Twilio call.reject() failed."
+      logBrowserIncomingCall("reject_failed", { message })
+      throw new Error(message)
+    } finally {
+      clearIncomingCall("operator_reject")
+    }
+  }, [clearIncomingCall])
+
+  const disconnectActiveCall = useCallback(async () => {
+    const call = activeTwilioCallRef.current ?? incomingTwilioCallRef.current
+    logBrowserIncomingCall("hangup_clicked", {
+      callSid: call ? extractVoiceBrowserIncomingCallView(call).callSid : null,
+    })
+    if (!call) return
+    try {
+      call.disconnect?.()
+      logBrowserIncomingCall("hangup_succeeded", {
+        callSid: extractVoiceBrowserIncomingCallView(call).callSid,
+      })
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Twilio call.disconnect() failed."
+      logBrowserIncomingCall("hangup_failed", { message })
+      throw new Error(message)
+    } finally {
+      clearIncomingCall("operator_hangup")
+      if (activeTwilioCallRef.current === call) activeTwilioCallRef.current = null
+    }
+  }, [clearIncomingCall])
 
   const register = useCallback(async () => {
     if (!enabled) return
@@ -108,20 +257,22 @@ export function useVoiceBrowserCalling(input?: {
         const device = new Device(tokenData.token, {
           logLevel: 1,
           codecPreferences: ["opus", "pcmu"],
-        })
+        }) as TwilioVoiceDevice
 
         let registrationError: unknown = null
         const captureRegistrationError = (error: unknown) => {
           registrationError = error
         }
         device.on("error", captureRegistrationError)
+        device.on("incoming", onDeviceIncoming)
         device.on("tokenWillExpire", () => undefined)
 
         try {
           await device.register()
         } catch (registerError) {
           captureRegistrationError(registerError)
-          device.destroy()
+          device.removeListener("incoming", onDeviceIncoming)
+          device.destroy?.()
           throw new Error(formatBrowserRegistrationError(registrationError ?? registerError))
         } finally {
           device.removeListener("error", captureRegistrationError)
@@ -131,12 +282,12 @@ export function useVoiceBrowserCalling(input?: {
       }
 
       setRegistrationState("registered")
-      await sync()
+      await syncRef.current()
     } catch (e) {
       setRegistrationState("error")
       setError(formatBrowserRegistrationError(e))
     }
-  }, [disconnectDevice, enabled, sync])
+  }, [disconnectDevice, enabled, onDeviceIncoming])
 
   useEffect(() => {
     if (!enabled) return
@@ -155,17 +306,21 @@ export function useVoiceBrowserCalling(input?: {
   useEffect(() => {
     if (!enabled || registrationState !== "registered") return
     const intervalId = window.setInterval(() => {
-      void sync().catch(() => undefined)
+      void syncRef.current().catch(() => undefined)
     }, 4000)
     return () => window.clearInterval(intervalId)
-  }, [enabled, registrationState, sync])
+  }, [enabled, registrationState])
 
   return {
     qaMarker: VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER,
     snapshot,
     clientIdentity,
+    incomingCall,
     registrationState,
     error,
     refresh: sync,
+    acceptIncomingCall,
+    rejectIncomingCall,
+    disconnectActiveCall,
   }
 }
