@@ -3,7 +3,7 @@
 import type { NativeCallWorkspaceSessionPublicView } from "@/lib/growth/native-dialer/native-dialer-types"
 import type { VoiceInboundBrowserOfferView } from "@/lib/voice/browser-calling/types"
 
-export const CALL_LIFECYCLE_RECONCILIATION_QA_MARKER = "call-lifecycle-reconciliation-v2" as const
+export const CALL_LIFECYCLE_RECONCILIATION_QA_MARKER = "call-lifecycle-reconciliation-v3" as const
 
 const TERMINAL_SESSION_STATUSES = new Set<NativeCallWorkspaceSessionPublicView["status"]>([
   "completed",
@@ -256,4 +256,53 @@ export function registerCompletedCallLifecycle(input: {
   if (input.sessionId && !input.sessionId.startsWith("pending-inbound-")) {
     input.completedSessionIds.add(input.sessionId)
   }
+}
+
+export type CallLifecycleLockSnapshot = {
+  endedVoiceCallIds: ReadonlySet<string>
+  endedSessionIds: ReadonlySet<string>
+  completedSessionIds: ReadonlySet<string>
+  completedVoiceCallIds: ReadonlySet<string>
+}
+
+export function isCallLifecycleEndedLocked(input: {
+  voiceCallId?: string | null
+  sessionId?: string | null
+  locks: CallLifecycleLockSnapshot
+}): boolean {
+  if (input.sessionId && input.locks.endedSessionIds.has(input.sessionId)) return true
+  if (input.sessionId && input.locks.completedSessionIds.has(input.sessionId)) return true
+  if (input.voiceCallId && input.locks.endedVoiceCallIds.has(input.voiceCallId)) return true
+  if (input.voiceCallId && input.locks.completedVoiceCallIds.has(input.voiceCallId)) return true
+  return false
+}
+
+/** SDK incoming must not drive workspace phase after local end for the same call. */
+export function shouldHonorSdkIncomingForLifecycle(input: {
+  sdkIncoming: boolean
+  voiceCallId?: string | null
+  sessionId?: string | null
+  locks: CallLifecycleLockSnapshot
+}): boolean {
+  if (!input.sdkIncoming) return false
+  return !isCallLifecycleEndedLocked({
+    voiceCallId: input.voiceCallId,
+    sessionId: input.sessionId,
+    locks: input.locks,
+  })
+}
+
+const NATIVE_SESSION_SYNC_PROTECTED_STATUSES = new Set<NativeCallWorkspaceSessionPublicView["status"]>([
+  "wrapping",
+  "completed",
+  "missed",
+  "failed",
+  "no_answer",
+  "cancelled",
+])
+
+export function shouldSyncNativeSessionFromVoiceCall(
+  sessionStatus: NativeCallWorkspaceSessionPublicView["status"] | null | undefined,
+): boolean {
+  return sessionStatus != null && !NATIVE_SESSION_SYNC_PROTECTED_STATUSES.has(sessionStatus)
 }

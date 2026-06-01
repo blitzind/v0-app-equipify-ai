@@ -5,6 +5,8 @@ import {
   mapVoiceCallStatusToBrowserCallState,
   resolveInboundNativeSessionStatusFromVoiceCall,
 } from "@/lib/voice/browser-calling/status-mapping"
+import { shouldSyncNativeSessionFromVoiceCall } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
+import type { NativeCallWorkspaceSessionPublicView } from "@/lib/growth/native-dialer/native-dialer-types"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
 import type { VoiceBrowserCallState, VoiceBrowserSyncSnapshot, VoiceOperatorPresenceStatus } from "@/lib/voice/browser-calling/types"
 import {
@@ -131,6 +133,13 @@ export async function syncWorkspaceSessionFromVoiceCall(
     answeredAt: (callRow.answered_at as string | null) ?? null,
     onHold: Boolean(sessionRow.on_hold),
   })
+  const currentStatus = sessionRow.status as NativeCallWorkspaceSessionPublicView["status"]
+  if (
+    ["wrapping", "completed", "missed", "failed", "no_answer", "cancelled"].includes(currentStatus) &&
+    (nativeStatus === "active" || nativeStatus === "on_hold" || nativeStatus === "ringing")
+  ) {
+    return
+  }
   const patch: Record<string, unknown> = {
     status: nativeStatus,
     updated_at: new Date().toISOString(),
@@ -205,12 +214,15 @@ export async function buildVoiceBrowserSyncSnapshot(
   let sessionLeadId: string | null = null
   let sessionContactName: string | null = null
 
+  let sessionStatusForSync: NativeCallWorkspaceSessionPublicView["status"] | null = null
+
   if (workspaceSessionId) {
     const { data: sessionRow } = await sessionsTable(admin)
       .select("voice_call_id, muted, on_hold, status, phone_number, lead_id, contact_name")
       .eq("id", workspaceSessionId)
       .maybeSingle()
     activeVoiceCallId = (sessionRow?.voice_call_id as string | null) ?? null
+    sessionStatusForSync = (sessionRow?.status as NativeCallWorkspaceSessionPublicView["status"] | null) ?? null
     muted = Boolean(sessionRow?.muted)
     onHold = Boolean(sessionRow?.on_hold)
     sessionPhone = (sessionRow?.phone_number as string | null) ?? null
@@ -227,6 +239,7 @@ export async function buildVoiceBrowserSyncSnapshot(
       .maybeSingle()
     workspaceSessionId = (activeSession?.id as string | null) ?? null
     activeVoiceCallId = (activeSession?.voice_call_id as string | null) ?? null
+    sessionStatusForSync = (activeSession?.status as NativeCallWorkspaceSessionPublicView["status"] | null) ?? null
     muted = Boolean(activeSession?.muted)
     onHold = Boolean(activeSession?.on_hold)
     sessionPhone = (activeSession?.phone_number as string | null) ?? null
@@ -242,10 +255,12 @@ export async function buildVoiceBrowserSyncSnapshot(
       .eq("id", activeVoiceCallId)
       .maybeSingle()
     voiceStatus = (callRow?.status as VoiceCallStatus | null) ?? null
-    await syncWorkspaceSessionFromVoiceCall(admin, {
-      voiceCallId: activeVoiceCallId,
-      organizationId: input.organizationId,
-    })
+    if (shouldSyncNativeSessionFromVoiceCall(sessionStatusForSync)) {
+      await syncWorkspaceSessionFromVoiceCall(admin, {
+        voiceCallId: activeVoiceCallId,
+        organizationId: input.organizationId,
+      })
+    }
   }
 
   const browserCallState: VoiceBrowserCallState = mapVoiceCallStatusToBrowserCallState({

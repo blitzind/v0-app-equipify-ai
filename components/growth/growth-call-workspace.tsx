@@ -76,11 +76,14 @@ import {
   buildOptimisticWrappingSession,
   filterInboundOfferForLifecycle,
   isActiveSessionStatus,
+  isCallLifecycleEndedLocked,
   mergeServerSessionIntoLocal,
   registerAcceptedCallLifecycle,
   registerCompletedCallLifecycle,
   registerEndedCallLifecycle,
   shouldApplyInboundOfferToSession,
+  shouldHonorSdkIncomingForLifecycle,
+  type CallLifecycleLockSnapshot,
 } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
 
 export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader?: boolean }) {
@@ -125,6 +128,33 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   const completedVoiceCallIdsRef = useRef(new Set<string>())
   const endCallInFlightRef = useRef(false)
 
+  const getLifecycleLocks = useCallback((): CallLifecycleLockSnapshot => {
+    return {
+      endedVoiceCallIds: endedVoiceCallIdsRef.current,
+      endedSessionIds: endedSessionIdsRef.current,
+      completedSessionIds: completedSessionIdsRef.current,
+      completedVoiceCallIds: completedVoiceCallIdsRef.current,
+    }
+  }, [])
+
+  const applyServerSession = useCallback(
+    (server: NativeCallWorkspaceSessionPublicView | null | undefined) => {
+      const locks = getLifecycleLocks()
+      setActiveSession((prev) =>
+        mergeServerSessionIntoLocal({
+          local: prev,
+          server: server ?? null,
+          acceptedSessionIds: acceptedSessionIdsRef.current,
+          endedVoiceCallIds: locks.endedVoiceCallIds,
+          endedSessionIds: locks.endedSessionIds,
+          completedSessionIds: locks.completedSessionIds,
+          completedVoiceCallIds: locks.completedVoiceCallIds,
+        }),
+      )
+    },
+    [getLifecycleLocks],
+  )
+
   const clearStaleRingingSession = useCallback((reason: string) => {
     logInboundRingDiagnostic(INBOUND_RING_DIAG_EVENTS.INBOUND_OFFER_CLEARED, { reason })
     lastInboundOfferVoiceCallIdRef.current = null
@@ -141,8 +171,8 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     [clearStaleRingingSession],
   )
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (options?: { background?: boolean }) => {
+    if (!options?.background) setLoading(true)
     setError(null)
     try {
       const [dashRes, queueRes] = await Promise.all([
@@ -169,26 +199,15 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           dashData.meta?.probeUncertain ? dashData.meta.setupMessage ?? null : null,
         )
         setDashboard(dashData.workspaceDashboard ?? null)
-        setActiveSession((prev) => {
-          const next = dashData.workspaceDashboard?.activeSession ?? null
-          return mergeServerSessionIntoLocal({
-            local: prev,
-            server: next,
-            acceptedSessionIds: acceptedSessionIdsRef.current,
-            endedVoiceCallIds: endedVoiceCallIdsRef.current,
-            endedSessionIds: endedSessionIdsRef.current,
-            completedSessionIds: completedSessionIdsRef.current,
-            completedVoiceCallIds: completedVoiceCallIdsRef.current,
-          })
-        })
+        applyServerSession(dashData.workspaceDashboard?.activeSession ?? null)
       }
       setQueue(queueData.queue ?? [])
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load call workspace.")
     } finally {
-      setLoading(false)
+      if (!options?.background) setLoading(false)
     }
-  }, [])
+  }, [applyServerSession])
 
   const loadLeadContext = useCallback(async (leadId: string) => {
     const res = await fetch(`/api/platform/growth/calls/workspace/lead/${leadId}`, { cache: "no-store" })
@@ -199,8 +218,21 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     }
   }, [phone])
 
+  const lifecycleLocks = getLifecycleLocks()
+  const syncWorkspaceSessionId =
+    activeSession &&
+    (activeSession.status === "wrapping" ||
+      activeSession.status === "completed" ||
+      isCallLifecycleEndedLocked({
+        sessionId: activeSession.id,
+        voiceCallId: activeSession.voiceCallId,
+        locks: lifecycleLocks,
+      }))
+      ? null
+      : activeSession?.id ?? null
+
   const voiceBrowser = useVoiceBrowserCalling({
-    workspaceSessionId: activeSession?.id ?? null,
+    workspaceSessionId: syncWorkspaceSessionId,
     onIncomingCleared: handleIncomingCleared,
   })
 
@@ -220,6 +252,19 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     [activeSession, inboundOfferRaw],
   )
   const hasSdkIncoming = Boolean(voiceBrowser.incomingCall)
+  const lockedVoiceCallId =
+    activeSession?.voiceCallId ??
+    inboundOffer?.voiceCallId ??
+    voiceBrowser.snapshot?.activeVoiceCallId ??
+    null
+  const lockedSessionId =
+    activeSession?.id ?? inboundOffer?.workspaceSessionId ?? voiceBrowser.snapshot?.workspaceSessionId ?? null
+  const honorSdkIncoming = shouldHonorSdkIncomingForLifecycle({
+    sdkIncoming: hasSdkIncoming,
+    voiceCallId: lockedVoiceCallId,
+    sessionId: lockedSessionId,
+    locks: lifecycleLocks,
+  })
 
   useEffect(() => {
     const offer = inboundOffer
@@ -288,23 +333,36 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     if (activeSession && (isActiveSessionStatus(activeSession.status) || activeSession.status === "wrapping")) {
       return null
     }
-    if (!hasSdkIncoming || !voiceBrowser.incomingCall) return null
+    if (
+      isCallLifecycleEndedLocked({
+        voiceCallId:
+          inboundOffer?.voiceCallId ??
+          voiceBrowser.snapshot?.activeVoiceCallId ??
+          voiceBrowser.incomingCall?.callSid ??
+          null,
+        sessionId: inboundOffer?.workspaceSessionId ?? voiceBrowser.snapshot?.workspaceSessionId ?? null,
+        locks: lifecycleLocks,
+      })
+    ) {
+      return null
+    }
+    if (!honorSdkIncoming || !voiceBrowser.incomingCall) return null
     return buildInboundRingingSessionPlaceholder({
       incomingCall: voiceBrowser.incomingCall,
       inboundOffer,
       workspaceSessionId: voiceBrowser.snapshot?.workspaceSessionId ?? null,
       voiceCallId: voiceBrowser.snapshot?.activeVoiceCallId ?? inboundOffer?.voiceCallId ?? null,
     })
-  }, [activeSession, hasSdkIncoming, inboundOffer, voiceBrowser.incomingCall, voiceBrowser.snapshot])
+  }, [activeSession, honorSdkIncoming, inboundOffer, lifecycleLocks, voiceBrowser.incomingCall, voiceBrowser.snapshot])
 
   const displaySession = incomingSession ?? activeSession
 
   const workspacePhase = useMemo((): GrowthCallWorkspacePhase => {
     return resolveInboundWorkspacePhase({
       activeSessionStatus: activeSession?.status ?? incomingSession?.status,
-      sdkIncoming: hasSdkIncoming,
+      sdkIncoming: honorSdkIncoming,
     })
-  }, [incomingSession?.status, activeSession?.status, hasSdkIncoming])
+  }, [incomingSession?.status, activeSession?.status, honorSdkIncoming])
 
   useEffect(() => {
     if (workspacePhase !== "incoming") {
@@ -360,7 +418,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     const data = (await res.json().catch(() => ({}))) as { message?: string; ok?: boolean }
     if (!res.ok || !data.ok) throw new Error(data.message ?? "Call control action failed.")
     await voiceBrowser.refresh()
-    await load()
+    await load({ background: true })
   }
 
   async function toggleMute() {
@@ -475,7 +533,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         message?: string
       }
       if (!res.ok || !data.session) throw new Error(data.message ?? "Could not start call.")
-      setActiveSession(data.session)
+      applyServerSession(data.session)
       if (data.session.status === "external_bridge_pending") {
         const { copied } = await beginGoogleVoiceBridgeDialFlow(data.session.phoneNumber)
         toast({
@@ -514,7 +572,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         message?: string
       }
       if (!res.ok || !data.session) throw new Error(data.message ?? "Could not mark call started.")
-      setActiveSession(data.session)
+      applyServerSession(data.session)
       if (data.session.leadId) {
         setLeadLinked(true)
         setCoachingMode("lead_linked")
@@ -556,21 +614,10 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         })
         const data = (await res.json().catch(() => ({}))) as { session?: NativeCallWorkspaceSessionPublicView }
         if (!res.ok || !data.session) throw new Error("Could not end call.")
-        setActiveSession((prev) =>
-          mergeServerSessionIntoLocal({
-            local: prev,
-            server: data.session ?? null,
-            acceptedSessionIds: acceptedSessionIdsRef.current,
-            endedVoiceCallIds: endedVoiceCallIdsRef.current,
-            endedSessionIds: endedSessionIdsRef.current,
-            completedSessionIds: completedSessionIdsRef.current,
-            completedVoiceCallIds: completedVoiceCallIdsRef.current,
-          }),
-        )
+        applyServerSession(data.session)
       } else {
         setActiveSession(null)
       }
-      void voiceBrowser.refresh().catch(() => undefined)
     } catch (e) {
       setError(e instanceof Error ? e.message : "End failed.")
     } finally {
@@ -582,6 +629,15 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     sessionForAnswer: NativeCallWorkspaceSessionPublicView
     hadSdkIncoming: boolean
   }) {
+    if (
+      isCallLifecycleEndedLocked({
+        sessionId: input.sessionForAnswer.id,
+        voiceCallId: input.sessionForAnswer.voiceCallId,
+        locks: getLifecycleLocks(),
+      })
+    ) {
+      return
+    }
     try {
       let sessionId = input.sessionForAnswer.id
       if (!sessionId || sessionId.startsWith("pending-inbound-")) {
@@ -609,19 +665,18 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           voiceCallId: data.session.voiceCallId,
           sessionId: data.session.id,
         })
-        setActiveSession((prev) =>
-          mergeServerSessionIntoLocal({
-            local: prev,
-            server: data.session ?? null,
-            acceptedSessionIds: acceptedSessionIdsRef.current,
-            endedVoiceCallIds: endedVoiceCallIdsRef.current,
-            endedSessionIds: endedSessionIdsRef.current,
-            completedSessionIds: completedSessionIdsRef.current,
-            completedVoiceCallIds: completedVoiceCallIdsRef.current,
-          }),
-        )
+        if (
+          isCallLifecycleEndedLocked({
+            sessionId: data.session.id,
+            voiceCallId: data.session.voiceCallId,
+            locks: getLifecycleLocks(),
+          })
+        ) {
+          return
+        }
+        applyServerSession(data.session)
       } else {
-        await load()
+        await load({ background: true })
       }
       void voiceBrowser.refresh().catch(() => undefined)
     } catch (e) {
@@ -694,7 +749,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       }
       setActiveSession(null)
       await voiceBrowser.refresh().catch(() => undefined)
-      await load()
+      await load({ background: true })
     } catch (e) {
       setError(e instanceof Error ? e.message : "Decline failed.")
     } finally {
@@ -740,7 +795,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       })
       const data = (await res.json().catch(() => ({}))) as { wrapup?: NativeCallWrapupPublicView; message?: string }
       if (!res.ok || !data.wrapup) throw new Error(data.message ?? "Wrap-up failed.")
-      void load()
+      void load({ background: true })
       void voiceBrowser.refresh().catch(() => undefined)
       return data.wrapup
     } catch (e) {
@@ -752,9 +807,9 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   }
 
   const showIncomingDuringLoad =
-    workspacePhase === "incoming" || hasSdkIncoming || Boolean(inboundOffer)
+    workspacePhase === "incoming" || honorSdkIncoming || Boolean(inboundOffer)
 
-  if (loading && !showIncomingDuringLoad) {
+  if (loading && !showIncomingDuringLoad && workspacePhase !== "wrapup" && workspacePhase !== "active") {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />
@@ -849,7 +904,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
               void loadLeadContext(leadId)
               setLeadLinked(true)
               setCoachingMode("lead_linked")
-              if (session) setActiveSession(session)
+              if (session) applyServerSession(session)
               else if (activeSession) setActiveSession({ ...activeSession, leadId })
             }}
           />
@@ -937,7 +992,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
             void loadLeadContext(leadId)
             setLeadLinked(true)
             setCoachingMode("lead_linked")
-            if (session) setActiveSession(session)
+            if (session) applyServerSession(session)
             else if (activeSession) setActiveSession({ ...activeSession, leadId })
           }}
         />

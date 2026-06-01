@@ -12,6 +12,8 @@ import {
   filterInboundOfferForLifecycle,
   mergeServerSessionIntoLocal,
   shouldApplyInboundOfferToSession,
+  shouldHonorSdkIncomingForLifecycle,
+  shouldSyncNativeSessionFromVoiceCall,
 } from "../lib/voice/browser-calling/call-lifecycle-reconciliation"
 import type { NativeCallWorkspaceSessionPublicView } from "../lib/growth/native-dialer/native-dialer-types"
 import type { VoiceInboundBrowserOfferView } from "../lib/voice/browser-calling/types"
@@ -67,7 +69,36 @@ const endedVoiceCallIds = new Set<string>()
 const endedSessionIds = new Set<string>()
 const completedSessionIds = new Set<string>()
 
-assert.equal(CALL_LIFECYCLE_RECONCILIATION_QA_MARKER, "call-lifecycle-reconciliation-v2")
+assert.equal(CALL_LIFECYCLE_RECONCILIATION_QA_MARKER, "call-lifecycle-reconciliation-v3")
+
+assert.equal(
+  shouldHonorSdkIncomingForLifecycle({
+    sdkIncoming: true,
+    voiceCallId: "vc-1",
+    sessionId: "sess-1",
+    locks: { endedVoiceCallIds: new Set(["vc-1"]), endedSessionIds: new Set(["sess-1"]), completedSessionIds: new Set(), completedVoiceCallIds: new Set() },
+  }),
+  false,
+  "sdk incoming must be ignored after local end lock",
+)
+
+assert.equal(shouldSyncNativeSessionFromVoiceCall("wrapping"), false)
+assert.equal(shouldSyncNativeSessionFromVoiceCall("active"), true)
+
+const workspaceBridgeSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/browser-calling/workspace-bridge.ts"),
+  "utf8",
+)
+assert.match(workspaceBridgeSource, /shouldSyncNativeSessionFromVoiceCall/)
+assert.match(workspaceBridgeSource, /"wrapping", "completed"/)
+
+const workspaceComponentSource = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace.tsx"),
+  "utf8",
+)
+assert.match(workspaceComponentSource, /shouldHonorSdkIncomingForLifecycle/)
+assert.match(workspaceComponentSource, /syncWorkspaceSessionId/)
+assert.match(workspaceComponentSource, /applyServerSession/)
 
 assert.equal(
   shouldApplyInboundOfferToSession({
