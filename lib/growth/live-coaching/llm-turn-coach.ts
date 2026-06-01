@@ -5,6 +5,7 @@ import "server-only"
 import { z } from "zod"
 import { runAiTask } from "@/lib/ai/router"
 import { phraseViolatesStagePolicy } from "@/lib/growth/live-coaching/stage-coaching-policy"
+import { lastCustomerFacingTranscriptEvent } from "@/lib/growth/live-coaching/prospect-turn-detection"
 import {
   CONVERSATION_STAGE_OBJECTIVES,
   CONVERSATION_STAGES,
@@ -27,6 +28,7 @@ export type LlmTurnCoachInput = {
   stageObjective: string
   snapshot: GrowthRealtimeLiveSnapshot
   inbound?: boolean
+  previousCoach?: ConversationCoachTurn | null
 }
 
 function buildSystemPrompt(stage: ConversationStage): string {
@@ -49,15 +51,15 @@ function recentWindow(events: GrowthRealtimeTranscriptEvent[], limit = 10) {
   }))
 }
 
-function lastProspectEvent(events: GrowthRealtimeTranscriptEvent[]) {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    if (events[index]?.speaker === "prospect") return events[index]!
-  }
-  return null
+function lastProspectEvent(
+  events: GrowthRealtimeTranscriptEvent[],
+  previousCoach?: ConversationCoachTurn | null,
+) {
+  return lastCustomerFacingTranscriptEvent(events, { previousCoach })
 }
 
 export async function generateLlmCoachTurn(input: LlmTurnCoachInput): Promise<ConversationCoachTurn | null> {
-  const lastProspect = lastProspectEvent(input.events)
+  const lastProspect = lastProspectEvent(input.events, input.previousCoach)
   if (!lastProspect) return null
 
   const userPayload = {

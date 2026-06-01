@@ -86,6 +86,13 @@ const mediaSession = fs.readFileSync(
 )
 assert.match(mediaSession, /bridgeVoiceSegmentToGrowthRealtime/)
 
+const streamRegistry = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/media-streaming/stream-transcript-runtime-registry.ts"),
+  "utf8",
+)
+assert.match(streamRegistry, /TWILIO_MEDIA_TRACKS/)
+assert.match(streamRegistry, /fixedTrack/)
+
 const migration = fs.readFileSync(
   path.join(process.cwd(), "supabase/migrations/20270620121000_voice_growth_live_coaching_bridge.sql"),
   "utf8",

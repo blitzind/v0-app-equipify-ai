@@ -67,6 +67,7 @@ import { VOICE_UNIFIED_OPERATOR_WORKSPACE_UX_QA_MARKER } from "@/lib/voice/works
 import { buildWorkspaceContextInputFromVoiceSnapshot } from "@/lib/voice/workspace-context/snapshot-input-mapper"
 import { buildWorkspaceContextSnapshot } from "@/lib/voice/workspace-context/workspace-context-builder"
 import type { ConversationCoachTurn } from "@/lib/growth/live-coaching/types"
+import { mergeOperatorAssistPreferringNewerCoach } from "@/lib/growth/operator-assist/resolve-say-this-next"
 import {
   buildOptimisticActiveInboundSession,
   buildOptimisticInboundAnswerCoachTurn,
@@ -653,7 +654,10 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         callAuthority.phase === "wrapup" ||
         callAuthority.phase === "ending")
     ) {
-      operatorAssistStableRef.current = nextAssist
+      operatorAssistStableRef.current = mergeOperatorAssistPreferringNewerCoach(
+        operatorAssistStableRef.current,
+        nextAssist,
+      )
       return
     }
     if (callAuthority.phase === "idle" || callAuthority.phase === "completed") {

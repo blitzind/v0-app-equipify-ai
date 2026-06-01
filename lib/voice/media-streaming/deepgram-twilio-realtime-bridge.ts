@@ -29,6 +29,8 @@ export type DeepgramTwilioTranscriptEvent = {
 export type DeepgramTwilioRealtimeBridgeOptions = {
   mediaSessionId: string
   voiceCallId: string
+  /** When set, transcript events always use this Twilio track for speaker attribution. */
+  fixedTrack?: "inbound" | "outbound"
   onTranscript: (event: DeepgramTwilioTranscriptEvent) => void | Promise<void>
   onInterim?: (event: DeepgramTwilioTranscriptEvent) => void | Promise<void>
   onError?: (message: string) => void
@@ -234,9 +236,13 @@ export class DeepgramTwilioRealtimeBridge {
     })
   }
 
+  private resolveAttributionTrack(): string | undefined {
+    return this.options.fixedTrack ?? this.activeTrack
+  }
+
   private async handleMessage(raw: string): Promise<void> {
     const event = normalizeDeepgramMessage(raw, {
-      track: this.activeTrack,
+      track: this.resolveAttributionTrack(),
       openedAt: this.openedAt,
     })
     if (!event) return

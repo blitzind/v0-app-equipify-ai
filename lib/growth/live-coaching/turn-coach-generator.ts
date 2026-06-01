@@ -1,6 +1,7 @@
 /** Deterministic turn coach — responds to the prospect's last statement within stage. */
 
 import { phraseViolatesStagePolicy } from "@/lib/growth/live-coaching/stage-coaching-policy"
+import { lastCustomerFacingTranscriptEvent } from "@/lib/growth/live-coaching/prospect-turn-detection"
 import {
   CONVERSATION_STAGE_OBJECTIVES,
   type ConversationCoachTurn,
@@ -16,11 +17,11 @@ function trimPhrase(value: string, max = 180): string {
   return `${(lastSpace > 50 ? cut.slice(0, lastSpace) : cut).trim()}…`
 }
 
-function lastProspectEvent(events: GrowthRealtimeTranscriptEvent[]): GrowthRealtimeTranscriptEvent | null {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    if (events[index]?.speaker === "prospect") return events[index]!
-  }
-  return null
+function lastProspectEvent(
+  events: GrowthRealtimeTranscriptEvent[],
+  previousCoach?: ConversationCoachTurn | null,
+): GrowthRealtimeTranscriptEvent | null {
+  return lastCustomerFacingTranscriptEvent(events, { previousCoach })
 }
 
 function extractTopicSnippet(content: string): string {
@@ -142,10 +143,11 @@ export function generateDeterministicCoachTurn(input: {
   snapshot: GrowthRealtimeLiveSnapshot
   inbound?: boolean
   triggeredBySequenceNumber?: number | null
+  previousCoach?: ConversationCoachTurn | null
 }): ConversationCoachTurn {
   const now = new Date().toISOString()
   const stageObjective = CONVERSATION_STAGE_OBJECTIVES[input.stage]
-  const prospectEvent = lastProspectEvent(input.events)
+  const prospectEvent = lastProspectEvent(input.events, input.previousCoach)
 
   if (prospectEvent) {
     const tailored = respondToProspectUtterance({
@@ -162,7 +164,25 @@ export function generateDeterministicCoachTurn(input: {
         evidenceQuote: extractTopicSnippet(prospectEvent.content),
         triggeredBySequenceNumber: prospectEvent.sequenceNumber,
         source: "deterministic",
-        confidence: 0.78,
+        confidence: prospectEvent.speaker === "prospect" ? 0.78 : 0.62,
+        updatedAt: now,
+      }
+    }
+
+    const snippet = extractTopicSnippet(prospectEvent.content)
+    const reflectPhrase = trimPhrase(
+      `Got it — when you mention "${snippet.toLowerCase()}", what's the main thing you're trying to solve?`,
+    )
+    if (!phraseViolatesStagePolicy(input.stage, reflectPhrase)) {
+      return {
+        primaryPhrase: reflectPhrase,
+        rationale: "Reflect the customer's latest statement and invite them to expand.",
+        stage: input.stage,
+        stageObjective,
+        evidenceQuote: snippet,
+        triggeredBySequenceNumber: prospectEvent.sequenceNumber,
+        source: "deterministic",
+        confidence: prospectEvent.speaker === "prospect" ? 0.74 : 0.6,
         updatedAt: now,
       }
     }

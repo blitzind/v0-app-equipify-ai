@@ -15,6 +15,10 @@ import {
   buildInboundBootstrapCoachTurn,
   generateDeterministicCoachTurn,
 } from "../lib/growth/live-coaching/turn-coach-generator"
+import {
+  lastCustomerFacingTranscriptEvent,
+  shouldRefreshCoachForCustomerSpeech,
+} from "../lib/growth/live-coaching/prospect-turn-detection"
 import { generateLiveGuidanceCandidates } from "../lib/growth/live-guidance/live-guidance-engine"
 import { emptyRealtimeLiveSnapshot } from "../lib/growth/realtime/realtime-live-snapshot-defaults"
 import { resolveSayThisNext } from "../lib/growth/operator-assist/resolve-say-this-next"
@@ -208,5 +212,50 @@ const coachingService = fs.readFileSync(
   "utf8",
 )
 assert.match(coachingService, /hydrateDetail/)
+
+const mislabeledCustomer = [
+  {
+    id: "1",
+    sessionId: "s1",
+    speaker: "rep" as const,
+    content: "We need help with our billing workflow this quarter.",
+    sequenceNumber: 0,
+    timestampMs: Date.now(),
+    sourceVoiceSegmentId: "seg-1",
+    createdAt: new Date().toISOString(),
+  },
+]
+
+assert.equal(
+  lastCustomerFacingTranscriptEvent(mislabeledCustomer, { previousCoach: bootstrap })?.sequenceNumber,
+  0,
+)
+assert.equal(
+  shouldRefreshCoachForCustomerSpeech({ events: mislabeledCustomer, previousCoach: bootstrap }),
+  true,
+)
+
+const refreshedTurn = generateDeterministicCoachTurn({
+  events: mislabeledCustomer,
+  stage: "rapport",
+  snapshot,
+  inbound: true,
+  previousCoach: bootstrap,
+})
+assert.notEqual(refreshedTurn.primaryPhrase, bootstrap.primaryPhrase)
+assert.ok(refreshedTurn.triggeredBySequenceNumber === 0)
+
+const streamRegistry = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/media-streaming/stream-transcript-runtime-registry.ts"),
+  "utf8",
+)
+assert.match(streamRegistry, /fixedTrack/)
+assert.match(streamRegistry, /TWILIO_MEDIA_TRACKS/)
+
+const deepgramBridge = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/media-streaming/deepgram-twilio-realtime-bridge.ts"),
+  "utf8",
+)
+assert.match(deepgramBridge, /fixedTrack/)
 
 console.log("live-coaching-v2 checks passed")

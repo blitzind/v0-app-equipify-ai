@@ -11,6 +11,7 @@ import {
   buildOutboundBootstrapCoachTurn,
   generateDeterministicCoachTurn,
 } from "@/lib/growth/live-coaching/turn-coach-generator"
+import { shouldRefreshCoachForCustomerSpeech } from "@/lib/growth/live-coaching/prospect-turn-detection"
 import { updateGrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-repository"
 import type {
   GrowthRealtimeCallSession,
@@ -25,23 +26,11 @@ export type ConversationCoachSyncResult = {
   liveSnapshot: GrowthRealtimeLiveSnapshot
 }
 
-function lastProspectSequence(events: GrowthRealtimeTranscriptEvent[]): number | null {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    if (events[index]?.speaker === "prospect") return events[index]!.sequenceNumber
-  }
-  return null
-}
-
 function shouldRefreshCoachTurn(input: {
   events: GrowthRealtimeTranscriptEvent[]
   previousCoach: ConversationCoachTurn | null | undefined
 }): boolean {
-  if (input.events.length === 0) return !input.previousCoach
-  const lastProspectSeq = lastProspectSequence(input.events)
-  if (lastProspectSeq === null) return false
-  if (!input.previousCoach) return true
-  if (input.previousCoach.triggeredBySequenceNumber === null) return true
-  return lastProspectSeq > input.previousCoach.triggeredBySequenceNumber
+  return shouldRefreshCoachForCustomerSpeech(input)
 }
 
 export async function syncConversationCoach(input: {
@@ -72,6 +61,7 @@ export async function syncConversationCoach(input: {
       stage: stageResult.stage,
       snapshot: input.snapshot,
       inbound: input.direction === "inbound",
+      previousCoach: coachTurn,
     })
 
     let nextTurn = deterministic
@@ -83,6 +73,7 @@ export async function syncConversationCoach(input: {
         stageObjective: stageResult.stageObjective,
         snapshot: input.snapshot,
         inbound: input.direction === "inbound",
+        previousCoach: coachTurn,
       }).catch(() => null)
       if (llmTurn) nextTurn = llmTurn
     }

@@ -40,6 +40,48 @@ export type SayThisNextSnapshot = {
   qaMarker: typeof GROWTH_LIVE_COACHING_V2_QA_MARKER
 }
 
+function coachUpdatedAt(coach: ConversationCoachTurn | null | undefined): number {
+  if (!coach?.updatedAt) return 0
+  const parsed = Date.parse(coach.updatedAt)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function pickPrimaryCoachTurn(input: {
+  serverCoach: ConversationCoachTurn | null | undefined
+  optimisticCoach: ConversationCoachTurn | null | undefined
+}): ConversationCoachTurn | null {
+  const serverCoach = input.serverCoach ?? null
+  const optimisticCoach = input.optimisticCoach ?? null
+  if (!serverCoach) return optimisticCoach
+  if (!optimisticCoach) return serverCoach
+  return coachUpdatedAt(serverCoach) >= coachUpdatedAt(optimisticCoach) ? serverCoach : optimisticCoach
+}
+
+/** Keep the freshest primaryCoach when browser sync returns a stale operatorAssist shell. */
+export function mergeOperatorAssistPreferringNewerCoach(
+  previous: UnifiedOperatorAssistSnapshot | null,
+  incoming: UnifiedOperatorAssistSnapshot,
+): UnifiedOperatorAssistSnapshot {
+  if (!previous?.coachingState?.primaryCoach || !incoming.coachingState?.primaryCoach) {
+    return incoming
+  }
+  const prevCoach = previous.coachingState.primaryCoach
+  const nextCoach = incoming.coachingState.primaryCoach
+  if (coachUpdatedAt(nextCoach) >= coachUpdatedAt(prevCoach)) {
+    return incoming
+  }
+  return {
+    ...incoming,
+    coachingState: {
+      ...incoming.coachingState,
+      primaryCoach: prevCoach,
+      suggestedNextQuestion: prevCoach.primaryPhrase,
+      conversationStage: prevCoach.stage,
+      stageObjective: prevCoach.stageObjective,
+    },
+  }
+}
+
 export function resolveSayThisNext(
   operatorAssist: UnifiedOperatorAssistSnapshot | null,
   optimisticCoach?: ConversationCoachTurn | null,
@@ -48,7 +90,10 @@ export function resolveSayThisNext(
 
   const generatedAt = operatorAssist?.generatedAt ?? new Date().toISOString()
   const coachingState = operatorAssist?.coachingState ?? null
-  const primaryCoach = coachingState?.primaryCoach ?? optimisticCoach ?? null
+  const primaryCoach = pickPrimaryCoachTurn({
+    serverCoach: coachingState?.primaryCoach,
+    optimisticCoach,
+  })
 
   if (primaryCoach?.primaryPhrase) {
     const phrase = trimPhrase(primaryCoach.primaryPhrase)
