@@ -1,8 +1,10 @@
 /**
- * Optimistic inbound answer — UI must not block on server reconcile.
+ * Optimistic inbound answer — UI uses an active local session while server reconcile is authoritative.
  * Run: pnpm test:optimistic-inbound-answer
  */
 import assert from "node:assert/strict"
+import fs from "node:fs"
+import path from "node:path"
 import {
   buildOptimisticActiveInboundSession,
   buildOptimisticInboundAnswerCoachTurn,
@@ -61,5 +63,25 @@ assert.ok(sayThisNext)
 assert.match(sayThisNext!.phrase, /prompted you to reach out/i)
 assert.equal(sayThisNext!.qaMarker, "growth-live-coaching-v2-v1")
 assert.equal(OPTIMISTIC_INBOUND_ANSWER_QA_MARKER, "growth-optimistic-inbound-answer-v1")
+
+const workspaceSource = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace.tsx"),
+  "utf8",
+)
+assert.match(
+  workspaceSource,
+  /await reconcileInboundAnswer\(\{[\s\S]*sessionForAnswer: capturedSession[\s\S]*hadSdkIncoming: hasSdkIncoming[\s\S]*\}\)/,
+  "answer flow must await server reconciliation after SDK accept",
+)
+assert.doesNotMatch(
+  workspaceSource,
+  /void voiceBrowser\.refresh\(\)\.catch\(\(\) => undefined\)[\s\S]{0,200}await reconcileInboundAnswer/,
+  "answer flow must not refresh browser/operator assist state before answer reconciliation completes",
+)
+assert.match(
+  workspaceSource,
+  /applyServerSession\(data\.session\)[\s\S]*void voiceBrowser\.refresh\(\)\.catch\(\(\) => undefined\)/,
+  "answer reconciliation must apply the linked server session before refreshing operator assist",
+)
 
 console.log("optimistic-inbound-answer checks passed")

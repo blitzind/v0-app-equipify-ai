@@ -1074,19 +1074,18 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           }),
         )
       }
-      setAnswering(false)
-
-      void voiceBrowser.refresh().catch(() => undefined)
-
       if (capturedSession) {
-        void reconcileInboundAnswer({
+        await reconcileInboundAnswer({
           sessionForAnswer: capturedSession,
           hadSdkIncoming: hasSdkIncoming,
         })
+      } else {
+        await voiceBrowser.refresh().catch(() => undefined)
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Answer failed.")
       setAnswering(false)
+    } catch (e) {
+	      setError(e instanceof Error ? e.message : "Answer failed.")
+	      setAnswering(false)
       setCallAuthority((prev) => transitionCallLifecycleAuthority(prev, { type: "decline_or_cancel" }))
     }
   }

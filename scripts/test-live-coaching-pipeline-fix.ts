@@ -123,6 +123,16 @@ assert.match(
   /if \(\(existing\.direction as string\) === "inbound" && !refreshedRealtimeSessionId\)/,
   "answer path must re-read the native session and diagnose missing realtime_session_id",
 )
+assert.match(
+  nativeDialerRepo,
+  /const canReconcileAlreadyAnsweredInbound =[\s\S]*existingDirection === "inbound"[\s\S]*\(existingStatus === "active" \|\| existingStatus === "on_hold"\)[\s\S]*!existingRealtimeSessionId/,
+  "answer reconciliation must be idempotent for already-active inbound sessions without realtime_session_id",
+)
+assert.match(
+  nativeDialerRepo,
+  /if \(existingStatus !== "ringing" && !canReconcileAlreadyAnsweredInbound\)[\s\S]*throw new Error\("Call is not ringing\."\)/,
+  "non-ringing sessions should only be accepted for the explicit inbound coaching reconciliation fallback",
+)
 
 const coachingTypes = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/native-dialer/call-workspace-coaching-types.ts"),

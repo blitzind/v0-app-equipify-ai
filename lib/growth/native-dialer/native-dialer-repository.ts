@@ -417,95 +417,108 @@ export async function answerNativeCallSession(
   const { data: existing, error: fetchError } = await sessionsTable(admin).select(SESSION_SELECT).eq("id", sessionId).maybeSingle()
   if (fetchError) throw new Error(fetchError.message)
   if (!existing) throw new Error("Call session not found.")
-  if (existing.status !== "ringing") throw new Error("Call is not ringing.")
+  const existingStatus = existing.status as NativeCallWorkspaceSessionPublicView["status"]
+  const existingDirection = existing.direction as string
+  const existingRealtimeSessionId = (existing.realtime_session_id as string | null) ?? null
+  const canReconcileAlreadyAnsweredInbound =
+    existingDirection === "inbound" &&
+    (existingStatus === "active" || existingStatus === "on_hold") &&
+    !existingRealtimeSessionId
+  if (existingStatus !== "ringing" && !canReconcileAlreadyAnsweredInbound) {
+    throw new Error("Call is not ringing.")
+  }
 
   const orgId = await getGrowthEngineAiOrgId(admin)
   const voiceCallId = (existing.voice_call_id as string | null) ?? null
   const now = new Date().toISOString()
 
-  if (voiceCallId && ownerUserId) {
-    const claim = await claimInboundVoiceCallForOperator(admin, {
-      organizationId: orgId,
-      userId: ownerUserId,
-      voiceCallId,
-      workspaceSessionId: sessionId,
-    })
-    if (!claim.ok) throw new Error(claim.reason)
+  if (existingStatus === "ringing") {
+    if (voiceCallId && ownerUserId) {
+      const claim = await claimInboundVoiceCallForOperator(admin, {
+        organizationId: orgId,
+        userId: ownerUserId,
+        voiceCallId,
+        workspaceSessionId: sessionId,
+      })
+      if (!claim.ok) throw new Error(claim.reason)
 
-    await admin
-      .schema("voice")
-      .from("voice_calls")
-      .update({ status: "in_progress", answered_at: now, updated_at: now })
-      .eq("id", voiceCallId)
-      .eq("organization_id", orgId)
+      await admin
+        .schema("voice")
+        .from("voice_calls")
+        .update({ status: "in_progress", answered_at: now, updated_at: now })
+        .eq("id", voiceCallId)
+        .eq("organization_id", orgId)
 
-    await appendVoiceCallEvent(admin, {
-      organizationId: orgId,
-      voiceCallId,
-      provider: "twilio",
-      eventType: "answered",
-      eventTimestamp: now,
-      payloadJson: { source: "call_workspace", sessionId },
-      idempotencyKey: `workspace:${sessionId}:answered`,
-    })
-  } else if (voiceCallId && (existing.direction as string) === "inbound" && !ownerUserId) {
-    pipeline.liveCoachingLinked = false
-    pipeline.liveCoachingFailureReason = "missing_owner_user_id"
-    pipeline.liveCoachingError = "missing_owner_user_id"
-    logVoiceInfrastructure("voice_growth_coaching_link_missing_after_answer", {
-      nativeSessionId: sessionId,
-      voiceCallId,
-      organizationId: orgId,
-      direction: existing.direction as string | null,
-      status: existing.status as string | null,
-      phase: existing.status as string | null,
-      reason: pipeline.liveCoachingFailureReason,
-      realtimeSessionId: null,
-      linkResult: null,
-      persistedRealtimeSessionId: null,
-    })
-  } else {
-    const providers = await resolveNativeDialerProviders(admin)
-    const routed = await routeNativeDialerProvider(providers)
-    const startResult = await routed.provider.startCall({
-      sessionId,
-      phoneNumber: existing.phone_number as string,
-      leadId: (existing.lead_id as string | null) ?? null,
-      contactName: (existing.contact_name as string | null) ?? null,
-      companyName: (existing.company_name as string | null) ?? null,
-    })
+      await appendVoiceCallEvent(admin, {
+        organizationId: orgId,
+        voiceCallId,
+        provider: "twilio",
+        eventType: "answered",
+        eventTimestamp: now,
+        payloadJson: { source: "call_workspace", sessionId },
+        idempotencyKey: `workspace:${sessionId}:answered`,
+      })
+    } else if (voiceCallId && existingDirection === "inbound" && !ownerUserId) {
+      pipeline.liveCoachingLinked = false
+      pipeline.liveCoachingFailureReason = "missing_owner_user_id"
+      pipeline.liveCoachingError = "missing_owner_user_id"
+      logVoiceInfrastructure("voice_growth_coaching_link_missing_after_answer", {
+        nativeSessionId: sessionId,
+        voiceCallId,
+        organizationId: orgId,
+        direction: existing.direction as string | null,
+        status: existing.status as string | null,
+        phase: existing.status as string | null,
+        reason: pipeline.liveCoachingFailureReason,
+        realtimeSessionId: null,
+        linkResult: null,
+        persistedRealtimeSessionId: null,
+      })
+    } else {
+      const providers = await resolveNativeDialerProviders(admin)
+      const routed = await routeNativeDialerProvider(providers)
+      const startResult = await routed.provider.startCall({
+        sessionId,
+        phoneNumber: existing.phone_number as string,
+        leadId: (existing.lead_id as string | null) ?? null,
+        contactName: (existing.contact_name as string | null) ?? null,
+        companyName: (existing.company_name as string | null) ?? null,
+      })
 
-    const { data: active, error: activeError } = await sessionsTable(admin)
+      const { data: active, error: activeError } = await sessionsTable(admin)
+        .update({
+          status: "active",
+          connected_at: now,
+          provider: routed.providerId,
+          fallback_provider: routed.failoverApplied ? providers.fallbackProvider : providers.primaryProvider,
+          provider_call_ref: startResult.providerCallRef,
+          recording_state: "active",
+          safe_summary: startResult.message,
+          updated_at: now,
+        })
+        .eq("id", sessionId)
+        .select(SESSION_SELECT)
+        .single()
+      if (activeError) throw new Error(activeError.message)
+      return { session: mapNativeCallSessionRow(active as SessionRow), pipeline }
+    }
+
+    const { error: activeError } = await sessionsTable(admin)
       .update({
         status: "active",
         connected_at: now,
-        provider: routed.providerId,
-        fallback_provider: routed.failoverApplied ? providers.fallbackProvider : providers.primaryProvider,
-        provider_call_ref: startResult.providerCallRef,
+        owner_user_id: ownerUserId ?? existing.owner_user_id,
         recording_state: "active",
-        safe_summary: startResult.message,
+        safe_summary: "Inbound call answered via canonical voice infrastructure.",
         updated_at: now,
       })
       .eq("id", sessionId)
       .select(SESSION_SELECT)
       .single()
     if (activeError) throw new Error(activeError.message)
-    return { session: mapNativeCallSessionRow(active as SessionRow), pipeline }
+  } else if (!voiceCallId) {
+    throw new Error("Call session is missing voice call.")
   }
-
-  const { data: active, error: activeError } = await sessionsTable(admin)
-    .update({
-      status: "active",
-      connected_at: now,
-      owner_user_id: ownerUserId ?? existing.owner_user_id,
-      recording_state: "active",
-      safe_summary: "Inbound call answered via canonical voice infrastructure.",
-      updated_at: now,
-    })
-    .eq("id", sessionId)
-    .select(SESSION_SELECT)
-    .single()
-  if (activeError) throw new Error(activeError.message)
   await syncWorkspaceSessionFromVoiceCall(admin, {
     voiceCallId: voiceCallId!,
     organizationId: orgId,
