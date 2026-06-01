@@ -21,6 +21,7 @@ export interface VoiceCallControlProvider {
     callerId?: string
     recordingCallbackUrl?: string | null
     statusCallbackUrl?: string | null
+    mediaStream?: { wssUrl: string; callSid?: string | null } | null
   }): VoiceCallControlResponse
   forwardCall(input: {
     toNumber: string

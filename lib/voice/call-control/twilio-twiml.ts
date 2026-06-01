@@ -1,10 +1,17 @@
 import type { InboundCallControlDecision } from "@/lib/voice/call-control/types"
 
+export type InboundDialMediaStreamTwimlInput = {
+  wssUrl: string
+  callSid?: string | null
+}
+
 export type TwilioCallControlVerbInput = {
   decision: InboundCallControlDecision
   callerId?: string
   recordingCallbackUrl?: string | null
   statusCallbackUrl?: string | null
+  /** Prepends `<Start><Stream>` inside `<Response>` for live transcript ingestion. */
+  mediaStream?: InboundDialMediaStreamTwimlInput | null
 }
 
 function xmlEscape(value: string): string {
@@ -18,6 +25,31 @@ function xmlEscape(value: string): string {
 
 export function buildTwilioSayAndHangup(message: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?><Response><Say>${xmlEscape(message)}</Say><Hangup/></Response>`
+}
+
+export function buildMediaStreamStartTwimlFragment(input: {
+  wssUrl: string
+  callSid?: string | null
+  track?: "inbound_track" | "outbound_track" | "both_tracks"
+}): string {
+  const streamUrl = xmlEscape(input.wssUrl)
+  const track = input.track ?? "both_tracks"
+  const callSidParam = input.callSid
+    ? `<Parameter name="callSid" value="${xmlEscape(input.callSid)}" />`
+    : ""
+  return `<Start><Stream url="${streamUrl}" track="${track}">${callSidParam}</Stream></Start>`
+}
+
+export function injectInboundDialMediaStreamTwiml(
+  twiml: string,
+  mediaStream?: InboundDialMediaStreamTwimlInput | null,
+): string {
+  if (!mediaStream?.wssUrl?.trim()) return twiml
+  const fragment = buildMediaStreamStartTwimlFragment({
+    wssUrl: mediaStream.wssUrl.trim(),
+    callSid: mediaStream.callSid,
+  })
+  return twiml.replace("<Response>", `<Response>${fragment}`)
 }
 
 export function buildTwilioReject(): string {
@@ -129,21 +161,27 @@ export function generateInboundCallResponseTwiml(input: TwilioCallControlVerbInp
     case "say_and_hangup":
       return buildTwilioSayAndHangup(decision.fallbackReason ?? "This number is unavailable.")
     case "forward":
-      return forwardCallTwiml({
-        toNumber: decision.dialNumbers[0] ?? "",
-        callerId: input.callerId,
-        record,
-        recordingCallbackUrl,
-      })
+      return injectInboundDialMediaStreamTwiml(
+        forwardCallTwiml({
+          toNumber: decision.dialNumbers[0] ?? "",
+          callerId: input.callerId,
+          record,
+          recordingCallbackUrl,
+        }),
+        input.mediaStream,
+      )
     case "dial":
-      return dialMultipleTwiml({
-        numbers: decision.dialNumbers,
-        clientIdentities: decision.dialClientIdentities ?? [],
-        callerId: input.callerId,
-        simultaneous: decision.routingMode === "simultaneous_ring",
-        record,
-        recordingCallbackUrl,
-      })
+      return injectInboundDialMediaStreamTwiml(
+        dialMultipleTwiml({
+          numbers: decision.dialNumbers,
+          clientIdentities: decision.dialClientIdentities ?? [],
+          callerId: input.callerId,
+          simultaneous: decision.routingMode === "simultaneous_ring",
+          record,
+          recordingCallbackUrl,
+        }),
+        input.mediaStream,
+      )
     case "voicemail":
       return sendToVoicemailTwiml({
         greetingText: decision.fallbackReason ?? undefined,

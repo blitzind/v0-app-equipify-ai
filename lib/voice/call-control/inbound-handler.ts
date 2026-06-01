@@ -37,12 +37,17 @@ import {
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import { VOICE_CALL_CONTROL_QA_MARKER } from "@/lib/voice/call-control/types"
 import type { InboundVoiceRouteResolution } from "@/lib/voice/routing/routing-resolver"
+import { buildVoiceMediaStreamTwilioWssUrl } from "@/lib/voice/call-control/urls"
+import { shouldEnableInboundDialMediaStream } from "@/lib/voice/media-streaming/inbound-dial-media-stream-config"
+import { VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER } from "@/lib/voice/media-streaming/voice-stream-lifecycle"
 
 export type HandleTwilioInboundCallInput = {
   admin: SupabaseClient
   payload: Record<string, unknown>
   recordingCallbackUrl: string
   statusCallbackUrl?: string
+  /** Public HTTPS origin for Twilio media stream WSS URL construction. */
+  mediaStreamOrigin?: string | null
 }
 
 export type HandleTwilioInboundCallResult =
@@ -289,11 +294,35 @@ export async function handleTwilioInboundCall(
     inboundCallControlReady: true,
   })
 
+  const mediaStreamEnabled =
+    Boolean(callSid) &&
+    shouldEnableInboundDialMediaStream() &&
+    (decision.action === "dial" || decision.action === "forward")
+  const mediaStream = mediaStreamEnabled
+    ? {
+        wssUrl: buildVoiceMediaStreamTwilioWssUrl(input.mediaStreamOrigin ?? null),
+        callSid,
+      }
+    : null
+
+  if (mediaStream) {
+    logVoiceInfrastructure("voice_inbound_dial_media_stream_twiml", {
+      qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
+      foundationMarker: VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER,
+      organizationId,
+      callSid,
+      action: decision.action,
+      wssUrl: mediaStream.wssUrl,
+      dialClientIdentities: decision.dialClientIdentities ?? [],
+    })
+  }
+
   const response = generateInboundCallResponse(provider, {
     decision,
     callerId: voiceNumber.phoneNumber,
     recordingCallbackUrl: input.recordingCallbackUrl,
     statusCallbackUrl: input.statusCallbackUrl,
+    mediaStream,
   })
 
   return {

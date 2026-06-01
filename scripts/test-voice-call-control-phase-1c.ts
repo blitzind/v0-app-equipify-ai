@@ -14,10 +14,13 @@ import {
   shouldRecordCall,
 } from "../lib/voice/call-control/recording-policy"
 import {
+  dialMultipleTwiml,
   forwardCallTwiml,
   generateInboundCallResponseTwiml,
+  injectInboundDialMediaStreamTwiml,
   sendToVoicemailTwiml,
 } from "../lib/voice/call-control/twilio-twiml"
+import { shouldEnableInboundDialMediaStream } from "../lib/voice/media-streaming/inbound-dial-media-stream-config"
 import { VOICE_CALL_CONTROL_QA_MARKER } from "../lib/voice/call-control/types"
 import { buildVoiceInboundTwilioUrl, buildVoiceRecordingCallbackUrl } from "../lib/voice/call-control/urls"
 import { resolveTwilioWebhookValidationUrl } from "../lib/voice/webhooks/twilio-request-url"
@@ -187,6 +190,57 @@ assert.match(recordingRoute, /ingestVoicemailRecordingCallback/)
 
 assert.match(buildVoiceInboundTwilioUrl("https://app.equipify.ai"), /\/api\/voice\/inbound\/twilio/)
 assert.match(buildVoiceRecordingCallbackUrl("https://app.equipify.ai"), /\/recording/)
+
+const prevDeepgramKey = process.env.DEEPGRAM_API_KEY
+process.env.DEEPGRAM_API_KEY = "test-deepgram-key"
+assert.equal(shouldEnableInboundDialMediaStream(), true)
+
+const browserDialDecision = {
+  qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
+  action: "dial" as const,
+  routeStatus: "resolved" as const,
+  routingMode: "assigned_user" as const,
+  dialNumbers: [] as string[],
+  dialClientIdentities: ["user_abc123"],
+  voicemailBoxId: null,
+  recordingEnabled: false,
+  recordingDisclosureText: null,
+  fallbackReason: null,
+  warnings: [] as string[],
+}
+const dialTwimlWithStream = generateInboundCallResponseTwiml({
+  decision: browserDialDecision,
+  mediaStream: {
+    wssUrl: "wss://app.equipify.ai/api/voice/media/twilio",
+    callSid: "CA123",
+  },
+})
+assert.match(dialTwimlWithStream, /<Start><Stream url="wss:\/\/app\.equipify\.ai\/api\/voice\/media\/twilio" track="both_tracks">/)
+assert.match(dialTwimlWithStream, /<Parameter name="callSid" value="CA123"/)
+assert.match(dialTwimlWithStream, /<Client>user_abc123<\/Client>/)
+assert.doesNotMatch(
+  generateInboundCallResponseTwiml({ decision: browserDialDecision }),
+  /<Start><Stream/,
+)
+
+const dialOnlyTwiml = dialMultipleTwiml({ numbers: [], clientIdentities: ["user_x"] })
+assert.match(
+  injectInboundDialMediaStreamTwiml(dialOnlyTwiml, {
+    wssUrl: "wss://app.equipify.ai/api/voice/media/twilio",
+  }),
+  /<Response><Start><Stream/,
+)
+
+process.env.DEEPGRAM_API_KEY = prevDeepgramKey
+delete process.env.DEEPGRAM_API_KEY
+
+const inboundHandler = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/call-control/inbound-handler.ts"),
+  "utf8",
+)
+assert.match(inboundHandler, /shouldEnableInboundDialMediaStream/)
+assert.match(inboundHandler, /voice_inbound_dial_media_stream_twiml/)
+assert.match(inboundHandler, /mediaStreamEnabled/)
 
 import {
   mintTwilioVoiceBrowserAccessToken,

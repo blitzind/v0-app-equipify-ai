@@ -195,6 +195,20 @@ const incomingRoute = fs.readFileSync(
 assert.match(incomingRoute, /buildTwilioVoiceIncomingStreamTwiml/)
 assert.match(incomingRoute, /VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER/)
 
+const growthInboundHandler = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/call-control/inbound-handler.ts"),
+  "utf8",
+)
+assert.match(growthInboundHandler, /shouldEnableInboundDialMediaStream/)
+assert.match(growthInboundHandler, /injectInboundDialMediaStreamTwiml|mediaStreamEnabled/)
+assert.match(growthInboundHandler, /voice_inbound_dial_media_stream_twiml/)
+
+const growthInboundRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/voice/inbound/twilio/route.ts"),
+  "utf8",
+)
+assert.match(growthInboundRoute, /mediaStreamOrigin/)
+
 const bridgeSource = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/media-streaming/deepgram-twilio-realtime-bridge.ts"),
   "utf8",
@@ -207,5 +221,6 @@ const wsServerSource = fs.readFileSync(
   "utf8",
 )
 assert.match(wsServerSource, /attachTwilioMediaWebSocketUpgradeHandler/)
+assert.match(wsServerSource, /getActiveConnectionCount/)
 
 console.log("voice-media-streaming-phase-1f checks passed")

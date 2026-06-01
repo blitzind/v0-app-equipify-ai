@@ -2,6 +2,7 @@ import "server-only"
 
 import { buildTwilioSayAndHangup } from "@/lib/voice/call-control/twilio-twiml"
 import { buildVoiceMediaStreamTwilioWssUrl } from "@/lib/voice/call-control/urls"
+import { shouldEnableInboundDialMediaStream } from "@/lib/voice/media-streaming/inbound-dial-media-stream-config"
 import { createTwilioVoiceProvider } from "@/lib/voice/providers/twilio-provider"
 import { VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER } from "@/lib/voice/media-streaming/voice-stream-lifecycle"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
@@ -51,13 +52,7 @@ export function resolveTwilioVoiceIncomingMediaStreamWssUrl(requestUrl: string):
 }
 
 export function shouldUseTwilioVoiceIncomingMediaStream(): boolean {
-  if (process.env.TWILIO_VOICE_INCOMING_STREAM_ENABLED?.trim() === "false") {
-    return false
-  }
-  return (
-    process.env.TWILIO_VOICE_INCOMING_STREAM_ENABLED?.trim() === "true" ||
-    Boolean(process.env.DEEPGRAM_API_KEY?.trim())
-  )
+  return shouldEnableInboundDialMediaStream()
 }
 
 export function shouldSkipTwilioWebhookSignatureValidation(): boolean {

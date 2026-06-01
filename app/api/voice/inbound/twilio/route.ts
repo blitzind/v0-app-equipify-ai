@@ -70,6 +70,7 @@ export async function POST(request: Request) {
     payload,
     recordingCallbackUrl: buildVoiceRecordingCallbackUrl(origin),
     statusCallbackUrl: `${origin}/api/voice/webhooks/twilio`,
+    mediaStreamOrigin: origin,
   })
 
   return new NextResponse(result.twiml, {

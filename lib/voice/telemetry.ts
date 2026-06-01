@@ -26,6 +26,7 @@ export type VoiceTelemetryEvent =
   | "voice_media_websocket_frame"
   | "voice_media_websocket_error"
   | "voice_media_websocket_closed"
+  | "voice_media_websocket_production"
   | "voice_media_stream_started"
   | "voice_media_stream_stopped"
   | "voice_stream_lifecycle_transition"
