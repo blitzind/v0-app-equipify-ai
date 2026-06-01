@@ -130,25 +130,28 @@ function CopilotSuggestionCard({
 
 export function GrowthCallWorkspaceAiCopilotSection({
   voiceCallId,
+  nativeSessionId = null,
   aiCopilot,
   onRefresh,
 }: {
   voiceCallId: string | null
+  nativeSessionId?: string | null
   aiCopilot: VoiceAiCopilotWorkspaceSnapshot | null
   onRefresh?: () => Promise<void>
 }) {
   const [acting, setActing] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const canonicalVoiceCallId = voiceCallId ?? aiCopilot?.voiceCallId ?? null
 
   const patchSuggestion = useCallback(
     async (suggestionId: string, action: "acknowledge" | "dismiss" | "copied") => {
-      if (!voiceCallId) return
+      if (!canonicalVoiceCallId) return
       setActing(`${action}:${suggestionId}`)
       setError(null)
       try {
         const res = await fetch(
-          `/api/platform/growth/voice/calls/${voiceCallId}/ai-copilot/suggestions/${suggestionId}`,
+          `/api/platform/growth/voice/calls/${canonicalVoiceCallId}/ai-copilot/suggestions/${suggestionId}`,
           {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -164,16 +167,20 @@ export function GrowthCallWorkspaceAiCopilotSection({
         setActing(null)
       }
     },
-    [onRefresh, voiceCallId],
+    [onRefresh, canonicalVoiceCallId],
   )
 
   const generateSuggestions = useCallback(async () => {
-    if (!voiceCallId) return
+    if (!canonicalVoiceCallId) return
     setGenerating(true)
     setError(null)
     try {
-      const res = await fetch(`/api/platform/growth/voice/calls/${voiceCallId}/ai-copilot/generate`, {
+      const res = await fetch(`/api/platform/growth/voice/calls/${canonicalVoiceCallId}/ai-copilot/generate`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceSessionId: nativeSessionId ?? undefined,
+        }),
       })
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
       if (!res.ok || !data.ok) throw new Error(data.message ?? "Could not generate suggestions.")
@@ -183,9 +190,9 @@ export function GrowthCallWorkspaceAiCopilotSection({
     } finally {
       setGenerating(false)
     }
-  }, [onRefresh, voiceCallId])
+  }, [nativeSessionId, onRefresh, canonicalVoiceCallId])
 
-  if (!voiceCallId) return null
+  if (!canonicalVoiceCallId) return null
 
   const suggestions = aiCopilot?.activeSuggestions ?? []
   const topSuggestions = aiCopilot?.topSuggestions ?? []
@@ -301,7 +308,7 @@ export function GrowthCallWorkspaceAiCopilotSection({
               <CopilotSuggestionCard
                 key={`top:${suggestion.id}`}
                 suggestion={suggestion}
-                voiceCallId={voiceCallId}
+                voiceCallId={canonicalVoiceCallId}
                 acting={acting}
                 onLifecycle={patchSuggestion}
               />
@@ -318,7 +325,7 @@ export function GrowthCallWorkspaceAiCopilotSection({
               <CopilotSuggestionCard
                 key={suggestion.id}
                 suggestion={suggestion}
-                voiceCallId={voiceCallId}
+                voiceCallId={canonicalVoiceCallId}
                 acting={acting}
                 onLifecycle={patchSuggestion}
               />
@@ -347,7 +354,7 @@ export function GrowthCallWorkspaceAiCopilotSection({
               <CopilotSuggestionCard
                 key={suggestion.id}
                 suggestion={suggestion}
-                voiceCallId={voiceCallId}
+                voiceCallId={canonicalVoiceCallId}
                 acting={acting}
                 onLifecycle={patchSuggestion}
               />

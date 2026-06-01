@@ -268,7 +268,11 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     )
   }, [displaySession?.id, displaySession?.voiceCallId, hasSdkIncoming, inboundOffer?.voiceCallCreatedAt, workspacePhase])
 
-  const voiceCallId = voiceBrowser.snapshot?.activeVoiceCallId ?? null
+  const voiceCallId =
+    voiceBrowser.snapshot?.activeVoiceCallId ??
+    activeSession?.voiceCallId ??
+    inboundOffer?.voiceCallId ??
+    null
   const operatorParticipant =
     voiceBrowser.snapshot?.participants.find((participant) => participant.participantRole === "operator") ??
     voiceBrowser.snapshot?.participants[0] ??
@@ -376,8 +380,12 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   useEffect(() => {
     if (workspaceContext.contextRailExpanded) {
       setContextRailExpanded(true)
+      return
     }
-  }, [workspaceContext.contextRailExpanded, workspaceContext.mode])
+    if (workspacePhase === "active" || workspacePhase === "bridge_pending") {
+      setContextRailExpanded(false)
+    }
+  }, [workspaceContext.contextRailExpanded, workspaceContext.mode, workspacePhase])
 
   async function startCall(input?: { phoneNumber?: string; leadId?: string | null; queueItemId?: string | null }) {
     const phoneNumber = normalizeDialPhoneForApi(input?.phoneNumber ?? phone)
@@ -734,7 +742,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           aiCopilot={voiceBrowser.snapshot?.aiCopilot ?? null}
           aiReceptionist={voiceBrowser.snapshot?.aiReceptionist ?? null}
           missedCallRecovery={voiceBrowser.snapshot?.missedCallRecovery ?? null}
-          voiceCallId={voiceBrowser.snapshot?.activeVoiceCallId ?? null}
+          voiceCallId={voiceCallId}
           onOperatorAssistRefresh={voiceBrowser.refresh}
           muted={sessionMuted}
           onHold={sessionOnHold}

@@ -35,6 +35,9 @@ import { GrowthCallWorkspaceMissedCallRecoverySection } from "@/components/growt
 import type { VoiceMissedCallRecoveryWorkspaceSnapshot } from "@/lib/voice/missed-call-recovery/types"
 import type { VoiceAiCopilotWorkspaceSnapshot } from "@/lib/voice/ai-copilot/types"
 import type { VoiceAiReceptionistWorkspaceSnapshot } from "@/lib/voice/ai-receptionist/types"
+import { GrowthCallWorkspaceCollapsiblePanel } from "@/components/growth/growth-call-workspace-collapsible-panel"
+import { SayThisNextCard } from "@/components/growth/live-coaching/say-this-next-card"
+import { resolveSayThisNext } from "@/lib/growth/operator-assist/resolve-say-this-next"
 import { cn } from "@/lib/utils"
 
 export function GrowthCallWorkspaceUnifiedAssistPanel({
@@ -52,6 +55,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   onSnapshotRefresh,
   contextualCompactMode = false,
   showSecondaryAssistSections = true,
+  liveCoachingFocusMode = false,
   workspaceMode = null,
 }: {
   phase: "idle" | "incoming" | "bridge_pending" | "active" | "wrapup"
@@ -68,6 +72,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   onSnapshotRefresh?: () => Promise<void>
   contextualCompactMode?: boolean
   showSecondaryAssistSections?: boolean
+  liveCoachingFocusMode?: boolean
   workspaceMode?: VoiceWorkspaceMode | null
 }) {
   const [acting, setActing] = useState<string | null>(null)
@@ -91,6 +96,9 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
     () => visibleFeed.map(unifiedAssistEventToGuidanceEvent),
     [visibleFeed],
   )
+
+  const sayThisNext = useMemo(() => resolveSayThisNext(operatorAssist), [operatorAssist])
+  const focusMode = liveCoachingFocusMode && (phase === "active" || phase === "bridge_pending")
 
   const modeLabel = useMemo(() => {
     if (leadLinked || coachingMode === "lead_linked") return "Lead-linked intelligence"
@@ -239,7 +247,134 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   const supervisor = operatorAssist?.supervisorVisibility
   const interruptionSummary = operatorAssist?.interruptionSummary
 
-  const panelBody = (
+  const coachingStatusLine = coachingState
+    ? `${coachingState.riskLevel} risk · ${coachingState.momentum.replace(/_/g, " ")} · score ${coachingState.executionScore.score}`
+    : null
+
+  const panelBody = focusMode ? (
+    <>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <Sparkles className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <h4 className="font-semibold">Live coaching</h4>
+          {coachingActive ? (
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+              <span className="size-2 animate-pulse rounded-full bg-emerald-500" />
+              Live
+            </span>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <GrowthBadge label={modeLabel} tone={leadLinked ? "healthy" : "attention"} />
+          {!coachingActive ? (
+            <Button
+              type="button"
+              size="sm"
+              disabled={!canStartCoaching || startingCoaching}
+              data-qa-action="call-workspace-start-coaching"
+              onClick={() => void startCoaching()}
+            >
+              {startingCoaching ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Starting…
+                </>
+              ) : (
+                <>
+                  <Mic className="mr-2 size-4" />
+                  Start coaching
+                </>
+              )}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      {error ? <p className="mb-2 text-sm text-destructive">{error}</p> : null}
+
+      <SayThisNextCard sayThisNext={sayThisNext} coachingActive={coachingActive} className="mb-3" />
+
+      {coachingStatusLine ? (
+        <p className="mb-3 text-xs text-muted-foreground">{coachingStatusLine}</p>
+      ) : null}
+
+      {interruptionSummary && interruptionSummary.totalInterruptions > 0 ? (
+        <div className="mb-3 rounded-lg border border-amber-200/70 bg-amber-50/40 px-3 py-2 text-xs dark:border-amber-900/40 dark:bg-amber-950/20">
+          <p className="font-semibold text-amber-900 dark:text-amber-100">Pause — customer interrupted</p>
+          <p className="mt-0.5 text-amber-800/90 dark:text-amber-100/90">
+            Let them finish, then use the line above.
+          </p>
+        </div>
+      ) : null}
+
+      <div className="min-h-0 flex-1 space-y-2 overflow-x-hidden overflow-y-auto">
+        <GrowthCallWorkspaceCollapsiblePanel
+          title="More coaching cards"
+          summary={
+            guidanceEvents.length > 0
+              ? `${guidanceEvents.length} card${guidanceEvents.length === 1 ? "" : "s"} available`
+              : "No additional cards yet"
+          }
+          defaultOpen={false}
+          qaAction="live-coaching-more-cards-toggle"
+        >
+          {guidanceEvents.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Additional guidance appears here as the conversation evolves.
+            </p>
+          ) : (
+            <LiveCoachingGuidancePanel
+              events={guidanceEvents}
+              acting={acting}
+              compact
+              onAccept={handleAccept}
+              onDismiss={handleDismiss}
+            />
+          )}
+        </GrowthCallWorkspaceCollapsiblePanel>
+
+        {coachingState && liveSnapshot ? (
+          <GrowthCallWorkspaceCollapsiblePanel
+            title="Execution score"
+            summary={`Score ${coachingState.executionScore.score}`}
+            defaultOpen={false}
+            qaAction="live-coaching-execution-toggle"
+          >
+            <LiveCoachingExecutionScorePanel coachingState={coachingState} snapshot={liveSnapshot} compact />
+          </GrowthCallWorkspaceCollapsiblePanel>
+        ) : null}
+
+        {showAiHandoffSections || aiCopilot || aiReceptionist || missedCallRecovery ? (
+          <GrowthCallWorkspaceCollapsiblePanel
+            title="AI tools"
+            summary="Copilot, receptionist, recovery"
+            defaultOpen={false}
+            qaAction="live-coaching-ai-tools-toggle"
+          >
+            <div className="space-y-3">
+              <GrowthCallWorkspaceMissedCallRecoverySection
+                missedCallRecovery={missedCallRecovery}
+                onSnapshotRefresh={onSnapshotRefresh}
+              />
+              <GrowthCallWorkspaceAiReceptionistSection
+                voiceCallId={voiceCallId}
+                aiReceptionist={aiReceptionist}
+                onSnapshotRefresh={onSnapshotRefresh}
+              />
+              <GrowthCallWorkspaceAiCopilotSection
+                voiceCallId={voiceCallId}
+                nativeSessionId={nativeSessionId}
+                aiCopilot={aiCopilot}
+                onRefresh={onSnapshotRefresh}
+              />
+            </div>
+          </GrowthCallWorkspaceCollapsiblePanel>
+        ) : null}
+
+        <p className="text-xs leading-relaxed text-muted-foreground">{GROWTH_CALL_DIALER_SAFETY_COPY}</p>
+      </div>
+    </>
+  ) : (
     <>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
@@ -407,6 +542,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
 
             <GrowthCallWorkspaceAiCopilotSection
               voiceCallId={voiceCallId}
+              nativeSessionId={nativeSessionId}
               aiCopilot={aiCopilot}
               onRefresh={onSnapshotRefresh}
             />
@@ -427,7 +563,8 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   return (
     <div
       className={cn(
-        "flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/70 bg-background/50 p-4 dark:border-white/10 dark:bg-white/[0.02]",
+        "flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-emerald-300/50 bg-emerald-50/20 p-4 dark:border-emerald-500/30 dark:bg-emerald-950/10",
+        focusMode && "shadow-sm",
       )}
       {...qaProps}
     >

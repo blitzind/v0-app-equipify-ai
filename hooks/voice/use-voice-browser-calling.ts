@@ -46,6 +46,7 @@ type TwilioVoiceDevice = {
 
 const VOICE_BROWSER_SYNC_INTERVAL_MS = 4000
 const VOICE_BROWSER_RINGING_SYNC_INTERVAL_MS = 1000
+const VOICE_BROWSER_ACTIVE_CALL_SYNC_INTERVAL_MS = 2000
 
 export function useVoiceBrowserCalling(input?: {
   workspaceSessionId?: string | null
@@ -352,14 +353,17 @@ export function useVoiceBrowserCalling(input?: {
     const intervalMs =
       incomingCall || snapshot?.inboundRinging
         ? VOICE_BROWSER_RINGING_SYNC_INTERVAL_MS
-        : VOICE_BROWSER_SYNC_INTERVAL_MS
+        : snapshot?.browserCallState &&
+            ["active", "held", "muted", "ringing", "connecting"].includes(snapshot.browserCallState)
+          ? VOICE_BROWSER_ACTIVE_CALL_SYNC_INTERVAL_MS
+          : VOICE_BROWSER_SYNC_INTERVAL_MS
 
     const intervalId = window.setInterval(() => {
       void syncRef.current().catch(() => undefined)
     }, intervalMs)
 
     return () => window.clearInterval(intervalId)
-  }, [enabled, registrationState, incomingCall, snapshot?.inboundRinging])
+  }, [enabled, registrationState, incomingCall, snapshot?.inboundRinging, snapshot?.browserCallState])
 
   return {
     qaMarker: VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER,

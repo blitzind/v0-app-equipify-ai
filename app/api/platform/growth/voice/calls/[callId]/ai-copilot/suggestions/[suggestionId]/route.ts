@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireVoicePlatformRouteContext, UUID_RE, voiceInvalidIdResponse } from "@/lib/voice/api/voice-platform-route"
 import { updateAiCopilotSuggestionLifecycle } from "@/lib/voice/ai-copilot/ai-copilot-service"
+import { resolveVoiceCallForCopilot } from "@/lib/voice/ai-copilot/resolve-voice-call-for-copilot"
 import { VOICE_AI_COPILOT_LIFECYCLE_ACTIONS, VOICE_AI_COPILOT_QA_MARKER } from "@/lib/voice/ai-copilot/types"
 
 export const runtime = "nodejs"
@@ -27,9 +28,17 @@ export async function PATCH(
   }
 
   try {
+    const resolved = await resolveVoiceCallForCopilot(ctx.admin, {
+      organizationId: ctx.organizationId,
+      callId,
+    })
+    if (!resolved) {
+      return NextResponse.json({ error: "not_found", message: "Voice call not found." }, { status: 404 })
+    }
+
     const result = await updateAiCopilotSuggestionLifecycle(ctx.admin, {
       organizationId: ctx.organizationId,
-      voiceCallId: callId,
+      voiceCallId: resolved.voiceCallId,
       suggestionId,
       action: parsed.data.action,
     })

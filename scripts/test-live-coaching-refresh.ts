@@ -13,6 +13,7 @@ import { mapVoiceSpeakerToGrowthRealtime } from "../lib/growth/realtime/voice-sp
 import { analyzeRealtimeCallTranscript } from "../lib/growth/realtime/realtime-session-analyzer"
 import type { GrowthRealtimeTranscriptEvent } from "../lib/growth/realtime/realtime-call-types"
 import { buildUnifiedOperatorAssistSnapshot } from "../lib/growth/operator-assist/orchestration"
+import { resolveSayThisNext, GROWTH_SAY_THIS_NEXT_QA_MARKER } from "../lib/growth/operator-assist/resolve-say-this-next"
 import {
   applyUnifiedAssistRecencyAdjustments,
   rankUnifiedAssistEvents,
@@ -392,5 +393,26 @@ const unified = buildUnifiedOperatorAssistSnapshot({
 
 assert.ok(unified?.topPriority.length, "unified assist should expose top priority cards")
 assert.equal(inferGuidanceDedupeKey({ eventType: "discovery_gap_guidance", title: "Timeline Not Covered", dedupeKey: null }), "discovery_gap_guidance:timeline")
+
+const sayThisNext = resolveSayThisNext(unified)
+assert.ok(sayThisNext?.phrase, "say-this-next should resolve a live phrase")
+assert.equal(GROWTH_SAY_THIS_NEXT_QA_MARKER, "growth-say-this-next-v1")
+
+const assistPanel = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace-unified-assist-panel.tsx"),
+  "utf8",
+)
+assert.match(assistPanel, /SayThisNextCard/)
+assert.match(assistPanel, /liveCoachingFocusMode/)
+assert.match(assistPanel, /GrowthCallWorkspaceCollapsiblePanel/)
+
+const centerPanel = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace-center-panel.tsx"),
+  "utf8",
+)
+assert.match(centerPanel, /live-call-details-toggle/)
+
+const browserHook = fs.readFileSync(path.join(process.cwd(), "hooks/voice/use-voice-browser-calling.ts"), "utf8")
+assert.match(browserHook, /VOICE_BROWSER_ACTIVE_CALL_SYNC_INTERVAL_MS/)
 
 console.log(`${QA_MARKER} checks passed`)

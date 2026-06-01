@@ -49,6 +49,7 @@ import type { VoiceAiReceptionistWorkspaceSnapshot } from "@/lib/voice/ai-recept
 import type { VoiceMissedCallRecoveryWorkspaceSnapshot } from "@/lib/voice/missed-call-recovery/types"
 import type { CallWorkspaceCoachingMode } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import { GrowthCallWorkspaceLiveTranscriptPanel } from "@/components/growth/growth-call-workspace-live-transcript-panel"
+import { GrowthCallWorkspaceCollapsiblePanel } from "@/components/growth/growth-call-workspace-collapsible-panel"
 import { GrowthCallWorkspaceSimplifiedTimeline } from "@/components/growth/growth-call-workspace-simplified-timeline"
 import { NATIVE_DIALER_PROVIDER_LABELS } from "@/lib/growth/native-dialer/native-dialer-types"
 import type { VoiceWorkspaceContextSnapshot } from "@/lib/voice/workspace-context/types"
@@ -294,7 +295,8 @@ export function GrowthCallWorkspaceCenterPanel({
 }) {
   const [elapsed, setElapsed] = useState(activeSession?.durationSeconds ?? 0)
   const externalBridge = isExternalBridgeSession(activeSession)
-  const showSecondaryAssist = !workspaceContext?.deferredAnalytics
+  const liveCoachingFocusMode = phase === "active" || phase === "bridge_pending"
+  const showSecondaryAssist = !liveCoachingFocusMode && !workspaceContext?.deferredAnalytics
   const assistCompactMode = workspaceContext?.deferredAnalytics ?? false
 
   useEffect(() => {
@@ -423,6 +425,7 @@ export function GrowthCallWorkspaceCenterPanel({
               onSnapshotRefresh={onOperatorAssistRefresh}
               contextualCompactMode={assistCompactMode}
               showSecondaryAssistSections={showSecondaryAssist}
+              liveCoachingFocusMode={liveCoachingFocusMode}
               workspaceMode={workspaceContext?.mode}
             />
           </>
@@ -446,23 +449,33 @@ export function GrowthCallWorkspaceCenterPanel({
               onSnapshotRefresh={onOperatorAssistRefresh}
               contextualCompactMode={assistCompactMode}
               showSecondaryAssistSections={showSecondaryAssist}
+              liveCoachingFocusMode={liveCoachingFocusMode}
               workspaceMode={workspaceContext?.mode}
             />
-            <Textarea
-              placeholder="Call notes (operator)"
-              value={activeSession.notesDraft}
-              readOnly
-              rows={2}
-              className="resize-none text-sm"
-            />
-            <VoiceCallTimelinePanel
-              timeline={voiceTimeline}
-              recording={voiceRecording}
-              browserCallStateLabel={voiceBrowserCallStateLabel ?? null}
-              workspaceMode={workspaceContext?.mode}
-            />
-            <GrowthCallWorkspaceLiveTranscriptPanel transcript={voiceLiveTranscript} />
-            <ActiveParticipantsPanel participants={voiceParticipants} activeTransfer={voiceActiveTransfer} />
+            <GrowthCallWorkspaceCollapsiblePanel
+              title="Call details"
+              summary="Notes, transcript, timeline, participants"
+              defaultOpen={false}
+              qaAction="live-call-details-toggle"
+            >
+              <div className="space-y-3">
+                <Textarea
+                  placeholder="Call notes (operator)"
+                  value={activeSession.notesDraft}
+                  readOnly
+                  rows={2}
+                  className="resize-none text-sm"
+                />
+                <VoiceCallTimelinePanel
+                  timeline={voiceTimeline}
+                  recording={voiceRecording}
+                  browserCallStateLabel={voiceBrowserCallStateLabel ?? null}
+                  workspaceMode={workspaceContext?.mode}
+                />
+                <GrowthCallWorkspaceLiveTranscriptPanel transcript={voiceLiveTranscript} />
+                <ActiveParticipantsPanel participants={voiceParticipants} activeTransfer={voiceActiveTransfer} />
+              </div>
+            </GrowthCallWorkspaceCollapsiblePanel>
             {controlsEnabled ? (
               <div className="flex flex-col gap-2 rounded-xl border border-border/60 bg-muted/10 px-3 py-2 dark:border-white/5">
                 <label className="text-xs font-medium text-muted-foreground" htmlFor="transfer-target">

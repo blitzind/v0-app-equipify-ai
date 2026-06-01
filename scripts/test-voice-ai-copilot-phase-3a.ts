@@ -19,6 +19,7 @@ import {
 import { isOpenAiCopilotConfigured } from "../lib/voice/ai-copilot/openai-provider"
 import { resolveVoiceAiCopilotProviderMode } from "../lib/voice/ai-copilot/provider-registry"
 import { buildAiCopilotWorkspaceSnapshot } from "../lib/voice/ai-copilot/snapshot-builder"
+import { resolveVoiceCallForCopilot } from "../lib/voice/ai-copilot/resolve-voice-call-for-copilot"
 import {
   VOICE_AI_COPILOT_AUTONOMOUS_ACTIONS_DISABLED,
   VOICE_AI_COPILOT_EVIDENCE_REQUIRED,
@@ -209,6 +210,22 @@ const copilotSection = fs.readFileSync(
 )
 assert.match(copilotSection, /VOICE_AI_COPILOT_QA_MARKER/)
 assert.match(copilotSection, /AI does not act automatically/)
+assert.match(copilotSection, /workspaceSessionId/)
+
+const generateRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/voice/calls/[callId]/ai-copilot/generate/route.ts"),
+  "utf8",
+)
+assert.match(generateRoute, /resolveVoiceCallForCopilot/)
+assert.match(generateRoute, /workspaceSessionId: resolved\.nativeSessionId/)
+
+const resolverModule = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/ai-copilot/resolve-voice-call-for-copilot.ts"),
+  "utf8",
+)
+assert.match(resolverModule, /realtime_session_id/)
+assert.match(resolverModule, /native_call_workspace_sessions/)
+assert.equal(typeof resolveVoiceCallForCopilot, "function")
 
 const settingsPanel = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-voice-infrastructure-settings-panel.tsx"),
