@@ -194,6 +194,15 @@ export async function ensureInboundCallWorkspaceLiveCoachingLinked(
     return null
   }
 
+  const { data: voiceCallRow, error: voiceCallError } = await admin
+    .schema("voice")
+    .from("voice_calls")
+    .select("answered_at")
+    .eq("id", input.voiceCallId)
+    .maybeSingle()
+  if (voiceCallError) throw new Error(voiceCallError.message)
+  if (!voiceCallRow?.answered_at) return null
+
   const coaching = await startCallWorkspaceLiveCoaching(admin, {
     nativeSessionId: sessionRow.id as string,
     createdBy: input.createdBy ?? (sessionRow.owner_user_id as string | null) ?? null,

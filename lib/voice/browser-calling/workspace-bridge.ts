@@ -3,7 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   mapVoiceCallStatusToBrowserCallState,
-  mapVoiceCallStatusToNativeSessionStatus,
+  resolveInboundNativeSessionStatusFromVoiceCall,
 } from "@/lib/voice/browser-calling/status-mapping"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
 import type { VoiceBrowserCallState, VoiceBrowserSyncSnapshot, VoiceOperatorPresenceStatus } from "@/lib/voice/browser-calling/types"
@@ -120,7 +120,10 @@ export async function syncWorkspaceSessionFromVoiceCall(
     .maybeSingle()
   if (!sessionRow) return
 
-  const nativeStatus = mapVoiceCallStatusToNativeSessionStatus(callRow.status as VoiceCallStatus, {
+  const nativeStatus = resolveInboundNativeSessionStatusFromVoiceCall({
+    voiceStatus: callRow.status as VoiceCallStatus,
+    direction: sessionRow.direction as "inbound" | "outbound",
+    answeredAt: (callRow.answered_at as string | null) ?? null,
     onHold: Boolean(sessionRow.on_hold),
   })
   const patch: Record<string, unknown> = {
@@ -141,6 +144,7 @@ export async function syncWorkspaceSessionFromVoiceCall(
 
   const isAnsweredInbound =
     sessionRow.direction === "inbound" &&
+    Boolean(callRow.answered_at) &&
     (nativeStatus === "active" || nativeStatus === "on_hold") &&
     !(sessionRow.realtime_session_id as string | null)
   if (isAnsweredInbound) {

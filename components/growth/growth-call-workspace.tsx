@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Headphones, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -92,6 +92,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   const [callActionPending, setCallActionPending] = useState(false)
   const [contextRailExpanded, setContextRailExpanded] = useState(false)
   const [deepIntelligenceExpanded, setDeepIntelligenceExpanded] = useState(false)
+  const inboundOfferHydratedVoiceCallIdRef = useRef<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -140,17 +141,51 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     }
   }, [phone])
 
+  const refreshInboundOfferSession = useCallback(async (input: {
+    voiceCallId: string
+    workspaceSessionId: string
+  }) => {
+    if (inboundOfferHydratedVoiceCallIdRef.current === input.voiceCallId) return
+    inboundOfferHydratedVoiceCallIdRef.current = input.voiceCallId
+    try {
+      const res = await fetch("/api/platform/growth/calls/dashboard", { cache: "no-store" })
+      const dashData = (await res.json().catch(() => ({}))) as {
+        workspaceDashboard?: NativeCallWorkspaceDashboard | null
+      }
+      const session = dashData.workspaceDashboard?.activeSession ?? null
+      if (
+        session &&
+        (session.id === input.workspaceSessionId ||
+          session.voiceCallId === input.voiceCallId ||
+          session.status === "ringing")
+      ) {
+        setActiveSession(session)
+      }
+    } catch {
+      inboundOfferHydratedVoiceCallIdRef.current = null
+    }
+  }, [])
+
   const voiceBrowser = useVoiceBrowserCalling({
     workspaceSessionId: activeSession?.id ?? null,
     onInboundOffer: (snapshot) => {
-      if (snapshot.inboundRinging?.workspaceSessionId) {
-        void load()
-      }
+      const offer = snapshot.inboundRinging
+      if (!offer?.workspaceSessionId || !offer.voiceCallId) return
+      void refreshInboundOfferSession({
+        voiceCallId: offer.voiceCallId,
+        workspaceSessionId: offer.workspaceSessionId,
+      })
     },
   })
 
   const inboundOffer = voiceBrowser.snapshot?.inboundRinging ?? null
   const hasSdkIncoming = Boolean(voiceBrowser.incomingCall)
+
+  useEffect(() => {
+    if (!hasSdkIncoming && !inboundOffer && activeSession?.status !== "ringing") {
+      inboundOfferHydratedVoiceCallIdRef.current = null
+    }
+  }, [activeSession?.status, hasSdkIncoming, inboundOffer])
 
   const incomingSession = useMemo((): NativeCallWorkspaceSessionPublicView | null => {
     if (activeSession?.status === "ringing") return activeSession

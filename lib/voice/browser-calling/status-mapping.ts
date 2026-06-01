@@ -39,6 +39,22 @@ export function mapVoiceCallStatusToBrowserCallState(input: {
   }
 }
 
+export function resolveInboundNativeSessionStatusFromVoiceCall(input: {
+  voiceStatus: VoiceCallStatus | null | undefined
+  direction: "inbound" | "outbound"
+  answeredAt: string | null
+  onHold?: boolean
+}): NativeCallSessionStatus {
+  if (
+    input.direction === "inbound" &&
+    input.voiceStatus === "in_progress" &&
+    !input.answeredAt
+  ) {
+    return "ringing"
+  }
+  return mapVoiceCallStatusToNativeSessionStatus(input.voiceStatus, { onHold: input.onHold })
+}
+
 export function mapVoiceCallStatusToNativeSessionStatus(
   voiceStatus: VoiceCallStatus | null | undefined,
   input?: { onHold?: boolean },

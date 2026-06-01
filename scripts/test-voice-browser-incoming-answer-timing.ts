@@ -10,6 +10,37 @@ import {
   resolveInboundWorkspacePhase,
   shouldShowInboundAnswerControls,
 } from "../lib/voice/browser-calling/browser-incoming-call"
+import { resolveInboundNativeSessionStatusFromVoiceCall } from "../lib/voice/browser-calling/status-mapping"
+
+assert.equal(
+  resolveInboundNativeSessionStatusFromVoiceCall({
+    voiceStatus: "in_progress",
+    direction: "inbound",
+    answeredAt: null,
+  }),
+  "ringing",
+  "inbound in_progress without answered_at should stay ringing",
+)
+
+assert.equal(
+  resolveInboundNativeSessionStatusFromVoiceCall({
+    voiceStatus: "in_progress",
+    direction: "inbound",
+    answeredAt: "2026-06-01T00:01:00.000Z",
+  }),
+  "active",
+  "inbound in_progress with answered_at should become active",
+)
+
+assert.equal(
+  resolveInboundNativeSessionStatusFromVoiceCall({
+    voiceStatus: "in_progress",
+    direction: "outbound",
+    answeredAt: null,
+  }),
+  "active",
+  "outbound in_progress should not be forced to ringing",
+)
 
 assert.equal(
   resolveInboundWorkspacePhase({ activeSessionStatus: null, sdkIncoming: true }),
@@ -59,5 +90,25 @@ assert.match(workspaceSource, /acceptIncomingCall/)
 assert.match(workspaceSource, /rejectIncomingCall/)
 assert.match(workspaceSource, /resolveInboundWorkspacePhase/)
 assert.match(workspaceSource, /buildInboundRingingSessionPlaceholder/)
+assert.match(workspaceSource, /refreshInboundOfferSession/)
+assert.match(workspaceSource, /inboundOfferHydratedVoiceCallIdRef/)
+assert.doesNotMatch(
+  workspaceSource,
+  /onInboundOffer[\s\S]{0,400}void load\(\)/,
+  "inbound offer handler should not trigger full load()",
+)
+
+const workspaceBridge = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/browser-calling/workspace-bridge.ts"),
+  "utf8",
+)
+assert.match(workspaceBridge, /resolveInboundNativeSessionStatusFromVoiceCall/)
+assert.match(workspaceBridge, /Boolean\(callRow\.answered_at\)/)
+
+const coachingService = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/native-dialer/call-workspace-coaching-service.ts"),
+  "utf8",
+)
+assert.match(coachingService, /voiceCallRow\?\.answered_at/)
 
 console.log("voice-browser-incoming-answer-timing checks passed")
