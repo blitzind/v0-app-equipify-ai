@@ -47,6 +47,7 @@ import {
 } from "@/lib/voice/repository/voice-media-streaming-repository"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import { processTranscriptSegmentIntelligence } from "@/lib/voice/intelligence/intelligence-service"
+import { bridgeVoiceSegmentToGrowthRealtime } from "@/lib/growth/realtime/voice-transcript-bridge"
 import { createVoiceTranscriptProvider } from "@/lib/voice/transcripts/providers/registry"
 import { resolveConfiguredTranscriptProviderKind } from "@/lib/voice/transcripts/providers/types"
 import {
@@ -408,71 +409,101 @@ export async function ingestVoiceTranscriptProviderEvent(
     track?: string
   },
 ): Promise<{ appended: boolean; sequenceNumber: number | null }> {
-  const transcriptSession = await findActiveTranscriptSessionForMedia(admin, input.organizationId, input.mediaSessionId)
-  if (!transcriptSession) return { appended: false, sequenceNumber: null }
+  try {
+    const transcriptSession = await findActiveTranscriptSessionForMedia(admin, input.organizationId, input.mediaSessionId)
+    if (!transcriptSession) return { appended: false, sequenceNumber: null }
 
-  const transcriptProvider = createVoiceTranscriptProvider(transcriptSession.transcriptProvider)
-  const providerSessionRef =
-    typeof transcriptSession.metadataJson.providerSessionRef === "string"
-      ? transcriptSession.metadataJson.providerSessionRef
-      : transcriptSession.id
-  const appendResult = await transcriptProvider.appendTranscriptSegment(providerSessionRef, input.rawEvent)
-  if (!appendResult.ok || !appendResult.normalized?.isFinal || !appendResult.normalized.transcriptText.trim()) {
+    const transcriptProvider = createVoiceTranscriptProvider(transcriptSession.transcriptProvider)
+    const providerSessionRef =
+      typeof transcriptSession.metadataJson.providerSessionRef === "string"
+        ? transcriptSession.metadataJson.providerSessionRef
+        : transcriptSession.id
+    const appendResult = await transcriptProvider.appendTranscriptSegment(providerSessionRef, input.rawEvent)
+    if (!appendResult.ok || !appendResult.normalized?.isFinal || !appendResult.normalized.transcriptText.trim()) {
+      return { appended: false, sequenceNumber: null }
+    }
+
+    const normalized = appendResult.normalized
+    const speakerType =
+      normalized.speakerType === "unknown" ? mapTwilioTrackToSpeakerType(input.track) : normalized.speakerType
+    const sequenceNumber = await getNextTranscriptSequenceNumber(admin, transcriptSession.id)
+    const segment = await appendTranscriptSegment(admin, {
+      organizationId: input.organizationId,
+      transcriptSessionId: transcriptSession.id,
+      speakerIdentity: normalized.speakerIdentity,
+      speakerType,
+      transcriptText: normalized.transcriptText,
+      confidenceScore: normalized.confidenceScore,
+      startedAt: normalized.startedAt,
+      endedAt: normalized.endedAt,
+      sequenceNumber,
+      metadataJson: normalized.metadata ?? {},
+    })
+
+    await emitDeterministicMediaEvent(admin, {
+      organizationId: input.organizationId,
+      mediaSessionId: input.mediaSessionId,
+      voiceCallId: input.voiceCallId,
+      provider: input.provider,
+      eventType: "transcript_segment_append",
+      idempotencySuffix: `${transcriptSession.id}:${segment.sequenceNumber}`,
+      payload: {
+        transcriptSessionId: transcriptSession.id,
+        sequenceNumber: segment.sequenceNumber,
+        speakerType: segment.speakerType,
+      },
+    })
+
+    try {
+      await processTranscriptSegmentIntelligence(admin, {
+        organizationId: input.organizationId,
+        voiceCallId: input.voiceCallId,
+        transcriptSessionId: transcriptSession.id,
+        transcriptSegmentId: segment.id,
+        sequenceNumber: segment.sequenceNumber,
+        speakerType: segment.speakerType,
+        transcriptText: segment.transcriptText,
+        confidenceScore: segment.confidenceScore,
+      })
+    } catch (intelligenceError) {
+      logVoiceInfrastructure("voice_conversation_intelligence_failed", {
+        organizationId: input.organizationId,
+        voiceCallId: input.voiceCallId,
+        transcriptSegmentId: segment.id,
+        message: intelligenceError instanceof Error ? intelligenceError.message : String(intelligenceError),
+      })
+    }
+
+    try {
+      await bridgeVoiceSegmentToGrowthRealtime(admin, {
+        voiceCallId: input.voiceCallId,
+        transcriptSegmentId: segment.id,
+        sequenceNumber: segment.sequenceNumber,
+        speakerType: segment.speakerType,
+        transcriptText: segment.transcriptText,
+        startedAt: segment.startedAt,
+      })
+    } catch (bridgeError) {
+      logVoiceInfrastructure("voice_transcript_failed", {
+        organizationId: input.organizationId,
+        voiceCallId: input.voiceCallId,
+        transcriptSegmentId: segment.id,
+        message: bridgeError instanceof Error ? bridgeError.message : String(bridgeError),
+      })
+    }
+
+    return { appended: true, sequenceNumber: segment.sequenceNumber }
+  } catch (error) {
+    logVoiceInfrastructure("voice_transcript_failed", {
+      qaMarker: VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER,
+      organizationId: input.organizationId,
+      mediaSessionId: input.mediaSessionId,
+      voiceCallId: input.voiceCallId,
+      stage: "transcript_persistence",
+      message: error instanceof Error ? error.message : String(error),
+    })
     return { appended: false, sequenceNumber: null }
   }
-
-  const normalized = appendResult.normalized
-  const speakerType =
-    normalized.speakerType === "unknown" ? mapTwilioTrackToSpeakerType(input.track) : normalized.speakerType
-  const sequenceNumber = await getNextTranscriptSequenceNumber(admin, transcriptSession.id)
-  const segment = await appendTranscriptSegment(admin, {
-    organizationId: input.organizationId,
-    transcriptSessionId: transcriptSession.id,
-    speakerIdentity: normalized.speakerIdentity,
-    speakerType,
-    transcriptText: normalized.transcriptText,
-    confidenceScore: normalized.confidenceScore,
-    startedAt: normalized.startedAt,
-    endedAt: normalized.endedAt,
-    sequenceNumber,
-    metadataJson: normalized.metadata ?? {},
-  })
-
-  await emitDeterministicMediaEvent(admin, {
-    organizationId: input.organizationId,
-    mediaSessionId: input.mediaSessionId,
-    voiceCallId: input.voiceCallId,
-    provider: input.provider,
-    eventType: "transcript_segment_append",
-    idempotencySuffix: `${transcriptSession.id}:${segment.sequenceNumber}`,
-    payload: {
-      transcriptSessionId: transcriptSession.id,
-      sequenceNumber: segment.sequenceNumber,
-      speakerType: segment.speakerType,
-    },
-  })
-
-  try {
-    await processTranscriptSegmentIntelligence(admin, {
-      organizationId: input.organizationId,
-      voiceCallId: input.voiceCallId,
-      transcriptSessionId: transcriptSession.id,
-      transcriptSegmentId: segment.id,
-      sequenceNumber: segment.sequenceNumber,
-      speakerType: segment.speakerType,
-      transcriptText: segment.transcriptText,
-      confidenceScore: segment.confidenceScore,
-    })
-  } catch (intelligenceError) {
-    logVoiceInfrastructure("voice_conversation_intelligence_failed", {
-      organizationId: input.organizationId,
-      voiceCallId: input.voiceCallId,
-      transcriptSegmentId: segment.id,
-      message: intelligenceError instanceof Error ? intelligenceError.message : String(intelligenceError),
-    })
-  }
-
-  return { appended: true, sequenceNumber: segment.sequenceNumber }
 }
 
 export async function processTwilioMediaStreamMessage(

@@ -80,6 +80,7 @@ export type GrowthRealtimeTranscriptEvent = {
   content: string
   sequenceNumber: number
   timestampMs: number
+  sourceVoiceSegmentId: string | null
   createdAt: string
 }
 

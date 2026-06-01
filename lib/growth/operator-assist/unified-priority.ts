@@ -32,6 +32,11 @@ const PRIORITY_LABEL_RANK: Record<GrowthLiveGuidancePriorityLabel, number> = {
   Low: 1,
 }
 
+export const UNIFIED_ASSIST_RECENCY_BOOST_MAX = 150
+export const UNIFIED_ASSIST_STALE_DECAY_MAX = 120
+export const UNIFIED_ASSIST_RECENCY_WINDOW_MS = 3 * 60 * 1000
+export const UNIFIED_ASSIST_STALE_WINDOW_MS = 5 * 60 * 1000
+
 function pseudoGuidanceEvent(input: {
   eventType: string
   severity: GrowthLiveGuidanceSeverity
@@ -44,6 +49,7 @@ function pseudoGuidanceEvent(input: {
     organizationId: null,
     leadId: "",
     realtimeCallSessionId: "",
+    dedupeKey: null,
     eventType: mappedType,
     severity: input.severity,
     title: "",
@@ -58,23 +64,51 @@ function pseudoGuidanceEvent(input: {
   }
 }
 
+export function applyUnifiedAssistRecencyAdjustments(
+  priorityScore: number,
+  surfacedAt: string,
+  now = Date.now(),
+): number {
+  const surfacedMs = Date.parse(surfacedAt)
+  if (!Number.isFinite(surfacedMs)) return priorityScore
+
+  const ageMs = Math.max(0, now - surfacedMs)
+  let adjusted = priorityScore
+
+  if (ageMs <= UNIFIED_ASSIST_RECENCY_WINDOW_MS) {
+    adjusted += Math.round(UNIFIED_ASSIST_RECENCY_BOOST_MAX * (1 - ageMs / UNIFIED_ASSIST_RECENCY_WINDOW_MS))
+  }
+
+  if (ageMs >= UNIFIED_ASSIST_STALE_WINDOW_MS) {
+    const staleMinutes = Math.floor((ageMs - UNIFIED_ASSIST_STALE_WINDOW_MS) / 60_000)
+    adjusted -= Math.min(UNIFIED_ASSIST_STALE_DECAY_MAX, staleMinutes * 15)
+  }
+
+  return adjusted
+}
+
 export function scoreUnifiedAssistEvent(
   event: Pick<UnifiedOperatorAssistEvent, "eventType" | "severity" | "confidenceScore" | "surfacedAt" | "category">,
+  now = Date.now(),
 ): { priorityScore: number; priorityLabel: GrowthLiveGuidancePriorityLabel } {
   const pseudo = pseudoGuidanceEvent(event)
   let priorityScore = guidancePriorityScore(pseudo)
   if (event.category === "interruption") priorityScore += 50
   if (event.category === "risk") priorityScore += 120
+  priorityScore = applyUnifiedAssistRecencyAdjustments(priorityScore, event.surfacedAt, now)
   return {
     priorityScore,
     priorityLabel: guidancePriorityLabel(pseudo),
   }
 }
 
-export function rankUnifiedAssistEvents(events: UnifiedOperatorAssistEvent[]): UnifiedOperatorAssistEvent[] {
+export function rankUnifiedAssistEvents(
+  events: UnifiedOperatorAssistEvent[],
+  now = Date.now(),
+): UnifiedOperatorAssistEvent[] {
   return [...events]
     .map((event) => {
-      const scored = scoreUnifiedAssistEvent(event)
+      const scored = scoreUnifiedAssistEvent(event, now)
       return { ...event, priorityScore: scored.priorityScore, priorityLabel: scored.priorityLabel }
     })
     .sort((a, b) => {
@@ -84,11 +118,14 @@ export function rankUnifiedAssistEvents(events: UnifiedOperatorAssistEvent[]): U
     })
 }
 
-export function partitionUnifiedAssistFeed(events: UnifiedOperatorAssistEvent[]): {
+export function partitionUnifiedAssistFeed(
+  events: UnifiedOperatorAssistEvent[],
+  now = Date.now(),
+): {
   topPriority: UnifiedOperatorAssistEvent[]
   additional: UnifiedOperatorAssistEvent[]
 } {
-  const ranked = rankUnifiedAssistEvents(events)
+  const ranked = rankUnifiedAssistEvents(events, now)
   return {
     topPriority: ranked.slice(0, LIVE_COACHING_TOP_GUIDANCE_COUNT),
     additional: ranked.slice(LIVE_COACHING_TOP_GUIDANCE_COUNT),

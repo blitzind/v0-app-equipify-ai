@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { generateLiveGuidanceCandidates, pickSuggestedNextQuestion } from "@/lib/growth/live-guidance/live-guidance-engine"
+import { planGuidanceSync } from "@/lib/growth/live-guidance/guidance-sync-logic"
 import {
   countAcceptedLiveGuidanceForSession,
   insertLiveGuidanceEvent,
@@ -57,25 +58,33 @@ export async function syncLiveGuidanceForSession(
     snapshot: input.snapshot,
     events: input.events,
     lead: input.lead,
-  }).filter((candidate) =>
+  })
+
+  const passesThreshold = (candidate: GrowthLiveGuidanceCandidate) =>
     passesGuidanceThreshold(candidate, {
       critical: settings.criticalGuidanceThreshold,
       normal: settings.normalGuidanceThreshold,
-    }),
-  )
+    })
 
   const active = await listActiveLiveGuidanceEvents(admin, input.sessionId)
-  const activeTypes = new Set(active.map((event) => event.eventType))
+  const actions = planGuidanceSync({
+    activeEvents: active,
+    candidates,
+    passesThreshold,
+  })
 
-  for (const candidate of candidates) {
-    if (activeTypes.has(candidate.eventType)) continue
+  for (const action of actions) {
+    if (action.type === "dismiss") {
+      await updateLiveGuidanceEventAction(admin, action.eventId, "dismiss")
+      continue
+    }
+
     const inserted = await insertLiveGuidanceEvent(admin, {
       organizationId: input.organizationId ?? null,
       leadId: input.leadId,
       sessionId: input.sessionId,
-      candidate,
+      candidate: action.candidate,
     })
-    activeTypes.add(candidate.eventType)
     if (input.actor) {
       await emitGrowthLeadLiveGuidanceGeneratedTimeline(admin, {
         leadId: input.leadId,

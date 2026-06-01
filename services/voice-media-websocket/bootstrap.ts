@@ -5,7 +5,7 @@
 import http from "node:http"
 import type { Server as HttpServer } from "node:http"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
+import { createVoiceMediaStreamingServiceRoleClient } from "@/lib/voice/repository/supabase-rest-diagnostics"
 import {
   attachTwilioMediaWebSocketUpgradeHandler,
   getTwilioMediaWebSocketPath,
@@ -285,7 +285,7 @@ export async function createVoiceMediaWebsocketHost(
       throw new Error(`Missing required environment variables: ${missing.join(", ")}`)
     }
 
-    admin = createServiceRoleSupabaseClient()
+    admin = createVoiceMediaStreamingServiceRoleClient()
     websocket = attachTwilioMediaWebSocketUpgradeHandler(server, admin)
     websocketReady = true
     hostRef.admin = admin

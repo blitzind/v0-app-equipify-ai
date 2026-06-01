@@ -9,7 +9,7 @@ const OBJECTION_RULES: Array<{ key: GrowthRealtimeObjectionKey; label: string; p
     label: "Already using a solution",
     pattern: /\b(already (use|using|have)|current vendor|incumbent|locked in)\b/i,
   },
-  { key: "feature_gap", label: "Feature gap", pattern: /\b(missing|doesn't have|lack|need feature|does not support)\b/i },
+  { key: "feature_gap", label: "Feature gap", pattern: /\b(missing|doesn't have|lack|need feature|does not support|migration|migrate|data transfer|switch over)\b/i },
   { key: "authority_objection", label: "Authority objection", pattern: /\b(boss|decision maker|approval|sign.?off|stakeholder)\b/i },
   { key: "priority_objection", label: "Priority objection", pattern: /\b(not a priority|back burner|other priorities)\b/i },
 ]

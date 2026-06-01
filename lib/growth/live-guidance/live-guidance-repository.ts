@@ -12,6 +12,7 @@ type GuidanceRow = {
   organization_id: string | null
   lead_id: string
   realtime_call_session_id: string
+  dedupe_key: string | null
   event_type: string
   severity: string
   title: string
@@ -35,6 +36,7 @@ function mapRow(row: GuidanceRow): GrowthLiveGuidanceEvent {
     organizationId: row.organization_id,
     leadId: row.lead_id,
     realtimeCallSessionId: row.realtime_call_session_id,
+    dedupeKey: row.dedupe_key,
     eventType: row.event_type as GrowthLiveGuidanceEventType,
     severity: row.severity as GrowthLiveGuidanceEvent["severity"],
     title: row.title,
@@ -89,6 +91,7 @@ export async function insertLiveGuidanceEvent(
       organization_id: input.organizationId ?? null,
       lead_id: input.leadId,
       realtime_call_session_id: input.sessionId,
+      dedupe_key: input.candidate.dedupeKey,
       event_type: input.candidate.eventType,
       severity: input.candidate.severity,
       title: input.candidate.title,

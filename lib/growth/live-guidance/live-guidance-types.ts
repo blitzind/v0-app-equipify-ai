@@ -45,6 +45,7 @@ export type GrowthLiveGuidanceEvent = {
   organizationId: string | null
   leadId: string
   realtimeCallSessionId: string
+  dedupeKey: string | null
   eventType: GrowthLiveGuidanceEventType
   severity: GrowthLiveGuidanceSeverity
   title: string

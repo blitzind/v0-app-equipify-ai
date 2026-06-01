@@ -33,7 +33,15 @@ export function analyzeRealtimeCallTranscript(input: {
     })),
   )
   const talkRatio = computeRealtimeTalkRatio(input.events)
-  const discovery = computeRealtimeDiscoveryCoverage(input.events)
+  let discovery = computeRealtimeDiscoveryCoverage(input.events)
+  if (buyingSignals.some((signal) => signal.key === "decision_maker_confirmed")) {
+    const covered = new Set(discovery.covered)
+    covered.add("decision_maker_confirmed")
+    discovery = {
+      covered: [...covered],
+      missing: discovery.missing.filter((area) => area !== "decision_maker_confirmed"),
+    }
+  }
   const competitorGuidance = buildRealtimeCompetitorGuidance(transcriptText)
 
   const prospectEvents = input.events.filter((event) => event.speaker === "prospect")

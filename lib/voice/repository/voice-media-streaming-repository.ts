@@ -1,6 +1,10 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import {
+  executeVoiceMediaRepositoryQuery,
+  type VoiceMediaRepositoryQueryContext,
+} from "@/lib/voice/repository/supabase-rest-diagnostics"
 import type {
   VoiceMediaParticipantRecord,
   VoiceMediaSessionRecord,
@@ -336,18 +340,27 @@ export async function findActiveTranscriptSessionForMedia(
   organizationId: string,
   mediaSessionId: string,
 ): Promise<VoiceTranscriptSessionRecord | null> {
-  const { data, error } = await admin
-    .schema("voice")
-    .from("voice_transcript_sessions")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .eq("media_session_id", mediaSessionId)
-    .in("transcript_status", ["starting", "active", "paused"])
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (error) throw new Error(error.message)
-  return data ? mapTranscriptSession(data as Record<string, unknown>) : null
+  const context: VoiceMediaRepositoryQueryContext = {
+    operation: "findActiveTranscriptSessionForMedia",
+    table: "voice.voice_transcript_sessions",
+    organizationId,
+    mediaSessionId,
+  }
+
+  return executeVoiceMediaRepositoryQuery(context, async () => {
+    const { data, error } = await admin
+      .schema("voice")
+      .from("voice_transcript_sessions")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("media_session_id", mediaSessionId)
+      .in("transcript_status", ["starting", "active", "paused"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error) throw new Error(error.message)
+    return data ? mapTranscriptSession(data as Record<string, unknown>) : null
+  })
 }
 
 export async function updateTranscriptSessionStatus(
@@ -376,16 +389,25 @@ export async function getNextTranscriptSequenceNumber(
   admin: SupabaseClient,
   transcriptSessionId: string,
 ): Promise<number> {
-  const { data, error } = await admin
-    .schema("voice")
-    .from("voice_transcript_segments")
-    .select("sequence_number")
-    .eq("transcript_session_id", transcriptSessionId)
-    .order("sequence_number", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (error) throw new Error(error.message)
-  return data?.sequence_number != null ? Number(data.sequence_number) + 1 : 0
+  return executeVoiceMediaRepositoryQuery(
+    {
+      operation: "getNextTranscriptSequenceNumber",
+      table: "voice.voice_transcript_segments",
+      transcriptSessionId,
+    },
+    async () => {
+      const { data, error } = await admin
+        .schema("voice")
+        .from("voice_transcript_segments")
+        .select("sequence_number")
+        .eq("transcript_session_id", transcriptSessionId)
+        .order("sequence_number", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) throw new Error(error.message)
+      return data?.sequence_number != null ? Number(data.sequence_number) + 1 : 0
+    },
+  )
 }
 
 export async function appendTranscriptSegment(
@@ -404,26 +426,36 @@ export async function appendTranscriptSegment(
     metadataJson?: Record<string, unknown>
   },
 ): Promise<VoiceTranscriptSegmentRecord> {
-  const { data, error } = await admin
-    .schema("voice")
-    .from("voice_transcript_segments")
-    .insert({
-      organization_id: input.organizationId,
-      transcript_session_id: input.transcriptSessionId,
-      voice_call_leg_id: input.voiceCallLegId ?? null,
-      speaker_identity: input.speakerIdentity,
-      speaker_type: input.speakerType,
-      transcript_text: input.transcriptText,
-      confidence_score: input.confidenceScore ?? null,
-      started_at: input.startedAt ?? null,
-      ended_at: input.endedAt ?? null,
-      sequence_number: input.sequenceNumber,
-      metadata_json: input.metadataJson ?? {},
-    })
-    .select("*")
-    .single()
-  if (error) throw new Error(error.message)
-  return mapTranscriptSegment(data as Record<string, unknown>)
+  return executeVoiceMediaRepositoryQuery(
+    {
+      operation: "appendTranscriptSegment",
+      table: "voice.voice_transcript_segments",
+      organizationId: input.organizationId,
+      transcriptSessionId: input.transcriptSessionId,
+    },
+    async () => {
+      const { data, error } = await admin
+        .schema("voice")
+        .from("voice_transcript_segments")
+        .insert({
+          organization_id: input.organizationId,
+          transcript_session_id: input.transcriptSessionId,
+          voice_call_leg_id: input.voiceCallLegId ?? null,
+          speaker_identity: input.speakerIdentity,
+          speaker_type: input.speakerType,
+          transcript_text: input.transcriptText,
+          confidence_score: input.confidenceScore ?? null,
+          started_at: input.startedAt ?? null,
+          ended_at: input.endedAt ?? null,
+          sequence_number: input.sequenceNumber,
+          metadata_json: input.metadataJson ?? {},
+        })
+        .select("*")
+        .single()
+      if (error) throw new Error(error.message)
+      return mapTranscriptSegment(data as Record<string, unknown>)
+    },
+  )
 }
 
 export async function listTranscriptSegments(

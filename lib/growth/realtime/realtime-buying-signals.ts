@@ -16,7 +16,7 @@ const BUYING_RULES: Array<{ key: GrowthRealtimeBuyingSignalKey; label: string; p
   {
     key: "decision_maker_confirmed",
     label: "Decision maker confirmed",
-    pattern: /\b(i (decide|approve|sign)|my call|decision maker|owner here|i'm the (owner|director|vp))\b/i,
+    pattern: /\b(i (decide|approve|sign)|decision maker|owner here|i'm the (owner|director|vp))\b/i,
   },
 ]
 

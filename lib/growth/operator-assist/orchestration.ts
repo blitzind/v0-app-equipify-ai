@@ -12,6 +12,7 @@ import {
   dedupeUnifiedAssistEvents,
   preferGrowthGuidanceOnConflict,
 } from "@/lib/growth/operator-assist/deduplication"
+import { inferGuidanceDedupeKey } from "@/lib/growth/live-guidance/infer-guidance-dedupe-key"
 import { detectConversationalInterruptions } from "@/lib/growth/operator-assist/interruption-detection"
 import {
   isActiveAssistLifecycle,
@@ -125,11 +126,7 @@ function mapGrowthGuidanceEvent(event: GrowthLiveGuidanceEvent): UnifiedOperator
     growthGuidanceEventId: event.id,
     coachingLeadId: event.leadId,
     realtimeSessionId: event.realtimeCallSessionId,
-    dedupeKey: buildAssistDedupeKey({
-      category,
-      eventType: event.eventType,
-      evidenceText: event.supportingReason || event.operatorPrompt,
-    }),
+    dedupeKey: event.dedupeKey ?? inferGuidanceDedupeKey(event),
   }
   const scored = scoreUnifiedAssistEvent(base)
   return { ...base, ...scored }

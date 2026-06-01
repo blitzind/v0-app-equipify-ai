@@ -41,6 +41,10 @@ export type VoiceTelemetryEvent =
   | "voice_conversation_intelligence_failed"
   | "voice_browser_token_issued"
   | "voice_browser_token_mint_diagnostics"
+  | "voice_supabase_rest_anomaly"
+  | "voice_supabase_rest_fetch_failed"
+  | "voice_supabase_rest_query_failed"
+  | "voice_growth_transcript_bridged"
 
 export function logVoiceInfrastructure(
   event: VoiceTelemetryEvent,

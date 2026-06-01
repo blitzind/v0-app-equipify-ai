@@ -19,6 +19,12 @@ function hasSummerTimelineSignal(events: GrowthRealtimeTranscriptEvent[]): boole
   )
 }
 
+function hasDemoRequestSignal(events: GrowthRealtimeTranscriptEvent[]): boolean {
+  return events.some((event) =>
+    /\b(demo|walkthrough|show (me )?how|see it in action|product tour|schedule a demo)\b/i.test(event.content),
+  )
+}
+
 export function generateLiveGuidanceCandidates(input: {
   snapshot: GrowthRealtimeLiveSnapshot
   events: GrowthRealtimeTranscriptEvent[]
@@ -26,6 +32,45 @@ export function generateLiveGuidanceCandidates(input: {
 }): GrowthLiveGuidanceCandidate[] {
   const { snapshot, events, lead } = input
   const candidates: GrowthLiveGuidanceCandidate[] = []
+
+  if (snapshot.objections.some((entry) => entry.key === "feature_gap")) {
+    candidates.push({
+      dedupeKey: "objection_guidance:implementation",
+      eventType: "objection_guidance",
+      severity: "high",
+      title: "Migration / Implementation Concern",
+      operatorPrompt: "Validate scope and migration path before defending the product.",
+      recommendation: "What part of the rollout feels hardest today — data, training, or workflow change?",
+      supportingReason: "Implementation or feature gap concern detected.",
+      confidenceScore: 85,
+    })
+  }
+
+  if (snapshot.buyingSignals.some((signal) => signal.key === "decision_maker_confirmed")) {
+    candidates.push({
+      dedupeKey: "buying_signal_detected:dm_confirmed",
+      eventType: "buying_signal_detected",
+      severity: "medium",
+      title: "Buying Committee Identified",
+      operatorPrompt: "Confirm authority and success criteria before advancing.",
+      recommendation: "Besides yourself, who else would weigh in before a decision?",
+      supportingReason: "Decision-maker authority signal detected in conversation.",
+      confidenceScore: 82,
+    })
+  }
+
+  if (hasDemoRequestSignal(events)) {
+    candidates.push({
+      dedupeKey: "meeting_lock_prompt:demo",
+      eventType: "meeting_lock_prompt",
+      severity: "high",
+      title: "Demo Opportunity",
+      operatorPrompt: "Convert demo interest into a concrete next step.",
+      recommendation: "Would a 30-minute working session next week help you evaluate fit?",
+      supportingReason: "Prospect requested or accepted a demo-style next step.",
+      confidenceScore: 92,
+    })
+  }
 
   if (snapshot.objections.some((entry) => entry.key === "pricing_objection")) {
     candidates.push({

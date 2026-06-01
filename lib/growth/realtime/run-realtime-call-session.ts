@@ -51,6 +51,16 @@ import { generateCallIntelligenceScorecard } from "@/lib/growth/call-intelligenc
 
 type Actor = { userId: string | null; email: string | null }
 
+export async function recomputeGrowthRealtimeCallSession(
+  admin: SupabaseClient,
+  sessionId: string,
+  actor?: Actor,
+): Promise<{ session: GrowthRealtimeCallSession; coachingState: GrowthLiveCoachingState | null } | null> {
+  const session = await fetchGrowthRealtimeCallSession(admin, sessionId)
+  if (!session) return null
+  return recomputeAndPersistSnapshot(admin, session, actor)
+}
+
 async function recomputeAndPersistSnapshot(
   admin: SupabaseClient,
   session: GrowthRealtimeCallSession,

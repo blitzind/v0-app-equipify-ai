@@ -21,6 +21,7 @@ const events: GrowthRealtimeTranscriptEvent[] = [
     content: "Tell me about your current process and who makes the final decision here.",
     sequenceNumber: 0,
     timestampMs: 0,
+    sourceVoiceSegmentId: null,
     createdAt: "2026-05-18T12:00:00.000Z",
   },
   {
@@ -30,6 +31,7 @@ const events: GrowthRealtimeTranscriptEvent[] = [
     content: "We use Housecall Pro today and pricing feels too expensive for our budget.",
     sequenceNumber: 1,
     timestampMs: 1000,
+    sourceVoiceSegmentId: null,
     createdAt: "2026-05-18T12:00:01.000Z",
   },
   {
@@ -39,6 +41,7 @@ const events: GrowthRealtimeTranscriptEvent[] = [
     content: "I hear you. Let me explain every feature we offer and our full pricing tiers in detail.",
     sequenceNumber: 2,
     timestampMs: 2000,
+    sourceVoiceSegmentId: null,
     createdAt: "2026-05-18T12:00:02.000Z",
   },
   {
@@ -48,6 +51,7 @@ const events: GrowthRealtimeTranscriptEvent[] = [
     content: "We also integrate with QuickBooks, have mobile apps, dispatch boards, and reporting.",
     sequenceNumber: 3,
     timestampMs: 3000,
+    sourceVoiceSegmentId: null,
     createdAt: "2026-05-18T12:00:03.000Z",
   },
   {
@@ -57,6 +61,7 @@ const events: GrowthRealtimeTranscriptEvent[] = [
     content: "We'd like this live before summer if we move forward.",
     sequenceNumber: 4,
     timestampMs: 4000,
+    sourceVoiceSegmentId: null,
     createdAt: "2026-05-18T12:00:04.000Z",
   },
 ]
@@ -103,6 +108,7 @@ const highRepTalkEvents: GrowthRealtimeTranscriptEvent[] = [
     content: "Let me walk through our entire platform for the next ten minutes without stopping.",
     sequenceNumber: 5,
     timestampMs: 5000,
+    sourceVoiceSegmentId: null,
     createdAt: "2026-05-18T12:00:05.000Z",
   },
 ]
@@ -127,6 +133,7 @@ const momentumSnapshot = analyzeRealtimeCallTranscript({
       content: "Honestly this is not a priority and timing is bad.",
       sequenceNumber: 6,
       timestampMs: 6000,
+      sourceVoiceSegmentId: null,
       createdAt: "2026-05-18T12:00:06.000Z",
     },
   ],
@@ -178,6 +185,7 @@ const sampleEvents = candidates.map((candidate, index) => ({
   organizationId: null,
   leadId: "lead-1",
   realtimeCallSessionId: "s1",
+  dedupeKey: candidate.dedupeKey,
   eventType: candidate.eventType,
   severity: candidate.severity,
   title: candidate.title,

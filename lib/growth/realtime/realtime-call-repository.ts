@@ -52,6 +52,7 @@ type TranscriptRow = {
   content: string
   sequence_number: number
   timestamp_ms: number
+  source_voice_segment_id: string | null
   created_at: string
 }
 
@@ -112,6 +113,7 @@ function mapTranscript(row: TranscriptRow): GrowthRealtimeTranscriptEvent {
     content: row.content,
     sequenceNumber: row.sequence_number,
     timestampMs: row.timestamp_ms,
+    sourceVoiceSegmentId: row.source_voice_segment_id,
     createdAt: row.created_at,
   }
 }
@@ -249,11 +251,70 @@ export async function listGrowthRealtimeTranscriptEvents(
   sessionId: string,
 ): Promise<GrowthRealtimeTranscriptEvent[]> {
   const { data, error } = await transcriptTable(admin)
-    .select("id, session_id, speaker, content, sequence_number, timestamp_ms, created_at")
+    .select("id, session_id, speaker, content, sequence_number, timestamp_ms, source_voice_segment_id, created_at")
     .eq("session_id", sessionId)
     .order("sequence_number", { ascending: true })
   if (error) throw new Error(error.message)
   return ((data ?? []) as TranscriptRow[]).map(mapTranscript)
+}
+
+export async function findActiveRealtimeSessionIdForVoiceCall(
+  admin: SupabaseClient,
+  voiceCallId: string,
+): Promise<string | null> {
+  const { data, error } = await admin
+    .schema("growth")
+    .from("native_call_workspace_sessions")
+    .select("realtime_session_id")
+    .eq("voice_call_id", voiceCallId)
+    .not("realtime_session_id", "is", null)
+    .in("status", ["ringing", "active", "on_hold", "external_bridge_pending"])
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return (data?.realtime_session_id as string | null) ?? null
+}
+
+export async function appendGrowthRealtimeTranscriptEventFromVoiceSegment(
+  admin: SupabaseClient,
+  input: {
+    sessionId: string
+    sourceVoiceSegmentId: string
+    speaker: GrowthRealtimeCallSpeaker
+    content: string
+    timestampMs?: number
+  },
+): Promise<{ event: GrowthRealtimeTranscriptEvent; duplicate: boolean }> {
+  const existingEvents = await listGrowthRealtimeTranscriptEvents(admin, input.sessionId)
+  const { data, error } = await transcriptTable(admin)
+    .insert({
+      session_id: input.sessionId,
+      speaker: input.speaker,
+      content: input.content.trim(),
+      sequence_number: existingEvents.length,
+      timestamp_ms: input.timestampMs ?? 0,
+      source_voice_segment_id: input.sourceVoiceSegmentId,
+    })
+    .select("id, session_id, speaker, content, sequence_number, timestamp_ms, source_voice_segment_id, created_at")
+    .single()
+
+  if (error) {
+    if (error.code === "23505") {
+      const { data: duplicateRow } = await transcriptTable(admin)
+        .select("id, session_id, speaker, content, sequence_number, timestamp_ms, source_voice_segment_id, created_at")
+        .eq("source_voice_segment_id", input.sourceVoiceSegmentId)
+        .maybeSingle()
+      if (duplicateRow) {
+        return { event: mapTranscript(duplicateRow as TranscriptRow), duplicate: true }
+      }
+      const fallback = existingEvents[existingEvents.length - 1]
+      if (fallback) return { event: fallback, duplicate: true }
+    }
+    throw new Error(error.message)
+  }
+
+  return { event: mapTranscript(data as TranscriptRow), duplicate: false }
 }
 
 export async function appendGrowthRealtimeTranscriptEvent(
@@ -274,7 +335,7 @@ export async function appendGrowthRealtimeTranscriptEvent(
       sequence_number: input.sequenceNumber,
       timestamp_ms: input.timestampMs ?? 0,
     })
-    .select("id, session_id, speaker, content, sequence_number, timestamp_ms, created_at")
+    .select("id, session_id, speaker, content, sequence_number, timestamp_ms, source_voice_segment_id, created_at")
     .single()
   if (error) throw new Error(error.message)
   return mapTranscript(data as TranscriptRow)
