@@ -30,6 +30,7 @@ import { fetchAiReceptionistWorkspaceSnapshot } from "@/lib/voice/ai-receptionis
 import { fetchMissedCallRecoveryWorkspaceSnapshot } from "@/lib/voice/missed-call-recovery/missed-call-recovery-service"
 import { appendVoiceCallEvent } from "@/lib/voice/repository/voice-repository"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
+import { VoiceRouteTimer } from "@/lib/voice/performance/voice-route-timing"
 import type { VoiceCallStatus } from "@/lib/voice/types"
 import {
   INBOUND_RING_DIAG_EVENTS,
@@ -178,6 +179,49 @@ export async function syncWorkspaceSessionFromVoiceCall(
   }
 }
 
+const LIVE_BROWSER_SESSION_STATUSES = new Set<NativeCallWorkspaceSessionPublicView["status"]>([
+  "ringing",
+  "active",
+  "on_hold",
+  "external_bridge_pending",
+])
+
+function isLiveBrowserWorkspaceSession(
+  status: NativeCallWorkspaceSessionPublicView["status"] | null | undefined,
+): boolean {
+  return status != null && LIVE_BROWSER_SESSION_STATUSES.has(status)
+}
+
+function emptyVoiceBrowserSyncSnapshot(input: {
+  generatedAt: string
+  device: VoiceBrowserSyncSnapshot["device"]
+  inboundRinging: VoiceBrowserSyncSnapshot["inboundRinging"]
+}): VoiceBrowserSyncSnapshot {
+  return {
+    qaMarker: VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER,
+    generatedAt: input.generatedAt,
+    browserCallState: "idle",
+    device: input.device,
+    presence: null,
+    activeVoiceCallId: null,
+    workspaceSessionId: null,
+    timeline: [],
+    recording: null,
+    inboundRinging: input.inboundRinging,
+    participants: [],
+    activeTransfer: null,
+    liveTranscript: null,
+    conversationIntelligence: null,
+    operatorAssist: null,
+    relationshipMemory: null,
+    revenueIntelligence: null,
+    retentionIntelligence: null,
+    aiCopilot: null,
+    aiReceptionist: null,
+    missedCallRecovery: null,
+  }
+}
+
 export async function buildVoiceBrowserSyncSnapshot(
   admin: SupabaseClient,
   input: {
@@ -187,23 +231,19 @@ export async function buildVoiceBrowserSyncSnapshot(
     workspaceSessionId?: string | null
   },
 ): Promise<VoiceBrowserSyncSnapshot> {
+  const timer = new VoiceRouteTimer("voice_browser_sync")
   const generatedAt = new Date().toISOString()
+
   let device = null
   if (input.clientIdentity) {
-    device = await heartbeatVoiceBrowserDevice(admin, {
-      organizationId: input.organizationId,
-      userId: input.userId,
-      clientIdentity: input.clientIdentity,
-    })
+    device = await timer.measure("heartbeat", () =>
+      heartbeatVoiceBrowserDevice(admin, {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        clientIdentity: input.clientIdentity,
+      }),
+    )
   }
-
-  const { data: presenceRow } = await admin
-    .schema("voice")
-    .from("voice_operator_presence")
-    .select("*")
-    .eq("organization_id", input.organizationId)
-    .eq("user_id", input.userId)
-    .maybeSingle()
 
   let activeVoiceCallId: string | null = null
   let workspaceSessionId = input.workspaceSessionId ?? null
@@ -213,30 +253,41 @@ export async function buildVoiceBrowserSyncSnapshot(
   let sessionPhone: string | null = null
   let sessionLeadId: string | null = null
   let sessionContactName: string | null = null
-
   let sessionStatusForSync: NativeCallWorkspaceSessionPublicView["status"] | null = null
 
   if (workspaceSessionId) {
-    const { data: sessionRow } = await sessionsTable(admin)
-      .select("voice_call_id, muted, on_hold, status, phone_number, lead_id, contact_name")
-      .eq("id", workspaceSessionId)
-      .maybeSingle()
-    activeVoiceCallId = (sessionRow?.voice_call_id as string | null) ?? null
-    sessionStatusForSync = (sessionRow?.status as NativeCallWorkspaceSessionPublicView["status"] | null) ?? null
-    muted = Boolean(sessionRow?.muted)
-    onHold = Boolean(sessionRow?.on_hold)
-    sessionPhone = (sessionRow?.phone_number as string | null) ?? null
-    sessionLeadId = (sessionRow?.lead_id as string | null) ?? null
-    sessionContactName = (sessionRow?.contact_name as string | null) ?? null
-  } else {
-    const { data: activeSession } = await sessionsTable(admin)
-      .select("id, voice_call_id, muted, on_hold, status, owner_user_id, phone_number, lead_id, contact_name")
-      .eq("organization_id", input.organizationId)
-      .eq("owner_user_id", input.userId)
-      .in("status", ["ringing", "active", "on_hold", "external_bridge_pending"])
-      .order("started_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const sessionRow = await timer.measure("session_lookup", async () => {
+      const { data } = await sessionsTable(admin)
+        .select("voice_call_id, muted, on_hold, status, phone_number, lead_id, contact_name")
+        .eq("id", workspaceSessionId)
+        .maybeSingle()
+      return data
+    })
+    if (!isLiveBrowserWorkspaceSession(sessionRow?.status as NativeCallWorkspaceSessionPublicView["status"] | null)) {
+      workspaceSessionId = null
+    } else {
+      activeVoiceCallId = (sessionRow?.voice_call_id as string | null) ?? null
+      sessionStatusForSync = (sessionRow?.status as NativeCallWorkspaceSessionPublicView["status"] | null) ?? null
+      muted = Boolean(sessionRow?.muted)
+      onHold = Boolean(sessionRow?.on_hold)
+      sessionPhone = (sessionRow?.phone_number as string | null) ?? null
+      sessionLeadId = (sessionRow?.lead_id as string | null) ?? null
+      sessionContactName = (sessionRow?.contact_name as string | null) ?? null
+    }
+  }
+
+  if (!workspaceSessionId) {
+    const activeSession = await timer.measure("active_session_lookup", async () => {
+      const { data } = await sessionsTable(admin)
+        .select("id, voice_call_id, muted, on_hold, status, owner_user_id, phone_number, lead_id, contact_name")
+        .eq("organization_id", input.organizationId)
+        .eq("owner_user_id", input.userId)
+        .in("status", ["ringing", "active", "on_hold", "external_bridge_pending"])
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      return data
+    })
     workspaceSessionId = (activeSession?.id as string | null) ?? null
     activeVoiceCallId = (activeSession?.voice_call_id as string | null) ?? null
     sessionStatusForSync = (activeSession?.status as NativeCallWorkspaceSessionPublicView["status"] | null) ?? null
@@ -247,19 +298,66 @@ export async function buildVoiceBrowserSyncSnapshot(
     sessionContactName = (activeSession?.contact_name as string | null) ?? null
   }
 
+  const inboundRinging = await timer.measure("inbound_offer", () =>
+    fetchInboundBrowserOfferForUser(admin, {
+      organizationId: input.organizationId,
+      userId: input.userId,
+    }),
+  )
+
+  if (inboundRinging && !activeVoiceCallId) {
+    activeVoiceCallId = inboundRinging.voiceCallId
+    workspaceSessionId = inboundRinging.workspaceSessionId
+    sessionStatusForSync = "ringing"
+  }
+
+  const hasActiveLiveSession =
+    Boolean(activeVoiceCallId) &&
+    isLiveBrowserWorkspaceSession(sessionStatusForSync) &&
+    sessionStatusForSync !== "ringing"
+
+  if (!hasActiveLiveSession && !inboundRinging) {
+    timer.finish({ mode: "idle" })
+    return emptyVoiceBrowserSyncSnapshot({ generatedAt, device, inboundRinging })
+  }
+
+  if (!hasActiveLiveSession && inboundRinging) {
+    timer.finish({ mode: "ringing", workspaceSessionId: inboundRinging.workspaceSessionId })
+    logInboundRingDiagnostic(
+      INBOUND_RING_DIAG_EVENTS.BROWSER_SYNC_INBOUND_RINGING,
+      withInboundRingElapsed(inboundRinging.voiceCallCreatedAt, {
+        voice_call_id: inboundRinging.voiceCallId,
+        native_session_id: inboundRinging.workspaceSessionId,
+        user_id: input.userId,
+        client_identity: input.clientIdentity ?? null,
+      }),
+    )
+    return {
+      ...emptyVoiceBrowserSyncSnapshot({ generatedAt, device, inboundRinging }),
+      browserCallState: "ringing",
+      activeVoiceCallId: inboundRinging.voiceCallId,
+      workspaceSessionId: inboundRinging.workspaceSessionId,
+    }
+  }
+
   if (activeVoiceCallId) {
-    const { data: callRow } = await admin
-      .schema("voice")
-      .from("voice_calls")
-      .select("status")
-      .eq("id", activeVoiceCallId)
-      .maybeSingle()
+    const callRow = await timer.measure("voice_call_status", async () => {
+      const { data } = await admin
+        .schema("voice")
+        .from("voice_calls")
+        .select("status")
+        .eq("id", activeVoiceCallId)
+        .maybeSingle()
+      return data
+    })
     voiceStatus = (callRow?.status as VoiceCallStatus | null) ?? null
     if (shouldSyncNativeSessionFromVoiceCall(sessionStatusForSync)) {
-      await syncWorkspaceSessionFromVoiceCall(admin, {
-        voiceCallId: activeVoiceCallId,
-        organizationId: input.organizationId,
-      })
+      await timer.measure("session_sync_write", () =>
+        syncWorkspaceSessionFromVoiceCall(admin, {
+          voiceCallId: activeVoiceCallId,
+          organizationId: input.organizationId,
+        }),
+      )
     }
   }
 
@@ -269,80 +367,98 @@ export async function buildVoiceBrowserSyncSnapshot(
     onHold,
   })
 
-  const timeline = activeVoiceCallId ? await fetchVoiceCallTimeline(admin, activeVoiceCallId) : []
+  const timeline = activeVoiceCallId
+    ? await timer.measure("timeline", () => fetchVoiceCallTimeline(admin, activeVoiceCallId))
+    : []
   const recording = activeVoiceCallId
-    ? await fetchVoiceCallRecordingVisibility(admin, activeVoiceCallId)
+    ? await timer.measure("recording", () => fetchVoiceCallRecordingVisibility(admin, activeVoiceCallId))
     : null
   const controlSnapshot = activeVoiceCallId
-    ? await fetchVoiceCallControlSnapshot(admin, input.organizationId, activeVoiceCallId)
+    ? await timer.measure("call_control", () =>
+        fetchVoiceCallControlSnapshot(admin, input.organizationId, activeVoiceCallId),
+      )
     : { participants: [], activeTransfer: null }
   const liveTranscript = activeVoiceCallId
-    ? await fetchVoiceCallTranscriptSnapshot(admin, input.organizationId, activeVoiceCallId)
+    ? await timer.measure("transcript", () =>
+        fetchVoiceCallTranscriptSnapshot(admin, input.organizationId, activeVoiceCallId),
+      )
     : null
   const conversationIntelligence = activeVoiceCallId
-    ? await fetchVoiceCallConversationIntelligenceSnapshot(admin, input.organizationId, activeVoiceCallId)
+    ? await timer.measure("conversation_intelligence", () =>
+        fetchVoiceCallConversationIntelligenceSnapshot(admin, input.organizationId, activeVoiceCallId),
+      )
     : null
-  const operatorAssist = await fetchUnifiedOperatorAssistSnapshot(admin, {
-    organizationId: input.organizationId,
-    userId: input.userId,
-    workspaceSessionId,
-    voiceCallId: activeVoiceCallId,
-    voiceTranscript: liveTranscript,
-    conversationIntelligence,
-    participants: controlSnapshot.participants,
-  })
+  const operatorAssist = await timer.measure("operator_assist", () =>
+    fetchUnifiedOperatorAssistSnapshot(admin, {
+      organizationId: input.organizationId,
+      userId: input.userId,
+      workspaceSessionId,
+      voiceCallId: activeVoiceCallId,
+      voiceTranscript: liveTranscript,
+      conversationIntelligence,
+      participants: controlSnapshot.participants,
+    }),
+  )
   const relationshipMemory = sessionPhone
-    ? await fetchRelationshipMemoryWorkspaceSnapshot(admin, {
-        organizationId: input.organizationId,
-        phoneNumber: sessionPhone,
-        leadId: sessionLeadId,
-        contactName: sessionContactName,
-        activeVoiceCallId,
-      })
+    ? await timer.measure("relationship_memory", () =>
+        fetchRelationshipMemoryWorkspaceSnapshot(admin, {
+          organizationId: input.organizationId,
+          phoneNumber: sessionPhone,
+          leadId: sessionLeadId,
+          contactName: sessionContactName,
+          activeVoiceCallId,
+        }),
+      )
     : null
   const revenueIntelligence = sessionPhone
-    ? await fetchRevenueIntelligenceWorkspaceSnapshot(admin, {
-        organizationId: input.organizationId,
-        phoneNumber: sessionPhone,
-        leadId: sessionLeadId,
-        activeVoiceCallId,
-        relationshipMemoryProfileId: relationshipMemory?.profile?.id ?? null,
-      })
+    ? await timer.measure("revenue_intelligence", () =>
+        fetchRevenueIntelligenceWorkspaceSnapshot(admin, {
+          organizationId: input.organizationId,
+          phoneNumber: sessionPhone,
+          leadId: sessionLeadId,
+          activeVoiceCallId,
+          relationshipMemoryProfileId: relationshipMemory?.profile?.id ?? null,
+        }),
+      )
     : null
   const retentionIntelligence = sessionPhone
-    ? await fetchRetentionIntelligenceWorkspaceSnapshot(admin, {
-        organizationId: input.organizationId,
-        phoneNumber: sessionPhone,
-        leadId: sessionLeadId,
-        activeVoiceCallId,
-        relationshipMemoryProfileId: relationshipMemory?.profile?.id ?? null,
-      })
+    ? await timer.measure("retention_intelligence", () =>
+        fetchRetentionIntelligenceWorkspaceSnapshot(admin, {
+          organizationId: input.organizationId,
+          phoneNumber: sessionPhone,
+          leadId: sessionLeadId,
+          activeVoiceCallId,
+          relationshipMemoryProfileId: relationshipMemory?.profile?.id ?? null,
+        }),
+      )
     : null
   const aiCopilot = activeVoiceCallId
-    ? await fetchAiCopilotWorkspaceSnapshot(admin, {
-        organizationId: input.organizationId,
-        voiceCallId: activeVoiceCallId,
-        operatorAssist,
-        liveTranscript,
-        retentionIntelligence,
-      })
+    ? await timer.measure("ai_copilot", () =>
+        fetchAiCopilotWorkspaceSnapshot(admin, {
+          organizationId: input.organizationId,
+          voiceCallId: activeVoiceCallId,
+          operatorAssist,
+          liveTranscript,
+          retentionIntelligence,
+        }),
+      )
     : null
   const aiReceptionist = activeVoiceCallId
-    ? await fetchAiReceptionistWorkspaceSnapshot(admin, {
-        organizationId: input.organizationId,
-        voiceCallId: activeVoiceCallId,
-      })
+    ? await timer.measure("ai_receptionist", () =>
+        fetchAiReceptionistWorkspaceSnapshot(admin, {
+          organizationId: input.organizationId,
+          voiceCallId: activeVoiceCallId,
+        }),
+      )
     : null
   const missedCallRecovery = activeVoiceCallId
-    ? await fetchMissedCallRecoveryWorkspaceSnapshot(admin, {
-        organizationId: input.organizationId,
-        voiceCallId: activeVoiceCallId,
-      })
+    ? await timer.measure("missed_call_recovery", () =>
+        fetchMissedCallRecoveryWorkspaceSnapshot(admin, {
+          organizationId: input.organizationId,
+          voiceCallId: activeVoiceCallId,
+        }),
+      )
     : null
-  const inboundRinging = await fetchInboundBrowserOfferForUser(admin, {
-    organizationId: input.organizationId,
-    userId: input.userId,
-  })
 
   if (inboundRinging) {
     logInboundRingDiagnostic(
@@ -355,6 +471,19 @@ export async function buildVoiceBrowserSyncSnapshot(
       }),
     )
   }
+
+  timer.finish({ mode: "live", activeVoiceCallId, workspaceSessionId })
+
+  const presenceRow = await timer.measure("presence", async () => {
+    const { data } = await admin
+      .schema("voice")
+      .from("voice_operator_presence")
+      .select("*")
+      .eq("organization_id", input.organizationId)
+      .eq("user_id", input.userId)
+      .maybeSingle()
+    return data
+  })
 
   return {
     qaMarker: VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER,

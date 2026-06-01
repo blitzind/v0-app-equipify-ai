@@ -132,32 +132,83 @@ export async function probeVoiceSchemaHealth(admin: SupabaseClient): Promise<Voi
   }
 }
 
-const WEBHOOK_SCHEMA_PROBE_CACHE_TTL_MS = 5 * 60 * 1000
-let webhookSchemaProbeCache: { probe: VoiceSchemaHealthProbe; expiresAt: number } | null = null
+const VOICE_SCHEMA_PROBE_CACHE_TTL_MS = 5 * 60 * 1000
+let voiceSchemaProbeCache: { probe: VoiceSchemaHealthProbe; expiresAt: number } | null = null
 
-/** Cached + fast path for latency-sensitive Twilio webhooks. */
+function readVoiceSchemaProbeCache(now = Date.now()): VoiceSchemaHealthProbe | null {
+  if (
+    voiceSchemaProbeCache &&
+    voiceSchemaProbeCache.expiresAt > now &&
+    voiceSchemaProbeCache.probe.ready
+  ) {
+    return voiceSchemaProbeCache.probe
+  }
+  return null
+}
+
+function writeVoiceSchemaProbeCache(probe: VoiceSchemaHealthProbe, now = Date.now()): void {
+  if (probe.ready) {
+    voiceSchemaProbeCache = {
+      probe,
+      expiresAt: now + VOICE_SCHEMA_PROBE_CACHE_TTL_MS,
+    }
+  } else {
+    voiceSchemaProbeCache = null
+  }
+}
+
+/** Cached schema probe for latency-sensitive routes (webhooks + browser sync). */
+export async function probeVoiceSchemaHealthCached(
+  admin: SupabaseClient,
+): Promise<VoiceSchemaHealthProbe> {
+  const cached = readVoiceSchemaProbeCache()
+  if (cached) return cached
+
+  const probe = await probeVoiceSchemaHealth(admin)
+  writeVoiceSchemaProbeCache(probe)
+  return probe
+}
+
+/** @deprecated Use probeVoiceSchemaHealthCached */
 export async function probeVoiceSchemaHealthForWebhook(
   admin: SupabaseClient,
 ): Promise<VoiceSchemaHealthProbe> {
-  const now = Date.now()
-  if (
-    webhookSchemaProbeCache &&
-    webhookSchemaProbeCache.expiresAt > now &&
-    webhookSchemaProbeCache.probe.ready
-  ) {
-    return webhookSchemaProbeCache.probe
-  }
+  return probeVoiceSchemaHealthCached(admin)
+}
 
-  const probe = await probeVoiceSchemaHealth(admin)
-  if (probe.ready) {
-    webhookSchemaProbeCache = {
-      probe,
-      expiresAt: now + WEBHOOK_SCHEMA_PROBE_CACHE_TTL_MS,
+export async function probeVoiceSchemaHealthWithBudget(
+  admin: SupabaseClient,
+  budgetMs: number,
+): Promise<VoiceSchemaHealthProbe> {
+  const cached = readVoiceSchemaProbeCache()
+  if (cached) return cached
+
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+  try {
+    const probe = await Promise.race([
+      probeVoiceSchemaHealth(admin).then((result) => {
+        writeVoiceSchemaProbeCache(result)
+        return result
+      }),
+      new Promise<VoiceSchemaHealthProbe | null>((resolve) => {
+        timeoutId = setTimeout(() => resolve(null), budgetMs)
+      }),
+    ])
+
+    if (probe) return probe
+
+    return {
+      qaMarker: VOICE_FOUNDATION_QA_MARKER,
+      probeVersion: VOICE_SCHEMA_PROBE_VERSION,
+      migrationId: VOICE_SCHEMA_MIGRATION_ID,
+      ready: true,
+      probeUncertain: true,
+      missingTables: [],
+      message: "Voice schema probe budget exceeded — using fast path.",
     }
-  } else {
-    webhookSchemaProbeCache = null
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
   }
-  return probe
 }
 
 export function isVoiceWebhookSchemaReady(probe: VoiceSchemaHealthProbe): boolean {

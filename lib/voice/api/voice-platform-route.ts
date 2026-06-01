@@ -3,7 +3,7 @@ import "server-only"
 import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
-import { probeVoiceSchemaHealth } from "@/lib/voice/schema-health"
+import { probeVoiceSchemaHealthCached } from "@/lib/voice/schema-health"
 import { resolveVoiceInfrastructureOrganizationId } from "@/lib/voice/repository/voice-repository"
 import { VOICE_OPERATIONS_QA_MARKER } from "@/lib/voice/types"
 
@@ -36,7 +36,7 @@ export async function requireVoicePlatformRouteContext(): Promise<VoicePlatformR
     }
   }
 
-  const schemaProbe = await probeVoiceSchemaHealth(access.admin)
+  const schemaProbe = await probeVoiceSchemaHealthCached(access.admin)
   if (schemaProbe.missingTables.length > 0) {
     return {
       ok: false,

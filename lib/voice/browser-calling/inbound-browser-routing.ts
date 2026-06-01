@@ -4,8 +4,35 @@ import type { InboundVoiceRouteResolution } from "@/lib/voice/routing/routing-re
 import type { VoiceRoutingProfileMemberRecord } from "@/lib/voice/types"
 import { normalizePhoneNumber } from "@/lib/voice/phone-normalization"
 import { buildVoiceBrowserClientIdentity } from "@/lib/voice/browser-calling/status-mapping"
+import type { VoiceBrowserDevicePublicView } from "@/lib/voice/browser-calling/types"
 
 const BROWSER_ROUTING_MODES = new Set(["assigned_user", "round_robin", "simultaneous_ring"])
+const ONLINE_BROWSER_DEVICES_CACHE_TTL_MS = 30_000
+const onlineBrowserDevicesCache = new Map<
+  string,
+  { expiresAt: number; devices: VoiceBrowserDevicePublicView[] }
+>()
+
+async function listCachedOnlineVoiceBrowserDevices(
+  admin: SupabaseClient,
+  organizationId: string,
+  input?: { userIds?: string[] },
+): Promise<VoiceBrowserDevicePublicView[]> {
+  const cacheKey = `${organizationId}:${(input?.userIds ?? []).join(",")}`
+  const now = Date.now()
+  const cached = onlineBrowserDevicesCache.get(cacheKey)
+  if (cached && cached.expiresAt > now) return cached.devices
+
+  const { listOnlineVoiceBrowserDevices } = await import(
+    "@/lib/voice/repository/voice-browser-calling-repository"
+  )
+  const devices = await listOnlineVoiceBrowserDevices(admin, organizationId, input)
+  onlineBrowserDevicesCache.set(cacheKey, {
+    devices,
+    expiresAt: now + ONLINE_BROWSER_DEVICES_CACHE_TTL_MS,
+  })
+  return devices
+}
 
 export function resolveBrowserRoutingTargets(input: {
   route: InboundVoiceRouteResolution
@@ -94,10 +121,7 @@ export async function resolveInboundDialTargetsWithBrowser(
     targetUserIds = targetUserIds.slice(0, 1)
   }
 
-  const { listOnlineVoiceBrowserDevices } = await import(
-    "@/lib/voice/repository/voice-browser-calling-repository"
-  )
-  const onlineDevices = await listOnlineVoiceBrowserDevices(admin, input.organizationId, {
+  const onlineDevices = await listCachedOnlineVoiceBrowserDevices(admin, input.organizationId, {
     userIds: targetUserIds,
   })
   const clientIdentities = onlineDevices.map((device) => device.clientIdentity)

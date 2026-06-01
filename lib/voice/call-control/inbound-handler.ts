@@ -11,6 +11,7 @@ import { createInboundVoiceCallFromTwilio,
 } from "@/lib/voice/browser-calling/workspace-bridge"
 import { startAiReceptionistSessionForCall } from "@/lib/voice/ai-receptionist/receptionist-service"
 import { isVoiceAiReceptionistEnabled } from "@/lib/voice/ai-receptionist/provider-types"
+import { buildTwilioSayAndHangup } from "@/lib/voice/call-control/twilio-twiml"
 import {
   mapInboundRouteToCallControlDecision,
   resolveDialNumbersFromRoute,
@@ -36,6 +37,8 @@ import {
 } from "@/lib/voice/repository/voice-call-control-repository"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import { VOICE_CALL_CONTROL_QA_MARKER } from "@/lib/voice/call-control/types"
+import { VoiceRouteTimer, withVoiceTimeout } from "@/lib/voice/performance/voice-route-timing"
+import { runVoiceBackgroundTask } from "@/lib/voice/performance/run-voice-background-task"
 import type { InboundVoiceRouteResolution } from "@/lib/voice/routing/routing-resolver"
 import { buildVoiceMediaStreamTwilioWssUrl } from "@/lib/voice/call-control/urls"
 import { shouldEnableInboundDialMediaStream } from "@/lib/voice/media-streaming/inbound-dial-media-stream-config"
@@ -206,16 +209,21 @@ export async function previewInboundCallControlDecision(
 export async function handleTwilioInboundCall(
   input: HandleTwilioInboundCallInput,
 ): Promise<HandleTwilioInboundCallResult> {
+  const timer = new VoiceRouteTimer("voice_inbound_twilio")
   const provider = createTwilioCallControlProvider()
   const toNumber = readToNumber(input.payload)
   if (!toNumber) {
     const twiml = provider.rejectCall().body
+    timer.finish({ outcome: "missing_to" })
     return { ok: false, code: "number_not_found", message: "Missing To number.", twiml }
   }
 
-  const voiceNumber = await fetchVoiceNumberByPhone(input.admin, toNumber)
+  const voiceNumber = await timer.measure("voice_number_lookup", () =>
+    fetchVoiceNumberByPhone(input.admin, toNumber),
+  )
   if (!voiceNumber) {
     const twiml = provider.rejectCall().body
+    timer.finish({ outcome: "number_not_found" })
     return { ok: false, code: "number_not_found", message: "Voice number not registered.", twiml }
   }
 
@@ -231,73 +239,36 @@ export async function handleTwilioInboundCall(
     voice_number_id: voiceNumber.id,
   })
 
-  const bundle = await resolveInboundCallControlBundle(input.admin, {
-    organizationId,
-    voiceNumberId: voiceNumber.id,
-    fromNumber: readFromNumber(input.payload),
-  })
+  const bundle = await timer.measure("routing_bundle", () =>
+    withVoiceTimeout(
+      "voice_inbound_routing_bundle",
+      1500,
+      () =>
+        resolveInboundCallControlBundle(input.admin, {
+          organizationId,
+          voiceNumberId: voiceNumber.id,
+          fromNumber: readFromNumber(input.payload),
+        }),
+      null,
+    ),
+  )
+  if (!bundle) {
+    timer.finish({ outcome: "routing_timeout", callSid })
+    const twiml = buildTwilioSayAndHangup("We are unable to connect your call right now.")
+    return {
+      ok: false,
+      code: "configuration_error",
+      message: "Inbound routing timed out.",
+      twiml,
+    }
+  }
   if (!bundle.ok) {
+    timer.finish({ outcome: "routing_failed", callSid })
     const twiml = provider.rejectCall().body
     return { ok: false, code: "configuration_error", message: bundle.message, twiml }
   }
 
   const { decision, browserTargetUserIds } = bundle
-
-  if (
-    callSid &&
-    decision.action === "dial" &&
-    (decision.dialClientIdentities?.length ?? 0) > 0
-  ) {
-    try {
-      const voiceCallId = await createInboundVoiceCallFromTwilio(input.admin, {
-        organizationId,
-        providerCallId: callSid,
-        fromNumber,
-        toNumber,
-        assignedUserId: browserTargetUserIds[0] ?? voiceNumber.assignedUserId,
-      })
-
-      await provisionInboundBrowserWorkspaceOffers(input.admin, {
-        organizationId,
-        voiceCallId,
-        targetUserIds: browserTargetUserIds,
-        fromNumber,
-        toNumber,
-      })
-    } catch (error) {
-      logVoiceInfrastructure("voice_inbound_browser_provision_failed", {
-        qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
-        organizationId,
-        callSid,
-        message: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
-
-  if (callSid && decision.action === "ai_receptionist" && isVoiceAiReceptionistEnabled()) {
-    try {
-      const voiceCallId = await createInboundVoiceCallFromTwilio(input.admin, {
-        organizationId,
-        providerCallId: callSid,
-        fromNumber,
-        toNumber,
-        assignedUserId: voiceNumber.assignedUserId,
-      })
-
-      await startAiReceptionistSessionForCall(input.admin, {
-        organizationId,
-        voiceCallId,
-        afterHours: bundle.route.businessHoursStatus === "closed",
-        callerNumber: fromNumber,
-      })
-    } catch (error) {
-      logVoiceInfrastructure("voice_ai_receptionist_session_start_failed", {
-        organizationId,
-        callSid,
-        message: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
 
   logVoiceInfrastructure("voice_inbound_route_decision", {
     qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
@@ -310,10 +281,6 @@ export async function handleTwilioInboundCall(
     dialClientIdentities: decision.dialClientIdentities ?? [],
     warnings: decision.warnings,
     businessHoursStatus: bundle.route.businessHoursStatus,
-  })
-
-  await upsertVoiceCallControlSettings(input.admin, organizationId, {
-    inboundCallControlReady: true,
   })
 
   const mediaStreamEnabled =
@@ -346,6 +313,64 @@ export async function handleTwilioInboundCall(
     statusCallbackUrl: input.statusCallbackUrl,
     mediaStream,
   })
+
+  if (
+    callSid &&
+    decision.action === "dial" &&
+    (decision.dialClientIdentities?.length ?? 0) > 0
+  ) {
+    runVoiceBackgroundTask("inbound_browser_provision", async () => {
+      try {
+        const voiceCallId = await createInboundVoiceCallFromTwilio(input.admin, {
+          organizationId,
+          providerCallId: callSid,
+          fromNumber,
+          toNumber,
+          assignedUserId: browserTargetUserIds[0] ?? voiceNumber.assignedUserId,
+        })
+        await provisionInboundBrowserWorkspaceOffers(input.admin, {
+          organizationId,
+          voiceCallId,
+          targetUserIds: browserTargetUserIds,
+          fromNumber,
+          toNumber,
+        })
+      } catch (error) {
+        logVoiceInfrastructure("voice_inbound_browser_provision_failed", {
+          qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
+          organizationId,
+          callSid,
+          message: error instanceof Error ? error.message : String(error),
+        })
+      }
+    })
+  }
+
+  if (callSid && decision.action === "ai_receptionist" && isVoiceAiReceptionistEnabled()) {
+    runVoiceBackgroundTask("inbound_ai_receptionist", async () => {
+      const voiceCallId = await createInboundVoiceCallFromTwilio(input.admin, {
+        organizationId,
+        providerCallId: callSid,
+        fromNumber,
+        toNumber,
+        assignedUserId: voiceNumber.assignedUserId,
+      })
+      await startAiReceptionistSessionForCall(input.admin, {
+        organizationId,
+        voiceCallId,
+        afterHours: bundle.route.businessHoursStatus === "closed",
+        callerNumber: fromNumber,
+      })
+    })
+  }
+
+  runVoiceBackgroundTask("inbound_call_control_settings", async () => {
+    await upsertVoiceCallControlSettings(input.admin, organizationId, {
+      inboundCallControlReady: true,
+    })
+  })
+
+  timer.finish({ outcome: "twiml_ready", callSid, action: decision.action })
 
   return {
     ok: true,
