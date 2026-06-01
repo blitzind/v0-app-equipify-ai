@@ -49,6 +49,12 @@ assert.equal(
   "optimistic active session should enter active phase without waiting for server",
 )
 
+assert.equal(
+  resolveInboundWorkspacePhase({ activeSessionStatus: "active", sdkIncoming: true }),
+  "active",
+  "active session must win over stale sdkIncoming flag",
+)
+
 const optimisticCoach = buildOptimisticInboundAnswerCoachTurn()
 const sayThisNext = resolveSayThisNext(null, optimisticCoach)
 assert.ok(sayThisNext)

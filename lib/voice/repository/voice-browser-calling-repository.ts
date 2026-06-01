@@ -310,9 +310,22 @@ export async function fetchInboundBrowserOfferForUser(
   const { data: callRow } = await admin
     .schema("voice")
     .from("voice_calls")
-    .select("from_number, to_number, started_at")
+    .select("from_number, to_number, started_at, status, answered_at")
     .eq("id", data.voice_call_id as string)
     .maybeSingle()
+
+  const voiceStatus = (callRow?.status as string | null) ?? null
+  if (
+    callRow?.answered_at ||
+    voiceStatus === "in_progress" ||
+    voiceStatus === "completed" ||
+    voiceStatus === "canceled" ||
+    voiceStatus === "no_answer" ||
+    voiceStatus === "busy" ||
+    voiceStatus === "failed"
+  ) {
+    return null
+  }
 
   return {
     voiceCallId: data.voice_call_id as string,

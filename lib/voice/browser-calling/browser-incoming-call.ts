@@ -73,8 +73,8 @@ export function resolveInboundWorkspacePhase(input: {
 }): "idle" | "incoming" | "bridge_pending" | "active" | "wrapup" {
   if (input.activeSessionStatus === "wrapping") return "wrapup"
   if (input.activeSessionStatus === "external_bridge_pending") return "bridge_pending"
-  if (input.sdkIncoming || input.activeSessionStatus === "ringing") return "incoming"
   if (input.activeSessionStatus && ["active", "on_hold"].includes(input.activeSessionStatus)) return "active"
+  if (input.sdkIncoming || input.activeSessionStatus === "ringing") return "incoming"
   return "idle"
 }
 
