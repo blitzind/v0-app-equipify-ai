@@ -29,6 +29,11 @@ import { fetchMissedCallRecoveryWorkspaceSnapshot } from "@/lib/voice/missed-cal
 import { appendVoiceCallEvent } from "@/lib/voice/repository/voice-repository"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import type { VoiceCallStatus } from "@/lib/voice/types"
+import {
+  INBOUND_RING_DIAG_EVENTS,
+  logInboundRingDiagnostic,
+  withInboundRingElapsed,
+} from "@/lib/voice/browser-calling/inbound-ring-diagnostics"
 
 const SESSION_SELECT =
   "id, lead_id, owner_user_id, queue_item_id, provider, fallback_provider, dial_mode, direction, status, phone_number, contact_name, company_name, started_at, connected_at, ended_at, duration_seconds, recording_state, muted, on_hold, transfer_target, notes_draft, realtime_session_id, call_copilot_session_id, provider_call_ref, safe_summary, voice_call_id"
@@ -324,6 +329,18 @@ export async function buildVoiceBrowserSyncSnapshot(
     userId: input.userId,
   })
 
+  if (inboundRinging) {
+    logInboundRingDiagnostic(
+      INBOUND_RING_DIAG_EVENTS.BROWSER_SYNC_INBOUND_RINGING,
+      withInboundRingElapsed(inboundRinging.voiceCallCreatedAt, {
+        voice_call_id: inboundRinging.voiceCallId,
+        native_session_id: inboundRinging.workspaceSessionId,
+        user_id: input.userId,
+        client_identity: input.clientIdentity ?? null,
+      }),
+    )
+  }
+
   return {
     qaMarker: VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER,
     generatedAt,
@@ -390,7 +407,8 @@ export async function provisionInboundBrowserWorkspaceOffers(
       .maybeSingle()
     if (existing?.id) continue
 
-    await sessionsTable(admin).insert({
+    const { data: inserted, error: insertError } = await sessionsTable(admin)
+      .insert({
       organization_id: input.organizationId,
       owner_user_id: userId,
       direction: "inbound",
@@ -406,6 +424,27 @@ export async function provisionInboundBrowserWorkspaceOffers(
       safe_summary: `Inbound browser offer from ${input.fromNumber} to ${input.toNumber}.`,
       started_at: now,
     })
+      .select("id")
+      .single()
+    if (insertError) throw new Error(insertError.message)
+
+    const { data: callRow } = await admin
+      .schema("voice")
+      .from("voice_calls")
+      .select("started_at")
+      .eq("id", input.voiceCallId)
+      .maybeSingle()
+    const voiceCallCreatedAt = (callRow?.started_at as string | null) ?? null
+
+    logInboundRingDiagnostic(
+      INBOUND_RING_DIAG_EVENTS.NATIVE_SESSION_CREATED,
+      withInboundRingElapsed(voiceCallCreatedAt, {
+        voice_call_id: input.voiceCallId,
+        native_session_id: inserted.id as string,
+        owner_user_id: userId,
+        organization_id: input.organizationId,
+      }),
+    )
   }
 }
 
@@ -443,6 +482,14 @@ export async function createInboundVoiceCallFromTwilio(
   if (error) throw new Error(error.message)
 
   const voiceCallId = data.id as string
+  logInboundRingDiagnostic(INBOUND_RING_DIAG_EVENTS.VOICE_CALL_CREATED, {
+    voice_call_id: voiceCallId,
+    provider_call_id: input.providerCallId,
+    voice_call_created_at: now,
+    organization_id: input.organizationId,
+    from_number: input.fromNumber,
+    to_number: input.toNumber,
+  })
   await appendVoiceCallEvent(admin, {
     organizationId: input.organizationId,
     voiceCallId,

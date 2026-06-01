@@ -44,9 +44,14 @@ import { useVoiceBrowserCalling } from "@/hooks/voice/use-voice-browser-calling"
 import {
   buildInboundRingingSessionFromOffer,
   buildInboundRingingSessionPlaceholder,
-  logBrowserIncomingCall,
   resolveInboundWorkspacePhase,
 } from "@/lib/voice/browser-calling/browser-incoming-call"
+import {
+  INBOUND_RING_DIAG_EVENTS,
+  logInboundRingDiagnostic,
+  withInboundRingElapsed,
+  inboundRingElapsedMs,
+} from "@/lib/voice/browser-calling/inbound-ring-diagnostics"
 import { mapBrowserCallStateLabel } from "@/lib/voice/browser-calling/status-mapping"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
 import { VOICE_TRANSFER_CONTROL_QA_MARKER } from "@/lib/voice/transfer-control/types"
@@ -99,7 +104,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   const suppressedInboundOfferVoiceCallIdRef = useRef<string | null>(null)
 
   const clearStaleRingingSession = useCallback((reason: string) => {
-    logBrowserIncomingCall("inbound_offer_cleared", { reason })
+    logInboundRingDiagnostic(INBOUND_RING_DIAG_EVENTS.INBOUND_OFFER_CLEARED, { reason })
     lastInboundOfferVoiceCallIdRef.current = null
     setActiveSession((prev) => (prev?.status === "ringing" ? null : prev))
   }, [])
@@ -191,16 +196,23 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
 
     const isNewOffer = lastInboundOfferVoiceCallIdRef.current !== offer.voiceCallId
     if (isNewOffer) {
-      const latencyMs = Math.max(0, Date.now() - Date.parse(offer.offeredAt))
-      logBrowserIncomingCall("inbound_offer_received", {
-        voiceCallId: offer.voiceCallId,
-        workspaceSessionId: offer.workspaceSessionId,
-        fromNumber: offer.fromNumber,
-      })
-      logBrowserIncomingCall("inbound_offer_latency_ms", {
-        voiceCallId: offer.voiceCallId,
-        latencyMs,
-      })
+      logInboundRingDiagnostic(
+        INBOUND_RING_DIAG_EVENTS.INBOUND_OFFER_RECEIVED,
+        withInboundRingElapsed(offer.voiceCallCreatedAt, {
+          voice_call_id: offer.voiceCallId,
+          native_session_id: offer.workspaceSessionId,
+          from_number: offer.fromNumber,
+        }),
+      )
+      const latencyMs = inboundRingElapsedMs(offer.voiceCallCreatedAt)
+      if (latencyMs !== null) {
+        logInboundRingDiagnostic(INBOUND_RING_DIAG_EVENTS.INBOUND_OFFER_LATENCY_MS, {
+          voice_call_id: offer.voiceCallId,
+          native_session_id: offer.workspaceSessionId,
+          inbound_offer_latency_ms: latencyMs,
+          elapsed_ms_since_voice_call_created: latencyMs,
+        })
+      }
       lastInboundOfferVoiceCallIdRef.current = offer.voiceCallId
     }
 
@@ -245,12 +257,16 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     const sessionId = displaySession?.id
     if (!sessionId || lastRenderedIncomingSessionIdRef.current === sessionId) return
     lastRenderedIncomingSessionIdRef.current = sessionId
-    logBrowserIncomingCall("inbound_offer_rendered", {
-      sessionId,
-      voiceCallId: displaySession?.voiceCallId ?? null,
-      source: hasSdkIncoming ? "sdk" : "sync_offer",
-    })
-  }, [displaySession?.id, displaySession?.voiceCallId, hasSdkIncoming, workspacePhase])
+    logInboundRingDiagnostic(
+      INBOUND_RING_DIAG_EVENTS.INBOUND_OFFER_RENDERED,
+      withInboundRingElapsed(inboundOffer?.voiceCallCreatedAt ?? null, {
+        session_id: sessionId,
+        native_session_id: sessionId,
+        voice_call_id: displaySession?.voiceCallId ?? null,
+        source: hasSdkIncoming ? "sdk" : "sync_offer",
+      }),
+    )
+  }, [displaySession?.id, displaySession?.voiceCallId, hasSdkIncoming, inboundOffer?.voiceCallCreatedAt, workspacePhase])
 
   const voiceCallId = voiceBrowser.snapshot?.activeVoiceCallId ?? null
   const operatorParticipant =
@@ -733,6 +749,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           coachingStartSignal={coachingStartSignal}
           coachingMode={coachingMode}
           leadLinked={leadLinked}
+          inboundVoiceCallCreatedAt={inboundOffer?.voiceCallCreatedAt ?? null}
           onAnswer={() => void answerCall()}
           onDecline={() => void declineCall()}
           onEndCall={() => void endCall()}

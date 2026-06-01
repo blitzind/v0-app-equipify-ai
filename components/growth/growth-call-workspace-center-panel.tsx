@@ -240,6 +240,7 @@ export function GrowthCallWorkspaceCenterPanel({
   onMarkBridgeStarted,
   onStartLiveCoaching,
   onSubmitWrapup,
+  inboundVoiceCallCreatedAt,
 }: {
   phase: GrowthCallWorkspacePhase
   activeSession: NativeCallWorkspaceSessionPublicView | null
@@ -289,6 +290,7 @@ export function GrowthCallWorkspaceCenterPanel({
     decisionMakerPresent?: boolean
     notes?: string
   }) => Promise<NativeCallWrapupPublicView | null>
+  inboundVoiceCallCreatedAt?: string | null
 }) {
   const [elapsed, setElapsed] = useState(activeSession?.durationSeconds ?? 0)
   const externalBridge = isExternalBridgeSession(activeSession)
@@ -363,6 +365,7 @@ export function GrowthCallWorkspaceCenterPanel({
           <>
             <GrowthIncomingCallPanel
               session={activeSession}
+              voiceCallCreatedAt={inboundVoiceCallCreatedAt}
               onAnswer={onAnswer}
               onDecline={onDecline}
               answering={answering}

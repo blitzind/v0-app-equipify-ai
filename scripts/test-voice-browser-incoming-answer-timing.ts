@@ -81,6 +81,7 @@ const offerSession = buildInboundRingingSessionFromOffer({
   toNumber: "+18333784743",
   contactLabel: "Acme",
   offeredAt: "2026-06-01T00:00:00.000Z",
+  voiceCallCreatedAt: "2026-06-01T00:00:00.000Z",
 })
 assert.equal(offerSession.id, "sess-456")
 assert.equal(offerSession.voiceCallId, "vc-123")
@@ -96,9 +97,21 @@ assert.match(hookSource, /call\.accept\(/)
 assert.match(hookSource, /incomingCall/)
 assert.match(hookSource, /acceptIncomingCall/)
 assert.match(hookSource, /onIncomingCleared/)
-assert.match(hookSource, /sdk_incoming_received/)
-assert.match(hookSource, /sdk_incoming_cancelled/)
-assert.match(hookSource, /VOICE_BROWSER_RINGING_SYNC_INTERVAL_MS/)
+assert.match(hookSource, /SDK_INCOMING_RECEIVED/)
+assert.match(hookSource, /SDK_INCOMING_CANCELLED/)
+assert.match(hookSource, /inbound-ring-diagnostics/)
+
+const diagSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/browser-calling/inbound-ring-diagnostics.ts"),
+  "utf8",
+)
+assert.match(diagSource, /inbound_ring_twilio_webhook_received/)
+assert.match(diagSource, /inbound_ring_voice_call_created/)
+assert.match(diagSource, /inbound_ring_native_session_created/)
+assert.match(diagSource, /inbound_ring_browser_sync_inbound_ringing/)
+assert.match(diagSource, /inbound_ring_answer_button_mounted/)
+assert.match(diagSource, /inbound_ring_decline_api_called/)
+assert.match(diagSource, /elapsed_ms_since_voice_call_created/)
 
 const workspaceSource = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-workspace.tsx"),
@@ -109,9 +122,7 @@ assert.match(workspaceSource, /rejectIncomingCall/)
 assert.match(workspaceSource, /resolveInboundWorkspacePhase/)
 assert.match(workspaceSource, /buildInboundRingingSessionFromOffer/)
 assert.match(workspaceSource, /buildInboundRingingSessionPlaceholder/)
-assert.match(workspaceSource, /inbound_offer_received/)
-assert.match(workspaceSource, /inbound_offer_rendered/)
-assert.match(workspaceSource, /inbound_offer_cleared/)
+assert.match(workspaceSource, /INBOUND_RING_DIAG_EVENTS/)
 assert.match(workspaceSource, /showIncomingDuringLoad/)
 assert.doesNotMatch(
   workspaceSource,

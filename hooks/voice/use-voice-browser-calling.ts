@@ -8,6 +8,11 @@ import {
   type VoiceBrowserIncomingCallView,
 } from "@/lib/voice/browser-calling/browser-incoming-call"
 import { formatBrowserRegistrationError } from "@/lib/voice/browser-calling/format-browser-registration-error"
+import {
+  INBOUND_RING_DIAG_EVENTS,
+  logInboundRingDiagnostic,
+  withInboundRingElapsed,
+} from "@/lib/voice/browser-calling/inbound-ring-diagnostics"
 import type { VoiceBrowserSyncSnapshot } from "@/lib/voice/browser-calling/types"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
 
@@ -62,6 +67,7 @@ export function useVoiceBrowserCalling(input?: {
   const workspaceSessionIdRef = useRef(input?.workspaceSessionId ?? null)
   const inboundOfferRef = useRef(input?.onInboundOffer)
   const onIncomingClearedRef = useRef(input?.onIncomingCleared)
+  const voiceCallCreatedAtRef = useRef<string | null>(null)
   workspaceSessionIdRef.current = input?.workspaceSessionId ?? null
   inboundOfferRef.current = input?.onInboundOffer
   onIncomingClearedRef.current = input?.onIncomingCleared
@@ -81,10 +87,16 @@ export function useVoiceBrowserCalling(input?: {
     setIncomingCall(null)
     logBrowserIncomingCall("incoming_cleared", { reason })
     if (hadIncoming && (reason === "cancel" || reason === "disconnect")) {
-      logBrowserIncomingCall("sdk_incoming_cancelled", {
-        reason,
-        callSid: call ? extractVoiceBrowserIncomingCallView(call).callSid : null,
-      })
+      const callView = call ? extractVoiceBrowserIncomingCallView(call) : null
+      logInboundRingDiagnostic(
+        INBOUND_RING_DIAG_EVENTS.SDK_INCOMING_CANCELLED,
+        withInboundRingElapsed(voiceCallCreatedAtRef.current, {
+          reason,
+          call_sid: callView?.callSid ?? null,
+          voice_call_id: snapshotRef.current?.inboundRinging?.voiceCallId ?? null,
+          native_session_id: snapshotRef.current?.inboundRinging?.workspaceSessionId ?? null,
+        }),
+      )
       onIncomingClearedRef.current?.(reason)
     }
   }, [])
@@ -106,10 +118,17 @@ export function useVoiceBrowserCalling(input?: {
           role,
           ...view,
         })
-        logBrowserIncomingCall("sdk_incoming_received", {
-          role,
-          ...view,
-        })
+        logInboundRingDiagnostic(
+          INBOUND_RING_DIAG_EVENTS.SDK_INCOMING_RECEIVED,
+          withInboundRingElapsed(voiceCallCreatedAtRef.current, {
+            role,
+            call_sid: view.callSid,
+            from_number: view.fromNumber,
+            to_number: view.toNumber,
+            voice_call_id: snapshotRef.current?.inboundRinging?.voiceCallId ?? null,
+            native_session_id: snapshotRef.current?.inboundRinging?.workspaceSessionId ?? null,
+          }),
+        )
       }
     },
     [clearIncomingCall],
@@ -128,6 +147,9 @@ export function useVoiceBrowserCalling(input?: {
       throw new Error(data.message ?? "Could not sync voice browser state.")
     }
     setSnapshot(data.snapshot)
+    if (data.snapshot.inboundRinging?.voiceCallCreatedAt) {
+      voiceCallCreatedAtRef.current = data.snapshot.inboundRinging.voiceCallCreatedAt
+    }
     if (data.snapshot.inboundRinging || incomingTwilioCallRef.current) {
       inboundOfferRef.current?.(data.snapshot)
     }
@@ -136,6 +158,8 @@ export function useVoiceBrowserCalling(input?: {
 
   const syncRef = useRef(sync)
   syncRef.current = sync
+  const snapshotRef = useRef(snapshot)
+  snapshotRef.current = snapshot
 
   const handleDeviceIncoming = useCallback(
     (call: TwilioVoiceSdkCall) => {

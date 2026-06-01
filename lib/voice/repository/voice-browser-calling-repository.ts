@@ -310,7 +310,7 @@ export async function fetchInboundBrowserOfferForUser(
   const { data: callRow } = await admin
     .schema("voice")
     .from("voice_calls")
-    .select("from_number, to_number")
+    .select("from_number, to_number, started_at")
     .eq("id", data.voice_call_id as string)
     .maybeSingle()
 
@@ -321,6 +321,7 @@ export async function fetchInboundBrowserOfferForUser(
     toNumber: (callRow?.to_number as string | null) ?? "Unknown",
     contactLabel: (data.contact_name as string | null) ?? null,
     offeredAt: data.started_at as string,
+    voiceCallCreatedAt: (callRow?.started_at as string | null) ?? null,
   }
 }
 

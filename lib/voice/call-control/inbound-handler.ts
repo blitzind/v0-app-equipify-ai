@@ -40,6 +40,10 @@ import type { InboundVoiceRouteResolution } from "@/lib/voice/routing/routing-re
 import { buildVoiceMediaStreamTwilioWssUrl } from "@/lib/voice/call-control/urls"
 import { shouldEnableInboundDialMediaStream } from "@/lib/voice/media-streaming/inbound-dial-media-stream-config"
 import { VOICE_MEDIA_STREAMING_FOUNDATION_QA_MARKER } from "@/lib/voice/media-streaming/voice-stream-lifecycle"
+import {
+  INBOUND_RING_DIAG_EVENTS,
+  logInboundRingDiagnostic,
+} from "@/lib/voice/browser-calling/inbound-ring-diagnostics"
 
 export type HandleTwilioInboundCallInput = {
   admin: SupabaseClient
@@ -216,6 +220,17 @@ export async function handleTwilioInboundCall(
   }
 
   const organizationId = voiceNumber.organizationId
+  const callSid = readCallSid(input.payload)
+  const fromNumber = readFromNumber(input.payload)
+
+  logInboundRingDiagnostic(INBOUND_RING_DIAG_EVENTS.TWILIO_WEBHOOK_RECEIVED, {
+    provider_call_id: callSid,
+    from_number: fromNumber,
+    to_number: toNumber,
+    organization_id: organizationId,
+    voice_number_id: voiceNumber.id,
+  })
+
   const bundle = await resolveInboundCallControlBundle(input.admin, {
     organizationId,
     voiceNumberId: voiceNumber.id,
@@ -227,8 +242,6 @@ export async function handleTwilioInboundCall(
   }
 
   const { decision, browserTargetUserIds } = bundle
-  const callSid = readCallSid(input.payload)
-  const fromNumber = readFromNumber(input.payload)
 
   if (
     callSid &&

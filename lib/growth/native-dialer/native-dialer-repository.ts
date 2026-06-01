@@ -18,6 +18,11 @@ import {
   syncWorkspaceSessionFromVoiceCall,
 } from "@/lib/voice/browser-calling/workspace-bridge"
 import { appendVoiceCallEvent } from "@/lib/voice/repository/voice-repository"
+import {
+  INBOUND_RING_DIAG_EVENTS,
+  logInboundRingDiagnostic,
+  withInboundRingElapsed,
+} from "@/lib/voice/browser-calling/inbound-ring-diagnostics"
 import type {
   NativeCallSessionStatus,
   NativeCallWrapupPublicView,
@@ -481,6 +486,25 @@ export async function declineNativeCallSession(
   const { data: existing } = await sessionsTable(admin).select("voice_call_id").eq("id", sessionId).maybeSingle()
   const voiceCallId = (existing?.voice_call_id as string | null) ?? null
   const now = new Date().toISOString()
+
+  let voiceCallCreatedAt: string | null = null
+  if (voiceCallId) {
+    const { data: callRow } = await admin
+      .schema("voice")
+      .from("voice_calls")
+      .select("started_at")
+      .eq("id", voiceCallId)
+      .maybeSingle()
+    voiceCallCreatedAt = (callRow?.started_at as string | null) ?? null
+  }
+
+  logInboundRingDiagnostic(
+    INBOUND_RING_DIAG_EVENTS.DECLINE_API_CALLED,
+    withInboundRingElapsed(voiceCallCreatedAt, {
+      native_session_id: sessionId,
+      voice_call_id: voiceCallId,
+    }),
+  )
 
   if (voiceCallId) {
     await admin

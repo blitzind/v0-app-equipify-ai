@@ -131,6 +131,8 @@ export type VoiceInboundBrowserOfferView = {
   toNumber: string
   contactLabel: string | null
   offeredAt: string
+  /** voice.voice_calls.started_at — used for inbound ring latency diagnostics */
+  voiceCallCreatedAt: string | null
 }
 
 export type VoiceBrowserTokenResponse = {
