@@ -32,6 +32,17 @@ const coachingService = fs.readFileSync(
 )
 assert.match(coachingService, /priority: "answer_hot_path"/)
 assert.match(coachingService, /closeOrphanedActiveRealtimeCoachingSessionsForLeadFast/)
+assert.match(coachingService, /AutoStartCallWorkspaceLiveCoachingOnAnswerResult/)
+assert.match(coachingService, /reason: "native_session_not_found"/)
+assert.match(coachingService, /reason: "native_session_not_inbound"/)
+assert.match(coachingService, /reason: "native_session_not_active"/)
+assert.match(coachingService, /reason: "realtime_session_create_failed"/)
+assert.match(coachingService, /reason: "native_session_link_failed"/)
+assert.match(coachingService, /voice_growth_coaching_native_link_failed/)
+assert.match(coachingService, /throw new Error\("realtime_session_create_failed"\)/)
+assert.match(coachingService, /organizationId = getGrowthEngineAiOrgId\(\)/)
+assert.match(coachingService, /organizationId,/)
+assert.doesNotMatch(coachingService, /linkResult\.message/, "client-safe link result must not expose raw DB messages")
 
 const lifecycleModule = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/native-dialer/call-workspace-coaching-lifecycle.ts"),
@@ -52,6 +63,11 @@ assert.match(
   "native link must happen before optional session start hydration",
 )
 assert.match(coachingService, /voice_growth_coaching_native_linked/)
+assert.match(
+  coachingService,
+  /if \(realtimeSessionId && context\.linkResult\?\.linked\)[\s\S]*voice_growth_coaching_auto_linked/,
+  "auto-linked success must require a persisted native realtime link",
+)
 
 const answeredMediaStream = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/media-streaming/ensure-answered-inbound-media-stream.ts"),
@@ -70,6 +86,62 @@ const nativeDialerRepo = fs.readFileSync(
 const coachingIdx = nativeDialerRepo.indexOf("autoStartCallWorkspaceLiveCoachingOnAnswer")
 const mediaIdx = nativeDialerRepo.indexOf("ensureAnsweredInboundCallMediaStream")
 assert.ok(coachingIdx > 0 && mediaIdx > coachingIdx, "coaching auto-start must run before media restart")
+assert.match(nativeDialerRepo, /type LinkNativeCallRealtimeSessionResult/)
+assert.match(nativeDialerRepo, /select\("id, realtime_session_id"\)/)
+assert.match(nativeDialerRepo, /reason: "native_session_not_found"/)
+assert.match(nativeDialerRepo, /reason: "native_session_update_failed"/)
+assert.match(nativeDialerRepo, /reason: "realtime_session_not_persisted"/)
+assert.match(nativeDialerRepo, /missing_owner_user_id/)
+assert.match(nativeDialerRepo, /voice_growth_coaching_link_missing_after_answer/)
+assert.match(nativeDialerRepo, /organizationId: orgId/)
+assert.match(nativeDialerRepo, /ownerUserId/)
+assert.match(nativeDialerRepo, /direction/)
+assert.match(nativeDialerRepo, /status/)
+assert.match(nativeDialerRepo, /linkResult/)
+assert.match(
+  nativeDialerRepo,
+  /pipeline\.liveCoachingLinked = Boolean\(persistedRealtimeSessionId\)/,
+  "answer route must not report healthy coaching unless realtime_session_id was persisted",
+)
+assert.match(
+  nativeDialerRepo,
+  /const refreshedRealtimeSessionId = \(refreshed\.realtime_session_id as string \| null\) \?\? null[\s\S]*pipeline\.realtimeSessionId = refreshedRealtimeSessionId[\s\S]*pipeline\.liveCoachingLinked = Boolean\(refreshedRealtimeSessionId\)/,
+  "final linked state must depend strictly on refreshed realtime_session_id",
+)
+assert.match(
+  nativeDialerRepo,
+  /errorMessage === "realtime_session_create_failed"[\s\S]*\? "realtime_session_create_failed"[\s\S]*: "auto_start_exception"/,
+  "auto-start exceptions must be visible in answer pipeline diagnostics",
+)
+assert.match(
+  nativeDialerRepo,
+  /pipeline\.liveCoachingError = pipeline\.liveCoachingFailureReason/,
+  "pipeline diagnostics must expose sanitized reason codes instead of raw exception text",
+)
+assert.match(
+  nativeDialerRepo,
+  /if \(\(existing\.direction as string\) === "inbound" && !refreshedRealtimeSessionId\)/,
+  "answer path must re-read the native session and diagnose missing realtime_session_id",
+)
+
+const coachingTypes = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/native-dialer/call-workspace-coaching-types.ts"),
+  "utf8",
+)
+assert.match(coachingTypes, /createdRealtimeSessionId/)
+assert.match(coachingTypes, /liveCoachingFailureReason/)
+assert.match(coachingTypes, /linkResult: LinkNativeCallRealtimeSessionResult \| null/)
+assert.match(coachingTypes, /export type LinkNativeCallRealtimeSessionResult/)
+assert.doesNotMatch(coachingTypes, /message\?: string/, "client link result must not include raw DB/PostgREST messages")
+
+const manualLiveCoachingRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/calls/sessions/[sessionId]/live-coaching/route.ts"),
+  "utf8",
+)
+assert.match(manualLiveCoachingRoute, /coaching\.linkResult && !coaching\.linkResult\.linked/)
+assert.match(manualLiveCoachingRoute, /error: "link_failed"/)
+assert.match(manualLiveCoachingRoute, /reason: coaching\.linkResult\.reason/)
+assert.match(manualLiveCoachingRoute, /status: 409/)
 
 const unifiedAssist = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-workspace-unified-assist-panel.tsx"),

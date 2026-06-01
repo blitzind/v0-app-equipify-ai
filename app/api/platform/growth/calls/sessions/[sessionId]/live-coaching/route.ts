@@ -50,6 +50,15 @@ export async function POST(
       createdBy: access.userId,
       userEmail: access.userEmail,
     })
+    if (coaching.linkResult && !coaching.linkResult.linked) {
+      return NextResponse.json({
+        ok: false,
+        qaMarker: GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER,
+        error: "link_failed",
+        reason: coaching.linkResult.reason,
+        coaching,
+      }, { status: 409 })
+    }
     return NextResponse.json({ ok: true, qaMarker: GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER, coaching })
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not start live coaching."

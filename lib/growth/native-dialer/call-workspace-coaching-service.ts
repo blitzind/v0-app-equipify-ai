@@ -17,7 +17,10 @@ import {
   callWorkspaceCoachingModeForLead,
   ensureCallWorkspaceTranscriptAnchorLead,
 } from "@/lib/growth/native-dialer/call-workspace-coaching-lead"
-import type { CallWorkspaceCoachingMode } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
+import type {
+  CallWorkspaceCoachingMode,
+  LinkNativeCallRealtimeSessionResult,
+} from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import {
   closeOrphanedActiveRealtimeCoachingSessionsForLeadFast,
   completeOrphanedActiveRealtimeCoachingSessionsForLead,
@@ -30,6 +33,7 @@ import {
 } from "@/lib/growth/native-dialer/native-dialer-repository"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import { runVoiceBackgroundTask } from "@/lib/voice/performance/run-voice-background-task"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
 
 const ACTIVE_NATIVE_WORKSPACE_STATUSES = [
   "ringing",
@@ -46,7 +50,30 @@ export type CallWorkspaceCoachingContext = {
   leadLinked: boolean
   realtimeSession: GrowthRealtimeCallSession | null
   coachingState: GrowthLiveCoachingState | null
+  linkResult: LinkNativeCallRealtimeSessionResult | null
 }
+
+export type AutoStartCallWorkspaceLiveCoachingOnAnswerResult =
+  | {
+      linked: true
+      reason: null
+      realtimeSessionId: string
+      context: CallWorkspaceCoachingContext
+      linkResult: LinkNativeCallRealtimeSessionResult | null
+    }
+  | {
+      linked: false
+      reason:
+        | "native_session_not_found"
+        | "native_session_not_inbound"
+        | "native_session_not_active"
+        | "realtime_session_create_failed"
+        | "realtime_session_missing_after_start"
+        | "native_session_link_failed"
+      realtimeSessionId: string | null
+      context: CallWorkspaceCoachingContext | null
+      linkResult: LinkNativeCallRealtimeSessionResult | null
+    }
 
 async function resolveCoachingLeadId(
   admin: SupabaseClient,
@@ -103,6 +130,7 @@ export async function fetchCallWorkspaceLiveCoaching(
     leadLinked,
     realtimeSession,
     coachingState,
+    linkResult: null,
   }
 }
 
@@ -118,9 +146,11 @@ export async function startCallWorkspaceLiveCoaching(
 ): Promise<CallWorkspaceCoachingContext> {
   const nativeSession = await fetchNativeCallSessionById(admin, input.nativeSessionId)
   if (!nativeSession) throw new Error("Call session not found.")
+  const organizationId = getGrowthEngineAiOrgId()
 
   const { coachingLeadId, coachingMode, leadLinked } = await resolveCoachingLeadId(admin, nativeSession, input.createdBy)
   const answerHotPath = input.priority === "answer_hot_path"
+  let linkResult: LinkNativeCallRealtimeSessionResult | null = null
 
   let realtimeSession =
     nativeSession.realtimeSessionId
@@ -152,10 +182,22 @@ export async function startCallWorkspaceLiveCoaching(
       })
     }
 
-    realtimeSession = await createGrowthRealtimeCallSession(admin, {
-      leadId: coachingLeadId,
-      createdBy: input.createdBy ?? null,
-    })
+    try {
+      realtimeSession = await createGrowthRealtimeCallSession(admin, {
+        leadId: coachingLeadId,
+        createdBy: input.createdBy ?? null,
+      })
+    } catch (error) {
+      logVoiceInfrastructure("voice_growth_coaching_auto_start_failed", {
+        nativeSessionId: nativeSession.id,
+        coachingLeadId,
+        voiceCallId: nativeSession.voiceCallId ?? null,
+        priority: input.priority ?? "standard",
+        reason: "realtime_session_create_failed",
+        message: error instanceof Error ? error.message : String(error),
+      })
+      throw new Error("realtime_session_create_failed")
+    }
     logVoiceInfrastructure("voice_growth_coaching_session_created", {
       nativeSessionId: nativeSession.id,
       realtimeSessionId: realtimeSession.id,
@@ -166,10 +208,29 @@ export async function startCallWorkspaceLiveCoaching(
   }
 
   if (nativeSession.realtimeSessionId !== realtimeSession.id) {
-    await linkNativeCallRealtimeSession(admin, {
+    linkResult = await linkNativeCallRealtimeSession(admin, {
       nativeSessionId: nativeSession.id,
       realtimeSessionId: realtimeSession.id,
+      organizationId,
     })
+    if (!linkResult.linked) {
+      logVoiceInfrastructure("voice_growth_coaching_native_link_failed", {
+        nativeSessionId: nativeSession.id,
+        realtimeSessionId: realtimeSession.id,
+        voiceCallId: nativeSession.voiceCallId ?? null,
+        priority: input.priority ?? "standard",
+        reason: linkResult.reason,
+      })
+    }
+  } else {
+    linkResult = {
+      linked: true,
+      nativeSessionId: nativeSession.id,
+      realtimeSessionId: realtimeSession.id,
+      reason: null,
+    }
+  }
+  if (linkResult.linked) {
     logVoiceInfrastructure("voice_growth_coaching_native_linked", {
       nativeSessionId: nativeSession.id,
       realtimeSessionId: realtimeSession.id,
@@ -300,6 +361,7 @@ export async function startCallWorkspaceLiveCoaching(
             primaryCoach: bootstrapCoach,
           }
         : null,
+      linkResult,
     }
   }
 
@@ -313,6 +375,7 @@ export async function startCallWorkspaceLiveCoaching(
     leadLinked,
     realtimeSession: detail?.session ?? realtimeSession,
     coachingState: detail?.coachingState ?? null,
+    linkResult,
   }
 }
 
@@ -385,10 +448,35 @@ export async function ensureInboundCallWorkspaceLiveCoachingLinked(
 export async function autoStartCallWorkspaceLiveCoachingOnAnswer(
   admin: SupabaseClient,
   input: { nativeSessionId: string; createdBy?: string | null; userEmail?: string | null },
-): Promise<CallWorkspaceCoachingContext | null> {
+): Promise<AutoStartCallWorkspaceLiveCoachingOnAnswerResult> {
   const nativeSession = await fetchNativeCallSessionById(admin, input.nativeSessionId)
-  if (!nativeSession || nativeSession.direction !== "inbound") return null
-  if (nativeSession.status !== "active" && nativeSession.status !== "on_hold") return null
+  if (!nativeSession) {
+    return {
+      linked: false,
+      reason: "native_session_not_found",
+      realtimeSessionId: null,
+      context: null,
+      linkResult: null,
+    }
+  }
+  if (nativeSession.direction !== "inbound") {
+    return {
+      linked: false,
+      reason: "native_session_not_inbound",
+      realtimeSessionId: null,
+      context: null,
+      linkResult: null,
+    }
+  }
+  if (nativeSession.status !== "active" && nativeSession.status !== "on_hold") {
+    return {
+      linked: false,
+      reason: "native_session_not_active",
+      realtimeSessionId: null,
+      context: null,
+      linkResult: null,
+    }
+  }
 
   const context = await startCallWorkspaceLiveCoaching(admin, {
     nativeSessionId: input.nativeSessionId,
@@ -399,13 +487,37 @@ export async function autoStartCallWorkspaceLiveCoachingOnAnswer(
   })
 
   const realtimeSessionId = context.realtimeSession?.id ?? null
-  if (realtimeSessionId) {
+  if (realtimeSessionId && context.linkResult?.linked) {
     logVoiceInfrastructure("voice_growth_coaching_auto_linked", {
       nativeSessionId: input.nativeSessionId,
       realtimeSessionId,
       voiceCallId: nativeSession.voiceCallId ?? null,
       stage: "answer",
     })
+    return {
+      linked: true,
+      reason: null,
+      realtimeSessionId,
+      context,
+      linkResult: context.linkResult,
+    }
+  }
+
+  if (realtimeSessionId && context.linkResult && !context.linkResult.linked) {
+    logVoiceInfrastructure("voice_growth_coaching_auto_start_failed", {
+      nativeSessionId: input.nativeSessionId,
+      realtimeSessionId,
+      voiceCallId: nativeSession.voiceCallId ?? null,
+      reason: context.linkResult.reason,
+      stage: "answer_link",
+    })
+    return {
+      linked: false,
+      reason: "native_session_link_failed",
+      realtimeSessionId,
+      context,
+      linkResult: context.linkResult,
+    }
   } else {
     logVoiceInfrastructure("voice_growth_coaching_auto_start_failed", {
       nativeSessionId: input.nativeSessionId,
@@ -414,5 +526,11 @@ export async function autoStartCallWorkspaceLiveCoachingOnAnswer(
     })
   }
 
-  return context
+  return {
+    linked: false,
+    reason: "realtime_session_missing_after_start",
+    realtimeSessionId,
+    context,
+    linkResult: context.linkResult,
+  }
 }

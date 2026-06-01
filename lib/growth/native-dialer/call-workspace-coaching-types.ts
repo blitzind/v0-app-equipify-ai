@@ -20,17 +20,40 @@ export const CALL_WORKSPACE_MEDIA_STREAM_RESTART_FAILED_COPY =
 export type CallWorkspaceAnswerPipelineDiagnostics = {
   liveCoachingLinked: boolean
   realtimeSessionId: string | null
+  createdRealtimeSessionId: string | null
   liveCoachingError: string | null
+  liveCoachingFailureReason: string | null
+  linkResult: LinkNativeCallRealtimeSessionResult | null
   mediaStreamStarted: boolean
   mediaStreamReason: string | null
   mediaStreamWssHost: string | null
 }
 
+export type LinkNativeCallRealtimeSessionResult =
+  | {
+      linked: true
+      realtimeSessionId: string
+      nativeSessionId: string
+      reason: null
+    }
+  | {
+      linked: false
+      realtimeSessionId: string
+      nativeSessionId: string
+      reason:
+        | "native_session_not_found"
+        | "native_session_update_failed"
+        | "realtime_session_not_persisted"
+    }
+
 export function emptyCallWorkspaceAnswerPipelineDiagnostics(): CallWorkspaceAnswerPipelineDiagnostics {
   return {
     liveCoachingLinked: false,
     realtimeSessionId: null,
+    createdRealtimeSessionId: null,
     liveCoachingError: null,
+    liveCoachingFailureReason: null,
+    linkResult: null,
     mediaStreamStarted: false,
     mediaStreamReason: null,
     mediaStreamWssHost: null,
