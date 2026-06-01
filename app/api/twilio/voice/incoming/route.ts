@@ -67,7 +67,7 @@ export async function POST(request: Request) {
   try {
     const rawBody = await request.text()
     if (!rawBody.trim()) {
-      return twimlResponse(buildTwilioSayAndHangup("Invalid request."), 400)
+      return twimlResponse(buildTwilioSayAndHangup("Invalid request."))
     }
 
     const formParams = parseTwilioFormBody(rawBody)
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
         message: validation.message,
         callSid: metadata.callSid,
       })
-      return twimlResponse('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>', 401)
+      return twimlResponse('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>')
     }
 
     logTwilioIncomingWebhookReceived(metadata)
@@ -113,7 +113,6 @@ export async function POST(request: Request) {
     })
     return twimlResponse(
       '<?xml version="1.0" encoding="UTF-8"?><Response><Say>We are unable to connect your call right now.</Say><Hangup/></Response>',
-      500,
     )
   }
 }

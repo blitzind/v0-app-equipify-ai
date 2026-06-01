@@ -248,21 +248,30 @@ export async function handleTwilioInboundCall(
     decision.action === "dial" &&
     (decision.dialClientIdentities?.length ?? 0) > 0
   ) {
-    const voiceCallId = await createInboundVoiceCallFromTwilio(input.admin, {
-      organizationId,
-      providerCallId: callSid,
-      fromNumber,
-      toNumber,
-      assignedUserId: browserTargetUserIds[0] ?? voiceNumber.assignedUserId,
-    })
+    try {
+      const voiceCallId = await createInboundVoiceCallFromTwilio(input.admin, {
+        organizationId,
+        providerCallId: callSid,
+        fromNumber,
+        toNumber,
+        assignedUserId: browserTargetUserIds[0] ?? voiceNumber.assignedUserId,
+      })
 
-    await provisionInboundBrowserWorkspaceOffers(input.admin, {
-      organizationId,
-      voiceCallId,
-      targetUserIds: browserTargetUserIds,
-      fromNumber,
-      toNumber,
-    })
+      await provisionInboundBrowserWorkspaceOffers(input.admin, {
+        organizationId,
+        voiceCallId,
+        targetUserIds: browserTargetUserIds,
+        fromNumber,
+        toNumber,
+      })
+    } catch (error) {
+      logVoiceInfrastructure("voice_inbound_browser_provision_failed", {
+        qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
+        organizationId,
+        callSid,
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
   }
 
   if (callSid && decision.action === "ai_receptionist" && isVoiceAiReceptionistEnabled()) {

@@ -684,6 +684,15 @@ export async function saveNativeCallWrapup(
   return mapWrapupRow(data as WrapupRow)
 }
 
+export async function fetchNativeCallWrapupBySessionId(
+  admin: SupabaseClient,
+  sessionId: string,
+): Promise<NativeCallWrapupPublicView | null> {
+  const { data, error } = await wrapupsTable(admin).select("*").eq("session_id", sessionId).maybeSingle()
+  if (error) throw new Error(error.message)
+  return data ? mapWrapupRow(data as WrapupRow) : null
+}
+
 export async function listNativeDialerQueue(
   admin: SupabaseClient,
   input?: { limit?: number; modes?: NativeDialerQueueMode[] },

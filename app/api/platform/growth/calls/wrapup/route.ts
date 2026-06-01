@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { fetchNativeCallWrapupBySessionId } from "@/lib/growth/native-dialer/native-dialer-repository"
 import { submitGrowthNativeCallWrapup } from "@/lib/growth/native-dialer/native-dialer-service"
 import { GROWTH_NATIVE_DIALER_QA_MARKER, NATIVE_CALL_WRAPUP_OUTCOMES } from "@/lib/growth/native-dialer/native-dialer-types"
 import {
@@ -45,12 +46,40 @@ export async function POST(request: Request) {
     )
   }
 
-  const parsed = bodySchema.safeParse(await request.json().catch(() => ({})))
-  if (!parsed.success) {
+  const rawBody = await request.json().catch(() => null)
+  if (!rawBody || typeof rawBody !== "object") {
     return NextResponse.json({ error: "invalid_body", message: "Invalid wrap-up payload." }, { status: 400 })
   }
 
+  const parsed = bodySchema.safeParse(rawBody)
+  if (!parsed.success) {
+    const sessionId = typeof (rawBody as Record<string, unknown>).sessionId === "string"
+      ? ((rawBody as Record<string, unknown>).sessionId as string)
+      : null
+    if (sessionId && !sessionId.startsWith("pending-inbound-")) {
+      const existing = await fetchNativeCallWrapupBySessionId(access.admin, sessionId).catch(() => null)
+      if (existing) {
+        return NextResponse.json({ ok: true, qaMarker: GROWTH_NATIVE_DIALER_QA_MARKER, wrapup: existing })
+      }
+    }
+    return NextResponse.json(
+      {
+        error: "invalid_body",
+        message:
+          sessionId?.startsWith("pending-inbound-")
+            ? "Call session is still syncing. Wait a moment and try again."
+            : "Invalid wrap-up payload.",
+      },
+      { status: 400 },
+    )
+  }
+
   try {
+    const existing = await fetchNativeCallWrapupBySessionId(access.admin, parsed.data.sessionId)
+    if (existing) {
+      return NextResponse.json({ ok: true, qaMarker: GROWTH_NATIVE_DIALER_QA_MARKER, wrapup: existing })
+    }
+
     const wrapup = await submitGrowthNativeCallWrapup(access.admin, {
       sessionId: parsed.data.sessionId,
       ownerUserId: access.userId,

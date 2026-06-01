@@ -84,6 +84,7 @@ import {
   buildOptimisticWrappingSession,
   filterInboundOfferForLifecycle,
   isCallLifecycleEndedLocked,
+  isNativeSessionIdServerReady,
   registerAcceptedCallLifecycle,
   registerCompletedCallLifecycle,
   registerEndedCallLifecycle,
@@ -132,8 +133,11 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   const completedSessionIdsRef = useRef(new Set<string>())
   const completedVoiceCallIdsRef = useRef(new Set<string>())
   const endCallInFlightRef = useRef(false)
+  const wrapupSubmittedSessionIdsRef = useRef(new Set<string>())
   const lastKnownSessionRef = useRef<NativeCallWorkspaceSessionPublicView | null>(null)
   const operatorAssistStableRef = useRef<import("@/lib/growth/operator-assist/types").UnifiedOperatorAssistSnapshot | null>(null)
+  const idleWorkspaceContextRef = useRef<import("@/lib/voice/workspace-context/types").VoiceWorkspaceContextSnapshot | null>(null)
+  const idleWorkspaceContextKeyRef = useRef<string | null>(null)
   const [callAuthority, setCallAuthority] = useState<CallLifecycleAuthorityState>(
     createInitialCallLifecycleAuthority,
   )
@@ -578,6 +582,34 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   }, [initialLeadId, loadLeadContext])
 
   const workspaceContext = useMemo(() => {
+    if (workspacePhase === "idle") {
+      const idleKey = leadContext?.leadId ?? "none"
+      if (idleWorkspaceContextRef.current && idleWorkspaceContextKeyRef.current === idleKey) {
+        return idleWorkspaceContextRef.current
+      }
+      const input = buildWorkspaceContextInputFromVoiceSnapshot({
+        callPhase: "idle",
+        startingCall: false,
+        leadLinked,
+        operatorAssist: null,
+        aiCopilot: null,
+        aiReceptionist: null,
+        missedCallRecovery: null,
+        hasActiveTransfer: false,
+        relationshipSummary: leadContext
+          ? `${leadContext.companyName ?? "Account"} · ${leadContext.contactName ?? "Contact"}`
+          : null,
+        preferredChannel: "voice",
+        workflowStatusLabel: "Ready",
+      })
+      const snapshot = buildWorkspaceContextSnapshot(input)
+      idleWorkspaceContextRef.current = snapshot
+      idleWorkspaceContextKeyRef.current = idleKey
+      return snapshot
+    }
+
+    idleWorkspaceContextRef.current = null
+    idleWorkspaceContextKeyRef.current = null
     const operatorAssistSnapshot =
       operatorAssistStableRef.current ?? voiceBrowser.snapshot?.operatorAssist ?? null
     const input = buildWorkspaceContextInputFromVoiceSnapshot({
@@ -596,7 +628,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       workflowStatusLabel: workspacePhase === "idle" ? "Ready" : workspacePhase,
     })
     return buildWorkspaceContextSnapshot(input)
-  }, [workspacePhase, starting, leadLinked, voiceBrowser.snapshot, leadContext])
+  }, [workspacePhase, starting, leadLinked, leadContext, voiceBrowser.snapshot])
 
   useEffect(() => {
     const nextAssist = voiceBrowser.snapshot?.operatorAssist ?? null
@@ -612,6 +644,8 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     }
     if (callAuthority.phase === "idle" || callAuthority.phase === "completed") {
       operatorAssistStableRef.current = null
+      idleWorkspaceContextRef.current = null
+      idleWorkspaceContextKeyRef.current = null
     }
   }, [voiceBrowser.snapshot?.operatorAssist, callAuthority.phase])
 
@@ -925,38 +959,73 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     decisionMakerPresent?: boolean
     notes?: string
   }): Promise<NativeCallWrapupPublicView | null> {
-    if (!activeSession) return null
+    const sessionForWrapup =
+      activeSession ??
+      (callAuthority.phase === "wrapup" || callAuthority.phase === "ending"
+        ? lastKnownSessionRef.current
+        : null)
+    if (!sessionForWrapup || sessionForWrapup.status !== "wrapping") return null
     if (submittingWrapup) return null
 
-    const sessionId = activeSession.id
-    const voiceCallId = activeSession.voiceCallId
+    let sessionId = sessionForWrapup.id
+    if (!isNativeSessionIdServerReady(sessionId)) {
+      const synced = await voiceBrowser.refresh().catch(() => null)
+      sessionId =
+        synced?.inboundRinging?.workspaceSessionId ??
+        synced?.workspaceSessionId ??
+        sessionId
+    }
+    if (!isNativeSessionIdServerReady(sessionId)) {
+      setError("Call session is still syncing. Wait a moment and try again.")
+      return null
+    }
+    if (wrapupSubmittedSessionIdsRef.current.has(sessionId)) return null
+
+    wrapupSubmittedSessionIdsRef.current.add(sessionId)
+    const companyName = sessionForWrapup.companyName
+    const voiceCallId = sessionForWrapup.voiceCallId
     registerCompletedCallLifecycle({
       completedSessionIds: completedSessionIdsRef.current,
       completedVoiceCallIds: completedVoiceCallIdsRef.current,
       sessionId,
       voiceCallId,
     })
-    setCallAuthority((prev) => transitionCallLifecycleAuthority(prev, { type: "wrapup_confirmed" }))
-    setActiveSession(null)
     setSubmittingWrapup(true)
     setError(null)
+
+    const payload = {
+      sessionId,
+      companyName,
+      outcome: input.outcome,
+      objectionCategory: input.objectionCategory ?? null,
+      buyingSignals: input.buyingSignals ?? [],
+      competitorMentioned: input.competitorMentioned ?? false,
+      timelineDetected: input.timelineDetected ?? false,
+      budgetDetected: input.budgetDetected ?? false,
+      championIdentified: input.championIdentified ?? false,
+      decisionMakerPresent: input.decisionMakerPresent ?? false,
+      notes: input.notes ?? "",
+    }
 
     try {
       const res = await fetch("/api/platform/growth/calls/wrapup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId,
-          companyName: activeSession.companyName,
-          ...input,
-        }),
+        body: JSON.stringify(payload),
       })
       const data = (await res.json().catch(() => ({}))) as { wrapup?: NativeCallWrapupPublicView; message?: string }
       if (!res.ok || !data.wrapup) throw new Error(data.message ?? "Wrap-up failed.")
+      setCallAuthority((prev) => transitionCallLifecycleAuthority(prev, { type: "wrapup_confirmed" }))
+      setActiveSession(null)
+      lastKnownSessionRef.current = null
+      operatorAssistStableRef.current = null
+      idleWorkspaceContextRef.current = null
+      idleWorkspaceContextKeyRef.current = null
       void load({ background: true })
       void voiceBrowser.refresh().catch(() => undefined)
       return data.wrapup
     } catch (e) {
+      wrapupSubmittedSessionIdsRef.current.delete(sessionId)
       setError(e instanceof Error ? e.message : "Wrap-up failed.")
       return null
     } finally {
@@ -1098,8 +1167,12 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           voiceParticipants={voiceBrowser.snapshot?.participants ?? []}
           voiceActiveTransfer={voiceBrowser.snapshot?.activeTransfer ?? null}
           voiceLiveTranscript={voiceBrowser.snapshot?.liveTranscript ?? null}
-          operatorAssist={operatorAssistStableRef.current ?? voiceBrowser.snapshot?.operatorAssist ?? null}
-          aiCopilot={voiceBrowser.snapshot?.aiCopilot ?? null}
+          operatorAssist={
+            workspacePhase === "idle"
+              ? null
+              : operatorAssistStableRef.current ?? voiceBrowser.snapshot?.operatorAssist ?? null
+          }
+          aiCopilot={workspacePhase === "idle" ? null : voiceBrowser.snapshot?.aiCopilot ?? null}
           aiReceptionist={voiceBrowser.snapshot?.aiReceptionist ?? null}
           missedCallRecovery={voiceBrowser.snapshot?.missedCallRecovery ?? null}
           voiceCallId={voiceCallId}
@@ -1139,7 +1212,11 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           leadContext={leadContext}
           nativeSessionId={activeSession?.id ?? null}
           sessionPhone={activeSession?.phoneNumber ?? phone}
-          operatorAssist={operatorAssistStableRef.current ?? voiceBrowser.snapshot?.operatorAssist ?? null}
+          operatorAssist={
+            workspacePhase === "idle"
+              ? null
+              : operatorAssistStableRef.current ?? voiceBrowser.snapshot?.operatorAssist ?? null
+          }
           relationshipMemory={voiceBrowser.snapshot?.relationshipMemory ?? null}
           revenueIntelligence={voiceBrowser.snapshot?.revenueIntelligence ?? null}
           retentionIntelligence={voiceBrowser.snapshot?.retentionIntelligence ?? null}

@@ -5,6 +5,14 @@ import type { VoiceInboundBrowserOfferView } from "@/lib/voice/browser-calling/t
 
 export const CALL_LIFECYCLE_RECONCILIATION_QA_MARKER = "call-lifecycle-reconciliation-v3" as const
 
+const NATIVE_SESSION_UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+export function isNativeSessionIdServerReady(sessionId: string | null | undefined): boolean {
+  if (!sessionId || sessionId.startsWith("pending-inbound-")) return false
+  return NATIVE_SESSION_UUID_PATTERN.test(sessionId)
+}
+
 const TERMINAL_SESSION_STATUSES = new Set<NativeCallWorkspaceSessionPublicView["status"]>([
   "completed",
   "failed",

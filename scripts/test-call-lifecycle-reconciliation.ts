@@ -10,6 +10,7 @@ import {
   buildOptimisticWrappingSession,
   CALL_LIFECYCLE_RECONCILIATION_QA_MARKER,
   filterInboundOfferForLifecycle,
+  isNativeSessionIdServerReady,
   mergeServerSessionIntoLocal,
   shouldApplyInboundOfferToSession,
   shouldHonorSdkIncomingForLifecycle,
@@ -101,6 +102,8 @@ assert.match(workspaceComponentSource, /applyServerSessionUnderAuthority/)
 assert.match(workspaceComponentSource, /mapAuthorityToWorkspacePhase/)
 assert.match(workspaceComponentSource, /syncWorkspaceSessionId/)
 assert.match(workspaceComponentSource, /applyServerSession/)
+assert.match(workspaceComponentSource, /idleWorkspaceContextRef/)
+assert.match(workspaceComponentSource, /isNativeSessionIdServerReady/)
 
 assert.equal(
   shouldApplyInboundOfferToSession({
@@ -203,5 +206,15 @@ const inboundRouteSource = fs.readFileSync(
 )
 assert.match(inboundRouteSource, /voice_inbound_webhook_failed/)
 assert.match(inboundRouteSource, /fallbackInboundTwiml/)
+assert.match(inboundRouteSource, /status: 200/)
+assert.doesNotMatch(inboundRouteSource, /twimlResponse\(result\.twiml, result\.ok \? 200 : 404\)/)
+assert.equal(isNativeSessionIdServerReady("pending-inbound-CA123"), false)
+assert.equal(isNativeSessionIdServerReady("550e8400-e29b-41d4-a716-446655440000"), true)
+
+const wrapupRouteSource = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/calls/wrapup/route.ts"),
+  "utf8",
+)
+assert.match(wrapupRouteSource, /fetchNativeCallWrapupBySessionId/)
 
 console.log("call-lifecycle-reconciliation checks passed")
