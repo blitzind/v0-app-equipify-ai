@@ -230,6 +230,8 @@ export function GrowthCallWorkspaceCenterPanel({
   markingBridgeStarted,
   submittingWrapup,
   coachingStartSignal,
+  coachingNativeSessionId = null,
+  answerReconcileInFlight = false,
   coachingMode,
   leadLinked,
   optimisticCoachTurn = null,
@@ -274,6 +276,8 @@ export function GrowthCallWorkspaceCenterPanel({
   markingBridgeStarted?: boolean
   submittingWrapup?: boolean
   coachingStartSignal?: number
+  coachingNativeSessionId?: string | null
+  answerReconcileInFlight?: boolean
   coachingMode: CallWorkspaceCoachingMode
   leadLinked: boolean
   optimisticCoachTurn?: ConversationCoachTurn | null
@@ -421,7 +425,7 @@ export function GrowthCallWorkspaceCenterPanel({
             />
             <GrowthCallWorkspaceUnifiedAssistPanel
               phase="bridge_pending"
-              nativeSessionId={activeSession.id}
+              nativeSessionId={coachingNativeSessionId}
               sessionLeadId={activeSession.leadId}
               coachingMode={coachingMode}
               leadLinked={leadLinked}
@@ -431,7 +435,7 @@ export function GrowthCallWorkspaceCenterPanel({
               mediaStreamDiagnostic={mediaStreamDiagnostic}
               onRetryMediaStream={onRetryMediaStream}
               linkedRealtimeSessionId={activeSession.realtimeSessionId}
-              answerReconciliationPending={Boolean(answering)}
+              answerReconciliationPending={answerReconcileInFlight}
               aiCopilot={aiCopilot}
               aiReceptionist={aiReceptionist}
               missedCallRecovery={missedCallRecovery}
@@ -450,7 +454,7 @@ export function GrowthCallWorkspaceCenterPanel({
             <ActiveCallHeader session={activeSession} elapsed={elapsed} externalBridge={externalBridge} />
             <GrowthCallWorkspaceUnifiedAssistPanel
               phase="active"
-              nativeSessionId={activeSession.id}
+              nativeSessionId={coachingNativeSessionId}
               sessionLeadId={activeSession.leadId}
               coachingMode={coachingMode}
               leadLinked={leadLinked}
@@ -461,7 +465,7 @@ export function GrowthCallWorkspaceCenterPanel({
               mediaStreamDiagnostic={mediaStreamDiagnostic}
               onRetryMediaStream={onRetryMediaStream}
               linkedRealtimeSessionId={activeSession.realtimeSessionId}
-              answerReconciliationPending={Boolean(answering)}
+              answerReconciliationPending={answerReconcileInFlight}
               aiCopilot={aiCopilot}
               aiReceptionist={aiReceptionist}
               missedCallRecovery={missedCallRecovery}

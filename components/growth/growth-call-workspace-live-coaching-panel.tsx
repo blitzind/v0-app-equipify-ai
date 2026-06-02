@@ -17,6 +17,7 @@ import {
   type CallWorkspaceCoachingMode,
 } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import { GROWTH_NATIVE_DIALER_LIVE_COACHING_CENTER_QA_MARKER } from "@/lib/growth/native-dialer/native-dialer-types"
+import { isNativeSessionIdServerReady } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
 import type { GrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-types"
 
 type WorkspaceCoachingPayload = {
@@ -59,10 +60,18 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
     (activeRealtimeSession?.transcriptStatus === "live" ||
       activeRealtimeSession?.browserAudioCaptureStatus === "active")
 
-  const canStartCoaching = (phase === "bridge_pending" || phase === "active") && Boolean(nativeSessionId)
+  const canStartCoaching =
+    (phase === "bridge_pending" || phase === "active") &&
+    isNativeSessionIdServerReady(nativeSessionId)
 
   const loadCoaching = useCallback(async () => {
-    if (!nativeSessionId || (phase !== "active" && phase !== "bridge_pending")) {
+    if (!nativeSessionId || !isNativeSessionIdServerReady(nativeSessionId)) {
+      if (phase !== "active" && phase !== "bridge_pending") {
+        setCoachingPayload(null)
+      }
+      return
+    }
+    if (phase !== "active" && phase !== "bridge_pending") {
       setCoachingPayload(null)
       return
     }
@@ -94,7 +103,7 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
   }, [loadCoaching, sessionLeadId, coachingMode, leadLinked])
 
   async function startCoaching() {
-    if (!nativeSessionId) return
+    if (!nativeSessionId || !isNativeSessionIdServerReady(nativeSessionId)) return
     setActing(true)
     setError(null)
     try {
@@ -119,10 +128,11 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
 
   useEffect(() => {
     if (!startSignal || !nativeSessionId) return
+    if (!isNativeSessionIdServerReady(nativeSessionId)) return
     if (phase !== "bridge_pending" && phase !== "active") return
     void startCoaching()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- explicit operator trigger via startSignal
-  }, [startSignal])
+  }, [nativeSessionId, phase, startSignal])
 
   const modeLabel = useMemo(() => {
     if (leadLinked || coachingMode === "lead_linked") return "Lead-linked intelligence"

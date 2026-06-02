@@ -96,6 +96,7 @@ import {
   registerAcceptedCallLifecycle,
   registerCompletedCallLifecycle,
   registerEndedCallLifecycle,
+  resolveAuthoritativeNativeSessionId,
   shouldApplyInboundOfferToSession,
   type CallLifecycleLockSnapshot,
 } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
@@ -142,6 +143,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   const [submittingWrapup, setSubmittingWrapup] = useState(false)
   const [dialingQueueId, setDialingQueueId] = useState<string | null>(null)
   const [answering, setAnswering] = useState(false)
+  const [answerReconcileInFlight, setAnswerReconcileInFlight] = useState(false)
   const [optimisticCoachTurn, setOptimisticCoachTurn] = useState<ConversationCoachTurn | null>(null)
   const [answerPipelineDiagnostic, setAnswerPipelineDiagnostic] = useState<string | null>(null)
   const [mediaStreamDiagnostic, setMediaStreamDiagnostic] = useState<string | null>(null)
@@ -525,6 +527,14 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     callAuthority.phase === "incoming"
       ? incomingSession ?? activeSession
       : activeSession ?? lastKnownSessionRef.current
+
+  const coachingNativeSessionId = useMemo(() => {
+    return resolveAuthoritativeNativeSessionId({
+      authoritySessionId: callAuthority.sessionId,
+      localSessionId: activeSession?.id,
+      serverSessionId: lastKnownSessionRef.current?.id,
+    })
+  }, [activeSession?.id, callAuthority.sessionId])
 
   const workspacePhase = useMemo((): GrowthCallWorkspacePhase => {
     return mapAuthorityToWorkspacePhase({
@@ -1019,6 +1029,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       return
     }
     try {
+      setAnswerReconcileInFlight(true)
       let sessionId = input.sessionForAnswer.id
       if (!sessionId || sessionId.startsWith("pending-inbound-")) {
         logLiveCoachingAutoStartQa("operator_assist_refresh_start", {
@@ -1121,16 +1132,16 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
             })
           }
           clearLifecycleLocksForAnsweredSession(answeredSession)
-          setCallAuthority((prev) => ({
-            ...prev,
-            phase: "active",
-            voiceCallId: answeredSession.voiceCallId ?? prev.voiceCallId,
-            sessionId: answeredSession.id,
-            connectedAt: answeredSession.connectedAt ?? prev.connectedAt ?? new Date().toISOString(),
-            endedAt: null,
-            frozenDurationSeconds: null,
-          }))
         }
+        setCallAuthority((prev) => ({
+          ...prev,
+          phase: "active",
+          voiceCallId: answeredSession.voiceCallId ?? prev.voiceCallId,
+          sessionId: answeredSession.id,
+          connectedAt: answeredSession.connectedAt ?? prev.connectedAt ?? new Date().toISOString(),
+          endedAt: null,
+          frozenDurationSeconds: null,
+        }))
         applyServerSession(answeredSession)
         logLiveCoachingAutoStartQa("reconcileInboundAnswer_success", {
           sessionId: answeredSession.id,
@@ -1174,6 +1185,8 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         message: e instanceof Error ? e.message : "Answer failed.",
       })
       setError(e instanceof Error ? e.message : "Answer failed.")
+    } finally {
+      setAnswerReconcileInFlight(false)
     }
   }
 
@@ -1532,6 +1545,8 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           markingBridgeStarted={markingBridgeStarted}
           submittingWrapup={submittingWrapup}
           coachingStartSignal={coachingStartSignal}
+          coachingNativeSessionId={coachingNativeSessionId}
+          answerReconcileInFlight={answerReconcileInFlight}
           coachingMode={coachingMode}
           leadLinked={leadLinked}
           inboundVoiceCallCreatedAt={inboundOffer?.voiceCallCreatedAt ?? null}

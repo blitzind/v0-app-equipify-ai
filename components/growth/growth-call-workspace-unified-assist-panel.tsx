@@ -40,6 +40,7 @@ import { SayThisNextCard } from "@/components/growth/live-coaching/say-this-next
 import { resolveSayThisNext } from "@/lib/growth/operator-assist/resolve-say-this-next"
 import type { ConversationCoachTurn } from "@/lib/growth/live-coaching/types"
 import { cn } from "@/lib/utils"
+import { isNativeSessionIdServerReady } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
 
 export function GrowthCallWorkspaceUnifiedAssistPanel({
   phase,
@@ -101,7 +102,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   const coachingActive = hasLinkedRealtimeSession
   const canStartCoaching =
     (phase === "bridge_pending" || phase === "active") &&
-    Boolean(nativeSessionId) &&
+    isNativeSessionIdServerReady(nativeSessionId) &&
     !hasLinkedRealtimeSession
   const coachingPendingFromAnswer = answerReconciliationPending && canStartCoaching
 
@@ -130,7 +131,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   }, [coachingMode, leadLinked])
 
   const startCoaching = useCallback(async () => {
-    if (!nativeSessionId) return
+    if (!nativeSessionId || !isNativeSessionIdServerReady(nativeSessionId)) return
     setStartingCoaching(true)
     setError(null)
     try {
@@ -149,9 +150,11 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
 
   useEffect(() => {
     if (!startSignal || !nativeSessionId) return
+    if (!isNativeSessionIdServerReady(nativeSessionId)) return
+    if (answerReconciliationPending) return
     if (phase !== "bridge_pending" && phase !== "active") return
     void startCoaching()
-  }, [nativeSessionId, phase, startCoaching, startSignal])
+  }, [answerReconciliationPending, nativeSessionId, phase, startCoaching, startSignal])
 
   const patchAssistEvent = useCallback(
     async (event: UnifiedOperatorAssistEvent, action: "accept" | "dismiss") => {

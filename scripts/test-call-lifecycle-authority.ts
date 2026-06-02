@@ -69,6 +69,26 @@ const mergedWhileActive = applyServerSessionUnderAuthority({
 assert.equal(mergedWhileActive?.status, "active")
 assert.equal(mergedWhileActive?.contactName, "Acme")
 
+// Answered server UUID must replace pending-inbound authority/local ids during active reconcile
+const serverAnswered: NativeCallWorkspaceSessionPublicView = {
+  ...baseSession,
+  id: "550e8400-e29b-41d4-a716-446655440000",
+  status: "active",
+  realtimeSessionId: "rt-1",
+}
+const mergedAfterAnswer = applyServerSessionUnderAuthority({
+  local: { ...baseSession, id: "pending-inbound-CA123", status: "active" },
+  server: serverAnswered,
+  authority: {
+    ...authority,
+    sessionId: "pending-inbound-CA123",
+  },
+  acceptedSessionIds: new Set(["550e8400-e29b-41d4-a716-446655440000"]),
+  endedVoiceCallIds: new Set(),
+})
+assert.equal(mergedAfterAnswer?.id, "550e8400-e29b-41d4-a716-446655440000")
+assert.equal(mergedAfterAnswer?.realtimeSessionId, "rt-1")
+
 // Server idle/null must not clear while authority active
 const mergedWhileActiveNoServer = applyServerSessionUnderAuthority({
   local: baseSession,

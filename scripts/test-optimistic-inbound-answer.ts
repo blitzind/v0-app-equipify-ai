@@ -100,8 +100,18 @@ assert.match(
 )
 assert.match(
   workspaceSource,
-  /if \(authoritativeLinkedAnswer\) \{[\s\S]*clearLifecycleLocksForAnsweredSession\(answeredSession\)[\s\S]*phase: "active"[\s\S]*applyServerSession\(answeredSession\)/,
-  "authoritative linked answer responses must clear stale locks, restore active authority, and apply the server session",
+  /setAnswerReconcileInFlight\(true\)/,
+  "answer reconciliation must track in-flight reconcile separately from answering UI state",
+)
+assert.match(
+  workspaceSource,
+  /resolveAuthoritativeNativeSessionId/,
+  "workspace must resolve coaching session id from authority/local/server sources",
+)
+assert.match(
+  workspaceSource,
+  /setCallAuthority\(\(prev\) => \(\{[\s\S]*sessionId: answeredSession\.id[\s\S]*applyServerSession\(answeredSession\)/,
+  "successful answer responses must bind native session authority before applying server session",
 )
 assert.doesNotMatch(
   workspaceSource,
@@ -115,8 +125,13 @@ const centerPanelSource = fs.readFileSync(
 )
 assert.match(
   centerPanelSource,
-  /answerReconciliationPending=\{Boolean\(answering\)\}/,
+  /answerReconciliationPending=\{answerReconcileInFlight\}/,
   "active call assist panel must receive answer reconciliation pending state",
+)
+assert.match(
+  centerPanelSource,
+  /nativeSessionId=\{coachingNativeSessionId\}/,
+  "coaching requests must use the resolved native session id",
 )
 
 const assistPanelSource = fs.readFileSync(
@@ -135,8 +150,13 @@ assert.match(
 )
 assert.match(
   assistPanelSource,
-  /disabled=\{!canStartCoaching \|\| startingCoaching \|\| coachingPendingFromAnswer\}/,
-  "Start Coaching must be disabled while inbound answer reconciliation is pending",
+  /isNativeSessionIdServerReady\(nativeSessionId\)/,
+  "coaching start must require a server-ready native session id",
+)
+assert.match(
+  assistPanelSource,
+  /if \(answerReconciliationPending\) return/,
+  "auto coaching start must wait for inbound answer reconciliation",
 )
 assert.match(
   assistPanelSource,

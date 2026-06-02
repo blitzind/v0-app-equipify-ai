@@ -13,6 +13,18 @@ export function isNativeSessionIdServerReady(sessionId: string | null | undefine
   return NATIVE_SESSION_UUID_PATTERN.test(sessionId)
 }
 
+/** Prefer the first server-ready native UUID across authority/local/server sources. */
+export function resolveAuthoritativeNativeSessionId(input: {
+  authoritySessionId?: string | null
+  localSessionId?: string | null
+  serverSessionId?: string | null
+}): string | null {
+  for (const id of [input.serverSessionId, input.authoritySessionId, input.localSessionId]) {
+    if (isNativeSessionIdServerReady(id)) return id!.trim()
+  }
+  return input.serverSessionId ?? input.authoritySessionId ?? input.localSessionId ?? null
+}
+
 const TERMINAL_SESSION_STATUSES = new Set<NativeCallWorkspaceSessionPublicView["status"]>([
   "completed",
   "failed",

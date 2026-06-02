@@ -5,7 +5,10 @@
 import type { NativeCallWorkspaceSessionPublicView } from "@/lib/growth/native-dialer/native-dialer-types"
 import type { GrowthCallWorkspacePhase } from "@/components/growth/growth-call-workspace-center-panel"
 import type { CallLifecycleLockSnapshot } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
-import { mergeServerSessionIntoLocal } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
+import {
+  mergeServerSessionIntoLocal,
+  resolveAuthoritativeNativeSessionId,
+} from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
 
 export const CALL_LIFECYCLE_AUTHORITY_QA_MARKER = "call-lifecycle-authority-v1" as const
 
@@ -251,7 +254,12 @@ export function applyServerSessionUnderAuthority(input: {
       ...(base ?? server)!,
       ...(server ? pickSessionMetadata(server) : {}),
       status,
-      id: authority.sessionId ?? local?.id ?? server?.id ?? (base ?? server)!.id,
+      id:
+        resolveAuthoritativeNativeSessionId({
+          authoritySessionId: authority.sessionId,
+          localSessionId: local?.id,
+          serverSessionId: server?.id,
+        }) ?? (base ?? server)!.id,
       voiceCallId: authority.voiceCallId ?? local?.voiceCallId ?? server?.voiceCallId ?? null,
       connectedAt: authority.connectedAt ?? local?.connectedAt ?? server?.connectedAt ?? null,
     }

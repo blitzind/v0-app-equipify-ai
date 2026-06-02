@@ -213,6 +213,12 @@ assert.doesNotMatch(inboundRouteSource, /twimlResponse\(result\.twiml, result\.o
 assert.equal(isNativeSessionIdServerReady("pending-inbound-CA123"), false)
 assert.equal(isNativeSessionIdServerReady("550e8400-e29b-41d4-a716-446655440000"), true)
 
+const reconciliationSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/browser-calling/call-lifecycle-reconciliation.ts"),
+  "utf8",
+)
+assert.match(reconciliationSource, /resolveAuthoritativeNativeSessionId/)
+
 const wrapupRouteSource = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/calls/wrapup/route.ts"),
   "utf8",
