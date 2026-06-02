@@ -234,30 +234,36 @@ export async function ensureAnsweredInboundCallMediaStream(
     return { started: false, reason: "media_stream_url_missing" }
   }
 
-  const streamCallSid = await resolveTwilioStreamCallSid(admin, {
+  const resolvedStreamCallSid = await resolveTwilioStreamCallSid(admin, {
     organizationId: input.organizationId,
     voiceCallId: input.voiceCallId,
     fallbackProviderCallId: input.providerCallId,
     credentialAccountSid: credentials.accountSid,
   })
+  // Inbound dial `<Start><Stream>` attaches to the parent PSTN call. Post-answer REST
+  // stream create/stop must use the same CallSid or Twilio rejects the request.
+  const twilioStreamCallSid =
+    resolvedStreamCallSid.voiceCallProviderCallId ??
+    input.providerCallId ??
+    resolvedStreamCallSid.streamCallSid
   const streamLog = {
     ...baseLog,
-    providerCallId: streamCallSid.streamCallSid,
-    voiceCallProviderCallId: streamCallSid.voiceCallProviderCallId,
-    providerCallIdSource: streamCallSid.source,
-    callLegId: streamCallSid.legId,
-    callLegType: streamCallSid.legType,
-    callLegStatus: streamCallSid.legStatus,
-    voiceCallStatus: streamCallSid.callStatus,
-    voiceCallEndedAt: streamCallSid.callEndedAt,
-    webhookAccountSid: streamCallSid.webhookAccountSid,
+    providerCallId: twilioStreamCallSid,
+    voiceCallProviderCallId: resolvedStreamCallSid.voiceCallProviderCallId,
+    providerCallIdSource: "voice_call",
+    callLegId: resolvedStreamCallSid.legId,
+    callLegType: resolvedStreamCallSid.legType,
+    callLegStatus: resolvedStreamCallSid.legStatus,
+    voiceCallStatus: resolvedStreamCallSid.callStatus,
+    voiceCallEndedAt: resolvedStreamCallSid.callEndedAt,
+    webhookAccountSid: resolvedStreamCallSid.webhookAccountSid,
     credentialAccountSid: credentials.accountSid,
-    accountSidMismatch: streamCallSid.accountSidMismatch,
+    accountSidMismatch: resolvedStreamCallSid.accountSidMismatch,
   }
 
   logVoiceInfrastructure("voice_answered_inbound_media_stream_call_sid_resolved", streamLog)
 
-  if (streamCallSid.callEndedAt) {
+  if (resolvedStreamCallSid.callEndedAt) {
     logVoiceInfrastructure("voice_answered_inbound_media_stream_skipped", {
       ...streamLog,
       reason: "call_already_ended",
@@ -265,7 +271,7 @@ export async function ensureAnsweredInboundCallMediaStream(
     return { started: false, reason: "call_already_ended" }
   }
 
-  if (streamCallSid.accountSidMismatch) {
+  if (resolvedStreamCallSid.accountSidMismatch) {
     logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
       ...streamLog,
       stage: "twilio_stream_create",
@@ -278,7 +284,7 @@ export async function ensureAnsweredInboundCallMediaStream(
     const stopResult = await stopTwilioCallStream({
       accountSid: credentials.accountSid,
       authToken: credentials.authToken,
-      providerCallId: streamCallSid.streamCallSid,
+      providerCallId: twilioStreamCallSid,
       providerStreamSid: activeMedia.providerStreamSid,
     })
     await updateMediaSessionStatus(admin, {
@@ -301,7 +307,7 @@ export async function ensureAnsweredInboundCallMediaStream(
     })
   }
 
-  const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${credentials.accountSid}/Calls/${encodeURIComponent(streamCallSid.streamCallSid)}/Streams.json`
+  const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${credentials.accountSid}/Calls/${encodeURIComponent(twilioStreamCallSid)}/Streams.json`
   const auth = Buffer.from(`${credentials.accountSid}:${credentials.authToken}`).toString("base64")
   const createStartedAt = Date.now()
 
@@ -309,7 +315,7 @@ export async function ensureAnsweredInboundCallMediaStream(
     ...streamLog,
     restartedAfterStaleRingStream: staleRingStream,
     staleMediaSessionId: activeMedia?.id ?? null,
-    twilioEndpointPath: `/Calls/${streamCallSid.streamCallSid}/Streams.json`,
+    twilioEndpointPath: `/Calls/${twilioStreamCallSid}/Streams.json`,
     timeoutMs: TWILIO_STREAM_CREATE_TIMEOUT_MS,
   })
 
@@ -324,7 +330,7 @@ export async function ensureAnsweredInboundCallMediaStream(
         Url: wssUrl,
         Track: "both_tracks",
         "Parameter1.Name": "callSid",
-        "Parameter1.Value": streamCallSid.streamCallSid,
+        "Parameter1.Value": twilioStreamCallSid,
       }),
     })
     const durationMs = Date.now() - createStartedAt

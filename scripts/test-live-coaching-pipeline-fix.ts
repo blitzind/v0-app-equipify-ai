@@ -86,7 +86,16 @@ assert.match(answeredMediaStream, /fetchTwilioStreamCreate/)
 assert.match(answeredMediaStream, /resolveTwilioStreamCallSid/)
 assert.match(answeredMediaStream, /voice_call_legs/)
 assert.match(answeredMediaStream, /provider_call_sid/)
-assert.match(answeredMediaStream, /providerCallIdSource/)
+assert.match(
+  answeredMediaStream,
+  /providerCallIdSource: "voice_call"/,
+  "post-answer media stream must target parent inbound CallSid like ring TwiML",
+)
+assert.match(
+  answeredMediaStream,
+  /twilioStreamCallSid/,
+  "post-answer stream create/stop must use parent inbound CallSid",
+)
 assert.match(answeredMediaStream, /voice_answered_inbound_media_stream_call_sid_resolved/)
 assert.match(answeredMediaStream, /reason: "twilio_account_sid_mismatch"/)
 assert.match(answeredMediaStream, /reason: "call_already_ended"/)

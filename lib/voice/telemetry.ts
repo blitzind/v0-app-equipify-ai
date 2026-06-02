@@ -59,6 +59,7 @@ export type VoiceTelemetryEvent =
   | "voice_growth_coaching_bootstrap_failed"
   | "voice_growth_coaching_session_completed"
   | "voice_growth_coaching_orphan_completed"
+  | "voice_answered_inbound_media_stream_call_sid_resolved"
   | "voice_answered_inbound_media_stream_skipped"
   | "voice_answered_inbound_media_stream_stale_stopped"
   | "voice_answered_inbound_media_stream_create_requested"
