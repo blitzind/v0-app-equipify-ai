@@ -431,3 +431,21 @@ export async function requireVoiceOperatorRouteContext(
     session,
   }
 }
+
+/** Auth-only operator context for token/register routes — no workspace session lookup or call reconciliation. */
+export async function requireVoiceBrowserLightweightOperatorContext(input: {
+  request?: Request
+  route: string
+  diagnostics?: VoiceOperatorRouteDiagnostics
+}): Promise<VoiceOperatorRouteContext> {
+  return requireVoiceOperatorRouteContext({
+    request: input.request,
+    sessionId: null,
+    requireSessionOwner: false,
+    diagnostics: input.diagnostics,
+    sessionIdDiagnostics: {
+      route: input.route,
+      sessionIdSource: "lightweight_route",
+    },
+  })
+}

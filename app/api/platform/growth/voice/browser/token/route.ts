@@ -2,10 +2,12 @@ import { NextResponse } from "next/server"
 import { buildVoiceBrowserClientIdentity } from "@/lib/voice/browser-calling/status-mapping"
 import { resolveVoiceBrowserCallingProvider } from "@/lib/voice/browser-calling/provider-registry"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
-import { requireVoiceOperatorRouteContext } from "@/lib/voice/api/voice-operator-route"
+import { requireVoiceBrowserLightweightOperatorContext } from "@/lib/voice/api/voice-operator-route"
 import { logVoiceInfrastructure, type VoiceTelemetryEvent } from "@/lib/voice/telemetry"
 
 export const runtime = "nodejs"
+
+const BROWSER_TOKEN_ROUTE = "POST /api/platform/growth/voice/browser/token"
 
 function createBrowserTokenStepLogger() {
   const requestStartedAt = Date.now()
@@ -33,6 +35,9 @@ function createBrowserTokenStepLogger() {
         ...extra,
       })
     },
+    totalDurationMs(): number {
+      return Date.now() - requestStartedAt
+    },
   }
 }
 
@@ -40,8 +45,9 @@ export async function POST(request: Request) {
   const steps = createBrowserTokenStepLogger()
   steps.logStep("browser_token_request_start")
 
-  const ctx = await requireVoiceOperatorRouteContext({
+  const ctx = await requireVoiceBrowserLightweightOperatorContext({
     request,
+    route: BROWSER_TOKEN_ROUTE,
     diagnostics: {
       onAuthComplete: (durationMs) =>
         steps.logStep("browser_token_auth_complete", { authDurationMs: durationMs }),
@@ -50,6 +56,16 @@ export async function POST(request: Request) {
     },
   })
   if (!ctx.ok) {
+    const deniedBody = (await ctx.response.clone().json().catch(() => ({}))) as {
+      error?: string
+      authStage?: string
+    }
+    logVoiceInfrastructure("voice_browser_token_auth_denied", {
+      route: BROWSER_TOKEN_ROUTE,
+      error: deniedBody.error ?? null,
+      authStage: deniedBody.authStage ?? null,
+      durationMs: steps.totalDurationMs(),
+    })
     steps.logResponse({
       ok: false,
       status: ctx.response.status,
@@ -57,6 +73,13 @@ export async function POST(request: Request) {
     })
     return ctx.response
   }
+
+  logVoiceInfrastructure("voice_browser_token_auth_success", {
+    route: BROWSER_TOKEN_ROUTE,
+    organizationId: ctx.organizationId,
+    operatorUserId: ctx.userId,
+    durationMs: steps.totalDurationMs(),
+  })
 
   const body = (await request.json().catch(() => ({}))) as { ttlSeconds?: number }
   const clientIdentity = buildVoiceBrowserClientIdentity({

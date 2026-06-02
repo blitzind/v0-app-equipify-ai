@@ -3,10 +3,13 @@ import { z } from "zod"
 import { buildVoiceBrowserClientIdentity } from "@/lib/voice/browser-calling/status-mapping"
 import { resolveVoiceBrowserCallingProvider } from "@/lib/voice/browser-calling/provider-registry"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER, VOICE_BROWSER_PROVIDER_IDS } from "@/lib/voice/browser-calling/types"
-import { requireVoiceOperatorRouteContext } from "@/lib/voice/api/voice-operator-route"
+import { requireVoiceBrowserLightweightOperatorContext } from "@/lib/voice/api/voice-operator-route"
 import { registerVoiceBrowserDevice } from "@/lib/voice/repository/voice-browser-calling-repository"
 
 export const runtime = "nodejs"
+
+const BROWSER_REGISTER_ROUTE = "POST /api/platform/growth/voice/browser/register"
+const BROWSER_UNREGISTER_ROUTE = "DELETE /api/platform/growth/voice/browser/register"
 
 const bodySchema = z.object({
   clientIdentity: z.string().min(8).optional(),
@@ -16,7 +19,10 @@ const bodySchema = z.object({
 })
 
 export async function POST(request: Request) {
-  const ctx = await requireVoiceOperatorRouteContext({ request })
+  const ctx = await requireVoiceBrowserLightweightOperatorContext({
+    request,
+    route: BROWSER_REGISTER_ROUTE,
+  })
   if (!ctx.ok) return ctx.response
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => ({})))
@@ -63,7 +69,10 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const ctx = await requireVoiceOperatorRouteContext({ request })
+  const ctx = await requireVoiceBrowserLightweightOperatorContext({
+    request,
+    route: BROWSER_UNREGISTER_ROUTE,
+  })
   if (!ctx.ok) return ctx.response
 
   const url = new URL(request.url)

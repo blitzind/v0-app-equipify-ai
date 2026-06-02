@@ -11,6 +11,14 @@ const operatorRoute = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/api/voice-operator-route.ts"),
   "utf8",
 )
+const browserTokenRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/voice/browser/token/route.ts"),
+  "utf8",
+)
+const browserRegisterRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/voice/browser/register/route.ts"),
+  "utf8",
+)
 const browserSyncRoute = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/voice/browser/sync/route.ts"),
   "utf8",
@@ -33,6 +41,22 @@ assert.match(
   "401 must not use generic sign-in copy when session cookie is missing",
 )
 
+assert.match(operatorRoute, /requireVoiceBrowserLightweightOperatorContext/)
+assert.match(operatorRoute, /lightweight_route/)
+
+assert.match(browserTokenRoute, /requireVoiceBrowserLightweightOperatorContext/)
+assert.match(browserTokenRoute, /voice_browser_token_auth_success/)
+assert.match(browserTokenRoute, /voice_browser_token_auth_denied/)
+assert.doesNotMatch(browserTokenRoute, /workspace-bridge/)
+assert.doesNotMatch(browserTokenRoute, /resolveInboundBrowserOfferForUser/)
+assert.doesNotMatch(browserTokenRoute, /reconcileStaleRingingOfferCandidates/)
+assert.doesNotMatch(browserTokenRoute, /buildVoiceBrowserSyncSnapshot/)
+assert.doesNotMatch(browserTokenRoute, /probeVoiceSchemaHealth/)
+
+assert.match(browserRegisterRoute, /requireVoiceBrowserLightweightOperatorContext/)
+assert.doesNotMatch(browserRegisterRoute, /workspace-bridge/)
+assert.doesNotMatch(browserRegisterRoute, /resolveInboundBrowserOfferForUser/)
+
 assert.match(browserSyncRoute, /requireVoiceOperatorRouteContext\(\{[\s\S]*request,/)
 assert.match(browserSyncRoute, /voice_browser_sync_auth_success/)
 assert.match(browserSyncRoute, /voice_browser_sync_auth_denied/)
@@ -47,6 +71,13 @@ assert.match(browserHook, /formatBrowserVoiceApiError/)
 assert.match(telemetry, /voice_browser_sync_auth_denied/)
 assert.match(telemetry, /voice_browser_sync_auth_success/)
 assert.match(telemetry, /voice_browser_sync_success/)
+assert.match(telemetry, /voice_browser_token_auth_denied/)
+assert.match(telemetry, /voice_browser_token_auth_success/)
+
+assert.equal(
+  formatBrowserVoiceApiError({ error: "membership_lookup_failed", message: "ignored" }, "fallback"),
+  "Could not verify organization membership. Wait a moment and try again.",
+)
 
 assert.equal(
   formatBrowserVoiceApiError(

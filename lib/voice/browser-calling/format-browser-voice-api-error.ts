@@ -30,6 +30,12 @@ export function formatBrowserVoiceApiError(
   if (authStage === "workspace_session_missing") {
     return "Call workspace session is missing. Refresh the page and try again."
   }
+  if (error === "membership_lookup_failed") {
+    return "Could not verify organization membership. Wait a moment and try again."
+  }
+  if (error === "session_lookup_failed") {
+    return "Could not verify call session access. Wait a moment and try again."
+  }
   if (error === "forbidden" && message) {
     return message
   }

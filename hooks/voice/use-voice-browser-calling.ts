@@ -117,8 +117,14 @@ async function fetchVoiceBrowserAccessToken(): Promise<VoiceBrowserTokenResponse
     authStage?: string
   }
   if (!tokenRes.ok || !tokenData.clientIdentity) {
+    const gatewayTimeout = tokenRes.status === 504 || tokenRes.status === 502 || tokenRes.status === 503
     throw new Error(
-      formatBrowserVoiceApiError(tokenData, tokenData.message ?? "Could not fetch browser calling token."),
+      formatBrowserVoiceApiError(
+        tokenData,
+        gatewayTimeout
+          ? "Browser calling timed out. Wait a moment and refresh the page."
+          : tokenData.message ?? "Could not fetch browser calling token.",
+      ),
     )
   }
   return tokenData
