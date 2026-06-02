@@ -311,6 +311,29 @@ export async function handleTwilioInboundCall(
     })
   }
 
+  let preparedVoiceCallId: string | null = null
+  if (mediaStreamEnabled && callSid && decision.action === "dial") {
+    try {
+      preparedVoiceCallId = await timer.measure("inbound_voice_call_sync", () =>
+        createInboundVoiceCallFromTwilio(input.admin, {
+          organizationId,
+          providerCallId: callSid,
+          fromNumber,
+          toNumber,
+          assignedUserId: browserTargetUserIds[0] ?? voiceNumber.assignedUserId,
+          accountSid,
+        }),
+      )
+    } catch (error) {
+      logVoiceInfrastructure("voice_inbound_browser_provision_failed", {
+        qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
+        organizationId,
+        callSid,
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
   const response = generateInboundCallResponse(provider, {
     decision,
     callerId: voiceNumber.phoneNumber,
@@ -326,14 +349,16 @@ export async function handleTwilioInboundCall(
   ) {
     runVoiceBackgroundTask("inbound_browser_provision", async () => {
       try {
-        const voiceCallId = await createInboundVoiceCallFromTwilio(input.admin, {
-          organizationId,
-          providerCallId: callSid,
-          fromNumber,
-          toNumber,
-          assignedUserId: browserTargetUserIds[0] ?? voiceNumber.assignedUserId,
-          accountSid,
-        })
+        const voiceCallId =
+          preparedVoiceCallId ??
+          (await createInboundVoiceCallFromTwilio(input.admin, {
+            organizationId,
+            providerCallId: callSid,
+            fromNumber,
+            toNumber,
+            assignedUserId: browserTargetUserIds[0] ?? voiceNumber.assignedUserId,
+            accountSid,
+          }))
         await provisionInboundBrowserWorkspaceOffers(input.admin, {
           organizationId,
           voiceCallId,

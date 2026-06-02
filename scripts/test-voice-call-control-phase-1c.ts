@@ -241,6 +241,16 @@ const inboundHandler = fs.readFileSync(
 assert.match(inboundHandler, /shouldEnableInboundDialMediaStream/)
 assert.match(inboundHandler, /voice_inbound_dial_media_stream_twiml/)
 assert.match(inboundHandler, /mediaStreamEnabled/)
+assert.match(
+  inboundHandler,
+  /mediaStreamEnabled && callSid && decision\.action === "dial"[\s\S]*createInboundVoiceCallFromTwilio[\s\S]*generateInboundCallResponse/,
+  "dial media stream TwiML must sync voice_calls row before Twilio executes Start Stream",
+)
+assert.match(
+  inboundHandler,
+  /preparedVoiceCallId[\s\S]*runVoiceBackgroundTask\("inbound_browser_provision"/,
+  "browser workspace offers stay async after sync voice call insert",
+)
 
 import {
   mintTwilioVoiceBrowserAccessToken,
