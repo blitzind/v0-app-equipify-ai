@@ -278,6 +278,8 @@ assert.doesNotMatch(tokenMintSource, /apiKeySecret \|\| authToken/)
 assert.doesNotMatch(providerRegistrySource, /apiKeySecret \|\| authToken/)
 assert.doesNotMatch(providerRegistrySource, /apiKeySid \|\| accountSid/)
 assert.match(tokenMintSource, /apiKeySecret\.trim\(\)/)
+assert.doesNotMatch(tokenMintSource, /await import\("twilio"\)/)
+assert.match(tokenMintSource, /import twilio from "twilio"/)
 
 const tokenInput = {
   accountSid: "ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

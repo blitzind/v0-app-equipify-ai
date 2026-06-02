@@ -1,3 +1,5 @@
+import twilio from "twilio"
+
 export type TwilioBrowserAccessTokenInput = {
   accountSid: string
   apiKeySid: string
@@ -42,8 +44,6 @@ export async function mintTwilioVoiceBrowserAccessToken(
   input: TwilioBrowserAccessTokenInput,
 ): Promise<string> {
   const normalized = normalizeTwilioBrowserAccessTokenInput(input)
-  const twilioModule = await import("twilio")
-  const twilio = twilioModule.default ?? twilioModule
   const AccessToken = twilio.jwt.AccessToken
   const VoiceGrant = AccessToken.VoiceGrant
 
