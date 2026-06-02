@@ -16,7 +16,7 @@ const bodySchema = z.object({
 })
 
 export async function POST(request: Request) {
-  const ctx = await requireVoiceOperatorRouteContext()
+  const ctx = await requireVoiceOperatorRouteContext({ request })
   if (!ctx.ok) return ctx.response
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => ({})))
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const ctx = await requireVoiceOperatorRouteContext()
+  const ctx = await requireVoiceOperatorRouteContext({ request })
   if (!ctx.ok) return ctx.response
 
   const url = new URL(request.url)

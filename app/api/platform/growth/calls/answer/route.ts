@@ -56,6 +56,7 @@ export async function POST(request: Request) {
   })
 
   const access = await requireVoiceOperatorRouteContext({
+    request,
     sessionId,
     requireSessionOwner: true,
     skipSessionIdFormatValidation: true,

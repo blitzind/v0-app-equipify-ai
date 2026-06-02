@@ -292,7 +292,7 @@ assert.match(voiceOperatorRoute, /createServerSupabaseClient/)
 assert.match(voiceOperatorRoute, /createServiceRoleSupabaseClient/)
 assert.match(voiceOperatorRoute, /resolveVoiceInfrastructureOrganizationId/)
 assert.match(voiceOperatorRoute, /\.from\("organization_members"\)[\s\S]*\.eq\("status", "active"\)/)
-assert.match(voiceOperatorRoute, /operatorUserId: user\.id/)
+assert.match(voiceOperatorRoute, /operatorUserId: auth\.userId/)
 assert.match(voiceOperatorRoute, /membershipFound: true/)
 assert.match(voiceOperatorRoute, /membershipFound: false/)
 assert.match(
@@ -302,11 +302,14 @@ assert.match(
 )
 assert.match(
   voiceOperatorRoute,
-  /options\.requireSessionOwner && session\.owner_user_id !== user\.id/,
+  /options\.requireSessionOwner && session\.owner_user_id !== auth\.userId/,
   "operator route guard must enforce native session ownership for active-call mutations",
 )
-assert.doesNotMatch(voiceOperatorRoute, /isPlatformAdminEmail/)
 assert.doesNotMatch(voiceOperatorRoute, /SUPABASE_SERVICE_ROLE_KEY is not configured/)
+assert.match(voiceOperatorRoute, /isPlatformAdminEmail/)
+assert.match(voiceOperatorRoute, /operator_platform_admin_granted/)
+assert.match(voiceOperatorRoute, /getBearerAccessToken/)
+assert.match(voiceOperatorRoute, /authStage/)
 assert.match(
   voiceOperatorRoute,
   /normalizeNativeSessionId/,

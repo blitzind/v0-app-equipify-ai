@@ -2,9 +2,14 @@ import "server-only"
 
 import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { cookies } from "next/headers"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isGrowthEngineEnabledEnv, logGrowthEngine } from "@/lib/growth/access"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { isPlatformAdminEmail } from "@/lib/platform-admin"
+import {
+  createServerSupabaseClient,
+  getBearerAccessToken,
+} from "@/lib/supabase/server"
 import {
   describeNativeSessionIdValidation,
   LEGACY_OPERATOR_UUID_RE,
@@ -52,6 +57,7 @@ export type VoiceOperatorRouteSessionIdDiagnostics = {
 }
 
 export type VoiceOperatorRouteContextOptions = {
+  request?: Request
   sessionId?: string | null
   requireSessionOwner?: boolean
   /** When true, trust caller-side Zod validation (answer route) and skip format re-check. */
@@ -60,7 +66,22 @@ export type VoiceOperatorRouteContextOptions = {
   sessionIdDiagnostics?: VoiceOperatorRouteSessionIdDiagnostics
 }
 
-function jsonResponse(error: string, message: string, status: number): VoiceOperatorRouteContext {
+export type VoiceOperatorAuthStage =
+  | "no_session_cookie"
+  | "session_invalid"
+  | "not_org_member"
+  | "org_not_configured"
+  | "session_not_owned"
+  | "workspace_session_missing"
+  | "platform_admin_granted"
+  | "org_member_granted"
+
+function jsonResponse(
+  error: string,
+  message: string,
+  status: number,
+  authStage?: VoiceOperatorAuthStage,
+): VoiceOperatorRouteContext {
   return {
     ok: false,
     response: NextResponse.json(
@@ -68,10 +89,85 @@ function jsonResponse(error: string, message: string, status: number): VoiceOper
         ok: false,
         error,
         message,
+        authStage: authStage ?? null,
         qaMarker: VOICE_OPERATIONS_QA_MARKER,
       },
       { status },
     ),
+  }
+}
+
+function hasSupabaseAuthCookie(cookieEntries: Array<{ name: string }>): boolean {
+  return cookieEntries.some(
+    ({ name }) => name.includes("-auth-token") || name.startsWith("sb-") || name.includes("supabase-auth-token"),
+  )
+}
+
+type ResolvedVoiceOperatorAuth =
+  | {
+      ok: true
+      userId: string
+      userEmail: string | null
+      authSource: "cookie" | "bearer"
+      hadAuthCookie: boolean
+    }
+  | {
+      ok: false
+      authStage: "no_session_cookie" | "session_invalid"
+    }
+
+async function resolveVoiceOperatorAuth(input: {
+  request?: Request
+  route?: string
+}): Promise<ResolvedVoiceOperatorAuth> {
+  const cookieStore = await cookies()
+  const cookieEntries = cookieStore.getAll()
+  const hadAuthCookie = hasSupabaseAuthCookie(cookieEntries)
+  const bearer = input.request ? getBearerAccessToken(input.request) : null
+  const supabase = await createServerSupabaseClient()
+
+  if (bearer) {
+    const { data, error } = await supabase.auth.getUser(bearer)
+    if (error || !data.user?.id) {
+      logGrowthEngine("operator_access_denied", {
+        reason: "session_invalid",
+        route: input.route ?? "requireVoiceOperatorRouteContext",
+        authSource: "bearer",
+        hadAuthCookie,
+        bearerPresent: true,
+      })
+      return { ok: false, authStage: "session_invalid" }
+    }
+    return {
+      ok: true,
+      userId: data.user.id,
+      userEmail: data.user.email ?? null,
+      authSource: "bearer",
+      hadAuthCookie,
+    }
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user?.id) {
+    logGrowthEngine("operator_access_denied", {
+      reason: hadAuthCookie ? "session_invalid" : "no_session_cookie",
+      route: input.route ?? "requireVoiceOperatorRouteContext",
+      authSource: "cookie",
+      hadAuthCookie,
+      bearerPresent: false,
+    })
+    return { ok: false, authStage: hadAuthCookie ? "session_invalid" : "no_session_cookie" }
+  }
+
+  return {
+    ok: true,
+    userId: user.id,
+    userEmail: user.email ?? null,
+    authSource: "cookie",
+    hadAuthCookie,
   }
 }
 
@@ -107,26 +203,44 @@ function logInvalidNativeSessionIdReturn(input: {
 export async function requireVoiceOperatorRouteContext(
   options: VoiceOperatorRouteContextOptions = {},
 ): Promise<VoiceOperatorRouteContext> {
+  const operatorRoute =
+    options.sessionIdDiagnostics?.route ?? "requireVoiceOperatorRouteContext"
+
   if (!isGrowthEngineEnabledEnv()) {
-    logGrowthEngine("operator_access_denied", { reason: "feature_disabled" })
+    logGrowthEngine("operator_access_denied", { reason: "feature_disabled", route: operatorRoute })
     return jsonResponse("feature_disabled", "Growth Engine is not enabled for this deployment.", 403)
   }
 
   const organizationId = resolveVoiceInfrastructureOrganizationId()
   if (!organizationId) {
-    return jsonResponse("org_not_configured", "Set GROWTH_ENGINE_AI_ORG_ID to scope voice operations.", 400)
+    logGrowthEngine("operator_access_denied", { reason: "org_not_configured", route: operatorRoute })
+    return jsonResponse(
+      "org_not_configured",
+      "Set GROWTH_ENGINE_AI_ORG_ID to scope voice operations.",
+      400,
+      "org_not_configured",
+    )
   }
 
   const authStartedAt = Date.now()
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const auth = await resolveVoiceOperatorAuth({ request: options.request, route: operatorRoute })
   options.diagnostics?.onAuthComplete?.(Date.now() - authStartedAt)
 
-  if (!user?.id) {
-    logGrowthEngine("operator_access_denied", { reason: "unauthorized" })
-    return jsonResponse("unauthorized", "Sign in required.", 401)
+  if (!auth.ok) {
+    if (auth.authStage === "no_session_cookie") {
+      return jsonResponse(
+        "unauthorized",
+        "Your sign-in session expired. Refresh this page to restore browser calling.",
+        401,
+        "no_session_cookie",
+      )
+    }
+    return jsonResponse(
+      "unauthorized",
+      "Could not verify your sign-in session. Refresh this page and try again.",
+      401,
+      "session_invalid",
+    )
   }
 
   let admin: SupabaseClient
@@ -134,54 +248,74 @@ export async function requireVoiceOperatorRouteContext(
     admin = createServiceRoleSupabaseClient()
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
-    logGrowthEngine("operator_access_denied", { reason: "server_config", detail })
+    logGrowthEngine("operator_access_denied", { reason: "server_config", detail, route: operatorRoute })
     return jsonResponse("server_config", "Server is not configured for voice operations.", 503)
   }
 
-  const membershipStartedAt = Date.now()
-  const { data: membership, error: membershipError } = await admin
-    .from("organization_members")
-    .select("user_id")
-    .eq("organization_id", organizationId)
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .maybeSingle()
-  options.diagnostics?.onMembershipComplete?.(Date.now() - membershipStartedAt)
-
-  if (membershipError) {
-    logGrowthEngine("operator_access_denied", {
-      reason: "membership_lookup_failed",
+  const isPlatformAdmin = Boolean(auth.userEmail && isPlatformAdminEmail(auth.userEmail))
+  if (isPlatformAdmin) {
+    logGrowthEngine("operator_platform_admin_granted", {
       organizationId,
-      operatorUserId: user.id,
-      membershipFound: false,
-      detail: membershipError.message,
+      operatorUserId: auth.userId,
+      route: operatorRoute,
+      authSource: auth.authSource,
+      hadAuthCookie: auth.hadAuthCookie,
     })
-    return jsonResponse("membership_lookup_failed", "Could not verify organization membership.", 503)
-  }
+  } else {
+    const membershipStartedAt = Date.now()
+    const { data: membership, error: membershipError } = await admin
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", organizationId)
+      .eq("user_id", auth.userId)
+      .eq("status", "active")
+      .maybeSingle()
+    options.diagnostics?.onMembershipComplete?.(Date.now() - membershipStartedAt)
 
-  if (!membership) {
-    logGrowthEngine("operator_access_denied", {
-      reason: "not_org_member",
+    if (membershipError) {
+      logGrowthEngine("operator_access_denied", {
+        reason: "membership_lookup_failed",
+        organizationId,
+        operatorUserId: auth.userId,
+        membershipFound: false,
+        detail: membershipError.message,
+        route: operatorRoute,
+      })
+      return jsonResponse("membership_lookup_failed", "Could not verify organization membership.", 503)
+    }
+
+    if (!membership) {
+      logGrowthEngine("operator_access_denied", {
+        reason: "not_org_member",
+        organizationId,
+        operatorUserId: auth.userId,
+        membershipFound: false,
+        route: operatorRoute,
+        authSource: auth.authSource,
+        hadAuthCookie: auth.hadAuthCookie,
+      })
+      return jsonResponse(
+        "forbidden",
+        "Growth Engine voice access requires membership in the configured organization.",
+        403,
+        "not_org_member",
+      )
+    }
+
+    logGrowthEngine("operator_membership_verified", {
       organizationId,
-      operatorUserId: user.id,
-      membershipFound: false,
+      operatorUserId: auth.userId,
+      membershipFound: true,
+      route: operatorRoute,
+      authSource: auth.authSource,
     })
-    return jsonResponse("forbidden", "Organization membership required.", 403)
   }
-
-  logGrowthEngine("operator_membership_verified", {
-    organizationId,
-    operatorUserId: user.id,
-    membershipFound: true,
-  })
 
   const rawSessionId = options.sessionId ?? null
   let sessionId: string | null = null
   let session: OperatorSessionRow | null = null
 
   if (rawSessionId?.trim()) {
-    const operatorRoute =
-      options.sessionIdDiagnostics?.route ?? "requireVoiceOperatorRouteContext"
     const sessionIdSource =
       options.sessionIdDiagnostics?.sessionIdSource ?? "operator_route_options"
 
@@ -237,8 +371,9 @@ export async function requireVoiceOperatorRouteContext(
         reason: "session_lookup_failed",
         organizationId,
         sessionId,
-        userId: user.id,
+        userId: auth.userId,
         detail: sessionError.message,
+        route: operatorRoute,
       })
       return jsonResponse("session_lookup_failed", "Could not verify call session access.", 503)
     }
@@ -256,25 +391,26 @@ export async function requireVoiceOperatorRouteContext(
         errorCode: "not_found",
         message: "Call session not found.",
       })
-      return jsonResponse("not_found", "Call session not found.", 404)
+      return jsonResponse("not_found", "Call session not found.", 404, "workspace_session_missing")
     }
 
     session = sessionRow as OperatorSessionRow
 
-    if (options.requireSessionOwner && session.owner_user_id !== user.id) {
+    if (options.requireSessionOwner && session.owner_user_id !== auth.userId && !isPlatformAdmin) {
       logGrowthEngine("operator_access_denied", {
         reason: session.owner_user_id ? "session_not_owned" : "session_unassigned",
         organizationId,
         sessionId,
-        userId: user.id,
+        userId: auth.userId,
         ownerUserId: session.owner_user_id,
         status: session.status,
+        route: operatorRoute,
       })
-      return jsonResponse("forbidden", "Call session operator access required.", 403)
+      return jsonResponse("forbidden", "Call session operator access required.", 403, "session_not_owned")
     }
   } else if (options.requireSessionOwner) {
     logVoiceOperatorSessionIdAudit({
-      route: options.sessionIdDiagnostics?.route ?? "requireVoiceOperatorRouteContext",
+      route: operatorRoute,
       branch: "invalid_id_session_id_required",
       sessionId: rawSessionId,
       sessionIdSource: options.sessionIdDiagnostics?.sessionIdSource ?? "operator_route_options",
@@ -283,15 +419,15 @@ export async function requireVoiceOperatorRouteContext(
       errorCode: "invalid_id",
       message: "Session id is required.",
     })
-    return jsonResponse("invalid_id", "Session id is required.", 400)
+    return jsonResponse("invalid_id", "Session id is required.", 400, "workspace_session_missing")
   }
 
   return {
     ok: true,
     admin,
     organizationId,
-    userId: user.id,
-    userEmail: user.email ?? null,
+    userId: auth.userId,
+    userEmail: auth.userEmail,
     session,
   }
 }

@@ -8,6 +8,7 @@ import {
   type VoiceBrowserIncomingCallView,
 } from "@/lib/voice/browser-calling/browser-incoming-call"
 import { formatBrowserRegistrationError } from "@/lib/voice/browser-calling/format-browser-registration-error"
+import { formatBrowserVoiceApiError } from "@/lib/voice/browser-calling/format-browser-voice-api-error"
 import {
   INBOUND_RING_DIAG_EVENTS,
   logInboundRingDiagnostic,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/voice/browser-calling/inbound-ring-diagnostics"
 import type { VoiceBrowserSyncSnapshot } from "@/lib/voice/browser-calling/types"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 
 type VoiceBrowserTokenResponse = {
   ok?: boolean
@@ -35,6 +37,31 @@ type VoiceBrowserSyncResponse = {
   snapshot?: VoiceBrowserSyncSnapshot
   diagnostics?: VoiceBrowserSyncSnapshot["diagnostics"]
   message?: string
+  error?: string
+  authStage?: string
+}
+
+async function buildVoiceBrowserFetchInit(init?: RequestInit): Promise<RequestInit> {
+  const headers = new Headers(init?.headers)
+  if (init?.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json")
+  }
+  try {
+    const supabase = createBrowserSupabaseClient()
+    const { data } = await supabase.auth.getSession()
+    const accessToken = data.session?.access_token
+    if (accessToken && !headers.has("Authorization")) {
+      headers.set("Authorization", `Bearer ${accessToken}`)
+    }
+  } catch {
+    // Cookie auth may still succeed server-side.
+  }
+  return {
+    ...init,
+    headers,
+    credentials: "include",
+    cache: "no-store",
+  }
 }
 
 type TwilioVoiceDevice = {
@@ -78,14 +105,21 @@ function mergeVoiceBrowserSyncSnapshot(
 }
 
 async function fetchVoiceBrowserAccessToken(): Promise<VoiceBrowserTokenResponse> {
-  const tokenRes = await fetch("/api/platform/growth/voice/browser/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ttlSeconds: 3600 }),
-  })
-  const tokenData = (await tokenRes.json().catch(() => ({}))) as VoiceBrowserTokenResponse
+  const tokenRes = await fetch(
+    "/api/platform/growth/voice/browser/token",
+    await buildVoiceBrowserFetchInit({
+      method: "POST",
+      body: JSON.stringify({ ttlSeconds: 3600 }),
+    }),
+  )
+  const tokenData = (await tokenRes.json().catch(() => ({}))) as VoiceBrowserTokenResponse & {
+    error?: string
+    authStage?: string
+  }
   if (!tokenRes.ok || !tokenData.clientIdentity) {
-    throw new Error(tokenData.message ?? "Could not fetch browser calling token.")
+    throw new Error(
+      formatBrowserVoiceApiError(tokenData, tokenData.message ?? "Could not fetch browser calling token."),
+    )
   }
   return tokenData
 }
@@ -219,12 +253,13 @@ export function useVoiceBrowserCalling(input?: {
       params.set("clientIdentity", clientIdentityRef.current)
     }
     if (workspaceSessionIdRef.current) params.set("workspaceSessionId", workspaceSessionIdRef.current)
-    const res = await fetch(`/api/platform/growth/voice/browser/sync?${params.toString()}`, {
-      cache: "no-store",
-    })
+    const res = await fetch(
+      `/api/platform/growth/voice/browser/sync?${params.toString()}`,
+      await buildVoiceBrowserFetchInit(),
+    )
     const data = (await res.json().catch(() => ({}))) as VoiceBrowserSyncResponse
     if (!res.ok || !data.snapshot) {
-      throw new Error(data.message ?? "Could not sync voice browser state.")
+      throw new Error(formatBrowserVoiceApiError(data, data.message ?? "Could not sync voice browser state."))
     }
     let mergedSnapshot = data.snapshot
     setSnapshot((previous) => {
@@ -283,9 +318,10 @@ export function useVoiceBrowserCalling(input?: {
   const markBrowserDeviceOffline = useCallback(async () => {
     const identity = clientIdentityRef.current
     if (!identity) return
-    await fetch(`/api/platform/growth/voice/browser/register?clientIdentity=${encodeURIComponent(identity)}`, {
-      method: "DELETE",
-    }).catch(() => undefined)
+    await fetch(
+      `/api/platform/growth/voice/browser/register?clientIdentity=${encodeURIComponent(identity)}`,
+      await buildVoiceBrowserFetchInit({ method: "DELETE" }),
+    ).catch(() => undefined)
   }, [])
 
   const disconnectDevice = useCallback(async () => {
@@ -409,17 +445,24 @@ export function useVoiceBrowserCalling(input?: {
     try {
       const tokenData = await fetchVoiceBrowserAccessToken()
 
-      const registerRes = await fetch("/api/platform/growth/voice/browser/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientIdentity: tokenData.clientIdentity,
-          userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      const registerRes = await fetch(
+        "/api/platform/growth/voice/browser/register",
+        await buildVoiceBrowserFetchInit({
+          method: "POST",
+          body: JSON.stringify({
+            clientIdentity: tokenData.clientIdentity,
+            userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+          }),
         }),
-      })
-      const registerData = (await registerRes.json().catch(() => ({}))) as VoiceBrowserRegisterResponse
+      )
+      const registerData = (await registerRes.json().catch(() => ({}))) as VoiceBrowserRegisterResponse & {
+        error?: string
+        authStage?: string
+      }
       if (!registerRes.ok) {
-        throw new Error(registerData.message ?? "Could not register browser device.")
+        throw new Error(
+          formatBrowserVoiceApiError(registerData, registerData.message ?? "Could not register browser device."),
+        )
       }
 
       clientIdentityRef.current = tokenData.clientIdentity
@@ -542,9 +585,12 @@ export function useVoiceBrowserCalling(input?: {
       void disconnectDevice()
       const identity = clientIdentityRef.current
       if (identity) {
-        void fetch(`/api/platform/growth/voice/browser/register?clientIdentity=${encodeURIComponent(identity)}`, {
-          method: "DELETE",
-        })
+        void buildVoiceBrowserFetchInit({ method: "DELETE" }).then((init) =>
+          fetch(
+            `/api/platform/growth/voice/browser/register?clientIdentity=${encodeURIComponent(identity)}`,
+            init,
+          ),
+        )
       }
     }
   }, [disconnectDevice, enabled, register])

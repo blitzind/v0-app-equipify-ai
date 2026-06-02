@@ -41,6 +41,7 @@ export async function POST(request: Request) {
   steps.logStep("browser_token_request_start")
 
   const ctx = await requireVoiceOperatorRouteContext({
+    request,
     diagnostics: {
       onAuthComplete: (durationMs) =>
         steps.logStep("browser_token_auth_complete", { authDurationMs: durationMs }),
