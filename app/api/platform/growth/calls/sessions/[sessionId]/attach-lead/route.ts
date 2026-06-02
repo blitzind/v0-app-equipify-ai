@@ -3,11 +3,14 @@ import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { attachCallWorkspaceLead } from "@/lib/growth/native-dialer/call-workspace-coaching-service"
 import { GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
+import { logSessionIdValidationFailure } from "@/lib/voice/api/session-id-validation-diagnostics"
 
 export const runtime = "nodejs"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+const ATTACH_LEAD_ROUTE = "/api/platform/growth/calls/sessions/[sessionId]/attach-lead"
 
 const BodySchema = z.object({
   leadId: z.string().uuid(),
@@ -22,6 +25,14 @@ export async function PATCH(
 
   const { sessionId } = await context.params
   if (!UUID_RE.test(sessionId)) {
+    logSessionIdValidationFailure({
+      route: `PATCH ${ATTACH_LEAD_ROUTE}`,
+      message: "Invalid session id.",
+      sessionId,
+      sessionIdSource: "url_path_param",
+      nativeSessionId: sessionId,
+      sessionIdPassedUuidValidation: false,
+    })
     return NextResponse.json({ error: "invalid_id", message: "Invalid session id." }, { status: 400 })
   }
 

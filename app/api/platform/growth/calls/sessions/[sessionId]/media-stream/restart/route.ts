@@ -19,6 +19,11 @@ export async function POST(
   const access = await requireVoiceOperatorRouteContext({
     sessionId: trimmedSessionId,
     requireSessionOwner: true,
+    sessionIdDiagnostics: {
+      route: "POST /api/platform/growth/calls/sessions/[sessionId]/media-stream/restart",
+      sessionIdSource: "url_path_param",
+      nativeSessionId: trimmedSessionId,
+    },
   })
   if (!access.ok) return access.response
 

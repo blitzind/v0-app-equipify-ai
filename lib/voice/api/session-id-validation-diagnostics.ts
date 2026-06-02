@@ -1,7 +1,11 @@
 import "server-only"
 
-import { z } from "zod"
 import { logGrowthEngine } from "@/lib/growth/access"
+import {
+  describeNativeSessionIdValidation,
+  isNativeSessionIdFormat,
+  LEGACY_OPERATOR_UUID_RE,
+} from "@/lib/voice/api/native-session-id-validation"
 
 export const SESSION_ID_VALIDATION_DIAGNOSTICS_QA_MARKER =
   "voice-session-id-validation-diagnostics-v1" as const
@@ -9,39 +13,19 @@ export const SESSION_ID_VALIDATION_DIAGNOSTICS_QA_MARKER =
 export const GROWTH_CALLS_ANSWER_VALIDATION_AUDIT_QA_MARKER =
   "growth-calls-answer-validation-audit-v1" as const
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-const ZOD_UUID = z.string().uuid()
-
-export type SessionIdValidationSnapshot = {
-  rawSessionId: string | null
-  trimmedSessionId: string | null
-  sessionIdLength: number | null
-  trimmedSessionIdLength: number | null
-  zodUuidPass: boolean
+export type SessionIdValidationSnapshot = ReturnType<typeof describeNativeSessionIdValidation> & {
   operatorUuidRegexPass: boolean
-  versionNibble: string | null
-  variantNibble: string | null
   sessionIdKind: string
 }
 
 export function describeSessionIdValidation(
   sessionId: string | null | undefined,
 ): SessionIdValidationSnapshot {
-  const rawSessionId = sessionId ?? null
-  const trimmedSessionId = rawSessionId?.trim() || null
-  const segments = trimmedSessionId?.split("-") ?? []
+  const validation = describeNativeSessionIdValidation(sessionId)
   return {
-    rawSessionId,
-    trimmedSessionId,
-    sessionIdLength: rawSessionId?.length ?? null,
-    trimmedSessionIdLength: trimmedSessionId?.length ?? null,
-    zodUuidPass: trimmedSessionId ? ZOD_UUID.safeParse(trimmedSessionId).success : false,
-    operatorUuidRegexPass: trimmedSessionId ? UUID_RE.test(trimmedSessionId) : false,
-    versionNibble: segments[2]?.[0] ?? null,
-    variantNibble: segments[3]?.[0] ?? null,
-    sessionIdKind: classifySessionIdKind(rawSessionId),
+    ...validation,
+    operatorUuidRegexPass: validation.legacyOperatorUuidRegexPass,
+    sessionIdKind: classifySessionIdKind(sessionId),
   }
 }
 
@@ -59,37 +43,27 @@ export function logGrowthCallsAnswerValidationAudit(
   })
 }
 
-export function logVoiceOperatorSessionIdAudit(input: {
-  route: string
-  branch: string
-  sessionId?: string | null
-  sessionIdSource?: string
-  dbLookupFound?: boolean | null
-  dbLookupError?: string | null
-  organizationId?: string | null
-  httpStatus?: number
-  errorCode?: string
-  message?: string
-}): void {
-  const validation = describeSessionIdValidation(input.sessionId)
+export function logVoiceOperatorSessionIdAudit(
+  input: Record<string, unknown> & {
+    route: string
+    branch: string
+    sessionId?: string | null
+  },
+): void {
+  const validation = describeSessionIdValidation(
+    typeof input.sessionId === "string" ? input.sessionId : null,
+  )
   logGrowthEngine("voice_operator_session_id_audit", {
     qaMarker: GROWTH_CALLS_ANSWER_VALIDATION_AUDIT_QA_MARKER,
     ts: new Date().toISOString(),
-    route: input.route,
-    branch: input.branch,
-    sessionIdSource: input.sessionIdSource ?? null,
-    dbLookupFound: input.dbLookupFound ?? null,
-    dbLookupError: input.dbLookupError ?? null,
-    organizationId: input.organizationId ?? null,
-    httpStatus: input.httpStatus ?? null,
-    errorCode: input.errorCode ?? null,
-    message: input.message ?? null,
     ...validation,
+    ...input,
   })
 }
 
 export type SessionIdValidationFailureInput = {
   route: string
+  branch?: string
   message: "Session id is invalid." | "Invalid session id."
   sessionId: string | null | undefined
   sessionIdSource: string
@@ -105,20 +79,22 @@ export function classifySessionIdKind(sessionId: string | null | undefined): str
   if (trimmed === "null") return "literal_null_string"
   if (trimmed === "undefined") return "literal_undefined_string"
   if (trimmed.startsWith("pending-inbound-")) return "pending_inbound_placeholder"
-  if (UUID_RE.test(trimmed)) return "valid_uuid"
+  if (isNativeSessionIdFormat(trimmed)) return "valid_uuid"
+  if (LEGACY_OPERATOR_UUID_RE.test(trimmed)) return "legacy_regex_only_uuid"
   return "invalid_non_uuid"
 }
 
 export function sessionIdPassedUuidValidation(sessionId: string | null | undefined): boolean {
-  if (!sessionId?.trim()) return false
-  return UUID_RE.test(sessionId.trim())
+  return isNativeSessionIdFormat(sessionId)
 }
 
 export function logSessionIdValidationFailure(input: SessionIdValidationFailureInput): void {
   const sessionId = input.sessionId?.trim() || null
+  const validation = describeSessionIdValidation(sessionId)
   logGrowthEngine("voice_session_id_validation_failed", {
     qaMarker: SESSION_ID_VALIDATION_DIAGNOSTICS_QA_MARKER,
     route: input.route,
+    branch: input.branch ?? null,
     message: input.message,
     sessionId,
     sessionIdSource: input.sessionIdSource,
@@ -126,7 +102,16 @@ export function logSessionIdValidationFailure(input: SessionIdValidationFailureI
     nativeSessionId: input.nativeSessionId ?? sessionId,
     realtimeSessionId: input.realtimeSessionId ?? null,
     sessionIdPassedUuidValidation:
-      input.sessionIdPassedUuidValidation ?? sessionIdPassedUuidValidation(sessionId),
-    sessionIdKind: classifySessionIdKind(sessionId),
+      input.sessionIdPassedUuidValidation ?? validation.zodUuidPass,
+    sessionIdKind: validation.sessionIdKind,
+    rawSessionId: validation.rawSessionId,
+    trimmedSessionId: validation.trimmedSessionId,
+    sessionIdLength: validation.sessionIdLength,
+    trimmedSessionIdLength: validation.trimmedSessionIdLength,
+    zodUuidPass: validation.zodUuidPass,
+    legacyOperatorUuidRegexPass: validation.legacyOperatorUuidRegexPass,
+    operatorUuidRegexPass: validation.legacyOperatorUuidRegexPass,
+    versionNibble: validation.versionNibble,
+    variantNibble: validation.variantNibble,
   })
 }

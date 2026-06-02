@@ -2,6 +2,7 @@ import "server-only"
 
 import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { z } from "zod"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isPlatformAdminEmail } from "@/lib/platform-admin"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
@@ -11,13 +12,12 @@ export function isGrowthEngineEnabledEnv(): boolean {
   return process.env.GROWTH_ENGINE_ENABLED?.trim() === "true"
 }
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
 /** Org UUID used for ai_usage_logs when running internal Growth Engine research. */
 export function getGrowthEngineAiOrgId(): string | null {
   const id = process.env.GROWTH_ENGINE_AI_ORG_ID?.trim()
-  return id && UUID_RE.test(id) ? id : null
+  if (!id) return null
+  const parsed = z.string().uuid().safeParse(id)
+  return parsed.success ? parsed.data : null
 }
 
 export function logGrowthEngine(event: string, details: Record<string, unknown>): void {
