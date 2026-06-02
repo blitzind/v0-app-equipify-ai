@@ -46,7 +46,7 @@ assert.match(workspaceBridge, /mode: "ringing"/)
 assert.match(workspaceBridge, /VoiceRouteTimer/)
 assert.match(workspaceBridge, /isLiveBrowserWorkspaceSession/)
 assert.match(workspaceBridge, /type VoiceBrowserSyncMode = "fast" \| "enrichment"/)
-assert.match(workspaceBridge, /const includeEnrichment = syncMode === "enrichment"/)
+assert.match(workspaceBridge, /buildVoiceBrowserEnrichmentSnapshot/)
 assert.match(workspaceBridge, /RELATIONSHIP_MEMORY_SYNC_CACHE_TTL_MS = 30_000/)
 assert.match(workspaceBridge, /relationshipMemorySyncCache/)
 assert.match(workspaceBridge, /queryCount/)
@@ -63,6 +63,9 @@ assert.match(voiceBrowserHook, /params\.set\("mode", mode\)/)
 assert.match(voiceBrowserHook, /syncRef\.current\("fast"\)/)
 assert.match(voiceBrowserHook, /syncRef\.current\("enrichment"\)/)
 assert.match(voiceBrowserHook, /mergeVoiceBrowserSyncSnapshot/)
+assert.match(voiceBrowserHook, /enrichmentWarning/)
+assert.match(voiceBrowserHook, /CALL_WORKSPACE_ENRICHMENT_SYNC_FAILED_COPY/)
+assert.match(voiceBrowserHook, /next\.diagnostics\?\.enrichmentTimedOut/)
 
 assert.match(platformRoute, /probeVoiceSchemaHealthCached/)
 assert.match(operatorRoute, /createServerSupabaseClient/)
@@ -152,7 +155,28 @@ assert.match(workspaceBridge, /voice_browser_sync_timing/)
 assert.match(workspaceBridge, /scheduleStaleRingingCleanupIfNeeded/)
 assert.match(workspaceBridge, /runVoiceBackgroundTask\("browser_sync_stale_ringing_cleanup"/)
 assert.doesNotMatch(workspaceBridge, /void reconcileStaleRingingOfferCandidates/)
-assert.match(workspaceBridge, /includeEnrichment && shouldSyncNativeSessionFromVoiceCall/)
+assert.match(workspaceBridge, /buildVoiceBrowserEnrichmentSnapshot/)
+assert.match(workspaceBridge, /runVoiceBackgroundTask\("browser_sync_session_sync"/)
+assert.match(workspaceBridge, /BrowserSyncEnrichmentTimer/)
+assert.match(workspaceBridge, /voice_browser_sync_enrichment_timeout/)
+assert.match(workspaceBridge, /ENRICHMENT_SYNC_BUDGET_MS = 8_000/)
+
+const growthCallWorkspace = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace.tsx"),
+  "utf8",
+)
+assert.match(growthCallWorkspace, /wasSdkAnswerAlreadyAccepted/)
+assert.match(growthCallWorkspace, /CALL_WORKSPACE_ANSWER_RECONCILE_FAILED_COPY/)
+assert.match(growthCallWorkspace, /enrichmentWarning/)
+
+const browserSyncEnrichmentTiming = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/browser-calling/browser-sync-enrichment-timing.ts"),
+  "utf8",
+)
+assert.match(browserSyncEnrichmentTiming, /voice_browser_sync_enrichment_timing/)
+
+const middleware = fs.readFileSync(path.join(process.cwd(), "middleware.ts"), "utf8")
+assert.match(middleware, /pathname\.startsWith\("\/api\/platform\/growth\/voice\/"\)/)
 
 const relationshipRepository = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/repository/voice-relationship-memory-repository.ts"),

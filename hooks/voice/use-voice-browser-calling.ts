@@ -16,6 +16,7 @@ import {
 } from "@/lib/voice/browser-calling/inbound-ring-diagnostics"
 import type { VoiceBrowserSyncSnapshot } from "@/lib/voice/browser-calling/types"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
+import { CALL_WORKSPACE_ENRICHMENT_SYNC_FAILED_COPY } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 
 type VoiceBrowserTokenResponse = {
@@ -84,7 +85,32 @@ function mergeVoiceBrowserSyncSnapshot(
   previous: VoiceBrowserSyncSnapshot | null,
   next: VoiceBrowserSyncSnapshot,
 ): VoiceBrowserSyncSnapshot {
-  if (next.syncMode === "enrichment") return next
+  if (next.syncMode === "enrichment") {
+    if (!previous) return next
+    if (next.diagnostics?.enrichmentTimedOut) return previous
+    return {
+      ...previous,
+      generatedAt: next.generatedAt,
+      syncMode: next.syncMode,
+      diagnostics: next.diagnostics ?? previous.diagnostics,
+      browserCallState: next.browserCallState ?? previous.browserCallState,
+      activeVoiceCallId: next.activeVoiceCallId ?? previous.activeVoiceCallId,
+      workspaceSessionId: next.workspaceSessionId ?? previous.workspaceSessionId,
+      timeline: next.timeline?.length ? next.timeline : previous.timeline,
+      recording: next.recording ?? previous.recording,
+      participants: next.participants?.length ? next.participants : previous.participants,
+      activeTransfer: next.activeTransfer ?? previous.activeTransfer,
+      liveTranscript: next.liveTranscript ?? previous.liveTranscript,
+      conversationIntelligence: next.conversationIntelligence ?? previous.conversationIntelligence,
+      operatorAssist: next.operatorAssist ?? previous.operatorAssist,
+      relationshipMemory: next.relationshipMemory ?? previous.relationshipMemory,
+      revenueIntelligence: next.revenueIntelligence ?? previous.revenueIntelligence,
+      retentionIntelligence: next.retentionIntelligence ?? previous.retentionIntelligence,
+      aiCopilot: next.aiCopilot ?? previous.aiCopilot,
+      aiReceptionist: next.aiReceptionist ?? previous.aiReceptionist,
+      missedCallRecovery: next.missedCallRecovery ?? previous.missedCallRecovery,
+    }
+  }
   if (!previous || previous.activeVoiceCallId !== next.activeVoiceCallId || !next.activeVoiceCallId) return next
   return {
     ...next,
@@ -158,6 +184,7 @@ export function useVoiceBrowserCalling(input?: {
   const [sdkCallPhase, setSdkCallPhase] = useState<VoiceBrowserSdkCallPhase>("idle")
   const [registrationState, setRegistrationState] = useState<"idle" | "registering" | "registered" | "error">("idle")
   const [error, setError] = useState<string | null>(null)
+  const [enrichmentWarning, setEnrichmentWarning] = useState<string | null>(null)
   const deviceRef = useRef<TwilioVoiceDevice | null>(null)
   const sdkRegisteredRef = useRef(false)
   const deviceLifecycleHandlersRef = useRef<DeviceLifecycleHandlers | null>(null)
@@ -265,7 +292,23 @@ export function useVoiceBrowserCalling(input?: {
     )
     const data = (await res.json().catch(() => ({}))) as VoiceBrowserSyncResponse
     if (!res.ok || !data.snapshot) {
-      throw new Error(formatBrowserVoiceApiError(data, data.message ?? "Could not sync voice browser state."))
+      const gatewayTimeout = res.status === 504 || res.status === 502 || res.status === 503
+      const message = formatBrowserVoiceApiError(
+        data,
+        mode === "enrichment"
+          ? CALL_WORKSPACE_ENRICHMENT_SYNC_FAILED_COPY
+          : data.message ?? "Could not sync voice browser state.",
+      )
+      if (mode === "enrichment") {
+        setEnrichmentWarning(gatewayTimeout ? message : CALL_WORKSPACE_ENRICHMENT_SYNC_FAILED_COPY)
+        return snapshotRef.current
+      }
+      throw new Error(message)
+    }
+    if (mode === "enrichment") {
+      setEnrichmentWarning(
+        data.snapshot.diagnostics?.enrichmentTimedOut ? CALL_WORKSPACE_ENRICHMENT_SYNC_FAILED_COPY : null,
+      )
     }
     let mergedSnapshot = data.snapshot
     setSnapshot((previous) => {
@@ -639,6 +682,7 @@ export function useVoiceBrowserCalling(input?: {
     hasSdkIncoming: sdkCallPhase === "incoming" || Boolean(incomingCall),
     registrationState,
     error,
+    enrichmentWarning,
     refresh: sync,
     acceptIncomingCall,
     rejectIncomingCall,

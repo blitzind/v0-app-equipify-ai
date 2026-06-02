@@ -128,6 +128,7 @@ export type VoiceBrowserSyncSnapshot = {
     queryCount: number
     rowsReturned: number
     relationshipMemoryCache?: "hit" | "miss" | "bypass" | "none"
+    enrichmentTimedOut?: boolean
   }
 }
 

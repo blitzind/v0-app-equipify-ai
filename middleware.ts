@@ -57,8 +57,8 @@ function skipArchivedOrgGuard(pathname: string) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Provider webhooks (Twilio signature verified in route handlers) — skip Supabase session refresh.
-  if (pathname.startsWith("/api/voice/")) {
+  // Provider webhooks + high-frequency voice operator APIs — skip Supabase session refresh.
+  if (pathname.startsWith("/api/voice/") || pathname.startsWith("/api/platform/growth/voice/")) {
     return NextResponse.next()
   }
 

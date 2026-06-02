@@ -78,6 +78,7 @@ import type { CallWorkspaceAnswerPipelineDiagnostics } from "@/lib/growth/native
 import {
   CALL_WORKSPACE_COACHING_LINK_FAILED_COPY,
   CALL_WORKSPACE_MEDIA_STREAM_RESTART_FAILED_COPY,
+  CALL_WORKSPACE_ANSWER_RECONCILE_FAILED_COPY,
 } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import {
   applyServerSessionUnderAuthority,
@@ -119,6 +120,21 @@ function logLiveCoachingAutoStartQa(event: string, details: Record<string, unkno
 function isClientFetchAbortError(error: unknown): boolean {
   if (error instanceof DOMException && error.name === "AbortError") return true
   if (error instanceof Error && /aborted/i.test(error.message)) return true
+  return false
+}
+
+function wasSdkAnswerAlreadyAccepted(input: {
+  hadSdkIncoming: boolean
+  voiceCallId: string | null
+  sessionId: string
+  acceptedVoiceCallIds: Set<string>
+  acceptedSessionIds: Set<string>
+  hasLiveSdkCall: boolean
+}): boolean {
+  if (!input.hadSdkIncoming) return false
+  if (input.hasLiveSdkCall) return true
+  if (input.voiceCallId && input.acceptedVoiceCallIds.has(input.voiceCallId)) return true
+  if (input.acceptedSessionIds.has(input.sessionId)) return true
   return false
 }
 
@@ -1082,7 +1098,28 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           linkResultLinked: data.pipeline?.linkResult?.linked ?? null,
           linkResultReason: data.pipeline?.linkResult?.reason ?? null,
         })
-        if (!res.ok || !data.session) throw new Error(data.message ?? "Could not answer call.")
+        if (!res.ok || !data.session) {
+          if (
+            wasSdkAnswerAlreadyAccepted({
+              hadSdkIncoming: input.hadSdkIncoming,
+              voiceCallId: input.sessionForAnswer.voiceCallId,
+              sessionId: input.sessionForAnswer.id,
+              acceptedVoiceCallIds: acceptedVoiceCallIdsRef.current,
+              acceptedSessionIds: acceptedSessionIdsRef.current,
+              hasLiveSdkCall: hasLiveSdkCallRef.current,
+            })
+          ) {
+            logLiveCoachingAutoStartQa("reconcileInboundAnswer_nonfatal_answer_api", {
+              sessionId,
+              voiceCallId: input.sessionForAnswer.voiceCallId,
+              httpStatus: res.status,
+              message: data.message ?? null,
+            })
+            setAnswerPipelineDiagnostic(CALL_WORKSPACE_ANSWER_RECONCILE_FAILED_COPY)
+            return
+          }
+          throw new Error(data.message ?? "Could not answer call.")
+        }
         const answeredSession = data.session
         if (data.pipeline?.liveCoachingLinked) {
           setAnswerPipelineDiagnostic(null)
@@ -1179,12 +1216,31 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           })
         })
     } catch (e) {
+      const message = e instanceof Error ? e.message : "Answer failed."
+      if (
+        wasSdkAnswerAlreadyAccepted({
+          hadSdkIncoming: input.hadSdkIncoming,
+          voiceCallId: input.sessionForAnswer.voiceCallId,
+          sessionId: input.sessionForAnswer.id,
+          acceptedVoiceCallIds: acceptedVoiceCallIdsRef.current,
+          acceptedSessionIds: acceptedSessionIdsRef.current,
+          hasLiveSdkCall: hasLiveSdkCallRef.current,
+        })
+      ) {
+        logLiveCoachingAutoStartQa("reconcileInboundAnswer_nonfatal", {
+          sessionId: input.sessionForAnswer.id,
+          voiceCallId: input.sessionForAnswer.voiceCallId,
+          message,
+        })
+        setAnswerPipelineDiagnostic(CALL_WORKSPACE_ANSWER_RECONCILE_FAILED_COPY)
+        return
+      }
       logLiveCoachingAutoStartQa("reconcileInboundAnswer_failure", {
         sessionId: input.sessionForAnswer.id,
         voiceCallId: input.sessionForAnswer.voiceCallId,
-        message: e instanceof Error ? e.message : "Answer failed.",
+        message,
       })
-      setError(e instanceof Error ? e.message : "Answer failed.")
+      setError(message)
     } finally {
       setAnswerReconcileInFlight(false)
     }
@@ -1463,6 +1519,12 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       )}
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+      {voiceBrowser.enrichmentWarning ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+          {voiceBrowser.enrichmentWarning}
+        </p>
+      ) : null}
 
       {setupWarning ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">

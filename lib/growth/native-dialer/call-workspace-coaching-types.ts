@@ -17,6 +17,12 @@ export const CALL_WORKSPACE_COACHING_LINK_FAILED_COPY =
 export const CALL_WORKSPACE_MEDIA_STREAM_RESTART_FAILED_COPY =
   "Live transcript stream did not restart after answer. Retry media stream or check voice infrastructure logs." as const
 
+export const CALL_WORKSPACE_ANSWER_RECONCILE_FAILED_COPY =
+  "Your call connected, but workspace sync is still catching up. Coaching data may be delayed." as const
+
+export const CALL_WORKSPACE_ENRICHMENT_SYNC_FAILED_COPY =
+  "Live coaching and call intelligence are temporarily unavailable. Your call is still connected." as const
+
 export type CallWorkspaceAnswerPipelineDiagnostics = {
   liveCoachingLinked: boolean
   realtimeSessionId: string | null
