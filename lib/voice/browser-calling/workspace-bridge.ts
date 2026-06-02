@@ -5,14 +5,18 @@ import {
   mapVoiceCallStatusToBrowserCallState,
   resolveInboundNativeSessionStatusFromVoiceCall,
 } from "@/lib/voice/browser-calling/status-mapping"
-import { shouldSyncNativeSessionFromVoiceCall } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
+import { shouldSyncNativeSessionFromVoiceCall, reconcileBrowserSyncInboundSelection, isVoiceCallOfferable } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
+import {
+  reconcileStaleRingingOfferCandidates,
+  resolveInboundBrowserOfferForUser,
+  type InboundBrowserOfferSelection,
+} from "@/lib/voice/browser-calling/inbound-browser-offer-resolver"
 import type { NativeCallWorkspaceSessionPublicView } from "@/lib/growth/native-dialer/native-dialer-types"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
 import type { VoiceBrowserCallState, VoiceBrowserSyncSnapshot, VoiceOperatorPresenceStatus } from "@/lib/voice/browser-calling/types"
 import type { VoiceRelationshipMemoryWorkspaceSnapshot } from "@/lib/voice/relationship-memory/types"
 import {
   assertVoiceCallPickupAllowed,
-  fetchInboundBrowserOfferForUser,
   fetchVoiceCallRecordingVisibility,
   fetchVoiceCallTimeline,
   heartbeatVoiceBrowserDevice,
@@ -299,6 +303,62 @@ function isLiveBrowserWorkspaceSession(
   return status != null && LIVE_BROWSER_SESSION_STATUSES.has(status)
 }
 
+function logBrowserSyncCallSelection(input: {
+  organizationId: string
+  userId: string
+  clientIdentity?: string | null
+  selection: InboundBrowserOfferSelection
+  selectionReason: string
+  pinnedWorkspaceSessionId?: string | null
+  activeVoiceCallId: string | null
+  activeVoiceCallProviderCallId: string | null
+  activeVoiceCallCreatedAt: string | null
+  activeVoiceCallStatus: string | null
+}): void {
+  logVoiceInfrastructure("voice_browser_sync_call_selected", {
+    organizationId: input.organizationId,
+    userId: input.userId,
+    voiceCallId: input.activeVoiceCallId ?? input.selection.selectedVoiceCallId ?? null,
+    providerCallId: input.activeVoiceCallProviderCallId ?? input.selection.selectedProviderCallId ?? null,
+    voiceCallCreatedAt: input.activeVoiceCallCreatedAt ?? input.selection.selectedVoiceCallCreatedAt ?? null,
+    voiceCallStatus: input.activeVoiceCallStatus ?? input.selection.selectedVoiceCallStatus ?? null,
+    selectionReason: input.selectionReason,
+    candidateCount: input.selection.candidateCount,
+    inboundOfferVoiceCallId: input.selection.selectedVoiceCallId ?? null,
+    pinnedWorkspaceSessionId: input.pinnedWorkspaceSessionId ?? null,
+    clientIdentity: input.clientIdentity ?? null,
+  })
+}
+
+async function fetchVoiceCallSyncMetadata(
+  admin: SupabaseClient,
+  voiceCallId: string | null,
+): Promise<{
+  status: string | null
+  answeredAt: string | null
+  startedAt: string | null
+  providerCallId: string | null
+  offerable: boolean
+} | null> {
+  if (!voiceCallId) return null
+  const { data } = await admin
+    .schema("voice")
+    .from("voice_calls")
+    .select("status, answered_at, started_at, provider_call_id")
+    .eq("id", voiceCallId)
+    .maybeSingle()
+  if (!data) return null
+  const status = (data.status as string | null) ?? null
+  const answeredAt = (data.answered_at as string | null) ?? null
+  return {
+    status,
+    answeredAt,
+    startedAt: (data.started_at as string | null) ?? null,
+    providerCallId: (data.provider_call_id as string | null) ?? null,
+    offerable: isVoiceCallOfferable({ status, answeredAt }),
+  }
+}
+
 function emptyVoiceBrowserSyncSnapshot(input: {
   generatedAt: string
   device: VoiceBrowserSyncSnapshot["device"]
@@ -378,6 +438,10 @@ export async function buildVoiceBrowserSyncSnapshot(
   let sessionLeadId: string | null = null
   let sessionContactName: string | null = null
   let sessionStatusForSync: NativeCallWorkspaceSessionPublicView["status"] | null = null
+  let callSelectionReason = input.workspaceSessionId ? "client_pinned_session" : "none"
+  let activeVoiceCallCreatedAt: string | null = null
+  let activeVoiceCallProviderCallId: string | null = null
+  let activeVoiceCallStatus: string | null = null
 
   if (workspaceSessionId) {
     const sessionRow = await timer.measure("session_lookup", async () => {
@@ -390,6 +454,7 @@ export async function buildVoiceBrowserSyncSnapshot(
     })
     if (!isLiveBrowserWorkspaceSession(sessionRow?.status as NativeCallWorkspaceSessionPublicView["status"] | null)) {
       workspaceSessionId = null
+      callSelectionReason = "pinned_session_not_live"
     } else {
       activeVoiceCallId = (sessionRow?.voice_call_id as string | null) ?? null
       sessionStatusForSync = (sessionRow?.status as NativeCallWorkspaceSessionPublicView["status"] | null) ?? null
@@ -398,6 +463,28 @@ export async function buildVoiceBrowserSyncSnapshot(
       sessionPhone = (sessionRow?.phone_number as string | null) ?? null
       sessionLeadId = (sessionRow?.lead_id as string | null) ?? null
       sessionContactName = (sessionRow?.contact_name as string | null) ?? null
+      const pinnedVoiceCall = await timer.measure("pinned_voice_call_lookup", () =>
+        fetchVoiceCallSyncMetadata(admin, activeVoiceCallId),
+      )
+      recordVoiceSyncQuery(stats, pinnedVoiceCall)
+      if (pinnedVoiceCall) {
+        activeVoiceCallCreatedAt = pinnedVoiceCall.startedAt
+        activeVoiceCallProviderCallId = pinnedVoiceCall.providerCallId
+        activeVoiceCallStatus = pinnedVoiceCall.status
+      }
+      if (
+        sessionStatusForSync === "ringing" &&
+        pinnedVoiceCall &&
+        !pinnedVoiceCall.offerable
+      ) {
+        activeVoiceCallId = null
+        workspaceSessionId = null
+        sessionStatusForSync = null
+        activeVoiceCallCreatedAt = null
+        activeVoiceCallProviderCallId = null
+        activeVoiceCallStatus = null
+        callSelectionReason = "pinned_session_voice_call_not_offerable"
+      }
     }
   }
 
@@ -422,21 +509,80 @@ export async function buildVoiceBrowserSyncSnapshot(
     sessionPhone = (activeSession?.phone_number as string | null) ?? null
     sessionLeadId = (activeSession?.lead_id as string | null) ?? null
     sessionContactName = (activeSession?.contact_name as string | null) ?? null
+    if (activeSession) {
+      callSelectionReason = "active_session_lookup"
+      const activeVoiceCall = await timer.measure("active_voice_call_lookup", () =>
+        fetchVoiceCallSyncMetadata(admin, activeVoiceCallId),
+      )
+      recordVoiceSyncQuery(stats, activeVoiceCall)
+      if (activeVoiceCall) {
+        activeVoiceCallCreatedAt = activeVoiceCall.startedAt
+        activeVoiceCallProviderCallId = activeVoiceCall.providerCallId
+        activeVoiceCallStatus = activeVoiceCall.status
+      }
+      if (
+        sessionStatusForSync === "ringing" &&
+        activeVoiceCall &&
+        !activeVoiceCall.offerable
+      ) {
+        activeVoiceCallId = null
+        workspaceSessionId = null
+        sessionStatusForSync = null
+        activeVoiceCallCreatedAt = null
+        activeVoiceCallProviderCallId = null
+        activeVoiceCallStatus = null
+        callSelectionReason = "active_session_voice_call_not_offerable"
+      }
+    }
   }
 
-  const inboundRinging = await timer.measure("inbound_offer", () =>
-    fetchInboundBrowserOfferForUser(admin, {
+  const inboundSelection = await timer.measure("inbound_offer", () =>
+    resolveInboundBrowserOfferForUser(admin, {
       organizationId: input.organizationId,
       userId: input.userId,
     }),
   )
-  recordVoiceSyncQuery(stats, inboundRinging, 2)
-
-  if (inboundRinging && !activeVoiceCallId) {
-    activeVoiceCallId = inboundRinging.voiceCallId
-    workspaceSessionId = inboundRinging.workspaceSessionId
-    sessionStatusForSync = "ringing"
+  recordVoiceSyncQuery(stats, inboundSelection.offer, 2)
+  if (inboundSelection.candidates.some((candidate) => candidate.excludedReason)) {
+    void reconcileStaleRingingOfferCandidates(admin, {
+      organizationId: input.organizationId,
+      candidates: inboundSelection.candidates,
+    }).catch(() => undefined)
   }
+
+  const inboundRinging = inboundSelection.offer
+  const reconciledSelection = reconcileBrowserSyncInboundSelection({
+    activeVoiceCallId,
+    workspaceSessionId,
+    sessionStatusForSync,
+    activeVoiceCallCreatedAt,
+    inboundOffer: inboundRinging,
+    baseSelectionReason: callSelectionReason,
+    inboundSelectionReason: inboundSelection.selectionReason,
+  })
+  activeVoiceCallId = reconciledSelection.activeVoiceCallId
+  workspaceSessionId = reconciledSelection.workspaceSessionId
+  sessionStatusForSync = reconciledSelection.sessionStatusForSync
+  callSelectionReason = reconciledSelection.selectionReason
+
+  if (inboundRinging && activeVoiceCallId === inboundRinging.voiceCallId) {
+    activeVoiceCallCreatedAt = inboundRinging.voiceCallCreatedAt ?? activeVoiceCallCreatedAt
+    activeVoiceCallProviderCallId = inboundSelection.selectedProviderCallId ?? activeVoiceCallProviderCallId
+    activeVoiceCallStatus = inboundSelection.selectedVoiceCallStatus ?? activeVoiceCallStatus
+  }
+
+  logBrowserSyncCallSelection({
+    organizationId: input.organizationId,
+    userId: input.userId,
+    clientIdentity: input.clientIdentity,
+    selection: inboundSelection,
+    selectionReason: callSelectionReason,
+    pinnedWorkspaceSessionId: input.workspaceSessionId ?? null,
+    activeVoiceCallId,
+    activeVoiceCallProviderCallId,
+    activeVoiceCallCreatedAt,
+    activeVoiceCallStatus,
+  })
 
   const hasActiveLiveSession =
     Boolean(activeVoiceCallId) &&

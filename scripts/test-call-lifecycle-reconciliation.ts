@@ -9,9 +9,11 @@ import { resolveInboundWorkspacePhase } from "../lib/voice/browser-calling/brows
 import {
   buildOptimisticWrappingSession,
   CALL_LIFECYCLE_RECONCILIATION_QA_MARKER,
+  compareVoiceCallRecency,
   filterInboundOfferForLifecycle,
   isNativeSessionIdServerReady,
   mergeServerSessionIntoLocal,
+  reconcileBrowserSyncInboundSelection,
   shouldApplyInboundOfferToSession,
   shouldHonorSdkIncomingForLifecycle,
   shouldSyncNativeSessionFromVoiceCall,
@@ -71,6 +73,28 @@ const endedSessionIds = new Set<string>()
 const completedSessionIds = new Set<string>()
 
 assert.equal(CALL_LIFECYCLE_RECONCILIATION_QA_MARKER, "call-lifecycle-reconciliation-v3")
+
+assert.ok(
+  compareVoiceCallRecency("2026-06-02T22:18:44.000Z", "2026-06-02T22:32:03.000Z") > 0,
+)
+
+assert.equal(
+  reconcileBrowserSyncInboundSelection({
+    activeVoiceCallId: "vc-old",
+    workspaceSessionId: "sess-old",
+    sessionStatusForSync: "ringing",
+    activeVoiceCallCreatedAt: "2026-06-02T22:18:44.000Z",
+    inboundOffer: {
+      ...offer,
+      voiceCallId: "vc-new",
+      workspaceSessionId: "sess-new",
+      voiceCallCreatedAt: "2026-06-02T22:32:03.000Z",
+    },
+    baseSelectionReason: "client_pinned_session",
+    inboundSelectionReason: "newest_offerable_voice_call",
+  }).selectionReason,
+  "inbound_offer_supersedes_stale_pin",
+)
 
 assert.equal(
   shouldHonorSdkIncomingForLifecycle({

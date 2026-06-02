@@ -326,3 +326,103 @@ export function shouldSyncNativeSessionFromVoiceCall(
 ): boolean {
   return sessionStatus != null && !NATIVE_SESSION_SYNC_PROTECTED_STATUSES.has(sessionStatus)
 }
+
+const TERMINAL_VOICE_CALL_STATUSES = new Set([
+  "completed",
+  "canceled",
+  "cancelled",
+  "failed",
+  "busy",
+  "no_answer",
+])
+
+export function isVoiceCallOfferable(input: {
+  status: string | null | undefined
+  answeredAt: string | null | undefined
+}): boolean {
+  if (input.answeredAt) return false
+  const status = (input.status ?? "").trim()
+  if (!status) return false
+  if (TERMINAL_VOICE_CALL_STATUSES.has(status)) return false
+  if (status === "in_progress") return false
+  return status === "ringing" || status === "queued"
+}
+
+export function isTerminalVoiceCallStatus(status: string | null | undefined): boolean {
+  return TERMINAL_VOICE_CALL_STATUSES.has((status ?? "").trim())
+}
+
+function parseVoiceCallTimestamp(value: string | null | undefined): number {
+  if (!value) return 0
+  const parsed = Date.parse(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+/** Positive when `rightCreatedAt` is newer than `leftCreatedAt`. */
+export function compareVoiceCallRecency(
+  leftCreatedAt: string | null | undefined,
+  rightCreatedAt: string | null | undefined,
+): number {
+  return parseVoiceCallTimestamp(rightCreatedAt) - parseVoiceCallTimestamp(leftCreatedAt)
+}
+
+export function reconcileBrowserSyncInboundSelection(input: {
+  activeVoiceCallId: string | null
+  workspaceSessionId: string | null
+  sessionStatusForSync: NativeCallWorkspaceSessionPublicView["status"] | null
+  activeVoiceCallCreatedAt: string | null
+  inboundOffer: VoiceInboundBrowserOfferView | null
+  baseSelectionReason: string
+  inboundSelectionReason: string
+}): {
+  activeVoiceCallId: string | null
+  workspaceSessionId: string | null
+  sessionStatusForSync: NativeCallWorkspaceSessionPublicView["status"] | null
+  selectionReason: string
+} {
+  const inboundOffer = input.inboundOffer
+  let activeVoiceCallId = input.activeVoiceCallId
+  let workspaceSessionId = input.workspaceSessionId
+  let sessionStatusForSync = input.sessionStatusForSync
+  let selectionReason = input.baseSelectionReason
+
+  if (!inboundOffer) {
+    return { activeVoiceCallId, workspaceSessionId, sessionStatusForSync, selectionReason }
+  }
+
+  if (!activeVoiceCallId) {
+    return {
+      activeVoiceCallId: inboundOffer.voiceCallId,
+      workspaceSessionId: inboundOffer.workspaceSessionId,
+      sessionStatusForSync: "ringing",
+      selectionReason: input.inboundSelectionReason,
+    }
+  }
+
+  if (activeVoiceCallId === inboundOffer.voiceCallId) {
+    if (sessionStatusForSync === "ringing" && workspaceSessionId !== inboundOffer.workspaceSessionId) {
+      workspaceSessionId = inboundOffer.workspaceSessionId
+      selectionReason = "inbound_offer_session_reconciled"
+    }
+    return { activeVoiceCallId, workspaceSessionId, sessionStatusForSync, selectionReason }
+  }
+
+  if (isLiveCallSessionStatus(sessionStatusForSync)) {
+    return { activeVoiceCallId, workspaceSessionId, sessionStatusForSync, selectionReason }
+  }
+
+  if (sessionStatusForSync === "ringing") {
+    const inboundIsNewer =
+      compareVoiceCallRecency(input.activeVoiceCallCreatedAt, inboundOffer.voiceCallCreatedAt) > 0
+    if (inboundIsNewer) {
+      return {
+        activeVoiceCallId: inboundOffer.voiceCallId,
+        workspaceSessionId: inboundOffer.workspaceSessionId,
+        sessionStatusForSync: "ringing",
+        selectionReason: "inbound_offer_supersedes_stale_pin",
+      }
+    }
+  }
+
+  return { activeVoiceCallId, workspaceSessionId, sessionStatusForSync, selectionReason }
+}

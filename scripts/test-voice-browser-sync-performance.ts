@@ -109,9 +109,15 @@ const browserRepository = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/repository/voice-browser-calling-repository.ts"),
   "utf8",
 )
+assert.match(browserRepository, /resolveInboundBrowserOfferForUser/)
 assert.match(browserRepository, /VOICE_BROWSER_DEVICE_SELECT/)
 assert.match(browserRepository, /VOICE_OPERATOR_PRESENCE_SELECT/)
 assert.doesNotMatch(browserRepository, /\.select\("\*"\)/)
+
+assert.match(workspaceBridge, /resolveInboundBrowserOfferForUser/)
+assert.match(workspaceBridge, /reconcileBrowserSyncInboundSelection/)
+assert.match(workspaceBridge, /voice_browser_sync_call_selected/)
+assert.match(workspaceBridge, /reconcileStaleRingingOfferCandidates/)
 
 const relationshipRepository = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/repository/voice-relationship-memory-repository.ts"),

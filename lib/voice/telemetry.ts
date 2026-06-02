@@ -45,6 +45,7 @@ export type VoiceTelemetryEvent =
   | "voice_browser_sync_auth_success"
   | "voice_browser_sync_success"
   | "voice_browser_sync_failed"
+  | "voice_browser_sync_call_selected"
   | "voice_supabase_rest_anomaly"
   | "voice_supabase_rest_fetch_failed"
   | "voice_supabase_rest_query_failed"

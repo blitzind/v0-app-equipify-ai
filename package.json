@@ -117,6 +117,7 @@
     "test:live-coaching-v2": "tsx scripts/test-live-coaching-v2.ts",
     "test:optimistic-inbound-answer": "tsx scripts/test-optimistic-inbound-answer.ts",
     "test:call-lifecycle-reconciliation": "tsx scripts/test-call-lifecycle-reconciliation.ts",
+    "test:inbound-browser-offer-resolver": "tsx scripts/test-inbound-browser-offer-resolver.ts",
     "test:voice-browser-sync-performance": "tsx scripts/test-voice-browser-sync-performance.ts",
     "test:voice-browser-sync-auth": "tsx scripts/test-voice-browser-sync-auth.ts",
     "test:call-lifecycle-authority": "tsx scripts/test-call-lifecycle-authority.ts",

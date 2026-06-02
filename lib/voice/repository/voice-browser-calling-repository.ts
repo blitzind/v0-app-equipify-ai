@@ -11,6 +11,7 @@ import type {
   VoiceOperatorPresencePublicView,
   VoiceOperatorPresenceStatus,
 } from "@/lib/voice/browser-calling/types"
+import { resolveInboundBrowserOfferForUser } from "@/lib/voice/browser-calling/inbound-browser-offer-resolver"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 
 function browserDevicesTable(admin: SupabaseClient) {
@@ -298,49 +299,8 @@ export async function fetchInboundBrowserOfferForUser(
   admin: SupabaseClient,
   input: { organizationId: string; userId: string },
 ): Promise<VoiceInboundBrowserOfferView | null> {
-  const { data, error } = await admin
-    .schema("growth")
-    .from("native_call_workspace_sessions")
-    .select("id, voice_call_id, phone_number, contact_name, started_at, owner_user_id, status, direction")
-    .eq("organization_id", input.organizationId)
-    .eq("owner_user_id", input.userId)
-    .eq("direction", "inbound")
-    .eq("status", "ringing")
-    .order("started_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (error) throw new Error(error.message)
-  if (!data?.voice_call_id) return null
-
-  const { data: callRow } = await admin
-    .schema("voice")
-    .from("voice_calls")
-    .select("from_number, to_number, started_at, status, answered_at")
-    .eq("id", data.voice_call_id as string)
-    .maybeSingle()
-
-  const voiceStatus = (callRow?.status as string | null) ?? null
-  if (
-    callRow?.answered_at ||
-    voiceStatus === "in_progress" ||
-    voiceStatus === "completed" ||
-    voiceStatus === "canceled" ||
-    voiceStatus === "no_answer" ||
-    voiceStatus === "busy" ||
-    voiceStatus === "failed"
-  ) {
-    return null
-  }
-
-  return {
-    voiceCallId: data.voice_call_id as string,
-    workspaceSessionId: data.id as string,
-    fromNumber: (callRow?.from_number as string | null) ?? (data.phone_number as string | null) ?? "Unknown",
-    toNumber: (callRow?.to_number as string | null) ?? "Unknown",
-    contactLabel: (data.contact_name as string | null) ?? null,
-    offeredAt: data.started_at as string,
-    voiceCallCreatedAt: (callRow?.started_at as string | null) ?? null,
-  }
+  const selection = await resolveInboundBrowserOfferForUser(admin, input)
+  return selection.offer
 }
 
 export async function countVoiceBrowserPresenceSummary(
