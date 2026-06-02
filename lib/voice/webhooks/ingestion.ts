@@ -29,6 +29,91 @@ import {
 import { normalizeVoiceWebhookEvent } from "@/lib/voice/webhooks/normalizer"
 import type { VoiceWebhookIngestResult } from "@/lib/voice/webhooks/types"
 
+function readString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null
+}
+
+function mapTwilioLegStatus(status: string | null): "queued" | "ringing" | "in_progress" | "completed" | "failed" | "canceled" {
+  const normalized = status?.toLowerCase() ?? ""
+  if (normalized === "ringing") return "ringing"
+  if (normalized === "answered" || normalized === "in-progress" || normalized === "in_progress") return "in_progress"
+  if (normalized === "completed") return "completed"
+  if (normalized === "canceled" || normalized === "cancelled") return "canceled"
+  if (normalized === "busy" || normalized === "failed" || normalized === "no-answer" || normalized === "no_answer") {
+    return "failed"
+  }
+  return "queued"
+}
+
+function resolveTwilioLegType(payload: Record<string, unknown>): "browser_client" | "pstn" {
+  const to = readString(payload.To) ?? readString(payload.Called) ?? ""
+  return to.toLowerCase().startsWith("client:") ? "browser_client" : "pstn"
+}
+
+async function upsertTwilioChildCallLegFromWebhook(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    voiceCallId: string
+    providerCallSid: string
+    payload: Record<string, unknown>
+    eventTimestamp: string
+  },
+): Promise<void> {
+  const status = mapTwilioLegStatus(readString(input.payload.CallStatus))
+  const legType = resolveTwilioLegType(input.payload)
+  const patch = {
+    status,
+    answered_at: status === "in_progress" ? input.eventTimestamp : null,
+    ended_at: ["completed", "failed", "canceled"].includes(status) ? input.eventTimestamp : null,
+    metadata_json: {
+      parent_call_sid: readString(input.payload.ParentCallSid),
+      dial_call_status: readString(input.payload.DialCallStatus),
+      source: "twilio_dial_status_callback",
+    },
+  }
+
+  const { data: existing } = await admin
+    .schema("voice")
+    .from("voice_call_legs")
+    .select("id, answered_at, ended_at")
+    .eq("organization_id", input.organizationId)
+    .eq("provider", "twilio")
+    .eq("provider_call_sid", input.providerCallSid)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (existing?.id) {
+    await admin
+      .schema("voice")
+      .from("voice_call_legs")
+      .update({
+        status,
+        answered_at: existing.answered_at ?? patch.answered_at,
+        ended_at: existing.ended_at ?? patch.ended_at,
+        metadata_json: patch.metadata_json,
+      })
+      .eq("id", existing.id as string)
+    return
+  }
+
+  await admin.schema("voice").from("voice_call_legs").insert({
+    organization_id: input.organizationId,
+    voice_call_id: input.voiceCallId,
+    provider: "twilio",
+    provider_call_sid: input.providerCallSid,
+    leg_type: legType,
+    phone_number: readString(input.payload.To) ?? "",
+    client_identity: legType === "browser_client" ? (readString(input.payload.To) ?? "").replace(/^client:/i, "") : "",
+    status,
+    started_at: input.eventTimestamp,
+    answered_at: patch.answered_at,
+    ended_at: patch.ended_at,
+    metadata_json: patch.metadata_json,
+  })
+}
+
 function resolveDirection(event: NormalizedVoiceWebhookEvent): VoiceCallDirection {
   if (event.direction === "inbound" || event.direction === "outbound") return event.direction
   return "inbound"
@@ -128,11 +213,16 @@ export async function ingestVoiceProviderWebhook(
   }
 
   const mappedStatus = mapProviderCallStatus(input.provider, enriched.providerStatus) ?? "initiated"
+  const twilioParentCallSid = input.provider === "twilio" ? readString(input.payload.ParentCallSid) : null
+  const parentCall = twilioParentCallSid
+    ? await findVoiceCallByProviderId(admin, organizationId, input.provider, twilioParentCallSid)
+    : null
+  const canonicalProviderCallId = parentCall ? twilioParentCallSid! : enriched.providerCallId
   const priorCall = await findVoiceCallByProviderId(
     admin,
     organizationId,
     input.provider,
-    enriched.providerCallId,
+    canonicalProviderCallId,
   )
   const transition = mergeVoiceCallStatus(priorCall?.status ?? "queued", mappedStatus)
   const finalStatus = transition.ok ? transition.nextStatus : priorCall?.status ?? mappedStatus
@@ -152,7 +242,7 @@ export async function ingestVoiceProviderWebhook(
   const persistedCall = await upsertVoiceCallFromWebhook(admin, {
     organizationId,
     provider: input.provider,
-    providerCallId: enriched.providerCallId,
+    providerCallId: canonicalProviderCallId,
     direction: priorCall?.direction ?? resolveDirection(enriched),
     status: finalStatus,
     fromNumber: normalizePhoneNumber(enriched.fromNumber) || priorCall?.fromNumber || "",
@@ -167,11 +257,22 @@ export async function ingestVoiceProviderWebhook(
       ...(priorCall?.metadataJson ?? {}),
       last_canonical_event_type: enriched.canonicalEventType,
       last_provider_status: enriched.providerStatus,
+      ...(accountSid ? { account_sid: accountSid } : {}),
     },
   })
 
   if (!persistedCall) {
     return { ok: false, code: "persistence_failed", message: "Failed to persist voice call record." }
+  }
+
+  if (input.provider === "twilio" && twilioParentCallSid && enriched.providerCallId !== twilioParentCallSid) {
+    await upsertTwilioChildCallLegFromWebhook(admin, {
+      organizationId,
+      voiceCallId: persistedCall.id,
+      providerCallSid: enriched.providerCallId,
+      payload: input.payload,
+      eventTimestamp: enriched.eventTimestamp,
+    })
   }
 
   let voiceConversationId = persistedCall.voiceConversationId

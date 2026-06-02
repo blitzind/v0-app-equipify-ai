@@ -781,6 +781,7 @@ export async function createInboundVoiceCallFromTwilio(
     fromNumber: string
     toNumber: string
     assignedUserId?: string | null
+    accountSid?: string | null
   },
 ): Promise<string> {
   const now = new Date().toISOString()
@@ -798,7 +799,11 @@ export async function createInboundVoiceCallFromTwilio(
         to_number: input.toNumber,
         assigned_user_id: input.assignedUserId ?? null,
         started_at: now,
-        metadata_json: { source: "inbound_twilio", browser_routing: true },
+        metadata_json: {
+          source: "inbound_twilio",
+          browser_routing: true,
+          ...(input.accountSid ? { account_sid: input.accountSid } : {}),
+        },
       },
       { onConflict: "organization_id,provider,provider_call_id" },
     )

@@ -86,6 +86,10 @@ function readCallSid(payload: Record<string, unknown>): string | null {
   return typeof payload.CallSid === "string" ? payload.CallSid : null
 }
 
+function readAccountSid(payload: Record<string, unknown>): string | null {
+  return typeof payload.AccountSid === "string" ? payload.AccountSid : null
+}
+
 async function resolveInboundCallControlBundle(
   admin: SupabaseClient,
   input: {
@@ -229,6 +233,7 @@ export async function handleTwilioInboundCall(
 
   const organizationId = voiceNumber.organizationId
   const callSid = readCallSid(input.payload)
+  const accountSid = readAccountSid(input.payload)
   const fromNumber = readFromNumber(input.payload)
 
   logInboundRingDiagnostic(INBOUND_RING_DIAG_EVENTS.TWILIO_WEBHOOK_RECEIVED, {
@@ -327,6 +332,7 @@ export async function handleTwilioInboundCall(
           fromNumber,
           toNumber,
           assignedUserId: browserTargetUserIds[0] ?? voiceNumber.assignedUserId,
+          accountSid,
         })
         await provisionInboundBrowserWorkspaceOffers(input.admin, {
           organizationId,
@@ -354,6 +360,7 @@ export async function handleTwilioInboundCall(
         fromNumber,
         toNumber,
         assignedUserId: voiceNumber.assignedUserId,
+        accountSid,
       })
       await startAiReceptionistSessionForCall(input.admin, {
         organizationId,

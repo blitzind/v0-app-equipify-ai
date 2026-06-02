@@ -13,12 +13,98 @@ import { isStaleRingPhaseMediaSession } from "@/lib/voice/media-streaming/inboun
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 
 const TWILIO_STREAM_CREATE_TIMEOUT_MS = 4_000
+const STREAMABLE_LEG_STATUSES = ["in_progress", "ringing", "queued"] as const
 
 function readTwilioCredentials(): { accountSid: string; authToken: string } | null {
   const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim()
   const authToken = process.env.TWILIO_AUTH_TOKEN?.trim()
   if (!accountSid || !authToken) return null
   return { accountSid, authToken }
+}
+
+type TwilioStreamCallSidResolution = {
+  streamCallSid: string
+  source: "voice_call_leg" | "voice_call"
+  voiceCallProviderCallId: string | null
+  legId: string | null
+  legType: string | null
+  legStatus: string | null
+  callStatus: string | null
+  callEndedAt: string | null
+  webhookAccountSid: string | null
+  accountSidMismatch: boolean
+}
+
+function readMetadataString(metadata: unknown, key: string): string | null {
+  if (!metadata || typeof metadata !== "object") return null
+  const value = (metadata as Record<string, unknown>)[key]
+  return typeof value === "string" && value.trim() ? value.trim() : null
+}
+
+async function resolveTwilioStreamCallSid(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    voiceCallId: string
+    fallbackProviderCallId: string
+    credentialAccountSid: string
+  },
+): Promise<TwilioStreamCallSidResolution> {
+  const { data: leg } = await admin
+    .schema("voice")
+    .from("voice_call_legs")
+    .select("id, provider_call_sid, leg_type, status, answered_at, created_at")
+    .eq("organization_id", input.organizationId)
+    .eq("voice_call_id", input.voiceCallId)
+    .eq("provider", "twilio")
+    .in("status", [...STREAMABLE_LEG_STATUSES])
+    .neq("provider_call_sid", "")
+    .order("answered_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle()
+
+  const { data: callRow } = await admin
+    .schema("voice")
+    .from("voice_calls")
+    .select("provider_call_id, status, ended_at, metadata_json")
+    .eq("id", input.voiceCallId)
+    .eq("organization_id", input.organizationId)
+    .maybeSingle()
+
+  const webhookAccountSid =
+    readMetadataString(callRow?.metadata_json, "account_sid") ??
+    readMetadataString(callRow?.metadata_json, "twilio_account_sid")
+  const accountSidMismatch =
+    Boolean(webhookAccountSid) && webhookAccountSid !== input.credentialAccountSid
+
+  if (leg?.provider_call_sid) {
+    return {
+      streamCallSid: String(leg.provider_call_sid),
+      source: "voice_call_leg",
+      voiceCallProviderCallId: (callRow?.provider_call_id as string | null) ?? input.fallbackProviderCallId,
+      legId: String(leg.id),
+      legType: (leg.leg_type as string | null) ?? null,
+      legStatus: (leg.status as string | null) ?? null,
+      callStatus: (callRow?.status as string | null) ?? null,
+      callEndedAt: (callRow?.ended_at as string | null) ?? null,
+      webhookAccountSid,
+      accountSidMismatch,
+    }
+  }
+
+  return {
+    streamCallSid: (callRow?.provider_call_id as string | null) ?? input.fallbackProviderCallId,
+    source: "voice_call",
+    voiceCallProviderCallId: (callRow?.provider_call_id as string | null) ?? input.fallbackProviderCallId,
+    legId: null,
+    legType: null,
+    legStatus: null,
+    callStatus: (callRow?.status as string | null) ?? null,
+    callEndedAt: (callRow?.ended_at as string | null) ?? null,
+    webhookAccountSid,
+    accountSidMismatch,
+  }
 }
 
 async function stopTwilioCallStream(input: {
@@ -148,11 +234,51 @@ export async function ensureAnsweredInboundCallMediaStream(
     return { started: false, reason: "media_stream_url_missing" }
   }
 
+  const streamCallSid = await resolveTwilioStreamCallSid(admin, {
+    organizationId: input.organizationId,
+    voiceCallId: input.voiceCallId,
+    fallbackProviderCallId: input.providerCallId,
+    credentialAccountSid: credentials.accountSid,
+  })
+  const streamLog = {
+    ...baseLog,
+    providerCallId: streamCallSid.streamCallSid,
+    voiceCallProviderCallId: streamCallSid.voiceCallProviderCallId,
+    providerCallIdSource: streamCallSid.source,
+    callLegId: streamCallSid.legId,
+    callLegType: streamCallSid.legType,
+    callLegStatus: streamCallSid.legStatus,
+    voiceCallStatus: streamCallSid.callStatus,
+    voiceCallEndedAt: streamCallSid.callEndedAt,
+    webhookAccountSid: streamCallSid.webhookAccountSid,
+    credentialAccountSid: credentials.accountSid,
+    accountSidMismatch: streamCallSid.accountSidMismatch,
+  }
+
+  logVoiceInfrastructure("voice_answered_inbound_media_stream_call_sid_resolved", streamLog)
+
+  if (streamCallSid.callEndedAt) {
+    logVoiceInfrastructure("voice_answered_inbound_media_stream_skipped", {
+      ...streamLog,
+      reason: "call_already_ended",
+    })
+    return { started: false, reason: "call_already_ended" }
+  }
+
+  if (streamCallSid.accountSidMismatch) {
+    logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
+      ...streamLog,
+      stage: "twilio_stream_create",
+      reason: "twilio_account_sid_mismatch",
+    })
+    return { started: false, reason: "twilio_account_sid_mismatch" }
+  }
+
   if (activeMedia && staleRingStream) {
     const stopResult = await stopTwilioCallStream({
       accountSid: credentials.accountSid,
       authToken: credentials.authToken,
-      providerCallId: input.providerCallId,
+      providerCallId: streamCallSid.streamCallSid,
       providerStreamSid: activeMedia.providerStreamSid,
     })
     await updateMediaSessionStatus(admin, {
@@ -166,7 +292,7 @@ export async function ensureAnsweredInboundCallMediaStream(
       },
     })
     logVoiceInfrastructure("voice_answered_inbound_media_stream_stale_stopped", {
-      ...baseLog,
+      ...streamLog,
       mediaSessionId: activeMedia.id,
       providerStreamSid: activeMedia.providerStreamSid,
       twilioStopOk: stopResult.ok,
@@ -175,15 +301,15 @@ export async function ensureAnsweredInboundCallMediaStream(
     })
   }
 
-  const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${credentials.accountSid}/Calls/${encodeURIComponent(input.providerCallId)}/Streams.json`
+  const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${credentials.accountSid}/Calls/${encodeURIComponent(streamCallSid.streamCallSid)}/Streams.json`
   const auth = Buffer.from(`${credentials.accountSid}:${credentials.authToken}`).toString("base64")
   const createStartedAt = Date.now()
 
   logVoiceInfrastructure("voice_answered_inbound_media_stream_create_requested", {
-    ...baseLog,
+    ...streamLog,
     restartedAfterStaleRingStream: staleRingStream,
     staleMediaSessionId: activeMedia?.id ?? null,
-    twilioEndpointPath: `/Calls/${input.providerCallId}/Streams.json`,
+    twilioEndpointPath: `/Calls/${streamCallSid.streamCallSid}/Streams.json`,
     timeoutMs: TWILIO_STREAM_CREATE_TIMEOUT_MS,
   })
 
@@ -198,14 +324,14 @@ export async function ensureAnsweredInboundCallMediaStream(
         Url: wssUrl,
         Track: "both_tracks",
         "Parameter1.Name": "callSid",
-        "Parameter1.Value": input.providerCallId,
+        "Parameter1.Value": streamCallSid.streamCallSid,
       }),
     })
     const durationMs = Date.now() - createStartedAt
 
     if (timedOut || !response) {
       logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
-        ...baseLog,
+        ...streamLog,
         durationMs,
         timeoutMs: TWILIO_STREAM_CREATE_TIMEOUT_MS,
         restartedAfterStaleRingStream: staleRingStream,
@@ -218,7 +344,7 @@ export async function ensureAnsweredInboundCallMediaStream(
     const responseBody = await response.text().catch(() => "")
     if (!response.ok) {
       logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
-        ...baseLog,
+        ...streamLog,
         status: response.status,
         durationMs,
         message: responseBody.slice(0, 240),
@@ -236,7 +362,7 @@ export async function ensureAnsweredInboundCallMediaStream(
     }
 
     logVoiceInfrastructure("voice_answered_inbound_media_stream_started", {
-      ...baseLog,
+      ...streamLog,
       restartedAfterStaleRingStream: staleRingStream,
       providerStreamSid,
       twilioCreateStatus: response.status,
@@ -246,7 +372,7 @@ export async function ensureAnsweredInboundCallMediaStream(
     return { started: true, reason: staleRingStream ? "stream_created_after_stale_restart" : "stream_created" }
   } catch (error) {
     logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
-      ...baseLog,
+      ...streamLog,
       message: error instanceof Error ? error.message : String(error),
       durationMs: Date.now() - createStartedAt,
       restartedAfterStaleRingStream: staleRingStream,

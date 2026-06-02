@@ -83,12 +83,36 @@ assert.match(answeredMediaStream, /wssHost/)
 assert.match(answeredMediaStream, /wssUrl/)
 assert.match(answeredMediaStream, /TWILIO_STREAM_CREATE_TIMEOUT_MS/)
 assert.match(answeredMediaStream, /fetchTwilioStreamCreate/)
+assert.match(answeredMediaStream, /resolveTwilioStreamCallSid/)
+assert.match(answeredMediaStream, /voice_call_legs/)
+assert.match(answeredMediaStream, /provider_call_sid/)
+assert.match(answeredMediaStream, /providerCallIdSource/)
+assert.match(answeredMediaStream, /voice_answered_inbound_media_stream_call_sid_resolved/)
+assert.match(answeredMediaStream, /reason: "twilio_account_sid_mismatch"/)
+assert.match(answeredMediaStream, /reason: "call_already_ended"/)
 assert.match(answeredMediaStream, /voice_answered_inbound_media_stream_create_requested/)
 assert.match(answeredMediaStream, /timeoutMs: TWILIO_STREAM_CREATE_TIMEOUT_MS/)
 assert.match(answeredMediaStream, /durationMs/)
 assert.match(answeredMediaStream, /reason: "twilio_stream_create_timeout"/)
 assert.match(answeredMediaStream, /\/Streams\.json/)
 assert.match(answeredMediaStream, /voice_answered_inbound_media_stream_stale_stopped/)
+
+const twilioTwiml = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/call-control/twilio-twiml.ts"),
+  "utf8",
+)
+assert.match(twilioTwiml, /statusCallbackUrl/)
+assert.match(twilioTwiml, /statusCallbackEvent="initiated ringing answered completed"/)
+
+const webhookIngestion = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/webhooks/ingestion.ts"),
+  "utf8",
+)
+assert.match(webhookIngestion, /ParentCallSid/)
+assert.match(webhookIngestion, /upsertTwilioChildCallLegFromWebhook/)
+assert.match(webhookIngestion, /voice_call_legs/)
+assert.match(webhookIngestion, /canonicalProviderCallId/)
+assert.match(webhookIngestion, /providerCallSid: enriched\.providerCallId/)
 
 const nativeDialerRepo = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/native-dialer/native-dialer-repository.ts"),

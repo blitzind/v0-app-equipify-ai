@@ -75,6 +75,7 @@ export function dialMultipleTwiml(input: {
   simultaneous?: boolean
   record?: boolean
   recordingCallbackUrl?: string | null
+  statusCallbackUrl?: string | null
 }): string {
   const clients = input.clientIdentities ?? []
   if (input.numbers.length === 0 && clients.length === 0) {
@@ -88,6 +89,11 @@ export function dialMultipleTwiml(input: {
       attrs.push(`recordingStatusCallback="${xmlEscape(input.recordingCallbackUrl)}"`)
       attrs.push('recordingStatusCallbackMethod="POST"')
     }
+  }
+  if (input.statusCallbackUrl) {
+    attrs.push(`statusCallback="${xmlEscape(input.statusCallbackUrl)}"`)
+    attrs.push('statusCallbackMethod="POST"')
+    attrs.push('statusCallbackEvent="initiated ringing answered completed"')
   }
   const numbers = input.numbers.map((n) => `<Number>${xmlEscape(n)}</Number>`).join("")
   const clientTags = clients.map((c) => `<Client>${xmlEscape(c)}</Client>`).join("")
@@ -179,6 +185,7 @@ export function generateInboundCallResponseTwiml(input: TwilioCallControlVerbInp
           simultaneous: decision.routingMode === "simultaneous_ring",
           record,
           recordingCallbackUrl,
+          statusCallbackUrl: input.statusCallbackUrl ?? null,
         }),
         input.mediaStream,
       )
