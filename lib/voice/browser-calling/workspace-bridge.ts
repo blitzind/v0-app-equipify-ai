@@ -9,6 +9,7 @@ import { shouldSyncNativeSessionFromVoiceCall } from "@/lib/voice/browser-callin
 import type { NativeCallWorkspaceSessionPublicView } from "@/lib/growth/native-dialer/native-dialer-types"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
 import type { VoiceBrowserCallState, VoiceBrowserSyncSnapshot, VoiceOperatorPresenceStatus } from "@/lib/voice/browser-calling/types"
+import type { VoiceRelationshipMemoryWorkspaceSnapshot } from "@/lib/voice/relationship-memory/types"
 import {
   assertVoiceCallPickupAllowed,
   fetchInboundBrowserOfferForUser,
@@ -40,6 +41,63 @@ import {
 
 const SESSION_SELECT =
   "id, lead_id, owner_user_id, queue_item_id, provider, fallback_provider, dial_mode, direction, status, phone_number, contact_name, company_name, started_at, connected_at, ended_at, duration_seconds, recording_state, muted, on_hold, transfer_target, notes_draft, realtime_session_id, call_copilot_session_id, provider_call_ref, safe_summary, voice_call_id"
+const VOICE_OPERATOR_PRESENCE_SELECT =
+  "user_id, status, active_device_count, active_voice_call_id, active_workspace_session_id, last_seen_at"
+const RELATIONSHIP_MEMORY_SYNC_CACHE_TTL_MS = 30_000
+const RELATIONSHIP_MEMORY_SYNC_CACHE_MAX_ENTRIES = 500
+
+type VoiceBrowserSyncMode = "fast" | "enrichment"
+
+type VoiceBrowserSyncStats = {
+  queryCount: number
+  rowsReturned: number
+  relationshipMemoryCache: "hit" | "miss" | "bypass" | "none"
+}
+
+type RelationshipMemoryCacheEntry = {
+  expiresAt: number
+  snapshot: VoiceRelationshipMemoryWorkspaceSnapshot
+}
+
+const relationshipMemorySyncCache = new Map<string, RelationshipMemoryCacheEntry>()
+
+function createVoiceBrowserSyncStats(): VoiceBrowserSyncStats {
+  return {
+    queryCount: 0,
+    rowsReturned: 0,
+    relationshipMemoryCache: "none",
+  }
+}
+
+function recordVoiceSyncQuery(stats: VoiceBrowserSyncStats, rows: unknown, count = 1): void {
+  stats.queryCount += count
+  if (Array.isArray(rows)) {
+    stats.rowsReturned += rows.length
+    return
+  }
+  if (rows) stats.rowsReturned += 1
+}
+
+function relationshipMemoryCacheKey(input: {
+  organizationId: string
+  phoneNumber: string
+  leadId: string | null
+  activeVoiceCallId: string | null
+}): string {
+  return [input.organizationId, input.phoneNumber, input.leadId ?? "", input.activeVoiceCallId ?? ""].join(":")
+}
+
+function pruneRelationshipMemorySyncCache(now = Date.now()): void {
+  if (relationshipMemorySyncCache.size <= RELATIONSHIP_MEMORY_SYNC_CACHE_MAX_ENTRIES) return
+  for (const [key, entry] of relationshipMemorySyncCache) {
+    if (entry.expiresAt <= now) relationshipMemorySyncCache.delete(key)
+  }
+  while (relationshipMemorySyncCache.size > RELATIONSHIP_MEMORY_SYNC_CACHE_MAX_ENTRIES) {
+    const oldestKey = relationshipMemorySyncCache.keys().next().value
+    if (!oldestKey) return
+    relationshipMemorySyncCache.delete(oldestKey)
+  }
+}
 
 function sessionsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("native_call_workspace_sessions")
@@ -245,10 +303,13 @@ function emptyVoiceBrowserSyncSnapshot(input: {
   generatedAt: string
   device: VoiceBrowserSyncSnapshot["device"]
   inboundRinging: VoiceBrowserSyncSnapshot["inboundRinging"]
+  syncMode: VoiceBrowserSyncMode
+  diagnostics: VoiceBrowserSyncSnapshot["diagnostics"]
 }): VoiceBrowserSyncSnapshot {
   return {
     qaMarker: VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER,
     generatedAt: input.generatedAt,
+    syncMode: input.syncMode,
     browserCallState: "idle",
     device: input.device,
     presence: null,
@@ -268,6 +329,7 @@ function emptyVoiceBrowserSyncSnapshot(input: {
     aiCopilot: null,
     aiReceptionist: null,
     missedCallRecovery: null,
+    diagnostics: input.diagnostics,
   }
 }
 
@@ -278,10 +340,22 @@ export async function buildVoiceBrowserSyncSnapshot(
     userId: string
     clientIdentity?: string | null
     workspaceSessionId?: string | null
+    mode?: VoiceBrowserSyncMode
   },
 ): Promise<VoiceBrowserSyncSnapshot> {
   const timer = new VoiceRouteTimer("voice_browser_sync")
+  const startedAt = Date.now()
+  const stats = createVoiceBrowserSyncStats()
+  const syncMode = input.mode ?? "fast"
+  const includeEnrichment = syncMode === "enrichment"
   const generatedAt = new Date().toISOString()
+
+  const buildDiagnostics = (): VoiceBrowserSyncSnapshot["diagnostics"] => ({
+    durationMs: Date.now() - startedAt,
+    queryCount: stats.queryCount,
+    rowsReturned: stats.rowsReturned,
+    relationshipMemoryCache: stats.relationshipMemoryCache,
+  })
 
   let device = null
   if (input.clientIdentity) {
@@ -292,6 +366,7 @@ export async function buildVoiceBrowserSyncSnapshot(
         clientIdentity: input.clientIdentity,
       }),
     )
+    recordVoiceSyncQuery(stats, device, 3)
   }
 
   let activeVoiceCallId: string | null = null
@@ -310,6 +385,7 @@ export async function buildVoiceBrowserSyncSnapshot(
         .select("voice_call_id, muted, on_hold, status, phone_number, lead_id, contact_name")
         .eq("id", workspaceSessionId)
         .maybeSingle()
+      recordVoiceSyncQuery(stats, data)
       return data
     })
     if (!isLiveBrowserWorkspaceSession(sessionRow?.status as NativeCallWorkspaceSessionPublicView["status"] | null)) {
@@ -335,6 +411,7 @@ export async function buildVoiceBrowserSyncSnapshot(
         .order("started_at", { ascending: false })
         .limit(1)
         .maybeSingle()
+      recordVoiceSyncQuery(stats, data)
       return data
     })
     workspaceSessionId = (activeSession?.id as string | null) ?? null
@@ -353,6 +430,7 @@ export async function buildVoiceBrowserSyncSnapshot(
       userId: input.userId,
     }),
   )
+  recordVoiceSyncQuery(stats, inboundRinging, 2)
 
   if (inboundRinging && !activeVoiceCallId) {
     activeVoiceCallId = inboundRinging.voiceCallId
@@ -366,12 +444,14 @@ export async function buildVoiceBrowserSyncSnapshot(
     sessionStatusForSync !== "ringing"
 
   if (!hasActiveLiveSession && !inboundRinging) {
-    timer.finish({ mode: "idle" })
-    return emptyVoiceBrowserSyncSnapshot({ generatedAt, device, inboundRinging })
+    const diagnostics = buildDiagnostics()
+    timer.finish({ mode: "idle", syncMode, ...diagnostics })
+    return emptyVoiceBrowserSyncSnapshot({ generatedAt, device, inboundRinging, syncMode, diagnostics })
   }
 
   if (!hasActiveLiveSession && inboundRinging) {
-    timer.finish({ mode: "ringing", workspaceSessionId: inboundRinging.workspaceSessionId })
+    const diagnostics = buildDiagnostics()
+    timer.finish({ mode: "ringing", syncMode, workspaceSessionId: inboundRinging.workspaceSessionId, ...diagnostics })
     logInboundRingDiagnostic(
       INBOUND_RING_DIAG_EVENTS.BROWSER_SYNC_INBOUND_RINGING,
       withInboundRingElapsed(inboundRinging.voiceCallCreatedAt, {
@@ -382,7 +462,7 @@ export async function buildVoiceBrowserSyncSnapshot(
       }),
     )
     return {
-      ...emptyVoiceBrowserSyncSnapshot({ generatedAt, device, inboundRinging }),
+      ...emptyVoiceBrowserSyncSnapshot({ generatedAt, device, inboundRinging, syncMode, diagnostics }),
       browserCallState: "ringing",
       activeVoiceCallId: inboundRinging.voiceCallId,
       workspaceSessionId: inboundRinging.workspaceSessionId,
@@ -397,6 +477,7 @@ export async function buildVoiceBrowserSyncSnapshot(
         .select("status")
         .eq("id", activeVoiceCallId)
         .maybeSingle()
+      recordVoiceSyncQuery(stats, data)
       return data
     })
     voiceStatus = (callRow?.status as VoiceCallStatus | null) ?? null
@@ -409,6 +490,7 @@ export async function buildVoiceBrowserSyncSnapshot(
           userId: input.userId,
         }),
       )
+      recordVoiceSyncQuery(stats, null)
     }
   }
 
@@ -418,50 +500,82 @@ export async function buildVoiceBrowserSyncSnapshot(
     onHold,
   })
 
-  const timeline = activeVoiceCallId
+  const timeline = includeEnrichment && activeVoiceCallId
     ? await timer.measure("timeline", () => fetchVoiceCallTimeline(admin, activeVoiceCallId))
     : []
-  const recording = activeVoiceCallId
+  recordVoiceSyncQuery(stats, timeline, includeEnrichment && activeVoiceCallId ? 1 : 0)
+  const recording = includeEnrichment && activeVoiceCallId
     ? await timer.measure("recording", () => fetchVoiceCallRecordingVisibility(admin, activeVoiceCallId))
     : null
-  const controlSnapshot = activeVoiceCallId
+  recordVoiceSyncQuery(stats, recording, includeEnrichment && activeVoiceCallId ? 1 : 0)
+  const controlSnapshot = includeEnrichment && activeVoiceCallId
     ? await timer.measure("call_control", () =>
         fetchVoiceCallControlSnapshot(admin, input.organizationId, activeVoiceCallId),
       )
     : { participants: [], activeTransfer: null }
-  const liveTranscript = activeVoiceCallId
+  recordVoiceSyncQuery(stats, controlSnapshot.participants, includeEnrichment && activeVoiceCallId ? 1 : 0)
+  const liveTranscript = includeEnrichment && activeVoiceCallId
     ? await timer.measure("transcript", () =>
         fetchVoiceCallTranscriptSnapshot(admin, input.organizationId, activeVoiceCallId),
       )
     : null
-  const conversationIntelligence = activeVoiceCallId
+  recordVoiceSyncQuery(stats, liveTranscript ? liveTranscript.segments : [], includeEnrichment && activeVoiceCallId ? 1 : 0)
+  const conversationIntelligence = includeEnrichment && activeVoiceCallId
     ? await timer.measure("conversation_intelligence", () =>
         fetchVoiceCallConversationIntelligenceSnapshot(admin, input.organizationId, activeVoiceCallId),
       )
     : null
-  const operatorAssist = await timer.measure("operator_assist", () =>
-    fetchUnifiedOperatorAssistSnapshot(admin, {
-      organizationId: input.organizationId,
-      userId: input.userId,
-      workspaceSessionId,
-      voiceCallId: activeVoiceCallId,
-      voiceTranscript: liveTranscript,
-      conversationIntelligence,
-      participants: controlSnapshot.participants,
-    }),
-  )
-  const relationshipMemory = sessionPhone
-    ? await timer.measure("relationship_memory", () =>
-        fetchRelationshipMemoryWorkspaceSnapshot(admin, {
+  recordVoiceSyncQuery(stats, conversationIntelligence, includeEnrichment && activeVoiceCallId ? 1 : 0)
+  const operatorAssist = includeEnrichment
+    ? await timer.measure("operator_assist", () =>
+        fetchUnifiedOperatorAssistSnapshot(admin, {
+          organizationId: input.organizationId,
+          userId: input.userId,
+          workspaceSessionId,
+          voiceCallId: activeVoiceCallId,
+          voiceTranscript: liveTranscript,
+          conversationIntelligence,
+          participants: controlSnapshot.participants,
+        }),
+      )
+    : null
+  recordVoiceSyncQuery(stats, operatorAssist?.feed ?? [], includeEnrichment ? 1 : 0)
+  const relationshipMemory = includeEnrichment && sessionPhone
+    ? await timer.measure("relationship_memory", async () => {
+        const key = relationshipMemoryCacheKey({
+          organizationId: input.organizationId,
+          phoneNumber: sessionPhone,
+          leadId: sessionLeadId,
+          activeVoiceCallId,
+        })
+        const cached = relationshipMemorySyncCache.get(key)
+        if (cached && cached.expiresAt > Date.now()) {
+          stats.relationshipMemoryCache = "hit"
+          return cached.snapshot
+        }
+        stats.relationshipMemoryCache = "miss"
+        const snapshot = await fetchRelationshipMemoryWorkspaceSnapshot(admin, {
           organizationId: input.organizationId,
           phoneNumber: sessionPhone,
           leadId: sessionLeadId,
           contactName: sessionContactName,
           activeVoiceCallId,
-        }),
-      )
+        })
+        relationshipMemorySyncCache.set(key, {
+          expiresAt: Date.now() + RELATIONSHIP_MEMORY_SYNC_CACHE_TTL_MS,
+          snapshot,
+        })
+        pruneRelationshipMemorySyncCache()
+        return snapshot
+      })
     : null
-  const revenueIntelligence = sessionPhone
+  if (!includeEnrichment) stats.relationshipMemoryCache = "bypass"
+  recordVoiceSyncQuery(
+    stats,
+    stats.relationshipMemoryCache === "miss" ? (relationshipMemory?.timeline ?? []) : [],
+    includeEnrichment && sessionPhone && stats.relationshipMemoryCache === "miss" ? 4 : 0,
+  )
+  const revenueIntelligence = includeEnrichment && sessionPhone
     ? await timer.measure("revenue_intelligence", () =>
         fetchRevenueIntelligenceWorkspaceSnapshot(admin, {
           organizationId: input.organizationId,
@@ -472,7 +586,8 @@ export async function buildVoiceBrowserSyncSnapshot(
         }),
       )
     : null
-  const retentionIntelligence = sessionPhone
+  recordVoiceSyncQuery(stats, revenueIntelligence, includeEnrichment && sessionPhone ? 1 : 0)
+  const retentionIntelligence = includeEnrichment && sessionPhone
     ? await timer.measure("retention_intelligence", () =>
         fetchRetentionIntelligenceWorkspaceSnapshot(admin, {
           organizationId: input.organizationId,
@@ -483,7 +598,8 @@ export async function buildVoiceBrowserSyncSnapshot(
         }),
       )
     : null
-  const aiCopilot = activeVoiceCallId
+  recordVoiceSyncQuery(stats, retentionIntelligence, includeEnrichment && sessionPhone ? 1 : 0)
+  const aiCopilot = includeEnrichment && activeVoiceCallId
     ? await timer.measure("ai_copilot", () =>
         fetchAiCopilotWorkspaceSnapshot(admin, {
           organizationId: input.organizationId,
@@ -494,7 +610,8 @@ export async function buildVoiceBrowserSyncSnapshot(
         }),
       )
     : null
-  const aiReceptionist = activeVoiceCallId
+  recordVoiceSyncQuery(stats, aiCopilot?.activeSuggestions ?? [], includeEnrichment && activeVoiceCallId ? 1 : 0)
+  const aiReceptionist = includeEnrichment && activeVoiceCallId
     ? await timer.measure("ai_receptionist", () =>
         fetchAiReceptionistWorkspaceSnapshot(admin, {
           organizationId: input.organizationId,
@@ -502,7 +619,8 @@ export async function buildVoiceBrowserSyncSnapshot(
         }),
       )
     : null
-  const missedCallRecovery = activeVoiceCallId
+  recordVoiceSyncQuery(stats, aiReceptionist, includeEnrichment && activeVoiceCallId ? 1 : 0)
+  const missedCallRecovery = includeEnrichment && activeVoiceCallId
     ? await timer.measure("missed_call_recovery", () =>
         fetchMissedCallRecoveryWorkspaceSnapshot(admin, {
           organizationId: input.organizationId,
@@ -510,6 +628,7 @@ export async function buildVoiceBrowserSyncSnapshot(
         }),
       )
     : null
+  recordVoiceSyncQuery(stats, missedCallRecovery, includeEnrichment && activeVoiceCallId ? 1 : 0)
 
   if (inboundRinging) {
     logInboundRingDiagnostic(
@@ -523,22 +642,24 @@ export async function buildVoiceBrowserSyncSnapshot(
     )
   }
 
-  timer.finish({ mode: "live", activeVoiceCallId, workspaceSessionId })
-
   const presenceRow = await timer.measure("presence", async () => {
     const { data } = await admin
       .schema("voice")
       .from("voice_operator_presence")
-      .select("*")
+      .select(VOICE_OPERATOR_PRESENCE_SELECT)
       .eq("organization_id", input.organizationId)
       .eq("user_id", input.userId)
       .maybeSingle()
+    recordVoiceSyncQuery(stats, data)
     return data
   })
+  const diagnostics = buildDiagnostics()
+  timer.finish({ mode: "live", syncMode, activeVoiceCallId, workspaceSessionId, ...diagnostics })
 
   return {
     qaMarker: VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER,
     generatedAt,
+    syncMode,
     browserCallState,
     device,
     presence: presenceRow
@@ -567,6 +688,7 @@ export async function buildVoiceBrowserSyncSnapshot(
     aiCopilot,
     aiReceptionist,
     missedCallRecovery,
+    diagnostics,
   }
 }
 

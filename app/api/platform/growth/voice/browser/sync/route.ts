@@ -14,12 +14,14 @@ export async function GET(request: Request) {
   const clientIdentity = url.searchParams.get("clientIdentity")
   const workspaceSessionId = url.searchParams.get("workspaceSessionId")
   const includePresence = url.searchParams.get("includePresence") === "1"
+  const mode = url.searchParams.get("mode") === "enrichment" ? "enrichment" : "fast"
 
   const snapshot = await buildVoiceBrowserSyncSnapshot(ctx.admin, {
     organizationId: ctx.organizationId,
     userId: ctx.userId,
     clientIdentity,
     workspaceSessionId,
+    mode,
   })
 
   const operators = includePresence
@@ -30,6 +32,7 @@ export async function GET(request: Request) {
     ok: true,
     qaMarker: VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER,
     snapshot,
+    diagnostics: snapshot.diagnostics,
     operators,
   })
 }

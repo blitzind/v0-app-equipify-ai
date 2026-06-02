@@ -33,6 +33,7 @@ type VoiceBrowserRegisterResponse = {
 type VoiceBrowserSyncResponse = {
   ok?: boolean
   snapshot?: VoiceBrowserSyncSnapshot
+  diagnostics?: VoiceBrowserSyncSnapshot["diagnostics"]
   message?: string
 }
 
@@ -52,6 +53,30 @@ type DeviceLifecycleHandlers = {
   tokenWillExpire: () => void
 }
 
+function mergeVoiceBrowserSyncSnapshot(
+  previous: VoiceBrowserSyncSnapshot | null,
+  next: VoiceBrowserSyncSnapshot,
+): VoiceBrowserSyncSnapshot {
+  if (next.syncMode === "enrichment") return next
+  if (!previous || previous.activeVoiceCallId !== next.activeVoiceCallId || !next.activeVoiceCallId) return next
+  return {
+    ...next,
+    timeline: previous.timeline,
+    recording: previous.recording,
+    participants: previous.participants,
+    activeTransfer: previous.activeTransfer,
+    liveTranscript: previous.liveTranscript,
+    conversationIntelligence: previous.conversationIntelligence,
+    operatorAssist: previous.operatorAssist,
+    relationshipMemory: previous.relationshipMemory,
+    revenueIntelligence: previous.revenueIntelligence,
+    retentionIntelligence: previous.retentionIntelligence,
+    aiCopilot: previous.aiCopilot,
+    aiReceptionist: previous.aiReceptionist,
+    missedCallRecovery: previous.missedCallRecovery,
+  }
+}
+
 async function fetchVoiceBrowserAccessToken(): Promise<VoiceBrowserTokenResponse> {
   const tokenRes = await fetch("/api/platform/growth/voice/browser/token", {
     method: "POST",
@@ -68,6 +93,9 @@ async function fetchVoiceBrowserAccessToken(): Promise<VoiceBrowserTokenResponse
 const VOICE_BROWSER_SYNC_INTERVAL_MS = 4000
 const VOICE_BROWSER_RINGING_SYNC_INTERVAL_MS = 1000
 const VOICE_BROWSER_ACTIVE_CALL_SYNC_INTERVAL_MS = 2000
+const VOICE_BROWSER_ENRICHMENT_SYNC_INTERVAL_MS = 12_000
+
+type VoiceBrowserSyncMode = "fast" | "enrichment"
 
 export type VoiceBrowserSdkCallPhase = "idle" | "incoming" | "active"
 
@@ -183,9 +211,10 @@ export function useVoiceBrowserCalling(input?: {
     [clearIncomingCall, notifyActiveCallDisconnected],
   )
 
-  const sync = useCallback(async () => {
+  const sync = useCallback(async (mode: VoiceBrowserSyncMode = "fast") => {
     if (!enabled) return null
     const params = new URLSearchParams()
+    params.set("mode", mode)
     if (sdkRegisteredRef.current && clientIdentityRef.current) {
       params.set("clientIdentity", clientIdentityRef.current)
     }
@@ -197,14 +226,18 @@ export function useVoiceBrowserCalling(input?: {
     if (!res.ok || !data.snapshot) {
       throw new Error(data.message ?? "Could not sync voice browser state.")
     }
-    setSnapshot(data.snapshot)
-    if (data.snapshot.inboundRinging?.voiceCallCreatedAt) {
-      voiceCallCreatedAtRef.current = data.snapshot.inboundRinging.voiceCallCreatedAt
+    let mergedSnapshot = data.snapshot
+    setSnapshot((previous) => {
+      mergedSnapshot = mergeVoiceBrowserSyncSnapshot(previous, data.snapshot as VoiceBrowserSyncSnapshot)
+      return mergedSnapshot
+    })
+    if (mergedSnapshot.inboundRinging?.voiceCallCreatedAt) {
+      voiceCallCreatedAtRef.current = mergedSnapshot.inboundRinging.voiceCallCreatedAt
     }
-    if (data.snapshot.inboundRinging || incomingTwilioCallRef.current) {
-      inboundOfferRef.current?.(data.snapshot)
+    if (mergedSnapshot.inboundRinging || incomingTwilioCallRef.current) {
+      inboundOfferRef.current?.(mergedSnapshot)
     }
-    return data.snapshot
+    return mergedSnapshot
   }, [enabled])
 
   const syncRef = useRef(sync)
@@ -218,7 +251,7 @@ export function useVoiceBrowserCalling(input?: {
       setIncomingCall(extractVoiceBrowserIncomingCallView(call))
       setSdkCallPhase("incoming")
       attachCallLifecycleHandlers(call, "incoming")
-      void syncRef.current().catch(() => undefined)
+      void syncRef.current("fast").catch(() => undefined)
     },
     [attachCallLifecycleHandlers],
   )
@@ -483,7 +516,8 @@ export function useVoiceBrowserCalling(input?: {
       }
 
       setRegistrationState("registered")
-      await syncRef.current()
+      await syncRef.current("fast")
+      void syncRef.current("enrichment").catch(() => undefined)
     } catch (e) {
       setRegistrationState("error")
       setError(formatBrowserRegistrationError(e))
@@ -527,11 +561,21 @@ export function useVoiceBrowserCalling(input?: {
           : VOICE_BROWSER_SYNC_INTERVAL_MS
 
     const intervalId = window.setInterval(() => {
-      void syncRef.current().catch(() => undefined)
+      void syncRef.current("fast").catch(() => undefined)
     }, intervalMs)
 
     return () => window.clearInterval(intervalId)
   }, [enabled, registrationState, incomingCall, sdkCallPhase, snapshot?.inboundRinging, snapshot?.browserCallState])
+
+  useEffect(() => {
+    if (!enabled || registrationState !== "registered") return
+
+    const intervalId = window.setInterval(() => {
+      void syncRef.current("enrichment").catch(() => undefined)
+    }, VOICE_BROWSER_ENRICHMENT_SYNC_INTERVAL_MS)
+
+    return () => window.clearInterval(intervalId)
+  }, [enabled, registrationState])
 
   return {
     qaMarker: VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER,

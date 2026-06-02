@@ -21,6 +21,11 @@ function operatorPresenceTable(admin: SupabaseClient) {
   return admin.schema("voice").from("voice_operator_presence")
 }
 
+const VOICE_BROWSER_DEVICE_SELECT =
+  "id, client_identity, provider, status, last_registered_at, last_heartbeat_at, active_voice_call_id"
+const VOICE_OPERATOR_PRESENCE_SELECT =
+  "user_id, status, active_device_count, active_voice_call_id, active_workspace_session_id, last_seen_at"
+
 function mapDeviceRow(row: Record<string, unknown>): VoiceBrowserDevicePublicView {
   return {
     id: row.id as string,
@@ -76,7 +81,7 @@ export async function registerVoiceBrowserDevice(
         updated_at: now,
       })
       .eq("id", existing.id as string)
-      .select("*")
+      .select(VOICE_BROWSER_DEVICE_SELECT)
       .single()
     if (error) throw new Error(error.message)
     await refreshVoiceOperatorPresence(admin, input.organizationId, input.userId)
@@ -100,7 +105,7 @@ export async function registerVoiceBrowserDevice(
       last_registered_at: now,
       last_heartbeat_at: now,
     })
-    .select("*")
+    .select(VOICE_BROWSER_DEVICE_SELECT)
     .single()
   if (error) throw new Error(error.message)
   await refreshVoiceOperatorPresence(admin, input.organizationId, input.userId)
@@ -131,7 +136,7 @@ export async function heartbeatVoiceBrowserDevice(
     .eq("organization_id", input.organizationId)
     .eq("user_id", input.userId)
     .eq("client_identity", input.clientIdentity)
-    .select("*")
+    .select(VOICE_BROWSER_DEVICE_SELECT)
     .maybeSingle()
   if (error) throw new Error(error.message)
   if (!data) return null
@@ -194,7 +199,7 @@ export async function refreshVoiceOperatorPresence(
       },
       { onConflict: "organization_id,user_id" },
     )
-    .select("*")
+    .select(VOICE_OPERATOR_PRESENCE_SELECT)
     .single()
   if (error) throw new Error(error.message)
   return mapPresenceRow(data as Record<string, unknown>)
@@ -206,7 +211,7 @@ export async function listOnlineVoiceBrowserDevices(
   input?: { userIds?: string[] },
 ): Promise<VoiceBrowserDevicePublicView[]> {
   let query = browserDevicesTable(admin)
-    .select("*")
+    .select(VOICE_BROWSER_DEVICE_SELECT)
     .eq("organization_id", organizationId)
     .in("status", ["available", "busy", "reconnecting"])
     .order("last_heartbeat_at", { ascending: false })
@@ -223,7 +228,7 @@ export async function listVoiceOperatorPresence(
   organizationId: string,
 ): Promise<VoiceOperatorPresencePublicView[]> {
   const { data, error } = await operatorPresenceTable(admin)
-    .select("*")
+    .select(VOICE_OPERATOR_PRESENCE_SELECT)
     .eq("organization_id", organizationId)
     .order("last_seen_at", { ascending: false })
   if (error) throw new Error(error.message)

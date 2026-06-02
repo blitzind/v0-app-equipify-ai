@@ -103,6 +103,7 @@ export type VoiceBrowserCallingReadinessSnapshot = {
 export type VoiceBrowserSyncSnapshot = {
   qaMarker: typeof VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER
   generatedAt: string
+  syncMode?: "fast" | "enrichment"
   browserCallState: VoiceBrowserCallState
   device: VoiceBrowserDevicePublicView | null
   presence: VoiceOperatorPresencePublicView | null
@@ -122,6 +123,12 @@ export type VoiceBrowserSyncSnapshot = {
   aiCopilot: VoiceAiCopilotWorkspaceSnapshot | null
   aiReceptionist: VoiceAiReceptionistWorkspaceSnapshot | null
   missedCallRecovery: VoiceMissedCallRecoveryWorkspaceSnapshot | null
+  diagnostics?: {
+    durationMs: number
+    queryCount: number
+    rowsReturned: number
+    relationshipMemoryCache?: "hit" | "miss" | "bypass" | "none"
+  }
 }
 
 export type VoiceInboundBrowserOfferView = {

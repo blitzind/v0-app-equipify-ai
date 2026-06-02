@@ -29,6 +29,24 @@ assert.match(workspaceBridge, /mode: "idle"/)
 assert.match(workspaceBridge, /mode: "ringing"/)
 assert.match(workspaceBridge, /VoiceRouteTimer/)
 assert.match(workspaceBridge, /isLiveBrowserWorkspaceSession/)
+assert.match(workspaceBridge, /type VoiceBrowserSyncMode = "fast" \| "enrichment"/)
+assert.match(workspaceBridge, /const includeEnrichment = syncMode === "enrichment"/)
+assert.match(workspaceBridge, /RELATIONSHIP_MEMORY_SYNC_CACHE_TTL_MS = 30_000/)
+assert.match(workspaceBridge, /relationshipMemorySyncCache/)
+assert.match(workspaceBridge, /queryCount/)
+assert.match(workspaceBridge, /rowsReturned/)
+assert.match(workspaceBridge, /relationshipMemoryCache/)
+assert.doesNotMatch(workspaceBridge, /\.select\("\*"\)/)
+
+const voiceBrowserHook = fs.readFileSync(
+  path.join(process.cwd(), "hooks/voice/use-voice-browser-calling.ts"),
+  "utf8",
+)
+assert.match(voiceBrowserHook, /VOICE_BROWSER_ENRICHMENT_SYNC_INTERVAL_MS = 12_000/)
+assert.match(voiceBrowserHook, /params\.set\("mode", mode\)/)
+assert.match(voiceBrowserHook, /syncRef\.current\("fast"\)/)
+assert.match(voiceBrowserHook, /syncRef\.current\("enrichment"\)/)
+assert.match(voiceBrowserHook, /mergeVoiceBrowserSyncSnapshot/)
 
 assert.match(platformRoute, /probeVoiceSchemaHealthCached/)
 
@@ -40,5 +58,20 @@ assert.match(inboundRoute, /VoiceRouteTimer/)
 
 assert.match(inboundHandler, /runVoiceBackgroundTask\("inbound_browser_provision"/)
 assert.match(inboundHandler, /provisionInboundBrowserWorkspaceOffers/)
+
+const browserRepository = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/repository/voice-browser-calling-repository.ts"),
+  "utf8",
+)
+assert.match(browserRepository, /VOICE_BROWSER_DEVICE_SELECT/)
+assert.match(browserRepository, /VOICE_OPERATOR_PRESENCE_SELECT/)
+assert.doesNotMatch(browserRepository, /\.select\("\*"\)/)
+
+const relationshipRepository = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/repository/voice-relationship-memory-repository.ts"),
+  "utf8",
+)
+assert.match(relationshipRepository, /RELATIONSHIP_MEMORY_PROFILE_SELECT/)
+assert.match(relationshipRepository, /RELATIONSHIP_MEMORY_EVENT_SELECT/)
 
 console.log("voice-browser-sync-performance checks passed")

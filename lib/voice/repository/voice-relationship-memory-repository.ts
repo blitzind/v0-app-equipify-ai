@@ -48,6 +48,13 @@ function mapEvent(row: Record<string, unknown>): VoiceRelationshipMemoryEventPub
   }
 }
 
+const RELATIONSHIP_MEMORY_PROFILE_SELECT =
+  "id, organization_id, related_customer_id, related_prospect_id, primary_contact_name, primary_phone_number, relationship_status, first_interaction_at, last_interaction_at, total_call_count, total_talk_time_seconds, objection_count, buying_signal_count, escalation_count, sentiment_trend, metadata_json, created_at, updated_at"
+const RELATIONSHIP_MEMORY_EVENT_SELECT =
+  "id, organization_id, memory_profile_id, source_voice_call_id, source_transcript_segment_id, memory_type, evidence_text, confidence_score, event_status, created_by_source, created_at"
+const VOICE_MEMORY_DRAFT_SELECT =
+  "id, organization_id, voice_call_id, transcript_segment_id, draft_kind, draft_label, draft_value, evidence_text, confidence_score, status, operator_notes, expires_at, created_at"
+
 export type VoiceMemoryDraftRow = {
   id: string
   organizationId: string
@@ -91,7 +98,7 @@ export async function findRelationshipMemoryProfileByPhone(
   const { data, error } = await admin
     .schema("voice")
     .from("voice_relationship_memory_profiles")
-    .select("*")
+    .select(RELATIONSHIP_MEMORY_PROFILE_SELECT)
     .eq("organization_id", organizationId)
     .eq("primary_phone_number", phoneNumber)
     .maybeSingle()
@@ -128,7 +135,7 @@ export async function createRelationshipMemoryProfile(
       metadata_json: input.metadataJson ?? {},
       updated_at: now,
     })
-    .select("*")
+    .select(RELATIONSHIP_MEMORY_PROFILE_SELECT)
     .single()
   if (error) throw new Error(error.message)
   return mapProfile(data as Record<string, unknown>)
@@ -157,7 +164,7 @@ export async function resolveRelationshipMemoryProfile(
           updated_at: new Date().toISOString(),
         })
         .eq("id", existing.id)
-        .select("*")
+        .select(RELATIONSHIP_MEMORY_PROFILE_SELECT)
         .single()
       if (error) throw new Error(error.message)
       return mapProfile(data as Record<string, unknown>)
@@ -182,7 +189,7 @@ export async function getRelationshipMemoryProfile(
   const { data, error } = await admin
     .schema("voice")
     .from("voice_relationship_memory_profiles")
-    .select("*")
+    .select(RELATIONSHIP_MEMORY_PROFILE_SELECT)
     .eq("organization_id", organizationId)
     .eq("id", profileId)
     .maybeSingle()
@@ -198,7 +205,7 @@ export async function listRelationshipMemoryProfiles(
   let query = admin
     .schema("voice")
     .from("voice_relationship_memory_profiles")
-    .select("*")
+    .select(RELATIONSHIP_MEMORY_PROFILE_SELECT)
     .eq("organization_id", organizationId)
     .order("updated_at", { ascending: false })
     .limit(input?.limit ?? 20)
@@ -222,7 +229,7 @@ export async function listRelationshipMemoryEvents(
   const { data, error } = await admin
     .schema("voice")
     .from("voice_relationship_memory_events")
-    .select("*")
+    .select(RELATIONSHIP_MEMORY_EVENT_SELECT)
     .eq("organization_id", organizationId)
     .eq("memory_profile_id", profileId)
     .order("created_at", { ascending: false })
@@ -257,7 +264,7 @@ export async function insertRelationshipMemoryEvent(
       source_transcript_segment_id: input.sourceTranscriptSegmentId ?? null,
       created_by_source: input.createdBySource ?? "draft_accept",
     })
-    .select("*")
+    .select(RELATIONSHIP_MEMORY_EVENT_SELECT)
     .single()
   if (error) throw new Error(error.message)
   return mapEvent(data as Record<string, unknown>)
@@ -298,7 +305,7 @@ export async function refreshRelationshipMemoryProfileRollup(
     })
     .eq("organization_id", input.organizationId)
     .eq("id", input.profileId)
-    .select("*")
+    .select(RELATIONSHIP_MEMORY_PROFILE_SELECT)
     .single()
   if (error) throw new Error(error.message)
   return mapProfile(data as Record<string, unknown>)
@@ -312,7 +319,7 @@ export async function getMemoryDraftById(
   const { data, error } = await admin
     .schema("voice")
     .from("voice_conversation_memory_drafts")
-    .select("*")
+    .select(VOICE_MEMORY_DRAFT_SELECT)
     .eq("organization_id", organizationId)
     .eq("id", draftId)
     .maybeSingle()
@@ -343,7 +350,7 @@ export async function updateMemoryDraftReview(
     })
     .eq("organization_id", input.organizationId)
     .eq("id", input.draftId)
-    .select("*")
+    .select(VOICE_MEMORY_DRAFT_SELECT)
     .single()
   if (error) throw new Error(error.message)
   return mapDraftRow(data as Record<string, unknown>)
