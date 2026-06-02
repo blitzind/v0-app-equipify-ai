@@ -97,6 +97,7 @@ export async function GET(request: Request) {
     mode,
     browserCallState: snapshot.browserCallState,
     durationMs: Date.now() - syncStartedAt,
+    snapshotDurationMs: snapshot.diagnostics?.durationMs ?? null,
   })
 
   return NextResponse.json({
