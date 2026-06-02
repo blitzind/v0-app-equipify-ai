@@ -903,11 +903,14 @@ export async function buildVoiceBrowserSyncSnapshot(
     return snapshot
   }
 
+  let sessionPinRejected: string | null = null
+
   const buildDiagnostics = (): VoiceBrowserSyncSnapshot["diagnostics"] => ({
     durationMs: Date.now() - startedAt,
     queryCount: stats.queryCount,
     rowsReturned: stats.rowsReturned,
     relationshipMemoryCache: stats.relationshipMemoryCache,
+    sessionPinRejected,
   })
 
   let device = null
@@ -932,6 +935,7 @@ export async function buildVoiceBrowserSyncSnapshot(
   let sessionContactName: string | null = null
   let sessionStatusForSync: NativeCallWorkspaceSessionPublicView["status"] | null = null
   let callSelectionReason = input.workspaceSessionId ? "client_pinned_session" : "none"
+  const pinnedWorkspaceSessionId = input.workspaceSessionId ?? null
   let activeVoiceCallCreatedAt: string | null = null
   let activeVoiceCallProviderCallId: string | null = null
   let activeVoiceCallStatus: string | null = null
@@ -943,24 +947,45 @@ export async function buildVoiceBrowserSyncSnapshot(
 
   if (workspaceSessionId) {
     const sessionRow = await timer.measure("session_lookup", async () => {
-      const { data } = await sessionsTable(admin)
+      const { data, error } = await sessionsTable(admin)
         .select("voice_call_id, muted, on_hold, status, phone_number, lead_id, contact_name")
         .eq("id", workspaceSessionId)
         .maybeSingle()
       recordVoiceSyncQuery(stats, data)
-      return data
+      return { data, error }
     })
-    if (!isLiveBrowserWorkspaceSession(sessionRow?.status as NativeCallWorkspaceSessionPublicView["status"] | null)) {
+    if (sessionRow.error) {
+      logVoiceInfrastructure("voice_browser_sync_session_pin_rejected", {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        pinnedWorkspaceSessionId,
+        reason: "pinned_session_lookup_error",
+        detail: sessionRow.error.message,
+      })
+      workspaceSessionId = null
+      callSelectionReason = "pinned_session_lookup_error"
+      sessionPinRejected = callSelectionReason
+    } else if (
+      !isLiveBrowserWorkspaceSession(sessionRow.data?.status as NativeCallWorkspaceSessionPublicView["status"] | null)
+    ) {
+      logVoiceInfrastructure("voice_browser_sync_session_pin_rejected", {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        pinnedWorkspaceSessionId,
+        reason: "pinned_session_not_live",
+        sessionStatus: sessionRow.data?.status ?? null,
+      })
       workspaceSessionId = null
       callSelectionReason = "pinned_session_not_live"
+      sessionPinRejected = callSelectionReason
     } else {
-      activeVoiceCallId = (sessionRow?.voice_call_id as string | null) ?? null
-      sessionStatusForSync = (sessionRow?.status as NativeCallWorkspaceSessionPublicView["status"] | null) ?? null
-      muted = Boolean(sessionRow?.muted)
-      onHold = Boolean(sessionRow?.on_hold)
-      sessionPhone = (sessionRow?.phone_number as string | null) ?? null
-      sessionLeadId = (sessionRow?.lead_id as string | null) ?? null
-      sessionContactName = (sessionRow?.contact_name as string | null) ?? null
+      activeVoiceCallId = (sessionRow.data?.voice_call_id as string | null) ?? null
+      sessionStatusForSync = (sessionRow.data?.status as NativeCallWorkspaceSessionPublicView["status"] | null) ?? null
+      muted = Boolean(sessionRow.data?.muted)
+      onHold = Boolean(sessionRow.data?.on_hold)
+      sessionPhone = (sessionRow.data?.phone_number as string | null) ?? null
+      sessionLeadId = (sessionRow.data?.lead_id as string | null) ?? null
+      sessionContactName = (sessionRow.data?.contact_name as string | null) ?? null
     }
   }
 

@@ -98,6 +98,7 @@ import {
   registerCompletedCallLifecycle,
   registerEndedCallLifecycle,
   resolveAuthoritativeNativeSessionId,
+  resolveWorkspaceSessionPinForBrowserSync,
   shouldApplyInboundOfferToSession,
   type CallLifecycleLockSnapshot,
 } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
@@ -355,21 +356,13 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   }, [phone])
 
   const lifecycleLocks = getLifecycleLocks()
-  const syncWorkspaceSessionId =
-    callAuthority.phase === "active" ||
-    callAuthority.phase === "accepting" ||
-    callAuthority.phase === "incoming"
-      ? activeSession?.id ?? callAuthority.sessionId ?? lastKnownSessionRef.current?.id ?? null
-      : activeSession &&
-          (activeSession.status === "wrapping" ||
-            activeSession.status === "completed" ||
-            isCallLifecycleEndedLocked({
-              sessionId: activeSession.id,
-              voiceCallId: activeSession.voiceCallId,
-              locks: lifecycleLocks,
-            }))
-        ? null
-        : activeSession?.id ?? null
+  const syncWorkspaceSessionId = resolveWorkspaceSessionPinForBrowserSync({
+    authorityPhase: callAuthority.phase,
+    activeSession,
+    authoritySessionId: callAuthority.sessionId,
+    lastKnownSessionId: lastKnownSessionRef.current?.id ?? null,
+    locks: lifecycleLocks,
+  })
 
   const voiceBrowser = useVoiceBrowserCalling({
     workspaceSessionId: isNativeSessionIdServerReady(syncWorkspaceSessionId)
@@ -435,6 +428,40 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       )
     }
   }, [voiceBrowser.sdkCallPhase, callAuthority.phase, voiceBrowser.incomingCall?.callSid, activeSession?.connectedAt])
+
+  useEffect(() => {
+    if (voiceBrowser.hasLiveSdkCall) return
+    const snap = voiceBrowser.snapshot
+    if (!snap) return
+    if (snap.browserCallState !== "idle" || snap.activeVoiceCallId || snap.inboundRinging) return
+    if (callAuthority.phase !== "active") return
+
+    const session = lastKnownSessionRef.current
+    registerEndedCallLifecycle({
+      endedVoiceCallIds: endedVoiceCallIdsRef.current,
+      endedSessionIds: endedSessionIdsRef.current,
+      voiceCallId: session?.voiceCallId ?? callAuthority.sessionId,
+      sessionId: session?.id ?? callAuthority.sessionId,
+    })
+    setCallAuthority((prev) => {
+      if (prev.phase !== "active") return prev
+      return transitionCallLifecycleAuthority(prev, { type: "sdk_disconnected", reason: "sync_idle" })
+    })
+    setActiveSession((prev) => {
+      const base = prev ?? lastKnownSessionRef.current
+      if (!base || base.status === "wrapping" || base.status === "completed") return prev
+      const wrapped = buildOptimisticWrappingSession(base, new Date().toISOString())
+      lastKnownSessionRef.current = wrapped
+      return wrapped
+    })
+  }, [
+    voiceBrowser.hasLiveSdkCall,
+    voiceBrowser.snapshot?.browserCallState,
+    voiceBrowser.snapshot?.activeVoiceCallId,
+    voiceBrowser.snapshot?.inboundRinging,
+    callAuthority.phase,
+    callAuthority.sessionId,
+  ])
 
   useEffect(() => {
     const offer = inboundOffer

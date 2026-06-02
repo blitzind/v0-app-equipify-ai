@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { buildVoiceBrowserSyncSnapshot } from "@/lib/voice/browser-calling/workspace-bridge"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
 import { normalizeNativeSessionId } from "@/lib/voice/api/native-session-id-validation"
-import { requireVoiceOperatorRouteContext } from "@/lib/voice/api/voice-operator-route"
+import { requireVoiceBrowserLightweightOperatorContext } from "@/lib/voice/api/voice-operator-route"
 import { listVoiceOperatorPresence } from "@/lib/voice/repository/voice-browser-calling-repository"
 import { probeVoiceSchemaHealthCached } from "@/lib/voice/schema-health"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
@@ -21,17 +21,9 @@ export async function GET(request: Request) {
   const mode = url.searchParams.get("mode") === "enrichment" ? "enrichment" : "fast"
   const syncStartedAt = Date.now()
 
-  const ctx = await requireVoiceOperatorRouteContext({
+  const ctx = await requireVoiceBrowserLightweightOperatorContext({
     request,
-    sessionId: workspaceSessionId,
-    requireSessionOwner: Boolean(workspaceSessionId),
-    sessionIdDiagnostics: workspaceSessionId
-      ? {
-          route: BROWSER_SYNC_ROUTE,
-          sessionIdSource: "query.workspaceSessionId",
-          nativeSessionId: workspaceSessionId,
-        }
-      : undefined,
+    route: BROWSER_SYNC_ROUTE,
   })
   if (!ctx.ok) {
     const deniedBody = (await ctx.response.clone().json().catch(() => ({}))) as {

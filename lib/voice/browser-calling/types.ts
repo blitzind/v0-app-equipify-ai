@@ -129,6 +129,8 @@ export type VoiceBrowserSyncSnapshot = {
     rowsReturned: number
     relationshipMemoryCache?: "hit" | "miss" | "bypass" | "none"
     enrichmentTimedOut?: boolean
+    /** Set when a client-pinned workspaceSessionId was dropped during sync. */
+    sessionPinRejected?: string | null
   }
 }
 

@@ -327,6 +327,76 @@ export function shouldSyncNativeSessionFromVoiceCall(
   return sessionStatus != null && !NATIVE_SESSION_SYNC_PROTECTED_STATUSES.has(sessionStatus)
 }
 
+export type BrowserSyncWorkspaceSessionPinAuthorityPhase =
+  | "idle"
+  | "incoming"
+  | "accepting"
+  | "active"
+  | "ending"
+  | "wrapup"
+  | "completed"
+
+const BROWSER_SYNC_LIVE_PIN_AUTHORITY_PHASES = new Set<BrowserSyncWorkspaceSessionPinAuthorityPhase>([
+  "incoming",
+  "accepting",
+  "active",
+])
+
+export function isTerminalNativeSessionStatusForBrowserSync(
+  sessionStatus: NativeCallWorkspaceSessionPublicView["status"] | null | undefined,
+): boolean {
+  return sessionStatus != null && NATIVE_SESSION_SYNC_PROTECTED_STATUSES.has(sessionStatus)
+}
+
+/** Only pin a workspace session id on browser sync while the call is genuinely live locally. */
+export function resolveWorkspaceSessionPinForBrowserSync(input: {
+  authorityPhase: BrowserSyncWorkspaceSessionPinAuthorityPhase
+  activeSession: NativeCallWorkspaceSessionPublicView | null
+  authoritySessionId: string | null
+  lastKnownSessionId: string | null
+  locks: CallLifecycleLockSnapshot
+}): string | null {
+  if (
+    input.authorityPhase === "idle" ||
+    input.authorityPhase === "ending" ||
+    input.authorityPhase === "wrapup" ||
+    input.authorityPhase === "completed"
+  ) {
+    return null
+  }
+
+  const candidateId =
+    input.activeSession?.id ?? input.authoritySessionId ?? input.lastKnownSessionId ?? null
+  if (!candidateId) return null
+
+  const sessionForStatus =
+    input.activeSession?.id === candidateId ? input.activeSession : null
+  if (isTerminalNativeSessionStatusForBrowserSync(sessionForStatus?.status)) {
+    return null
+  }
+
+  if (
+    isCallLifecycleEndedLocked({
+      sessionId: candidateId,
+      voiceCallId: sessionForStatus?.voiceCallId ?? null,
+      locks: input.locks,
+    })
+  ) {
+    return null
+  }
+
+  if (BROWSER_SYNC_LIVE_PIN_AUTHORITY_PHASES.has(input.authorityPhase)) {
+    return candidateId
+  }
+
+  return input.activeSession?.id ?? null
+}
+
+export const RECOVERABLE_BROWSER_SYNC_SESSION_ERRORS = new Set([
+  "session_lookup_failed",
+  "not_found",
+])
+
 const TERMINAL_VOICE_CALL_STATUSES = new Set([
   "completed",
   "canceled",

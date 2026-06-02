@@ -14,6 +14,7 @@ import {
   isNativeSessionIdServerReady,
   mergeServerSessionIntoLocal,
   reconcileBrowserSyncInboundSelection,
+  resolveWorkspaceSessionPinForBrowserSync,
   shouldApplyInboundOfferToSession,
   shouldHonorSdkIncomingForLifecycle,
   shouldSyncNativeSessionFromVoiceCall,
@@ -110,6 +111,61 @@ assert.equal(
 assert.equal(shouldSyncNativeSessionFromVoiceCall("wrapping"), false)
 assert.equal(shouldSyncNativeSessionFromVoiceCall("active"), true)
 
+const emptyLocks = {
+  endedVoiceCallIds: new Set<string>(),
+  endedSessionIds: new Set<string>(),
+  completedSessionIds: new Set<string>(),
+  completedVoiceCallIds: new Set<string>(),
+}
+
+assert.equal(
+  resolveWorkspaceSessionPinForBrowserSync({
+    authorityPhase: "active",
+    activeSession,
+    authoritySessionId: "sess-1",
+    lastKnownSessionId: "sess-1",
+    locks: emptyLocks,
+  }),
+  "sess-1",
+  "live active call must pin workspace session",
+)
+
+assert.equal(
+  resolveWorkspaceSessionPinForBrowserSync({
+    authorityPhase: "active",
+    activeSession: { ...activeSession, status: "wrapping", endedAt: "2026-05-29T12:05:00.000Z" },
+    authoritySessionId: "sess-1",
+    lastKnownSessionId: "sess-1",
+    locks: emptyLocks,
+  }),
+  null,
+  "wrapping session must not pin browser sync",
+)
+
+assert.equal(
+  resolveWorkspaceSessionPinForBrowserSync({
+    authorityPhase: "wrapup",
+    activeSession: { ...activeSession, status: "wrapping", endedAt: "2026-05-29T12:05:00.000Z" },
+    authoritySessionId: "sess-1",
+    lastKnownSessionId: "sess-1",
+    locks: emptyLocks,
+  }),
+  null,
+  "wrapup authority must not pin browser sync",
+)
+
+assert.equal(
+  resolveWorkspaceSessionPinForBrowserSync({
+    authorityPhase: "active",
+    activeSession,
+    authoritySessionId: "sess-1",
+    lastKnownSessionId: "sess-1",
+    locks: { ...emptyLocks, endedSessionIds: new Set(["sess-1"]) },
+  }),
+  null,
+  "ended lifecycle lock must not pin browser sync",
+)
+
 const workspaceBridgeSource = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/browser-calling/workspace-bridge.ts"),
   "utf8",
@@ -124,7 +180,8 @@ const workspaceComponentSource = fs.readFileSync(
 assert.match(workspaceComponentSource, /callAuthority/)
 assert.match(workspaceComponentSource, /applyServerSessionUnderAuthority/)
 assert.match(workspaceComponentSource, /mapAuthorityToWorkspacePhase/)
-assert.match(workspaceComponentSource, /syncWorkspaceSessionId/)
+assert.match(workspaceComponentSource, /resolveWorkspaceSessionPinForBrowserSync/)
+assert.match(workspaceComponentSource, /sync_idle/)
 assert.match(workspaceComponentSource, /applyServerSession/)
 assert.match(workspaceComponentSource, /idleWorkspaceContextRef/)
 assert.match(workspaceComponentSource, /isNativeSessionIdServerReady/)

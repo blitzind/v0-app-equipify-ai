@@ -9,6 +9,7 @@ import {
 } from "@/lib/voice/browser-calling/browser-incoming-call"
 import { formatBrowserRegistrationError } from "@/lib/voice/browser-calling/format-browser-registration-error"
 import { formatBrowserVoiceApiError } from "@/lib/voice/browser-calling/format-browser-voice-api-error"
+import { RECOVERABLE_BROWSER_SYNC_SESSION_ERRORS } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
 import {
   INBOUND_RING_DIAG_EVENTS,
   logInboundRingDiagnostic,
@@ -312,6 +313,8 @@ export function useVoiceBrowserCalling(input?: {
     const data = (await res.json().catch(() => ({}))) as VoiceBrowserSyncResponse
     if (!res.ok || !data.snapshot) {
       const gatewayTimeout = res.status === 504 || res.status === 502 || res.status === 503
+      const recoverableSessionError =
+        mode === "fast" && RECOVERABLE_BROWSER_SYNC_SESSION_ERRORS.has(data.error ?? "")
       const message = formatBrowserVoiceApiError(
         data,
         mode === "enrichment"
@@ -329,6 +332,9 @@ export function useVoiceBrowserCalling(input?: {
         } else {
           setEnrichmentWarning(null)
         }
+        return snapshotRef.current
+      }
+      if (recoverableSessionError) {
         return snapshotRef.current
       }
       throw new Error(message)
