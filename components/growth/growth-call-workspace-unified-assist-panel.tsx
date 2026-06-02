@@ -63,6 +63,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   mediaStreamDiagnostic = null,
   onRetryMediaStream,
   linkedRealtimeSessionId = null,
+  answerReconciliationPending = false,
 }: {
   phase: "idle" | "incoming" | "bridge_pending" | "active" | "wrapup"
   nativeSessionId: string | null
@@ -85,6 +86,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   mediaStreamDiagnostic?: string | null
   onRetryMediaStream?: () => void
   linkedRealtimeSessionId?: string | null
+  answerReconciliationPending?: boolean
 }) {
   const [acting, setActing] = useState<string | null>(null)
   const [startingCoaching, setStartingCoaching] = useState(false)
@@ -101,6 +103,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
     (phase === "bridge_pending" || phase === "active") &&
     Boolean(nativeSessionId) &&
     !hasLinkedRealtimeSession
+  const coachingPendingFromAnswer = answerReconciliationPending && canStartCoaching
 
   const visibleFeed = useMemo(() => {
     const feed = operatorAssist?.feed ?? []
@@ -263,7 +266,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
     )
   }
 
-  const showStartCoachingButton = !coachingActive && canStartCoaching
+  const showStartCoachingButton = !coachingActive && (canStartCoaching || coachingPendingFromAnswer)
   const nextBest = operatorAssist?.nextBestAction.primary ?? null
   const supervisor = operatorAssist?.supervisorVisibility
   const interruptionSummary = operatorAssist?.interruptionSummary
@@ -291,14 +294,14 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
             <Button
               type="button"
               size="sm"
-              disabled={!canStartCoaching || startingCoaching}
+              disabled={!canStartCoaching || startingCoaching || coachingPendingFromAnswer}
               data-qa-action="call-workspace-start-coaching"
               onClick={() => void startCoaching()}
             >
-              {startingCoaching ? (
+              {coachingPendingFromAnswer || startingCoaching ? (
                 <>
                   <Loader2 className="mr-2 size-4 animate-spin" />
-                  Starting…
+                  Starting coaching…
                 </>
               ) : (
                 <>
@@ -435,14 +438,14 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
             <Button
               type="button"
               size="sm"
-              disabled={!canStartCoaching || startingCoaching}
+              disabled={!canStartCoaching || startingCoaching || coachingPendingFromAnswer}
               data-qa-action="call-workspace-start-coaching"
               onClick={() => void startCoaching()}
             >
-              {startingCoaching ? (
+              {coachingPendingFromAnswer || startingCoaching ? (
                 <>
                   <Loader2 className="mr-2 size-4 animate-spin" />
-                  Starting…
+                  Starting coaching…
                 </>
               ) : (
                 <>

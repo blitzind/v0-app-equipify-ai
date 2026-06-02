@@ -109,4 +109,39 @@ assert.doesNotMatch(
   "answer response must not unconditionally return before applying an active linked server session",
 )
 
+const centerPanelSource = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace-center-panel.tsx"),
+  "utf8",
+)
+assert.match(
+  centerPanelSource,
+  /answerReconciliationPending=\{Boolean\(answering\)\}/,
+  "active call assist panel must receive answer reconciliation pending state",
+)
+
+const assistPanelSource = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace-unified-assist-panel.tsx"),
+  "utf8",
+)
+assert.match(
+  assistPanelSource,
+  /answerReconciliationPending\?: boolean/,
+  "unified assist panel must expose answer reconciliation pending state",
+)
+assert.match(
+  assistPanelSource,
+  /const coachingPendingFromAnswer = answerReconciliationPending && canStartCoaching/,
+  "pending answer reconciliation should drive coaching pending state before realtime_session_id is applied",
+)
+assert.match(
+  assistPanelSource,
+  /disabled=\{!canStartCoaching \|\| startingCoaching \|\| coachingPendingFromAnswer\}/,
+  "Start Coaching must be disabled while inbound answer reconciliation is pending",
+)
+assert.match(
+  assistPanelSource,
+  /coachingPendingFromAnswer \|\| startingCoaching[\s\S]*Starting coaching/,
+  "pending answer reconciliation should show Starting coaching copy instead of an enabled Start Coaching action",
+)
+
 console.log("optimistic-inbound-answer checks passed")

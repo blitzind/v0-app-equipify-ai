@@ -431,6 +431,7 @@ export function GrowthCallWorkspaceCenterPanel({
               mediaStreamDiagnostic={mediaStreamDiagnostic}
               onRetryMediaStream={onRetryMediaStream}
               linkedRealtimeSessionId={activeSession.realtimeSessionId}
+              answerReconciliationPending={Boolean(answering)}
               aiCopilot={aiCopilot}
               aiReceptionist={aiReceptionist}
               missedCallRecovery={missedCallRecovery}
@@ -460,6 +461,7 @@ export function GrowthCallWorkspaceCenterPanel({
               mediaStreamDiagnostic={mediaStreamDiagnostic}
               onRetryMediaStream={onRetryMediaStream}
               linkedRealtimeSessionId={activeSession.realtimeSessionId}
+              answerReconciliationPending={Boolean(answering)}
               aiCopilot={aiCopilot}
               aiReceptionist={aiReceptionist}
               missedCallRecovery={missedCallRecovery}
