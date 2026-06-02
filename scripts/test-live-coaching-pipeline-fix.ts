@@ -309,6 +309,16 @@ assert.doesNotMatch(
   /accept[\s\S]{0,400}setOptimisticCoachTurn\(\{/,
   "SDK accept must not seed bootstrap before answer pipeline links coaching",
 )
+assert.match(
+  workspaceUi,
+  /async function retryMediaStream\(\)[\s\S]*if \(!isNativeSessionIdServerReady\(sessionId\)\) return[\s\S]*\/media-stream\/restart/,
+  "media stream restart must skip pending-inbound placeholders before POST",
+)
+assert.match(
+  workspaceUi,
+  /async function retryMediaStream\(\)[\s\S]*isNativeSessionIdServerReady\(sessionId\)[\s\S]*fetch\([\s\S]*\/media-stream\/restart/,
+  "media stream restart must still POST once native session UUID is ready",
+)
 
 const workspaceBridge = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/browser-calling/workspace-bridge.ts"),

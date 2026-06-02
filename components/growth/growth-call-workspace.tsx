@@ -1180,6 +1180,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   async function retryMediaStream() {
     const sessionId = activeSession?.id
     if (!sessionId) return
+    if (!isNativeSessionIdServerReady(sessionId)) return
     setError(null)
     try {
       const res = await fetch(
