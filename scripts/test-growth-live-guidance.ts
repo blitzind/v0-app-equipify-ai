@@ -231,4 +231,24 @@ assert.match(drawerSource, /refreshCoachingDetail/)
 assert.match(workspaceSource, /LiveCoachingExecutionScorePanel/)
 assert.match(workspaceSource, /Top actions/)
 
+const guidanceUiSource = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/live-coaching/live-coaching-guidance-ui.tsx"),
+  "utf8",
+)
+assert.match(
+  guidanceUiSource,
+  /export function LiveCoachingGuidanceRow[\s\S]*return \(\s*<div/,
+  "compact guidance rows must not render li outside ul (React hydration #418)",
+)
+assert.doesNotMatch(
+  guidanceUiSource,
+  /export function LiveCoachingGuidanceRow[\s\S]*return \(\s*<li/,
+  "LiveCoachingGuidanceRow root must not be li when parent panel uses div",
+)
+assert.match(
+  guidanceUiSource,
+  /compact \? \([\s\S]*LiveCoachingGuidanceRow/,
+  "compact guidance path must still use LiveCoachingGuidanceRow",
+)
+
 console.log("growth-live-guidance: all checks passed")

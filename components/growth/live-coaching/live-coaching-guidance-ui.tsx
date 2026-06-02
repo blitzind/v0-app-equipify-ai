@@ -239,7 +239,7 @@ export function LiveCoachingGuidanceRow({
   const reasons = guidanceConfidenceReasonLines(event)
 
   return (
-    <li
+    <div
       className={cn(
         "rounded-lg border px-3 py-2 text-sm",
         emphasized ? "border-violet-300/60 bg-violet-50/30 dark:border-violet-500/30" : "border-border/50",
@@ -262,7 +262,7 @@ export function LiveCoachingGuidanceRow({
       {event.recommendation ? (
         <p className="mt-1 text-xs text-foreground/80">Suggested: {event.recommendation}</p>
       ) : null}
-    </li>
+    </div>
   )
 }
 

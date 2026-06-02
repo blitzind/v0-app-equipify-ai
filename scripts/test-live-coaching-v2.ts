@@ -332,6 +332,22 @@ const assistPanel = fs.readFileSync(
 )
 assert.match(assistPanel, /showStartCoachingButton/)
 assert.match(assistPanel, /realtimeSessionId/)
+assert.match(assistPanel, /LiveCoachingGuidancePanel[\s\S]*compact/)
+
+const guidanceUiSource = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/live-coaching/live-coaching-guidance-ui.tsx"),
+  "utf8",
+)
+assert.match(
+  guidanceUiSource,
+  /export function LiveCoachingGuidanceRow[\s\S]*return \(\s*<div/,
+  "compact guidance rows must not render li outside ul (React hydration #418)",
+)
+assert.doesNotMatch(
+  guidanceUiSource,
+  /export function LiveCoachingGuidanceRow[\s\S]*return \(\s*<li/,
+  "LiveCoachingGuidanceRow root must not be li when parent panel uses div",
+)
 
 const hero = fs.readFileSync(
   path.join(process.cwd(), "components/growth/live-coaching/say-this-next-card.tsx"),
