@@ -161,6 +161,25 @@ const VOICE_BROWSER_RINGING_SYNC_INTERVAL_MS = 1000
 const VOICE_BROWSER_ACTIVE_CALL_SYNC_INTERVAL_MS = 2000
 const VOICE_BROWSER_ENRICHMENT_SYNC_INTERVAL_MS = 12_000
 
+const LIVE_BROWSER_CALL_STATES = new Set([
+  "ringing",
+  "connecting",
+  "active",
+  "held",
+  "muted",
+])
+
+function hasLiveBrowserCallContext(input: {
+  sdkCallPhase: VoiceBrowserSdkCallPhase
+  snapshot: VoiceBrowserSyncSnapshot | null
+}): boolean {
+  if (input.sdkCallPhase === "incoming" || input.sdkCallPhase === "active") return true
+  if (input.snapshot?.inboundRinging) return true
+  return Boolean(
+    input.snapshot?.browserCallState && LIVE_BROWSER_CALL_STATES.has(input.snapshot.browserCallState),
+  )
+}
+
 type VoiceBrowserSyncMode = "fast" | "enrichment"
 
 export type VoiceBrowserSdkCallPhase = "idle" | "incoming" | "active"
@@ -300,14 +319,29 @@ export function useVoiceBrowserCalling(input?: {
           : data.message ?? "Could not sync voice browser state.",
       )
       if (mode === "enrichment") {
-        setEnrichmentWarning(gatewayTimeout ? message : CALL_WORKSPACE_ENRICHMENT_SYNC_FAILED_COPY)
+        if (
+          hasLiveBrowserCallContext({
+            sdkCallPhase: sdkCallPhaseRef.current,
+            snapshot: snapshotRef.current,
+          })
+        ) {
+          setEnrichmentWarning(gatewayTimeout ? message : CALL_WORKSPACE_ENRICHMENT_SYNC_FAILED_COPY)
+        } else {
+          setEnrichmentWarning(null)
+        }
         return snapshotRef.current
       }
       throw new Error(message)
     }
     if (mode === "enrichment") {
       setEnrichmentWarning(
-        data.snapshot.diagnostics?.enrichmentTimedOut ? CALL_WORKSPACE_ENRICHMENT_SYNC_FAILED_COPY : null,
+        data.snapshot.diagnostics?.enrichmentTimedOut &&
+          hasLiveBrowserCallContext({
+            sdkCallPhase: sdkCallPhaseRef.current,
+            snapshot: mergedSnapshot,
+          })
+          ? CALL_WORKSPACE_ENRICHMENT_SYNC_FAILED_COPY
+          : null,
       )
     }
     let mergedSnapshot = data.snapshot
@@ -328,6 +362,8 @@ export function useVoiceBrowserCalling(input?: {
   syncRef.current = sync
   const snapshotRef = useRef(snapshot)
   snapshotRef.current = snapshot
+  const sdkCallPhaseRef = useRef(sdkCallPhase)
+  sdkCallPhaseRef.current = sdkCallPhase
 
   const handleDeviceIncoming = useCallback(
     (call: TwilioVoiceSdkCall) => {
@@ -671,6 +707,12 @@ export function useVoiceBrowserCalling(input?: {
 
     return () => window.clearInterval(intervalId)
   }, [enabled, registrationState])
+
+  useEffect(() => {
+    if (!hasLiveBrowserCallContext({ sdkCallPhase, snapshot })) {
+      setEnrichmentWarning(null)
+    }
+  }, [sdkCallPhase, snapshot?.browserCallState, snapshot?.inboundRinging])
 
   return {
     qaMarker: VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER,

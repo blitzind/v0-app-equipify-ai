@@ -8,8 +8,10 @@ import { isGrowthEngineEnabledEnv, logGrowthEngine } from "@/lib/growth/access"
 import { isPlatformAdminEmail } from "@/lib/platform-admin"
 import {
   createServerSupabaseClient,
+  createSupabaseClientWithAccessToken,
   getBearerAccessToken,
 } from "@/lib/supabase/server"
+import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import {
   describeNativeSessionIdValidation,
   LEGACY_OPERATOR_UUID_RE,
@@ -110,64 +112,156 @@ type ResolvedVoiceOperatorAuth =
       userEmail: string | null
       authSource: "cookie" | "bearer"
       hadAuthCookie: boolean
+      bearerPresent: boolean
     }
   | {
       ok: false
       authStage: "no_session_cookie" | "session_invalid"
+      authFailureReason: string
+      hadAuthCookie: boolean
+      bearerPresent: boolean
     }
+
+function logVoiceOperatorAuthResolution(input: {
+  route: string
+  outcome: "granted" | "denied"
+  authSource: "cookie" | "bearer" | "none"
+  hadAuthCookie: boolean
+  bearerPresent: boolean
+  sessionUserId?: string | null
+  platformAdminMatched?: boolean
+  authFailureReason?: string | null
+  bearerFallback?: string | null
+}): void {
+  logVoiceInfrastructure("voice_operator_auth_resolution", {
+    route: input.route,
+    outcome: input.outcome,
+    authSource: input.authSource,
+    hadAuthCookie: input.hadAuthCookie,
+    bearerPresent: input.bearerPresent,
+    sessionUserId: input.sessionUserId ?? null,
+    platformAdminMatched: input.platformAdminMatched ?? false,
+    authFailureReason: input.authFailureReason ?? null,
+    bearerFallback: input.bearerFallback ?? null,
+  })
+}
 
 async function resolveVoiceOperatorAuth(input: {
   request?: Request
   route?: string
 }): Promise<ResolvedVoiceOperatorAuth> {
+  const route = input.route ?? "requireVoiceOperatorRouteContext"
   const cookieStore = await cookies()
   const cookieEntries = cookieStore.getAll()
   const hadAuthCookie = hasSupabaseAuthCookie(cookieEntries)
   const bearer = input.request ? getBearerAccessToken(input.request) : null
+  const bearerPresent = Boolean(bearer)
   const supabase = await createServerSupabaseClient()
 
-  if (bearer) {
-    const { data, error } = await supabase.auth.getUser(bearer)
-    if (error || !data.user?.id) {
-      logGrowthEngine("operator_access_denied", {
-        reason: "session_invalid",
-        route: input.route ?? "requireVoiceOperatorRouteContext",
-        authSource: "bearer",
-        hadAuthCookie,
-        bearerPresent: true,
-      })
-      return { ok: false, authStage: "session_invalid" }
-    }
-    return {
-      ok: true,
-      userId: data.user.id,
-      userEmail: data.user.email ?? null,
-      authSource: "bearer",
-      hadAuthCookie,
-    }
-  }
-
   const {
-    data: { user },
+    data: { user: cookieUser },
+    error: cookieError,
   } = await supabase.auth.getUser()
 
-  if (!user?.id) {
-    logGrowthEngine("operator_access_denied", {
-      reason: hadAuthCookie ? "session_invalid" : "no_session_cookie",
-      route: input.route ?? "requireVoiceOperatorRouteContext",
+  if (cookieUser?.id) {
+    logVoiceOperatorAuthResolution({
+      route,
+      outcome: "granted",
       authSource: "cookie",
       hadAuthCookie,
-      bearerPresent: false,
+      bearerPresent,
+      sessionUserId: cookieUser.id,
+      platformAdminMatched: Boolean(cookieUser.email && isPlatformAdminEmail(cookieUser.email)),
+      bearerFallback: bearerPresent ? "ignored_stale_bearer_cookie_authoritative" : null,
     })
-    return { ok: false, authStage: hadAuthCookie ? "session_invalid" : "no_session_cookie" }
+    return {
+      ok: true,
+      userId: cookieUser.id,
+      userEmail: cookieUser.email ?? null,
+      authSource: "cookie",
+      hadAuthCookie,
+      bearerPresent,
+    }
   }
 
-  return {
-    ok: true,
-    userId: user.id,
-    userEmail: user.email ?? null,
+  if (bearer) {
+    const bearerClient = createSupabaseClientWithAccessToken(bearer)
+    const { data, error } = await bearerClient.auth.getUser()
+    if (data.user?.id) {
+      logVoiceOperatorAuthResolution({
+        route,
+        outcome: "granted",
+        authSource: "bearer",
+        hadAuthCookie,
+        bearerPresent,
+        sessionUserId: data.user.id,
+        platformAdminMatched: Boolean(data.user.email && isPlatformAdminEmail(data.user.email)),
+        bearerFallback: "cookie_missing_or_invalid_used_bearer",
+      })
+      return {
+        ok: true,
+        userId: data.user.id,
+        userEmail: data.user.email ?? null,
+        authSource: "bearer",
+        hadAuthCookie,
+        bearerPresent,
+      }
+    }
+
+    const authFailureReason = hadAuthCookie
+      ? "bearer_invalid_and_cookie_invalid"
+      : "bearer_invalid"
+    logVoiceOperatorAuthResolution({
+      route,
+      outcome: "denied",
+      authSource: "bearer",
+      hadAuthCookie,
+      bearerPresent,
+      authFailureReason,
+      bearerFallback: cookieError?.message ?? null,
+    })
+    logGrowthEngine("operator_access_denied", {
+      reason: authFailureReason,
+      route,
+      authSource: "bearer",
+      hadAuthCookie,
+      bearerPresent: true,
+      cookieError: cookieError?.message ?? null,
+      bearerError: error?.message ?? null,
+    })
+    return {
+      ok: false,
+      authStage: hadAuthCookie || bearerPresent ? "session_invalid" : "no_session_cookie",
+      authFailureReason,
+      hadAuthCookie,
+      bearerPresent,
+    }
+  }
+
+  const authFailureReason = hadAuthCookie ? "cookie_invalid" : "no_session_cookie"
+  logVoiceOperatorAuthResolution({
+    route,
+    outcome: "denied",
     authSource: "cookie",
     hadAuthCookie,
+    bearerPresent,
+    authFailureReason,
+    bearerFallback: cookieError?.message ?? null,
+  })
+  logGrowthEngine("operator_access_denied", {
+    reason: authFailureReason,
+    route,
+    authSource: "cookie",
+    hadAuthCookie,
+    bearerPresent: false,
+    cookieError: cookieError?.message ?? null,
+  })
+  return {
+    ok: false,
+    authStage: hadAuthCookie ? "session_invalid" : "no_session_cookie",
+    authFailureReason,
+    hadAuthCookie,
+    bearerPresent,
   }
 }
 
@@ -243,6 +337,8 @@ export async function requireVoiceOperatorRouteContext(
     )
   }
 
+  const isPlatformAdmin = Boolean(auth.userEmail && isPlatformAdminEmail(auth.userEmail))
+
   let admin: SupabaseClient
   try {
     admin = createServiceRoleSupabaseClient()
@@ -252,7 +348,6 @@ export async function requireVoiceOperatorRouteContext(
     return jsonResponse("server_config", "Server is not configured for voice operations.", 503)
   }
 
-  const isPlatformAdmin = Boolean(auth.userEmail && isPlatformAdminEmail(auth.userEmail))
   if (isPlatformAdmin) {
     logGrowthEngine("operator_platform_admin_granted", {
       organizationId,
@@ -260,6 +355,7 @@ export async function requireVoiceOperatorRouteContext(
       route: operatorRoute,
       authSource: auth.authSource,
       hadAuthCookie: auth.hadAuthCookie,
+      bearerPresent: auth.bearerPresent,
     })
   } else {
     const membershipStartedAt = Date.now()
