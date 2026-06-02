@@ -9,7 +9,7 @@ import {
   findActiveMediaSessionForCall,
   updateMediaSessionStatus,
 } from "@/lib/voice/repository/voice-media-streaming-repository"
-import { isStaleRingPhaseMediaSession } from "@/lib/voice/media-streaming/inbound-media-stream-restart-logic"
+import { isDisconnectedInboundMediaSession } from "@/lib/voice/media-streaming/inbound-media-stream-restart-logic"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 
 const TWILIO_STREAM_CREATE_TIMEOUT_MS = 4_000
@@ -166,9 +166,9 @@ async function fetchTwilioStreamCreate(
 }
 
 /**
- * Inbound browser calls can ring for a long time while the initial `<Start><Stream>` leg
- * has already stopped. Restart Twilio Media Streams when the operator answers so transcript
- * segments reach the Growth coaching bridge.
+ * Inbound browser calls start media via TwiML `<Start><Stream>` on the parent call.
+ * Reuse that session on answer; only REST-restart when there is no active session or
+ * explicit disconnect evidence on the existing one.
  */
 export async function ensureAnsweredInboundCallMediaStream(
   admin: SupabaseClient,
@@ -205,16 +205,22 @@ export async function ensureAnsweredInboundCallMediaStream(
   }
 
   const activeMedia = await findActiveMediaSessionForCall(admin, input.organizationId, input.voiceCallId)
-  const staleRingStream =
-    activeMedia !== null && isStaleRingPhaseMediaSession({ mediaSession: activeMedia, answeredAtMs })
+  const disconnectedMediaSession =
+    activeMedia !== null && isDisconnectedInboundMediaSession(activeMedia)
 
-  if (activeMedia && !staleRingStream) {
-    logVoiceInfrastructure("voice_answered_inbound_media_stream_skipped", {
+  if (activeMedia && !disconnectedMediaSession) {
+    const reuseLog = {
       ...baseLog,
-      reason: "active_media_session_exists",
       mediaSessionId: activeMedia.id,
+      providerStreamSid: activeMedia.providerStreamSid,
+      streamStatus: activeMedia.streamStatus,
+    }
+    logVoiceInfrastructure("voice_answered_inbound_media_stream_reused", reuseLog)
+    logVoiceInfrastructure("voice_answered_inbound_media_stream_restart_skipped", {
+      ...reuseLog,
+      reason: "twiml_stream_active",
     })
-    return { started: false, reason: "active_media_session_exists" }
+    return { started: true, reason: "twiml_stream_reused" }
   }
 
   const credentials = readTwilioCredentials()
@@ -280,13 +286,30 @@ export async function ensureAnsweredInboundCallMediaStream(
     return { started: false, reason: "twilio_account_sid_mismatch" }
   }
 
-  if (activeMedia && staleRingStream) {
+  if (activeMedia && disconnectedMediaSession) {
     const stopResult = await stopTwilioCallStream({
       accountSid: credentials.accountSid,
       authToken: credentials.authToken,
       providerCallId: twilioStreamCallSid,
       providerStreamSid: activeMedia.providerStreamSid,
     })
+    logVoiceInfrastructure("voice_answered_inbound_media_stream_stale_stopped", {
+      ...streamLog,
+      mediaSessionId: activeMedia.id,
+      providerStreamSid: activeMedia.providerStreamSid,
+      twilioStopOk: stopResult.ok,
+      twilioStopStatus: stopResult.status ?? null,
+      twilioStopMessage: stopResult.message ?? null,
+    })
+    if (!stopResult.ok) {
+      logVoiceInfrastructure("voice_answered_inbound_media_stream_restart_skipped", {
+        ...streamLog,
+        mediaSessionId: activeMedia.id,
+        providerStreamSid: activeMedia.providerStreamSid,
+        reason: "twilio_stream_stop_failed",
+      })
+      return { started: false, reason: "twilio_stream_stop_failed" }
+    }
     await updateMediaSessionStatus(admin, {
       organizationId: input.organizationId,
       mediaSessionId: activeMedia.id,
@@ -297,14 +320,6 @@ export async function ensureAnsweredInboundCallMediaStream(
         stoppedReason: "answered_inbound_stream_restart",
       },
     })
-    logVoiceInfrastructure("voice_answered_inbound_media_stream_stale_stopped", {
-      ...streamLog,
-      mediaSessionId: activeMedia.id,
-      providerStreamSid: activeMedia.providerStreamSid,
-      twilioStopOk: stopResult.ok,
-      twilioStopStatus: stopResult.status ?? null,
-      twilioStopMessage: stopResult.message ?? null,
-    })
   }
 
   const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${credentials.accountSid}/Calls/${encodeURIComponent(twilioStreamCallSid)}/Streams.json`
@@ -313,8 +328,8 @@ export async function ensureAnsweredInboundCallMediaStream(
 
   logVoiceInfrastructure("voice_answered_inbound_media_stream_create_requested", {
     ...streamLog,
-    restartedAfterStaleRingStream: staleRingStream,
-    staleMediaSessionId: activeMedia?.id ?? null,
+    restartedAfterDisconnectedSession: disconnectedMediaSession,
+    disconnectedMediaSessionId: activeMedia?.id ?? null,
     twilioEndpointPath: `/Calls/${twilioStreamCallSid}/Streams.json`,
     timeoutMs: TWILIO_STREAM_CREATE_TIMEOUT_MS,
   })
@@ -340,7 +355,7 @@ export async function ensureAnsweredInboundCallMediaStream(
         ...streamLog,
         durationMs,
         timeoutMs: TWILIO_STREAM_CREATE_TIMEOUT_MS,
-        restartedAfterStaleRingStream: staleRingStream,
+        restartedAfterDisconnectedSession: disconnectedMediaSession,
         stage: "twilio_stream_create",
         reason: "twilio_stream_create_timeout",
       })
@@ -354,7 +369,7 @@ export async function ensureAnsweredInboundCallMediaStream(
         status: response.status,
         durationMs,
         message: responseBody.slice(0, 240),
-        restartedAfterStaleRingStream: staleRingStream,
+        restartedAfterDisconnectedSession: disconnectedMediaSession,
         stage: "twilio_stream_create",
       })
       return { started: false, reason: "twilio_stream_create_failed" }
@@ -369,23 +384,26 @@ export async function ensureAnsweredInboundCallMediaStream(
 
     logVoiceInfrastructure("voice_answered_inbound_media_stream_started", {
       ...streamLog,
-      restartedAfterStaleRingStream: staleRingStream,
+      restartedAfterDisconnectedSession: disconnectedMediaSession,
       providerStreamSid,
       twilioCreateStatus: response.status,
       durationMs,
       dbMediaSessionPendingWebsocketConnect: true,
     })
-    return { started: true, reason: staleRingStream ? "stream_created_after_stale_restart" : "stream_created" }
+    return {
+      started: true,
+      reason: disconnectedMediaSession ? "stream_created_after_disconnect_restart" : "stream_created",
+    }
   } catch (error) {
     logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
       ...streamLog,
       message: error instanceof Error ? error.message : String(error),
       durationMs: Date.now() - createStartedAt,
-      restartedAfterStaleRingStream: staleRingStream,
+      restartedAfterDisconnectedSession: disconnectedMediaSession,
       stage: "twilio_stream_create",
     })
     return { started: false, reason: "twilio_stream_create_failed" }
   }
 }
 
-export { isStaleRingPhaseMediaSession } from "@/lib/voice/media-streaming/inbound-media-stream-restart-logic"
+export { isDisconnectedInboundMediaSession } from "@/lib/voice/media-streaming/inbound-media-stream-restart-logic"

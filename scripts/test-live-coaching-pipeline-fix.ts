@@ -10,7 +10,7 @@ import {
   describeVoiceMediaStreamWssTarget,
   resolveVoiceMediaStreamPublicBaseUrl,
 } from "../lib/voice/call-control/urls"
-import { isStaleRingPhaseMediaSession } from "../lib/voice/media-streaming/inbound-media-stream-restart-logic"
+import { isDisconnectedInboundMediaSession } from "../lib/voice/media-streaming/inbound-media-stream-restart-logic"
 
 const QA_MARKER = "live-coaching-pipeline-fix-v1"
 
@@ -104,7 +104,10 @@ assert.match(answeredMediaStream, /timeoutMs: TWILIO_STREAM_CREATE_TIMEOUT_MS/)
 assert.match(answeredMediaStream, /durationMs/)
 assert.match(answeredMediaStream, /reason: "twilio_stream_create_timeout"/)
 assert.match(answeredMediaStream, /\/Streams\.json/)
-assert.match(answeredMediaStream, /voice_answered_inbound_media_stream_stale_stopped/)
+assert.match(answeredMediaStream, /voice_answered_inbound_media_stream_reused/)
+assert.match(answeredMediaStream, /voice_answered_inbound_media_stream_restart_skipped/)
+assert.match(answeredMediaStream, /reason: "twiml_stream_reused"/)
+assert.match(answeredMediaStream, /isDisconnectedInboundMediaSession/)
 
 const twilioTwiml = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/call-control/twilio-twiml.ts"),
@@ -370,29 +373,37 @@ assert.match(
   "successful answer sync must not overwrite an active accepted native session back to ringing",
 )
 
+const longRingMediaSession = {
+  id: "m1",
+  organizationId: "o1",
+  voiceCallId: "v1",
+  voiceConferenceId: null,
+  voiceRecordingId: null,
+  provider: "twilio" as const,
+  providerStreamSid: "MZ1",
+  mediaDirection: "duplex" as const,
+  streamStatus: "active" as const,
+  startedAt: "2026-06-01T17:06:49.767Z",
+  endedAt: null,
+  reconnectCount: 0,
+  metadataJson: {},
+  createdAt: "2026-06-01T17:06:50Z",
+  updatedAt: "2026-06-01T17:06:50Z",
+}
+
 assert.equal(
-  isStaleRingPhaseMediaSession({
-    mediaSession: {
-      id: "m1",
-      organizationId: "o1",
-      voiceCallId: "v1",
-      voiceConferenceId: null,
-      voiceRecordingId: null,
-      provider: "twilio",
-      providerStreamSid: "MZ1",
-      mediaDirection: "duplex",
-      streamStatus: "active",
-      startedAt: "2026-06-01T17:06:49.767Z",
-      endedAt: null,
-      reconnectCount: 0,
-      metadataJson: {},
-      createdAt: "2026-06-01T17:06:50Z",
-      updatedAt: "2026-06-01T17:06:50Z",
-    },
-    answeredAtMs: Date.parse("2026-06-01T17:25:16.202Z"),
+  isDisconnectedInboundMediaSession(longRingMediaSession),
+  false,
+  "long ring duration alone must not trigger post-answer restart",
+)
+
+assert.equal(
+  isDisconnectedInboundMediaSession({
+    ...longRingMediaSession,
+    metadataJson: { websocketDisconnected: true },
   }),
   true,
-  "stale ring media must trigger post-answer restart",
+  "explicit websocket disconnect evidence must allow restart",
 )
 
 const previousMediaOrigin = process.env.VOICE_MEDIA_STREAM_PUBLIC_ORIGIN
