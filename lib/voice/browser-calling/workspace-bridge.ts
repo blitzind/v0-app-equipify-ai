@@ -110,7 +110,13 @@ export async function createVoiceCallForWorkspaceSession(
 
 export async function syncWorkspaceSessionFromVoiceCall(
   admin: SupabaseClient,
-  input: { voiceCallId: string; organizationId: string; workspaceSessionId?: string | null; userId?: string | null },
+  input: {
+    voiceCallId: string
+    organizationId: string
+    workspaceSessionId?: string | null
+    userId?: string | null
+    preventActiveToRingingDowngrade?: boolean
+  },
 ): Promise<void> {
   const { data: callRow, error: callError } = await admin
     .schema("voice")
@@ -151,6 +157,14 @@ export async function syncWorkspaceSessionFromVoiceCall(
     onHold: Boolean(sessionRow.on_hold),
   })
   const currentStatus = sessionRow.status as NativeCallWorkspaceSessionPublicView["status"]
+  if (
+    input.preventActiveToRingingDowngrade &&
+    input.workspaceSessionId &&
+    nativeStatus === "ringing" &&
+    (currentStatus === "active" || currentStatus === "on_hold")
+  ) {
+    return
+  }
   if (
     ["wrapping", "completed", "missed", "failed", "no_answer", "cancelled"].includes(currentStatus) &&
     (nativeStatus === "active" || nativeStatus === "on_hold" || nativeStatus === "ringing")

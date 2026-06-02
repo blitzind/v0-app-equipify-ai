@@ -133,6 +133,41 @@ assert.match(
   /if \(existingStatus !== "ringing" && !canReconcileAlreadyAnsweredInbound\)[\s\S]*throw new Error\("Call is not ringing\."\)/,
   "non-ringing sessions should only be accepted for the explicit inbound coaching reconciliation fallback",
 )
+assert.match(
+  nativeDialerRepo,
+  /const \{ data: answeredVoiceCall, error: answerVoiceCallError \} = await admin[\s\S]*\.schema\("voice"\)[\s\S]*\.from\("voice_calls"\)[\s\S]*\.update\(\{ status: "in_progress", answered_at: now, updated_at: now \}\)[\s\S]*\.eq\("id", voiceCallId\)[\s\S]*\.eq\("organization_id", orgId\)[\s\S]*\.select\("id,status,answered_at"\)[\s\S]*\.maybeSingle\(\)/,
+  "answer reconciliation must verify the canonical voice call update before syncing native session state",
+)
+assert.match(
+  nativeDialerRepo,
+  /if \(answerVoiceCallError\) throw new Error\("voice_call_answer_update_failed"\)/,
+  "failed voice.voice_calls update must stop answer reconciliation",
+)
+assert.match(
+  nativeDialerRepo,
+  /if \(!answeredVoiceCall\) throw new Error\("voice_call_answer_update_missing"\)/,
+  "zero-row voice.voice_calls answer update must stop answer reconciliation",
+)
+assert.match(
+  nativeDialerRepo,
+  /answeredVoiceCall\.status[\s\S]*!== "in_progress"[\s\S]*throw new Error\("voice_call_answer_status_not_in_progress"\)/,
+  "answer reconciliation must reject a voice call that did not persist in_progress status",
+)
+assert.match(
+  nativeDialerRepo,
+  /answeredVoiceCall\.answered_at[\s\S]*throw new Error\("voice_call_answered_at_missing"\)/,
+  "answer reconciliation must reject a voice call with missing answered_at",
+)
+assert.match(
+  nativeDialerRepo,
+  /syncWorkspaceSessionFromVoiceCall\(admin, \{[\s\S]*workspaceSessionId: sessionId[\s\S]*preventActiveToRingingDowngrade: true/,
+  "answer reconciliation must not allow sync to downgrade the accepted active native session back to ringing",
+)
+assert.match(
+  nativeDialerRepo,
+  /const \{ data: refreshed[\s\S]*\.eq\("id", sessionId\)[\s\S]*return \{ session: mapNativeCallSessionRow\(refreshed as SessionRow\), pipeline \}/,
+  "answer_api_response must be based on the final refreshed accepted session row",
+)
 
 const coachingTypes = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/native-dialer/call-workspace-coaching-types.ts"),
@@ -175,6 +210,17 @@ assert.doesNotMatch(
   workspaceUi,
   /accept[\s\S]{0,400}setOptimisticCoachTurn\(\{/,
   "SDK accept must not seed bootstrap before answer pipeline links coaching",
+)
+
+const workspaceBridge = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/browser-calling/workspace-bridge.ts"),
+  "utf8",
+)
+assert.match(workspaceBridge, /preventActiveToRingingDowngrade\?: boolean/)
+assert.match(
+  workspaceBridge,
+  /input\.preventActiveToRingingDowngrade[\s\S]*nativeStatus === "ringing"[\s\S]*\(currentStatus === "active" \|\| currentStatus === "on_hold"\)[\s\S]*return/,
+  "successful answer sync must not overwrite an active accepted native session back to ringing",
 )
 
 assert.equal(

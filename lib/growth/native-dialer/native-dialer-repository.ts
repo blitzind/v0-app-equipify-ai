@@ -463,12 +463,22 @@ export async function answerNativeCallSession(
       })
       if (!claim.ok) throw new Error(claim.reason)
 
-      await admin
+      const { data: answeredVoiceCall, error: answerVoiceCallError } = await admin
         .schema("voice")
         .from("voice_calls")
         .update({ status: "in_progress", answered_at: now, updated_at: now })
         .eq("id", voiceCallId)
         .eq("organization_id", orgId)
+        .select("id,status,answered_at")
+        .maybeSingle()
+      if (answerVoiceCallError) throw new Error("voice_call_answer_update_failed")
+      if (!answeredVoiceCall) throw new Error("voice_call_answer_update_missing")
+      if ((answeredVoiceCall.status as string | null) !== "in_progress") {
+        throw new Error("voice_call_answer_status_not_in_progress")
+      }
+      if (!((answeredVoiceCall.answered_at as string | null) ?? null)) {
+        throw new Error("voice_call_answered_at_missing")
+      }
 
       await appendVoiceCallEvent(admin, {
         organizationId: orgId,
@@ -545,6 +555,7 @@ export async function answerNativeCallSession(
     organizationId: orgId,
     workspaceSessionId: sessionId,
     userId: ownerUserId ?? null,
+    preventActiveToRingingDowngrade: true,
   })
 
   pipeline.mediaStreamWssHost = describeVoiceMediaStreamWssTarget(null).wssHost
