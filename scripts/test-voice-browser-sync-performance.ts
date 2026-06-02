@@ -63,6 +63,7 @@ assert.match(operatorRoute, /\.from\("organization_members"\)[\s\S]*\.eq\("statu
 assert.match(operatorRoute, /options\.requireSessionOwner && session\.owner_user_id !== user\.id/)
 assert.match(browserSyncRoute, /requireVoiceOperatorRouteContext/)
 assert.doesNotMatch(browserSyncRoute, /requireVoicePlatformRouteContext/)
+assert.match(browserSyncRoute, /UUID_RE\.test\(rawWorkspaceSessionId\)/)
 assert.match(browserSyncRoute, /sessionId: workspaceSessionId/)
 assert.match(browserSyncRoute, /requireSessionOwner: Boolean\(workspaceSessionId\)/)
 assert.match(browserSyncRoute, /probeVoiceSchemaHealthCached/)

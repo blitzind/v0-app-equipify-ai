@@ -354,7 +354,9 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         : activeSession?.id ?? null
 
   const voiceBrowser = useVoiceBrowserCalling({
-    workspaceSessionId: syncWorkspaceSessionId,
+    workspaceSessionId: isNativeSessionIdServerReady(syncWorkspaceSessionId)
+      ? syncWorkspaceSessionId
+      : null,
     onIncomingCleared: handleIncomingCleared,
     onSdkCallDisconnected: handleSdkCallDisconnected,
   })
