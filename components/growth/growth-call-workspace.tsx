@@ -188,6 +188,28 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     }
   }, [])
 
+  function clearLifecycleLocksForAnsweredSession(session: NativeCallWorkspaceSessionPublicView): void {
+    endedSessionIdsRef.current.delete(session.id)
+    completedSessionIdsRef.current.delete(session.id)
+    if (session.voiceCallId) {
+      endedVoiceCallIdsRef.current.delete(session.voiceCallId)
+      completedVoiceCallIdsRef.current.delete(session.voiceCallId)
+    }
+  }
+
+  function isAuthoritativeLinkedAnswerResponse(input: {
+    session: NativeCallWorkspaceSessionPublicView
+    pipeline?: CallWorkspaceAnswerPipelineDiagnostics
+  }): boolean {
+    return (
+      input.session.direction === "inbound" &&
+      (input.session.status === "active" || input.session.status === "on_hold") &&
+      Boolean(input.session.realtimeSessionId) &&
+      input.pipeline?.liveCoachingLinked === true &&
+      Boolean(input.pipeline.realtimeSessionId)
+    )
+  }
+
   const applyServerSession = useCallback(
     (server: NativeCallWorkspaceSessionPublicView | null | undefined) => {
       logLiveCoachingAutoStartQa("applyServerSession", {
@@ -1048,6 +1070,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           linkResultReason: data.pipeline?.linkResult?.reason ?? null,
         })
         if (!res.ok || !data.session) throw new Error(data.message ?? "Could not answer call.")
+        const answeredSession = data.session
         if (data.pipeline?.liveCoachingLinked) {
           setAnswerPipelineDiagnostic(null)
           setOptimisticCoachTurn(null)
@@ -1067,30 +1090,52 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         registerAcceptedCallLifecycle({
           acceptedVoiceCallIds: acceptedVoiceCallIdsRef.current,
           acceptedSessionIds: acceptedSessionIdsRef.current,
-          voiceCallId: data.session.voiceCallId,
-          sessionId: data.session.id,
+          voiceCallId: answeredSession.voiceCallId,
+          sessionId: answeredSession.id,
         })
-        if (
-          isCallLifecycleEndedLocked({
-            sessionId: data.session.id,
-            voiceCallId: data.session.voiceCallId,
-            locks: getLifecycleLocks(),
-          })
-        ) {
+        const authoritativeLinkedAnswer = isAuthoritativeLinkedAnswerResponse({
+          session: answeredSession,
+          pipeline: data.pipeline,
+        })
+        const responseLifecycleLocked = isCallLifecycleEndedLocked({
+          sessionId: answeredSession.id,
+          voiceCallId: answeredSession.voiceCallId,
+          locks: getLifecycleLocks(),
+        })
+        if (responseLifecycleLocked && !authoritativeLinkedAnswer) {
           logLiveCoachingAutoStartQa("reconcileInboundAnswer_skipped_response_lifecycle_locked", {
-            sessionId: data.session.id,
-            voiceCallId: data.session.voiceCallId,
-            realtimeSessionId: data.session.realtimeSessionId,
+            sessionId: answeredSession.id,
+            voiceCallId: answeredSession.voiceCallId,
+            realtimeSessionId: answeredSession.realtimeSessionId,
           })
           return
         }
-        applyServerSession(data.session)
+        if (authoritativeLinkedAnswer) {
+          if (responseLifecycleLocked) {
+            logLiveCoachingAutoStartQa("reconcileInboundAnswer_cleared_stale_lifecycle_lock", {
+              sessionId: answeredSession.id,
+              voiceCallId: answeredSession.voiceCallId,
+              realtimeSessionId: answeredSession.realtimeSessionId,
+            })
+          }
+          clearLifecycleLocksForAnsweredSession(answeredSession)
+          setCallAuthority((prev) => ({
+            ...prev,
+            phase: "active",
+            voiceCallId: answeredSession.voiceCallId ?? prev.voiceCallId,
+            sessionId: answeredSession.id,
+            connectedAt: answeredSession.connectedAt ?? prev.connectedAt ?? new Date().toISOString(),
+            endedAt: null,
+            frozenDurationSeconds: null,
+          }))
+        }
+        applyServerSession(answeredSession)
         logLiveCoachingAutoStartQa("reconcileInboundAnswer_success", {
-          sessionId: data.session.id,
-          voiceCallId: data.session.voiceCallId,
-          status: data.session.status,
-          direction: data.session.direction,
-          realtimeSessionId: data.session.realtimeSessionId,
+          sessionId: answeredSession.id,
+          voiceCallId: answeredSession.voiceCallId,
+          status: answeredSession.status,
+          direction: answeredSession.direction,
+          realtimeSessionId: answeredSession.realtimeSessionId,
           liveCoachingLinked: data.pipeline?.liveCoachingLinked ?? null,
           liveCoachingFailureReason: data.pipeline?.liveCoachingFailureReason ?? null,
         })

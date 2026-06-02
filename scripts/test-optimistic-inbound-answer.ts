@@ -80,8 +80,33 @@ assert.doesNotMatch(
 )
 assert.match(
   workspaceSource,
-  /applyServerSession\(data\.session\)[\s\S]*void voiceBrowser\.refresh\(\)\.catch\(\(\) => undefined\)/,
+  /applyServerSession\(answeredSession\)[\s\S]*void voiceBrowser\.refresh\(\)\.catch\(\(\) => undefined\)/,
   "answer reconciliation must apply the linked server session before refreshing operator assist",
+)
+assert.match(
+  workspaceSource,
+  /function isAuthoritativeLinkedAnswerResponse[\s\S]*input\.session\.status === "active" \|\| input\.session\.status === "on_hold"[\s\S]*Boolean\(input\.session\.realtimeSessionId\)[\s\S]*input\.pipeline\?\.liveCoachingLinked === true[\s\S]*Boolean\(input\.pipeline\.realtimeSessionId\)/,
+  "client must recognize an active linked answer response as authoritative",
+)
+assert.match(
+  workspaceSource,
+  /const authoritativeLinkedAnswer = isAuthoritativeLinkedAnswerResponse\(\{[\s\S]*session: answeredSession[\s\S]*pipeline: data\.pipeline[\s\S]*\}\)/,
+  "answer reconciliation must classify the returned server session before applying lifecycle locks",
+)
+assert.match(
+  workspaceSource,
+  /if \(responseLifecycleLocked && !authoritativeLinkedAnswer\)[\s\S]*reconcileInboundAnswer_skipped_response_lifecycle_locked[\s\S]*return/,
+  "lifecycle locks may only skip non-authoritative answer responses",
+)
+assert.match(
+  workspaceSource,
+  /if \(authoritativeLinkedAnswer\) \{[\s\S]*clearLifecycleLocksForAnsweredSession\(answeredSession\)[\s\S]*phase: "active"[\s\S]*applyServerSession\(answeredSession\)/,
+  "authoritative linked answer responses must clear stale locks, restore active authority, and apply the server session",
+)
+assert.doesNotMatch(
+  workspaceSource,
+  /if \(\s*isCallLifecycleEndedLocked\(\{[\s\S]*sessionId: data\.session\.id[\s\S]*return[\s\S]*\}\s*\)\s*\)\s*\{/,
+  "answer response must not unconditionally return before applying an active linked server session",
 )
 
 console.log("optimistic-inbound-answer checks passed")
