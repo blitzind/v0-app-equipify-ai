@@ -6,6 +6,7 @@ import {
   growthNativeDialerSchemaResponseMeta,
   requireGrowthNativeDialerSchemaReady,
 } from "@/lib/growth/native-dialer/native-dialer-schema-health"
+import { logGrowthCallsAnswerValidationAudit } from "@/lib/voice/api/session-id-validation-diagnostics"
 import { requireVoiceOperatorRouteContext } from "@/lib/voice/api/voice-operator-route"
 
 export const runtime = "nodejs"
@@ -30,16 +31,52 @@ function logLiveCoachingAutoStartQa(event: string, details: Record<string, unkno
 }
 
 export async function POST(request: Request) {
-  const parsed = bodySchema.safeParse(await request.json().catch(() => ({})))
+  const rawBody = await request.json().catch(() => ({}))
+  const parsed = bodySchema.safeParse(rawBody)
   if (!parsed.success) {
+    logGrowthCallsAnswerValidationAudit("zod_rejected", {
+      branch: "invalid_body",
+      sessionId:
+        typeof rawBody === "object" &&
+        rawBody !== null &&
+        "sessionId" in rawBody &&
+        typeof (rawBody as { sessionId?: unknown }).sessionId === "string"
+          ? (rawBody as { sessionId: string }).sessionId
+          : null,
+      zodIssues: parsed.error.issues.map((issue) => issue.message),
+    })
     return NextResponse.json({ error: "invalid_body", message: "Invalid answer payload." }, { status: 400 })
   }
+
+  logGrowthCallsAnswerValidationAudit("pre_operator_guard", {
+    branch: "zod_accepted",
+    sessionId: parsed.data.sessionId,
+  })
 
   const access = await requireVoiceOperatorRouteContext({
     sessionId: parsed.data.sessionId,
     requireSessionOwner: true,
+    sessionIdDiagnostics: {
+      route: "POST /api/platform/growth/calls/answer",
+      sessionIdSource: "json_body.sessionId",
+      nativeSessionId: parsed.data.sessionId,
+    },
   })
-  if (!access.ok) return access.response
+  if (!access.ok) {
+    logGrowthCallsAnswerValidationAudit("operator_guard_rejected", {
+      branch: "operator_guard_rejected",
+      sessionId: parsed.data.sessionId,
+    })
+    return access.response
+  }
+
+  logGrowthCallsAnswerValidationAudit("operator_guard_accepted", {
+    branch: "operator_guard_accepted",
+    sessionId: parsed.data.sessionId,
+    nativeSessionId: access.session?.id ?? null,
+    nativeSessionStatus: access.session?.status ?? null,
+    nativeSessionOwnerUserId: access.session?.owner_user_id ?? null,
+  })
 
   const schemaGate = await requireGrowthNativeDialerSchemaReady(access.admin)
   if (!schemaGate.ok) {

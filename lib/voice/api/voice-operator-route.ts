@@ -6,6 +6,10 @@ import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-clie
 import { isGrowthEngineEnabledEnv, logGrowthEngine } from "@/lib/growth/access"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { resolveVoiceInfrastructureOrganizationId } from "@/lib/voice/repository/voice-repository"
+import {
+  logSessionIdValidationFailure,
+  logVoiceOperatorSessionIdAudit,
+} from "@/lib/voice/api/session-id-validation-diagnostics"
 import { VOICE_OPERATIONS_QA_MARKER } from "@/lib/voice/types"
 
 export const UUID_RE =
@@ -29,9 +33,24 @@ export type VoiceOperatorRouteContext =
     }
   | { ok: false; response: NextResponse }
 
+export type VoiceOperatorRouteDiagnostics = {
+  onAuthComplete?: (durationMs: number) => void
+  onMembershipComplete?: (durationMs: number) => void
+}
+
+export type VoiceOperatorRouteSessionIdDiagnostics = {
+  route: string
+  sessionIdSource: string
+  activeVoiceCallId?: string | null
+  nativeSessionId?: string | null
+  realtimeSessionId?: string | null
+}
+
 export type VoiceOperatorRouteContextOptions = {
   sessionId?: string | null
   requireSessionOwner?: boolean
+  diagnostics?: VoiceOperatorRouteDiagnostics
+  sessionIdDiagnostics?: VoiceOperatorRouteSessionIdDiagnostics
 }
 
 function jsonResponse(error: string, message: string, status: number): VoiceOperatorRouteContext {
@@ -62,10 +81,12 @@ export async function requireVoiceOperatorRouteContext(
     return jsonResponse("org_not_configured", "Set GROWTH_ENGINE_AI_ORG_ID to scope voice operations.", 400)
   }
 
+  const authStartedAt = Date.now()
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
+  options.diagnostics?.onAuthComplete?.(Date.now() - authStartedAt)
 
   if (!user?.id) {
     logGrowthEngine("operator_access_denied", { reason: "unauthorized" })
@@ -81,6 +102,7 @@ export async function requireVoiceOperatorRouteContext(
     return jsonResponse("server_config", "Server is not configured for voice operations.", 503)
   }
 
+  const membershipStartedAt = Date.now()
   const { data: membership, error: membershipError } = await admin
     .from("organization_members")
     .select("user_id")
@@ -88,6 +110,7 @@ export async function requireVoiceOperatorRouteContext(
     .eq("user_id", user.id)
     .eq("status", "active")
     .maybeSingle()
+  options.diagnostics?.onMembershipComplete?.(Date.now() - membershipStartedAt)
 
   if (membershipError) {
     logGrowthEngine("operator_access_denied", {
@@ -120,9 +143,42 @@ export async function requireVoiceOperatorRouteContext(
   let session: OperatorSessionRow | null = null
 
   if (sessionId) {
+    const operatorRoute =
+      options.sessionIdDiagnostics?.route ?? "requireVoiceOperatorRouteContext"
+    const sessionIdSource =
+      options.sessionIdDiagnostics?.sessionIdSource ?? "operator_route_options"
+
     if (!UUID_RE.test(sessionId)) {
+      logSessionIdValidationFailure({
+        route: operatorRoute,
+        message: "Session id is invalid.",
+        sessionId,
+        sessionIdSource,
+        activeVoiceCallId: options.sessionIdDiagnostics?.activeVoiceCallId ?? null,
+        nativeSessionId: options.sessionIdDiagnostics?.nativeSessionId ?? sessionId,
+        realtimeSessionId: options.sessionIdDiagnostics?.realtimeSessionId ?? null,
+        sessionIdPassedUuidValidation: false,
+      })
+      logVoiceOperatorSessionIdAudit({
+        route: operatorRoute,
+        branch: "invalid_id_uuid_regex_failed",
+        sessionId: options.sessionId,
+        sessionIdSource,
+        organizationId,
+        httpStatus: 400,
+        errorCode: "invalid_id",
+        message: "Session id is invalid.",
+      })
       return jsonResponse("invalid_id", "Session id is invalid.", 400)
     }
+
+    logVoiceOperatorSessionIdAudit({
+      route: operatorRoute,
+      branch: "uuid_regex_passed",
+      sessionId: options.sessionId,
+      sessionIdSource,
+      organizationId,
+    })
 
     const { data: sessionRow, error: sessionError } = await admin
       .schema("growth")
@@ -131,6 +187,20 @@ export async function requireVoiceOperatorRouteContext(
       .eq("id", sessionId)
       .eq("organization_id", organizationId)
       .maybeSingle()
+
+    logVoiceOperatorSessionIdAudit({
+      route: operatorRoute,
+      branch: sessionError
+        ? "db_lookup_error"
+        : sessionRow
+          ? "db_lookup_found"
+          : "db_lookup_not_found",
+      sessionId: options.sessionId,
+      sessionIdSource,
+      organizationId,
+      dbLookupFound: sessionRow ? true : sessionRow === null ? false : null,
+      dbLookupError: sessionError?.message ?? null,
+    })
 
     if (sessionError) {
       logGrowthEngine("operator_access_denied", {
@@ -144,6 +214,17 @@ export async function requireVoiceOperatorRouteContext(
     }
 
     if (!sessionRow) {
+      logVoiceOperatorSessionIdAudit({
+        route: operatorRoute,
+        branch: "not_found_return",
+        sessionId: options.sessionId,
+        sessionIdSource,
+        organizationId,
+        dbLookupFound: false,
+        httpStatus: 404,
+        errorCode: "not_found",
+        message: "Call session not found.",
+      })
       return jsonResponse("not_found", "Call session not found.", 404)
     }
 
