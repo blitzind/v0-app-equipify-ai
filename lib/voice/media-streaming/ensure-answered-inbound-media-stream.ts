@@ -12,6 +12,8 @@ import {
 import { isStaleRingPhaseMediaSession } from "@/lib/voice/media-streaming/inbound-media-stream-restart-logic"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 
+const TWILIO_STREAM_CREATE_TIMEOUT_MS = 4_000
+
 function readTwilioCredentials(): { accountSid: string; authToken: string } | null {
   const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim()
   const authToken = process.env.TWILIO_AUTH_TOKEN?.trim()
@@ -55,6 +57,28 @@ function readTwilioStreamSid(payload: unknown): string | null {
   return typeof sid === "string" && sid.trim() ? sid.trim() : null
 }
 
+async function fetchTwilioStreamCreate(
+  endpoint: string,
+  init: RequestInit,
+): Promise<{ response: Response | null; timedOut: boolean }> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), TWILIO_STREAM_CREATE_TIMEOUT_MS)
+  try {
+    const response = await fetch(endpoint, { ...init, signal: controller.signal })
+    return { response, timedOut: false }
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return { response: null, timedOut: true }
+    }
+    if (error instanceof Error && error.name === "AbortError") {
+      return { response: null, timedOut: true }
+    }
+    throw error
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 /**
  * Inbound browser calls can ring for a long time while the initial `<Start><Stream>` leg
  * has already stopped. Restart Twilio Media Streams when the operator answers so transcript
@@ -74,6 +98,7 @@ export async function ensureAnsweredInboundCallMediaStream(
   const baseLog = {
     voiceCallId: input.voiceCallId,
     providerCallId: input.providerCallId,
+    wssUrl,
     wssHost: streamTarget.wssHost,
     originSource: streamTarget.originSource,
   }
@@ -152,15 +177,18 @@ export async function ensureAnsweredInboundCallMediaStream(
 
   const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${credentials.accountSid}/Calls/${encodeURIComponent(input.providerCallId)}/Streams.json`
   const auth = Buffer.from(`${credentials.accountSid}:${credentials.authToken}`).toString("base64")
+  const createStartedAt = Date.now()
 
   logVoiceInfrastructure("voice_answered_inbound_media_stream_create_requested", {
     ...baseLog,
     restartedAfterStaleRingStream: staleRingStream,
     staleMediaSessionId: activeMedia?.id ?? null,
+    twilioEndpointPath: `/Calls/${input.providerCallId}/Streams.json`,
+    timeoutMs: TWILIO_STREAM_CREATE_TIMEOUT_MS,
   })
 
   try {
-    const response = await fetch(endpoint, {
+    const { response, timedOut } = await fetchTwilioStreamCreate(endpoint, {
       method: "POST",
       headers: {
         Authorization: `Basic ${auth}`,
@@ -173,12 +201,26 @@ export async function ensureAnsweredInboundCallMediaStream(
         "Parameter1.Value": input.providerCallId,
       }),
     })
+    const durationMs = Date.now() - createStartedAt
+
+    if (timedOut || !response) {
+      logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
+        ...baseLog,
+        durationMs,
+        timeoutMs: TWILIO_STREAM_CREATE_TIMEOUT_MS,
+        restartedAfterStaleRingStream: staleRingStream,
+        stage: "twilio_stream_create",
+        reason: "twilio_stream_create_timeout",
+      })
+      return { started: false, reason: "twilio_stream_create_timeout" }
+    }
 
     const responseBody = await response.text().catch(() => "")
     if (!response.ok) {
       logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
         ...baseLog,
         status: response.status,
+        durationMs,
         message: responseBody.slice(0, 240),
         restartedAfterStaleRingStream: staleRingStream,
         stage: "twilio_stream_create",
@@ -198,6 +240,7 @@ export async function ensureAnsweredInboundCallMediaStream(
       restartedAfterStaleRingStream: staleRingStream,
       providerStreamSid,
       twilioCreateStatus: response.status,
+      durationMs,
       dbMediaSessionPendingWebsocketConnect: true,
     })
     return { started: true, reason: staleRingStream ? "stream_created_after_stale_restart" : "stream_created" }
@@ -205,6 +248,7 @@ export async function ensureAnsweredInboundCallMediaStream(
     logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
       ...baseLog,
       message: error instanceof Error ? error.message : String(error),
+      durationMs: Date.now() - createStartedAt,
       restartedAfterStaleRingStream: staleRingStream,
       stage: "twilio_stream_create",
     })

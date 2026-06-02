@@ -65,6 +65,11 @@ assert.match(
 assert.match(coachingService, /voice_growth_coaching_native_linked/)
 assert.match(
   coachingService,
+  /const createRealtimeStartedAt = Date\.now\(\)[\s\S]*createGrowthRealtimeCallSession[\s\S]*voice_growth_coaching_session_created[\s\S]*durationMs: Date\.now\(\) - createRealtimeStartedAt/,
+  "coaching telemetry must expose realtime session creation duration",
+)
+assert.match(
+  coachingService,
   /if \(realtimeSessionId && context\.linkResult\?\.linked\)[\s\S]*voice_growth_coaching_auto_linked/,
   "auto-linked success must require a persisted native realtime link",
 )
@@ -75,7 +80,13 @@ const answeredMediaStream = fs.readFileSync(
 )
 assert.match(answeredMediaStream, /describeVoiceMediaStreamWssTarget/)
 assert.match(answeredMediaStream, /wssHost/)
+assert.match(answeredMediaStream, /wssUrl/)
+assert.match(answeredMediaStream, /TWILIO_STREAM_CREATE_TIMEOUT_MS/)
+assert.match(answeredMediaStream, /fetchTwilioStreamCreate/)
 assert.match(answeredMediaStream, /voice_answered_inbound_media_stream_create_requested/)
+assert.match(answeredMediaStream, /timeoutMs: TWILIO_STREAM_CREATE_TIMEOUT_MS/)
+assert.match(answeredMediaStream, /durationMs/)
+assert.match(answeredMediaStream, /reason: "twilio_stream_create_timeout"/)
 assert.match(answeredMediaStream, /\/Streams\.json/)
 assert.match(answeredMediaStream, /voice_answered_inbound_media_stream_stale_stopped/)
 
@@ -86,6 +97,11 @@ const nativeDialerRepo = fs.readFileSync(
 const coachingIdx = nativeDialerRepo.indexOf("autoStartCallWorkspaceLiveCoachingOnAnswer")
 const mediaIdx = nativeDialerRepo.indexOf("ensureAnsweredInboundCallMediaStream")
 assert.ok(coachingIdx > 0 && mediaIdx > coachingIdx, "coaching auto-start must run before media restart")
+assert.match(
+  nativeDialerRepo,
+  /const coachingStartedAt = Date\.now\(\)[\s\S]*autoStartCallWorkspaceLiveCoachingOnAnswer[\s\S]*durationMs: Date\.now\(\) - coachingStartedAt/,
+  "answer telemetry must expose auto-start duration before media stream restart",
+)
 assert.match(nativeDialerRepo, /type LinkNativeCallRealtimeSessionResult/)
 assert.match(nativeDialerRepo, /select\("id, realtime_session_id"\)/)
 assert.match(nativeDialerRepo, /reason: "native_session_not_found"/)

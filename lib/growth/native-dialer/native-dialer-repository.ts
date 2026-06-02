@@ -565,6 +565,7 @@ export async function answerNativeCallSession(
       "@/lib/growth/native-dialer/call-workspace-coaching-service"
     )
     try {
+      const coachingStartedAt = Date.now()
       logLiveCoachingAutoStartQa("autoStartCallWorkspaceLiveCoachingOnAnswer_start", {
         nativeSessionId: sessionId,
         voiceCallId,
@@ -586,6 +587,7 @@ export async function answerNativeCallSession(
         reason: coaching.reason,
         linkResultLinked: coaching.linkResult?.linked ?? null,
         linkResultReason: coaching.linkResult?.reason ?? null,
+        durationMs: Date.now() - coachingStartedAt,
       })
       pipeline.liveCoachingFailureReason = coaching.reason
       pipeline.createdRealtimeSessionId = coaching.realtimeSessionId

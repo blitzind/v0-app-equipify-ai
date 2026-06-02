@@ -183,9 +183,18 @@ export async function startCallWorkspaceLiveCoaching(
     }
 
     try {
+      const createRealtimeStartedAt = Date.now()
       realtimeSession = await createGrowthRealtimeCallSession(admin, {
         leadId: coachingLeadId,
         createdBy: input.createdBy ?? null,
+      })
+      logVoiceInfrastructure("voice_growth_coaching_session_created", {
+        nativeSessionId: nativeSession.id,
+        realtimeSessionId: realtimeSession.id,
+        coachingLeadId,
+        voiceCallId: nativeSession.voiceCallId ?? null,
+        priority: input.priority ?? "standard",
+        durationMs: Date.now() - createRealtimeStartedAt,
       })
     } catch (error) {
       logVoiceInfrastructure("voice_growth_coaching_auto_start_failed", {
@@ -198,13 +207,6 @@ export async function startCallWorkspaceLiveCoaching(
       })
       throw new Error("realtime_session_create_failed")
     }
-    logVoiceInfrastructure("voice_growth_coaching_session_created", {
-      nativeSessionId: nativeSession.id,
-      realtimeSessionId: realtimeSession.id,
-      coachingLeadId,
-      voiceCallId: nativeSession.voiceCallId ?? null,
-      priority: input.priority ?? "standard",
-    })
   }
 
   if (nativeSession.realtimeSessionId !== realtimeSession.id) {
