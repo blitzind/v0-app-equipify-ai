@@ -11,7 +11,6 @@ import type {
   VoiceOperatorPresencePublicView,
   VoiceOperatorPresenceStatus,
 } from "@/lib/voice/browser-calling/types"
-import { resolveInboundBrowserOfferForUser } from "@/lib/voice/browser-calling/inbound-browser-offer-resolver"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 
 function browserDevicesTable(admin: SupabaseClient) {
@@ -211,17 +210,10 @@ export async function listOnlineVoiceBrowserDevices(
   organizationId: string,
   input?: { userIds?: string[] },
 ): Promise<VoiceBrowserDevicePublicView[]> {
-  let query = browserDevicesTable(admin)
-    .select(VOICE_BROWSER_DEVICE_SELECT)
-    .eq("organization_id", organizationId)
-    .in("status", ["available", "busy", "reconnecting"])
-    .order("last_heartbeat_at", { ascending: false })
-  if (input?.userIds?.length) {
-    query = query.in("user_id", input.userIds)
-  }
-  const { data, error } = await query
-  if (error) throw new Error(error.message)
-  return (data ?? []).map((row) => mapDeviceRow(row as Record<string, unknown>))
+  const { listOnlineVoiceBrowserDevices: listDevices } = await import(
+    "@/lib/voice/repository/voice-browser-devices-repository"
+  )
+  return listDevices(admin, organizationId, input)
 }
 
 export async function listVoiceOperatorPresence(
@@ -299,6 +291,9 @@ export async function fetchInboundBrowserOfferForUser(
   admin: SupabaseClient,
   input: { organizationId: string; userId: string },
 ): Promise<VoiceInboundBrowserOfferView | null> {
+  const { resolveInboundBrowserOfferForUser } = await import(
+    "@/lib/voice/browser-calling/inbound-browser-offer-resolver"
+  )
   const selection = await resolveInboundBrowserOfferForUser(admin, input)
   return selection.offer
 }

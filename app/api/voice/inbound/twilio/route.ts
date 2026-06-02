@@ -97,6 +97,21 @@ export async function POST(request: Request) {
         qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
         code: result.code,
         message: result.message,
+        callSid: payload.CallSid ?? null,
+        failureReason: result.code === "configuration_error" ? "routing_or_config" : result.code,
+      })
+    } else if (
+      result.decision.action === "dial" &&
+      !result.twiml.includes("<Dial") &&
+      !result.twiml.includes("<Client")
+    ) {
+      logVoiceInfrastructure("voice_inbound_route_unresolved", {
+        qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
+        code: "twiml_without_dial",
+        message: "Inbound dial action returned TwiML without dial target.",
+        action: result.decision.action,
+        callSid: payload.CallSid ?? null,
+        failureReason: "twiml_without_dial",
       })
     }
 
@@ -107,6 +122,7 @@ export async function POST(request: Request) {
     logVoiceInfrastructure("voice_inbound_webhook_failed", {
       qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
       message,
+      failureReason: "exception",
     })
     timer.finish({ outcome: "exception", message })
     return twimlResponse(

@@ -57,6 +57,11 @@ function skipArchivedOrgGuard(pathname: string) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Provider webhooks (Twilio signature verified in route handlers) — skip Supabase session refresh.
+  if (pathname.startsWith("/api/voice/")) {
+    return NextResponse.next()
+  }
+
   const portalRedirect = await portalAuthGate(request)
   if (portalRedirect) return portalRedirect
 

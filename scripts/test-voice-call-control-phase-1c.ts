@@ -251,6 +251,11 @@ assert.match(
   /preparedVoiceCallId[\s\S]*runVoiceBackgroundTask\("inbound_browser_provision"/,
   "browser workspace offers stay async after sync voice call insert",
 )
+assert.match(inboundHandler, /InboundRoutingBundleTimer/)
+assert.match(inboundHandler, /selectRoundRobinMemberForwardNumber/)
+assert.match(inboundHandler, /runVoiceBackgroundTask\("inbound_round_robin_cursor"/)
+assert.match(inboundHandler, /fetchVoiceVoicemailBoxById/)
+assert.doesNotMatch(inboundHandler, /pickRoundRobinMemberForwardNumber/)
 
 import {
   mintTwilioVoiceBrowserAccessToken,

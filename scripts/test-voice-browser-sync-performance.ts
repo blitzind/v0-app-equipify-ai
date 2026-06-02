@@ -109,7 +109,32 @@ assert.match(inboundRoute, /probeVoiceSchemaHealthWithBudget/)
 assert.match(inboundRoute, /VoiceRouteTimer/)
 
 assert.match(inboundHandler, /runVoiceBackgroundTask\("inbound_browser_provision"/)
-assert.match(inboundHandler, /provisionInboundBrowserWorkspaceOffers/)
+assert.match(inboundHandler, /inbound-workspace-provision/)
+assert.doesNotMatch(inboundHandler, /from "@\/lib\/voice\/browser-calling\/workspace-bridge"/)
+assert.match(inboundHandler, /voice_inbound_routing_timeout/)
+assert.match(inboundHandler, /INBOUND_ROUTING_BUNDLE_TIMEOUT_MS = 5_000/)
+assert.match(inboundHandler, /InboundRoutingBundleTimer/)
+assert.match(inboundHandler, /bundleTimer\.finish\("routing_timeout"/)
+assert.match(inboundHandler, /bundleSteps: bundleTimer\.snapshot\(\)/)
+assert.match(inboundHandler, /selectRoundRobinMemberForwardNumber/)
+assert.match(inboundHandler, /runVoiceBackgroundTask\("inbound_round_robin_cursor"/)
+assert.match(inboundHandler, /fetchVoiceVoicemailBoxById/)
+assert.doesNotMatch(inboundHandler, /pickRoundRobinMemberForwardNumber/)
+assert.doesNotMatch(inboundHandler, /fetchVoiceVoicemailBoxes/)
+
+const inboundBrowserRouting = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/browser-calling/inbound-browser-routing.ts"),
+  "utf8",
+)
+assert.match(inboundBrowserRouting, /voice-browser-devices-repository/)
+assert.doesNotMatch(inboundBrowserRouting, /await import\("@\/lib\/voice\/repository\/voice-browser-calling-repository"\)/)
+
+const inboundRoutingBundleTiming = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/call-control/inbound-routing-bundle-timing.ts"),
+  "utf8",
+)
+assert.match(inboundRoutingBundleTiming, /voice_inbound_routing_bundle_step/)
+assert.match(inboundRoutingBundleTiming, /voice_inbound_routing_bundle_timing/)
 
 const browserRepository = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/repository/voice-browser-calling-repository.ts"),

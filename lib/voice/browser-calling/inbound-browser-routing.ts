@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logInboundRouteAudit } from "@/lib/voice/call-control/inbound-route-audit"
 import type { InboundVoiceRouteResolution } from "@/lib/voice/routing/routing-resolver"
+import { listOnlineVoiceBrowserDevices } from "@/lib/voice/repository/voice-browser-devices-repository"
 import type { VoiceRoutingProfileMemberRecord } from "@/lib/voice/types"
 import { normalizePhoneNumber } from "@/lib/voice/phone-normalization"
 import { buildVoiceBrowserClientIdentity } from "@/lib/voice/browser-calling/status-mapping"
@@ -23,9 +24,6 @@ async function listCachedOnlineVoiceBrowserDevices(
   const cached = onlineBrowserDevicesCache.get(cacheKey)
   if (cached && cached.expiresAt > now) return cached.devices
 
-  const { listOnlineVoiceBrowserDevices } = await import(
-    "@/lib/voice/repository/voice-browser-calling-repository"
-  )
   const devices = await listOnlineVoiceBrowserDevices(admin, organizationId, input)
   onlineBrowserDevicesCache.set(cacheKey, {
     devices,

@@ -73,6 +73,19 @@ assert.match(telemetry, /voice_browser_sync_auth_success/)
 assert.match(telemetry, /voice_browser_sync_success/)
 assert.match(telemetry, /voice_browser_token_auth_denied/)
 assert.match(telemetry, /voice_browser_token_auth_success/)
+assert.match(telemetry, /voice_inbound_routing_timeout/)
+assert.match(telemetry, /voice_inbound_webhook_failed/)
+
+const middlewareSource = fs.readFileSync(path.join(process.cwd(), "middleware.ts"), "utf8")
+assert.match(middlewareSource, /pathname\.startsWith\("\/api\/voice\/"\)/)
+
+const inboundProvisionSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/browser-calling/inbound-workspace-provision.ts"),
+  "utf8",
+)
+assert.doesNotMatch(inboundProvisionSource, /workspace-bridge/)
+assert.doesNotMatch(inboundProvisionSource, /resolveInboundBrowserOfferForUser/)
+assert.doesNotMatch(inboundProvisionSource, /reconcileStaleRingingOfferCandidates/)
 
 assert.equal(
   formatBrowserVoiceApiError({ error: "membership_lookup_failed", message: "ignored" }, "fallback"),

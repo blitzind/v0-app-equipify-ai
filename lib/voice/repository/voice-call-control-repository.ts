@@ -244,24 +244,52 @@ export async function fetchVoiceVoicemailBoxes(
   return data.map((row) => mapVoicemailBox(row as Record<string, unknown>))
 }
 
-export async function pickRoundRobinMemberForwardNumber(
+export async function fetchVoiceVoicemailBoxById(
   admin: SupabaseClient,
   organizationId: string,
-  routingProfileId: string,
-  members: VoiceRoutingProfileMemberRecord[],
-): Promise<string | null> {
-  const active = members
-    .filter((m) => m.isActive && m.forwardingPhoneNumber)
-    .sort((a, b) => a.priority - b.priority)
-  if (active.length === 0) return null
+  voicemailBoxId: string,
+): Promise<VoiceVoicemailBoxRecord | null> {
+  const { data, error } = await admin
+    .schema("voice")
+    .from("voice_voicemail_boxes")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("id", voicemailBoxId)
+    .maybeSingle()
+  if (error || !data) return null
+  return mapVoicemailBox(data as Record<string, unknown>)
+}
 
-  const settings = await fetchVoiceCallControlSettings(admin, organizationId)
+export function selectRoundRobinMemberForwardNumber(
+  members: VoiceRoutingProfileMemberRecord[],
+  settings: VoiceCallControlSettingsRecord | null,
+  routingProfileId: string,
+): { forwardNumber: string | null; nextCursor: number } {
+  const active = members
+    .filter((member) => member.isActive && member.forwardingPhoneNumber)
+    .sort((a, b) => a.priority - b.priority)
+  if (active.length === 0) return { forwardNumber: null, nextCursor: 0 }
+
   const cursorRaw = settings?.metadataJson?.round_robin_cursor
   const cursor = typeof cursorRaw === "number" ? cursorRaw : 0
   const nextIndex = cursor % active.length
   const nextMember = active[nextIndex]
-  if (!nextMember) return null
+  if (!nextMember) return { forwardNumber: null, nextCursor: cursor }
 
+  return {
+    forwardNumber:
+      normalizePhoneNumber(nextMember.forwardingPhoneNumber) || nextMember.forwardingPhoneNumber,
+    nextCursor: nextIndex + 1,
+  }
+}
+
+export async function advanceRoundRobinCursor(
+  admin: SupabaseClient,
+  organizationId: string,
+  routingProfileId: string,
+  settings: VoiceCallControlSettingsRecord | null,
+  nextCursor: number,
+): Promise<void> {
   await admin
     .schema("voice")
     .from("voice_call_control_settings")
@@ -269,19 +297,38 @@ export async function pickRoundRobinMemberForwardNumber(
       {
         organization_id: organizationId,
         default_recording_policy: settings?.defaultRecordingPolicy ?? "disabled",
-        recording_disclosure_text: settings?.recordingDisclosureText ?? "This call may be recorded for quality assurance.",
+        recording_disclosure_text:
+          settings?.recordingDisclosureText ??
+          "This call may be recorded for quality assurance.",
         inbound_call_control_ready: settings?.inboundCallControlReady ?? false,
         voicemail_callback_ready: settings?.voicemailCallbackReady ?? false,
         metadata_json: {
           ...(settings?.metadataJson ?? {}),
-          round_robin_cursor: nextIndex + 1,
+          round_robin_cursor: nextCursor,
           round_robin_profile_id: routingProfileId,
         },
       },
       { onConflict: "organization_id" },
     )
+}
 
-  return normalizePhoneNumber(nextMember.forwardingPhoneNumber) || nextMember.forwardingPhoneNumber
+export async function pickRoundRobinMemberForwardNumber(
+  admin: SupabaseClient,
+  organizationId: string,
+  routingProfileId: string,
+  members: VoiceRoutingProfileMemberRecord[],
+): Promise<string | null> {
+  const settings = await fetchVoiceCallControlSettings(admin, organizationId)
+  const selected = selectRoundRobinMemberForwardNumber(members, settings, routingProfileId)
+  if (!selected.forwardNumber) return null
+  await advanceRoundRobinCursor(
+    admin,
+    organizationId,
+    routingProfileId,
+    settings,
+    selected.nextCursor,
+  )
+  return selected.forwardNumber
 }
 
 export async function ingestVoicemailRecordingCallback(

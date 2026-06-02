@@ -8,7 +8,7 @@ import {
 } from "@/lib/voice/browser-calling/inbound-browser-routing"
 import { createInboundVoiceCallFromTwilio,
   provisionInboundBrowserWorkspaceOffers,
-} from "@/lib/voice/browser-calling/workspace-bridge"
+} from "@/lib/voice/browser-calling/inbound-workspace-provision"
 import { startAiReceptionistSessionForCall } from "@/lib/voice/ai-receptionist/receptionist-service"
 import { isVoiceAiReceptionistEnabled } from "@/lib/voice/ai-receptionist/provider-types"
 import { buildTwilioSayAndHangup } from "@/lib/voice/call-control/twilio-twiml"
@@ -30,11 +30,13 @@ import {
   fetchVoiceNumberByPhone,
   fetchVoiceRoutingProfileById,
   fetchVoiceRoutingProfileMembers,
-  fetchVoiceVoicemailBoxes,
-  mapNumber,
-  pickRoundRobinMemberForwardNumber,
+  fetchVoiceVoicemailBoxById,
+  selectRoundRobinMemberForwardNumber,
+  advanceRoundRobinCursor,
   upsertVoiceCallControlSettings,
 } from "@/lib/voice/repository/voice-call-control-repository"
+import { InboundRoutingBundleTimer } from "@/lib/voice/call-control/inbound-routing-bundle-timing"
+import type { VoiceNumberRecord } from "@/lib/voice/types"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import { VOICE_CALL_CONTROL_QA_MARKER } from "@/lib/voice/call-control/types"
 import { VoiceRouteTimer, withVoiceTimeout } from "@/lib/voice/performance/voice-route-timing"
@@ -47,6 +49,8 @@ import {
   INBOUND_RING_DIAG_EVENTS,
   logInboundRingDiagnostic,
 } from "@/lib/voice/browser-calling/inbound-ring-diagnostics"
+
+const INBOUND_ROUTING_BUNDLE_TIMEOUT_MS = 5_000
 
 export type HandleTwilioInboundCallInput = {
   admin: SupabaseClient
@@ -94,9 +98,10 @@ async function resolveInboundCallControlBundle(
   admin: SupabaseClient,
   input: {
     organizationId: string
-    voiceNumberId: string
+    voiceNumber: VoiceNumberRecord
     fromNumber: string
     skipRoundRobinAdvance?: boolean
+    bundleTimer?: InboundRoutingBundleTimer
   },
 ): Promise<
   | {
@@ -108,27 +113,36 @@ async function resolveInboundCallControlBundle(
     }
   | { ok: false; message: string }
 > {
-  const { data } = await admin
-    .schema("voice")
-    .from("voice_numbers")
-    .select("*")
-    .eq("organization_id", input.organizationId)
-    .eq("id", input.voiceNumberId)
-    .maybeSingle()
+  const timer =
+    input.bundleTimer ??
+    new InboundRoutingBundleTimer({
+      organizationId: input.organizationId,
+      voiceNumberId: input.voiceNumber.id,
+    })
+  const voiceNumber = input.voiceNumber
 
-  if (!data) return { ok: false, message: "Voice number not found." }
+  const settings = await timer.measure("call_control_settings", () =>
+    fetchVoiceCallControlSettings(admin, input.organizationId),
+  )
 
-  const voiceNumber = mapNumber(data as Record<string, unknown>)
-  const settings = await fetchVoiceCallControlSettings(admin, input.organizationId)
   const routingProfile = voiceNumber.routingProfileId
-    ? await fetchVoiceRoutingProfileById(admin, input.organizationId, voiceNumber.routingProfileId)
+    ? await timer.measure("routing_profile", () =>
+        fetchVoiceRoutingProfileById(admin, input.organizationId, voiceNumber.routingProfileId!),
+      )
     : null
+
   const members = routingProfile
-    ? await fetchVoiceRoutingProfileMembers(admin, input.organizationId, routingProfile.id)
+    ? await timer.measure("routing_profile_members", () =>
+        fetchVoiceRoutingProfileMembers(admin, input.organizationId, routingProfile.id),
+      )
     : []
+
   const businessHours = routingProfile?.businessHoursId
-    ? await fetchVoiceBusinessHoursById(admin, input.organizationId, routingProfile.businessHoursId)
+    ? await timer.measure("business_hours", () =>
+        fetchVoiceBusinessHoursById(admin, input.organizationId, routingProfile.businessHoursId!),
+      )
     : null
+
   const businessHoursStatus = evaluateVoiceBusinessHours(businessHours)
   const memberForwardNumbers = members
     .filter((member) => member.isActive && member.forwardingPhoneNumber)
@@ -136,19 +150,33 @@ async function resolveInboundCallControlBundle(
     .map((member) => normalizePhoneNumber(member.forwardingPhoneNumber))
     .filter(Boolean)
 
-  const roundRobinNumber =
-    routingProfile && !input.skipRoundRobinAdvance
-      ? await pickRoundRobinMemberForwardNumber(admin, input.organizationId, routingProfile.id, members)
-      : memberForwardNumbers[0] ?? null
+  let roundRobinNumber = memberForwardNumbers[0] ?? null
+  if (routingProfile && !input.skipRoundRobinAdvance) {
+    const selected = selectRoundRobinMemberForwardNumber(members, settings, routingProfile.id)
+    roundRobinNumber = selected.forwardNumber
+    if (selected.forwardNumber) {
+      runVoiceBackgroundTask("inbound_round_robin_cursor", async () => {
+        await advanceRoundRobinCursor(
+          admin,
+          input.organizationId,
+          routingProfile.id,
+          settings,
+          selected.nextCursor,
+        )
+      })
+    }
+  }
 
-  const route = resolveInboundVoiceRoute({
-    organizationId: input.organizationId,
-    number: voiceNumber,
-    fromNumber: input.fromNumber,
-    routingProfile,
-    routingMembers: members,
-    businessHoursStatus,
-  })
+  const route = await timer.measure("route_resolution", async () =>
+    resolveInboundVoiceRoute({
+      organizationId: input.organizationId,
+      number: voiceNumber,
+      fromNumber: input.fromNumber,
+      routingProfile,
+      routingMembers: members,
+      businessHoursStatus,
+    }),
+  )
 
   const dialNumbers = resolveDialNumbersFromRoute({
     route,
@@ -158,12 +186,14 @@ async function resolveInboundCallControlBundle(
   })
 
   const roundRobinUserId = resolveRoundRobinMemberUserId({ members, roundRobinNumber })
-  const browserTargets = await resolveInboundDialTargetsWithBrowser(admin, {
-    organizationId: input.organizationId,
-    route,
-    pstnNumbers: dialNumbers,
-    roundRobinUserId,
-  })
+  const browserTargets = await timer.measure("browser_dial_targets", () =>
+    resolveInboundDialTargetsWithBrowser(admin, {
+      organizationId: input.organizationId,
+      route,
+      pstnNumbers: dialNumbers,
+      roundRobinUserId,
+    }),
+  )
 
   const recordingPolicy = resolveEffectiveRecordingPolicy({
     direction: "inbound",
@@ -173,8 +203,9 @@ async function resolveInboundCallControlBundle(
 
   let voicemailGreeting: string | null = null
   if (route.voicemailBoxId) {
-    const boxes = await fetchVoiceVoicemailBoxes(admin, input.organizationId)
-    const box = boxes.find((entry) => entry.id === route.voicemailBoxId)
+    const box = await timer.measure("voicemail_box", () =>
+      fetchVoiceVoicemailBoxById(admin, input.organizationId, route.voicemailBoxId!),
+    )
     voicemailGreeting = box?.greetingText ?? null
   }
 
@@ -186,6 +217,10 @@ async function resolveInboundCallControlBundle(
     recordingDisclosureText: settings?.recordingDisclosureText ?? null,
     voicemailGreetingText: voicemailGreeting,
   })
+
+  if (!input.bundleTimer) {
+    timer.finish("bundle_complete")
+  }
 
   return {
     ok: true,
@@ -205,7 +240,42 @@ export async function previewInboundCallControlDecision(
     skipRoundRobinAdvance?: boolean
   },
 ): Promise<{ ok: true; decision: InboundCallControlDecision; route: InboundVoiceRouteResolution } | { ok: false; message: string }> {
-  const bundle = await resolveInboundCallControlBundle(admin, input)
+  const { data } = await admin
+    .schema("voice")
+    .from("voice_numbers")
+    .select("*")
+    .eq("organization_id", input.organizationId)
+    .eq("id", input.voiceNumberId)
+    .maybeSingle()
+  if (!data) return { ok: false, message: "Voice number not found." }
+
+  const voiceNumber = {
+    id: String(data.id),
+    organizationId: String(data.organization_id),
+    provider: data.provider,
+    providerNumberId: String(data.provider_number_id ?? ""),
+    phoneNumber: String(data.phone_number),
+    displayName: String(data.display_name ?? ""),
+    capabilitiesJson: (data.capabilities_json as Record<string, unknown>) ?? {},
+    status: data.status,
+    smsEnabled: Boolean(data.sms_enabled),
+    voiceEnabled: Boolean(data.voice_enabled),
+    assignedUserId: data.assigned_user_id ? String(data.assigned_user_id) : null,
+    routingProfileId: data.routing_profile_id ? String(data.routing_profile_id) : null,
+    routingMode: data.routing_mode ?? null,
+    defaultForwardingTarget: String(data.default_forwarding_target ?? ""),
+    recordingPolicy: data.recording_policy ?? null,
+    metadataJson: (data.metadata_json as Record<string, unknown>) ?? {},
+    createdAt: String(data.created_at),
+    updatedAt: String(data.updated_at),
+  } as VoiceNumberRecord
+
+  const bundle = await resolveInboundCallControlBundle(admin, {
+    organizationId: input.organizationId,
+    voiceNumber,
+    fromNumber: input.fromNumber,
+    skipRoundRobinAdvance: input.skipRoundRobinAdvance,
+  })
   if (!bundle.ok) return bundle
   return { ok: true, decision: bundle.decision, route: bundle.route }
 }
@@ -244,21 +314,36 @@ export async function handleTwilioInboundCall(
     voice_number_id: voiceNumber.id,
   })
 
+  const bundleTimer = new InboundRoutingBundleTimer({
+    organizationId,
+    voiceNumberId: voiceNumber.id,
+    callSid,
+  })
+
   const bundle = await timer.measure("routing_bundle", () =>
     withVoiceTimeout(
       "voice_inbound_routing_bundle",
-      1500,
+      INBOUND_ROUTING_BUNDLE_TIMEOUT_MS,
       () =>
         resolveInboundCallControlBundle(input.admin, {
           organizationId,
-          voiceNumberId: voiceNumber.id,
+          voiceNumber,
           fromNumber: readFromNumber(input.payload),
+          bundleTimer,
         }),
       null,
     ),
   )
   if (!bundle) {
-    timer.finish({ outcome: "routing_timeout", callSid })
+    bundleTimer.finish("routing_timeout", { timedOut: true, timeoutMs: INBOUND_ROUTING_BUNDLE_TIMEOUT_MS })
+    timer.finish({ outcome: "routing_timeout", callSid, timedOut: true })
+    logVoiceInfrastructure("voice_inbound_routing_timeout", {
+      qaMarker: VOICE_CALL_CONTROL_QA_MARKER,
+      organizationId,
+      callSid,
+      timeoutMs: INBOUND_ROUTING_BUNDLE_TIMEOUT_MS,
+      bundleSteps: bundleTimer.snapshot(),
+    })
     const twiml = buildTwilioSayAndHangup("We are unable to connect your call right now.")
     return {
       ok: false,
@@ -268,11 +353,13 @@ export async function handleTwilioInboundCall(
     }
   }
   if (!bundle.ok) {
+    bundleTimer.finish("routing_failed", { message: bundle.message })
     timer.finish({ outcome: "routing_failed", callSid })
     const twiml = provider.rejectCall().body
     return { ok: false, code: "configuration_error", message: bundle.message, twiml }
   }
 
+  bundleTimer.finish("twiml_ready")
   const { decision, browserTargetUserIds } = bundle
 
   logVoiceInfrastructure("voice_inbound_route_decision", {
