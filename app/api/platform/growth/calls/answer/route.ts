@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { answerGrowthNativeCall } from "@/lib/growth/native-dialer/native-dialer-service"
 import { GROWTH_NATIVE_DIALER_QA_MARKER } from "@/lib/growth/native-dialer/native-dialer-types"
 import {
   growthNativeDialerSchemaResponseMeta,
   requireGrowthNativeDialerSchemaReady,
 } from "@/lib/growth/native-dialer/native-dialer-schema-health"
+import { requireVoiceOperatorRouteContext } from "@/lib/voice/api/voice-operator-route"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -30,7 +30,15 @@ function logLiveCoachingAutoStartQa(event: string, details: Record<string, unkno
 }
 
 export async function POST(request: Request) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const parsed = bodySchema.safeParse(await request.json().catch(() => ({})))
+  if (!parsed.success) {
+    return NextResponse.json({ error: "invalid_body", message: "Invalid answer payload." }, { status: 400 })
+  }
+
+  const access = await requireVoiceOperatorRouteContext({
+    sessionId: parsed.data.sessionId,
+    requireSessionOwner: true,
+  })
   if (!access.ok) return access.response
 
   const schemaGate = await requireGrowthNativeDialerSchemaReady(access.admin)
@@ -43,11 +51,6 @@ export async function POST(request: Request) {
       },
       { status: schemaGate.status },
     )
-  }
-
-  const parsed = bodySchema.safeParse(await request.json().catch(() => ({})))
-  if (!parsed.success) {
-    return NextResponse.json({ error: "invalid_body", message: "Invalid answer payload." }, { status: 400 })
   }
 
   logLiveCoachingAutoStartQa("answer_api_request_start", {

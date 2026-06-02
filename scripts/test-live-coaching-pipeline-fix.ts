@@ -227,6 +227,61 @@ assert.match(manualLiveCoachingRoute, /coaching\.linkResult && !coaching\.linkRe
 assert.match(manualLiveCoachingRoute, /error: "link_failed"/)
 assert.match(manualLiveCoachingRoute, /reason: coaching\.linkResult\.reason/)
 assert.match(manualLiveCoachingRoute, /status: 409/)
+assert.doesNotMatch(manualLiveCoachingRoute, /requireGrowthEnginePlatformAccess/)
+assert.match(manualLiveCoachingRoute, /requireVoiceOperatorRouteContext/)
+assert.match(
+  manualLiveCoachingRoute,
+  /export async function GET[\s\S]*requireVoiceOperatorRouteContext\(\{[\s\S]*sessionId,[\s\S]*requireSessionOwner: true/,
+  "manual live-coaching GET must be scoped to the signed-in session owner",
+)
+assert.match(
+  manualLiveCoachingRoute,
+  /export async function POST[\s\S]*requireVoiceOperatorRouteContext\(\{[\s\S]*sessionId,[\s\S]*requireSessionOwner: true/,
+  "manual live-coaching POST must be scoped to the signed-in session owner",
+)
+
+const answerRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/calls/answer/route.ts"),
+  "utf8",
+)
+assert.doesNotMatch(answerRoute, /requireGrowthEnginePlatformAccess/)
+assert.match(
+  answerRoute,
+  /const parsed = bodySchema\.safeParse[\s\S]*requireVoiceOperatorRouteContext\(\{[\s\S]*sessionId: parsed\.data\.sessionId,[\s\S]*requireSessionOwner: true/,
+  "answer route must authorize the accepted session with org/user scoped operator access",
+)
+
+const mediaRestartRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/calls/sessions/[sessionId]/media-stream/restart/route.ts"),
+  "utf8",
+)
+assert.doesNotMatch(mediaRestartRoute, /requireGrowthEnginePlatformAccess/)
+assert.match(
+  mediaRestartRoute,
+  /requireVoiceOperatorRouteContext\(\{[\s\S]*sessionId: trimmedSessionId,[\s\S]*requireSessionOwner: true/,
+  "media stream restart must be scoped to the signed-in session owner",
+)
+
+const voiceOperatorRoute = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/api/voice-operator-route.ts"),
+  "utf8",
+)
+assert.match(voiceOperatorRoute, /createServerSupabaseClient/)
+assert.match(voiceOperatorRoute, /createServiceRoleSupabaseClient/)
+assert.match(voiceOperatorRoute, /resolveVoiceInfrastructureOrganizationId/)
+assert.match(voiceOperatorRoute, /\.from\("organization_members"\)[\s\S]*\.eq\("status", "active"\)/)
+assert.match(
+  voiceOperatorRoute,
+  /\.from\("native_call_workspace_sessions"\)[\s\S]*\.eq\("organization_id", organizationId\)/,
+  "operator route guard must scope native session lookup to the configured organization",
+)
+assert.match(
+  voiceOperatorRoute,
+  /options\.requireSessionOwner && session\.owner_user_id !== user\.id/,
+  "operator route guard must enforce native session ownership for active-call mutations",
+)
+assert.doesNotMatch(voiceOperatorRoute, /isPlatformAdminEmail/)
+assert.doesNotMatch(voiceOperatorRoute, /SUPABASE_SERVICE_ROLE_KEY is not configured/)
 
 const unifiedAssist = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-workspace-unified-assist-panel.tsx"),

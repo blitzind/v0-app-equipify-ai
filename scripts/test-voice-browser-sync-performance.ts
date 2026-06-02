@@ -14,6 +14,14 @@ const platformRoute = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/api/voice-platform-route.ts"),
   "utf8",
 )
+const operatorRoute = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/api/voice-operator-route.ts"),
+  "utf8",
+)
+const browserSyncRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/voice/browser/sync/route.ts"),
+  "utf8",
+)
 const inboundRoute = fs.readFileSync(
   path.join(process.cwd(), "app/api/voice/inbound/twilio/route.ts"),
   "utf8",
@@ -49,6 +57,15 @@ assert.match(voiceBrowserHook, /syncRef\.current\("enrichment"\)/)
 assert.match(voiceBrowserHook, /mergeVoiceBrowserSyncSnapshot/)
 
 assert.match(platformRoute, /probeVoiceSchemaHealthCached/)
+assert.match(operatorRoute, /createServerSupabaseClient/)
+assert.match(operatorRoute, /createServiceRoleSupabaseClient/)
+assert.match(operatorRoute, /\.from\("organization_members"\)[\s\S]*\.eq\("status", "active"\)/)
+assert.match(operatorRoute, /options\.requireSessionOwner && session\.owner_user_id !== user\.id/)
+assert.match(browserSyncRoute, /requireVoiceOperatorRouteContext/)
+assert.doesNotMatch(browserSyncRoute, /requireVoicePlatformRouteContext/)
+assert.match(browserSyncRoute, /sessionId: workspaceSessionId/)
+assert.match(browserSyncRoute, /requireSessionOwner: Boolean\(workspaceSessionId\)/)
+assert.match(browserSyncRoute, /probeVoiceSchemaHealthCached/)
 
 assert.match(schemaHealth, /probeVoiceSchemaHealthCached/)
 assert.match(schemaHealth, /probeVoiceSchemaHealthWithBudget/)

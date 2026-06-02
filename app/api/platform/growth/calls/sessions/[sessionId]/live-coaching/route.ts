@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import {
   fetchCallWorkspaceLiveCoaching,
   startCallWorkspaceLiveCoaching,
 } from "@/lib/growth/native-dialer/call-workspace-coaching-service"
 import { GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
+import { requireVoiceOperatorRouteContext } from "@/lib/voice/api/voice-operator-route"
 
 export const runtime = "nodejs"
 
@@ -15,13 +15,16 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ sessionId: string }> },
 ) {
-  const access = await requireGrowthEnginePlatformAccess()
-  if (!access.ok) return access.response
-
   const { sessionId } = await context.params
   if (!UUID_RE.test(sessionId)) {
     return NextResponse.json({ error: "invalid_id", message: "Invalid session id." }, { status: 400 })
   }
+
+  const access = await requireVoiceOperatorRouteContext({
+    sessionId,
+    requireSessionOwner: true,
+  })
+  if (!access.ok) return access.response
 
   try {
     const coaching = await fetchCallWorkspaceLiveCoaching(access.admin, sessionId)
@@ -36,13 +39,16 @@ export async function POST(
   _request: Request,
   context: { params: Promise<{ sessionId: string }> },
 ) {
-  const access = await requireGrowthEnginePlatformAccess()
-  if (!access.ok) return access.response
-
   const { sessionId } = await context.params
   if (!UUID_RE.test(sessionId)) {
     return NextResponse.json({ error: "invalid_id", message: "Invalid session id." }, { status: 400 })
   }
+
+  const access = await requireVoiceOperatorRouteContext({
+    sessionId,
+    requireSessionOwner: true,
+  })
+  if (!access.ok) return access.response
 
   try {
     const coaching = await startCallWorkspaceLiveCoaching(access.admin, {
