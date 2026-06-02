@@ -93,7 +93,8 @@ export async function requireVoiceOperatorRouteContext(
     logGrowthEngine("operator_access_denied", {
       reason: "membership_lookup_failed",
       organizationId,
-      userId: user.id,
+      operatorUserId: user.id,
+      membershipFound: false,
       detail: membershipError.message,
     })
     return jsonResponse("membership_lookup_failed", "Could not verify organization membership.", 503)
@@ -103,10 +104,17 @@ export async function requireVoiceOperatorRouteContext(
     logGrowthEngine("operator_access_denied", {
       reason: "not_org_member",
       organizationId,
-      userId: user.id,
+      operatorUserId: user.id,
+      membershipFound: false,
     })
     return jsonResponse("forbidden", "Organization membership required.", 403)
   }
+
+  logGrowthEngine("operator_membership_verified", {
+    organizationId,
+    operatorUserId: user.id,
+    membershipFound: true,
+  })
 
   const sessionId = options.sessionId?.trim() || null
   let session: OperatorSessionRow | null = null

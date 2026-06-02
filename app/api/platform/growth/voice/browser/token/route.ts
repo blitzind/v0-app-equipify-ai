@@ -2,13 +2,13 @@ import { NextResponse } from "next/server"
 import { buildVoiceBrowserClientIdentity } from "@/lib/voice/browser-calling/status-mapping"
 import { resolveVoiceBrowserCallingProvider } from "@/lib/voice/browser-calling/provider-registry"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
-import { requireVoicePlatformRouteContext } from "@/lib/voice/api/voice-platform-route"
+import { requireVoiceOperatorRouteContext } from "@/lib/voice/api/voice-operator-route"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 
 export const runtime = "nodejs"
 
 export async function POST(request: Request) {
-  const ctx = await requireVoicePlatformRouteContext()
+  const ctx = await requireVoiceOperatorRouteContext()
   if (!ctx.ok) return ctx.response
 
   const body = (await request.json().catch(() => ({}))) as { ttlSeconds?: number }

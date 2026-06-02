@@ -148,7 +148,15 @@ const tokenRoute = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/voice/browser/token/route.ts"),
   "utf8",
 )
-assert.match(tokenRoute, /requireVoicePlatformRouteContext/)
+assert.match(tokenRoute, /requireVoiceOperatorRouteContext/)
+assert.doesNotMatch(tokenRoute, /requireVoicePlatformRouteContext/)
+
+const registerRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/voice/browser/register/route.ts"),
+  "utf8",
+)
+assert.match(registerRoute, /requireVoiceOperatorRouteContext/)
+assert.doesNotMatch(registerRoute, /requireVoicePlatformRouteContext/)
 assert.match(tokenRoute, /VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER/)
 
 const syncRoute = fs.readFileSync(

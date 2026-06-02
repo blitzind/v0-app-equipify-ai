@@ -270,6 +270,9 @@ assert.match(voiceOperatorRoute, /createServerSupabaseClient/)
 assert.match(voiceOperatorRoute, /createServiceRoleSupabaseClient/)
 assert.match(voiceOperatorRoute, /resolveVoiceInfrastructureOrganizationId/)
 assert.match(voiceOperatorRoute, /\.from\("organization_members"\)[\s\S]*\.eq\("status", "active"\)/)
+assert.match(voiceOperatorRoute, /operatorUserId: user\.id/)
+assert.match(voiceOperatorRoute, /membershipFound: true/)
+assert.match(voiceOperatorRoute, /membershipFound: false/)
 assert.match(
   voiceOperatorRoute,
   /\.from\("native_call_workspace_sessions"\)[\s\S]*\.eq\("organization_id", organizationId\)/,
