@@ -247,8 +247,13 @@ const answerRoute = fs.readFileSync(
 assert.doesNotMatch(answerRoute, /requireGrowthEnginePlatformAccess/)
 assert.match(
   answerRoute,
-  /const parsed = bodySchema\.safeParse[\s\S]*requireVoiceOperatorRouteContext\(\{[\s\S]*sessionId: parsed\.data\.sessionId,[\s\S]*requireSessionOwner: true/,
-  "answer route must authorize the accepted session with org/user scoped operator access",
+  /skipSessionIdFormatValidation: true/,
+  "answer route must skip duplicate operator format validation after zod body parse",
+)
+assert.match(
+  answerRoute,
+  /nativeSessionIdSchema/,
+  "answer route must share native session id schema with operator guard",
 )
 
 const mediaRestartRoute = fs.readFileSync(
@@ -260,6 +265,11 @@ assert.match(
   mediaRestartRoute,
   /requireVoiceOperatorRouteContext\(\{[\s\S]*sessionId: trimmedSessionId,[\s\S]*requireSessionOwner: true/,
   "media stream restart must be scoped to the signed-in session owner",
+)
+assert.match(
+  mediaRestartRoute,
+  /sessionIdDiagnostics:[\s\S]*media-stream\/restart/,
+  "media-stream restart must pass route diagnostics into operator guard",
 )
 
 const voiceOperatorRoute = fs.readFileSync(
@@ -285,6 +295,26 @@ assert.match(
 )
 assert.doesNotMatch(voiceOperatorRoute, /isPlatformAdminEmail/)
 assert.doesNotMatch(voiceOperatorRoute, /SUPABASE_SERVICE_ROLE_KEY is not configured/)
+assert.match(
+  voiceOperatorRoute,
+  /normalizeNativeSessionId/,
+  "operator route guard must validate native session ids with shared zod helper",
+)
+assert.match(
+  voiceOperatorRoute,
+  /skipSessionIdFormatValidation/,
+  "operator route must allow answer route to skip duplicate format validation",
+)
+assert.doesNotMatch(
+  voiceOperatorRoute,
+  /if \(!UUID_RE\.test\(sessionId\)\)/,
+  "operator route must not reject zod-valid ids via legacy UUID_RE",
+)
+assert.match(
+  manualLiveCoachingRoute,
+  /logSessionIdValidationFailure[\s\S]*Invalid session id\./,
+  "live-coaching route must log structured diagnostics before invalid session id returns",
+)
 
 const unifiedAssist = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-workspace-unified-assist-panel.tsx"),

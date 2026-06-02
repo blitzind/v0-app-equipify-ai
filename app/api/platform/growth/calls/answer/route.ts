@@ -7,13 +7,14 @@ import {
   requireGrowthNativeDialerSchemaReady,
 } from "@/lib/growth/native-dialer/native-dialer-schema-health"
 import { logGrowthCallsAnswerValidationAudit } from "@/lib/voice/api/session-id-validation-diagnostics"
+import { nativeSessionIdSchema } from "@/lib/voice/api/native-session-id-validation"
 import { requireVoiceOperatorRouteContext } from "@/lib/voice/api/voice-operator-route"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
 
 const bodySchema = z.object({
-  sessionId: z.string().uuid(),
+  sessionId: nativeSessionIdSchema,
 })
 
 const LIVE_COACHING_AUTO_START_QA_MARKER = "growth-live-coaching-auto-start-qa-v1" as const
@@ -48,31 +49,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_body", message: "Invalid answer payload." }, { status: 400 })
   }
 
+  const sessionId = parsed.data.sessionId.trim()
   logGrowthCallsAnswerValidationAudit("pre_operator_guard", {
     branch: "zod_accepted",
-    sessionId: parsed.data.sessionId,
+    sessionId,
   })
 
   const access = await requireVoiceOperatorRouteContext({
-    sessionId: parsed.data.sessionId,
+    sessionId,
     requireSessionOwner: true,
+    skipSessionIdFormatValidation: true,
     sessionIdDiagnostics: {
       route: "POST /api/platform/growth/calls/answer",
       sessionIdSource: "json_body.sessionId",
-      nativeSessionId: parsed.data.sessionId,
+      nativeSessionId: sessionId,
     },
   })
   if (!access.ok) {
     logGrowthCallsAnswerValidationAudit("operator_guard_rejected", {
       branch: "operator_guard_rejected",
-      sessionId: parsed.data.sessionId,
+      sessionId,
     })
     return access.response
   }
 
   logGrowthCallsAnswerValidationAudit("operator_guard_accepted", {
     branch: "operator_guard_accepted",
-    sessionId: parsed.data.sessionId,
+    sessionId,
     nativeSessionId: access.session?.id ?? null,
     nativeSessionStatus: access.session?.status ?? null,
     nativeSessionOwnerUserId: access.session?.owner_user_id ?? null,
@@ -91,18 +94,18 @@ export async function POST(request: Request) {
   }
 
   logLiveCoachingAutoStartQa("answer_api_request_start", {
-    sessionId: parsed.data.sessionId,
+    sessionId,
     ownerUserId: access.userId,
   })
 
   try {
     const { session, pipeline } = await answerGrowthNativeCall(
       access.admin,
-      parsed.data.sessionId,
+      sessionId,
       access.userId,
     )
     logLiveCoachingAutoStartQa("answer_api_response", {
-      sessionId: parsed.data.sessionId,
+      sessionId,
       responseSessionId: session.id,
       voiceCallId: session.voiceCallId,
       status: session.status,
@@ -124,7 +127,7 @@ export async function POST(request: Request) {
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not answer call."
     logLiveCoachingAutoStartQa("answer_api_response", {
-      sessionId: parsed.data.sessionId,
+      sessionId,
       ok: false,
       error: "answer_failed",
       message,

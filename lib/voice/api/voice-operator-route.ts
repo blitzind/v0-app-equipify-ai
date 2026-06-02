@@ -5,15 +5,20 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isGrowthEngineEnabledEnv, logGrowthEngine } from "@/lib/growth/access"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { resolveVoiceInfrastructureOrganizationId } from "@/lib/voice/repository/voice-repository"
+import {
+  describeNativeSessionIdValidation,
+  LEGACY_OPERATOR_UUID_RE,
+  normalizeNativeSessionId,
+} from "@/lib/voice/api/native-session-id-validation"
 import {
   logSessionIdValidationFailure,
   logVoiceOperatorSessionIdAudit,
 } from "@/lib/voice/api/session-id-validation-diagnostics"
+import { resolveVoiceInfrastructureOrganizationId } from "@/lib/voice/repository/voice-repository"
 import { VOICE_OPERATIONS_QA_MARKER } from "@/lib/voice/types"
 
-export const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i
+/** @deprecated Use normalizeNativeSessionId / nativeSessionIdSchema instead. */
+export const UUID_RE = LEGACY_OPERATOR_UUID_RE
 
 type OperatorSessionRow = {
   id: string
@@ -49,6 +54,8 @@ export type VoiceOperatorRouteSessionIdDiagnostics = {
 export type VoiceOperatorRouteContextOptions = {
   sessionId?: string | null
   requireSessionOwner?: boolean
+  /** When true, trust caller-side Zod validation (answer route) and skip format re-check. */
+  skipSessionIdFormatValidation?: boolean
   diagnostics?: VoiceOperatorRouteDiagnostics
   sessionIdDiagnostics?: VoiceOperatorRouteSessionIdDiagnostics
 }
@@ -66,6 +73,35 @@ function jsonResponse(error: string, message: string, status: number): VoiceOper
       { status },
     ),
   }
+}
+
+function logInvalidNativeSessionIdReturn(input: {
+  route: string
+  branch: string
+  sessionIdSource: string
+  rawSessionId: string | null
+  organizationId?: string | null
+}): void {
+  const validation = describeNativeSessionIdValidation(input.rawSessionId)
+  logSessionIdValidationFailure({
+    route: input.route,
+    branch: input.branch,
+    message: "Session id is invalid.",
+    sessionId: input.rawSessionId,
+    sessionIdSource: input.sessionIdSource,
+    sessionIdPassedUuidValidation: validation.zodUuidPass,
+  })
+  logVoiceOperatorSessionIdAudit({
+    route: input.route,
+    branch: input.branch,
+    sessionId: input.rawSessionId,
+    sessionIdSource: input.sessionIdSource,
+    organizationId: input.organizationId ?? null,
+    httpStatus: 400,
+    errorCode: "invalid_id",
+    message: "Session id is invalid.",
+    ...validation,
+  })
 }
 
 export async function requireVoiceOperatorRouteContext(
@@ -139,45 +175,38 @@ export async function requireVoiceOperatorRouteContext(
     membershipFound: true,
   })
 
-  const sessionId = options.sessionId?.trim() || null
+  const rawSessionId = options.sessionId ?? null
+  let sessionId: string | null = null
   let session: OperatorSessionRow | null = null
 
-  if (sessionId) {
+  if (rawSessionId?.trim()) {
     const operatorRoute =
       options.sessionIdDiagnostics?.route ?? "requireVoiceOperatorRouteContext"
     const sessionIdSource =
       options.sessionIdDiagnostics?.sessionIdSource ?? "operator_route_options"
 
-    if (!UUID_RE.test(sessionId)) {
-      logSessionIdValidationFailure({
+    sessionId = options.skipSessionIdFormatValidation
+      ? rawSessionId.trim()
+      : normalizeNativeSessionId(rawSessionId)
+
+    if (!sessionId) {
+      logInvalidNativeSessionIdReturn({
         route: operatorRoute,
-        message: "Session id is invalid.",
-        sessionId,
+        branch: "invalid_id_zod_uuid_failed",
         sessionIdSource,
-        activeVoiceCallId: options.sessionIdDiagnostics?.activeVoiceCallId ?? null,
-        nativeSessionId: options.sessionIdDiagnostics?.nativeSessionId ?? sessionId,
-        realtimeSessionId: options.sessionIdDiagnostics?.realtimeSessionId ?? null,
-        sessionIdPassedUuidValidation: false,
-      })
-      logVoiceOperatorSessionIdAudit({
-        route: operatorRoute,
-        branch: "invalid_id_uuid_regex_failed",
-        sessionId: options.sessionId,
-        sessionIdSource,
+        rawSessionId,
         organizationId,
-        httpStatus: 400,
-        errorCode: "invalid_id",
-        message: "Session id is invalid.",
       })
       return jsonResponse("invalid_id", "Session id is invalid.", 400)
     }
 
     logVoiceOperatorSessionIdAudit({
       route: operatorRoute,
-      branch: "uuid_regex_passed",
-      sessionId: options.sessionId,
+      branch: "uuid_validation_passed",
+      sessionId: rawSessionId,
       sessionIdSource,
       organizationId,
+      ...describeNativeSessionIdValidation(rawSessionId),
     })
 
     const { data: sessionRow, error: sessionError } = await admin
@@ -195,11 +224,12 @@ export async function requireVoiceOperatorRouteContext(
         : sessionRow
           ? "db_lookup_found"
           : "db_lookup_not_found",
-      sessionId: options.sessionId,
+      sessionId: rawSessionId,
       sessionIdSource,
       organizationId,
       dbLookupFound: sessionRow ? true : sessionRow === null ? false : null,
       dbLookupError: sessionError?.message ?? null,
+      normalizedSessionId: sessionId,
     })
 
     if (sessionError) {
@@ -217,10 +247,11 @@ export async function requireVoiceOperatorRouteContext(
       logVoiceOperatorSessionIdAudit({
         route: operatorRoute,
         branch: "not_found_return",
-        sessionId: options.sessionId,
+        sessionId: rawSessionId,
         sessionIdSource,
         organizationId,
         dbLookupFound: false,
+        normalizedSessionId: sessionId,
         httpStatus: 404,
         errorCode: "not_found",
         message: "Call session not found.",
@@ -242,6 +273,16 @@ export async function requireVoiceOperatorRouteContext(
       return jsonResponse("forbidden", "Call session operator access required.", 403)
     }
   } else if (options.requireSessionOwner) {
+    logVoiceOperatorSessionIdAudit({
+      route: options.sessionIdDiagnostics?.route ?? "requireVoiceOperatorRouteContext",
+      branch: "invalid_id_session_id_required",
+      sessionId: rawSessionId,
+      sessionIdSource: options.sessionIdDiagnostics?.sessionIdSource ?? "operator_route_options",
+      organizationId,
+      httpStatus: 400,
+      errorCode: "invalid_id",
+      message: "Session id is required.",
+    })
     return jsonResponse("invalid_id", "Session id is required.", 400)
   }
 

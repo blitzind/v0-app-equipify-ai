@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { buildVoiceBrowserSyncSnapshot } from "@/lib/voice/browser-calling/workspace-bridge"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
-import { requireVoiceOperatorRouteContext, UUID_RE } from "@/lib/voice/api/voice-operator-route"
+import { normalizeNativeSessionId } from "@/lib/voice/api/native-session-id-validation"
+import { requireVoiceOperatorRouteContext } from "@/lib/voice/api/voice-operator-route"
 import { listVoiceOperatorPresence } from "@/lib/voice/repository/voice-browser-calling-repository"
 import { probeVoiceSchemaHealthCached } from "@/lib/voice/schema-health"
 import { VOICE_OPERATIONS_QA_MARKER } from "@/lib/voice/types"
@@ -12,8 +13,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const clientIdentity = url.searchParams.get("clientIdentity")
   const rawWorkspaceSessionId = url.searchParams.get("workspaceSessionId")?.trim() || null
-  const workspaceSessionId =
-    rawWorkspaceSessionId && UUID_RE.test(rawWorkspaceSessionId) ? rawWorkspaceSessionId : null
+  const workspaceSessionId = normalizeNativeSessionId(rawWorkspaceSessionId)
   const includePresence = url.searchParams.get("includePresence") === "1"
   const mode = url.searchParams.get("mode") === "enrichment" ? "enrichment" : "fast"
 
