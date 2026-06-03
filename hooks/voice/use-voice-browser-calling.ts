@@ -19,7 +19,10 @@ import type { VoiceBrowserSyncSnapshot } from "@/lib/voice/browser-calling/types
 import { logCallWorkspaceCoachingUiTelemetry } from "@/lib/growth/native-dialer/call-workspace-coaching-ui-telemetry"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
 import { CALL_WORKSPACE_ENRICHMENT_SYNC_FAILED_COPY } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
-import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import {
+  buildVoiceBrowserFetchInit,
+  logVoiceBrowserClientAuthTelemetry,
+} from "@/lib/voice/browser-calling/build-voice-browser-fetch-init"
 
 type VoiceBrowserTokenResponse = {
   ok?: boolean
@@ -42,29 +45,6 @@ type VoiceBrowserSyncResponse = {
   message?: string
   error?: string
   authStage?: string
-}
-
-async function buildVoiceBrowserFetchInit(init?: RequestInit): Promise<RequestInit> {
-  const headers = new Headers(init?.headers)
-  if (init?.body && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json")
-  }
-  try {
-    const supabase = createBrowserSupabaseClient()
-    const { data } = await supabase.auth.getSession()
-    const accessToken = data.session?.access_token
-    if (accessToken && !headers.has("Authorization")) {
-      headers.set("Authorization", `Bearer ${accessToken}`)
-    }
-  } catch {
-    // Cookie auth may still succeed server-side.
-  }
-  return {
-    ...init,
-    headers,
-    credentials: "include",
-    cache: "no-store",
-  }
 }
 
 type TwilioVoiceDevice = {
@@ -336,6 +316,14 @@ export function useVoiceBrowserCalling(input?: {
       await buildVoiceBrowserFetchInit(),
     )
     const data = (await res.json().catch(() => ({}))) as VoiceBrowserSyncResponse
+    logVoiceBrowserClientAuthTelemetry("voice_browser_sync_auth_result", {
+      mode,
+      httpStatus: res.status,
+      ok: res.ok && Boolean(data.snapshot),
+      authStage: data.authStage ?? null,
+      error: data.error ?? null,
+      failure: !(res.ok && data.snapshot),
+    })
     if (!res.ok || !data.snapshot) {
       const gatewayTimeout = res.status === 504 || res.status === 502 || res.status === 503
       const recoverableSessionError =

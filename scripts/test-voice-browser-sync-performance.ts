@@ -165,7 +165,12 @@ const browserSyncEnrichmentTiming = fs.readFileSync(
 assert.match(browserSyncEnrichmentTiming, /voice_browser_sync_enrichment_timing/)
 
 const middleware = fs.readFileSync(path.join(process.cwd(), "middleware.ts"), "utf8")
-assert.match(middleware, /pathname\.startsWith\("\/api\/platform\/growth\/voice\/"\)/)
+assert.match(middleware, /shouldSkipSupabaseSessionRefresh/)
+assert.doesNotMatch(
+  middleware,
+  /pathname\.startsWith\("\/api\/platform\/growth\/voice\/"\)/,
+  "browser sync must not bypass middleware session refresh",
+)
 
 const relationshipRepository = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/repository/voice-relationship-memory-repository.ts"),

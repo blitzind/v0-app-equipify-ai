@@ -54,11 +54,15 @@ function skipArchivedOrgGuard(pathname: string) {
   )
 }
 
+function shouldSkipSupabaseSessionRefresh(pathname: string): boolean {
+  // Provider ingress only (Twilio webhooks, inbound TwiML, media websocket) — no operator session.
+  return pathname.startsWith("/api/voice/")
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Provider webhooks + high-frequency voice operator APIs — skip Supabase session refresh.
-  if (pathname.startsWith("/api/voice/") || pathname.startsWith("/api/platform/growth/voice/")) {
+  if (shouldSkipSupabaseSessionRefresh(pathname)) {
     return NextResponse.next()
   }
 

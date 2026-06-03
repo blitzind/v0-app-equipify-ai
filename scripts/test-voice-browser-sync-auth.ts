@@ -27,6 +27,10 @@ const browserHook = fs.readFileSync(
   path.join(process.cwd(), "hooks/voice/use-voice-browser-calling.ts"),
   "utf8",
 )
+const browserFetchInit = fs.readFileSync(
+  path.join(process.cwd(), "lib/voice/browser-calling/build-voice-browser-fetch-init.ts"),
+  "utf8",
+)
 const telemetry = fs.readFileSync(path.join(process.cwd(), "lib/voice/telemetry.ts"), "utf8")
 
 assert.match(operatorRoute, /voice_browser_auth_source/)
@@ -54,9 +58,14 @@ assert.match(browserRegisterRoute, /requireVoiceBrowserLightweightOperatorContex
 assert.match(browserSyncRoute, /workspaceSessionId/)
 assert.match(browserSyncRoute, /requireVoiceBrowserLightweightOperatorContext/)
 
-assert.match(browserHook, /createBrowserSupabaseClient/)
-assert.match(browserHook, /Authorization/)
 assert.match(browserHook, /buildVoiceBrowserFetchInit/)
+assert.match(browserHook, /logVoiceBrowserClientAuthTelemetry/)
+assert.match(browserHook, /voice_browser_sync_auth_result/)
+assert.match(browserFetchInit, /resolveVoiceBrowserFetchAuth/)
+assert.match(browserFetchInit, /auth\.getUser\(\)/)
+assert.match(browserFetchInit, /voice_browser_fetch_auth_resolved/)
+assert.match(browserFetchInit, /auth\.accessToken && !headers\.has\("Authorization"\)/)
+assert.match(browserFetchInit, /auth = await resolveVoiceBrowserFetchAuth\(\)/)
 
 assert.match(telemetry, /voice_browser_auth_source/)
 assert.match(telemetry, /voice_operator_auth_resolution/)
@@ -68,8 +77,13 @@ assert.match(operatorRoute, /logSessionInvalidAuthFailure/)
 assert.match(operatorRoute, /logVoiceBrowserSyncAuthFailure/)
 
 const middlewareSource = fs.readFileSync(path.join(process.cwd(), "middleware.ts"), "utf8")
+assert.match(middlewareSource, /shouldSkipSupabaseSessionRefresh/)
 assert.match(middlewareSource, /pathname\.startsWith\("\/api\/voice\/"\)/)
-assert.match(middlewareSource, /pathname\.startsWith\("\/api\/platform\/growth\/voice\/"\)/)
+assert.doesNotMatch(
+  middlewareSource,
+  /pathname\.startsWith\("\/api\/platform\/growth\/voice\/"\)/,
+  "operator browser APIs must receive middleware session refresh",
+)
 
 const growthCallWorkspace = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-workspace.tsx"),
