@@ -20,6 +20,9 @@ import { GrowthLeadMultichannelTimelinePanel } from "@/components/growth/growth-
 import { GrowthRevenueReadinessPanel } from "@/components/growth/growth-revenue-readiness-panel"
 import { GrowthRevenueWorkflowWorkspacePanel } from "@/components/growth/growth-revenue-workflow-workspace-panel"
 import { GrowthRevenueForecast } from "@/components/growth/growth-revenue-forecast"
+import { GrowthRevenueForecastEvidencePanel } from "@/components/growth/growth-revenue-forecast-evidence-panel"
+import { GrowthRevenueTimelinePanel } from "@/components/growth/growth-revenue-timeline-panel"
+import { GrowthSalesExecutionPlanPanel } from "@/components/growth/growth-sales-execution-plan-panel"
 import { GrowthVoiceRevenueIntelligencePassiveCard } from "@/components/growth/growth-voice-revenue-intelligence-passive-card"
 import { GrowthVoiceRetentionIntelligencePassiveCard } from "@/components/growth/growth-voice-retention-intelligence-passive-card"
 import { GrowthExecutiveOperatingIntelligence } from "@/components/growth/growth-executive-operating-intelligence"
@@ -104,7 +107,13 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
 
           <GrowthRevenueForecast lead={activeLead} />
 
+          <GrowthRevenueForecastEvidencePanel leadId={activeLead.id} />
+
           <GrowthRevenueReadinessPanel lead={activeLead} />
+
+          <GrowthSalesExecutionPlanPanel leadId={activeLead.id} />
+
+          <GrowthRevenueTimelinePanel leadId={activeLead.id} />
 
           <GrowthRevenueWorkflowWorkspacePanel leadId={activeLead.id} compact />
 

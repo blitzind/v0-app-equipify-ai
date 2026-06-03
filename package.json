@@ -165,6 +165,7 @@
     "test:growth-predictive-deal-intelligence": "tsx scripts/test-growth-predictive-deal-intelligence.ts",
     "test:growth-true-call-intelligence": "tsx scripts/test-growth-true-call-intelligence.ts",
     "test:growth-revenue-execution": "tsx scripts/test-growth-revenue-execution.ts",
+    "test:growth-revenue-execution-v5": "tsx scripts/test-growth-revenue-execution-v5.ts",
     "test:growth-human-approved-execution": "tsx scripts/test-growth-human-approved-execution.ts",
     "test:growth-meeting-outcome-intelligence": "tsx scripts/test-growth-meeting-outcome-intelligence.ts",
     "test:onboarding-provision-finalization": "tsx scripts/test-onboarding-provision-finalization.ts",

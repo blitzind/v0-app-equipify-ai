@@ -140,6 +140,8 @@ async function main(): Promise<void> {
 
   const dismissSource = readSource("app/api/platform/growth/opportunities/recommendations/[id]/dismiss/route.ts")
   assert.match(dismissSource, /dismissOpportunityRecommendation/)
+  assert.match(dismissSource, /humanApprovalConfirmed/)
+  assert.match(dismissSource, /Human approval confirmation required/)
 
   const uiSource = readSource("components/growth/growth-opportunity-intelligence-dashboard.tsx")
   assert.match(uiSource, /GROWTH_OPPORTUNITY_INTELLIGENCE_QA_MARKER/)

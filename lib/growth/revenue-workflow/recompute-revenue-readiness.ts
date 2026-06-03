@@ -40,6 +40,20 @@ export async function recomputeGrowthLeadRevenueReadiness(
     tier: snapshot.tier,
   })
 
+  const previous = readGrowthLeadRevenueReadinessSnapshot(lead.metadata)
+  if (previous?.score !== snapshot.score || previous?.tier !== snapshot.tier) {
+    const { appendRevenueExecutionTimelineEntry } = await import(
+      "@/lib/growth/revenue-execution/revenue-timeline"
+    )
+    await appendRevenueExecutionTimelineEntry(admin, leadId, {
+      occurredAt: snapshot.computedAt,
+      category: "revenue_readiness",
+      title: "Revenue readiness updated",
+      summary: `Score ${snapshot.score} (${snapshot.tier})`,
+      metadata: { fromScore: previous?.score ?? null, toScore: snapshot.score },
+    }).catch(() => undefined)
+  }
+
   return snapshot
 }
 

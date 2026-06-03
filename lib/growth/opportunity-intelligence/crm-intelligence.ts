@@ -385,6 +385,21 @@ export async function listOpportunitySignals(
   return rows.map((row) => mapSignal(row as Row, labels.get(String((row as Row).lead_id)) ?? "Account"))
 }
 
+export async function fetchOpportunityRecommendationById(
+  admin: SupabaseClient,
+  recommendationId: string,
+): Promise<GrowthOpportunityRecommendation | null> {
+  const { data, error } = await recommendationsTable(admin)
+    .select("*")
+    .eq("id", recommendationId)
+    .maybeSingle()
+  if (error || !data) return null
+
+  const row = data as Row
+  const leadLabel = await resolveLeadLabel(admin, String(row.lead_id))
+  return mapRecommendation(row, leadLabel)
+}
+
 export async function listOpportunityRecommendations(
   admin: SupabaseClient,
   input?: { leadId?: string; status?: GrowthOpportunityRecommendation["status"]; limit?: number },

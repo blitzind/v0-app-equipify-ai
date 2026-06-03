@@ -134,7 +134,10 @@ export function GrowthRevenueWorkflowWorkspacePanel({ leadId, compact }: { leadI
       </div>
 
       <p className="mt-4 text-xs text-muted-foreground">
-        Recommendations require operator confirmation. No autonomous pipeline advancement.
+        Recommendations require operator confirmation. No autonomous pipeline advancement.{" "}
+        <Link href="/admin/growth/revenue-execution" className="font-medium text-primary hover:underline">
+          Open Revenue Command Center →
+        </Link>
       </p>
     </GrowthEngineCard>
   )

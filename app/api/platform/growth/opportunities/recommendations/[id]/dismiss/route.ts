@@ -8,6 +8,8 @@ export const runtime = "nodejs"
 
 const BodySchema = z.object({
   reason: z.string().max(500).optional(),
+  note: z.string().max(500).optional(),
+  humanApprovalConfirmed: z.literal(true),
 })
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -22,7 +24,10 @@ export async function POST(request: Request, context: RouteContext) {
 
   const parsed = BodySchema.safeParse(await request.json().catch(() => ({})))
   if (!parsed.success) {
-    return NextResponse.json({ error: "invalid_body", message: "Invalid dismiss payload." }, { status: 400 })
+    return NextResponse.json(
+      { error: "invalid_body", message: "Human approval confirmation required." },
+      { status: 400 },
+    )
   }
 
   const { id } = await context.params
@@ -30,9 +35,13 @@ export async function POST(request: Request, context: RouteContext) {
     const recommendation = await dismissOpportunityRecommendation(access.admin, {
       recommendationId: id,
       actorUserId: access.userId,
-      reason: parsed.data.reason,
+      reason: parsed.data.reason ?? parsed.data.note,
     })
-    return NextResponse.json({ ok: true, recommendation })
+    return NextResponse.json({
+      ok: true,
+      recommendation,
+      message: "Recommendation rejected — no autonomous action taken.",
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not dismiss recommendation."
     const status = message === "recommendation_not_found" ? 404 : message === "invalid_status" ? 400 : 500

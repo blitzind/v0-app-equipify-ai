@@ -321,6 +321,19 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     ],
   },
   {
+    id: "revenue-execution",
+    label: "Revenue Execution",
+    href: "/admin/growth/revenue-execution",
+    keywords: [
+      "revenue execution",
+      "command center",
+      "opportunity review",
+      "execution plan",
+      "playbook",
+      "pipeline advancement",
+    ],
+  },
+  {
     id: "revenue-intelligence",
     label: "Revenue",
     href: "/admin/growth/revenue-intelligence",
@@ -618,6 +631,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         href: "/admin/growth/experiments",
         label: "Experiments",
         match: prefixMatch("/admin/growth/experiments"),
+      },
+      {
+        id: "revenue-execution",
+        href: "/admin/growth/revenue-execution",
+        label: "Revenue Execution",
+        match: prefixMatch("/admin/growth/revenue-execution"),
       },
       {
         id: "revenue-intelligence",

@@ -157,4 +157,7 @@ export const GROWTH_DRAWER_CARD_KEYS = {
   customerLifecycle: "customer-lifecycle",
   activityStream: "activity-stream",
   timeline: "timeline",
+  revenueForecastEvidence: "revenue-forecast-evidence",
+  revenueTimeline: "revenue-timeline",
+  salesExecutionPlan: "sales-execution-plan",
 } as const
