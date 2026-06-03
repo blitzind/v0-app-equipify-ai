@@ -34,12 +34,21 @@ export type SequenceExecutionRunInput = {
 
 export async function approveSequenceExecutionJob(
   admin: SupabaseClient,
-  input: { jobId: string; approvedBy: string; actorEmail?: string },
+  input: {
+    jobId: string
+    approvedBy: string
+    actorEmail?: string
+    recordJobApprovedAudit?: boolean
+    recordStepApprovedTimeline?: boolean
+  },
 ): Promise<GrowthSequenceExecutionRunResult> {
   const job = await getSequenceExecutionJob(admin, input.jobId)
   if (!job) return { ok: false, jobId: input.jobId, status: "failed", message: "job_not_found" }
   if (job.status === "sent") {
     return { ok: true, jobId: job.id, status: job.status, message: "already_sent" }
+  }
+  if (job.status === "approved" && job.humanApprovedAt) {
+    return { ok: true, jobId: job.id, status: job.status, message: "already_approved" }
   }
   if (!["draft", "pending_approval", "blocked", "failed"].includes(job.status)) {
     return { ok: false, jobId: job.id, status: job.status, message: "invalid_status_for_approval" }
@@ -64,23 +73,30 @@ export async function approveSequenceExecutionJob(
     lastError: null,
   })
 
-  await recordSequenceExecutionJobAuditEvent(admin, {
-    jobId: job.id,
-    eventType: "job_approved",
-    title: "Execution job approved",
-    description: "Human approval recorded — send still requires explicit run.",
-    metadata: { approved_by: input.approvedBy },
-  })
+  const recordJobApprovedAudit = input.recordJobApprovedAudit !== false
+  const recordStepApprovedTimeline = input.recordStepApprovedTimeline !== false
 
-  await recordSequenceExecutionTimelineEvent(admin, {
-    leadId: job.leadId,
-    eventType: "sequence_step_approved",
-    title: "Sequence step approved",
-    summary: "Human approved sequence step for send.",
-    jobId: job.id,
-    enrollmentId: job.sequenceEnrollmentId,
-    stepId: job.sequenceStepId,
-  })
+  if (recordJobApprovedAudit) {
+    await recordSequenceExecutionJobAuditEvent(admin, {
+      jobId: job.id,
+      eventType: "job_approved",
+      title: "Execution job approved",
+      description: "Human approval recorded — send still requires explicit run.",
+      metadata: { approved_by: input.approvedBy },
+    })
+  }
+
+  if (recordStepApprovedTimeline) {
+    await recordSequenceExecutionTimelineEvent(admin, {
+      leadId: job.leadId,
+      eventType: "sequence_step_approved",
+      title: "Sequence step approved",
+      summary: "Human approved sequence step for send.",
+      jobId: job.id,
+      enrollmentId: job.sequenceEnrollmentId,
+      stepId: job.sequenceStepId,
+    })
+  }
 
   return { ok: true, jobId: updated.id, status: updated.status }
 }

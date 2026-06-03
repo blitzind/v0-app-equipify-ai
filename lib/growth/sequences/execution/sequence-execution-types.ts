@@ -96,6 +96,8 @@ export type GrowthSequenceSafeExecutionDashboard = {
   blocked: number
   sent24h: number
   jobs: GrowthSequenceExecutionJobView[]
+  soloApprovalEnabled?: boolean
+  outboundMode?: "adapter" | "standalone"
 }
 
 export type GrowthSequenceExecutionPlanResult = {

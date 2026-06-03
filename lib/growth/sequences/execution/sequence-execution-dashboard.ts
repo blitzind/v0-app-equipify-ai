@@ -1,6 +1,8 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { getGrowthOutboundMode } from "@/lib/growth/runtime/outbound-mode"
+import { canUseGrowthOutboundSoloApproval } from "@/lib/growth/runtime/outbound-solo-approval"
 import {
   GROWTH_SEQUENCE_SAFE_EXECUTION_QA_MARKER,
   type GrowthSequenceSafeExecutionDashboard,
@@ -36,5 +38,7 @@ export async function fetchGrowthSequenceSafeExecutionDashboard(
     blocked,
     sent24h,
     jobs: views,
+    soloApprovalEnabled: canUseGrowthOutboundSoloApproval({ platformAdmin: true }),
+    outboundMode: getGrowthOutboundMode(),
   }
 }

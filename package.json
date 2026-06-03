@@ -104,6 +104,7 @@
     "test:growth-sequence-execution": "tsx scripts/test-growth-sequence-execution.ts",
     "test:growth-sequence-scheduler": "tsx scripts/test-growth-sequence-scheduler.ts",
     "test:growth-outbound-mode": "tsx scripts/test-growth-outbound-mode.ts",
+    "test:growth-outbound-solo-approval": "tsx scripts/test-growth-outbound-solo-approval.ts",
     "test:growth-sequence-safe-execution": "tsx scripts/test-growth-sequence-safe-execution.ts",
     "test:growth-lead-assignment": "tsx scripts/test-growth-lead-assignment.ts",
     "test:growth-notifications": "tsx scripts/test-growth-notifications.ts",

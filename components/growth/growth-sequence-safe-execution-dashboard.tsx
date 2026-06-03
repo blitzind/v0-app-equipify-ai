@@ -152,8 +152,20 @@ export function GrowthSequenceSafeExecutionDashboard() {
           <div className="flex items-start gap-2">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
             <div>
-              <p className="font-medium">Autonomous sequence sending is off.</p>
-              <p className="text-amber-900/90">All sends require human approval.</p>
+              {dashboard?.soloApprovalEnabled ? (
+                <>
+                  <p className="font-medium">Standalone solo approval is on.</p>
+                  <p className="text-amber-900/90">
+                    Use Approve &amp; Queue Send once per email — safe-execute cron delivers after
+                    compliance checks.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium">Autonomous sequence sending is off.</p>
+                  <p className="text-amber-900/90">All sends require human approval.</p>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -162,6 +174,12 @@ export function GrowthSequenceSafeExecutionDashboard() {
 
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <GrowthBadge label={GROWTH_SEQUENCE_SAFE_EXECUTION_QA_MARKER} tone="neutral" />
+          {dashboard?.soloApprovalEnabled ? (
+            <GrowthBadge label="Solo approve & queue" tone="healthy" />
+          ) : null}
+          {dashboard?.outboundMode === "standalone" ? (
+            <GrowthBadge label="Standalone transport" tone="medium" />
+          ) : null}
           <Button variant="outline" size="sm" asChild>
             <Link href="/admin/growth/settings/governance">Governance</Link>
           </Button>
@@ -251,6 +269,7 @@ export function GrowthSequenceSafeExecutionDashboard() {
                     key={job.id}
                     job={job}
                     busy={actionJobId === job.id}
+                    soloApprovalEnabled={dashboard.soloApprovalEnabled === true}
                     onApprove={() => void jobAction(job.id, "approve")}
                     onRun={() => void jobAction(job.id, "run")}
                     onSkip={() => void jobAction(job.id, "skip")}
@@ -302,18 +321,20 @@ export function GrowthSequenceSafeExecutionDashboard() {
 function JobRow({
   job,
   busy,
+  soloApprovalEnabled,
   onApprove,
   onRun,
   onSkip,
 }: {
   job: GrowthSequenceExecutionJobView
   busy: boolean
+  soloApprovalEnabled: boolean
   onApprove: () => void
   onRun: () => void
   onSkip: () => void
 }) {
   const canApprove = ["draft", "pending_approval", "blocked", "failed"].includes(job.status)
-  const canRun = job.status === "approved" && Boolean(job.humanApprovedAt)
+  const canRun = !soloApprovalEnabled && job.status === "approved" && Boolean(job.humanApprovedAt)
   const canSkip = !["sent", "skipped"].includes(job.status)
 
   return (
@@ -367,8 +388,14 @@ function JobRow({
         <div className="flex flex-wrap gap-1">
           {canApprove ? (
             <Button variant="outline" size="sm" disabled={busy} onClick={onApprove}>
-              Approve
+              {soloApprovalEnabled ? "Approve & Queue Send" : "Approve"}
             </Button>
+          ) : null}
+          {soloApprovalEnabled && job.status === "approved" ? (
+            <span className="inline-flex items-center gap-1 px-1 text-xs text-emerald-700">
+              <CheckCircle2 className="size-3.5" />
+              Queued for cron
+            </span>
           ) : null}
           {canRun ? (
             <Button size="sm" disabled={busy} onClick={onRun}>
