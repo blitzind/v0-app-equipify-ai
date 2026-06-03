@@ -64,6 +64,7 @@ const pipelineSource = fs.readFileSync(
 )
 assert.match(pipelineSource, /ingestGrowthReplyFromWebhook/)
 assert.match(pipelineSource, /ingestGrowthReplyFromInboxSync/)
+assert.match(pipelineSource, /rebuildLeadMemoryProfile/)
 
 const processSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/reply-intelligence/process-reply-intelligence.ts"),

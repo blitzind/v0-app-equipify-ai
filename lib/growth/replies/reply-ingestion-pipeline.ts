@@ -7,6 +7,7 @@ import { insertGrowthMessageEvent } from "@/lib/growth/outbound/event-repository
 import { insertGrowthOutboundReply } from "@/lib/growth/outbound/reply-repository"
 import { classifyReplyIntentV2 } from "@/lib/growth/reply-intelligence/reply-intent-classifier-v2"
 import type { GrowthReplyIngestionSource } from "@/lib/growth/reply-intelligence/reply-intent-types"
+import { rebuildLeadMemoryProfile } from "@/lib/growth/lead-memory/dashboard"
 import {
   findReplyIngestionByDedupeKey,
   insertReplyIngestionEvent,
@@ -80,6 +81,17 @@ async function resolveConnectionForLead(admin: SupabaseClient, leadId: string): 
   return (data as { connection_id?: string } | null)?.connection_id ?? null
 }
 
+async function finalizeReplyIngestionResult(
+  admin: SupabaseClient,
+  leadId: string | null | undefined,
+  result: ReplyIngestionResult,
+): Promise<ReplyIngestionResult> {
+  if (!result.deduped && leadId) {
+    await rebuildLeadMemoryProfile(admin, leadId).catch(() => undefined)
+  }
+  return result
+}
+
 export async function ingestGrowthReply(
   admin: SupabaseClient,
   input: NormalizedReplyIngestInput,
@@ -143,12 +155,12 @@ export async function ingestGrowthReply(
   }
 
   if (input.existingOutboundReplyId) {
-    return {
+    return finalizeReplyIngestionResult(admin, input.leadId, {
       deduped: false,
       ingestionEventId: ingestionEvent.id,
       outboundReplyId: input.existingOutboundReplyId,
       outboundReply: null,
-    }
+    })
   }
 
   if (!input.leadId) {
@@ -159,7 +171,12 @@ export async function ingestGrowthReply(
   const connectionId = input.connectionId ?? (await resolveConnectionForLead(admin, input.leadId))
   if (!connectionId) {
     await markReplyIngestionProcessed(admin, ingestionEvent.id, { processingStatus: "processed" })
-    return { deduped: false, ingestionEventId: ingestionEvent.id, outboundReplyId: null, outboundReply: null }
+    return finalizeReplyIngestionResult(admin, input.leadId, {
+      deduped: false,
+      ingestionEventId: ingestionEvent.id,
+      outboundReplyId: null,
+      outboundReply: null,
+    })
   }
 
   const classified = classifyReplyIntentV2(input.bodyExcerpt)
@@ -222,12 +239,12 @@ export async function ingestGrowthReply(
     processingStatus: "processed",
   })
 
-  return {
+  return finalizeReplyIngestionResult(admin, input.leadId, {
     deduped: false,
     ingestionEventId: ingestionEvent.id,
     outboundReplyId: outboundReply.id,
     outboundReply,
-  }
+  })
 }
 
 export async function ingestGrowthReplyFromWebhook(

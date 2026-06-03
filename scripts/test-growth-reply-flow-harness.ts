@@ -88,6 +88,9 @@ assert.match(reportSource, /GROWTH_REPLY_FLOW_CHECK_LABELS/)
 assert.match(harnessSource, /bulkEnrollLeadsInGrowthSequence/)
 assert.match(harnessSource, /runApprovedDueSequenceExecutionJobs/)
 assert.match(harnessSource, /fetchLeadMemoryProfileView/)
+assert.match(harnessSource, /inbox_threads/)
+assert.match(harnessSource, /thread_id/)
+assert.match(reportSource, /processing_status/)
 
 const cliSource = readSource("scripts/qa-growth-reply-flow.ts")
 assert.match(cliSource, /qa:growth-reply-flow/)
@@ -194,5 +197,30 @@ assert.match(formatted, /GROWTH REPLY FLOW QA — PASS/)
 assert.match(formatted, /Lead Created/)
 assert.match(formatted, /Transport Sent/)
 assert.match(formatted, /leadId: lead-1/)
+
+const replyViaProcessingStatus = buildGrowthReplyFlowReport(
+  {
+    lead: { id: "lead-2", contact_email: "wikus@example.com" },
+    enrollment: null,
+    steps: [],
+    jobs: [],
+    jobEvents: [],
+    deliveryAttempts: [],
+    transportEvents: [],
+    sender: null,
+    provider: null,
+    mailbox: null,
+    timelineEvents: [],
+    inboxMessages: [],
+    replyIngestionEvents: [{ processing_status: "processed", lead_id: "lead-2" }],
+    inboxSyncRuns: [{ status: "completed" }],
+    leadMemory: null,
+  },
+  { requireReply: true },
+)
+assert.equal(
+  replyViaProcessingStatus.checks.find((c) => c.label === "Reply Received")?.pass,
+  true,
+)
 
 console.log("growth reply flow harness tests passed")

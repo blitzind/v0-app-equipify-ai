@@ -39,6 +39,10 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
 }
 
+function replyIngestionProcessingStatus(row: Record<string, unknown>): string {
+  return asString(row.processing_status) || asString(row.status)
+}
+
 function recordString(record: Record<string, unknown> | null | undefined, ...keys: string[]): string {
   if (!record) return ""
   for (const key of keys) {
@@ -144,7 +148,9 @@ function buildChecks(
 
   const inboundReply =
     snapshot.inboxMessages.some((row) => asString(row.direction) === "inbound") ||
-    snapshot.replyIngestionEvents.some((row) => ["processed", "received"].includes(asString(row.status)))
+    snapshot.replyIngestionEvents.some((row) =>
+      ["processed", "received"].includes(replyIngestionProcessingStatus(row)),
+    )
 
   const inboxSyncProcessed = snapshot.inboxSyncRuns.some((row) => asString(row.status) === "completed")
 

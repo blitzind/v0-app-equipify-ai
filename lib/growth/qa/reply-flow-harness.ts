@@ -394,13 +394,26 @@ export async function inspectGrowthReplyFlowLead(
     .order("occurred_at", { ascending: false })
     .limit(50)
 
-  const { data: inboxMessages } = await admin
+  const { data: inboxThreads } = await admin
     .schema("growth")
-    .from("inbox_messages")
-    .select("*")
+    .from("inbox_threads")
+    .select("id")
     .eq("lead_id", leadId)
-    .order("created_at", { ascending: false })
-    .limit(20)
+
+  const inboxThreadIds = (inboxThreads ?? [])
+    .map((row) => asString((row as Record<string, unknown>).id))
+    .filter(Boolean)
+
+  const { data: inboxMessages } =
+    inboxThreadIds.length > 0
+      ? await admin
+          .schema("growth")
+          .from("inbox_messages")
+          .select("*")
+          .in("thread_id", inboxThreadIds)
+          .order("created_at", { ascending: false })
+          .limit(20)
+      : { data: [] as Record<string, unknown>[] }
 
   const { data: replyIngestionEvents } = await admin
     .schema("growth")
