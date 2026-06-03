@@ -41,6 +41,10 @@ import { resolveSayThisNext } from "@/lib/growth/operator-assist/resolve-say-thi
 import type { ConversationCoachTurn } from "@/lib/growth/live-coaching/types"
 import { cn } from "@/lib/utils"
 import { isNativeSessionIdServerReady } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
+import {
+  logCallWorkspaceCoachingUiTelemetry,
+  type CallWorkspaceCoachingRenderState,
+} from "@/lib/growth/native-dialer/call-workspace-coaching-ui-telemetry"
 
 export function GrowthCallWorkspaceUnifiedAssistPanel({
   phase,
@@ -65,6 +69,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   onRetryMediaStream,
   linkedRealtimeSessionId = null,
   answerReconciliationPending = false,
+  browserSyncMode = null,
 }: {
   phase: "idle" | "incoming" | "bridge_pending" | "active" | "wrapup"
   nativeSessionId: string | null
@@ -88,6 +93,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   onRetryMediaStream?: () => void
   linkedRealtimeSessionId?: string | null
   answerReconciliationPending?: boolean
+  browserSyncMode?: "fast" | "enrichment" | null
 }) {
   const [acting, setActing] = useState<string | null>(null)
   const [startingCoaching, setStartingCoaching] = useState(false)
@@ -105,6 +111,16 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
     isNativeSessionIdServerReady(nativeSessionId) &&
     !hasLinkedRealtimeSession
   const coachingPendingFromAnswer = answerReconciliationPending && canStartCoaching
+
+  const renderedCoachingState: CallWorkspaceCoachingRenderState = answerPipelineDiagnostic
+    ? "diagnostic_banner"
+    : coachingActive
+      ? "coaching_active"
+      : coachingPendingFromAnswer
+        ? "coaching_pending_answer_reconcile"
+        : canStartCoaching
+          ? "coaching_start_available"
+          : "coaching_idle"
 
   const visibleFeed = useMemo(() => {
     const feed = operatorAssist?.feed ?? []
@@ -277,6 +293,48 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   const coachingStatusLine = coachingState
     ? `${coachingState.riskLevel} risk · ${coachingState.momentum.replace(/_/g, " ")} · score ${coachingState.executionScore.score}`
     : null
+
+  useEffect(() => {
+    logCallWorkspaceCoachingUiTelemetry({
+      event: "voice_call_workspace_coaching_render_decision",
+      workspaceSessionId: nativeSessionId,
+      realtimeSessionId: linkedRealtimeSessionId,
+      linkedRealtimeSessionId,
+      operatorAssistRealtimeSessionId: operatorAssist?.realtimeSessionId ?? null,
+      liveCoachingLinked: hasLinkedRealtimeSession,
+      answerPipelineDiagnostic,
+      coachingStatus: coachingStatusLine,
+      renderedCoachingState,
+      syncMode: browserSyncMode,
+      phase,
+      answerReconciliationPending,
+      coachingActive,
+      hasLinkedRealtimeSession,
+      extra: {
+        coachingMode,
+        leadLinked,
+        hasCoachingState: Boolean(coachingState),
+        hasLiveSnapshot: Boolean(liveSnapshot),
+        hasPrimaryCoach: Boolean(coachingState?.primaryCoach),
+      },
+    })
+  }, [
+    answerPipelineDiagnostic,
+    answerReconciliationPending,
+    coachingActive,
+    coachingMode,
+    coachingState,
+    coachingStatusLine,
+    hasLinkedRealtimeSession,
+    leadLinked,
+    linkedRealtimeSessionId,
+    liveSnapshot,
+    nativeSessionId,
+    operatorAssist?.realtimeSessionId,
+    browserSyncMode,
+    phase,
+    renderedCoachingState,
+  ])
 
   const panelBody = focusMode ? (
     <>

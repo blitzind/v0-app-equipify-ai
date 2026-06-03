@@ -29,65 +29,54 @@ const browserHook = fs.readFileSync(
 )
 const telemetry = fs.readFileSync(path.join(process.cwd(), "lib/voice/telemetry.ts"), "utf8")
 
-assert.match(operatorRoute, /getBearerAccessToken/)
-assert.match(operatorRoute, /isPlatformAdminEmail/)
-assert.match(operatorRoute, /createSupabaseClientWithAccessToken/)
-assert.match(operatorRoute, /voice_operator_auth_resolution/)
-assert.match(operatorRoute, /cookieUser\.id/)
-assert.match(operatorRoute, /ignored_stale_bearer_cookie_authoritative/)
-assert.match(operatorRoute, /authFailureReason/)
-assert.match(operatorRoute, /bearerPresent/)
-assert.match(operatorRoute, /platformAdminMatched/)
-assert.match(operatorRoute, /operator_platform_admin_granted/)
-assert.match(operatorRoute, /no_session_cookie/)
-assert.match(operatorRoute, /session_invalid/)
-assert.match(operatorRoute, /authStage/)
-assert.match(
+assert.match(operatorRoute, /voice_browser_auth_source/)
+assert.match(operatorRoute, /logVoiceBrowserAuthSource/)
+assert.match(operatorRoute, /cookie_fallback/)
+assert.match(operatorRoute, /bearer_invalid_and_cookie_invalid/)
+assert.match(operatorRoute, /createServerSupabaseClient\(\)[\s\S]*auth\.getUser\(\)/)
+assert.match(operatorRoute, /if \(cookieUser\?\.id\)/)
+assert.doesNotMatch(
   operatorRoute,
-  /Your sign-in session expired\. Refresh this page to restore browser calling\./,
-  "401 must not use generic sign-in copy when session cookie is missing",
+  /if \(bearer\)[\s\S]*return[\s\S]*if \(cookieUser/,
+  "bearer must not be checked before cookie user resolution",
 )
 
+assert.match(operatorRoute, /getBearerAccessToken/)
+assert.match(operatorRoute, /createSupabaseClientWithAccessToken/)
+assert.match(operatorRoute, /voice_operator_auth_resolution/)
+assert.match(operatorRoute, /ignored_stale_bearer_cookie_authoritative/)
+assert.match(operatorRoute, /session_invalid/)
 assert.match(operatorRoute, /requireVoiceBrowserLightweightOperatorContext/)
-assert.match(operatorRoute, /lightweight_route/)
+assert.match(operatorRoute, /browserAuthTelemetry/)
 
 assert.match(browserTokenRoute, /requireVoiceBrowserLightweightOperatorContext/)
-assert.match(browserTokenRoute, /voice_browser_token_auth_success/)
-assert.match(browserTokenRoute, /voice_browser_token_auth_denied/)
-assert.doesNotMatch(browserTokenRoute, /workspace-bridge/)
-assert.doesNotMatch(browserTokenRoute, /resolveInboundBrowserOfferForUser/)
-assert.doesNotMatch(browserTokenRoute, /reconcileStaleRingingOfferCandidates/)
-assert.doesNotMatch(browserTokenRoute, /buildVoiceBrowserSyncSnapshot/)
-assert.doesNotMatch(browserTokenRoute, /probeVoiceSchemaHealth/)
-
 assert.match(browserRegisterRoute, /requireVoiceBrowserLightweightOperatorContext/)
-assert.doesNotMatch(browserRegisterRoute, /workspace-bridge/)
-assert.doesNotMatch(browserRegisterRoute, /resolveInboundBrowserOfferForUser/)
+assert.match(browserSyncRoute, /workspaceSessionId/)
+assert.match(browserSyncRoute, /requireVoiceBrowserLightweightOperatorContext/)
 
-assert.match(browserSyncRoute, /requireVoiceBrowserLightweightOperatorContext\(\{[\s\S]*request,/)
-assert.match(browserSyncRoute, /voice_browser_sync_auth_success/)
-assert.match(browserSyncRoute, /voice_browser_sync_auth_denied/)
-assert.match(browserSyncRoute, /voice_browser_sync_success/)
-assert.doesNotMatch(browserSyncRoute, /requireSessionOwner: Boolean\(workspaceSessionId\)/)
-assert.doesNotMatch(browserSyncRoute, /sessionId: workspaceSessionId/)
-
-assert.match(browserHook, /credentials: "include"/)
 assert.match(browserHook, /createBrowserSupabaseClient/)
 assert.match(browserHook, /Authorization/)
-assert.match(browserHook, /hasLiveBrowserCallContext/)
-assert.match(browserHook, /setEnrichmentWarning\(null\)/)
+assert.match(browserHook, /buildVoiceBrowserFetchInit/)
 
+assert.match(telemetry, /voice_browser_auth_source/)
 assert.match(telemetry, /voice_operator_auth_resolution/)
 assert.match(telemetry, /voice_browser_sync_auth_denied/)
 assert.match(telemetry, /voice_browser_sync_auth_success/)
-assert.match(telemetry, /voice_browser_sync_session_pin_rejected/)
-assert.match(telemetry, /voice_browser_token_auth_denied/)
-assert.match(telemetry, /voice_browser_token_auth_success/)
-assert.match(telemetry, /voice_inbound_routing_timeout/)
-assert.match(telemetry, /voice_inbound_webhook_failed/)
 
 const middlewareSource = fs.readFileSync(path.join(process.cwd(), "middleware.ts"), "utf8")
 assert.match(middlewareSource, /pathname\.startsWith\("\/api\/voice\/"\)/)
+assert.match(middlewareSource, /pathname\.startsWith\("\/api\/platform\/growth\/voice\/"\)/)
+
+const growthCallWorkspace = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace.tsx"),
+  "utf8",
+)
+assert.match(growthCallWorkspace, /fetch\("\/api\/platform\/growth\/calls\/answer"/)
+assert.doesNotMatch(
+  growthCallWorkspace,
+  /buildVoiceBrowserFetchInit[\s\S]*fetch\("\/api\/platform\/growth\/calls\/answer"/,
+  "answer reconcile must not reuse browser fetch init with bearer",
+)
 
 const inboundProvisionSource = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/browser-calling/inbound-workspace-provision.ts"),

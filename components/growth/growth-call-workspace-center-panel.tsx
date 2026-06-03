@@ -232,6 +232,7 @@ export function GrowthCallWorkspaceCenterPanel({
   coachingStartSignal,
   coachingNativeSessionId = null,
   answerReconcileInFlight = false,
+  browserSyncMode = null,
   coachingMode,
   leadLinked,
   optimisticCoachTurn = null,
@@ -278,6 +279,7 @@ export function GrowthCallWorkspaceCenterPanel({
   coachingStartSignal?: number
   coachingNativeSessionId?: string | null
   answerReconcileInFlight?: boolean
+  browserSyncMode?: "fast" | "enrichment" | null
   coachingMode: CallWorkspaceCoachingMode
   leadLinked: boolean
   optimisticCoachTurn?: ConversationCoachTurn | null
@@ -436,6 +438,7 @@ export function GrowthCallWorkspaceCenterPanel({
               onRetryMediaStream={onRetryMediaStream}
               linkedRealtimeSessionId={activeSession.realtimeSessionId}
               answerReconciliationPending={answerReconcileInFlight}
+              browserSyncMode={browserSyncMode}
               aiCopilot={aiCopilot}
               aiReceptionist={aiReceptionist}
               missedCallRecovery={missedCallRecovery}
@@ -466,6 +469,7 @@ export function GrowthCallWorkspaceCenterPanel({
               onRetryMediaStream={onRetryMediaStream}
               linkedRealtimeSessionId={activeSession.realtimeSessionId}
               answerReconciliationPending={answerReconcileInFlight}
+              browserSyncMode={browserSyncMode}
               aiCopilot={aiCopilot}
               aiReceptionist={aiReceptionist}
               missedCallRecovery={missedCallRecovery}

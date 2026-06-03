@@ -16,6 +16,7 @@ import {
   withInboundRingElapsed,
 } from "@/lib/voice/browser-calling/inbound-ring-diagnostics"
 import type { VoiceBrowserSyncSnapshot } from "@/lib/voice/browser-calling/types"
+import { logCallWorkspaceCoachingUiTelemetry } from "@/lib/growth/native-dialer/call-workspace-coaching-ui-telemetry"
 import { VOICE_NATIVE_DIALER_INTEGRATION_QA_MARKER } from "@/lib/voice/browser-calling/types"
 import { CALL_WORKSPACE_ENRICHMENT_SYNC_FAILED_COPY } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -89,7 +90,7 @@ function mergeVoiceBrowserSyncSnapshot(
   if (next.syncMode === "enrichment") {
     if (!previous) return next
     if (next.diagnostics?.enrichmentTimedOut) return previous
-    return {
+    const merged = {
       ...previous,
       generatedAt: next.generatedAt,
       syncMode: next.syncMode,
@@ -111,9 +112,22 @@ function mergeVoiceBrowserSyncSnapshot(
       aiReceptionist: next.aiReceptionist ?? previous.aiReceptionist,
       missedCallRecovery: next.missedCallRecovery ?? previous.missedCallRecovery,
     }
+    logCallWorkspaceCoachingUiTelemetry({
+      event: "voice_call_workspace_coaching_sync_merge",
+      workspaceSessionId: merged.workspaceSessionId,
+      syncMode: "enrichment",
+      operatorAssistRealtimeSessionId: merged.operatorAssist?.realtimeSessionId ?? null,
+      extra: {
+        incomingOperatorAssistRealtimeSessionId: next.operatorAssist?.realtimeSessionId ?? null,
+        previousOperatorAssistRealtimeSessionId: previous.operatorAssist?.realtimeSessionId ?? null,
+        usedIncomingOperatorAssist: Boolean(next.operatorAssist),
+        enrichmentTimedOut: Boolean(next.diagnostics?.enrichmentTimedOut),
+      },
+    })
+    return merged
   }
   if (!previous || previous.activeVoiceCallId !== next.activeVoiceCallId || !next.activeVoiceCallId) return next
-  return {
+  const merged = {
     ...next,
     timeline: previous.timeline,
     recording: previous.recording,
@@ -129,6 +143,17 @@ function mergeVoiceBrowserSyncSnapshot(
     aiReceptionist: previous.aiReceptionist,
     missedCallRecovery: previous.missedCallRecovery,
   }
+  logCallWorkspaceCoachingUiTelemetry({
+    event: "voice_call_workspace_coaching_sync_merge",
+    workspaceSessionId: merged.workspaceSessionId,
+    syncMode: "fast",
+    operatorAssistRealtimeSessionId: merged.operatorAssist?.realtimeSessionId ?? null,
+    extra: {
+      preservedPreviousOperatorAssist: Boolean(previous.operatorAssist),
+      incomingOperatorAssist: next.operatorAssist?.realtimeSessionId ?? null,
+    },
+  })
+  return merged
 }
 
 async function fetchVoiceBrowserAccessToken(): Promise<VoiceBrowserTokenResponse> {

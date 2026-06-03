@@ -58,6 +58,18 @@ export type VoiceOperatorRouteSessionIdDiagnostics = {
   realtimeSessionId?: string | null
 }
 
+export type VoiceBrowserAuthSourceTelemetry =
+  | "cookie"
+  | "bearer"
+  | "cookie_fallback"
+  | "bearer_rejected"
+  | "session_invalid"
+
+export type VoiceBrowserAuthTelemetryContext = {
+  route: string
+  workspaceSessionId?: string | null
+}
+
 export type VoiceOperatorRouteContextOptions = {
   request?: Request
   sessionId?: string | null
@@ -66,6 +78,7 @@ export type VoiceOperatorRouteContextOptions = {
   skipSessionIdFormatValidation?: boolean
   diagnostics?: VoiceOperatorRouteDiagnostics
   sessionIdDiagnostics?: VoiceOperatorRouteSessionIdDiagnostics
+  browserAuthTelemetry?: VoiceBrowserAuthTelemetryContext
 }
 
 export type VoiceOperatorAuthStage =
@@ -120,7 +133,41 @@ type ResolvedVoiceOperatorAuth =
       authFailureReason: string
       hadAuthCookie: boolean
       bearerPresent: boolean
+      cookieErrorMessage?: string | null
+      bearerErrorMessage?: string | null
     }
+
+function resolveVoiceBrowserAuthSourceTelemetry(
+  auth: ResolvedVoiceOperatorAuth,
+): VoiceBrowserAuthSourceTelemetry {
+  if (auth.ok) {
+    if (auth.authSource === "cookie" && auth.bearerPresent) return "cookie_fallback"
+    return auth.authSource
+  }
+  if (auth.authStage === "session_invalid") return "session_invalid"
+  if (auth.bearerPresent) return "bearer_rejected"
+  return "session_invalid"
+}
+
+function logVoiceBrowserAuthSource(input: {
+  route: string
+  workspaceSessionId?: string | null
+  auth: ResolvedVoiceOperatorAuth
+}): void {
+  const authSource = resolveVoiceBrowserAuthSourceTelemetry(input.auth)
+  logVoiceInfrastructure("voice_browser_auth_source", {
+    route: input.route,
+    workspaceSessionId: input.workspaceSessionId ?? null,
+    authSource,
+    userId: input.auth.ok ? input.auth.userId : null,
+    bearerPresent: input.auth.bearerPresent,
+    cookiePresent: input.auth.hadAuthCookie,
+    rejectionReason: input.auth.ok ? null : input.auth.authFailureReason,
+    cookieError: input.auth.ok ? null : (input.auth.cookieErrorMessage ?? null),
+    bearerError: input.auth.ok ? null : (input.auth.bearerErrorMessage ?? null),
+    authStage: input.auth.ok ? null : input.auth.authStage,
+  })
+}
 
 function logVoiceOperatorAuthResolution(input: {
   route: string
@@ -149,6 +196,7 @@ function logVoiceOperatorAuthResolution(input: {
 async function resolveVoiceOperatorAuth(input: {
   request?: Request
   route?: string
+  browserAuthTelemetry?: VoiceBrowserAuthTelemetryContext
 }): Promise<ResolvedVoiceOperatorAuth> {
   const route = input.route ?? "requireVoiceOperatorRouteContext"
   const cookieStore = await cookies()
@@ -174,7 +222,7 @@ async function resolveVoiceOperatorAuth(input: {
       platformAdminMatched: Boolean(cookieUser.email && isPlatformAdminEmail(cookieUser.email)),
       bearerFallback: bearerPresent ? "ignored_stale_bearer_cookie_authoritative" : null,
     })
-    return {
+    const resolved: ResolvedVoiceOperatorAuth = {
       ok: true,
       userId: cookieUser.id,
       userEmail: cookieUser.email ?? null,
@@ -182,6 +230,14 @@ async function resolveVoiceOperatorAuth(input: {
       hadAuthCookie,
       bearerPresent,
     }
+    if (input.browserAuthTelemetry) {
+      logVoiceBrowserAuthSource({
+        route: input.browserAuthTelemetry.route,
+        workspaceSessionId: input.browserAuthTelemetry.workspaceSessionId,
+        auth: resolved,
+      })
+    }
+    return resolved
   }
 
   if (bearer) {
@@ -198,7 +254,7 @@ async function resolveVoiceOperatorAuth(input: {
         platformAdminMatched: Boolean(data.user.email && isPlatformAdminEmail(data.user.email)),
         bearerFallback: "cookie_missing_or_invalid_used_bearer",
       })
-      return {
+      const resolved: ResolvedVoiceOperatorAuth = {
         ok: true,
         userId: data.user.id,
         userEmail: data.user.email ?? null,
@@ -206,6 +262,14 @@ async function resolveVoiceOperatorAuth(input: {
         hadAuthCookie,
         bearerPresent,
       }
+      if (input.browserAuthTelemetry) {
+        logVoiceBrowserAuthSource({
+          route: input.browserAuthTelemetry.route,
+          workspaceSessionId: input.browserAuthTelemetry.workspaceSessionId,
+          auth: resolved,
+        })
+      }
+      return resolved
     }
 
     const authFailureReason = hadAuthCookie
@@ -229,13 +293,23 @@ async function resolveVoiceOperatorAuth(input: {
       cookieError: cookieError?.message ?? null,
       bearerError: error?.message ?? null,
     })
-    return {
+    const resolved: ResolvedVoiceOperatorAuth = {
       ok: false,
       authStage: hadAuthCookie || bearerPresent ? "session_invalid" : "no_session_cookie",
       authFailureReason,
       hadAuthCookie,
       bearerPresent,
+      cookieErrorMessage: cookieError?.message ?? null,
+      bearerErrorMessage: error?.message ?? null,
     }
+    if (input.browserAuthTelemetry) {
+      logVoiceBrowserAuthSource({
+        route: input.browserAuthTelemetry.route,
+        workspaceSessionId: input.browserAuthTelemetry.workspaceSessionId,
+        auth: resolved,
+      })
+    }
+    return resolved
   }
 
   const authFailureReason = hadAuthCookie ? "cookie_invalid" : "no_session_cookie"
@@ -256,13 +330,23 @@ async function resolveVoiceOperatorAuth(input: {
     bearerPresent: false,
     cookieError: cookieError?.message ?? null,
   })
-  return {
+  const resolved: ResolvedVoiceOperatorAuth = {
     ok: false,
     authStage: hadAuthCookie ? "session_invalid" : "no_session_cookie",
     authFailureReason,
     hadAuthCookie,
     bearerPresent,
+    cookieErrorMessage: cookieError?.message ?? null,
+    bearerErrorMessage: null,
   }
+  if (input.browserAuthTelemetry) {
+    logVoiceBrowserAuthSource({
+      route: input.browserAuthTelemetry.route,
+      workspaceSessionId: input.browserAuthTelemetry.workspaceSessionId,
+      auth: resolved,
+    })
+  }
+  return resolved
 }
 
 function logInvalidNativeSessionIdReturn(input: {
@@ -317,7 +401,11 @@ export async function requireVoiceOperatorRouteContext(
   }
 
   const authStartedAt = Date.now()
-  const auth = await resolveVoiceOperatorAuth({ request: options.request, route: operatorRoute })
+  const auth = await resolveVoiceOperatorAuth({
+    request: options.request,
+    route: operatorRoute,
+    browserAuthTelemetry: options.browserAuthTelemetry,
+  })
   options.diagnostics?.onAuthComplete?.(Date.now() - authStartedAt)
 
   if (!auth.ok) {
@@ -532,6 +620,7 @@ export async function requireVoiceOperatorRouteContext(
 export async function requireVoiceBrowserLightweightOperatorContext(input: {
   request?: Request
   route: string
+  workspaceSessionId?: string | null
   diagnostics?: VoiceOperatorRouteDiagnostics
 }): Promise<VoiceOperatorRouteContext> {
   return requireVoiceOperatorRouteContext({
@@ -542,6 +631,10 @@ export async function requireVoiceBrowserLightweightOperatorContext(input: {
     sessionIdDiagnostics: {
       route: input.route,
       sessionIdSource: "lightweight_route",
+    },
+    browserAuthTelemetry: {
+      route: input.route,
+      workspaceSessionId: input.workspaceSessionId ?? null,
     },
   })
 }

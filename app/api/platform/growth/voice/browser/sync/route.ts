@@ -24,6 +24,7 @@ export async function GET(request: Request) {
   const ctx = await requireVoiceBrowserLightweightOperatorContext({
     request,
     route: BROWSER_SYNC_ROUTE,
+    workspaceSessionId,
   })
   if (!ctx.ok) {
     const deniedBody = (await ctx.response.clone().json().catch(() => ({}))) as {
