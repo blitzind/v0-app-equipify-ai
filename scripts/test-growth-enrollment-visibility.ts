@@ -71,4 +71,31 @@ assert.match(sidebar, /patternActiveCount/)
 const statsApi = readSource("app/api/platform/growth/sequences/enrollments/stats/route.ts")
 assert.match(statsApi, /fetchPatternEnrollmentStats/)
 
+const crmPage = readSource("app/(admin)/admin/growth/leads/crm/page.tsx")
+const tableSource = readSource("components/growth/growth-leads-table.tsx")
+
+assert.match(crmPage, /refreshLeadsInBackground/)
+assert.match(crmPage, /onBulkEnrollDismissed/)
+assert.doesNotMatch(crmPage, /onBulkEnrolled/)
+assert.doesNotMatch(crmPage, /onBulkEnrollDismissed[\s\S]{0,120}void load\(\)/)
+
+assert.match(tableSource, /onDismissAfterSuccess=\{onBulkEnrollDismissed\}/)
+assert.doesNotMatch(tableSource, /onBulkEnrolled/)
+
+assert.match(bulkDialog, /onDismissAfterSuccess/)
+assert.match(bulkDialog, /handleOpenChange/)
+assert.match(bulkDialog, /notifySuccessDismissal/)
+assert.doesNotMatch(bulkDialog, /onCompleted/)
+assert.match(bulkDialog, /setResult\(data\.result\)/)
+assert.doesNotMatch(
+  bulkDialog.slice(bulkDialog.indexOf("async function runScheduler"), bulkDialog.indexOf("function renderOutcomeRow")),
+  /onDismissAfterSuccess/,
+)
+assert.match(bulkDialog, /result\.enrolled\.length/)
+assert.match(bulkDialog, /result\.skippedAlreadyEnrolled\.length/)
+assert.match(bulkDialog, /result\.skippedBlocked\.length/)
+assert.match(bulkDialog, /result\.failed\.length/)
+assert.match(bulkDialog, /onClick=\{notifySuccessDismissal\}/)
+assert.match(bulkDialog, /Run Scheduler Now/)
+
 console.log("growth enrollment visibility tests passed")

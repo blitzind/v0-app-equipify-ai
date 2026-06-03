@@ -59,32 +59,50 @@ export default function AdminGrowthLeadsPage() {
     }, {})
   }, [leads])
 
+  async function fetchLeads() {
+    const params = new URLSearchParams()
+    if (assignedToFilter) params.set("assignedTo", assignedToFilter)
+    if (unassignedFilter) params.set("unassigned", "true")
+    const query = params.toString()
+    const res = await fetch(`/api/platform/growth/leads${query ? `?${query}` : ""}`, { cache: "no-store" })
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean
+      leads?: GrowthLead[]
+      meta?: { archiveSchemaReady?: boolean }
+      message?: string
+      error?: string
+    }
+    if (!res.ok || !data.ok) {
+      throw new Error(data.message ?? data.error ?? "Could not load growth leads.")
+    }
+    return {
+      leads: data.leads ?? [],
+      archiveSchemaReady: data.meta?.archiveSchemaReady ?? true,
+    }
+  }
+
   async function load() {
     setLoading(true)
     setError(null)
     setSuccessMessage(null)
     try {
-      const params = new URLSearchParams()
-      if (assignedToFilter) params.set("assignedTo", assignedToFilter)
-      if (unassignedFilter) params.set("unassigned", "true")
-      const query = params.toString()
-      const res = await fetch(`/api/platform/growth/leads${query ? `?${query}` : ""}`, { cache: "no-store" })
-      const data = (await res.json().catch(() => ({}))) as {
-        ok?: boolean
-        leads?: GrowthLead[]
-        meta?: { archiveSchemaReady?: boolean }
-        message?: string
-        error?: string
-      }
-      if (!res.ok || !data.ok) {
-        throw new Error(data.message ?? data.error ?? "Could not load growth leads.")
-      }
-      setLeads(data.leads ?? [])
-      setArchiveSchemaReady(data.meta?.archiveSchemaReady ?? true)
+      const data = await fetchLeads()
+      setLeads(data.leads)
+      setArchiveSchemaReady(data.archiveSchemaReady)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load growth leads.")
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function refreshLeadsInBackground() {
+    try {
+      const data = await fetchLeads()
+      setLeads(data.leads)
+      setArchiveSchemaReady(data.archiveSchemaReady)
+    } catch {
+      // Keep the success dialog visible; background refresh must not unmount the table.
     }
   }
 
@@ -337,9 +355,9 @@ export default function AdminGrowthLeadsPage() {
             onOpenLead={openLead}
             onArchiveLead={archiveLead}
             onBulkArchive={bulkArchiveLeads}
-            onBulkEnrolled={() => {
-              setSuccessMessage("Bulk sequence enrollment completed — review results in the dialog.")
-              void load()
+            onBulkEnrollDismissed={() => {
+              setSuccessMessage("Bulk sequence enrollment completed.")
+              void refreshLeadsInBackground()
             }}
             archivingLeadId={archivingLeadId}
             bulkArchiving={bulkArchiving}

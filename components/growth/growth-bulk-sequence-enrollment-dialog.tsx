@@ -42,7 +42,8 @@ type GrowthBulkSequenceEnrollmentDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   leadIds: string[]
-  onCompleted?: (result: BulkSequenceEnrollmentResult) => void
+  /** Fires when the user leaves the post-enrollment success view (close, back, or navigation). */
+  onDismissAfterSuccess?: () => void
 }
 
 function pickPrimaryEnrollmentId(result: BulkSequenceEnrollmentResult): string | null {
@@ -66,7 +67,7 @@ export function GrowthBulkSequenceEnrollmentDialog({
   open,
   onOpenChange,
   leadIds,
-  onCompleted,
+  onDismissAfterSuccess,
 }: GrowthBulkSequenceEnrollmentDialogProps) {
   const router = useRouter()
   const [patterns, setPatterns] = useState<GrowthSequencePattern[]>([])
@@ -88,6 +89,18 @@ export function GrowthBulkSequenceEnrollmentDialog({
   const showSuccess = Boolean(result && !result.dryRun)
   const primaryEnrollmentId = result ? pickPrimaryEnrollmentId(result) : null
   const primaryLeadId = result ? pickPrimaryLeadId(result, uniqueLeadIds) : null
+
+  const notifySuccessDismissal = useCallback(() => {
+    if (result && !result.dryRun) onDismissAfterSuccess?.()
+  }, [onDismissAfterSuccess, result])
+
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen && result && !result.dryRun) onDismissAfterSuccess?.()
+      onOpenChange(nextOpen)
+    },
+    [onDismissAfterSuccess, onOpenChange, result],
+  )
 
   const loadPatterns = useCallback(async () => {
     setLoadingPatterns(true)
@@ -150,7 +163,6 @@ export function GrowthBulkSequenceEnrollmentDialog({
         throw new Error(data.message ?? "Bulk enrollment failed.")
       }
       setResult(data.result)
-      if (!dryRun) onCompleted?.(data.result)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Bulk enrollment failed.")
     } finally {
@@ -189,7 +201,9 @@ export function GrowthBulkSequenceEnrollmentDialog({
         <span className="text-muted-foreground">{label}</span>
         {entry.enrollmentId ? (
           <Button size="sm" variant="link" className="h-auto px-0" asChild>
-            <Link href={growthPatternEnrollmentDetailHref(entry.enrollmentId)}>View enrollment</Link>
+            <Link href={growthPatternEnrollmentDetailHref(entry.enrollmentId)} onClick={notifySuccessDismissal}>
+              View enrollment
+            </Link>
           </Button>
         ) : (
           <span className="text-xs text-muted-foreground">{entry.reason ?? entry.code}</span>
@@ -199,7 +213,7 @@ export function GrowthBulkSequenceEnrollmentDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -273,6 +287,7 @@ export function GrowthBulkSequenceEnrollmentDialog({
                             highlightJobId: job.id,
                           })}
                           className="font-medium underline-offset-2 hover:underline"
+                          onClick={notifySuccessDismissal}
                         >
                           Step {job.stepOrder ?? "—"} · pending approval
                         </Link>
@@ -294,7 +309,7 @@ export function GrowthBulkSequenceEnrollmentDialog({
             <div className="flex flex-col gap-2">
               {primaryEnrollmentId ? (
                 <Button asChild>
-                  <Link href={growthPatternEnrollmentDetailHref(primaryEnrollmentId)}>
+                  <Link href={growthPatternEnrollmentDetailHref(primaryEnrollmentId)} onClick={notifySuccessDismissal}>
                     View Enrollment
                     <ArrowRight className="ml-2 size-4" />
                   </Link>
@@ -307,7 +322,7 @@ export function GrowthBulkSequenceEnrollmentDialog({
               <Button
                 variant="ghost"
                 onClick={() => {
-                  onOpenChange(false)
+                  handleOpenChange(false)
                   router.push(growthLeadsCrmHref())
                 }}
               >
@@ -321,6 +336,7 @@ export function GrowthBulkSequenceEnrollmentDialog({
                       leadId: primaryLeadId ?? undefined,
                       sequencePatternId: result.sequencePatternId,
                     })}
+                    onClick={notifySuccessDismissal}
                   >
                     Open Execution Console
                   </Link>
@@ -394,7 +410,7 @@ export function GrowthBulkSequenceEnrollmentDialog({
 
         {!showSuccess ? (
           <DialogFooter className="gap-2 sm:justify-between">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="ghost" onClick={() => handleOpenChange(false)}>
               Close
             </Button>
             <div className="flex flex-wrap gap-2">

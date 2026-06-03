@@ -40,7 +40,8 @@ type GrowthLeadsTableProps = {
   onOpenLead?: (lead: GrowthLead) => void
   onArchiveLead?: (lead: GrowthLead) => Promise<void>
   onBulkArchive?: (leadIds: string[]) => Promise<void>
-  onBulkEnrolled?: () => void
+  /** Refresh CRM data after the user leaves the post-enrollment success dialog. */
+  onBulkEnrollDismissed?: () => void
   archivingLeadId?: string | null
   bulkArchiving?: boolean
   archiveAvailable?: boolean
@@ -51,7 +52,7 @@ export function GrowthLeadsTable({
   onOpenLead,
   onArchiveLead,
   onBulkArchive,
-  onBulkEnrolled,
+  onBulkEnrollDismissed,
   archivingLeadId = null,
   bulkArchiving = false,
   archiveAvailable = true,
@@ -149,9 +150,7 @@ export function GrowthLeadsTable({
           open={bulkEnrollOpen}
           onOpenChange={setBulkEnrollOpen}
           leadIds={[...selectedIds]}
-          onCompleted={() => {
-            onBulkEnrolled?.()
-          }}
+          onDismissAfterSuccess={onBulkEnrollDismissed}
         />
 
         <div className="overflow-x-auto rounded-xl border border-border">
