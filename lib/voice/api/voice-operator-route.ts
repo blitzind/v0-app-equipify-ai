@@ -149,6 +149,46 @@ function resolveVoiceBrowserAuthSourceTelemetry(
   return "session_invalid"
 }
 
+function logVoiceBrowserSyncAuthFailure(input: {
+  route: string
+  workspaceSessionId?: string | null
+  authSource: VoiceBrowserAuthSourceTelemetry
+  hasCookie: boolean
+  hasBearer: boolean
+  userId: string | null
+  platformAdminUserId: string | null
+  reason: string
+}): void {
+  logVoiceInfrastructure("voice_browser_sync_auth_failure", {
+    authSource: input.authSource,
+    hasCookie: input.hasCookie,
+    hasBearer: input.hasBearer,
+    userId: input.userId,
+    platformAdminUserId: input.platformAdminUserId,
+    reason: input.reason,
+    workspaceSessionId: input.workspaceSessionId ?? null,
+    route: input.route,
+  })
+}
+
+function logSessionInvalidAuthFailure(input: {
+  route: string
+  auth: Extract<ResolvedVoiceOperatorAuth, { ok: false }>
+  browserAuthTelemetry?: VoiceBrowserAuthTelemetryContext
+}): void {
+  if (input.auth.authStage !== "session_invalid") return
+  logVoiceBrowserSyncAuthFailure({
+    route: input.route,
+    workspaceSessionId: input.browserAuthTelemetry?.workspaceSessionId ?? null,
+    authSource: resolveVoiceBrowserAuthSourceTelemetry(input.auth),
+    hasCookie: input.auth.hadAuthCookie,
+    hasBearer: input.auth.bearerPresent,
+    userId: null,
+    platformAdminUserId: null,
+    reason: input.auth.authFailureReason,
+  })
+}
+
 function logVoiceBrowserAuthSource(input: {
   route: string
   workspaceSessionId?: string | null
@@ -309,6 +349,11 @@ async function resolveVoiceOperatorAuth(input: {
         auth: resolved,
       })
     }
+    logSessionInvalidAuthFailure({
+      route,
+      auth: resolved,
+      browserAuthTelemetry: input.browserAuthTelemetry,
+    })
     return resolved
   }
 
@@ -346,6 +391,11 @@ async function resolveVoiceOperatorAuth(input: {
       auth: resolved,
     })
   }
+  logSessionInvalidAuthFailure({
+    route,
+    auth: resolved,
+    browserAuthTelemetry: input.browserAuthTelemetry,
+  })
   return resolved
 }
 
@@ -417,6 +467,11 @@ export async function requireVoiceOperatorRouteContext(
         "no_session_cookie",
       )
     }
+    logSessionInvalidAuthFailure({
+      route: operatorRoute,
+      auth,
+      browserAuthTelemetry: options.browserAuthTelemetry,
+    })
     return jsonResponse(
       "unauthorized",
       "Could not verify your sign-in session. Refresh this page and try again.",

@@ -49,6 +49,7 @@ export type VoiceTelemetryEvent =
   | "voice_browser_token_issued"
   | "voice_browser_token_mint_diagnostics"
   | "voice_browser_sync_auth_denied"
+  | "voice_browser_sync_auth_failure"
   | "voice_browser_sync_auth_success"
   | "voice_browser_sync_success"
   | "voice_browser_sync_failed"
