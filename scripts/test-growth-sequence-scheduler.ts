@@ -76,4 +76,23 @@ assert.match(uiSource, /GROWTH_SEQUENCE_SCHEDULER_QA_MARKER/)
 assert.match(uiSource, /Dry Run/)
 assert.match(uiSource, /Auto-plans execution jobs/)
 
+const qaAccelerationSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/sequence-enrollment/qa-acceleration.ts"),
+  "utf8",
+)
+if (qaAccelerationSource.includes("runGrowthOutreachPreflight")) {
+  assert.match(
+    qaAccelerationSource,
+    /import \{[^}]*runGrowthOutreachPreflight[^}]*\} from "@\/lib\/growth\/outreach\/outreach-preflight"/,
+    "qa-acceleration must import runGrowthOutreachPreflight when calling it",
+  )
+}
+
+const transportQueueSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/sequences/execution/queue-sequence-step-transport-job.ts"),
+  "utf8",
+)
+assert.match(transportQueueSource, /runGrowthOutreachPreflight/)
+assert.match(transportQueueSource, /from "@\/lib\/growth\/outreach\/outreach-preflight"/)
+
 console.log("growth sequence scheduler tests passed")

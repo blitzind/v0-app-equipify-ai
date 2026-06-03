@@ -50,6 +50,8 @@ for (const eventType of GROWTH_QA_ACCELERATION_TIMELINE_EVENT_TYPES) {
 }
 
 const qaSource = readSource("lib/growth/sequence-enrollment/qa-acceleration.ts")
+assert.match(qaSource, /runGrowthOutreachPreflight/)
+assert.match(qaSource, /from "@\/lib\/growth\/outreach\/outreach-preflight"/)
 assert.match(qaSource, /qaScheduleGrowthEnrollmentStepNow/)
 assert.match(qaSource, /qaForceGrowthEnrollmentStepDueNow/)
 assert.match(qaSource, /qaRunGrowthEnrollmentSchedulerNow/)
