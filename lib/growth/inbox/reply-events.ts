@@ -144,7 +144,7 @@ export async function persistReplyEventDrafts(
   drafts: ReplyEventDraft[],
   actor?: { actorUserId?: string | null; actorEmail?: string | null },
 ): Promise<void> {
-  const actor = resolveGrowthActorForDb(actor)
+  const resolvedActor = resolveGrowthActorForDb(actor)
   for (const draft of drafts) {
     await createReplyIntelligenceEvent(admin, {
       thread_id: threadId,
@@ -162,8 +162,8 @@ export async function persistReplyEventDrafts(
         threadId,
         leadId,
         payload: draft.metadata,
-        actorUserId: actor.actorUserId,
-        actorEmail: actor.actorEmail,
+        actorUserId: resolvedActor.actorUserId,
+        actorEmail: resolvedActor.actorEmail,
       })
     }
   }
