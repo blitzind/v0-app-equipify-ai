@@ -46,6 +46,8 @@ const cronSource = fs.readFileSync(
 )
 assert.match(cronSource, /runGrowthCronJob/)
 assert.match(cronSource, /runGrowthSequenceScheduler/)
+assert.match(cronSource, /export async function GET/)
+assert.match(cronSource, /return POST\(request\)/)
 
 const platformRouteSource = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/sequences/scheduler/run/route.ts"),

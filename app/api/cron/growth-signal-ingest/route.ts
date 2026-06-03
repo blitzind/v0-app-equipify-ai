@@ -14,3 +14,8 @@ export async function POST(request: Request) {
     () => processSignalIngestionQueue(admin, 25),
   )
 }
+
+/** Vercel Cron invokes scheduled routes with GET. */
+export async function GET(request: Request) {
+  return POST(request)
+}

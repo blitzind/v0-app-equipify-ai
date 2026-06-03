@@ -18,3 +18,8 @@ export async function POST(request: Request) {
     (result) => ({ metadata: { summary: result.summary } }),
   )
 }
+
+/** Vercel Cron invokes scheduled routes with GET. */
+export async function GET(request: Request) {
+  return POST(request)
+}

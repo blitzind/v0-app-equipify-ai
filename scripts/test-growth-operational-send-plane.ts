@@ -50,6 +50,7 @@ async function main(): Promise<void> {
   )
   assert.match(cronRoute, /runGrowthCronJob/)
   assert.match(cronRoute, /growth-cron-runner/)
+  assert.match(cronRoute, /export async function GET/)
 
   const transport = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/providers/transport/transport-orchestrator.ts"),

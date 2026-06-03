@@ -117,6 +117,8 @@ async function main(): Promise<void> {
   const cronSource = readSource("app/api/cron/growth-sequence-safe-execute/route.ts")
   assert.match(cronSource, /runGrowthCronJob/)
   assert.match(cronSource, /runApprovedDueSequenceExecutionJobs/)
+  assert.match(cronSource, /export async function GET/)
+  assert.match(cronSource, /return POST\(request\)/)
   assert.doesNotMatch(cronSource, /approveSequenceExecutionJob/)
 
   const approveRouteSource = readSource(
