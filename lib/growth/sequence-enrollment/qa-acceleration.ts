@@ -28,6 +28,10 @@ import {
 } from "@/lib/growth/sequence-enrollment/qa-acceleration-types"
 import { runGrowthSequenceScheduler } from "@/lib/growth/sequence-enrollment/run-sequence-scheduler"
 import {
+  formatGrowthSchedulerStepFailureMessage,
+  pickSchedulerStepFailureForEnrollment,
+} from "@/lib/growth/sequence-enrollment/scheduler-step-failure-types"
+import {
   fetchGrowthSequenceEnrollmentById,
   listGrowthSequenceEnrollmentSteps,
   updateGrowthSequenceEnrollment,
@@ -263,6 +267,9 @@ async function diagnoseEnrollmentSchedulerBlocker(
   if (!preflight.allowed && preflight.code === "suppressed") {
     return "blocked_by_suppression"
   }
+  if (!preflight.allowed && preflight.code) {
+    return preflight.code
+  }
 
   return null
 }
@@ -298,8 +305,21 @@ export async function qaRunGrowthEnrollmentSchedulerNow(
   const jobCreated = Boolean(createdJob)
 
   let blockReason: GrowthQaAccelerationSchedulerBlockReason | null = null
+  let blockReasonDetail: string | null = null
   if (!jobCreated) {
-    blockReason = await diagnoseEnrollmentSchedulerBlocker(admin, { enrollment, step })
+    const schedulerStepFailure = pickSchedulerStepFailureForEnrollment({
+      stepFailures: schedulerResult.stepFailures,
+      enrollmentId: enrollment.id,
+      stepId: step?.id,
+    })
+    if (schedulerStepFailure) {
+      blockReason = schedulerStepFailure.code
+      blockReasonDetail = formatGrowthSchedulerStepFailureMessage(schedulerStepFailure)
+    }
+
+    if (!blockReason) {
+      blockReason = await diagnoseEnrollmentSchedulerBlocker(admin, { enrollment, step })
+    }
     if (!blockReason) {
       if (!transportReadiness.ready && transportReadiness.blockReason) {
         blockReason = transportReadiness.blockReason
@@ -322,6 +342,9 @@ export async function qaRunGrowthEnrollmentSchedulerNow(
     }
   }
 
+  const blockReasonLabel = blockReasonDetail
+    ?? (blockReason ? formatQaAccelerationBlockReason(blockReason) : null)
+
   await emitGrowthLeadQaSchedulerRunTimeline(admin, {
     leadId: enrollment.leadId,
     enrollmentId: enrollment.id,
@@ -329,6 +352,7 @@ export async function qaRunGrowthEnrollmentSchedulerNow(
     jobCreated,
     createdJobId: createdJob?.id ?? null,
     blockReason,
+    blockReasonLabel,
     schedulerRunId: schedulerResult.runId,
   })
 
@@ -355,15 +379,20 @@ export async function qaRunGrowthEnrollmentSchedulerNow(
     jobCreated,
     createdJobId: createdJob?.id ?? null,
     blockReason,
-    blockReasonLabel: blockReason ? formatQaAccelerationBlockReason(blockReason) : null,
+    blockReasonLabel,
+    blockReasonDetail,
     executionHref,
   }
 }
 
 export function explainQaSchedulerNoJobCreated(input: {
   blockReason: GrowthQaAccelerationSchedulerBlockReason | null
+  blockReasonDetail?: string | null
   schedulerResult: GrowthQaAccelerationSchedulerRunResult["schedulerResult"]
 }): string[] {
+  if (input.blockReasonDetail?.trim()) {
+    return [input.blockReasonDetail.trim()]
+  }
   if (input.blockReason) {
     return [formatQaAccelerationBlockReason(input.blockReason)]
   }

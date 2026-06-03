@@ -8,6 +8,11 @@ import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { runGrowthOutreachPreflight } from "@/lib/growth/outreach/outreach-preflight"
 import { fetchGrowthOutreachQueueByEnrollmentStepId } from "@/lib/growth/outreach/outreach-queue-repository"
 import { runGrowthAiCopilotGeneration } from "@/lib/growth/run-ai-copilot-generation"
+import { getGrowthAiProvider } from "@/lib/growth/ai-copilot-provider"
+import type { GrowthSequenceSchedulerStepFailure } from "@/lib/growth/sequence-enrollment/scheduler-step-failure-types"
+import {
+  normalizeGrowthSchedulerAiGenerationFailureCode,
+} from "@/lib/growth/sequence-enrollment/scheduler-step-failure-types"
 import {
   updateGrowthSequenceEnrollmentStep,
 } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
@@ -47,6 +52,33 @@ export type QueueSequenceStepTransportJobResult = {
     | "cadence_task_failed"
     | string
   jobId?: string
+  failure?: GrowthSequenceSchedulerStepFailure
+}
+
+function buildQueueStepFailure(input: {
+  enrollmentId: string
+  step: GrowthSequenceEnrollmentStep
+  leadId: string
+  generationType?: string | null
+  code: string
+  message: string
+  phase: GrowthSequenceSchedulerStepFailure["phase"]
+  providerHealth?: GrowthSequenceSchedulerStepFailure["providerHealth"]
+}): GrowthSequenceSchedulerStepFailure {
+  const normalizedCode = normalizeGrowthSchedulerAiGenerationFailureCode({
+    code: input.code,
+    message: input.message,
+  })
+  return {
+    enrollmentId: input.enrollmentId,
+    stepId: input.step.id,
+    leadId: input.leadId,
+    generationType: input.generationType ?? null,
+    code: normalizedCode,
+    message: input.message,
+    phase: input.phase,
+    providerHealth: input.providerHealth ?? null,
+  }
 }
 
 export async function queueSequenceStepTransportJob(
@@ -122,19 +154,68 @@ export async function queueSequenceStepTransportJob(
 
   if (input.step.channel === "email" && input.step.status === "pending") {
     const generationType = (input.step.generationType ?? "follow_up_email") as GrowthAiCopilotGenerationType
-    const result = await runGrowthAiCopilotGeneration({
-      admin,
-      leadId: lead.id,
-      generationType,
-      actingUserId: input.actingUserId,
-      actingUserEmail: input.actingUserEmail,
-    })
-    if (!result.ok) return { queued: false, reason: result.code }
-    generation = result.generation
-    generationId = result.generation.id
+    const provider = getGrowthAiProvider()
+    const providerHealth = await provider.health()
+
+    let generationResult: Awaited<ReturnType<typeof runGrowthAiCopilotGeneration>>
+    try {
+      generationResult = await runGrowthAiCopilotGeneration({
+        admin,
+        leadId: lead.id,
+        generationType,
+        actingUserId: input.actingUserId,
+        actingUserEmail: input.actingUserEmail,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const code = /personalization/i.test(message) ? "personalization_failed" : "unknown_generation_error"
+      const failure = buildQueueStepFailure({
+        enrollmentId: input.enrollmentId,
+        step: input.step,
+        leadId: lead.id,
+        generationType,
+        code,
+        message,
+        phase: "ai_generation",
+        providerHealth,
+      })
+      logGrowthEngine("sequence_scheduler_ai_generation_failed", {
+        ...failure,
+        reason: failure.code,
+        providerId: provider.id,
+        providerHealth,
+        idempotencyKey,
+        exception: message,
+      })
+      return { queued: false, reason: failure.code, failure }
+    }
+
+    if (!generationResult.ok) {
+      const failure = buildQueueStepFailure({
+        enrollmentId: input.enrollmentId,
+        step: input.step,
+        leadId: lead.id,
+        generationType,
+        code: generationResult.code,
+        message: generationResult.message,
+        phase: "ai_generation",
+        providerHealth,
+      })
+      logGrowthEngine("sequence_scheduler_ai_generation_failed", {
+        ...failure,
+        reason: failure.code,
+        providerId: provider.id,
+        providerHealth,
+        idempotencyKey,
+      })
+      return { queued: false, reason: failure.code, failure }
+    }
+
+    generation = generationResult.generation
+    generationId = generationResult.generation.id
     await updateGrowthSequenceEnrollmentStep(admin, input.step.id, {
       status: "draft_created",
-      generationId: result.generation.id,
+      generationId: generationResult.generation.id,
       stepExecutionConfidence: computeStepExecutionConfidence({ lead, channel: input.step.channel }),
     })
   }
@@ -151,7 +232,20 @@ export async function queueSequenceStepTransportJob(
     generationApproved: true,
   })
   if (!preflight.allowed) {
-    return { queued: false, reason: preflight.code ?? "preflight_blocked" }
+    const code = preflight.code ?? "preflight_blocked"
+    return {
+      queued: false,
+      reason: code,
+      failure: buildQueueStepFailure({
+        enrollmentId: input.enrollmentId,
+        step: input.step,
+        leadId: lead.id,
+        generationType: input.step.generationType,
+        code,
+        message: preflight.reason ?? "Outreach preflight blocked queueing.",
+        phase: "queue_preflight",
+      }),
+    }
   }
 
   const sender = await resolveSequenceExecutionSender(admin)

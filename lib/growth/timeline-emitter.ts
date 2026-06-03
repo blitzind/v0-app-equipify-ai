@@ -1204,6 +1204,7 @@ export async function emitGrowthLeadQaSchedulerRunTimeline(
     jobCreated: boolean
     createdJobId?: string | null
     blockReason?: string | null
+    blockReasonLabel?: string | null
     schedulerRunId?: string | null
   },
 ) {
@@ -1213,14 +1214,17 @@ export async function emitGrowthLeadQaSchedulerRunTimeline(
     title: "QA: scheduler run",
     summary: input.jobCreated
       ? "Scheduler created an execution job for QA testing."
-      : input.blockReason
-        ? `Scheduler did not create a job: ${input.blockReason.replace(/_/g, " ")}.`
-        : "Scheduler run completed without creating an execution job.",
+      : input.blockReasonLabel
+        ? `Scheduler did not create a job: ${input.blockReasonLabel}`
+        : input.blockReason
+          ? `Scheduler did not create a job: ${input.blockReason.replace(/_/g, " ")}.`
+          : "Scheduler run completed without creating an execution job.",
     payload: {
       enrollmentId: input.enrollmentId,
       jobCreated: input.jobCreated,
       createdJobId: input.createdJobId ?? null,
       blockReason: input.blockReason ?? null,
+      blockReasonLabel: input.blockReasonLabel ?? null,
       schedulerRunId: input.schedulerRunId ?? null,
     },
     actorUserId: input.actor.userId,

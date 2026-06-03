@@ -10,6 +10,12 @@ import {
   GROWTH_QA_ACCELERATION_QA_MARKER,
   GROWTH_QA_ACCELERATION_TIMELINE_EVENT_TYPES,
 } from "../lib/growth/sequence-enrollment/qa-acceleration-types"
+import {
+  formatGrowthSchedulerStepFailureMessage,
+  GROWTH_SCHEDULER_AI_GENERATION_FAILURE_CODES,
+  normalizeGrowthSchedulerAiGenerationFailureCode,
+  pickSchedulerStepFailureForEnrollment,
+} from "../lib/growth/sequence-enrollment/scheduler-step-failure-types"
 import { GROWTH_LEAD_TIMELINE_EVENT_TYPES } from "../lib/growth/timeline-types"
 
 function readSource(relativePath: string): string {
@@ -55,6 +61,15 @@ assert.match(qaSource, /from "@\/lib\/growth\/outreach\/outreach-preflight"/)
 assert.match(qaSource, /qaScheduleGrowthEnrollmentStepNow/)
 assert.match(qaSource, /qaForceGrowthEnrollmentStepDueNow/)
 assert.match(qaSource, /qaRunGrowthEnrollmentSchedulerNow/)
+assert.match(qaSource, /pickSchedulerStepFailureForEnrollment/)
+assert.match(qaSource, /schedulerResult\.stepFailures/)
+assert.match(qaSource, /blockReasonDetail/)
+const stepFailurePickIdx = qaSource.indexOf("pickSchedulerStepFailureForEnrollment")
+const stepNotEligibleIdx = qaSource.indexOf('blockReason = "step_not_eligible"')
+assert.ok(
+  stepFailurePickIdx !== -1 && stepNotEligibleIdx !== -1 && stepFailurePickIdx < stepNotEligibleIdx,
+  "QA scheduler must resolve stepFailures before falling back to step_not_eligible",
+)
 assert.match(qaSource, /emitGrowthLeadQaScheduleStepNowTimeline/)
 assert.match(qaSource, /emitGrowthLeadQaForceDueNowTimeline/)
 assert.match(qaSource, /emitGrowthLeadQaSchedulerRunTimeline/)
@@ -65,6 +80,12 @@ assert.doesNotMatch(qaSource, /executeGrowthOutreachQueueItem/)
 const schedulerSource = readSource("lib/growth/sequence-enrollment/run-sequence-scheduler.ts")
 assert.match(schedulerSource, /qaBypassBusinessHours/)
 assert.match(schedulerSource, /respectBusinessHours: !qaBypassBusinessHours/)
+assert.match(schedulerSource, /stepFailures/)
+
+const transportQueueSource = readSource("lib/growth/sequences/execution/queue-sequence-step-transport-job.ts")
+assert.match(transportQueueSource, /sequence_scheduler_ai_generation_failed/)
+assert.match(transportQueueSource, /providerHealth/)
+assert.match(transportQueueSource, /runGrowthAiCopilotGeneration/)
 
 const accessSource = readSource("lib/growth/access.ts")
 assert.match(accessSource, /requireGrowthQaAccelerationAccess/)
@@ -108,6 +129,65 @@ assert.equal(formatQaAccelerationBlockReason("sender_pending"), "Sender account 
 assert.equal(
   formatQaAccelerationBlockReason("outside_business_hours"),
   "The step is not due yet — use Make Step Due Now to bypass business hours.",
+)
+
+assert.equal(GROWTH_SCHEDULER_AI_GENERATION_FAILURE_CODES.length, 9)
+assert.equal(
+  normalizeGrowthSchedulerAiGenerationFailureCode({
+    code: "ai_not_configured",
+    message: "GROWTH_ENGINE_AI_ORG_ID is not configured.",
+  }),
+  "ai_org_missing_or_invalid",
+)
+assert.equal(
+  formatGrowthSchedulerStepFailureMessage({
+    code: "ai_not_configured",
+    message: "GROWTH_ENGINE_AI_ORG_ID is not configured.",
+  }),
+  "GROWTH_ENGINE_AI_ORG_ID is missing or not a valid UUID — draft generation cannot run. (GROWTH_ENGINE_AI_ORG_ID is not configured.)",
+)
+assert.match(
+  formatQaAccelerationBlockReason("ai_provider_unavailable"),
+  /AI provider is unavailable/,
+)
+assert.match(
+  formatQaAccelerationBlockReason("personalization_failed"),
+  /personalization failed/i,
+)
+assert.match(
+  formatQaAccelerationBlockReason("generation_insert_failed"),
+  /could not be saved/i,
+)
+assert.match(
+  formatQaAccelerationBlockReason("unknown_generation_error"),
+  /unknown reason/i,
+)
+
+const aiFailure = pickSchedulerStepFailureForEnrollment({
+  stepFailures: [
+    {
+      enrollmentId: "enroll-1",
+      stepId: "step-1",
+      leadId: "lead-1",
+      code: "ai_not_configured",
+      message: "GROWTH_ENGINE_AI_ORG_ID is not configured.",
+      phase: "ai_generation",
+      generationType: "cold_email",
+    },
+  ],
+  enrollmentId: "enroll-1",
+  stepId: "step-1",
+})
+assert.ok(aiFailure)
+assert.equal(aiFailure?.code, "ai_not_configured")
+assert.equal(
+  formatGrowthSchedulerStepFailureMessage(aiFailure!),
+  "GROWTH_ENGINE_AI_ORG_ID is missing or not a valid UUID — draft generation cannot run. (GROWTH_ENGINE_AI_ORG_ID is not configured.)",
+)
+assert.notEqual(
+  formatGrowthSchedulerStepFailureMessage(aiFailure!),
+  formatQaAccelerationBlockReason("step_not_eligible"),
+  "AI generation failure must not surface as step_not_eligible",
 )
 
 console.log("growth qa acceleration tests passed")

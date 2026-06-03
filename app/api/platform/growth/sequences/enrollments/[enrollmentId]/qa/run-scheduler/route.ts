@@ -25,6 +25,7 @@ export async function POST(
       ? []
       : explainQaSchedulerNoJobCreated({
           blockReason: result.blockReason,
+          blockReasonDetail: result.blockReasonDetail,
           schedulerResult: result.schedulerResult,
         })
     return NextResponse.json({ ok: true, result, reasons })

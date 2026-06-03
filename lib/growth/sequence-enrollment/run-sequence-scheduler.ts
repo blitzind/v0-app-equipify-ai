@@ -41,6 +41,7 @@ import {
   type GrowthSequenceSchedulerRunResult,
   type GrowthSequenceSchedulerStatus,
 } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
+import type { GrowthSequenceSchedulerStepFailure } from "@/lib/growth/sequence-enrollment/scheduler-step-failure-types"
 import type { GrowthSequenceEnrollmentStep } from "@/lib/growth/sequence-enrollment-types"
 import {
   emitGrowthLeadSequenceStepDueTimeline,
@@ -341,6 +342,7 @@ export async function runGrowthSequenceScheduler(
     skippedNoSender: 0,
     failed: 0,
   }
+  const stepFailures: GrowthSequenceSchedulerStepFailure[] = []
 
   const outreachSettings = await fetchGrowthOutreachSettings(admin)
 
@@ -413,8 +415,26 @@ export async function runGrowthSequenceScheduler(
           })
         } else if (preflight.code === "capacity_blocked") {
           counts.failed += 1
+          stepFailures.push({
+            enrollmentId: enrollment.id,
+            stepId: step.id,
+            leadId: step.leadId,
+            generationType: step.generationType,
+            code: preflight.code,
+            message: preflight.reason ?? "Operational capacity blocked outreach.",
+            phase: "scheduler_preflight",
+          })
         } else {
           counts.failed += 1
+          stepFailures.push({
+            enrollmentId: enrollment.id,
+            stepId: step.id,
+            leadId: step.leadId,
+            generationType: step.generationType,
+            code: preflight.code ?? "preflight_blocked",
+            message: preflight.reason ?? "Outreach preflight blocked scheduling.",
+            phase: "scheduler_preflight",
+          })
         }
         continue
       }
@@ -475,12 +495,29 @@ export async function runGrowthSequenceScheduler(
       }
       if (!result.queued) {
         counts.failed += 1
+        if ("failure" in result && result.failure) {
+          stepFailures.push(result.failure)
+        } else {
+          stepFailures.push({
+            enrollmentId: enrollment.id,
+            stepId: step.id,
+            leadId: step.leadId,
+            generationType: step.generationType,
+            code: result.reason ?? "queue_failed",
+            message: result.reason ?? "Scheduler could not queue step",
+            phase: "queue_other",
+          })
+        }
         if (!dryRun) {
+          const failureMessage =
+            "failure" in result && result.failure
+              ? result.failure.message
+              : (result.reason ?? "Scheduler could not queue step")
           await emitGrowthSequenceFailedNotification(admin, {
             leadId: step.leadId,
             stepId: step.id,
             companyName: lead?.companyName ?? "Lead",
-            reason: result.reason ?? "Scheduler could not queue step",
+            reason: failureMessage,
             ownerUserId: lead?.assignedTo ?? null,
           })
         }
@@ -509,6 +546,7 @@ export async function runGrowthSequenceScheduler(
     outreachQueueItemsQueued: standaloneMode ? 0 : counts.queued,
     skippedTransportNotConfigured: counts.skippedTransportNotConfigured,
     skippedNoSender: counts.skippedNoSender,
+    stepFailures,
   }
 
   if (!dryRun) {
@@ -566,6 +604,7 @@ export async function runGrowthSequenceScheduler(
     planningCronRoute: GROWTH_SEQUENCE_SCHEDULER_CRON_ROUTE,
     executionJobsPlanned: planningMetadata.executionJobsPlanned,
     outreachQueueItemsQueued: planningMetadata.outreachQueueItemsQueued,
+    stepFailures,
   }
 }
 

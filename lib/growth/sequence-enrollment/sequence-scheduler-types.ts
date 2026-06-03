@@ -1,6 +1,7 @@
 /** Client-safe Growth Engine sequence scheduler types (slice 6.16A). */
 
 import type { GrowthOutboundMode } from "@/lib/growth/runtime/outbound-mode-types"
+import type { GrowthSequenceSchedulerStepFailure } from "@/lib/growth/sequence-enrollment/scheduler-step-failure-types"
 
 export type { GrowthOutboundMode } from "@/lib/growth/runtime/outbound-mode-types"
 
@@ -23,6 +24,7 @@ export type GrowthSequenceSchedulerRunPlanningMetadata = {
   outreachQueueItemsQueued?: number
   skippedTransportNotConfigured?: number
   skippedNoSender?: number
+  stepFailures?: GrowthSequenceSchedulerStepFailure[]
 }
 
 export type GrowthSequenceSchedulerRunMode = "live" | "dry_run"
@@ -80,6 +82,7 @@ export type GrowthSequenceSchedulerRunResult = {
   planningCronRoute?: typeof GROWTH_SEQUENCE_SCHEDULER_CRON_ROUTE
   executionJobsPlanned?: number
   outreachQueueItemsQueued?: number
+  stepFailures?: GrowthSequenceSchedulerStepFailure[]
 }
 
 export function buildSequenceSchedulerIdempotencyKey(enrollmentId: string, stepId: string): string {
