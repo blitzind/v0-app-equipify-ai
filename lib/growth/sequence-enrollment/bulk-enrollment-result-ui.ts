@@ -210,6 +210,7 @@ export function buildBulkEnrollmentSchedulerExecutionHref(input: {
   enrollmentId?: string | null
   leadId?: string | null
   sequencePatternId?: string | null
+  highlightJobId?: string | null
 }): string | null {
   if (!schedulerPlannedExecutionJobs(input.schedulerResult)) return null
   const enrollmentId = input.enrollmentId ?? input.enrollmentDetail?.enrollment.id ?? null
@@ -219,7 +220,7 @@ export function buildBulkEnrollmentSchedulerExecutionHref(input: {
     enrollmentId,
     leadId: input.leadId ?? input.enrollmentDetail?.leadId ?? undefined,
     sequencePatternId: input.sequencePatternId ?? input.enrollmentDetail?.enrollment.sequencePatternId ?? undefined,
-    highlightJobId: pickPendingExecutionHighlightJobId(input.enrollmentDetail),
+    highlightJobId: input.highlightJobId ?? pickPendingExecutionHighlightJobId(input.enrollmentDetail),
   }
   return growthSequenceExecutionHref(hrefInput)
 }

@@ -2,6 +2,7 @@
 
 import type { GrowthSequenceEnrollmentStep, GrowthSequenceEnrollmentWithSteps } from "@/lib/growth/sequence-enrollment-types"
 import type { GrowthSequenceSchedulerStatus } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
+import type { PatternEnrollmentHistoryEventView } from "@/lib/growth/sequence-enrollment/qa-acceleration-types"
 import type {
   GrowthSequenceExecutionJob,
   GrowthSequenceExecutionJobStatus,
@@ -52,6 +53,8 @@ export type PatternEnrollmentDetailView = {
     nextActionLabel: string
     nextActionHref: string | null
   }
+  qaAccelerationEnabled: boolean
+  historyEvents: PatternEnrollmentHistoryEventView[]
 }
 
 export type PatternEnrollmentStats = {

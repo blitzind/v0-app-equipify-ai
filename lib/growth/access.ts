@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isPlatformAdminEmail } from "@/lib/platform-admin"
+import { isGrowthQaAccelerationEnabled } from "@/lib/growth/sequence-enrollment/qa-acceleration-config"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 /** Global kill switch for Growth Engine platform routes. Default off. */
@@ -92,4 +93,25 @@ export async function requireGrowthEnginePlatformAccess(): Promise<GrowthEngineP
       ),
     }
   }
+}
+
+export async function requireGrowthQaAccelerationAccess(): Promise<GrowthEnginePlatformAccess> {
+  const access = await requireGrowthEnginePlatformAccess()
+  if (!access.ok) return access
+
+  if (!isGrowthQaAccelerationEnabled()) {
+    logGrowthEngine("qa_acceleration_denied", { reason: "disabled_in_environment" })
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          error: "qa_acceleration_disabled",
+          message: "QA acceleration controls are disabled in this environment.",
+        },
+        { status: 403 },
+      ),
+    }
+  }
+
+  return access
 }

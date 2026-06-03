@@ -1140,6 +1140,94 @@ export async function emitGrowthLeadSequenceStepSkippedTimeline(
   })
 }
 
+export async function emitGrowthLeadQaScheduleStepNowTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    enrollmentId: string
+    stepId: string
+    stepOrder: number
+    scheduledFor: string
+    actor: { userId: string; email: string }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "qa_schedule_step_now",
+    title: "QA: step scheduled now",
+    summary: `Step ${input.stepOrder} scheduled_for set to now for QA testing.`,
+    payload: {
+      enrollmentId: input.enrollmentId,
+      stepId: input.stepId,
+      stepOrder: input.stepOrder,
+      scheduledFor: input.scheduledFor,
+    },
+    actorUserId: input.actor.userId,
+    actorEmail: input.actor.email,
+  })
+}
+
+export async function emitGrowthLeadQaForceDueNowTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    enrollmentId: string
+    stepId: string
+    stepOrder: number
+    scheduledFor: string
+    actor: { userId: string; email: string }
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "qa_force_due_now",
+    title: "QA: step forced due",
+    summary: `Step ${input.stepOrder} marked due now with business-hours bypass for QA testing.`,
+    payload: {
+      enrollmentId: input.enrollmentId,
+      stepId: input.stepId,
+      stepOrder: input.stepOrder,
+      scheduledFor: input.scheduledFor,
+      bypassBusinessHours: true,
+    },
+    actorUserId: input.actor.userId,
+    actorEmail: input.actor.email,
+  })
+}
+
+export async function emitGrowthLeadQaSchedulerRunTimeline(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    enrollmentId: string
+    actor: { userId: string; email: string }
+    jobCreated: boolean
+    createdJobId?: string | null
+    blockReason?: string | null
+    schedulerRunId?: string | null
+  },
+) {
+  await appendGrowthLeadTimelineEvent(admin, {
+    leadId: input.leadId,
+    eventType: "qa_scheduler_run",
+    title: "QA: scheduler run",
+    summary: input.jobCreated
+      ? "Scheduler created an execution job for QA testing."
+      : input.blockReason
+        ? `Scheduler did not create a job: ${input.blockReason.replace(/_/g, " ")}.`
+        : "Scheduler run completed without creating an execution job.",
+    payload: {
+      enrollmentId: input.enrollmentId,
+      jobCreated: input.jobCreated,
+      createdJobId: input.createdJobId ?? null,
+      blockReason: input.blockReason ?? null,
+      schedulerRunId: input.schedulerRunId ?? null,
+    },
+    actorUserId: input.actor.userId,
+    actorEmail: input.actor.email,
+  })
+}
+
 export async function emitGrowthLeadLiveCallStartedTimeline(
   admin: SupabaseClient,
   input: {

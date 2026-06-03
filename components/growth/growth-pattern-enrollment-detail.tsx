@@ -1,8 +1,9 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
-import { ArrowRight, GitBranch, Loader2, Play, RefreshCw } from "lucide-react"
+import { ArrowRight, Clock, FastForward, GitBranch, Loader2, Play, RefreshCw, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import type { PatternEnrollmentDetailView } from "@/lib/growth/sequence-enrollment/enrollment-detail-types"
@@ -12,9 +13,9 @@ import {
 } from "@/lib/growth/sequence-enrollment/enrollment-detail-types"
 import {
   growthLeadsCrmHref,
-  growthPatternEnrollmentDetailHref,
   growthSequenceExecutionHref,
 } from "@/lib/growth/sequence-enrollment/enrollment-navigation"
+import type { GrowthQaAccelerationSchedulerRunResult } from "@/lib/growth/sequence-enrollment/qa-acceleration-types"
 import type { GrowthSequenceSchedulerRunResult } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
 import { cn } from "@/lib/utils"
 
@@ -41,10 +42,14 @@ const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutra
 }
 
 export function GrowthPatternEnrollmentDetail({ enrollmentId }: { enrollmentId: string }) {
+  const router = useRouter()
   const [detail, setDetail] = useState<PatternEnrollmentDetailView | null>(null)
   const [loading, setLoading] = useState(true)
   const [schedulerLoading, setSchedulerLoading] = useState(false)
-  const [schedulerResult, setSchedulerResult] = useState<GrowthSequenceSchedulerRunResult | null>(null)
+  const [qaActionLoading, setQaActionLoading] = useState<string | null>(null)
+  const [qaSchedulerResult, setQaSchedulerResult] = useState<GrowthQaAccelerationSchedulerRunResult | null>(null)
+  const [legacySchedulerResult, setLegacySchedulerResult] = useState<GrowthSequenceSchedulerRunResult | null>(null)
+  const [schedulerReasons, setSchedulerReasons] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -70,6 +75,54 @@ export function GrowthPatternEnrollmentDetail({ enrollmentId }: { enrollmentId: 
     void load()
   }, [load])
 
+  async function runQaScheduler() {
+    setQaActionLoading("run-scheduler")
+    setError(null)
+    setSchedulerReasons([])
+    try {
+      const res = await fetch(
+        `/api/platform/growth/sequences/enrollments/${enrollmentId}/qa/run-scheduler`,
+        { method: "POST" },
+      )
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        result?: GrowthQaAccelerationSchedulerRunResult
+        reasons?: string[]
+        message?: string
+      }
+      if (!res.ok || !data.ok || !data.result) throw new Error(data.message ?? "Scheduler run failed.")
+      setQaSchedulerResult(data.result)
+      setSchedulerReasons(data.reasons ?? [])
+      await load()
+      if (data.result.executionHref) {
+        router.push(data.result.executionHref)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Scheduler run failed.")
+    } finally {
+      setQaActionLoading(null)
+    }
+  }
+
+  async function runQaAction(action: "schedule-step-now" | "force-due-now") {
+    setQaActionLoading(action)
+    setError(null)
+    try {
+      const path =
+        action === "schedule-step-now"
+          ? `/api/platform/growth/sequences/enrollments/${enrollmentId}/qa/schedule-step-now`
+          : `/api/platform/growth/sequences/enrollments/${enrollmentId}/qa/force-due-now`
+      const res = await fetch(path, { method: "POST" })
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
+      if (!res.ok || !data.ok) throw new Error(data.message ?? "QA action failed.")
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "QA action failed.")
+    } finally {
+      setQaActionLoading(null)
+    }
+  }
+
   async function runScheduler() {
     setSchedulerLoading(true)
     setError(null)
@@ -85,7 +138,7 @@ export function GrowthPatternEnrollmentDetail({ enrollmentId }: { enrollmentId: 
         message?: string
       }
       if (!res.ok || !data.ok || !data.result) throw new Error(data.message ?? "Scheduler run failed.")
-      setSchedulerResult(data.result)
+      setLegacySchedulerResult(data.result)
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Scheduler run failed.")
@@ -137,10 +190,12 @@ export function GrowthPatternEnrollmentDetail({ enrollmentId }: { enrollmentId: 
         <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-950">
           <p className="font-medium">{detail.workflow.nextActionLabel}</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => void runScheduler()} disabled={schedulerLoading}>
-              {schedulerLoading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Play className="mr-2 size-4" />}
-              Run Scheduler Now
-            </Button>
+            {!detail.qaAccelerationEnabled ? (
+              <Button size="sm" onClick={() => void runScheduler()} disabled={schedulerLoading}>
+                {schedulerLoading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Play className="mr-2 size-4" />}
+                Run Scheduler Now
+              </Button>
+            ) : null}
             <Button size="sm" variant="outline" asChild>
               <Link href={growthSequenceExecutionHref({ enrollmentId: detail.enrollment.id, leadId: detail.leadId })}>
                 Open Execution Console
@@ -153,15 +208,83 @@ export function GrowthPatternEnrollmentDetail({ enrollmentId }: { enrollmentId: 
           </div>
         </div>
 
-        {schedulerResult ? (
+        {legacySchedulerResult && !detail.qaAccelerationEnabled ? (
           <p className="mt-3 text-xs text-muted-foreground">
-            Scheduler run · queued {schedulerResult.queued}
-            {schedulerResult.executionJobsPlanned != null
-              ? ` · execution jobs planned ${schedulerResult.executionJobsPlanned}`
+            Scheduler run · queued {legacySchedulerResult.queued}
+            {legacySchedulerResult.executionJobsPlanned != null
+              ? ` · execution jobs planned ${legacySchedulerResult.executionJobsPlanned}`
               : ""}
           </p>
         ) : null}
       </GrowthEngineCard>
+
+      {detail.qaAccelerationEnabled ? (
+        <GrowthEngineCard title="QA Tools" icon={<Zap className="size-4" />}>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Operator-only controls to accelerate scheduling for dogfooding. Does not auto-approve, auto-send, or bypass
+            suppression.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void runQaAction("schedule-step-now")}
+              disabled={qaActionLoading !== null || detail.enrollment.status !== "active"}
+            >
+              {qaActionLoading === "schedule-step-now" ? (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              ) : (
+                <Clock className="mr-2 size-4" />
+              )}
+              Schedule Step Now
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void runQaAction("force-due-now")}
+              disabled={qaActionLoading !== null || detail.enrollment.status !== "active"}
+            >
+              {qaActionLoading === "force-due-now" ? (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              ) : (
+                <FastForward className="mr-2 size-4" />
+              )}
+              Make Step Due Now
+            </Button>
+            <Button size="sm" onClick={() => void runQaScheduler()} disabled={qaActionLoading !== null}>
+              {qaActionLoading === "run-scheduler" ? (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              ) : (
+                <Play className="mr-2 size-4" />
+              )}
+              Run Scheduler Now
+            </Button>
+          </div>
+          {qaSchedulerResult ? (
+            <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+              {qaSchedulerResult.jobCreated ? (
+                <p>
+                  Execution job created
+                  {qaSchedulerResult.createdJobId ? ` · ${qaSchedulerResult.createdJobId.slice(0, 8)}` : ""}.
+                  {qaSchedulerResult.executionHref ? " Opening Execution Console…" : ""}
+                </p>
+              ) : (
+                <>
+                  <p className="font-medium text-foreground">No execution job created</p>
+                  {(schedulerReasons.length > 0
+                    ? schedulerReasons
+                    : qaSchedulerResult.blockReasonLabel
+                      ? [qaSchedulerResult.blockReasonLabel]
+                      : ["Scheduler completed without creating an execution job."]
+                  ).map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                </>
+              )}
+            </div>
+          ) : null}
+        </GrowthEngineCard>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <GrowthEngineCard title="Current Step">
@@ -263,6 +386,28 @@ export function GrowthPatternEnrollmentDetail({ enrollmentId }: { enrollmentId: 
                     Review Job
                   </Link>
                 </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </GrowthEngineCard>
+
+      <GrowthEngineCard title="Enrollment History">
+        {detail.historyEvents.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No enrollment timeline events yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {detail.historyEvents.map((event) => (
+              <li key={event.id} className="rounded-lg border border-border px-3 py-2 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{event.title}</span>
+                  <span className="text-xs text-muted-foreground">{formatWhen(event.occurredAt)}</span>
+                </div>
+                {event.summary ? <p className="mt-1 text-muted-foreground">{event.summary}</p> : null}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {event.eventType.replace(/_/g, " ")}
+                  {event.actorEmail ? ` · ${event.actorEmail}` : ""}
+                </p>
               </li>
             ))}
           </ul>

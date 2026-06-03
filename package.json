@@ -110,6 +110,7 @@
     "test:growth-enrollment-visibility": "tsx scripts/test-growth-enrollment-visibility.ts",
     "test:growth-bulk-enrollment-result-ui": "tsx scripts/test-growth-bulk-enrollment-result-ui.ts",
     "test:growth-bulk-enrollment-retry": "tsx scripts/test-growth-bulk-enrollment-retry.ts",
+    "test:growth-qa-acceleration": "tsx scripts/test-growth-qa-acceleration.ts",
     "test:growth-sequence-safe-execution": "tsx scripts/test-growth-sequence-safe-execution.ts",
     "test:growth-lead-assignment": "tsx scripts/test-growth-lead-assignment.ts",
     "test:growth-notifications": "tsx scripts/test-growth-notifications.ts",

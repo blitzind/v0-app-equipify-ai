@@ -171,6 +171,7 @@ export async function updateGrowthSequenceEnrollment(
     completedAt: string | null
     cancelledAt: string | null
     cancelledReason: string | null
+    metadata: Record<string, unknown>
   }>,
 ): Promise<GrowthSequenceEnrollment> {
   const row: Record<string, unknown> = { updated_at: new Date().toISOString() }
@@ -184,6 +185,7 @@ export async function updateGrowthSequenceEnrollment(
   if (patch.completedAt !== undefined) row.completed_at = patch.completedAt
   if (patch.cancelledAt !== undefined) row.cancelled_at = patch.cancelledAt
   if (patch.cancelledReason !== undefined) row.cancelled_reason = patch.cancelledReason
+  if (patch.metadata !== undefined) row.metadata = patch.metadata
 
   const { data, error } = await enrollmentsTable(admin)
     .update(row)

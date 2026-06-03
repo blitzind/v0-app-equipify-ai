@@ -348,10 +348,16 @@ export async function runGrowthSequenceScheduler(
 
       if (step.scheduledFor && Date.parse(step.scheduledFor) > Date.now()) continue
 
+      const qaBypassBusinessHours =
+        enrollment.metadata?.qaAcceleration &&
+        typeof enrollment.metadata.qaAcceleration === "object" &&
+        (enrollment.metadata.qaAcceleration as { bypassBusinessHoursStepId?: string }).bypassBusinessHoursStepId ===
+          step.id
+
       const scheduled = resolveScheduledFor({
         sendNow: true,
         scheduledFor: step.scheduledFor,
-        respectBusinessHours: true,
+        respectBusinessHours: !qaBypassBusinessHours,
         timezone: outreachSettings.timezone,
         startMinutes: outreachSettings.businessHoursStartMinutes,
         endMinutes: outreachSettings.businessHoursEndMinutes,

@@ -16,6 +16,8 @@ import {
   enrichSequenceExecutionJobViews,
   listSequenceExecutionJobsForEnrollment,
 } from "@/lib/growth/sequences/execution/sequence-job-repository"
+import { isGrowthQaAccelerationEnabled } from "@/lib/growth/sequence-enrollment/qa-acceleration-config"
+import { listPatternEnrollmentHistoryEvents } from "@/lib/growth/sequence-enrollment/qa-acceleration"
 
 function pickCurrentStep(steps: GrowthSequenceEnrollmentStep[], currentStepOrder: number) {
   const inProgress = steps.find(
@@ -124,9 +126,13 @@ export async function fetchPatternEnrollmentDetail(
   const bundle = await fetchPatternEnrollmentWithSteps(admin, enrollmentId)
   if (!bundle) return null
 
-  const [jobs, schedulerStatus] = await Promise.all([
+  const [jobs, schedulerStatus, historyEvents] = await Promise.all([
     listSequenceExecutionJobsForEnrollment(admin, enrollmentId),
     fetchGrowthSequenceSchedulerStatus(admin).catch(() => null),
+    listPatternEnrollmentHistoryEvents(admin, {
+      leadId: bundle.leadId,
+      enrollmentId: bundle.id,
+    }).catch(() => []),
   ])
   const jobViews = await enrichSequenceExecutionJobViews(admin, jobs)
   const stepOrderById = new Map(bundle.steps.map((step) => [step.id, step.stepOrder]))
@@ -182,5 +188,7 @@ export async function fetchPatternEnrollmentDetail(
       enrollmentId: bundle.id,
       leadId: bundle.leadId,
     }),
+    qaAccelerationEnabled: isGrowthQaAccelerationEnabled(),
+    historyEvents,
   }
 }
