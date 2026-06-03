@@ -30,6 +30,9 @@ assert.match(schedulerSource, /skippedAlreadyQueued/)
 assert.match(schedulerSource, /emitGrowthLeadSequenceStepDueTimeline/)
 assert.match(schedulerSource, /emitGrowthLeadSequenceStepSkippedTimeline/)
 assert.doesNotMatch(schedulerSource, /executeGrowthOutreachQueueItem/)
+assert.match(schedulerSource, /queueSequenceStepTransportJob/)
+assert.match(schedulerSource, /isGrowthOutboundStandaloneMode/)
+assert.match(schedulerSource, /sequence_scheduler_outbound_mode/)
 
 const executeRouteSource = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/outreach/queue/[queueId]/execute/route.ts"),

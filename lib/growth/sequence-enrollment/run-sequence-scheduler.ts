@@ -54,6 +54,14 @@ import {
   emitGrowthSequenceFailedNotification,
   emitGrowthSuppressionBlockedNotification,
 } from "@/lib/growth/notifications/notification-integrations"
+import {
+  getGrowthOutboundMode,
+  growthOutboundModeLabel,
+  isGrowthOutboundStandaloneMode,
+} from "@/lib/growth/runtime/outbound-mode"
+import { isGrowthOutboundTransportConfigured } from "@/lib/growth/runtime/outbound-transport-readiness"
+import { findActiveSequenceExecutionJob } from "@/lib/growth/sequences/execution/sequence-job-repository"
+import { queueSequenceStepTransportJob } from "@/lib/growth/sequences/execution/queue-sequence-step-transport-job"
 
 function buildQueuePayloadFromGeneration(input: {
   generation: {
@@ -137,9 +145,30 @@ async function queueSequenceStepOutreach(
   },
 ): Promise<{ queued: boolean; reason?: string }> {
   const idempotencyKey = buildSequenceSchedulerIdempotencyKey(input.enrollmentId, input.step.id)
-  const existingQueue = await fetchGrowthOutreachQueueByEnrollmentStepId(admin, input.step.id)
-  const existingTask = await fetchGrowthCadenceTaskByEnrollmentStepId(admin, input.step.id)
-  if (existingQueue || input.step.outreachQueueId || existingTask || input.step.cadenceTaskId) {
+  const [existingQueue, existingTask, existingJob] = await Promise.all([
+    fetchGrowthOutreachQueueByEnrollmentStepId(admin, input.step.id),
+    fetchGrowthCadenceTaskByEnrollmentStepId(admin, input.step.id),
+    findActiveSequenceExecutionJob(admin, {
+      sequenceEnrollmentId: input.enrollmentId,
+      sequenceStepId: input.step.id,
+    }),
+  ])
+  if (
+    existingQueue ||
+    input.step.outreachQueueId ||
+    existingTask ||
+    input.step.cadenceTaskId ||
+    existingJob
+  ) {
+    if (existingJob) {
+      logGrowthEngine("sequence_scheduler_adapter_path_skipped", {
+        stepId: input.step.id,
+        enrollmentId: input.enrollmentId,
+        reason: "active_transport_job_exists",
+        jobId: existingJob.id,
+        idempotencyKey,
+      })
+    }
     return { queued: false, reason: "already_queued" }
   }
 
@@ -278,8 +307,22 @@ export async function runGrowthSequenceScheduler(
 ): Promise<GrowthSequenceSchedulerRunResult> {
   const limit = input.limit ?? GROWTH_SEQUENCE_SCHEDULER_DEFAULT_BATCH_SIZE
   const dryRun = input.dryRun === true
+  const outboundMode = getGrowthOutboundMode()
+  const standaloneMode = isGrowthOutboundStandaloneMode()
   const commSettings = await fetchGrowthPlatformCommunicationSettings(admin)
-  const providerWarning = !commSettings.activeEmailConnectionId
+  const transportConfigured = await isGrowthOutboundTransportConfigured(admin)
+  const providerWarning = standaloneMode
+    ? !transportConfigured
+    : !commSettings.activeEmailConnectionId
+
+  logGrowthEngine("sequence_scheduler_outbound_mode", {
+    outboundMode,
+    outboundModeLabel: growthOutboundModeLabel(outboundMode),
+    standaloneMode,
+    transportConfigured,
+    adapterProviderConfigured: Boolean(commSettings.activeEmailConnectionId),
+    providerWarning,
+  })
 
   const dueSteps = await listDueSequenceSchedulerSteps(admin, limit)
   const scanned = dueSteps.length
@@ -373,15 +416,23 @@ export async function runGrowthSequenceScheduler(
         })
       }
 
-      const result = await queueSequenceStepOutreach(admin, {
-        step,
-        enrollmentId: enrollment.id,
-        sequencePatternId: enrollment.sequencePatternId,
-        actingUserId: input.actingUserId,
-        actingUserEmail: input.actingUserEmail,
-        dryRun,
-        providerConnectionId: commSettings.activeEmailConnectionId,
-      })
+      const result = standaloneMode
+        ? await queueSequenceStepTransportJob(admin, {
+            step,
+            enrollmentId: enrollment.id,
+            actingUserId: input.actingUserId,
+            actingUserEmail: input.actingUserEmail,
+            dryRun,
+          })
+        : await queueSequenceStepOutreach(admin, {
+            step,
+            enrollmentId: enrollment.id,
+            sequencePatternId: enrollment.sequencePatternId,
+            actingUserId: input.actingUserId,
+            actingUserEmail: input.actingUserEmail,
+            dryRun,
+            providerConnectionId: commSettings.activeEmailConnectionId,
+          })
 
       if (result.reason === "already_queued") {
         counts.skippedAlreadyQueued += 1
@@ -428,7 +479,11 @@ export async function runGrowthSequenceScheduler(
       failed: counts.failed,
       providerWarning,
       createdBy: input.actingUserId,
-      metadata: { qaMarker: GROWTH_SEQUENCE_SCHEDULER_QA_MARKER },
+      metadata: {
+        qaMarker: GROWTH_SEQUENCE_SCHEDULER_QA_MARKER,
+        outboundMode,
+        transportConfigured,
+      },
     })
     runId = run.id
   }
@@ -438,6 +493,8 @@ export async function runGrowthSequenceScheduler(
     ...counts,
     scanned,
     providerWarning,
+    outboundMode,
+    standaloneMode,
     runId,
   })
 
@@ -448,22 +505,30 @@ export async function runGrowthSequenceScheduler(
     providerWarning,
     qaMarker: GROWTH_SEQUENCE_SCHEDULER_QA_MARKER,
     runId,
+    outboundMode,
+    transportConfigured,
   }
 }
 
 export async function fetchGrowthSequenceSchedulerStatus(
   admin: SupabaseClient,
 ): Promise<GrowthSequenceSchedulerStatus> {
-  const [dueStepsCount, lastRun, commSettings] = await Promise.all([
+  const standaloneMode = isGrowthOutboundStandaloneMode()
+  const [dueStepsCount, lastRun, commSettings, transportConfigured] = await Promise.all([
     countDueSequenceSchedulerSteps(admin),
     fetchLatestGrowthSequenceSchedulerRun(admin),
     fetchGrowthPlatformCommunicationSettings(admin),
+    isGrowthOutboundTransportConfigured(admin),
   ])
 
   return {
     dueStepsCount,
     lastRun,
     qaMarker: GROWTH_SEQUENCE_SCHEDULER_QA_MARKER,
-    providerConfigured: Boolean(commSettings.activeEmailConnectionId),
+    providerConfigured: standaloneMode
+      ? transportConfigured
+      : Boolean(commSettings.activeEmailConnectionId),
+    outboundMode: getGrowthOutboundMode(),
+    transportConfigured,
   }
 }

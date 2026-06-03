@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { listDueSequenceSchedulerSteps } from "@/lib/growth/sequence-enrollment/sequence-scheduler-repository"
+import { fetchGrowthOutreachQueueByEnrollmentStepId } from "@/lib/growth/outreach/outreach-queue-repository"
 import type { GrowthSequenceExecutionPlanResult } from "@/lib/growth/sequences/execution/sequence-execution-types"
 import {
   recordSequenceExecutionJobAuditEvent,
@@ -33,11 +34,14 @@ export async function planSequenceExecutionJobs(
     }
 
     try {
-      const existing = await findActiveSequenceExecutionJob(admin, {
-        sequenceEnrollmentId: step.enrollmentId,
-        sequenceStepId: step.id,
-      })
-      if (existing) {
+      const [existing, existingQueue] = await Promise.all([
+        findActiveSequenceExecutionJob(admin, {
+          sequenceEnrollmentId: step.enrollmentId,
+          sequenceStepId: step.id,
+        }),
+        fetchGrowthOutreachQueueByEnrollmentStepId(admin, step.id),
+      ])
+      if (existing || existingQueue) {
         result.skippedExisting += 1
         continue
       }

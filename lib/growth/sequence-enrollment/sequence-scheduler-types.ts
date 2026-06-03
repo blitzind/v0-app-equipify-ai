@@ -1,5 +1,9 @@
 /** Client-safe Growth Engine sequence scheduler types (slice 6.16A). */
 
+import type { GrowthOutboundMode } from "@/lib/growth/runtime/outbound-mode-types"
+
+export type { GrowthOutboundMode } from "@/lib/growth/runtime/outbound-mode-types"
+
 export const GROWTH_SEQUENCE_SCHEDULER_QA_MARKER = "growth-sequence-scheduler-v1" as const
 
 export const GROWTH_SEQUENCE_SCHEDULER_DEFAULT_BATCH_SIZE = 25 as const
@@ -28,6 +32,8 @@ export type GrowthSequenceSchedulerStatus = {
   lastRun: GrowthSequenceSchedulerRunSummary | null
   qaMarker: typeof GROWTH_SEQUENCE_SCHEDULER_QA_MARKER
   providerConfigured: boolean
+  outboundMode?: GrowthOutboundMode
+  transportConfigured?: boolean
 }
 
 export type GrowthSequenceSchedulerRunResult = {
@@ -42,6 +48,8 @@ export type GrowthSequenceSchedulerRunResult = {
   providerWarning: boolean
   qaMarker: typeof GROWTH_SEQUENCE_SCHEDULER_QA_MARKER
   runId: string | null
+  outboundMode?: GrowthOutboundMode
+  transportConfigured?: boolean
 }
 
 export function buildSequenceSchedulerIdempotencyKey(enrollmentId: string, stepId: string): string {
