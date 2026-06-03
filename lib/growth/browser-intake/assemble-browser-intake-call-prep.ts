@@ -31,6 +31,13 @@ export type BrowserIntakeCallPrepAssemblyInput = {
   verificationTriage: GrowthLeadEngineVerificationTriageOutput | null
   decisionMakers: Array<{ name: string; title: string | null; role: string | null }>
   timelineSummaries: string[]
+  relationshipMemory?: {
+    summary: string | null
+    objections: string[]
+    preferences: string[]
+    interactions: string[]
+    commitments: string[]
+  }
 }
 
 function uniqueStrings(values: Array<string | null | undefined>, limit = 8): string[] {
@@ -74,6 +81,13 @@ function buildWhoTheyAre(input: BrowserIntakeCallPrepAssemblyInput): string {
 
   if (input.lead.score != null) {
     parts.push(`Lead score ${input.lead.score}.`)
+  }
+
+  if (input.relationshipMemory?.summary?.trim()) {
+    parts.push(`Relationship memory: ${input.relationshipMemory.summary.trim()}`)
+  }
+  for (const preference of input.relationshipMemory?.preferences ?? []) {
+    if (preference.trim()) parts.push(`Known preference: ${preference.trim()}`)
   }
 
   return parts.join(" ")
@@ -153,7 +167,7 @@ function buildDiscoveryQuestions(input: BrowserIntakeCallPrepAssemblyInput): str
 }
 
 function buildLikelyObjections(input: BrowserIntakeCallPrepAssemblyInput): string[] {
-  const objections: string[] = []
+  const objections: string[] = [...(input.relationshipMemory?.objections ?? [])]
 
   if (input.accountBrief?.risk_summary?.trim()) {
     objections.push(input.accountBrief.risk_summary.trim())
@@ -210,6 +224,15 @@ function buildRelevantSignals(input: BrowserIntakeCallPrepAssemblyInput): string
   for (const summary of input.timelineSummaries) {
     if (summary.trim()) signals.push(summary.trim())
   }
+  for (const summary of input.relationshipMemory?.interactions ?? []) {
+    if (summary.trim()) signals.push(summary.trim())
+  }
+  for (const summary of input.relationshipMemory?.commitments ?? []) {
+    if (summary.trim()) signals.push(`Commitment: ${summary.trim()}`)
+  }
+  for (const preference of input.relationshipMemory?.preferences ?? []) {
+    if (preference.trim()) signals.push(`Preference: ${preference.trim()}`)
+  }
 
   if (input.lead.nextBestActionReason?.trim()) {
     signals.push(input.lead.nextBestActionReason.trim())
@@ -257,6 +280,7 @@ function resolveSourcesUsed(input: BrowserIntakeCallPrepAssemblyInput): string[]
   if (input.verificationTriage) sources.push("verification_triage")
   if (input.decisionMakers.length > 0) sources.push("decision_makers")
   if (input.timelineSummaries.length > 0) sources.push("timeline")
+  if (input.relationshipMemory?.summary) sources.push("relationship_memory")
   return sources
 }
 

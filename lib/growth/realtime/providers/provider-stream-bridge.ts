@@ -11,7 +11,7 @@ import {
   updateGrowthRealtimeCallSession,
 } from "@/lib/growth/realtime/realtime-call-repository"
 import type { GrowthRealtimeCallSession } from "@/lib/growth/realtime/realtime-call-types"
-import { toGrowthLeadRealtimeIntelligenceInput } from "@/lib/growth/realtime/realtime-lead-intelligence"
+import { buildGrowthLeadRealtimeIntelligenceInput } from "@/lib/growth/realtime/realtime-lead-intelligence"
 import { analyzeRealtimeCallTranscript } from "@/lib/growth/realtime/realtime-session-analyzer"
 import { computeTranscriptQualityScore } from "@/lib/growth/realtime/providers/transcript-quality"
 import type { RealtimeTranscriptChunk } from "@/lib/growth/realtime/providers/provider-types"
@@ -89,9 +89,10 @@ export async function ingestRealtimeProviderTranscriptChunk(
     events,
   }).score
   const nextEvents = await listGrowthRealtimeTranscriptEvents(admin, input.session.id)
+  const leadIntel = await buildGrowthLeadRealtimeIntelligenceInput(admin, lead)
   const snapshot = analyzeRealtimeCallTranscript({
     events: nextEvents,
-    lead: toGrowthLeadRealtimeIntelligenceInput(lead),
+    lead: leadIntel,
   })
 
   const guidanceStarted = Date.now()
@@ -102,7 +103,7 @@ export async function ingestRealtimeProviderTranscriptChunk(
     sessionId: input.session.id,
     snapshot,
     events: nextEvents,
-    lead: toGrowthLeadRealtimeIntelligenceInput(lead),
+    lead: leadIntel,
     organizationId,
     direction,
     session: input.session,

@@ -14,6 +14,7 @@ import { listGrowthOutreachQueueItems } from "@/lib/growth/outreach/outreach-que
 import { fetchLatestUsableGrowthLeadResearchRun } from "@/lib/growth/research-repository"
 import { normalizeGrowthResearchConfidence } from "@/lib/growth/research/research-confidence"
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
+import { buildLeadMemoryInfluenceContext, mergeMemoryObjectionSummaries } from "@/lib/growth/lead-memory/memory-influence-context"
 import { listGrowthLeadTimelineEvents } from "@/lib/growth/timeline-repository"
 import type { GrowthLead } from "@/lib/growth/types"
 
@@ -43,7 +44,8 @@ export async function buildOutreachContextPacket(
   admin: SupabaseClient,
   lead: GrowthLead,
 ): Promise<OutreachContextPacket> {
-  const [decisionMakers, messages, replies, researchRun, prospectRun, queueItems, timelineEvents] = await Promise.all([
+  const [decisionMakers, messages, replies, researchRun, prospectRun, queueItems, timelineEvents, memory] =
+    await Promise.all([
     listGrowthLeadDecisionMakers(admin, lead.id),
     listGrowthOutboundMessagesForLead(admin, lead.id),
     listGrowthOutboundRepliesForLead(admin, lead.id),
@@ -55,6 +57,7 @@ export async function buildOutreachContextPacket(
       : Promise.resolve(null),
     listGrowthOutreachQueueItems(admin, { leadId: lead.id, limit: 5 }),
     listGrowthLeadTimelineEvents(admin, { leadId: lead.id, limit: 8 }),
+    buildLeadMemoryInfluenceContext(admin, lead.id),
   ])
 
   const dm = primaryDecisionMaker(decisionMakers)
@@ -96,10 +99,13 @@ export async function buildOutreachContextPacket(
     return truncate(`${reply.bodyPreview}${classification}`)
   })
 
-  const objectionSummaries = buildOutreachObjectionSummaries({
-    conversationObjectionProfile: lead.conversationObjectionProfile,
-    conversationTopSignals: lead.conversationTopSignals,
-  }).map((entry) => truncate(entry, 80))
+  const objectionSummaries = mergeMemoryObjectionSummaries(
+    buildOutreachObjectionSummaries({
+      conversationObjectionProfile: lead.conversationObjectionProfile,
+      conversationTopSignals: lead.conversationTopSignals,
+    }).map((entry) => truncate(entry, 80)),
+    memory,
+  )
 
   const sequenceHistorySummaries = queueItems
     .filter((item) => item.sequencePatternId)
@@ -165,6 +171,15 @@ export async function buildOutreachContextPacket(
     priorTouchCount: priorTouchSummaries.length,
     hasWebsiteResearch: Boolean(research?.websiteSummary || websiteFindings.length > 0),
     hasDecisionMaker: Boolean(dm.name) || lead.decisionMakerStatus === "confirmed",
+    memoryAvailable: memory.available,
+    memoryCoverageScore: memory.memoryCoverageScore,
+    relationshipStage: memory.relationshipStage,
+    relationshipSummary: memory.relationshipSummary ? truncate(memory.relationshipSummary, 400) : null,
+    memoryPreferenceSummaries: memory.topPreferences.map((entry) => truncate(entry, 100)),
+    memoryInteractionSummaries: memory.priorInteractionSummaries.map((entry) => truncate(entry, 120)),
+    memoryCommitmentSummaries: memory.commitmentSummaries.map((entry) => truncate(entry, 120)),
+    memoryAvoidRepeating: memory.avoidRepeating.map((entry) => truncate(entry, 100)),
+    memoryRiskFlags: memory.riskFlags.map((entry) => truncate(entry, 100)),
   }
 }
 
@@ -188,5 +203,9 @@ export function buildAllowedFactsFromContextPacket(packet: OutreachContextPacket
     ...packet.equipmentServiceIndicators,
     ...packet.priorReplySummaries,
     ...packet.objectionSummaries,
+    ...(packet.relationshipSummary ? [packet.relationshipSummary] : []),
+    ...packet.memoryPreferenceSummaries,
+    ...packet.memoryInteractionSummaries,
+    ...packet.memoryCommitmentSummaries,
   ].filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
 }

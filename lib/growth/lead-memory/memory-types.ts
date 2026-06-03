@@ -162,6 +162,27 @@ export type GrowthLeadMemoryProfileView = {
   summarySnapshots: GrowthRelationshipSummarySnapshot[]
 }
 
+/** Projected memory context for Growth Engine decision surfaces (Sprint 3). */
+export type GrowthLeadMemoryInfluenceContext = {
+  available: boolean
+  memoryCoverageScore: number | null
+  relationshipStage: string | null
+  relationshipSummary: string | null
+  engagementTrend: string | null
+  progressionScore: number | null
+  topObjections: string[]
+  topPreferences: string[]
+  priorInteractionSummaries: string[]
+  commitmentSummaries: string[]
+  riskFlags: string[]
+  avoidRepeating: string[]
+  committeeContext: string[]
+  unresolvedObjectionCount: number
+  unresolvedHighSeverityObjectionCount: number
+}
+
+export const GROWTH_LEAD_MEMORY_UTILIZATION_QA_MARKER = "growth-lead-memory-utilization-v1" as const
+
 export function sanitizeMemoryEvidenceSnippet(text: string, maxLength = 280): string {
   const cleaned = text
     .replace(/api[_-]?key[^\s]*/gi, "[redacted]")

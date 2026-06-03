@@ -18,6 +18,7 @@ import {
   resolveProspectSearchQualificationFields,
 } from "@/lib/growth/prospect-search/prospect-search-qualification-overlays"
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
+import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
 
 function metaRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {}
@@ -77,7 +78,7 @@ export async function gatherMeetingPrepBundleForMeeting(
 
   const metadata = metaRecord(lead.metadata)
 
-  const [decisionMakers, research, contactIntelMap] = await Promise.all([
+  const [decisionMakers, research, contactIntelMap, memory] = await Promise.all([
     listGrowthLeadDecisionMakers(admin, lead.id),
     fetchLatestCompletedProspectResearchRun(admin, lead.id),
     loadProspectSearchContactIntelligenceBatch(admin, [
@@ -88,6 +89,7 @@ export async function gatherMeetingPrepBundleForMeeting(
         company_name: lead.companyName,
       },
     ]),
+    buildLeadMemoryInfluenceContext(admin, lead.id),
   ])
 
   const contactIntelligence = contactIntelMap.get(`growth_lead:${lead.id}`) ?? null
@@ -100,5 +102,15 @@ export async function gatherMeetingPrepBundleForMeeting(
     decisionMakers,
     contactIntelligence,
     research,
+    relationshipMemory: memory.available
+      ? {
+          summary: memory.relationshipSummary,
+          topObjections: memory.topObjections,
+          priorInteractions: memory.priorInteractionSummaries,
+          commitments: memory.commitmentSummaries,
+          riskFlags: memory.riskFlags,
+          preferences: memory.topPreferences,
+        }
+      : undefined,
   })
 }

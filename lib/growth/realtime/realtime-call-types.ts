@@ -185,4 +185,9 @@ export type GrowthLeadRealtimeIntelligenceInput = {
   executivePriorityTier?: string | null
   recommendedSequenceNextStep?: { channel?: string | null } | null
   conversationCompetitorPressure?: number | null
+  memoryRelationshipStage?: string | null
+  memoryEngagementTrend?: string | null
+  memoryTopObjections?: string[]
+  memoryAvoidRepeating?: string[]
+  memoryCoverageScore?: number | null
 }

@@ -5,6 +5,7 @@ import { logGrowthEngine } from "@/lib/growth/access"
 import { fetchGrowthLeadDecisionMakerById, listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { fetchGrowthLeadEmailEventSummary } from "@/lib/growth/outbound/email-event-summary"
 import { computeGrowthLeadNextBestAction } from "@/lib/growth/next-best-action"
+import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadEngagementIntelligence } from "@/lib/growth/recompute-engagement-intelligence"
 import { recomputeGrowthLeadRelationshipIntelligence } from "@/lib/growth/recompute-relationship-intelligence"
@@ -46,6 +47,7 @@ export async function recomputeGrowthLeadNextBestAction(
   }
 
   const emailSummary = await fetchGrowthLeadEmailEventSummary(admin, leadId, lead.contactEmail)
+  const memory = await buildLeadMemoryInfluenceContext(admin, leadId)
 
   const nba = computeGrowthLeadNextBestAction({
     status: lead.status,
@@ -97,6 +99,11 @@ export async function recomputeGrowthLeadNextBestAction(
     assignedTo: lead.assignedTo,
     assignedAt: lead.assignedAt,
     lastHumanTouchAt: lead.lastHumanTouchAt,
+    memoryCoverageScore: memory.memoryCoverageScore,
+    memoryRelationshipStage: memory.relationshipStage,
+    memoryEngagementTrend: memory.engagementTrend,
+    memoryUnresolvedObjectionCount: memory.unresolvedObjectionCount,
+    memoryUnresolvedHighSeverityObjectionCount: memory.unresolvedHighSeverityObjectionCount,
   })
 
   const now = new Date().toISOString()

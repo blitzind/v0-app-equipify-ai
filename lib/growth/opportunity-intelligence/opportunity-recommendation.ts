@@ -15,6 +15,13 @@ export function generateOpportunityRecommendations(input: {
   signals: DetectedOpportunitySignal[]
   hasActiveSequence?: boolean
   hasOwner?: boolean
+  memory?: {
+    available: boolean
+    relationshipStage: string | null
+    unresolvedObjectionCount: number
+    riskFlags: string[]
+    commitmentSummaries: string[]
+  }
 }): GeneratedOpportunityRecommendation[] {
   if (!hasMinimumEvidence(input.signals)) return []
 
@@ -68,6 +75,56 @@ export function generateOpportunityRecommendations(input: {
       description: "Competitive pressure detected — operator review recommended before next touch.",
       evidence,
     })
+  }
+
+  if (input.memory?.available) {
+    if ((input.memory.unresolvedObjectionCount ?? 0) > 0) {
+      recommendations.push({
+        recommendationType: "human_review_needed",
+        title: "Review unresolved objections",
+        description: "Relationship memory records unresolved objections — review before advancing the deal.",
+        evidence: [
+          ...evidence,
+          { snippet: `${input.memory.unresolvedObjectionCount} unresolved objection(s) in lead memory`, source: "relationship_memory" },
+        ],
+      })
+    }
+    if (
+      (input.memory.relationshipStage === "evaluating" || input.memory.relationshipStage === "opportunity") &&
+      strongBuying
+    ) {
+      recommendations.push({
+        recommendationType: "advance_stage",
+        title: "Memory-backed stage review",
+        description: "Relationship memory stage aligns with buying signals — human should confirm pipeline stage.",
+        evidence: [
+          ...evidence,
+          { snippet: `Relationship stage: ${input.memory.relationshipStage}`, source: "relationship_memory" },
+        ],
+      })
+    }
+    for (const flag of input.memory.riskFlags.slice(0, 2)) {
+      recommendations.push({
+        recommendationType: "human_review_needed",
+        title: "Memory risk flag",
+        description: flag,
+        evidence: [{ snippet: flag, source: "relationship_memory" }],
+      })
+    }
+    if ((input.memory.commitmentSummaries?.length ?? 0) > 0) {
+      recommendations.push({
+        recommendationType: "follow_up_needed",
+        title: "Honor prior commitment",
+        description: "Relationship memory records prior commitments — confirm follow-through before advancing.",
+        evidence: [
+          ...evidence,
+          {
+            snippet: input.memory.commitmentSummaries[0]!.slice(0, 160),
+            source: "relationship_memory",
+          },
+        ],
+      })
+    }
   }
 
   if (!input.hasOwner) {

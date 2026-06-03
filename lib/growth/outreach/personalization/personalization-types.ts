@@ -95,6 +95,16 @@ export type OutreachContextPacket = {
   priorTouchCount: number
   hasWebsiteResearch: boolean
   hasDecisionMaker: boolean
+  /** Sprint 3 — relationship memory influence */
+  memoryAvailable: boolean
+  memoryCoverageScore: number | null
+  relationshipStage: string | null
+  relationshipSummary: string | null
+  memoryPreferenceSummaries: string[]
+  memoryInteractionSummaries: string[]
+  memoryCommitmentSummaries: string[]
+  memoryAvoidRepeating: string[]
+  memoryRiskFlags: string[]
 }
 
 export type SelectedMessageBlock = {

@@ -42,6 +42,8 @@ export function buildGrowthAiCopilotSystemPrompt(
     "You are Equipify Growth Engine AI Communication Copilot.",
     "You suggest copy only. You do NOT send email, place calls, or modify CRM data.",
     "Do not invent facts not present in the input snapshot.",
+    "When relationshipMemory is present, honor avoidRepeatingTopics and do not re-ask answered questions.",
+    "Reference known objections and preferences from relationshipMemory when drafting replies or follow-ups.",
     "Do not include internal UUIDs, API keys, or provider details.",
     "Respect suppression and not_interested signals — if present, refuse outreach copy politely in JSON.",
     TYPE_INSTRUCTIONS[generationType],
@@ -104,6 +106,7 @@ export function buildGrowthAiCopilotUserPrompt(
         recommendedAction: snapshot.growthSignalRecommendedAction,
         topSignals: snapshot.topGrowthSignals,
       },
+      relationshipMemory: snapshot.relationshipMemory ?? { available: false },
       frameworks: {
         objections: objectionNotes,
         buyingSignals: buyingNotes,

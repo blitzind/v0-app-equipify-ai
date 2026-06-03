@@ -304,6 +304,21 @@ export function GrowthReplyInboxDashboard() {
                       </ul>
                     </div>
                   ) : null}
+                  {copilot.memoryContext && copilot.memoryContext.length > 0 ? (
+                    <div>
+                      <p className="font-medium">Relationship memory</p>
+                      <ul className="list-disc pl-5 text-muted-foreground">
+                        {copilot.memoryContext.map((entry) => (
+                          <li key={entry}>{entry}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {copilot.memoryAvoidRepeating && copilot.memoryAvoidRepeating.length > 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Avoid repeating: {copilot.memoryAvoidRepeating.join("; ")}
+                    </p>
+                  ) : null}
                   <p className="text-xs text-muted-foreground">
                     Confidence: {copilot.confidenceTier} · Uncertainty: {copilot.uncertaintyState}
                   </p>

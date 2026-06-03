@@ -172,4 +172,18 @@ export type GrowthAiCopilotInputSnapshot = {
     buyingSignals: string[]
     commitmentSignals: string[]
   }
+  relationshipMemory?: {
+    available: boolean
+    memoryCoverageScore: number | null
+    relationshipStage: string | null
+    relationshipSummary: string | null
+    engagementTrend: string | null
+    topObjections: string[]
+    topPreferences: string[]
+    priorInteractions: string[]
+    commitments: string[]
+    avoidRepeatingTopics: string[]
+    riskFlags: string[]
+    committeeContext: string[]
+  }
 }

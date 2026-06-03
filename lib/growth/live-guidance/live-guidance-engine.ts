@@ -242,7 +242,7 @@ export function generateLiveGuidanceCandidates(input: {
     })
   }
 
-  if (lead.relationshipTrend === "cooling") {
+  if (lead.relationshipTrend === "cooling" || lead.memoryEngagementTrend === "cooling" || lead.memoryEngagementTrend === "declining") {
     candidates.push({
       dedupeKey: "relationship_recovery",
       eventType: "relationship_recovery",
@@ -250,8 +250,53 @@ export function generateLiveGuidanceCandidates(input: {
       title: "Relationship Recovery",
       operatorPrompt: "Rebuild trust before pushing close.",
       recommendation: "What's changed on your side since we last spoke?",
-      supportingReason: "Relationship trend is cooling.",
+      supportingReason:
+        lead.memoryEngagementTrend === "declining" || lead.memoryEngagementTrend === "cooling"
+          ? "Relationship memory trend is cooling."
+          : "Relationship trend is cooling.",
       confidenceScore: 80,
+    })
+  }
+
+  if ((lead.memoryTopObjections?.length ?? 0) > 0) {
+    candidates.push({
+      dedupeKey: "memory_objection_context",
+      eventType: "objection_detected",
+      severity: "medium",
+      title: "Known Objection Context",
+      operatorPrompt: `Address remembered concern: ${lead.memoryTopObjections![0]!.slice(0, 120)}`,
+      recommendation: "Can we revisit the concern you raised earlier?",
+      supportingReason: "Relationship memory includes unresolved objection context.",
+      confidenceScore: 78,
+    })
+  }
+
+  if ((lead.memoryAvoidRepeating?.length ?? 0) > 0) {
+    candidates.push({
+      dedupeKey: "memory_avoid_repeat",
+      eventType: "objection_guidance",
+      severity: "medium",
+      title: "Do Not Re-Ask",
+      operatorPrompt: `Avoid repeating: ${lead.memoryAvoidRepeating![0]!.slice(0, 120)}`,
+      recommendation: "Acknowledge what they already shared before asking anything new.",
+      supportingReason: "Relationship memory flagged topics already answered.",
+      confidenceScore: 76,
+    })
+  }
+
+  if (
+    (lead.memoryRelationshipStage === "evaluating" || lead.memoryRelationshipStage === "opportunity") &&
+    (lead.memoryCoverageScore ?? 0) >= 40
+  ) {
+    candidates.push({
+      dedupeKey: "memory_active_evaluation",
+      eventType: "buying_signal_detected",
+      severity: "medium",
+      title: "Memory-Backed Evaluation",
+      operatorPrompt: "Confirm where they are in the evaluation process.",
+      recommendation: "What would help you decide whether to move forward?",
+      supportingReason: `Relationship memory stage: ${lead.memoryRelationshipStage}.`,
+      confidenceScore: 77,
     })
   }
 

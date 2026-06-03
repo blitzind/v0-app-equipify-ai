@@ -8,6 +8,13 @@ import { GROWTH_REPLY_INTELLIGENCE_V2_QA_MARKER } from "@/lib/growth/reply-intel
 import { extractBuyingSignals } from "@/lib/growth/reply-intelligence/buying-signal-extractor"
 import { detectReplyObjections } from "@/lib/growth/reply-intelligence/objection-detection"
 import { classifyReplyIntentV2 } from "@/lib/growth/reply-intelligence/reply-intent-classifier-v2"
+import {
+  buildMemoryAwareSuggestedReplyDraft,
+  type ReplyCopilotRelationshipMemory,
+} from "@/lib/growth/reply-intelligence/reply-copilot-memory"
+
+export type { ReplyCopilotRelationshipMemory } from "@/lib/growth/reply-intelligence/reply-copilot-memory"
+export { mapMemoryInfluenceToReplyCopilotRelationship } from "@/lib/growth/reply-intelligence/reply-copilot-memory"
 
 function buildSummary(bodyPreview: string | null | undefined, intent: GrowthReplyIntent): string {
   const excerpt = bodyPreview?.trim().slice(0, 180) ?? "No reply body available."
@@ -39,11 +46,11 @@ function buildCallPrepBullets(intent: GrowthReplyIntent, buyingSignals: string[]
   return bullets
 }
 
-/** Deterministic reply copilot — labeled AI-assisted, no auto-send. */
 export function buildReplyCopilotAssist(input: {
   bodyPreview: string | null | undefined
   companyName?: string | null
   contactLabel?: string | null
+  relationshipMemory?: ReplyCopilotRelationshipMemory
 }): GrowthReplyCopilotAssist {
   const classified = classifyReplyIntentV2(input.bodyPreview)
   const buying = extractBuyingSignals(input.bodyPreview)
@@ -54,11 +61,24 @@ export function buildReplyCopilotAssist(input: {
     ...objections.map((o) => o.excerpt),
   ].filter(Boolean)
 
-  const suggestedReplyDraft =
-    objections[0]?.suggestedReplyDraft ??
-    (classified.intent === "positive_interest"
-      ? `Thanks for your interest${input.contactLabel ? `, ${input.contactLabel}` : ""} — happy to share next steps when you're ready.`
-      : "Thanks for your reply — I'll follow up with details shortly.")
+  const memoryContext = [
+    input.relationshipMemory?.relationshipSummary,
+    ...(input.relationshipMemory?.topObjections ?? []),
+    ...(input.relationshipMemory?.topPreferences ?? []),
+    ...(input.relationshipMemory?.commitmentSummaries ?? []),
+  ].filter((entry): entry is string => Boolean(entry?.trim()))
+
+  const suggestedReplyDraft = buildMemoryAwareSuggestedReplyDraft({
+    contactLabel: input.contactLabel,
+    intent: classified.intent,
+    bodyObjectionDraft: objections[0]?.suggestedReplyDraft,
+    relationshipMemory: input.relationshipMemory,
+  })
+
+  const mergedObjectionLabels = [
+    ...objections.map((o) => o.category),
+    ...(input.relationshipMemory?.topObjections ?? []).map((entry) => entry.split(":")[0]?.trim() ?? entry),
+  ].filter(Boolean)
 
   const uncertaintyState: GrowthReplyUncertaintyState = classified.uncertaintyState
   const confidenceTier: GrowthReplyConfidenceTier = classified.confidenceTier
@@ -74,16 +94,14 @@ export function buildReplyCopilotAssist(input: {
     suggestedInternalNote: buildInternalNote({
       intent: classified.intent,
       buyingSignals: buying.map((s) => s.signal),
-      objections: objections.map((o) => o.category),
+      objections: mergedObjectionLabels,
       confidenceTier,
     }),
-    callPrepBullets: buildCallPrepBullets(
-      classified.intent,
-      buying.map((s) => s.signal),
-      objections.map((o) => o.category),
-    ),
+    callPrepBullets: buildCallPrepBullets(classified.intent, buying.map((s) => s.signal), mergedObjectionLabels),
     confidenceTier,
     uncertaintyState,
     evidenceExcerpts: evidenceExcerpts.slice(0, 8),
+    memoryContext: memoryContext.length ? memoryContext.slice(0, 6) : undefined,
+    memoryAvoidRepeating: input.relationshipMemory?.avoidRepeating?.slice(0, 5),
   }
 }

@@ -76,5 +76,18 @@ export function extractPersonalizationSignals(packet: OutreachContextPacket): Pe
     signals.push("high_fit_signal")
   }
 
+  if (packet.memoryAvailable) {
+    if (
+      packet.memoryInteractionSummaries.length > 0 ||
+      packet.memoryCommitmentSummaries.length > 0 ||
+      packet.priorReplySummaries.length > 0
+    ) {
+      signals.push("recent_engagement_signal")
+    }
+    if (packet.priorTouchCount >= 2 || packet.memoryInteractionSummaries.length >= 2) {
+      signals.push("repeat_touch_signal")
+    }
+  }
+
   return [...new Set(signals)]
 }

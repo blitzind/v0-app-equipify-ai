@@ -7,6 +7,7 @@ import { fetchGrowthCopilotSettings } from "@/lib/growth/ai-copilot-repository"
 import { getInboxThread } from "@/lib/growth/inbox/thread-repository"
 import { fetchInboxThreadSyncDetail } from "@/lib/growth/inbox-sync/inbox-sync-repository"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
 import { fetchGrowthLeadEmailEventSummary } from "@/lib/growth/outbound/email-event-summary"
 import type { GrowthReplyDraftContext, GrowthReplyDraftType } from "@/lib/growth/replies/reply-draft-types"
 import { resolveReplyDraftTypeFromClassification } from "@/lib/growth/replies/reply-draft-types"
@@ -42,11 +43,12 @@ export async function buildReplyDraftContext(
     return { ok: false, code: "no_inbound_message", message: "Thread has no inbound message context." }
   }
 
-  const [emailSummary, syncDetail, copilotInput, settings] = await Promise.all([
+  const [emailSummary, syncDetail, copilotInput, settings, memory] = await Promise.all([
     fetchGrowthLeadEmailEventSummary(admin, lead.id, lead.contactEmail),
     fetchInboxThreadSyncDetail(admin, thread.id).catch(() => null),
     buildGrowthAiCopilotInput(admin, lead),
     fetchGrowthCopilotSettings(admin),
+    buildLeadMemoryInfluenceContext(admin, lead.id),
   ])
 
   const complianceFlags: string[] = []
@@ -89,6 +91,16 @@ export async function buildReplyDraftContext(
       playbookInfluence,
       marketSignals,
       draftType,
+      relationshipMemory: {
+        available: memory.available,
+        relationshipStage: memory.relationshipStage,
+        relationshipSummary: memory.relationshipSummary,
+        topObjections: memory.topObjections,
+        topPreferences: memory.topPreferences,
+        priorInteractions: memory.priorInteractionSummaries,
+        commitments: memory.commitmentSummaries,
+        avoidRepeatingTopics: memory.avoidRepeating,
+      },
     },
   }
 }
@@ -101,5 +113,6 @@ export function buildReplyDraftSnapshotOverrides(context: GrowthReplyDraftContex
     complianceFlags: context.complianceFlags,
     playbookInfluence: context.playbookInfluence,
     marketSignals: context.marketSignals,
+    relationshipMemory: context.relationshipMemory,
   }
 }

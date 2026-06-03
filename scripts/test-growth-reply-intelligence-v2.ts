@@ -49,6 +49,43 @@ assert.equal(copilot.qaMarker, GROWTH_REPLY_INTELLIGENCE_V2_QA_MARKER)
 assert.ok(copilot.evidenceExcerpts.length > 0)
 assert.ok(!copilot.suggestedReplyDraft.includes("auto-send"))
 
+const memoryCopilot = buildReplyCopilotAssist({
+  bodyPreview: "Following up on our conversation.",
+  companyName: "Acme Co",
+  contactLabel: "Alex",
+  relationshipMemory: {
+    relationshipSummary: "Prospect evaluating pricing after demo.",
+    topObjections: ["Budget concern: tight this quarter"],
+    topPreferences: ["communication preference: email follow-up"],
+    avoidRepeating: ["What is your budget for this quarter?"],
+    commitmentSummaries: ["Demo scheduled for next week"],
+  },
+})
+assert.match(memoryCopilot.suggestedReplyDraft, /budget|earlier|concern/i)
+assert.ok(memoryCopilot.memoryContext?.length)
+assert.ok(memoryCopilot.memoryAvoidRepeating?.length)
+
+const copilotRouteSource = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/replies/copilot/route.ts"),
+  "utf8",
+)
+assert.match(copilotRouteSource, /buildLeadMemoryInfluenceContext/)
+assert.match(copilotRouteSource, /mapMemoryInfluenceToReplyCopilotRelationship/)
+
+const replyPromptSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/replies/reply-prompt.ts"),
+  "utf8",
+)
+assert.match(replyPromptSource, /formatRelationshipMemoryForReplyPrompt/)
+assert.match(replyPromptSource, /buildMemoryAwareSuggestedReplyDraft/)
+
+const memoryStrategySource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/outreach/personalization/memory-strategy.ts"),
+  "utf8",
+)
+assert.match(memoryStrategySource, /resolveMemoryInfluencedPainId/)
+assert.match(memoryStrategySource, /shouldAvoidPainBlock/)
+
 const migrationSource = fs.readFileSync(
   path.join(process.cwd(), "supabase/migrations/20270601120000_growth_reply_intelligence_v2.sql"),
   "utf8",

@@ -10,6 +10,7 @@ import { fetchLatestUsableGrowthLeadResearchRun } from "@/lib/growth/research-re
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
 import { loadCompanyGrowthSignalsSnapshot } from "@/lib/growth/company-growth-signals/growth-signal-repository"
 import { GROWTH_SIGNAL_TYPE_LABELS } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
+import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
 import type { GrowthLead } from "@/lib/growth/types"
 
 function truncate(value: string | null | undefined, max = 240): string {
@@ -23,7 +24,7 @@ export async function buildGrowthAiCopilotInput(
   lead: GrowthLead,
   options?: { sourceReplyId?: string | null },
 ): Promise<GrowthAiCopilotInputSnapshot> {
-  const [decisionMakers, messages, replies, researchRun, prospectRun, growthSignals] = await Promise.all([
+  const [decisionMakers, messages, replies, researchRun, prospectRun, growthSignals, memory] = await Promise.all([
     listGrowthLeadDecisionMakers(admin, lead.id),
     listGrowthOutboundMessagesForLead(admin, lead.id),
     listGrowthOutboundRepliesForLead(admin, lead.id),
@@ -34,6 +35,7 @@ export async function buildGrowthAiCopilotInput(
       ? fetchLatestCompletedProspectResearchRun(admin, lead.id)
       : Promise.resolve(null),
     loadCompanyGrowthSignalsSnapshot(admin, lead.id).catch(() => null),
+    buildLeadMemoryInfluenceContext(admin, lead.id),
   ])
 
   const sourceReply = options?.sourceReplyId
@@ -61,10 +63,10 @@ export async function buildGrowthAiCopilotInput(
     companyName: lead.companyName,
     contactName: lead.contactName,
     fitScore: lead.score,
-    engagementTier: lead.engagementTier,
-    engagementSummary: truncate(lead.engagementSummary, 160),
-    relationshipTier: lead.relationshipStrengthTier,
-    relationshipTrend: lead.relationshipTrend,
+    engagementTier: memory.engagementTrend ? `${lead.engagementTier ?? "unknown"} (memory trend: ${memory.engagementTrend})` : lead.engagementTier,
+    engagementSummary: truncate(memory.relationshipSummary ?? lead.engagementSummary, 160),
+    relationshipTier: memory.relationshipStage ?? lead.relationshipStrengthTier,
+    relationshipTrend: memory.engagementTrend ?? lead.relationshipTrend,
     opportunityTier: lead.opportunityReadinessTier,
     opportunityBlockers: lead.opportunityBlockers.map((entry) => entry.label),
     opportunityAccelerators: lead.opportunityAccelerators.map((entry) => entry.label),
@@ -97,5 +99,19 @@ export async function buildGrowthAiCopilotInput(
       evidence: truncate(signal.evidence_excerpt, 160),
     })),
     frameworks: resolveGrowthAiCopilotFrameworkKeys(lead),
+    relationshipMemory: {
+      available: memory.available,
+      memoryCoverageScore: memory.memoryCoverageScore,
+      relationshipStage: memory.relationshipStage,
+      relationshipSummary: memory.relationshipSummary,
+      engagementTrend: memory.engagementTrend,
+      topObjections: memory.topObjections,
+      topPreferences: memory.topPreferences,
+      priorInteractions: memory.priorInteractionSummaries,
+      commitments: memory.commitmentSummaries,
+      avoidRepeatingTopics: memory.avoidRepeating,
+      riskFlags: memory.riskFlags,
+      committeeContext: memory.committeeContext,
+    },
   }
 }

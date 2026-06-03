@@ -78,6 +78,12 @@ export type NextBestActionInput = {
   recommendedSequencePatternId?: string | null
   recommendedSequenceConfidence?: number | null
   sequenceFatigueRisk?: GrowthSequenceFatigueRisk | null
+  /** Sprint 3 — relationship memory influence */
+  memoryCoverageScore?: number | null
+  memoryRelationshipStage?: string | null
+  memoryEngagementTrend?: string | null
+  memoryUnresolvedObjectionCount?: number
+  memoryUnresolvedHighSeverityObjectionCount?: number
   now?: Date
 }
 
@@ -657,6 +663,56 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
       blockers,
       "medium",
     )
+  }
+
+  if ((input.memoryUnresolvedHighSeverityObjectionCount ?? 0) > 0) {
+    return buildResult(
+      "relationship_recovery",
+      "Relationship memory records unresolved high-severity objections — address known concerns before pushing outreach.",
+      ["Unresolved objection in lead memory"],
+      "high",
+    )
+  }
+
+  if (
+    (input.memoryUnresolvedObjectionCount ?? 0) > 0 &&
+    (input.memoryUnresolvedHighSeverityObjectionCount ?? 0) === 0
+  ) {
+    return buildResult(
+      "relationship_recovery",
+      "Relationship memory records unresolved objections — address known concerns before continuing outreach pressure.",
+      ["Unresolved objection in lead memory"],
+      "medium",
+    )
+  }
+
+  if (
+    (input.memoryEngagementTrend === "declining" || input.memoryEngagementTrend === "cooling") &&
+    (input.engagementTier === "dormant" || input.engagementTier === "cold")
+  ) {
+    return buildResult(
+      "rebuild_relationship",
+      "Memory engagement trend is cooling — rebuild relationship before continuing sequence pressure.",
+      [],
+      "medium",
+    )
+  }
+
+  if (
+    (input.memoryRelationshipStage === "evaluating" || input.memoryRelationshipStage === "opportunity") &&
+    (input.memoryCoverageScore ?? 0) >= 50 &&
+    (leadPhone || dmPhone)
+  ) {
+    return buildResult(
+      leadPhone ? "call_primary_contact" : "call_decision_maker",
+      "Relationship memory indicates active evaluation with strong coverage — prioritize a human call.",
+      [],
+      "high",
+    )
+  }
+
+  if ((input.memoryCoverageScore ?? 100) < 20 && input.status === "replied") {
+    blockers.push("Low relationship memory coverage")
   }
 
   return buildResult(

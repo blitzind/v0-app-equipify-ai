@@ -3,6 +3,13 @@
 import type { GrowthAiCopilotGenerationType } from "@/lib/growth/ai-copilot-types"
 import { detectOutreachIndustry } from "@/lib/growth/outreach/personalization/industry-detection"
 import {
+  hasCompetitiveMemoryRisk,
+  hasMemoryRelationshipEngagement,
+  prefersConciseOutreach,
+  resolveMemoryInfluencedPainId,
+  shouldAvoidPainBlock,
+} from "@/lib/growth/outreach/personalization/memory-strategy"
+import {
   industryBlocksFor,
   interpolateBlockText,
   OUTREACH_MESSAGE_BLOCK_LIBRARY,
@@ -54,6 +61,54 @@ function resolveStrategyPick(input: {
   generationType: GrowthAiCopilotGenerationType
 }): StrategyPick {
   const industry = detectOutreachIndustry(input.packet)
+  const defaultIndustryId = industryBlocksFor(industry)[0]?.id ?? "general_ops"
+
+  if (input.packet.memoryAvailable) {
+    let memoryPain = resolveMemoryInfluencedPainId(input.packet)
+    if (memoryPain && shouldAvoidPainBlock(memoryPain, input.packet)) {
+      memoryPain = "service_visibility"
+      if (shouldAvoidPainBlock(memoryPain, input.packet)) memoryPain = null
+    }
+
+    if (
+      input.generationType === "follow_up_email" ||
+      input.generationType === "reengagement_email" ||
+      input.generationType === "next_message"
+    ) {
+      if (hasMemoryRelationshipEngagement(input.packet) || input.packet.relationshipStage === "evaluating") {
+        return {
+          angle: "engagement_follow_up",
+          openingId: "opening_follow_up",
+          painId: memoryPain ?? "service_visibility",
+          proofId: "workflow_proof",
+          ctaId: prefersConciseOutreach(input.packet) ? "fifteen_minute" : "operations_review",
+          industryId: defaultIndustryId,
+        }
+      }
+    }
+
+    if (memoryPain && input.generationType === "cold_email") {
+      return {
+        angle: memoryPain === "dispatch_manual" ? "dispatch_pain_capacity" : "capacity_growth_ops",
+        openingId: hasMemoryRelationshipEngagement(input.packet) ? "opening_follow_up" : "opening_context",
+        painId: memoryPain,
+        proofId: memoryPain === "capacity_strain" ? "capacity_proof" : "workflow_proof",
+        ctaId: prefersConciseOutreach(input.packet) ? "fifteen_minute" : "operations_review",
+        industryId: defaultIndustryId,
+      }
+    }
+
+    if (hasCompetitiveMemoryRisk(input.packet) && input.generationType === "executive_email") {
+      return {
+        angle: "executive_outcome",
+        openingId: "opening_context",
+        painId: memoryPain ?? "capacity_strain",
+        proofId: "capacity_proof",
+        ctaId: "operations_review",
+        industryId: defaultIndustryId,
+      }
+    }
+  }
 
   if (input.generationType === "response_draft") {
     return {

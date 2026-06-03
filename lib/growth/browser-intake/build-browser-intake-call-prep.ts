@@ -19,6 +19,7 @@ import {
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { loadProspectIntelligenceBundle } from "@/lib/growth/research/research-repository"
 import { listGrowthLeadTimelineEvents } from "@/lib/growth/timeline-repository"
+import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
 
 function isPipelineRun(value: unknown): value is GrowthLeadEnginePipelineRun {
   if (!value || typeof value !== "object") return false
@@ -74,10 +75,11 @@ export async function buildBrowserIntakeCallPrep(
     return { matched: false, artifact: null, message: "Lead not found." }
   }
 
-  const [researchBundle, decisionMakers, timeline] = await Promise.all([
+  const [researchBundle, decisionMakers, timeline, memory] = await Promise.all([
     loadProspectIntelligenceBundle(admin, lead.id),
     listGrowthLeadDecisionMakers(admin, lead.id),
     listGrowthLeadTimelineEvents(admin, { leadId: lead.id, limit: 5 }),
+    buildLeadMemoryInfluenceContext(admin, lead.id),
   ])
 
   const runRaw = lead.metadata?.[GROWTH_LEAD_ENGINE_RUN_METADATA_KEY]
@@ -115,6 +117,15 @@ export async function buildBrowserIntakeCallPrep(
     timelineSummaries: timeline
       .map((event) => event.title ?? event.summary)
       .filter((value): value is string => Boolean(value?.trim())),
+    relationshipMemory: memory.available
+      ? {
+          summary: memory.relationshipSummary,
+          objections: memory.topObjections,
+          preferences: memory.topPreferences,
+          interactions: memory.priorInteractionSummaries,
+          commitments: memory.commitmentSummaries,
+        }
+      : undefined,
   }
 
   return {

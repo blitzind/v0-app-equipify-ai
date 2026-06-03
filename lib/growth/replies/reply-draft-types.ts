@@ -86,6 +86,16 @@ export type GrowthReplyDraftContext = {
   playbookInfluence: string[]
   marketSignals: string[]
   draftType: GrowthReplyDraftType
+  relationshipMemory: {
+    available: boolean
+    relationshipStage: string | null
+    relationshipSummary: string | null
+    topObjections: string[]
+    topPreferences: string[]
+    priorInteractions: string[]
+    commitments: string[]
+    avoidRepeatingTopics: string[]
+  }
 }
 
 export type GrowthReplyDraftDashboard = {

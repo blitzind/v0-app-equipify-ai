@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { detectBuyingCommitteeSignals } from "@/lib/growth/opportunity-intelligence/committee-signal"
 import { generateOpportunityRecommendations } from "@/lib/growth/opportunity-intelligence/opportunity-recommendation"
+import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
 import {
   insertCrmIntelligenceEvent,
   recordOpportunityIntelligencePlatformTimeline,
@@ -118,8 +119,11 @@ export async function ingestOpportunityIntelligenceFromInbox(
   if (!hasMinimumEvidence(detected)) return { signals: [], recommendations: [] }
 
   const leadLabel = await resolveLeadLabel(admin, input.leadId)
-  const hasActiveSequence = await leadHasActiveSequence(admin, input.leadId)
-  const hasOwner = await leadHasOwner(admin, input.leadId)
+  const [hasActiveSequence, hasOwner, memory] = await Promise.all([
+    leadHasActiveSequence(admin, input.leadId),
+    leadHasOwner(admin, input.leadId),
+    buildLeadMemoryInfluenceContext(admin, input.leadId),
+  ])
   const signalIds: string[] = []
   const createdSignals: GrowthOpportunitySignal[] = []
 
@@ -178,6 +182,13 @@ export async function ingestOpportunityIntelligenceFromInbox(
     signals: detected,
     hasActiveSequence,
     hasOwner,
+    memory: {
+      available: memory.available,
+      relationshipStage: memory.relationshipStage,
+      unresolvedObjectionCount: memory.unresolvedObjectionCount,
+      riskFlags: memory.riskFlags,
+      commitmentSummaries: memory.commitmentSummaries,
+    },
   })
   const createdRecommendations: GrowthOpportunityRecommendation[] = []
 

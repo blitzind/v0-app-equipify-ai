@@ -205,6 +205,8 @@ export type GrowthReplyCopilotAssist = {
   confidenceTier: GrowthReplyConfidenceTier
   uncertaintyState: GrowthReplyUncertaintyState
   evidenceExcerpts: string[]
+  memoryContext?: string[]
+  memoryAvoidRepeating?: string[]
 }
 
 export type GrowthSalesExecutionDashboard = GrowthReplyInboxDashboard & {

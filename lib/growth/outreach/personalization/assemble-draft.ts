@@ -2,6 +2,7 @@
 
 import { countWords } from "@/lib/growth/outreach/personalization/message-variability"
 import { buildDeterministicSubject, selectMessageStrategy } from "@/lib/growth/outreach/personalization/message-strategy"
+import { buildMemoryContextOpener } from "@/lib/growth/outreach/personalization/memory-strategy"
 import type {
   OutreachContextPacket,
   OutreachPersonalizationDraft,
@@ -20,12 +21,15 @@ export function assembleDeterministicOutreachDraft(input: {
   strategy: SelectedMessageStrategy
   subject: string
   maxWords: number
+  memoryOpener?: string | null
 }): OutreachPersonalizationDraft {
   const ordered = ["opening", "pain", "industry", "proof", "cta"] as const
-  const body = ordered
+  const blockText = ordered
     .map((key) => input.strategy.blocks.find((block) => block.key === key)?.text)
     .filter(Boolean)
     .join(" ")
+  const opener = input.memoryOpener?.trim()
+  const body = opener ? `${opener} ${blockText}` : blockText
   const trimmed = trimToMaxWords(body, input.maxWords)
   return {
     subject: input.subject,
@@ -48,6 +52,11 @@ export function buildPersonalizedOutreachDraft(input: {
     generationType: input.generationType,
   })
   const subject = buildDeterministicSubject({ packet: input.packet, strategy })
-  const draft = assembleDeterministicOutreachDraft({ strategy, subject, maxWords: input.maxWords })
+  const draft = assembleDeterministicOutreachDraft({
+    strategy,
+    subject,
+    maxWords: input.maxWords,
+    memoryOpener: buildMemoryContextOpener(input.packet),
+  })
   return { strategy, draft }
 }

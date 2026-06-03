@@ -12,6 +12,7 @@ import { buildPlaybookAttribution, computePlaybookInfluenceScore } from "@/lib/g
 import { resolveGrowthAiCopilotPlaybookRules } from "@/lib/growth/ai-copilot-playbook-resolver"
 import type { GrowthCallCopilotBriefing } from "@/lib/growth/call-copilot-types"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
+import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
 import type { GrowthLead } from "@/lib/growth/types"
 
 export {
@@ -32,17 +33,18 @@ export async function buildGrowthCallCopilotBriefing(
   admin: SupabaseClient,
   lead: GrowthLead,
 ): Promise<GrowthCallCopilotBriefing> {
-  const [decisionMakers, inputSnapshot, settings] = await Promise.all([
+  const [decisionMakers, inputSnapshot, settings, memory] = await Promise.all([
     listGrowthLeadDecisionMakers(admin, lead.id),
     buildGrowthAiCopilotInput(admin, lead),
     fetchGrowthCopilotSettings(admin),
+    buildLeadMemoryInfluenceContext(admin, lead.id),
   ])
 
   const frameworks = resolveGrowthAiCopilotFrameworkKeys(lead)
-  const likelyObjections = describeFrameworkKeys(
-    frameworks.objections,
-    GROWTH_AI_COPILOT_OBJECTION_FRAMEWORK,
-  )
+  const likelyObjections = [
+    ...memory.topObjections,
+    ...describeFrameworkKeys(frameworks.objections, GROWTH_AI_COPILOT_OBJECTION_FRAMEWORK),
+  ].filter((entry, index, all) => all.indexOf(entry) === index)
 
   const playbookRules = settings.aiCopilotPlaybookEnabled
     ? (
@@ -58,11 +60,20 @@ export async function buildGrowthCallCopilotBriefing(
   for (const rule of playbookRules) {
     if (rule.category === "words_to_avoid") doNotSay.push(rule.title)
   }
+  for (const pref of memory.topPreferences) {
+    doNotSay.push(`Do not contradict known preference: ${pref}`)
+  }
+  for (const topic of memory.avoidRepeating) {
+    doNotSay.push(`Avoid re-asking: ${topic}`)
+  }
   if (lead.opportunityBlockers.some((b) => b.key === "suppressed")) {
     doNotSay.push("Do not pitch — lead is suppressed.")
   }
 
   const riskWarnings: string[] = []
+  for (const flag of memory.riskFlags) {
+    riskWarnings.push(`Memory risk: ${flag}`)
+  }
   if (lead.executivePriorityTier === "executive_now") {
     riskWarnings.push("Executive intervention tier — leadership attention required.")
   }
@@ -80,6 +91,7 @@ export async function buildGrowthCallCopilotBriefing(
   }
 
   const whyNow =
+    memory.relationshipSummary?.trim() ||
     lead.nextBestActionReason?.trim() ||
     lead.executiveRecommendation?.trim() ||
     `NBA: ${lead.nextBestAction ?? "call_now"} with ${lead.engagementTier ?? "unknown"} engagement.`
@@ -118,6 +130,16 @@ export async function buildGrowthCallCopilotBriefing(
       playbookRules.length > 0
         ? { score: influenceScore, ruleTitles: attribution.ruleTitles }
         : undefined,
+    relationshipMemory: {
+      available: memory.available,
+      relationshipStage: memory.relationshipStage,
+      relationshipSummary: memory.relationshipSummary,
+      topObjections: memory.topObjections,
+      topPreferences: memory.topPreferences,
+      priorInteractions: memory.priorInteractionSummaries,
+      commitments: memory.commitmentSummaries,
+      riskFlags: memory.riskFlags,
+    },
   }
 
   void inputSnapshot

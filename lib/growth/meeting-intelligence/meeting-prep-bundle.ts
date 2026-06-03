@@ -86,8 +86,20 @@ export function mapDecisionMakersForPrep(
     }))
 }
 
-export function buildMeetingPrepSignals(lead: GrowthLead, research: GrowthResearchRunPublicView | null): string[] {
+export function buildMeetingPrepSignals(
+  lead: GrowthLead,
+  research: GrowthResearchRunPublicView | null,
+  memory?: {
+    summary: string | null
+    priorInteractions: string[]
+    commitments: string[]
+    preferences?: string[]
+  },
+): string[] {
   const signals: string[] = []
+  if (memory?.summary) signals.push(memory.summary)
+  signals.push(...(memory?.priorInteractions ?? []), ...(memory?.commitments ?? []))
+  signals.push(...(memory?.preferences ?? []))
   if (lead.momentumWhySummary) signals.push(lead.momentumWhySummary)
   if (lead.executiveRecommendation) signals.push(lead.executiveRecommendation)
   if (lead.nextBestActionReason) signals.push(lead.nextBestActionReason)
@@ -106,9 +118,30 @@ export function buildMeetingPrepOpenRisks(input: {
   decisionMakers: MeetingPrepDecisionMaker[]
   contactIntelligence: GrowthProspectSearchContactIntelligence | null
   research: GrowthResearchRunPublicView | null
+  memoryObjections?: string[]
+  memoryRiskFlags?: string[]
 }): MeetingPrepOpenRisk[] {
   const risks: MeetingPrepOpenRisk[] = []
   const { lead } = input
+
+  for (const objection of input.memoryObjections ?? []) {
+    risks.push({
+      id: `memory-objection-${objection.slice(0, 24)}`,
+      label: "Memory objection",
+      priority: "High",
+      reason: objection,
+      source: "relationship_memory",
+    })
+  }
+  for (const flag of input.memoryRiskFlags ?? []) {
+    risks.push({
+      id: `memory-risk-${flag.slice(0, 24)}`,
+      label: "Memory risk",
+      priority: "Medium",
+      reason: flag,
+      source: "relationship_memory",
+    })
+  }
 
   if ((lead.conversationCompetitorPressure ?? 0) >= 30 || lead.conversationCompetitorMentions.length > 0) {
     risks.push({
@@ -410,12 +443,25 @@ export function assembleMeetingPrepBundle(input: {
   decisionMakers: GrowthLeadDecisionMaker[]
   contactIntelligence: GrowthProspectSearchContactIntelligence | null
   research: GrowthResearchRunPublicView | null
+  relationshipMemory?: {
+    summary: string | null
+    topObjections: string[]
+    priorInteractions: string[]
+    commitments: string[]
+    riskFlags: string[]
+    preferences?: string[]
+  }
 }): GrowthMeetingPrepBundle {
   const companySnapshot = buildMeetingPrepCompanySnapshot(input.lead, input.research)
   const territoryContext = buildMeetingPrepTerritoryContext(input.lead)
   const mappedDecisionMakers = mapDecisionMakersForPrep(input.decisionMakers)
   const researchSummary = buildMeetingPrepResearchSummary(input.research)
-  const signals = buildMeetingPrepSignals(input.lead, input.research)
+  const signals = buildMeetingPrepSignals(input.lead, input.research, {
+    summary: input.relationshipMemory?.summary ?? null,
+    priorInteractions: input.relationshipMemory?.priorInteractions ?? [],
+    commitments: input.relationshipMemory?.commitments ?? [],
+    preferences: input.relationshipMemory?.preferences ?? [],
+  })
   const openRisks = buildMeetingPrepOpenRisks({
     lead: input.lead,
     buyingStage: input.buyingStage,
@@ -423,6 +469,8 @@ export function assembleMeetingPrepBundle(input: {
     decisionMakers: mappedDecisionMakers,
     contactIntelligence: input.contactIntelligence,
     research: input.research,
+    memoryObjections: input.relationshipMemory?.topObjections,
+    memoryRiskFlags: input.relationshipMemory?.riskFlags,
   })
   const recommendedObjectives = buildMeetingPrepObjectives({
     lead: input.lead,

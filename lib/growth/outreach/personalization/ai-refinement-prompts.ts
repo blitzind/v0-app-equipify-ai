@@ -20,6 +20,7 @@ export function buildOutreachRefinementUserPrompt(input: {
   blocks: SelectedMessageBlock[]
   allowedFacts: string[]
   maxWords: number
+  avoidRepeatingTopics?: string[]
 }): string {
   return JSON.stringify(
     {
@@ -34,6 +35,7 @@ export function buildOutreachRefinementUserPrompt(input: {
           "invent personalization",
           "fake urgency",
           "hype language",
+          "re-ask questions already answered in relationship memory",
         ],
         maxWords: input.maxWords,
       },
@@ -48,6 +50,7 @@ export function buildOutreachRefinementUserPrompt(input: {
         text: block.text,
       })),
       allowedFacts: input.allowedFacts,
+      avoidRepeatingTopics: input.avoidRepeatingTopics ?? [],
     },
     null,
     2,

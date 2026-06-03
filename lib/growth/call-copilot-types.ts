@@ -83,6 +83,16 @@ export type GrowthCallCopilotBriefing = {
     score: number
     ruleTitles: string[]
   }
+  relationshipMemory?: {
+    available: boolean
+    relationshipStage: string | null
+    relationshipSummary: string | null
+    topObjections: string[]
+    topPreferences: string[]
+    priorInteractions: string[]
+    commitments: string[]
+    riskFlags: string[]
+  }
 }
 
 export type GrowthCallCopilotSession = {

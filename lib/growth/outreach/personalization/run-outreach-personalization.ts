@@ -84,6 +84,7 @@ export async function runOutreachPersonalizationGeneration(
         blocks: strategy.blocks,
         allowedFacts,
         maxWords,
+        avoidRepeatingTopics: contextPacket.memoryAvoidRepeating,
       })
 
       try {

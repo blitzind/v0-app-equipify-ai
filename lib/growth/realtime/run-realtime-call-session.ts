@@ -19,7 +19,7 @@ import type {
   GrowthRealtimeCallSpeaker,
   GrowthRealtimeTranscriptEvent,
 } from "@/lib/growth/realtime/realtime-call-types"
-import { toGrowthLeadRealtimeIntelligenceInput } from "@/lib/growth/realtime/realtime-lead-intelligence"
+import { buildGrowthLeadRealtimeIntelligenceInput } from "@/lib/growth/realtime/realtime-lead-intelligence"
 import { analyzeRealtimeCallTranscript, diffRealtimeSnapshot } from "@/lib/growth/realtime/realtime-session-analyzer"
 import { reconcileVoiceTranscriptBridgeForCall } from "@/lib/growth/realtime/reconcile-voice-transcript-bridge"
 import { createRealtimeTranscriptProvider } from "@/lib/growth/realtime/realtime-transcript-provider"
@@ -75,7 +75,7 @@ async function recomputeAndPersistSnapshot(
   const events = await listGrowthRealtimeTranscriptEvents(admin, session.id)
   const snapshot = analyzeRealtimeCallTranscript({
     events,
-    lead: toGrowthLeadRealtimeIntelligenceInput(lead),
+    lead: await buildGrowthLeadRealtimeIntelligenceInput(admin, lead),
   })
 
   const diff = diffRealtimeSnapshot(session.liveSnapshot, snapshot)
@@ -160,7 +160,7 @@ async function recomputeAndPersistSnapshot(
       sessionId: session.id,
       snapshot,
       events,
-      lead: toGrowthLeadRealtimeIntelligenceInput(lead),
+      lead: await buildGrowthLeadRealtimeIntelligenceInput(admin, lead),
       organizationId,
       direction,
       session,
@@ -373,7 +373,7 @@ export async function getGrowthRealtimeCallSessionDetail(
   const events = await listGrowthRealtimeTranscriptEvents(admin, sessionId)
   const analyzedSnapshot = analyzeRealtimeCallTranscript({
     events,
-    lead: toGrowthLeadRealtimeIntelligenceInput(lead),
+    lead: await buildGrowthLeadRealtimeIntelligenceInput(admin, lead),
   })
 
   let coachingState: GrowthLiveCoachingState | null = null
@@ -385,7 +385,7 @@ export async function getGrowthRealtimeCallSessionDetail(
       sessionId,
       snapshot: analyzedSnapshot,
       events,
-      lead: toGrowthLeadRealtimeIntelligenceInput(lead),
+      lead: await buildGrowthLeadRealtimeIntelligenceInput(admin, lead),
       organizationId,
       direction,
       session,

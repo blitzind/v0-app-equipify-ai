@@ -6,7 +6,8 @@ import { extractBuyingSignals } from "@/lib/growth/reply-intelligence/buying-sig
 import { recordCampaignReplyLearning } from "@/lib/growth/reply-intelligence/campaign-reply-learning"
 import { processRevenueIntelligence } from "@/lib/growth/revenue-intelligence/process-revenue-intelligence"
 import { applyReplyComplianceHardening } from "@/lib/growth/reply-intelligence/reply-compliance-hardening"
-import { buildReplyCopilotAssist } from "@/lib/growth/reply-intelligence/reply-copilot-service"
+import { buildReplyCopilotAssist, mapMemoryInfluenceToReplyCopilotRelationship } from "@/lib/growth/reply-intelligence/reply-copilot-service"
+import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
 import { classifyReplyIntentV2 } from "@/lib/growth/reply-intelligence/reply-intent-classifier-v2"
 import { insertConversationTimelineEvent } from "@/lib/growth/reply-intelligence/reply-ingestion-repository"
 import { detectReplyObjections } from "@/lib/growth/reply-intelligence/objection-detection"
@@ -166,10 +167,13 @@ export async function processReplyIntelligence(
     }).catch(() => undefined)
   }
 
+  const copilotMemory = await buildLeadMemoryInfluenceContext(admin, input.lead.id).catch(() => null)
+
   const copilot = buildReplyCopilotAssist({
     bodyPreview: input.bodyPreview,
     companyName: input.lead.companyName,
     contactLabel: input.lead.contactName,
+    relationshipMemory: mapMemoryInfluenceToReplyCopilotRelationship(copilotMemory),
   })
 
   await appendGrowthLeadTimelineEvent(admin, {
