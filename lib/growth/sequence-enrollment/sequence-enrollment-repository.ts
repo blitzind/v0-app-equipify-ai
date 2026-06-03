@@ -63,6 +63,23 @@ export async function fetchActiveGrowthSequenceEnrollmentForLead(
   }
 }
 
+export async function fetchGrowthSequenceEnrollmentForLeadAndPattern(
+  admin: SupabaseClient,
+  leadId: string,
+  sequencePatternId: string,
+): Promise<GrowthSequenceEnrollment | null> {
+  const { data, error } = await enrollmentsTable(admin)
+    .select(ENROLLMENT_SELECT)
+    .eq("lead_id", leadId)
+    .eq("sequence_pattern_id", sequencePatternId)
+    .in("status", ["draft", "active", "paused"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return data ? mapGrowthSequenceEnrollmentRow(data as EnrollmentRow) : null
+}
+
 export async function listGrowthSequenceEnrollmentSteps(
   admin: SupabaseClient,
   enrollmentId: string,

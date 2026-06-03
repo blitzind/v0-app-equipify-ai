@@ -75,6 +75,8 @@ export async function createGrowthSequenceEnrollmentDraft(
     patternId?: string | null
     actingUserId: string
     actingUserEmail: string
+    scheduledStartAt?: string | null
+    ownerUserId?: string | null
   },
 ): Promise<GrowthSequenceEnrollmentWithSteps> {
   const lead = await fetchGrowthLeadById(admin, input.leadId)
@@ -95,11 +97,11 @@ export async function createGrowthSequenceEnrollmentDraft(
     sequencePatternId: pattern.id,
     sequenceVersion: pattern.sequenceVersion,
     status: "draft",
-    ownerUserId: input.actingUserId,
+    ownerUserId: input.ownerUserId ?? input.actingUserId,
     createdBy: input.actingUserId,
   })
 
-  const baseTime = new Date().toISOString()
+  const baseTime = input.scheduledStartAt ?? new Date().toISOString()
   let cursor = baseTime
   const steps = []
   for (const patternStep of [...pattern.steps].sort((a, b) => a.stepOrder - b.stepOrder)) {

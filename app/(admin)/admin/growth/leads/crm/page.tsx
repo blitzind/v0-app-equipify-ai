@@ -337,6 +337,10 @@ export default function AdminGrowthLeadsPage() {
             onOpenLead={openLead}
             onArchiveLead={archiveLead}
             onBulkArchive={bulkArchiveLeads}
+            onBulkEnrolled={() => {
+              setSuccessMessage("Bulk sequence enrollment completed.")
+              void load()
+            }}
             archivingLeadId={archivingLeadId}
             bulkArchiving={bulkArchiving}
             archiveAvailable={archiveSchemaReady}

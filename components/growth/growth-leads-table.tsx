@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import {
   Archive,
+  GitBranch,
   Loader2,
   Mail,
   MoreHorizontal,
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { GrowthCallActionSheet } from "@/components/growth/growth-call-action-sheet"
+import { GrowthBulkSequenceEnrollmentDialog } from "@/components/growth/growth-bulk-sequence-enrollment-dialog"
 import { GrowthNativeDialerLaunchButton } from "@/components/growth/growth-native-dialer-launch-button"
 import { GROWTH_NEXT_BEST_ACTION_LABELS } from "@/lib/growth/nba-types"
 import type { GrowthLead } from "@/lib/growth/types"
@@ -38,6 +40,7 @@ type GrowthLeadsTableProps = {
   onOpenLead?: (lead: GrowthLead) => void
   onArchiveLead?: (lead: GrowthLead) => Promise<void>
   onBulkArchive?: (leadIds: string[]) => Promise<void>
+  onBulkEnrolled?: () => void
   archivingLeadId?: string | null
   bulkArchiving?: boolean
   archiveAvailable?: boolean
@@ -48,11 +51,13 @@ export function GrowthLeadsTable({
   onOpenLead,
   onArchiveLead,
   onBulkArchive,
+  onBulkEnrolled,
   archivingLeadId = null,
   bulkArchiving = false,
   archiveAvailable = true,
 }: GrowthLeadsTableProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [bulkEnrollOpen, setBulkEnrollOpen] = useState(false)
   const [archiveTarget, setArchiveTarget] = useState<GrowthLead | "bulk" | null>(null)
   const [callTarget, setCallTarget] = useState<GrowthLead | null>(null)
 
@@ -113,26 +118,42 @@ export function GrowthLeadsTable({
   return (
     <TooltipProvider delayDuration={200}>
       <>
-        {selectedCount > 0 && archiveAvailable ? (
+        {selectedCount > 0 ? (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
             <p className="text-sm font-medium">{selectedCount} selected</p>
             <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-destructive hover:text-destructive"
-                disabled={bulkArchiving || !archiveAvailable}
-                onClick={() => setArchiveTarget("bulk")}
-              >
-                {bulkArchiving ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Archive className="mr-2 size-4" />}
-                Archive Selected
+              <Button size="sm" variant="outline" onClick={() => setBulkEnrollOpen(true)}>
+                <GitBranch className="mr-2 size-4" />
+                Enroll in Sequence
               </Button>
+              {archiveAvailable ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:text-destructive"
+                  disabled={bulkArchiving || !archiveAvailable}
+                  onClick={() => setArchiveTarget("bulk")}
+                >
+                  {bulkArchiving ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Archive className="mr-2 size-4" />}
+                  Archive Selected
+                </Button>
+              ) : null}
               <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())} disabled={bulkArchiving}>
                 Clear Selection
               </Button>
             </div>
           </div>
         ) : null}
+
+        <GrowthBulkSequenceEnrollmentDialog
+          open={bulkEnrollOpen}
+          onOpenChange={setBulkEnrollOpen}
+          leadIds={[...selectedIds]}
+          onCompleted={() => {
+            setSelectedIds(new Set())
+            onBulkEnrolled?.()
+          }}
+        />
 
         <div className="overflow-x-auto rounded-xl border border-border">
           <table className="min-w-full divide-y divide-border text-sm">
