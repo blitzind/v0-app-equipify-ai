@@ -38,3 +38,23 @@ export function isManualSequenceStepChannel(channel: GrowthSequenceStepChannel):
 export function isManualStepAwaitingCompletion(step: GrowthSequenceEnrollmentStep): boolean {
   return isManualSequenceStepChannel(step.channel) && ["queued", "draft_created"].includes(step.status)
 }
+
+/** Email step with AI draft materialized — ready for execution job planning. */
+export function isDraftReadyEmailSchedulerStep(step: GrowthSequenceEnrollmentStep): boolean {
+  return (
+    step.status === "draft_created" &&
+    isCadenceEmailChannel(step.channel) &&
+    Boolean(step.generationId)
+  )
+}
+
+export function isSequenceStepDueForScheduler(
+  step: GrowthSequenceEnrollmentStep,
+  nowMs: number = Date.now(),
+): boolean {
+  if (step.outreachQueueId) return false
+  if (!["pending", "draft_created"].includes(step.status)) return false
+  if (isDraftReadyEmailSchedulerStep(step)) return true
+  if (!step.scheduledFor) return false
+  return Date.parse(step.scheduledFor) <= nowMs
+}
