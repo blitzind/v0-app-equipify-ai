@@ -308,6 +308,15 @@ async function main(): Promise<void> {
   assert.doesNotMatch(capabilityRegistrySource, /adapter-registry|smtp-provider|net|tls/)
   assert.match(capabilityRegistrySource, /supportsLiveTransport/)
 
+  const transportRepositorySource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/providers/transport/transport-repository.ts"),
+    "utf8",
+  )
+  assert.match(transportRepositorySource, /mailbox_connections/)
+  assert.match(transportRepositorySource, /refreshGoogleMailboxTokensLive/)
+  assert.match(transportRepositorySource, /token_expires_at/)
+  assert.doesNotMatch(transportRepositorySource, /email_provider_connections/)
+
   console.log("growth-provider-transport: all checks passed")
 }
 
