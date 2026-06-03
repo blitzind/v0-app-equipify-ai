@@ -32,6 +32,11 @@ assert.doesNotMatch(bulkServiceSource, /insertGrowthOutreachQueueItem/)
 const orchestratorSource = readSource("lib/growth/sequence-enrollment/sequence-enrollment-orchestrator.ts")
 assert.match(orchestratorSource, /scheduledStartAt/)
 assert.match(orchestratorSource, /ownerUserId/)
+assert.match(
+  orchestratorSource,
+  /import \{ listGrowthSequencePatterns \} from "@\/lib\/growth\/sequence-pattern-repository"/,
+  "orchestrator must import listGrowthSequencePatterns",
+)
 
 const repositorySource = readSource("lib/growth/sequence-enrollment/sequence-enrollment-repository.ts")
 assert.match(repositorySource, /fetchGrowthSequenceEnrollmentForLeadAndPattern/)
