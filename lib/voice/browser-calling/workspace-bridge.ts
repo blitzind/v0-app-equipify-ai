@@ -27,6 +27,7 @@ import { fetchVoiceCallControlSnapshot } from "@/lib/voice/transfer-control/call
 import { fetchVoiceCallTranscriptSnapshot } from "@/lib/voice/media-streaming/media-session-service"
 import { fetchVoiceCallConversationIntelligenceSnapshot } from "@/lib/voice/intelligence/intelligence-service"
 import { ensureInboundCallWorkspaceLiveCoachingLinked } from "@/lib/growth/native-dialer/call-workspace-coaching-service"
+import { logCoachingLinkPipelineStage } from "@/lib/growth/native-dialer/call-workspace-coaching-link-pipeline-telemetry"
 import { fetchUnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/operator-assist-service"
 import { fetchRelationshipMemoryWorkspaceSnapshot } from "@/lib/voice/relationship-memory/relationship-memory-service"
 import { fetchRevenueIntelligenceWorkspaceSnapshot } from "@/lib/voice/revenue-intelligence/revenue-intelligence-service"
@@ -190,6 +191,16 @@ export async function syncWorkspaceSessionFromVoiceCall(
     preventActiveToRingingDowngrade?: boolean
   },
 ): Promise<void> {
+  const syncStartedAt = Date.now()
+  logCoachingLinkPipelineStage({
+    stage: "server_sync_workspace_session_from_voice_call",
+    outcome: "entered",
+    workspaceSessionId: input.workspaceSessionId ?? null,
+    voiceCallId: input.voiceCallId,
+    organizationId: input.organizationId,
+    ownerUserId: input.userId ?? null,
+  })
+
   const { data: callRow, error: callError } = await admin
     .schema("voice")
     .from("voice_calls")
@@ -198,7 +209,19 @@ export async function syncWorkspaceSessionFromVoiceCall(
     .eq("organization_id", input.organizationId)
     .maybeSingle()
   if (callError) throw new Error(callError.message)
-  if (!callRow) return
+  if (!callRow) {
+    logCoachingLinkPipelineStage({
+      stage: "server_sync_workspace_session_from_voice_call",
+      outcome: "skipped",
+      durationMs: Date.now() - syncStartedAt,
+      workspaceSessionId: input.workspaceSessionId ?? null,
+      voiceCallId: input.voiceCallId,
+      organizationId: input.organizationId,
+      ownerUserId: input.userId ?? null,
+      failureReason: "voice_call_row_missing",
+    })
+    return
+  }
 
   let sessionQuery = sessionsTable(admin)
     .select(SESSION_SELECT)
@@ -220,7 +243,23 @@ export async function syncWorkspaceSessionFromVoiceCall(
     .limit(1)
     .maybeSingle()
   if (sessionError) throw new Error(sessionError.message)
-  if (!sessionRow) return
+  if (!sessionRow) {
+    logCoachingLinkPipelineStage({
+      stage: "server_sync_workspace_session_from_voice_call",
+      outcome: "skipped",
+      durationMs: Date.now() - syncStartedAt,
+      workspaceSessionId: input.workspaceSessionId ?? null,
+      voiceCallId: input.voiceCallId,
+      organizationId: input.organizationId,
+      ownerUserId: input.userId ?? null,
+      failureReason: "native_session_row_missing",
+      extra: {
+        voiceCallStatus: callRow.status as string,
+        assignedUserId: (callRow.assigned_user_id as string | null) ?? null,
+      },
+    })
+    return
+  }
 
   const nativeStatus = resolveInboundNativeSessionStatusFromVoiceCall({
     voiceStatus: callRow.status as VoiceCallStatus,
@@ -235,12 +274,36 @@ export async function syncWorkspaceSessionFromVoiceCall(
     nativeStatus === "ringing" &&
     (currentStatus === "active" || currentStatus === "on_hold")
   ) {
+    logCoachingLinkPipelineStage({
+      stage: "server_sync_workspace_session_from_voice_call",
+      outcome: "skipped",
+      durationMs: Date.now() - syncStartedAt,
+      workspaceSessionId: input.workspaceSessionId,
+      nativeCallWorkspaceSessionId: sessionRow.id as string,
+      voiceCallId: input.voiceCallId,
+      organizationId: input.organizationId,
+      ownerUserId: input.userId ?? null,
+      failureReason: "prevent_active_to_ringing_downgrade",
+      extra: { currentStatus, nativeStatus },
+    })
     return
   }
   if (
     ["wrapping", "completed", "missed", "failed", "no_answer", "cancelled"].includes(currentStatus) &&
     (nativeStatus === "active" || nativeStatus === "on_hold" || nativeStatus === "ringing")
   ) {
+    logCoachingLinkPipelineStage({
+      stage: "server_sync_workspace_session_from_voice_call",
+      outcome: "skipped",
+      durationMs: Date.now() - syncStartedAt,
+      workspaceSessionId: sessionRow.id as string,
+      nativeCallWorkspaceSessionId: sessionRow.id as string,
+      voiceCallId: input.voiceCallId,
+      organizationId: input.organizationId,
+      ownerUserId: input.userId ?? null,
+      failureReason: "terminal_native_session_status",
+      extra: { currentStatus, nativeStatus },
+    })
     return
   }
   const patch: Record<string, unknown> = {
@@ -264,7 +327,37 @@ export async function syncWorkspaceSessionFromVoiceCall(
     Boolean(callRow.answered_at) &&
     (nativeStatus === "active" || nativeStatus === "on_hold") &&
     !(sessionRow.realtime_session_id as string | null)
+  if (!isAnsweredInbound) {
+    logCoachingLinkPipelineStage({
+      stage: "server_sync_workspace_session_from_voice_call",
+      outcome: "skipped",
+      durationMs: Date.now() - syncStartedAt,
+      workspaceSessionId: sessionRow.id as string,
+      nativeCallWorkspaceSessionId: sessionRow.id as string,
+      nativeCallWorkspaceRealtimeSessionId: (sessionRow.realtime_session_id as string | null) ?? null,
+      voiceCallId: input.voiceCallId,
+      organizationId: input.organizationId,
+      ownerUserId: input.userId ?? null,
+      failureReason: "coaching_link_preconditions_not_met",
+      extra: {
+        direction: sessionRow.direction as string,
+        voiceCallAnsweredAt: (callRow.answered_at as string | null) ?? null,
+        nativeStatus,
+        currentStatus,
+        hasRealtimeSessionId: Boolean(sessionRow.realtime_session_id),
+      },
+    })
+  }
   if (isAnsweredInbound) {
+    logCoachingLinkPipelineStage({
+      stage: "server_ensure_inbound_coaching_link",
+      outcome: "entered",
+      workspaceSessionId: sessionRow.id as string,
+      nativeCallWorkspaceSessionId: sessionRow.id as string,
+      voiceCallId: input.voiceCallId,
+      organizationId: input.organizationId,
+      ownerUserId: (sessionRow.owner_user_id as string | null) ?? input.userId ?? null,
+    })
     try {
       await ensureInboundCallWorkspaceLiveCoachingLinked(admin, {
         voiceCallId: input.voiceCallId,
@@ -642,6 +735,20 @@ async function buildVoiceBrowserEnrichmentSnapshot(
         userId: input.userId,
       }),
     )
+  } else {
+    logCoachingLinkPipelineStage({
+      stage: "server_sync_workspace_session_from_voice_call",
+      outcome: "skipped",
+      workspaceSessionId,
+      voiceCallId: activeVoiceCallId,
+      organizationId: input.organizationId,
+      ownerUserId: input.userId,
+      failureReason: "native_session_sync_not_eligible",
+      extra: {
+        sessionStatus,
+        syncMode: "enrichment",
+      },
+    })
   }
 
   const voiceStatusRow = await enrichmentTimer.measure("voice_call_status", async () => {

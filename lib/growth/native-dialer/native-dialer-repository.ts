@@ -462,6 +462,23 @@ export async function answerNativeCallSession(
     (existingStatus === "active" || existingStatus === "on_hold") &&
     !existingRealtimeSessionId
   if (existingStatus !== "ringing" && !canReconcileAlreadyAnsweredInbound) {
+    logCoachingLinkPipelineStage({
+      stage: "server_answer_native_call_session",
+      outcome: "failed",
+      durationMs: Date.now() - stageStartedAt,
+      pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+      workspaceSessionId: sessionId,
+      nativeCallWorkspaceSessionId: sessionId,
+      callSid: pipelineTelemetry?.callSid ?? null,
+      ownerUserId: ownerUserId ?? null,
+      failureReason: "call_not_ringing",
+      extra: {
+        existingStatus,
+        existingDirection,
+        canReconcileAlreadyAnsweredInbound,
+        existingRealtimeSessionId,
+      },
+    })
     throw new Error("Call is not ringing.")
   }
 
@@ -575,6 +592,21 @@ export async function answerNativeCallSession(
   })
 
   pipeline.mediaStreamWssHost = describeVoiceMediaStreamWssTarget(null).wssHost
+
+  if ((existing.direction as string) !== "inbound") {
+    logCoachingLinkPipelineStage({
+      stage: "server_auto_start_coaching_on_answer",
+      outcome: "skipped",
+      pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+      workspaceSessionId: sessionId,
+      nativeCallWorkspaceSessionId: sessionId,
+      voiceCallId,
+      callSid: pipelineTelemetry?.callSid ?? (existing.provider_call_ref as string | null) ?? null,
+      ownerUserId: ownerUserId ?? null,
+      failureReason: "native_session_not_inbound",
+      extra: { direction: existing.direction as string },
+    })
+  }
 
   if ((existing.direction as string) === "inbound") {
     const { autoStartCallWorkspaceLiveCoachingOnAnswer } = await import(

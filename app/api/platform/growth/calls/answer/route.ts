@@ -105,6 +105,16 @@ export async function POST(request: Request) {
 
   const schemaGate = await requireGrowthNativeDialerSchemaReady(access.admin)
   if (!schemaGate.ok) {
+    logCoachingLinkPipelineStage({
+      stage: "server_calls_answer_route",
+      outcome: "failed",
+      pipelineRunId,
+      workspaceSessionId: sessionId,
+      nativeCallWorkspaceSessionId: sessionId,
+      durationMs: Date.now() - routeStartedAt,
+      failureReason: "schema_not_ready",
+      httpStatus: schemaGate.status,
+    })
     return NextResponse.json(
       {
         ok: false,

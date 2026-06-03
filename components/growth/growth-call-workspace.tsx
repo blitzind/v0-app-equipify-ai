@@ -1186,6 +1186,12 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
               hasLiveSdkCall: hasLiveSdkCallRef.current,
             })
           ) {
+            logClientCoachingLinkStage(pipelineCtx, "client_reconcile_inbound_answer", "skipped", {
+              durationMs: Date.now() - reconcileStartedAt,
+              failureReason: "answer_api_nonfatal_sdk_already_accepted",
+              httpStatus: res.status,
+              extra: { message: data.message ?? null },
+            })
             logLiveCoachingAutoStartQa("reconcileInboundAnswer_nonfatal_answer_api", {
               sessionId,
               voiceCallId: input.sessionForAnswer.voiceCallId,
@@ -1230,6 +1236,12 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           locks: getLifecycleLocks(),
         })
         if (responseLifecycleLocked && !authoritativeLinkedAnswer) {
+          logClientCoachingLinkStage(pipelineCtx, "client_reconcile_inbound_answer", "skipped", {
+            durationMs: Date.now() - reconcileStartedAt,
+            workspaceSessionId: answeredSession.id,
+            nativeCallWorkspaceSessionId: answeredSession.id,
+            failureReason: "response_lifecycle_locked",
+          })
           logLiveCoachingAutoStartQa("reconcileInboundAnswer_skipped_response_lifecycle_locked", {
             sessionId: answeredSession.id,
             voiceCallId: answeredSession.voiceCallId,
@@ -1277,6 +1289,23 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           liveCoachingFailureReason: data.pipeline?.liveCoachingFailureReason ?? null,
         })
       } else {
+        logClientCoachingLinkStage(pipelineCtx, "client_answer_api", "skipped", {
+          durationMs: Date.now() - reconcileStartedAt,
+          workspaceSessionId: sessionId,
+          nativeCallWorkspaceSessionId: sessionId,
+          failureReason: "no_server_ready_session_id_after_refresh",
+          extra: {
+            sessionIdAfterRefresh: sessionId,
+            pendingPlaceholder: Boolean(sessionId?.startsWith("pending-inbound-")),
+          },
+        })
+        logClientCoachingLinkStage(pipelineCtx, "client_reconcile_inbound_answer", "skipped", {
+          durationMs: Date.now() - reconcileStartedAt,
+          failureReason: "answer_api_skipped_no_server_session_id",
+          extra: {
+            sessionIdAfterRefresh: sessionId,
+          },
+        })
         await load({ background: true })
       }
       logLiveCoachingAutoStartQa("operator_assist_refresh_start", {
@@ -1314,6 +1343,11 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           hasLiveSdkCall: hasLiveSdkCallRef.current,
         })
       ) {
+        logClientCoachingLinkStage(pipelineCtx, "client_reconcile_inbound_answer", "skipped", {
+          durationMs: Date.now() - reconcileStartedAt,
+          failureReason: "reconcile_nonfatal_sdk_already_accepted",
+          extra: { message },
+        })
         logLiveCoachingAutoStartQa("reconcileInboundAnswer_nonfatal", {
           sessionId: input.sessionForAnswer.id,
           voiceCallId: input.sessionForAnswer.voiceCallId,
@@ -1361,7 +1395,36 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
 
   async function answerCall() {
     const capturedSession = incomingSession ?? activeSession
-    if (!capturedSession && !hasSdkIncoming) return
+    const answerCallPipelineCtx = createCoachingLinkPipelineClientContext({
+      workspaceSessionId: capturedSession?.id ?? voiceBrowser.snapshot?.workspaceSessionId ?? null,
+      voiceCallId:
+        capturedSession?.voiceCallId ??
+        voiceBrowser.snapshot?.activeVoiceCallId ??
+        inboundOffer?.voiceCallId ??
+        null,
+      callSid: callAuthorityRef.current.callSid ?? voiceBrowser.incomingCall?.callSid ?? null,
+    })
+    if (!capturedSession && !hasSdkIncoming) {
+      logClientCoachingLinkStage(answerCallPipelineCtx, "client_answer_call", "skipped", {
+        failureReason: "no_session_and_no_sdk_incoming",
+        extra: {
+          authorityPhase: callAuthorityRef.current.phase,
+          hasSdkIncoming,
+        },
+      })
+      return
+    }
+    logClientCoachingLinkStage(answerCallPipelineCtx, "client_answer_call", "entered", {
+      workspaceSessionId: capturedSession?.id ?? null,
+      nativeCallWorkspaceSessionId: capturedSession?.id ?? null,
+      extra: {
+        authorityPhase: callAuthorityRef.current.phase,
+        capturedSessionStatus: capturedSession?.status ?? null,
+        hasSdkIncoming,
+        incomingSessionId: incomingSession?.id ?? null,
+        activeSessionId: activeSession?.id ?? null,
+      },
+    })
     setAnswering(true)
     setError(null)
     setCallAuthority((prev) => transitionCallLifecycleAuthority(prev, { type: "sdk_accept_started" }))
@@ -1419,8 +1482,20 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           hadSdkIncoming: hasSdkIncoming,
         })
       } else {
+        logClientCoachingLinkStage(answerCallPipelineCtx, "client_answer_call", "skipped", {
+          failureReason: "reconcile_skipped_no_captured_session",
+          extra: {
+            authorityPhase: callAuthorityRef.current.phase,
+            hadSdkIncoming: hasSdkIncoming,
+            hasLiveSdkCall: hasLiveSdkCallRef.current,
+          },
+        })
         await voiceBrowser.refresh().catch(() => undefined)
       }
+      logClientCoachingLinkStage(answerCallPipelineCtx, "client_answer_call", "completed", {
+        workspaceSessionId: capturedSession?.id ?? lastKnownSessionRef.current?.id ?? null,
+        nativeCallWorkspaceSessionId: capturedSession?.id ?? lastKnownSessionRef.current?.id ?? null,
+      })
       setAnswering(false)
     } catch (e) {
 	      setError(e instanceof Error ? e.message : "Answer failed.")

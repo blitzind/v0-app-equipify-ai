@@ -535,6 +535,7 @@ export async function ensureInboundCallWorkspaceLiveCoachingLinked(
     userEmail?: string | null
   },
 ): Promise<string | null> {
+  const guardStartedAt = Date.now()
   let sessionQuery = admin
     .schema("growth")
     .from("native_call_workspace_sessions")
@@ -558,12 +559,46 @@ export async function ensureInboundCallWorkspaceLiveCoachingLinked(
     .limit(1)
     .maybeSingle()
   if (error) throw new Error(error.message)
-  if (!sessionRow) return null
+  if (!sessionRow) {
+    logCoachingLinkPipelineStage({
+      stage: "server_ensure_inbound_coaching_link",
+      outcome: "skipped",
+      durationMs: Date.now() - guardStartedAt,
+      workspaceSessionId: input.nativeSessionId ?? null,
+      nativeCallWorkspaceSessionId: input.nativeSessionId ?? null,
+      voiceCallId: input.voiceCallId,
+      failureReason: "native_session_row_not_found",
+    })
+    return null
+  }
 
   const existingRealtimeSessionId = (sessionRow.realtime_session_id as string | null) ?? null
-  if (existingRealtimeSessionId) return existingRealtimeSessionId
+  if (existingRealtimeSessionId) {
+    logCoachingLinkPipelineStage({
+      stage: "server_ensure_inbound_coaching_link",
+      outcome: "skipped",
+      durationMs: Date.now() - guardStartedAt,
+      workspaceSessionId: sessionRow.id as string,
+      nativeCallWorkspaceSessionId: sessionRow.id as string,
+      nativeCallWorkspaceRealtimeSessionId: existingRealtimeSessionId,
+      realtimeSessionId: existingRealtimeSessionId,
+      voiceCallId: input.voiceCallId,
+      failureReason: "already_linked",
+    })
+    return existingRealtimeSessionId
+  }
 
   if (sessionRow.status !== "active" && sessionRow.status !== "on_hold") {
+    logCoachingLinkPipelineStage({
+      stage: "server_ensure_inbound_coaching_link",
+      outcome: "skipped",
+      durationMs: Date.now() - guardStartedAt,
+      workspaceSessionId: sessionRow.id as string,
+      nativeCallWorkspaceSessionId: sessionRow.id as string,
+      voiceCallId: input.voiceCallId,
+      failureReason: "native_session_not_active",
+      extra: { status: sessionRow.status as string },
+    })
     return null
   }
 
@@ -574,7 +609,19 @@ export async function ensureInboundCallWorkspaceLiveCoachingLinked(
     .eq("id", input.voiceCallId)
     .maybeSingle()
   if (voiceCallError) throw new Error(voiceCallError.message)
-  if (!voiceCallRow?.answered_at) return null
+  if (!voiceCallRow?.answered_at) {
+    logCoachingLinkPipelineStage({
+      stage: "server_ensure_inbound_coaching_link",
+      outcome: "skipped",
+      durationMs: Date.now() - guardStartedAt,
+      workspaceSessionId: sessionRow.id as string,
+      nativeCallWorkspaceSessionId: sessionRow.id as string,
+      voiceCallId: input.voiceCallId,
+      failureReason: "voice_call_not_answered",
+      extra: { answeredAt: (voiceCallRow?.answered_at as string | null) ?? null },
+    })
+    return null
+  }
 
   const coaching = await startCallWorkspaceLiveCoaching(admin, {
     nativeSessionId: sessionRow.id as string,
@@ -584,10 +631,35 @@ export async function ensureInboundCallWorkspaceLiveCoachingLinked(
 
   const realtimeSessionId = coaching.realtimeSession?.id ?? null
   if (realtimeSessionId) {
+    logCoachingLinkPipelineStage({
+      stage: "server_ensure_inbound_coaching_link",
+      outcome: "completed",
+      durationMs: Date.now() - guardStartedAt,
+      workspaceSessionId: sessionRow.id as string,
+      nativeCallWorkspaceSessionId: sessionRow.id as string,
+      nativeCallWorkspaceRealtimeSessionId: realtimeSessionId,
+      realtimeSessionId,
+      voiceCallId: input.voiceCallId,
+      liveCoachingLinked: true,
+      linkResultLinked: coaching.linkResult?.linked ?? null,
+      linkResultReason: coaching.linkResult?.reason ?? null,
+    })
     logVoiceInfrastructure("voice_growth_coaching_auto_linked", {
       voiceCallId: input.voiceCallId,
       nativeSessionId: sessionRow.id,
       realtimeSessionId,
+    })
+  } else {
+    logCoachingLinkPipelineStage({
+      stage: "server_ensure_inbound_coaching_link",
+      outcome: "failed",
+      durationMs: Date.now() - guardStartedAt,
+      workspaceSessionId: sessionRow.id as string,
+      nativeCallWorkspaceSessionId: sessionRow.id as string,
+      voiceCallId: input.voiceCallId,
+      failureReason: coaching.linkResult?.reason ?? "realtime_session_create_failed",
+      linkResultLinked: coaching.linkResult?.linked ?? null,
+      linkResultReason: coaching.linkResult?.reason ?? null,
     })
   }
 

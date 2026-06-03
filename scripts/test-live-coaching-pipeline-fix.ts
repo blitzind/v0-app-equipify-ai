@@ -80,14 +80,18 @@ const coachingLinkPipelineTypes = fs.readFileSync(
 )
 assert.match(coachingLinkPipelineTypes, /server_create_growth_realtime_call_session/)
 assert.match(coachingLinkPipelineTypes, /server_link_native_call_realtime_session/)
-assert.match(coachingLinkPipelineTypes, /server_pipeline_persisted_read/)
+assert.match(coachingLinkPipelineTypes, /server_sync_workspace_session_from_voice_call/)
+assert.match(coachingLinkPipelineTypes, /server_ensure_inbound_coaching_link/)
+assert.match(coachingLinkPipelineTypes, /client_answer_call/)
 
 const coachingLinkPipelineTelemetry = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/native-dialer/call-workspace-coaching-link-pipeline-telemetry.ts"),
   "utf8",
 )
 assert.match(coachingLinkPipelineTelemetry, /voice_growth_coaching_link_pipeline_stage/)
-assert.match(coachingService, /logCoachingLinkPipelineStage/)
+assert.match(coachingService, /server_ensure_inbound_coaching_link/)
+assert.match(coachingService, /failureReason: "already_linked"/)
+assert.match(coachingService, /failureReason: "voice_call_not_answered"/)
 
 const answeredMediaStream = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/media-streaming/ensure-answered-inbound-media-stream.ts"),
@@ -370,6 +374,9 @@ assert.match(workspaceUi, /data\.pipeline\?\.liveCoachingLinked/)
 assert.match(workspaceUi, /answerPipelineDiagnostic/)
 assert.match(workspaceUi, /logClientCoachingLinkStage/)
 assert.match(workspaceUi, /client_answer_api/)
+assert.match(workspaceUi, /client_answer_call/)
+assert.match(workspaceUi, /reconcile_skipped_no_captured_session/)
+assert.match(workspaceUi, /answer_api_skipped_no_server_session_id/)
 assert.match(workspaceUi, /X-Coaching-Pipeline-Run-Id/)
 assert.doesNotMatch(
   workspaceUi,
@@ -392,6 +399,9 @@ const workspaceBridge = fs.readFileSync(
   "utf8",
 )
 assert.match(workspaceBridge, /preventActiveToRingingDowngrade\?: boolean/)
+assert.match(workspaceBridge, /logCoachingLinkPipelineStage/)
+assert.match(workspaceBridge, /coaching_link_preconditions_not_met/)
+assert.match(workspaceBridge, /native_session_sync_not_eligible/)
 assert.match(
   workspaceBridge,
   /input\.preventActiveToRingingDowngrade[\s\S]*nativeStatus === "ringing"[\s\S]*\(currentStatus === "active" \|\| currentStatus === "on_hold"\)[\s\S]*return/,

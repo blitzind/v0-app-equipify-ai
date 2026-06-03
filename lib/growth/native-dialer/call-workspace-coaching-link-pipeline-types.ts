@@ -1,6 +1,7 @@
 export const COACHING_LINK_PIPELINE_QA_MARKER = "coaching-link-pipeline-v1" as const
 
 export type CoachingLinkPipelineStage =
+  | "client_answer_call"
   | "client_reconcile_inbound_answer"
   | "client_answer_api"
   | "server_calls_answer_route"
@@ -11,6 +12,8 @@ export type CoachingLinkPipelineStage =
   | "server_link_native_call_realtime_session"
   | "server_pipeline_persisted_read"
   | "server_answer_response"
+  | "server_sync_workspace_session_from_voice_call"
+  | "server_ensure_inbound_coaching_link"
 
 export type CoachingLinkPipelineStageOutcome = "entered" | "completed" | "failed" | "skipped"
 
