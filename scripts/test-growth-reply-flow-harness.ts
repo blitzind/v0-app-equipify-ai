@@ -13,6 +13,8 @@ import {
   buildGrowthReplyFlowReport,
   formatGrowthReplyFlowReport,
 } from "../lib/growth/qa/reply-flow-report"
+import { isSequenceStepDueForScheduler } from "../lib/growth/sequence-enrollment/enrollment-step-progress"
+import type { GrowthSequenceEnrollmentStep } from "../lib/growth/sequence-enrollment-types"
 
 function readSource(relativePath: string): string {
   return fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
@@ -29,6 +31,55 @@ assert.match(harnessSource, /approveGrowthReplyFlowStepOne/)
 assert.match(harnessSource, /executeGrowthReplyFlowApprovedJobs/)
 assert.match(harnessSource, /inspectGrowthReplyFlowLead/)
 assert.match(harnessSource, /runGrowthReplyFlowHarness/)
+assert.match(harnessSource, /qaForceGrowthEnrollmentStepDueNow/)
+assert.match(harnessSource, /accelerateGrowthReplyFlowEnrollmentStepOne/)
+assert.match(harnessSource, /actions\.qaAcceleration/)
+
+function harnessStep(
+  partial: Partial<GrowthSequenceEnrollmentStep> &
+    Pick<GrowthSequenceEnrollmentStep, "status" | "channel">,
+): GrowthSequenceEnrollmentStep {
+  return {
+    id: "step-1",
+    enrollmentId: "enroll-1",
+    leadId: "lead-1",
+    sequencePatternStepId: "pattern-step-1",
+    stepOrder: 1,
+    generationType: "cold_email",
+    scheduledFor: null,
+    stepExecutionConfidence: 50,
+    outreachQueueId: null,
+    cadenceTaskId: null,
+    generationId: null,
+    instructions: null,
+    stepOutcome: null,
+    skipReason: null,
+    opportunityId: null,
+    meetingId: null,
+    dueAt: null,
+    completedAt: null,
+    failureReason: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...partial,
+  }
+}
+
+const futureScheduledPending = harnessStep({
+  status: "pending",
+  channel: "email",
+  scheduledFor: "2099-06-04T13:00:00.000Z",
+  generationId: null,
+})
+assert.equal(isSequenceStepDueForScheduler(futureScheduledPending), false)
+
+const acceleratedPending = harnessStep({
+  status: "pending",
+  channel: "email",
+  scheduledFor: new Date(Date.now() - 60_000).toISOString(),
+  generationId: null,
+})
+assert.equal(isSequenceStepDueForScheduler(acceleratedPending), true)
 
 const reportSource = readSource("lib/growth/qa/reply-flow-report.ts")
 assert.match(reportSource, /buildGrowthReplyFlowReport/)

@@ -8,6 +8,7 @@ import { runInboxSyncForEnabledMailboxes } from "@/lib/growth/inbox-sync/inbox-s
 import {
   bulkEnrollLeadsInGrowthSequence,
 } from "@/lib/growth/sequence-enrollment/bulk-sequence-enrollment"
+import { qaForceGrowthEnrollmentStepDueNow } from "@/lib/growth/sequence-enrollment/qa-acceleration"
 import { runGrowthSequenceScheduler } from "@/lib/growth/sequence-enrollment/run-sequence-scheduler"
 import { listGrowthSequenceEnrollmentSteps } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
 import { listGrowthSequencePatterns } from "@/lib/growth/sequence-pattern-repository"
@@ -178,6 +179,33 @@ export async function enrollGrowthReplyFlowLead(
   }
 
   return { enrollmentId, skipped, detail: outcome }
+}
+
+/** QA-only: force step 1 due now + business-hours bypass (same as platform QA buttons). */
+export async function accelerateGrowthReplyFlowEnrollmentStepOne(
+  admin: SupabaseClient,
+  input: {
+    enrollmentId: string
+    actingUser: ActingUser
+  },
+) {
+  return qaForceGrowthEnrollmentStepDueNow(admin, {
+    enrollmentId: input.enrollmentId,
+    actingUserId: input.actingUser.userId,
+    actingUserEmail: input.actingUser.email,
+  })
+}
+
+async function resolveHarnessEnrollmentId(
+  admin: SupabaseClient,
+  input: { leadId: string; enrollmentId: string | null },
+): Promise<string | null> {
+  if (input.enrollmentId) return input.enrollmentId
+  try {
+    return await resolveActiveEnrollmentId(admin, input.leadId)
+  } catch {
+    return null
+  }
 }
 
 export async function runGrowthReplyFlowScheduler(
@@ -487,6 +515,18 @@ export async function runGrowthReplyFlowHarness(
     })
     state.enrollmentId = enrolled.enrollmentId
     actions.enroll = enrolled
+  }
+
+  const enrollmentIdForQa = await resolveHarnessEnrollmentId(admin, {
+    leadId,
+    enrollmentId: state.enrollmentId,
+  })
+
+  if ((shouldEnroll || shouldScheduler) && enrollmentIdForQa) {
+    actions.qaAcceleration = await accelerateGrowthReplyFlowEnrollmentStepOne(admin, {
+      enrollmentId: enrollmentIdForQa,
+      actingUser,
+    })
   }
 
   if (shouldScheduler) {
