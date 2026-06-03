@@ -280,8 +280,14 @@ export async function executeGrowthReplyFlowApprovedJobs(
   })
 }
 
-export async function runGrowthReplyFlowInboxSync(admin: SupabaseClient): Promise<Record<string, unknown>> {
-  const summary = await runInboxSyncForEnabledMailboxes(admin)
+export async function runGrowthReplyFlowInboxSync(
+  admin: SupabaseClient,
+  actingUser?: ActingUser,
+): Promise<Record<string, unknown>> {
+  const summary = await runInboxSyncForEnabledMailboxes(admin, {
+    actorUserId: actingUser?.userId,
+    actorEmail: actingUser?.email,
+  })
   return summary as unknown as Record<string, unknown>
 }
 
@@ -542,7 +548,7 @@ export async function runGrowthReplyFlowHarness(
   }
 
   if (shouldInboxSync || process.env.GROWTH_QA_REPLY_FLOW_RUN_INBOX_SYNC === "true") {
-    actions.inboxSync = await runGrowthReplyFlowInboxSync(admin)
+    actions.inboxSync = await runGrowthReplyFlowInboxSync(admin, actingUser)
   }
 
   const snapshot = await inspectGrowthReplyFlowLead(admin, leadId)

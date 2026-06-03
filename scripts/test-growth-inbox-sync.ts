@@ -6,6 +6,12 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import {
+  GROWTH_CRON_ACTOR_EMAIL,
+  isGrowthActorUserIdUuid,
+  normalizeGrowthActorUserIdForDb,
+  resolveGrowthActorForDb,
+} from "../lib/growth/actor-user-id"
+import {
   buildInboxPreviewDedupeKey,
   createInboxDedupeState,
   shouldSkipInboxDuplicate,
@@ -198,6 +204,44 @@ async function main(): Promise<void> {
   assert.equal(normalizeRfcMessageId("<abc@gmail.com>"), "abc@gmail.com")
   assert.deepEqual(parseReferencesHeader("<one@test.com> <two@test.com>"), ["one@test.com", "two@test.com"])
   assert.equal(parseEmailAddress("Jane Doe <jane@acme.com>"), "jane@acme.com")
+
+  const validActorUuid = "43b6b778-8a1e-4c6b-9163-148fde7becad"
+  assert.equal(normalizeGrowthActorUserIdForDb(undefined), null)
+  assert.equal(normalizeGrowthActorUserIdForDb(null), null)
+  assert.equal(normalizeGrowthActorUserIdForDb("system"), null)
+  assert.equal(normalizeGrowthActorUserIdForDb(validActorUuid), validActorUuid)
+  assert.ok(isGrowthActorUserIdUuid(validActorUuid))
+  assert.equal(normalizeGrowthActorUserIdForDb("not-a-uuid"), null)
+
+  assert.deepEqual(resolveGrowthActorForDb(undefined), {
+    actorUserId: null,
+    actorEmail: GROWTH_CRON_ACTOR_EMAIL,
+  })
+  assert.deepEqual(resolveGrowthActorForDb({ actorUserId: null }), {
+    actorUserId: null,
+    actorEmail: GROWTH_CRON_ACTOR_EMAIL,
+  })
+  assert.deepEqual(resolveGrowthActorForDb({ actorUserId: "system", actorEmail: "cron@test.internal" }), {
+    actorUserId: null,
+    actorEmail: "cron@test.internal",
+  })
+  assert.deepEqual(
+    resolveGrowthActorForDb({ actorUserId: validActorUuid, actorEmail: "qa@equipify.ai" }),
+    { actorUserId: validActorUuid, actorEmail: "qa@equipify.ai" },
+  )
+
+  assert.doesNotMatch(runnerSource, /\?\?\s*"system"/)
+  assert.doesNotMatch(runnerSource, /actorUserId:\s*"system"/)
+
+  const replyEventsSource = readSource("lib/growth/inbox/reply-events.ts")
+  assert.match(replyEventsSource, /normalizeGrowthActorUserIdForDb/)
+  assert.match(replyEventsSource, /resolveGrowthActorForDb/)
+
+  const timelineSource = readSource("lib/growth/timeline-repository.ts")
+  assert.match(timelineSource, /normalizeGrowthActorUserIdForDb/)
+
+  assert.doesNotMatch(cronSource, /actingUserId/)
+  assert.match(cronSource, /actorEmail:\s*"cron@growth\.equipify\.internal"/)
 
   console.log("growth-inbox-sync: all checks passed")
 }

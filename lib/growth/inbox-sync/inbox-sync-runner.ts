@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { resolveGrowthActorForDb } from "@/lib/growth/actor-user-id"
 import { getMailboxConnection, listMailboxConnections } from "@/lib/growth/mailboxes/mailbox-repository"
 import { getMailboxProviderCapabilities } from "@/lib/growth/mailboxes/mailbox-provider-registry"
 import { addInboxMessage, createInboxThread } from "@/lib/growth/inbox/thread-repository"
@@ -69,6 +70,11 @@ export async function runInboxSyncForMailbox(
     providerFamily: mailbox.provider_family,
     mailboxConnectionId: mailbox.id,
     admin,
+  })
+
+  const actor = resolveGrowthActorForDb({
+    actorUserId: input.actorUserId,
+    actorEmail: input.actorEmail,
   })
 
   let messagesSeen = 0
@@ -173,8 +179,8 @@ export async function runInboxSyncForMailbox(
         body_preview: message.bodyPreview,
         provider_message_id: message.providerMessageId,
         message_timestamp: message.messageTimestamp,
-        actorUserId: input.actorUserId,
-        actorEmail: input.actorEmail,
+        actorUserId: actor.actorUserId,
+        actorEmail: actor.actorEmail,
       })
 
       await insertInboxProviderMessageMap(admin, {
@@ -236,6 +242,8 @@ export async function runInboxSyncForMailbox(
             summary: message.subject
               ? `Inbound reply synced: ${message.subject}`
               : "Inbound reply synced from Gmail mailbox.",
+            actorUserId: actor.actorUserId,
+            actorEmail: actor.actorEmail,
             payload: {
               ingestion_event_id: ingestion.ingestionEventId,
               inbox_message_id: imported.message.id,
@@ -302,7 +310,7 @@ export async function runInboxSyncForMailbox(
 
 export async function runInboxSyncForEnabledMailboxes(
   admin: SupabaseClient,
-  input?: { actorUserId?: string; actorEmail?: string; limit?: number },
+  input?: { actorUserId?: string | null; actorEmail?: string | null; limit?: number },
 ): Promise<{ scanned: number; completed: number; failed: number; summaries: GrowthInboxSyncRunSummary[] }> {
   const mailboxes = await listMailboxConnections(admin)
   const eligible = mailboxes.filter((mailbox) => {
@@ -318,11 +326,15 @@ export async function runInboxSyncForEnabledMailboxes(
   let failed = 0
 
   for (const mailbox of batch) {
+    const actor = resolveGrowthActorForDb({
+      actorUserId: input?.actorUserId,
+      actorEmail: input?.actorEmail,
+    })
     try {
       const summary = await runInboxSyncForMailbox(admin, {
         mailboxConnectionId: mailbox.id,
-        actorUserId: input?.actorUserId ?? "system",
-        actorEmail: input?.actorEmail ?? "cron@growth.equipify.internal",
+        actorUserId: actor.actorUserId,
+        actorEmail: actor.actorEmail,
       })
       summaries.push(summary)
       completed += 1

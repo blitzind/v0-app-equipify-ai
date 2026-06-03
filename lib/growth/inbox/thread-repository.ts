@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { normalizeGrowthActorUserIdForDb, resolveGrowthActorForDb } from "@/lib/growth/actor-user-id"
 import { buildInboxDashboard, buildReplyIntelligenceSummary } from "@/lib/growth/inbox/inbox-dashboard"
 import { classifyReply } from "@/lib/growth/inbox/reply-classifier"
 import {
@@ -300,6 +301,11 @@ export async function addInboxMessage(
   const thread = await getInboxThread(admin, input.thread_id, false)
   if (!thread) throw new Error("inbox_thread_not_found")
 
+  const actor = resolveGrowthActorForDb({
+    actorUserId: input.actorUserId,
+    actorEmail: input.actorEmail,
+  })
+
   const subject = input.subject?.trim() ?? thread.subject
   const bodyPreview = input.body_preview?.trim() ?? ""
   const classificationResult = classifyReply({ subject, body: bodyPreview })
@@ -330,7 +336,7 @@ export async function addInboxMessage(
     subject,
     body: bodyPreview,
     isInbound: input.direction === "inbound",
-    actor: { actorUserId: input.actorUserId, actorEmail: input.actorEmail },
+    actor: { actorUserId: actor.actorUserId, actorEmail: actor.actorEmail },
   })
 
   if (input.direction === "inbound" && thread.lead_id) {
@@ -392,8 +398,12 @@ export async function assignThreadOwner(
   const existing = await getInboxThread(admin, threadId, false)
   if (!existing) throw new Error("inbox_thread_not_found")
 
-  const ownerUserId = input.owner_user_id ?? input.actorUserId ?? null
-  const ownerLabel = formatOwnerLabel(input.actorEmail)
+  const actor = resolveGrowthActorForDb({
+    actorUserId: input.actorUserId,
+    actorEmail: input.actorEmail,
+  })
+  const ownerUserId = normalizeGrowthActorUserIdForDb(input.owner_user_id) ?? actor.actorUserId
+  const ownerLabel = formatOwnerLabel(actor.actorEmail)
   const now = new Date().toISOString()
 
   const { data, error } = await threadsTable(admin)
@@ -409,8 +419,8 @@ export async function assignThreadOwner(
 
   const draft = buildThreadOwnerAssignedEvent(existing.lead_label, ownerLabel)
   await persistReplyEventDrafts(admin, threadId, existing.lead_id, [draft], {
-    actorUserId: input.actorUserId,
-    actorEmail: input.actorEmail,
+    actorUserId: actor.actorUserId,
+    actorEmail: actor.actorEmail,
   })
 
   const ownerLabels = new Map([[threadId, ownerLabel]])

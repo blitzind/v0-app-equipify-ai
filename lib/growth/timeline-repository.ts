@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
+import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
 import type { GrowthLeadTimelineEvent, GrowthLeadTimelineEventType } from "@/lib/growth/timeline-types"
 
 const TIMELINE_SELECT =
@@ -77,7 +78,7 @@ export async function appendGrowthLeadTimelineEvent(
       title: input.title,
       summary: input.summary?.trim() ? input.summary.trim() : null,
       payload: input.payload ?? {},
-      actor_user_id: input.actorUserId ?? null,
+      actor_user_id: normalizeGrowthActorUserIdForDb(input.actorUserId),
       actor_email: input.actorEmail?.trim() ? input.actorEmail.trim() : null,
       research_run_id: input.researchRunId ?? null,
       call_event_id: input.callEventId ?? null,

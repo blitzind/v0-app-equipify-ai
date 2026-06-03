@@ -13,7 +13,6 @@ export async function POST(request: Request) {
     { cronRoute: CRON_ROUTE, category: "inbox", request, admin },
     async () => {
       const summary = await runInboxSyncForEnabledMailboxes(admin, {
-        actingUserId: "system",
         actorEmail: "cron@growth.equipify.internal",
         limit: 10,
       })

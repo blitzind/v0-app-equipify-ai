@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { normalizeGrowthActorUserIdForDb, resolveGrowthActorForDb } from "@/lib/growth/actor-user-id"
 import type {
   GrowthInboxTimelineEventType,
   GrowthReplyEventSeverity,
@@ -119,6 +120,7 @@ export async function appendInboxTimelineEvent(
     actorEmail?: string | null
   },
 ): Promise<void> {
+  const actorUserId = normalizeGrowthActorUserIdForDb(input.actorUserId)
   const { error } = await timelineTable(admin).insert({
     connection_id: null,
     event_type: input.eventType,
@@ -129,8 +131,8 @@ export async function appendInboxTimelineEvent(
       thread_id: input.threadId ?? null,
       lead_id: input.leadId ?? null,
     },
-    actor_user_id: input.actorUserId ?? null,
-    actor_email: input.actorEmail ?? null,
+    actor_user_id: actorUserId,
+    actor_email: input.actorEmail?.trim() ? input.actorEmail.trim() : null,
   })
   if (error) throw new Error(error.message)
 }
@@ -142,6 +144,7 @@ export async function persistReplyEventDrafts(
   drafts: ReplyEventDraft[],
   actor?: { actorUserId?: string | null; actorEmail?: string | null },
 ): Promise<void> {
+  const actor = resolveGrowthActorForDb(actor)
   for (const draft of drafts) {
     await createReplyIntelligenceEvent(admin, {
       thread_id: threadId,
@@ -159,8 +162,8 @@ export async function persistReplyEventDrafts(
         threadId,
         leadId,
         payload: draft.metadata,
-        actorUserId: actor?.actorUserId,
-        actorEmail: actor?.actorEmail,
+        actorUserId: actor.actorUserId,
+        actorEmail: actor.actorEmail,
       })
     }
   }
