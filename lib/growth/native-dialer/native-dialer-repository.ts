@@ -739,9 +739,6 @@ export async function answerNativeCallSession(
   } else if (!voiceCallId) {
     throw new Error("Call session is missing voice call.")
   }
-  } else if (!voiceCallId) {
-    throw new Error("Call session is missing voice call.")
-  }
 
   pipeline.mediaStreamWssHost = describeVoiceMediaStreamWssTarget(null).wssHost
   const isInbound = (existing.direction as string) === "inbound"
