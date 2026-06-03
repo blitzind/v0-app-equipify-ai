@@ -37,6 +37,13 @@ export type PatternEnrollmentDetailView = {
   patternKey: string
   currentStep: GrowthSequenceEnrollmentStep | null
   nextStep: GrowthSequenceEnrollmentStep | null
+  currentCadenceTask: {
+    id: string
+    status: string
+    title: string
+    dueAt: string | null
+    channel: string
+  } | null
   executionJobs: PatternEnrollmentDetailJobView[]
   pendingApprovalJobCount: number
   sentJobCount: number

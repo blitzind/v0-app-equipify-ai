@@ -23,6 +23,7 @@ export type GrowthQaAccelerationSchedulerBlockReason =
   | GrowthOutboundTransportBlockReason
   | GrowthSchedulerAiGenerationFailureCode
   | "step_not_eligible"
+  | "manual_step_in_progress"
   | "already_queued"
   | "blocked_by_suppression"
   | "inactive_enrollment"
@@ -121,6 +122,8 @@ export function formatQaAccelerationBlockReason(
       })
     case "step_not_eligible":
       return "The current step is not eligible for scheduling."
+    case "manual_step_in_progress":
+      return "Complete the current manual step before scheduling the next email step."
     case "already_queued":
       return "This step already has a queued execution job."
     case "blocked_by_suppression":

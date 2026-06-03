@@ -21,7 +21,11 @@ import { fetchGrowthOutreachSettings } from "@/lib/growth/outreach/outreach-sett
 import { resolveScheduledFor } from "@/lib/growth/outreach/outreach-scheduling"
 import { runGrowthAiCopilotGeneration } from "@/lib/growth/run-ai-copilot-generation"
 import {
+  enrollmentHasPriorIncompleteSteps,
+} from "@/lib/growth/sequence-enrollment/enrollment-step-progress"
+import {
   fetchGrowthSequenceEnrollmentById,
+  listGrowthSequenceEnrollmentSteps,
   updateGrowthSequenceEnrollmentStep,
 } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
 import {
@@ -350,6 +354,16 @@ export async function runGrowthSequenceScheduler(
     try {
       const enrollment = await fetchGrowthSequenceEnrollmentById(admin, step.enrollmentId)
       if (!enrollment || enrollment.status !== "active") continue
+
+      const enrollmentSteps = await listGrowthSequenceEnrollmentSteps(admin, enrollment.id)
+      if (enrollmentHasPriorIncompleteSteps(enrollmentSteps, step)) {
+        logGrowthEngine("sequence_scheduler_step_skipped_prior_incomplete", {
+          stepId: step.id,
+          enrollmentId: enrollment.id,
+          stepOrder: step.stepOrder,
+        })
+        continue
+      }
 
       if (step.scheduledFor && Date.parse(step.scheduledFor) > Date.now()) continue
 

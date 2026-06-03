@@ -16,7 +16,7 @@ export const GROWTH_CRON_EXECUTION_TELEMETRY_MIGRATION =
   "20270527123000_growth_engine_cron_execution_telemetry.sql" as const
 
 export const GROWTH_CRON_EXECUTION_TELEMETRY_GRANTS_MIGRATION =
-  "20270617120000_growth_cron_execution_runs_service_role_grants.sql" as const
+  "20270617121000_growth_cron_execution_runs_service_role_grants.sql" as const
 
 type RunRow = {
   id: string

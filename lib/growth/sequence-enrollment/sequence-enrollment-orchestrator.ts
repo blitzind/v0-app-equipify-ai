@@ -18,6 +18,12 @@ import { resolveScheduledFor } from "@/lib/growth/outreach/outreach-scheduling"
 import { fetchGrowthPlatformCommunicationSettings } from "@/lib/growth/communication/settings-repository"
 import { createCadenceTaskFromEnrollmentStep } from "@/lib/growth/cadence/materialize-cadence-step"
 import { isCadenceEmailChannel } from "@/lib/growth/cadence/cadence-channel-engine"
+import { fetchGrowthCadenceTaskById } from "@/lib/growth/cadence/cadence-task-repository"
+import {
+  completeGrowthCadenceTask,
+  skipGrowthCadenceTask,
+} from "@/lib/growth/cadence/mutate-cadence-task"
+import type { GrowthCadenceTaskOutcome } from "@/lib/growth/cadence/cadence-types"
 import { fetchGrowthAiCopilotGenerationById } from "@/lib/growth/ai-copilot-repository"
 import { runGrowthAiCopilotGeneration } from "@/lib/growth/run-ai-copilot-generation"
 import { listGrowthSequencePatterns } from "@/lib/growth/sequence-pattern-repository"
@@ -473,10 +479,24 @@ export async function completeGrowthSequenceEnrollmentStepManually(
     stepId: string
     actingUserId: string
     actingUserEmail: string
+    cadenceOutcome?: GrowthCadenceTaskOutcome
   },
 ): Promise<void> {
   const step = await fetchGrowthSequenceEnrollmentStepById(admin, input.stepId)
   if (!step) throw new Error("not_found")
+
+  if (step.cadenceTaskId) {
+    const task = await fetchGrowthCadenceTaskById(admin, step.cadenceTaskId)
+    if (task?.status === "open") {
+      await completeGrowthCadenceTask(admin, {
+        taskId: task.id,
+        outcome: input.cadenceOutcome ?? "connected",
+        actingUserId: input.actingUserId,
+        actingUserEmail: input.actingUserEmail,
+      })
+      return
+    }
+  }
 
   await advanceGrowthSequenceEnrollmentAfterStep(admin, {
     enrollmentStepId: step.id,
@@ -487,14 +507,35 @@ export async function completeGrowthSequenceEnrollmentStepManually(
 
 export async function skipGrowthSequenceEnrollmentStep(
   admin: SupabaseClient,
-  input: { stepId: string; actingUserId: string; actingUserEmail: string },
+  input: {
+    stepId: string
+    actingUserId: string
+    actingUserEmail: string
+    reason?: string
+  },
 ): Promise<void> {
   const step = await fetchGrowthSequenceEnrollmentStepById(admin, input.stepId)
   if (!step) throw new Error("not_found")
 
+  const skipReason = input.reason?.trim() || "Skipped from sequence enrollment"
+
+  if (step.cadenceTaskId) {
+    const task = await fetchGrowthCadenceTaskById(admin, step.cadenceTaskId)
+    if (task?.status === "open") {
+      await skipGrowthCadenceTask(admin, {
+        taskId: task.id,
+        reason: skipReason,
+        actingUserId: input.actingUserId,
+        actingUserEmail: input.actingUserEmail,
+      })
+      return
+    }
+  }
+
   await updateGrowthSequenceEnrollmentStep(admin, step.id, {
     status: "skipped",
     completedAt: new Date().toISOString(),
+    skipReason,
   })
 
   await advanceGrowthSequenceEnrollmentAfterStep(admin, {

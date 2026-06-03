@@ -32,6 +32,11 @@ import {
   pickSchedulerStepFailureForEnrollment,
 } from "@/lib/growth/sequence-enrollment/scheduler-step-failure-types"
 import {
+  enrollmentHasPriorIncompleteSteps,
+  isManualStepAwaitingCompletion,
+  pickInProgressEnrollmentStep,
+} from "@/lib/growth/sequence-enrollment/enrollment-step-progress"
+import {
   fetchGrowthSequenceEnrollmentById,
   listGrowthSequenceEnrollmentSteps,
   updateGrowthSequenceEnrollment,
@@ -83,17 +88,9 @@ function pickCurrentQaStep(
   currentStepOrder: number,
   allowedStatuses: GrowthSequenceEnrollmentStep["status"][],
 ): GrowthSequenceEnrollmentStep | null {
-  const inProgress = steps.find(
-    (step) =>
-      allowedStatuses.includes(step.status) &&
-      !["executed", "skipped", "cancelled"].includes(step.status) &&
-      step.stepOrder >= currentStepOrder,
-  )
-  return (
-    inProgress ??
-    steps.find((step) => allowedStatuses.includes(step.status) && step.stepOrder === currentStepOrder) ??
-    null
-  )
+  const inProgress = pickInProgressEnrollmentStep(steps, currentStepOrder)
+  if (!inProgress || !allowedStatuses.includes(inProgress.status)) return null
+  return inProgress
 }
 
 function assertQaAccelerationEnabled(): void {
@@ -116,6 +113,11 @@ async function resolveActiveEnrollmentStep(input: {
   }
 
   const steps = await listGrowthSequenceEnrollmentSteps(input.admin, input.enrollmentId)
+  const inProgress = pickInProgressEnrollmentStep(steps, enrollment.currentStepOrder)
+  if (inProgress && isManualStepAwaitingCompletion(inProgress)) {
+    throw new Error("Complete the current manual step before accelerating the next step.")
+  }
+
   const step = pickCurrentQaStep(steps, enrollment.currentStepOrder, input.allowedStatuses)
   if (!step) {
     throw new Error("No eligible pending step found for this enrollment.")
@@ -218,6 +220,16 @@ async function diagnoseEnrollmentSchedulerBlocker(
 
   if (enrollment.status !== "active") return "inactive_enrollment"
   if (!step) return "step_not_eligible"
+
+  const steps = await listGrowthSequenceEnrollmentSteps(admin, enrollment.id)
+  const inProgress = pickInProgressEnrollmentStep(steps, enrollment.currentStepOrder)
+  if (inProgress && isManualStepAwaitingCompletion(inProgress)) {
+    return "manual_step_in_progress"
+  }
+  if (step && enrollmentHasPriorIncompleteSteps(steps, step)) {
+    return "manual_step_in_progress"
+  }
+
   if (!["pending", "draft_created"].includes(step.status)) return "step_not_eligible"
 
   const transportReadiness = await evaluateGrowthOutboundTransportReadiness(admin)
@@ -288,7 +300,9 @@ export async function qaRunGrowthEnrollmentSchedulerNow(
   if (!enrollment) throw new Error("Enrollment not found.")
 
   const steps = await listGrowthSequenceEnrollmentSteps(admin, input.enrollmentId)
-  const step = pickCurrentQaStep(steps, enrollment.currentStepOrder, ["pending", "draft_created"])
+  const inProgress = pickInProgressEnrollmentStep(steps, enrollment.currentStepOrder)
+  const step =
+    inProgress && ["pending", "draft_created"].includes(inProgress.status) ? inProgress : null
   const jobsBefore = await listSequenceExecutionJobsForEnrollment(admin, input.enrollmentId)
   const jobIdsBefore = new Set(jobsBefore.map((job) => job.id))
 

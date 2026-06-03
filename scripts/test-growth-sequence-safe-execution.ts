@@ -143,6 +143,8 @@ async function main(): Promise<void> {
   assert.match(uiSource, /growthLeadDetailHref/)
   assert.match(uiSource, /Restore/)
   assert.match(runnerSource, /restoreSequenceExecutionJob/)
+  assert.match(runnerSource, /resolveSequenceExecutionAuditActorUserId/)
+  assert.match(runnerSource, /actorUserId: auditActorUserId/)
   assert.doesNotMatch(uiSource, /api_key|secret|password/i)
 
   console.log("growth sequence safe execution tests passed")

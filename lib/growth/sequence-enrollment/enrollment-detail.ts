@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { fetchGrowthCadenceTaskById } from "@/lib/growth/cadence/cadence-task-repository"
 import { fetchGrowthSequenceSchedulerStatus } from "@/lib/growth/sequence-enrollment/run-sequence-scheduler"
 import {
   GROWTH_PATTERN_ENROLLMENT_DETAIL_QA_MARKER,
@@ -10,6 +11,10 @@ import {
   growthPatternEnrollmentDetailHref,
   growthSequenceExecutionHref,
 } from "@/lib/growth/sequence-enrollment/enrollment-navigation"
+import {
+  isManualStepAwaitingCompletion,
+  pickInProgressEnrollmentStep,
+} from "@/lib/growth/sequence-enrollment/enrollment-step-progress"
 import { fetchPatternEnrollmentWithSteps } from "@/lib/growth/sequence-enrollment/pattern-enrollment-stats"
 import type { GrowthSequenceEnrollmentStep } from "@/lib/growth/sequence-enrollment-types"
 import {
@@ -23,10 +28,7 @@ import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { fetchGrowthQaDeliverabilityBypassView } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass"
 
 function pickCurrentStep(steps: GrowthSequenceEnrollmentStep[], currentStepOrder: number) {
-  const inProgress = steps.find(
-    (step) => !["executed", "skipped", "cancelled"].includes(step.status) && step.stepOrder >= currentStepOrder,
-  )
-  return inProgress ?? steps.find((step) => step.stepOrder === currentStepOrder) ?? null
+  return pickInProgressEnrollmentStep(steps, currentStepOrder)
 }
 
 function pickNextStep(steps: GrowthSequenceEnrollmentStep[], current: GrowthSequenceEnrollmentStep | null) {
@@ -57,6 +59,19 @@ function buildWorkflow(input: {
       awaitingApproval: false,
       readyForSend: false,
       nextActionLabel: "Confirm enrollment to activate the sequence and allow scheduler planning.",
+      nextActionHref: growthPatternEnrollmentDetailHref(input.enrollmentId),
+    }
+  }
+
+  if (input.currentStep && isManualStepAwaitingCompletion(input.currentStep)) {
+    return {
+      enrollmentActive,
+      stepDueNow: false,
+      jobsPlanned: false,
+      awaitingApproval: false,
+      readyForSend: false,
+      nextActionLabel:
+        "Complete the manual step (log call outcome on the cadence task or Mark Complete below) to advance the sequence.",
       nextActionHref: growthPatternEnrollmentDetailHref(input.enrollmentId),
     }
   }
@@ -166,6 +181,10 @@ export async function fetchPatternEnrollmentDetail(
 
   const currentStep = pickCurrentStep(bundle.steps, bundle.currentStepOrder)
   const nextStep = pickNextStep(bundle.steps, currentStep)
+  const currentCadenceTask =
+    currentStep?.cadenceTaskId != null
+      ? await fetchGrowthCadenceTaskById(admin, currentStep.cadenceTaskId).catch(() => null)
+      : null
   const lead = await fetchGrowthLeadById(admin, bundle.leadId)
   const qaDeliverabilityBypass =
     options?.actingUserEmail && lead?.contactEmail
@@ -191,6 +210,15 @@ export async function fetchPatternEnrollmentDetail(
     patternKey: bundle.patternKey ?? "pattern",
     currentStep,
     nextStep,
+    currentCadenceTask: currentCadenceTask
+      ? {
+          id: currentCadenceTask.id,
+          status: currentCadenceTask.status,
+          title: currentCadenceTask.title,
+          dueAt: currentCadenceTask.dueAt,
+          channel: currentCadenceTask.channel,
+        }
+      : null,
     executionJobs,
     pendingApprovalJobCount,
     sentJobCount,

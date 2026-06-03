@@ -15,6 +15,9 @@ import {
   growthLeadsCrmHref,
   growthSequenceExecutionHref,
 } from "@/lib/growth/sequence-enrollment/enrollment-navigation"
+import { isManualStepAwaitingCompletion } from "@/lib/growth/sequence-enrollment/enrollment-step-progress"
+import type { GrowthCadenceTaskOutcome } from "@/lib/growth/cadence/cadence-types"
+import { cadenceCallQueueHref, cadenceLeadDrawerHref } from "@/lib/growth/cadence/cadence-channel-engine"
 import type { GrowthQaAccelerationSchedulerRunResult } from "@/lib/growth/sequence-enrollment/qa-acceleration-types"
 import { GROWTH_QA_DELIVERABILITY_BYPASS_BANNER } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass-types"
 import type { GrowthSequenceSchedulerRunResult } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
@@ -48,6 +51,7 @@ export function GrowthPatternEnrollmentDetail({ enrollmentId }: { enrollmentId: 
   const [loading, setLoading] = useState(true)
   const [schedulerLoading, setSchedulerLoading] = useState(false)
   const [qaActionLoading, setQaActionLoading] = useState<string | null>(null)
+  const [stepActionLoading, setStepActionLoading] = useState<string | null>(null)
   const [qaSchedulerResult, setQaSchedulerResult] = useState<GrowthQaAccelerationSchedulerRunResult | null>(null)
   const [legacySchedulerResult, setLegacySchedulerResult] = useState<GrowthSequenceSchedulerRunResult | null>(null)
   const [schedulerReasons, setSchedulerReasons] = useState<string[]>([])
@@ -102,6 +106,33 @@ export function GrowthPatternEnrollmentDetail({ enrollmentId }: { enrollmentId: 
       setError(e instanceof Error ? e.message : "Scheduler run failed.")
     } finally {
       setQaActionLoading(null)
+    }
+  }
+
+  async function postStepAction(
+    stepId: string,
+    action: "complete" | "skip",
+    body?: Record<string, unknown>,
+  ) {
+    if (!detail) return
+    setStepActionLoading(`${action}:${stepId}`)
+    setError(null)
+    try {
+      const res = await fetch(
+        `/api/platform/growth/leads/${detail.leadId}/sequence-enrollment-steps/${stepId}/${action}`,
+        {
+          method: "POST",
+          headers: body ? { "Content-Type": "application/json" } : undefined,
+          body: body ? JSON.stringify(body) : undefined,
+        },
+      )
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; message?: string }
+      if (!res.ok || data.error) throw new Error(data.error ?? data.message ?? `${action} failed.`)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `${action} failed.`)
+    } finally {
+      setStepActionLoading(null)
     }
   }
 
@@ -169,6 +200,16 @@ export function GrowthPatternEnrollmentDetail({ enrollmentId }: { enrollmentId: 
   }
 
   if (!detail) return null
+
+  const manualStepAwaitingCompletion =
+    detail.currentStep != null && isManualStepAwaitingCompletion(detail.currentStep)
+  const callOutcomes: GrowthCadenceTaskOutcome[] = [
+    "connected",
+    "left_voicemail",
+    "no_answer",
+    "interested",
+    "meeting_booked",
+  ]
 
   return (
     <div className="space-y-6">
@@ -265,7 +306,11 @@ export function GrowthPatternEnrollmentDetail({ enrollmentId }: { enrollmentId: 
               size="sm"
               variant="outline"
               onClick={() => void runQaAction("force-due-now")}
-              disabled={qaActionLoading !== null || detail.enrollment.status !== "active"}
+              disabled={
+                qaActionLoading !== null ||
+                detail.enrollment.status !== "active" ||
+                manualStepAwaitingCompletion
+              }
             >
               {qaActionLoading === "force-due-now" ? (
                 <Loader2 className="mr-2 size-4 animate-spin" />
@@ -310,6 +355,68 @@ export function GrowthPatternEnrollmentDetail({ enrollmentId }: { enrollmentId: 
               )}
             </div>
           ) : null}
+        </GrowthEngineCard>
+      ) : null}
+
+      {manualStepAwaitingCompletion && detail.currentStep ? (
+        <GrowthEngineCard title="Manual Step Actions">
+          <p className="mb-3 text-sm text-muted-foreground">
+            This step requires a human action. Log a call outcome on the linked cadence task, or mark the step complete
+            here to advance the sequence.
+          </p>
+          {detail.currentCadenceTask ? (
+            <div className="mb-4 rounded-lg border border-border px-3 py-2 text-sm">
+              <p className="font-medium">{detail.currentCadenceTask.title}</p>
+              <p className="text-muted-foreground">
+                Cadence task · {detail.currentCadenceTask.status}
+                {detail.currentCadenceTask.dueAt
+                  ? ` · due ${formatWhen(detail.currentCadenceTask.dueAt)}`
+                  : ""}
+              </p>
+            </div>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            {detail.currentStep.channel === "manual_call" || detail.currentStep.channel === "voicemail" ? (
+              <>
+                {callOutcomes.map((outcome) => (
+                  <Button
+                    key={outcome}
+                    size="sm"
+                    variant="outline"
+                    disabled={stepActionLoading !== null}
+                    onClick={() =>
+                      void postStepAction(detail.currentStep!.id, "complete", { cadenceOutcome: outcome })
+                    }
+                  >
+                    {outcome.replace(/_/g, " ")}
+                  </Button>
+                ))}
+                <Button size="sm" variant="ghost" asChild>
+                  <Link href={cadenceCallQueueHref(detail.leadId)}>Open call queue</Link>
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={stepActionLoading !== null}
+                onClick={() => void postStepAction(detail.currentStep!.id, "complete")}
+              >
+                Mark Complete
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={stepActionLoading !== null}
+              onClick={() => void postStepAction(detail.currentStep!.id, "skip")}
+            >
+              Skip Step
+            </Button>
+            <Button size="sm" variant="ghost" asChild>
+              <Link href={cadenceLeadDrawerHref(detail.leadId, "cadence")}>Open lead cadence</Link>
+            </Button>
+          </div>
         </GrowthEngineCard>
       ) : null}
 
