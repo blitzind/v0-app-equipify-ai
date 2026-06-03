@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
-import { buildGoogleProviderAuthorizeUrl, googleProviderOAuthConfigured } from "@/lib/growth/provider-setup/google-oauth"
+import { buildGoogleProviderAuthorizeUrl, getGoogleOAuthScopes, googleProviderOAuthConfigured } from "@/lib/growth/provider-setup/google-oauth"
 import {
   createProviderSetupOAuthNonce,
   createProviderSetupOAuthStateRecord,
@@ -27,13 +27,30 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as {
     return_to?: string
     sender_account_id?: string
+    mailbox_connection_id?: string
+  }
+
+  const senderAccountId = body.sender_account_id?.trim() || null
+  const mailboxConnectionId = body.mailbox_connection_id?.trim() || null
+
+  let loginHint: string | null = null
+  if (mailboxConnectionId) {
+    const { getMailboxConnection } = await import("@/lib/growth/mailboxes/mailbox-repository")
+    const mailbox = await getMailboxConnection(access.admin, mailboxConnectionId)
+    loginHint = mailbox?.email_address ?? null
+  } else if (senderAccountId) {
+    const { getMailboxConnectionBySender } = await import("@/lib/growth/mailboxes/mailbox-repository")
+    const { getSenderAccount } = await import("@/lib/growth/sender/sender-repository")
+    const mailbox = await getMailboxConnectionBySender(access.admin, senderAccountId)
+    const sender = await getSenderAccount(access.admin, senderAccountId)
+    loginHint = mailbox?.email_address ?? sender?.email_address ?? null
   }
 
   const statePayload = {
     userId: access.userId,
     providerFamily: "google" as const,
     returnTo: normalizeProviderSetupReturnTo(body.return_to),
-    senderAccountId: body.sender_account_id?.trim() || null,
+    senderAccountId: senderAccountId,
     ts: Date.now(),
     nonce: createProviderSetupOAuthNonce(),
   }
@@ -69,6 +86,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     qa_marker: GROWTH_LIVE_PROVIDER_SETUP_QA_MARKER,
-    authorize_url: buildGoogleProviderAuthorizeUrl({ state }),
+    authorize_url: buildGoogleProviderAuthorizeUrl({ state, loginHint }),
+    scopes: getGoogleOAuthScopes(),
   })
 }

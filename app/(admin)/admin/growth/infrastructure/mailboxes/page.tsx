@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { Mail } from "lucide-react"
 import Link from "next/link"
 import { useAdmin } from "@/lib/admin-store"
@@ -53,7 +54,15 @@ export default function AdminGrowthMailboxConnectionsPage() {
         />
 
         <GrowthSectionLayout>
-          <GrowthMailboxConnectionsDashboard />
+          <Suspense
+            fallback={
+              <div className="rounded-xl border border-border bg-card p-8 text-sm text-muted-foreground">
+                Loading mailbox connections…
+              </div>
+            }
+          >
+            <GrowthMailboxConnectionsDashboard />
+          </Suspense>
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>

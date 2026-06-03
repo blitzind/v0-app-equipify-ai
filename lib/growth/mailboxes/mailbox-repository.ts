@@ -256,6 +256,7 @@ export async function updateMailboxConnection(
     refresh_token: string | null
     token_expires_at: string | null
     provider_metadata: Record<string, unknown>
+    validation_failure_count: number
   }> & {
     actorUserId?: string | null
     actorEmail?: string | null
@@ -273,6 +274,7 @@ export async function updateMailboxConnection(
   }
   if (input.access_token !== undefined) patch.encrypted_access_token = encryptMailboxToken(input.access_token)
   if (input.refresh_token !== undefined) patch.encrypted_refresh_token = encryptMailboxToken(input.refresh_token)
+  if (input.validation_failure_count !== undefined) patch.validation_failure_count = input.validation_failure_count
 
   const { data, error } = await connectionsTable(admin)
     .update(patch)

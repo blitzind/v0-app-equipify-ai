@@ -111,7 +111,10 @@ export function GrowthProviderSetupDashboard() {
     const res = await fetch(`/api/platform/growth/provider-setup/${provider}/start`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sender_account_id: selectedSenderId || undefined }),
+      body: JSON.stringify({
+        sender_account_id: selectedSenderId || undefined,
+        return_to: "/admin/growth/providers/setup",
+      }),
     })
     const data = (await res.json().catch(() => ({}))) as { authorize_url?: string; message?: string }
     if (!res.ok || !data.authorize_url) throw new Error(data.message ?? "OAuth start failed.")
@@ -199,9 +202,9 @@ export function GrowthProviderSetupDashboard() {
           </div>
         </div>
         <div className="relative z-0 flex flex-wrap gap-2">
-          <Button type="button" disabled={!!actionLoading} onClick={() => runAction("google", () => startOAuth("google"))}>
+          <Button type="button" disabled={!!actionLoading || !selectedSenderId} onClick={() => runAction("google", () => startOAuth("google"))}>
             {actionLoading === "google" ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Plug className="mr-2 size-4" />}
-            Connect Google
+            Connect / Reconnect Google
           </Button>
           <Button type="button" variant="outline" disabled={!!actionLoading} onClick={() => runAction("microsoft", () => startOAuth("microsoft"))}>
             Connect Microsoft

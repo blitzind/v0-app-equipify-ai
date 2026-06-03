@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Loader2, Plus, RefreshCw, Trash2 } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { Loader2, Plug, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -63,7 +64,24 @@ function formatDate(value: string | null): string {
   return new Date(value).toLocaleString()
 }
 
+function googleMailboxNeedsReconnect(mailbox: GrowthMailboxConnectionSummary): boolean {
+  if (mailbox.provider_family !== "google") return false
+  if (mailbox.status === "disabled") return false
+  return (
+    !mailbox.token_configured ||
+    mailbox.status === "error" ||
+    mailbox.status === "expired" ||
+    mailbox.status === "pending" ||
+    mailbox.status === "connecting"
+  )
+}
+
+function googleReconnectLabel(mailbox: GrowthMailboxConnectionSummary): string {
+  return mailbox.token_configured ? "Reconnect Gmail" : "Connect Gmail"
+}
+
 export function GrowthMailboxConnectionsDashboard() {
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [mailboxes, setMailboxes] = useState<GrowthMailboxConnectionSummary[]>([])
@@ -72,6 +90,7 @@ export function GrowthMailboxConnectionsDashboard() {
   const [events, setEvents] = useState<GrowthMailboxConnectionEvent[]>([])
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<GrowthMailboxConnectionSummary | null>(null)
+  const [oauthNotice, setOauthNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null)
 
   const [newSenderId, setNewSenderId] = useState("")
   const [newProvider, setNewProvider] = useState<GrowthSenderProviderFamily>("google")
@@ -121,6 +140,24 @@ export function GrowthMailboxConnectionsDashboard() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    const providerConnected = searchParams.get("provider_connected")
+    const providerError = searchParams.get("provider_error")
+    if (providerConnected === "google") {
+      setOauthNotice({
+        tone: "success",
+        message: "Gmail connected successfully. Tokens are encrypted and live validation passed (send + inbox read).",
+      })
+    } else if (providerError) {
+      setOauthNotice({
+        tone: "error",
+        message: `Gmail reconnect failed: ${providerError.replace(/_/g, " ")}.`,
+      })
+    }
+  }, [searchParams])
+
+  const reconnectSenderId = searchParams.get("reconnect_sender")?.trim() || null
 
   const healthFeed = useMemo(() => {
     return events.filter((event) =>
@@ -186,6 +223,27 @@ export function GrowthMailboxConnectionsDashboard() {
     setDeleteTarget(null)
   }
 
+  async function startGoogleOAuthReconnect(mailbox: GrowthMailboxConnectionSummary) {
+    const res = await fetch("/api/platform/growth/provider-setup/google/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sender_account_id: mailbox.sender_account_id,
+        mailbox_connection_id: mailbox.id,
+        return_to: "/admin/growth/infrastructure/mailboxes",
+      }),
+    })
+    const data = (await res.json().catch(() => ({}))) as {
+      authorize_url?: string
+      message?: string
+      error?: string
+    }
+    if (!res.ok || !data.authorize_url) {
+      throw new Error(data.message ?? "Google OAuth is not configured or could not start reconnect.")
+    }
+    window.location.href = data.authorize_url
+  }
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-8 text-sm text-muted-foreground">
@@ -199,7 +257,8 @@ export function GrowthMailboxConnectionsDashboard() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
-          {GROWTH_MAILBOX_CONNECTION_QA_MARKER} · Infrastructure only — no sending, OAuth, reply sync, or DNS execution.
+          {GROWTH_MAILBOX_CONNECTION_QA_MARKER} · Google OAuth reconnect stores encrypted send + inbox-read tokens for
+          outbound delivery and inbox sync.
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
@@ -214,6 +273,18 @@ export function GrowthMailboxConnectionsDashboard() {
           </Button>
         </div>
       </div>
+
+      {oauthNotice ? (
+        <div
+          className={
+            oauthNotice.tone === "success"
+              ? "rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+              : "rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
+          }
+        >
+          {oauthNotice.message}
+        </div>
+      ) : null}
 
       {error ? (
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{error}</div>
@@ -282,12 +353,9 @@ export function GrowthMailboxConnectionsDashboard() {
         </div>
 
         <div className="mb-4 flex flex-wrap gap-2">
-          {(["google", "microsoft", "smtp", "custom"] as GrowthSenderProviderFamily[]).map((provider) => (
-            <Button key={provider} type="button" variant="outline" size="sm" disabled>
-              {PROVIDER_LABELS[provider]} OAuth
-              <GrowthBadge label="Coming Soon" tone="neutral" className="ml-2" />
-            </Button>
-          ))}
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/providers/setup">Provider Setup (all OAuth families)</Link>
+          </Button>
         </div>
 
         <div className="overflow-x-auto">
@@ -311,15 +379,37 @@ export function GrowthMailboxConnectionsDashboard() {
                   </td>
                 </tr>
               ) : (
-                mailboxes.map((mailbox) => (
-                  <tr key={mailbox.id} className="border-b border-border/60">
+                mailboxes.map((mailbox) => {
+                  const highlightReconnect =
+                    reconnectSenderId != null && mailbox.sender_account_id === reconnectSenderId
+                  const needsReconnect = googleMailboxNeedsReconnect(mailbox)
+                  return (
+                  <tr
+                    key={mailbox.id}
+                    className={
+                      highlightReconnect
+                        ? "border-b border-amber-300/80 bg-amber-50/40"
+                        : "border-b border-border/60"
+                    }
+                  >
                     <td className="px-2 py-3">
                       <div className="font-medium">{mailbox.email_address}</div>
                       <div className="text-xs text-muted-foreground">{mailbox.display_name}</div>
+                      {mailbox.health_reason ? (
+                        <p className="mt-1 text-xs text-muted-foreground">{mailbox.health_reason}</p>
+                      ) : null}
                     </td>
                     <td className="px-2 py-3">{PROVIDER_LABELS[mailbox.provider_family]}</td>
                     <td className="px-2 py-3">
-                      <GrowthBadge label={mailbox.status} tone={STATUS_TONE[mailbox.status] ?? "neutral"} />
+                      <div className="flex flex-col gap-1">
+                        <GrowthBadge label={mailbox.status} tone={STATUS_TONE[mailbox.status] ?? "neutral"} />
+                        <span className="text-xs text-muted-foreground">
+                          {mailbox.token_configured ? "Tokens stored" : "No OAuth tokens"}
+                        </span>
+                        {needsReconnect ? (
+                          <GrowthBadge label="Reconnect required" tone="attention" />
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-2 py-3">
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -331,6 +421,24 @@ export function GrowthMailboxConnectionsDashboard() {
                     <td className="px-2 py-3">{formatDate(mailbox.last_validation_at)}</td>
                     <td className="px-2 py-3">
                       <div className="flex flex-wrap gap-1">
+                        {mailbox.provider_family === "google" ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={needsReconnect ? "default" : "outline"}
+                            disabled={Boolean(actionLoading) || mailbox.status === "disabled"}
+                            onClick={() =>
+                              void runAction(`oauth-${mailbox.id}`, () => startGoogleOAuthReconnect(mailbox))
+                            }
+                          >
+                            {actionLoading === `oauth-${mailbox.id}` ? (
+                              <Loader2 className="mr-1 size-3.5 animate-spin" />
+                            ) : (
+                              <Plug className="mr-1 size-3.5" />
+                            )}
+                            {googleReconnectLabel(mailbox)}
+                          </Button>
+                        ) : null}
                         <Button
                           type="button"
                           size="sm"
@@ -361,7 +469,8 @@ export function GrowthMailboxConnectionsDashboard() {
                       </div>
                     </td>
                   </tr>
-                ))
+                  )
+                })
               )}
             </tbody>
           </table>

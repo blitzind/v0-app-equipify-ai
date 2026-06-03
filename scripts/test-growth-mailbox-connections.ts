@@ -129,8 +129,16 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(uiSource, /Mailbox Health/)
-  assert.match(uiSource, /Coming Soon/)
+  assert.match(uiSource, /Reconnect Gmail/)
+  assert.match(uiSource, /provider-setup\/google\/start/)
   assert.match(uiSource, /GROWTH_MAILBOX_CONNECTION_QA_MARKER/)
+
+  const oauthCompleteSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/provider-setup/dashboard.ts"),
+    "utf8",
+  )
+  assert.match(oauthCompleteSource, /getMailboxConnectionBySender/)
+  assert.match(oauthCompleteSource, /validateMailboxConnection/)
 
   const navSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts"),

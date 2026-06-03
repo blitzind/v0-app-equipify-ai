@@ -123,7 +123,7 @@ function main(): void {
   )
   assert.match(uiSource, /GROWTH_LIVE_PROVIDER_SETUP_QA_MARKER/)
   assert.match(uiSource, /growth-sender-select-overlay-fix-v1/)
-  assert.match(uiSource, /Connect Google/)
+  assert.match(uiSource, /Connect \/ Reconnect Google/)
   assert.match(uiSource, /humanApprovalConfirmed/)
   assert.match(uiSource, /position="popper"/)
 

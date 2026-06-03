@@ -55,7 +55,7 @@ export function googleProviderOAuthEnvWarnings(): string[] {
   return warnings
 }
 
-export function buildGoogleProviderAuthorizeUrl(params: { state: string }): string {
+export function buildGoogleProviderAuthorizeUrl(params: { state: string; loginHint?: string | null }): string {
   const clientId = getGoogleOAuthClientId()
   const redirectUri = getGoogleOAuthRedirectUri()
   if (!clientId || !redirectUri) {
@@ -70,6 +70,8 @@ export function buildGoogleProviderAuthorizeUrl(params: { state: string }): stri
   u.searchParams.set("prompt", "consent")
   u.searchParams.set("include_granted_scopes", "true")
   u.searchParams.set("state", params.state)
+  const loginHint = params.loginHint?.trim()
+  if (loginHint) u.searchParams.set("login_hint", loginHint)
   return u.toString()
 }
 

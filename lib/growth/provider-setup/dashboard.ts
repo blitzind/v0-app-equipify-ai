@@ -314,6 +314,7 @@ export async function completeOAuthProviderConnection(
   input: {
     providerFamily: "google" | "microsoft"
     senderAccountId: string | null
+    mailboxConnectionId?: string | null
     email: string
     displayName?: string | null
     accessToken: string
@@ -324,22 +325,52 @@ export async function completeOAuthProviderConnection(
     actorEmail?: string | null
   },
 ): Promise<{ settings: ReturnType<typeof mapSettingsRow>; mailbox_connection_id: string }> {
-  const { createMailboxConnection, updateMailboxConnection, getMailboxConnection } = await import(
-    "@/lib/growth/mailboxes/mailbox-repository"
-  )
+  const {
+    createMailboxConnection,
+    updateMailboxConnection,
+    getMailboxConnection,
+    getMailboxConnectionBySender,
+    validateMailboxConnection,
+  } = await import("@/lib/growth/mailboxes/mailbox-repository")
+  const { appendMailboxTimelineEvent } = await import("@/lib/growth/mailboxes/mailbox-events")
 
   let mailboxId: string | null = null
-  const existing = await getProviderConnectionSettings(admin, input.providerFamily)
-  if (existing?.mailbox_connection_id) {
-    mailboxId = existing.mailbox_connection_id
+
+  if (input.mailboxConnectionId) {
+    const mailbox = await getMailboxConnection(admin, input.mailboxConnectionId)
+    if (mailbox && mailbox.provider_family === input.providerFamily) {
+      mailboxId = mailbox.id
+    }
+  }
+
+  if (!mailboxId && input.senderAccountId) {
+    const bySender = await getMailboxConnectionBySender(admin, input.senderAccountId)
+    if (bySender && bySender.provider_family === input.providerFamily) {
+      mailboxId = bySender.id
+    }
+  }
+
+  if (!mailboxId) {
+    const existing = await getProviderConnectionSettings(admin, input.providerFamily)
+    if (existing?.mailbox_connection_id) {
+      mailboxId = existing.mailbox_connection_id
+    }
+  }
+
+  const tokenPatch = {
+    access_token: input.accessToken,
+    refresh_token: input.refreshToken,
+    token_expires_at: input.tokenExpiresAt,
+    display_name: input.displayName ?? input.email,
+    actorUserId: input.actorUserId,
+    actorEmail: input.actorEmail,
+  }
+
+  if (mailboxId) {
     await updateMailboxConnection(admin, mailboxId, {
-      access_token: input.accessToken,
-      refresh_token: input.refreshToken,
-      token_expires_at: input.tokenExpiresAt,
-      status: "connected",
-      display_name: input.displayName ?? input.email,
-      actorUserId: input.actorUserId,
-      actorEmail: input.actorEmail,
+      ...tokenPatch,
+      status: "connecting",
+      validation_failure_count: 0,
     })
   } else if (input.senderAccountId) {
     const mailbox = await createMailboxConnection(admin, {
@@ -356,6 +387,24 @@ export async function completeOAuthProviderConnection(
     mailboxId = mailbox.id
   } else {
     throw new Error("sender_account_id is required for first OAuth connection.")
+  }
+
+  const validated = await validateMailboxConnection(admin, mailboxId, {
+    actorUserId: input.actorUserId,
+    actorEmail: input.actorEmail,
+  })
+
+  if (validated.status !== "connected") {
+    await appendMailboxTimelineEvent(admin, {
+      eventType: "mailbox_validation_failed",
+      title: `OAuth reconnect validation: ${validated.email_address}`,
+      summary: validated.health_reason ?? "Mailbox validation did not reach connected status.",
+      mailboxConnectionId: mailboxId,
+      actorUserId: input.actorUserId,
+      actorEmail: input.actorEmail,
+      payload: { oauth: true, status: validated.status },
+    })
+    throw new Error(validated.health_reason ?? "Mailbox validation failed after OAuth reconnect.")
   }
 
   const settings = await upsertProviderConnectionSettings(admin, {
@@ -375,12 +424,18 @@ export async function completeOAuthProviderConnection(
     providerFamily: input.providerFamily,
     action: "oauth_connected",
     actorUserId: input.actorUserId,
-    metadata: { email: input.email, mailbox_connection_id: mailboxId },
+    metadata: { email: input.email, mailbox_connection_id: mailboxId, reconnect: true },
   })
 
-  if (mailboxId) {
-    await getMailboxConnection(admin, mailboxId)
-  }
+  await appendMailboxTimelineEvent(admin, {
+    eventType: "mailbox_connected",
+    title: `Gmail OAuth connected: ${validated.email_address}`,
+    summary: "Mailbox OAuth tokens stored and live validation passed (send + inbox read scopes).",
+    mailboxConnectionId: mailboxId,
+    actorUserId: input.actorUserId,
+    actorEmail: input.actorEmail,
+    payload: { provider_family: input.providerFamily, scopes: input.scopes },
+  })
 
   if (input.senderAccountId && mailboxId) {
     const { wireOAuthProviderTransportAfterConnection } = await import(
@@ -395,7 +450,7 @@ export async function completeOAuthProviderConnection(
     })
   }
 
-  return { settings, mailbox_connection_id: mailboxId! }
+  return { settings, mailbox_connection_id: mailboxId }
 }
 
 export function providerSetupConfigured(settings: ProviderConnectionSettingsRecord | null): boolean {
