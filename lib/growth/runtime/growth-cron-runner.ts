@@ -24,7 +24,7 @@ export async function runGrowthCronJob<T extends Record<string, unknown>>(
   execute: () => Promise<T>,
   metricsOverride?: (result: T) => GrowthCronExecutionMetrics,
 ): Promise<NextResponse> {
-  const unauthorized = verifyGrowthCronRequest(ctx.request)
+  const unauthorized = verifyGrowthCronRequest(ctx.request, ctx.cronRoute)
   if (unauthorized) return unauthorized
 
   if (ctx.enforceProductionSafety !== false) {
