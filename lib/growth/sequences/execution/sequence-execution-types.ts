@@ -89,6 +89,7 @@ export type GrowthSequenceExecutionJobView = GrowthSequenceExecutionJob & {
   experimentName?: string | null
   experimentVariantId?: string | null
   experimentVariantLabel?: string | null
+  qaDeliverabilityBypassUsed?: boolean
 }
 
 export type GrowthSequenceSafeExecutionDashboard = {

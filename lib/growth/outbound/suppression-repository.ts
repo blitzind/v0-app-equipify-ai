@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import type { GrowthQaDeliverabilityBypassSnapshot } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass-types"
 import { normalizeEmail } from "@/lib/growth/import/normalize"
 import type { GrowthSuppressionEntry, GrowthSuppressionReason, GrowthSuppressionSource } from "@/lib/growth/outbound/types"
 
@@ -101,13 +102,22 @@ export async function listGrowthSuppressionEntries(
 export async function assertEmailSendAllowed(
   admin: SupabaseClient,
   email: string,
-  input?: { leadId?: string | null; senderAccountId?: string },
+  input?: {
+    leadId?: string | null
+    senderAccountId?: string
+    qaDeliverabilityBypass?: GrowthQaDeliverabilityBypassSnapshot | null
+    actingUserEmail?: string | null
+    actingUserId?: string | null
+  },
 ): Promise<{ allowed: boolean; reason?: string; blockLayer?: string | null }> {
   const { evaluatePreSendAllowed } = await import("@/lib/growth/compliance/pre-send-assertion")
   const result = await evaluatePreSendAllowed(admin, {
     email,
     leadId: input?.leadId,
     senderAccountId: input?.senderAccountId,
+    qaDeliverabilityBypass: input?.qaDeliverabilityBypass,
+    actingUserEmail: input?.actingUserEmail,
+    actingUserId: input?.actingUserId,
   })
   if (!result.allowed) {
     return {

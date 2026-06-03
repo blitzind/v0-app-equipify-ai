@@ -16,6 +16,7 @@ import {
   growthSequenceExecutionHref,
 } from "@/lib/growth/sequence-enrollment/enrollment-navigation"
 import type { GrowthQaAccelerationSchedulerRunResult } from "@/lib/growth/sequence-enrollment/qa-acceleration-types"
+import { GROWTH_QA_DELIVERABILITY_BYPASS_BANNER } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass-types"
 import type { GrowthSequenceSchedulerRunResult } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
 import { cn } from "@/lib/utils"
 
@@ -237,6 +238,11 @@ export function GrowthPatternEnrollmentDetail({ enrollmentId }: { enrollmentId: 
               </>
             )}
           </div>
+          {detail.qaDeliverabilityBypass?.active ? (
+            <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50/80 px-4 py-3 text-sm text-indigo-950">
+              <p className="font-medium">{GROWTH_QA_DELIVERABILITY_BYPASS_BANNER}</p>
+            </div>
+          ) : null}
           <p className="mb-4 text-sm text-muted-foreground">
             Operator-only controls to accelerate scheduling for dogfooding. Does not auto-approve, auto-send, or bypass
             suppression.

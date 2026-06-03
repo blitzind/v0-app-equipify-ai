@@ -8,6 +8,8 @@ import { fetchGrowthLeadEmailEventSummary } from "@/lib/growth/outbound/email-ev
 import { assertEmailSendAllowed } from "@/lib/growth/outbound/suppression-repository"
 import type { GrowthOutreachQueueChannel } from "@/lib/growth/outreach/outreach-queue-types"
 import type { GrowthLead } from "@/lib/growth/types"
+import type { GrowthQaDeliverabilityBypassSnapshot } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass-types"
+import { evaluateGrowthQaDeliverabilityBypass } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass"
 
 export type OutreachPreflightResult = {
   allowed: boolean
@@ -36,6 +38,10 @@ export async function runGrowthOutreachPreflight(
     generationType?: GrowthAiCopilotGenerationType | null
     generationApproved?: boolean
     senderAccountId?: string | null
+    actingUserEmail?: string | null
+    actingUserId?: string | null
+    qaDeliverabilityBypass?: GrowthQaDeliverabilityBypassSnapshot | null
+    enrollmentId?: string | null
   },
 ): Promise<OutreachPreflightResult> {
   if (input.generationType && !input.generationApproved) {
@@ -49,9 +55,23 @@ export async function runGrowthOutreachPreflight(
     }
 
     const senderAccountId = await resolveOutreachPreflightSenderAccountId(admin, input.senderAccountId)
+    const qaDeliverabilityBypass =
+      input.qaDeliverabilityBypass ??
+      (input.actingUserEmail
+        ? await evaluateGrowthQaDeliverabilityBypass(admin, {
+            actingUserEmail: input.actingUserEmail,
+            recipientEmail: email,
+            senderAccountId,
+            enrollmentId: input.enrollmentId ?? null,
+          })
+        : null)
+
     const suppression = await assertEmailSendAllowed(admin, email, {
       leadId: input.lead.id,
       senderAccountId: senderAccountId ?? undefined,
+      qaDeliverabilityBypass,
+      actingUserEmail: input.actingUserEmail,
+      actingUserId: input.actingUserId,
     })
     if (!suppression.allowed) {
       return {

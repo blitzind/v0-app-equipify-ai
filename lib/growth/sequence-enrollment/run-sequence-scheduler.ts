@@ -400,6 +400,9 @@ export async function runGrowthSequenceScheduler(
         toEmail: lead.contactEmail,
         generationType: null,
         generationApproved: true,
+        actingUserEmail: input.actingUserEmail,
+        actingUserId: input.actingUserId,
+        enrollmentId: enrollment.id,
       })
 
       if (!preflight.allowed) {

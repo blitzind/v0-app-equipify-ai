@@ -7,6 +7,8 @@ import { evaluatePreSendInfrastructureAllowed } from "@/lib/growth/compliance/pr
 import { isEmailSuppressed } from "@/lib/growth/outbound/suppression-repository"
 import { recordInternalOutboundAuditEvent } from "@/lib/growth/operations/internal-outbound-audit"
 import { GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER } from "@/lib/growth/operations/internal-outbound-ops-types"
+import { maybeApplyGrowthQaDeliverabilityInfrastructureBypass } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass"
+import type { GrowthQaDeliverabilityBypassSnapshot } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass-types"
 
 export const GROWTH_PRE_SEND_ASSERTION_QA_MARKER = GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER
 
@@ -16,6 +18,9 @@ export type GrowthPreSendAssertionInput = {
   senderAccountId?: string
   senderPoolId?: string | null
   skipInfrastructureChecks?: boolean
+  qaDeliverabilityBypass?: GrowthQaDeliverabilityBypassSnapshot | null
+  actingUserEmail?: string | null
+  actingUserId?: string | null
 }
 
 export type GrowthPreSendAssertionResult = GrowthPreSendSuppressionResult & {
@@ -55,6 +60,18 @@ export async function evaluatePreSendAllowed(
     })
 
     if (!infrastructure.allowed) {
+      const bypassDecision = await maybeApplyGrowthQaDeliverabilityInfrastructureBypass({
+        admin,
+        bypass: input.qaDeliverabilityBypass,
+        infrastructureBlockCode: infrastructure.blockCode,
+        actingUserEmail: input.actingUserEmail,
+        actingUserId: input.actingUserId,
+      })
+
+      if (bypassDecision.bypassApplied) {
+        return { allowed: true, reason: null, blockCode: null, blockLayer: null }
+      }
+
       await recordInternalOutboundAuditEvent(admin, {
         eventType: "pre_send_blocked",
         severity: "high",

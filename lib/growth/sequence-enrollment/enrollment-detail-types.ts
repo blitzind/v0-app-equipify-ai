@@ -3,7 +3,7 @@
 import type { GrowthSequenceEnrollmentStep, GrowthSequenceEnrollmentWithSteps } from "@/lib/growth/sequence-enrollment-types"
 import type { GrowthSequenceSchedulerStatus } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
 import type { PatternEnrollmentHistoryEventView } from "@/lib/growth/sequence-enrollment/qa-acceleration-types"
-import type { GrowthOutboundTransportReadiness } from "@/lib/growth/runtime/outbound-transport-readiness-types"
+import type { GrowthQaDeliverabilityBypassView } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass-types"
 import type {
   GrowthSequenceExecutionJob,
   GrowthSequenceExecutionJobStatus,
@@ -55,6 +55,7 @@ export type PatternEnrollmentDetailView = {
     nextActionHref: string | null
   }
   qaAccelerationEnabled: boolean
+  qaDeliverabilityBypass: GrowthQaDeliverabilityBypassView | null
   historyEvents: PatternEnrollmentHistoryEventView[]
   transportReadiness: GrowthOutboundTransportReadiness
 }

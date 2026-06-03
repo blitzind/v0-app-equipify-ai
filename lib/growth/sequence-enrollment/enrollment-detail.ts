@@ -19,6 +19,8 @@ import {
 import { isGrowthQaAccelerationEnabled } from "@/lib/growth/sequence-enrollment/qa-acceleration-config"
 import { listPatternEnrollmentHistoryEvents } from "@/lib/growth/sequence-enrollment/qa-acceleration"
 import { evaluateGrowthOutboundTransportReadiness } from "@/lib/growth/runtime/outbound-transport-readiness"
+import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { fetchGrowthQaDeliverabilityBypassView } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass"
 
 function pickCurrentStep(steps: GrowthSequenceEnrollmentStep[], currentStepOrder: number) {
   const inProgress = steps.find(
@@ -123,6 +125,7 @@ function buildWorkflow(input: {
 export async function fetchPatternEnrollmentDetail(
   admin: SupabaseClient,
   enrollmentId: string,
+  options?: { actingUserEmail?: string | null },
 ): Promise<PatternEnrollmentDetailView | null> {
   const bundle = await fetchPatternEnrollmentWithSteps(admin, enrollmentId)
   if (!bundle) return null
@@ -163,6 +166,16 @@ export async function fetchPatternEnrollmentDetail(
 
   const currentStep = pickCurrentStep(bundle.steps, bundle.currentStepOrder)
   const nextStep = pickNextStep(bundle.steps, currentStep)
+  const lead = await fetchGrowthLeadById(admin, bundle.leadId)
+  const qaDeliverabilityBypass =
+    options?.actingUserEmail && lead?.contactEmail
+      ? await fetchGrowthQaDeliverabilityBypassView(admin, {
+          actingUserEmail: options.actingUserEmail,
+          recipientEmail: lead.contactEmail,
+          senderAccountId: transportReadiness.senderAccountId,
+          enrollmentId: bundle.id,
+        })
+      : null
   const pendingApprovalJobCount = jobs.filter((job) =>
     ["draft", "pending_approval"].includes(job.status),
   ).length
@@ -200,6 +213,7 @@ export async function fetchPatternEnrollmentDetail(
       leadId: bundle.leadId,
     }),
     qaAccelerationEnabled: isGrowthQaAccelerationEnabled(),
+    qaDeliverabilityBypass,
     historyEvents,
     transportReadiness,
   }

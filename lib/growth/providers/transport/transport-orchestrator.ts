@@ -12,6 +12,7 @@ import { selectDeliveryRoute } from "@/lib/growth/providers/provider-router"
 import { getSenderAccount } from "@/lib/growth/sender/sender-repository"
 import { applyOutboundEmailTracking } from "@/lib/growth/tracking/tracking-links"
 import { assertPreSendAllowed } from "@/lib/growth/compliance/pre-send-assertion"
+import type { GrowthQaDeliverabilityBypassSnapshot } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass-types"
 import { assertGrowthProductionRuntimeSafe } from "@/lib/growth/runtime/runtime-guards"
 import { enforceGovernanceIfReady } from "@/lib/growth/governance/governance-enforcement"
 import { checkTransportRateLimit } from "@/lib/growth/providers/transport/transport-rate-limit"
@@ -54,6 +55,7 @@ export type TransportSendInput = {
   actorEmail: string
   is_test?: boolean
   metadata?: Record<string, unknown>
+  qa_deliverability_bypass?: GrowthQaDeliverabilityBypassSnapshot | null
 }
 
 export type TransportSendResult = {
@@ -121,6 +123,7 @@ async function executeAttemptOnRoute(
     is_test?: boolean
     retry_count?: number
     extra_metadata?: Record<string, unknown>
+    qa_deliverability_bypass?: GrowthQaDeliverabilityBypassSnapshot | null
   },
 ): Promise<TransportSendResult> {
   const suppression = await assertPreSendAllowed(admin, {
@@ -128,6 +131,9 @@ async function executeAttemptOnRoute(
     leadId: input.lead_id,
     senderAccountId: input.sender_account_id,
     senderPoolId: input.sender_pool_id,
+    qaDeliverabilityBypass: input.qa_deliverability_bypass,
+    actingUserEmail: input.actorEmail,
+    actingUserId: input.actorUserId,
   })
 
   if (!suppression.allowed) {
@@ -408,6 +414,7 @@ export async function executeTransportSend(
     actorEmail: input.actorEmail,
     is_test: input.is_test,
     extra_metadata: input.metadata,
+    qa_deliverability_bypass: input.qa_deliverability_bypass,
   })
 
   if (primaryResult.ok) {
@@ -439,6 +446,7 @@ export async function executeTransportSend(
     is_test: input.is_test,
     retry_count: 0,
     extra_metadata: input.metadata,
+    qa_deliverability_bypass: input.qa_deliverability_bypass,
   })
 
   await recordTransportAuditEvent(admin, {

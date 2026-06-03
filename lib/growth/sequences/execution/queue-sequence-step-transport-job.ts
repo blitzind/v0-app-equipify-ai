@@ -36,6 +36,10 @@ import {
 import { resolveSequenceExecutionSender } from "@/lib/growth/sequences/execution/sequence-send-builder"
 import { emitGrowthLeadSequenceStepQueuedTimeline } from "@/lib/growth/timeline-emitter"
 import {
+  evaluateGrowthQaDeliverabilityBypass,
+  serializeGrowthQaDeliverabilityBypassSnapshot,
+} from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass"
+import {
   evaluateGrowthOutboundTransportReadiness,
 } from "@/lib/growth/runtime/outbound-transport-readiness"
 import type { GrowthOutboundTransportBlockReason } from "@/lib/growth/runtime/outbound-transport-readiness-types"
@@ -230,6 +234,9 @@ export async function queueSequenceStepTransportJob(
     toEmail: lead.contactEmail,
     generationType: null,
     generationApproved: true,
+    actingUserEmail: input.actingUserEmail,
+    actingUserId: input.actingUserId,
+    enrollmentId: input.enrollmentId,
   })
   if (!preflight.allowed) {
     const code = preflight.code ?? "preflight_blocked"
@@ -268,9 +275,12 @@ export async function queueSequenceStepTransportJob(
     status: "pending_approval",
   })
 
-  await updateGrowthSequenceEnrollmentStep(admin, input.step.id, {
-    status: "queued",
-    generationId: generationId ?? null,
+  const qaDeliverabilityBypass = await evaluateGrowthQaDeliverabilityBypass(admin, {
+    actingUserEmail: input.actingUserEmail,
+    recipientEmail: lead.contactEmail,
+    senderAccountId: sender.senderAccountId,
+    enrollmentId: input.enrollmentId,
+    jobId: job.id,
   })
 
   await recordSequenceExecutionJobAuditEvent(admin, {
@@ -287,7 +297,13 @@ export async function queueSequenceStepTransportJob(
       provider_id: sender.providerId,
       generation_id: generationId ?? null,
       acting_user_id: input.actingUserId,
+      ...serializeGrowthQaDeliverabilityBypassSnapshot(qaDeliverabilityBypass),
     },
+  })
+
+  await updateGrowthSequenceEnrollmentStep(admin, input.step.id, {
+    status: "queued",
+    generationId: generationId ?? null,
   })
 
   await recordSequenceExecutionTimelineEvent(admin, {

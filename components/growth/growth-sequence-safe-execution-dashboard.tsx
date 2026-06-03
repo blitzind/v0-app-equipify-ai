@@ -389,7 +389,12 @@ function JobRow({
       <td className="px-2 py-3 text-muted-foreground">{job.sequenceLabel}</td>
       <td className="px-2 py-3 text-muted-foreground">{job.stepLabel}</td>
       <td className="px-2 py-3">
-        <GrowthBadge label={sequenceExecutionStatusLabel(job.status)} tone={STATUS_TONE[job.status] ?? "neutral"} />
+        <div className="flex flex-wrap items-center gap-1">
+          <GrowthBadge label={sequenceExecutionStatusLabel(job.status)} tone={STATUS_TONE[job.status] ?? "neutral"} />
+          {job.qaDeliverabilityBypassUsed ? (
+            <GrowthBadge label="QA deliverability bypass" tone="attention" />
+          ) : null}
+        </div>
       </td>
       <td className="px-2 py-3 tabular-nums text-muted-foreground">{formatWhen(job.scheduledFor)}</td>
       <td className="px-2 py-3">

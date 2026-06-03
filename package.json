@@ -111,6 +111,7 @@
     "test:growth-bulk-enrollment-result-ui": "tsx scripts/test-growth-bulk-enrollment-result-ui.ts",
     "test:growth-bulk-enrollment-retry": "tsx scripts/test-growth-bulk-enrollment-retry.ts",
     "test:growth-qa-acceleration": "tsx scripts/test-growth-qa-acceleration.ts",
+    "test:growth-qa-deliverability-bypass": "tsx scripts/test-growth-qa-deliverability-bypass.ts",
     "test:growth-transport-readiness-alignment": "tsx scripts/test-growth-transport-readiness-alignment.ts",
     "test:growth-sequence-safe-execution": "tsx scripts/test-growth-sequence-safe-execution.ts",
     "test:growth-lead-assignment": "tsx scripts/test-growth-lead-assignment.ts",

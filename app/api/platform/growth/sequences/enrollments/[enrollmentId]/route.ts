@@ -13,7 +13,9 @@ export async function GET(
 
   const { enrollmentId } = await context.params
   try {
-    const detail = await fetchPatternEnrollmentDetail(access.admin, enrollmentId)
+    const detail = await fetchPatternEnrollmentDetail(access.admin, enrollmentId, {
+      actingUserEmail: access.userEmail,
+    })
     if (!detail) {
       return NextResponse.json({ error: "not_found", message: "Enrollment not found." }, { status: 404 })
     }

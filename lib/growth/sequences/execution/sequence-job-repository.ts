@@ -8,6 +8,7 @@ import type {
   GrowthSequenceExecutionJobView,
 } from "@/lib/growth/sequences/execution/sequence-execution-types"
 import { maskSequenceExecutionLeadLabel } from "@/lib/growth/sequences/execution/sequence-execution-types"
+import { readQaDeliverabilityBypassFromJobEventMetadata } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass-types"
 import { resolveExperimentAssignmentPreviewsForJobs } from "@/lib/growth/experiments/experiment-repository"
 
 type JobRow = {
@@ -328,6 +329,25 @@ export async function enrichSequenceExecutionJobViews(
     jobs.map((job) => ({ leadId: job.leadId, sequenceStepId: job.sequenceStepId })),
   )
 
+  const jobIds = jobs.map((job) => job.id)
+  const { data: plannedEvents } =
+    jobIds.length > 0
+      ? await eventsTable(admin)
+          .select("job_id, metadata")
+          .in("job_id", jobIds)
+          .eq("event_type", "job_planned")
+      : { data: [] as Array<{ job_id: string; metadata: Record<string, unknown> }> }
+
+  const qaBypassByJobId = new Map<string, boolean>()
+  for (const row of plannedEvents ?? []) {
+    const snapshot = readQaDeliverabilityBypassFromJobEventMetadata(
+      row.metadata as Record<string, unknown>,
+    )
+    if (snapshot?.active) {
+      qaBypassByJobId.set(String(row.job_id), true)
+    }
+  }
+
   return jobs.map((job, index) => {
     const step = job.sequenceStepId ? stepMap.get(job.sequenceStepId) : null
     const experimentPreview = experimentPreviews[index]
@@ -344,6 +364,7 @@ export async function enrichSequenceExecutionJobViews(
       experimentName: experimentPreview?.experimentName ?? null,
       experimentVariantId: experimentPreview?.variantId ?? null,
       experimentVariantLabel: experimentPreview?.variantLabel ?? null,
+      qaDeliverabilityBypassUsed: qaBypassByJobId.get(job.id) ?? false,
     }
   })
 }

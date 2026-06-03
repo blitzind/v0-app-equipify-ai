@@ -20,6 +20,10 @@ import {
 import { buildSequenceExecutionSendPayload } from "@/lib/growth/sequences/execution/sequence-send-builder"
 import { applyReputationSafeScheduleGate } from "@/lib/growth/outbound/reputation-safe-scheduler"
 import { shouldSuppressCampaignFollowUp } from "@/lib/growth/outbound/reply-intelligence"
+import {
+  evaluateGrowthQaDeliverabilityBypassForJobSend,
+  fetchGrowthQaDeliverabilityBypassForJob,
+} from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass"
 
 export type SequenceExecutionRunInput = {
   jobId: string
@@ -241,19 +245,30 @@ export async function runSequenceExecutionJob(
     domain: payload.to.split("@")[1]?.toLowerCase() ?? null,
     priority: "normal",
   })
-  if (!scheduleGate.proceed) {
-    const reason = scheduleGate.result.reasons.join("; ") || "reputation_safe_scheduler_blocked"
-    if (scheduleGate.result.decision === "defer") {
-      await updateSequenceExecutionJob(admin, locked.id, {
-        status: "approved",
-        lockedAt: null,
-        lockedBy: null,
-        lastError: reason,
-      })
-      return { ok: false, jobId: locked.id, status: "approved", message: reason, blocked: false }
+  const plannedBypass = await fetchGrowthQaDeliverabilityBypassForJob(admin, locked.id)
+  const sendBypass = await evaluateGrowthQaDeliverabilityBypassForJobSend(admin, {
+    recipientEmail: payload.to,
+    senderAccountId: payload.senderAccountId,
+    enrollmentId: locked.sequenceEnrollmentId,
+    jobId: locked.id,
+    plannedBypass,
+  })
+
+  if (!sendBypass.active) {
+    if (!scheduleGate.proceed) {
+      const reason = scheduleGate.result.reasons.join("; ") || "reputation_safe_scheduler_blocked"
+      if (scheduleGate.result.decision === "defer") {
+        await updateSequenceExecutionJob(admin, locked.id, {
+          status: "approved",
+          lockedAt: null,
+          lockedBy: null,
+          lastError: reason,
+        })
+        return { ok: false, jobId: locked.id, status: "approved", message: reason, blocked: false }
+      }
+      await finalizeBlockedJob(admin, locked, reason)
+      return { ok: false, jobId: locked.id, status: "blocked", message: reason, blocked: true }
     }
-    await finalizeBlockedJob(admin, locked, reason)
-    return { ok: false, jobId: locked.id, status: "blocked", message: reason, blocked: true }
   }
 
   try {
@@ -279,6 +294,9 @@ export async function runSequenceExecutionJob(
     leadId: locked.leadId,
     senderAccountId: payload.senderAccountId,
     senderPoolId: payload.senderPoolId ?? locked.senderPoolId,
+    qaDeliverabilityBypass: sendBypass.active ? sendBypass : null,
+    actingUserEmail: input.actingUserEmail,
+    actingUserId: input.actingUserId,
   })
   if (!suppression.allowed) {
     await finalizeBlockedJob(admin, locked, suppression.reason ?? "suppression_blocked")
@@ -307,6 +325,7 @@ export async function runSequenceExecutionJob(
     human_approval_confirmed: true,
     actorUserId: input.actingUserId,
     actorEmail: input.actingUserEmail,
+    qa_deliverability_bypass: sendBypass.active ? sendBypass : null,
     metadata: {
       ...(payload.experimentId && payload.experimentVariantId
         ? {
