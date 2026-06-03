@@ -174,10 +174,12 @@ create index if not exists idx_voice_ai_outbound_events_session_created
 alter table voice.voice_ai_outbound_sessions enable row level security;
 alter table voice.voice_ai_outbound_events enable row level security;
 
+drop policy if exists voice_ai_outbound_sessions_select on voice.voice_ai_outbound_sessions;
 create policy voice_ai_outbound_sessions_select on voice.voice_ai_outbound_sessions
   for select to authenticated
   using (organization_id in (select om.organization_id from public.organization_members om where om.user_id = auth.uid()));
 
+drop policy if exists voice_ai_outbound_events_select on voice.voice_ai_outbound_events;
 create policy voice_ai_outbound_events_select on voice.voice_ai_outbound_events
   for select to authenticated
   using (organization_id in (select om.organization_id from public.organization_members om where om.user_id = auth.uid()));
