@@ -150,7 +150,6 @@ export function GrowthLeadsTable({
           onOpenChange={setBulkEnrollOpen}
           leadIds={[...selectedIds]}
           onCompleted={() => {
-            setSelectedIds(new Set())
             onBulkEnrolled?.()
           }}
         />

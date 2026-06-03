@@ -137,6 +137,7 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
         opportunitiesRes,
         unifiedInboxRes,
         sequencesRes,
+        patternEnrollmentStatsRes,
       ] = await Promise.all([
         fetchJson<{ ok?: boolean; dashboard?: { missionControl?: { criticalActions?: number } } }>(
           "/api/platform/growth/command/dashboard",
@@ -229,7 +230,12 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
         fetchJson<{
           ok?: boolean
           dashboard?: { active_count?: number }
+          pattern_stats?: { activeCount?: number }
         }>("/api/platform/growth/sequences/dashboard"),
+        fetchJson<{
+          ok?: boolean
+          stats?: { activeCount?: number }
+        }>("/api/platform/growth/sequences/enrollments/stats"),
       ])
 
       const inboxTotal = leadInboxRes?.total ?? 0
@@ -267,7 +273,12 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
       const unifiedInbox = unifiedInboxRes?.dashboard
       const openInboxCount = unifiedInbox?.open_count ?? 0
       const inboxCriticalCount = unifiedInbox?.critical_priority_count ?? 0
-      const activeSequencesCount = sequencesRes?.dashboard?.active_count ?? 0
+      const templateActiveCount = sequencesRes?.dashboard?.active_count ?? 0
+      const patternActiveCount =
+        patternEnrollmentStatsRes?.stats?.activeCount ??
+        sequencesRes?.pattern_stats?.activeCount ??
+        0
+      const activeSequencesCount = patternActiveCount > 0 ? patternActiveCount : templateActiveCount
       const criticalSignalsCount = commandCritical + intentHighIntentCount + inboxCriticalCount
 
       setState({

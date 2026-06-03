@@ -338,7 +338,7 @@ export default function AdminGrowthLeadsPage() {
             onArchiveLead={archiveLead}
             onBulkArchive={bulkArchiveLeads}
             onBulkEnrolled={() => {
-              setSuccessMessage("Bulk sequence enrollment completed.")
+              setSuccessMessage("Bulk sequence enrollment completed — review results in the dialog.")
               void load()
             }}
             archivingLeadId={archivingLeadId}

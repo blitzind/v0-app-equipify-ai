@@ -6,6 +6,8 @@ import { isGrowthSequenceExecutionSchemaReady } from "@/lib/growth/sequences/seq
 import { GROWTH_SEQUENCE_EXECUTION_PRIVACY_NOTE } from "@/lib/growth/sequences/sequence-types"
 import { fetchAttributionRates } from "@/lib/growth/tracking/tracking-repository"
 import { isGrowthEngagementTrackingSchemaReady } from "@/lib/growth/tracking/tracking-schema-health"
+import { fetchPatternEnrollmentStats } from "@/lib/growth/sequence-enrollment/pattern-enrollment-stats"
+import { GROWTH_ENROLLMENT_PLANES_DOC } from "@/lib/growth/sequence-enrollment/enrollment-planes-doc"
 
 export const runtime = "nodejs"
 
@@ -24,10 +26,11 @@ export async function GET() {
   }
 
   try {
-    const [overview, events, trackingReady] = await Promise.all([
+    const [overview, events, trackingReady, patternStats] = await Promise.all([
       fetchSequenceExecutionFoundationDashboard(access.admin),
       listSequenceExecutionEvents(access.admin, { limit: 30 }),
       isGrowthEngagementTrackingSchemaReady(access.admin),
+      fetchPatternEnrollmentStats(access.admin),
     ])
     const attributionRates = trackingReady ? await fetchAttributionRates(access.admin) : null
     return NextResponse.json({
@@ -36,6 +39,8 @@ export async function GET() {
       events,
       attribution_rates: attributionRates,
       privacy_note: GROWTH_SEQUENCE_EXECUTION_PRIVACY_NOTE,
+      pattern_stats: patternStats,
+      enrollment_planes: GROWTH_ENROLLMENT_PLANES_DOC,
     })
   } catch {
     return NextResponse.json(

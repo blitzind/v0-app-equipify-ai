@@ -1,8 +1,10 @@
 "use client"
 
 import { useSearchParams } from "next/navigation"
+import { useCallback, useState } from "react"
 import { PlayCircle } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
+import { GrowthEnrollmentExecutionContext } from "@/components/growth/growth-enrollment-execution-context"
 import { GrowthSequenceExecutionFoundationDashboard } from "@/components/growth/growth-sequence-execution-foundation-dashboard"
 import { GrowthSequenceSafeExecutionDashboard } from "@/components/growth/growth-sequence-safe-execution-dashboard"
 import { OutboundLaunchContextBanner } from "@/components/growth/outbound-launch/outbound-launch-context-banner"
@@ -18,6 +20,15 @@ export default function AdminGrowthSequenceExecutionPage() {
   const searchParams = useSearchParams()
   const highlightEnrollmentId = searchParams.get("highlight")
   const filterLeadId = searchParams.get("leadId")
+  const contextEnrollmentId = searchParams.get("enrollmentId")
+  const sequencePatternId = searchParams.get("sequencePatternId")
+  const highlightJobId = searchParams.get("highlightJobId")
+  const [safeExecutionRefreshKey, setSafeExecutionRefreshKey] = useState(0)
+
+  const onSchedulerComplete = useCallback(() => {
+    setSafeExecutionRefreshKey((value) => value + 1)
+  }, [])
+
   const { sessionIdentity } = useAdmin()
   const header = usePlatformAdminHeaderIdentity({
     displayName: sessionIdentity?.displayName,
@@ -46,10 +57,20 @@ export default function AdminGrowthSequenceExecutionPage() {
 
         <GrowthSectionLayout>
           <OutboundLaunchContextBanner className="mb-4" />
-          <GrowthSequenceSafeExecutionDashboard />
+          <GrowthEnrollmentExecutionContext
+            enrollmentId={contextEnrollmentId}
+            leadId={filterLeadId}
+            sequencePatternId={sequencePatternId}
+            onSchedulerComplete={onSchedulerComplete}
+          />
+          <GrowthSequenceSafeExecutionDashboard
+            key={safeExecutionRefreshKey}
+            highlightJobId={highlightJobId}
+            enrollmentId={contextEnrollmentId}
+          />
           <div className="mt-8">
             <GrowthSequenceExecutionFoundationDashboard
-              highlightEnrollmentId={highlightEnrollmentId}
+              highlightEnrollmentId={highlightEnrollmentId ?? contextEnrollmentId}
               filterLeadId={filterLeadId}
             />
           </div>

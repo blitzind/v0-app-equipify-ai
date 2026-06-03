@@ -34,7 +34,13 @@ function formatWhen(value: string | null | undefined): string {
   return date.toLocaleString()
 }
 
-export function GrowthSequenceSafeExecutionDashboard() {
+export function GrowthSequenceSafeExecutionDashboard({
+  highlightJobId,
+  enrollmentId,
+}: {
+  highlightJobId?: string | null
+  enrollmentId?: string | null
+} = {}) {
   const [dashboard, setDashboard] = useState<GrowthSequenceSafeExecutionDashboard | null>(null)
   const [meetingIntentReviews, setMeetingIntentReviews] = useState(0)
   const [sequenceStopCandidates, setSequenceStopCandidates] = useState(0)
@@ -91,6 +97,13 @@ export function GrowthSequenceSafeExecutionDashboard() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (!highlightJobId) return
+    requestAnimationFrame(() => {
+      document.getElementById(`sequence-job-${highlightJobId}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
+    })
+  }, [highlightJobId, dashboard])
 
   async function planJobs() {
     setActionJobId("plan")
@@ -178,6 +191,14 @@ export function GrowthSequenceSafeExecutionDashboard() {
         </div>
 
         <p className="mb-4 text-xs text-muted-foreground">{GROWTH_SEQUENCE_SAFE_EXECUTION_PRIVACY_NOTE}</p>
+        {enrollmentId ? (
+          <p className="mb-4 text-xs text-muted-foreground">
+            Enrollment context:{" "}
+            <Link href={`/admin/growth/sequences/enrollments/${enrollmentId}`} className="font-medium underline-offset-2 hover:underline">
+              view pattern enrollment
+            </Link>
+          </p>
+        ) : null}
 
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <GrowthBadge label={GROWTH_SEQUENCE_SAFE_EXECUTION_QA_MARKER} tone="neutral" />
@@ -363,7 +384,7 @@ function JobRow({
   const canSkip = !["sent", "skipped"].includes(job.status)
 
   return (
-    <tr className="border-b border-border/70 align-top">
+    <tr id={`sequence-job-${job.id}`} className="border-b border-border/70 align-top">
       <td className="px-2 py-3 font-medium">{job.leadLabel}</td>
       <td className="px-2 py-3 text-muted-foreground">{job.sequenceLabel}</td>
       <td className="px-2 py-3 text-muted-foreground">{job.stepLabel}</td>

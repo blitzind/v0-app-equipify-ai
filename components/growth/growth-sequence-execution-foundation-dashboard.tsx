@@ -25,13 +25,15 @@ import {
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import { sequenceHealthTierLabel } from "@/lib/growth/sequences/sequence-health"
 import { sequenceEnrollmentStatusLabel } from "@/lib/growth/sequences/sequence-state-machine"
+import type { PatternEnrollmentStats } from "@/lib/growth/sequence-enrollment/enrollment-detail-types"
+import { GROWTH_ENROLLMENT_PLANES_DOC } from "@/lib/growth/sequence-enrollment/enrollment-planes-doc"
+import { GROWTH_SEQUENCE_EXECUTION_FOUNDATION_QA_MARKER } from "@/lib/growth/sequences/sequence-types"
 import type {
   GrowthSequenceEnrollment,
   GrowthSequenceExecutionDashboard,
   GrowthSequenceExecutionEvent,
   GrowthSequenceTemplate,
 } from "@/lib/growth/sequences/sequence-types"
-import { GROWTH_SEQUENCE_EXECUTION_FOUNDATION_QA_MARKER } from "@/lib/growth/sequences/sequence-types"
 import type { GrowthAttributionRates } from "@/lib/growth/tracking/tracking-types"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
@@ -77,6 +79,8 @@ type DashboardPayload = {
   enrollments?: GrowthSequenceEnrollment[]
   events?: GrowthSequenceExecutionEvent[]
   attribution_rates?: GrowthAttributionRates | null
+  pattern_stats?: PatternEnrollmentStats
+  enrollment_planes?: typeof GROWTH_ENROLLMENT_PLANES_DOC
   message?: string
 }
 
@@ -100,6 +104,7 @@ export function GrowthSequenceExecutionFoundationDashboard({
   const [enrollments, setEnrollments] = useState<GrowthSequenceEnrollment[]>([])
   const [events, setEvents] = useState<GrowthSequenceExecutionEvent[]>([])
   const [attributionRates, setAttributionRates] = useState<GrowthAttributionRates | null>(null)
+  const [patternStats, setPatternStats] = useState<PatternEnrollmentStats | null>(null)
   const [leads, setLeads] = useState<Array<{ id: string; label: string }>>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState("")
   const [newName, setNewName] = useState("")
@@ -132,6 +137,7 @@ export function GrowthSequenceExecutionFoundationDashboard({
       setDashboard(dashboardPayload.dashboard ?? null)
       setEvents(dashboardPayload.events ?? [])
       setAttributionRates(dashboardPayload.attribution_rates ?? null)
+      setPatternStats(dashboardPayload.pattern_stats ?? null)
       if (!selectedTemplateId && (listPayload.templates?.length ?? 0) > 0) {
         setSelectedTemplateId(listPayload.templates![0].id)
       }
@@ -251,6 +257,20 @@ export function GrowthSequenceExecutionFoundationDashboard({
       {error ? (
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{error}</div>
       ) : null}
+
+      <GrowthEngineCard title="Pattern Enrollments (Outbound)">
+        <p className="mb-3 text-sm text-muted-foreground">
+          Bulk enroll, scheduler, and standalone transport use pattern enrollments in{" "}
+          <span className="font-medium">growth.sequence_enrollments</span>. Template enrollments below are the legacy
+          foundation workspace ({GROWTH_ENROLLMENT_PLANES_DOC.template.tables.join(", ")}).
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatTile label="Pattern active" value={String(patternStats?.activeCount ?? 0)} />
+          <StatTile label="Pattern draft" value={String(patternStats?.draftCount ?? 0)} />
+          <StatTile label="Pattern paused" value={String(patternStats?.pausedCount ?? 0)} />
+          <StatTile label="Jobs pending approval" value={String(patternStats?.pendingApprovalJobs ?? 0)} />
+        </div>
+      </GrowthEngineCard>
 
       <GrowthEngineCard title="Sequence Health">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
