@@ -22,6 +22,7 @@ import { resolveScheduledFor } from "@/lib/growth/outreach/outreach-scheduling"
 import { runGrowthAiCopilotGeneration } from "@/lib/growth/run-ai-copilot-generation"
 import {
   enrollmentHasPriorIncompleteSteps,
+  isDraftReadyEmailSchedulerStep,
 } from "@/lib/growth/sequence-enrollment/enrollment-step-progress"
 import {
   fetchGrowthSequenceEnrollmentById,
@@ -339,6 +340,7 @@ export async function runGrowthSequenceScheduler(
   const counts = {
     due: 0,
     queued: 0,
+    executionJobsPlanned: 0,
     skippedSuppressed: 0,
     skippedAlreadyQueued: 0,
     skippedMissingDraft: 0,
@@ -372,11 +374,12 @@ export async function runGrowthSequenceScheduler(
         typeof enrollment.metadata.qaAcceleration === "object" &&
         (enrollment.metadata.qaAcceleration as { bypassBusinessHoursStepId?: string }).bypassBusinessHoursStepId ===
           step.id
+      const draftReadyForExecutionJob = isDraftReadyEmailSchedulerStep(step)
 
       const scheduled = resolveScheduledFor({
         sendNow: true,
         scheduledFor: step.scheduledFor,
-        respectBusinessHours: !qaBypassBusinessHours,
+        respectBusinessHours: !qaBypassBusinessHours && !draftReadyForExecutionJob,
         timezone: outreachSettings.timezone,
         startMinutes: outreachSettings.businessHoursStartMinutes,
         endMinutes: outreachSettings.businessHoursEndMinutes,
@@ -542,6 +545,9 @@ export async function runGrowthSequenceScheduler(
       }
 
       counts.queued += 1
+      if (standaloneMode && result.jobId) {
+        counts.executionJobsPlanned += 1
+      }
     } catch (error) {
       counts.failed += 1
       logGrowthEngine("sequence_scheduler_step_failed", {
@@ -559,7 +565,7 @@ export async function runGrowthSequenceScheduler(
     standalonePlanningAutomated: standaloneMode,
     planningPlane: standaloneMode ? ("sequence_execution_jobs" as const) : ("outreach_queue" as const),
     planningCronRoute: GROWTH_SEQUENCE_SCHEDULER_CRON_ROUTE,
-    executionJobsPlanned: standaloneMode ? counts.queued : 0,
+    executionJobsPlanned: standaloneMode ? counts.executionJobsPlanned : 0,
     outreachQueueItemsQueued: standaloneMode ? 0 : counts.queued,
     skippedTransportNotConfigured: counts.skippedTransportNotConfigured,
     skippedNoSender: counts.skippedNoSender,
@@ -597,7 +603,7 @@ export async function runGrowthSequenceScheduler(
   if (standaloneMode && !dryRun) {
     logGrowthEngine("sequence_scheduler_standalone_planning_completed", {
       runId,
-      executionJobsPlanned: counts.queued,
+      executionJobsPlanned: counts.executionJobsPlanned,
       skippedAlreadyQueued: counts.skippedAlreadyQueued,
       skippedTransportNotConfigured: counts.skippedTransportNotConfigured,
       skippedNoSender: counts.skippedNoSender,

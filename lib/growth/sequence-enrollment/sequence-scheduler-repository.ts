@@ -7,6 +7,7 @@ import {
   mapGrowthSequenceEnrollmentStepRow,
   type StepRow,
 } from "@/lib/growth/sequence-enrollment/sequence-enrollment-mappers"
+import { isSequenceStepDueForScheduler } from "@/lib/growth/sequence-enrollment/enrollment-step-progress"
 import type {
   GrowthSequenceSchedulerRunMode,
   GrowthSequenceSchedulerRunPlanningMetadata,
@@ -97,7 +98,7 @@ export async function listDueSequenceSchedulerSteps(
   admin: SupabaseClient,
   limit: number,
 ): Promise<GrowthSequenceEnrollmentStep[]> {
-  const now = new Date().toISOString()
+  const nowMs = Date.now()
   const { data: enrollments, error: enrollmentError } = await admin
     .schema("growth")
     .from("sequence_enrollments")
@@ -113,12 +114,14 @@ export async function listDueSequenceSchedulerSteps(
     .in("enrollment_id", activeEnrollmentIds)
     .in("status", ["pending", "draft_created"])
     .is("outreach_queue_id", null)
-    .not("scheduled_for", "is", null)
-    .lte("scheduled_for", now)
-    .order("scheduled_for", { ascending: true })
-    .limit(limit)
+    .order("scheduled_for", { ascending: true, nullsFirst: false })
+    .limit(Math.max(limit * 4, limit))
   if (error) throw new Error(error.message)
-  return ((data ?? []) as StepRow[]).map(mapGrowthSequenceEnrollmentStepRow)
+
+  return ((data ?? []) as StepRow[])
+    .map(mapGrowthSequenceEnrollmentStepRow)
+    .filter((step) => isSequenceStepDueForScheduler(step, nowMs))
+    .slice(0, limit)
 }
 
 export async function insertGrowthSequenceSchedulerRun(

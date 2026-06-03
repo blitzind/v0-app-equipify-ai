@@ -26,7 +26,8 @@ import {
 import type { GrowthCadenceTaskOutcome } from "@/lib/growth/cadence/cadence-types"
 import { fetchGrowthAiCopilotGenerationById } from "@/lib/growth/ai-copilot-repository"
 import { runGrowthAiCopilotGeneration } from "@/lib/growth/run-ai-copilot-generation"
-import { listGrowthSequencePatterns } from "@/lib/growth/sequence-pattern-repository"
+import { isGrowthOutboundStandaloneMode } from "@/lib/growth/runtime/outbound-mode"
+import { queueSequenceStepTransportJob } from "@/lib/growth/sequences/execution/queue-sequence-step-transport-job"
 import {
   computeEnrollmentHealthScore,
   computeStepExecutionConfidence,
@@ -255,6 +256,29 @@ export async function materializeGrowthSequenceEnrollmentStep(
       stepOrder: step.stepOrder,
       channel: step.channel,
     })
+
+    if (isGrowthOutboundStandaloneMode()) {
+      const materializedStep = {
+        ...step,
+        status: "draft_created" as const,
+        generationId: result.generation.id,
+        stepExecutionConfidence: computeStepExecutionConfidence({ lead, channel: step.channel }),
+      }
+      const planResult = await queueSequenceStepTransportJob(admin, {
+        step: materializedStep,
+        enrollmentId: enrollment.id,
+        actingUserId: input.actingUserId,
+        actingUserEmail: input.actingUserEmail,
+        dryRun: false,
+      })
+      if (!planResult.queued) {
+        logGrowthEngine("sequence_materialize_transport_job_deferred", {
+          stepId: step.id,
+          enrollmentId: enrollment.id,
+          reason: planResult.reason ?? "plan_failed",
+        })
+      }
+    }
     return
   }
 
