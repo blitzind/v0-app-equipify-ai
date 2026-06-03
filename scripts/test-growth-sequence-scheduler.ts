@@ -74,5 +74,6 @@ const uiSource = fs.readFileSync(
 )
 assert.match(uiSource, /GROWTH_SEQUENCE_SCHEDULER_QA_MARKER/)
 assert.match(uiSource, /Dry Run/)
+assert.match(uiSource, /Auto-plans execution jobs/)
 
 console.log("growth sequence scheduler tests passed")

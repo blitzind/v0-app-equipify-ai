@@ -9,6 +9,7 @@ import {
 } from "@/lib/growth/sequence-enrollment/sequence-enrollment-mappers"
 import type {
   GrowthSequenceSchedulerRunMode,
+  GrowthSequenceSchedulerRunPlanningMetadata,
   GrowthSequenceSchedulerRunSummary,
 } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
 import { GROWTH_SEQUENCE_SCHEDULER_QA_MARKER } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
@@ -39,6 +40,34 @@ function stepsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("sequence_enrollment_steps")
 }
 
+function mapSchedulerRunPlanningMetadata(
+  metadata: Record<string, unknown> | null,
+): GrowthSequenceSchedulerRunPlanningMetadata | undefined {
+  if (!metadata || Object.keys(metadata).length === 0) return undefined
+  return {
+    outboundMode: metadata.outboundMode as GrowthSequenceSchedulerRunPlanningMetadata["outboundMode"],
+    transportConfigured:
+      typeof metadata.transportConfigured === "boolean" ? metadata.transportConfigured : undefined,
+    standalonePlanningAutomated:
+      typeof metadata.standalonePlanningAutomated === "boolean"
+        ? metadata.standalonePlanningAutomated
+        : undefined,
+    planningPlane: metadata.planningPlane as GrowthSequenceSchedulerRunPlanningMetadata["planningPlane"],
+    planningCronRoute:
+      metadata.planningCronRoute as GrowthSequenceSchedulerRunPlanningMetadata["planningCronRoute"],
+    executionJobsPlanned:
+      typeof metadata.executionJobsPlanned === "number" ? metadata.executionJobsPlanned : undefined,
+    outreachQueueItemsQueued:
+      typeof metadata.outreachQueueItemsQueued === "number" ? metadata.outreachQueueItemsQueued : undefined,
+    skippedTransportNotConfigured:
+      typeof metadata.skippedTransportNotConfigured === "number"
+        ? metadata.skippedTransportNotConfigured
+        : undefined,
+    skippedNoSender:
+      typeof metadata.skippedNoSender === "number" ? metadata.skippedNoSender : undefined,
+  }
+}
+
 function mapSchedulerRun(row: SchedulerRunRow): GrowthSequenceSchedulerRunSummary {
   return {
     id: row.id,
@@ -55,6 +84,7 @@ function mapSchedulerRun(row: SchedulerRunRow): GrowthSequenceSchedulerRunSummar
     startedAt: row.started_at,
     finishedAt: row.finished_at,
     createdBy: row.created_by,
+    planning: mapSchedulerRunPlanningMetadata(row.metadata),
   }
 }
 

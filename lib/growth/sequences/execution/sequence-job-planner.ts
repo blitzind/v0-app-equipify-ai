@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { isGrowthOutboundStandaloneMode } from "@/lib/growth/runtime/outbound-mode"
 import { listDueSequenceSchedulerSteps } from "@/lib/growth/sequence-enrollment/sequence-scheduler-repository"
 import { fetchGrowthOutreachQueueByEnrollmentStepId } from "@/lib/growth/outreach/outreach-queue-repository"
 import type { GrowthSequenceExecutionPlanResult } from "@/lib/growth/sequences/execution/sequence-execution-types"
@@ -17,6 +18,12 @@ export async function planSequenceExecutionJobs(
   admin: SupabaseClient,
   input?: { limit?: number; actingUserId?: string | null },
 ): Promise<GrowthSequenceExecutionPlanResult> {
+  if (isGrowthOutboundStandaloneMode()) {
+    throw new Error(
+      "standalone_mode_uses_scheduler: use growth-sequence-scheduler cron or runGrowthSequenceScheduler instead of planSequenceExecutionJobs",
+    )
+  }
+
   const limit = input?.limit ?? 25
   const dueSteps = await listDueSequenceSchedulerSteps(admin, limit)
   const result: GrowthSequenceExecutionPlanResult = {

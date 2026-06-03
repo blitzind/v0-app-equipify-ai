@@ -166,6 +166,13 @@ export function GrowthSequenceSafeExecutionDashboard() {
                   <p className="text-amber-900/90">All sends require human approval.</p>
                 </>
               )}
+              {dashboard?.standalonePlanningAutomated ? (
+                <p className="mt-2 text-amber-900/90">
+                  Due email steps auto-plan into pending jobs via{" "}
+                  <span className="font-medium">{dashboard.planningCronRoute ?? "growth-sequence-scheduler"}</span>{" "}
+                  cron (every 10 min). No manual plan API required.
+                </p>
+              ) : null}
             </div>
           </div>
         </div>
@@ -179,6 +186,9 @@ export function GrowthSequenceSafeExecutionDashboard() {
           ) : null}
           {dashboard?.outboundMode === "standalone" ? (
             <GrowthBadge label="Standalone transport" tone="medium" />
+          ) : null}
+          {dashboard?.standalonePlanningAutomated ? (
+            <GrowthBadge label="Cron auto-plans jobs" tone="healthy" />
           ) : null}
           <Button variant="outline" size="sm" asChild>
             <Link href="/admin/growth/settings/governance">Governance</Link>
@@ -198,9 +208,20 @@ export function GrowthSequenceSafeExecutionDashboard() {
           </Button>
           <Button size="sm" onClick={() => void planJobs()} disabled={actionJobId === "plan"}>
             {actionJobId === "plan" ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : <Clock className="mr-1 size-3.5" />}
-            Plan due steps
+            {dashboard?.standalonePlanningAutomated ? "Run scheduler now" : "Plan due steps"}
           </Button>
         </div>
+
+        {dashboard?.standalonePlanningAutomated && dashboard.lastSchedulerRun ? (
+          <p className="mb-3 text-xs text-muted-foreground">
+            Last scheduler run {new Date(dashboard.lastSchedulerRun.startedAt).toLocaleString()} · planned{" "}
+            {dashboard.lastSchedulerRun.planning?.executionJobsPlanned ?? dashboard.lastSchedulerRun.queued}{" "}
+            execution job(s)
+            {(dashboard.lastSchedulerRun.planning?.skippedTransportNotConfigured ?? 0) > 0
+              ? ` · ${dashboard.lastSchedulerRun.planning?.skippedTransportNotConfigured} skipped (transport not configured)`
+              : ""}
+          </p>
+        ) : null}
 
         {error ? <p className="mb-3 text-sm text-destructive">{error}</p> : null}
 
@@ -244,7 +265,11 @@ export function GrowthSequenceSafeExecutionDashboard() {
 
       <GrowthEngineCard title="Job queue">
         {!dashboard?.jobs.length ? (
-          <p className="text-sm text-muted-foreground">No execution jobs yet. Plan due steps to create pending jobs.</p>
+          <p className="text-sm text-muted-foreground">
+            {dashboard?.standalonePlanningAutomated
+              ? "No execution jobs yet. Due steps appear here after the sequence scheduler cron runs (or use Run scheduler now)."
+              : "No execution jobs yet. Plan due steps to create pending jobs."}
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[880px] text-sm">

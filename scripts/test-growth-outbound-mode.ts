@@ -65,5 +65,11 @@ assert.match(cronSafeSource, /runApprovedDueSequenceExecutionJobs/)
 
 const envExample = readSource(".env.local.example")
 assert.match(envExample, /GROWTH_OUTBOUND_MODE=standalone/)
+assert.match(envExample, /growth-sequence-scheduler cron/)
+
+const planningTestExists = fs.existsSync(
+  path.join(process.cwd(), "scripts/test-growth-standalone-sequence-planning.ts"),
+)
+assert.equal(planningTestExists, true)
 
 console.log("growth outbound mode tests passed")

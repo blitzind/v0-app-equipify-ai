@@ -1,5 +1,7 @@
 /** Client-safe Growth Engine sequence safe execution types (Phase 2H). */
 
+import type { GrowthSequenceSchedulerRunSummary } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
+
 export const GROWTH_SEQUENCE_SAFE_EXECUTION_QA_MARKER = "growth-sequence-safe-execution-v1" as const
 
 export const GROWTH_SEQUENCE_SAFE_EXECUTION_PRIVACY_NOTE =
@@ -98,6 +100,9 @@ export type GrowthSequenceSafeExecutionDashboard = {
   jobs: GrowthSequenceExecutionJobView[]
   soloApprovalEnabled?: boolean
   outboundMode?: "adapter" | "standalone"
+  standalonePlanningAutomated?: boolean
+  planningCronRoute?: string
+  lastSchedulerRun?: GrowthSequenceSchedulerRunSummary | null
 }
 
 export type GrowthSequenceExecutionPlanResult = {

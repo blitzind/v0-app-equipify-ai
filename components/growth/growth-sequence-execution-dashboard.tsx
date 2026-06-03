@@ -13,6 +13,7 @@ import type {
   GrowthSequenceSchedulerRunResult,
   GrowthSequenceSchedulerStatus,
 } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
+import { GROWTH_SEQUENCE_SCHEDULER_QA_MARKER } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
 import { GrowthCadenceDashboard } from "@/components/growth/growth-cadence-dashboard"
 import { cn } from "@/lib/utils"
 
@@ -174,12 +175,28 @@ export function GrowthSequenceExecutionDashboard({
     <div className="space-y-6">
       <GrowthEngineCard title="Sequence Scheduler" icon={<GitBranch className="size-4" />}>
         <div className="mb-4 flex flex-wrap items-center gap-2">
+          <GrowthBadge label={GROWTH_SEQUENCE_SCHEDULER_QA_MARKER} tone="neutral" />
           {schedulerStatus?.providerConfigured ? (
             <GrowthBadge label="Provider configured" tone="healthy" />
           ) : (
             <GrowthBadge label="No live email provider" tone="attention" />
           )}
+          {schedulerStatus?.outboundMode === "standalone" ? (
+            <GrowthBadge label="Standalone transport" tone="medium" />
+          ) : null}
+          {schedulerStatus?.standalonePlanningAutomated ? (
+            <GrowthBadge label="Auto-plans execution jobs" tone="healthy" />
+          ) : null}
         </div>
+
+        {schedulerStatus?.standalonePlanningAutomated ? (
+          <p className="mb-4 text-sm text-muted-foreground">
+            Standalone mode: this scheduler (cron every 10 min via{" "}
+            {schedulerStatus.planningCronRoute ?? "growth-sequence-scheduler"}) creates{" "}
+            <span className="font-medium">pending_approval</span> execution jobs — not outreach_queue items.
+            Approve in Safe Execution; safe-execute cron sends.
+          </p>
+        ) : null}
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile label="Due steps" value={schedulerStatus?.dueStepsCount ?? 0} />
@@ -196,6 +213,9 @@ export function GrowthSequenceExecutionDashboard({
           <p className="mt-3 text-xs text-muted-foreground">
             Last run {new Date(schedulerStatus.lastRun.startedAt).toLocaleString()} · scanned{" "}
             {schedulerStatus.lastRun.scanned} · due {schedulerStatus.lastRun.due}
+            {schedulerStatus.standalonePlanningAutomated
+              ? ` · execution jobs planned ${schedulerStatus.lastRun.planning?.executionJobsPlanned ?? schedulerStatus.lastRun.queued}`
+              : ` · queued ${schedulerStatus.lastRun.queued}`}
           </p>
         ) : (
           <p className="mt-3 text-sm text-muted-foreground">No scheduler runs yet.</p>
@@ -204,9 +224,16 @@ export function GrowthSequenceExecutionDashboard({
         {schedulerResult ? (
           <div className="mt-3 rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm">
             {schedulerResult.dryRun ? "Dry run" : "Live run"} · scanned {schedulerResult.scanned} · due{" "}
-            {schedulerResult.due} · queued {schedulerResult.queued} · suppressed{" "}
-            {schedulerResult.skippedSuppressed} · already queued {schedulerResult.skippedAlreadyQueued} · failed{" "}
-            {schedulerResult.failed}
+            {schedulerResult.due} · queued {schedulerResult.queued}
+            {schedulerResult.standalonePlanningAutomated
+              ? ` · execution jobs planned ${schedulerResult.executionJobsPlanned ?? schedulerResult.queued}`
+              : ""}{" "}
+            · suppressed {schedulerResult.skippedSuppressed} · already queued{" "}
+            {schedulerResult.skippedAlreadyQueued}
+            {(schedulerResult.skippedTransportNotConfigured ?? 0) > 0
+              ? ` · transport not configured ${schedulerResult.skippedTransportNotConfigured}`
+              : ""}{" "}
+            · failed {schedulerResult.failed}
           </div>
         ) : null}
 

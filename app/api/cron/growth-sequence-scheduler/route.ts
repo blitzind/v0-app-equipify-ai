@@ -5,6 +5,7 @@ import { growthCronApiPath } from "@/lib/growth/runtime/cron-telemetry-types"
 
 export const runtime = "nodejs"
 
+/** Every 10 min — adapter mode queues outreach_queue; standalone mode plans sequence_execution_jobs. */
 const CRON_ROUTE = growthCronApiPath("growth-sequence-scheduler")
 
 export async function POST(request: Request) {

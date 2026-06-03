@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { runGrowthSequenceScheduler } from "@/lib/growth/sequence-enrollment/run-sequence-scheduler"
+import { isGrowthOutboundStandaloneMode } from "@/lib/growth/runtime/outbound-mode"
 import { planSequenceExecutionJobs } from "@/lib/growth/sequences/execution/sequence-job-planner"
 
 export const runtime = "nodejs"
@@ -19,6 +21,22 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (isGrowthOutboundStandaloneMode()) {
+      const result = await runGrowthSequenceScheduler(access.admin, {
+        actingUserId: access.userId,
+        actingUserEmail: access.userEmail,
+        limit: parsed.data.limit,
+        dryRun: false,
+      })
+      return NextResponse.json({
+        ok: true,
+        delegatedToScheduler: true,
+        message:
+          "Standalone mode plans through growth-sequence-scheduler (same path as the every-10-minute cron). Manual plan is optional.",
+        result,
+      })
+    }
+
     const result = await planSequenceExecutionJobs(access.admin, {
       limit: parsed.data.limit,
       actingUserId: access.userId,

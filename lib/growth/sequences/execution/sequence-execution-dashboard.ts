@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { fetchGrowthSequenceSchedulerStatus } from "@/lib/growth/sequence-enrollment/run-sequence-scheduler"
 import { getGrowthOutboundMode } from "@/lib/growth/runtime/outbound-mode"
 import { canUseGrowthOutboundSoloApproval } from "@/lib/growth/runtime/outbound-solo-approval"
 import {
@@ -17,7 +18,10 @@ export async function fetchGrowthSequenceSafeExecutionDashboard(
 ): Promise<GrowthSequenceSafeExecutionDashboard> {
   const now = Date.now()
   const sentSince = new Date(now - 24 * 60 * 60 * 1000).toISOString()
-  const jobs = await listSequenceExecutionJobs(admin, { limit: 100 })
+  const [jobs, schedulerStatus] = await Promise.all([
+    listSequenceExecutionJobs(admin, { limit: 100 }),
+    fetchGrowthSequenceSchedulerStatus(admin).catch(() => null),
+  ])
   const views = await enrichSequenceExecutionJobViews(admin, jobs)
 
   const dueJobs = jobs.filter(
@@ -40,5 +44,8 @@ export async function fetchGrowthSequenceSafeExecutionDashboard(
     jobs: views,
     soloApprovalEnabled: canUseGrowthOutboundSoloApproval({ platformAdmin: true }),
     outboundMode: getGrowthOutboundMode(),
+    standalonePlanningAutomated: schedulerStatus?.standalonePlanningAutomated ?? false,
+    planningCronRoute: schedulerStatus?.planningCronRoute,
+    lastSchedulerRun: schedulerStatus?.lastRun ?? null,
   }
 }

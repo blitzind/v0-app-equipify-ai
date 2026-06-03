@@ -35,6 +35,7 @@ import {
 } from "@/lib/growth/sequence-enrollment/sequence-scheduler-repository"
 import {
   buildSequenceSchedulerIdempotencyKey,
+  GROWTH_SEQUENCE_SCHEDULER_CRON_ROUTE,
   GROWTH_SEQUENCE_SCHEDULER_DEFAULT_BATCH_SIZE,
   GROWTH_SEQUENCE_SCHEDULER_QA_MARKER,
   type GrowthSequenceSchedulerRunResult,
@@ -333,6 +334,8 @@ export async function runGrowthSequenceScheduler(
     skippedSuppressed: 0,
     skippedAlreadyQueued: 0,
     skippedMissingDraft: 0,
+    skippedTransportNotConfigured: 0,
+    skippedNoSender: 0,
     failed: 0,
   }
 
@@ -442,6 +445,24 @@ export async function runGrowthSequenceScheduler(
         counts.skippedMissingDraft += 1
         continue
       }
+      if (result.reason === "transport_not_configured") {
+        counts.skippedTransportNotConfigured += 1
+        logGrowthEngine("sequence_scheduler_transport_not_configured", {
+          stepId: step.id,
+          enrollmentId: enrollment.id,
+          outboundMode,
+        })
+        continue
+      }
+      if (result.reason === "no_sender_route") {
+        counts.skippedNoSender += 1
+        logGrowthEngine("sequence_scheduler_no_sender_route", {
+          stepId: step.id,
+          enrollmentId: enrollment.id,
+          outboundMode,
+        })
+        continue
+      }
       if (!result.queued) {
         counts.failed += 1
         if (!dryRun) {
@@ -467,6 +488,19 @@ export async function runGrowthSequenceScheduler(
   }
 
   let runId: string | null = null
+  const planningMetadata = {
+    qaMarker: GROWTH_SEQUENCE_SCHEDULER_QA_MARKER,
+    outboundMode,
+    transportConfigured,
+    standalonePlanningAutomated: standaloneMode,
+    planningPlane: standaloneMode ? ("sequence_execution_jobs" as const) : ("outreach_queue" as const),
+    planningCronRoute: GROWTH_SEQUENCE_SCHEDULER_CRON_ROUTE,
+    executionJobsPlanned: standaloneMode ? counts.queued : 0,
+    outreachQueueItemsQueued: standaloneMode ? 0 : counts.queued,
+    skippedTransportNotConfigured: counts.skippedTransportNotConfigured,
+    skippedNoSender: counts.skippedNoSender,
+  }
+
   if (!dryRun) {
     const run = await insertGrowthSequenceSchedulerRun(admin, {
       runMode: "live",
@@ -479,11 +513,7 @@ export async function runGrowthSequenceScheduler(
       failed: counts.failed,
       providerWarning,
       createdBy: input.actingUserId,
-      metadata: {
-        qaMarker: GROWTH_SEQUENCE_SCHEDULER_QA_MARKER,
-        outboundMode,
-        transportConfigured,
-      },
+      metadata: planningMetadata,
     })
     runId = run.id
   }
@@ -496,7 +526,21 @@ export async function runGrowthSequenceScheduler(
     outboundMode,
     standaloneMode,
     runId,
+    ...planningMetadata,
   })
+
+  if (standaloneMode && !dryRun) {
+    logGrowthEngine("sequence_scheduler_standalone_planning_completed", {
+      runId,
+      executionJobsPlanned: counts.queued,
+      skippedAlreadyQueued: counts.skippedAlreadyQueued,
+      skippedTransportNotConfigured: counts.skippedTransportNotConfigured,
+      skippedNoSender: counts.skippedNoSender,
+      transportConfigured,
+      due: counts.due,
+      failed: counts.failed,
+    })
+  }
 
   return {
     scanned,
@@ -507,6 +551,11 @@ export async function runGrowthSequenceScheduler(
     runId,
     outboundMode,
     transportConfigured,
+    standalonePlanningAutomated: standaloneMode,
+    planningPlane: planningMetadata.planningPlane,
+    planningCronRoute: GROWTH_SEQUENCE_SCHEDULER_CRON_ROUTE,
+    executionJobsPlanned: planningMetadata.executionJobsPlanned,
+    outreachQueueItemsQueued: planningMetadata.outreachQueueItemsQueued,
   }
 }
 
@@ -530,5 +579,9 @@ export async function fetchGrowthSequenceSchedulerStatus(
       : Boolean(commSettings.activeEmailConnectionId),
     outboundMode: getGrowthOutboundMode(),
     transportConfigured,
+    standalonePlanningAutomated: standaloneMode,
+    planningCronRoute: GROWTH_SEQUENCE_SCHEDULER_CRON_ROUTE,
+    planningPlane: standaloneMode ? "sequence_execution_jobs" : "outreach_queue",
+    manualPlanRequired: !standaloneMode,
   }
 }
