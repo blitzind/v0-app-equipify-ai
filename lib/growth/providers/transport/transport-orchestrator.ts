@@ -292,17 +292,34 @@ async function executeAttemptOnRoute(
 
   if (sendResult.ok) {
     await incrementProviderRateLimit(admin, input.provider_id, 1)
+    const sendMetadata: Record<string, unknown> = {
+      ...attempt.metadata,
+      provider_message_id: sendResult.provider_message_id ?? null,
+      simulated: sendResult.simulated ?? false,
+    }
+    if (sendResult.provider_thread_id) {
+      sendMetadata.provider_thread_id = sendResult.provider_thread_id
+    }
+    if (sendResult.rfc_message_id) {
+      sendMetadata.rfc_message_id = sendResult.rfc_message_id
+    }
     const sent = await updateDeliveryAttempt(admin, attempt.id, {
       status: "sent",
       sent_at: new Date().toISOString(),
       provider_message_id: sendResult.provider_message_id ?? null,
+      metadata: sendMetadata,
     })
     await recordTransportAuditEvent(admin, {
       provider_id: input.provider_id,
       event_type: "delivery_sent",
       title: input.is_test ? "Test delivery sent" : "Delivery sent",
       description: `Transport completed for ${input.message.to}`,
-      metadata: { provider_message_id: sendResult.provider_message_id, simulated: sendResult.simulated ?? false },
+      metadata: {
+        provider_message_id: sendResult.provider_message_id,
+        provider_thread_id: sendResult.provider_thread_id ?? null,
+        rfc_message_id: sendResult.rfc_message_id ?? null,
+        simulated: sendResult.simulated ?? false,
+      },
       attemptId: attempt.id,
       actorUserId: input.actorUserId,
       actorEmail: input.actorEmail,

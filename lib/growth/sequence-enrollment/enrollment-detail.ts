@@ -12,6 +12,7 @@ import {
   growthSequenceExecutionHref,
 } from "@/lib/growth/sequence-enrollment/enrollment-navigation"
 import {
+  isDraftReadyEmailSchedulerStep,
   isManualStepAwaitingCompletion,
   pickInProgressEnrollmentStep,
 } from "@/lib/growth/sequence-enrollment/enrollment-step-progress"
@@ -47,9 +48,10 @@ function buildWorkflow(input: {
 }): PatternEnrollmentDetailView["workflow"] {
   const enrollmentActive = input.enrollmentStatus === "active"
   const stepDueNow =
-    Boolean(input.currentStep?.scheduledFor) &&
-    Date.parse(input.currentStep!.scheduledFor!) <= Date.now() &&
-    ["pending", "draft_created"].includes(input.currentStep?.status ?? "")
+    (Boolean(input.currentStep?.scheduledFor) &&
+      Date.parse(input.currentStep!.scheduledFor!) <= Date.now() &&
+      ["pending", "draft_created"].includes(input.currentStep?.status ?? "")) ||
+    (input.currentStep != null && isDraftReadyEmailSchedulerStep(input.currentStep))
 
   if (input.enrollmentStatus === "draft") {
     return {
@@ -83,9 +85,12 @@ function buildWorkflow(input: {
       jobsPlanned: false,
       awaitingApproval: false,
       readyForSend: false,
-      nextActionLabel: stepDueNow
-        ? "Step is due — run the sequence scheduler to create a pending approval job."
-        : "No execution job planned yet — wait for the scheduled step or run the scheduler when due.",
+      nextActionLabel:
+        input.currentStep && isDraftReadyEmailSchedulerStep(input.currentStep)
+          ? "Email draft is ready — run the sequence scheduler to create a pending approval job."
+          : stepDueNow
+            ? "Step is due — run the sequence scheduler to create a pending approval job."
+            : "No execution job planned yet — wait for the scheduled step or run the scheduler when due.",
       nextActionHref: growthSequenceExecutionHref({
         enrollmentId: input.enrollmentId,
         leadId: input.leadId,

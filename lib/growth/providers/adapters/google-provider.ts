@@ -6,6 +6,7 @@ import {
   hasCredential,
   truncateTransportError,
 } from "@/lib/growth/providers/adapters/adapter-utils"
+import { fetchGmailSentMessageMetadata } from "@/lib/growth/inbox-sync/gmail-api-utils"
 import type {
   GrowthProviderAdapter,
   ProviderAdapterCredentials,
@@ -59,11 +60,27 @@ export const googleProviderAdapter: GrowthProviderAdapter = {
         body: JSON.stringify({ raw }),
       })
 
-      const payload = (await response.json().catch(() => ({}))) as { id?: string; error?: { message?: string } }
+      const payload = (await response.json().catch(() => ({}))) as {
+        id?: string
+        threadId?: string
+        error?: { message?: string }
+      }
       if (!response.ok) {
         return { ok: false, error: truncateTransportError(payload.error?.message ?? `Gmail API ${response.status}`) }
       }
-      return { ok: true, provider_message_id: payload.id ?? undefined }
+
+      const providerMessageId = payload.id ?? undefined
+      if (!providerMessageId || !credentials.access_token) {
+        return { ok: true, provider_message_id: providerMessageId }
+      }
+
+      const metadata = await fetchGmailSentMessageMetadata(credentials.access_token, providerMessageId)
+      return {
+        ok: true,
+        provider_message_id: providerMessageId,
+        provider_thread_id: payload.threadId ?? metadata.threadId ?? undefined,
+        rfc_message_id: metadata.rfcMessageId ?? undefined,
+      }
     } catch (error) {
       return { ok: false, error: truncateTransportError(error instanceof Error ? error.message : "Google send failed.") }
     }

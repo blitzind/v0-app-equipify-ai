@@ -1,8 +1,10 @@
 import "server-only"
 
+import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GrowthInboxProviderRawMessage } from "@/lib/growth/inbox-sync/provider-message-normalizer"
 import { normalizeProviderMessage } from "@/lib/growth/inbox-sync/provider-message-normalizer"
 import type { GrowthInboxNormalizedMessage } from "@/lib/growth/inbox-sync/inbox-sync-types"
+import { createGoogleInboxSyncAdapter } from "@/lib/growth/inbox-sync/provider-sync-adapters/google-inbox-sync-adapter"
 
 export type GrowthInboxSyncAdapter = {
   providerFamily: string
@@ -16,7 +18,7 @@ function isSimulateEnabled(): boolean {
   return process.env.GROWTH_INBOX_SYNC_SIMULATE?.trim() === "true"
 }
 
-function fixtureMessages(providerFamily: string, mailboxConnectionId: string): GrowthInboxProviderRawMessage[] {
+function fixtureMessages(providerFamily: string): GrowthInboxProviderRawMessage[] {
   const now = new Date().toISOString()
   return [
     {
@@ -39,15 +41,31 @@ function fixtureMessages(providerFamily: string, mailboxConnectionId: string): G
       body_preview: "Let's schedule a call next week.",
       message_timestamp: now,
     },
-  ].map((message) => ({ ...message, provider_thread_id: message.provider_thread_id ?? null }))
+  ]
 }
 
-function createAdapter(providerFamily: string, mailboxConnectionId: string, supported: boolean): GrowthInboxSyncAdapter {
+function createSimulateAdapter(providerFamily: string, mailboxConnectionId: string): GrowthInboxSyncAdapter {
   return {
     providerFamily,
     async listRecentMessages() {
-      if (isSimulateEnabled()) return fixtureMessages(providerFamily, mailboxConnectionId)
-      if (!supported) return []
+      return fixtureMessages(providerFamily)
+    },
+    normalizeMessage(raw) {
+      return normalizeProviderMessage(raw, mailboxConnectionId)
+    },
+    getThreadId(raw) {
+      return raw.provider_thread_id?.trim() || null
+    },
+    getMessageId(raw) {
+      return raw.provider_message_id.trim()
+    },
+  }
+}
+
+function createUnsupportedAdapter(providerFamily: string, mailboxConnectionId: string): GrowthInboxSyncAdapter {
+  return {
+    providerFamily,
+    async listRecentMessages() {
       return []
     },
     normalizeMessage(raw) {
@@ -65,16 +83,21 @@ function createAdapter(providerFamily: string, mailboxConnectionId: string, supp
 export function getInboxSyncAdapter(input: {
   providerFamily: string
   mailboxConnectionId: string
+  admin: SupabaseClient
 }): GrowthInboxSyncAdapter {
+  if (isSimulateEnabled()) {
+    return createSimulateAdapter(input.providerFamily, input.mailboxConnectionId)
+  }
+
   switch (input.providerFamily) {
     case "google":
-      return createAdapter("google", input.mailboxConnectionId, true)
+      return createGoogleInboxSyncAdapter(input.admin, input.mailboxConnectionId)
     case "microsoft":
-      return createAdapter("microsoft", input.mailboxConnectionId, true)
+      return createUnsupportedAdapter("microsoft", input.mailboxConnectionId)
     case "smtp":
-      return createAdapter("smtp", input.mailboxConnectionId, false)
+      return createUnsupportedAdapter("smtp", input.mailboxConnectionId)
     case "custom":
     default:
-      return createAdapter(input.providerFamily, input.mailboxConnectionId, false)
+      return createUnsupportedAdapter(input.providerFamily, input.mailboxConnectionId)
   }
 }

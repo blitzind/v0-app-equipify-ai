@@ -30,6 +30,11 @@ import {
 } from "../lib/growth/inbox-sync/inbox-sync-types"
 import { GROWTH_INBOX_SYNC_SCHEMA_MIGRATION } from "../lib/growth/inbox-sync/inbox-sync-schema-health"
 import { classifyReply } from "../lib/growth/inbox/reply-classifier"
+import {
+  normalizeRfcMessageId,
+  parseEmailAddress,
+  parseReferencesHeader,
+} from "../lib/growth/inbox-sync/gmail-message-utils"
 
 function readSource(relativePath: string): string {
   return fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
@@ -86,6 +91,9 @@ async function main(): Promise<void> {
     deliveryAttemptByReference: new Map([
       ["transport-1", { attemptId: "attempt-1", leadId: "lead-1", enrollmentId: "enroll-1" }],
     ]),
+    deliveryAttemptByThreadId: new Map([
+      ["gmail-thread-outbound-1", { attemptId: "attempt-2", leadId: "lead-3", enrollmentId: "enroll-3" }],
+    ]),
     leadIdByEmailHash: new Map([[hashEmailAddress("buyer@acme.com"), "lead-2"]]),
     threadSubjectById: new Map([["inbox-thread-2", "Demo request"]]),
     threadLeadById: new Map([
@@ -97,6 +105,7 @@ async function main(): Promise<void> {
 
   assert.deepEqual(resolveThreadMatchOrder(), [
     "provider_thread_id",
+    "delivery_thread_id",
     "provider_message_id",
     "message_reference",
     "email_hash",
@@ -134,15 +143,43 @@ async function main(): Promise<void> {
   assert.equal(referenceMatch.matchedBy, "message_reference")
   assert.equal(referenceMatch.deliveryAttemptId, "attempt-1")
 
+  const deliveryThreadMatch = resolveThreadMatchFromContext(
+    {
+      providerThreadId: "gmail-thread-outbound-1",
+      providerMessageId: "msg-4",
+      inReplyTo: null,
+      references: [],
+      fromEmail: "prospect@example.com",
+      fromEmailHash: hashEmailAddress("prospect@example.com"),
+      subject: "Re: follow up",
+    },
+    context,
+  )
+  assert.equal(deliveryThreadMatch.matchedBy, "delivery_thread_id")
+  assert.equal(deliveryThreadMatch.leadId, "lead-3")
+  assert.equal(deliveryThreadMatch.deliveryAttemptId, "attempt-2")
+
   assert.equal(maskInboxSyncEmail("prospect@example.com"), "pr…@example.com")
 
   const runnerSource = readSource("lib/growth/inbox-sync/inbox-sync-runner.ts")
   assert.match(runnerSource, /addInboxMessage/)
-  assert.match(runnerSource, /recordSequenceExitCandidate/)
+  assert.match(runnerSource, /reply_received/)
+  assert.match(runnerSource, /ingestGrowthReplyFromInboxSync/)
+  assert.doesNotMatch(runnerSource, /processReplyIntelligence/)
   assert.doesNotMatch(runnerSource, /autoReply|sendMail|executeTransportSend/)
 
+  const googleAdapterSource = readSource("lib/growth/inbox-sync/provider-sync-adapters/google-inbox-sync-adapter.ts")
+  assert.match(googleAdapterSource, /gmailApiFetch/)
+  assert.match(googleAdapterSource, /in:inbox/)
+
+  const gmailApiSource = readSource("lib/growth/inbox-sync/gmail-api-utils.ts")
+  assert.match(gmailApiSource, /gmail\.googleapis\.com/)
+
+  const oauthSource = readSource("lib/growth/provider-setup/google-oauth.ts")
+  assert.match(oauthSource, /gmail\.readonly/)
+
   const cronSource = readSource("app/api/cron/growth-inbox-sync/route.ts")
-  assert.match(cronSource, /CRON_SECRET/)
+  assert.match(cronSource, /runGrowthCronJob/)
   assert.match(cronSource, /runInboxSyncForEnabledMailboxes/)
   assert.doesNotMatch(cronSource, /sendMail|autoReply|executeTransportSend/)
 
@@ -157,6 +194,10 @@ async function main(): Promise<void> {
   assert.doesNotMatch(uiSource, /api_key|secret|password/i)
 
   assert.equal(classifyReply({ body: "What is pricing?" }).classification, "budget")
+
+  assert.equal(normalizeRfcMessageId("<abc@gmail.com>"), "abc@gmail.com")
+  assert.deepEqual(parseReferencesHeader("<one@test.com> <two@test.com>"), ["one@test.com", "two@test.com"])
+  assert.equal(parseEmailAddress("Jane Doe <jane@acme.com>"), "jane@acme.com")
 
   console.log("growth-inbox-sync: all checks passed")
 }

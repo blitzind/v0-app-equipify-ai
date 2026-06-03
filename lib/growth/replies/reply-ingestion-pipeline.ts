@@ -158,7 +158,7 @@ export async function ingestGrowthReply(
 
   const connectionId = input.connectionId ?? (await resolveConnectionForLead(admin, input.leadId))
   if (!connectionId) {
-    await markReplyIngestionProcessed(admin, ingestionEvent.id, { processingStatus: "skipped" })
+    await markReplyIngestionProcessed(admin, ingestionEvent.id, { processingStatus: "processed" })
     return { deduped: false, ingestionEventId: ingestionEvent.id, outboundReplyId: null, outboundReply: null }
   }
 

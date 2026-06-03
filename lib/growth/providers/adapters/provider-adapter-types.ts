@@ -86,6 +86,8 @@ export type ProviderAdapterCredentials = {
 export type ProviderSendResult = {
   ok: boolean
   provider_message_id?: string
+  provider_thread_id?: string
+  rfc_message_id?: string
   error?: string
   simulated?: boolean
 }

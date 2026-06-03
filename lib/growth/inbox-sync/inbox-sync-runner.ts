@@ -29,9 +29,8 @@ import {
   shouldCreateNewInboxThread,
 } from "@/lib/growth/inbox-sync/thread-matcher"
 import type { GrowthInboxSyncRunSummary } from "@/lib/growth/inbox-sync/inbox-sync-types"
-import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { ingestGrowthReplyFromInboxSync } from "@/lib/growth/replies/reply-ingestion-pipeline"
-import { processReplyIntelligence, leadHasCallablePhone } from "@/lib/growth/reply-intelligence/process-reply-intelligence"
+import { appendGrowthLeadTimelineEvent } from "@/lib/growth/timeline-repository"
 
 function isSimulateEnabled(): boolean {
   return process.env.GROWTH_INBOX_SYNC_SIMULATE?.trim() === "true"
@@ -69,6 +68,7 @@ export async function runInboxSyncForMailbox(
   const adapter = getInboxSyncAdapter({
     providerFamily: mailbox.provider_family,
     mailboxConnectionId: mailbox.id,
+    admin,
   })
 
   let messagesSeen = 0
@@ -228,19 +228,22 @@ export async function runInboxSyncForMailbox(
           },
         })
 
-        if (ingestion.outboundReply && !ingestion.deduped) {
-          const lead = await fetchGrowthLeadById(admin, leadId)
-          if (lead) {
-            await processReplyIntelligence(admin, {
-              reply: ingestion.outboundReply,
-              lead,
-              bodyPreview: message.bodyPreview,
-              hasCallablePhone: leadHasCallablePhone(lead, null),
-              senderEmail: message.fromEmail,
-              sequenceEnrollmentId: match.sequenceEnrollmentId,
-              ingestionEventId: ingestion.ingestionEventId,
-            })
-          }
+        if (!ingestion.deduped && leadId) {
+          await appendGrowthLeadTimelineEvent(admin, {
+            leadId,
+            eventType: "reply_received",
+            title: "Reply received",
+            summary: message.subject
+              ? `Inbound reply synced: ${message.subject}`
+              : "Inbound reply synced from Gmail mailbox.",
+            payload: {
+              ingestion_event_id: ingestion.ingestionEventId,
+              inbox_message_id: imported.message.id,
+              source: "google_mailbox_sync",
+              matched_by: match.matchedBy,
+              outbound_reply_id: ingestion.outboundReplyId,
+            },
+          }).catch(() => undefined)
         }
       }
 

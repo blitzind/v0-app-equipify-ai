@@ -5,6 +5,7 @@ const USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 const DEFAULT_SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/userinfo.email",
 ]
 

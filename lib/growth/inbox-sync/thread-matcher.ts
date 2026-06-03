@@ -8,6 +8,7 @@ export type GrowthInboxThreadMatchContext = {
   providerThreadMap: Map<string, string>
   providerMessageMap: Map<string, string>
   deliveryAttemptByReference: Map<string, { attemptId: string; leadId: string | null; enrollmentId: string | null }>
+  deliveryAttemptByThreadId: Map<string, { attemptId: string; leadId: string | null; enrollmentId: string | null }>
   leadIdByEmailHash: Map<string, string>
   threadSubjectById: Map<string, string>
   threadLeadById: Map<string, string>
@@ -32,6 +33,22 @@ export function resolveThreadMatchFromContext(
     const threadId = context.providerThreadMap.get(input.providerThreadId)
     if (threadId) {
       return buildMatch(threadId, "provider_thread_id", GROWTH_INBOX_THREAD_MATCH_CONFIDENCE.provider_thread, context, null)
+    }
+
+    const outboundAttempt = context.deliveryAttemptByThreadId.get(input.providerThreadId)
+    if (outboundAttempt) {
+      const threadId = findThreadForLead(context, outboundAttempt.leadId)
+      return {
+        inboxThreadId: threadId,
+        leadId: outboundAttempt.leadId,
+        deliveryAttemptId: outboundAttempt.attemptId,
+        sequenceEnrollmentId:
+          outboundAttempt.enrollmentId ??
+          (outboundAttempt.leadId ? context.activeEnrollmentByLeadId.get(outboundAttempt.leadId) ?? null : null),
+        matchedBy: "delivery_thread_id",
+        confidence: GROWTH_INBOX_THREAD_MATCH_CONFIDENCE.delivery_attempt,
+        createNew: !threadId,
+      }
     }
   }
 
@@ -139,6 +156,7 @@ function findThreadForLead(context: GrowthInboxThreadMatchContext, leadId: strin
 export function resolveThreadMatchOrder(): readonly string[] {
   return [
     "provider_thread_id",
+    "delivery_thread_id",
     "provider_message_id",
     "message_reference",
     "email_hash",

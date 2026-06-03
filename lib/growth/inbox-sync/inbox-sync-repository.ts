@@ -11,6 +11,7 @@ import type {
 import { maskInboxSyncEmail } from "@/lib/growth/inbox-sync/inbox-sync-types"
 import type { GrowthInboxThreadMatchContext } from "@/lib/growth/inbox-sync/thread-matcher"
 import { hashEmailAddress } from "@/lib/growth/inbox-sync/provider-message-normalizer"
+import { normalizeRfcMessageId } from "@/lib/growth/inbox-sync/gmail-message-utils"
 import {
   createInboxDedupeState,
   type GrowthInboxDedupeState,
@@ -225,6 +226,7 @@ export async function loadInboxThreadMatchContext(admin: SupabaseClient): Promis
     providerThreadMap: new Map(),
     providerMessageMap: new Map(),
     deliveryAttemptByReference: new Map(),
+    deliveryAttemptByThreadId: new Map(),
     leadIdByEmailHash: new Map(),
     threadSubjectById: new Map(),
     threadLeadById: new Map(),
@@ -237,7 +239,7 @@ export async function loadInboxThreadMatchContext(admin: SupabaseClient): Promis
     admin
       .schema("growth")
       .from("delivery_attempts")
-      .select("id, lead_id, sequence_enrollment_id, provider_message_id")
+      .select("id, lead_id, sequence_enrollment_id, provider_message_id, metadata")
       .not("provider_message_id", "is", null)
       .limit(5000),
     admin.schema("growth").from("leads").select("id, contact_email").not("contact_email", "is", null).limit(5000),
@@ -264,11 +266,24 @@ export async function loadInboxThreadMatchContext(admin: SupabaseClient): Promis
     const record = row as Row
     const providerMessageId = asString(record.provider_message_id)
     if (!providerMessageId) continue
-    context.deliveryAttemptByReference.set(providerMessageId, {
+
+    const attemptRef = {
       attemptId: asString(record.id),
       leadId: asString(record.lead_id) || null,
       enrollmentId: asString(record.sequence_enrollment_id) || null,
-    })
+    }
+    context.deliveryAttemptByReference.set(providerMessageId, attemptRef)
+
+    const metadata =
+      record.metadata && typeof record.metadata === "object" ? (record.metadata as Record<string, unknown>) : {}
+    const providerThreadId = asString(metadata.provider_thread_id)
+    if (providerThreadId) {
+      context.deliveryAttemptByThreadId.set(providerThreadId, attemptRef)
+    }
+    const rfcMessageId = normalizeRfcMessageId(asString(metadata.rfc_message_id))
+    if (rfcMessageId) {
+      context.deliveryAttemptByReference.set(rfcMessageId, attemptRef)
+    }
   }
 
   for (const row of leads.data ?? []) {
