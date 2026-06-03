@@ -46,6 +46,24 @@ export type SequenceExecutionRunInput = {
   cronMode?: boolean
 }
 
+function isUuid(value: string | null | undefined): value is string {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  )
+}
+
+/** UUID audit columns must use the human approver — cron workers pass actingUserId "system". */
+function resolveSequenceExecutionAuditActorUserId(
+  job: { humanApprovedBy: string | null },
+  input: Pick<SequenceExecutionRunInput, "approvedBy" | "actingUserId">,
+): string | null {
+  for (const candidate of [input.approvedBy, job.humanApprovedBy, input.actingUserId]) {
+    if (isUuid(candidate)) return candidate
+  }
+  return null
+}
+
 export async function approveSequenceExecutionJob(
   admin: SupabaseClient,
   input: {
@@ -409,10 +427,22 @@ export async function runSequenceExecutionJob(
     }
   }
 
+  const auditActorUserId = resolveSequenceExecutionAuditActorUserId(locked, input)
+  if (!auditActorUserId) {
+    await finalizeBlockedJob(admin, locked, "missing_audit_actor_user")
+    return {
+      ok: false,
+      jobId: locked.id,
+      status: "blocked",
+      message: "missing_audit_actor_user",
+      blocked: true,
+    }
+  }
+
   try {
     await enforceGovernanceIfReady(admin, {
       action: "sequence_job_run",
-      actorUserId: input.actingUserId,
+      actorUserId: auditActorUserId,
       actorEmail: input.actingUserEmail,
       sourceRoute: "sequence_execution.run",
       entityType: "sequence_execution_job",
@@ -434,7 +464,7 @@ export async function runSequenceExecutionJob(
     senderPoolId: payload.senderPoolId ?? locked.senderPoolId,
     qaDeliverabilityBypass: sendBypass.active ? sendBypass : null,
     actingUserEmail: input.actingUserEmail,
-    actingUserId: input.actingUserId,
+    actingUserId: auditActorUserId,
   })
   if (!suppression.allowed) {
     await finalizeBlockedJob(admin, locked, suppression.reason ?? "suppression_blocked")
@@ -461,7 +491,7 @@ export async function runSequenceExecutionJob(
     sequence_enrollment_id: locked.sequenceEnrollmentId,
     human_approved: true,
     human_approval_confirmed: true,
-    actorUserId: input.actingUserId,
+    actorUserId: auditActorUserId,
     actorEmail: input.actingUserEmail,
     qa_deliverability_bypass: sendBypass.active ? sendBypass : null,
     metadata: {
@@ -596,7 +626,7 @@ export async function runSequenceExecutionJob(
 
   await advanceGrowthSequenceEnrollmentAfterStep(admin, {
     enrollmentStepId: locked.sequenceStepId,
-    actingUserId: input.actingUserId,
+    actingUserId: auditActorUserId,
     actingUserEmail: input.actingUserEmail,
   })
 
