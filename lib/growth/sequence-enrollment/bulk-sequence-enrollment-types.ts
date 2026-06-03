@@ -6,6 +6,7 @@ export const GROWTH_SEQUENCE_BULK_ENROLL_QA_MARKER = "growth-sequence-bulk-enrol
 
 export type BulkSequenceEnrollmentLeadOutcome = {
   leadId: string
+  leadLabel?: string
   enrollmentId?: string
   code?: string
   reason?: string

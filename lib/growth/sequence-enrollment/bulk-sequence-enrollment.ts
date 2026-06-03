@@ -22,9 +22,17 @@ export { GROWTH_SEQUENCE_BULK_ENROLL_MAX_LEADS } from "@/lib/growth/sequence-enr
 
 function outcome(
   leadId: string,
-  input?: { enrollmentId?: string; code?: string; reason?: string },
+  input?: { enrollmentId?: string; code?: string; reason?: string; leadLabel?: string },
 ): BulkSequenceEnrollmentLeadOutcome {
   return { leadId, ...input }
+}
+
+function leadLabelFromLead(lead: { companyName?: string | null; contactName?: string | null }): string | undefined {
+  const company = lead.companyName?.trim()
+  if (company) return company
+  const contact = lead.contactName?.trim()
+  if (contact) return contact
+  return undefined
 }
 
 async function resolveExistingEnrollment(
@@ -77,6 +85,8 @@ async function enrollSingleLeadInGrowthSequence(
     return { bucket: "failed", item: outcome(input.leadId, { code: "not_found", reason: "Lead not found." }) }
   }
 
+  const label = leadLabelFromLead(lead)
+
   const existing = await resolveExistingEnrollment(admin, input.leadId, input.patternId)
   if (existing.kind === "same_pattern") {
     if (existing.status === "draft" && input.startImmediately && !input.dryRun) {
@@ -89,13 +99,18 @@ async function enrollSingleLeadInGrowthSequence(
         })
         return {
           bucket: "enrolled",
-          item: outcome(input.leadId, { enrollmentId: confirmed.id, code: "confirmed_existing_draft" }),
+          item: outcome(input.leadId, { enrollmentId: confirmed.id, code: "confirmed_existing_draft", leadLabel: label }),
         }
       } catch (error) {
         const code = error instanceof Error ? error.message : "confirm_failed"
         return {
           bucket: "failed",
-          item: outcome(input.leadId, { enrollmentId: existing.enrollmentId, code, reason: "Could not confirm existing draft enrollment." }),
+          item: outcome(input.leadId, {
+            enrollmentId: existing.enrollmentId,
+            code,
+            reason: "Could not confirm existing draft enrollment.",
+            leadLabel: label,
+          }),
         }
       }
     }
@@ -106,6 +121,7 @@ async function enrollSingleLeadInGrowthSequence(
         enrollmentId: existing.enrollmentId,
         code: "already_enrolled",
         reason: "Lead is already enrolled in this sequence.",
+        leadLabel: label,
       }),
     }
   }
@@ -117,6 +133,7 @@ async function enrollSingleLeadInGrowthSequence(
         enrollmentId: existing.enrollmentId,
         code: "active_enrollment",
         reason: "Lead already has an active sequence enrollment on a different pattern.",
+        leadLabel: label,
       }),
     }
   }
@@ -130,6 +147,7 @@ async function enrollSingleLeadInGrowthSequence(
       item: outcome(input.leadId, {
         code: preflight.code ?? "preflight_blocked",
         reason: preflight.reason ?? "Sequence enrollment blocked.",
+        leadLabel: label,
       }),
     }
   }
@@ -137,7 +155,7 @@ async function enrollSingleLeadInGrowthSequence(
   if (input.dryRun) {
     return {
       bucket: "enrolled",
-      item: outcome(input.leadId, { code: "dry_run_would_enroll", reason: "Preflight passed — would enroll." }),
+      item: outcome(input.leadId, { code: "dry_run_would_enroll", reason: "Preflight passed — would enroll.", leadLabel: label }),
     }
   }
 
@@ -154,7 +172,7 @@ async function enrollSingleLeadInGrowthSequence(
     if (!input.startImmediately) {
       return {
         bucket: "enrolled",
-        item: outcome(input.leadId, { enrollmentId: draft.id, code: "draft_created" }),
+        item: outcome(input.leadId, { enrollmentId: draft.id, code: "draft_created", leadLabel: label }),
       }
     }
 
@@ -167,13 +185,13 @@ async function enrollSingleLeadInGrowthSequence(
 
     return {
       bucket: "enrolled",
-      item: outcome(input.leadId, { enrollmentId: confirmed.id, code: "enrolled_active" }),
+      item: outcome(input.leadId, { enrollmentId: confirmed.id, code: "enrolled_active", leadLabel: label }),
     }
   } catch (error) {
     const code = error instanceof Error ? error.message : "enrollment_failed"
     return {
       bucket: "failed",
-      item: outcome(input.leadId, { code, reason: "Could not enroll lead in sequence." }),
+      item: outcome(input.leadId, { code, reason: "Could not enroll lead in sequence.", leadLabel: label }),
     }
   }
 }

@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ArrowRight, CheckCircle2, GitBranch, Loader2 } from "lucide-react"
+import { ArrowRight, CheckCircle2, GitBranch, Loader2, TriangleAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -30,6 +30,15 @@ import type {
 } from "@/lib/growth/sequence-enrollment/bulk-sequence-enrollment-types"
 import { GROWTH_SEQUENCE_BULK_ENROLL_MAX_LEADS } from "@/lib/growth/sequence-enrollment/bulk-sequence-enrollment-types"
 import {
+  buildBulkEnrollmentSchedulerExecutionHref,
+  classifyBulkEnrollmentResult,
+  explainSchedulerNoJobsPlanned,
+  formatBulkEnrollmentOutcomeDetail,
+  formatBulkEnrollmentOutcomeLeadLabel,
+  pickBulkEnrollmentPrimaryEnrollmentId,
+  pickBulkEnrollmentPrimaryLeadId,
+} from "@/lib/growth/sequence-enrollment/bulk-enrollment-result-ui"
+import {
   growthLeadsCrmHref,
   growthPatternEnrollmentDetailHref,
   growthSequenceExecutionHref,
@@ -46,21 +55,10 @@ type GrowthBulkSequenceEnrollmentDialogProps = {
   onDismissAfterSuccess?: () => void
 }
 
-function pickPrimaryEnrollmentId(result: BulkSequenceEnrollmentResult): string | null {
-  return (
-    result.enrolled.find((entry) => entry.enrollmentId)?.enrollmentId ??
-    result.skippedAlreadyEnrolled.find((entry) => entry.enrollmentId)?.enrollmentId ??
-    null
-  )
-}
-
-function pickPrimaryLeadId(result: BulkSequenceEnrollmentResult, fallbackLeadIds: string[]): string | null {
-  return (
-    result.enrolled[0]?.leadId ??
-    result.skippedAlreadyEnrolled[0]?.leadId ??
-    fallbackLeadIds[0] ??
-    null
-  )
+function resultBannerClass(variant: "success" | "warning" | "failure"): string {
+  if (variant === "success") return "border-emerald-200 bg-emerald-50/80 text-emerald-950"
+  if (variant === "warning") return "border-amber-200 bg-amber-50/80 text-amber-950"
+  return "border-destructive/30 bg-destructive/5 text-destructive"
 }
 
 export function GrowthBulkSequenceEnrollmentDialog({
@@ -80,15 +78,16 @@ export function GrowthBulkSequenceEnrollmentDialog({
   const [schedulerLoading, setSchedulerLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<BulkSequenceEnrollmentResult | null>(null)
-  const [schedulerResult, setSchedulerResult] = useState<GrowthSequenceSchedulerRunResult | null>(null)
+  const [schedulerNoJobsExplanation, setSchedulerNoJobsExplanation] = useState<string[] | null>(null)
   const [enrollmentDetail, setEnrollmentDetail] = useState<PatternEnrollmentDetailView | null>(null)
 
   const uniqueLeadIds = useMemo(() => [...new Set(leadIds)], [leadIds])
   const overLimit = uniqueLeadIds.length > GROWTH_SEQUENCE_BULK_ENROLL_MAX_LEADS
   const selectedPattern = patterns.find((entry) => entry.id === patternId)
-  const showSuccess = Boolean(result && !result.dryRun)
-  const primaryEnrollmentId = result ? pickPrimaryEnrollmentId(result) : null
-  const primaryLeadId = result ? pickPrimaryLeadId(result, uniqueLeadIds) : null
+  const showResult = Boolean(result && !result.dryRun)
+  const resultUi = result && !result.dryRun ? classifyBulkEnrollmentResult(result) : null
+  const primaryEnrollmentId = result ? pickBulkEnrollmentPrimaryEnrollmentId(result) : null
+  const primaryLeadId = result ? pickBulkEnrollmentPrimaryLeadId(result, uniqueLeadIds) : null
 
   const notifySuccessDismissal = useCallback(() => {
     if (result && !result.dryRun) onDismissAfterSuccess?.()
@@ -120,22 +119,26 @@ export function GrowthBulkSequenceEnrollmentDialog({
   const loadEnrollmentDetail = useCallback(async (enrollmentId: string) => {
     const res = await fetch(`/api/platform/growth/sequences/enrollments/${enrollmentId}`, { cache: "no-store" })
     const data = (await res.json().catch(() => ({}))) as { ok?: boolean; detail?: PatternEnrollmentDetailView }
-    if (res.ok && data.ok && data.detail) setEnrollmentDetail(data.detail)
+    if (res.ok && data.ok && data.detail) {
+      setEnrollmentDetail(data.detail)
+      return data.detail
+    }
+    return null
   }, [])
 
   useEffect(() => {
     if (!open) return
     setError(null)
     setResult(null)
-    setSchedulerResult(null)
+    setSchedulerNoJobsExplanation(null)
     setEnrollmentDetail(null)
     void loadPatterns()
   }, [open, loadPatterns])
 
   useEffect(() => {
-    if (!primaryEnrollmentId || !showSuccess) return
+    if (!primaryEnrollmentId || !showResult) return
     void loadEnrollmentDetail(primaryEnrollmentId)
-  }, [primaryEnrollmentId, showSuccess, loadEnrollmentDetail])
+  }, [primaryEnrollmentId, showResult, loadEnrollmentDetail])
 
   async function submit(dryRun: boolean) {
     if (!patternId || uniqueLeadIds.length === 0 || overLimit) return
@@ -172,8 +175,10 @@ export function GrowthBulkSequenceEnrollmentDialog({
   }
 
   async function runScheduler() {
+    if (!resultUi?.showSchedulerCta || !result) return
     setSchedulerLoading(true)
     setError(null)
+    setSchedulerNoJobsExplanation(null)
     try {
       const res = await fetch("/api/platform/growth/sequences/scheduler/run", {
         method: "POST",
@@ -186,8 +191,33 @@ export function GrowthBulkSequenceEnrollmentDialog({
         message?: string
       }
       if (!res.ok || !data.ok || !data.result) throw new Error(data.message ?? "Scheduler run failed.")
-      setSchedulerResult(data.result)
-      if (primaryEnrollmentId) await loadEnrollmentDetail(primaryEnrollmentId)
+
+      let detail = enrollmentDetail
+      if (primaryEnrollmentId) {
+        detail = (await loadEnrollmentDetail(primaryEnrollmentId)) ?? detail
+      }
+
+      const executionHref = buildBulkEnrollmentSchedulerExecutionHref({
+        schedulerResult: data.result,
+        enrollmentDetail: detail,
+        enrollmentId: primaryEnrollmentId,
+        leadId: primaryLeadId,
+        sequencePatternId: result.sequencePatternId,
+      })
+
+      if (executionHref) {
+        notifySuccessDismissal()
+        router.push(executionHref)
+        return
+      }
+
+      setSchedulerNoJobsExplanation(
+        explainSchedulerNoJobsPlanned({
+          schedulerResult: data.result,
+          enrollmentDetail: detail,
+          bulkResult: result,
+        }),
+      )
     } catch (e) {
       setError(e instanceof Error ? e.message : "Scheduler run failed.")
     } finally {
@@ -198,7 +228,10 @@ export function GrowthBulkSequenceEnrollmentDialog({
   function renderOutcomeRow(entry: BulkSequenceEnrollmentLeadOutcome, label: string) {
     return (
       <li key={`${label}-${entry.leadId}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/70 px-2 py-1.5">
-        <span className="text-muted-foreground">{label}</span>
+        <div className="min-w-0">
+          <p className="font-medium">{formatBulkEnrollmentOutcomeLeadLabel(entry)}</p>
+          <p className="text-xs text-muted-foreground">{label}</p>
+        </div>
         {entry.enrollmentId ? (
           <Button size="sm" variant="link" className="h-auto px-0" asChild>
             <Link href={growthPatternEnrollmentDetailHref(entry.enrollmentId)} onClick={notifySuccessDismissal}>
@@ -206,8 +239,18 @@ export function GrowthBulkSequenceEnrollmentDialog({
             </Link>
           </Button>
         ) : (
-          <span className="text-xs text-muted-foreground">{entry.reason ?? entry.code}</span>
+          <span className="text-xs text-muted-foreground">{formatBulkEnrollmentOutcomeDetail(entry)}</span>
         )}
+      </li>
+    )
+  }
+
+  function renderIssueRow(entry: BulkSequenceEnrollmentLeadOutcome) {
+    return (
+      <li key={entry.leadId} className="rounded-md border border-border/70 px-2 py-1.5">
+        <p className="font-medium">{formatBulkEnrollmentOutcomeLeadLabel(entry)}</p>
+        <p className="text-xs text-muted-foreground">{formatBulkEnrollmentOutcomeDetail(entry)}</p>
+        {entry.code ? <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{entry.code}</p> : null}
       </li>
     )
   }
@@ -218,26 +261,36 @@ export function GrowthBulkSequenceEnrollmentDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <GitBranch className="size-4" />
-            {showSuccess ? "Enrollment complete" : "Bulk enroll in sequence"}
+            {resultUi ? resultUi.title : "Bulk enroll in sequence"}
           </DialogTitle>
           <DialogDescription>
-            {showSuccess
-              ? "Pattern enrollment succeeded. Review results below and continue in the enrollment detail or execution console."
+            {resultUi
+              ? resultUi.description
               : `Enroll ${uniqueLeadIds.length} lead(s) into a Growth sequence pattern. Human approval is still required before send.`}
           </DialogDescription>
         </DialogHeader>
 
-        {showSuccess && result ? (
+        {showResult && result && resultUi ? (
           <div className="space-y-4">
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-950">
+            <div className={`rounded-lg border px-4 py-3 text-sm ${resultBannerClass(resultUi.variant)}`}>
               <div className="flex items-start gap-2">
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+                {resultUi.variant === "success" ? (
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+                ) : (
+                  <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                )}
                 <div>
-                  <p className="font-medium">Enrollment processed for {selectedPattern?.label ?? "sequence pattern"}</p>
-                  <p className="mt-1 text-emerald-900/90">
-                    Pattern enrollments live in the outbound execution plane — not the legacy template table on the
-                    foundation dashboard.
+                  <p className="font-medium">
+                    {resultUi.variant === "failure"
+                      ? `No leads enrolled in ${selectedPattern?.label ?? "sequence pattern"}`
+                      : `Enrollment processed for ${selectedPattern?.label ?? "sequence pattern"}`}
                   </p>
+                  {resultUi.variant === "success" ? (
+                    <p className="mt-1 opacity-90">
+                      Pattern enrollments live in the outbound execution plane — not the legacy template table on the
+                      foundation dashboard.
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -272,6 +325,20 @@ export function GrowthBulkSequenceEnrollmentDialog({
               </div>
             ) : null}
 
+            {result.skippedBlocked.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Blocked</p>
+                <ul className="space-y-1 text-sm">{result.skippedBlocked.map((entry) => renderIssueRow(entry))}</ul>
+              </div>
+            ) : null}
+
+            {result.failed.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Failed to enroll</p>
+                <ul className="space-y-1 text-sm">{result.failed.map((entry) => renderIssueRow(entry))}</ul>
+              </div>
+            ) : null}
+
             {enrollmentDetail?.executionJobs.some((job) => ["draft", "pending_approval"].includes(job.status)) ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm">
                 <p className="font-medium">Jobs ready for approval</p>
@@ -297,17 +364,19 @@ export function GrowthBulkSequenceEnrollmentDialog({
               </div>
             ) : null}
 
-            {schedulerResult ? (
-              <p className="text-xs text-muted-foreground">
-                Scheduler queued {schedulerResult.queued} step(s)
-                {schedulerResult.executionJobsPlanned != null
-                  ? ` · ${schedulerResult.executionJobsPlanned} execution job(s) planned`
-                  : ""}
-              </p>
+            {schedulerNoJobsExplanation && schedulerNoJobsExplanation.length > 0 ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-950">
+                <p className="font-medium">No execution jobs planned</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {schedulerNoJobsExplanation.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
 
             <div className="flex flex-col gap-2">
-              {primaryEnrollmentId ? (
+              {resultUi.showViewEnrollment && primaryEnrollmentId ? (
                 <Button asChild>
                   <Link href={growthPatternEnrollmentDetailHref(primaryEnrollmentId)} onClick={notifySuccessDismissal}>
                     View Enrollment
@@ -315,10 +384,12 @@ export function GrowthBulkSequenceEnrollmentDialog({
                   </Link>
                 </Button>
               ) : null}
-              <Button variant="outline" onClick={() => void runScheduler()} disabled={schedulerLoading}>
-                {schedulerLoading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                Run Scheduler Now
-              </Button>
+              {resultUi.showSchedulerCta ? (
+                <Button variant="outline" onClick={() => void runScheduler()} disabled={schedulerLoading}>
+                  {schedulerLoading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                  Run Scheduler Now
+                </Button>
+              ) : null}
               <Button
                 variant="ghost"
                 onClick={() => {
@@ -328,7 +399,7 @@ export function GrowthBulkSequenceEnrollmentDialog({
               >
                 Back to Leads
               </Button>
-              {primaryEnrollmentId ? (
+              {resultUi.showViewEnrollment && primaryEnrollmentId ? (
                 <Button variant="secondary" asChild>
                   <Link
                     href={growthSequenceExecutionHref({
@@ -408,7 +479,7 @@ export function GrowthBulkSequenceEnrollmentDialog({
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-        {!showSuccess ? (
+        {!showResult ? (
           <DialogFooter className="gap-2 sm:justify-between">
             <Button type="button" variant="ghost" onClick={() => handleOpenChange(false)}>
               Close
