@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { sendEmail } from "@/lib/email/resend"
-import { buildQuoteEmailContent } from "@/lib/email/templates"
 import { isValidEmail } from "@/lib/email/format"
 import { parseUuid, requireOrganizationMember } from "@/lib/email/route-auth"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
 import { quoteStatusUiToDb } from "@/lib/org-quotes-invoices/map"
 import type { QuoteStatus } from "@/lib/mock-data"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
+import { loadQuoteDocumentContext } from "@/lib/quotes/load-quote-document-context"
+import { dispatchCustomerQuoteEmail } from "@/lib/quotes/dispatch-customer-quote-email"
 
 type Body = {
   organizationId?: string
@@ -53,82 +53,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "forbidden", message: "You do not have access to this organization." }, { status: 403 })
   }
 
-  // Phase 2 (Permissions): sending a quote bumps status / sent_at — gate on canEditQuotes.
   const capGate = await requireOrgPermission(organizationId, "canEditQuotes")
   if ("error" in capGate) return capGate.error
 
-  const { data: row, error: qErr } = await supabase
-    .from("org_quotes")
-    .select("id, customer_id, equipment_id, quote_number, title, amount_cents, status, expires_at, notes, archived_at")
-    .eq("id", quoteId)
-    .eq("organization_id", organizationId)
-    .maybeSingle()
-
-  if (qErr || !row || row.archived_at) {
+  const docCtx = await loadQuoteDocumentContext(supabase, organizationId, quoteId)
+  if (!docCtx) {
     return NextResponse.json({ error: "not_found", message: "Quote not found." }, { status: 404 })
   }
 
-  const [{ data: org }, { data: cust }] = await Promise.all([
-    supabase.from("organizations").select("name").eq("id", organizationId).maybeSingle(),
-    supabase
-      .from("customers")
-      .select("company_name")
-      .eq("organization_id", organizationId)
-      .eq("id", row.customer_id as string)
-      .maybeSingle(),
-  ])
-
-  const organizationName = (org as { name?: string } | null)?.name?.trim() || "Your service team"
-  const customerName = (cust as { company_name?: string } | null)?.company_name?.trim() || "Customer"
-
-  let equipmentLine = ""
-  if (row.equipment_id) {
-    const { data: eq } = await supabase
-      .from("equipment")
-      .select("name")
-      .eq("organization_id", organizationId)
-      .eq("id", row.equipment_id as string)
-      .maybeSingle()
-    equipmentLine = (eq as { name?: string } | null)?.name?.trim() ? `Equipment: ${(eq as { name: string }).name}` : ""
-  }
-
-  const quoteLabel = String(row.quote_number ?? "").trim() || "Quote"
-  const amountCents = Number(row.amount_cents ?? 0)
-  const amountLabel = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amountCents / 100)
-  const expRaw = row.expires_at as string | null
-  const expiresLabel = expRaw
-    ? new Date(expRaw).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-    : "—"
-  const notes = String(row.notes ?? "").trim()
-  const scopeSummary = [equipmentLine, notes ? notes.slice(0, 200) : ""].filter(Boolean).join(" · ") || undefined
-
-  const subjectOverride = typeof body.subject === "string" ? body.subject : undefined
   const messagePlain = typeof body.message === "string" ? body.message : undefined
+  const subjectOverride = typeof body.subject === "string" ? body.subject : undefined
 
-  const { subject, html, text } = buildQuoteEmailContent({
-    organizationName,
-    customerName,
-    quoteLabel,
-    amountLabel,
-    expiresLabel,
-    scopeSummary,
-    messagePlain,
-    subjectOverride,
-  })
-
-  const sendResult = await sendEmail({
-    to,
-    subject,
-    html,
-    text,
-    category: "quote_customer",
+  const dispatched = await dispatchCustomerQuoteEmail({
+    supabase,
     organizationId,
+    quoteId,
+    to,
+    subjectOverride,
+    messagePlain,
+    variant,
+    documentContext: docCtx,
   })
 
-  if (!sendResult.ok) {
-    const status = sendResult.code === "config" ? 503 : 502
-    return NextResponse.json({ error: "send_failed", message: sendResult.error }, { status })
+  if (!dispatched.ok) {
+    const status = dispatched.code === "config" ? 503 : 502
+    return NextResponse.json({ error: dispatched.code, message: dispatched.message }, { status })
   }
+
+  const sendResult = dispatched.send
+  const quoteLabel = docCtx.quoteNumberLabel
 
   const sentAt = new Date().toISOString()
   const rowPatch: Record<string, unknown> =
@@ -142,7 +95,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: "persist_failed",
-        message: `Email may have been delivered but status was not updated: ${upErr.message}`,
+        message: "Email may have been delivered but status was not updated.",
       },
       { status: 500 },
     )
@@ -158,7 +111,7 @@ export async function POST(request: Request) {
     countsTowardUnread: false,
     deliveryStatus: "sent",
     recipientKind: "customer",
-    recipientCustomerId: row.customer_id as string,
+    recipientCustomerId: docCtx.customerId,
     recipientAddress: to,
     relatedEntityType: "quote",
     relatedEntityId: quoteId,
@@ -166,7 +119,7 @@ export async function POST(request: Request) {
     providerMessageId: sendResult.id ?? null,
     sentAt,
     createdBy: user.id,
-    metadata: { variant },
+    metadata: { variant, pdfAttached: dispatched.pdfAttached },
   })
 
   return NextResponse.json({ ok: true, sentAt, emailId: sendResult.id })

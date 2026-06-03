@@ -10,6 +10,7 @@ export type QuoteEmailArgs = {
   scopeSummary?: string
   messagePlain?: string
   subjectOverride?: string
+  pdfAttached?: boolean
 }
 
 export function buildQuoteEmailContent(args: QuoteEmailArgs): { subject: string; html: string; text: string } {
@@ -27,9 +28,11 @@ ${args.scopeSummary ? `<li>${escapeHtml(args.scopeSummary)}</li>` : ""}
       plainTextToHtml(args.messagePlain)
     : `<p>We would be happy to schedule this work when you are ready. Reply to this email with any questions or to accept the quote.</p>`
   const attach =
-    "<p style=\"font-size:13px;color:#475569;\"><strong>Detailed PDF:</strong> A formatted quote PDF will be attached when document generation is enabled.</p>"
+    args.pdfAttached
+      ? "<p style=\"font-size:13px;color:#475569;\"><strong>PDF copy:</strong> The detailed quote is attached as a PDF to this email.</p>"
+      : ""
   const html = wrapEquipifyEmail(args.organizationName, `${intro}${bodyBlock}${attach}`)
-  const text = [
+  const textLines = [
     `Dear ${args.customerName},`,
     "",
     `Quote ${args.quoteLabel} from ${args.organizationName}`,
@@ -39,7 +42,9 @@ ${args.scopeSummary ? `<li>${escapeHtml(args.scopeSummary)}</li>` : ""}
     "",
     args.messagePlain?.trim() ||
       "Reply with questions or to proceed.",
-  ].join("\n")
+  ]
+  if (args.pdfAttached) textLines.push("", "A PDF copy of this quote is attached.")
+  const text = textLines.join("\n")
   return { subject, html, text }
 }
 

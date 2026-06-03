@@ -49,11 +49,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { useTenant } from "@/lib/tenant-store"
-import { documentBrandingFromTenantWorkspace } from "@/lib/organization/document-branding"
-import { buildQuoteDocumentHtml } from "@/lib/documents/simple-document-html"
-import { downloadCertificateHtmlFile } from "@/lib/certificates/certificate-pdf-html"
-import { escapeHtml } from "@/lib/email/format"
+import { buildQuotePdfFilename } from "@/lib/quotes/quote-pdf-filename"
 import type { QuoteInvoiceLineItem } from "@/lib/org-quotes-invoices/map"
 import type { CatalogListItemRow } from "@/lib/catalog/catalog-line-snapshots"
 import { buildQuoteInvoiceLineSnapshot } from "@/lib/catalog/catalog-line-snapshots"
@@ -576,6 +572,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   const [quoteEmailTo, setQuoteEmailTo] = useState("")
   const [quoteEmailNote, setQuoteEmailNote] = useState("")
   const [quoteEmailBusy, setQuoteEmailBusy] = useState(false)
+  const [downloadPdfBusy, setDownloadPdfBusy] = useState(false)
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [archiveBusy, setArchiveBusy] = useState(false)
   const [restoreBusy, setRestoreBusy] = useState(false)
@@ -622,37 +619,41 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
     return invoices.find((inv) => inv.quoteId === quote.id && !inv.isArchived) ?? null
   }, [invoices, quote])
 
-  const { workspace } = useTenant()
-  const documentBranding = useMemo(() => documentBrandingFromTenantWorkspace(workspace), [workspace])
-
-  function handleDownloadQuotePdf() {
-    if (!quote) return
-    const fmtMoney = (n: number) =>
-      new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n)
-    const rows =
-      quote.lineItems.filter((li) => li.description.trim()).length > 0 ?
-        quote.lineItems
-          .filter((li) => li.description.trim())
-          .map(
-            (li) =>
-              `<tr><td>${escapeHtml(li.description.trim())}</td><td class="num">${fmtMoney(li.qty * li.unit)}</td></tr>`,
-          )
-          .join("")
-      : `<tr><td>${escapeHtml(quote.description.trim() || "Quoted services")}</td><td class="num">${fmtMoney(quote.amount)}</td></tr>`
-    const html = buildQuoteDocumentHtml({
-      branding: documentBranding,
-      quoteNumber: quote.quoteNumber?.trim() || quote.id.slice(0, 8),
-      customerName: quote.customerName,
-      equipmentLabel: quote.equipmentName?.trim() || "—",
-      description: quote.description,
-      status: quote.status,
-      amount: quote.amount,
-      expiresDate: fmtDate(quote.expiresDate),
-      createdDate: fmtDate(quote.createdDate),
-      lineItemsHtml: rows,
-      notes: quote.notes?.trim() || null,
-    })
-    downloadCertificateHtmlFile(html, `Quote-${quote.quoteNumber?.trim() || "estimate"}`)
+  async function handleDownloadQuotePdf() {
+    if (!quote || downloadPdfBusy) return
+    const oid = activeOrgId?.trim()
+    if (!oid || orgStatus !== "ready") {
+      toast(orgStatus === "ready" && !oid ? "No organization selected." : "Loading organization…", "info")
+      return
+    }
+    setDownloadPdfBusy(true)
+    try {
+      const url = `/api/organizations/${encodeURIComponent(oid)}/quotes/${encodeURIComponent(quote.id)}/pdf`
+      const res = await fetch(url, { credentials: "include", cache: "no-store" })
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { message?: string }
+        toast(typeof j.message === "string" ? j.message : "Could not download PDF.", "info")
+        return
+      }
+      const blob = await res.blob()
+      const cd = res.headers.get("Content-Disposition")
+      let name = buildQuotePdfFilename(quote.quoteNumber?.trim() || "Quote")
+      const m = cd?.match(/filename="([^"]+)"/i)
+      if (m?.[1]) name = m[1].trim()
+      const href = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = href
+      a.download = name
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(href)
+      toast("Quote PDF downloaded")
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not download PDF.", "info")
+    } finally {
+      setDownloadPdfBusy(false)
+    }
   }
 
   useEffect(() => {
@@ -1300,9 +1301,18 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
                 variant="outline"
                 className="gap-1.5 text-xs cursor-pointer"
                 type="button"
-                onClick={() => handleDownloadQuotePdf()}
+                disabled={downloadPdfBusy}
+                onClick={() => void handleDownloadQuotePdf()}
               >
-                <Download className="w-3.5 h-3.5" /> Download PDF
+                {downloadPdfBusy ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Downloading…
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-3.5 h-3.5" /> Download PDF
+                  </>
+                )}
               </Button>
               <Button
                 size="sm"
@@ -1733,7 +1743,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
                 />
               </div>
               <p className="text-[11px] text-muted-foreground">
-                PDF attachments will be added when document generation is enabled.
+                A PDF copy of the quote will be attached to this email.
               </p>
             </div>
             <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
