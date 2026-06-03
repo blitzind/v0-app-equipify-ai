@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
-import { AlertTriangle, CheckCircle2, Clock, Loader2, Play, RefreshCw, ShieldCheck, SkipForward } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Clock, Loader2, Play, RefreshCw, RotateCcw, ShieldCheck, SkipForward } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import {
@@ -12,6 +12,13 @@ import {
   type GrowthSequenceSafeExecutionDashboard,
   sequenceExecutionStatusLabel,
 } from "@/lib/growth/sequences/execution/sequence-execution-types"
+import { growthLeadDetailHref } from "@/lib/growth/sequence-enrollment/enrollment-navigation"
+import {
+  GROWTH_SEQUENCE_EXECUTION_FOCUS_JOB_EVENT,
+  GROWTH_SEQUENCE_EXECUTION_JOB_HIGHLIGHT_CLASS,
+  scheduleSequenceExecutionJobFocus,
+  sequenceExecutionJobRowId,
+} from "@/lib/growth/sequence-enrollment/sequence-execution-job-focus"
 import { channelTypeLabel, taskStatusLabel, type GrowthSequenceChannelTask } from "@/lib/growth/multichannel/multichannel-types"
 import { cn } from "@/lib/utils"
 
@@ -100,10 +107,19 @@ export function GrowthSequenceSafeExecutionDashboard({
 
   useEffect(() => {
     if (!highlightJobId) return
-    requestAnimationFrame(() => {
-      document.getElementById(`sequence-job-${highlightJobId}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
-    })
+    scheduleSequenceExecutionJobFocus(highlightJobId)
   }, [highlightJobId, dashboard])
+
+  useEffect(() => {
+    function handleFocus(event: Event) {
+      const jobId = (event as CustomEvent<{ jobId?: string }>).detail?.jobId
+      if (!jobId) return
+      scheduleSequenceExecutionJobFocus(jobId)
+    }
+
+    window.addEventListener(GROWTH_SEQUENCE_EXECUTION_FOCUS_JOB_EVENT, handleFocus)
+    return () => window.removeEventListener(GROWTH_SEQUENCE_EXECUTION_FOCUS_JOB_EVENT, handleFocus)
+  }, [])
 
   async function planJobs() {
     setActionJobId("plan")
@@ -124,7 +140,21 @@ export function GrowthSequenceSafeExecutionDashboard({
     }
   }
 
-  async function jobAction(jobId: string, action: "approve" | "run" | "skip") {
+  async function jobAction(jobId: string, action: "approve" | "run" | "skip" | "restore") {
+    if (action === "skip") {
+      const confirmed = window.confirm(
+        "Skip this execution job? The enrollment step will advance. Unsent skipped jobs can be restored later.",
+      )
+      if (!confirmed) return
+    }
+
+    if (action === "restore") {
+      const confirmed = window.confirm(
+        "Restore this skipped job to pending approval? You will still need to Approve & Queue Send before delivery.",
+      )
+      if (!confirmed) return
+    }
+
     setActionJobId(jobId)
     setError(null)
     try {
@@ -315,10 +345,12 @@ export function GrowthSequenceSafeExecutionDashboard({
                     key={job.id}
                     job={job}
                     busy={actionJobId === job.id}
+                    highlighted={highlightJobId === job.id}
                     soloApprovalEnabled={dashboard.soloApprovalEnabled === true}
                     onApprove={() => void jobAction(job.id, "approve")}
                     onRun={() => void jobAction(job.id, "run")}
                     onSkip={() => void jobAction(job.id, "skip")}
+                    onRestore={() => void jobAction(job.id, "restore")}
                   />
                 ))}
               </tbody>
@@ -367,24 +399,35 @@ export function GrowthSequenceSafeExecutionDashboard({
 function JobRow({
   job,
   busy,
+  highlighted,
   soloApprovalEnabled,
   onApprove,
   onRun,
   onSkip,
+  onRestore,
 }: {
   job: GrowthSequenceExecutionJobView
   busy: boolean
+  highlighted?: boolean
   soloApprovalEnabled: boolean
   onApprove: () => void
   onRun: () => void
   onSkip: () => void
+  onRestore: () => void
 }) {
   const canApprove = ["draft", "pending_approval", "blocked", "failed"].includes(job.status)
   const canRun = !soloApprovalEnabled && job.status === "approved" && Boolean(job.humanApprovedAt)
   const canSkip = !["sent", "skipped"].includes(job.status)
+  const canRestore = job.status === "skipped" && !job.deliveryAttemptId
 
   return (
-    <tr id={`sequence-job-${job.id}`} className="border-b border-border/70 align-top">
+    <tr
+      id={sequenceExecutionJobRowId(job.id)}
+      className={cn(
+        "border-b border-border/70 align-top transition-colors",
+        highlighted ? GROWTH_SEQUENCE_EXECUTION_JOB_HIGHLIGHT_CLASS : undefined,
+      )}
+    >
       <td className="px-2 py-3 font-medium">{job.leadLabel}</td>
       <td className="px-2 py-3 text-muted-foreground">{job.sequenceLabel}</td>
       <td className="px-2 py-3 text-muted-foreground">{job.stepLabel}</td>
@@ -438,7 +481,7 @@ function JobRow({
       <td className="px-2 py-3">
         <div className="flex flex-wrap gap-1">
           {canApprove ? (
-            <Button variant="outline" size="sm" disabled={busy} onClick={onApprove}>
+            <Button variant="outline" size="sm" disabled={busy} data-sequence-action="approve" onClick={onApprove}>
               {soloApprovalEnabled ? "Approve & Queue Send" : "Approve"}
             </Button>
           ) : null}
@@ -460,8 +503,14 @@ function JobRow({
               Skip
             </Button>
           ) : null}
+          {canRestore ? (
+            <Button variant="ghost" size="sm" disabled={busy} onClick={onRestore}>
+              <RotateCcw className="mr-1 size-3.5" />
+              Restore
+            </Button>
+          ) : null}
           <Button variant="ghost" size="sm" asChild>
-            <Link href={`/admin/growth/leads/${job.leadId}`}>View Lead</Link>
+            <Link href={growthLeadDetailHref(job.leadId, "growth.leads")}>View Lead</Link>
           </Button>
         </div>
       </td>

@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
 import { ArrowRight, CheckCircle2, GitBranch, Loader2, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -10,6 +11,7 @@ import {
   growthPatternEnrollmentDetailHref,
   growthSequenceExecutionHref,
 } from "@/lib/growth/sequence-enrollment/enrollment-navigation"
+import { dispatchSequenceExecutionJobFocus } from "@/lib/growth/sequence-enrollment/sequence-execution-job-focus"
 import type { GrowthSequenceSchedulerRunResult } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
 
 type GrowthEnrollmentExecutionContextProps = {
@@ -30,6 +32,28 @@ export function GrowthEnrollmentExecutionContext({
   const [schedulerLoading, setSchedulerLoading] = useState(false)
   const [schedulerResult, setSchedulerResult] = useState<GrowthSequenceSchedulerRunResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const pathname = usePathname()
+  const router = useRouter()
+
+  const navigateToExecutionJob = useCallback(
+    (jobId: string) => {
+      const href = growthSequenceExecutionHref({
+        enrollmentId: detail?.enrollment.id ?? enrollmentId ?? undefined,
+        leadId: detail?.leadId ?? leadId ?? undefined,
+        sequencePatternId: sequencePatternId ?? undefined,
+        highlightJobId: jobId,
+      })
+
+      if (pathname === "/admin/growth/sequences/execution") {
+        router.push(href, { scroll: false })
+        dispatchSequenceExecutionJobFocus(jobId)
+        return
+      }
+
+      router.push(href)
+    },
+    [detail, enrollmentId, leadId, pathname, router, sequencePatternId],
+  )
 
   const load = useCallback(async () => {
     if (!enrollmentId) {
@@ -154,17 +178,9 @@ export function GrowthEnrollmentExecutionContext({
                 <GrowthBadge label="Pending approval" tone="attention" />
                 <span>Step {job.stepOrder ?? "—"}</span>
               </div>
-              <Button size="sm" variant="outline" asChild>
-                <Link
-                  href={growthSequenceExecutionHref({
-                    enrollmentId: detail?.enrollment.id,
-                    leadId: detail?.leadId ?? leadId ?? undefined,
-                    highlightJobId: job.id,
-                  })}
-                >
-                  Ready for approval
-                  <ArrowRight className="ml-2 size-4" />
-                </Link>
+              <Button size="sm" variant="outline" onClick={() => navigateToExecutionJob(job.id)}>
+                Ready for approval
+                <ArrowRight className="ml-2 size-4" />
               </Button>
             </div>
           ))}
@@ -177,16 +193,8 @@ export function GrowthEnrollmentExecutionContext({
           {approvedJobs.map((job) => (
             <div key={job.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-white/70 px-3 py-2">
               <GrowthBadge label="Approved" tone="healthy" />
-              <Button size="sm" variant="outline" asChild>
-                <Link
-                  href={growthSequenceExecutionHref({
-                    enrollmentId: detail?.enrollment.id,
-                    leadId: detail?.leadId ?? leadId ?? undefined,
-                    highlightJobId: job.id,
-                  })}
-                >
-                  View approved job
-                </Link>
+              <Button size="sm" variant="outline" onClick={() => navigateToExecutionJob(job.id)}>
+                View approved job
               </Button>
             </div>
           ))}

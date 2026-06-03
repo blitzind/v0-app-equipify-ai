@@ -9,6 +9,8 @@ import {
   GROWTH_PATTERN_ENROLLMENT_DETAIL_QA_MARKER,
   growthPatternEnrollmentDetailHref,
   growthSequenceExecutionHref,
+  growthCrmLeadDetailHref,
+  growthLeadDetailHref,
 } from "../lib/growth/sequence-enrollment/enrollment-navigation"
 import { GROWTH_ENROLLMENT_PLANES_DOC } from "../lib/growth/sequence-enrollment/enrollment-planes-doc"
 
@@ -25,8 +27,10 @@ assert.match(
     leadId: "00000000-0000-4000-8000-000000000002",
     highlightJobId: "00000000-0000-4000-8000-000000000003",
   }),
-  /enrollmentId=/,
+  /highlightJobId=/,
 )
+assert.match(growthCrmLeadDetailHref("00000000-0000-4000-8000-000000000002"), /open=/)
+assert.match(growthLeadDetailHref("00000000-0000-4000-8000-000000000002"), /crm/)
 
 const bulkDialog = readSource("components/growth/growth-bulk-sequence-enrollment-dialog.tsx")
 assert.match(bulkDialog, /View Enrollment/)
@@ -60,6 +64,8 @@ const executionContext = readSource("components/growth/growth-enrollment-executi
 assert.match(executionContext, /no execution job planned yet/i)
 assert.match(executionContext, /Run Scheduler Now/)
 assert.match(executionContext, /pending approval/)
+assert.match(executionContext, /navigateToExecutionJob/)
+assert.match(executionContext, /dispatchSequenceExecutionJobFocus/)
 
 const foundation = readSource("components/growth/growth-sequence-execution-foundation-dashboard.tsx")
 assert.match(foundation, /Pattern Enrollments \(Outbound\)/)

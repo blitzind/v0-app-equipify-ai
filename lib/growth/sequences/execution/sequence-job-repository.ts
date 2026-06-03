@@ -204,6 +204,18 @@ export async function listSequenceExecutionJobsForEnrollment(
   return (data ?? []).map((row) => mapJob(row as JobRow))
 }
 
+export async function listSequenceExecutionJobsForStep(
+  admin: SupabaseClient,
+  sequenceStepId: string,
+): Promise<GrowthSequenceExecutionJob[]> {
+  const { data, error } = await jobsTable(admin)
+    .select("*")
+    .eq("sequence_step_id", sequenceStepId)
+    .order("created_at", { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((row) => mapJob(row as JobRow))
+}
+
 export async function tryLockSequenceExecutionJob(
   admin: SupabaseClient,
   jobId: string,

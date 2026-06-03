@@ -137,6 +137,10 @@ async function main(): Promise<void> {
   assert.match(uiSource, /Pending Approval/)
   assert.match(uiSource, /Sent 24h/)
   assert.match(uiSource, /Experiment/)
+  assert.match(uiSource, /window\.confirm/)
+  assert.match(uiSource, /growthLeadDetailHref/)
+  assert.match(uiSource, /Restore/)
+  assert.match(runnerSource, /restoreSequenceExecutionJob/)
   assert.doesNotMatch(uiSource, /api_key|secret|password/i)
 
   console.log("growth sequence safe execution tests passed")

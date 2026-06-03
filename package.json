@@ -114,6 +114,7 @@
     "test:growth-qa-deliverability-bypass": "tsx scripts/test-growth-qa-deliverability-bypass.ts",
     "test:growth-transport-readiness-alignment": "tsx scripts/test-growth-transport-readiness-alignment.ts",
     "test:growth-sequence-safe-execution": "tsx scripts/test-growth-sequence-safe-execution.ts",
+    "test:growth-sequence-execution-cta-restore": "tsx scripts/test-growth-sequence-execution-cta-restore.ts",
     "test:growth-lead-assignment": "tsx scripts/test-growth-lead-assignment.ts",
     "test:growth-notifications": "tsx scripts/test-growth-notifications.ts",
     "test:growth-opportunity-pipeline": "tsx scripts/test-growth-opportunity-pipeline.ts",

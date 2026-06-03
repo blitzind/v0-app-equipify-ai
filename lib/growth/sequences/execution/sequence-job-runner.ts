@@ -5,6 +5,14 @@ import { assertPreSendAllowed } from "@/lib/growth/compliance/pre-send-assertion
 import { enforceGovernanceIfReady } from "@/lib/growth/governance/governance-enforcement"
 import { advanceGrowthSequenceEnrollmentAfterStep } from "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
 import { skipGrowthSequenceEnrollmentStep } from "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
+import {
+  fetchGrowthSequenceEnrollmentById,
+  fetchGrowthSequenceEnrollmentStepById,
+  listGrowthSequenceEnrollmentSteps,
+  setLeadActiveSequenceEnrollment,
+  updateGrowthSequenceEnrollment,
+  updateGrowthSequenceEnrollmentStep,
+} from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
 import { executeTransportSend } from "@/lib/growth/providers/transport/transport-orchestrator"
 import { assertSequenceRunApproval } from "@/lib/growth/sequences/execution/sequence-approval-gate"
 import {
@@ -14,6 +22,8 @@ import {
 import type { GrowthSequenceExecutionRunResult } from "@/lib/growth/sequences/execution/sequence-execution-types"
 import {
   getSequenceExecutionJob,
+  findActiveSequenceExecutionJob,
+  listSequenceExecutionJobsForStep,
   tryLockSequenceExecutionJob,
   updateSequenceExecutionJob,
 } from "@/lib/growth/sequences/execution/sequence-job-repository"
@@ -145,6 +155,134 @@ export async function skipSequenceExecutionJob(
     jobId: job.id,
     enrollmentId: job.sequenceEnrollmentId,
     stepId: job.sequenceStepId,
+  })
+
+  return { ok: true, jobId: updated.id, status: updated.status }
+}
+
+function jobHasDeliveryAttempt(job: { status: string; deliveryAttemptId: string | null }): boolean {
+  return job.status === "sent" || Boolean(job.deliveryAttemptId)
+}
+
+async function revertEnrollmentAfterSkippedExecutionJobRestore(
+  admin: SupabaseClient,
+  job: { id: string; sequenceEnrollmentId: string; sequenceStepId: string | null },
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!job.sequenceStepId) return { ok: true }
+
+  const step = await fetchGrowthSequenceEnrollmentStepById(admin, job.sequenceStepId)
+  if (!step) return { ok: false, message: "step_not_found" }
+
+  const enrollment = await fetchGrowthSequenceEnrollmentById(admin, step.enrollmentId)
+  if (!enrollment) return { ok: false, message: "enrollment_not_found" }
+
+  if (["queued", "draft_created", "pending"].includes(step.status)) {
+    return { ok: true }
+  }
+
+  if (!["executed", "skipped"].includes(step.status)) {
+    return { ok: false, message: "step_not_revertible" }
+  }
+
+  const steps = await listGrowthSequenceEnrollmentSteps(admin, enrollment.id)
+  const nextStep = steps.find((entry) => entry.stepOrder === step.stepOrder + 1) ?? null
+
+  if (nextStep) {
+    const nextStepJobs = await listSequenceExecutionJobsForStep(admin, nextStep.id)
+    if (nextStepJobs.some((entry) => jobHasDeliveryAttempt(entry))) {
+      return { ok: false, message: "subsequent_step_sent" }
+    }
+
+    for (const entry of nextStepJobs) {
+      if (entry.id === job.id || jobHasDeliveryAttempt(entry)) continue
+      if (entry.status === "skipped") continue
+      await updateSequenceExecutionJob(admin, entry.id, {
+        status: "skipped",
+        lastError: "superseded_by_job_restore",
+        lockedAt: null,
+        lockedBy: null,
+      })
+    }
+
+    if (["draft_created", "queued", "pending"].includes(nextStep.status)) {
+      await updateGrowthSequenceEnrollmentStep(admin, nextStep.id, {
+        status: "pending",
+        generationId: null,
+        completedAt: null,
+        skipReason: null,
+      })
+    }
+  }
+
+  await updateGrowthSequenceEnrollmentStep(admin, step.id, {
+    status: "queued",
+    completedAt: null,
+    skipReason: null,
+  })
+
+  if (enrollment.status === "completed") {
+    await updateGrowthSequenceEnrollment(admin, enrollment.id, {
+      status: "active",
+      completedAt: null,
+    })
+    await setLeadActiveSequenceEnrollment(admin, step.leadId, enrollment.id)
+  }
+
+  await updateGrowthSequenceEnrollment(admin, enrollment.id, {
+    currentStepOrder: step.stepOrder,
+  })
+
+  return { ok: true }
+}
+
+export async function restoreSequenceExecutionJob(
+  admin: SupabaseClient,
+  input: { jobId: string; actingUserId: string; actingUserEmail: string },
+): Promise<GrowthSequenceExecutionRunResult> {
+  const job = await getSequenceExecutionJob(admin, input.jobId)
+  if (!job) return { ok: false, jobId: input.jobId, status: "failed", message: "job_not_found" }
+  if (job.status !== "skipped") {
+    return { ok: false, jobId: job.id, status: job.status, message: "invalid_status_for_restore" }
+  }
+  if (jobHasDeliveryAttempt(job)) {
+    return { ok: false, jobId: job.id, status: job.status, message: "delivery_attempt_exists" }
+  }
+
+  if (!job.sequenceStepId) {
+    return { ok: false, jobId: job.id, status: job.status, message: "missing_sequence_step" }
+  }
+
+  const active = await findActiveSequenceExecutionJob(admin, {
+    sequenceEnrollmentId: job.sequenceEnrollmentId,
+    sequenceStepId: job.sequenceStepId,
+  })
+  if (active) {
+    return { ok: false, jobId: job.id, status: job.status, message: "active_job_exists" }
+  }
+
+  const revert = await revertEnrollmentAfterSkippedExecutionJobRestore(admin, job)
+  if (!revert.ok) {
+    return { ok: false, jobId: job.id, status: job.status, message: revert.message }
+  }
+
+  const updated = await updateSequenceExecutionJob(admin, job.id, {
+    status: "pending_approval",
+    lastError: null,
+    humanApprovedAt: null,
+    humanApprovedBy: null,
+    lockedAt: null,
+    lockedBy: null,
+  })
+
+  await recordSequenceExecutionJobAuditEvent(admin, {
+    jobId: job.id,
+    eventType: "sequence_execution_job_restored",
+    title: "Execution job restored",
+    description: "Restored skipped job to pending approval — send still requires explicit approve.",
+    metadata: {
+      restored_by: input.actingUserId,
+      restored_by_email: input.actingUserEmail,
+    },
   })
 
   return { ok: true, jobId: updated.id, status: updated.status }
