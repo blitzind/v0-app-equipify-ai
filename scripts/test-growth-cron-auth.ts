@@ -6,6 +6,7 @@ import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
 import {
   buildGrowthCronAuthFailureLog,
+  describeConfiguredGrowthCronSecret,
   diagnoseGrowthCronAuth,
   extractGrowthCronBearerToken,
   hashGrowthCronAuthTokenPrefix,
@@ -108,6 +109,31 @@ function testUnauthorizedDiagnostics(): void {
   })
 }
 
+function testDescribeConfiguredGrowthCronSecret(): void {
+  const previous = process.env.CRON_SECRET
+  delete process.env.CRON_SECRET
+  try {
+    assert.deepEqual(describeConfiguredGrowthCronSecret(), {
+      configured: false,
+      length: 0,
+      hashPrefix: "",
+    })
+  } finally {
+    if (previous) process.env.CRON_SECRET = previous
+  }
+
+  withSecret(TEST_SECRET, () => {
+    const described = describeConfiguredGrowthCronSecret()
+    assert.equal(described.configured, true)
+    assert.equal(described.length, TEST_SECRET.length)
+    assert.equal(described.hashPrefix, hashGrowthCronAuthTokenPrefix(TEST_SECRET))
+    assert.equal(
+      described.hashPrefix,
+      createHash("sha256").update(TEST_SECRET, "utf8").digest("hex").slice(0, 8),
+    )
+  })
+}
+
 function testFailureLogHashDiagnostics(): void {
   withSecret(TEST_SECRET, () => {
     const mismatchLog = buildGrowthCronAuthFailureLog(
@@ -178,6 +204,7 @@ function main(): void {
   testAuthorizationVariants()
   testXCronSecretHeader()
   testEnvSecretTrimming()
+  testDescribeConfiguredGrowthCronSecret()
   testFailureLogHashDiagnostics()
   testUnauthorizedDiagnostics()
   testMissingConfiguredSecret()

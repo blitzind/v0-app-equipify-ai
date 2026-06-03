@@ -37,6 +37,23 @@ function readConfiguredCronSecret(): string | null {
   return secret && secret.length > 0 ? secret : null
 }
 
+/** Safe runtime fingerprint for admin diagnostics — never returns the raw secret. */
+export function describeConfiguredGrowthCronSecret(): {
+  configured: boolean
+  length: number
+  hashPrefix: string
+} {
+  const secret = readConfiguredCronSecret()
+  if (!secret) {
+    return { configured: false, length: 0, hashPrefix: "" }
+  }
+  return {
+    configured: true,
+    length: secret.length,
+    hashPrefix: hashGrowthCronAuthTokenPrefix(secret) ?? "",
+  }
+}
+
 /** Safe fingerprint for comparing env vs incoming tokens without logging secrets. */
 export function hashGrowthCronAuthTokenPrefix(token: string | null | undefined): string | null {
   if (!token || token.length === 0) return null
