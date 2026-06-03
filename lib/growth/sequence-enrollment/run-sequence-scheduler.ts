@@ -60,7 +60,10 @@ import {
   growthOutboundModeLabel,
   isGrowthOutboundStandaloneMode,
 } from "@/lib/growth/runtime/outbound-mode"
-import { isGrowthOutboundTransportConfigured } from "@/lib/growth/runtime/outbound-transport-readiness"
+import {
+  isGrowthOutboundTransportConfigured,
+  isGrowthOutboundTransportBlockReason,
+} from "@/lib/growth/runtime/outbound-transport-readiness"
 import { findActiveSequenceExecutionJob } from "@/lib/growth/sequences/execution/sequence-job-repository"
 import { queueSequenceStepTransportJob } from "@/lib/growth/sequences/execution/queue-sequence-step-transport-job"
 
@@ -451,12 +454,13 @@ export async function runGrowthSequenceScheduler(
         counts.skippedMissingDraft += 1
         continue
       }
-      if (result.reason === "transport_not_configured") {
+      if (result.reason === "transport_not_configured" || isGrowthOutboundTransportBlockReason(result.reason)) {
         counts.skippedTransportNotConfigured += 1
         logGrowthEngine("sequence_scheduler_transport_not_configured", {
           stepId: step.id,
           enrollmentId: enrollment.id,
           outboundMode,
+          blockReason: result.reason,
         })
         continue
       }

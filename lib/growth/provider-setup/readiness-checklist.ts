@@ -26,6 +26,10 @@ import {
   providerSetupFamilyLabel,
 } from "@/lib/growth/provider-setup/provider-setup-types"
 import { findWebhookEndpointByFamily } from "@/lib/growth/webhooks/webhook-repository"
+import {
+  evaluateGrowthOutboundTransportReadiness,
+} from "@/lib/growth/runtime/outbound-transport-readiness"
+import { growthOutboundTransportReadinessCardStatus } from "@/lib/growth/runtime/outbound-transport-readiness-types"
 
 type SettingsRow = {
   provider_family: string
@@ -114,6 +118,7 @@ function buildCards(
   family: GrowthProviderSetupFamily,
   row: SettingsRow | null,
   checks: GrowthProviderSetupFamilySummary["readiness_checks"],
+  transportReadiness: Awaited<ReturnType<typeof evaluateGrowthOutboundTransportReadiness>>,
 ): GrowthProviderSetupCard[] {
   const byKey = new Map(checks.map((check) => [check.check_key, check]))
   const status = asString(row?.status) || "not_configured"
@@ -159,13 +164,11 @@ function buildCards(
     {
       key: "transport_status",
       label: "Transport Status",
-      status:
-        status === "connected"
-          ? "pass"
-          : status === "warning" || status === "pending"
-            ? "warning"
-            : "fail",
-      message: `Connection status: ${status}.`,
+      status: growthOutboundTransportReadinessCardStatus({
+        ready: transportReadiness.ready,
+        blockReason: transportReadiness.blockReason,
+      }),
+      message: `${transportReadiness.label} — ${transportReadiness.message}`,
     },
     {
       key: "webhook_status",
@@ -309,6 +312,12 @@ export async function computeProviderSetupReadiness(
   for (const family of GROWTH_PROVIDER_SETUP_FAMILIES) {
     const row = byFamily.get(family) ?? null
     const readiness_checks = await evaluateFamilyChecks(admin, family, row)
+    const transportReadiness = await evaluateGrowthOutboundTransportReadiness(admin, {
+      providerFamily: family,
+      providerConnectionStatus: asString(row?.status) || "not_configured",
+      senderAccountId: row?.sender_account_id ?? null,
+      mailboxConnectionId: row?.mailbox_connection_id ?? null,
+    })
     families.push({
       provider_family: family,
       label: providerSetupFamilyLabel(family),
@@ -325,7 +334,7 @@ export async function computeProviderSetupReadiness(
       oauth_configured: oauthConfiguredForFamily(family),
       config_warnings: parseWarnings(row?.config_warnings),
       readiness_checks,
-      cards: buildCards(family, row, readiness_checks),
+      cards: buildCards(family, row, readiness_checks, transportReadiness),
     })
   }
 

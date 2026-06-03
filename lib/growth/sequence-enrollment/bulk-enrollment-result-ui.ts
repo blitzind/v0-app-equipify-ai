@@ -246,7 +246,7 @@ export function explainSchedulerNoJobsPlanned(input: {
   }
 
   if (schedulerResult.transportConfigured === false || (schedulerResult.skippedTransportNotConfigured ?? 0) > 0) {
-    lines.push("Outbound transport is not configured — connect a sender before execution jobs can be planned.")
+    lines.push("Outbound transport is blocked — check Provider Setup transport readiness for the exact blocker.")
   }
 
   if ((schedulerResult.skippedNoSender ?? 0) > 0) {

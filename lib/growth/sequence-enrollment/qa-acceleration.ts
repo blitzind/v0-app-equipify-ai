@@ -6,7 +6,9 @@ import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { fetchGrowthOutreachSettings } from "@/lib/growth/outreach/outreach-settings-repository"
 import { resolveScheduledFor } from "@/lib/growth/outreach/outreach-scheduling"
 import { fetchGrowthOutreachQueueByEnrollmentStepId } from "@/lib/growth/outreach/outreach-queue-repository"
-import { isGrowthOutboundTransportConfigured } from "@/lib/growth/runtime/outbound-transport-readiness"
+import {
+  evaluateGrowthOutboundTransportReadiness,
+} from "@/lib/growth/runtime/outbound-transport-readiness"
 import {
   buildBulkEnrollmentSchedulerExecutionHref,
   explainSchedulerNoJobsPlanned,
@@ -213,8 +215,10 @@ async function diagnoseEnrollmentSchedulerBlocker(
   if (!step) return "step_not_eligible"
   if (!["pending", "draft_created"].includes(step.status)) return "step_not_eligible"
 
-  const transportConfigured = await isGrowthOutboundTransportConfigured(admin)
-  if (!transportConfigured) return "transport_not_configured"
+  const transportReadiness = await evaluateGrowthOutboundTransportReadiness(admin)
+  if (!transportReadiness.ready && transportReadiness.blockReason) {
+    return transportReadiness.blockReason
+  }
 
   const [existingQueue, existingTask, existingJob] = await Promise.all([
     fetchGrowthOutreachQueueByEnrollmentStepId(admin, step.id),
@@ -280,6 +284,7 @@ export async function qaRunGrowthEnrollmentSchedulerNow(
   const jobsBefore = await listSequenceExecutionJobsForEnrollment(admin, input.enrollmentId)
   const jobIdsBefore = new Set(jobsBefore.map((job) => job.id))
 
+  const transportReadiness = await evaluateGrowthOutboundTransportReadiness(admin)
   const schedulerResult = await runGrowthSequenceScheduler(admin, {
     actingUserId: input.actingUserId,
     actingUserEmail: input.actingUserEmail,
@@ -295,8 +300,10 @@ export async function qaRunGrowthEnrollmentSchedulerNow(
   if (!jobCreated) {
     blockReason = await diagnoseEnrollmentSchedulerBlocker(admin, { enrollment, step })
     if (!blockReason) {
-      if (schedulerResult.transportConfigured === false || (schedulerResult.skippedTransportNotConfigured ?? 0) > 0) {
-        blockReason = "transport_not_configured"
+      if (!transportReadiness.ready && transportReadiness.blockReason) {
+        blockReason = transportReadiness.blockReason
+      } else if (schedulerResult.transportConfigured === false || (schedulerResult.skippedTransportNotConfigured ?? 0) > 0) {
+        blockReason = "no_enabled_delivery_route"
       } else if ((schedulerResult.skippedSuppressed ?? 0) > 0) {
         blockReason = "blocked_by_suppression"
       } else if ((schedulerResult.skippedAlreadyQueued ?? 0) > 0) {

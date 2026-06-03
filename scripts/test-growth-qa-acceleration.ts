@@ -16,6 +16,24 @@ function readSource(relativePath: string): string {
   return fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
 }
 
+const QA_ACCELERATION_MIGRATION_SUFFIX = "growth_qa_acceleration_timeline_events.sql"
+
+function findQaAccelerationMigrationRelativePath(): string {
+  const migrationsDir = path.join(process.cwd(), "supabase/migrations")
+  const matches = fs
+    .readdirSync(migrationsDir)
+    .filter((file) => file.endsWith(QA_ACCELERATION_MIGRATION_SUFFIX))
+    .sort()
+
+  assert.equal(
+    matches.length,
+    1,
+    `Expected exactly one QA acceleration migration (*${QA_ACCELERATION_MIGRATION_SUFFIX}); found: ${matches.join(", ") || "none"}`,
+  )
+
+  return path.join("supabase/migrations", matches[0]!)
+}
+
 assert.equal(GROWTH_QA_ACCELERATION_QA_MARKER, "growth-qa-acceleration-v1")
 assert.equal(GROWTH_QA_ACCELERATION_TIMELINE_EVENT_TYPES.length, 3)
 
@@ -26,9 +44,7 @@ for (const eventType of GROWTH_QA_ACCELERATION_TIMELINE_EVENT_TYPES) {
   )
 }
 
-const migrationSource = readSource(
-  "supabase/migrations/20270604120000_growth_qa_acceleration_timeline_events.sql",
-)
+const migrationSource = readSource(findQaAccelerationMigrationRelativePath())
 for (const eventType of GROWTH_QA_ACCELERATION_TIMELINE_EVENT_TYPES) {
   assert.match(migrationSource, new RegExp(`'${eventType}'`))
 }
@@ -83,9 +99,10 @@ const envExample = readSource(".env.local.example")
 assert.match(envExample, /GROWTH_ENABLE_QA_ACCELERATION/)
 
 assert.equal(
-  formatQaAccelerationBlockReason("transport_not_configured"),
-  "Outbound transport is not configured.",
+  formatQaAccelerationBlockReason("no_enabled_delivery_route"),
+  "No enabled delivery route.",
 )
+assert.equal(formatQaAccelerationBlockReason("sender_pending"), "Sender account is pending activation.")
 assert.equal(
   formatQaAccelerationBlockReason("outside_business_hours"),
   "The step is not due yet — use Make Step Due Now to bypass business hours.",

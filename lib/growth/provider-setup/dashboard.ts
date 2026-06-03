@@ -382,6 +382,19 @@ export async function completeOAuthProviderConnection(
     await getMailboxConnection(admin, mailboxId)
   }
 
+  if (input.senderAccountId && mailboxId) {
+    const { wireOAuthProviderTransportAfterConnection } = await import(
+      "@/lib/growth/provider-setup/oauth-transport-auto-wire"
+    )
+    await wireOAuthProviderTransportAfterConnection(admin, {
+      providerFamily: input.providerFamily,
+      senderAccountId: input.senderAccountId,
+      mailboxConnectionId: mailboxId,
+      actorUserId: input.actorUserId,
+      actorEmail: input.actorEmail ?? null,
+    })
+  }
+
   return { settings, mailbox_connection_id: mailboxId! }
 }
 

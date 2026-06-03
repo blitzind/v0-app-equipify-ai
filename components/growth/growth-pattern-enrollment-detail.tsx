@@ -220,6 +220,23 @@ export function GrowthPatternEnrollmentDetail({ enrollmentId }: { enrollmentId: 
 
       {detail.qaAccelerationEnabled ? (
         <GrowthEngineCard title="QA Tools" icon={<Zap className="size-4" />}>
+          <div
+            className={cn(
+              "mb-4 rounded-lg border px-4 py-3 text-sm",
+              detail.transportReadiness.ready
+                ? "border-emerald-200 bg-emerald-50/80 text-emerald-950"
+                : "border-amber-200 bg-amber-50/80 text-amber-950",
+            )}
+          >
+            {detail.transportReadiness.ready ? (
+              <p className="font-medium">Transport Ready ✓</p>
+            ) : (
+              <>
+                <p className="font-medium">Transport Blocked</p>
+                <p className="mt-1">{detail.transportReadiness.message}</p>
+              </>
+            )}
+          </div>
           <p className="mb-4 text-sm text-muted-foreground">
             Operator-only controls to accelerate scheduling for dogfooding. Does not auto-approve, auto-send, or bypass
             suppression.
@@ -251,7 +268,11 @@ export function GrowthPatternEnrollmentDetail({ enrollmentId }: { enrollmentId: 
               )}
               Make Step Due Now
             </Button>
-            <Button size="sm" onClick={() => void runQaScheduler()} disabled={qaActionLoading !== null}>
+            <Button
+              size="sm"
+              onClick={() => void runQaScheduler()}
+              disabled={qaActionLoading !== null || !detail.transportReadiness.ready}
+            >
               {qaActionLoading === "run-scheduler" ? (
                 <Loader2 className="mr-2 size-4 animate-spin" />
               ) : (

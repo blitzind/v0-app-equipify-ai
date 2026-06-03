@@ -18,6 +18,7 @@ import {
 } from "@/lib/growth/sequences/execution/sequence-job-repository"
 import { isGrowthQaAccelerationEnabled } from "@/lib/growth/sequence-enrollment/qa-acceleration-config"
 import { listPatternEnrollmentHistoryEvents } from "@/lib/growth/sequence-enrollment/qa-acceleration"
+import { evaluateGrowthOutboundTransportReadiness } from "@/lib/growth/runtime/outbound-transport-readiness"
 
 function pickCurrentStep(steps: GrowthSequenceEnrollmentStep[], currentStepOrder: number) {
   const inProgress = steps.find(
@@ -126,13 +127,23 @@ export async function fetchPatternEnrollmentDetail(
   const bundle = await fetchPatternEnrollmentWithSteps(admin, enrollmentId)
   if (!bundle) return null
 
-  const [jobs, schedulerStatus, historyEvents] = await Promise.all([
+  const [jobs, schedulerStatus, historyEvents, transportReadiness] = await Promise.all([
     listSequenceExecutionJobsForEnrollment(admin, enrollmentId),
     fetchGrowthSequenceSchedulerStatus(admin).catch(() => null),
     listPatternEnrollmentHistoryEvents(admin, {
       leadId: bundle.leadId,
       enrollmentId: bundle.id,
     }).catch(() => []),
+    evaluateGrowthOutboundTransportReadiness(admin).catch(() => ({
+      qaMarker: "growth-outbound-transport-readiness-v1" as const,
+      ready: false,
+      blockReason: "no_enabled_delivery_route" as const,
+      label: "Transport not routable",
+      message: "No enabled delivery route.",
+      senderAccountId: null,
+      deliveryRouteId: null,
+      providerFamily: null,
+    })),
   ])
   const jobViews = await enrichSequenceExecutionJobViews(admin, jobs)
   const stepOrderById = new Map(bundle.steps.map((step) => [step.id, step.stepOrder]))
@@ -190,5 +201,6 @@ export async function fetchPatternEnrollmentDetail(
     }),
     qaAccelerationEnabled: isGrowthQaAccelerationEnabled(),
     historyEvents,
+    transportReadiness,
   }
 }

@@ -30,7 +30,10 @@ import {
 } from "@/lib/growth/sequences/execution/sequence-job-repository"
 import { resolveSequenceExecutionSender } from "@/lib/growth/sequences/execution/sequence-send-builder"
 import { emitGrowthLeadSequenceStepQueuedTimeline } from "@/lib/growth/timeline-emitter"
-import { isGrowthOutboundTransportConfigured } from "@/lib/growth/runtime/outbound-transport-readiness"
+import {
+  evaluateGrowthOutboundTransportReadiness,
+} from "@/lib/growth/runtime/outbound-transport-readiness"
+import type { GrowthOutboundTransportBlockReason } from "@/lib/growth/runtime/outbound-transport-readiness-types"
 
 export type QueueSequenceStepTransportJobResult = {
   queued: boolean
@@ -40,7 +43,7 @@ export type QueueSequenceStepTransportJobResult = {
     | "missing_draft"
     | "preflight_blocked"
     | "no_sender_route"
-    | "transport_not_configured"
+    | GrowthOutboundTransportBlockReason
     | "cadence_task_failed"
     | string
   jobId?: string
@@ -101,15 +104,17 @@ export async function queueSequenceStepTransportJob(
     return { queued: true }
   }
 
-  const transportConfigured = await isGrowthOutboundTransportConfigured(admin)
-  if (!transportConfigured) {
+  const transportReadiness = await evaluateGrowthOutboundTransportReadiness(admin)
+  if (!transportReadiness.ready) {
+    const reason = transportReadiness.blockReason ?? "provider_disconnected"
     logGrowthEngine("sequence_scheduler_transport_job_skipped", {
       stepId: input.step.id,
       enrollmentId: input.enrollmentId,
-      reason: "transport_not_configured",
+      reason,
+      blockReason: transportReadiness.blockReason,
       idempotencyKey,
     })
-    return { queued: false, reason: "transport_not_configured" }
+    return { queued: false, reason }
   }
 
   let generationId = input.step.generationId
