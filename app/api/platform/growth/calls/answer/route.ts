@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { answerGrowthNativeCall } from "@/lib/growth/native-dialer/native-dialer-service"
 import { GROWTH_NATIVE_DIALER_QA_MARKER } from "@/lib/growth/native-dialer/native-dialer-types"
 import {
   growthNativeDialerSchemaResponseMeta,
-  requireGrowthNativeDialerSchemaReady,
+  requireGrowthNativeDialerSchemaReadyWithBudget,
 } from "@/lib/growth/native-dialer/native-dialer-schema-health"
 import { logGrowthCallsAnswerValidationAudit } from "@/lib/voice/api/session-id-validation-diagnostics"
 import { nativeSessionIdSchema } from "@/lib/voice/api/native-session-id-validation"
@@ -66,17 +67,21 @@ export async function POST(request: Request) {
     sessionId,
   })
 
-  const access = await requireVoiceOperatorRouteContext({
-    request,
-    sessionId,
-    requireSessionOwner: true,
-    skipSessionIdFormatValidation: true,
-    sessionIdDiagnostics: {
-      route: "POST /api/platform/growth/calls/answer",
-      sessionIdSource: "json_body.sessionId",
-      nativeSessionId: sessionId,
-    },
-  })
+  const schemaAdmin = createServiceRoleSupabaseClient()
+  const [access, schemaGate] = await Promise.all([
+    requireVoiceOperatorRouteContext({
+      request,
+      sessionId,
+      requireSessionOwner: true,
+      skipSessionIdFormatValidation: true,
+      sessionIdDiagnostics: {
+        route: "POST /api/platform/growth/calls/answer",
+        sessionIdSource: "json_body.sessionId",
+        nativeSessionId: sessionId,
+      },
+    }),
+    requireGrowthNativeDialerSchemaReadyWithBudget(schemaAdmin, 800),
+  ])
   if (!access.ok) {
     logCoachingLinkPipelineStage({
       stage: "server_calls_answer_route",
@@ -103,7 +108,6 @@ export async function POST(request: Request) {
     nativeSessionOwnerUserId: access.session?.owner_user_id ?? null,
   })
 
-  const schemaGate = await requireGrowthNativeDialerSchemaReady(access.admin)
   if (!schemaGate.ok) {
     logCoachingLinkPipelineStage({
       stage: "server_calls_answer_route",
@@ -139,7 +143,11 @@ export async function POST(request: Request) {
     )
     logCoachingLinkPipelineStage({
       stage: "server_answer_response",
-      outcome: pipeline.liveCoachingLinked ? "completed" : "failed",
+      outcome: pipeline.liveCoachingLinked
+        ? "completed"
+        : pipeline.coachingLinkPending
+          ? "skipped"
+          : "failed",
       pipelineRunId,
       workspaceSessionId: sessionId,
       nativeCallWorkspaceSessionId: session.id,

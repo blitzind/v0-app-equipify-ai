@@ -26,6 +26,7 @@ import {
   type LinkNativeCallRealtimeSessionResult,
 } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import { describeVoiceMediaStreamWssTarget } from "@/lib/voice/call-control/urls"
+import { runVoiceBackgroundTask } from "@/lib/voice/performance/run-voice-background-task"
 import { appendVoiceCallEvent } from "@/lib/voice/repository/voice-repository"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import {
@@ -420,6 +421,161 @@ export async function updateNativeDialerSettingsRow(
   }
 }
 
+type InboundAnswerDeferredWorkInput = {
+  sessionId: string
+  voiceCallId: string
+  organizationId: string
+  ownerUserId: string | null
+  providerCallRef: string | null
+  pipelineTelemetry?: CoachingLinkPipelineTelemetryContext
+}
+
+async function runInboundAnswerDeferredWork(
+  admin: SupabaseClient,
+  input: InboundAnswerDeferredWorkInput,
+): Promise<void> {
+  const { sessionId, voiceCallId, organizationId: orgId, ownerUserId, providerCallRef, pipelineTelemetry } =
+    input
+
+  await syncWorkspaceSessionFromVoiceCall(admin, {
+    voiceCallId,
+    organizationId: orgId,
+    workspaceSessionId: sessionId,
+    userId: ownerUserId,
+    preventActiveToRingingDowngrade: true,
+  })
+
+  if (!ownerUserId) return
+
+  const { autoStartCallWorkspaceLiveCoachingOnAnswer } = await import(
+    "@/lib/growth/native-dialer/call-workspace-coaching-service"
+  )
+  try {
+    const coachingStartedAt = Date.now()
+    logLiveCoachingAutoStartQa("autoStartCallWorkspaceLiveCoachingOnAnswer_start", {
+      nativeSessionId: sessionId,
+      voiceCallId,
+      organizationId: orgId,
+      ownerUserId,
+      direction: "inbound",
+      status: "active",
+      deferred: true,
+    })
+    const coaching = await autoStartCallWorkspaceLiveCoachingOnAnswer(admin, {
+      nativeSessionId: sessionId,
+      createdBy: ownerUserId,
+      pipelineTelemetry: {
+        pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+        callSid: pipelineTelemetry?.callSid ?? providerCallRef,
+      },
+    })
+    logLiveCoachingAutoStartQa("autoStartCallWorkspaceLiveCoachingOnAnswer_result", {
+      nativeSessionId: sessionId,
+      voiceCallId,
+      organizationId: orgId,
+      ownerUserId,
+      realtimeSessionId: coaching.realtimeSessionId,
+      reason: coaching.reason,
+      linkResultLinked: coaching.linkResult?.linked ?? null,
+      linkResultReason: coaching.linkResult?.reason ?? null,
+      durationMs: Date.now() - coachingStartedAt,
+      deferred: true,
+    })
+    if (!coaching.realtimeSessionId || !coaching.linkResult?.linked) {
+      logVoiceInfrastructure("voice_growth_coaching_link_missing_after_answer", {
+        nativeSessionId: sessionId,
+        voiceCallId,
+        organizationId: orgId,
+        ownerUserId,
+        direction: "inbound",
+        status: "active",
+        phase: "active",
+        reason: coaching.reason ?? "realtime_session_not_linked_after_answer",
+        realtimeSessionId: coaching.realtimeSessionId,
+        linkResult: coaching.linkResult,
+        persistedRealtimeSessionId: coaching.realtimeSessionId,
+        deferred: true,
+      })
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const failureReason =
+      errorMessage === "realtime_session_create_failed"
+        ? "realtime_session_create_failed"
+        : "auto_start_exception"
+    logLiveCoachingAutoStartQa("autoStartCallWorkspaceLiveCoachingOnAnswer_failure", {
+      nativeSessionId: sessionId,
+      voiceCallId,
+      organizationId: orgId,
+      ownerUserId,
+      direction: "inbound",
+      status: "active",
+      reason: failureReason,
+      message: errorMessage,
+      deferred: true,
+    })
+    logVoiceInfrastructure("voice_growth_coaching_auto_start_failed", {
+      nativeSessionId: sessionId,
+      voiceCallId,
+      organizationId: orgId,
+      ownerUserId,
+      direction: "inbound",
+      status: "active",
+      phase: "active",
+      stage: "inbound_answer_deferred_work",
+      reason: failureReason,
+      message: errorMessage,
+      stack: error instanceof Error ? error.stack?.slice(0, 500) ?? null : null,
+    })
+  }
+
+  const { data: voiceCallRow } = await admin
+    .schema("voice")
+    .from("voice_calls")
+    .select("provider_call_id")
+    .eq("id", voiceCallId)
+    .maybeSingle()
+  const providerCallId = (voiceCallRow?.provider_call_id as string | null) ?? null
+  if (!providerCallId) return
+
+  const mediaStreamWssHost = describeVoiceMediaStreamWssTarget(null).wssHost
+  const { ensureAnsweredInboundCallMediaStream } = await import(
+    "@/lib/voice/media-streaming/ensure-answered-inbound-media-stream"
+  )
+  try {
+    const mediaResult = await ensureAnsweredInboundCallMediaStream(admin, {
+      organizationId: orgId,
+      voiceCallId,
+      providerCallId,
+    })
+    if (!mediaResult.started) {
+      logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
+        voiceCallId,
+        providerCallId,
+        stage: "inbound_answer_deferred_work",
+        reason: mediaResult.reason,
+        wssHost: mediaStreamWssHost,
+      })
+    }
+  } catch (error) {
+    logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
+      voiceCallId,
+      providerCallId,
+      stage: "inbound_answer_deferred_work",
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack?.slice(0, 500) ?? null : null,
+      wssHost: mediaStreamWssHost,
+    })
+  }
+}
+
+function scheduleInboundAnswerDeferredWork(
+  admin: SupabaseClient,
+  input: InboundAnswerDeferredWorkInput,
+): void {
+  runVoiceBackgroundTask("inbound_answer_coaching_link", () => runInboundAnswerDeferredWork(admin, input))
+}
+
 export type NativeCallAnswerResult = {
   session: NativeCallWorkspaceSessionPublicView
   pipeline: CallWorkspaceAnswerPipelineDiagnostics
@@ -583,17 +739,20 @@ export async function answerNativeCallSession(
   } else if (!voiceCallId) {
     throw new Error("Call session is missing voice call.")
   }
-  await syncWorkspaceSessionFromVoiceCall(admin, {
-    voiceCallId: voiceCallId!,
-    organizationId: orgId,
-    workspaceSessionId: sessionId,
-    userId: ownerUserId ?? null,
-    preventActiveToRingingDowngrade: true,
-  })
+  } else if (!voiceCallId) {
+    throw new Error("Call session is missing voice call.")
+  }
 
   pipeline.mediaStreamWssHost = describeVoiceMediaStreamWssTarget(null).wssHost
+  const isInbound = (existing.direction as string) === "inbound"
+  const shouldDeferInboundAnswerWork =
+    isInbound &&
+    Boolean(voiceCallId) &&
+    Boolean(ownerUserId) &&
+    !existingRealtimeSessionId &&
+    pipeline.liveCoachingFailureReason !== "missing_owner_user_id"
 
-  if ((existing.direction as string) !== "inbound") {
+  if (!isInbound) {
     logCoachingLinkPipelineStage({
       stage: "server_auto_start_coaching_on_answer",
       outcome: "skipped",
@@ -608,139 +767,30 @@ export async function answerNativeCallSession(
     })
   }
 
-  if ((existing.direction as string) === "inbound") {
-    const { autoStartCallWorkspaceLiveCoachingOnAnswer } = await import(
-      "@/lib/growth/native-dialer/call-workspace-coaching-service"
-    )
-    try {
-      const coachingStartedAt = Date.now()
-      logLiveCoachingAutoStartQa("autoStartCallWorkspaceLiveCoachingOnAnswer_start", {
-        nativeSessionId: sessionId,
-        voiceCallId,
-        organizationId: orgId,
-        ownerUserId: ownerUserId ?? null,
-        direction: existing.direction as string | null,
-        status: "active",
-      })
-      const coaching = await autoStartCallWorkspaceLiveCoachingOnAnswer(admin, {
-        nativeSessionId: sessionId,
-        createdBy: ownerUserId ?? null,
-        pipelineTelemetry: {
-          pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
-          callSid: pipelineTelemetry?.callSid ?? (existing.provider_call_ref as string | null) ?? null,
-        },
-      })
-      logLiveCoachingAutoStartQa("autoStartCallWorkspaceLiveCoachingOnAnswer_result", {
-        nativeSessionId: sessionId,
-        voiceCallId,
-        organizationId: orgId,
-        ownerUserId: ownerUserId ?? null,
-        realtimeSessionId: coaching.realtimeSessionId,
-        reason: coaching.reason,
-        linkResultLinked: coaching.linkResult?.linked ?? null,
-        linkResultReason: coaching.linkResult?.reason ?? null,
-        durationMs: Date.now() - coachingStartedAt,
-      })
-      pipeline.liveCoachingFailureReason = coaching.reason
-      pipeline.createdRealtimeSessionId = coaching.realtimeSessionId
-      pipeline.linkResult = coaching.linkResult
-      const { data: linkedRow } = await sessionsTable(admin)
-        .select("realtime_session_id, direction, status, owner_user_id")
-        .eq("id", sessionId)
-        .maybeSingle()
-      const persistedRealtimeSessionId = (linkedRow?.realtime_session_id as string | null) ?? null
-      pipeline.realtimeSessionId = persistedRealtimeSessionId
-      pipeline.liveCoachingLinked = Boolean(persistedRealtimeSessionId)
-      if (!pipeline.liveCoachingLinked) {
-        pipeline.liveCoachingFailureReason =
-          coaching.reason ?? "realtime_session_not_linked_after_answer"
-        pipeline.liveCoachingError = pipeline.liveCoachingFailureReason
-        logVoiceInfrastructure("voice_growth_coaching_link_missing_after_answer", {
-          nativeSessionId: sessionId,
-          voiceCallId,
-          organizationId: orgId,
-          ownerUserId: ownerUserId ?? (linkedRow?.owner_user_id as string | null) ?? null,
-          direction: (linkedRow?.direction as string | null) ?? (existing.direction as string | null) ?? null,
-          status: (linkedRow?.status as string | null) ?? null,
-          phase: (linkedRow?.status as string | null) ?? null,
-          realtimeSessionId: coaching.realtimeSessionId,
-          linkResult: coaching.linkResult,
-          reason: pipeline.liveCoachingFailureReason,
-          persistedRealtimeSessionId,
-        })
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      pipeline.liveCoachingFailureReason =
-        errorMessage === "realtime_session_create_failed"
-          ? "realtime_session_create_failed"
-          : "auto_start_exception"
-      pipeline.liveCoachingError = pipeline.liveCoachingFailureReason
-      logLiveCoachingAutoStartQa("autoStartCallWorkspaceLiveCoachingOnAnswer_failure", {
-        nativeSessionId: sessionId,
-        voiceCallId,
-        organizationId: orgId,
-        ownerUserId: ownerUserId ?? null,
-        direction: existing.direction as string | null,
-        status: "active",
-        reason: pipeline.liveCoachingFailureReason,
-        message: errorMessage,
-      })
-      logVoiceInfrastructure("voice_growth_coaching_auto_start_failed", {
-        nativeSessionId: sessionId,
-        voiceCallId,
-        organizationId: orgId,
-        ownerUserId: ownerUserId ?? null,
-        direction: existing.direction as string | null,
-        status: "active",
-        phase: "active",
-        stage: "answer_native_call_session",
-        reason: pipeline.liveCoachingFailureReason,
-        message: errorMessage,
-        stack: error instanceof Error ? error.stack?.slice(0, 500) ?? null : null,
-      })
-    }
-
-    const { data: voiceCallRow } = await admin
-      .schema("voice")
-      .from("voice_calls")
-      .select("provider_call_id")
-      .eq("id", voiceCallId!)
-      .maybeSingle()
-    const providerCallId = (voiceCallRow?.provider_call_id as string | null) ?? null
-    if (providerCallId) {
-      const { ensureAnsweredInboundCallMediaStream } = await import(
-        "@/lib/voice/media-streaming/ensure-answered-inbound-media-stream"
-      )
-      try {
-        const mediaResult = await ensureAnsweredInboundCallMediaStream(admin, {
-          organizationId: orgId,
-          voiceCallId: voiceCallId!,
-          providerCallId,
-        })
-        pipeline.mediaStreamStarted = mediaResult.started
-        pipeline.mediaStreamReason = mediaResult.reason
-        if (!mediaResult.started) {
-          logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
-            voiceCallId,
-            providerCallId,
-            stage: "answer_native_call_session",
-            reason: mediaResult.reason,
-            wssHost: pipeline.mediaStreamWssHost,
-          })
-        }
-      } catch (error) {
-        pipeline.mediaStreamReason = error instanceof Error ? error.message : String(error)
-        logVoiceInfrastructure("voice_answered_inbound_media_stream_failed", {
-          voiceCallId,
-          providerCallId,
-          stage: "answer_native_call_session",
-          message: pipeline.mediaStreamReason,
-          stack: error instanceof Error ? error.stack?.slice(0, 500) ?? null : null,
-          wssHost: pipeline.mediaStreamWssHost,
-        })
-      }
-    }
+  if (shouldDeferInboundAnswerWork) {
+    pipeline.coachingLinkPending = true
+    pipeline.liveCoachingLinked = false
+    scheduleInboundAnswerDeferredWork(admin, {
+      sessionId,
+      voiceCallId: voiceCallId!,
+      organizationId: orgId,
+      ownerUserId: ownerUserId ?? null,
+      providerCallRef:
+        pipelineTelemetry?.callSid ?? (existing.provider_call_ref as string | null) ?? null,
+      pipelineTelemetry,
+    })
+    logCoachingLinkPipelineStage({
+      stage: "server_auto_start_coaching_on_answer",
+      outcome: "skipped",
+      pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+      workspaceSessionId: sessionId,
+      nativeCallWorkspaceSessionId: sessionId,
+      voiceCallId,
+      callSid: pipelineTelemetry?.callSid ?? (existing.provider_call_ref as string | null) ?? null,
+      ownerUserId: ownerUserId ?? null,
+      failureReason: "deferred_to_background",
+      extra: { coachingLinkPending: true },
+    })
   }
 
   const { data: refreshed, error: refreshError } = await sessionsTable(admin)
@@ -752,7 +802,10 @@ export async function answerNativeCallSession(
 
   const refreshedRealtimeSessionId = (refreshed.realtime_session_id as string | null) ?? null
   pipeline.realtimeSessionId = refreshedRealtimeSessionId
-  pipeline.liveCoachingLinked = Boolean(refreshedRealtimeSessionId)
+  if (refreshedRealtimeSessionId) {
+    pipeline.liveCoachingLinked = true
+    pipeline.coachingLinkPending = false
+  }
   logCoachingLinkPipelineStage({
     stage: "server_pipeline_persisted_read",
     outcome: "completed",
@@ -761,7 +814,7 @@ export async function answerNativeCallSession(
     workspaceSessionId: sessionId,
     nativeCallWorkspaceSessionId: sessionId,
     nativeCallWorkspaceRealtimeSessionId: refreshedRealtimeSessionId,
-    realtimeSessionId: pipeline.createdRealtimeSessionId ?? refreshedRealtimeSessionId,
+    realtimeSessionId: refreshedRealtimeSessionId,
     voiceCallId,
     callSid: pipelineTelemetry?.callSid ?? (refreshed.provider_call_ref as string | null) ?? null,
     organizationId: orgId,
@@ -771,10 +824,8 @@ export async function answerNativeCallSession(
     linkResultReason: pipeline.linkResult?.reason ?? null,
     failureReason: pipeline.liveCoachingFailureReason,
     extra: {
+      coachingLinkPending: pipeline.coachingLinkPending,
       pipelineRealtimeSessionId: pipeline.realtimeSessionId,
-      createdRealtimeSessionId: pipeline.createdRealtimeSessionId,
-      linkResultMatchesPersisted:
-        pipeline.linkResult?.linked === true && refreshedRealtimeSessionId === pipeline.linkResult.realtimeSessionId,
     },
   })
   logLiveCoachingAutoStartQa("answer_native_call_session_refreshed", {
@@ -786,32 +837,9 @@ export async function answerNativeCallSession(
     status: refreshed.status as string | null,
     realtimeSessionId: refreshedRealtimeSessionId,
     liveCoachingLinked: pipeline.liveCoachingLinked,
+    coachingLinkPending: pipeline.coachingLinkPending,
     liveCoachingFailureReason: pipeline.liveCoachingFailureReason,
-    createdRealtimeSessionId: pipeline.createdRealtimeSessionId,
-    linkResultLinked: pipeline.linkResult?.linked ?? null,
-    linkResultReason: pipeline.linkResult?.reason ?? null,
   })
-  if ((existing.direction as string) === "inbound" && !refreshedRealtimeSessionId) {
-    if (!pipeline.liveCoachingFailureReason) {
-      pipeline.liveCoachingFailureReason = "realtime_session_not_linked_after_refresh"
-      pipeline.liveCoachingError = pipeline.liveCoachingFailureReason
-    }
-    if (pipeline.liveCoachingFailureReason !== "missing_owner_user_id") {
-      logVoiceInfrastructure("voice_growth_coaching_link_missing_after_answer", {
-        nativeSessionId: sessionId,
-        voiceCallId,
-        organizationId: orgId,
-        ownerUserId: ownerUserId ?? (refreshed.owner_user_id as string | null) ?? null,
-        direction: refreshed.direction as string | null,
-        status: refreshed.status as string | null,
-        phase: refreshed.status as string | null,
-        realtimeSessionId: pipeline.createdRealtimeSessionId,
-        linkResult: pipeline.linkResult,
-        reason: pipeline.liveCoachingFailureReason,
-        persistedRealtimeSessionId: null,
-      })
-    }
-  }
 
   logCoachingLinkPipelineStage({
     stage: "server_answer_native_call_session",
@@ -830,6 +858,7 @@ export async function answerNativeCallSession(
     linkResultLinked: pipeline.linkResult?.linked ?? null,
     linkResultReason: pipeline.linkResult?.reason ?? null,
     failureReason: pipeline.liveCoachingFailureReason,
+    extra: { coachingLinkPending: pipeline.coachingLinkPending },
   })
 
   return { session: mapNativeCallSessionRow(refreshed as SessionRow), pipeline }

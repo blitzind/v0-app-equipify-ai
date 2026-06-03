@@ -149,13 +149,16 @@ const nativeDialerRepo = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/native-dialer/native-dialer-repository.ts"),
   "utf8",
 )
-const coachingIdx = nativeDialerRepo.indexOf("autoStartCallWorkspaceLiveCoachingOnAnswer")
-const mediaIdx = nativeDialerRepo.indexOf("ensureAnsweredInboundCallMediaStream")
-assert.ok(coachingIdx > 0 && mediaIdx > coachingIdx, "coaching auto-start must run before media restart")
+const coachingIdx = nativeDialerRepo.indexOf("runInboundAnswerDeferredWork")
+const mediaIdx = nativeDialerRepo.indexOf("ensureAnsweredInboundCallMediaStream", coachingIdx)
+assert.ok(coachingIdx > 0 && mediaIdx > coachingIdx, "deferred coaching auto-start must run before media restart")
+assert.match(nativeDialerRepo, /runVoiceBackgroundTask\("inbound_answer_coaching_link"/)
+assert.match(nativeDialerRepo, /scheduleInboundAnswerDeferredWork/)
+assert.match(nativeDialerRepo, /pipeline\.coachingLinkPending = true/)
 assert.match(
   nativeDialerRepo,
-  /const coachingStartedAt = Date\.now\(\)[\s\S]*autoStartCallWorkspaceLiveCoachingOnAnswer[\s\S]*durationMs: Date\.now\(\) - coachingStartedAt/,
-  "answer telemetry must expose auto-start duration before media stream restart",
+  /preventActiveToRingingDowngrade: true/,
+  "deferred answer sync must not allow sync to downgrade the accepted active native session back to ringing",
 )
 assert.match(nativeDialerRepo, /type LinkNativeCallRealtimeSessionResult/)
 assert.match(nativeDialerRepo, /select\("id, realtime_session_id"\)/)
@@ -171,28 +174,36 @@ assert.match(nativeDialerRepo, /status/)
 assert.match(nativeDialerRepo, /linkResult/)
 assert.match(
   nativeDialerRepo,
-  /pipeline\.liveCoachingLinked = Boolean\(persistedRealtimeSessionId\)/,
-  "answer route must not report healthy coaching unless realtime_session_id was persisted",
+  /if \(refreshedRealtimeSessionId\)[\s\S]*pipeline\.liveCoachingLinked = true[\s\S]*pipeline\.coachingLinkPending = false/,
+  "fast answer response must only report linked coaching when realtime_session_id is already persisted",
 )
 assert.match(
   nativeDialerRepo,
-  /const refreshedRealtimeSessionId = \(refreshed\.realtime_session_id as string \| null\) \?\? null[\s\S]*pipeline\.realtimeSessionId = refreshedRealtimeSessionId[\s\S]*pipeline\.liveCoachingLinked = Boolean\(refreshedRealtimeSessionId\)/,
-  "final linked state must depend strictly on refreshed realtime_session_id",
+  /const refreshedRealtimeSessionId = \(refreshed\.realtime_session_id as string \| null\) \?\? null[\s\S]*pipeline\.realtimeSessionId = refreshedRealtimeSessionId/,
+  "answer response must reflect the current persisted realtime_session_id read",
 )
 assert.match(
   nativeDialerRepo,
   /errorMessage === "realtime_session_create_failed"[\s\S]*\? "realtime_session_create_failed"[\s\S]*: "auto_start_exception"/,
-  "auto-start exceptions must be visible in answer pipeline diagnostics",
+  "deferred auto-start exceptions must be logged with sanitized reason codes",
 )
 assert.match(
   nativeDialerRepo,
-  /pipeline\.liveCoachingError = pipeline\.liveCoachingFailureReason/,
-  "pipeline diagnostics must expose sanitized reason codes instead of raw exception text",
+  /shouldDeferInboundAnswerWork[\s\S]*scheduleInboundAnswerDeferredWork/,
+  "inbound answer hot path must defer coaching link work to background execution",
 )
-assert.match(
-  nativeDialerRepo,
-  /if \(\(existing\.direction as string\) === "inbound" && !refreshedRealtimeSessionId\)/,
-  "answer path must re-read the native session and diagnose missing realtime_session_id",
+const answerFnStart = nativeDialerRepo.indexOf("export async function answerNativeCallSession")
+const answerFnEnd = nativeDialerRepo.indexOf("export async function retryAnsweredInboundMediaStream")
+const answerNativeCallSessionSource = nativeDialerRepo.slice(answerFnStart, answerFnEnd)
+assert.doesNotMatch(
+  answerNativeCallSessionSource,
+  /await autoStartCallWorkspaceLiveCoachingOnAnswer/,
+  "answer response must not block on synchronous coaching auto-start",
+)
+assert.doesNotMatch(
+  answerNativeCallSessionSource,
+  /await syncWorkspaceSessionFromVoiceCall/,
+  "answer response must not block on synchronous workspace sync",
 )
 assert.match(
   nativeDialerRepo,
@@ -245,6 +256,7 @@ const coachingTypes = fs.readFileSync(
   "utf8",
 )
 assert.match(coachingTypes, /createdRealtimeSessionId/)
+assert.match(coachingTypes, /coachingLinkPending/)
 assert.match(coachingTypes, /liveCoachingFailureReason/)
 assert.match(coachingTypes, /linkResult: LinkNativeCallRealtimeSessionResult \| null/)
 assert.match(coachingTypes, /export type LinkNativeCallRealtimeSessionResult/)
@@ -287,7 +299,10 @@ assert.match(
   "answer route must share native session id schema with operator guard",
 )
 assert.match(answerRoute, /x-coaching-pipeline-run-id/)
+assert.match(answerRoute, /requireGrowthNativeDialerSchemaReadyWithBudget/)
+assert.match(answerRoute, /Promise\.all\(\[[\s\S]*requireVoiceOperatorRouteContext[\s\S]*requireGrowthNativeDialerSchemaReadyWithBudget/)
 assert.match(answerRoute, /server_calls_answer_route/)
+assert.match(answerRoute, /coachingLinkPending/)
 assert.match(answerRoute, /server_answer_response/)
 assert.match(answerRoute, /logCoachingLinkPipelineStage/)
 
@@ -370,13 +385,35 @@ const workspaceUi = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-call-workspace.tsx"),
   "utf8",
 )
+const unifiedAssistPanel = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-call-workspace-unified-assist-panel.tsx"),
+  "utf8",
+)
+const voiceBrowserHook = fs.readFileSync(
+  path.join(process.cwd(), "hooks/voice/use-voice-browser-calling.ts"),
+  "utf8",
+)
+const coachingUiTelemetry = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/native-dialer/call-workspace-coaching-ui-telemetry.ts"),
+  "utf8",
+)
+assert.match(coachingUiTelemetry, /voice_call_workspace_coaching_render_decision/)
+assert.match(coachingUiTelemetry, /voice_call_workspace_coaching_answer_timing/)
+assert.match(coachingUiTelemetry, /voice_call_workspace_coaching_sync_merge/)
+assert.match(unifiedAssistPanel, /renderedCoachingState/)
+assert.match(unifiedAssistPanel, /diagnostic_banner/)
+assert.match(voiceBrowserHook, /voice_call_workspace_coaching_sync_merge/)
 assert.match(workspaceUi, /data\.pipeline\?\.liveCoachingLinked/)
+assert.match(workspaceUi, /data\.pipeline\?\.coachingLinkPending/)
+assert.match(workspaceUi, /coachingLinkPendingAfterAnswer/)
 assert.match(workspaceUi, /answerPipelineDiagnostic/)
 assert.match(workspaceUi, /logClientCoachingLinkStage/)
 assert.match(workspaceUi, /client_answer_api/)
 assert.match(workspaceUi, /client_answer_call/)
 assert.match(workspaceUi, /reconcile_skipped_no_captured_session/)
 assert.match(workspaceUi, /answer_api_skipped_no_server_session_id/)
+assert.match(workspaceUi, /logCallWorkspaceCoachingUiTelemetry/)
+assert.match(workspaceUi, /voice_call_workspace_coaching_answer_timing/)
 assert.match(workspaceUi, /X-Coaching-Pipeline-Run-Id/)
 assert.doesNotMatch(
   workspaceUi,

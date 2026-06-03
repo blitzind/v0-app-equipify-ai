@@ -25,6 +25,8 @@ export const CALL_WORKSPACE_ENRICHMENT_SYNC_FAILED_COPY =
 
 export type CallWorkspaceAnswerPipelineDiagnostics = {
   liveCoachingLinked: boolean
+  /** True when coaching link + media stream continue on the server after a fast answer response. */
+  coachingLinkPending: boolean
   realtimeSessionId: string | null
   createdRealtimeSessionId: string | null
   liveCoachingError: string | null
@@ -55,6 +57,7 @@ export type LinkNativeCallRealtimeSessionResult =
 export function emptyCallWorkspaceAnswerPipelineDiagnostics(): CallWorkspaceAnswerPipelineDiagnostics {
   return {
     liveCoachingLinked: false,
+    coachingLinkPending: false,
     realtimeSessionId: null,
     createdRealtimeSessionId: null,
     liveCoachingError: null,

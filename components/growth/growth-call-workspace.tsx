@@ -93,6 +93,7 @@ import {
   createCoachingLinkPipelineClientContext,
   logClientCoachingLinkStage,
 } from "@/lib/growth/native-dialer/call-workspace-coaching-link-pipeline-client-log"
+import { logCallWorkspaceCoachingUiTelemetry } from "@/lib/growth/native-dialer/call-workspace-coaching-ui-telemetry"
 import {
   buildOptimisticWrappingSession,
   filterInboundOfferForLifecycle,
@@ -165,6 +166,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   const [dialingQueueId, setDialingQueueId] = useState<string | null>(null)
   const [answering, setAnswering] = useState(false)
   const [answerReconcileInFlight, setAnswerReconcileInFlight] = useState(false)
+  const [coachingLinkPendingAfterAnswer, setCoachingLinkPendingAfterAnswer] = useState(false)
   const [optimisticCoachTurn, setOptimisticCoachTurn] = useState<ConversationCoachTurn | null>(null)
   const [answerPipelineDiagnostic, setAnswerPipelineDiagnostic] = useState<string | null>(null)
   const [mediaStreamDiagnostic, setMediaStreamDiagnostic] = useState<string | null>(null)
@@ -201,6 +203,10 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   const callAuthorityRef = useRef(callAuthority)
   callAuthorityRef.current = callAuthority
   const hasLiveSdkCallRef = useRef(false)
+  const answerTimingRef = useRef<{ sdkAcceptAt: number | null; answerApiStartAt: number | null }>({
+    sdkAcceptAt: null,
+    answerApiStartAt: null,
+  })
 
   const getLifecycleLocks = useCallback((): CallLifecycleLockSnapshot => {
     return {
@@ -725,6 +731,13 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   ])
 
   useEffect(() => {
+    if (!coachingLinkPendingAfterAnswer) return
+    if (!activeSession?.realtimeSessionId) return
+    setCoachingLinkPendingAfterAnswer(false)
+    setAnswerPipelineDiagnostic(null)
+  }, [activeSession?.realtimeSessionId, coachingLinkPendingAfterAnswer])
+
+  useEffect(() => {
     void load()
   }, [load])
 
@@ -1127,6 +1140,18 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           voiceCallId: input.sessionForAnswer.voiceCallId,
         })
         const answerStartedAt = Date.now()
+        answerTimingRef.current.answerApiStartAt = answerStartedAt
+        if (answerTimingRef.current.sdkAcceptAt != null) {
+          logCallWorkspaceCoachingUiTelemetry({
+            event: "voice_call_workspace_coaching_answer_timing",
+            workspaceSessionId: sessionId,
+            stage: "client_answer_api_request_start",
+            durationMs: answerStartedAt - answerTimingRef.current.sdkAcceptAt,
+            extra: {
+              msSinceSdkAccept: answerStartedAt - answerTimingRef.current.sdkAcceptAt,
+            },
+          })
+        }
         const res = await fetch("/api/platform/growth/calls/answer", {
           method: "POST",
           headers: {
@@ -1140,6 +1165,29 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           pipeline?: CallWorkspaceAnswerPipelineDiagnostics
           message?: string
         }
+        const answerApiDurationMs = Date.now() - answerStartedAt
+        logCallWorkspaceCoachingUiTelemetry({
+          event: "voice_call_workspace_coaching_answer_timing",
+          workspaceSessionId: sessionId,
+          realtimeSessionId: data.pipeline?.realtimeSessionId ?? data.session?.realtimeSessionId ?? null,
+          liveCoachingLinked: data.pipeline?.liveCoachingLinked ?? null,
+          stage: "client_answer_api_response_received",
+          outcome: res.ok && data.session ? "completed" : "failed",
+          durationMs: answerApiDurationMs,
+          failureReason:
+            !res.ok || !data.session
+              ? (data.message ?? `answer_http_${res.status}`)
+              : (data.pipeline?.liveCoachingFailureReason ?? null),
+          extra: {
+            httpStatus: res.status,
+            responseSessionRealtimeSessionId: data.session?.realtimeSessionId ?? null,
+            pipelineRealtimeSessionId: data.pipeline?.realtimeSessionId ?? null,
+            msSinceSdkAccept:
+              answerTimingRef.current.sdkAcceptAt != null
+                ? Date.now() - answerTimingRef.current.sdkAcceptAt
+                : null,
+          },
+        })
         logClientCoachingLinkStage(pipelineCtx, "client_answer_api", res.ok && data.session ? "completed" : "failed", {
           durationMs: Date.now() - answerStartedAt,
           workspaceSessionId: sessionId,
@@ -1204,16 +1252,44 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           throw new Error(data.message ?? "Could not answer call.")
         }
         const answeredSession = data.session
+        logCallWorkspaceCoachingUiTelemetry({
+          event: "voice_call_workspace_coaching_answer_timing",
+          workspaceSessionId: answeredSession.id,
+          realtimeSessionId: data.pipeline?.realtimeSessionId ?? answeredSession.realtimeSessionId,
+          liveCoachingLinked: data.pipeline?.liveCoachingLinked ?? null,
+          answerPipelineDiagnostic: data.pipeline?.liveCoachingLinked
+            ? null
+            : data.pipeline?.coachingLinkPending
+              ? null
+              : (data.pipeline?.liveCoachingError ?? CALL_WORKSPACE_COACHING_LINK_FAILED_COPY),
+          stage: "client_answer_pipeline_diagnostic_decision",
+          outcome:
+            data.pipeline?.liveCoachingLinked || data.pipeline?.coachingLinkPending ? "completed" : "failed",
+          failureReason: data.pipeline?.liveCoachingFailureReason ?? null,
+          extra: {
+            coachingLinkPending: data.pipeline?.coachingLinkPending ?? null,
+            willClearDiagnostic: Boolean(
+              data.pipeline?.liveCoachingLinked || data.pipeline?.coachingLinkPending,
+            ),
+            willSetDiagnostic: !data.pipeline?.liveCoachingLinked && !data.pipeline?.coachingLinkPending,
+          },
+        })
         if (data.pipeline?.liveCoachingLinked) {
+          setCoachingLinkPendingAfterAnswer(false)
+          setAnswerPipelineDiagnostic(null)
+          setOptimisticCoachTurn(null)
+        } else if (data.pipeline?.coachingLinkPending) {
+          setCoachingLinkPendingAfterAnswer(true)
           setAnswerPipelineDiagnostic(null)
           setOptimisticCoachTurn(null)
         } else {
+          setCoachingLinkPendingAfterAnswer(false)
           setOptimisticCoachTurn(null)
           setAnswerPipelineDiagnostic(
             data.pipeline?.liveCoachingError ?? CALL_WORKSPACE_COACHING_LINK_FAILED_COPY,
           )
         }
-        if (data.pipeline && !data.pipeline.mediaStreamStarted) {
+        if (data.pipeline && !data.pipeline.mediaStreamStarted && !data.pipeline.coachingLinkPending) {
           setMediaStreamDiagnostic(
             data.pipeline.mediaStreamReason ?? CALL_WORKSPACE_MEDIA_STREAM_RESTART_FAILED_COPY,
           )
@@ -1438,6 +1514,13 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           realtimeSessionId: capturedSession?.realtimeSessionId ?? null,
         })
         await voiceBrowser.acceptIncomingCall()
+        answerTimingRef.current.sdkAcceptAt = Date.now()
+        logCallWorkspaceCoachingUiTelemetry({
+          event: "voice_call_workspace_coaching_answer_timing",
+          workspaceSessionId: capturedSession?.id ?? null,
+          stage: "client_sdk_accept_completed",
+          outcome: "completed",
+        })
         logLiveCoachingAutoStartQa("sdk_accept_success", {
           sessionId: capturedSession?.id ?? null,
           voiceCallId: capturedSession?.voiceCallId ?? null,
@@ -1770,7 +1853,8 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           submittingWrapup={submittingWrapup}
           coachingStartSignal={coachingStartSignal}
           coachingNativeSessionId={coachingNativeSessionId}
-          answerReconcileInFlight={answerReconcileInFlight}
+          answerReconcileInFlight={answerReconcileInFlight || coachingLinkPendingAfterAnswer}
+          browserSyncMode={voiceBrowser.snapshot?.syncMode ?? null}
           coachingMode={coachingMode}
           leadLinked={leadLinked}
           inboundVoiceCallCreatedAt={inboundOffer?.voiceCallCreatedAt ?? null}
