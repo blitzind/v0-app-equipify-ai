@@ -5,6 +5,10 @@ import { logGrowthEngine } from "@/lib/growth/access"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { listGrowthSequencePatterns } from "@/lib/growth/sequence-pattern-repository"
 import {
+  enrichBulkSequenceEnrollmentOutcome,
+  fetchConflictingSequenceEnrollment,
+} from "@/lib/growth/sequence-enrollment/bulk-sequence-enrollment-outcome"
+import {
   confirmGrowthSequenceEnrollment,
   createGrowthSequenceEnrollmentDraft,
 } from "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
@@ -22,7 +26,7 @@ export { GROWTH_SEQUENCE_BULK_ENROLL_MAX_LEADS } from "@/lib/growth/sequence-enr
 
 function outcome(
   leadId: string,
-  input?: { enrollmentId?: string; code?: string; reason?: string; leadLabel?: string },
+  input?: Omit<BulkSequenceEnrollmentLeadOutcome, "leadId">,
 ): BulkSequenceEnrollmentLeadOutcome {
   return { leadId, ...input }
 }
@@ -42,7 +46,7 @@ async function resolveExistingEnrollment(
 ): Promise<
   | { kind: "none" }
   | { kind: "same_pattern"; enrollmentId: string; status: string }
-  | { kind: "other_pattern"; enrollmentId: string; patternId: string }
+  | { kind: "other_pattern"; enrollmentId: string; patternId: string; status: string }
 > {
   const existing = await fetchGrowthSequenceEnrollmentForLeadAndPattern(admin, leadId, patternId)
   if (existing) {
@@ -55,6 +59,7 @@ async function resolveExistingEnrollment(
     .select("id, sequence_pattern_id, status")
     .eq("lead_id", leadId)
     .in("status", ["draft", "active", "paused"])
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle()
   if (error) throw new Error(error.message)
@@ -64,6 +69,116 @@ async function resolveExistingEnrollment(
     kind: "other_pattern",
     enrollmentId: String(data.id),
     patternId: String(data.sequence_pattern_id),
+    status: String(data.status),
+  }
+}
+
+async function buildActiveEnrollmentConflictOutcome(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    leadLabel?: string
+    excludeEnrollmentId?: string | null
+    reason?: string
+  },
+): Promise<BulkSequenceEnrollmentLeadOutcome> {
+  const conflicting = await fetchConflictingSequenceEnrollment(admin, input.leadId, input.excludeEnrollmentId)
+  const viewEnrollmentId = conflicting?.id ?? input.excludeEnrollmentId
+  if (!viewEnrollmentId) {
+    return outcome(input.leadId, {
+      code: "active_enrollment",
+      reason: input.reason ?? "Lead already has another sequence enrollment in progress.",
+      leadLabel: input.leadLabel,
+    })
+  }
+
+  return enrichBulkSequenceEnrollmentOutcome(admin, input.leadId, outcome(input.leadId, {
+    enrollmentId: viewEnrollmentId,
+    conflictingEnrollmentId: conflicting?.id,
+    code: "active_enrollment",
+    reason:
+      input.reason ??
+      "Another sequence enrollment is blocking this action — continue from the existing enrollment.",
+    leadLabel: input.leadLabel,
+    suggestedAction: "view_enrollment",
+  }))
+}
+
+async function handleSamePatternExistingEnrollment(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    patternId: string
+    startImmediately: boolean
+    dryRun: boolean
+    actingUserId: string
+    actingUserEmail: string
+    leadLabel?: string
+    existing: { enrollmentId: string; status: string }
+  },
+): Promise<{ bucket: keyof Pick<BulkSequenceEnrollmentResult, "enrolled" | "skippedAlreadyEnrolled" | "skippedBlocked" | "failed">; item: BulkSequenceEnrollmentLeadOutcome }> {
+  if (input.existing.status === "draft" && input.startImmediately && !input.dryRun) {
+    try {
+      const confirmed = await confirmGrowthSequenceEnrollment(admin, {
+        leadId: input.leadId,
+        enrollmentId: input.existing.enrollmentId,
+        actingUserId: input.actingUserId,
+        actingUserEmail: input.actingUserEmail,
+      })
+      return {
+        bucket: "enrolled",
+        item: await enrichBulkSequenceEnrollmentOutcome(admin, input.leadId, outcome(input.leadId, {
+          enrollmentId: confirmed.id,
+          code: "confirmed_existing_draft",
+          leadLabel: input.leadLabel,
+          enrollmentStatus: "active",
+          schedulerEligible: true,
+        })),
+      }
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "confirm_failed"
+      if (code === "active_enrollment") {
+        return {
+          bucket: "skippedAlreadyEnrolled",
+          item: await buildActiveEnrollmentConflictOutcome(admin, {
+            leadId: input.leadId,
+            leadLabel: input.leadLabel,
+            excludeEnrollmentId: input.existing.enrollmentId,
+          }),
+        }
+      }
+
+      return {
+        bucket: "skippedAlreadyEnrolled",
+        item: await enrichBulkSequenceEnrollmentOutcome(admin, input.leadId, outcome(input.leadId, {
+          enrollmentId: input.existing.enrollmentId,
+          code,
+          reason:
+            code === "preflight_blocked"
+              ? "Could not activate the draft enrollment because preflight blocked it."
+              : "Could not activate the draft enrollment — continue from the existing draft.",
+          leadLabel: input.leadLabel,
+          suggestedAction: "view_enrollment",
+        })),
+      }
+    }
+  }
+
+  const reason =
+    input.existing.status === "draft"
+      ? "Draft enrollment already exists for this sequence — continue from it or cancel to retry."
+      : input.existing.status === "paused"
+        ? "Enrollment is paused — resume it to continue scheduling."
+        : "Lead is already enrolled in this sequence."
+
+  return {
+    bucket: "skippedAlreadyEnrolled",
+    item: await enrichBulkSequenceEnrollmentOutcome(admin, input.leadId, outcome(input.leadId, {
+      enrollmentId: input.existing.enrollmentId,
+      code: input.existing.status === "paused" ? "paused_enrollment" : "already_enrolled",
+      reason,
+      leadLabel: input.leadLabel,
+    })),
   }
 }
 
@@ -89,57 +204,44 @@ async function enrollSingleLeadInGrowthSequence(
 
   const existing = await resolveExistingEnrollment(admin, input.leadId, input.patternId)
   if (existing.kind === "same_pattern") {
-    if (existing.status === "draft" && input.startImmediately && !input.dryRun) {
-      try {
-        const confirmed = await confirmGrowthSequenceEnrollment(admin, {
-          leadId: input.leadId,
-          enrollmentId: existing.enrollmentId,
-          actingUserId: input.actingUserId,
-          actingUserEmail: input.actingUserEmail,
-        })
-        return {
-          bucket: "enrolled",
-          item: outcome(input.leadId, { enrollmentId: confirmed.id, code: "confirmed_existing_draft", leadLabel: label }),
-        }
-      } catch (error) {
-        const code = error instanceof Error ? error.message : "confirm_failed"
-        return {
-          bucket: "failed",
-          item: outcome(input.leadId, {
-            enrollmentId: existing.enrollmentId,
-            code,
-            reason: "Could not confirm existing draft enrollment.",
-            leadLabel: label,
-          }),
-        }
-      }
-    }
-
-    return {
-      bucket: "skippedAlreadyEnrolled",
-      item: outcome(input.leadId, {
-        enrollmentId: existing.enrollmentId,
-        code: "already_enrolled",
-        reason: "Lead is already enrolled in this sequence.",
-        leadLabel: label,
-      }),
-    }
+    return handleSamePatternExistingEnrollment(admin, {
+      leadId: input.leadId,
+      patternId: input.patternId,
+      startImmediately: input.startImmediately,
+      dryRun: input.dryRun,
+      actingUserId: input.actingUserId,
+      actingUserEmail: input.actingUserEmail,
+      leadLabel: label,
+      existing: { enrollmentId: existing.enrollmentId, status: existing.status },
+    })
   }
 
   if (existing.kind === "other_pattern") {
     return {
       bucket: "skippedBlocked",
-      item: outcome(input.leadId, {
+      item: await enrichBulkSequenceEnrollmentOutcome(admin, input.leadId, outcome(input.leadId, {
         enrollmentId: existing.enrollmentId,
         code: "active_enrollment",
-        reason: "Lead already has an active sequence enrollment on a different pattern.",
+        reason: "Lead already has a sequence enrollment on a different pattern.",
         leadLabel: label,
-      }),
+        suggestedAction: "view_enrollment",
+      })),
     }
   }
 
   const preflight = await runSequenceEnrollmentPreflight(admin, lead, { patternId: input.patternId })
   if (!preflight.allowed) {
+    if (preflight.code === "active_enrollment") {
+      return {
+        bucket: "skippedAlreadyEnrolled",
+        item: await buildActiveEnrollmentConflictOutcome(admin, {
+          leadId: input.leadId,
+          leadLabel: label,
+          reason: preflight.reason,
+        }),
+      }
+    }
+
     const blockedCodes = ["lead_blocked", "fatigue_blocked", "suppressed", "preflight_blocked"]
     const bucket = blockedCodes.includes(preflight.code ?? "") ? "skippedBlocked" : "failed"
     return {
@@ -172,7 +274,11 @@ async function enrollSingleLeadInGrowthSequence(
     if (!input.startImmediately) {
       return {
         bucket: "enrolled",
-        item: outcome(input.leadId, { enrollmentId: draft.id, code: "draft_created", leadLabel: label }),
+        item: await enrichBulkSequenceEnrollmentOutcome(admin, input.leadId, outcome(input.leadId, {
+          enrollmentId: draft.id,
+          code: "draft_created",
+          leadLabel: label,
+        })),
       }
     }
 
@@ -185,10 +291,26 @@ async function enrollSingleLeadInGrowthSequence(
 
     return {
       bucket: "enrolled",
-      item: outcome(input.leadId, { enrollmentId: confirmed.id, code: "enrolled_active", leadLabel: label }),
+      item: await enrichBulkSequenceEnrollmentOutcome(admin, input.leadId, outcome(input.leadId, {
+        enrollmentId: confirmed.id,
+        code: "enrolled_active",
+        leadLabel: label,
+        enrollmentStatus: "active",
+        schedulerEligible: true,
+      })),
     }
   } catch (error) {
     const code = error instanceof Error ? error.message : "enrollment_failed"
+    if (code === "active_enrollment") {
+      return {
+        bucket: "skippedAlreadyEnrolled",
+        item: await buildActiveEnrollmentConflictOutcome(admin, {
+          leadId: input.leadId,
+          leadLabel: label,
+        }),
+      }
+    }
+
     return {
       bucket: "failed",
       item: outcome(input.leadId, { code, reason: "Could not enroll lead in sequence.", leadLabel: label }),

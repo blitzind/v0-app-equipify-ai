@@ -37,6 +37,7 @@ import {
   formatBulkEnrollmentOutcomeLeadLabel,
   pickBulkEnrollmentPrimaryEnrollmentId,
   pickBulkEnrollmentPrimaryLeadId,
+  resolveBulkEnrollmentViewId,
 } from "@/lib/growth/sequence-enrollment/bulk-enrollment-result-ui"
 import {
   growthLeadsCrmHref,
@@ -80,6 +81,7 @@ export function GrowthBulkSequenceEnrollmentDialog({
   const [result, setResult] = useState<BulkSequenceEnrollmentResult | null>(null)
   const [schedulerNoJobsExplanation, setSchedulerNoJobsExplanation] = useState<string[] | null>(null)
   const [enrollmentDetail, setEnrollmentDetail] = useState<PatternEnrollmentDetailView | null>(null)
+  const [enrollmentActionKey, setEnrollmentActionKey] = useState<string | null>(null)
 
   const uniqueLeadIds = useMemo(() => [...new Set(leadIds)], [leadIds])
   const overLimit = uniqueLeadIds.length > GROWTH_SEQUENCE_BULK_ENROLL_MAX_LEADS
@@ -174,6 +176,54 @@ export function GrowthBulkSequenceEnrollmentDialog({
     }
   }
 
+  async function rerunEnrollment() {
+    await submit(false)
+  }
+
+  async function resumeEnrollment(entry: BulkSequenceEnrollmentLeadOutcome) {
+    const enrollmentId = resolveBulkEnrollmentViewId(entry)
+    if (!enrollmentId) return
+    setEnrollmentActionKey(`${entry.leadId}:resume`)
+    setError(null)
+    try {
+      const res = await fetch(
+        `/api/platform/growth/leads/${entry.leadId}/sequence-enrollments/${enrollmentId}/resume`,
+        { method: "POST" },
+      )
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Could not resume enrollment.")
+      await rerunEnrollment()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not resume enrollment.")
+    } finally {
+      setEnrollmentActionKey(null)
+    }
+  }
+
+  async function cancelDraftEnrollment(entry: BulkSequenceEnrollmentLeadOutcome) {
+    const enrollmentId = resolveBulkEnrollmentViewId(entry)
+    if (!enrollmentId) return
+    setEnrollmentActionKey(`${entry.leadId}:cancel`)
+    setError(null)
+    try {
+      const res = await fetch(
+        `/api/platform/growth/leads/${entry.leadId}/sequence-enrollments/${enrollmentId}/cancel`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: "Cancelled from bulk enrollment dialog to retry." }),
+        },
+      )
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Could not cancel draft enrollment.")
+      await rerunEnrollment()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not cancel draft enrollment.")
+    } finally {
+      setEnrollmentActionKey(null)
+    }
+  }
+
   async function runScheduler() {
     if (!resultUi?.showSchedulerCta || !result) return
     setSchedulerLoading(true)
@@ -225,22 +275,81 @@ export function GrowthBulkSequenceEnrollmentDialog({
     }
   }
 
-  function renderOutcomeRow(entry: BulkSequenceEnrollmentLeadOutcome, label: string) {
+  function renderEnrollmentActions(entry: BulkSequenceEnrollmentLeadOutcome) {
+    const viewEnrollmentId = resolveBulkEnrollmentViewId(entry)
+    const actionKeyPrefix = entry.leadId
+
     return (
-      <li key={`${label}-${entry.leadId}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/70 px-2 py-1.5">
-        <div className="min-w-0">
-          <p className="font-medium">{formatBulkEnrollmentOutcomeLeadLabel(entry)}</p>
-          <p className="text-xs text-muted-foreground">{label}</p>
-        </div>
-        {entry.enrollmentId ? (
+      <div className="flex flex-wrap items-center gap-2">
+        {viewEnrollmentId ? (
           <Button size="sm" variant="link" className="h-auto px-0" asChild>
-            <Link href={growthPatternEnrollmentDetailHref(entry.enrollmentId)} onClick={notifySuccessDismissal}>
+            <Link href={growthPatternEnrollmentDetailHref(viewEnrollmentId)} onClick={notifySuccessDismissal}>
               View enrollment
             </Link>
           </Button>
-        ) : (
-          <span className="text-xs text-muted-foreground">{formatBulkEnrollmentOutcomeDetail(entry)}</span>
-        )}
+        ) : null}
+        {entry.suggestedAction === "resume_enrollment" && viewEnrollmentId ? (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={enrollmentActionKey !== null}
+            onClick={() => void resumeEnrollment(entry)}
+          >
+            {enrollmentActionKey === `${actionKeyPrefix}:resume` ? (
+              <Loader2 className="mr-2 size-4 animate-spin" />
+            ) : null}
+            Resume enrollment
+          </Button>
+        ) : null}
+        {entry.suggestedAction === "cancel_draft" && viewEnrollmentId ? (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={enrollmentActionKey !== null}
+            onClick={() => void cancelDraftEnrollment(entry)}
+          >
+            {enrollmentActionKey === `${actionKeyPrefix}:cancel` ? (
+              <Loader2 className="mr-2 size-4 animate-spin" />
+            ) : null}
+            Cancel draft
+          </Button>
+        ) : null}
+      </div>
+    )
+  }
+
+  function renderOutcomeRow(entry: BulkSequenceEnrollmentLeadOutcome, label: string) {
+    return (
+      <li key={`${label}-${entry.leadId}`} className="rounded-md border border-border/70 px-2 py-1.5">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-medium">{formatBulkEnrollmentOutcomeLeadLabel(entry)}</p>
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{formatBulkEnrollmentOutcomeDetail(entry)}</p>
+            {entry.enrollmentStatus ? (
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                {entry.enrollmentStatus.replace(/_/g, " ")}
+                {entry.schedulerEligible ? " · scheduler ready" : ""}
+              </p>
+            ) : null}
+          </div>
+          {renderEnrollmentActions(entry)}
+        </div>
+      </li>
+    )
+  }
+
+  function renderContinuableBlockedRow(entry: BulkSequenceEnrollmentLeadOutcome) {
+    return (
+      <li key={entry.leadId} className="rounded-md border border-border/70 px-2 py-1.5">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-medium">{formatBulkEnrollmentOutcomeLeadLabel(entry)}</p>
+            <p className="text-xs text-muted-foreground">{formatBulkEnrollmentOutcomeDetail(entry)}</p>
+            {entry.code ? <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{entry.code}</p> : null}
+          </div>
+          {renderEnrollmentActions(entry)}
+        </div>
       </li>
     )
   }
@@ -328,7 +437,11 @@ export function GrowthBulkSequenceEnrollmentDialog({
             {result.skippedBlocked.length > 0 ? (
               <div className="space-y-2">
                 <p className="text-sm font-medium">Blocked</p>
-                <ul className="space-y-1 text-sm">{result.skippedBlocked.map((entry) => renderIssueRow(entry))}</ul>
+                <ul className="space-y-1 text-sm">
+                  {result.skippedBlocked.map((entry) =>
+                    resolveBulkEnrollmentViewId(entry) ? renderContinuableBlockedRow(entry) : renderIssueRow(entry),
+                  )}
+                </ul>
               </div>
             ) : null}
 

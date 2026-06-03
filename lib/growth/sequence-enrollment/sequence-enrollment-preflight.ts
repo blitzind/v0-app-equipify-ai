@@ -14,7 +14,7 @@ export type SequenceEnrollmentPreflightResult = {
 export async function runSequenceEnrollmentPreflight(
   admin: SupabaseClient,
   lead: GrowthLead,
-  options?: { patternId?: string | null },
+  options?: { patternId?: string | null; excludeEnrollmentId?: string | null },
 ): Promise<SequenceEnrollmentPreflightResult> {
   if (lead.contactTemperature === "suppressed" || lead.status === "disqualified" || lead.status === "archived") {
     return { allowed: false, code: "lead_blocked", reason: "Lead is not eligible for sequence enrollment." }
@@ -40,17 +40,28 @@ export async function runSequenceEnrollmentPreflight(
     return emailPreflight
   }
 
-  const { data: active } = await admin
+  let activeQuery = admin
     .schema("growth")
     .from("sequence_enrollments")
-    .select("id")
+    .select("id, sequence_pattern_id, status")
     .eq("lead_id", lead.id)
     .in("status", ["draft", "active", "paused"])
+    .order("created_at", { ascending: false })
     .limit(1)
-    .maybeSingle()
+
+  if (options?.excludeEnrollmentId) {
+    activeQuery = activeQuery.neq("id", options.excludeEnrollmentId)
+  }
+
+  const { data: active, error: activeError } = await activeQuery.maybeSingle()
+  if (activeError) throw new Error(activeError.message)
 
   if (active) {
-    return { allowed: false, code: "active_enrollment", reason: "Lead already has an active sequence enrollment." }
+    return {
+      allowed: false,
+      code: "active_enrollment",
+      reason: "Lead already has another sequence enrollment in progress.",
+    }
   }
 
   return { allowed: true }

@@ -70,7 +70,7 @@ assert.equal(allFailed.showViewEnrollment, false)
 
 const mixed = classifyBulkEnrollmentResult(
   baseResult({
-    enrolled: [{ leadId: "lead-1", enrollmentId: "enr-1", leadLabel: "Acme" }],
+    enrolled: [{ leadId: "lead-1", enrollmentId: "enr-1", leadLabel: "Acme", schedulerEligible: true }],
     failed: [{ leadId: "lead-2", leadLabel: "Beta", code: "enrollment_failed", reason: "Could not enroll lead." }],
   }),
 )
@@ -80,7 +80,7 @@ assert.equal(mixed.showSchedulerCta, true)
 assert.equal(mixed.showViewEnrollment, true)
 
 const successResult = baseResult({
-  enrolled: [{ leadId: "lead-1", enrollmentId: "enr-1", leadLabel: "Acme" }],
+  enrolled: [{ leadId: "lead-1", enrollmentId: "enr-1", leadLabel: "Acme", schedulerEligible: true }],
 })
 const success = classifyBulkEnrollmentResult(successResult)
 assert.equal(success.variant, "success")

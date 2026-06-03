@@ -1,6 +1,9 @@
 /** Client-safe bulk enrollment result + scheduler CTA helpers. */
 
-import type { BulkSequenceEnrollmentResult } from "@/lib/growth/sequence-enrollment/bulk-sequence-enrollment-types"
+import type {
+  BulkSequenceEnrollmentLeadOutcome,
+  BulkSequenceEnrollmentResult,
+} from "@/lib/growth/sequence-enrollment/bulk-sequence-enrollment-types"
 import type { PatternEnrollmentDetailView } from "@/lib/growth/sequence-enrollment/enrollment-detail-types"
 import {
   growthSequenceExecutionHref,
@@ -21,12 +24,32 @@ export type BulkEnrollmentResultUiState = {
   showViewEnrollment: boolean
 }
 
-export function pickBulkEnrollmentPrimaryEnrollmentId(result: BulkSequenceEnrollmentResult): string | null {
-  return (
-    result.enrolled.find((entry) => entry.enrollmentId)?.enrollmentId ??
-    result.skippedAlreadyEnrolled.find((entry) => entry.enrollmentId)?.enrollmentId ??
-    null
+export function resolveBulkEnrollmentViewId(entry: BulkSequenceEnrollmentLeadOutcome): string | null {
+  return entry.enrollmentId ?? entry.conflictingEnrollmentId ?? null
+}
+
+export function listBulkEnrollmentContinuableOutcomes(
+  result: BulkSequenceEnrollmentResult,
+): BulkSequenceEnrollmentLeadOutcome[] {
+  return [...result.enrolled, ...result.skippedAlreadyEnrolled, ...result.skippedBlocked].filter(
+    (entry) => resolveBulkEnrollmentViewId(entry) !== null,
   )
+}
+
+export function bulkEnrollmentHasContinuableEnrollment(result: BulkSequenceEnrollmentResult): boolean {
+  return listBulkEnrollmentContinuableOutcomes(result).length > 0
+}
+
+export function bulkEnrollmentHasSchedulerEligible(result: BulkSequenceEnrollmentResult): boolean {
+  return [...result.enrolled, ...result.skippedAlreadyEnrolled].some((entry) => entry.schedulerEligible === true)
+}
+
+export function pickBulkEnrollmentPrimaryEnrollmentId(result: BulkSequenceEnrollmentResult): string | null {
+  for (const entry of [...result.enrolled, ...result.skippedAlreadyEnrolled, ...result.skippedBlocked]) {
+    const viewId = resolveBulkEnrollmentViewId(entry)
+    if (viewId) return viewId
+  }
+  return null
 }
 
 export function pickBulkEnrollmentPrimaryLeadId(
@@ -46,8 +69,10 @@ export function classifyBulkEnrollmentResult(result: BulkSequenceEnrollmentResul
   const alreadyEnrolledCount = result.skippedAlreadyEnrolled.length
   const failedCount = result.failed.length
   const blockedCount = result.skippedBlocked.length
-  const hasValidEnrollments = enrolledCount + alreadyEnrolledCount > 0
+  const hasContinuableEnrollment = bulkEnrollmentHasContinuableEnrollment(result)
+  const hasValidEnrollments = enrolledCount + alreadyEnrolledCount > 0 || hasContinuableEnrollment
   const primaryEnrollmentId = pickBulkEnrollmentPrimaryEnrollmentId(result)
+  const showSchedulerCta = bulkEnrollmentHasSchedulerEligible(result)
 
   if (!hasValidEnrollments && failedCount > 0) {
     return {
@@ -73,7 +98,7 @@ export function classifyBulkEnrollmentResult(result: BulkSequenceEnrollmentResul
     }
   }
 
-  if (failedCount > 0 || blockedCount > 0) {
+  if (failedCount > 0 || (blockedCount > 0 && !hasContinuableEnrollment)) {
     return {
       qaMarker: GROWTH_BULK_ENROLLMENT_RESULT_UI_QA_MARKER,
       variant: "warning",
@@ -81,7 +106,19 @@ export function classifyBulkEnrollmentResult(result: BulkSequenceEnrollmentResul
       description:
         "Some leads enrolled or were already enrolled, but others were blocked or failed. Review the details below.",
       hasValidEnrollments,
-      showSchedulerCta: hasValidEnrollments,
+      showSchedulerCta,
+      showViewEnrollment: Boolean(primaryEnrollmentId),
+    }
+  }
+
+  if (alreadyEnrolledCount > 0 && enrolledCount === 0 && failedCount === 0 && blockedCount === 0) {
+    return {
+      qaMarker: GROWTH_BULK_ENROLLMENT_RESULT_UI_QA_MARKER,
+      variant: "success",
+      title: "Already enrolled",
+      description: "These leads are already enrolled in this sequence. Continue from the existing enrollment.",
+      hasValidEnrollments,
+      showSchedulerCta,
       showViewEnrollment: Boolean(primaryEnrollmentId),
     }
   }
@@ -93,7 +130,7 @@ export function classifyBulkEnrollmentResult(result: BulkSequenceEnrollmentResul
     description:
       "Pattern enrollment succeeded. Review results below and continue in the enrollment detail or execution console.",
     hasValidEnrollments,
-    showSchedulerCta: hasValidEnrollments,
+    showSchedulerCta,
     showViewEnrollment: Boolean(primaryEnrollmentId),
   }
 }
@@ -104,11 +141,53 @@ export function formatBulkEnrollmentOutcomeLeadLabel(
   return entry.leadLabel?.trim() || entry.leadId.slice(0, 8)
 }
 
+export function summarizeEnrollmentStepContext(
+  enrollment: { status: string; currentStepOrder: number; pauseReason?: string | null } | null,
+  steps: Array<{ stepOrder: number; status: string }>,
+): string | undefined {
+  if (!enrollment) return undefined
+  if (enrollment.status === "draft") return "Draft enrollment — confirm or cancel before scheduling."
+  if (enrollment.status === "paused") {
+    return enrollment.pauseReason
+      ? `Paused · ${enrollment.pauseReason}`
+      : `Paused at step ${enrollment.currentStepOrder}`
+  }
+
+  const nextStep =
+    steps.find((step) => step.stepOrder === enrollment.currentStepOrder + 1) ??
+    steps.find((step) => step.status === "pending" || step.status === "draft_created")
+
+  if (!nextStep) {
+    return enrollment.status === "active"
+      ? `Active · step ${enrollment.currentStepOrder} complete`
+      : `Status ${enrollment.status.replace(/_/g, " ")}`
+  }
+
+  return `Step ${nextStep.stepOrder} · ${nextStep.status.replace(/_/g, " ")}`
+}
+
+export function suggestBulkEnrollmentAction(
+  status: string | undefined,
+): "view_enrollment" | "resume_enrollment" | "cancel_draft" {
+  if (status === "paused") return "resume_enrollment"
+  if (status === "draft") return "cancel_draft"
+  return "view_enrollment"
+}
+
+export function isBulkEnrollmentSchedulerEligible(status: string | undefined): boolean {
+  return status === "active"
+}
+
 export function formatBulkEnrollmentOutcomeDetail(entry: {
   code?: string
   reason?: string
+  enrollmentStatus?: string
+  currentStepSummary?: string
 }): string {
-  return entry.reason?.trim() || entry.code?.replace(/_/g, " ") || "Unknown issue"
+  if (entry.currentStepSummary?.trim()) return entry.currentStepSummary.trim()
+  if (entry.reason?.trim()) return entry.reason.trim()
+  if (entry.enrollmentStatus) return `Status ${entry.enrollmentStatus.replace(/_/g, " ")}`
+  return entry.code?.replace(/_/g, " ") || "Unknown issue"
 }
 
 export function countSchedulerPlannedJobs(result: GrowthSequenceSchedulerRunResult): number {

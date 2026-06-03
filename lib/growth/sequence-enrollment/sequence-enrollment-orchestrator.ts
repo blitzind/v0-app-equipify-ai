@@ -156,6 +156,7 @@ export async function confirmGrowthSequenceEnrollment(
 
   const preflight = await runSequenceEnrollmentPreflight(admin, lead, {
     patternId: enrollment.sequencePatternId,
+    excludeEnrollmentId: enrollment.id,
   })
   if (!preflight.allowed) throw new Error(preflight.code ?? "preflight_blocked")
 
