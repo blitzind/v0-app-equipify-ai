@@ -15,6 +15,9 @@ import {
 export const GROWTH_CRON_EXECUTION_TELEMETRY_MIGRATION =
   "20270527123000_growth_engine_cron_execution_telemetry.sql" as const
 
+export const GROWTH_CRON_EXECUTION_TELEMETRY_GRANTS_MIGRATION =
+  "20270617120000_growth_cron_execution_runs_service_role_grants.sql" as const
+
 type RunRow = {
   id: string
   cron_route: string
@@ -37,6 +40,26 @@ function runsTable(admin: SupabaseClient) {
 export async function isGrowthCronTelemetrySchemaReady(admin: SupabaseClient): Promise<boolean> {
   const { error } = await runsTable(admin).select("id").limit(1)
   return !error
+}
+
+export type GrowthCronTelemetrySchemaProbe = {
+  ready: boolean
+  errorCode: string | null
+  errorMessage: string | null
+}
+
+export async function probeGrowthCronTelemetrySchema(
+  admin: SupabaseClient,
+): Promise<GrowthCronTelemetrySchemaProbe> {
+  const { error } = await runsTable(admin).select("id").limit(1)
+  if (!error) {
+    return { ready: true, errorCode: null, errorMessage: null }
+  }
+  return {
+    ready: false,
+    errorCode: error.code ?? null,
+    errorMessage: error.message,
+  }
 }
 
 function mapRow(row: RunRow): GrowthCronExecutionRunRecord {
@@ -76,7 +99,18 @@ export async function recordGrowthCronExecutionRun(
     metrics?: GrowthCronExecutionMetrics
   },
 ): Promise<GrowthCronExecutionRunRecord | null> {
-  if (!(await isGrowthCronTelemetrySchemaReady(admin))) return null
+  const schema = await probeGrowthCronTelemetrySchema(admin)
+  if (!schema.ready) {
+    console.error(
+      "[growth-cron-telemetry] schema not ready:",
+      JSON.stringify({
+        code: schema.errorCode,
+        message: schema.errorMessage,
+        cronRoute: input.cronRoute,
+      }),
+    )
+    return null
+  }
 
   const durationMs = Math.max(0, Date.parse(input.finishedAt) - Date.parse(input.startedAt))
   const metrics = input.metrics ?? {}
@@ -102,7 +136,14 @@ export async function recordGrowthCronExecutionRun(
     .single()
 
   if (error) {
-    console.error("[growth-cron-telemetry] insert failed:", error.message)
+    console.error(
+      "[growth-cron-telemetry] insert failed:",
+      JSON.stringify({
+        message: error.message,
+        code: error.code,
+        cronRoute: input.cronRoute,
+      }),
+    )
     return null
   }
 

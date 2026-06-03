@@ -44,7 +44,7 @@ export async function runGrowthCronJob<T extends Record<string, unknown>>(
     const finishedAt = new Date().toISOString()
     const metrics = metricsOverride?.(result) ?? extractGrowthCronMetricsFromResult(result)
 
-    await recordGrowthCronExecutionRun(ctx.admin, {
+    const recorded = await recordGrowthCronExecutionRun(ctx.admin, {
       cronRoute: ctx.cronRoute,
       category: ctx.category,
       startedAt,
@@ -58,6 +58,9 @@ export async function runGrowthCronJob<T extends Record<string, unknown>>(
         },
       },
     })
+    if (!recorded) {
+      console.warn(`[growth-cron] ${ctx.cronRoute} telemetry persist skipped (ok run)`)
+    }
 
     console.info(
       `[growth-cron] ${ctx.cronRoute} ok processed=${metrics.processedCount ?? 0} failed=${metrics.failedCount ?? 0} duration_ms=${Date.now() - startedMs}`,
@@ -68,7 +71,7 @@ export async function runGrowthCronJob<T extends Record<string, unknown>>(
     const finishedAt = new Date().toISOString()
     const message = error instanceof Error ? error.message : String(error)
 
-    await recordGrowthCronExecutionRun(ctx.admin, {
+    const recorded = await recordGrowthCronExecutionRun(ctx.admin, {
       cronRoute: ctx.cronRoute,
       category: ctx.category,
       startedAt,
@@ -76,6 +79,9 @@ export async function runGrowthCronJob<T extends Record<string, unknown>>(
       ok: false,
       errorMessage: message,
     })
+    if (!recorded) {
+      console.warn(`[growth-cron] ${ctx.cronRoute} telemetry persist skipped (failed run)`)
+    }
 
     console.error(`[growth-cron] ${ctx.cronRoute} failed:`, message)
 

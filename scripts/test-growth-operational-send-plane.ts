@@ -5,7 +5,7 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
-import { GROWTH_CRON_EXECUTION_TELEMETRY_MIGRATION } from "../lib/growth/runtime/cron-telemetry-repository"
+import { GROWTH_CRON_EXECUTION_TELEMETRY_GRANTS_MIGRATION, GROWTH_CRON_EXECUTION_TELEMETRY_MIGRATION } from "../lib/growth/runtime/cron-telemetry-repository"
 import {
   GROWTH_CRON_ROUTE_IDS,
   GROWTH_CRON_TELEMETRY_QA_MARKER,
@@ -21,13 +21,28 @@ import { DEV_FALLBACK_CREDENTIAL_PEPPER, isUsingDevFallbackCredentialPepper } fr
 async function main(): Promise<void> {
   assert.equal(GROWTH_CRON_TELEMETRY_QA_MARKER, "growth-operational-send-plane-v1")
   assert.equal(GROWTH_INFRASTRUCTURE_READINESS_QA_MARKER, "growth-internal-outbound-ops-v1")
-  assert.equal(GROWTH_CRON_ROUTE_IDS.length, 14)
+  assert.equal(GROWTH_CRON_ROUTE_IDS.length, 15)
 
   const migration = fs.readFileSync(
     path.join(process.cwd(), `supabase/migrations/${GROWTH_CRON_EXECUTION_TELEMETRY_MIGRATION}`),
     "utf8",
   )
   assert.match(migration, /growth\.cron_execution_runs/)
+
+  const grantsMigration = fs.readFileSync(
+    path.join(process.cwd(), `supabase/migrations/${GROWTH_CRON_EXECUTION_TELEMETRY_GRANTS_MIGRATION}`),
+    "utf8",
+  )
+  assert.match(
+    grantsMigration,
+    /grant select, insert, update, delete on table growth\.cron_execution_runs to service_role/,
+  )
+
+  const cronRunner = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/runtime/growth-cron-runner.ts"),
+    "utf8",
+  )
+  assert.match(cronRunner, /telemetry persist skipped/)
 
   const vercel = JSON.parse(fs.readFileSync(path.join(process.cwd(), "vercel.json"), "utf8")) as {
     crons: Array<{ path: string }>
