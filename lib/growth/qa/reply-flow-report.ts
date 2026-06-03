@@ -24,6 +24,9 @@ export type GrowthReplyFlowInspectSnapshot = {
   inboxMessages: Record<string, unknown>[]
   replyIngestionEvents: Record<string, unknown>[]
   inboxSyncRuns: Record<string, unknown>[]
+  outboundReplies: Record<string, unknown>[]
+  replyWorkflowActions: Record<string, unknown>[]
+  growthNotifications: Record<string, unknown>[]
   leadMemory: {
     profile?: { id?: string; updatedAt?: string } | null
     relationshipContext?: unknown | null
@@ -160,10 +163,35 @@ function buildChecks(
       snapshot.leadMemory?.relationshipContext,
   )
 
+  const intelligenceProcessed = snapshot.outboundReplies.some((row) =>
+    Boolean(asString(row.intelligence_processed_at)),
+  )
+
+  const workflowActionsCreated = snapshot.replyWorkflowActions.length > 0
+
+  const leadStatusOnReply =
+    ["replied", "call_ready"].includes(recordString(snapshot.lead, "status")) ||
+    snapshot.timelineEvents.some((row) => asString(row.event_type) === "lead_status_changed")
+
+  const nbaUpdatedOnReply = Boolean(
+    recordString(snapshot.lead, "next_best_action_computed_at", "nextBestActionComputedAt") ||
+      snapshot.timelineEvents.some((row) => asString(row.event_type) === "next_best_action_changed"),
+  )
+
+  const ownerNotificationCreated = snapshot.growthNotifications.some((row) =>
+    ["reply_waiting", "high_priority_reply", "meeting_request_received", "unassigned_reply_attention"].includes(
+      asString(row.notification_type),
+    ),
+  )
+
+  const sequencePausedOnReply = asString(snapshot.enrollment?.status) === "paused"
+
   const approvalCreated =
     snapshot.jobEvents.some((event) =>
       ["solo_approval_used", "job_approved"].includes(asString(event.event_type)),
     ) || Boolean(job?.human_approved_at)
+
+  const optionalReplyCheck = (pass: boolean) => (options.requireReply ? pass : true)
 
   const checkMap: Record<GrowthReplyFlowCheckLabel, GrowthReplyFlowCheckResult> = {
     "Lead Created": {
@@ -247,6 +275,62 @@ function buildChecks(
       detail: memoryUpdated
         ? `profile=${snapshot.leadMemory?.profile?.id ?? "context"} events=${snapshot.leadMemory?.events?.length ?? 0}`
         : "no lead_memory_profiles / events for lead",
+    },
+    "Reply Intelligence Processed": {
+      label: "Reply Intelligence Processed",
+      pass: optionalReplyCheck(intelligenceProcessed),
+      detail: intelligenceProcessed
+        ? `outbound_replies=${snapshot.outboundReplies.length} intelligence_processed_at set`
+        : options.requireReply
+          ? "no outbound_replies with intelligence_processed_at"
+          : "not required for outbound-only harness run",
+    },
+    "Workflow Actions Created": {
+      label: "Workflow Actions Created",
+      pass: optionalReplyCheck(workflowActionsCreated),
+      detail: workflowActionsCreated
+        ? `reply_workflow_actions=${snapshot.replyWorkflowActions.length}`
+        : options.requireReply
+          ? "no reply_workflow_actions for lead"
+          : "not required for outbound-only harness run",
+    },
+    "Lead Status Updated On Reply": {
+      label: "Lead Status Updated On Reply",
+      pass: optionalReplyCheck(leadStatusOnReply),
+      detail: leadStatusOnReply
+        ? `lead_status=${recordString(snapshot.lead, "status")}`
+        : options.requireReply
+          ? "lead status not replied/call_ready and no status timeline event"
+          : "not required for outbound-only harness run",
+    },
+    "NBA Updated On Reply": {
+      label: "NBA Updated On Reply",
+      pass: optionalReplyCheck(nbaUpdatedOnReply),
+      detail: nbaUpdatedOnReply
+        ? `next_best_action=${recordString(snapshot.lead, "next_best_action", "nextBestAction") || "timeline event"}`
+        : options.requireReply
+          ? "next_best_action_computed_at missing and no NBA timeline event"
+          : "not required for outbound-only harness run",
+    },
+    "Owner Notification Created": {
+      label: "Owner Notification Created",
+      pass: optionalReplyCheck(ownerNotificationCreated),
+      detail: ownerNotificationCreated
+        ? `notifications=${snapshot.growthNotifications.length}`
+        : options.requireReply
+          ? "no reply-related growth notifications for lead"
+          : "not required for outbound-only harness run",
+    },
+    "Sequence Paused On Reply": {
+      label: "Sequence Paused On Reply",
+      pass: optionalReplyCheck(sequencePausedOnReply || !snapshot.enrollment?.id),
+      detail: sequencePausedOnReply
+        ? `enrollment_status=paused pause_reason=${asString(snapshot.enrollment?.pause_reason)}`
+        : snapshot.enrollment?.id
+          ? options.requireReply
+            ? `enrollment_status=${asString(snapshot.enrollment?.status) || "unknown"}`
+            : "not required for outbound-only harness run"
+          : "no enrollment to pause",
     },
   }
 
@@ -337,6 +421,9 @@ export function buildGrowthReplyFlowReport(
       replyIngestionEvents: snapshot.replyIngestionEvents.length,
       leadMemoryEvents: snapshot.leadMemory?.events?.length ?? 0,
       inboxSyncRuns: snapshot.inboxSyncRuns.length,
+      outboundReplies: snapshot.outboundReplies.length,
+      replyWorkflowActions: snapshot.replyWorkflowActions.length,
+      growthNotifications: snapshot.growthNotifications.length,
     },
     missingRecords,
     fkIssues,

@@ -171,8 +171,13 @@ async function main(): Promise<void> {
   assert.match(runnerSource, /addInboxMessage/)
   assert.match(runnerSource, /reply_received/)
   assert.match(runnerSource, /ingestGrowthReplyFromInboxSync/)
-  assert.doesNotMatch(runnerSource, /processReplyIntelligence/)
+  assert.match(runnerSource, /finalizeIngestedReplyIntelligence/)
+  assert.match(runnerSource, /pauseSequenceEnrollmentOnInboundReply/)
   assert.doesNotMatch(runnerSource, /autoReply|sendMail|executeTransportSend/)
+
+  const bridgeSource = readSource("lib/growth/replies/finalize-ingested-reply-intelligence.ts")
+  assert.match(bridgeSource, /processReplyIntelligence/)
+  assert.match(bridgeSource, /recomputeGrowthLeadWorkflowSignals/)
 
   const googleAdapterSource = readSource("lib/growth/inbox-sync/provider-sync-adapters/google-inbox-sync-adapter.ts")
   assert.match(googleAdapterSource, /gmailApiFetch/)

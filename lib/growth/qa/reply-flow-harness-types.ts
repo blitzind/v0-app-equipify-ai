@@ -14,6 +14,12 @@ export const GROWTH_REPLY_FLOW_CHECK_LABELS = [
   "Reply Received",
   "Inbox Sync Processed",
   "Relationship Memory Updated",
+  "Reply Intelligence Processed",
+  "Workflow Actions Created",
+  "Lead Status Updated On Reply",
+  "NBA Updated On Reply",
+  "Owner Notification Created",
+  "Sequence Paused On Reply",
 ] as const
 
 export type GrowthReplyFlowCheckLabel = (typeof GROWTH_REPLY_FLOW_CHECK_LABELS)[number]
@@ -76,6 +82,9 @@ export type GrowthReplyFlowHarnessReport = {
     replyIngestionEvents: number
     leadMemoryEvents: number
     inboxSyncRuns: number
+    outboundReplies: number
+    replyWorkflowActions: number
+    growthNotifications: number
   }
   missingRecords: string[]
   fkIssues: GrowthReplyFlowFkIssue[]

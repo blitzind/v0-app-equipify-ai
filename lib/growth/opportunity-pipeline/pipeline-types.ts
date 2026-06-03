@@ -28,7 +28,7 @@ export const GROWTH_OPPORTUNITY_PRIORITIES = ["low", "medium", "high", "critical
 
 export type GrowthOpportunityPriority = (typeof GROWTH_OPPORTUNITY_PRIORITIES)[number]
 
-export const GROWTH_OPPORTUNITY_SOURCES = ["manual", "lead_conversion", "import"] as const
+export const GROWTH_OPPORTUNITY_SOURCES = ["manual", "lead_conversion", "import", "reply_intelligence"] as const
 
 export type GrowthOpportunitySource = (typeof GROWTH_OPPORTUNITY_SOURCES)[number]
 

@@ -73,6 +73,20 @@ const processSource = fs.readFileSync(
 assert.match(processSource, /classifyReplyIntentV2/)
 assert.match(processSource, /routeReplyWorkflows/)
 
+const bridgeSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/replies/finalize-ingested-reply-intelligence.ts"),
+  "utf8",
+)
+assert.match(bridgeSource, /processReplyIntelligence/)
+assert.match(bridgeSource, /recomputeGrowthLeadWorkflowSignals/)
+
+const inboxRunnerSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/inbox-sync/inbox-sync-runner.ts"),
+  "utf8",
+)
+assert.match(inboxRunnerSource, /finalizeIngestedReplyIntelligence/)
+assert.match(inboxRunnerSource, /pauseSequenceEnrollmentOnInboundReply/)
+
 const uiSource = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-reply-inbox-dashboard.tsx"),
   "utf8",

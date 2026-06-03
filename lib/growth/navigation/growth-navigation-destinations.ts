@@ -587,6 +587,13 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: prefixMatch("/admin/growth/replies"),
       },
       {
+        id: "reply-workflow",
+        href: "/admin/growth/replies/workflow",
+        label: "Reply Workflow",
+        consoleKey: "conversations",
+        match: prefixMatch("/admin/growth/replies/workflow"),
+      },
+      {
         id: "relationships",
         href: "/admin/growth/relationships",
         label: "Relationships",

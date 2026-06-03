@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createReplyIntelligenceEvent } from "@/lib/growth/inbox/reply-events"
+import { pauseGrowthSequenceEnrollment } from "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
 import { appendGrowthLeadTimelineEvent } from "@/lib/growth/timeline-repository"
 import type { GrowthInboxSyncTimelineEventType } from "@/lib/growth/inbox-sync/inbox-sync-types"
 
@@ -79,4 +80,27 @@ export async function recordSequenceExitCandidate(
       auto_exit: false,
     },
   })
+}
+
+/** Pause active enrollment on inbound reply; human review still required before exit. */
+export async function pauseSequenceEnrollmentOnInboundReply(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    sequenceEnrollmentId: string
+    reason?: string
+  },
+): Promise<void> {
+  try {
+    await pauseGrowthSequenceEnrollment(admin, {
+      enrollmentId: input.sequenceEnrollmentId,
+      leadId: input.leadId,
+      pauseReason: input.reason ?? "inbound_reply_on_active_sequence",
+    })
+  } catch (error) {
+    if (error instanceof Error && (error.message === "invalid_status" || error.message === "not_found")) {
+      return
+    }
+    throw error
+  }
 }

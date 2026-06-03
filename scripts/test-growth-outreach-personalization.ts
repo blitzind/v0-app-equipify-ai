@@ -13,6 +13,7 @@ import {
 } from "../lib/growth/outreach/personalization/ai-refinement-guard"
 import { buildPersonalizedOutreachDraft } from "../lib/growth/outreach/personalization/assemble-draft"
 import { detectOutreachIndustry } from "../lib/growth/outreach/personalization/industry-detection"
+import { normalizeGrowthResearchConfidence } from "../lib/growth/research/research-confidence"
 import { buildPersonalizationWarnings, computePersonalizationConfidence } from "../lib/growth/outreach/personalization/personalization-warnings"
 import {
   OUTREACH_PERSONALIZATION_DEFAULT_MAX_WORDS,
@@ -202,5 +203,32 @@ for (const relativePath of clientSafeFiles) {
   const source = fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
   assert.ok(!source.includes("server-only"), `${relativePath} must remain client-safe`)
 }
+
+assert.equal(normalizeGrowthResearchConfidence(0.85), 85)
+assert.equal(normalizeGrowthResearchConfidence(0.65), 65)
+assert.equal(normalizeGrowthResearchConfidence(72), 72)
+assert.equal(normalizeGrowthResearchConfidence(null), null)
+
+const leadResearchPacket: OutreachContextPacket = {
+  ...basePacket,
+  researchConfidence: normalizeGrowthResearchConfidence(0.85),
+}
+const leadResearchStrategy = selectMessageStrategy({
+  packet: leadResearchPacket,
+  signals: extractPersonalizationSignals(leadResearchPacket),
+  generationType: "cold_email",
+})
+const leadResearchConfidence = computePersonalizationConfidence({
+  packet: leadResearchPacket,
+  signals: extractPersonalizationSignals(leadResearchPacket),
+  strategy: leadResearchStrategy,
+})
+assert.ok(leadResearchConfidence.score >= 55, "0–1 lead research confidence should contribute after normalization")
+
+const contextBuilderSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/outreach/personalization/context-packet-builder.ts"),
+  "utf8",
+)
+assert.match(contextBuilderSource, /normalizeGrowthResearchConfidence/)
 
 console.log("growth outreach personalization tests passed")

@@ -12,6 +12,7 @@ import { listGrowthOutboundRepliesForLead } from "@/lib/growth/outbound/reply-re
 import type { OutreachContextPacket } from "@/lib/growth/outreach/personalization/personalization-types"
 import { listGrowthOutreachQueueItems } from "@/lib/growth/outreach/outreach-queue-repository"
 import { fetchLatestUsableGrowthLeadResearchRun } from "@/lib/growth/research-repository"
+import { normalizeGrowthResearchConfidence } from "@/lib/growth/research/research-confidence"
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
 import { listGrowthLeadTimelineEvents } from "@/lib/growth/timeline-repository"
 import type { GrowthLead } from "@/lib/growth/types"
@@ -156,7 +157,9 @@ export async function buildOutreachContextPacket(
     objectionSummaries,
     sequenceHistorySummaries,
     timelineEventSummaries,
-    researchConfidence: research?.researchConfidence ?? researchRun?.researchConfidence ?? null,
+    researchConfidence: normalizeGrowthResearchConfidence(
+      research?.researchConfidence ?? researchRun?.researchConfidence ?? null,
+    ),
     researchPainPoints: (research?.equipifyPainPoints ?? []).map((entry) => truncate(entry, 100)),
     equipmentServiceIndicators: (research?.equipmentServiceIndicators ?? []).map((entry) => truncate(entry, 100)),
     priorTouchCount: priorTouchSummaries.length,

@@ -17,6 +17,7 @@ import {
 import {
   recordInboxSyncLeadEvent,
   recordInboxSyncPlatformEvent,
+  pauseSequenceEnrollmentOnInboundReply,
   recordSequenceExitCandidate,
 } from "@/lib/growth/inbox-sync/inbox-sync-events"
 import { getInboxSyncAdapter } from "@/lib/growth/inbox-sync/provider-sync-adapters/inbox-sync-adapter-registry"
@@ -31,6 +32,7 @@ import {
 } from "@/lib/growth/inbox-sync/thread-matcher"
 import type { GrowthInboxSyncRunSummary } from "@/lib/growth/inbox-sync/inbox-sync-types"
 import { ingestGrowthReplyFromInboxSync } from "@/lib/growth/replies/reply-ingestion-pipeline"
+import { finalizeIngestedReplyIntelligence } from "@/lib/growth/replies/finalize-ingested-reply-intelligence"
 import { appendGrowthLeadTimelineEvent } from "@/lib/growth/timeline-repository"
 
 function isSimulateEnabled(): boolean {
@@ -235,23 +237,35 @@ export async function runInboxSyncForMailbox(
         })
 
         if (!ingestion.deduped && leadId) {
-          await appendGrowthLeadTimelineEvent(admin, {
-            leadId,
-            eventType: "reply_received",
-            title: "Reply received",
-            summary: message.subject
-              ? `Inbound reply synced: ${message.subject}`
-              : "Inbound reply synced from Gmail mailbox.",
-            actorUserId: actor.actorUserId,
-            actorEmail: actor.actorEmail,
-            payload: {
-              ingestion_event_id: ingestion.ingestionEventId,
-              inbox_message_id: imported.message.id,
-              source: "google_mailbox_sync",
-              matched_by: match.matchedBy,
-              outbound_reply_id: ingestion.outboundReplyId,
-            },
-          }).catch(() => undefined)
+          if (ingestion.outboundReply) {
+            await finalizeIngestedReplyIntelligence(admin, {
+              leadId,
+              outboundReply: ingestion.outboundReply,
+              bodyPreview: message.bodyPreview,
+              senderEmail: message.fromEmail,
+              sequenceEnrollmentId: match.sequenceEnrollmentId,
+              ingestionEventId: ingestion.ingestionEventId,
+              deliveryAttemptId: match.deliveryAttemptId,
+            })
+          } else {
+            await appendGrowthLeadTimelineEvent(admin, {
+              leadId,
+              eventType: "reply_received",
+              title: "Reply received",
+              summary: message.subject
+                ? `Inbound reply synced: ${message.subject}`
+                : "Inbound reply synced from Gmail mailbox.",
+              actorUserId: actor.actorUserId,
+              actorEmail: actor.actorEmail,
+              payload: {
+                ingestion_event_id: ingestion.ingestionEventId,
+                inbox_message_id: imported.message.id,
+                source: "google_mailbox_sync",
+                matched_by: match.matchedBy,
+                outbound_reply_id: ingestion.outboundReplyId,
+              },
+            }).catch(() => undefined)
+          }
         }
       }
 
@@ -261,6 +275,10 @@ export async function runInboxSyncForMailbox(
           leadId,
           sequenceEnrollmentId: match.sequenceEnrollmentId,
           reason: "inbound_reply_on_active_sequence",
+        })
+        await pauseSequenceEnrollmentOnInboundReply(admin, {
+          leadId,
+          sequenceEnrollmentId: match.sequenceEnrollmentId,
         })
       }
     }

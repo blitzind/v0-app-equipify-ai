@@ -21,7 +21,7 @@ function readSource(relativePath: string): string {
 }
 
 assert.equal(GROWTH_REPLY_FLOW_QA_MARKER, "growth-reply-flow-qa-v1")
-assert.equal(GROWTH_REPLY_FLOW_CHECK_LABELS.length, 11)
+assert.equal(GROWTH_REPLY_FLOW_CHECK_LABELS.length, 17)
 
 const harnessSource = readSource("lib/growth/qa/reply-flow-harness.ts")
 assert.match(harnessSource, /createGrowthReplyFlowLead/)
@@ -90,7 +90,10 @@ assert.match(harnessSource, /runApprovedDueSequenceExecutionJobs/)
 assert.match(harnessSource, /fetchLeadMemoryProfileView/)
 assert.match(harnessSource, /inbox_threads/)
 assert.match(harnessSource, /thread_id/)
-assert.match(reportSource, /processing_status/)
+assert.match(reportSource, /Reply Intelligence Processed/)
+assert.match(reportSource, /Sequence Paused On Reply/)
+assert.match(harnessSource, /outbound_replies/)
+assert.match(harnessSource, /reply_workflow_actions/)
 
 const cliSource = readSource("scripts/qa-growth-reply-flow.ts")
 assert.match(cliSource, /qa:growth-reply-flow/)
@@ -146,6 +149,9 @@ const passReport = buildGrowthReplyFlowReport(
     inboxMessages: [],
     replyIngestionEvents: [],
     inboxSyncRuns: [{ status: "completed" }],
+    outboundReplies: [],
+    replyWorkflowActions: [],
+    growthNotifications: [],
     leadMemory: {
       profile: { id: "mem-1", updatedAt: new Date().toISOString() } as never,
       relationshipContext: null,
@@ -160,7 +166,7 @@ const passReport = buildGrowthReplyFlowReport(
 )
 
 assert.equal(passReport.overall, "PASS")
-assert.equal(passReport.checks.length, 11)
+assert.equal(passReport.checks.length, 17)
 assert.ok(passReport.checks.every((check) => check.pass))
 assert.equal(passReport.ids.leadId, "lead-1")
 assert.equal(passReport.transport.gmailMessageId, "gmail-msg-123")
@@ -183,6 +189,9 @@ const failReport = buildGrowthReplyFlowReport(
     inboxMessages: [],
     replyIngestionEvents: [],
     inboxSyncRuns: [],
+    outboundReplies: [],
+    replyWorkflowActions: [],
+    growthNotifications: [],
     leadMemory: null,
   },
   { requireReply: true, actions: { step: "inspect" } },
@@ -214,6 +223,9 @@ const replyViaProcessingStatus = buildGrowthReplyFlowReport(
     inboxMessages: [],
     replyIngestionEvents: [{ processing_status: "processed", lead_id: "lead-2" }],
     inboxSyncRuns: [{ status: "completed" }],
+    outboundReplies: [],
+    replyWorkflowActions: [],
+    growthNotifications: [],
     leadMemory: null,
   },
   { requireReply: true },

@@ -242,6 +242,9 @@ export function GrowthReplyInboxDashboard() {
                   <Link href={`/admin/growth/leads?leadId=${item.leadId}`} className="font-medium text-indigo-600 hover:underline">
                     Open lead
                   </Link>
+                  <Link href="/admin/growth/replies/workflow" className="font-medium text-indigo-600 hover:underline">
+                    Workflow actions
+                  </Link>
                 </div>
               </li>
             ))}

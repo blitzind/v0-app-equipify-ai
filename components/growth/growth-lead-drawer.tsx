@@ -15,6 +15,7 @@ import { GrowthOpportunityReadiness } from "@/components/growth/growth-opportuni
 import { GrowthLeadOpportunityIntelligencePanel } from "@/components/growth/growth-lead-opportunity-intelligence-panel"
 import { GrowthLeadBookingIntelligencePanel } from "@/components/growth/growth-lead-booking-intelligence-panel"
 import { GrowthLeadRelationshipMemoryPanel } from "@/components/growth/growth-lead-relationship-memory-panel"
+import { GrowthReplyWorkflowActionsPanel } from "@/components/growth/growth-reply-workflow-actions-panel"
 import { GrowthLeadMultichannelTimelinePanel } from "@/components/growth/growth-lead-multichannel-timeline-panel"
 import { GrowthRevenueForecast } from "@/components/growth/growth-revenue-forecast"
 import { GrowthVoiceRevenueIntelligencePassiveCard } from "@/components/growth/growth-voice-revenue-intelligence-passive-card"
@@ -92,6 +93,8 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
             onAddDecisionMaker={handleAddDecisionMaker}
             onTimelineRefresh={() => setTimelineRefreshToken((token) => token + 1)}
           />
+
+          <GrowthReplyWorkflowActionsPanel leadId={activeLead.id} compact showSequenceExit />
 
           <GrowthExecutiveOperatingIntelligence lead={activeLead} />
 

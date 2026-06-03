@@ -423,6 +423,30 @@ export async function inspectGrowthReplyFlowLead(
     .order("created_at", { ascending: false })
     .limit(20)
 
+  const { data: outboundReplies } = await admin
+    .schema("growth")
+    .from("outbound_replies")
+    .select("*")
+    .eq("lead_id", leadId)
+    .order("received_at", { ascending: false })
+    .limit(20)
+
+  const { data: replyWorkflowActions } = await admin
+    .schema("growth")
+    .from("reply_workflow_actions")
+    .select("*")
+    .eq("lead_id", leadId)
+    .order("created_at", { ascending: false })
+    .limit(20)
+
+  const { data: growthNotifications } = await admin
+    .schema("growth")
+    .from("notifications")
+    .select("*")
+    .eq("lead_id", leadId)
+    .order("created_at", { ascending: false })
+    .limit(20)
+
   const mailboxConnectionId = asString(mailbox?.id)
   const { data: inboxSyncRuns } = mailboxConnectionId
     ? await admin
@@ -456,6 +480,9 @@ export async function inspectGrowthReplyFlowLead(
     inboxMessages: (inboxMessages ?? []) as Record<string, unknown>[],
     replyIngestionEvents: (replyIngestionEvents ?? []) as Record<string, unknown>[],
     inboxSyncRuns: (inboxSyncRuns ?? []) as Record<string, unknown>[],
+    outboundReplies: (outboundReplies ?? []) as Record<string, unknown>[],
+    replyWorkflowActions: (replyWorkflowActions ?? []) as Record<string, unknown>[],
+    growthNotifications: (growthNotifications ?? []) as Record<string, unknown>[],
     leadMemory,
   }
 }

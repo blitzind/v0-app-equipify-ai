@@ -16,6 +16,7 @@ export type GrowthCommandSectionTab = {
 export const GROWTH_COMMAND_JUMP_DESTINATIONS: readonly GrowthCommandNavLink[] = [
   { label: "Queue", href: GROWTH_REVENUE_QUEUE_HREF },
   { label: "Reply Inbox", href: "/admin/growth/replies" },
+  { label: "Reply Workflow", href: "/admin/growth/replies/workflow" },
   { label: "Meetings", href: "/admin/growth/meetings" },
   { label: "Call Queue", href: "/admin/growth/leads/queue" },
   { label: "Imports", href: "/admin/growth/imports" },

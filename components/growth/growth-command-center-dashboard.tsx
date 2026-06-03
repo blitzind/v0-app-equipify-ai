@@ -37,6 +37,7 @@ import {
 } from "@/components/growth/growth-command-revenue-execution-section"
 import { GrowthCommandPipelineRevenueSection } from "@/components/growth/growth-command-pipeline-revenue-section"
 import { GrowthCommandQuickActionsRail } from "@/components/growth/growth-command-quick-actions-rail"
+import { GrowthReplyWorkflowActionsPanel } from "@/components/growth/growth-reply-workflow-actions-panel"
 import { GrowthCommandSectionTabs } from "@/components/growth/growth-command-section-tabs"
 import { GrowthOperatorAttentionStrip } from "@/components/growth/growth-operator-attention-strip"
 import { GrowthOperatorDailyWorkflow } from "@/components/growth/growth-operator-daily-workflow"
@@ -447,6 +448,8 @@ export function GrowthCommandCenterDashboard() {
           </GrowthEngineCard>
 
           <GrowthCommandQuickActionsRail variant="chips" />
+
+          <GrowthReplyWorkflowActionsPanel compact showSequenceExit title="Reply workflow queue" />
 
           {filteredActions.length > 0 ? (
           <GrowthEngineCard

@@ -1,8 +1,8 @@
 "use client"
 
-import { Inbox } from "lucide-react"
+import { GitBranch } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
-import { GrowthReplyInboxDashboard } from "@/components/growth/growth-reply-inbox-dashboard"
+import { GrowthReplyWorkflowActionCenter } from "@/components/growth/growth-reply-workflow-actions-panel"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -11,7 +11,7 @@ import {
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
-export default function AdminGrowthRepliesPage() {
+export default function AdminGrowthReplyWorkflowPage() {
   const { sessionIdentity } = useAdmin()
   const header = usePlatformAdminHeaderIdentity({
     displayName: sessionIdentity?.displayName,
@@ -27,22 +27,19 @@ export default function AdminGrowthRepliesPage() {
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center gap-2">
             <span className="flex size-9 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
-              <Inbox size={17} />
+              <GitBranch size={17} />
             </span>
             <div>
-              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Inbox Intelligence</h1>
+              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Sales Workflow Actions</h1>
               <p className="text-sm text-muted-foreground">
-                Reply intelligence v2 — evidence-backed classification, operator workflows, conversation timeline, and AI-assisted copilot. Human executes; no autonomous sends.{" "}
-                <a href="/admin/growth/replies/workflow" className="font-medium text-indigo-600 hover:underline">
-                  Open Workflow Action Center
-                </a>
+                Reply-generated recommendations — mark interested, create call tasks, review opportunities, and resolve sequence exits. All actions require operator confirmation.
               </p>
             </div>
           </div>
         </section>
 
         <GrowthSectionLayout>
-          <GrowthReplyInboxDashboard />
+          <GrowthReplyWorkflowActionCenter />
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>
