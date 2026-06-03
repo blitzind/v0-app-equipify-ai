@@ -198,6 +198,37 @@ export async function unassignGrowthLead(
   return { ok: true, lead: enriched, event: "unassigned" }
 }
 
+export async function recordGrowthLeadInitialAssignment(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    assignedToUserId: string
+    assignedToLabel: string
+    source: GrowthLeadAssignmentSource
+    companyName: string
+    actor: { userId: string; email: string }
+  },
+): Promise<void> {
+  await emitGrowthLeadAssignedTimeline(admin, {
+    leadId: input.leadId,
+    assignedToUserId: input.assignedToUserId,
+    assignedToLabel: input.assignedToLabel,
+    source: input.source,
+    actor: input.actor,
+  })
+
+  await touchGrowthRepLastAssigned(admin, input.assignedToUserId)
+
+  await emitGrowthLeadAssignedNotification(admin, {
+    leadId: input.leadId,
+    ownerUserId: input.assignedToUserId,
+    companyName: input.companyName,
+    sourceId: input.source,
+  })
+
+  await syncGrowthOpportunityOwnerFromLead(admin, input.leadId)
+}
+
 export async function setGrowthLeadAssignmentOnImport(
   admin: SupabaseClient,
   input: {

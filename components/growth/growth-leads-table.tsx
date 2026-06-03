@@ -9,6 +9,7 @@ import {
   MoreHorizontal,
   PanelRightOpen,
   Phone,
+  UserCheck,
 } from "lucide-react"
 import {
   AlertDialog,
@@ -37,6 +38,10 @@ import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthLeadsTableProps = {
   leads: GrowthLead[]
+  ownerLabels?: Record<string, string>
+  currentUserId?: string | null
+  onAssignToMe?: (lead: GrowthLead) => Promise<void>
+  assigningToMeLeadId?: string | null
   onOpenLead?: (lead: GrowthLead) => void
   onArchiveLead?: (lead: GrowthLead) => Promise<void>
   onBulkArchive?: (leadIds: string[]) => Promise<void>
@@ -49,6 +54,10 @@ type GrowthLeadsTableProps = {
 
 export function GrowthLeadsTable({
   leads,
+  ownerLabels = {},
+  currentUserId = null,
+  onAssignToMe,
+  assigningToMeLeadId = null,
   onOpenLead,
   onArchiveLead,
   onBulkArchive,
@@ -182,6 +191,7 @@ export function GrowthLeadsTable({
                   : "—"
                 const sourceLabel = lead.sourceChannel ?? lead.sourceKind?.replace(/_/g, " ") ?? "—"
                 const priorityLabel = lead.researchPriority ?? "—"
+                const ownerLabel = lead.assignedTo ? ownerLabels[lead.assignedTo] ?? null : null
 
                 return (
                   <tr key={lead.id} className="hover:bg-muted/30">
@@ -211,7 +221,7 @@ export function GrowthLeadsTable({
                     <td className="px-4 py-3 align-top text-muted-foreground">{nbaLabel}</td>
                     <td className="px-4 py-3 align-top">
                       {lead.assignedTo ? (
-                        <span className="text-sm text-foreground">Assigned</span>
+                        <span className="text-sm text-foreground">{ownerLabel ?? "Assigned"}</span>
                       ) : (
                         <span className="text-sm text-amber-700">Unassigned</span>
                       )}
@@ -264,6 +274,28 @@ export function GrowthLeadsTable({
                           <span className="sr-only">Open</span>
                         </Button>
 
+                        {!lead.assignedTo && currentUserId && onAssignToMe ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2"
+                                disabled={assigningToMeLeadId === lead.id}
+                                onClick={() => void onAssignToMe(lead)}
+                              >
+                                {assigningToMeLeadId === lead.id ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                  <UserCheck className="size-3.5" />
+                                )}
+                                <span className="sr-only">Assign to me</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Assign to me</TooltipContent>
+                          </Tooltip>
+                        ) : null}
+
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button size="sm" variant="outline" className="h-8 px-2">
@@ -273,6 +305,14 @@ export function GrowthLeadsTable({
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => onOpenLead?.(lead)}>Open Lead</DropdownMenuItem>
+                            {!lead.assignedTo && currentUserId && onAssignToMe ? (
+                              <DropdownMenuItem
+                                disabled={assigningToMeLeadId === lead.id}
+                                onClick={() => void onAssignToMe(lead)}
+                              >
+                                Assign to me
+                              </DropdownMenuItem>
+                            ) : null}
                             {archiveAvailable ? (
                               <DropdownMenuItem
                                 className="text-destructive focus:text-destructive"

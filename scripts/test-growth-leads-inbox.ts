@@ -71,7 +71,7 @@ const leadsRouteSource = fs.readFileSync(
 assert.match(leadsRouteSource, /archiveSchemaReady/, "list API exposes archive schema readiness")
 
 const pageSource = fs.readFileSync(
-  path.join(process.cwd(), "app/(admin)/admin/growth/leads/page.tsx"),
+  path.join(process.cwd(), "app/(admin)/admin/growth/leads/crm/page.tsx"),
   "utf8",
 )
 assert.match(pageSource, /onArchiveLead=\{archiveLead\}/, "page wires archiveLead handler")
@@ -94,6 +94,8 @@ assert.match(tableSource, /No phone on lead/, "phone quick action disabled toolt
 assert.match(tableSource, /Archive Selected/, "bulk archive toolbar label")
 assert.match(tableSource, /archiveAvailable/, "table respects archive availability")
 assert.match(tableSource, /sourceKind\?\.replace/, "table handles missing source kind safely")
+assert.match(tableSource, /ownerLabels/, "table accepts owner label map")
+assert.match(tableSource, /Assign to me/, "table exposes assign-to-me quick action")
 
 const editDialogSource = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-lead-edit-contact-dialog.tsx"),

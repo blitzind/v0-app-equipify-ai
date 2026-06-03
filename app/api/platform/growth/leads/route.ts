@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { recordGrowthLeadInitialAssignment } from "@/lib/growth/assignment/assign-lead"
+import { fetchGrowthRepByUserId, syncGrowthRepRosterFromPlatformAdmins } from "@/lib/growth/assignment/rep-roster-repository"
 import { createGrowthLead, isGrowthLeadArchiveSchemaReady, listGrowthLeads } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { emitGrowthLeadCreatedTimeline } from "@/lib/growth/timeline-emitter"
@@ -30,7 +32,7 @@ const CreateLeadSchema = z.object({
   score: z.number().int().min(0).max(100).optional().nullable(),
   notes: optionalLongText,
   researchPriority: z.enum(GROWTH_LEAD_RESEARCH_PRIORITIES).optional(),
-  assignedTo: z.string().uuid().optional().nullable(),
+  assignedTo: z.string().uuid(),
   sourceChannel: optionalText,
   sourceCampaign: optionalText,
   sourceVendor: optionalText,
@@ -99,6 +101,16 @@ export async function POST(request: Request) {
 
   const body = parsed.data
   const contactEmail = body.contactEmail?.trim() ? body.contactEmail.trim() : null
+  const assignedTo = body.assignedTo.trim()
+
+  await syncGrowthRepRosterFromPlatformAdmins(access.admin)
+  const assignee = await fetchGrowthRepByUserId(access.admin, assignedTo)
+  if (!assignee || assignee.status === "inactive") {
+    return NextResponse.json(
+      { error: "assignee_ineligible", message: "Assigned To must be an active growth rep." },
+      { status: 400 },
+    )
+  }
 
   try {
     const lead = await createGrowthLead(access.admin, {
@@ -119,7 +131,7 @@ export async function POST(request: Request) {
       score: body.score ?? null,
       notes: body.notes,
       researchPriority: body.researchPriority,
-      assignedTo: body.assignedTo,
+      assignedTo,
       sourceChannel: body.sourceChannel,
       sourceCampaign: body.sourceCampaign,
       sourceVendor: body.sourceVendor,
@@ -130,6 +142,16 @@ export async function POST(request: Request) {
       leadId: lead.id,
       companyName: lead.companyName,
       sourceKind: lead.sourceKind,
+      actor: { userId: access.userId, email: access.userEmail },
+    })
+
+    const assignmentSource = lead.sourceKind === "import" ? "import" : "manual"
+    await recordGrowthLeadInitialAssignment(access.admin, {
+      leadId: lead.id,
+      assignedToUserId: assignedTo,
+      assignedToLabel: assignee.displayName ?? assignee.email,
+      source: assignmentSource,
+      companyName: lead.companyName,
       actor: { userId: access.userId, email: access.userEmail },
     })
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { GROWTH_LEAD_SOURCE_KINDS, GROWTH_LEAD_STATUSES, GROWTH_LEAD_RESEARCH_PRIORITIES, type GrowthLeadResearchPriority, type GrowthLeadSourceKind, type GrowthLeadStatus } from "@/lib/growth/types"
+import type { GrowthRepRosterEntry } from "@/lib/growth/assignment/assignment-types"
 
 export type GrowthLeadFormValues = {
   sourceKind: GrowthLeadSourceKind
@@ -32,23 +33,27 @@ export type GrowthLeadFormValues = {
   city: string
   state: string
   status: GrowthLeadStatus
+  assignedTo: string
   researchPriority: GrowthLeadResearchPriority
   notes: string
 }
 
-const EMPTY_FORM: GrowthLeadFormValues = {
-  sourceKind: "manual",
-  sourceDetail: "",
-  companyName: "",
-  contactName: "",
-  contactEmail: "",
-  contactPhone: "",
-  website: "",
-  city: "",
-  state: "",
-  status: "new",
-  researchPriority: "normal",
-  notes: "",
+function createEmptyForm(defaultAssignee = ""): GrowthLeadFormValues {
+  return {
+    sourceKind: "manual",
+    sourceDetail: "",
+    companyName: "",
+    contactName: "",
+    contactEmail: "",
+    contactPhone: "",
+    website: "",
+    city: "",
+    state: "",
+    status: "new",
+    assignedTo: defaultAssignee,
+    researchPriority: "normal",
+    notes: "",
+  }
 }
 
 type GrowthLeadFormDialogProps = {
@@ -56,6 +61,8 @@ type GrowthLeadFormDialogProps = {
   onOpenChange: (open: boolean) => void
   onSubmit: (values: GrowthLeadFormValues) => Promise<void>
   saving?: boolean
+  /** Defaults Assigned To on open; used for "Assign to me". */
+  currentUserId?: string | null
 }
 
 export function GrowthLeadFormDialog({
@@ -63,8 +70,46 @@ export function GrowthLeadFormDialog({
   onOpenChange,
   onSubmit,
   saving = false,
+  currentUserId = null,
 }: GrowthLeadFormDialogProps) {
-  const [form, setForm] = useState<GrowthLeadFormValues>(EMPTY_FORM)
+  const [form, setForm] = useState<GrowthLeadFormValues>(() => createEmptyForm())
+  const [reps, setReps] = useState<GrowthRepRosterEntry[]>([])
+  const [loadingReps, setLoadingReps] = useState(false)
+
+  const activeReps = reps.filter((rep) => rep.status !== "inactive")
+
+  const loadReps = useCallback(async () => {
+    setLoadingReps(true)
+    try {
+      const res = await fetch("/api/platform/growth/assignment/reps", { cache: "no-store" })
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; reps?: GrowthRepRosterEntry[] }
+      if (res.ok && data.ok) setReps(data.reps ?? [])
+    } finally {
+      setLoadingReps(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    void loadReps()
+  }, [open, loadReps])
+
+  useEffect(() => {
+    if (!open) return
+    setForm(createEmptyForm(""))
+  }, [open])
+
+  useEffect(() => {
+    if (!open || loadingReps) return
+    setForm((prev) => {
+      if (prev.assignedTo) return prev
+      const defaultAssignee =
+        currentUserId && activeReps.some((rep) => rep.userId === currentUserId)
+          ? currentUserId
+          : activeReps[0]?.userId ?? ""
+      return { ...prev, assignedTo: defaultAssignee }
+    })
+  }, [open, loadingReps, currentUserId, activeReps])
 
   function updateField<K extends keyof GrowthLeadFormValues>(key: K, value: GrowthLeadFormValues[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -72,9 +117,12 @@ export function GrowthLeadFormDialog({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
+    if (!form.assignedTo.trim()) return
     await onSubmit(form)
-    setForm(EMPTY_FORM)
+    setForm(createEmptyForm(currentUserId && activeReps.some((rep) => rep.userId === currentUserId) ? currentUserId : ""))
   }
+
+  const canSubmit = form.companyName.trim().length > 0 && form.assignedTo.trim().length > 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -122,6 +170,47 @@ export function GrowthLeadFormDialog({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <div className="flex items-end justify-between gap-2">
+                <Label htmlFor="growth-lead-assigned-to" className="flex-1">
+                  Assigned To *
+                </Label>
+                {currentUserId ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 shrink-0 px-2 text-xs"
+                    disabled={loadingReps || saving || !activeReps.some((rep) => rep.userId === currentUserId)}
+                    onClick={() => updateField("assignedTo", currentUserId)}
+                  >
+                    Assign to me
+                  </Button>
+                ) : null}
+              </div>
+              <Select
+                value={form.assignedTo || undefined}
+                onValueChange={(value) => updateField("assignedTo", value)}
+                disabled={loadingReps || saving || activeReps.length === 0}
+                required
+              >
+                <SelectTrigger id="growth-lead-assigned-to">
+                  <SelectValue placeholder={loadingReps ? "Loading reps…" : "Select owner"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeReps.map((rep) => (
+                    <SelectItem key={rep.userId} value={rep.userId}>
+                      {rep.displayName ?? rep.email}
+                      {rep.status === "paused" ? " (paused)" : ""}
+                      {rep.userId === currentUserId ? " (you)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!loadingReps && activeReps.length === 0 ? (
+                <p className="text-xs text-destructive">No active reps available. Configure the sales roster first.</p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="growth-lead-research-priority">Research priority</Label>
@@ -205,7 +294,7 @@ export function GrowthLeadFormDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button type="submit" disabled={saving || !form.companyName.trim()}>
+            <Button type="submit" disabled={saving || !canSubmit}>
               {saving ? "Saving…" : "Create lead"}
             </Button>
           </DialogFooter>

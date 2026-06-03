@@ -109,6 +109,30 @@ assert.doesNotMatch(engineSource, /executeGrowthOutreachQueueItem/)
 const assignSource = fs.readFileSync(path.join(process.cwd(), "lib/growth/assignment/assign-lead.ts"), "utf8")
 assert.match(assignSource, /manual_owner_protected/)
 assert.match(assignSource, /manager_override/)
+assert.match(assignSource, /recordGrowthLeadInitialAssignment/)
+
+const leadsRouteSource = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/leads/route.ts"),
+  "utf8",
+)
+assert.match(leadsRouteSource, /assignedTo: z\.string\(\)\.uuid\(\)/)
+assert.match(leadsRouteSource, /recordGrowthLeadInitialAssignment/)
+assert.match(leadsRouteSource, /assignee_ineligible/)
+
+const formDialogSource = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-lead-form-dialog.tsx"),
+  "utf8",
+)
+assert.match(formDialogSource, /Assigned To \*/)
+assert.match(formDialogSource, /Assign to me/)
+assert.match(formDialogSource, /assignment\/reps/)
+
+const crmPageSource = fs.readFileSync(
+  path.join(process.cwd(), "app/(admin)/admin/growth/leads/crm/page.tsx"),
+  "utf8",
+)
+assert.match(crmPageSource, /assignedTo: values\.assignedTo/)
+assert.match(crmPageSource, /ownerLabels/)
 
 const schedulerSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/sequence-enrollment/run-sequence-scheduler.ts"),

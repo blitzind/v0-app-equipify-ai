@@ -18,6 +18,7 @@ import {
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import type { GrowthLead } from "@/lib/growth/types"
+import type { GrowthRepRosterEntry } from "@/lib/growth/assignment/assignment-types"
 import { GROWTH_LEAD_ARCHIVE_SCHEMA_PUBLIC_MESSAGE, isGrowthLeadArchiveSchemaIncompleteErrorCode } from "@/lib/growth/lead-archive-api-errors"
 import {
   applyGrowthCommandLeadFocusExpand,
@@ -41,6 +42,8 @@ export default function AdminGrowthLeadsPage() {
   const [saving, setSaving] = useState(false)
   const [archivingLeadId, setArchivingLeadId] = useState<string | null>(null)
   const [bulkArchiving, setBulkArchiving] = useState(false)
+  const [assigningToMeLeadId, setAssigningToMeLeadId] = useState<string | null>(null)
+  const [reps, setReps] = useState<GrowthRepRosterEntry[]>([])
   const [archiveSchemaReady, setArchiveSchemaReady] = useState(true)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [selectedLead, setSelectedLead] = useState<GrowthLead | null>(null)
@@ -51,6 +54,24 @@ export default function AdminGrowthLeadsPage() {
   const pendingReplyId = searchParams.get("replyId")
   const assignedToFilter = searchParams.get("assignedTo")
   const unassignedFilter = searchParams.get("unassigned") === "true"
+
+  const ownerLabels = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const rep of reps) {
+      map[rep.userId] = rep.displayName ?? rep.email
+    }
+    return map
+  }, [reps])
+
+  async function loadReps() {
+    try {
+      const res = await fetch("/api/platform/growth/assignment/reps", { cache: "no-store" })
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; reps?: GrowthRepRosterEntry[] }
+      if (res.ok && data.ok) setReps(data.reps ?? [])
+    } catch {
+      // Owner labels are optional display enrichment; lead list still works without them.
+    }
+  }
 
   const counts = useMemo(() => {
     return leads.reduce<Record<string, number>>((acc, lead) => {
@@ -107,6 +128,10 @@ export default function AdminGrowthLeadsPage() {
   }
 
   useEffect(() => {
+    void loadReps()
+  }, [])
+
+  useEffect(() => {
     void load()
   }, [assignedToFilter, unassignedFilter])
 
@@ -144,6 +169,7 @@ export default function AdminGrowthLeadsPage() {
           status: values.status,
           researchPriority: values.researchPriority,
           notes: values.notes || null,
+          assignedTo: values.assignedTo,
         }),
       })
       const data = (await res.json().catch(() => ({}))) as {
@@ -161,6 +187,38 @@ export default function AdminGrowthLeadsPage() {
       setError(e instanceof Error ? e.message : "Could not create growth lead.")
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function assignLeadToMe(lead: GrowthLead) {
+    const userId = sessionIdentity?.authUserId
+    if (!userId) {
+      setError("Sign in to assign leads.")
+      return
+    }
+    setAssigningToMeLeadId(lead.id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/platform/growth/leads/${lead.id}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignedToUserId: userId }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        lead?: GrowthLead
+        message?: string
+        error?: string
+      }
+      if (!res.ok || !data.ok || !data.lead) {
+        throw new Error(data.message ?? data.error ?? "Could not assign lead.")
+      }
+      handleLeadUpdated(lead.id, data.lead)
+      setSuccessMessage(`Assigned “${lead.companyName}” to you.`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not assign lead.")
+    } finally {
+      setAssigningToMeLeadId(null)
     }
   }
 
@@ -352,6 +410,10 @@ export default function AdminGrowthLeadsPage() {
         ) : (
           <GrowthLeadsTable
             leads={leads}
+            ownerLabels={ownerLabels}
+            currentUserId={sessionIdentity?.authUserId ?? null}
+            onAssignToMe={assignLeadToMe}
+            assigningToMeLeadId={assigningToMeLeadId}
             onOpenLead={openLead}
             onArchiveLead={archiveLead}
             onBulkArchive={bulkArchiveLeads}
@@ -378,7 +440,13 @@ export default function AdminGrowthLeadsPage() {
         pendingReplyId={pendingReplyId}
       />
 
-      <GrowthLeadFormDialog open={createOpen} onOpenChange={setCreateOpen} onSubmit={createLead} saving={saving} />
+      <GrowthLeadFormDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onSubmit={createLead}
+        saving={saving}
+        currentUserId={sessionIdentity?.authUserId ?? null}
+      />
 
       <GrowthManualContactFormDialog
         open={manualContactOpen}
