@@ -58,6 +58,8 @@ export type VoiceTelemetryEvent =
   | "voice_browser_sync_enrichment_timing"
   | "voice_browser_sync_enrichment_timeout"
   | "voice_browser_sync_session_pin_rejected"
+  | "voice_browser_auth_source"
+  | "voice_growth_coaching_link_pipeline_stage"
   | "voice_browser_token_auth_denied"
   | "voice_browser_token_auth_success"
   | "voice_operator_auth_resolution"

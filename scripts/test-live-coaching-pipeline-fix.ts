@@ -74,6 +74,21 @@ assert.match(
   "auto-linked success must require a persisted native realtime link",
 )
 
+const coachingLinkPipelineTypes = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/native-dialer/call-workspace-coaching-link-pipeline-types.ts"),
+  "utf8",
+)
+assert.match(coachingLinkPipelineTypes, /server_create_growth_realtime_call_session/)
+assert.match(coachingLinkPipelineTypes, /server_link_native_call_realtime_session/)
+assert.match(coachingLinkPipelineTypes, /server_pipeline_persisted_read/)
+
+const coachingLinkPipelineTelemetry = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/native-dialer/call-workspace-coaching-link-pipeline-telemetry.ts"),
+  "utf8",
+)
+assert.match(coachingLinkPipelineTelemetry, /voice_growth_coaching_link_pipeline_stage/)
+assert.match(coachingService, /logCoachingLinkPipelineStage/)
+
 const answeredMediaStream = fs.readFileSync(
   path.join(process.cwd(), "lib/voice/media-streaming/ensure-answered-inbound-media-stream.ts"),
   "utf8",
@@ -267,6 +282,10 @@ assert.match(
   /nativeSessionIdSchema/,
   "answer route must share native session id schema with operator guard",
 )
+assert.match(answerRoute, /x-coaching-pipeline-run-id/)
+assert.match(answerRoute, /server_calls_answer_route/)
+assert.match(answerRoute, /server_answer_response/)
+assert.match(answerRoute, /logCoachingLinkPipelineStage/)
 
 const mediaRestartRoute = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/calls/sessions/[sessionId]/media-stream/restart/route.ts"),
@@ -349,6 +368,9 @@ const workspaceUi = fs.readFileSync(
 )
 assert.match(workspaceUi, /data\.pipeline\?\.liveCoachingLinked/)
 assert.match(workspaceUi, /answerPipelineDiagnostic/)
+assert.match(workspaceUi, /logClientCoachingLinkStage/)
+assert.match(workspaceUi, /client_answer_api/)
+assert.match(workspaceUi, /X-Coaching-Pipeline-Run-Id/)
 assert.doesNotMatch(
   workspaceUi,
   /accept[\s\S]{0,400}setOptimisticCoachTurn\(\{/,

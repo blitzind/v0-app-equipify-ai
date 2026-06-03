@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { fetchNativeCallWorkspaceDashboard } from "@/lib/growth/native-dialer/native-dialer-dashboard-repository"
+import type { CoachingLinkPipelineTelemetryContext } from "@/lib/growth/native-dialer/call-workspace-coaching-link-pipeline-telemetry"
 import {
   answerNativeCallSession,
   type NativeCallAnswerResult,
@@ -62,8 +63,9 @@ export async function answerGrowthNativeCall(
   admin: SupabaseClient,
   sessionId: string,
   ownerUserId?: string | null,
+  pipelineTelemetry?: CoachingLinkPipelineTelemetryContext,
 ): Promise<NativeCallAnswerResult> {
-  return answerNativeCallSession(admin, sessionId, ownerUserId)
+  return answerNativeCallSession(admin, sessionId, ownerUserId, pipelineTelemetry)
 }
 
 export async function retryGrowthNativeCallMediaStream(

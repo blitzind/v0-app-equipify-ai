@@ -29,6 +29,10 @@ import { describeVoiceMediaStreamWssTarget } from "@/lib/voice/call-control/urls
 import { appendVoiceCallEvent } from "@/lib/voice/repository/voice-repository"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import {
+  logCoachingLinkPipelineStage,
+  type CoachingLinkPipelineTelemetryContext,
+} from "@/lib/growth/native-dialer/call-workspace-coaching-link-pipeline-telemetry"
+import {
   INBOUND_RING_DIAG_EVENTS,
   logInboundRingDiagnostic,
   withInboundRingElapsed,
@@ -425,7 +429,19 @@ export async function answerNativeCallSession(
   admin: SupabaseClient,
   sessionId: string,
   ownerUserId?: string | null,
+  pipelineTelemetry?: CoachingLinkPipelineTelemetryContext,
 ): Promise<NativeCallAnswerResult> {
+  const stageStartedAt = Date.now()
+  logCoachingLinkPipelineStage({
+    stage: "server_answer_native_call_session",
+    outcome: "entered",
+    pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+    workspaceSessionId: sessionId,
+    nativeCallWorkspaceSessionId: sessionId,
+    callSid: pipelineTelemetry?.callSid ?? null,
+    ownerUserId: ownerUserId ?? null,
+  })
+
   const pipeline = emptyCallWorkspaceAnswerPipelineDiagnostics()
   const { data: existing, error: fetchError } = await sessionsTable(admin).select(SESSION_SELECT).eq("id", sessionId).maybeSingle()
   if (fetchError) throw new Error(fetchError.message)
@@ -577,6 +593,10 @@ export async function answerNativeCallSession(
       const coaching = await autoStartCallWorkspaceLiveCoachingOnAnswer(admin, {
         nativeSessionId: sessionId,
         createdBy: ownerUserId ?? null,
+        pipelineTelemetry: {
+          pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+          callSid: pipelineTelemetry?.callSid ?? (existing.provider_call_ref as string | null) ?? null,
+        },
       })
       logLiveCoachingAutoStartQa("autoStartCallWorkspaceLiveCoachingOnAnswer_result", {
         nativeSessionId: sessionId,
@@ -701,6 +721,30 @@ export async function answerNativeCallSession(
   const refreshedRealtimeSessionId = (refreshed.realtime_session_id as string | null) ?? null
   pipeline.realtimeSessionId = refreshedRealtimeSessionId
   pipeline.liveCoachingLinked = Boolean(refreshedRealtimeSessionId)
+  logCoachingLinkPipelineStage({
+    stage: "server_pipeline_persisted_read",
+    outcome: "completed",
+    durationMs: Date.now() - stageStartedAt,
+    pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+    workspaceSessionId: sessionId,
+    nativeCallWorkspaceSessionId: sessionId,
+    nativeCallWorkspaceRealtimeSessionId: refreshedRealtimeSessionId,
+    realtimeSessionId: pipeline.createdRealtimeSessionId ?? refreshedRealtimeSessionId,
+    voiceCallId,
+    callSid: pipelineTelemetry?.callSid ?? (refreshed.provider_call_ref as string | null) ?? null,
+    organizationId: orgId,
+    ownerUserId: ownerUserId ?? (refreshed.owner_user_id as string | null) ?? null,
+    liveCoachingLinked: pipeline.liveCoachingLinked,
+    linkResultLinked: pipeline.linkResult?.linked ?? null,
+    linkResultReason: pipeline.linkResult?.reason ?? null,
+    failureReason: pipeline.liveCoachingFailureReason,
+    extra: {
+      pipelineRealtimeSessionId: pipeline.realtimeSessionId,
+      createdRealtimeSessionId: pipeline.createdRealtimeSessionId,
+      linkResultMatchesPersisted:
+        pipeline.linkResult?.linked === true && refreshedRealtimeSessionId === pipeline.linkResult.realtimeSessionId,
+    },
+  })
   logLiveCoachingAutoStartQa("answer_native_call_session_refreshed", {
     nativeSessionId: sessionId,
     voiceCallId,
@@ -736,6 +780,25 @@ export async function answerNativeCallSession(
       })
     }
   }
+
+  logCoachingLinkPipelineStage({
+    stage: "server_answer_native_call_session",
+    outcome: "completed",
+    durationMs: Date.now() - stageStartedAt,
+    pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+    workspaceSessionId: sessionId,
+    nativeCallWorkspaceSessionId: sessionId,
+    nativeCallWorkspaceRealtimeSessionId: refreshedRealtimeSessionId,
+    realtimeSessionId: refreshedRealtimeSessionId,
+    voiceCallId,
+    callSid: pipelineTelemetry?.callSid ?? (refreshed.provider_call_ref as string | null) ?? null,
+    organizationId: orgId,
+    ownerUserId: ownerUserId ?? (refreshed.owner_user_id as string | null) ?? null,
+    liveCoachingLinked: pipeline.liveCoachingLinked,
+    linkResultLinked: pipeline.linkResult?.linked ?? null,
+    linkResultReason: pipeline.linkResult?.reason ?? null,
+    failureReason: pipeline.liveCoachingFailureReason,
+  })
 
   return { session: mapNativeCallSessionRow(refreshed as SessionRow), pipeline }
 }

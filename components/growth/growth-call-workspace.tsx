@@ -90,6 +90,10 @@ import {
   type CallLifecycleAuthorityState,
 } from "@/lib/voice/browser-calling/call-lifecycle-authority"
 import {
+  createCoachingLinkPipelineClientContext,
+  logClientCoachingLinkStage,
+} from "@/lib/growth/native-dialer/call-workspace-coaching-link-pipeline-client-log"
+import {
   buildOptimisticWrappingSession,
   filterInboundOfferForLifecycle,
   isCallLifecycleEndedLocked,
@@ -1050,6 +1054,21 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
     sessionForAnswer: NativeCallWorkspaceSessionPublicView
     hadSdkIncoming: boolean
   }) {
+    const pipelineCtx = createCoachingLinkPipelineClientContext({
+      workspaceSessionId: input.sessionForAnswer.id,
+      voiceCallId: input.sessionForAnswer.voiceCallId,
+      callSid: callAuthorityRef.current.callSid ?? voiceBrowser.incomingCall?.callSid ?? null,
+    })
+    const reconcileStartedAt = Date.now()
+    logClientCoachingLinkStage(pipelineCtx, "client_reconcile_inbound_answer", "entered", {
+      nativeCallWorkspaceRealtimeSessionId: input.sessionForAnswer.realtimeSessionId,
+      failureReason: null,
+      extra: {
+        status: input.sessionForAnswer.status,
+        direction: input.sessionForAnswer.direction,
+        hadSdkIncoming: input.hadSdkIncoming,
+      },
+    })
     logLiveCoachingAutoStartQa("reconcileInboundAnswer_start", {
       sessionId: input.sessionForAnswer.id,
       voiceCallId: input.sessionForAnswer.voiceCallId,
@@ -1065,6 +1084,10 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         locks: getLifecycleLocks(),
       })
     ) {
+      logClientCoachingLinkStage(pipelineCtx, "client_reconcile_inbound_answer", "skipped", {
+        durationMs: Date.now() - reconcileStartedAt,
+        failureReason: "lifecycle_locked",
+      })
       logLiveCoachingAutoStartQa("reconcileInboundAnswer_skipped_lifecycle_locked", {
         sessionId: input.sessionForAnswer.id,
         voiceCallId: input.sessionForAnswer.voiceCallId,
@@ -1095,13 +1118,21 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       }
 
       if (sessionId && !sessionId.startsWith("pending-inbound-")) {
+        logClientCoachingLinkStage(pipelineCtx, "client_answer_api", "entered", {
+          workspaceSessionId: sessionId,
+          nativeCallWorkspaceSessionId: sessionId,
+        })
         logLiveCoachingAutoStartQa("answer_api_request_start", {
           sessionId,
           voiceCallId: input.sessionForAnswer.voiceCallId,
         })
+        const answerStartedAt = Date.now()
         const res = await fetch("/api/platform/growth/calls/answer", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Coaching-Pipeline-Run-Id": pipelineCtx.pipelineRunId,
+          },
           body: JSON.stringify({ sessionId }),
         })
         const data = (await res.json().catch(() => ({}))) as {
@@ -1109,6 +1140,25 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           pipeline?: CallWorkspaceAnswerPipelineDiagnostics
           message?: string
         }
+        logClientCoachingLinkStage(pipelineCtx, "client_answer_api", res.ok && data.session ? "completed" : "failed", {
+          durationMs: Date.now() - answerStartedAt,
+          workspaceSessionId: sessionId,
+          nativeCallWorkspaceSessionId: data.session?.id ?? sessionId,
+          nativeCallWorkspaceRealtimeSessionId: data.session?.realtimeSessionId ?? null,
+          realtimeSessionId: data.pipeline?.realtimeSessionId ?? data.session?.realtimeSessionId ?? null,
+          voiceCallId: data.session?.voiceCallId ?? input.sessionForAnswer.voiceCallId,
+          httpStatus: res.status,
+          liveCoachingLinked: data.pipeline?.liveCoachingLinked ?? null,
+          linkResultLinked: data.pipeline?.linkResult?.linked ?? null,
+          linkResultReason: data.pipeline?.linkResult?.reason ?? null,
+          failureReason:
+            !res.ok || !data.session
+              ? (data.message ?? `answer_http_${res.status}`)
+              : (data.pipeline?.liveCoachingFailureReason ?? data.pipeline?.liveCoachingError ?? null),
+          extra: {
+            createdRealtimeSessionId: data.pipeline?.createdRealtimeSessionId ?? null,
+          },
+        })
         logLiveCoachingAutoStartQa("answer_api_response", {
           sessionId,
           httpStatus: res.status,
@@ -1207,6 +1257,16 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           frozenDurationSeconds: null,
         }))
         applyServerSession(answeredSession)
+        logClientCoachingLinkStage(pipelineCtx, "client_reconcile_inbound_answer", "completed", {
+          durationMs: Date.now() - reconcileStartedAt,
+          nativeCallWorkspaceSessionId: answeredSession.id,
+          nativeCallWorkspaceRealtimeSessionId: answeredSession.realtimeSessionId,
+          realtimeSessionId: data.pipeline?.realtimeSessionId ?? answeredSession.realtimeSessionId,
+          liveCoachingLinked: data.pipeline?.liveCoachingLinked ?? null,
+          linkResultLinked: data.pipeline?.linkResult?.linked ?? null,
+          linkResultReason: data.pipeline?.linkResult?.reason ?? null,
+          failureReason: data.pipeline?.liveCoachingFailureReason ?? null,
+        })
         logLiveCoachingAutoStartQa("reconcileInboundAnswer_success", {
           sessionId: answeredSession.id,
           voiceCallId: answeredSession.voiceCallId,

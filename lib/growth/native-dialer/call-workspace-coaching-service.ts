@@ -33,6 +33,10 @@ import {
 } from "@/lib/growth/native-dialer/native-dialer-repository"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
 import { runVoiceBackgroundTask } from "@/lib/voice/performance/run-voice-background-task"
+import {
+  logCoachingLinkPipelineStage,
+  type CoachingLinkPipelineTelemetryContext,
+} from "@/lib/growth/native-dialer/call-workspace-coaching-link-pipeline-telemetry"
 import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
 
 const ACTIVE_NATIVE_WORKSPACE_STATUSES = [
@@ -142,8 +146,21 @@ export async function startCallWorkspaceLiveCoaching(
     userEmail?: string | null
     hydrateDetail?: boolean
     priority?: "standard" | "answer_hot_path"
+    pipelineTelemetry?: CoachingLinkPipelineTelemetryContext
   },
 ): Promise<CallWorkspaceCoachingContext> {
+  const pipelineTelemetry = input.pipelineTelemetry
+  const stageStartedAt = Date.now()
+  logCoachingLinkPipelineStage({
+    stage: "server_start_call_workspace_live_coaching",
+    outcome: "entered",
+    pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+    workspaceSessionId: input.nativeSessionId,
+    nativeCallWorkspaceSessionId: input.nativeSessionId,
+    callSid: pipelineTelemetry?.callSid ?? null,
+    ownerUserId: input.createdBy ?? null,
+  })
+
   const nativeSession = await fetchNativeCallSessionById(admin, input.nativeSessionId)
   if (!nativeSession) throw new Error("Call session not found.")
   const organizationId = getGrowthEngineAiOrgId()
@@ -184,9 +201,37 @@ export async function startCallWorkspaceLiveCoaching(
 
     try {
       const createRealtimeStartedAt = Date.now()
+      logCoachingLinkPipelineStage({
+        stage: "server_create_growth_realtime_call_session",
+        outcome: "entered",
+        pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+        workspaceSessionId: nativeSession.id,
+        nativeCallWorkspaceSessionId: nativeSession.id,
+        nativeCallWorkspaceRealtimeSessionId: nativeSession.realtimeSessionId,
+        voiceCallId: nativeSession.voiceCallId ?? null,
+        callSid: pipelineTelemetry?.callSid ?? nativeSession.providerCallRef ?? null,
+        organizationId,
+        ownerUserId: input.createdBy ?? nativeSession.ownerUserId ?? null,
+        extra: { coachingLeadId },
+      })
       realtimeSession = await createGrowthRealtimeCallSession(admin, {
         leadId: coachingLeadId,
         createdBy: input.createdBy ?? null,
+      })
+      logCoachingLinkPipelineStage({
+        stage: "server_create_growth_realtime_call_session",
+        outcome: "completed",
+        durationMs: Date.now() - createRealtimeStartedAt,
+        pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+        workspaceSessionId: nativeSession.id,
+        nativeCallWorkspaceSessionId: nativeSession.id,
+        nativeCallWorkspaceRealtimeSessionId: nativeSession.realtimeSessionId,
+        realtimeSessionId: realtimeSession.id,
+        voiceCallId: nativeSession.voiceCallId ?? null,
+        callSid: pipelineTelemetry?.callSid ?? nativeSession.providerCallRef ?? null,
+        organizationId,
+        ownerUserId: input.createdBy ?? nativeSession.ownerUserId ?? null,
+        extra: { coachingLeadId },
       })
       logVoiceInfrastructure("voice_growth_coaching_session_created", {
         nativeSessionId: nativeSession.id,
@@ -197,6 +242,24 @@ export async function startCallWorkspaceLiveCoaching(
         durationMs: Date.now() - createRealtimeStartedAt,
       })
     } catch (error) {
+      logCoachingLinkPipelineStage({
+        stage: "server_create_growth_realtime_call_session",
+        outcome: "failed",
+        durationMs: Date.now() - stageStartedAt,
+        pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+        workspaceSessionId: nativeSession.id,
+        nativeCallWorkspaceSessionId: nativeSession.id,
+        nativeCallWorkspaceRealtimeSessionId: nativeSession.realtimeSessionId,
+        voiceCallId: nativeSession.voiceCallId ?? null,
+        callSid: pipelineTelemetry?.callSid ?? nativeSession.providerCallRef ?? null,
+        organizationId,
+        ownerUserId: input.createdBy ?? nativeSession.ownerUserId ?? null,
+        failureReason: "realtime_session_create_failed",
+        extra: {
+          coachingLeadId,
+          message: error instanceof Error ? error.message : String(error),
+        },
+      })
       logVoiceInfrastructure("voice_growth_coaching_auto_start_failed", {
         nativeSessionId: nativeSession.id,
         coachingLeadId,
@@ -210,10 +273,41 @@ export async function startCallWorkspaceLiveCoaching(
   }
 
   if (nativeSession.realtimeSessionId !== realtimeSession.id) {
+    const linkStartedAt = Date.now()
+    logCoachingLinkPipelineStage({
+      stage: "server_link_native_call_realtime_session",
+      outcome: "entered",
+      pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+      workspaceSessionId: nativeSession.id,
+      nativeCallWorkspaceSessionId: nativeSession.id,
+      nativeCallWorkspaceRealtimeSessionId: nativeSession.realtimeSessionId,
+      realtimeSessionId: realtimeSession.id,
+      voiceCallId: nativeSession.voiceCallId ?? null,
+      callSid: pipelineTelemetry?.callSid ?? nativeSession.providerCallRef ?? null,
+      organizationId,
+      ownerUserId: input.createdBy ?? nativeSession.ownerUserId ?? null,
+    })
     linkResult = await linkNativeCallRealtimeSession(admin, {
       nativeSessionId: nativeSession.id,
       realtimeSessionId: realtimeSession.id,
       organizationId,
+    })
+    logCoachingLinkPipelineStage({
+      stage: "server_link_native_call_realtime_session",
+      outcome: linkResult.linked ? "completed" : "failed",
+      durationMs: Date.now() - linkStartedAt,
+      pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+      workspaceSessionId: nativeSession.id,
+      nativeCallWorkspaceSessionId: nativeSession.id,
+      nativeCallWorkspaceRealtimeSessionId: linkResult.linked ? realtimeSession.id : nativeSession.realtimeSessionId,
+      realtimeSessionId: realtimeSession.id,
+      voiceCallId: nativeSession.voiceCallId ?? null,
+      callSid: pipelineTelemetry?.callSid ?? nativeSession.providerCallRef ?? null,
+      organizationId,
+      ownerUserId: input.createdBy ?? nativeSession.ownerUserId ?? null,
+      linkResultLinked: linkResult.linked,
+      linkResultReason: linkResult.reason,
+      failureReason: linkResult.linked ? null : (linkResult.reason ?? "link_failed"),
     })
     if (!linkResult.linked) {
       logVoiceInfrastructure("voice_growth_coaching_native_link_failed", {
@@ -330,6 +424,24 @@ export async function startCallWorkspaceLiveCoaching(
 
   if (input.hydrateDetail === false) {
     const bootstrapCoach = realtimeSession.liveSnapshot.conversationCoach ?? null
+    logCoachingLinkPipelineStage({
+      stage: "server_start_call_workspace_live_coaching",
+      outcome: "completed",
+      durationMs: Date.now() - stageStartedAt,
+      pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+      workspaceSessionId: nativeSession.id,
+      nativeCallWorkspaceSessionId: nativeSession.id,
+      nativeCallWorkspaceRealtimeSessionId:
+        linkResult?.linked ? realtimeSession.id : nativeSession.realtimeSessionId,
+      realtimeSessionId: realtimeSession.id,
+      voiceCallId: nativeSession.voiceCallId ?? null,
+      callSid: pipelineTelemetry?.callSid ?? nativeSession.providerCallRef ?? null,
+      organizationId,
+      ownerUserId: input.createdBy ?? nativeSession.ownerUserId ?? null,
+      linkResultLinked: linkResult?.linked ?? null,
+      linkResultReason: linkResult?.reason ?? null,
+      liveCoachingLinked: linkResult?.linked ?? Boolean(nativeSession.realtimeSessionId),
+    })
     return {
       nativeSessionId: nativeSession.id,
       coachingLeadId,
@@ -368,6 +480,25 @@ export async function startCallWorkspaceLiveCoaching(
   }
 
   const detail = await getGrowthRealtimeCallSessionDetail(admin, realtimeSession.id)
+
+  logCoachingLinkPipelineStage({
+    stage: "server_start_call_workspace_live_coaching",
+    outcome: "completed",
+    durationMs: Date.now() - stageStartedAt,
+    pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+    workspaceSessionId: nativeSession.id,
+    nativeCallWorkspaceSessionId: nativeSession.id,
+    nativeCallWorkspaceRealtimeSessionId:
+      linkResult?.linked ? realtimeSession.id : nativeSession.realtimeSessionId,
+    realtimeSessionId: realtimeSession.id,
+    voiceCallId: nativeSession.voiceCallId ?? null,
+    callSid: pipelineTelemetry?.callSid ?? nativeSession.providerCallRef ?? null,
+    organizationId,
+    ownerUserId: input.createdBy ?? nativeSession.ownerUserId ?? null,
+    linkResultLinked: linkResult?.linked ?? null,
+    linkResultReason: linkResult?.reason ?? null,
+    liveCoachingLinked: linkResult?.linked ?? Boolean(nativeSession.realtimeSessionId),
+  })
 
   return {
     nativeSessionId: nativeSession.id,
@@ -466,10 +597,37 @@ export async function ensureInboundCallWorkspaceLiveCoachingLinked(
 /** Starts coaching and seeds the opening coach line when an inbound call is answered. */
 export async function autoStartCallWorkspaceLiveCoachingOnAnswer(
   admin: SupabaseClient,
-  input: { nativeSessionId: string; createdBy?: string | null; userEmail?: string | null },
+  input: {
+    nativeSessionId: string
+    createdBy?: string | null
+    userEmail?: string | null
+    pipelineTelemetry?: CoachingLinkPipelineTelemetryContext
+  },
 ): Promise<AutoStartCallWorkspaceLiveCoachingOnAnswerResult> {
+  const stageStartedAt = Date.now()
+  const pipelineTelemetry = input.pipelineTelemetry
+  logCoachingLinkPipelineStage({
+    stage: "server_auto_start_coaching_on_answer",
+    outcome: "entered",
+    pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+    workspaceSessionId: input.nativeSessionId,
+    nativeCallWorkspaceSessionId: input.nativeSessionId,
+    callSid: pipelineTelemetry?.callSid ?? null,
+    ownerUserId: input.createdBy ?? null,
+  })
+
   const nativeSession = await fetchNativeCallSessionById(admin, input.nativeSessionId)
   if (!nativeSession) {
+    logCoachingLinkPipelineStage({
+      stage: "server_auto_start_coaching_on_answer",
+      outcome: "failed",
+      durationMs: Date.now() - stageStartedAt,
+      pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+      workspaceSessionId: input.nativeSessionId,
+      nativeCallWorkspaceSessionId: input.nativeSessionId,
+      callSid: pipelineTelemetry?.callSid ?? null,
+      failureReason: "native_session_not_found",
+    })
     return {
       linked: false,
       reason: "native_session_not_found",
@@ -479,6 +637,19 @@ export async function autoStartCallWorkspaceLiveCoachingOnAnswer(
     }
   }
   if (nativeSession.direction !== "inbound") {
+    logCoachingLinkPipelineStage({
+      stage: "server_auto_start_coaching_on_answer",
+      outcome: "failed",
+      durationMs: Date.now() - stageStartedAt,
+      pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+      workspaceSessionId: input.nativeSessionId,
+      nativeCallWorkspaceSessionId: input.nativeSessionId,
+      nativeCallWorkspaceRealtimeSessionId: nativeSession.realtimeSessionId,
+      voiceCallId: nativeSession.voiceCallId ?? null,
+      callSid: pipelineTelemetry?.callSid ?? nativeSession.providerCallRef ?? null,
+      failureReason: "native_session_not_inbound",
+      extra: { direction: nativeSession.direction },
+    })
     return {
       linked: false,
       reason: "native_session_not_inbound",
@@ -488,6 +659,19 @@ export async function autoStartCallWorkspaceLiveCoachingOnAnswer(
     }
   }
   if (nativeSession.status !== "active" && nativeSession.status !== "on_hold") {
+    logCoachingLinkPipelineStage({
+      stage: "server_auto_start_coaching_on_answer",
+      outcome: "failed",
+      durationMs: Date.now() - stageStartedAt,
+      pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+      workspaceSessionId: input.nativeSessionId,
+      nativeCallWorkspaceSessionId: input.nativeSessionId,
+      nativeCallWorkspaceRealtimeSessionId: nativeSession.realtimeSessionId,
+      voiceCallId: nativeSession.voiceCallId ?? null,
+      callSid: pipelineTelemetry?.callSid ?? nativeSession.providerCallRef ?? null,
+      failureReason: "native_session_not_active",
+      extra: { status: nativeSession.status },
+    })
     return {
       linked: false,
       reason: "native_session_not_active",
@@ -503,10 +687,25 @@ export async function autoStartCallWorkspaceLiveCoachingOnAnswer(
     userEmail: input.userEmail ?? null,
     hydrateDetail: false,
     priority: "answer_hot_path",
+    pipelineTelemetry,
   })
 
   const realtimeSessionId = context.realtimeSession?.id ?? null
   if (realtimeSessionId && context.linkResult?.linked) {
+    logCoachingLinkPipelineStage({
+      stage: "server_auto_start_coaching_on_answer",
+      outcome: "completed",
+      durationMs: Date.now() - stageStartedAt,
+      pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+      workspaceSessionId: input.nativeSessionId,
+      nativeCallWorkspaceSessionId: input.nativeSessionId,
+      nativeCallWorkspaceRealtimeSessionId: realtimeSessionId,
+      realtimeSessionId,
+      voiceCallId: nativeSession.voiceCallId ?? null,
+      callSid: pipelineTelemetry?.callSid ?? nativeSession.providerCallRef ?? null,
+      linkResultLinked: true,
+      liveCoachingLinked: true,
+    })
     logVoiceInfrastructure("voice_growth_coaching_auto_linked", {
       nativeSessionId: input.nativeSessionId,
       realtimeSessionId,
@@ -523,6 +722,22 @@ export async function autoStartCallWorkspaceLiveCoachingOnAnswer(
   }
 
   if (realtimeSessionId && context.linkResult && !context.linkResult.linked) {
+    logCoachingLinkPipelineStage({
+      stage: "server_auto_start_coaching_on_answer",
+      outcome: "failed",
+      durationMs: Date.now() - stageStartedAt,
+      pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+      workspaceSessionId: input.nativeSessionId,
+      nativeCallWorkspaceSessionId: input.nativeSessionId,
+      nativeCallWorkspaceRealtimeSessionId: nativeSession.realtimeSessionId,
+      realtimeSessionId,
+      voiceCallId: nativeSession.voiceCallId ?? null,
+      callSid: pipelineTelemetry?.callSid ?? nativeSession.providerCallRef ?? null,
+      linkResultLinked: false,
+      linkResultReason: context.linkResult.reason,
+      failureReason: "native_session_link_failed",
+      liveCoachingLinked: false,
+    })
     logVoiceInfrastructure("voice_growth_coaching_auto_start_failed", {
       nativeSessionId: input.nativeSessionId,
       realtimeSessionId,
@@ -538,6 +753,22 @@ export async function autoStartCallWorkspaceLiveCoachingOnAnswer(
       linkResult: context.linkResult,
     }
   } else {
+    logCoachingLinkPipelineStage({
+      stage: "server_auto_start_coaching_on_answer",
+      outcome: "failed",
+      durationMs: Date.now() - stageStartedAt,
+      pipelineRunId: pipelineTelemetry?.pipelineRunId ?? null,
+      workspaceSessionId: input.nativeSessionId,
+      nativeCallWorkspaceSessionId: input.nativeSessionId,
+      nativeCallWorkspaceRealtimeSessionId: nativeSession.realtimeSessionId,
+      realtimeSessionId,
+      voiceCallId: nativeSession.voiceCallId ?? null,
+      callSid: pipelineTelemetry?.callSid ?? nativeSession.providerCallRef ?? null,
+      linkResultLinked: context.linkResult?.linked ?? null,
+      linkResultReason: context.linkResult?.reason ?? null,
+      failureReason: "realtime_session_missing_after_start",
+      liveCoachingLinked: false,
+    })
     logVoiceInfrastructure("voice_growth_coaching_auto_start_failed", {
       nativeSessionId: input.nativeSessionId,
       voiceCallId: nativeSession.voiceCallId ?? null,
