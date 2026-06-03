@@ -67,6 +67,12 @@ export type GrowthLeadRevenueForecastInput = {
   previousScore: number | null
   previousTier: GrowthRevenueProbabilityTier | null
   previousConfidence: number | null
+  revenueReadinessScore?: number | null
+  revenueReadinessTier?: import("@/lib/growth/revenue-workflow/revenue-workflow-types").GrowthRevenueReadinessTier | null
+  opportunityRecommendationScore?: number | null
+  memoryCoverageScore?: number | null
+  commitmentCount?: number
+  unresolvedObjectionCount?: number
   now?: Date
 }
 

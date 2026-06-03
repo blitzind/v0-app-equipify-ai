@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthOpportunityRecommendationScoringDetails } from "@/components/growth/growth-opportunity-recommendation-scoring-details"
 import {
   recommendationTypeLabel,
   signalTypeLabel,
@@ -111,6 +112,7 @@ export function GrowthInboxOpportunityIntelligencePanel({
                   <span className="font-medium">{recommendation.title}</span>
                 </div>
                 <p className="mt-1 text-muted-foreground">{recommendation.description}</p>
+                <GrowthOpportunityRecommendationScoringDetails recommendation={recommendation} />
                 <div className="mt-2 flex gap-2">
                   <Button
                     type="button"

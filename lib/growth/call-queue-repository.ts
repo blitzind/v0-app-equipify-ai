@@ -1,16 +1,17 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { computeGrowthCallPriority, matchesCallQueueFilter } from "@/lib/growth/call-priority"
+import { matchesCallQueueFilter } from "@/lib/growth/call-priority"
 import type { GrowthCallQueueFilter, GrowthCallQueueRow } from "@/lib/growth/call-types"
 import { fetchGrowthLeadDecisionMakerById } from "@/lib/growth/decision-maker-repository"
 import { listGrowthLeads } from "@/lib/growth/lead-repository"
 import { resolveGrowthRepLabels } from "@/lib/growth/assignment/rep-roster-repository"
+import { computeGrowthLeadCallPriorityResult } from "@/lib/growth/recompute-lead-call-priority"
 import {
-  fetchGrowthLeadResearchNotes,
   fetchLatestUsableGrowthLeadResearchRun,
 } from "@/lib/growth/research-repository"
 import { isProtectedGrowthOpportunityFromLead } from "@/lib/growth/operational-capacity-score"
+import { sortCallQueueByRevenueWorkflow } from "@/lib/growth/revenue-workflow/call-queue-prioritization"
 import type { GrowthLead } from "@/lib/growth/types"
 
 const CAPACITY_FILTERS = new Set<GrowthCallQueueFilter>([
@@ -47,7 +48,6 @@ export async function listGrowthCallQueue(
     const latestRun = lead.latestResearchRunId
       ? await fetchLatestUsableGrowthLeadResearchRun(admin, lead.id)
       : null
-    const manualNotes = await fetchGrowthLeadResearchNotes(admin, lead.id)
     const websiteFetchStatus = latestRun?.websiteFetchStatus ?? null
 
     if (
@@ -92,19 +92,20 @@ export async function listGrowthCallQueue(
       continue
     }
 
-    const priority = computeGrowthCallPriority({
-      researchPriority: lead.researchPriority,
-      score: lead.score,
-      status: lead.status,
-      lastResearchedAt: lead.lastResearchedAt,
-      recommendedNextAction: latestRun?.result?.recommendedNextAction ?? null,
-      leadNotes: lead.notes,
-      manualResearchNotes: manualNotes?.body ?? null,
-      callDisposition: lead.callDisposition,
-      followUpAt: lead.followUpAt,
-      callPriorityOverride: lead.callPriorityOverride,
-      now,
-    })
+    const hasPersistedPriority =
+      lead.callPriorityScore != null &&
+      lead.callPriorityTier != null &&
+      Boolean(lead.callPriorityComputedAt)
+
+    const priority = hasPersistedPriority
+      ? {
+          effectiveScore: lead.callPriorityScore!,
+          tier: lead.callPriorityTier!,
+          whySummary: "Persisted Sprint 4 call priority.",
+          computedScore: lead.callPriorityScore!,
+          excludedFromQueue: false,
+        }
+      : await computeGrowthLeadCallPriorityResult(admin, lead)
 
     enriched.push(
       await buildQueueRow(
@@ -120,27 +121,23 @@ export async function listGrowthCallQueue(
     )
   }
 
-  enriched.sort((a, b) => {
-    if (CAPACITY_FILTERS.has(input.filter)) {
+  if (CAPACITY_FILTERS.has(input.filter)) {
+    enriched.sort((a, b) => {
       const capacityDiff = (a.operationalCapacityScore ?? 100) - (b.operationalCapacityScore ?? 100)
       if (capacityDiff !== 0) return capacityDiff
       const pressureDiff = (b.capacityPressureLevel ?? 0) - (a.capacityPressureLevel ?? 0)
       if (pressureDiff !== 0) return pressureDiff
-    }
-    const engagementDiff = (b.engagementScore ?? 0) - (a.engagementScore ?? 0)
-    if (engagementDiff !== 0) return engagementDiff
-    const relationshipDiff = (b.relationshipStrengthScore ?? 0) - (a.relationshipStrengthScore ?? 0)
-    if (relationshipDiff !== 0) return relationshipDiff
-    const opportunityDiff = (b.opportunityReadinessScore ?? 0) - (a.opportunityReadinessScore ?? 0)
-    if (opportunityDiff !== 0) return opportunityDiff
-    const revenueDiff = (b.revenueProbabilityScore ?? 0) - (a.revenueProbabilityScore ?? 0)
-    if (revenueDiff !== 0) return revenueDiff
-    const executiveDiff = (b.executivePriorityScore ?? 0) - (a.executivePriorityScore ?? 0)
-    if (executiveDiff !== 0) return executiveDiff
-    const fitDiff = (b.score ?? 0) - (a.score ?? 0)
-    if (fitDiff !== 0) return fitDiff
-    return (b.callPriorityScore ?? 0) - (a.callPriorityScore ?? 0)
-  })
+      return (b.callPriorityScore ?? 0) - (a.callPriorityScore ?? 0)
+    })
+  } else {
+    const sorted = sortCallQueueByRevenueWorkflow(
+      enriched.map((row) => ({
+        ...row,
+        effectiveScore: row.callPriorityScore ?? 0,
+      })),
+    )
+    enriched.splice(0, enriched.length, ...sorted)
+  }
 
   const offset = Math.max(input.offset ?? 0, 0)
   const limit = Math.min(Math.max(input.limit ?? 50, 1), 100)
@@ -177,7 +174,7 @@ async function buildQueueRow(
     status: lead.status,
     researchPriority: lead.researchPriority,
     score: lead.score,
-    callPriorityScore: lead.callPriorityScore ?? effectiveScore,
+    callPriorityScore: effectiveScore,
     callPriorityTier: tier,
     callPriorityOverride: lead.callPriorityOverride,
     callDisposition: lead.callDisposition,

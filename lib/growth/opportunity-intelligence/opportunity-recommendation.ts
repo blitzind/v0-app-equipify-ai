@@ -3,26 +3,43 @@ import type {
 } from "@/lib/growth/opportunity-intelligence/opportunity-types"
 import type { DetectedOpportunitySignal } from "@/lib/growth/opportunity-intelligence/signal-detector"
 import { hasMinimumEvidence, toEvidenceSnippets } from "@/lib/growth/opportunity-intelligence/signal-detector"
+import {
+  scoreOpportunityRecommendation,
+  type OpportunityRecommendationContext,
+} from "@/lib/growth/revenue-workflow/opportunity-recommendation-engine"
+import type { GrowthOpportunityRecommendationScore } from "@/lib/growth/revenue-workflow/revenue-workflow-types"
 
 export type GeneratedOpportunityRecommendation = {
   recommendationType: GrowthOpportunityRecommendationType
   title: string
   description: string
   evidence: ReturnType<typeof toEvidenceSnippets>
+  scoring?: GrowthOpportunityRecommendationScore
 }
 
-export function generateOpportunityRecommendations(input: {
+export type GenerateOpportunityRecommendationsInput = {
   signals: DetectedOpportunitySignal[]
   hasActiveSequence?: boolean
   hasOwner?: boolean
-  memory?: {
-    available: boolean
-    relationshipStage: string | null
-    unresolvedObjectionCount: number
-    riskFlags: string[]
-    commitmentSummaries: string[]
+  memory?: OpportunityRecommendationContext["memory"]
+  replyIntelligence?: OpportunityRecommendationContext["replyIntelligence"]
+  engagement?: OpportunityRecommendationContext["engagement"]
+  opportunityReadinessScore?: number | null
+  revenueReadinessScore?: number | null
+}
+
+function buildScoringContext(input: GenerateOpportunityRecommendationsInput): OpportunityRecommendationContext {
+  return {
+    signals: input.signals,
+    memory: input.memory,
+    replyIntelligence: input.replyIntelligence,
+    engagement: input.engagement,
+    opportunityReadinessScore: input.opportunityReadinessScore,
+    revenueReadinessScore: input.revenueReadinessScore,
   }
-}): GeneratedOpportunityRecommendation[] {
+}
+
+export function generateOpportunityRecommendations(input: GenerateOpportunityRecommendationsInput): GeneratedOpportunityRecommendation[] {
   if (!hasMinimumEvidence(input.signals)) return []
 
   const recommendations: GeneratedOpportunityRecommendation[] = []
@@ -158,5 +175,9 @@ export function generateOpportunityRecommendations(input: {
   for (const recommendation of recommendations) {
     unique.set(recommendation.recommendationType, recommendation)
   }
-  return [...unique.values()]
+  const scoring = scoreOpportunityRecommendation(buildScoringContext(input))
+  return [...unique.values()].map((recommendation) => ({
+    ...recommendation,
+    scoring,
+  }))
 }

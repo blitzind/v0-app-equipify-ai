@@ -6,6 +6,7 @@ import { matchesOpportunityQueueFilter } from "@/lib/growth/opportunity-queue-fi
 import { matchesRevenueForecastQueueFilter } from "@/lib/growth/revenue-forecast-queue-filters"
 import { matchesExecutiveOperatingQueueFilter } from "@/lib/growth/executive-operating-queue-filters"
 import { matchesOperationalCapacityQueueFilter } from "@/lib/growth/operational-capacity-queue-filters"
+import { computeCallQueueRevenueWorkflowBoost } from "@/lib/growth/revenue-workflow/call-queue-prioritization"
 import type { GrowthEngagementTier } from "@/lib/growth/engagement-types"
 import type { GrowthLeadResearchPriority, GrowthLeadStatus } from "@/lib/growth/types"
 
@@ -22,6 +23,12 @@ export type CallPriorityInput = {
   callPriorityOverride: number | null
   emailSummary?: GrowthLeadEmailEventSummary
   now?: Date
+  revenueReadinessScore?: number | null
+  revenueReadinessTier?: string | null
+  opportunityRecommendationScore?: number | null
+  replyUrgencyBoost?: number
+  engagementTrend?: string | null
+  meetingIntentPending?: boolean
 }
 
 export type CallPriorityResult = {
@@ -148,7 +155,15 @@ export function computeGrowthCallPriority(input: CallPriorityInput): CallPriorit
     (input.emailSummary?.interestedReply7d ? 6 : 0) +
     (input.emailSummary && input.emailSummary.clickCount14d > 0 && input.emailSummary.replyCount14d === 0 ? 4 : 0) +
     (input.emailSummary && input.emailSummary.openCount14d > 0 && input.emailSummary.replyCount14d === 0 ? 2 : 0)
-  const computedScore = clampScore(base - penalty + emailBoost)
+  const revenueWorkflowBoost = computeCallQueueRevenueWorkflowBoost({
+    revenueReadinessScore: input.revenueReadinessScore,
+    revenueReadinessTier: input.revenueReadinessTier,
+    opportunityRecommendationScore: input.opportunityRecommendationScore,
+    replyUrgencyBoost: input.replyUrgencyBoost,
+    engagementTrend: input.engagementTrend,
+    meetingIntentPending: input.meetingIntentPending,
+  })
+  const computedScore = clampScore(base - penalty + emailBoost + revenueWorkflowBoost.boostPoints)
   const effectiveScore =
     input.callPriorityOverride != null ? clampScore(input.callPriorityOverride) : computedScore
   const tier = tierFromScore(effectiveScore)
@@ -178,6 +193,7 @@ export function computeGrowthCallPriority(input: CallPriorityInput): CallPriorit
     if (input.callDisposition === "call_attempted") whyParts.push("recent call attempt")
     if (input.callDisposition === "left_voicemail") whyParts.push("voicemail left")
     if (input.emailSummary?.interestedReply7d) whyParts.push("interested email reply")
+    if (revenueWorkflowBoost.priorityReason) whyParts.push(revenueWorkflowBoost.priorityReason)
   }
 
   return {

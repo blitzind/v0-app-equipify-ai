@@ -25,7 +25,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { GrowthNextBestActionBanner } from "@/components/growth/growth-next-best-action-banner"
+import { GrowthRevenueReadinessBadge } from "@/components/growth/growth-revenue-readiness-panel"
 import { GrowthLeadAssignmentPanel } from "@/components/growth/growth-lead-assignment-panel"
 import { GrowthCallActionSheet } from "@/components/growth/growth-call-action-sheet"
 import { GrowthNativeDialerLaunchButton } from "@/components/growth/growth-native-dialer-launch-button"
@@ -251,6 +251,7 @@ export function GrowthLeadCommandCenter({
                 tone={priorityTierTone(lead.callPriorityTier)}
               />
             ) : null}
+            <GrowthRevenueReadinessBadge lead={lead} />
             {lead.score != null ? <GrowthBadge label={`Fit ${lead.score}`} tone="medium" /> : null}
             <GrowthBadge label={formatSource(lead)} tone="neutral" className="normal-case" />
           </div>

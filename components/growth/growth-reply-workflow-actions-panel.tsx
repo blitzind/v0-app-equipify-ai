@@ -22,6 +22,7 @@ import type {
   GrowthReplyWorkflowActionRecord,
   GrowthSequenceExitCandidateRecord,
 } from "@/lib/growth/reply-intelligence/workflow-actions-types"
+import { GrowthRevenueWorkflowWorkspacePanel } from "@/components/growth/growth-revenue-workflow-workspace-panel"
 import { GROWTH_REPLY_WORKFLOW_CENTER_QA_MARKER } from "@/lib/growth/reply-intelligence/workflow-actions-types"
 
 type FilterKey = "all" | "interested" | "call_task" | "follow_up" | "opportunity"
@@ -483,6 +484,8 @@ export function GrowthReplyWorkflowActionsPanel({
           </ul>
         </GrowthEngineCard>
       ) : null}
+
+      {leadId ? <GrowthRevenueWorkflowWorkspacePanel leadId={leadId} compact /> : null}
 
       <OpportunityReviewDialog
         open={oppOpen}

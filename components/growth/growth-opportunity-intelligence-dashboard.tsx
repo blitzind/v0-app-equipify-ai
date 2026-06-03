@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Lightbulb, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthOpportunityRecommendationScoringDetails } from "@/components/growth/growth-opportunity-recommendation-scoring-details"
 import {
   GROWTH_OPPORTUNITY_INTELLIGENCE_PRIVACY_NOTE,
   GROWTH_OPPORTUNITY_INTELLIGENCE_QA_MARKER,
@@ -185,6 +186,7 @@ export function GrowthOpportunityIntelligenceDashboardView() {
                     </div>
                     <p className="mt-1 text-muted-foreground">{recommendation.description}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{recommendation.leadLabel}</p>
+                    <GrowthOpportunityRecommendationScoringDetails recommendation={recommendation} />
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button

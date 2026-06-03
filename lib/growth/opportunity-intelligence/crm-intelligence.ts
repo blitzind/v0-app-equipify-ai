@@ -24,6 +24,16 @@ import type {
   GrowthSequencePauseCandidate,
 } from "@/lib/growth/opportunity-intelligence/opportunity-types"
 import { maskOpportunityLeadLabel } from "@/lib/growth/opportunity-intelligence/opportunity-types"
+import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import {
+  GROWTH_REVENUE_WORKFLOW_QA_MARKER,
+} from "@/lib/growth/revenue-workflow/revenue-workflow-types"
+import type {
+  GeneratedOpportunityRecommendation,
+  GenerateOpportunityRecommendationsInput,
+} from "@/lib/growth/opportunity-intelligence/opportunity-recommendation"
+import { scoreOpportunityRecommendation } from "@/lib/growth/revenue-workflow/opportunity-recommendation-engine"
+import { recomputeGrowthLeadRevenueReadiness } from "@/lib/growth/revenue-workflow/recompute-revenue-readiness"
 
 type Row = Record<string, unknown>
 
@@ -79,6 +89,39 @@ function mapSignal(row: Row, leadLabel: string): GrowthOpportunitySignal {
   }
 }
 
+function recommendationScoring(input: GenerateOpportunityRecommendationsInput) {
+  return scoreOpportunityRecommendation({
+    signals: input.signals,
+    memory: input.memory,
+    replyIntelligence: input.replyIntelligence,
+    engagement: input.engagement,
+    opportunityReadinessScore: input.opportunityReadinessScore,
+    revenueReadinessScore: input.revenueReadinessScore,
+  })
+}
+
+function recommendationMetadata(
+  recommendation: GeneratedOpportunityRecommendation,
+  source: string,
+): Record<string, unknown> {
+  const scoring = recommendation.scoring
+  return {
+    source,
+    qaMarker: GROWTH_REVENUE_WORKFLOW_QA_MARKER,
+    requiresHumanApproval: true,
+    ...(scoring
+      ? {
+          opportunityScore: scoring.opportunityScore,
+          confidence: scoring.confidence,
+          confidenceLabel: scoring.confidenceLabel,
+          recommendedStage: scoring.recommendedStage,
+          recommendedValueMin: scoring.recommendedValueMin,
+          recommendedValueMax: scoring.recommendedValueMax,
+          supportingEvidence: scoring.supportingEvidence,
+        }
+      : {}),
+  }
+}
 function mapRecommendation(row: Row, leadLabel: string): GrowthOpportunityRecommendation {
   return {
     id: String(row.id),
@@ -119,11 +162,17 @@ export async function ingestOpportunityIntelligenceFromInbox(
   if (!hasMinimumEvidence(detected)) return { signals: [], recommendations: [] }
 
   const leadLabel = await resolveLeadLabel(admin, input.leadId)
-  const [hasActiveSequence, hasOwner, memory] = await Promise.all([
+  const [hasActiveSequence, hasOwner, memory, lead] = await Promise.all([
     leadHasActiveSequence(admin, input.leadId),
     leadHasOwner(admin, input.leadId),
     buildLeadMemoryInfluenceContext(admin, input.leadId),
+    fetchGrowthLeadById(admin, input.leadId),
   ])
+  const readinessSnapshot = await recomputeGrowthLeadRevenueReadiness(admin, input.leadId)
+  const refreshedLead = (await fetchGrowthLeadById(admin, input.leadId)) ?? lead
+  const buyingSignalCount = detected.filter((signal) =>
+    ["meeting_interest", "proposal_request", "budget_signal", "pricing_interest"].includes(signal.signalType),
+  ).length
   const signalIds: string[] = []
   const createdSignals: GrowthOpportunitySignal[] = []
 
@@ -178,7 +227,7 @@ export async function ingestOpportunityIntelligenceFromInbox(
     }).catch(() => undefined)
   }
 
-  const generated = generateOpportunityRecommendations({
+  const recommendationInput: GenerateOpportunityRecommendationsInput = {
     signals: detected,
     hasActiveSequence,
     hasOwner,
@@ -188,8 +237,29 @@ export async function ingestOpportunityIntelligenceFromInbox(
       unresolvedObjectionCount: memory.unresolvedObjectionCount,
       riskFlags: memory.riskFlags,
       commitmentSummaries: memory.commitmentSummaries,
+      memoryCoverageScore: memory.memoryCoverageScore,
+      topObjections: memory.topObjections,
+      engagementTrend: memory.engagementTrend,
     },
-  })
+    replyIntelligence: {
+      intent: input.classification,
+      buyingSignalCount,
+      objectionCount: input.classification === "not_interested" || input.classification === "competitor" ? 1 : 0,
+      confidenceTier: null,
+    },
+    engagement: {
+      replyCount30d: 1,
+      hasPositiveReply:
+        input.classification === "positive_interest" ||
+        input.classification === "meeting_intent" ||
+        input.classification === "budget",
+      connectedCallCount: refreshedLead?.connectedCallCount ?? 0,
+    },
+    opportunityReadinessScore: refreshedLead?.opportunityReadinessScore ?? null,
+    revenueReadinessScore: readinessSnapshot?.score ?? null,
+  }
+
+  const generated = generateOpportunityRecommendations(recommendationInput)
   const createdRecommendations: GrowthOpportunityRecommendation[] = []
 
   for (const recommendation of generated) {
@@ -204,7 +274,7 @@ export async function ingestOpportunityIntelligenceFromInbox(
         evidence: recommendation.evidence,
         signal_ids: signalIds,
         requires_human_approval: true,
-        metadata: { source: "inbox_classifier" },
+        metadata: recommendationMetadata(recommendation, "inbox_classifier"),
       })
       .select("*")
       .single()
@@ -248,17 +318,25 @@ export async function ingestOpportunityIntelligenceFromInbox(
 
   const stopCandidate = detectStopSequenceCandidate({ signals: detected, hasActiveSequence })
   if (stopCandidate) {
+    const stopRecommendation: GeneratedOpportunityRecommendation = {
+      recommendationType: "stop_sequence",
+      title: "Stop sequence",
+      description: stopCandidate.reason,
+      evidence: [{ source: "inbox_classifier", snippet: stopCandidate.evidenceSnippet }],
+      scoring: recommendationScoring(recommendationInput),
+    }
     await recommendationsTable(admin)
       .insert({
         lead_id: input.leadId,
         inbox_thread_id: input.inboxThreadId ?? null,
         recommendation_type: "stop_sequence",
         status: "pending",
-        title: "Stop sequence",
-        description: stopCandidate.reason,
-        evidence: [{ source: "inbox_classifier", snippet: stopCandidate.evidenceSnippet }],
+        title: stopRecommendation.title,
+        description: stopRecommendation.description,
+        evidence: stopRecommendation.evidence,
         signal_ids: signalIds,
         requires_human_approval: true,
+        metadata: recommendationMetadata(stopRecommendation, "inbox_classifier"),
       })
       .catch(() => undefined)
   }
