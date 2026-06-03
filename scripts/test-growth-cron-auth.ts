@@ -3,9 +3,12 @@
  * Run: pnpm test:growth-cron-auth
  */
 import assert from "node:assert/strict"
+import { createHash } from "node:crypto"
 import {
+  buildGrowthCronAuthFailureLog,
   diagnoseGrowthCronAuth,
   extractGrowthCronBearerToken,
+  hashGrowthCronAuthTokenPrefix,
   verifyGrowthCronRequest,
 } from "../lib/growth/runtime/growth-cron-auth"
 
@@ -105,6 +108,40 @@ function testUnauthorizedDiagnostics(): void {
   })
 }
 
+function testFailureLogHashDiagnostics(): void {
+  withSecret(TEST_SECRET, () => {
+    const mismatchLog = buildGrowthCronAuthFailureLog(
+      cronRequest({ Authorization: "Bearer wrong-secret" }),
+      diagnoseGrowthCronAuth(cronRequest({ Authorization: "Bearer wrong-secret" })),
+      "/api/cron/growth-sequence-safe-execute",
+    )
+    assert.ok(mismatchLog)
+    assert.equal(mismatchLog.envSecretLength, TEST_SECRET.length)
+    assert.equal(
+      mismatchLog.envSecretHashPrefix,
+      createHash("sha256").update(TEST_SECRET, "utf8").digest("hex").slice(0, 8),
+    )
+    assert.equal(mismatchLog.incomingTokenLength, "wrong-secret".length)
+    assert.equal(
+      mismatchLog.incomingTokenHashPrefix,
+      createHash("sha256").update("wrong-secret", "utf8").digest("hex").slice(0, 8),
+    )
+    assert.notEqual(mismatchLog.envSecretHashPrefix, mismatchLog.incomingTokenHashPrefix)
+    assert.equal(mismatchLog.failureReason, "token_mismatch")
+    assert.equal(mismatchLog.cronRoute, "/api/cron/growth-sequence-safe-execute")
+
+    const matchingPrefix = hashGrowthCronAuthTokenPrefix(TEST_SECRET)
+    const successDiagnostics = diagnoseGrowthCronAuth(
+      cronRequest({ Authorization: `Bearer ${TEST_SECRET}` }),
+    )
+    assert.equal(buildGrowthCronAuthFailureLog(cronRequest(), successDiagnostics), null)
+    assert.equal(
+      hashGrowthCronAuthTokenPrefix(` ${TEST_SECRET} `.trim()),
+      matchingPrefix,
+    )
+  })
+}
+
 function testMissingConfiguredSecret(): void {
   const previous = process.env.CRON_SECRET
   delete process.env.CRON_SECRET
@@ -141,6 +178,7 @@ function main(): void {
   testAuthorizationVariants()
   testXCronSecretHeader()
   testEnvSecretTrimming()
+  testFailureLogHashDiagnostics()
   testUnauthorizedDiagnostics()
   testMissingConfiguredSecret()
   testVerifyGrowthCronRequestResponses()

@@ -1,5 +1,6 @@
 import "server-only"
 
+import { createHash } from "node:crypto"
 import { NextResponse } from "next/server"
 
 export type GrowthCronAuthFailureReason =
@@ -11,16 +12,35 @@ export type GrowthCronAuthBranch = "bearer" | "x-cron-secret"
 
 export type GrowthCronAuthDiagnostics = {
   cronSecretConfigured: boolean
-  cronSecretLength: number
+  envSecretLength: number
   authorizationHeaderPresent: boolean
   xCronSecretHeaderPresent: boolean
   authBranch: GrowthCronAuthBranch | null
   failureReason: GrowthCronAuthFailureReason | null
 }
 
+export type GrowthCronAuthFailureLog = {
+  cronSecretConfigured: boolean
+  envSecretLength: number
+  envSecretHashPrefix: string | null
+  authorizationHeaderPresent: boolean
+  xCronSecretHeaderPresent: boolean
+  incomingTokenLength: number
+  incomingTokenHashPrefix: string | null
+  authBranch: GrowthCronAuthBranch | null
+  failureReason: GrowthCronAuthFailureReason
+  cronRoute: string | null
+}
+
 function readConfiguredCronSecret(): string | null {
   const secret = process.env.CRON_SECRET?.trim()
   return secret && secret.length > 0 ? secret : null
+}
+
+/** Safe fingerprint for comparing env vs incoming tokens without logging secrets. */
+export function hashGrowthCronAuthTokenPrefix(token: string | null | undefined): string | null {
+  if (!token || token.length === 0) return null
+  return createHash("sha256").update(token, "utf8").digest("hex").slice(0, 8)
 }
 
 /** Extract bearer token; tolerate case/spacing/newline differences Vercel and curl may introduce. */
@@ -29,6 +49,37 @@ export function extractGrowthCronBearerToken(authorizationHeader: string | null)
   if (!/^Bearer\s+/i.test(authorizationHeader)) return null
   const token = authorizationHeader.replace(/^Bearer\s+/i, "").trim()
   return token.length > 0 ? token : null
+}
+
+function resolveIncomingCronToken(request: Request): string | null {
+  const bearerToken = extractGrowthCronBearerToken(request.headers.get("authorization"))
+  if (bearerToken) return bearerToken
+  const xCronSecret = request.headers.get("x-cron-secret")?.trim() ?? ""
+  return xCronSecret.length > 0 ? xCronSecret : null
+}
+
+export function buildGrowthCronAuthFailureLog(
+  request: Request,
+  diagnostics: GrowthCronAuthDiagnostics,
+  cronRoute?: string,
+): GrowthCronAuthFailureLog | null {
+  if (!diagnostics.failureReason) return null
+
+  const envSecret = readConfiguredCronSecret()
+  const incomingToken = resolveIncomingCronToken(request)
+
+  return {
+    cronSecretConfigured: diagnostics.cronSecretConfigured,
+    envSecretLength: envSecret?.length ?? 0,
+    envSecretHashPrefix: hashGrowthCronAuthTokenPrefix(envSecret),
+    authorizationHeaderPresent: diagnostics.authorizationHeaderPresent,
+    xCronSecretHeaderPresent: diagnostics.xCronSecretHeaderPresent,
+    incomingTokenLength: incomingToken?.length ?? 0,
+    incomingTokenHashPrefix: hashGrowthCronAuthTokenPrefix(incomingToken),
+    authBranch: diagnostics.authBranch,
+    failureReason: diagnostics.failureReason,
+    cronRoute: cronRoute ?? null,
+  }
 }
 
 export function diagnoseGrowthCronAuth(request: Request): GrowthCronAuthDiagnostics {
@@ -40,7 +91,7 @@ export function diagnoseGrowthCronAuth(request: Request): GrowthCronAuthDiagnost
   if (!secret) {
     return {
       cronSecretConfigured: false,
-      cronSecretLength: 0,
+      envSecretLength: 0,
       authorizationHeaderPresent: Boolean(authorizationHeader),
       xCronSecretHeaderPresent: xCronSecret.length > 0,
       authBranch: null,
@@ -51,7 +102,7 @@ export function diagnoseGrowthCronAuth(request: Request): GrowthCronAuthDiagnost
   if (bearerToken === secret) {
     return {
       cronSecretConfigured: true,
-      cronSecretLength: secret.length,
+      envSecretLength: secret.length,
       authorizationHeaderPresent: Boolean(authorizationHeader),
       xCronSecretHeaderPresent: xCronSecret.length > 0,
       authBranch: "bearer",
@@ -62,7 +113,7 @@ export function diagnoseGrowthCronAuth(request: Request): GrowthCronAuthDiagnost
   if (xCronSecret.length > 0 && xCronSecret === secret) {
     return {
       cronSecretConfigured: true,
-      cronSecretLength: secret.length,
+      envSecretLength: secret.length,
       authorizationHeaderPresent: Boolean(authorizationHeader),
       xCronSecretHeaderPresent: true,
       authBranch: "x-cron-secret",
@@ -72,7 +123,7 @@ export function diagnoseGrowthCronAuth(request: Request): GrowthCronAuthDiagnost
 
   return {
     cronSecretConfigured: true,
-    cronSecretLength: secret.length,
+    envSecretLength: secret.length,
     authorizationHeaderPresent: Boolean(authorizationHeader),
     xCronSecretHeaderPresent: xCronSecret.length > 0,
     authBranch: null,
@@ -81,23 +132,26 @@ export function diagnoseGrowthCronAuth(request: Request): GrowthCronAuthDiagnost
   }
 }
 
-function logGrowthCronAuthFailure(diagnostics: GrowthCronAuthDiagnostics, routeHint?: string): void {
-  console.warn(
-    `[growth-cron-auth] unauthorized${routeHint ? ` route=${routeHint}` : ""}`,
-    JSON.stringify(diagnostics),
-  )
+function logGrowthCronAuthFailure(
+  request: Request,
+  diagnostics: GrowthCronAuthDiagnostics,
+  cronRoute?: string,
+): void {
+  const payload = buildGrowthCronAuthFailureLog(request, diagnostics, cronRoute)
+  if (!payload) return
+  console.warn("[growth-cron-auth] unauthorized", JSON.stringify(payload))
 }
 
-export function verifyGrowthCronRequest(request: Request, routeHint?: string): NextResponse | null {
+export function verifyGrowthCronRequest(request: Request, cronRoute?: string): NextResponse | null {
   const diagnostics = diagnoseGrowthCronAuth(request)
 
   if (diagnostics.failureReason === "cron_secret_not_configured") {
-    logGrowthCronAuthFailure(diagnostics, routeHint)
+    logGrowthCronAuthFailure(request, diagnostics, cronRoute)
     return NextResponse.json({ error: "cron_secret_not_configured" }, { status: 503 })
   }
 
   if (diagnostics.failureReason) {
-    logGrowthCronAuthFailure(diagnostics, routeHint)
+    logGrowthCronAuthFailure(request, diagnostics, cronRoute)
     return NextResponse.json(
       {
         error: "unauthorized",
