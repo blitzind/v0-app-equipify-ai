@@ -1,6 +1,11 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import {
+  buildOutreachObjectionSummaries,
+  resolveConversationCompetitorMentionNames,
+  resolveOperationalCapacityConstraintLabels,
+} from "@/lib/growth/outreach/personalization/context-lead-field-guards"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { listGrowthOutboundMessagesForLead } from "@/lib/growth/outbound/message-repository"
 import { listGrowthOutboundRepliesForLead } from "@/lib/growth/outbound/reply-repository"
@@ -90,12 +95,10 @@ export async function buildOutreachContextPacket(
     return truncate(`${reply.bodyPreview}${classification}`)
   })
 
-  const objectionSummaries = [
-    ...lead.conversationObjectionProfile.clusters.map((entry) => truncate(entry.key.replace(/_/g, " "), 80)),
-    ...lead.conversationTopSignals
-      .filter((signal) => /objection|competitor|budget|timing/i.test(signal.label))
-      .map((signal) => truncate(signal.label, 80)),
-  ]
+  const objectionSummaries = buildOutreachObjectionSummaries({
+    conversationObjectionProfile: lead.conversationObjectionProfile,
+    conversationTopSignals: lead.conversationTopSignals,
+  }).map((entry) => truncate(entry, 80))
 
   const sequenceHistorySummaries = queueItems
     .filter((item) => item.sequencePatternId)
@@ -110,23 +113,19 @@ export async function buildOutreachContextPacket(
     .slice(0, 6)
     .map((event) => truncate(`${event.title}${event.summary ? ` — ${event.summary}` : ""}`, 120))
 
+  const capacityConstraints = resolveOperationalCapacityConstraintLabels(lead.operationalCapacityTopConstraints)
   const capacitySignals = [
     lead.capacityProtectionRecommendation,
     lead.operationalCapacitySummary,
-    ...lead.operationalCapacityTopConstraints.map((entry) => entry.label),
+    ...capacityConstraints,
   ]
     .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
     .map((entry) => truncate(entry, 100))
 
+  const competitorMentions = resolveConversationCompetitorMentionNames(lead.conversationCompetitorMentions)
   const competitorPressure =
-    lead.conversationCompetitorMentions.length > 0
-      ? truncate(
-          lead.conversationCompetitorMentions
-            .map((entry) => entry.name)
-            .filter(Boolean)
-            .join(", "),
-          120,
-        ) || null
+    competitorMentions.length > 0
+      ? truncate(competitorMentions.join(", "), 120) || null
       : lead.fieldServiceStackDetected
         ? truncate(`Existing stack: ${lead.fieldServiceStackDetected}`, 120)
         : null

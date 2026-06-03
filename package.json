@@ -114,6 +114,7 @@
     "test:growth-bulk-enrollment-retry": "tsx scripts/test-growth-bulk-enrollment-retry.ts",
     "test:growth-qa-acceleration": "tsx scripts/test-growth-qa-acceleration.ts",
     "test:growth-qa-deliverability-bypass": "tsx scripts/test-growth-qa-deliverability-bypass.ts",
+    "test:growth-conversation-objection-profile-normalization": "tsx scripts/test-growth-conversation-objection-profile-normalization.ts",
     "test:growth-reply-flow-harness": "tsx scripts/test-growth-reply-flow-harness.ts",
     "test:growth-reply-flow-env-bootstrap": "tsx scripts/test-growth-reply-flow-env-bootstrap.ts",
     "test:growth-reply-flow-api": "tsx scripts/test-growth-reply-flow-api.ts",

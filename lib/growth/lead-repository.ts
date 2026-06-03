@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { GrowthLeadArchiveSchemaIncompleteError } from "@/lib/growth/lead-archive-api-errors"
 import { probeGrowthLeadArchiveSchema } from "@/lib/growth/lead-archive-schema-health"
+import { normalizeGrowthConversationObjectionProfile } from "@/lib/growth/conversation-objection-profile"
 import type {
   CreateGrowthLeadInput,
   GrowthLead,
@@ -375,12 +376,9 @@ function mapGrowthLeadRow(row: GrowthLeadDbRow): GrowthLead {
     conversationSentiment: row.conversation_sentiment as GrowthLead["conversationSentiment"],
     conversationUrgencyLevel: row.conversation_urgency_level as GrowthLead["conversationUrgencyLevel"],
     conversationBuyingIntent: row.conversation_buying_intent as GrowthLead["conversationBuyingIntent"],
-    conversationObjectionProfile:
-      row.conversation_objection_profile &&
-      typeof row.conversation_objection_profile === "object" &&
-      !Array.isArray(row.conversation_objection_profile)
-        ? (row.conversation_objection_profile as GrowthLead["conversationObjectionProfile"])
-        : { clusters: [], totalSeverityScore: 0 },
+    conversationObjectionProfile: normalizeGrowthConversationObjectionProfile(
+      row.conversation_objection_profile,
+    ),
     conversationCompetitorMentions: Array.isArray(row.conversation_competitor_mentions)
       ? (row.conversation_competitor_mentions as GrowthLead["conversationCompetitorMentions"])
       : [],
