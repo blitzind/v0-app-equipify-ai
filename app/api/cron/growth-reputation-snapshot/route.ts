@@ -20,6 +20,9 @@ export async function POST(request: Request) {
         pauses_persisted: result.pauses_persisted,
         recoveries_recorded: result.recoveries_recorded,
         qa_marker: result.qa_marker,
+        mailbox_health_qa_marker: result.mailbox_health_qa_marker,
+        mailbox_health_synced: result.mailbox_health_synced,
+        mailbox_health_snapshots_updated: result.mailbox_health_snapshots_updated,
       },
     }),
   )

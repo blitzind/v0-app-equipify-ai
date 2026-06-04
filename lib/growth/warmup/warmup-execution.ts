@@ -254,7 +254,9 @@ export async function runWarmupProgressionForProfile(
   const reputation = await assessMailboxReputation(admin, profile.sender_account_id).catch(() => null)
   if (
     reputation &&
-    (reputation.health_tier === "critical" || reputation.risk_score >= 75) &&
+    (reputation.health_tier === "high_risk" ||
+      reputation.health_tier === "paused" ||
+      reputation.risk_score >= 75) &&
     profile.status === "warming"
   ) {
     nextStatus = "throttled"

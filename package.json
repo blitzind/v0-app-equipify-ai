@@ -226,6 +226,7 @@
     "test:growth-outbound-lifecycle-ops": "tsx scripts/test-growth-outbound-lifecycle-ops.ts",
     "test:growth-warmup": "tsx scripts/test-growth-warmup.ts",
     "test:growth-native-warmup-execution": "tsx scripts/test-growth-native-warmup-execution.ts",
+    "test:growth-mailbox-health-intelligence": "tsx scripts/test-growth-mailbox-health-intelligence.ts",
     "test:growth-unified-inbox": "tsx scripts/test-growth-unified-inbox.ts",
     "test:growth-inbox-workspace-phase2": "tsx scripts/test-growth-inbox-workspace-phase2.ts",
     "test:growth-inbox-workspace-phase3": "tsx scripts/test-growth-inbox-workspace-phase3.ts",

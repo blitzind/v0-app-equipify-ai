@@ -8,6 +8,9 @@ export const GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_MIGRATION =
 export const GROWTH_DELIVERABILITY_H1_HARDENING_MIGRATION =
   "20270604120000_growth_deliverability_h1_hardening.sql" as const
 
+export const GROWTH_MAILBOX_HEALTH_INTELLIGENCE_MIGRATION =
+  "20270705120000_growth_mailbox_health_intelligence.sql" as const
+
 export const GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_SETUP_MESSAGE =
   "Deliverability reputation protection schema is not applied. Run supabase db push."
 
@@ -32,6 +35,17 @@ export async function isGrowthDeliverabilityH1SchemaReady(admin: SupabaseClient)
     .schema("growth")
     .from("sender_accounts")
     .select("deliverability_paused_at")
+    .limit(1)
+  return !error
+}
+
+export async function isGrowthMailboxHealthIntelligenceSchemaReady(
+  admin: SupabaseClient,
+): Promise<boolean> {
+  const { error } = await admin
+    .schema("growth")
+    .from("mailbox_reputation_snapshots")
+    .select("health_state, delivery_success_rate")
     .limit(1)
   return !error
 }

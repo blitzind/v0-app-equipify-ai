@@ -26,6 +26,25 @@ import {
   type GrowthDeliverabilitySequenceSafetyModule,
 } from "@/lib/growth/deliverability/deliverability-protection-console-types"
 import { GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_QA_MARKER } from "@/lib/growth/deliverability/reputation-protection-types"
+import { mailboxHealthStateLabel } from "@/lib/growth/deliverability/mailbox-health-score"
+import type { GrowthMailboxHealthState } from "@/lib/growth/deliverability/mailbox-health-score-types"
+
+function healthStateTone(state: string): "healthy" | "attention" | "critical" | "neutral" | "blocked" {
+  switch (state) {
+    case "healthy":
+      return "healthy"
+    case "warning":
+      return "attention"
+    case "at_risk":
+      return "attention"
+    case "critical":
+      return "critical"
+    case "disabled":
+      return "blocked"
+    default:
+      return "neutral"
+  }
+}
 
 function alertTone(severity: GrowthDeliverabilityOpsAlert["severity"]) {
   switch (severity) {
@@ -90,6 +109,53 @@ function SenderHealthWidget() {
                   </p>
                 </div>
               ))}
+            </div>
+          ) : null}
+          {data.mailbox_rows && data.mailbox_rows.length > 0 ? (
+            <div className="mt-4 overflow-x-auto" data-qa-marker={data.mailbox_health_intel_qa_marker}>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">Mailbox health intelligence</p>
+              <table className="w-full min-w-[720px] text-left text-xs">
+                <thead>
+                  <tr className="border-b border-border text-muted-foreground">
+                    <th className="px-2 py-2 font-medium">Mailbox</th>
+                    <th className="px-2 py-2 font-medium">Health</th>
+                    <th className="px-2 py-2 font-medium">Warmup</th>
+                    <th className="px-2 py-2 font-medium">Capacity</th>
+                    <th className="px-2 py-2 font-medium">Today</th>
+                    <th className="px-2 py-2 font-medium">Bounce</th>
+                    <th className="px-2 py-2 font-medium">Reply</th>
+                    <th className="px-2 py-2 font-medium">Delivery</th>
+                    <th className="px-2 py-2 font-medium">Throttle</th>
+                    <th className="px-2 py-2 font-medium">Trend</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.mailbox_rows.map((row) => (
+                    <tr key={row.email} className="border-b border-border/60">
+                      <td className="px-2 py-2 font-medium">{row.email}</td>
+                      <td className="px-2 py-2">
+                        <div className="flex items-center gap-2">
+                          <span>{row.health_score}</span>
+                          <GrowthBadge
+                            label={mailboxHealthStateLabel(row.health_state as GrowthMailboxHealthState)}
+                            tone={healthStateTone(row.health_state)}
+                          />
+                        </div>
+                      </td>
+                      <td className="px-2 py-2">{row.warmup_status ?? "—"}</td>
+                      <td className="px-2 py-2">{row.daily_capacity}</td>
+                      <td className="px-2 py-2">{row.sends_today}</td>
+                      <td className="px-2 py-2">{row.bounce_rate.toFixed(1)}%</td>
+                      <td className="px-2 py-2">{row.reply_rate.toFixed(1)}%</td>
+                      <td className="px-2 py-2">{row.delivery_success_rate.toFixed(0)}%</td>
+                      <td className="px-2 py-2">
+                        <GrowthBadge label={row.throttle_status} tone={healthStateTone(row.throttle_status === "ok" ? "healthy" : "critical")} />
+                      </td>
+                      <td className="px-2 py-2 capitalize text-muted-foreground">{row.trend_direction}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : null}
         </>

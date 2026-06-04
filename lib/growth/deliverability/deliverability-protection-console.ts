@@ -10,6 +10,7 @@ import {
   GROWTH_DELIVERABILITY_OPS_V2_QA_MARKER,
   GROWTH_DELIVERABILITY_PROTECTION_MODULE_IDS,
   GROWTH_DELIVERABILITY_QUEUE_OPS_QA_MARKER,
+  GROWTH_DELIVERABILITY_MAILBOX_HEALTH_INTEL_QA_MARKER,
   GROWTH_DELIVERABILITY_SENDER_HEALTH_QA_MARKER,
   GROWTH_DELIVERABILITY_WIDGET_FALLBACK_QA_MARKER,
   type GrowthDeliverabilityDnsHealthModule,
@@ -33,6 +34,8 @@ import {
   buildReputationTrendSections,
   loadMailboxSendPolicy,
 } from "@/lib/growth/deliverability/mailbox-reputation-repository"
+import { buildHealthTrendDirection } from "@/lib/growth/deliverability/mailbox-health-score"
+import { buildMailboxHealthIntelligenceDashboard } from "@/lib/growth/deliverability/mailbox-health-intelligence"
 
 const MODULE_QA: Record<GrowthDeliverabilityProtectionModuleId, string> = {
   sender_health: GROWTH_DELIVERABILITY_SENDER_HEALTH_QA_MARKER,
@@ -125,7 +128,10 @@ export async function buildSenderHealthModule(
       const ready = await isGrowthDeliverabilityReputationProtectionSchemaReady(admin)
       if (!ready) throw new Error("Reputation protection schema not ready.")
 
-      const assessments = await assessAllMailboxReputations(admin)
+      const [assessments, healthDashboard] = await Promise.all([
+        assessAllMailboxReputations(admin, { persistSnapshots: false }),
+        buildMailboxHealthIntelligenceDashboard(admin),
+      ])
       const senders = await listSenderAccounts(admin)
       const atRisk = assessments.filter((row) =>
         ["caution", "high_risk", "protected"].includes(row.health_tier),
@@ -170,16 +176,27 @@ export async function buildSenderHealthModule(
 
       return {
         summary: {
-          total_mailboxes: assessments.length,
-          active_mailboxes: assessments.length - paused.length,
-          paused_mailboxes: paused.length,
-          warming_mailboxes: warming.length,
+          total_mailboxes: healthDashboard.summary.total_mailboxes,
+          active_mailboxes: healthDashboard.summary.total_mailboxes - healthDashboard.summary.paused_count,
+          paused_mailboxes: healthDashboard.summary.paused_count,
+          warming_mailboxes: healthDashboard.mailboxes.filter((r) => r.warmup_status === "warming").length,
           unhealthy_domains: unhealthy_domains.size,
-          average_risk_score:
-            assessments.length > 0
-              ? Math.round(assessments.reduce((sum, row) => sum + row.risk_score, 0) / assessments.length)
-              : 100,
+          average_risk_score: healthDashboard.summary.average_health_score,
         },
+        mailbox_health_intel_qa_marker: GROWTH_DELIVERABILITY_MAILBOX_HEALTH_INTEL_QA_MARKER,
+        mailbox_rows: healthDashboard.mailboxes.slice(0, 24).map((row) => ({
+          email: row.email_address,
+          health_score: row.health_score,
+          health_state: row.health_state,
+          warmup_status: row.warmup_status,
+          daily_capacity: row.daily_capacity,
+          sends_today: row.sends_today,
+          bounce_rate: row.bounce_rate,
+          reply_rate: row.reply_rate,
+          delivery_success_rate: row.delivery_success_rate,
+          throttle_status: row.throttle_status,
+          trend_direction: buildHealthTrendDirection(row.health_trend),
+        })),
         at_risk: atRisk.slice(0, 8).map((row) => ({
           email: row.metrics.email_address,
           health_tier: row.health_tier,

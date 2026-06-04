@@ -16,15 +16,20 @@ import {
   recoverSenderDeliverabilityPause,
 } from "@/lib/growth/deliverability/sender-pause-state"
 import { evaluateSendThrottle } from "@/lib/growth/deliverability/send-throttle-engine"
+import { runMailboxHealthIntelligenceRollup } from "@/lib/growth/deliverability/mailbox-health-intelligence"
+import { GROWTH_MAILBOX_HEALTH_INTELLIGENCE_QA_MARKER } from "@/lib/growth/deliverability/mailbox-health-score-types"
 import { listSenderAccounts } from "@/lib/growth/sender/sender-repository"
 
 export type GrowthReputationSnapshotRunSummary = {
   qa_marker: typeof GROWTH_DELIVERABILITY_H1_HARDENING_QA_MARKER
+  mailbox_health_qa_marker: typeof GROWTH_MAILBOX_HEALTH_INTELLIGENCE_QA_MARKER
   snapshot_date: string
   assessed_count: number
   alerts_emitted: number
   pauses_persisted: number
   recoveries_recorded: number
+  mailbox_health_synced: number
+  mailbox_health_snapshots_updated: number
 }
 
 async function loadPreviousSnapshot(
@@ -169,12 +174,19 @@ export async function runGrowthReputationSnapshotRollup(
     }
   }
 
+  const healthRollup = await runMailboxHealthIntelligenceRollup(admin, {
+    skipReputationAssess: true,
+  })
+
   return {
     qa_marker: GROWTH_DELIVERABILITY_H1_HARDENING_QA_MARKER,
+    mailbox_health_qa_marker: healthRollup.qa_marker,
     snapshot_date: snapshotDate,
     assessed_count: assessments.length,
     alerts_emitted: alertsEmitted,
     pauses_persisted: pausesPersisted,
     recoveries_recorded: recoveriesRecorded,
+    mailbox_health_synced: healthRollup.synced_sender_health,
+    mailbox_health_snapshots_updated: healthRollup.snapshots_updated,
   }
 }

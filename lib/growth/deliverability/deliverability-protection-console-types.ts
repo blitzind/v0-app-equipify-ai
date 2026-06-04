@@ -11,6 +11,9 @@ export const GROWTH_DELIVERABILITY_DEGRADED_MODE_QA_MARKER =
 export const GROWTH_DELIVERABILITY_QUEUE_OPS_QA_MARKER = "growth-deliverability-queue-ops-v1" as const
 export const GROWTH_DELIVERABILITY_SENDER_HEALTH_QA_MARKER =
   "growth-deliverability-sender-health-v1" as const
+
+export const GROWTH_DELIVERABILITY_MAILBOX_HEALTH_INTEL_QA_MARKER =
+  "growth-mailbox-health-intelligence-v1" as const
 export const GROWTH_DELIVERABILITY_DNS_HEALTH_QA_MARKER = "growth-deliverability-dns-health-v1" as const
 
 export const GROWTH_DELIVERABILITY_PROTECTION_MODULE_IDS = [
@@ -87,6 +90,20 @@ export type GrowthDeliverabilitySenderHealthModule = {
     daily_cap: number
     cap_utilization_pct: number
     throttled: boolean
+  }>
+  mailbox_health_intel_qa_marker: string
+  mailbox_rows: Array<{
+    email: string
+    health_score: number
+    health_state: string
+    warmup_status: string | null
+    daily_capacity: number
+    sends_today: number
+    bounce_rate: number
+    reply_rate: number
+    delivery_success_rate: number
+    throttle_status: string
+    trend_direction: string
   }>
 }
 
