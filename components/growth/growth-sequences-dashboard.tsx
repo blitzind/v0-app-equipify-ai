@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { GitBranch, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthSequenceOptimizationRecommendationsSection } from "@/components/growth/growth-sequence-optimization-recommendations"
 import type { GrowthSequencePattern } from "@/lib/growth/sequence-types"
 
 type DashboardPayload = {
@@ -192,6 +193,8 @@ export function GrowthSequencesDashboard() {
           ))}
         </ul>
       </GrowthEngineCard>
+
+      <GrowthSequenceOptimizationRecommendationsSection />
     </div>
   )
 }
