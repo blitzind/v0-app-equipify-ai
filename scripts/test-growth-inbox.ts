@@ -59,6 +59,13 @@ const repoSource = fs.readFileSync(path.join(process.cwd(), "lib/growth/inbox/th
 assert.match(repoSource, /from "@\/lib\/growth\/lead-label"/)
 assert.match(repoSource, /formatLeadLabel/)
 
+const conversationColumnSource = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/inbox/growth-inbox-conversation-column.tsx"),
+  "utf8",
+)
+assert.match(conversationColumnSource, /GROWTH_INBOX_CHANNEL_LABELS/)
+assert.match(conversationColumnSource, /from "@\/lib\/growth\/inbox\/inbox-channel-types"/)
+
 const uiSource = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-unified-inbox-dashboard.tsx"),
   "utf8",

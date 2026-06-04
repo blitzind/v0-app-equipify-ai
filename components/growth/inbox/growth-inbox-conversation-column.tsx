@@ -6,6 +6,7 @@ import { GrowthInboxInlineRevenueContext } from "@/components/growth/inbox/growt
 import { GrowthInboxRelationshipMemoryStrip } from "@/components/growth/inbox/growth-inbox-relationship-memory-strip"
 import { GrowthInboxRelationshipTimeline } from "@/components/growth/inbox/growth-inbox-relationship-timeline"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
+import { GROWTH_INBOX_CHANNEL_LABELS } from "@/lib/growth/inbox/inbox-channel-types"
 import {
   INBOX_STATUS_TONE,
   displayInboxLeadLabel,
