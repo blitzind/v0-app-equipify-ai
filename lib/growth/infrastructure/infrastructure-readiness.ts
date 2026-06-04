@@ -73,7 +73,16 @@ export function resolveDnsValidationReadiness(): GrowthInfrastructureReadinessDe
 }
 
 export function resolveWarmupReadiness(): GrowthInfrastructureReadinessDescriptor {
-  return descriptor("disabled", "Warmup execution is not enabled — registry and planning UI only.")
+  if (isGrowthTransportSimulationEnabled()) {
+    return descriptor(
+      "simulated",
+      "Warmup send counters advance on live transport only — GROWTH_TRANSPORT_SIMULATE skips real sends.",
+    )
+  }
+  return descriptor(
+    "live",
+    "Native warmup pre-send guards, daily caps, progression cron, and transport send counting are active.",
+  )
 }
 
 export function resolveWebhookIngestionReadiness(): GrowthInfrastructureReadinessDescriptor {

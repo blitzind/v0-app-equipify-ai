@@ -15,6 +15,9 @@ export const GROWTH_DELIVERABILITY_GOVERNANCE_QA_MARKER = "growth-deliverability
 export const GROWTH_DELIVERABILITY_H1_HARDENING_QA_MARKER =
   "growth-deliverability-h1-hardening-v1" as const
 
+export const GROWTH_DELIVERABILITY_PRODUCTION_HARDENING_QA_MARKER =
+  "growth-deliverability-production-hardening-v1" as const
+
 export const GROWTH_MAILBOX_REPUTATION_HEALTH_TIERS = [
   "healthy",
   "warming",

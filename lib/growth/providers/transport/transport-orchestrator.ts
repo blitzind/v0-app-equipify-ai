@@ -29,6 +29,7 @@ import {
 } from "@/lib/growth/providers/transport/transport-repository"
 import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 import { resolveTransportSenderWithPool } from "@/lib/growth/sender-pools/sender-pool-rotation-service"
+import type { GrowthSenderRotationFallbackCandidate } from "@/lib/growth/sender-pools/sender-pool-types"
 import { recordNativeWarmupSend } from "@/lib/growth/warmup/warmup-execution"
 
 export class TransportHumanApprovalRequiredError extends Error {
@@ -70,6 +71,8 @@ export type TransportSendResult = {
     selectedSenderLabel?: string | null
     reason?: string
     riskLevel?: string
+    used_pool_sender_failover?: boolean
+    pool_failover_sender_label?: string | null
     fallbackCandidates?: Array<{ senderLabel: string; reason: string; riskLevel: string }>
   }
 }
@@ -390,6 +393,7 @@ export async function executeTransportSend(
 
   let senderAccountId = input.sender_account_id
   let rotationMeta: TransportSendResult["sender_rotation"]
+  let poolFallbackSenders: GrowthSenderRotationFallbackCandidate[] = []
 
   if (input.sender_pool_id) {
     const resolved = await resolveTransportSenderWithPool(admin, {
@@ -408,51 +412,90 @@ export async function executeTransportSend(
       }
     }
     senderAccountId = resolved.senderAccountId
+    poolFallbackSenders = resolved.poolFallbackSenders ?? []
     const sender = await getSenderAccount(admin, senderAccountId)
     rotationMeta = {
       selectedSenderLabel: sender?.display_name || sender?.email_address || null,
       reason: resolved.rotationReason ?? "health_score",
       riskLevel: resolved.rotationRiskLevel ?? "low",
-      fallbackCandidates: [],
+      fallbackCandidates: poolFallbackSenders.map((candidate) => ({
+        senderLabel: candidate.senderLabel,
+        reason: candidate.reason,
+        riskLevel: candidate.riskLevel,
+      })),
     }
   }
 
-  const routes = await loadRouteCandidatesForSender(admin, senderAccountId)
-  const selection = selectDeliveryRoute({ routes, requested_volume: 1 })
-
-  if (!selection.selected_route_id) {
-    return { ok: false, attempt: null, error: selection.reason, requires_human_review: true }
-  }
-
-  const primaryRoute = routes.find((route) => route.route_id === selection.selected_route_id)!
-  const primaryResult = await executeAttemptOnRoute(admin, {
-    route_id: primaryRoute.route_id,
-    provider_id: primaryRoute.provider_id,
-    provider_family: primaryRoute.provider_family,
-    sender_account_id: senderAccountId,
-    message: { to: input.to, subject: input.subject, html: input.html, text: input.text },
-    lead_id: input.lead_id,
-    sequence_enrollment_id: input.sequence_enrollment_id,
-    sender_pool_id: input.sender_pool_id,
-    actorUserId: input.actorUserId,
-    actorEmail: input.actorEmail,
-    is_test: input.is_test,
+  const primaryResult = await executeTransportOnSenderRoute(admin, {
+    senderAccountId,
+    transportInput: input,
     extra_metadata: input.metadata,
-    qa_deliverability_bypass: input.qa_deliverability_bypass,
   })
 
   if (primaryResult.ok) {
     return rotationMeta ? { ...primaryResult, sender_rotation: rotationMeta } : primaryResult
   }
 
+  if (
+    input.sender_pool_id &&
+    poolFallbackSenders.length > 0 &&
+    transportFailureEligibleForPoolSenderFailover(primaryResult)
+  ) {
+    for (const candidate of poolFallbackSenders) {
+      const alternateResult = await executeTransportOnSenderRoute(admin, {
+        senderAccountId: candidate.senderAccountId,
+        transportInput: input,
+        extra_metadata: {
+          ...(input.metadata ?? {}),
+          pool_sender_failover: true,
+          primary_sender_account_id: senderAccountId,
+        },
+      })
+      if (alternateResult.ok) {
+        const alternateSender = await getSenderAccount(admin, candidate.senderAccountId)
+        await recordTransportAuditEvent(admin, {
+          provider_id: alternateResult.attempt?.provider_id ?? "",
+          event_type: "delivery_retry",
+          title: "Pool sender failover succeeded",
+          description: `Routed to ${candidate.senderLabel} after primary sender transport failure.`,
+          metadata: {
+            primary_sender_account_id: senderAccountId,
+            failover_sender_account_id: candidate.senderAccountId,
+          },
+          actorUserId: input.actorUserId,
+          actorEmail: input.actorEmail,
+          attemptId: alternateResult.attempt?.id,
+        })
+        return {
+          ...alternateResult,
+          sender_rotation: {
+            ...rotationMeta,
+            selectedSenderLabel: alternateSender?.display_name || alternateSender?.email_address || candidate.senderLabel,
+            reason: candidate.reason,
+            riskLevel: candidate.riskLevel,
+            used_pool_sender_failover: true,
+            pool_failover_sender_label: candidate.senderLabel,
+            fallbackCandidates: rotationMeta?.fallbackCandidates,
+          },
+        }
+      }
+    }
+  }
+
+  const routes = await loadRouteCandidatesForSender(admin, senderAccountId)
+  const primarySelection = selectDeliveryRoute({ routes, requested_volume: 1 })
+  const attemptedRouteId =
+    typeof primaryResult.attempt?.metadata?.route_id === "string"
+      ? primaryResult.attempt.metadata.route_id
+      : primarySelection.selected_route_id ?? undefined
   const fallback = resolveTransportFallbackRoute({
     routes,
     requested_volume: 1,
-    exclude_route_id: primaryRoute.route_id,
+    exclude_route_id: attemptedRouteId,
   })
 
   if (!fallback.route_id) {
-    return { ...primaryResult, requires_human_review: true }
+    return { ...primaryResult, requires_human_review: true, sender_rotation: rotationMeta }
   }
 
   const fallbackRoute = routes.find((route) => route.route_id === fallback.route_id)!
@@ -478,13 +521,17 @@ export async function executeTransportSend(
     event_type: "delivery_retry",
     title: "Fallback route attempted",
     description: fallback.reason,
-    metadata: { primary_route_id: primaryRoute.route_id, fallback_route_id: fallbackRoute.route_id },
+    metadata: { fallback_route_id: fallbackRoute.route_id, sender_account_id: senderAccountId },
     actorUserId: input.actorUserId,
     actorEmail: input.actorEmail,
     attemptId: fallbackResult.attempt?.id,
   })
 
-  return { ...fallbackResult, used_fallback: true }
+  return {
+    ...fallbackResult,
+    used_fallback: true,
+    sender_rotation: rotationMeta,
+  }
 }
 
 export async function retryScheduledDeliveryAttempt(
@@ -534,4 +581,60 @@ export async function retryScheduledDeliveryAttempt(
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
+}
+
+function transportFailureEligibleForPoolSenderFailover(result: TransportSendResult): boolean {
+  if (result.ok || !result.attempt) return false
+  const reason = (result.error ?? "").toLowerCase()
+  if (
+    reason.includes("blocked") ||
+    reason.includes("suppression") ||
+    reason.includes("warmup") ||
+    reason.includes("reputation") ||
+    reason.includes("cap exhausted") ||
+    reason.includes("unhealthy") ||
+    reason.includes("not eligible")
+  ) {
+    return false
+  }
+  return true
+}
+
+async function executeTransportOnSenderRoute(
+  admin: SupabaseClient,
+  input: {
+    senderAccountId: string
+    transportInput: TransportSendInput
+    extra_metadata?: Record<string, unknown>
+    retry_count?: number
+  },
+): Promise<TransportSendResult> {
+  const routes = await loadRouteCandidatesForSender(admin, input.senderAccountId)
+  const selection = selectDeliveryRoute({ routes, requested_volume: 1 })
+  if (!selection.selected_route_id) {
+    return { ok: false, attempt: null, error: selection.reason, requires_human_review: true }
+  }
+
+  const route = routes.find((row) => row.route_id === selection.selected_route_id)!
+  return executeAttemptOnRoute(admin, {
+    route_id: route.route_id,
+    provider_id: route.provider_id,
+    provider_family: route.provider_family,
+    sender_account_id: input.senderAccountId,
+    message: {
+      to: input.transportInput.to,
+      subject: input.transportInput.subject,
+      html: input.transportInput.html,
+      text: input.transportInput.text,
+    },
+    lead_id: input.transportInput.lead_id,
+    sequence_enrollment_id: input.transportInput.sequence_enrollment_id,
+    sender_pool_id: input.transportInput.sender_pool_id,
+    actorUserId: input.transportInput.actorUserId,
+    actorEmail: input.transportInput.actorEmail,
+    is_test: input.transportInput.is_test,
+    retry_count: input.retry_count,
+    extra_metadata: input.extra_metadata,
+    qa_deliverability_bypass: input.transportInput.qa_deliverability_bypass,
+  })
 }

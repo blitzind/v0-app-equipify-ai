@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { appendDeliverabilityGovernanceEvent } from "@/lib/growth/deliverability/deliverability-governance-events"
 import {
   assessMailboxReputation,
+  countActiveSequenceEnrollmentsForSender,
+  countSenderSendsLastHour,
   loadMailboxSendPolicy,
 } from "@/lib/growth/deliverability/mailbox-reputation-repository"
 import type { GrowthSendThrottleDecision } from "@/lib/growth/deliverability/reputation-protection-types"
@@ -54,9 +56,11 @@ export async function evaluateReputationProtectionPreSend(
     }
   }
 
-  const [assessment, policy] = await Promise.all([
+  const [assessment, policy, sendsLastHour, activeSequenceCount] = await Promise.all([
     assessMailboxReputation(admin, input.senderAccountId),
     loadMailboxSendPolicy(admin, input.senderAccountId),
+    countSenderSendsLastHour(admin, input.senderAccountId),
+    countActiveSequenceEnrollmentsForSender(admin, input.senderAccountId),
   ])
 
   if (!assessment) {
@@ -66,6 +70,8 @@ export async function evaluateReputationProtectionPreSend(
   const throttle = evaluateSendThrottle({
     policy,
     assessment,
+    sends_last_hour: sendsLastHour,
+    active_sequence_count: activeSequenceCount,
     last_send_at: sender.last_send_at,
   })
 
@@ -105,20 +111,32 @@ export async function evaluateReputationProtectionPreSend(
     }
   }
 
-  if (throttle.throttled && throttle.rule_id === "reputation_throttle") {
+  if (throttle.throttled) {
+    const eventType =
+      throttle.rule_id === "unsubscribe_spike" ? "send_throttle_applied" : "deliverability_risk_detected"
     await appendDeliverabilityGovernanceEvent(admin, {
-      event_type: "deliverability_risk_detected",
+      event_type: eventType,
       sender_account_id: input.senderAccountId,
       mailbox_connection_id: assessment.metrics.mailbox_connection_id,
-      title: "Deliverability risk — reduced velocity",
-      summary: throttle.reason ?? assessment.risk_reasons[0] ?? "Reputation tier requires caution.",
-      severity: "medium",
+      title: "Send blocked — deliverability throttle",
+      summary: throttle.reason ?? assessment.risk_reasons[0] ?? "Reputation protection requires reduced velocity.",
+      severity: "high",
+      reversible: true,
       metadata: {
         rule_id: throttle.rule_id,
         risk_score: assessment.risk_score,
         health_tier: assessment.health_tier,
+        sends_last_hour: sendsLastHour,
+        active_sequence_count: activeSequenceCount,
       },
     }).catch(() => undefined)
+
+    return {
+      allowed: false,
+      reason: throttle.reason,
+      blockCode: "reputation_throttled",
+      throttle: { ...throttle, allowed: false },
+    }
   }
 
   return { allowed: true, reason: throttle.reason, blockCode: null, throttle }

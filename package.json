@@ -255,6 +255,7 @@
     "test:growth-microsoft365-transport-parity": "tsx scripts/test-growth-microsoft365-transport-parity.ts",
     "test:growth-deliverability-ops": "tsx scripts/test-growth-deliverability-ops.ts",
     "test:growth-deliverability-reputation-protection": "tsx scripts/test-growth-deliverability-reputation-protection.ts",
+    "test:growth-deliverability-production-hardening": "tsx scripts/test-growth-deliverability-production-hardening.ts",
     "test:growth-outbound-reliability-h2": "tsx scripts/test-growth-outbound-reliability-h2.ts",
     "test:growth-content-library": "tsx scripts/test-growth-content-library.ts",
     "test:organization-account-classification": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-organization-account-classification.ts",

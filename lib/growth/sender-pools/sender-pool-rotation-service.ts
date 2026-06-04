@@ -336,6 +336,7 @@ export async function resolveTransportSenderWithPool(
   rotationDecisionId?: string | null
   rotationReason?: GrowthSenderRotationOutput["reason"]
   rotationRiskLevel?: GrowthSenderRotationOutput["riskLevel"]
+  poolFallbackSenders?: GrowthSenderRotationOutput["fallbackSenderCandidates"]
 } | null> {
   if (input.senderPoolId && (input.allowAutoRotation ?? true)) {
     const rotation = await resolveSenderRotationForPool(admin, {
@@ -354,6 +355,7 @@ export async function resolveTransportSenderWithPool(
         rotationDecisionId: rotation.decisionId ?? null,
         rotationReason: rotation.reason,
         rotationRiskLevel: rotation.riskLevel,
+        poolFallbackSenders: rotation.fallbackSenderCandidates,
       }
     }
   }

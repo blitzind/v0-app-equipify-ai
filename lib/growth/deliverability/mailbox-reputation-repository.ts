@@ -29,6 +29,27 @@ function ratePercent(numerator: number, denominator: number): number {
   return Number(((numerator / denominator) * 100).toFixed(2))
 }
 
+export async function countSenderSendsLastHour(
+  admin: SupabaseClient,
+  senderAccountId: string,
+): Promise<number> {
+  const sinceIso = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  return countSince(admin, "delivery_attempts", senderAccountId, sinceIso, "sent")
+}
+
+export async function countActiveSequenceEnrollmentsForSender(
+  admin: SupabaseClient,
+  senderAccountId: string,
+): Promise<number> {
+  const { count } = await admin
+    .schema("growth")
+    .from("sequence_enrollments")
+    .select("id", { count: "exact", head: true })
+    .eq("manual_sender_account_id", senderAccountId)
+    .in("status", ["active", "paused"])
+  return count ?? 0
+}
+
 async function countSince(
   admin: SupabaseClient,
   table: "delivery_attempts" | "email_bounces" | "email_complaints",

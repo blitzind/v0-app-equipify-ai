@@ -500,12 +500,27 @@ export async function computeMailboxOperationalHealth(
   const dailyCapUtilization =
     sender.daily_send_limit > 0 ? Math.round((sender.daily_send_used / sender.daily_send_limit) * 100) : 0
 
+  let warmupProgress = sender.warmup_enabled ? 0 : 100
+  const { data: warmupRow } = await admin
+    .schema("growth")
+    .from("warmup_profiles")
+    .select("warmup_progress, status")
+    .eq("sender_account_id", senderAccountId)
+    .is("deleted_at", null)
+    .maybeSingle()
+  if (warmupRow && sender.warmup_enabled) {
+    warmupProgress = Number((warmupRow as { warmup_progress?: number }).warmup_progress ?? 0)
+    if ((warmupRow as { status?: string }).status === "throttled") {
+      warmupProgress = Math.min(warmupProgress, 40)
+    }
+  }
+
   const bounceRate = sender.daily_send_used > 0 ? ((bounces ?? 0) / sender.daily_send_used) * 100 : 0
   const fatigueScore = computeSenderFatigueScore({
     recentVolume: sender.daily_send_used,
     bounceRisk: bounceRate,
     complaintRisk: (complaints ?? 0) * 10,
-    warmupProgress: sender.warmup_enabled ? 50 : 100,
+    warmupProgress,
     warmupEnabled: sender.warmup_enabled,
   })
 
