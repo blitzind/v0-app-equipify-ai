@@ -24,6 +24,7 @@ import type {
 } from "@/lib/growth/inbox/inbox-types"
 import { computeInboxThreadSlaDueAt } from "@/lib/growth/inbox-team-ownership/inbox-sla-tracker"
 import { resolveInboxThreadChannel } from "@/lib/growth/inbox/inbox-channel-types"
+import { formatLeadLabel } from "@/lib/growth/lead-label"
 
 type Row = Record<string, unknown>
 
