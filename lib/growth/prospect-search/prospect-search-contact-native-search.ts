@@ -9,6 +9,7 @@ import {
   type ProspectSearchResultMode,
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import { applyProspectSearchContactFirstHydrationLayers } from "@/lib/growth/prospect-search/prospect-search-contact-first-orchestration"
+import { filterProspectSearchPeopleByEngineIntelligence } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-filters"
 import { attachReachableHumanToCompanies } from "@/lib/growth/prospect-search/prospect-search-contactability-ranking"
 import {
   buildContactNativeIndexRecordsFromCompanies,
@@ -43,6 +44,7 @@ const PEOPLE_HYDRATION_BATCH_SIZE = 500
 export function buildContactNativePeopleFromHydratedCompanies(input: {
   companies: GrowthProspectSearchCompanyResult[]
   filteredPeople?: GrowthProspectSearchIndexPerson[]
+  filters?: GrowthProspectSearchFilters
   query: string
   page: number
   page_size: number
@@ -80,6 +82,10 @@ export function buildContactNativePeopleFromHydratedCompanies(input: {
 
   if (input.result_mode === "queue") {
     peopleRows = filterProspectSearchQueueReadyPeopleRows(peopleRows)
+  }
+
+  if (input.filters) {
+    peopleRows = filterProspectSearchPeopleByEngineIntelligence(peopleRows, input.filters)
   }
 
   const total_people = peopleRows.length
@@ -188,6 +194,7 @@ export async function runContactNativePeopleSearch(
   const native = buildContactNativePeopleFromHydratedCompanies({
     companies: hydratedCompanies,
     filteredPeople: input.filteredPeople,
+    filters: input.filters,
     query: input.query,
     page,
     page_size,

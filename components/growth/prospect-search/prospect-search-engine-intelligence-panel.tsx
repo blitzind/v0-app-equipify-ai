@@ -2,8 +2,15 @@
 
 import { Building2, ShieldCheck, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { ProspectSearchEngineIntelligenceDiscoveryBadge } from "@/components/growth/prospect-search/prospect-search-engine-intelligence-discovery-badge"
 import type { GrowthProspectSearchEngineIntelligence } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-types"
 import { GROWTH_PROSPECT_SEARCH_ENGINE_INTELLIGENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-types"
+import {
+  GROWTH_PROSPECT_SEARCH_INTELLIGENCE_UX_QA_MARKER,
+  PROSPECT_SEARCH_BUYING_COMMITTEE_ROLE_LABELS,
+  PROSPECT_SEARCH_ENGINE_INTELLIGENCE_PANEL_TITLE,
+} from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-ux"
+import type { GrowthBuyingCommitteeIntelligenceRole } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-types"
 import { ProspectSearchSchemaHealthNotice } from "@/components/growth/prospect-search/prospect-search-schema-health-notice"
 
 export function ProspectSearchEngineIntelligencePanel({
@@ -23,15 +30,20 @@ export function ProspectSearchEngineIntelligencePanel({
     <section
       className="mt-3 rounded-xl border border-sky-100 bg-sky-50/50 p-4"
       data-qa-marker={GROWTH_PROSPECT_SEARCH_ENGINE_INTELLIGENCE_QA_MARKER}
+      data-intelligence-ux-marker={GROWTH_PROSPECT_SEARCH_INTELLIGENCE_UX_QA_MARKER}
     >
       <div className="flex flex-wrap items-center gap-2">
         <Building2 className="size-4 text-sky-800" />
         <h4 className="text-sm font-semibold text-sky-950">
-          Growth Engine intelligence — {companyName}
+          {PROSPECT_SEARCH_ENGINE_INTELLIGENCE_PANEL_TITLE} — {companyName}
         </h4>
         <Badge variant="outline" className="text-[10px]">
           Canonical company linked
         </Badge>
+        <ProspectSearchEngineIntelligenceDiscoveryBadge
+          status={companyIntel?.discovery_status}
+          hasVerified={companyIntel?.has_verified_intelligence}
+        />
       </div>
 
       <ProspectSearchSchemaHealthNotice health={intelligence.schema_health} />
@@ -42,8 +54,6 @@ export function ProspectSearchEngineIntelligencePanel({
             <ShieldCheck className="mr-1 size-3" />
             Verified company intelligence ({companyIntel.categories_present.length} categories)
           </Badge>
-        ) : companyIntel ? (
-          <Badge variant="secondary">Company intelligence: {companyIntel.discovery_status}</Badge>
         ) : null}
         {committee?.verified_member_count ? (
           <Badge variant="outline">
@@ -79,7 +89,10 @@ export function ProspectSearchEngineIntelligencePanel({
           {committee.members.slice(0, 6).map((member) => (
             <li key={`${member.person_id}:${member.committee_role}`}>
               {member.full_name}
-              {member.job_title ? ` · ${member.job_title}` : ""} — {String(member.committee_role).replace(/_/g, " ")}
+              {member.job_title ? ` · ${member.job_title}` : ""} —{" "}
+              {PROSPECT_SEARCH_BUYING_COMMITTEE_ROLE_LABELS[
+                member.committee_role as GrowthBuyingCommitteeIntelligenceRole
+              ] ?? String(member.committee_role).replace(/_/g, " ")}
             </li>
           ))}
         </ul>

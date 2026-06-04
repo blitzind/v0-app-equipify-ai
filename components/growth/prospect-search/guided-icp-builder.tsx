@@ -38,6 +38,7 @@ import type {
   GrowthProspectSearchFilters,
   GrowthProspectSearchRevenueBand,
 } from "@/lib/growth/prospect-search/prospect-search-types"
+import { ProspectSearchEngineIntelligenceFiltersCard } from "@/components/growth/prospect-search/prospect-search-engine-intelligence-filters-card"
 import { cn } from "@/lib/utils"
 
 function FilterActions({
@@ -471,6 +472,15 @@ export function GuidedIcpBuilder({
               onChange={(v) => onChange((prev) => ({ ...prev, service_area: v || null }))}
               placeholder="e.g. Southeast, Dallas metro"
             />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="engine-intelligence" className="border-border/60 px-2">
+          <AccordionTrigger className="py-3 text-sm hover:no-underline">
+            Verified intelligence (Growth Engine)
+          </AccordionTrigger>
+          <AccordionContent className="pb-3">
+            <ProspectSearchEngineIntelligenceFiltersCard filters={filters} onChange={onChange} />
           </AccordionContent>
         </AccordionItem>
 

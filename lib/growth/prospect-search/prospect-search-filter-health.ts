@@ -1,6 +1,13 @@
 /** Client-safe filter health warnings and relax suggestions for Prospect Search. */
 
 import { parseTitleChips } from "@/lib/growth/prospect-search/title-suggestion-engine"
+import { hasActiveProspectSearchEngineIntelligenceFilters } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-filters"
+import {
+  PROSPECT_SEARCH_BUYING_COMMITTEE_ROLE_LABELS,
+  PROSPECT_SEARCH_COMPANY_INTELLIGENCE_CATEGORY_LABELS,
+} from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-ux"
+import type { GrowthCompanyIntelligenceCategory } from "@/lib/growth/company-intelligence/company-intelligence-types"
+import type { GrowthBuyingCommitteeIntelligenceRole } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-types"
 import type { GrowthProspectSearchDiscoveryMode, GrowthProspectSearchFilters } from "@/lib/growth/prospect-search/prospect-search-types"
 import { countActiveProspectSearchFilters } from "@/lib/growth/prospect-search/prospect-search-estimation-format"
 
@@ -35,6 +42,11 @@ export function buildProspectSearchFilterHealthWarnings(input: {
   }
   if ((input.filters.lead_score_min ?? 0) > 0 || (input.filters.lead_score_max ?? 0) > 0) {
     warnings.push("Lead score filters apply to indexed Growth records.")
+  }
+  if (hasActiveProspectSearchEngineIntelligenceFilters(input.filters)) {
+    warnings.push(
+      "Verified intelligence filters apply after search hydration — counts may be lower than the index estimate.",
+    )
   }
 
   return warnings
@@ -154,6 +166,44 @@ export function buildProspectSearchActiveFilterChips(
         title_contains: null,
         decision_maker_role: null,
       }),
+    )
+  }
+  if (filters.engine_verified_email) {
+    chips.push(chip("engine-email", "Verified intel", "Verified email", { engine_verified_email: undefined }))
+  }
+  if (filters.engine_verified_phone) {
+    chips.push(chip("engine-phone", "Verified intel", "Verified phone", { engine_verified_phone: undefined }))
+  }
+  if (filters.engine_verified_profile) {
+    chips.push(
+      chip("engine-profile", "Verified intel", "Verified profile", { engine_verified_profile: undefined }),
+    )
+  }
+  if (filters.buying_committee_roles?.length) {
+    chips.push(
+      chip(
+        "engine-roles",
+        "Verified intel",
+        filters.buying_committee_roles
+          .map((r) => PROSPECT_SEARCH_BUYING_COMMITTEE_ROLE_LABELS[r as GrowthBuyingCommitteeIntelligenceRole] ?? r)
+          .join(", "),
+        { buying_committee_roles: undefined },
+      ),
+    )
+  }
+  if (filters.company_intelligence_categories?.length) {
+    chips.push(
+      chip(
+        "engine-categories",
+        "Verified intel",
+        filters.company_intelligence_categories
+          .map(
+            (c) =>
+              PROSPECT_SEARCH_COMPANY_INTELLIGENCE_CATEGORY_LABELS[c as GrowthCompanyIntelligenceCategory] ?? c,
+          )
+          .join(", "),
+        { company_intelligence_categories: undefined },
+      ),
     )
   }
 

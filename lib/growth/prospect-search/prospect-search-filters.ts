@@ -1,4 +1,8 @@
 import type { GrowthBuyingStage } from "@/lib/growth/buying-stage/buying-stage-types"
+import type { GrowthCompanyIntelligenceCategory } from "@/lib/growth/company-intelligence/company-intelligence-types"
+import { GROWTH_COMPANY_INTELLIGENCE_CATEGORIES } from "@/lib/growth/company-intelligence/company-intelligence-types"
+import type { GrowthBuyingCommitteeIntelligenceRole } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-types"
+import { GROWTH_BUYING_COMMITTEE_INTELLIGENCE_ROLES } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-types"
 import type { GrowthSignalTier } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
 import { GROWTH_SIGNAL_TIERS } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
 import {
@@ -346,6 +350,22 @@ export function normalizeProspectSearchFilters(
         )
       : undefined,
     territory_id: asString(raw.territory_id) || null,
+    engine_verified_email: raw.engine_verified_email === true ? true : undefined,
+    engine_verified_phone: raw.engine_verified_phone === true ? true : undefined,
+    engine_verified_profile: raw.engine_verified_profile === true ? true : undefined,
+    buying_committee_roles: Array.isArray(raw.buying_committee_roles)
+      ? raw.buying_committee_roles.filter((role): role is GrowthBuyingCommitteeIntelligenceRole =>
+          GROWTH_BUYING_COMMITTEE_INTELLIGENCE_ROLES.includes(
+            role as GrowthBuyingCommitteeIntelligenceRole,
+          ),
+        )
+      : undefined,
+    company_intelligence_categories: Array.isArray(raw.company_intelligence_categories)
+      ? raw.company_intelligence_categories.filter(
+          (cat): cat is GrowthCompanyIntelligenceCategory =>
+            GROWTH_COMPANY_INTELLIGENCE_CATEGORIES.includes(cat as GrowthCompanyIntelligenceCategory),
+        )
+      : undefined,
   }
 }
 

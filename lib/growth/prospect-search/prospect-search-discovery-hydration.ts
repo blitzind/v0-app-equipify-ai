@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { applyProspectSearchIntelligenceOverlays } from "@/lib/growth/market-intelligence/integrations/prospect-search-bridge"
 import { applyProspectSearchContactIntelligenceOverlay } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-loader"
 import { GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-safe-fetch-json"
+import { filterProspectSearchCompaniesByEngineIntelligence } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-filters"
 import { applyProspectSearchSignalIntelligenceOverlay } from "@/lib/growth/signals/integrations/prospect-search-signal-intelligence-loader"
 import type {
   GrowthProspectSearchCompanyResult,
@@ -115,6 +116,8 @@ export async function applyProspectSearchDiscoverHydrationLayers(
       "Signal intelligence unavailable — momentum overlays may be missing.",
     )
   }
+
+  companies = filterProspectSearchCompaniesByEngineIntelligence(companies, input.filters)
 
   const partial_intelligence = diagnostics.length > 0
   const summary = partial_intelligence

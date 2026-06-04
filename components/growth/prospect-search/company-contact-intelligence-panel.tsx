@@ -12,6 +12,10 @@ import { ProspectSearchOperationalIntelligencePanel } from "@/components/growth/
 import { ProspectSearchOperatorAssistPanel } from "@/components/growth/prospect-search/prospect-search-operator-assist-panel"
 import { ProspectSearchSchemaHealthNotice } from "@/components/growth/prospect-search/prospect-search-schema-health-notice"
 import { ProspectSearchEngineIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-engine-intelligence-panel"
+import {
+  PROSPECT_SEARCH_LEGACY_CONTACT_DISCOVERY_COMMITTEE_TITLE,
+  shouldRenameLegacyContactDiscoveryCommittee,
+} from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-ux"
 
 export function CompanyContactIntelligencePanel({
   companyName,
@@ -145,7 +149,9 @@ export function CompanyContactIntelligencePanel({
       {intelligence.committee_roles.length > 0 ? (
         <div className="mt-3 space-y-2">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            Buying committee mapping
+            {shouldRenameLegacyContactDiscoveryCommittee(intelligence.engine_intelligence)
+              ? PROSPECT_SEARCH_LEGACY_CONTACT_DISCOVERY_COMMITTEE_TITLE
+              : "Buying committee mapping"}
           </p>
           <ul className="space-y-1.5">
             {intelligence.committee_roles.slice(0, 6).map((role) => (

@@ -183,6 +183,16 @@ export type GrowthProspectSearchFilters = {
   growth_signal_score_min?: number | null
   growth_signal_tiers?: GrowthSignalTier[]
   territory_id?: string | null
+  /** Growth Engine 7.3–7.5: company has ≥1 verified email on canonical persons (7.PS-B). */
+  engine_verified_email?: boolean
+  /** Growth Engine 7.3–7.5: company has ≥1 verified phone (7.PS-B). */
+  engine_verified_phone?: boolean
+  /** Growth Engine 7.5: company has ≥1 verified social profile (7.PS-B). */
+  engine_verified_profile?: boolean
+  /** Growth Engine 7.7: at least one selected committee role present (7.PS-B). */
+  buying_committee_roles?: import("@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-types").GrowthBuyingCommitteeIntelligenceRole[]
+  /** Growth Engine 7.6: at least one selected intelligence category present (7.PS-B). */
+  company_intelligence_categories?: import("@/lib/growth/company-intelligence/company-intelligence-types").GrowthCompanyIntelligenceCategory[]
 }
 
 export type GrowthProspectSearchParsedQuery = {

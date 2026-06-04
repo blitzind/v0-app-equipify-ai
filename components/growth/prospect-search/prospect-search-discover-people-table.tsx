@@ -40,6 +40,7 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import { formatProspectSearchFreshnessLabel } from "@/lib/growth/prospect-search/prospect-search-contact-freshness"
 import { prospectSearchPeopleSelectionKey } from "@/lib/growth/prospect-search/prospect-search-people-selection"
+import { ProspectSearchEngineIntelligenceChannelBadges } from "@/components/growth/prospect-search/prospect-search-engine-intelligence-channel-badges"
 import { cn } from "@/lib/utils"
 
 function eligibilityBadgeVariant(state: string): "default" | "outline" | "destructive" | "secondary" {
@@ -223,6 +224,7 @@ export function ProspectSearchDiscoverPeopleTable({
                     {row.persona_label}
                     {row.is_recommended_contact ? " · Recommended" : ""}
                   </p>
+                  <ProspectSearchEngineIntelligenceChannelBadges row={row} className="mt-1 flex flex-wrap gap-1" />
                 </td>
                 <td className="px-3 py-2">{row.company_name}</td>
                 <td className="px-3 py-2">{row.title ?? row.role ?? "—"}</td>

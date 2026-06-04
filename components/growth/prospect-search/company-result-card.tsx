@@ -15,6 +15,14 @@ import { CompanyEnrichmentBadges } from "@/components/growth/prospect-search/com
 import { CompanyIntelligenceCard } from "@/components/growth/company-signals/company-intelligence-card"
 import { BuyingCommitteePanel } from "@/components/growth/prospect-search/buying-committee-panel"
 import { CompanyContactIntelligencePanel } from "@/components/growth/prospect-search/company-contact-intelligence-panel"
+import { ProspectSearchEngineIntelligenceSummary } from "@/components/growth/prospect-search/prospect-search-engine-intelligence-summary"
+import { ProspectSearchLegacyIntelligenceNotice } from "@/components/growth/prospect-search/prospect-search-legacy-intelligence-notice"
+import {
+  PROSPECT_SEARCH_LEGACY_BUYING_COMMITTEE_PANEL_TITLE,
+  PROSPECT_SEARCH_LEGACY_COMPANY_SIGNALS_TITLE,
+  shouldGateLegacyProspectSearchBuyingCommitteePanel,
+  shouldGateLegacyProspectSearchCompanySignals,
+} from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-ux"
 import { CompanyContactsPanel } from "@/components/growth/prospect-search/company-contacts-panel"
 import { CompanyGrowthSignalsPanel } from "@/components/growth/prospect-search/company-growth-signals-panel"
 import { RelatedCompaniesPanel } from "@/components/growth/prospect-search/related-companies-panel"
@@ -170,6 +178,7 @@ export function CompanyResultCard({
       </div>
 
       <CompanyStatusBadges row={row} />
+      <ProspectSearchEngineIntelligenceSummary row={row} className="mt-1" />
       {row.contact_intelligence?.account_contact_strategy ? (
         <p className="text-xs font-medium text-cyan-900">
           {row.contact_intelligence.account_contact_strategy.strategy_summary ??
@@ -243,12 +252,23 @@ export function CompanyResultCard({
 
       {row.source_type === "external_discovered" && selected ? (
         <>
-          <CompanyIntelligenceCard
-            companyCandidateId={row.id}
-            companyName={row.company_name}
-            compact
-            suppressSchemaNotice={Boolean(row.contact_intelligence?.schema_health?.warning_message)}
-          />
+          {shouldGateLegacyProspectSearchCompanySignals(row.contact_intelligence?.engine_intelligence) ? (
+            <ProspectSearchLegacyIntelligenceNotice title={PROSPECT_SEARCH_LEGACY_COMPANY_SIGNALS_TITLE}>
+              <CompanyIntelligenceCard
+                companyCandidateId={row.id}
+                companyName={row.company_name}
+                compact
+                suppressSchemaNotice={Boolean(row.contact_intelligence?.schema_health?.warning_message)}
+              />
+            </ProspectSearchLegacyIntelligenceNotice>
+          ) : (
+            <CompanyIntelligenceCard
+              companyCandidateId={row.id}
+              companyName={row.company_name}
+              compact
+              suppressSchemaNotice={Boolean(row.contact_intelligence?.schema_health?.warning_message)}
+            />
+          )}
           <CompanyContactsPanel
             companyId={row.id}
             companyName={row.company_name}
@@ -263,7 +283,15 @@ export function CompanyResultCard({
             lastVerifiedAt={row.growth_signal_last_computed_at}
             suppressSchemaNotice={Boolean(row.contact_intelligence?.schema_health?.warning_message)}
           />
-          <BuyingCommitteePanel companyCandidateId={row.id} companyName={row.company_name} />
+          {shouldGateLegacyProspectSearchBuyingCommitteePanel(
+            row.contact_intelligence?.engine_intelligence,
+          ) ? (
+            <ProspectSearchLegacyIntelligenceNotice title={PROSPECT_SEARCH_LEGACY_BUYING_COMMITTEE_PANEL_TITLE}>
+              <BuyingCommitteePanel companyCandidateId={row.id} companyName={row.company_name} />
+            </ProspectSearchLegacyIntelligenceNotice>
+          ) : (
+            <BuyingCommitteePanel companyCandidateId={row.id} companyName={row.company_name} />
+          )}
           {row.related_companies?.length ? (
             <RelatedCompaniesPanel
               relatedCompanies={row.related_companies}

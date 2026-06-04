@@ -194,6 +194,7 @@ export async function runProspectSearch(
         ? buildContactNativePeopleFromHydratedCompanies({
             companies: companiesWithSignals,
             filteredPeople: [],
+            filters: mergedFilters,
             query: input.query,
             page,
             page_size,

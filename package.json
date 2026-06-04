@@ -223,6 +223,7 @@
     "test:growth-buying-committee-intelligence-7.7a": "tsx scripts/test-growth-buying-committee-intelligence-7.7a.ts",
     "test:growth-buying-committee-intelligence-7.7b": "tsx scripts/test-growth-buying-committee-intelligence-7.7b.ts",
     "test:growth-prospect-search-engine-intelligence-7-ps-a": "tsx scripts/test-growth-prospect-search-engine-intelligence-7-ps-a.ts",
+    "test:growth-prospect-search-intelligence-ux-7-ps-b": "tsx scripts/test-growth-prospect-search-intelligence-ux-7-ps-b.ts",
     "test:growth-serp-provider-audit": "tsx scripts/test-growth-serp-provider-audit.ts",
     "test:growth-provider-cache": "tsx scripts/test-growth-provider-cache.ts",
     "test:growth-company-signals": "tsx scripts/test-growth-company-signals.ts",
