@@ -50,10 +50,10 @@ export default function AdminGrowthUnifiedInboxPage() {
                 <Mail size={17} />
               </span>
               <div>
-                <h1 className={PAGE_STANDARD_PAGE_TITLE}>{workspaceV2 ? "Inbox Workspace" : "Inbox"}</h1>
+                <h1 className={PAGE_STANDARD_PAGE_TITLE}>Inbox</h1>
                 <p className="text-sm text-muted-foreground">
                   {workspaceV2
-                    ? "Three-column inbox workspace — thread queue, conversation, and action center foundation."
+                    ? "Three-column inbox — thread queue, conversation, and action center foundation."
                     : "Unified inbox ownership and reply intelligence — orchestration only, no mailbox sync or auto replies."}
                 </p>
                 {workspaceV2 ? (

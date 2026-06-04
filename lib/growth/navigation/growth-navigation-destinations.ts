@@ -125,7 +125,7 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
   },
   {
     id: "unified-inbox",
-    label: "Inbox Workspace",
+    label: "Inbox",
     href: "/admin/growth/inbox",
     keywords: ["inbox", "reply", "thread", "unified inbox", "reply intelligence", "inbox workspace"],
   },
@@ -475,7 +475,7 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
       {
         id: "unified-inbox",
         href: "/admin/growth/inbox",
-        label: "Inbox Workspace",
+        label: "Inbox",
         match: (path) => path === "/admin/growth/inbox" || path.startsWith("/admin/growth/inbox?"),
       },
       {

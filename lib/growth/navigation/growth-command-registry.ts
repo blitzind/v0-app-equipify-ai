@@ -31,7 +31,7 @@ export const GROWTH_COMMAND_REGISTRY: GrowthCommandRegistryEntry[] = [
   },
   {
     id: "open-inbox",
-    label: "Inbox Workspace",
+    label: "Inbox",
     href: "/admin/growth/inbox",
     keywords: ["inbox", "reply", "thread", "unified inbox", "inbox workspace"],
     aliases: ["unified inbox", "open inbox"],

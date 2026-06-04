@@ -48,7 +48,7 @@ export default function AdminGrowthInboxDiagnosticsPage() {
               </div>
             </div>
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href={GROWTH_INBOX_WORKSPACE_HREF}>Inbox Workspace</Link>
+              <Link href={GROWTH_INBOX_WORKSPACE_HREF}>Inbox</Link>
             </Button>
           </div>
         </section>
