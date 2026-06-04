@@ -1,6 +1,8 @@
 -- Growth Engine Phase 5.2 — Allow sms_provider_webhook in reply_ingestion_events.source.
--- Phase 5.2 code ingests SMS replies with source=sms_provider_webhook but the v2 table
--- check constraint only listed email sources, causing post-ingestion pipeline failure.
+-- Renamed from 20270704120000_* to 20270704120001_* so it runs before native warmup (120002).
+-- Idempotent: drop/recreate source check only; safe to re-apply.
+-- If you already applied this SQL under the old migration name, run after push:
+--   supabase migration repair --status applied 20270704120001_growth_sms_reply_ingestion_source
 
 alter table growth.reply_ingestion_events
   drop constraint if exists reply_ingestion_events_source_check;

@@ -3,7 +3,7 @@
 export const GROWTH_NATIVE_WARMUP_EXECUTION_QA_MARKER = "growth-native-warmup-execution-v1" as const
 
 export const GROWTH_NATIVE_WARMUP_EXECUTION_MIGRATION =
-  "20270704120000_growth_native_warmup_execution.sql" as const
+  "20270704120002_growth_native_warmup_execution.sql" as const
 
 /** Day milestones for native ramp — interpolate between these points. */
 export const NATIVE_WARMUP_DAY_MILESTONES = [

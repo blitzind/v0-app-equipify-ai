@@ -48,7 +48,7 @@ No changes to `sequence_execution_jobs`, approval APIs, or inbox/reply/SMS subsy
 
 ## Migration
 
-Apply `supabase/migrations/20270704120000_growth_native_warmup_execution.sql`:
+Apply `supabase/migrations/20270704120002_growth_native_warmup_execution.sql` (after `20270704120001_growth_sms_reply_ingestion_source.sql`):
 
 - Migrates `draft` → `new`, `completed` → `active`
 - Adds `current_warmup_day`, `sends_today`, `sends_today_date`, throttle fields
