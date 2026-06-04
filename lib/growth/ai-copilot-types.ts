@@ -1,6 +1,7 @@
 /** Client-safe Growth Engine AI copilot types. */
 
 import type { OutreachPersonalizationAudit } from "@/lib/growth/outreach/personalization/personalization-types"
+import type { OutreachPerformanceAttributionRecord } from "@/lib/growth/outreach/performance/performance-types"
 
 export const GROWTH_AI_COPILOT_GENERATION_TYPES = [
   "cold_email",
@@ -65,6 +66,7 @@ export type GrowthAiCopilotClassification = {
     riskSummary?: string
   }
   personalization?: OutreachPersonalizationAudit
+  performanceAttribution?: OutreachPerformanceAttributionRecord
 }
 
 export type GrowthAiCopilotGeneration = {

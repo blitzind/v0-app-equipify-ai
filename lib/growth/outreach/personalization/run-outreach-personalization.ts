@@ -144,6 +144,10 @@ export async function runOutreachPersonalizationGeneration(
     ctaIntelligence: strategy.ctaIntelligence,
     contextQuality,
     memoryQuality,
+    researchOpener: strategy.researchOpener,
+    memoryOpener: strategy.memoryOpener,
+    memoryInfluence: strategy.memoryInfluence,
+    communicationStyle: strategy.communicationStyle,
   }
 
   return {

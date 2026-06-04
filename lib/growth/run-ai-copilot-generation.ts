@@ -37,6 +37,10 @@ import {
 } from "@/lib/growth/outreach/personalization/personalization-types"
 import { runOutreachPersonalizationGeneration } from "@/lib/growth/outreach/personalization/run-outreach-personalization"
 import {
+  persistOutreachPerformanceAttribution,
+} from "@/lib/growth/outreach/performance/performance-attribution-repository"
+import { buildOutreachPerformanceAttributionRecord } from "@/lib/growth/outreach/performance/outreach-attribution-builder"
+import {
   emitGrowthLeadAiCopilotGenerationApprovedTimeline,
   emitGrowthLeadAiCopilotGenerationCreatedTimeline,
   emitGrowthLeadPlaybookConflictDetectedTimeline,
@@ -146,6 +150,10 @@ export async function runGrowthAiCopilotGeneration(
       classification: {
         confidence: personalized.audit.confidenceScore / 100,
         personalization: personalized.audit,
+        performanceAttribution: buildOutreachPerformanceAttributionRecord({
+          audit: personalized.audit,
+          leadId: lead.id,
+        }),
       },
     }
 
@@ -200,6 +208,18 @@ export async function runGrowthAiCopilotGeneration(
       playbookAttribution,
       createdBy: input.actingUserId,
     })
+
+    const performanceAttribution = await persistOutreachPerformanceAttribution(input.admin, {
+      generationId: generation.id,
+      leadId: lead.id,
+      audit: personalized.audit,
+      recordedAt: generation.createdAt,
+    })
+
+    generation.classification = {
+      ...generation.classification,
+      performanceAttribution,
+    }
 
     await insertGrowthAiCopilotEffectiveness(input.admin, {
       generationId: generation.id,

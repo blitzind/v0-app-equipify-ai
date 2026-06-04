@@ -374,6 +374,10 @@ export type OutreachPersonalizationAudit = {
   ctaIntelligence?: CtaIntelligenceMetadata
   contextQuality?: OutreachContextQualityMetadata
   memoryQuality?: MemoryQualityMetadata
+  researchOpener?: ResearchOpenerMetadata
+  memoryOpener?: MemoryOpenerMetadata
+  memoryInfluence?: MemoryInfluenceMetadata
+  communicationStyle?: MemoryCommunicationStyle
 }
 
 export function isOutreachPersonalizationEmailType(
