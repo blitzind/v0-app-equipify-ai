@@ -71,6 +71,7 @@ const basePacket: OutreachContextPacket = {
   hasDecisionMaker: true,
   outreachAngles: ["Growing commercial HVAC footprint across Denver metro"],
   companySummary: "Summit HVAC Services provides commercial HVAC maintenance across Colorado.",
+  priorOutboundSubjects: [],
   ...emptyMemoryFields,
 }
 
@@ -103,6 +104,10 @@ const draftA = buildPersonalizedOutreachDraft({
   generationType: "cold_email",
   maxWords: OUTREACH_PERSONALIZATION_DEFAULT_MAX_WORDS,
 })
+assert.ok(draftA.strategy.subjectIntelligence)
+assert.ok((draftA.strategy.subjectIntelligence?.qualityScore.overall ?? 0) >= 55)
+assert.ok(!/quick ops note/i.test(draftA.draft.subject))
+
 const draftB = buildPersonalizedOutreachDraft({
   leadId: "00000000-0000-4000-8000-000000000002",
   packet: basePacket,
@@ -226,6 +231,8 @@ const clientSafeFiles = [
   "lib/growth/outreach/personalization/signal-extraction.ts",
   "lib/growth/outreach/personalization/message-strategy.ts",
   "lib/growth/outreach/personalization/research-backed-opener.ts",
+  "lib/growth/outreach/personalization/subject-intelligence.ts",
+  "lib/growth/outreach/personalization/research-evidence-selection.ts",
   "lib/growth/outreach/personalization/ai-refinement-guard.ts",
   "components/growth/growth-outreach-personalization-preview.tsx",
 ]
@@ -261,7 +268,7 @@ const contextBuilderSource = fs.readFileSync(
 )
 assert.match(contextBuilderSource, /normalizeGrowthResearchConfidence/)
 assert.match(contextBuilderSource, /outreachAngles/)
-assert.match(contextBuilderSource, /companySummary/)
+assert.match(contextBuilderSource, /priorOutboundSubjects/)
 
 const mediumPacket: OutreachContextPacket = {
   ...basePacket,

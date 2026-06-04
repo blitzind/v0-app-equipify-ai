@@ -134,6 +134,7 @@ const harnessPacket: OutreachContextPacket = {
   equipmentServiceIndicators: [],
   companySummary: null,
   outreachAngles: [],
+  priorOutboundSubjects: [],
   priorTouchCount: 0,
   hasWebsiteResearch: false,
   hasDecisionMaker: true,

@@ -86,6 +86,16 @@ export async function buildOutreachContextPacket(
     .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
     .map((entry) => truncate(entry, 100))
 
+  const priorOutboundSubjects = [
+    ...messages
+      .slice(0, 6)
+      .map((message) => truncate(message.subject ?? "", 120))
+      .filter((entry) => entry.trim().length > 0),
+    ...queueItems
+      .map((item) => truncate(item.payloadSnapshot.subject ?? "", 120))
+      .filter((entry) => entry.trim().length > 0),
+  ]
+
   const priorTouchSummaries = [
     ...messages.slice(0, 4).map((message) => truncate(message.subject ?? message.bodyPreview ?? "Prior outbound message")),
     ...queueItems
@@ -170,6 +180,7 @@ export async function buildOutreachContextPacket(
     equipmentServiceIndicators: (research?.equipmentServiceIndicators ?? []).map((entry) => truncate(entry, 100)),
     companySummary: research?.companySummary ? truncate(research.companySummary, 160) : null,
     outreachAngles: (research?.outreachAngles ?? []).map((entry) => truncate(entry, 100)),
+    priorOutboundSubjects,
     priorTouchCount: priorTouchSummaries.length,
     hasWebsiteResearch: Boolean(research?.websiteSummary || websiteFindings.length > 0),
     hasDecisionMaker: Boolean(dm.name) || lead.decisionMakerStatus === "confirmed",

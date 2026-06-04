@@ -140,6 +140,7 @@ export async function runOutreachPersonalizationGeneration(
     refinedByAi,
     generationType: input.generationType,
     maxWords,
+    subjectIntelligence: strategy.subjectIntelligence,
   }
 
   return {

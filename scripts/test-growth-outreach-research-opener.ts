@@ -93,6 +93,7 @@ const highPacket: OutreachContextPacket = {
   equipmentServiceIndicators: ["HVAC maintenance"],
   companySummary: "Summit HVAC Services provides commercial HVAC maintenance and emergency repair across Colorado.",
   outreachAngles: ["Lead with dispatch workflow efficiency for a growing commercial HVAC fleet"],
+  priorOutboundSubjects: [],
   priorTouchCount: 0,
   hasWebsiteResearch: true,
   hasDecisionMaker: true,

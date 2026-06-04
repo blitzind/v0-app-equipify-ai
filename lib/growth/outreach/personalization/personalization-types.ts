@@ -80,6 +80,44 @@ export type ResearchOpenerMetadata = {
   confidenceTier: "high" | "medium"
 }
 
+export type SubjectCategory =
+  | "research_observation"
+  | "pain_point"
+  | "curiosity"
+  | "follow_up"
+  | "memory_aware"
+  | "legacy_fallback"
+
+export type SubjectEvidenceSource =
+  | ResearchOpenerSource
+  | "memory_commitment"
+  | "memory_interaction"
+  | "memory_objection"
+  | "relationship_stage"
+  | "pain_signal"
+  | "industry_signal"
+  | "sequence_context"
+  | "legacy_template"
+
+export type SubjectQualityScore = {
+  overall: number
+  specificity: number
+  relevance: number
+  nonGeneric: number
+  length: number
+  curiosity: number
+  diversity: number
+  isGenericPattern: boolean
+}
+
+export type SubjectIntelligenceMetadata = {
+  category: SubjectCategory
+  evidenceSource: SubjectEvidenceSource
+  evidence: string | null
+  qualityScore: SubjectQualityScore
+  legacySubject: string
+}
+
 export type OutreachContextPacket = {
   companyName: string
   industryLabel: string | null
@@ -107,6 +145,7 @@ export type OutreachContextPacket = {
   equipmentServiceIndicators: string[]
   companySummary: string | null
   outreachAngles: string[]
+  priorOutboundSubjects: string[]
   priorTouchCount: number
   hasWebsiteResearch: boolean
   hasDecisionMaker: boolean
@@ -136,6 +175,7 @@ export type SelectedMessageStrategy = {
   sourceSignals: PersonalizationSignalKey[]
   variationKey: string
   researchOpener?: ResearchOpenerMetadata
+  subjectIntelligence?: SubjectIntelligenceMetadata
 }
 
 export type OutreachPersonalizationDraft = {
@@ -159,6 +199,7 @@ export type OutreachPersonalizationAudit = {
   refinedByAi: boolean
   generationType: GrowthAiCopilotGenerationType
   maxWords: number
+  subjectIntelligence?: SubjectIntelligenceMetadata
 }
 
 export function isOutreachPersonalizationEmailType(

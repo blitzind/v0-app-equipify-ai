@@ -271,15 +271,4 @@ export function selectMessageStrategy(input: {
   }
 }
 
-export function buildDeterministicSubject(input: {
-  packet: OutreachContextPacket
-  strategy: SelectedMessageStrategy
-}): string {
-  const company = input.packet.companyName.trim()
-  if (input.strategy.angle === "breakup_respectful") return `Closing the loop — ${company}`
-  if (input.strategy.angle === "reply_response") return `Re: ${company} follow-up`
-  if (input.strategy.angle === "executive_outcome") return `${company} — ops workflow review`
-  if (input.strategy.industry === "hvac") return `${company} dispatch workflow`
-  if (input.strategy.industry === "medical_equipment") return `${company} service visibility`
-  return `${company} — quick ops note`
-}
+export { buildLegacyDeterministicSubject as buildDeterministicSubject } from "@/lib/growth/outreach/personalization/subject-intelligence"

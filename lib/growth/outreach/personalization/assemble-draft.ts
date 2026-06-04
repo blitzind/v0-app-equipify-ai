@@ -1,7 +1,8 @@
 /** Assemble deterministic outreach draft from selected blocks (slice 6.15B). */
 
 import { countWords } from "@/lib/growth/outreach/personalization/message-variability"
-import { buildDeterministicSubject, selectMessageStrategy } from "@/lib/growth/outreach/personalization/message-strategy"
+import { selectMessageStrategy } from "@/lib/growth/outreach/personalization/message-strategy"
+import { buildIntelligentSubject } from "@/lib/growth/outreach/personalization/subject-intelligence"
 import { buildMemoryContextOpener } from "@/lib/growth/outreach/personalization/memory-strategy"
 import type {
   OutreachContextPacket,
@@ -51,12 +52,27 @@ export function buildPersonalizedOutreachDraft(input: {
     signals: input.signals,
     generationType: input.generationType,
   })
-  const subject = buildDeterministicSubject({ packet: input.packet, strategy })
-  const draft = assembleDeterministicOutreachDraft({
+  const subjectResult = buildIntelligentSubject({
+    packet: input.packet,
     strategy,
-    subject,
+    generationType: input.generationType,
+    variationSeed: strategy.variationKey,
+  })
+  const enrichedStrategy: SelectedMessageStrategy = {
+    ...strategy,
+    subjectIntelligence: {
+      category: subjectResult.category,
+      evidenceSource: subjectResult.evidenceSource,
+      evidence: subjectResult.evidence,
+      qualityScore: subjectResult.qualityScore,
+      legacySubject: subjectResult.legacySubject,
+    },
+  }
+  const draft = assembleDeterministicOutreachDraft({
+    strategy: enrichedStrategy,
+    subject: subjectResult.subject,
     maxWords: input.maxWords,
     memoryOpener: buildMemoryContextOpener(input.packet),
   })
-  return { strategy, draft }
+  return { strategy: enrichedStrategy, draft }
 }
