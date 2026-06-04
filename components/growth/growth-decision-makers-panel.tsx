@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import { GrowthEmailDiscoveryOperatorCard } from "@/components/growth/growth-email-discovery-operator-card"
+import { GrowthPhoneDiscoveryOperatorCard } from "@/components/growth/growth-phone-discovery-operator-card"
 import type { GrowthLeadDecisionMaker } from "@/lib/growth/decision-maker-types"
 import type { GrowthLead } from "@/lib/growth/types"
 import { cn } from "@/lib/utils"
@@ -245,8 +246,14 @@ export function GrowthDecisionMakersPanel({
                         <p className="mt-2 text-xs text-muted-foreground line-clamp-2">{dm.evidenceExcerpt}</p>
                       ) : null}
                       {canonicalCompanyId && dm.canonicalPersonId ? (
-                        <div className="mt-3">
+                        <div className="mt-3 space-y-2">
                           <GrowthEmailDiscoveryOperatorCard
+                            compact
+                            companyId={canonicalCompanyId}
+                            personId={dm.canonicalPersonId}
+                            personLabel={dm.fullName}
+                          />
+                          <GrowthPhoneDiscoveryOperatorCard
                             compact
                             companyId={canonicalCompanyId}
                             personId={dm.canonicalPersonId}

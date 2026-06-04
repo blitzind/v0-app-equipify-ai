@@ -389,6 +389,10 @@ export async function processCompanyContactRefreshQueue(
           "@/lib/growth/email-discovery/email-discovery-triggers"
         )
         void triggerEmailDiscoveryAfterCompanyEnriched(admin, { company_id: refreshed.company_id })
+        const { triggerPhoneDiscoveryAfterCompanyEnriched } = await import(
+          "@/lib/growth/phone-discovery/phone-discovery-triggers"
+        )
+        void triggerPhoneDiscoveryAfterCompanyEnriched(admin, { company_id: refreshed.company_id })
       }
       processed += 1
     } catch (error) {

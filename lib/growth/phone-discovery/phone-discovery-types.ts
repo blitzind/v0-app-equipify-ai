@@ -136,17 +136,4 @@ export type GrowthPhoneDiscoveryRunDetail = {
   >
 }
 
-/** Operator rollup for infrastructure / future 7.4B (no runtime queue in 7.4A). */
-export type GrowthPhoneDiscoveryOperatorStatus = {
-  company_id: string
-  person_id: string
-  has_verified_phone: boolean
-  verified_phone: string | null
-  discovery_status: "none" | "completed" | "failed"
-  last_run_id: string | null
-  last_run_status: string | null
-  last_run_at: string | null
-  evidence_count: number
-  can_discover: boolean
-  can_view_evidence: boolean
-}
+export type { GrowthPhoneDiscoveryOperatorStatus } from "@/lib/growth/phone-discovery/phone-discovery-runtime-types"

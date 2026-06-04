@@ -65,6 +65,16 @@ export type GrowthBrowserIntakeCrmContextEmailDiscoveryContact = {
   can_discover: boolean
 }
 
+export type GrowthBrowserIntakeCrmContextPhoneDiscoveryContact = {
+  person_id: string
+  name: string
+  title: string | null
+  verified_phone: string | null
+  has_verified_phone: boolean
+  discovery_status: string
+  can_discover: boolean
+}
+
 export type GrowthBrowserIntakeCrmContext = {
   lead_id: string
   company_name: string
@@ -86,6 +96,7 @@ export type GrowthBrowserIntakeCrmContext = {
   company_relationship_map: GrowthBrowserIntakeCrmContextRelationshipMap
   canonical_company_id: string | null
   email_discovery_contacts: GrowthBrowserIntakeCrmContextEmailDiscoveryContact[]
+  phone_discovery_contacts: GrowthBrowserIntakeCrmContextPhoneDiscoveryContact[]
   links: GrowthBrowserIntakeCrmContextLinks
 }
 

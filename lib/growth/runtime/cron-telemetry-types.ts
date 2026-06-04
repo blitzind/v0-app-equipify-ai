@@ -13,6 +13,7 @@ export const GROWTH_CRON_ROUTE_IDS = [
   "growth-signal-ingest",
   "growth-discovery-worker",
   "growth-email-discovery-worker",
+  "growth-phone-discovery-worker",
   "growth-acquisition-worker",
   "growth-company-signal-refresh",
   "growth-contact-refresh",

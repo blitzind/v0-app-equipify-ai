@@ -2,7 +2,7 @@
 
 Canonical-scoped phone discovery: `growth.companies` + `growth.persons` → candidates → deterministic verification → optional `growth.person_phones` promotion.
 
-**Out of scope (7.4B):** `phone_discovery_jobs`, cron worker, browser extension, lead drawer triggers, company enrichment hooks.
+**Runtime (7.4B):** See `docs/GROWTH_PHONE_DISCOVERY_7.4B.md` — `phone_discovery_jobs`, cron worker, browser extension, lead drawer, enrichment hooks.
 
 ## Sources (deterministic)
 

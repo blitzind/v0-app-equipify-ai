@@ -45,6 +45,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/cron/growth-phone-discovery-worker",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/api/cron/growth-acquisition-worker",
       "schedule": "*/5 * * * *"
     },

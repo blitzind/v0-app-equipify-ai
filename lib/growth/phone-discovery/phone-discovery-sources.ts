@@ -24,6 +24,18 @@ export type PhoneDiscoveryPersonContext = {
   website_url: string | null
 }
 
+function stagingNameMatchesPerson(
+  ctx: PhoneDiscoveryPersonContext,
+  contactFullName: string | null | undefined,
+): boolean {
+  const name = typeof contactFullName === "string" ? contactFullName.trim() : ""
+  if (!name) return true
+  return personNameMatchesDiscoveryContact({
+    person_normalized_name: ctx.normalized_name,
+    contact_full_name: name,
+  })
+}
+
 function draftFromPhone(input: {
   phone: string
   source: GrowthPhoneDiscoveryDraftCandidate["source"]
@@ -147,6 +159,7 @@ export async function collectStagingPhoneDiscoveryCandidates(
     for (const row of companyContacts ?? []) {
       const phone = typeof row.phone === "string" ? row.phone : ""
       if (!phone.trim()) continue
+      if (!stagingNameMatchesPerson(ctx, row.full_name)) continue
       const trusted = stagingPhoneTrusted({
         phone_status: typeof row.phone_status === "string" ? row.phone_status : null,
         contact_status: typeof row.contact_status === "string" ? row.contact_status : null,
@@ -180,6 +193,7 @@ export async function collectStagingPhoneDiscoveryCandidates(
     for (const row of candidates ?? []) {
       const phone = typeof row.phone === "string" ? row.phone : ""
       if (!phone.trim()) continue
+      if (!stagingNameMatchesPerson(ctx, row.full_name)) continue
       const trusted = row.verification_state === "verified" || row.verification_state === "operator_verified"
       const draft = draftFromPhone({
         phone,
@@ -209,6 +223,7 @@ export async function collectStagingPhoneDiscoveryCandidates(
     for (const row of decisionMakers ?? []) {
       const phone = typeof row.phone === "string" ? row.phone : ""
       if (!phone.trim()) continue
+      if (!stagingNameMatchesPerson(ctx, row.full_name)) continue
       const draft = draftFromPhone({
         phone,
         source: "staging_contact",

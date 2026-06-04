@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { ExternalLink, Loader2, Phone, PhoneCall } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
-import type { GrowthPhoneDiscoveryOperatorStatus } from "@/lib/growth/phone-discovery/phone-discovery-types"
+import type { GrowthPhoneDiscoveryOperatorStatus } from "@/lib/growth/phone-discovery/phone-discovery-runtime-types"
 import type { GrowthPhoneDiscoveryRunDetail } from "@/lib/growth/phone-discovery/phone-discovery-types"
 
 type GrowthPhoneDiscoveryOperatorCardProps = {
@@ -12,10 +12,15 @@ type GrowthPhoneDiscoveryOperatorCardProps = {
   personId: string
   personLabel?: string
   compact?: boolean
+  triggerSource?: "manual" | "browser_extension"
 }
 
 function discoveryStatusLabel(status: GrowthPhoneDiscoveryOperatorStatus["discovery_status"]): string {
   switch (status) {
+    case "pending":
+      return "Pending"
+    case "running":
+      return "Running"
     case "completed":
       return "Completed"
     case "failed":
@@ -30,6 +35,7 @@ function discoveryStatusTone(
 ): "healthy" | "attention" | "neutral" {
   if (status === "completed") return "healthy"
   if (status === "failed") return "attention"
+  if (status === "pending" || status === "running") return "attention"
   return "neutral"
 }
 
@@ -45,11 +51,12 @@ export function GrowthPhoneDiscoveryOperatorCard({
   personId,
   personLabel,
   compact = false,
+  triggerSource = "manual",
 }: GrowthPhoneDiscoveryOperatorCardProps) {
   const [status, setStatus] = useState<GrowthPhoneDiscoveryOperatorStatus | null>(null)
   const [detail, setDetail] = useState<GrowthPhoneDiscoveryRunDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  const [running, setRunning] = useState(false)
+  const [enqueueing, setEnqueueing] = useState(false)
   const [loadingEvidence, setLoadingEvidence] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -83,46 +90,56 @@ export function GrowthPhoneDiscoveryOperatorCard({
     void loadStatus()
   }, [loadStatus])
 
-  async function runDiscovery() {
-    setRunning(true)
+  async function enqueueDiscovery() {
+    setEnqueueing(true)
     setError(null)
     setMessage(null)
     setDetail(null)
     try {
-      const res = await fetch("/api/platform/growth/phone-discovery/run", {
+      const res = await fetch("/api/platform/growth/phone-discovery/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           company_id: companyId,
           person_id: personId,
-          promote: true,
+          promote_on_complete: true,
+          trigger_source: triggerSource,
         }),
       })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
-        result?: { run_id: string; messages?: string[] }
+        enqueued?: boolean
+        reason?: string | null
         message?: string
       }
-      if (!res.ok || !data.ok || !data.result) {
-        throw new Error(data.message ?? "Phone discovery failed.")
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message ?? "Could not queue phone discovery.")
       }
-      setMessage(`Run ${data.result.run_id} completed.`)
+      setMessage(
+        data.enqueued
+          ? "Phone discovery queued. Results update when the worker completes."
+          : data.reason === "verified_phone_exists"
+            ? "Verified phone already on file."
+            : data.reason === "active_job_exists"
+              ? "Discovery already queued or running."
+              : "Discovery was not queued.",
+      )
       await loadStatus()
-      if (data.result.run_id) {
-        await loadEvidenceForRun(data.result.run_id)
-      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Phone discovery failed.")
+      setError(e instanceof Error ? e.message : "Could not queue phone discovery.")
     } finally {
-      setRunning(false)
+      setEnqueueing(false)
     }
   }
 
-  async function loadEvidenceForRun(runId: string) {
+  async function loadEvidence() {
+    if (!status?.last_run_id) return
     setLoadingEvidence(true)
     setError(null)
     try {
-      const res = await fetch(`/api/platform/growth/phone-discovery/runs/${runId}`, { cache: "no-store" })
+      const res = await fetch(`/api/platform/growth/phone-discovery/runs/${status.last_run_id}`, {
+        cache: "no-store",
+      })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
         detail?: GrowthPhoneDiscoveryRunDetail
@@ -137,11 +154,6 @@ export function GrowthPhoneDiscoveryOperatorCard({
     } finally {
       setLoadingEvidence(false)
     }
-  }
-
-  async function loadEvidence() {
-    if (!status?.last_run_id) return
-    await loadEvidenceForRun(status.last_run_id)
   }
 
   if (loading) {
@@ -204,8 +216,8 @@ export function GrowthPhoneDiscoveryOperatorCard({
 
       <div className="flex flex-wrap gap-2">
         {status.can_discover ? (
-          <Button size="sm" variant="outline" disabled={running} onClick={() => void runDiscovery()}>
-            {running ? <Loader2 className="mr-1 size-3 animate-spin" /> : <PhoneCall className="mr-1 size-3" />}
+          <Button size="sm" variant="outline" disabled={enqueueing} onClick={() => void enqueueDiscovery()}>
+            {enqueueing ? <Loader2 className="mr-1 size-3 animate-spin" /> : <PhoneCall className="mr-1 size-3" />}
             Discover Phone
           </Button>
         ) : null}
@@ -230,8 +242,28 @@ export function GrowthPhoneDiscoveryOperatorCard({
                 <span>{c.source}</span>
                 <GrowthBadge label={c.verification_status} tone={verificationTone(c.verification_status)} />
                 <span>confidence {(c.confidence * 100).toFixed(0)}%</span>
-                <span>evidence {c.evidence?.length ?? 0}</span>
               </p>
+              {c.evidence?.length ? (
+                <ul className="mt-1 list-disc pl-4 text-muted-foreground">
+                  {c.evidence.map((ev) => (
+                    <li key={ev.id}>
+                      <span className="font-medium">{ev.evidence_type}</span>: {ev.evidence_text}
+                      {ev.source_url ? (
+                        <>
+                          {" "}
+                          (
+                          <a href={ev.source_url} target="_blank" rel="noreferrer" className="underline">
+                            source
+                          </a>
+                          )
+                        </>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1 text-muted-foreground">evidence {c.evidence_count}</p>
+              )}
             </div>
           ))}
         </div>

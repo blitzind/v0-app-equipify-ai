@@ -13,6 +13,7 @@ import {
   type EmailDiscoveryRolePairRow,
 } from "@/lib/growth/email-discovery/email-discovery-role-pairs"
 import { GROWTH_PHONE_DISCOVERY_QA_MARKER } from "@/lib/growth/phone-discovery/phone-discovery-types"
+import { GROWTH_PHONE_DISCOVERY_RUNTIME_QA_MARKER } from "@/lib/growth/phone-discovery/phone-discovery-runtime-types"
 import type { GrowthPhoneDiscoveryRunDetail } from "@/lib/growth/phone-discovery/phone-discovery-types"
 
 type DiscoveryResult = {
@@ -47,6 +48,7 @@ export function GrowthPhoneDiscoveryPanel() {
   const [running, setRunning] = useState(false)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [result, setResult] = useState<DiscoveryResult | null>(null)
   const [detail, setDetail] = useState<GrowthPhoneDiscoveryRunDetail | null>(null)
   const [promote, setPromote] = useState(true)
@@ -183,7 +185,7 @@ export function GrowthPhoneDiscoveryPanel() {
     }
   }
 
-  async function runDiscovery() {
+  async function runDiscovery(sync = false) {
     if (!hasValidRole) {
       setError("Select a company/person role pair or enter IDs with an existing person_company_roles row.")
       return
@@ -191,30 +193,55 @@ export function GrowthPhoneDiscoveryPanel() {
 
     setRunning(true)
     setError(null)
+    setNotice(null)
     setResult(null)
     setDetail(null)
     try {
-      const res = await fetch("/api/platform/growth/phone-discovery/run", {
+      const endpoint = sync
+        ? "/api/platform/growth/phone-discovery/run"
+        : "/api/platform/growth/phone-discovery/jobs"
+      const body = sync
+        ? {
+            company_id: companyId.trim(),
+            person_id: personId.trim(),
+            promote,
+          }
+        : {
+            company_id: companyId.trim(),
+            person_id: personId.trim(),
+            promote_on_complete: promote,
+            trigger_source: "infrastructure_panel",
+          }
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          company_id: companyId.trim(),
-          person_id: personId.trim(),
-          promote,
-        }),
+        body: JSON.stringify(body),
       })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
         result?: DiscoveryResult
+        enqueued?: boolean
+        job_id?: string | null
+        reason?: string | null
         message?: string
         error?: unknown
       }
       if (!res.ok || !data.ok) {
         throw new Error(formatCanonicalPersonBackfillRequestError(data))
       }
-      if (data.result) {
+      if (sync && data.result) {
         setResult(data.result)
         await loadRunDetail(data.result.run_id)
+      } else {
+        setNotice(
+          data.enqueued
+            ? `Queued job ${data.job_id ?? ""}. The growth-phone-discovery-worker cron processes pending jobs.`
+            : data.reason === "verified_phone_exists"
+              ? "Verified phone already on file — job not queued."
+              : data.reason === "active_job_exists"
+                ? "Discovery already queued or running."
+                : "Discovery was not queued.",
+        )
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Phone discovery failed.")
@@ -231,14 +258,19 @@ export function GrowthPhoneDiscoveryPanel() {
     !running
 
   return (
-    <GrowthEngineCard title="Phone discovery (7.4A)">
-      <div className="space-y-4" data-qa-marker={GROWTH_PHONE_DISCOVERY_QA_MARKER}>
+    <GrowthEngineCard title="Phone discovery (7.4A + 7.4B)">
+      <div
+        className="space-y-4"
+        data-qa-marker={GROWTH_PHONE_DISCOVERY_QA_MARKER}
+        data-runtime-qa-marker={GROWTH_PHONE_DISCOVERY_RUNTIME_QA_MARKER}
+      >
         <p className="text-sm text-muted-foreground">
           Discover phones for a canonical company + person with an existing{" "}
           <code className="text-xs">person_company_roles</code> link. Deterministic verification only
-          (no paid providers, no AI guessing). Only <code className="text-xs">verified</code> candidates
-          at confidence ≥ 0.85 promote to <code className="text-xs">growth.person_phones</code>. Runtime
-          queueing is Phase 7.4B.
+          (no paid providers, no AI guessing, no outbound dialing). Only{" "}
+          <code className="text-xs">verified</code> candidates at confidence ≥ 0.85 promote to{" "}
+          <code className="text-xs">growth.person_phones</code>. Default action queues async jobs
+          processed by <code className="text-xs">growth-phone-discovery-worker</code>.
         </p>
 
         <GrowthEmailDiscoveryRolePicker
@@ -296,11 +328,16 @@ export function GrowthPhoneDiscoveryPanel() {
         </label>
 
         <div className="flex flex-wrap gap-2">
-          <Button type="button" disabled={!canRun} onClick={() => void runDiscovery()}>
+          <Button type="button" disabled={!canRun} onClick={() => void runDiscovery(false)}>
             {running ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Phone className="mr-2 size-4" />}
-            Discover Phone
+            Queue discovery (7.4B)
+          </Button>
+          <Button type="button" variant="outline" disabled={!canRun} onClick={() => void runDiscovery(true)}>
+            Run sync (debug)
           </Button>
         </div>
+
+        {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
 
         {result ? (
           <div className="space-y-2 text-sm">

@@ -191,7 +191,6 @@ assert.match(panel, /GROWTH_PHONE_DISCOVERY_QA_MARKER/)
 assert.match(panel, /GrowthEmailDiscoveryRolePicker/)
 assert.match(panel, /email-discovery\/role-pairs/)
 assert.match(panel, /phone-discovery\/run/)
-assert.doesNotMatch(panel, /phone-discovery\/jobs/)
 
 const operatorCard = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-phone-discovery-operator-card.tsx"),

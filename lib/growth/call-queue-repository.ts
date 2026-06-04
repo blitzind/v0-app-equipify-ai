@@ -8,6 +8,11 @@ import {
   matchesEmailDiscoveryProspectFilter,
   type GrowthEmailDiscoveryProspectFilter,
 } from "@/lib/growth/email-discovery/email-discovery-runtime-types"
+import { loadPhoneDiscoveryLeadRollup } from "@/lib/growth/phone-discovery/phone-discovery-lead-rollup"
+import {
+  matchesPhoneDiscoveryProspectFilter,
+  type GrowthPhoneDiscoveryProspectFilter,
+} from "@/lib/growth/phone-discovery/phone-discovery-runtime-types"
 import { fetchGrowthLeadDecisionMakerById } from "@/lib/growth/decision-maker-repository"
 import { listGrowthLeads } from "@/lib/growth/lead-repository"
 import { resolveGrowthRepLabels } from "@/lib/growth/assignment/rep-roster-repository"
@@ -35,6 +40,7 @@ export async function listGrowthCallQueue(
     assignedTo?: string | null
     unassigned?: boolean
     emailDiscoveryFilter?: GrowthEmailDiscoveryProspectFilter | null
+    phoneDiscoveryFilter?: GrowthPhoneDiscoveryProspectFilter | null
   },
 ): Promise<GrowthCallQueueRow[]> {
   const leads = await listGrowthLeads(admin, {
@@ -101,6 +107,13 @@ export async function listGrowthCallQueue(
     if (input.emailDiscoveryFilter) {
       const rollup = await loadEmailDiscoveryLeadRollup(admin, lead.id)
       if (!matchesEmailDiscoveryProspectFilter(input.emailDiscoveryFilter, rollup)) {
+        continue
+      }
+    }
+
+    if (input.phoneDiscoveryFilter) {
+      const rollup = await loadPhoneDiscoveryLeadRollup(admin, lead.id)
+      if (!matchesPhoneDiscoveryProspectFilter(input.phoneDiscoveryFilter, rollup)) {
         continue
       }
     }

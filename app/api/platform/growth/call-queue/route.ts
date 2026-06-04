@@ -5,6 +5,8 @@ import { listGrowthCallQueue } from "@/lib/growth/call-queue-repository"
 import { GROWTH_CALL_QUEUE_FILTERS } from "@/lib/growth/call-types"
 import { GROWTH_EMAIL_DISCOVERY_PROSPECT_FILTERS } from "@/lib/growth/email-discovery/email-discovery-runtime-types"
 import type { GrowthEmailDiscoveryProspectFilter } from "@/lib/growth/email-discovery/email-discovery-runtime-types"
+import { GROWTH_PHONE_DISCOVERY_PROSPECT_FILTERS } from "@/lib/growth/phone-discovery/phone-discovery-runtime-types"
+import type { GrowthPhoneDiscoveryProspectFilter } from "@/lib/growth/phone-discovery/phone-discovery-runtime-types"
 
 export const runtime = "nodejs"
 
@@ -50,6 +52,22 @@ export async function GET(request: Request) {
     )
   }
 
+  const phoneDiscoveryParam = url.searchParams.get("phone_discovery_filter") ?? ""
+  const phoneDiscoveryFilterParsed = GROWTH_PHONE_DISCOVERY_PROSPECT_FILTERS.includes(
+    phoneDiscoveryParam as GrowthPhoneDiscoveryProspectFilter,
+  )
+    ? (phoneDiscoveryParam as GrowthPhoneDiscoveryProspectFilter)
+    : null
+  if (phoneDiscoveryParam && !phoneDiscoveryFilterParsed) {
+    return NextResponse.json(
+      {
+        error: "invalid_phone_discovery_filter",
+        message: `phone_discovery_filter must be one of: ${GROWTH_PHONE_DISCOVERY_PROSPECT_FILTERS.join(", ")}.`,
+      },
+      { status: 400 },
+    )
+  }
+
   if (!limitParsed.success || !offsetParsed.success) {
     return NextResponse.json({ error: "invalid_pagination", message: "Invalid limit or offset." }, { status: 400 })
   }
@@ -62,6 +80,7 @@ export async function GET(request: Request) {
       assignedTo: assignedToParsed,
       unassigned: unassignedParam || undefined,
       emailDiscoveryFilter: emailDiscoveryFilterParsed,
+      phoneDiscoveryFilter: phoneDiscoveryFilterParsed,
     })
 
     logGrowthEngine("call_queue_list_success", {

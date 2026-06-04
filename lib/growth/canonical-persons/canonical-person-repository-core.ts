@@ -177,6 +177,7 @@ export async function upsertCanonicalPersonProfile(
     profile_url: string
     normalized_profile_key: string
     confidence: number
+    verification_status?: string
     source_table: string
     source_id: string
     provider_name: string
@@ -192,6 +193,7 @@ export async function upsertCanonicalPersonProfile(
       profile_url: input.profile_url,
       normalized_profile_key: input.normalized_profile_key,
       confidence: input.confidence,
+      verification_status: input.verification_status ?? "verified",
       source_table: input.source_table,
       source_id: input.source_id,
       provider_name: input.provider_name,
@@ -539,6 +541,13 @@ export async function persistCanonicalPersonChannels(
       "@/lib/growth/email-discovery/email-discovery-triggers"
     )
     await triggerEmailDiscoveryAfterPersonPersist(admin, {
+      company_id: input.canonical_company_id,
+      person_id: personId,
+    })
+    const { triggerPhoneDiscoveryAfterPersonPersist } = await import(
+      "@/lib/growth/phone-discovery/phone-discovery-triggers"
+    )
+    await triggerPhoneDiscoveryAfterPersonPersist(admin, {
       company_id: input.canonical_company_id,
       person_id: personId,
     })

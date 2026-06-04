@@ -1067,13 +1067,78 @@
       .map((contact) => {
         const verified = contact.has_verified_email
           ? `<span class="es-ws-meta">${escapeHtml(contact.verified_email ?? "verified")}</span>`
-          : `<button type="button" class="es-ws-inline-btn" data-company-id="${escapeHtml(companyId)}" data-person-id="${escapeHtml(contact.person_id)}">Discover email</button>`
+          : `<button type="button" class="es-ws-inline-btn es-ws-email-discovery-btn" data-company-id="${escapeHtml(companyId)}" data-person-id="${escapeHtml(contact.person_id)}">Discover email</button>`
         return `<div class="es-ws-email-discovery-row"><strong>${escapeHtml(contact.name)}</strong> ${verified}<span class="es-ws-meta">${escapeHtml(contact.discovery_status)}</span></div>`
       })
       .join("")
-    list.querySelectorAll("[data-person-id][data-company-id]").forEach((button) => {
+    list.querySelectorAll(".es-ws-email-discovery-btn[data-person-id][data-company-id]").forEach((button) => {
       button.addEventListener("click", () => {
         void enqueueBrowserEmailDiscovery(
+          button.getAttribute("data-company-id"),
+          button.getAttribute("data-person-id"),
+          button,
+        )
+      })
+    })
+  }
+
+  async function enqueueBrowserPhoneDiscovery(companyId, personId, buttonEl) {
+    if (!companyId || !personId) return
+    if (buttonEl) {
+      buttonEl.disabled = true
+      buttonEl.textContent = "Queuing…"
+    }
+    try {
+      const res = await fetch("/api/platform/growth/browser-intake/phone-discovery", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: companyId,
+          person_id: personId,
+          promote_on_complete: true,
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || !body.ok) {
+        throw new Error(body.message ?? "Could not queue phone discovery.")
+      }
+      if (buttonEl) {
+        buttonEl.textContent = body.enqueued ? "Queued" : body.reason ?? "Skipped"
+      }
+    } catch (error) {
+      if (buttonEl) buttonEl.textContent = "Discover phone"
+      window.EquipifyGrowthPanelLoad?.setStatus?.(
+        error instanceof Error ? error.message : "Phone discovery failed.",
+        "error",
+      )
+    } finally {
+      if (buttonEl && buttonEl.textContent === "Queuing…") buttonEl.textContent = "Discover phone"
+    }
+  }
+
+  function renderPhoneDiscoveryContacts(context) {
+    const list = document.getElementById("es-ws-phone-discovery-list")
+    if (!list) return
+    const companyId = trimOrNull(context?.canonical_company_id)
+    const contacts = context?.phone_discovery_contacts ?? []
+    if (!companyId || !contacts.length) {
+      list.innerHTML =
+        '<p class="es-ws-empty">Canonical phone discovery is available after decision makers are linked to canonical persons.</p>'
+      return
+    }
+    list.innerHTML = contacts
+      .slice(0, 6)
+      .map((contact) => {
+        const verified = contact.has_verified_phone
+          ? `<span class="es-ws-meta">${escapeHtml(contact.verified_phone ?? "verified")}</span>`
+          : `<button type="button" class="es-ws-inline-btn es-ws-phone-discovery-btn" data-company-id="${escapeHtml(companyId)}" data-person-id="${escapeHtml(contact.person_id)}">Discover phone</button>`
+        return `<div class="es-ws-phone-discovery-row"><strong>${escapeHtml(contact.name)}</strong> ${verified}<span class="es-ws-meta">${escapeHtml(contact.discovery_status)}</span></div>`
+      })
+      .join("")
+    list.querySelectorAll(".es-ws-phone-discovery-btn[data-person-id][data-company-id]").forEach((button) => {
+      button.addEventListener("click", () => {
+        void enqueueBrowserPhoneDiscovery(
           button.getAttribute("data-company-id"),
           button.getAttribute("data-person-id"),
           button,
@@ -1431,6 +1496,7 @@
     renderEmployees(context, input?.visibleLinkedInPeople ?? [], detected, formValues)
     renderCrmContacts(context)
     renderEmailDiscoveryContacts(context)
+    renderPhoneDiscoveryContacts(context)
     renderTechnologies(detected, context)
     renderSignals(detected, context)
     renderCrmRelationship(context, relationship, contactsCount, oppCount, customerCount, hasMatch)

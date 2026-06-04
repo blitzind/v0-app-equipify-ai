@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { loadPhoneDiscoveryOperatorStatus } from "@/lib/growth/phone-discovery/phone-discovery-operator-status"
 import { GROWTH_PHONE_DISCOVERY_QA_MARKER } from "@/lib/growth/phone-discovery/phone-discovery-types"
+import { GROWTH_PHONE_DISCOVERY_RUNTIME_QA_MARKER } from "@/lib/growth/phone-discovery/phone-discovery-runtime-types"
 
 export const runtime = "nodejs"
 
@@ -28,5 +29,10 @@ export async function GET(request: Request) {
     )
   }
 
-  return NextResponse.json({ ok: true, qa_marker: GROWTH_PHONE_DISCOVERY_QA_MARKER, status })
+  return NextResponse.json({
+    ok: true,
+    qa_marker: GROWTH_PHONE_DISCOVERY_QA_MARKER,
+    runtime_qa_marker: GROWTH_PHONE_DISCOVERY_RUNTIME_QA_MARKER,
+    status,
+  })
 }

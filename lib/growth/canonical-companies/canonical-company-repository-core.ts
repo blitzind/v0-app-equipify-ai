@@ -154,6 +154,43 @@ export async function upsertCanonicalCompanyLineage(
   if (error) throw new Error(`upsertCanonicalCompanyLineage: ${error.message}`)
 }
 
+export async function upsertCanonicalCompanyProfile(
+  admin: SupabaseClient,
+  input: {
+    company_id: string
+    profile_type: string
+    profile_url: string
+    normalized_profile_key: string
+    confidence: number
+    verification_status?: string
+    source_table: string
+    source_id: string
+    provider_name: string
+    discovery_source: string
+    observed_at: string
+    metadata: Record<string, unknown>
+  },
+): Promise<void> {
+  const { error } = await admin.schema("growth").from("company_profiles").upsert(
+    {
+      company_id: input.company_id,
+      profile_type: input.profile_type,
+      profile_url: input.profile_url,
+      normalized_profile_key: input.normalized_profile_key,
+      confidence: input.confidence,
+      verification_status: input.verification_status ?? "verified",
+      source_table: input.source_table,
+      source_id: input.source_id,
+      provider_name: input.provider_name,
+      discovery_source: input.discovery_source,
+      observed_at: input.observed_at,
+      metadata: input.metadata,
+    },
+    { onConflict: "normalized_profile_key", ignoreDuplicates: false },
+  )
+  if (error) throw new Error(`upsertCanonicalCompanyProfile: ${error.message}`)
+}
+
 export async function updateStagingCanonicalCompanyId(
   admin: SupabaseClient,
   sourceTable: GrowthCanonicalCompanyCandidateInput["source_table"],
